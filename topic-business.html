@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Business & Economy - SignalBoost Live</title>
+<style>
+  :root{
+    --bg:#202533;
+    --bg-soft:#272d3d;
+    --text:#e9edf5;
+    --muted:#aeb7c9;
+    --line:rgba(255,255,255,0.08);
+    --accent:#4da3ff;
+    --radius:18px;
+  }
+
+  * { box-sizing:border-box; }
+
+  body{
+    margin:0;
+    font-family:Arial, Helvetica, sans-serif;
+    background:linear-gradient(180deg,#1b2130 0%, var(--bg) 100%);
+    color:var(--text);
+  }
+
+  a{
+    color:inherit;
+    text-decoration:none;
+  }
+
+  .container{
+    width:90%;
+    max-width:1100px;
+    margin:auto;
+  }
+
+  .nav{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:18px 0;
+  }
+
+  .brand{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    font-weight:bold;
+  }
+
+  .brand-wave{
+    color:var(--accent);
+    letter-spacing:2px;
+    margin-bottom:2px;
+    font-weight:700;
+  }
+
+  .back-button{
+    background:var(--accent);
+    color:white;
+    padding:10px 16px;
+    border-radius:999px;
+    font-weight:600;
+  }
+
+  .hero{
+    padding:10px 0 18px;
+  }
+
+  .hero h1{
+    margin:0 0 10px;
+    font-size:2.4rem;
+  }
+
+  .hero p{
+    margin:0;
+    color:var(--muted);
+    line-height:1.5;
+  }
+
+  .section-title{
+    margin:24px 0 14px;
+    font-size:1.5rem;
+  }
+
+  .featured-video{
+    background:var(--bg-soft);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    overflow:hidden;
+    margin-bottom:22px;
+  }
+
+  .video-placeholder{
+    height:260px;
+    background:#31384b;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:var(--muted);
+    font-size:1rem;
+  }
+
+  .card{
+    background:var(--bg-soft);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    overflow:hidden;
+  }
+
+  .thumb{
+    height:140px;
+    background:#31384b;
+  }
+
+  .card-content{
+    padding:14px;
+  }
+
+  .card h3{
+    margin:0 0 8px;
+  }
+
+  .card p{
+    margin:0 0 10px;
+    color:var(--muted);
+    font-size:.92rem;
+    line-height:1.45;
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:16px;
+  }
+
+  .source-icons{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-top:10px;
+  }
+
+  .source-badge{
+    padding:5px 9px;
+    border-radius:999px;
+    background:rgba(255,255,255,0.05);
+    border:1px solid var(--line);
+    font-size:.74rem;
+    color:#dbe6ff;
+    white-space:nowrap;
+  }
+
+  .wide-card{
+    background:var(--bg-soft);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:18px;
+    margin-top:10px;
+  }
+
+  .wide-card p{
+    margin:0 0 10px;
+    color:var(--muted);
+    line-height:1.55;
+  }
+
+  @media (max-width:900px){
+    .grid{
+      grid-template-columns:1fr;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="container nav">
+  <div class="brand">
+    <div class="brand-wave">~~~~~</div>
+    <div>SignalBoost Live</div>
+  </div>
+
+  <a href="index.html" class="back-button">Back</a>
+</div>
+
+<div class="container hero">
+  <h1>Business & Economy</h1>
+  <p>Markets, companies, and global economic trends shaping the world.</p>
+</div>
+
+<div class="container">
+
+  <h2 class="section-title">Featured Video</h2>
+  <div class="featured-video">
+    <div class="video-placeholder">Featured business video placeholder</div>
+    <div class="card-content">
+      <h3>Business outlook and global economy</h3>
+      <p>Overview of current trends shaping markets and companies worldwide.</p>
+      <div class="source-icons">
+        <span class="source-badge">▶ YouTube</span>
+        <span class="source-badge">💼 Finance</span>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="section-title">Top Videos</h2>
+  <div class="grid">
+
+    <div class="card">
+      <div class="thumb"></div>
+      <div class="card-content">
+        <h3>Global markets update</h3>
+        <p>What is driving stocks, inflation, and interest rates.</p>
+        <div class="source-icons">
+          <span class="source-badge">▶ YouTube</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="thumb"></div>
+      <div class="card-content">
+        <h3>Recession or growth?</h3>
+        <p>Experts debate where the economy is heading.</p>
+        <div class="source-icons">
+          <span class="source-badge">▶ YouTube</span>
+          <span class="source-badge">💼 Finance</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="thumb"></div>
+      <div class="card-content">
+        <h3>Big tech and layoffs</h3>
+        <p>How major companies are restructuring.</p>
+        <div class="source-icons">
+          <span class="source-badge">▶ YouTube</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <h2 class="section-title">What People Are Saying</h2>
+  <div class="grid">
+
+    <div class="card">
+      <div class="card-content">
+        <p>"The economy is more resilient than expected."</p>
+        <div class="source-icons">
+          <span class="source-badge">𝕏 X</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-content">
+        <p>"Markets are reacting to policy changes."</p>
+        <div class="source-icons">
+          <span class="source-badge">T Truth Social</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-content">
+        <p>"Companies must adapt to new economic realities."</p>
+        <div class="source-icons">
+          <span class="source-badge">in LinkedIn</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <h2 class="section-title">Short Clips</h2>
+  <div class="grid">
+
+    <div class="card">
+      <div class="thumb"></div>
+      <div class="card-content">
+        <h3>Economy in 60 seconds</h3>
+        <p>Quick breakdown of key trends.</p>
+        <div class="source-icons">
+          <span class="source-badge">♪ TikTok</span>
+          <span class="source-badge">◎ Instagram</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="thumb"></div>
+      <div class="card-content">
+        <h3>Market tips</h3>
+        <p>Short insights for investors.</p>
+        <div class="source-icons">
+          <span class="source-badge">♪ TikTok</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="thumb"></div>
+      <div class="card-content">
+        <h3>Business strategy</h3>
+        <p>Advice for companies and startups.</p>
+        <div class="source-icons">
+          <span class="source-badge">◎ Instagram</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <h2 class="section-title">Quick Summary</h2>
+  <div class="wide-card">
+    <p>The business and economy topic trends because it impacts jobs, markets, and global stability. Discussions are driven by financial media, corporate leaders, and public reactions.</p>
+  </div>
+
+  <h2 class="section-title">Instant Context</h2>
+  <div class="wide-card">
+    <p><strong>Inflation</strong>: increase in prices over time.</p>
+    <p><strong>Interest rates</strong>: cost of borrowing money set by central banks.</p>
+  </div>
+
+</div>
+
+</body>
+</html>

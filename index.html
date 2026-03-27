@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SignalBoost Live</title>
+
+<style>
+:root{
+  --bg:#202533;
+  --bg-soft:#272d3d;
+  --text:#e9edf5;
+  --muted:#aeb7c9;
+  --line:rgba(255,255,255,0.08);
+  --accent:#4da3ff;
+  --radius:18px;
+}
+
+* { box-sizing:border-box; }
+
+body{
+  margin:0;
+  font-family:Arial, Helvetica, sans-serif;
+  background:linear-gradient(180deg,#1b2130 0%, var(--bg) 100%);
+  color:var(--text);
+}
+
+a{
+  color:inherit;
+  text-decoration:none;
+}
+
+.container{
+  width:90%;
+  max-width:1100px;
+  margin:auto;
+}
+
+.nav{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:18px 0;
+}
+
+.brand{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  font-weight:bold;
+}
+
+.brand-wave{
+  color:var(--accent);
+  letter-spacing:2px;
+  margin-bottom:2px;
+  font-weight:700;
+}
+
+.banner{
+  text-align:center;
+  padding:8px;
+  font-size:13px;
+  color:#aeb7c9;
+}
+
+.hero{
+  text-align:center;
+  padding:24px 0 10px;
+}
+
+.hero h1{
+  margin:0 0 10px;
+  font-size:2.6rem;
+}
+
+.hero p{
+  margin:0;
+  color:var(--muted);
+}
+
+.search-wrap{
+  display:flex;
+  justify-content:center;
+  gap:10px;
+  margin:20px 0 10px;
+  flex-wrap:wrap;
+}
+
+.search-wrap input{
+  width:60%;
+  max-width:680px;
+  min-width:260px;
+  padding:12px;
+  border-radius:999px;
+  border:none;
+  outline:none;
+  background:#2a3142;
+  color:var(--text);
+}
+
+.search-wrap button{
+  padding:12px 18px;
+  border:none;
+  border-radius:999px;
+  background:var(--accent);
+  color:white;
+  font-weight:600;
+  cursor:pointer;
+}
+
+.section-title{
+  margin:18px 0 14px;
+  font-size:1.5rem;
+}
+
+.cards{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:16px;
+}
+
+.card{
+  background:var(--bg-soft);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  overflow:hidden;
+  transition:transform .2s ease, box-shadow .2s ease;
+}
+
+.card:hover{
+  transform:translateY(-4px);
+  box-shadow:0 12px 30px rgba(0,0,0,0.35);
+}
+
+.thumb{
+  height:140px;
+  background:#31384b;
+}
+
+.card-content{
+  padding:14px;
+}
+
+.trend-badge{
+  color:var(--accent);
+  font-size:12px;
+  font-weight:700;
+  display:inline-block;
+  margin-bottom:8px;
+}
+
+.card h3{
+  margin:0 0 8px;
+}
+
+.card p{
+  margin:0 0 10px;
+  color:var(--muted);
+  font-size:.92rem;
+  line-height:1.45;
+}
+
+.source-icons{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:10px;
+}
+
+.source-badge{
+  padding:5px 9px;
+  border-radius:999px;
+  background:rgba(255,255,255,0.05);
+  border:1px solid var(--line);
+  font-size:.74rem;
+  color:#dbe6ff;
+}
+
+.more-topics{
+  margin-top:10px;
+  margin-bottom:30px;
+}
+
+.simple-card{
+  background:var(--bg-soft);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:16px;
+}
+
+.simple-card h3{
+  margin:0 0 8px;
+}
+
+.simple-card p{
+  margin:0;
+  color:var(--muted);
+  font-size:.92rem;
+}
+
+@media (max-width:900px){
+  .cards{
+    grid-template-columns:1fr;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container nav">
+  <div class="brand">
+    <div class="brand-wave">~~~~~</div>
+    <div>SignalBoost Live</div>
+  </div>
+</div>
+
+<div class="banner">
+🚧 Early preview version — work in progress
+</div>
+
+<div class="container hero">
+  <h1>Cut through the noise</h1>
+  <p>See what the world is talking about across all platforms</p>
+
+  <div class="search-wrap">
+    <input type="text" id="searchInput" placeholder="Search topics (AI, Bitcoin, Politics...)">
+    <button id="searchButton">Search</button>
+  </div>
+</div>
+
+<div class="container">
+  <h2 class="section-title">Trending Topics</h2>
+
+  <div class="cards">
+
+    <a href="topic-politics.html">
+      <div class="card">
+        <div class="thumb"></div>
+        <div class="card-content">
+          <span class="trend-badge">🔥 Trending</span>
+          <h3>Europe migration debate</h3>
+          <p>Political discussion trending across Western media and social platforms.</p>
+          <div class="source-icons">
+            <span class="source-badge">▶ YouTube</span>
+            <span class="source-badge">𝕏 X</span>
+            <span class="source-badge">T Truth Social</span>
+            <span class="source-badge">◎ Instagram</span>
+            <span class="source-badge">♪ TikTok</span>
+            <span class="source-badge">in LinkedIn</span>
+            <span class="source-badge">🎙 Podcasts</span>
+          </div>
+        </div>
+      </div>
+    </a>
+
+    <a href="topic-ai.html">
+      <div class="card">
+        <div class="thumb"></div>
+        <div class="card-content">
+          <span class="trend-badge">🔥 Trending</span>
+          <h3>AI replacing jobs</h3>
+          <p>Major topic across business, tech, and podcast discussions.</p>
+          <div class="source-icons">
+            <span class="source-badge">▶ YouTube</span>
+            <span class="source-badge">𝕏 X</span>
+            <span class="source-badge">in LinkedIn</span>
+            <span class="source-badge">🎙 Podcasts</span>
+          </div>
+        </div>
+      </div>
+    </a>
+
+    <a href="topic-bitcoin.html">
+      <div class="card">
+        <div class="thumb"></div>
+        <div class="card-content">
+          <span class="trend-badge">🔥 Trending</span>
+          <h3>Bitcoin surge</h3>
+          <p>Crypto markets are trending again across videos, social media, and financial platforms.</p>
+          <div class="source-icons">
+            <span class="source-badge">▶ YouTube</span>
+            <span class="source-badge">𝕏 X</span>
+            <span class="source-badge">T Truth Social</span>
+            <span class="source-badge">♪ TikTok</span>
+            <span class="source-badge">🎙 Podcasts</span>
+          </div>
+        </div>
+      </div>
+    </a>
+
+  </div>
+
+  <div class="more-topics">
+    <h2 class="section-title">More Topics</h2>
+    <div class="cards">
+
+      <div class="simple-card">
+        <h3>Health & Fitness</h3>
+        <p>Trending discussions around health, performance, and lifestyle routines.</p>
+      </div>
+
+      <a href="topic-business.html">
+        <div class="simple-card">
+          <h3>Business & Economy</h3>
+          <p>Markets, companies, work trends, and the global economy in one place.</p>
+        </div>
+      </a>
+
+      <div class="simple-card">
+        <h3>Culture & Media</h3>
+        <p>Big conversations, viral moments, and commentary spreading across platforms.</p>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+function runSearch() {
+  const query = document.getElementById("searchInput").value.toLowerCase().trim();
+
+  if (query.includes("ai") || query.includes("jobs") || query.includes("automation")) {
+    window.location.href = "topic-ai.html";
+  } else if (query.includes("bitcoin") || query.includes("btc") || query.includes("crypto")) {
+    window.location.href = "topic-bitcoin.html";
+  } else if (
+    query.includes("politics") ||
+    query.includes("election") ||
+    query.includes("migration") ||
+    query.includes("government") ||
+    query.includes("policy")
+  ) {
+    window.location.href = "topic-politics.html";
+  } else if (
+    query.includes("business") ||
+    query.includes("economy") ||
+    query.includes("market") ||
+    query.includes("inflation")
+  ) {
+    window.location.href = "topic-business.html";
+  } else {
+    alert("Topic not found yet");
+  }
+}
+
+document.getElementById("searchButton").addEventListener("click", runSearch);
+
+document.getElementById("searchInput").addEventListener("keypress", function(e) {
+  if (e.key === "Enter") {
+    runSearch();
+  }
+});
+</script>
+
+</body>
+</html>

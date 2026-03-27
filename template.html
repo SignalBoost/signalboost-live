@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TOPIC NAME - SignalBoost Live</title>
+
+<style>
+:root{
+  --bg:#202533;
+  --bg-soft:#272d3d;
+  --text:#e9edf5;
+  --muted:#aeb7c9;
+  --line:rgba(255,255,255,0.08);
+  --accent:#4da3ff;
+  --radius:18px;
+}
+
+body{
+  margin:0;
+  font-family:Arial;
+  background:linear-gradient(180deg,#1b2130 0%, var(--bg) 100%);
+  color:var(--text);
+}
+
+.container{
+  width:90%;
+  max-width:1100px;
+  margin:auto;
+}
+
+.nav{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:18px 0;
+}
+
+.brand{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  font-weight:bold;
+}
+
+.brand-wave{
+  color:var(--accent);
+  letter-spacing:2px;
+}
+
+.back{
+  background:var(--accent);
+  color:white;
+  padding:10px 16px;
+  border-radius:999px;
+}
+
+.hero{
+  margin-bottom:20px;
+}
+
+.section{
+  margin-top:30px;
+}
+
+.card{
+  background:var(--bg-soft);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:15px;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:16px;
+}
+
+.placeholder{
+  height:200px;
+  background:#31384b;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:var(--muted);
+}
+
+.source{
+  font-size:12px;
+  color:var(--muted);
+  margin-top:10px;
+}
+
+@media(max-width:900px){
+  .grid{grid-template-columns:1fr;}
+}
+</style>
+
+</head>
+<body>
+
+<div class="container nav">
+  <div class="brand">
+    <div class="brand-wave">~~~~~</div>
+    <div>SignalBoost Live</div>
+  </div>
+
+  <a href="index.html" class="back">Back</a>
+</div>
+
+<div class="container hero">
+  <h1>TOPIC NAME</h1>
+  <p>Short description of the topic.</p>
+</div>
+
+<div class="container">
+
+  <div class="section">
+    <h2>Featured Video</h2>
+    <div class="card">
+      <div class="placeholder">Featured video</div>
+      <h3>Main discussion</h3>
+      <p>Explain what people are talking about.</p>
+      <div class="source">YouTube</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Top Videos</h2>
+    <div class="grid">
+
+      <div class="card">
+        <h3>Video title</h3>
+        <p>Description</p>
+        <div class="source">YouTube</div>
+      </div>
+
+      <div class="card">
+        <h3>Video title</h3>
+        <p>Description</p>
+        <div class="source">YouTube</div>
+      </div>
+
+      <div class="card">
+        <h3>Video title</h3>
+        <p>Description</p>
+        <div class="source">YouTube</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>What People Are Saying</h2>
+    <div class="grid">
+
+      <div class="card">
+        <p>Quote or opinion</p>
+        <div class="source">X</div>
+      </div>
+
+      <div class="card">
+        <p>Quote or opinion</p>
+        <div class="source">Truth Social</div>
+      </div>
+
+      <div class="card">
+        <p>Quote or opinion</p>
+        <div class="source">LinkedIn</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Summary</h2>
+    <div class="card">
+      <p>Explain why this topic matters.</p>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

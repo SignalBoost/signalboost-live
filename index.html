@@ -41,7 +41,7 @@ a{
   display:flex;
   justify-content:space-between;
   align-items:center;
-  padding:36px 0 16px;
+  padding:18px 0 10px;
 }
 
 .brand{
@@ -54,7 +54,7 @@ a{
 .brand-wave{
   color:var(--accent);
   letter-spacing:2px;
-  margin-bottom:4px;
+  margin-bottom:2px;
   font-weight:700;
 }
 
@@ -87,7 +87,7 @@ a{
   background:var(--bg-soft);
   border:1px solid var(--line);
   border-radius:22px;
-  padding:24px;
+  padding:22px;
 }
 
 .hero-main h1{
@@ -150,7 +150,7 @@ a{
 
 .platform-strip{
   display:grid;
-  grid-template-columns:repeat(6,minmax(0,1fr));
+  grid-template-columns:repeat(6, minmax(0,1fr));
   gap:12px;
   margin-bottom:22px;
 }
@@ -223,7 +223,7 @@ a{
 }
 
 .section{
-  margin-top:28px;
+  margin-top:26px;
 }
 
 .section h2{
@@ -407,42 +407,14 @@ a{
   margin-top:8px;
 }
 
-.wc-grid{
+.platform-guide-grid{
   display:grid;
-  grid-template-columns:1.2fr .9fr .9fr;
+  grid-template-columns:repeat(3,minmax(0,1fr));
   gap:16px;
 }
 
-.wc-block{
-  background:var(--bg-soft);
-  border:1px solid var(--line);
-  border-radius:var(--radius);
+.platform-guide-card{
   padding:16px;
-}
-
-.wc-block h3{
-  margin:0 0 10px;
-}
-
-.wc-list{
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-}
-
-.wc-row{
-  display:flex;
-  justify-content:space-between;
-  gap:10px;
-  padding:8px 0;
-  border-top:1px solid var(--line);
-  color:var(--muted);
-  font-size:.9rem;
-}
-
-.wc-row:first-child{
-  border-top:none;
-  padding-top:0;
 }
 
 .footer-disclaimer{
@@ -461,14 +433,14 @@ a{
     grid-template-columns:220px minmax(0,1fr) 260px;
   }
 
-  .topic-cards{
+  .topic-cards,
+  .platform-guide-grid{
     grid-template-columns:repeat(2,minmax(0,1fr));
   }
 
   .shelf-grid,
-  .platform-strip,
-  .wc-grid{
-    grid-template-columns:repeat(2,minmax(0,1fr));
+  .platform-strip{
+    grid-template-columns:repeat(3,minmax(0,1fr));
   }
 }
 
@@ -493,7 +465,7 @@ a{
   .topic-cards,
   .shelf-grid,
   .platform-strip,
-  .wc-grid{
+  .platform-guide-grid{
     grid-template-columns:1fr;
   }
 
@@ -532,52 +504,52 @@ a{
   <div class="hero">
     <div class="hero-main">
       <h1>Welcome to the signal mall</h1>
-      <p>The homepage is the entrance. Once inside, users should find many different “stores” — topics, platforms, categories, current events, and rotating shelves of content. This version adds World Cup 2026 near the top and makes the featured highlight rotate on refresh.</p>
+      <p>The homepage is the entrance. Once inside, users should find many different “stores” — topics, platforms, categories, and dynamic shelves of content. Non-YouTube platforms are now handled more intelligently so users do not immediately hit login walls.</p>
 
       <div class="search-wrap">
-        <input type="text" id="searchInput" placeholder="Search topics, names, events, teams, ideas...">
+        <input type="text" id="searchInput" placeholder="Search topics (AI, Bitcoin, Politics, Business...)">
         <button id="searchButton">Search</button>
       </div>
 
       <div class="hero-pills">
-        <span class="pill">Smarter search</span>
-        <span class="pill">Refresh rotates highlight</span>
-        <span class="pill">World Cup 2026 block</span>
-        <span class="pill">Football / soccer shelf</span>
+        <span class="pill">Dynamic homepage</span>
+        <span class="pill">Refresh changes shelves</span>
+        <span class="pill">Platform entrances</span>
+        <span class="pill">YouTube-first live media</span>
         <span class="pill">AI-ready structure</span>
       </div>
     </div>
 
     <div class="hero-side">
-      <h3 style="margin-top:0;">What changed</h3>
-      <p>The brand now sits lower. The homepage is less static. A World Cup 2026 section is now part of the main entrance, and the featured signal no longer has to be the exact same top item every refresh.</p>
+      <h3 style="margin-top:0;">Homepage idea</h3>
+      <p>This page should not feel like one fixed list. It should feel like a place users can enter and discover different zones, with the strongest content still visible but not identical every single time.</p>
     </div>
   </div>
 
   <div class="platform-strip">
     <a class="platform-link" href="https://www.youtube.com" target="_blank">
       <strong>YouTube</strong>
-      <span>Video signals</span>
+      <span>Open platform</span>
     </a>
-    <a class="platform-link" href="https://x.com" target="_blank">
+    <a class="platform-link" href="#platform-guide">
       <strong>X</strong>
-      <span>Fast public reactions</span>
+      <span>Source preview</span>
     </a>
-    <a class="platform-link" href="https://www.instagram.com" target="_blank">
+    <a class="platform-link" href="#platform-guide">
       <strong>Instagram</strong>
-      <span>Visual trends</span>
+      <span>Source preview</span>
     </a>
-    <a class="platform-link" href="https://www.tiktok.com" target="_blank">
+    <a class="platform-link" href="#platform-guide">
       <strong>TikTok</strong>
-      <span>Viral short clips</span>
+      <span>Source preview</span>
     </a>
-    <a class="platform-link" href="https://www.linkedin.com" target="_blank">
+    <a class="platform-link" href="#platform-guide">
       <strong>LinkedIn</strong>
-      <span>Professional discussions</span>
+      <span>Source preview</span>
     </a>
-    <a class="platform-link" href="https://truthsocial.com" target="_blank">
+    <a class="platform-link" href="#platform-guide">
       <strong>Truth Social</strong>
-      <span>Alternative political chatter</span>
+      <span>Source preview</span>
     </a>
   </div>
 
@@ -599,11 +571,11 @@ a{
         <h3>Source Platforms</h3>
         <div class="source-icons">
           <a href="https://www.youtube.com" target="_blank" class="source-badge">YouTube</a>
-          <a href="https://x.com" target="_blank" class="source-badge">X</a>
-          <a href="https://truthsocial.com" target="_blank" class="source-badge">Truth Social</a>
-          <a href="https://www.linkedin.com" target="_blank" class="source-badge">LinkedIn</a>
-          <a href="https://www.tiktok.com" target="_blank" class="source-badge">TikTok</a>
-          <a href="https://www.instagram.com" target="_blank" class="source-badge">Instagram</a>
+          <span class="source-badge">X</span>
+          <span class="source-badge">Truth Social</span>
+          <span class="source-badge">LinkedIn</span>
+          <span class="source-badge">TikTok</span>
+          <span class="source-badge">Instagram</span>
         </div>
       </div>
     </aside>
@@ -618,35 +590,6 @@ a{
       </div>
 
       <div class="section">
-        <div class="section-label">2026 World Cup</div>
-        <h2>Coming World Cup 2026</h2>
-        <div class="wc-grid">
-          <div class="wc-block">
-            <h3>Why it matters</h3>
-            <p>The 2026 tournament is one of the biggest football events on the horizon. This section gives the homepage a live sports anchor and a direct path into World Cup content, history, and current discussion.</p>
-            <div class="source-icons">
-              <a href="world-cup-history.html" class="source-badge">World Cup History</a>
-              <a href="https://www.fifa.com" target="_blank" class="source-badge">FIFA</a>
-            </div>
-          </div>
-          <div class="wc-block">
-            <h3>Groups / draw / fixtures</h3>
-            <div class="wc-list">
-              <div class="wc-row"><span>Group stage</span><span>Coming</span></div>
-              <div class="wc-row"><span>Fixtures</span><span>To be followed</span></div>
-              <div class="wc-row"><span>Standings</span><span>Will be added live</span></div>
-              <div class="wc-row"><span>Latest games</span><span>World Cup block ready</span></div>
-            </div>
-          </div>
-          <div class="wc-block">
-            <h3>Historic entry point</h3>
-            <p>Use the history page to connect current World Cup interest with the story of the tournament from 1930 until now.</p>
-            <a href="world-cup-history.html" class="charity-link">Open World Cup History</a>
-          </div>
-        </div>
-      </div>
-
-      <div class="section">
         <h2>Top Ranked Signals</h2>
         <div id="topVideos" class="grid"></div>
       </div>
@@ -655,6 +598,37 @@ a{
         <h2>Today’s Dynamic Shelves</h2>
         <p style="color:var(--muted); margin-top:0;">These shelves refresh in different order so the homepage feels more alive.</p>
         <div id="dynamicShelves"></div>
+      </div>
+
+      <div class="section" id="platform-guide">
+        <h2>Platform Guide</h2>
+        <p style="color:var(--muted); margin-top:0;">Some platforms are less open than YouTube and often push users to sign in. So for now, they are treated as source directions rather than direct open-content destinations.</p>
+        <div class="platform-guide-grid">
+          <div class="card platform-guide-card">
+            <h3>YouTube</h3>
+            <p>Best platform for direct playable content inside the site. This is why it is the main live content source right now.</p>
+          </div>
+          <div class="card platform-guide-card">
+            <h3>X</h3>
+            <p>Useful for fast reactions and live commentary. Later, this should appear as ranked signal previews rather than raw outbound links.</p>
+          </div>
+          <div class="card platform-guide-card">
+            <h3>Instagram</h3>
+            <p>Strong for visual trends and short-form creator content, but direct external links often push users to sign in.</p>
+          </div>
+          <div class="card platform-guide-card">
+            <h3>TikTok</h3>
+            <p>Important for viral discovery, but best handled later through preview logic instead of raw outbound linking.</p>
+          </div>
+          <div class="card platform-guide-card">
+            <h3>LinkedIn</h3>
+            <p>Best for professional commentary and business discussions. Public viewing can be limited, so it should remain a source layer for now.</p>
+          </div>
+          <div class="card platform-guide-card">
+            <h3>Truth Social</h3>
+            <p>Useful as a political source indicator, but not ideal as a direct homepage destination for users who just want easy access.</p>
+          </div>
+        </div>
       </div>
 
       <div class="section">
@@ -715,7 +689,7 @@ a{
 
       <div class="panel">
         <h3>Future AI direction</h3>
-        <p>Real AI search and source blending still need a backend. This homepage is now structured for that next step, but today it uses smarter front-end routing and live YouTube ranking.</p>
+        <p>Eventually, these stores and shelves should be driven by AI routing, source diversity, and dynamic relevance — not just fixed logic.</p>
       </div>
     </aside>
 
@@ -729,84 +703,58 @@ a{
 <script>
 const API_KEY = "AIzaSyBWSnsfSNZxY_kYG_ACxm-GQYMsCOEuIuc";
 
-/* ---------- SMARTER SEARCH ---------- */
 const searchPages = [
   {
     title: "AI Replacing Jobs",
     url: "topic-ai.html",
-    keywords: [
-      "ai","artificial intelligence","automation","jobs","job loss","future of work","openai",
-      "chatgpt","technology","tech","robot","robots","productivity","software","coding","rogan"
-    ]
+    text: "ai artificial intelligence jobs automation rogan technology tech productivity layoffs future of jobs"
   },
   {
     title: "Bitcoin Surge",
     url: "topic-bitcoin.html",
-    keywords: [
-      "bitcoin","btc","crypto","cryptocurrency","blockchain","ethereum","market","markets",
-      "bull run","price","wallet","trading","coins","altcoin","adoption"
-    ]
+    text: "bitcoin btc crypto cryptocurrency blockchain finance market volatility institutions adoption"
   },
   {
     title: "Europe Migration Debate",
     url: "topic-politics.html",
-    keywords: [
-      "politics","trump","biden","election","migration","immigration","border","government",
-      "policy","europe","war","debate","president","congress","right wing","left wing"
-    ]
+    text: "politics trump biden migration europe election government policy border debate truth social"
   },
   {
     title: "Business & Economy",
     url: "topic-business.html",
-    keywords: [
-      "business","economy","inflation","finance","layoffs","recession","growth","market",
-      "stocks","companies","tariffs","bezos","musk","jobs report","interest rates"
-    ]
-  },
-  {
-    title: "World Cup History",
-    url: "world-cup-history.html",
-    keywords: [
-      "world cup","fifa","football","soccer","messi","ronaldo","brazil","argentina","final",
-      "groups","fixtures","history","maradona","pele","mbappe","2026 world cup"
-    ]
+    text: "business economy inflation finance market layoffs recession growth companies global economy"
   }
 ];
 
-function smartScore(query, page) {
-  const q = query.toLowerCase().trim();
-  const tokens = q.split(/\s+/).filter(Boolean);
-  let score = 0;
-
-  for (const keyword of page.keywords) {
-    const k = keyword.toLowerCase();
-    if (q === k) score += 12;
-    if (q.includes(k)) score += 6;
-    if (k.includes(q)) score += 4;
-
-    for (const token of tokens) {
-      if (k === token) score += 4;
-      else if (k.includes(token)) score += 2;
-    }
-  }
-
-  if (page.title.toLowerCase().includes(q)) score += 8;
-  return score;
-}
-
 function runSearch() {
-  const query = document.getElementById("searchInput").value.trim();
+  const query = document.getElementById("searchInput").value.toLowerCase().trim();
+
   if (!query) {
     alert("Please enter a word");
     return;
   }
 
-  const ranked = searchPages
-    .map(page => ({ page, score: smartScore(query, page) }))
-    .sort((a, b) => b.score - a.score);
+  let bestMatch = null;
+  let bestScore = 0;
 
-  if (ranked[0].score > 0) {
-    window.location.href = ranked[0].page.url;
+  for (const page of searchPages) {
+    let score = 0;
+    if (page.title.toLowerCase().includes(query)) score += 3;
+    if (page.text.includes(query)) score += 2;
+
+    const words = query.split(/\s+/);
+    for (const word of words) {
+      if (page.text.includes(word)) score += 1;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = page;
+    }
+  }
+
+  if (bestMatch) {
+    window.location.href = bestMatch.url;
   } else {
     alert("Topic not found yet");
   }
@@ -817,7 +765,6 @@ document.getElementById("searchInput").addEventListener("keypress", function(e) 
   if (e.key === "Enter") runSearch();
 });
 
-/* ---------- VIDEO HELPERS ---------- */
 function formatViews(num) {
   const n = Number(num || 0);
   if (n >= 1000000000) return (n / 1000000000).toFixed(1).replace(".0","") + "B views";
@@ -888,11 +835,6 @@ function shuffleArray(array) {
   return copy;
 }
 
-function randomFromTop(videos, poolSize = 5) {
-  const pool = videos.slice(0, Math.min(poolSize, videos.length));
-  return pool[Math.floor(Math.random() * pool.length)];
-}
-
 function renderShelfSection(title, label, videos) {
   return `
     <div class="section">
@@ -917,14 +859,13 @@ function renderShelfSection(title, label, videos) {
   `;
 }
 
-/* ---------- HOMEPAGE CONTENT ---------- */
 async function loadHomepageVideos() {
   const featured = document.getElementById("featured");
   const topVideos = document.getElementById("topVideos");
 
   try {
     const sorted = await fetchRankedVideos(
-      "AI Bitcoin politics business economy migration debate Joe Rogan Trump automation finance Bezos Musk football soccer world cup",
+      "AI Bitcoin politics business economy migration debate Joe Rogan Trump automation finance",
       12
     );
 
@@ -934,14 +875,14 @@ async function loadHomepageVideos() {
       return;
     }
 
-    const top = randomFromTop(sorted, 5);
+    const top = sorted[0];
 
     featured.innerHTML = `
       <iframe class="hero-feature-frame" src="https://www.youtube.com/embed/${top.id}" allowfullscreen></iframe>
       <div class="card-content">
-        <span class="rank-badge">Featured rotating signal</span>
+        <span class="rank-badge">Top Signal #1</span>
         <h3>${top.snippet.title}</h3>
-        <p>${top.snippet.description ? top.snippet.description.substring(0, 180) + "..." : "Featured signal."}</p>
+        <p>${top.snippet.description ? top.snippet.description.substring(0, 180) + "..." : "Top ranked video."}</p>
         <div class="meta-row">
           <span>${formatViews(top.statistics?.viewCount)}</span>
           <span>•</span>
@@ -955,13 +896,13 @@ async function loadHomepageVideos() {
       </div>
     `;
 
-    const rest = shuffleArray(sorted.filter(v => v.id !== top.id)).slice(0, 6);
+    const rest = sorted.slice(1, 7);
 
     topVideos.innerHTML = rest.map((video, index) => `
       <div class="card video-card">
         <iframe class="video-frame" src="https://www.youtube.com/embed/${video.id}" allowfullscreen></iframe>
         <div class="card-content">
-          <span class="rank-badge">#${index + 1} shelf signal</span>
+          <span class="rank-badge">#${index + 2}</span>
           <h3>${video.snippet.title}</h3>
           <p>${video.snippet.description ? video.snippet.description.substring(0, 120) + "..." : "Video result."}</p>
           <div class="meta-row">
@@ -987,7 +928,7 @@ async function loadDynamicShelves() {
     {
       title: "Most Watched Right Now: Football / Soccer",
       label: "Sports Store",
-      query: "football soccer latest matches highlights premier league champions league la liga fifa world cup"
+      query: "football soccer latest matches highlights premier league champions league la liga"
     },
     {
       title: "Most Watched Right Now: Travel",
@@ -1033,7 +974,6 @@ async function loadDynamicShelves() {
   }).join("");
 }
 
-/* ---------- CHARITY ROTATION ---------- */
 const charityRotation = [
   {
     name: "St. Jude Children's Research Hospital",

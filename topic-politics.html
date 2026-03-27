@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Politics - SignalBoost Live</title>
+
 <style>
 :root{
   --bg:#202533;
@@ -44,8 +45,6 @@ body{
 
 .brand-wave{
   color:var(--accent);
-  letter-spacing:2px;
-  margin-bottom:2px;
 }
 
 .back{
@@ -56,28 +55,8 @@ body{
   text-decoration:none;
 }
 
-.hero{
-  margin-bottom:20px;
-}
-
-.hero h1{
-  margin:0 0 10px;
-}
-
-.hero p{
-  margin:0;
-  color:var(--muted);
-}
-
 .section{
   margin-top:30px;
-}
-
-.card{
-  background:var(--bg-soft);
-  border:1px solid var(--line);
-  border-radius:var(--radius);
-  padding:15px;
 }
 
 .grid{
@@ -86,15 +65,25 @@ body{
   gap:16px;
 }
 
-.placeholder{
-  height:220px;
-  background:#31384b;
-  display:flex;
-  align-items:center;
-  justify-content:center;
+.card{
+  background:var(--bg-soft);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  overflow:hidden;
+}
+
+.card-content{
+  padding:12px;
+}
+
+iframe{
+  width:100%;
+  height:200px;
+  border:none;
+}
+
+.loading{
   color:var(--muted);
-  border-radius:12px;
-  margin-bottom:12px;
 }
 
 .source-icons{
@@ -111,16 +100,21 @@ body{
   border:1px solid var(--line);
   font-size:.74rem;
   color:#dbe6ff;
+  white-space:nowrap;
 }
 
-.card h3{
-  margin:0 0 8px;
+.wide-card{
+  background:var(--bg-soft);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:18px;
+  margin-top:10px;
 }
 
-.card p{
+.wide-card p{
   margin:0 0 10px;
   color:var(--muted);
-  line-height:1.5;
+  line-height:1.55;
 }
 
 @media(max-width:900px){
@@ -128,6 +122,7 @@ body{
 }
 </style>
 </head>
+
 <body>
 
 <div class="container nav">
@@ -135,60 +130,21 @@ body{
     <div class="brand-wave">~~~~~</div>
     <div>SignalBoost Live</div>
   </div>
-
   <a href="index.html" class="back">Back</a>
 </div>
 
-<div class="container hero">
+<div class="container">
   <h1>Europe Migration Debate</h1>
   <p>Political discussions trending across media, government, and public platforms.</p>
-</div>
-
-<div class="container">
 
   <div class="section">
     <h2>Featured Video</h2>
-    <div class="card">
-      <div class="placeholder">Featured politics video</div>
-      <h3>Main political debate</h3>
-      <p>Overview of the arguments, reactions, and narratives shaping the discussion.</p>
-      <div class="source-icons">
-        <span class="source-badge">▶ YouTube</span>
-        <span class="source-badge">📰 News</span>
-      </div>
-    </div>
+    <div id="featured" class="loading">Loading...</div>
   </div>
 
   <div class="section">
     <h2>Top Videos</h2>
-    <div class="grid">
-
-      <div class="card">
-        <h3>Migration policy debate</h3>
-        <p>Different perspectives on border control and economic impact.</p>
-        <div class="source-icons">
-          <span class="source-badge">▶ YouTube</span>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3>Election discussions</h3>
-        <p>Political narratives shaping upcoming elections.</p>
-        <div class="source-icons">
-          <span class="source-badge">▶ YouTube</span>
-          <span class="source-badge">📰 News</span>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3>Government response</h3>
-        <p>How leaders are reacting to migration and public pressure.</p>
-        <div class="source-icons">
-          <span class="source-badge">▶ YouTube</span>
-        </div>
-      </div>
-
-    </div>
+    <div id="videos" class="grid"></div>
   </div>
 
   <div class="section">
@@ -196,23 +152,29 @@ body{
     <div class="grid">
 
       <div class="card">
-        <p>"Migration policy is becoming the defining issue of this decade."</p>
-        <div class="source-icons">
-          <span class="source-badge">𝕏 X</span>
+        <div class="card-content">
+          <p>"Migration policy is becoming the defining issue of this decade."</p>
+          <div class="source-icons">
+            <span class="source-badge">𝕏 X</span>
+          </div>
         </div>
       </div>
 
       <div class="card">
-        <p>"Governments are under pressure to act quickly."</p>
-        <div class="source-icons">
-          <span class="source-badge">T Truth Social</span>
+        <div class="card-content">
+          <p>"Governments are under pressure to act quickly."</p>
+          <div class="source-icons">
+            <span class="source-badge">T Truth Social</span>
+          </div>
         </div>
       </div>
 
       <div class="card">
-        <p>"Political decisions here will impact the global economy."</p>
-        <div class="source-icons">
-          <span class="source-badge">in LinkedIn</span>
+        <div class="card-content">
+          <p>"Political decisions here will impact the global economy."</p>
+          <div class="source-icons">
+            <span class="source-badge">in LinkedIn</span>
+          </div>
         </div>
       </div>
 
@@ -220,21 +182,78 @@ body{
   </div>
 
   <div class="section">
-    <h2>Summary</h2>
-    <div class="card">
+    <h2>Quick Summary</h2>
+    <div class="wide-card">
       <p>Politics trends because it directly affects economies, borders, and societies. The topic is amplified by media, public opinion, and government decisions.</p>
     </div>
   </div>
 
   <div class="section">
     <h2>Instant Context</h2>
-    <div class="card">
+    <div class="wide-card">
       <p><strong>Migration</strong>: movement of people across borders.</p>
       <p><strong>Policy</strong>: decisions made by governments to address issues.</p>
     </div>
   </div>
-
 </div>
+
+<script>
+const API_KEY = "PASTE_YOUR_API_KEY_HERE";
+const QUERY = "Europe migration debate politics Trump Biden election";
+
+async function loadVideos(){
+  try{
+    const res = await fetch(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=4&q=${encodeURIComponent(QUERY)}&key=${API_KEY}`
+    );
+
+    const data = await res.json();
+
+    if(!data.items){
+      document.getElementById("featured").innerText = "Error loading videos";
+      return;
+    }
+
+    const first = data.items[0];
+
+    document.getElementById("featured").innerHTML = `
+      <div class="card">
+        <iframe src="https://www.youtube.com/embed/${first.id.videoId}" allowfullscreen></iframe>
+        <div class="card-content">
+          <h3>${first.snippet.title}</h3>
+          <p>${first.snippet.description ? first.snippet.description.substring(0, 140) + "..." : "Featured politics video."}</p>
+          <div class="source-icons">
+            <span class="source-badge">▶ YouTube</span>
+            <span class="source-badge">📰 News</span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const rest = data.items.slice(1);
+
+    document.getElementById("videos").innerHTML = rest.map(v => `
+      <div class="card">
+        <iframe src="https://www.youtube.com/embed/${v.id.videoId}" allowfullscreen></iframe>
+        <div class="card-content">
+          <h3>${v.snippet.title}</h3>
+          <p>${v.snippet.description ? v.snippet.description.substring(0, 120) + "..." : "Real YouTube result."}</p>
+          <div class="source-icons">
+            <span class="source-badge">▶ YouTube</span>
+            <span class="source-badge">📰 News</span>
+          </div>
+        </div>
+      </div>
+    `).join("");
+
+  }catch(e){
+    document.getElementById("featured").innerText = "Failed to load videos";
+    console.error(e);
+  }
+}
+
+loadVideos();
+</script>
 
 </body>
 </html>

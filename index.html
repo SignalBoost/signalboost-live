@@ -1,1196 +1,910 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SignalBoost Live</title>
-
-<style>
-:root{
-  --bg:#202533;
-  --bg-soft:#272d3d;
-  --text:#e9edf5;
-  --muted:#aeb7c9;
-  --line:rgba(255,255,255,0.08);
-  --accent:#4da3ff;
-  --accent-soft:rgba(77,163,255,0.14);
-  --radius:18px;
-}
-
-*{box-sizing:border-box;}
-
-body{
-  margin:0;
-  font-family:Arial, Helvetica, sans-serif;
-  background:linear-gradient(180deg,#1b2130 0%, var(--bg) 100%);
-  color:var(--text);
-}
-
-a{
-  color:inherit;
-  text-decoration:none;
-}
-
-.page{
-  width:min(96%, 1540px);
-  margin:auto;
-}
-
-.topbar{
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  padding:38px 0 18px;
-}
-
-.brand{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  font-weight:bold;
-  text-align:center;
-}
-
-.brand-wave{
-  color:var(--accent);
-  letter-spacing:2px;
-  margin-bottom:4px;
-  font-weight:700;
-}
-
-.notice-bar{
-  display:grid;
-  grid-template-columns:2fr 1fr;
-  gap:14px;
-  margin-bottom:18px;
-}
-
-.notice-box{
-  background:var(--bg-soft);
-  border:1px solid var(--line);
-  border-radius:14px;
-  padding:12px 14px;
-  color:var(--muted);
-  font-size:.88rem;
-  line-height:1.45;
-}
-
-.hero{
-  display:grid;
-  grid-template-columns:1.2fr .8fr;
-  gap:20px;
-  margin-bottom:18px;
-}
-
-.hero-main,
-.hero-side{
-  background:var(--bg-soft);
-  border:1px solid var(--line);
-  border-radius:22px;
-  padding:24px;
-}
-
-.hero-main h1{
-  margin:0 0 10px;
-  font-size:3rem;
-  line-height:1.08;
-}
-
-.hero-main p,
-.hero-side p{
-  margin:0;
-  color:var(--muted);
-  line-height:1.55;
-}
-
-.search-wrap{
-  display:flex;
-  gap:10px;
-  margin-top:20px;
-  flex-wrap:wrap;
-}
-
-.search-wrap input{
-  flex:1;
-  min-width:240px;
-  padding:13px 15px;
-  border-radius:999px;
-  border:none;
-  outline:none;
-  background:#2a3142;
-  color:var(--text);
-  font-size:16px;
-}
-
-.search-wrap button{
-  padding:13px 18px;
-  border:none;
-  border-radius:999px;
-  background:var(--accent);
-  color:white;
-  font-weight:600;
-  cursor:pointer;
-}
-
-.search-hint{
-  margin-top:10px;
-  color:var(--muted);
-  font-size:.82rem;
-}
-
-.hero-pills{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  margin-top:16px;
-}
-
-.pill{
-  display:inline-flex;
-  align-items:center;
-  padding:6px 10px;
-  border-radius:999px;
-  background:var(--accent-soft);
-  border:1px solid var(--line);
-  font-size:.8rem;
-  color:#dbe6ff;
-}
-
-.platform-strip{
-  display:grid;
-  grid-template-columns:repeat(5, minmax(0,1fr));
-  gap:12px;
-  margin-bottom:20px;
-}
-
-.platform-link{
-  background:var(--bg-soft);
-  border:1px solid var(--line);
-  border-radius:16px;
-  padding:14px;
-  text-align:center;
-  min-height:84px;
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-}
-
-.platform-link strong{
-  display:block;
-  margin-bottom:6px;
-  font-size:.95rem;
-}
-
-.platform-link span{
-  color:var(--muted);
-  font-size:.82rem;
-  line-height:1.35;
-}
-
-.layout{
-  display:grid;
-  grid-template-columns:250px minmax(0,1fr) 290px;
-  gap:20px;
-  align-items:start;
-}
-
-.sidebar{
-  display:flex;
-  flex-direction:column;
-  gap:16px;
-  position:sticky;
-  top:16px;
-}
-
-.panel,
-.card{
-  background:var(--bg-soft);
-  border:1px solid var(--line);
-  border-radius:var(--radius);
-}
-
-.panel{
-  padding:16px;
-}
-
-.panel h3{
-  margin:0 0 12px;
-  font-size:1rem;
-}
-
-.panel p,
-.panel li{
-  color:var(--muted);
-  font-size:.92rem;
-  line-height:1.45;
-}
-
-.main{
-  min-width:0;
-}
-
-.section{
-  margin-top:26px;
-}
-
-.section:first-child{
-  margin-top:0;
-}
-
-.section h2{
-  margin:0 0 14px;
-  font-size:1.45rem;
-  line-height:1.2;
-}
-
-.featured{
-  overflow:hidden;
-}
-
-.hero-feature-frame{
-  width:100%;
-  height:390px;
-  border:none;
-  display:block;
-  background:#31384b;
-}
-
-.card-content{
-  padding:14px;
-}
-
-.card h3{
-  margin:0 0 8px;
-  line-height:1.25;
-}
-
-.card p{
-  margin:0 0 10px;
-  color:var(--muted);
-  line-height:1.5;
-  font-size:.92rem;
-}
-
-.grid{
-  display:grid;
-  grid-template-columns:repeat(2, minmax(0,1fr));
-  gap:16px;
-}
-
-.shelf-grid{
-  display:grid;
-  grid-template-columns:repeat(2, minmax(0,1fr));
-  gap:16px;
-}
-
-.video-card{
-  overflow:hidden;
-}
-
-.video-frame{
-  width:100%;
-  height:220px;
-  border:none;
-  display:block;
-  background:#31384b;
-}
-
-.small-frame{
-  width:100%;
-  height:200px;
-  border:none;
-  display:block;
-  background:#31384b;
-}
-
-.source-icons{
-  display:flex;
-  flex-wrap:wrap;
-  gap:6px;
-  margin-top:10px;
-}
-
-.source-badge{
-  display:inline-flex;
-  align-items:center;
-  padding:5px 9px;
-  border-radius:999px;
-  background:rgba(255,255,255,0.05);
-  border:1px solid var(--line);
-  font-size:.74rem;
-  color:#dbe6ff;
-  white-space:nowrap;
-}
-
-.meta-row{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  margin-top:8px;
-  color:var(--muted);
-  font-size:.82rem;
-}
-
-.rank-badge{
-  display:inline-block;
-  font-size:.76rem;
-  font-weight:700;
-  color:#fff;
-  background:#4da3ff;
-  padding:5px 9px;
-  border-radius:999px;
-  margin-bottom:8px;
-}
-
-.section-label{
-  display:inline-flex;
-  align-items:center;
-  padding:6px 10px;
-  border-radius:999px;
-  background:var(--accent-soft);
-  border:1px solid var(--line);
-  font-size:.8rem;
-  color:#dbe6ff;
-  margin-bottom:10px;
-}
-
-.topic-cards{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:16px;
-}
-
-.topic-card{
-  padding:16px;
-  min-height:120px;
-}
-
-.topic-card h3{
-  margin:0 0 8px;
-}
-
-.topic-card p{
-  margin:0;
-}
-
-.mini-list{
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-
-.mini-item{
-  padding:10px 0;
-  border-top:1px solid var(--line);
-}
-
-.mini-item:first-child{
-  border-top:none;
-  padding-top:0;
-}
-
-.mini-item strong{
-  display:block;
-  margin-bottom:4px;
-  font-size:.92rem;
-}
-
-.audio-frame{
-  width:100%;
-  height:180px;
-  border:none;
-  border-radius:12px;
-  background:#31384b;
-}
-
-.charity-link{
-  display:inline-block;
-  margin-top:10px;
-  color:#dbe6ff;
-  text-decoration:underline;
-}
-
-.notice{
-  font-size:.82rem;
-  color:var(--muted);
-  margin-top:8px;
-}
-
-.wc-grid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:16px;
-}
-
-.wc-block{
-  background:var(--bg-soft);
-  border:1px solid var(--line);
-  border-radius:var(--radius);
-  padding:16px;
-}
-
-.wc-block h3{
-  margin:0 0 10px;
-}
-
-.wc-list{
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-}
-
-.wc-row{
-  display:flex;
-  justify-content:space-between;
-  gap:10px;
-  padding:8px 0;
-  border-top:1px solid var(--line);
-  color:var(--muted);
-  font-size:.9rem;
-}
-
-.wc-row:first-child{
-  border-top:none;
-  padding-top:0;
-}
-
-.footer-disclaimer{
-  width:min(96%, 1540px);
-  margin:34px auto 24px;
-  color:#aeb7c9;
-  font-size:12px;
-  line-height:1.55;
-  border-top:1px solid rgba(255,255,255,0.08);
-  padding-top:16px;
-}
-
-/* adaptive visibility */
-.mobile-only{
-  display:none;
-}
-
-.desktop-only{
-  display:block;
-}
-
-/* tablet */
-@media(max-width:1180px){
-  .layout{
-    grid-template-columns:220px minmax(0,1fr);
-  }
-
-  .right-sidebar{
-    grid-column:1 / -1;
-    position:static;
-  }
-
-  .platform-strip{
-    grid-template-columns:repeat(4, minmax(0,1fr));
-  }
-}
-
-/* mobile */
-@media(max-width:860px){
-  .page{
-    width:94%;
-  }
-
-  .topbar{
-    padding:28px 0 14px;
-  }
-
-  .desktop-only{
-    display:none !important;
-  }
-
-  .mobile-only{
-    display:block;
-  }
-
-  .notice-bar,
-  .hero,
-  .layout,
-  .platform-strip,
-  .grid,
-  .shelf-grid,
-  .topic-cards,
-  .wc-grid{
-    grid-template-columns:1fr;
-  }
-
-  .sidebar,
-  .right-sidebar{
-    position:static;
-  }
-
-  .hero-main,
-  .hero-side,
-  .panel,
-  .card,
-  .wc-block,
-  .platform-link{
-    border-radius:16px;
-  }
-
-  .hero-main{
-    padding:20px;
-  }
-
-  .hero-main h1{
-    font-size:2.15rem;
-  }
-
-  .hero-feature-frame,
-  .video-frame,
-  .small-frame{
-    height:220px;
-  }
-
-  .search-wrap{
-    flex-direction:column;
-  }
-
-  .search-wrap input,
-  .search-wrap button{
-    width:100%;
-  }
-
-  .platform-link{
-    min-height:auto;
-  }
-
-  .mobile-stack{
-    display:flex;
-    flex-direction:column;
-    gap:18px;
-  }
-}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SignalBoost Live</title>
+
+  <style>
+    :root{
+      --bg:#202533;
+      --bg-soft:#272d3d;
+      --text:#e9edf5;
+      --muted:#aeb7c9;
+      --line:rgba(255,255,255,0.08);
+      --accent:#4da3ff;
+      --accent-soft:rgba(77,163,255,0.14);
+      --radius:18px;
+    }
+
+    *{
+      box-sizing:border-box;
+    }
+
+    body{
+      margin:0;
+      font-family:Arial, Helvetica, sans-serif;
+      background:linear-gradient(180deg,#1b2130 0%, var(--bg) 100%);
+      color:var(--text);
+    }
+
+    a{
+      color:inherit;
+      text-decoration:none;
+    }
+
+    .page{
+      width:min(94%, 1400px);
+      margin:0 auto;
+    }
+
+    .topbar{
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      padding:34px 0 18px;
+    }
+
+    .brand{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      text-align:center;
+      font-weight:bold;
+    }
+
+    .brand-wave{
+      color:var(--accent);
+      letter-spacing:2px;
+      margin-bottom:4px;
+      font-weight:700;
+    }
+
+    .hero{
+      background:var(--bg-soft);
+      border:1px solid var(--line);
+      border-radius:22px;
+      padding:24px;
+      margin-bottom:18px;
+    }
+
+    .hero h1{
+      margin:0 0 10px;
+      font-size:2.7rem;
+      line-height:1.08;
+      text-align:center;
+    }
+
+    .hero p{
+      margin:0 auto;
+      color:var(--muted);
+      line-height:1.55;
+      max-width:850px;
+      text-align:center;
+    }
+
+    .search-wrap{
+      display:flex;
+      gap:10px;
+      margin:20px auto 0;
+      max-width:850px;
+    }
+
+    .search-wrap input{
+      flex:1;
+      padding:14px 16px;
+      border-radius:999px;
+      border:none;
+      outline:none;
+      background:#2a3142;
+      color:var(--text);
+      font-size:16px;
+    }
+
+    .search-wrap button{
+      padding:14px 20px;
+      border:none;
+      border-radius:999px;
+      background:var(--accent);
+      color:#fff;
+      font-weight:600;
+      cursor:pointer;
+    }
+
+    .search-note{
+      margin-top:10px;
+      text-align:center;
+      font-size:.84rem;
+      color:var(--muted);
+    }
+
+    .platform-strip{
+      display:grid;
+      grid-template-columns:repeat(5, minmax(0,1fr));
+      gap:12px;
+      margin-bottom:18px;
+    }
+
+    .platform-link{
+      background:var(--bg-soft);
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:14px;
+      text-align:center;
+      min-height:84px;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+    }
+
+    .platform-link strong{
+      display:block;
+      margin-bottom:6px;
+      font-size:.95rem;
+    }
+
+    .platform-link span{
+      color:var(--muted);
+      font-size:.82rem;
+      line-height:1.35;
+    }
+
+    .desktop-layout{
+      display:grid;
+      grid-template-columns:240px minmax(0,1fr) 280px;
+      gap:18px;
+      align-items:start;
+    }
+
+    .sidebar{
+      display:flex;
+      flex-direction:column;
+      gap:16px;
+    }
+
+    .panel,
+    .card{
+      background:var(--bg-soft);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+    }
+
+    .panel{
+      padding:16px;
+    }
+
+    .panel h3{
+      margin:0 0 12px;
+      font-size:1rem;
+    }
+
+    .panel p,
+    .panel li{
+      color:var(--muted);
+      font-size:.92rem;
+      line-height:1.45;
+    }
+
+    .main{
+      min-width:0;
+    }
+
+    .section{
+      margin-top:24px;
+    }
+
+    .section:first-child{
+      margin-top:0;
+    }
+
+    .section h2{
+      margin:0 0 14px;
+      font-size:1.45rem;
+      line-height:1.2;
+    }
+
+    .section-label{
+      display:inline-flex;
+      align-items:center;
+      padding:6px 10px;
+      border-radius:999px;
+      background:var(--accent-soft);
+      border:1px solid var(--line);
+      font-size:.8rem;
+      color:#dbe6ff;
+      margin-bottom:10px;
+    }
+
+    .featured{
+      overflow:hidden;
+    }
+
+    .hero-feature-frame{
+      width:100%;
+      height:380px;
+      border:none;
+      display:block;
+      background:#31384b;
+    }
+
+    .card-content{
+      padding:14px;
+    }
+
+    .card h3{
+      margin:0 0 8px;
+      line-height:1.25;
+    }
+
+    .card p{
+      margin:0 0 10px;
+      color:var(--muted);
+      line-height:1.5;
+      font-size:.92rem;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0,1fr));
+      gap:16px;
+    }
+
+    .video-frame{
+      width:100%;
+      height:220px;
+      border:none;
+      display:block;
+      background:#31384b;
+    }
+
+    .small-frame{
+      width:100%;
+      height:200px;
+      border:none;
+      display:block;
+      background:#31384b;
+    }
+
+    .source-icons{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      margin-top:10px;
+    }
+
+    .source-badge{
+      display:inline-flex;
+      align-items:center;
+      padding:5px 9px;
+      border-radius:999px;
+      background:rgba(255,255,255,0.05);
+      border:1px solid var(--line);
+      font-size:.74rem;
+      color:#dbe6ff;
+      white-space:nowrap;
+    }
+
+    .meta-row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-top:8px;
+      color:var(--muted);
+      font-size:.82rem;
+    }
+
+    .rank-badge{
+      display:inline-block;
+      font-size:.76rem;
+      font-weight:700;
+      color:#fff;
+      background:#4da3ff;
+      padding:5px 9px;
+      border-radius:999px;
+      margin-bottom:8px;
+    }
+
+    .wc-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:16px;
+    }
+
+    .wc-block{
+      background:var(--bg-soft);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:16px;
+    }
+
+    .wc-block h3{
+      margin:0 0 10px;
+    }
+
+    .wc-list{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+
+    .wc-row{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      padding:8px 0;
+      border-top:1px solid var(--line);
+      color:var(--muted);
+      font-size:.9rem;
+    }
+
+    .wc-row:first-child{
+      border-top:none;
+      padding-top:0;
+    }
+
+    .topic-cards{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0,1fr));
+      gap:16px;
+    }
+
+    .topic-card{
+      padding:16px;
+      min-height:120px;
+    }
+
+    .topic-card h3{
+      margin:0 0 8px;
+    }
+
+    .topic-card p{
+      margin:0;
+    }
+
+    .mini-list{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .mini-item{
+      padding:10px 0;
+      border-top:1px solid var(--line);
+    }
+
+    .mini-item:first-child{
+      border-top:none;
+      padding-top:0;
+    }
+
+    .mini-item strong{
+      display:block;
+      margin-bottom:4px;
+      font-size:.92rem;
+    }
+
+    .audio-frame{
+      width:100%;
+      height:180px;
+      border:none;
+      border-radius:12px;
+      background:#31384b;
+    }
+
+    .charity-link{
+      display:inline-block;
+      margin-top:10px;
+      color:#dbe6ff;
+      text-decoration:underline;
+    }
+
+    .notice{
+      font-size:.82rem;
+      color:var(--muted);
+      margin-top:8px;
+    }
+
+    .footer-disclaimer{
+      width:min(94%, 1400px);
+      margin:34px auto 24px;
+      color:#aeb7c9;
+      font-size:12px;
+      line-height:1.55;
+      border-top:1px solid rgba(255,255,255,0.08);
+      padding-top:16px;
+    }
+
+    .mobile-layout{
+      display:none;
+    }
+
+    @media(max-width:1100px){
+      .desktop-layout{
+        grid-template-columns:1fr;
+      }
+    }
+
+    @media(max-width:760px){
+      .desktop-layout{
+        display:none;
+      }
+
+      .mobile-layout{
+        display:flex;
+        flex-direction:column;
+        gap:18px;
+      }
+
+      .page{
+        width:94%;
+      }
+
+      .topbar{
+        padding:26px 0 14px;
+      }
+
+      .hero{
+        padding:20px;
+        border-radius:16px;
+      }
+
+      .hero h1{
+        font-size:2.05rem;
+      }
+
+      .search-wrap{
+        flex-direction:column;
+      }
+
+      .search-wrap input,
+      .search-wrap button{
+        width:100%;
+      }
+
+      .platform-strip{
+        grid-template-columns:1fr;
+      }
+
+      .panel,
+      .card,
+      .wc-block,
+      .platform-link{
+        border-radius:16px;
+      }
+
+      .hero-feature-frame,
+      .video-frame,
+      .small-frame{
+        height:220px;
+      }
+
+      .grid,
+      .topic-cards,
+      .wc-grid{
+        grid-template-columns:1fr;
+      }
+    }
+  </style>
 </head>
 <body>
-
-<div class="page">
-  <div class="topbar">
-    <div class="brand">
-      <div class="brand-wave">~~~~~</div>
-      <div>SignalBoost Live</div>
+  <div class="page">
+    <div class="topbar">
+      <div class="brand">
+        <div class="brand-wave">~~~~~</div>
+        <div>SignalBoost Live</div>
+      </div>
     </div>
-  </div>
 
-  <div class="notice-bar desktop-only">
-    <div class="notice-box">
-      <strong>About this site</strong><br>
-      SignalBoost Live is a discovery platform designed like an entry point into many content stores. It is built to become AI-guided, multi-source, and constantly changing.
-    </div>
-    <div class="notice-box">
-      <strong>Guidance for minors</strong><br>
-      This site includes links and embedded content from third-party platforms. Viewer discretion is advised, and minors should use this site with parental or adult guidance.
-    </div>
-  </div>
-
-  <div class="hero">
-    <div class="hero-main">
-      <h1>Welcome to the signal mall</h1>
-      <p>The homepage is the entrance. Once inside, users should find many different stores: topics, platforms, current events, and rotating shelves of content.</p>
+    <div class="hero">
+      <h1>Cut through the noise</h1>
+      <p>See what the world is talking about across topics, platforms, and fast-moving conversations.</p>
 
       <div class="search-wrap">
         <input type="text" id="searchInput" placeholder="Search topics, names, events, teams, ideas...">
         <button id="searchButton">Search</button>
       </div>
-      <div class="search-hint">
-        Try: Trump, Messi, World Cup, Bitcoin, AI jobs, inflation, Musk, football
-      </div>
 
-      <div class="hero-pills desktop-only">
-        <span class="pill">Better search</span>
-        <span class="pill">Adaptive mobile</span>
-        <span class="pill">World Cup 2026</span>
-        <span class="pill">Dynamic shelves</span>
+      <div class="search-note">
+        Try: Trump, Messi, World Cup, Bitcoin, AI, inflation, football, Musk
       </div>
     </div>
 
-    <div class="hero-side desktop-only">
-      <h3 style="margin-top:0;">What this version does</h3>
-      <p>Desktop stays rich. Mobile becomes simpler. The search now routes much more broadly than before, and the phone experience shows fewer sections at once.</p>
-    </div>
-  </div>
-
-  <div class="platform-strip desktop-only">
-    <a class="platform-link" href="https://www.youtube.com" target="_blank">
-      <strong>YouTube</strong>
-      <span>Video signals</span>
-    </a>
-    <a class="platform-link" href="https://x.com" target="_blank">
-      <strong>X</strong>
-      <span>Fast reactions</span>
-    </a>
-    <a class="platform-link" href="https://www.instagram.com" target="_blank">
-      <strong>Instagram</strong>
-      <span>Visual trends</span>
-    </a>
-    <a class="platform-link" href="https://www.tiktok.com" target="_blank">
-      <strong>TikTok</strong>
-      <span>Short-form clips</span>
-    </a>
-    <a class="platform-link" href="https://www.linkedin.com" target="_blank">
-      <strong>LinkedIn</strong>
-      <span>Professional discussion</span>
-    </a>
-    <a class="platform-link" href="https://truthsocial.com" target="_blank">
-      <strong>Truth Social</strong>
-      <span>Alternative chatter</span>
-    </a>
-    <a class="platform-link" href="https://telegram.org" target="_blank">
-      <strong>Telegram</strong>
-      <span>Channels & communities</span>
-    </a>
-    <a class="platform-link" href="https://www.reddit.com" target="_blank">
-      <strong>Reddit</strong>
-      <span>Threaded discussion</span>
-    </a>
-    <a class="platform-link" href="https://www.facebook.com" target="_blank">
-      <strong>Facebook</strong>
-      <span>Mass audience</span>
-    </a>
-    <a class="platform-link" href="https://www.threads.net" target="_blank">
-      <strong>Threads</strong>
-      <span>Meta social stream</span>
-    </a>
-  </div>
-
-  <!-- MOBILE VERSION -->
-  <div class="mobile-only mobile-stack">
-    <div class="notice-box">
-      <strong>Mobile version</strong><br>
-      This version shows fewer sections at once so the page is easier to use on a phone.
+    <div class="platform-strip">
+      <a class="platform-link" href="https://www.youtube.com" target="_blank">
+        <strong>YouTube</strong>
+        <span>Video signals</span>
+      </a>
+      <a class="platform-link" href="https://x.com" target="_blank">
+        <strong>X</strong>
+        <span>Fast reactions</span>
+      </a>
+      <a class="platform-link" href="https://www.instagram.com" target="_blank">
+        <strong>Instagram</strong>
+        <span>Visual trends</span>
+      </a>
+      <a class="platform-link" href="https://telegram.org" target="_blank">
+        <strong>Telegram</strong>
+        <span>Channels</span>
+      </a>
+      <a class="platform-link" href="https://www.reddit.com" target="_blank">
+        <strong>Reddit</strong>
+        <span>Discussions</span>
+      </a>
     </div>
 
-    <div class="card">
-      <div class="card-content">
-        <h2 style="margin-top:0;">Top Signal Right Now</h2>
-        <div id="mobileFeatured">Loading featured video...</div>
-      </div>
-    </div>
-
-    <div class="wc-block">
-      <div class="section-label">2026 World Cup</div>
-      <h2 style="margin-top:6px;">World Cup 2026</h2>
-      <p style="color:var(--muted);">A dedicated World Cup block stays near the top on mobile so it is easy to find.</p>
-      <div class="source-icons">
-        <a href="world-cup-history.html" class="source-badge">World Cup History</a>
-        <a href="https://www.fifa.com" target="_blank" class="source-badge">FIFA</a>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-content">
-        <h2 style="margin-top:0;">Top Topics</h2>
-        <div class="topic-cards">
-          <a href="topic-ai.html">
-            <div class="card topic-card">
-              <h3>AI</h3>
-              <p>Automation, jobs, tools</p>
-            </div>
-          </a>
-          <a href="topic-bitcoin.html">
-            <div class="card topic-card">
-              <h3>Bitcoin</h3>
-              <p>Crypto, markets, adoption</p>
-            </div>
-          </a>
-          <a href="topic-politics.html">
-            <div class="card topic-card">
-              <h3>Politics</h3>
-              <p>Debates, elections, policy</p>
-            </div>
-          </a>
-          <a href="world-cup-history.html">
-            <div class="card topic-card">
-              <h3>World Cup</h3>
-              <p>History and legends</p>
-            </div>
-          </a>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-content">
-        <h2 style="margin-top:0;">Mobile Shelf</h2>
-        <div id="mobileShelf">Loading shelf...</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-content">
-        <h2 style="margin-top:0;">Featured Cause</h2>
-        <div id="mobileCharity">Loading charity...</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- DESKTOP / TABLET VERSION -->
-  <div class="layout desktop-only">
-
-    <aside class="sidebar">
-      <div class="panel">
-        <h3>Topic Stores</h3>
-        <div class="mini-list">
-          <div class="mini-item"><a href="topic-ai.html"><strong>AI</strong><span>Automation, jobs, tools</span></a></div>
-          <div class="mini-item"><a href="topic-bitcoin.html"><strong>Bitcoin</strong><span>Crypto, markets, adoption</span></a></div>
-          <div class="mini-item"><a href="topic-politics.html"><strong>Politics</strong><span>Debates, elections, policy</span></a></div>
-          <div class="mini-item"><a href="topic-business.html"><strong>Business</strong><span>Markets, inflation, layoffs</span></a></div>
-          <div class="mini-item"><a href="world-cup-history.html"><strong>World Cup History</strong><span>Tournament timeline and legends</span></a></div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <h3>Quick access</h3>
-        <div class="source-icons">
-          <a href="https://www.youtube.com" target="_blank" class="source-badge">YouTube</a>
-          <a href="https://www.reddit.com" target="_blank" class="source-badge">Reddit</a>
-          <a href="https://telegram.org" target="_blank" class="source-badge">Telegram</a>
-          <a href="https://www.facebook.com" target="_blank" class="source-badge">Facebook</a>
-          <a href="https://www.threads.net" target="_blank" class="source-badge">Threads</a>
-        </div>
-      </div>
-    </aside>
-
-    <main class="main">
-
-      <div class="section">
-        <h2>Top Signal Right Now</h2>
-        <div id="featured" class="card featured">
-          <div class="card-content">Loading featured video...</div>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-label">2026 World Cup</div>
-        <h2>Coming World Cup 2026</h2>
-        <div class="wc-grid">
-          <div class="wc-block">
-            <h3>Why it matters</h3>
-            <p>The 2026 tournament is one of the biggest football events on the horizon. This gives the homepage a live sports anchor and a direct path into World Cup content and history.</p>
-            <div class="source-icons">
-              <a href="world-cup-history.html" class="source-badge">World Cup History</a>
-              <a href="https://www.fifa.com" target="_blank" class="source-badge">FIFA</a>
-            </div>
-          </div>
-          <div class="wc-block">
-            <h3>Groups / fixtures / standings</h3>
-            <div class="wc-list">
-              <div class="wc-row"><span>Group stage</span><span>Coming</span></div>
-              <div class="wc-row"><span>Fixtures</span><span>To be added live</span></div>
-              <div class="wc-row"><span>Standings</span><span>To be added live</span></div>
-              <div class="wc-row"><span>Latest games</span><span>Football block ready</span></div>
-            </div>
+    <!-- DESKTOP / TABLET -->
+    <div class="desktop-layout">
+      <aside class="sidebar">
+        <div class="panel">
+          <h3>Topic Stores</h3>
+          <div class="mini-list">
+            <div class="mini-item"><a href="topic-ai.html"><strong>AI</strong><span>Automation, jobs, tools</span></a></div>
+            <div class="mini-item"><a href="topic-bitcoin.html"><strong>Bitcoin</strong><span>Crypto, markets, adoption</span></a></div>
+            <div class="mini-item"><a href="topic-politics.html"><strong>Politics</strong><span>Debates, elections, policy</span></a></div>
+            <div class="mini-item"><a href="topic-business.html"><strong>Business</strong><span>Markets, inflation, layoffs</span></a></div>
+            <div class="mini-item"><a href="world-cup-history.html"><strong>World Cup History</strong><span>Tournament timeline and legends</span></a></div>
           </div>
         </div>
-      </div>
 
-      <div class="section">
-        <h2>Top Ranked Signals</h2>
-        <div id="topVideos" class="grid"></div>
-      </div>
-
-      <div class="section">
-        <h2>Today’s Dynamic Shelves</h2>
-        <div id="dynamicShelves"></div>
-      </div>
-
-      <div class="section">
-        <h2>Explore by Topic</h2>
-        <div class="topic-cards">
-          <a href="topic-politics.html">
-            <div class="card topic-card">
-              <h3>Europe migration debate</h3>
-              <p>Political discussion trending across Western media and social platforms.</p>
-            </div>
-          </a>
-
-          <a href="topic-ai.html">
-            <div class="card topic-card">
-              <h3>AI replacing jobs</h3>
-              <p>Major topic across business, tech, and podcast discussions.</p>
-            </div>
-          </a>
-
-          <a href="topic-bitcoin.html">
-            <div class="card topic-card">
-              <h3>Bitcoin surge</h3>
-              <p>Crypto markets, adoption, and finance conversation in one place.</p>
-            </div>
-          </a>
-
-          <a href="topic-business.html">
-            <div class="card topic-card">
-              <h3>Business & economy</h3>
-              <p>Markets, inflation, layoffs, and global economic discussion.</p>
-            </div>
-          </a>
+        <div class="panel">
+          <h3>Quick Access</h3>
+          <div class="source-icons">
+            <a href="https://www.youtube.com" target="_blank" class="source-badge">YouTube</a>
+            <a href="https://telegram.org" target="_blank" class="source-badge">Telegram</a>
+            <a href="https://www.reddit.com" target="_blank" class="source-badge">Reddit</a>
+            <a href="https://www.facebook.com" target="_blank" class="source-badge">Facebook</a>
+            <a href="https://www.threads.net" target="_blank" class="source-badge">Threads</a>
+          </div>
         </div>
-      </div>
+      </aside>
 
-    </main>
+      <main class="main">
+        <div class="section">
+          <h2>Top Signal Right Now</h2>
+          <div id="featured" class="card featured">
+            <div class="card-content">Loading featured video...</div>
+          </div>
+        </div>
 
-    <aside class="sidebar right-sidebar">
-      <div class="panel">
-        <h3>Live Audio</h3>
-        <iframe
-          class="audio-frame"
-          src="https://www.youtube.com/embed/jfKfPfyJRdk"
-          title="Live audio stream"
-          allowfullscreen>
-        </iframe>
-        <p class="notice">Optional background listening while browsing.</p>
-      </div>
-
-      <div class="panel" id="charityPanel">
-        <h3>Featured Cause</h3>
-        <div id="charityCurrent">Loading charity spotlight...</div>
-        <div id="charityHistory" style="margin-top:14px;"></div>
-        <p class="notice">
-          We rotate featured charities every 4 months. This is an independent spotlight and not an official partnership or endorsement.
-        </p>
-      </div>
-
-      <div class="panel">
-        <h3>Messaging note</h3>
-        <p>SignalBoost’s own Telegram-style messaging feature is not built yet. The Telegram link here is only an external platform entrance.</p>
-      </div>
-    </aside>
-
-  </div>
-</div>
-
-<div class="footer-disclaimer">
-  Content on this site includes links and embedded media from third-party platforms. Charity spotlights are independent selections and do not imply official partnership, endorsement, or sponsorship unless clearly stated. Viewer discretion is advised, and minors should use this site with parental or adult guidance.
-</div>
-
-<script>
-const API_KEY = "AIzaSyBWSnsfSNZxY_kYG_ACxm-GQYMsCOEuIuc";
-
-/* SEARCH */
-const searchPages = [
-  {
-    title: "AI Replacing Jobs",
-    url: "topic-ai.html",
-    keywords: [
-      "ai","artificial intelligence","automation","jobs","job loss","future of work","openai",
-      "chatgpt","technology","tech","robot","robots","productivity","software","coding",
-      "sam altman","joe rogan ai"
-    ]
-  },
-  {
-    title: "Bitcoin Surge",
-    url: "topic-bitcoin.html",
-    keywords: [
-      "bitcoin","btc","crypto","cryptocurrency","blockchain","ethereum","market","markets",
-      "bull run","price","wallet","trading","coins","altcoin","adoption"
-    ]
-  },
-  {
-    title: "Europe Migration Debate",
-    url: "topic-politics.html",
-    keywords: [
-      "politics","trump","biden","election","migration","immigration","border","government",
-      "policy","europe","war","debate","president","congress","right wing","left wing","musk trump"
-    ]
-  },
-  {
-    title: "Business & Economy",
-    url: "topic-business.html",
-    keywords: [
-      "business","economy","inflation","finance","layoffs","recession","growth","market",
-      "stocks","companies","tariffs","bezos","musk","jobs report","interest rates","amazon","tesla"
-    ]
-  },
-  {
-    title: "World Cup History",
-    url: "world-cup-history.html",
-    keywords: [
-      "world cup","fifa","football","soccer","messi","ronaldo","brazil","argentina","final",
-      "groups","fixtures","history","maradona","pele","mbappe","2026 world cup","champions league"
-    ]
-  }
-];
-
-function smartScore(query, page) {
-  const q = query.toLowerCase().trim();
-  const tokens = q.split(/\s+/).filter(Boolean);
-  let score = 0;
-
-  for (const keyword of page.keywords) {
-    const k = keyword.toLowerCase();
-
-    if (q === k) score += 20;
-    if (q.includes(k)) score += 10;
-    if (k.includes(q)) score += 6;
-
-    for (const token of tokens) {
-      if (k === token) score += 6;
-      else if (k.includes(token)) score += 3;
-    }
-  }
-
-  if (page.title.toLowerCase().includes(q)) score += 12;
-  return score;
-}
-
-function runSearch() {
-  const query = document.getElementById("searchInput").value.trim();
-  if (!query) {
-    alert("Please enter a word");
-    return;
-  }
-
-  const ranked = searchPages
-    .map(page => ({ page, score: smartScore(query, page) }))
-    .sort((a, b) => b.score - a.score);
-
-  if (ranked[0].score > 0) {
-    window.location.href = ranked[0].page.url;
-  } else {
-    alert("Topic not found yet");
-  }
-}
-
-document.getElementById("searchButton").addEventListener("click", runSearch);
-document.getElementById("searchInput").addEventListener("keypress", function(e) {
-  if (e.key === "Enter") runSearch();
-});
-
-/* VIDEO HELPERS */
-function formatViews(num) {
-  const n = Number(num || 0);
-  if (n >= 1000000000) return (n / 1000000000).toFixed(1).replace(".0","") + "B views";
-  if (n >= 1000000) return (n / 1000000).toFixed(1).replace(".0","") + "M views";
-  if (n >= 1000) return (n / 1000).toFixed(1).replace(".0","") + "K views";
-  return n + " views";
-}
-
-function formatPublished(dateString) {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now - date;
-  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (days < 1) return "today";
-  if (days === 1) return "1 day ago";
-  if (days < 30) return `${days} days ago`;
-
-  const months = Math.floor(days / 30);
-  if (months === 1) return "1 month ago";
-  if (months < 12) return `${months} months ago`;
-
-  const years = Math.floor(months / 12);
-  if (years === 1) return "1 year ago";
-  return `${years} years ago`;
-}
-
-function calculateSignalScore(video) {
-  const views = Number(video.statistics?.viewCount || 0);
-  const publishedAt = new Date(video.snippet?.publishedAt || 0);
-  const now = new Date();
-  const ageDays = Math.max(1, Math.floor((now - publishedAt) / (1000 * 60 * 60 * 24)));
-  const viewScore = Math.log10(Math.max(views, 1)) * 100;
-  const freshnessBoost = Math.max(0, 30 - Math.min(ageDays, 30));
-  return viewScore + freshnessBoost;
-}
-
-async function fetchRankedVideos(query, maxResults = 8) {
-  const searchRes = await fetch(
-    `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResults}&q=${encodeURIComponent(query)}&key=${API_KEY}`
-  );
-  const searchData = await searchRes.json();
-  if (!searchData.items || !searchData.items.length) return [];
-
-  const videoIds = searchData.items.map(item => item.id.videoId).filter(Boolean).join(",");
-  const statsRes = await fetch(
-    `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${API_KEY}`
-  );
-  const statsData = await statsRes.json();
-  if (!statsData.items || !statsData.items.length) return [];
-
-  return [...statsData.items]
-    .map(item => ({ ...item, signalScore: calculateSignalScore(item) }))
-    .sort((a, b) => b.signalScore - a.signalScore);
-}
-
-function shuffleArray(array) {
-  const copy = [...array];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
-
-function randomFromTop(videos, poolSize = 5) {
-  const pool = videos.slice(0, Math.min(poolSize, videos.length));
-  return pool[Math.floor(Math.random() * pool.length)];
-}
-
-function renderShelfSection(title, label, videos) {
-  return `
-    <div class="section">
-      <div class="section-label">${label}</div>
-      <h2>${title}</h2>
-      <div class="shelf-grid">
-        ${videos.map(video => `
-          <div class="card video-card">
-            <iframe class="small-frame" src="https://www.youtube.com/embed/${video.id}" allowfullscreen></iframe>
-            <div class="card-content">
-              <h3>${video.snippet.title}</h3>
-              <div class="meta-row">
-                <span>${formatViews(video.statistics?.viewCount)}</span>
-                <span>•</span>
-                <span>${formatPublished(video.snippet?.publishedAt)}</span>
+        <div class="section">
+          <div class="section-label">2026 World Cup</div>
+          <h2>Coming World Cup 2026</h2>
+          <div class="wc-grid">
+            <div class="wc-block">
+              <h3>Why it matters</h3>
+              <p>One of the biggest football events on the horizon. This section gives the homepage a direct path into World Cup discussion and history.</p>
+              <div class="source-icons">
+                <a href="world-cup-history.html" class="source-badge">World Cup History</a>
+                <a href="https://www.fifa.com" target="_blank" class="source-badge">FIFA</a>
+              </div>
+            </div>
+            <div class="wc-block">
+              <h3>Groups / fixtures / standings</h3>
+              <div class="wc-list">
+                <div class="wc-row"><span>Group stage</span><span>Coming</span></div>
+                <div class="wc-row"><span>Fixtures</span><span>To be added live</span></div>
+                <div class="wc-row"><span>Standings</span><span>To be added live</span></div>
+                <div class="wc-row"><span>Latest games</span><span>Football block ready</span></div>
               </div>
             </div>
           </div>
-        `).join("")}
-      </div>
-    </div>
-  `;
-}
-
-async function loadHomepageVideos() {
-  const featured = document.getElementById("featured");
-  const topVideos = document.getElementById("topVideos");
-  const mobileFeatured = document.getElementById("mobileFeatured");
-
-  try {
-    const sorted = await fetchRankedVideos(
-      "AI Bitcoin politics business economy migration debate Joe Rogan Trump automation finance Bezos Musk football soccer world cup",
-      12
-    );
-
-    if (!sorted.length) {
-      if (featured) featured.innerHTML = `<div class="card-content">No videos found.</div>`;
-      if (topVideos) topVideos.innerHTML = "";
-      if (mobileFeatured) mobileFeatured.innerHTML = `No videos found.`;
-      return;
-    }
-
-    const top = randomFromTop(sorted, 5);
-
-    const featuredHtml = `
-      <iframe class="hero-feature-frame" src="https://www.youtube.com/embed/${top.id}" allowfullscreen></iframe>
-      <div class="card-content">
-        <span class="rank-badge">Featured rotating signal</span>
-        <h3>${top.snippet.title}</h3>
-        <p>${top.snippet.description ? top.snippet.description.substring(0, 180) + "..." : "Featured signal."}</p>
-        <div class="meta-row">
-          <span>${formatViews(top.statistics?.viewCount)}</span>
-          <span>•</span>
-          <span>${formatPublished(top.snippet?.publishedAt)}</span>
-          <span>•</span>
-          <span>${top.snippet.channelTitle}</span>
         </div>
-      </div>
-    `;
 
-    if (featured) featured.innerHTML = featuredHtml;
-    if (mobileFeatured) mobileFeatured.innerHTML = featuredHtml;
+        <div class="section">
+          <h2>Top Ranked Signals</h2>
+          <div id="topVideos" class="grid"></div>
+        </div>
 
-    const rest = shuffleArray(sorted.filter(v => v.id !== top.id)).slice(0, 4);
+        <div class="section">
+          <h2>Explore by Topic</h2>
+          <div class="topic-cards">
+            <a href="topic-ai.html">
+              <div class="card topic-card">
+                <h3>AI replacing jobs</h3>
+                <p>Business, tech, and automation discussion.</p>
+              </div>
+            </a>
 
-    if (topVideos) {
-      topVideos.innerHTML = rest.map((video, index) => `
-        <div class="card video-card">
-          <iframe class="video-frame" src="https://www.youtube.com/embed/${video.id}" allowfullscreen></iframe>
-          <div class="card-content">
-            <span class="rank-badge">#${index + 1} shelf signal</span>
-            <h3>${video.snippet.title}</h3>
-            <p>${video.snippet.description ? video.snippet.description.substring(0, 120) + "..." : "Video result."}</p>
-            <div class="meta-row">
-              <span>${formatViews(video.statistics?.viewCount)}</span>
-              <span>•</span>
-              <span>${formatPublished(video.snippet?.publishedAt)}</span>
-            </div>
+            <a href="topic-bitcoin.html">
+              <div class="card topic-card">
+                <h3>Bitcoin surge</h3>
+                <p>Crypto markets, adoption, and finance.</p>
+              </div>
+            </a>
+
+            <a href="topic-politics.html">
+              <div class="card topic-card">
+                <h3>Europe migration debate</h3>
+                <p>Political discussion and public reaction.</p>
+              </div>
+            </a>
+
+            <a href="topic-business.html">
+              <div class="card topic-card">
+                <h3>Business & economy</h3>
+                <p>Markets, inflation, layoffs, and growth.</p>
+              </div>
+            </a>
           </div>
         </div>
-      `).join("");
-    }
+      </main>
 
-  } catch (err) {
-    if (featured) featured.innerHTML = `<div class="card-content">Failed to load homepage videos.</div>`;
-    if (mobileFeatured) mobileFeatured.innerHTML = `Failed to load homepage videos.`;
-    if (topVideos) topVideos.innerHTML = "";
-    console.error(err);
-  }
-}
+      <aside class="sidebar">
+        <div class="panel">
+          <h3>Live Audio</h3>
+          <iframe
+            class="audio-frame"
+            src="https://www.youtube.com/embed/jfKfPfyJRdk"
+            title="Live audio stream"
+            allowfullscreen>
+          </iframe>
+          <p class="notice">Optional background listening while browsing.</p>
+        </div>
 
-async function loadDynamicShelves() {
-  const dynamicShelves = document.getElementById("dynamicShelves");
-  const mobileShelf = document.getElementById("mobileShelf");
+        <div class="panel" id="charityPanel">
+          <h3>Featured Cause</h3>
+          <div id="charityCurrent">Loading charity spotlight...</div>
+          <div id="charityHistory" style="margin-top:14px;"></div>
+          <p class="notice">
+            We rotate featured charities every 4 months. This is an independent spotlight and not an official partnership or endorsement.
+          </p>
+        </div>
 
-  const shelfConfigs = [
-    {
-      title: "Most Watched Right Now: Football / Soccer",
-      label: "Sports Store",
-      query: "football soccer latest matches highlights premier league champions league la liga fifa world cup"
-    },
-    {
-      title: "Most Watched Right Now: Travel",
-      label: "Travel Store",
-      query: "travel vlog top destinations tourism"
-    },
-    {
-      title: "Most Watched Right Now: Culinary",
-      label: "Food Store",
-      query: "cooking culinary food recipes chef"
-    },
-    {
-      title: "Most Watched Right Now: AI",
-      label: "Tech Store",
-      query: "AI automation jobs artificial intelligence"
-    }
-  ];
+        <div class="panel">
+          <h3>Important note</h3>
+          <p>The Telegram link is only an external platform entrance. SignalBoost’s own messaging feature is not built yet.</p>
+        </div>
+      </aside>
+    </div>
 
-  const shuffledShelves = shuffleArray(shelfConfigs);
+    <!-- MOBILE -->
+    <div class="mobile-layout">
+      <div class="card">
+        <div class="card-content">
+          <h2 style="margin-top:0;">Top Signal Right Now</h2>
+          <div id="mobileFeatured">Loading featured video...</div>
+        </div>
+      </div>
 
-  const results = await Promise.all(
-    shuffledShelves.map(async shelf => {
-      try {
-        const videos = await fetchRankedVideos(shelf.query, 6);
-        return { ...shelf, videos: videos.slice(0, 2) };
-      } catch (e) {
-        return { ...shelf, videos: [] };
+      <div class="wc-block">
+        <div class="section-label">2026 World Cup</div>
+        <h2 style="margin-top:6px;">World Cup 2026</h2>
+        <p style="color:var(--muted);">A lighter mobile block for World Cup discussion and history.</p>
+        <div class="source-icons">
+          <a href="world-cup-history.html" class="source-badge">World Cup History</a>
+          <a href="https://www.fifa.com" target="_blank" class="source-badge">FIFA</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-content">
+          <h2 style="margin-top:0;">Top Topics</h2>
+          <div class="topic-cards">
+            <a href="topic-ai.html">
+              <div class="card topic-card">
+                <h3>AI</h3>
+                <p>Automation and jobs</p>
+              </div>
+            </a>
+
+            <a href="topic-bitcoin.html">
+              <div class="card topic-card">
+                <h3>Bitcoin</h3>
+                <p>Crypto and markets</p>
+              </div>
+            </a>
+
+            <a href="topic-politics.html">
+              <div class="card topic-card">
+                <h3>Politics</h3>
+                <p>Debates and policy</p>
+              </div>
+            </a>
+
+            <a href="world-cup-history.html">
+              <div class="card topic-card">
+                <h3>World Cup</h3>
+                <p>History and legends</p>
+              </div>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-content">
+          <h2 style="margin-top:0;">Featured Cause</h2>
+          <div id="mobileCharity">Loading charity...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-disclaimer">
+    Content on this site includes links and embedded media from third-party platforms. Charity spotlights are independent selections and do not imply official partnership, endorsement, or sponsorship unless clearly stated. Viewer discretion is advised, and minors should use this site with parental or adult guidance.
+  </div>
+
+  <script>
+    const API_KEY = "AIzaSyBWSnsfSNZxY_kYG_ACxm-GQYMsCOEuIuc";
+
+    const searchMap = [
+      {
+        url: "topic-ai.html",
+        terms: [
+          "ai","artificial intelligence","automation","jobs","chatgpt","openai","future of work","robot","robots","technology","tech"
+        ]
+      },
+      {
+        url: "topic-bitcoin.html",
+        terms: [
+          "bitcoin","btc","crypto","cryptocurrency","blockchain","ethereum","wallet","trading","altcoin"
+        ]
+      },
+      {
+        url: "topic-politics.html",
+        terms: [
+          "politics","trump","biden","election","migration","immigration","border","government","policy","europe","war","president","congress"
+        ]
+      },
+      {
+        url: "topic-business.html",
+        terms: [
+          "business","economy","inflation","finance","layoffs","recession","growth","market","stocks","companies","bezos","musk","amazon","tesla"
+        ]
+      },
+      {
+        url: "world-cup-history.html",
+        terms: [
+          "world cup","fifa","football","soccer","messi","ronaldo","pele","maradona","mbappe","champions league","2026 world cup"
+        ]
       }
-    })
-  );
+    ];
 
-  if (dynamicShelves) {
-    dynamicShelves.innerHTML = results.map(shelf => {
-      if (!shelf.videos.length) {
-        return `
-          <div class="section">
-            <div class="section-label">${shelf.label}</div>
-            <h2>${shelf.title}</h2>
-            <div class="card"><div class="card-content">No videos found.</div></div>
+    function runSearch() {
+      const query = document.getElementById("searchInput").value.toLowerCase().trim();
+
+      if (!query) {
+        alert("Please enter a word");
+        return;
+      }
+
+      for (const item of searchMap) {
+        for (const term of item.terms) {
+          if (query.includes(term) || term.includes(query)) {
+            window.location.href = item.url;
+            return;
+          }
+        }
+      }
+
+      alert("Search is still being expanded. Try: AI, Bitcoin, Trump, inflation, Messi, World Cup.");
+    }
+
+    document.getElementById("searchButton").addEventListener("click", runSearch);
+    document.getElementById("searchInput").addEventListener("keypress", function(e) {
+      if (e.key === "Enter") runSearch();
+    });
+
+    function formatViews(num) {
+      const n = Number(num || 0);
+      if (n >= 1000000000) return (n / 1000000000).toFixed(1).replace(".0","") + "B views";
+      if (n >= 1000000) return (n / 1000000).toFixed(1).replace(".0","") + "M views";
+      if (n >= 1000) return (n / 1000).toFixed(1).replace(".0","") + "K views";
+      return n + " views";
+    }
+
+    function formatPublished(dateString) {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now - date;
+      const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      if (days < 1) return "today";
+      if (days === 1) return "1 day ago";
+      if (days < 30) return `${days} days ago`;
+
+      const months = Math.floor(days / 30);
+      if (months === 1) return "1 month ago";
+      if (months < 12) return `${months} months ago`;
+
+      const years = Math.floor(months / 12);
+      if (years === 1) return "1 year ago";
+      return `${years} years ago`;
+    }
+
+    function calculateSignalScore(video) {
+      const views = Number(video.statistics?.viewCount || 0);
+      const publishedAt = new Date(video.snippet?.publishedAt || 0);
+      const now = new Date();
+      const ageDays = Math.max(1, Math.floor((now - publishedAt) / (1000 * 60 * 60 * 24)));
+      const viewScore = Math.log10(Math.max(views, 1)) * 100;
+      const freshnessBoost = Math.max(0, 30 - Math.min(ageDays, 30));
+      return viewScore + freshnessBoost;
+    }
+
+    async function fetchRankedVideos(query, maxResults = 8) {
+      const searchRes = await fetch(
+        `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResults}&q=${encodeURIComponent(query)}&key=${API_KEY}`
+      );
+      const searchData = await searchRes.json();
+
+      if (!searchData.items || !searchData.items.length) return [];
+
+      const videoIds = searchData.items.map(item => item.id.videoId).filter(Boolean).join(",");
+      const statsRes = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${API_KEY}`
+      );
+      const statsData = await statsRes.json();
+
+      if (!statsData.items || !statsData.items.length) return [];
+
+      return [...statsData.items]
+        .map(item => ({ ...item, signalScore: calculateSignalScore(item) }))
+        .sort((a, b) => b.signalScore - a.signalScore);
+    }
+
+    function shuffleArray(array) {
+      const copy = [...array];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    function randomFromTop(videos, poolSize = 5) {
+      const pool = videos.slice(0, Math.min(poolSize, videos.length));
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+
+    async function loadHomepageVideos() {
+      const featured = document.getElementById("featured");
+      const topVideos = document.getElementById("topVideos");
+      const mobileFeatured = document.getElementById("mobileFeatured");
+
+      try {
+        const sorted = await fetchRankedVideos(
+          "AI Bitcoin politics business economy migration debate Joe Rogan Trump automation finance Bezos Musk football soccer world cup",
+          10
+        );
+
+        if (!sorted.length) {
+          featured.innerHTML = `<div class="card-content">No videos found.</div>`;
+          topVideos.innerHTML = "";
+          mobileFeatured.innerHTML = `No videos found.`;
+          return;
+        }
+
+        const top = randomFromTop(sorted, 5);
+
+        const featuredHtml = `
+          <iframe class="hero-feature-frame" src="https://www.youtube.com/embed/${top.id}" allowfullscreen></iframe>
+          <div class="card-content">
+            <span class="rank-badge">Featured rotating signal</span>
+            <h3>${top.snippet.title}</h3>
+            <p>${top.snippet.description ? top.snippet.description.substring(0, 180) + "..." : "Featured signal."}</p>
+            <div class="meta-row">
+              <span>${formatViews(top.statistics?.viewCount)}</span>
+              <span>•</span>
+              <span>${formatPublished(top.snippet?.publishedAt)}</span>
+              <span>•</span>
+              <span>${top.snippet.channelTitle}</span>
+            </div>
           </div>
         `;
-      }
-      return renderShelfSection(shelf.title, shelf.label, shelf.videos);
-    }).join("");
-  }
 
-  if (mobileShelf) {
-    const firstShelf = results.find(s => s.videos.length);
-    if (!firstShelf) {
-      mobileShelf.innerHTML = "No shelf available.";
-    } else {
-      mobileShelf.innerHTML = `
-        <div class="section-label">${firstShelf.label}</div>
-        <h3 style="margin:10px 0 14px;">${firstShelf.title}</h3>
-        ${firstShelf.videos.map(video => `
-          <div class="card video-card" style="margin-bottom:14px;">
-            <iframe class="small-frame" src="https://www.youtube.com/embed/${video.id}" allowfullscreen></iframe>
+        featured.innerHTML = featuredHtml;
+        mobileFeatured.innerHTML = featuredHtml;
+
+        const rest = shuffleArray(sorted.filter(v => v.id !== top.id)).slice(0, 4);
+
+        topVideos.innerHTML = rest.map((video, index) => `
+          <div class="card">
+            <iframe class="video-frame" src="https://www.youtube.com/embed/${video.id}" allowfullscreen></iframe>
             <div class="card-content">
+              <span class="rank-badge">#${index + 1} shelf signal</span>
               <h3>${video.snippet.title}</h3>
+              <p>${video.snippet.description ? video.snippet.description.substring(0, 120) + "..." : "Video result."}</p>
               <div class="meta-row">
                 <span>${formatViews(video.statistics?.viewCount)}</span>
                 <span>•</span>
@@ -1198,78 +912,76 @@ async function loadDynamicShelves() {
               </div>
             </div>
           </div>
-        `).join("")}
+        `).join("");
+      } catch (err) {
+        featured.innerHTML = `<div class="card-content">Failed to load homepage videos.</div>`;
+        topVideos.innerHTML = "";
+        mobileFeatured.innerHTML = `Failed to load homepage videos.`;
+        console.error(err);
+      }
+    }
+
+    const charityRotation = [
+      { name: "St. Jude Children's Research Hospital", url: "https://www.stjude.org/", note: "Supports children with cancer and other life-threatening diseases." },
+      { name: "American Red Cross", url: "https://www.redcross.org/", note: "Disaster relief, blood donation, and emergency support." },
+      { name: "Doctors Without Borders", url: "https://www.doctorswithoutborders.org/", note: "Emergency medical aid worldwide." },
+      { name: "Feeding America", url: "https://www.feedingamerica.org/", note: "Works to fight hunger across the United States." },
+      { name: "Charity: Water", url: "https://www.charitywater.org/", note: "Focuses on clean and safe drinking water." },
+      { name: "Save the Children", url: "https://www.savethechildren.org/", note: "Supports children through health, education, and emergency aid." },
+      { name: "The Nature Conservancy", url: "https://www.nature.org/", note: "Protects land, water, and biodiversity." },
+      { name: "World Wildlife Fund", url: "https://www.worldwildlife.org/", note: "Focuses on wildlife and environmental conservation." },
+      { name: "Habitat for Humanity", url: "https://www.habitat.org/", note: "Helps families build and improve homes." },
+      { name: "Direct Relief", url: "https://www.directrelief.org/", note: "Provides medical aid and humanitarian relief." }
+    ];
+
+    function getCharityRotationState() {
+      const rotationMonths = 4;
+      const startDate = new Date("2026-01-01T00:00:00Z");
+      const now = new Date();
+      const monthsElapsed =
+        (now.getUTCFullYear() - startDate.getUTCFullYear()) * 12 +
+        (now.getUTCMonth() - startDate.getUTCMonth());
+      const index = Math.floor(monthsElapsed / rotationMonths) % charityRotation.length;
+      return index < 0 ? 0 : index;
+    }
+
+    function renderCharitySpotlight() {
+      const currentIndex = getCharityRotationState();
+      const current = charityRotation[currentIndex];
+      const currentBox = document.getElementById("charityCurrent");
+      const historyBox = document.getElementById("charityHistory");
+      const mobileCharity = document.getElementById("mobileCharity");
+
+      const currentHtml = `
+        <strong>${current.name}</strong>
+        <p style="margin:10px 0 8px; color:var(--muted);">${current.note}</p>
+        <a class="charity-link" href="${current.url}" target="_blank">Visit organization</a>
+      `;
+
+      currentBox.innerHTML = currentHtml;
+      mobileCharity.innerHTML = currentHtml;
+
+      const past = [];
+      for (let i = 1; i <= 3; i++) {
+        const idx = (currentIndex - i + charityRotation.length) % charityRotation.length;
+        past.push(charityRotation[idx]);
+      }
+
+      historyBox.innerHTML = `
+        <h4 style="margin:0 0 8px; font-size:.95rem;">Recent rotation history</h4>
+        <div class="mini-list">
+          ${past.map(item => `
+            <div class="mini-item">
+              <strong>${item.name}</strong>
+              <span>${item.note}</span>
+            </div>
+          `).join("")}
+        </div>
       `;
     }
-  }
-}
 
-/* CHARITY */
-const charityRotation = [
-  { name: "St. Jude Children's Research Hospital", url: "https://www.stjude.org/", note: "Supports children with cancer and other life-threatening diseases." },
-  { name: "American Red Cross", url: "https://www.redcross.org/", note: "Disaster relief, blood donation, and emergency support." },
-  { name: "Doctors Without Borders", url: "https://www.doctorswithoutborders.org/", note: "Emergency medical aid worldwide." },
-  { name: "Feeding America", url: "https://www.feedingamerica.org/", note: "Works to fight hunger across the United States." },
-  { name: "Charity: Water", url: "https://www.charitywater.org/", note: "Focuses on clean and safe drinking water." },
-  { name: "Save the Children", url: "https://www.savethechildren.org/", note: "Supports children through health, education, and emergency aid." },
-  { name: "The Nature Conservancy", url: "https://www.nature.org/", note: "Protects land, water, and biodiversity." },
-  { name: "World Wildlife Fund", url: "https://www.worldwildlife.org/", note: "Focuses on wildlife and environmental conservation." },
-  { name: "Habitat for Humanity", url: "https://www.habitat.org/", note: "Helps families build and improve homes." },
-  { name: "Direct Relief", url: "https://www.directrelief.org/", note: "Provides medical aid and humanitarian relief." }
-];
-
-function getCharityRotationState() {
-  const rotationMonths = 4;
-  const startDate = new Date("2026-01-01T00:00:00Z");
-  const now = new Date();
-  const monthsElapsed =
-    (now.getUTCFullYear() - startDate.getUTCFullYear()) * 12 +
-    (now.getUTCMonth() - startDate.getUTCMonth());
-  const index = Math.floor(monthsElapsed / rotationMonths) % charityRotation.length;
-  return index < 0 ? 0 : index;
-}
-
-function renderCharitySpotlight() {
-  const currentIndex = getCharityRotationState();
-  const current = charityRotation[currentIndex];
-  const currentBox = document.getElementById("charityCurrent");
-  const historyBox = document.getElementById("charityHistory");
-  const mobileCharity = document.getElementById("mobileCharity");
-
-  const currentHtml = `
-    <strong>${current.name}</strong>
-    <p style="margin:10px 0 8px; color:var(--muted);">${current.note}</p>
-    <a class="charity-link" href="${current.url}" target="_blank">Visit organization</a>
-  `;
-
-  if (currentBox) currentBox.innerHTML = currentHtml;
-  if (mobileCharity) mobileCharity.innerHTML = currentHtml;
-
-  const past = [];
-  for (let i = 1; i <= 3; i++) {
-    const idx = (currentIndex - i + charityRotation.length) % charityRotation.length;
-    past.push(charityRotation[idx]);
-  }
-
-  if (historyBox) {
-    historyBox.innerHTML = `
-      <h4 style="margin:0 0 8px; font-size:.95rem;">Recent rotation history</h4>
-      <div class="mini-list">
-        ${past.map(item => `
-          <div class="mini-item">
-            <strong>${item.name}</strong>
-            <span>${item.note}</span>
-          </div>
-        `).join("")}
-      </div>
-    `;
-  }
-}
-
-renderCharitySpotlight();
-loadHomepageVideos();
-loadDynamicShelves();
-</script>
-
+    renderCharitySpotlight();
+    loadHomepageVideos();
+  </script>
 </body>
 </html>

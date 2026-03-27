@@ -750,7 +750,7 @@
       return viewScore + freshnessBoost;
     }
 
-    async function fetchRankedVideos(query, maxResults = 8) {
+    async function fetchRankedVideos(query, maxResults = 12) {
       const searchRes = await fetch(
         `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResults}&q=${encodeURIComponent(query)}&key=${API_KEY}`
       );
@@ -780,11 +780,6 @@
       return copy;
     }
 
-    function randomFromTop(videos, poolSize = 5) {
-      const pool = videos.slice(0, Math.min(poolSize, videos.length));
-      return pool[Math.floor(Math.random() * pool.length)];
-    }
-
     async function loadHomepageVideos() {
       const featured = document.getElementById("featured");
       const topVideos = document.getElementById("topVideos");
@@ -792,7 +787,7 @@
       try {
         const sorted = await fetchRankedVideos(
           "AI Bitcoin politics business economy migration debate Joe Rogan Trump automation finance Bezos Musk football soccer world cup",
-          10
+          12
         );
 
         if (!sorted.length) {
@@ -801,31 +796,34 @@
           return;
         }
 
-        const top = randomFromTop(sorted, 5);
+        const mainVideo = sorted[0];
+        const stableVideos = sorted.slice(1, 3);
+        const rotationPool = sorted.slice(3);
+        const shuffled = shuffleArray(rotationPool);
+        const rotatingVideos = shuffled.slice(0, 3);
+        const finalVideos = [...stableVideos, ...rotatingVideos];
 
         featured.innerHTML = `
-          <iframe class="hero-feature-frame" src="https://www.youtube.com/embed/${top.id}" allowfullscreen></iframe>
+          <iframe class="hero-feature-frame" src="https://www.youtube.com/embed/${mainVideo.id}" allowfullscreen></iframe>
           <div class="card-content">
-            <span class="rank-badge">Featured rotating signal</span>
-            <h3>${top.snippet.title}</h3>
-            <p>${top.snippet.description ? top.snippet.description.substring(0, 180) + "..." : "Featured signal."}</p>
+            <span class="rank-badge">Top Signal</span>
+            <h3>${mainVideo.snippet.title}</h3>
+            <p>${mainVideo.snippet.description ? mainVideo.snippet.description.substring(0, 180) + "..." : "Featured signal."}</p>
             <div class="meta-row">
-              <span>${formatViews(top.statistics?.viewCount)}</span>
+              <span>${formatViews(mainVideo.statistics?.viewCount)}</span>
               <span>•</span>
-              <span>${formatPublished(top.snippet?.publishedAt)}</span>
+              <span>${formatPublished(mainVideo.snippet?.publishedAt)}</span>
               <span>•</span>
-              <span>${top.snippet.channelTitle}</span>
+              <span>${mainVideo.snippet.channelTitle}</span>
             </div>
           </div>
         `;
 
-        const rest = shuffleArray(sorted.filter(v => v.id !== top.id)).slice(0, 4);
-
-        topVideos.innerHTML = rest.map((video, index) => `
+        topVideos.innerHTML = finalVideos.map((video, index) => `
           <div class="card">
             <iframe class="video-frame" src="https://www.youtube.com/embed/${video.id}" allowfullscreen></iframe>
             <div class="card-content">
-              <span class="rank-badge">#${index + 1} shelf signal</span>
+              <span class="rank-badge">${index < 2 ? "Strong Signal" : "New Signal"}</span>
               <h3>${video.snippet.title}</h3>
               <p>${video.snippet.description ? video.snippet.description.substring(0, 120) + "..." : "Video result."}</p>
               <div class="meta-row">

@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SignalBoost Live</title>
-
   <style>
     :root{
       --bg:#202533;
@@ -17,9 +16,7 @@
       --radius:18px;
     }
 
-    *{
-      box-sizing:border-box;
-    }
+    *{box-sizing:border-box;}
 
     body{
       margin:0;
@@ -34,7 +31,7 @@
     }
 
     .page{
-      width:min(94%, 1400px);
+      width:min(95%, 1480px);
       margin:0 auto;
     }
 
@@ -42,7 +39,7 @@
       display:flex;
       justify-content:center;
       align-items:center;
-      padding:34px 0 18px;
+      padding:36px 0 18px;
     }
 
     .brand{
@@ -70,7 +67,7 @@
 
     .hero h1{
       margin:0 0 10px;
-      font-size:2.7rem;
+      font-size:2.9rem;
       line-height:1.08;
       text-align:center;
     }
@@ -79,7 +76,7 @@
       margin:0 auto;
       color:var(--muted);
       line-height:1.55;
-      max-width:850px;
+      max-width:900px;
       text-align:center;
     }
 
@@ -87,7 +84,7 @@
       display:flex;
       gap:10px;
       margin:20px auto 0;
-      max-width:850px;
+      max-width:900px;
     }
 
     .search-wrap input{
@@ -106,7 +103,7 @@
       border:none;
       border-radius:999px;
       background:var(--accent);
-      color:#fff;
+      color:white;
       font-weight:600;
       cursor:pointer;
     }
@@ -149,7 +146,7 @@
       line-height:1.35;
     }
 
-    .desktop-layout{
+    .layout{
       display:grid;
       grid-template-columns:240px minmax(0,1fr) 280px;
       gap:18px;
@@ -221,7 +218,7 @@
 
     .hero-feature-frame{
       width:100%;
-      height:380px;
+      height:390px;
       border:none;
       display:block;
       background:#31384b;
@@ -252,14 +249,6 @@
     .video-frame{
       width:100%;
       height:220px;
-      border:none;
-      display:block;
-      background:#31384b;
-    }
-
-    .small-frame{
-      width:100%;
-      height:200px;
       border:none;
       display:block;
       background:#31384b;
@@ -405,7 +394,7 @@
     }
 
     .footer-disclaimer{
-      width:min(94%, 1400px);
+      width:min(95%, 1480px);
       margin:34px auto 24px;
       color:#aeb7c9;
       font-size:12px;
@@ -414,27 +403,13 @@
       padding-top:16px;
     }
 
-    .mobile-layout{
-      display:none;
-    }
-
-    @media(max-width:1100px){
-      .desktop-layout{
+    @media(max-width:1150px){
+      .layout{
         grid-template-columns:1fr;
       }
     }
 
     @media(max-width:760px){
-      .desktop-layout{
-        display:none;
-      }
-
-      .mobile-layout{
-        display:flex;
-        flex-direction:column;
-        gap:18px;
-      }
-
       .page{
         width:94%;
       }
@@ -461,8 +436,16 @@
         width:100%;
       }
 
-      .platform-strip{
+      .platform-strip,
+      .grid,
+      .wc-grid,
+      .topic-cards{
         grid-template-columns:1fr;
+      }
+
+      .hero-feature-frame,
+      .video-frame{
+        height:220px;
       }
 
       .panel,
@@ -470,18 +453,6 @@
       .wc-block,
       .platform-link{
         border-radius:16px;
-      }
-
-      .hero-feature-frame,
-      .video-frame,
-      .small-frame{
-        height:220px;
-      }
-
-      .grid,
-      .topic-cards,
-      .wc-grid{
-        grid-template-columns:1fr;
       }
     }
   </style>
@@ -518,6 +489,18 @@
         <strong>X</strong>
         <span>Fast reactions</span>
       </a>
+      <a class="platform-link" href="https://truthsocial.com" target="_blank">
+        <strong>Truth Social</strong>
+        <span>Political chatter</span>
+      </a>
+      <a class="platform-link" href="https://www.facebook.com" target="_blank">
+        <strong>Facebook</strong>
+        <span>Mass audience</span>
+      </a>
+      <a class="platform-link" href="https://www.tiktok.com" target="_blank">
+        <strong>TikTok</strong>
+        <span>Short clips</span>
+      </a>
       <a class="platform-link" href="https://www.instagram.com" target="_blank">
         <strong>Instagram</strong>
         <span>Visual trends</span>
@@ -530,10 +513,17 @@
         <strong>Reddit</strong>
         <span>Discussions</span>
       </a>
+      <a class="platform-link" href="https://www.linkedin.com" target="_blank">
+        <strong>LinkedIn</strong>
+        <span>Professional talk</span>
+      </a>
+      <a class="platform-link" href="https://www.threads.net" target="_blank">
+        <strong>Threads</strong>
+        <span>Meta social stream</span>
+      </a>
     </div>
 
-    <!-- DESKTOP / TABLET -->
-    <div class="desktop-layout">
+    <div class="layout">
       <aside class="sidebar">
         <div class="panel">
           <h3>Topic Stores</h3>
@@ -655,68 +645,6 @@
           <p>The Telegram link is only an external platform entrance. SignalBoost’s own messaging feature is not built yet.</p>
         </div>
       </aside>
-    </div>
-
-    <!-- MOBILE -->
-    <div class="mobile-layout">
-      <div class="card">
-        <div class="card-content">
-          <h2 style="margin-top:0;">Top Signal Right Now</h2>
-          <div id="mobileFeatured">Loading featured video...</div>
-        </div>
-      </div>
-
-      <div class="wc-block">
-        <div class="section-label">2026 World Cup</div>
-        <h2 style="margin-top:6px;">World Cup 2026</h2>
-        <p style="color:var(--muted);">A lighter mobile block for World Cup discussion and history.</p>
-        <div class="source-icons">
-          <a href="world-cup-history.html" class="source-badge">World Cup History</a>
-          <a href="https://www.fifa.com" target="_blank" class="source-badge">FIFA</a>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-content">
-          <h2 style="margin-top:0;">Top Topics</h2>
-          <div class="topic-cards">
-            <a href="topic-ai.html">
-              <div class="card topic-card">
-                <h3>AI</h3>
-                <p>Automation and jobs</p>
-              </div>
-            </a>
-
-            <a href="topic-bitcoin.html">
-              <div class="card topic-card">
-                <h3>Bitcoin</h3>
-                <p>Crypto and markets</p>
-              </div>
-            </a>
-
-            <a href="topic-politics.html">
-              <div class="card topic-card">
-                <h3>Politics</h3>
-                <p>Debates and policy</p>
-              </div>
-            </a>
-
-            <a href="world-cup-history.html">
-              <div class="card topic-card">
-                <h3>World Cup</h3>
-                <p>History and legends</p>
-              </div>
-            </a>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-content">
-          <h2 style="margin-top:0;">Featured Cause</h2>
-          <div id="mobileCharity">Loading charity...</div>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -860,7 +788,6 @@
     async function loadHomepageVideos() {
       const featured = document.getElementById("featured");
       const topVideos = document.getElementById("topVideos");
-      const mobileFeatured = document.getElementById("mobileFeatured");
 
       try {
         const sorted = await fetchRankedVideos(
@@ -871,13 +798,12 @@
         if (!sorted.length) {
           featured.innerHTML = `<div class="card-content">No videos found.</div>`;
           topVideos.innerHTML = "";
-          mobileFeatured.innerHTML = `No videos found.`;
           return;
         }
 
         const top = randomFromTop(sorted, 5);
 
-        const featuredHtml = `
+        featured.innerHTML = `
           <iframe class="hero-feature-frame" src="https://www.youtube.com/embed/${top.id}" allowfullscreen></iframe>
           <div class="card-content">
             <span class="rank-badge">Featured rotating signal</span>
@@ -892,9 +818,6 @@
             </div>
           </div>
         `;
-
-        featured.innerHTML = featuredHtml;
-        mobileFeatured.innerHTML = featuredHtml;
 
         const rest = shuffleArray(sorted.filter(v => v.id !== top.id)).slice(0, 4);
 
@@ -916,7 +839,6 @@
       } catch (err) {
         featured.innerHTML = `<div class="card-content">Failed to load homepage videos.</div>`;
         topVideos.innerHTML = "";
-        mobileFeatured.innerHTML = `Failed to load homepage videos.`;
         console.error(err);
       }
     }
@@ -950,16 +872,12 @@
       const current = charityRotation[currentIndex];
       const currentBox = document.getElementById("charityCurrent");
       const historyBox = document.getElementById("charityHistory");
-      const mobileCharity = document.getElementById("mobileCharity");
 
-      const currentHtml = `
+      currentBox.innerHTML = `
         <strong>${current.name}</strong>
         <p style="margin:10px 0 8px; color:var(--muted);">${current.note}</p>
         <a class="charity-link" href="${current.url}" target="_blank">Visit organization</a>
       `;
-
-      currentBox.innerHTML = currentHtml;
-      mobileCharity.innerHTML = currentHtml;
 
       const past = [];
       for (let i = 1; i <= 3; i++) {

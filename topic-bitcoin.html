@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bitcoin Surge - SignalBoost Live</title>
+<title>Bitcoin - SignalBoost Live</title>
+
 <style>
 :root{
   --bg:#202533;
@@ -44,8 +45,6 @@ body{
 
 .brand-wave{
   color:var(--accent);
-  letter-spacing:2px;
-  margin-bottom:2px;
 }
 
 .back{
@@ -56,28 +55,8 @@ body{
   text-decoration:none;
 }
 
-.hero{
-  margin-bottom:20px;
-}
-
-.hero h1{
-  margin:0 0 10px;
-}
-
-.hero p{
-  margin:0;
-  color:var(--muted);
-}
-
 .section{
   margin-top:30px;
-}
-
-.card{
-  background:var(--bg-soft);
-  border:1px solid var(--line);
-  border-radius:var(--radius);
-  padding:15px;
 }
 
 .grid{
@@ -86,15 +65,25 @@ body{
   gap:16px;
 }
 
-.placeholder{
-  height:220px;
-  background:#31384b;
-  display:flex;
-  align-items:center;
-  justify-content:center;
+.card{
+  background:var(--bg-soft);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  overflow:hidden;
+}
+
+.card-content{
+  padding:12px;
+}
+
+iframe{
+  width:100%;
+  height:200px;
+  border:none;
+}
+
+.loading{
   color:var(--muted);
-  border-radius:12px;
-  margin-bottom:12px;
 }
 
 .source-icons{
@@ -114,14 +103,18 @@ body{
   white-space:nowrap;
 }
 
-.card h3{
-  margin:0 0 8px;
+.wide-card{
+  background:var(--bg-soft);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:18px;
+  margin-top:10px;
 }
 
-.card p{
+.wide-card p{
   margin:0 0 10px;
   color:var(--muted);
-  line-height:1.5;
+  line-height:1.55;
 }
 
 @media(max-width:900px){
@@ -129,6 +122,7 @@ body{
 }
 </style>
 </head>
+
 <body>
 
 <div class="container nav">
@@ -136,60 +130,21 @@ body{
     <div class="brand-wave">~~~~~</div>
     <div>SignalBoost Live</div>
   </div>
-
   <a href="index.html" class="back">Back</a>
 </div>
 
-<div class="container hero">
+<div class="container">
   <h1>Bitcoin Surge</h1>
   <p>Crypto markets trending across media, finance channels, and social platforms.</p>
-</div>
-
-<div class="container">
 
   <div class="section">
     <h2>Featured Video</h2>
-    <div class="card">
-      <div class="placeholder">Featured Bitcoin video</div>
-      <h3>Why Bitcoin is rising</h3>
-      <p>Main discussion around price movement, adoption, and investor sentiment.</p>
-      <div class="source-icons">
-        <span class="source-badge">▶ YouTube</span>
-        <span class="source-badge">💼 Finance</span>
-      </div>
-    </div>
+    <div id="featured" class="loading">Loading...</div>
   </div>
 
   <div class="section">
     <h2>Top Videos</h2>
-    <div class="grid">
-
-      <div class="card">
-        <h3>Bitcoin explained</h3>
-        <p>A simple explanation of how Bitcoin works and why it matters.</p>
-        <div class="source-icons">
-          <span class="source-badge">▶ YouTube</span>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3>Market predictions</h3>
-        <p>Analysts discuss whether the next move is up, down, or sideways.</p>
-        <div class="source-icons">
-          <span class="source-badge">▶ YouTube</span>
-          <span class="source-badge">💼 Finance</span>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3>Crypto adoption</h3>
-        <p>Discussion of how Bitcoin is becoming more mainstream.</p>
-        <div class="source-icons">
-          <span class="source-badge">▶ YouTube</span>
-        </div>
-      </div>
-
-    </div>
+    <div id="videos" class="grid"></div>
   </div>
 
   <div class="section">
@@ -197,23 +152,29 @@ body{
     <div class="grid">
 
       <div class="card">
-        <p>"Bitcoin is back in focus because people are losing trust in traditional systems."</p>
-        <div class="source-icons">
-          <span class="source-badge">𝕏 X</span>
+        <div class="card-content">
+          <p>"Bitcoin is back in focus because people are losing trust in traditional systems."</p>
+          <div class="source-icons">
+            <span class="source-badge">𝕏 X</span>
+          </div>
         </div>
       </div>
 
       <div class="card">
-        <p>"Crypto is becoming part of a bigger political and economic conversation."</p>
-        <div class="source-icons">
-          <span class="source-badge">T Truth Social</span>
+        <div class="card-content">
+          <p>"Crypto is becoming part of a bigger political and economic conversation."</p>
+          <div class="source-icons">
+            <span class="source-badge">T Truth Social</span>
+          </div>
         </div>
       </div>
 
       <div class="card">
-        <p>"Institutions are treating Bitcoin more seriously than before."</p>
-        <div class="source-icons">
-          <span class="source-badge">in LinkedIn</span>
+        <div class="card-content">
+          <p>"Institutions are treating Bitcoin more seriously than before."</p>
+          <div class="source-icons">
+            <span class="source-badge">in LinkedIn</span>
+          </div>
         </div>
       </div>
 
@@ -221,21 +182,78 @@ body{
   </div>
 
   <div class="section">
-    <h2>Summary</h2>
-    <div class="card">
+    <h2>Quick Summary</h2>
+    <div class="wide-card">
       <p>Bitcoin trends because it combines finance, technology, speculation, and public trust. It attracts investors, creators, political voices, and everyday users all at once.</p>
     </div>
   </div>
 
   <div class="section">
     <h2>Instant Context</h2>
-    <div class="card">
+    <div class="wide-card">
       <p><strong>Bitcoin</strong>: a digital asset that runs on a decentralized network.</p>
       <p><strong>Volatility</strong>: prices can move up or down very quickly.</p>
     </div>
   </div>
-
 </div>
+
+<script>
+const API_KEY = "PASTE_YOUR_API_KEY_HERE";
+const QUERY = "Bitcoin crypto market";
+
+async function loadVideos(){
+  try{
+    const res = await fetch(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=4&q=${encodeURIComponent(QUERY)}&key=${API_KEY}`
+    );
+
+    const data = await res.json();
+
+    if(!data.items){
+      document.getElementById("featured").innerText = "Error loading videos";
+      return;
+    }
+
+    const first = data.items[0];
+
+    document.getElementById("featured").innerHTML = `
+      <div class="card">
+        <iframe src="https://www.youtube.com/embed/${first.id.videoId}" allowfullscreen></iframe>
+        <div class="card-content">
+          <h3>${first.snippet.title}</h3>
+          <p>${first.snippet.description ? first.snippet.description.substring(0, 140) + "..." : "Featured Bitcoin video."}</p>
+          <div class="source-icons">
+            <span class="source-badge">▶ YouTube</span>
+            <span class="source-badge">💼 Finance</span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const rest = data.items.slice(1);
+
+    document.getElementById("videos").innerHTML = rest.map(v => `
+      <div class="card">
+        <iframe src="https://www.youtube.com/embed/${v.id.videoId}" allowfullscreen></iframe>
+        <div class="card-content">
+          <h3>${v.snippet.title}</h3>
+          <p>${v.snippet.description ? v.snippet.description.substring(0, 120) + "..." : "Real YouTube result."}</p>
+          <div class="source-icons">
+            <span class="source-badge">▶ YouTube</span>
+            <span class="source-badge">💼 Finance</span>
+          </div>
+        </div>
+      </div>
+    `).join("");
+
+  }catch(e){
+    document.getElementById("featured").innerText = "Failed to load videos";
+    console.error(e);
+  }
+}
+
+loadVideos();
+</script>
 
 </body>
 </html>

@@ -9,11 +9,16 @@
 :root{
   --bg:#202533;
   --bg-soft:#272d3d;
+  --bg-panel:#252b3a;
   --text:#e9edf5;
   --muted:#aeb7c9;
   --line:rgba(255,255,255,0.08);
   --accent:#4da3ff;
   --radius:18px;
+}
+
+*{
+  box-sizing:border-box;
 }
 
 body{
@@ -23,13 +28,18 @@ body{
   color:var(--text);
 }
 
-.container{
-  width:90%;
-  max-width:1100px;
+a{
+  color:inherit;
+  text-decoration:none;
+}
+
+.page{
+  width:96%;
+  max-width:1500px;
   margin:auto;
 }
 
-.nav{
+.topbar{
   display:flex;
   justify-content:space-between;
   align-items:center;
@@ -45,6 +55,9 @@ body{
 
 .brand-wave{
   color:var(--accent);
+  letter-spacing:2px;
+  margin-bottom:2px;
+  font-weight:700;
 }
 
 .back{
@@ -53,108 +66,378 @@ body{
   padding:10px 16px;
   border-radius:999px;
   text-decoration:none;
+  font-weight:600;
 }
 
-.section{
-  margin-top:30px;
+.hero{
+  margin-bottom:18px;
 }
 
-.grid{
+.hero h1{
+  margin:0 0 10px;
+  font-size:2.3rem;
+}
+
+.hero p{
+  margin:0;
+  color:var(--muted);
+  max-width:900px;
+  line-height:1.5;
+}
+
+.layout{
   display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:16px;
+  grid-template-columns: 260px minmax(0, 1fr) 260px;
+  gap:20px;
+  align-items:start;
 }
 
+.sidebar{
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+  position:sticky;
+  top:16px;
+}
+
+.panel,
 .card{
   background:var(--bg-soft);
   border:1px solid var(--line);
   border-radius:var(--radius);
+}
+
+.panel{
+  padding:16px;
+}
+
+.panel h3{
+  margin:0 0 12px;
+  font-size:1rem;
+}
+
+.panel p,
+.panel li{
+  color:var(--muted);
+  font-size:.92rem;
+  line-height:1.45;
+}
+
+.panel ul{
+  margin:0;
+  padding-left:18px;
+}
+
+.main{
+  min-width:0;
+}
+
+.section{
+  margin-top:26px;
+}
+
+.section h2{
+  margin:0 0 14px;
+  font-size:1.45rem;
+}
+
+.featured{
   overflow:hidden;
 }
 
-.card-content{
-  padding:12px;
+.featured-frame{
+  width:100%;
+  height:380px;
+  border:none;
+  display:block;
+  background:#31384b;
 }
 
-iframe{
+.card-content{
+  padding:14px;
+}
+
+.card h3{
+  margin:0 0 8px;
+}
+
+.card p{
+  margin:0 0 10px;
+  color:var(--muted);
+  line-height:1.5;
+  font-size:.92rem;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:16px;
+}
+
+.video-card{
+  overflow:hidden;
+}
+
+.video-frame{
   width:100%;
-  height:200px;
+  height:220px;
   border:none;
+  display:block;
+  background:#31384b;
+}
+
+.source-icons{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:10px;
+}
+
+.source-badge{
+  display:inline-flex;
+  align-items:center;
+  padding:5px 9px;
+  border-radius:999px;
+  background:rgba(255,255,255,0.05);
+  border:1px solid var(--line);
+  font-size:.74rem;
+  color:#dbe6ff;
+  white-space:nowrap;
+}
+
+.mini-list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.mini-item{
+  padding:10px 0;
+  border-top:1px solid var(--line);
+}
+
+.mini-item:first-child{
+  border-top:none;
+  padding-top:0;
+}
+
+.mini-item strong{
+  display:block;
+  margin-bottom:4px;
+  font-size:.92rem;
 }
 
 .loading{
   color:var(--muted);
 }
 
-@media(max-width:900px){
-  .grid{grid-template-columns:1fr;}
+.quote-grid{
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:16px;
+}
+
+.quote-card{
+  padding:15px;
+}
+
+.quote-card p{
+  margin:0 0 10px;
+}
+
+.info-card{
+  padding:18px;
+}
+
+@media(max-width:1200px){
+  .layout{
+    grid-template-columns: 220px minmax(0, 1fr) 220px;
+  }
+}
+
+@media(max-width:980px){
+  .layout{
+    grid-template-columns:1fr;
+  }
+
+  .sidebar{
+    position:static;
+  }
+
+  .grid,
+  .quote-grid{
+    grid-template-columns:1fr;
+  }
+
+  .featured-frame{
+    height:280px;
+  }
 }
 </style>
 </head>
 
 <body>
 
-<div class="container nav">
-  <div class="brand">
-    <div class="brand-wave">~~~~~</div>
-    <div>SignalBoost Live</div>
-  </div>
-  <a href="index.html" class="back">Back</a>
-</div>
+<div class="page">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-wave">~~~~~</div>
+      <div>SignalBoost Live</div>
+    </div>
 
-<div class="container">
-  <h1>AI Replacing Jobs</h1>
-
-  <div class="section">
-    <h2>Featured Video</h2>
-    <div id="featured" class="loading">Loading...</div>
+    <a href="index.html" class="back">Back</a>
   </div>
 
-  <div class="section">
-    <h2>Top Videos</h2>
-    <div id="videos" class="grid"></div>
+  <div class="hero">
+    <h1>AI Replacing Jobs</h1>
+    <p>One of the fastest-growing topics across business, tech, and social platforms. This page brings together the strongest video discussion, related content, and supporting context in one place.</p>
+  </div>
+
+  <div class="layout">
+
+    <aside class="sidebar">
+      <div class="panel">
+        <h3>Trending Topics</h3>
+        <div class="mini-list">
+          <div class="mini-item"><strong>Bitcoin surge</strong><span>Markets, volatility, adoption</span></div>
+          <div class="mini-item"><strong>Europe migration debate</strong><span>Policy, borders, elections</span></div>
+          <div class="mini-item"><strong>Business & economy</strong><span>Inflation, layoffs, markets</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Quick Terms</h3>
+        <ul>
+          <li><strong>Automation</strong>: technology performing tasks with less human input.</li>
+          <li><strong>Reskilling</strong>: learning new abilities to stay relevant in changing jobs.</li>
+        </ul>
+      </div>
+    </aside>
+
+    <main class="main">
+
+      <div class="section">
+        <h2>Featured Video</h2>
+        <div id="featured" class="card featured loading">
+          <div class="card-content">Loading featured video...</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Top Videos</h2>
+        <div id="videos" class="grid"></div>
+      </div>
+
+      <div class="section">
+        <h2>What People Are Saying</h2>
+        <div class="quote-grid">
+
+          <div class="card quote-card">
+            <p>"AI will not replace jobs. People using AI will replace people who do not."</p>
+            <div class="source-icons">
+              <a href="https://x.com" target="_blank" class="source-badge">X</a>
+            </div>
+          </div>
+
+          <div class="card quote-card">
+            <p>"Mass layoffs may only be the beginning if automation keeps accelerating."</p>
+            <div class="source-icons">
+              <a href="https://truthsocial.com" target="_blank" class="source-badge">Truth Social</a>
+            </div>
+          </div>
+
+          <div class="card quote-card">
+            <p>"The companies that retrain their teams early will have the biggest advantage."</p>
+            <div class="source-icons">
+              <a href="https://www.linkedin.com" target="_blank" class="source-badge">LinkedIn</a>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Quick Summary</h2>
+        <div class="card info-card">
+          <p>AI replacing jobs trends because it touches economics, technology, and daily life at the same time. The topic is driven by media personalities, business leaders, creators, and public reactions.</p>
+        </div>
+      </div>
+
+    </main>
+
+    <aside class="sidebar">
+      <div class="panel">
+        <h3>Related Topics</h3>
+        <div class="mini-list">
+          <div class="mini-item"><strong>Automation tools</strong><span>How teams are doing more with less</span></div>
+          <div class="mini-item"><strong>Tech layoffs</strong><span>Why companies are restructuring</span></div>
+          <div class="mini-item"><strong>Future of work</strong><span>Jobs that may grow, not shrink</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Source Links</h3>
+        <div class="source-icons">
+          <a href="https://www.youtube.com" target="_blank" class="source-badge">YouTube</a>
+          <a href="https://x.com" target="_blank" class="source-badge">X</a>
+          <a href="https://www.linkedin.com" target="_blank" class="source-badge">LinkedIn</a>
+          <a href="https://www.tiktok.com" target="_blank" class="source-badge">TikTok</a>
+          <a href="https://www.instagram.com" target="_blank" class="source-badge">Instagram</a>
+        </div>
+      </div>
+    </aside>
+
   </div>
 </div>
 
 <script>
-const API_KEY = "AIzaSyBWSnsfSNZxY_kYG_ACxm-GQYMsCOEuIuc";
+const API_KEY = "PASTE_YOUR_API_KEY_HERE";
 const QUERY = "AI jobs automation";
 
 async function loadVideos(){
   try{
     const res = await fetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=4&q=${encodeURIComponent(QUERY)}&key=${API_KEY}`
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${encodeURIComponent(QUERY)}&key=${API_KEY}`
     );
 
     const data = await res.json();
 
-    if(!data.items){
-      document.getElementById("featured").innerText = "Error loading videos";
+    if(!data.items || !data.items.length){
+      document.getElementById("featured").innerHTML = `<div class="card-content">Error loading videos</div>`;
       return;
     }
 
     const first = data.items[0];
 
     document.getElementById("featured").innerHTML = `
-      <iframe src="https://www.youtube.com/embed/${first.id.videoId}" allowfullscreen></iframe>
+      <iframe class="featured-frame" src="https://www.youtube.com/embed/${first.id.videoId}" allowfullscreen></iframe>
       <div class="card-content">
         <h3>${first.snippet.title}</h3>
+        <p>${first.snippet.description ? first.snippet.description.substring(0, 180) + "..." : "Featured AI discussion."}</p>
+        <div class="source-icons">
+          <a href="https://www.youtube.com" target="_blank" class="source-badge">YouTube</a>
+          <span class="source-badge">Business</span>
+        </div>
       </div>
     `;
 
-    const rest = data.items.slice(1);
+    const rest = data.items.slice(1,5);
 
     document.getElementById("videos").innerHTML = rest.map(v => `
-      <div class="card">
-        <iframe src="https://www.youtube.com/embed/${v.id.videoId}" allowfullscreen></iframe>
+      <div class="card video-card">
+        <iframe class="video-frame" src="https://www.youtube.com/embed/${v.id.videoId}" allowfullscreen></iframe>
         <div class="card-content">
           <h3>${v.snippet.title}</h3>
+          <p>${v.snippet.description ? v.snippet.description.substring(0, 120) + "..." : "Real YouTube result."}</p>
+          <div class="source-icons">
+            <a href="https://www.youtube.com" target="_blank" class="source-badge">YouTube</a>
+          </div>
         </div>
       </div>
     `).join("");
 
   }catch(e){
-    document.getElementById("featured").innerText = "Failed to load videos";
+    document.getElementById("featured").innerHTML = `<div class="card-content">Failed to load videos</div>`;
     console.error(e);
   }
 }

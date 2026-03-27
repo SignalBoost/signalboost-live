@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube Gateway - SignalBoost Live</title>
+  <style>
+    :root{
+      --bg:#202533;
+      --bg-soft:#272d3d;
+      --text:#e9edf5;
+      --muted:#aeb7c9;
+      --line:rgba(255,255,255,0.08);
+      --accent:#4da3ff;
+      --accent-soft:rgba(77,163,255,0.14);
+      --radius:18px;
+    }
+
+    *{box-sizing:border-box;}
+
+    body{
+      margin:0;
+      font-family:Arial, Helvetica, sans-serif;
+      background:linear-gradient(180deg,#1b2130 0%, var(--bg) 100%);
+      color:var(--text);
+    }
+
+    a{
+      color:inherit;
+      text-decoration:none;
+    }
+
+    .page{
+      width:min(94%, 1200px);
+      margin:0 auto;
+      padding-bottom:28px;
+    }
+
+    .topbar{
+      position:sticky;
+      top:0;
+      z-index:20;
+      background:rgba(27,33,48,0.94);
+      backdrop-filter:blur(10px);
+      border-bottom:1px solid rgba(255,255,255,0.08);
+    }
+
+    .topbar-inner{
+      width:min(94%, 1200px);
+      margin:0 auto;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      padding:14px 0;
+    }
+
+    .brand{
+      display:flex;
+      flex-direction:column;
+      font-weight:bold;
+    }
+
+    .brand-wave{
+      color:var(--accent);
+      letter-spacing:2px;
+      font-size:.9rem;
+      line-height:1;
+      margin-bottom:2px;
+    }
+
+    .top-actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:10px 14px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:var(--bg-soft);
+      color:var(--text);
+      font-size:.9rem;
+      cursor:pointer;
+    }
+
+    .btn-primary{
+      background:var(--accent);
+      border-color:transparent;
+      color:white;
+    }
+
+    .hero{
+      margin-top:20px;
+      background:var(--bg-soft);
+      border:1px solid var(--line);
+      border-radius:24px;
+      padding:24px;
+    }
+
+    .hero h1{
+      margin:0 0 10px;
+      font-size:2.4rem;
+      line-height:1.1;
+    }
+
+    .hero p{
+      margin:0;
+      color:var(--muted);
+      line-height:1.55;
+      max-width:850px;
+    }
+
+    .hero-actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      margin-top:18px;
+    }
+
+    .layout{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) 300px;
+      gap:18px;
+      margin-top:18px;
+    }
+
+    .panel,
+    .card{
+      background:var(--bg-soft);
+      border:1px solid var(--line);
+      border-radius:18px;
+    }
+
+    .panel{
+      padding:16px;
+    }
+
+    .panel h2,
+    .panel h3{
+      margin:0 0 12px;
+    }
+
+    .panel p{
+      color:var(--muted);
+      line-height:1.5;
+      margin:0;
+    }
+
+    .featured-frame{
+      width:100%;
+      height:420px;
+      border:none;
+      display:block;
+      background:#31384b;
+      border-top-left-radius:18px;
+      border-top-right-radius:18px;
+    }
+
+    .card-content{
+      padding:14px;
+    }
+
+    .card h3{
+      margin:0 0 8px;
+      line-height:1.25;
+    }
+
+    .card p{
+      margin:0 0 10px;
+      color:var(--muted);
+      line-height:1.5;
+      font-size:.92rem;
+    }
+
+    .meta-row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-top:8px;
+      color:var(--muted);
+      font-size:.82rem;
+    }
+
+    .rank-badge{
+      display:inline-block;
+      font-size:.76rem;
+      font-weight:700;
+      color:#fff;
+      background:#4da3ff;
+      padding:5px 9px;
+      border-radius:999px;
+      margin-bottom:8px;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0,1fr));
+      gap:16px;
+    }
+
+    .video-frame{
+      width:100%;
+      height:220px;
+      border:none;
+      display:block;
+      background:#31384b;
+      border-top-left-radius:18px;
+      border-top-right-radius:18px;
+    }
+
+    .mini-list{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .mini-item{
+      padding:10px 0;
+      border-top:1px solid var(--line);
+    }
+
+    .mini-item:first-child{
+      border-top:none;
+      padding-top:0;
+    }
+
+    .mini-item strong{
+      display:block;
+      margin-bottom:4px;
+      font-size:.92rem;
+    }
+
+    .notice{
+      color:var(--muted);
+      font-size:.82rem;
+      margin-top:10px;
+      line-height:1.5;
+    }
+
+    .footer-space{
+      height:20px;
+    }
+
+    @media(max-width:900px){
+      .layout{
+        grid-template-columns:1fr;
+      }
+
+      .featured-frame{
+        height:240px;
+      }
+
+      .grid{
+        grid-template-columns:1fr;
+      }
+
+      .video-frame{
+        height:220px;
+      }
+
+      .hero h1{
+        font-size:2rem;
+      }
+    }
+
+    @media(max-width:640px){
+      .topbar-inner{
+        align-items:flex-start;
+        flex-direction:column;
+      }
+
+      .hero{
+        padding:20px;
+      }
+
+      .hero h1{
+        font-size:1.8rem;
+      }
+
+      .hero-actions,
+      .top-actions{
+        width:100%;
+      }
+
+      .top-actions .btn,
+      .hero-actions .btn{
+        flex:1 1 auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-wave">~~~~~</div>
+        <div>SignalBoost Live</div>
+      </div>
+
+      <div class="top-actions">
+        <a class="btn" href="index.html">Back to Home</a>
+        <a class="btn btn-primary" href="https://www.youtube.com" target="_blank" rel="noopener noreferrer">Open YouTube</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="page">
+    <div class="hero">
+      <h1>YouTube Gateway</h1>
+      <p>
+        This page keeps users inside SignalBoost first. From here they can explore featured video signals,
+        trending discussion, and then open YouTube when they want, without losing the path back to SignalBoost.
+      </p>
+
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="https://www.youtube.com/feed/trending" target="_blank" rel="noopener noreferrer">Open YouTube Trending</a>
+        <a class="btn" href="https://www.youtube.com/results?search_query=breaking+news+today" target="_blank" rel="noopener noreferrer">News Search</a>
+        <a class="btn" href="https://www.youtube.com/results?search_query=football+highlights+today" target="_blank" rel="noopener noreferrer">Football Search</a>
+      </div>
+    </div>
+
+    <div class="layout">
+      <main>
+        <div class="card">
+          <iframe
+            class="featured-frame"
+            src="https://www.youtube.com/embed/jNQXAC9IVRw"
+            title="Featured YouTube video"
+            allowfullscreen>
+          </iframe>
+          <div class="card-content">
+            <span class="rank-badge">Featured YouTube Access</span>
+            <h3>Featured signal entry point</h3>
+            <p>
+              This top block is your controlled gateway. Later we can make it dynamic with your real feed rules,
+              but for now it already solves the problem of users leaving SignalBoost with no easy return path.
+            </p>
+            <div class="meta-row">
+              <span>Inside SignalBoost first</span>
+              <span>•</span>
+              <span>Then open platform</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:18px;">
+          <h2>Fast YouTube Routes</h2>
+          <div class="grid">
+            <a href="https://www.youtube.com/results?search_query=trump+latest" target="_blank" rel="noopener noreferrer">
+              <div class="card">
+                <div class="card-content">
+                  <span class="rank-badge">Politics</span>
+                  <h3>Trump latest</h3>
+                  <p>Jump directly into YouTube search results for current Trump-related videos.</p>
+                </div>
+              </div>
+            </a>
+
+            <a href="https://www.youtube.com/results?search_query=bitcoin+news" target="_blank" rel="noopener noreferrer">
+              <div class="card">
+                <div class="card-content">
+                  <span class="rank-badge">Markets</span>
+                  <h3>Bitcoin news</h3>
+                  <p>Open crypto and market-focused YouTube results.</p>
+                </div>
+              </div>
+            </a>
+
+            <a href="https://www.youtube.com/results?search_query=ai+jobs+automation" target="_blank" rel="noopener noreferrer">
+              <div class="card">
+                <div class="card-content">
+                  <span class="rank-badge">AI</span>
+                  <h3>AI and jobs</h3>
+                  <p>Search YouTube for AI, automation, jobs, and future-of-work signals.</p>
+                </div>
+              </div>
+            </a>
+
+            <a href="https://www.youtube.com/results?search_query=world+cup+2026" target="_blank" rel="noopener noreferrer">
+              <div class="card">
+                <div class="card-content">
+                  <span class="rank-badge">Sports</span>
+                  <h3>World Cup 2026</h3>
+                  <p>Go straight into World Cup search results on YouTube.</p>
+                </div>
+              </div>
+            </a>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:18px;">
+          <h2>Suggested Video Paths</h2>
+          <div class="grid">
+            <div class="card">
+              <iframe
+                class="video-frame"
+                src="https://www.youtube.com/embed/jfKfPfyJRdk"
+                title="Live audio"
+                allowfullscreen>
+              </iframe>
+              <div class="card-content">
+                <span class="rank-badge">Ambient</span>
+                <h3>Live background stream</h3>
+                <p>A calm entry point while browsing the rest of SignalBoost.</p>
+              </div>
+            </div>
+
+            <div class="card">
+              <iframe
+                class="video-frame"
+                src="https://www.youtube.com/embed/aqz-KE-bpKQ"
+                title="Sample video"
+                allowfullscreen>
+              </iframe>
+              <div class="card-content">
+                <span class="rank-badge">Demo</span>
+                <h3>Second controlled video slot</h3>
+                <p>Later this can become a real dynamic slot driven by your ranking system.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <aside class="sidebar">
+        <div class="panel">
+          <h3>Why this page exists</h3>
+          <div class="mini-list">
+            <div class="mini-item">
+              <strong>Keep users inside SignalBoost first</strong>
+              <span class="notice">They do not jump out immediately from the homepage.</span>
+            </div>
+            <div class="mini-item">
+              <strong>Always show a way back</strong>
+              <span class="notice">The back button stays obvious and easy.</span>
+            </div>
+            <div class="mini-item">
+              <strong>Prepare for future app behavior</strong>
+              <span class="notice">This is closer to how a real app gateway would behave.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Next inside SignalBoost</h3>
+          <div class="mini-list">
+            <div class="mini-item">
+              <a href="index.html"><strong>Home</strong><span class="notice">Return to the main entry page.</span></a>
+            </div>
+            <div class="mini-item">
+              <a href="topic-ai.html"><strong>AI Topic</strong><span class="notice">Automation, jobs, and tools.</span></a>
+            </div>
+            <div class="mini-item">
+              <a href="topic-bitcoin.html"><strong>Bitcoin Topic</strong><span class="notice">Crypto, adoption, and markets.</span></a>
+            </div>
+            <div class="mini-item">
+              <a href="world-cup-history.html"><strong>World Cup</strong><span class="notice">History and tournament context.</span></a>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>External YouTube opens</h3>
+          <div class="hero-actions" style="margin-top:0;">
+            <a class="btn btn-primary" href="https://www.youtube.com" target="_blank" rel="noopener noreferrer">Open Main YouTube</a>
+            <a class="btn" href="https://www.youtube.com/feed/trending" target="_blank" rel="noopener noreferrer">Open Trending</a>
+          </div>
+          <p class="notice">
+            On mobile this solves the “I left SignalBoost and lost my way back” problem by giving users a controlled step before leaving.
+          </p>
+        </div>
+      </aside>
+    </div>
+
+    <div class="footer-space"></div>
+  </div>
+</body>
+</html>

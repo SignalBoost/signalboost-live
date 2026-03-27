@@ -464,6 +464,15 @@ a{
   padding-top:16px;
 }
 
+/* adaptive visibility */
+.mobile-only{
+  display:none;
+}
+
+.desktop-only{
+  display:block;
+}
+
 /* tablet */
 @media(max-width:1180px){
   .layout{
@@ -488,6 +497,14 @@ a{
 
   .topbar{
     padding:28px 0 14px;
+  }
+
+  .desktop-only{
+    display:none !important;
+  }
+
+  .mobile-only{
+    display:block;
   }
 
   .notice-bar,
@@ -541,6 +558,12 @@ a{
   .platform-link{
     min-height:auto;
   }
+
+  .mobile-stack{
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
 }
 </style>
 </head>
@@ -554,10 +577,10 @@ a{
     </div>
   </div>
 
-  <div class="notice-bar">
+  <div class="notice-bar desktop-only">
     <div class="notice-box">
       <strong>About this site</strong><br>
-      SignalBoost Live is a discovery platform designed like an entry point into many content “stores.” It is built to become AI-guided, multi-source, and constantly changing.
+      SignalBoost Live is a discovery platform designed like an entry point into many content stores. It is built to become AI-guided, multi-source, and constantly changing.
     </div>
     <div class="notice-box">
       <strong>Guidance for minors</strong><br>
@@ -578,21 +601,21 @@ a{
         Try: Trump, Messi, World Cup, Bitcoin, AI jobs, inflation, Musk, football
       </div>
 
-      <div class="hero-pills">
+      <div class="hero-pills desktop-only">
         <span class="pill">Better search</span>
-        <span class="pill">Mobile cleaned up</span>
+        <span class="pill">Adaptive mobile</span>
         <span class="pill">World Cup 2026</span>
         <span class="pill">Dynamic shelves</span>
       </div>
     </div>
 
-    <div class="hero-side">
-      <h3 style="margin-top:0;">What this fixes</h3>
-      <p>This version focuses only on two things: search and mobile. The layout is simpler on phone, and the search now understands many more terms and routes them more reliably.</p>
+    <div class="hero-side desktop-only">
+      <h3 style="margin-top:0;">What this version does</h3>
+      <p>Desktop stays rich. Mobile becomes simpler. The search now routes much more broadly than before, and the phone experience shows fewer sections at once.</p>
     </div>
   </div>
 
-  <div class="platform-strip">
+  <div class="platform-strip desktop-only">
     <a class="platform-link" href="https://www.youtube.com" target="_blank">
       <strong>YouTube</strong>
       <span>Video signals</span>
@@ -635,7 +658,79 @@ a{
     </a>
   </div>
 
-  <div class="layout">
+  <!-- MOBILE VERSION -->
+  <div class="mobile-only mobile-stack">
+    <div class="notice-box">
+      <strong>Mobile version</strong><br>
+      This version shows fewer sections at once so the page is easier to use on a phone.
+    </div>
+
+    <div class="card">
+      <div class="card-content">
+        <h2 style="margin-top:0;">Top Signal Right Now</h2>
+        <div id="mobileFeatured">Loading featured video...</div>
+      </div>
+    </div>
+
+    <div class="wc-block">
+      <div class="section-label">2026 World Cup</div>
+      <h2 style="margin-top:6px;">World Cup 2026</h2>
+      <p style="color:var(--muted);">A dedicated World Cup block stays near the top on mobile so it is easy to find.</p>
+      <div class="source-icons">
+        <a href="world-cup-history.html" class="source-badge">World Cup History</a>
+        <a href="https://www.fifa.com" target="_blank" class="source-badge">FIFA</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-content">
+        <h2 style="margin-top:0;">Top Topics</h2>
+        <div class="topic-cards">
+          <a href="topic-ai.html">
+            <div class="card topic-card">
+              <h3>AI</h3>
+              <p>Automation, jobs, tools</p>
+            </div>
+          </a>
+          <a href="topic-bitcoin.html">
+            <div class="card topic-card">
+              <h3>Bitcoin</h3>
+              <p>Crypto, markets, adoption</p>
+            </div>
+          </a>
+          <a href="topic-politics.html">
+            <div class="card topic-card">
+              <h3>Politics</h3>
+              <p>Debates, elections, policy</p>
+            </div>
+          </a>
+          <a href="world-cup-history.html">
+            <div class="card topic-card">
+              <h3>World Cup</h3>
+              <p>History and legends</p>
+            </div>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-content">
+        <h2 style="margin-top:0;">Mobile Shelf</h2>
+        <div id="mobileShelf">Loading shelf...</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-content">
+        <h2 style="margin-top:0;">Featured Cause</h2>
+        <div id="mobileCharity">Loading charity...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DESKTOP / TABLET VERSION -->
+  <div class="layout desktop-only">
 
     <aside class="sidebar">
       <div class="panel">
@@ -964,6 +1059,7 @@ function renderShelfSection(title, label, videos) {
 async function loadHomepageVideos() {
   const featured = document.getElementById("featured");
   const topVideos = document.getElementById("topVideos");
+  const mobileFeatured = document.getElementById("mobileFeatured");
 
   try {
     const sorted = await fetchRankedVideos(
@@ -972,14 +1068,15 @@ async function loadHomepageVideos() {
     );
 
     if (!sorted.length) {
-      featured.innerHTML = `<div class="card-content">No videos found.</div>`;
-      topVideos.innerHTML = "";
+      if (featured) featured.innerHTML = `<div class="card-content">No videos found.</div>`;
+      if (topVideos) topVideos.innerHTML = "";
+      if (mobileFeatured) mobileFeatured.innerHTML = `No videos found.`;
       return;
     }
 
     const top = randomFromTop(sorted, 5);
 
-    featured.innerHTML = `
+    const featuredHtml = `
       <iframe class="hero-feature-frame" src="https://www.youtube.com/embed/${top.id}" allowfullscreen></iframe>
       <div class="card-content">
         <span class="rank-badge">Featured rotating signal</span>
@@ -995,33 +1092,40 @@ async function loadHomepageVideos() {
       </div>
     `;
 
+    if (featured) featured.innerHTML = featuredHtml;
+    if (mobileFeatured) mobileFeatured.innerHTML = featuredHtml;
+
     const rest = shuffleArray(sorted.filter(v => v.id !== top.id)).slice(0, 4);
 
-    topVideos.innerHTML = rest.map((video, index) => `
-      <div class="card video-card">
-        <iframe class="video-frame" src="https://www.youtube.com/embed/${video.id}" allowfullscreen></iframe>
-        <div class="card-content">
-          <span class="rank-badge">#${index + 1} shelf signal</span>
-          <h3>${video.snippet.title}</h3>
-          <p>${video.snippet.description ? video.snippet.description.substring(0, 120) + "..." : "Video result."}</p>
-          <div class="meta-row">
-            <span>${formatViews(video.statistics?.viewCount)}</span>
-            <span>•</span>
-            <span>${formatPublished(video.snippet?.publishedAt)}</span>
+    if (topVideos) {
+      topVideos.innerHTML = rest.map((video, index) => `
+        <div class="card video-card">
+          <iframe class="video-frame" src="https://www.youtube.com/embed/${video.id}" allowfullscreen></iframe>
+          <div class="card-content">
+            <span class="rank-badge">#${index + 1} shelf signal</span>
+            <h3>${video.snippet.title}</h3>
+            <p>${video.snippet.description ? video.snippet.description.substring(0, 120) + "..." : "Video result."}</p>
+            <div class="meta-row">
+              <span>${formatViews(video.statistics?.viewCount)}</span>
+              <span>•</span>
+              <span>${formatPublished(video.snippet?.publishedAt)}</span>
+            </div>
           </div>
         </div>
-      </div>
-    `).join("");
+      `).join("");
+    }
 
   } catch (err) {
-    featured.innerHTML = `<div class="card-content">Failed to load homepage videos.</div>`;
-    topVideos.innerHTML = "";
+    if (featured) featured.innerHTML = `<div class="card-content">Failed to load homepage videos.</div>`;
+    if (mobileFeatured) mobileFeatured.innerHTML = `Failed to load homepage videos.`;
+    if (topVideos) topVideos.innerHTML = "";
     console.error(err);
   }
 }
 
 async function loadDynamicShelves() {
   const dynamicShelves = document.getElementById("dynamicShelves");
+  const mobileShelf = document.getElementById("mobileShelf");
 
   const shelfConfigs = [
     {
@@ -1059,18 +1163,45 @@ async function loadDynamicShelves() {
     })
   );
 
-  dynamicShelves.innerHTML = results.map(shelf => {
-    if (!shelf.videos.length) {
-      return `
-        <div class="section">
-          <div class="section-label">${shelf.label}</div>
-          <h2>${shelf.title}</h2>
-          <div class="card"><div class="card-content">No videos found.</div></div>
-        </div>
+  if (dynamicShelves) {
+    dynamicShelves.innerHTML = results.map(shelf => {
+      if (!shelf.videos.length) {
+        return `
+          <div class="section">
+            <div class="section-label">${shelf.label}</div>
+            <h2>${shelf.title}</h2>
+            <div class="card"><div class="card-content">No videos found.</div></div>
+          </div>
+        `;
+      }
+      return renderShelfSection(shelf.title, shelf.label, shelf.videos);
+    }).join("");
+  }
+
+  if (mobileShelf) {
+    const firstShelf = results.find(s => s.videos.length);
+    if (!firstShelf) {
+      mobileShelf.innerHTML = "No shelf available.";
+    } else {
+      mobileShelf.innerHTML = `
+        <div class="section-label">${firstShelf.label}</div>
+        <h3 style="margin:10px 0 14px;">${firstShelf.title}</h3>
+        ${firstShelf.videos.map(video => `
+          <div class="card video-card" style="margin-bottom:14px;">
+            <iframe class="small-frame" src="https://www.youtube.com/embed/${video.id}" allowfullscreen></iframe>
+            <div class="card-content">
+              <h3>${video.snippet.title}</h3>
+              <div class="meta-row">
+                <span>${formatViews(video.statistics?.viewCount)}</span>
+                <span>•</span>
+                <span>${formatPublished(video.snippet?.publishedAt)}</span>
+              </div>
+            </div>
+          </div>
+        `).join("")}
       `;
     }
-    return renderShelfSection(shelf.title, shelf.label, shelf.videos);
-  }).join("");
+  }
 }
 
 /* CHARITY */
@@ -1103,12 +1234,16 @@ function renderCharitySpotlight() {
   const current = charityRotation[currentIndex];
   const currentBox = document.getElementById("charityCurrent");
   const historyBox = document.getElementById("charityHistory");
+  const mobileCharity = document.getElementById("mobileCharity");
 
-  currentBox.innerHTML = `
+  const currentHtml = `
     <strong>${current.name}</strong>
     <p style="margin:10px 0 8px; color:var(--muted);">${current.note}</p>
     <a class="charity-link" href="${current.url}" target="_blank">Visit organization</a>
   `;
+
+  if (currentBox) currentBox.innerHTML = currentHtml;
+  if (mobileCharity) mobileCharity.innerHTML = currentHtml;
 
   const past = [];
   for (let i = 1; i <= 3; i++) {
@@ -1116,17 +1251,19 @@ function renderCharitySpotlight() {
     past.push(charityRotation[idx]);
   }
 
-  historyBox.innerHTML = `
-    <h4 style="margin:0 0 8px; font-size:.95rem;">Recent rotation history</h4>
-    <div class="mini-list">
-      ${past.map(item => `
-        <div class="mini-item">
-          <strong>${item.name}</strong>
-          <span>${item.note}</span>
-        </div>
-      `).join("")}
-    </div>
-  `;
+  if (historyBox) {
+    historyBox.innerHTML = `
+      <h4 style="margin:0 0 8px; font-size:.95rem;">Recent rotation history</h4>
+      <div class="mini-list">
+        ${past.map(item => `
+          <div class="mini-item">
+            <strong>${item.name}</strong>
+            <span>${item.note}</span>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
 }
 
 renderCharitySpotlight();

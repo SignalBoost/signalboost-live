@@ -87,7 +87,7 @@ a{
 
 .layout{
   display:grid;
-  grid-template-columns: 260px minmax(0, 1fr) 260px;
+  grid-template-columns:260px minmax(0, 1fr) 300px;
   gap:20px;
   align-items:start;
 }
@@ -205,6 +205,10 @@ a{
   white-space:nowrap;
 }
 
+a.source-badge{
+  text-decoration:none;
+}
+
 .mini-list{
   display:flex;
   flex-direction:column;
@@ -249,9 +253,30 @@ a{
   padding:18px;
 }
 
+.audio-frame{
+  width:100%;
+  height:180px;
+  border:none;
+  border-radius:12px;
+  background:#31384b;
+}
+
+.charity-link{
+  display:inline-block;
+  margin-top:10px;
+  color:#dbe6ff;
+  text-decoration:underline;
+}
+
+.notice{
+  font-size:.82rem;
+  color:var(--muted);
+  margin-top:8px;
+}
+
 @media(max-width:1200px){
   .layout{
-    grid-template-columns: 220px minmax(0, 1fr) 220px;
+    grid-template-columns:220px minmax(0, 1fr) 260px;
   }
 }
 
@@ -290,7 +315,7 @@ a{
 
   <div class="hero">
     <h1>AI Replacing Jobs</h1>
-    <p>One of the fastest-growing topics across business, tech, and social platforms. This page brings together the strongest video discussion, related content, and supporting context in one place.</p>
+    <p>One of the fastest-growing topics across business, tech, and social platforms. This page brings together the strongest video discussion, related content, live audio, and useful links in one place.</p>
   </div>
 
   <div class="layout">
@@ -311,6 +336,18 @@ a{
           <li><strong>Automation</strong>: technology performing tasks with less human input.</li>
           <li><strong>Reskilling</strong>: learning new abilities to stay relevant in changing jobs.</li>
         </ul>
+      </div>
+
+      <div class="panel">
+        <h3>Source Links</h3>
+        <div class="source-icons">
+          <a href="https://www.youtube.com" target="_blank" class="source-badge">YouTube</a>
+          <a href="https://x.com" target="_blank" class="source-badge">X</a>
+          <a href="https://www.linkedin.com" target="_blank" class="source-badge">LinkedIn</a>
+          <a href="https://www.tiktok.com" target="_blank" class="source-badge">TikTok</a>
+          <a href="https://www.instagram.com" target="_blank" class="source-badge">Instagram</a>
+          <a href="https://truthsocial.com" target="_blank" class="source-badge">Truth Social</a>
+        </div>
       </div>
     </aside>
 
@@ -367,22 +404,31 @@ a{
 
     <aside class="sidebar">
       <div class="panel">
+        <h3>Live Audio</h3>
+        <iframe
+          class="audio-frame"
+          src="https://www.youtube.com/embed/jfKfPfyJRdk"
+          title="Live audio stream"
+          allowfullscreen>
+        </iframe>
+        <p class="notice">Optional background listening while browsing the page.</p>
+      </div>
+
+      <div class="panel">
+        <h3>Featured Cause</h3>
+        <p>We highlight one major organization at a time to encourage support for meaningful work.</p>
+        <strong>Current spotlight: Red Cross</strong>
+        <br>
+        <a class="charity-link" href="https://www.redcross.org" target="_blank">Visit Red Cross</a>
+        <p class="notice">This is a public spotlight link, not an official partnership claim.</p>
+      </div>
+
+      <div class="panel">
         <h3>Related Topics</h3>
         <div class="mini-list">
           <div class="mini-item"><strong>Automation tools</strong><span>How teams are doing more with less</span></div>
           <div class="mini-item"><strong>Tech layoffs</strong><span>Why companies are restructuring</span></div>
           <div class="mini-item"><strong>Future of work</strong><span>Jobs that may grow, not shrink</span></div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <h3>Source Links</h3>
-        <div class="source-icons">
-          <a href="https://www.youtube.com" target="_blank" class="source-badge">YouTube</a>
-          <a href="https://x.com" target="_blank" class="source-badge">X</a>
-          <a href="https://www.linkedin.com" target="_blank" class="source-badge">LinkedIn</a>
-          <a href="https://www.tiktok.com" target="_blank" class="source-badge">TikTok</a>
-          <a href="https://www.instagram.com" target="_blank" class="source-badge">Instagram</a>
         </div>
       </div>
     </aside>

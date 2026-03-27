@@ -751,20 +751,31 @@
     }
 
     async function fetchRankedVideos(query, maxResults = 12) {
-      const searchRes = await fetch(
-        `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResults}&q=${encodeURIComponent(query)}&key=${API_KEY}`
-      );
+      const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResults}&q=${encodeURIComponent(query)}&key=${API_KEY}`;
+      const searchRes = await fetch(searchUrl);
       const searchData = await searchRes.json();
 
-      if (!searchData.items || !searchData.items.length) return [];
+      if (!searchRes.ok) {
+        throw new Error("YouTube search error: " + JSON.stringify(searchData));
+      }
+
+      if (!searchData.items || !searchData.items.length) {
+        throw new Error("YouTube search returned no items. Response: " + JSON.stringify(searchData));
+      }
 
       const videoIds = searchData.items.map(item => item.id.videoId).filter(Boolean).join(",");
-      const statsRes = await fetch(
-        `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${API_KEY}`
-      );
+
+      const statsUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${API_KEY}`;
+      const statsRes = await fetch(statsUrl);
       const statsData = await statsRes.json();
 
-      if (!statsData.items || !statsData.items.length) return [];
+      if (!statsRes.ok) {
+        throw new Error("YouTube stats error: " + JSON.stringify(statsData));
+      }
+
+      if (!statsData.items || !statsData.items.length) {
+        throw new Error("YouTube stats returned no items. Response: " + JSON.stringify(statsData));
+      }
 
       return [...statsData.items]
         .map(item => ({ ...item, signalScore: calculateSignalScore(item) }))
@@ -835,7 +846,7 @@
           </div>
         `).join("");
       } catch (err) {
-        featured.innerHTML = `<div class="card-content">Failed to load homepage videos.</div>`;
+        featured.innerHTML = `<div class="card-content">Failed to load homepage videos.<br><br>${String(err.message || err)}</div>`;
         topVideos.innerHTML = "";
         console.error(err);
       }

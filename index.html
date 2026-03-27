@@ -1,21 +1,562 @@
-<script>
-const API_KEY = "AIzaSyBWSnsfSNZxY_kYG_ACxm-GQYMsCOEuIuc";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SignalBoost Live</title>
 
-const HOMEPAGE_QUERY = "AI Bitcoin politics business economy migration debate Joe Rogan Trump automation finance";
-
-/* ---------- STOP OTHER VIDEOS ---------- */
-function stopAllVideos(currentFrame) {
-  const frames = document.querySelectorAll("iframe");
-
-  frames.forEach(frame => {
-    if (frame !== currentFrame) {
-      const src = frame.src;
-      frame.src = src; // reload = stop video
-    }
-  });
+<style>
+:root{
+  --bg:#202533;
+  --bg-soft:#272d3d;
+  --bg-panel:#252b3a;
+  --text:#e9edf5;
+  --muted:#aeb7c9;
+  --line:rgba(255,255,255,0.08);
+  --accent:#4da3ff;
+  --radius:18px;
 }
 
-/* ---------- FORMAT VIEWS ---------- */
+*{
+  box-sizing:border-box;
+}
+
+body{
+  margin:0;
+  font-family:Arial, Helvetica, sans-serif;
+  background:linear-gradient(180deg,#1b2130 0%, var(--bg) 100%);
+  color:var(--text);
+}
+
+a{
+  color:inherit;
+  text-decoration:none;
+}
+
+.page{
+  width:96%;
+  max-width:1500px;
+  margin:auto;
+}
+
+.topbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:18px 0;
+}
+
+.brand{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  font-weight:bold;
+}
+
+.brand-wave{
+  color:var(--accent);
+  letter-spacing:2px;
+  margin-bottom:2px;
+  font-weight:700;
+}
+
+.banner{
+  text-align:center;
+  padding:8px;
+  font-size:13px;
+  color:#aeb7c9;
+}
+
+.hero{
+  margin-bottom:20px;
+}
+
+.hero h1{
+  margin:0 0 10px;
+  font-size:2.8rem;
+}
+
+.hero p{
+  margin:0;
+  color:var(--muted);
+  max-width:920px;
+  line-height:1.5;
+}
+
+.search-wrap{
+  display:flex;
+  gap:10px;
+  margin-top:22px;
+  flex-wrap:wrap;
+}
+
+.search-wrap input{
+  flex:1;
+  min-width:260px;
+  padding:12px 14px;
+  border-radius:999px;
+  border:none;
+  outline:none;
+  background:#2a3142;
+  color:var(--text);
+}
+
+.search-wrap button{
+  padding:12px 18px;
+  border:none;
+  border-radius:999px;
+  background:var(--accent);
+  color:white;
+  font-weight:600;
+  cursor:pointer;
+}
+
+.layout{
+  display:grid;
+  grid-template-columns:260px minmax(0, 1fr) 300px;
+  gap:20px;
+  align-items:start;
+}
+
+.sidebar{
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+  position:sticky;
+  top:16px;
+}
+
+.panel,
+.card{
+  background:var(--bg-soft);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+}
+
+.panel{
+  padding:16px;
+}
+
+.panel h3{
+  margin:0 0 12px;
+  font-size:1rem;
+}
+
+.panel p,
+.panel li{
+  color:var(--muted);
+  font-size:.92rem;
+  line-height:1.45;
+}
+
+.panel ul{
+  margin:0;
+  padding-left:18px;
+}
+
+.main{
+  min-width:0;
+}
+
+.section{
+  margin-top:26px;
+}
+
+.section h2{
+  margin:0 0 14px;
+  font-size:1.5rem;
+}
+
+.hero-feature{
+  overflow:hidden;
+}
+
+.hero-feature-frame{
+  width:100%;
+  height:420px;
+  border:none;
+  display:block;
+  background:#31384b;
+}
+
+.card-content{
+  padding:14px;
+}
+
+.card h3{
+  margin:0 0 8px;
+}
+
+.card p{
+  margin:0 0 10px;
+  color:var(--muted);
+  line-height:1.5;
+  font-size:.92rem;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:16px;
+}
+
+.video-card{
+  overflow:hidden;
+}
+
+.video-frame{
+  width:100%;
+  height:220px;
+  border:none;
+  display:block;
+  background:#31384b;
+}
+
+.source-icons{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:10px;
+}
+
+.source-badge{
+  display:inline-flex;
+  align-items:center;
+  padding:5px 9px;
+  border-radius:999px;
+  background:rgba(255,255,255,0.05);
+  border:1px solid var(--line);
+  font-size:.74rem;
+  color:#dbe6ff;
+  white-space:nowrap;
+}
+
+a.source-badge{
+  text-decoration:none;
+}
+
+.meta-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:8px;
+  color:var(--muted);
+  font-size:.82rem;
+}
+
+.rank-badge{
+  display:inline-block;
+  font-size:.76rem;
+  font-weight:700;
+  color:#fff;
+  background:#4da3ff;
+  padding:5px 9px;
+  border-radius:999px;
+  margin-bottom:8px;
+}
+
+.topic-cards{
+  display:grid;
+  grid-template-columns:repeat(4, minmax(0, 1fr));
+  gap:16px;
+}
+
+.topic-card{
+  padding:16px;
+}
+
+.topic-card h3{
+  margin:0 0 8px;
+}
+
+.topic-card p{
+  margin:0;
+}
+
+.loading{
+  color:var(--muted);
+}
+
+.mini-list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.mini-item{
+  padding:10px 0;
+  border-top:1px solid var(--line);
+}
+
+.mini-item:first-child{
+  border-top:none;
+  padding-top:0;
+}
+
+.mini-item strong{
+  display:block;
+  margin-bottom:4px;
+  font-size:.92rem;
+}
+
+.audio-frame{
+  width:100%;
+  height:180px;
+  border:none;
+  border-radius:12px;
+  background:#31384b;
+}
+
+.charity-link{
+  display:inline-block;
+  margin-top:10px;
+  color:#dbe6ff;
+  text-decoration:underline;
+}
+
+.notice{
+  font-size:.82rem;
+  color:var(--muted);
+  margin-top:8px;
+}
+
+@media(max-width:1200px){
+  .layout{
+    grid-template-columns:220px minmax(0, 1fr) 260px;
+  }
+
+  .topic-cards{
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media(max-width:980px){
+  .layout{
+    grid-template-columns:1fr;
+  }
+
+  .sidebar{
+    position:static;
+  }
+
+  .grid,
+  .topic-cards{
+    grid-template-columns:1fr;
+  }
+
+  .hero-feature-frame{
+    height:280px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="page">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-wave">~~~~~</div>
+      <div>SignalBoost Live</div>
+    </div>
+  </div>
+
+  <div class="banner">
+    🚧 Early preview version — work in progress
+  </div>
+
+  <div class="hero">
+    <h1>Cut through the noise</h1>
+    <p>See what the world is talking about across platforms. This homepage highlights stronger YouTube signals ranked by view counts so the front page feels much more alive.</p>
+
+    <div class="search-wrap">
+      <input type="text" id="searchInput" placeholder="Search topics (AI, Bitcoin, Politics, Business...)">
+      <button id="searchButton">Search</button>
+    </div>
+  </div>
+
+  <div class="layout">
+
+    <aside class="sidebar">
+      <div class="panel">
+        <h3>Trending Topics</h3>
+        <div class="mini-list">
+          <div class="mini-item"><strong>AI replacing jobs</strong><span>Automation, work, productivity</span></div>
+          <div class="mini-item"><strong>Bitcoin surge</strong><span>Volatility, adoption, markets</span></div>
+          <div class="mini-item"><strong>Europe migration debate</strong><span>Policy, elections, borders</span></div>
+          <div class="mini-item"><strong>Business & economy</strong><span>Inflation, layoffs, growth</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Direct Topic Links</h3>
+        <div class="source-icons">
+          <a href="topic-ai.html" class="source-badge">AI</a>
+          <a href="topic-bitcoin.html" class="source-badge">Bitcoin</a>
+          <a href="topic-politics.html" class="source-badge">Politics</a>
+          <a href="topic-business.html" class="source-badge">Business</a>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Source Platforms</h3>
+        <div class="source-icons">
+          <a href="https://www.youtube.com" target="_blank" class="source-badge">YouTube</a>
+          <a href="https://x.com" target="_blank" class="source-badge">X</a>
+          <a href="https://truthsocial.com" target="_blank" class="source-badge">Truth Social</a>
+          <a href="https://www.linkedin.com" target="_blank" class="source-badge">LinkedIn</a>
+          <a href="https://www.tiktok.com" target="_blank" class="source-badge">TikTok</a>
+          <a href="https://www.instagram.com" target="_blank" class="source-badge">Instagram</a>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+
+      <div class="section">
+        <h2>Top Signal Right Now</h2>
+        <div id="featured" class="card hero-feature loading">
+          <div class="card-content">Loading featured video...</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Top 10 Videos by Views</h2>
+        <div id="topVideos" class="grid"></div>
+      </div>
+
+      <div class="section">
+        <h2>Explore by Topic</h2>
+        <div class="topic-cards">
+          <a href="topic-politics.html">
+            <div class="card topic-card">
+              <h3>Europe migration debate</h3>
+              <p>Political discussion trending across Western media and social platforms.</p>
+            </div>
+          </a>
+
+          <a href="topic-ai.html">
+            <div class="card topic-card">
+              <h3>AI replacing jobs</h3>
+              <p>Major topic across business, tech, and podcast discussions.</p>
+            </div>
+          </a>
+
+          <a href="topic-bitcoin.html">
+            <div class="card topic-card">
+              <h3>Bitcoin surge</h3>
+              <p>Crypto markets, adoption, and finance conversation in one place.</p>
+            </div>
+          </a>
+
+          <a href="topic-business.html">
+            <div class="card topic-card">
+              <h3>Business & economy</h3>
+              <p>Markets, inflation, layoffs, and global economic discussion.</p>
+            </div>
+          </a>
+        </div>
+      </div>
+
+    </main>
+
+    <aside class="sidebar">
+      <div class="panel">
+        <h3>Live Audio</h3>
+        <iframe
+          class="audio-frame"
+          src="https://www.youtube.com/embed/jfKfPfyJRdk"
+          title="Live audio stream"
+          allowfullscreen>
+        </iframe>
+        <p class="notice">Optional background listening while browsing.</p>
+      </div>
+
+      <div class="panel">
+        <h3>Featured Cause</h3>
+        <p>We highlight one major organization at a time to encourage support for meaningful work.</p>
+        <strong>Current spotlight: Red Cross</strong>
+        <br>
+        <a class="charity-link" href="https://www.redcross.org" target="_blank">Visit Red Cross</a>
+        <p class="notice">This is a public spotlight link, not an official partnership claim.</p>
+      </div>
+
+      <div class="panel">
+        <h3>What This Page Does</h3>
+        <p>This homepage ranks YouTube results by view count so the content feels less static and more like a signal board.</p>
+      </div>
+    </aside>
+
+  </div>
+</div>
+
+<script>
+const API_KEY = "AIzaSyBWSnsfSNZxY_kYG_ACxm-GQYMsCOEuIuc";
+const HOMEPAGE_QUERY = "AI Bitcoin politics business economy migration debate Joe Rogan Trump automation finance";
+
+const searchPages = [
+  {
+    title: "AI Replacing Jobs",
+    url: "topic-ai.html",
+    text: "ai artificial intelligence jobs automation rogan technology tech productivity layoffs future of jobs"
+  },
+  {
+    title: "Bitcoin Surge",
+    url: "topic-bitcoin.html",
+    text: "bitcoin btc crypto cryptocurrency blockchain finance market volatility institutions adoption"
+  },
+  {
+    title: "Europe Migration Debate",
+    url: "topic-politics.html",
+    text: "politics trump biden migration europe election government policy border debate truth social"
+  },
+  {
+    title: "Business & Economy",
+    url: "topic-business.html",
+    text: "business economy inflation finance market layoffs recession growth companies global economy"
+  }
+];
+
+function runSearch() {
+  const query = document.getElementById("searchInput").value.toLowerCase().trim();
+
+  if (!query) {
+    alert("Please enter a word");
+    return;
+  }
+
+  let bestMatch = null;
+  let bestScore = 0;
+
+  for (const page of searchPages) {
+    let score = 0;
+
+    if (page.title.toLowerCase().includes(query)) score += 3;
+    if (page.text.includes(query)) score += 2;
+
+    const words = query.split(/\s+/);
+    for (const word of words) {
+      if (page.text.includes(word)) score += 1;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = page;
+    }
+  }
+
+  if (bestMatch) {
+    window.location.href = bestMatch.url;
+  } else {
+    alert("Topic not found yet");
+  }
+}
+
+document.getElementById("searchButton").addEventListener("click", runSearch);
+document.getElementById("searchInput").addEventListener("keypress", function(e) {
+  if (e.key === "Enter") runSearch();
+});
+
 function formatViews(num) {
   const n = Number(num || 0);
   if (n >= 1000000000) return (n / 1000000000).toFixed(1).replace(".0","") + "B views";
@@ -24,7 +565,6 @@ function formatViews(num) {
   return n + " views";
 }
 
-/* ---------- LOAD VIDEOS ---------- */
 async function loadHomepageVideos() {
   const featured = document.getElementById("featured");
   const topVideos = document.getElementById("topVideos");
@@ -35,55 +575,78 @@ async function loadHomepageVideos() {
     );
     const searchData = await searchRes.json();
 
-    const videoIds = searchData.items.map(item => item.id.videoId).join(",");
+    if (!searchData.items || !searchData.items.length) {
+      featured.innerHTML = `<div class="card-content">No videos found.</div>`;
+      topVideos.innerHTML = "";
+      return;
+    }
+
+    const videoIds = searchData.items.map(item => item.id.videoId).filter(Boolean).join(",");
 
     const statsRes = await fetch(
       `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${API_KEY}`
     );
     const statsData = await statsRes.json();
 
-    const sorted = [...statsData.items].sort((a, b) =>
-      Number(b.statistics.viewCount) - Number(a.statistics.viewCount)
-    );
+    if (!statsData.items || !statsData.items.length) {
+      featured.innerHTML = `<div class="card-content">Could not load video statistics.</div>`;
+      topVideos.innerHTML = "";
+      return;
+    }
+
+    const sorted = [...statsData.items].sort((a, b) => {
+      return Number(b.statistics?.viewCount || 0) - Number(a.statistics?.viewCount || 0);
+    });
 
     const top = sorted[0];
 
     featured.innerHTML = `
-      <iframe class="hero-feature-frame" src="https://www.youtube.com/embed/${top.id}?enablejsapi=1"></iframe>
+      <iframe class="hero-feature-frame" src="https://www.youtube.com/embed/${top.id}" allowfullscreen></iframe>
       <div class="card-content">
+        <span class="rank-badge">#1 by views</span>
         <h3>${top.snippet.title}</h3>
-        <p>${formatViews(top.statistics.viewCount)}</p>
+        <p>${top.snippet.description ? top.snippet.description.substring(0, 180) + "..." : "Top ranked video."}</p>
+        <div class="meta-row">
+          <span>${formatViews(top.statistics?.viewCount)}</span>
+          <span>•</span>
+          <span>${top.snippet.channelTitle}</span>
+        </div>
+        <div class="source-icons">
+          <a href="https://www.youtube.com/watch?v=${top.id}" target="_blank" class="source-badge">Open on YouTube</a>
+        </div>
       </div>
     `;
 
     const rest = sorted.slice(1, 11);
 
-    topVideos.innerHTML = rest.map(v => `
-      <div class="card">
-        <iframe class="video-frame" src="https://www.youtube.com/embed/${v.id}?enablejsapi=1"></iframe>
+    topVideos.innerHTML = rest.map((video, index) => `
+      <div class="card video-card">
+        <iframe class="video-frame" src="https://www.youtube.com/embed/${video.id}" allowfullscreen></iframe>
         <div class="card-content">
-          <h3>${v.snippet.title}</h3>
-          <p>${formatViews(v.statistics.viewCount)}</p>
+          <span class="rank-badge">#${index + 2}</span>
+          <h3>${video.snippet.title}</h3>
+          <p>${video.snippet.description ? video.snippet.description.substring(0, 120) + "..." : "Video result."}</p>
+          <div class="meta-row">
+            <span>${formatViews(video.statistics?.viewCount)}</span>
+            <span>•</span>
+            <span>${video.snippet.channelTitle}</span>
+          </div>
+          <div class="source-icons">
+            <a href="https://www.youtube.com/watch?v=${video.id}" target="_blank" class="source-badge">YouTube</a>
+          </div>
         </div>
       </div>
     `).join("");
 
-    // ADD CLICK LISTENERS
-    setTimeout(() => {
-      const frames = document.querySelectorAll("iframe");
-
-      frames.forEach(frame => {
-        frame.addEventListener("click", () => {
-          stopAllVideos(frame);
-        });
-      });
-    }, 500);
-
   } catch (err) {
-    featured.innerHTML = "Failed to load videos";
+    featured.innerHTML = `<div class="card-content">Failed to load homepage videos.</div>`;
+    topVideos.innerHTML = "";
     console.error(err);
   }
 }
 
 loadHomepageVideos();
 </script>
+
+</body>
+</html>

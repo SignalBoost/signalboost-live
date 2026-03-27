@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>X Gateway - SignalBoost Live</title>
+  <style>
+    :root{
+      --bg:#202533;
+      --bg-soft:#272d3d;
+      --text:#e9edf5;
+      --muted:#aeb7c9;
+      --line:rgba(255,255,255,0.08);
+      --accent:#4da3ff;
+      --radius:18px;
+    }
+    *{box-sizing:border-box;}
+    body{
+      margin:0;
+      font-family:Arial, Helvetica, sans-serif;
+      background:linear-gradient(180deg,#1b2130 0%, var(--bg) 100%);
+      color:var(--text);
+    }
+    a{color:inherit;text-decoration:none;}
+    .page{width:min(94%,1200px);margin:0 auto;padding-bottom:28px;}
+    .topbar{
+      position:sticky;top:0;z-index:20;
+      background:rgba(27,33,48,0.94);
+      backdrop-filter:blur(10px);
+      border-bottom:1px solid rgba(255,255,255,0.08);
+    }
+    .topbar-inner{
+      width:min(94%,1200px);margin:0 auto;
+      display:flex;justify-content:space-between;align-items:center;gap:12px;
+      padding:14px 0;
+    }
+    .brand{display:flex;flex-direction:column;font-weight:bold;}
+    .brand-wave{color:var(--accent);letter-spacing:2px;font-size:.9rem;line-height:1;margin-bottom:2px;}
+    .top-actions,.hero-actions{display:flex;flex-wrap:wrap;gap:8px;}
+    .btn{
+      display:inline-flex;align-items:center;justify-content:center;
+      padding:10px 14px;border-radius:999px;border:1px solid var(--line);
+      background:var(--bg-soft);font-size:.9rem;
+    }
+    .btn-primary{background:var(--accent);border-color:transparent;color:white;}
+    .hero{
+      margin-top:20px;background:var(--bg-soft);border:1px solid var(--line);
+      border-radius:24px;padding:24px;
+    }
+    .hero h1{margin:0 0 10px;font-size:2.4rem;line-height:1.1;}
+    .hero p{margin:0;color:var(--muted);line-height:1.55;max-width:850px;}
+    .layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;margin-top:18px;}
+    .panel,.card{background:var(--bg-soft);border:1px solid var(--line);border-radius:18px;}
+    .panel{padding:16px;}
+    .panel h2,.panel h3{margin:0 0 12px;}
+    .panel p,.card p{color:var(--muted);line-height:1.5;}
+    .card-content{padding:14px;}
+    .card h3{margin:0 0 8px;line-height:1.25;}
+    .rank-badge{
+      display:inline-block;font-size:.76rem;font-weight:700;color:#fff;
+      background:#4da3ff;padding:5px 9px;border-radius:999px;margin-bottom:8px;
+    }
+    .meta-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;color:var(--muted);font-size:.82rem;}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}
+    .mini-list{display:flex;flex-direction:column;gap:10px;}
+    .mini-item{padding:10px 0;border-top:1px solid var(--line);}
+    .mini-item:first-child{border-top:none;padding-top:0;}
+    .mini-item strong{display:block;margin-bottom:4px;font-size:.92rem;}
+    .notice{color:var(--muted);font-size:.82rem;line-height:1.5;}
+    @media(max-width:900px){
+      .layout{grid-template-columns:1fr;}
+      .grid{grid-template-columns:1fr;}
+      .hero h1{font-size:2rem;}
+    }
+    @media(max-width:640px){
+      .topbar-inner{align-items:flex-start;flex-direction:column;}
+      .hero{padding:20px;}
+      .hero h1{font-size:1.8rem;}
+      .top-actions .btn,.hero-actions .btn{flex:1 1 auto;}
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-wave">~~~~~</div>
+        <div>SignalBoost Live</div>
+      </div>
+      <div class="top-actions">
+        <a class="btn" href="index.html">Back to Home</a>
+        <a class="btn btn-primary" href="https://x.com" target="_blank" rel="noopener noreferrer">Open X</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="page">
+    <div class="hero">
+      <h1>X Gateway</h1>
+      <p>
+        This page keeps SignalBoost as the hub before users jump to X. It works better on mobile because users can return to SignalBoost easily instead of getting lost outside the site.
+      </p>
+      <div class="hero-actions" style="margin-top:18px;">
+        <a class="btn btn-primary" href="https://x.com/explore" target="_blank" rel="noopener noreferrer">Open Explore</a>
+        <a class="btn" href="https://x.com/search?q=breaking%20news&src=typed_query" target="_blank" rel="noopener noreferrer">Breaking News</a>
+        <a class="btn" href="https://x.com/search?q=world%20cup&src=typed_query" target="_blank" rel="noopener noreferrer">World Cup</a>
+      </div>
+    </div>
+
+    <div class="layout">
+      <main>
+        <div class="panel">
+          <h2>Fast X Routes</h2>
+          <div class="grid">
+            <a href="https://x.com/search?q=Trump&src=typed_query" target="_blank" rel="noopener noreferrer">
+              <div class="card"><div class="card-content">
+                <span class="rank-badge">Politics</span>
+                <h3>Trump</h3>
+                <p>Search X for Trump-related discussion.</p>
+              </div></div>
+            </a>
+
+            <a href="https://x.com/search?q=Bitcoin&src=typed_query" target="_blank" rel="noopener noreferrer">
+              <div class="card"><div class="card-content">
+                <span class="rank-badge">Markets</span>
+                <h3>Bitcoin</h3>
+                <p>Open Bitcoin discussion on X.</p>
+              </div></div>
+            </a>
+
+            <a href="https://x.com/search?q=AI%20jobs&src=typed_query" target="_blank" rel="noopener noreferrer">
+              <div class="card"><div class="card-content">
+                <span class="rank-badge">AI</span>
+                <h3>AI jobs</h3>
+                <p>Search automation and jobs discussion.</p>
+              </div></div>
+            </a>
+
+            <a href="https://x.com/search?q=football&src=typed_query" target="_blank" rel="noopener noreferrer">
+              <div class="card"><div class="card-content">
+                <span class="rank-badge">Sports</span>
+                <h3>Football</h3>
+                <p>Open football and match reaction posts.</p>
+              </div></div>
+            </a>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:18px;">
+          <h2>Why use this page first</h2>
+          <p>
+            X is useful for very fast reaction and live conversation. But on mobile, users can disappear from your site too easily. This page keeps SignalBoost in control.
+          </p>
+          <div class="meta-row">
+            <span>Fast news</span><span>•</span>
+            <span>Live reaction</span><span>•</span>
+            <span>Easy path back</span>
+          </div>
+        </div>
+      </main>
+
+      <aside>
+        <div class="panel">
+          <h3>Inside SignalBoost</h3>
+          <div class="mini-list">
+            <div class="mini-item"><a href="index.html"><strong>Home</strong><span class="notice">Return to the main hub.</span></a></div>
+            <div class="mini-item"><a href="topic-politics.html"><strong>Politics Topic</strong><span class="notice">Debates, elections, policy.</span></a></div>
+            <div class="mini-item"><a href="topic-business.html"><strong>Business Topic</strong><span class="notice">Markets, inflation, layoffs.</span></a></div>
+            <div class="mini-item"><a href="world-cup-history.html"><strong>World Cup</strong><span class="notice">History and tournament context.</span></a></div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:18px;">
+          <h3>Open X directly</h3>
+          <div class="hero-actions" style="margin-top:0;">
+            <a class="btn btn-primary" href="https://x.com" target="_blank" rel="noopener noreferrer">Main X</a>
+            <a class="btn" href="https://x.com/explore" target="_blank" rel="noopener noreferrer">Explore</a>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</body>
+</html>

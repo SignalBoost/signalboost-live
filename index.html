@@ -116,34 +116,44 @@
     }
 
     .platform-strip{
-      display:grid;
-      grid-template-columns:repeat(5, minmax(0,1fr));
-      gap:12px;
-      margin-bottom:18px;
+      display:flex;
+      flex-wrap:wrap;
+      justify-content:center;
+      gap:8px;
+      margin-bottom:16px;
     }
 
     .platform-link{
       background:var(--bg-soft);
       border:1px solid var(--line);
-      border-radius:16px;
-      padding:14px;
+      border-radius:10px;
+      padding:8px 10px;
       text-align:center;
-      min-height:84px;
+      width:104px;
+      min-height:52px;
       display:flex;
       flex-direction:column;
       justify-content:center;
+      flex:0 0 auto;
+      transition:all 0.2s ease;
+    }
+
+    .platform-link:hover{
+      background:#2f3648;
+      transform:translateY(-2px);
     }
 
     .platform-link strong{
       display:block;
-      margin-bottom:6px;
-      font-size:.95rem;
+      margin-bottom:2px;
+      font-size:.82rem;
+      line-height:1.1;
     }
 
     .platform-link span{
       color:var(--muted);
-      font-size:.82rem;
-      line-height:1.35;
+      font-size:.68rem;
+      line-height:1.15;
     }
 
     .layout{
@@ -393,6 +403,31 @@
       margin-top:8px;
     }
 
+    .cache-note{
+      margin-top:8px;
+      color:var(--muted);
+      font-size:.8rem;
+    }
+
+    .fallback-actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-top:12px;
+    }
+
+    .fallback-button{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:8px 12px;
+      border-radius:999px;
+      background:var(--accent-soft);
+      border:1px solid var(--line);
+      color:#dbe6ff;
+      font-size:.82rem;
+    }
+
     .footer-disclaimer{
       width:min(95%, 1480px);
       margin:34px auto 24px;
@@ -436,7 +471,25 @@
         width:100%;
       }
 
-      .platform-strip,
+      .platform-strip{
+        justify-content:center;
+        gap:6px;
+      }
+
+      .platform-link{
+        width:96px;
+        min-height:48px;
+        padding:7px 8px;
+      }
+
+      .platform-link strong{
+        font-size:.78rem;
+      }
+
+      .platform-link span{
+        font-size:.64rem;
+      }
+
       .grid,
       .wc-grid,
       .topic-cards{
@@ -450,8 +503,7 @@
 
       .panel,
       .card,
-      .wc-block,
-      .platform-link{
+      .wc-block{
         border-radius:16px;
       }
     }
@@ -481,46 +533,17 @@
     </div>
 
     <div class="platform-strip">
-      <a class="platform-link" href="https://www.youtube.com" target="_blank">
-        <strong>YouTube</strong>
-        <span>Video signals</span>
-      </a>
-      <a class="platform-link" href="https://x.com" target="_blank">
-        <strong>X</strong>
-        <span>Fast reactions</span>
-      </a>
-      <a class="platform-link" href="https://truthsocial.com" target="_blank">
-        <strong>Truth Social</strong>
-        <span>Political chatter</span>
-      </a>
-      <a class="platform-link" href="https://www.facebook.com" target="_blank">
-        <strong>Facebook</strong>
-        <span>Mass audience</span>
-      </a>
-      <a class="platform-link" href="https://www.tiktok.com" target="_blank">
-        <strong>TikTok</strong>
-        <span>Short clips</span>
-      </a>
-      <a class="platform-link" href="https://www.instagram.com" target="_blank">
-        <strong>Instagram</strong>
-        <span>Visual trends</span>
-      </a>
-      <a class="platform-link" href="https://telegram.org" target="_blank">
-        <strong>Telegram</strong>
-        <span>Channels</span>
-      </a>
-      <a class="platform-link" href="https://www.reddit.com" target="_blank">
-        <strong>Reddit</strong>
-        <span>Discussions</span>
-      </a>
-      <a class="platform-link" href="https://www.linkedin.com" target="_blank">
-        <strong>LinkedIn</strong>
-        <span>Professional talk</span>
-      </a>
-      <a class="platform-link" href="https://www.threads.net" target="_blank">
-        <strong>Threads</strong>
-        <span>Meta social stream</span>
-      </a>
+      <a class="platform-link" href="https://www.youtube.com" target="_blank"><strong>YouTube</strong><span>Video signals</span></a>
+      <a class="platform-link" href="https://x.com" target="_blank"><strong>X</strong><span>Fast reactions</span></a>
+      <a class="platform-link" href="https://truthsocial.com" target="_blank"><strong>Truth Social</strong><span>Political chatter</span></a>
+      <a class="platform-link" href="https://www.facebook.com" target="_blank"><strong>Facebook</strong><span>Mass audience</span></a>
+      <a class="platform-link" href="https://www.tiktok.com" target="_blank"><strong>TikTok</strong><span>Short clips</span></a>
+      <a class="platform-link" href="https://www.instagram.com" target="_blank"><strong>Instagram</strong><span>Visual trends</span></a>
+      <a class="platform-link" href="https://signal.org" target="_blank"><strong>Signal</strong><span>Private messaging</span></a>
+      <a class="platform-link" href="https://telegram.org" target="_blank"><strong>Telegram</strong><span>Channels</span></a>
+      <a class="platform-link" href="https://www.reddit.com" target="_blank"><strong>Reddit</strong><span>Discussions</span></a>
+      <a class="platform-link" href="https://www.linkedin.com" target="_blank"><strong>LinkedIn</strong><span>Professional talk</span></a>
+      <a class="platform-link" href="https://www.threads.net" target="_blank"><strong>Threads</strong><span>Meta stream</span></a>
     </div>
 
     <div class="layout">
@@ -540,6 +563,7 @@
           <h3>Quick Access</h3>
           <div class="source-icons">
             <a href="https://www.youtube.com" target="_blank" class="source-badge">YouTube</a>
+            <a href="https://signal.org" target="_blank" class="source-badge">Signal</a>
             <a href="https://telegram.org" target="_blank" class="source-badge">Telegram</a>
             <a href="https://www.reddit.com" target="_blank" class="source-badge">Reddit</a>
             <a href="https://www.facebook.com" target="_blank" class="source-badge">Facebook</a>
@@ -583,38 +607,16 @@
         <div class="section">
           <h2>Top Ranked Signals</h2>
           <div id="topVideos" class="grid"></div>
+          <div id="cacheInfo" class="cache-note"></div>
         </div>
 
         <div class="section">
           <h2>Explore by Topic</h2>
           <div class="topic-cards">
-            <a href="topic-ai.html">
-              <div class="card topic-card">
-                <h3>AI replacing jobs</h3>
-                <p>Business, tech, and automation discussion.</p>
-              </div>
-            </a>
-
-            <a href="topic-bitcoin.html">
-              <div class="card topic-card">
-                <h3>Bitcoin surge</h3>
-                <p>Crypto markets, adoption, and finance.</p>
-              </div>
-            </a>
-
-            <a href="topic-politics.html">
-              <div class="card topic-card">
-                <h3>Europe migration debate</h3>
-                <p>Political discussion and public reaction.</p>
-              </div>
-            </a>
-
-            <a href="topic-business.html">
-              <div class="card topic-card">
-                <h3>Business & economy</h3>
-                <p>Markets, inflation, layoffs, and growth.</p>
-              </div>
-            </a>
+            <a href="topic-ai.html"><div class="card topic-card"><h3>AI replacing jobs</h3><p>Business, tech, and automation discussion.</p></div></a>
+            <a href="topic-bitcoin.html"><div class="card topic-card"><h3>Bitcoin surge</h3><p>Crypto markets, adoption, and finance.</p></div></a>
+            <a href="topic-politics.html"><div class="card topic-card"><h3>Europe migration debate</h3><p>Political discussion and public reaction.</p></div></a>
+            <a href="topic-business.html"><div class="card topic-card"><h3>Business & economy</h3><p>Markets, inflation, layoffs, and growth.</p></div></a>
           </div>
         </div>
       </main>
@@ -622,12 +624,7 @@
       <aside class="sidebar">
         <div class="panel">
           <h3>Live Audio</h3>
-          <iframe
-            class="audio-frame"
-            src="https://www.youtube.com/embed/jfKfPfyJRdk"
-            title="Live audio stream"
-            allowfullscreen>
-          </iframe>
+          <iframe class="audio-frame" src="https://www.youtube.com/embed/jfKfPfyJRdk" title="Live audio stream" allowfullscreen></iframe>
           <p class="notice">Optional background listening while browsing.</p>
         </div>
 
@@ -642,7 +639,7 @@
 
         <div class="panel">
           <h3>Important note</h3>
-          <p>The Telegram link is only an external platform entrance. SignalBoost’s own messaging feature is not built yet.</p>
+          <p>Signal, Telegram, and other platform links here are external platform entrances. SignalBoost’s own messaging feature is not built yet.</p>
         </div>
       </aside>
     </div>
@@ -654,48 +651,23 @@
 
   <script>
     const API_KEY = "AIzaSyBWSnsfSNZxY_kYG_ACxm-GQYMsCOEuIuc";
+    const CACHE_KEY = "signalboost_homepage_videos_cache_v3";
+    const CACHE_TTL_MS = 15 * 60 * 1000;
 
     const searchMap = [
-      {
-        url: "topic-ai.html",
-        terms: [
-          "ai","artificial intelligence","automation","jobs","chatgpt","openai","future of work","robot","robots","technology","tech"
-        ]
-      },
-      {
-        url: "topic-bitcoin.html",
-        terms: [
-          "bitcoin","btc","crypto","cryptocurrency","blockchain","ethereum","wallet","trading","altcoin"
-        ]
-      },
-      {
-        url: "topic-politics.html",
-        terms: [
-          "politics","trump","biden","election","migration","immigration","border","government","policy","europe","war","president","congress"
-        ]
-      },
-      {
-        url: "topic-business.html",
-        terms: [
-          "business","economy","inflation","finance","layoffs","recession","growth","market","stocks","companies","bezos","musk","amazon","tesla"
-        ]
-      },
-      {
-        url: "world-cup-history.html",
-        terms: [
-          "world cup","fifa","football","soccer","messi","ronaldo","pele","maradona","mbappe","champions league","2026 world cup"
-        ]
-      }
+      { url: "topic-ai.html", terms: ["ai","artificial intelligence","automation","jobs","chatgpt","openai","future of work","robot","robots","technology","tech"] },
+      { url: "topic-bitcoin.html", terms: ["bitcoin","btc","crypto","cryptocurrency","blockchain","ethereum","wallet","trading","altcoin"] },
+      { url: "topic-politics.html", terms: ["politics","trump","biden","election","migration","immigration","border","government","policy","europe","war","president","congress"] },
+      { url: "topic-business.html", terms: ["business","economy","inflation","finance","layoffs","recession","growth","market","stocks","companies","bezos","musk","amazon","tesla"] },
+      { url: "world-cup-history.html", terms: ["world cup","fifa","football","soccer","messi","ronaldo","pele","maradona","mbappe","champions league","2026 world cup"] }
     ];
 
     function runSearch() {
       const query = document.getElementById("searchInput").value.toLowerCase().trim();
-
       if (!query) {
         alert("Please enter a word");
         return;
       }
-
       for (const item of searchMap) {
         for (const term of item.terms) {
           if (query.includes(term) || term.includes(query)) {
@@ -704,7 +676,6 @@
           }
         }
       }
-
       alert("Search is still being expanded. Try: AI, Bitcoin, Trump, inflation, Messi, World Cup.");
     }
 
@@ -726,15 +697,12 @@
       const now = new Date();
       const diffMs = now - date;
       const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
       if (days < 1) return "today";
       if (days === 1) return "1 day ago";
       if (days < 30) return `${days} days ago`;
-
       const months = Math.floor(days / 30);
       if (months === 1) return "1 month ago";
       if (months < 12) return `${months} months ago`;
-
       const years = Math.floor(months / 12);
       if (years === 1) return "1 year ago";
       return `${years} years ago`;
@@ -758,13 +726,11 @@
       if (!searchRes.ok) {
         throw new Error("YouTube search error: " + JSON.stringify(searchData));
       }
-
       if (!searchData.items || !searchData.items.length) {
-        throw new Error("YouTube search returned no items. Response: " + JSON.stringify(searchData));
+        throw new Error("YouTube search returned no items.");
       }
 
       const videoIds = searchData.items.map(item => item.id.videoId).filter(Boolean).join(",");
-
       const statsUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${API_KEY}`;
       const statsRes = await fetch(statsUrl);
       const statsData = await statsRes.json();
@@ -772,9 +738,8 @@
       if (!statsRes.ok) {
         throw new Error("YouTube stats error: " + JSON.stringify(statsData));
       }
-
       if (!statsData.items || !statsData.items.length) {
-        throw new Error("YouTube stats returned no items. Response: " + JSON.stringify(statsData));
+        throw new Error("YouTube stats returned no items.");
       }
 
       return [...statsData.items]
@@ -791,9 +756,154 @@
       return copy;
     }
 
-    async function loadHomepageVideos() {
+    function saveCache(videos) {
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ timestamp: Date.now(), videos }));
+      } catch (e) {
+        console.error("Cache save failed", e);
+      }
+    }
+
+    function loadCache() {
+      try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw);
+      } catch (e) {
+        console.error("Cache read failed", e);
+        return null;
+      }
+    }
+
+    function renderVideos(sorted, sourceLabel) {
       const featured = document.getElementById("featured");
       const topVideos = document.getElementById("topVideos");
+      const cacheInfo = document.getElementById("cacheInfo");
+
+      if (!sorted || !sorted.length) {
+        renderFallbackFeed("No live video feed available right now.");
+        return;
+      }
+
+      const mainVideo = sorted[0];
+      const stableVideos = sorted.slice(1, 3);
+      const rotationPool = sorted.slice(3);
+      const shuffled = shuffleArray(rotationPool);
+      const rotatingVideos = shuffled.slice(0, 3);
+      const finalVideos = [...stableVideos, ...rotatingVideos];
+
+      featured.innerHTML = `
+        <iframe class="hero-feature-frame" src="https://www.youtube.com/embed/${mainVideo.id}" allowfullscreen></iframe>
+        <div class="card-content">
+          <span class="rank-badge">Top Signal</span>
+          <h3>${mainVideo.snippet.title}</h3>
+          <p>${mainVideo.snippet.description ? mainVideo.snippet.description.substring(0, 180) + "..." : "Featured signal."}</p>
+          <div class="meta-row">
+            <span>${formatViews(mainVideo.statistics?.viewCount)}</span>
+            <span>•</span>
+            <span>${formatPublished(mainVideo.snippet?.publishedAt)}</span>
+            <span>•</span>
+            <span>${mainVideo.snippet.channelTitle}</span>
+          </div>
+        </div>
+      `;
+
+      topVideos.innerHTML = finalVideos.map((video, index) => `
+        <div class="card">
+          <iframe class="video-frame" src="https://www.youtube.com/embed/${video.id}" allowfullscreen></iframe>
+          <div class="card-content">
+            <span class="rank-badge">${index < 2 ? "Strong Signal" : "New Signal"}</span>
+            <h3>${video.snippet.title}</h3>
+            <p>${video.snippet.description ? video.snippet.description.substring(0, 120) + "..." : "Video result."}</p>
+            <div class="meta-row">
+              <span>${formatViews(video.statistics?.viewCount)}</span>
+              <span>•</span>
+              <span>${formatPublished(video.snippet?.publishedAt)}</span>
+            </div>
+          </div>
+        </div>
+      `).join("");
+
+      cacheInfo.textContent = sourceLabel;
+    }
+
+    function renderFallbackFeed(message) {
+      const featured = document.getElementById("featured");
+      const topVideos = document.getElementById("topVideos");
+      const cacheInfo = document.getElementById("cacheInfo");
+
+      featured.innerHTML = `
+        <div class="card-content">
+          <span class="rank-badge">Backup Feed Active</span>
+          <h3>YouTube is temporarily unavailable</h3>
+          <p>${message}</p>
+          <p>Instead of showing an empty homepage, SignalBoost is switching to backup discovery routes.</p>
+          <div class="fallback-actions">
+            <a class="fallback-button" href="https://www.youtube.com/results?search_query=breaking+news+today" target="_blank">YouTube News</a>
+            <a class="fallback-button" href="https://www.reddit.com/search/?q=breaking%20news" target="_blank">Reddit News</a>
+            <a class="fallback-button" href="topic-politics.html">Politics Topic</a>
+            <a class="fallback-button" href="world-cup-history.html">World Cup</a>
+          </div>
+        </div>
+      `;
+
+      topVideos.innerHTML = `
+        <a href="topic-ai.html">
+          <div class="card topic-card">
+            <span class="rank-badge">Internal Backup</span>
+            <h3>AI replacing jobs</h3>
+            <p>Move into the AI topic page while live feed is limited.</p>
+          </div>
+        </a>
+        <a href="topic-bitcoin.html">
+          <div class="card topic-card">
+            <span class="rank-badge">Internal Backup</span>
+            <h3>Bitcoin surge</h3>
+            <p>Open crypto and finance discussions directly.</p>
+          </div>
+        </a>
+        <a href="https://www.reddit.com/search/?q=world%20cup" target="_blank">
+          <div class="card topic-card">
+            <span class="rank-badge">External Backup</span>
+            <h3>Reddit World Cup discussions</h3>
+            <p>Use Reddit as a live backup source while YouTube quota is limited.</p>
+          </div>
+        </a>
+        <a href="https://www.youtube.com/results?search_query=football+highlights+today" target="_blank">
+          <div class="card topic-card">
+            <span class="rank-badge">External Backup</span>
+            <h3>Football highlights search</h3>
+            <p>Jump directly into current football videos through search.</p>
+          </div>
+        </a>
+        <a href="https://www.youtube.com/results?search_query=joe+rogan+elon+musk" target="_blank">
+          <div class="card topic-card">
+            <span class="rank-badge">External Backup</span>
+            <h3>Podcast signal search</h3>
+            <p>Use direct search when the homepage video API is temporarily blocked.</p>
+          </div>
+        </a>
+        <a href="topic-business.html">
+          <div class="card topic-card">
+            <span class="rank-badge">Internal Backup</span>
+            <h3>Business & economy</h3>
+            <p>Open market, inflation, and company discussions immediately.</p>
+          </div>
+        </a>
+      `;
+
+      cacheInfo.textContent = "Backup feed active because the live YouTube feed is unavailable.";
+    }
+
+    async function loadHomepageVideos() {
+      const cache = loadCache();
+      const now = Date.now();
+      const hasFreshCache = cache && cache.timestamp && (now - cache.timestamp < CACHE_TTL_MS);
+
+      if (hasFreshCache) {
+        renderVideos(cache.videos, "Using saved homepage feed to reduce API quota.");
+        return;
+      }
 
       try {
         const sorted = await fetchRankedVideos(
@@ -801,53 +911,14 @@
           12
         );
 
-        if (!sorted.length) {
-          featured.innerHTML = `<div class="card-content">No videos found.</div>`;
-          topVideos.innerHTML = "";
+        saveCache(sorted);
+        renderVideos(sorted, "Fresh feed loaded from YouTube.");
+      } catch (err) {
+        if (cache && cache.videos && cache.videos.length) {
+          renderVideos(cache.videos, "Using older saved feed because YouTube is temporarily unavailable or quota is limited.");
           return;
         }
-
-        const mainVideo = sorted[0];
-        const stableVideos = sorted.slice(1, 3);
-        const rotationPool = sorted.slice(3);
-        const shuffled = shuffleArray(rotationPool);
-        const rotatingVideos = shuffled.slice(0, 3);
-        const finalVideos = [...stableVideos, ...rotatingVideos];
-
-        featured.innerHTML = `
-          <iframe class="hero-feature-frame" src="https://www.youtube.com/embed/${mainVideo.id}" allowfullscreen></iframe>
-          <div class="card-content">
-            <span class="rank-badge">Top Signal</span>
-            <h3>${mainVideo.snippet.title}</h3>
-            <p>${mainVideo.snippet.description ? mainVideo.snippet.description.substring(0, 180) + "..." : "Featured signal."}</p>
-            <div class="meta-row">
-              <span>${formatViews(mainVideo.statistics?.viewCount)}</span>
-              <span>•</span>
-              <span>${formatPublished(mainVideo.snippet?.publishedAt)}</span>
-              <span>•</span>
-              <span>${mainVideo.snippet.channelTitle}</span>
-            </div>
-          </div>
-        `;
-
-        topVideos.innerHTML = finalVideos.map((video, index) => `
-          <div class="card">
-            <iframe class="video-frame" src="https://www.youtube.com/embed/${video.id}" allowfullscreen></iframe>
-            <div class="card-content">
-              <span class="rank-badge">${index < 2 ? "Strong Signal" : "New Signal"}</span>
-              <h3>${video.snippet.title}</h3>
-              <p>${video.snippet.description ? video.snippet.description.substring(0, 120) + "..." : "Video result."}</p>
-              <div class="meta-row">
-                <span>${formatViews(video.statistics?.viewCount)}</span>
-                <span>•</span>
-                <span>${formatPublished(video.snippet?.publishedAt)}</span>
-              </div>
-            </div>
-          </div>
-        `).join("");
-      } catch (err) {
-        featured.innerHTML = `<div class="card-content">Failed to load homepage videos.<br><br>${String(err.message || err)}</div>`;
-        topVideos.innerHTML = "";
+        renderFallbackFeed(String(err.message || err));
         console.error(err);
       }
     }

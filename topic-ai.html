@@ -9,17 +9,15 @@
 :root{
   --bg:#202533;
   --bg-soft:#272d3d;
-  --bg-panel:#252b3a;
   --text:#e9edf5;
   --muted:#aeb7c9;
   --line:rgba(255,255,255,0.08);
   --accent:#4da3ff;
+  --accent-soft:rgba(77,163,255,0.14);
   --radius:18px;
 }
 
-*{
-  box-sizing:border-box;
-}
+*{box-sizing:border-box;}
 
 body{
   margin:0;
@@ -34,8 +32,7 @@ a{
 }
 
 .page{
-  width:96%;
-  max-width:1500px;
+  width:min(96%, 1500px);
   margin:auto;
 }
 
@@ -43,7 +40,7 @@ a{
   display:flex;
   justify-content:space-between;
   align-items:center;
-  padding:18px 0;
+  padding:34px 0 18px;
 }
 
 .brand{
@@ -51,12 +48,13 @@ a{
   flex-direction:column;
   align-items:center;
   font-weight:bold;
+  text-align:center;
 }
 
 .brand-wave{
   color:var(--accent);
   letter-spacing:2px;
-  margin-bottom:2px;
+  margin-bottom:4px;
   font-weight:700;
 }
 
@@ -65,29 +63,33 @@ a{
   color:white;
   padding:10px 16px;
   border-radius:999px;
-  text-decoration:none;
   font-weight:600;
 }
 
 .hero{
-  margin-bottom:18px;
+  background:var(--bg-soft);
+  border:1px solid var(--line);
+  border-radius:22px;
+  padding:24px;
+  margin-bottom:22px;
 }
 
 .hero h1{
   margin:0 0 10px;
-  font-size:2.3rem;
+  font-size:2.5rem;
+  line-height:1.1;
 }
 
 .hero p{
   margin:0;
   color:var(--muted);
+  line-height:1.55;
   max-width:900px;
-  line-height:1.5;
 }
 
 .layout{
   display:grid;
-  grid-template-columns:260px minmax(0, 1fr) 300px;
+  grid-template-columns:250px minmax(0,1fr) 280px;
   gap:20px;
   align-items:start;
 }
@@ -136,9 +138,14 @@ a{
   margin-top:26px;
 }
 
+.section:first-child{
+  margin-top:0;
+}
+
 .section h2{
   margin:0 0 14px;
   font-size:1.45rem;
+  line-height:1.2;
 }
 
 .featured{
@@ -153,29 +160,10 @@ a{
   background:#31384b;
 }
 
-.card-content{
-  padding:14px;
-}
-
-.card h3{
-  margin:0 0 8px;
-}
-
-.card p{
-  margin:0 0 10px;
-  color:var(--muted);
-  line-height:1.5;
-  font-size:.92rem;
-}
-
-.grid{
+.video-grid{
   display:grid;
-  grid-template-columns:repeat(2, minmax(0, 1fr));
+  grid-template-columns:repeat(2,minmax(0,1fr));
   gap:16px;
-}
-
-.video-card{
-  overflow:hidden;
 }
 
 .video-frame{
@@ -184,6 +172,32 @@ a{
   border:none;
   display:block;
   background:#31384b;
+}
+
+.card-content{
+  padding:14px;
+}
+
+.card h3{
+  margin:0 0 8px;
+  line-height:1.25;
+}
+
+.card p{
+  margin:0 0 10px;
+  color:var(--muted);
+  font-size:.92rem;
+  line-height:1.5;
+}
+
+.quote-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:16px;
+}
+
+.quote-card{
+  padding:15px;
 }
 
 .source-icons{
@@ -205,8 +219,13 @@ a{
   white-space:nowrap;
 }
 
-a.source-badge{
-  text-decoration:none;
+.meta-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:8px;
+  color:var(--muted);
+  font-size:.82rem;
 }
 
 .mini-list{
@@ -231,28 +250,6 @@ a.source-badge{
   font-size:.92rem;
 }
 
-.loading{
-  color:var(--muted);
-}
-
-.quote-grid{
-  display:grid;
-  grid-template-columns:repeat(3, minmax(0, 1fr));
-  gap:16px;
-}
-
-.quote-card{
-  padding:15px;
-}
-
-.quote-card p{
-  margin:0 0 10px;
-}
-
-.info-card{
-  padding:18px;
-}
-
 .audio-frame{
   width:100%;
   height:180px;
@@ -274,13 +271,25 @@ a.source-badge{
   margin-top:8px;
 }
 
+.loading{
+  color:var(--muted);
+}
+
 @media(max-width:1200px){
   .layout{
-    grid-template-columns:220px minmax(0, 1fr) 260px;
+    grid-template-columns:220px minmax(0,1fr) 240px;
   }
 }
 
 @media(max-width:980px){
+  .page{
+    width:94%;
+  }
+
+  .topbar{
+    padding:26px 0 14px;
+  }
+
   .layout{
     grid-template-columns:1fr;
   }
@@ -289,13 +298,31 @@ a.source-badge{
     position:static;
   }
 
-  .grid,
+  .video-grid,
   .quote-grid{
     grid-template-columns:1fr;
   }
 
   .featured-frame{
-    height:280px;
+    height:240px;
+  }
+
+  .video-frame{
+    height:210px;
+  }
+
+  .hero{
+    padding:20px;
+    border-radius:16px;
+  }
+
+  .hero h1{
+    font-size:2.05rem;
+  }
+
+  .panel,
+  .card{
+    border-radius:16px;
   }
 }
 </style>
@@ -309,24 +336,24 @@ a.source-badge{
       <div class="brand-wave">~~~~~</div>
       <div>SignalBoost Live</div>
     </div>
-
     <a href="index.html" class="back">Back</a>
   </div>
 
   <div class="hero">
     <h1>AI Replacing Jobs</h1>
-    <p>One of the fastest-growing topics across business, tech, and social platforms. This page brings together the strongest video discussion, related content, live audio, and useful links in one place.</p>
+    <p>One of the fastest-growing topics across business, tech, and social platforms. This page combines a featured signal, supporting videos, source links, live audio, and context in a layout that now works much better on mobile.</p>
   </div>
 
   <div class="layout">
 
     <aside class="sidebar">
       <div class="panel">
-        <h3>Trending Topics</h3>
+        <h3>Topic Navigation</h3>
         <div class="mini-list">
-          <div class="mini-item"><strong>Bitcoin surge</strong><span>Markets, volatility, adoption</span></div>
-          <div class="mini-item"><strong>Europe migration debate</strong><span>Policy, borders, elections</span></div>
-          <div class="mini-item"><strong>Business & economy</strong><span>Inflation, layoffs, markets</span></div>
+          <div class="mini-item"><a href="topic-bitcoin.html"><strong>Bitcoin</strong><span>Crypto, markets, adoption</span></a></div>
+          <div class="mini-item"><a href="topic-politics.html"><strong>Politics</strong><span>Debates, elections, policy</span></a></div>
+          <div class="mini-item"><a href="topic-business.html"><strong>Business</strong><span>Inflation, layoffs, markets</span></a></div>
+          <div class="mini-item"><a href="world-cup-history.html"><strong>World Cup History</strong><span>Tournament timeline and legends</span></a></div>
         </div>
       </div>
 
@@ -337,18 +364,6 @@ a.source-badge{
           <li><strong>Reskilling</strong>: learning new abilities to stay relevant in changing jobs.</li>
         </ul>
       </div>
-
-      <div class="panel">
-        <h3>Source Links</h3>
-        <div class="source-icons">
-          <a href="https://www.youtube.com" target="_blank" class="source-badge">YouTube</a>
-          <a href="https://x.com" target="_blank" class="source-badge">X</a>
-          <a href="https://www.linkedin.com" target="_blank" class="source-badge">LinkedIn</a>
-          <a href="https://www.tiktok.com" target="_blank" class="source-badge">TikTok</a>
-          <a href="https://www.instagram.com" target="_blank" class="source-badge">Instagram</a>
-          <a href="https://truthsocial.com" target="_blank" class="source-badge">Truth Social</a>
-        </div>
-      </div>
     </aside>
 
     <main class="main">
@@ -356,19 +371,18 @@ a.source-badge{
       <div class="section">
         <h2>Featured Video</h2>
         <div id="featured" class="card featured loading">
-          <div class="card-content">Loading featured video...</div>
+          <div class="card-content">Loading featured AI video...</div>
         </div>
       </div>
 
       <div class="section">
         <h2>Top Videos</h2>
-        <div id="videos" class="grid"></div>
+        <div id="videos" class="video-grid"></div>
       </div>
 
       <div class="section">
         <h2>What People Are Saying</h2>
         <div class="quote-grid">
-
           <div class="card quote-card">
             <p>"AI will not replace jobs. People using AI will replace people who do not."</p>
             <div class="source-icons">
@@ -389,20 +403,33 @@ a.source-badge{
               <a href="https://www.linkedin.com" target="_blank" class="source-badge">LinkedIn</a>
             </div>
           </div>
-
         </div>
       </div>
 
       <div class="section">
         <h2>Quick Summary</h2>
-        <div class="card info-card">
-          <p>AI replacing jobs trends because it touches economics, technology, and daily life at the same time. The topic is driven by media personalities, business leaders, creators, and public reactions.</p>
+        <div class="card">
+          <div class="card-content">
+            <p>AI replacing jobs trends because it touches economics, technology, and daily life at the same time. The discussion is driven by media personalities, business leaders, creators, and public reactions.</p>
+          </div>
         </div>
       </div>
 
     </main>
 
     <aside class="sidebar">
+      <div class="panel">
+        <h3>Source Links</h3>
+        <div class="source-icons">
+          <a href="https://www.youtube.com" target="_blank" class="source-badge">YouTube</a>
+          <a href="https://x.com" target="_blank" class="source-badge">X</a>
+          <a href="https://www.linkedin.com" target="_blank" class="source-badge">LinkedIn</a>
+          <a href="https://www.tiktok.com" target="_blank" class="source-badge">TikTok</a>
+          <a href="https://www.instagram.com" target="_blank" class="source-badge">Instagram</a>
+          <a href="https://telegram.org" target="_blank" class="source-badge">Telegram</a>
+        </div>
+      </div>
+
       <div class="panel">
         <h3>Live Audio</h3>
         <iframe
@@ -411,25 +438,14 @@ a.source-badge{
           title="Live audio stream"
           allowfullscreen>
         </iframe>
-        <p class="notice">Optional background listening while browsing the page.</p>
+        <p class="notice">Optional background listening while browsing.</p>
       </div>
 
       <div class="panel">
         <h3>Featured Cause</h3>
-        <p>We highlight one major organization at a time to encourage support for meaningful work.</p>
-        <strong>Current spotlight: Red Cross</strong>
-        <br>
-        <a class="charity-link" href="https://www.redcross.org" target="_blank">Visit Red Cross</a>
-        <p class="notice">This is a public spotlight link, not an official partnership claim.</p>
-      </div>
-
-      <div class="panel">
-        <h3>Related Topics</h3>
-        <div class="mini-list">
-          <div class="mini-item"><strong>Automation tools</strong><span>How teams are doing more with less</span></div>
-          <div class="mini-item"><strong>Tech layoffs</strong><span>Why companies are restructuring</span></div>
-          <div class="mini-item"><strong>Future of work</strong><span>Jobs that may grow, not shrink</span></div>
-        </div>
+        <p>Current spotlight: <strong>St. Jude Children’s Research Hospital</strong></p>
+        <a class="charity-link" href="https://www.stjude.org/" target="_blank">Visit organization</a>
+        <p class="notice">Independent spotlight — not an official partnership or endorsement.</p>
       </div>
     </aside>
 
@@ -438,52 +454,116 @@ a.source-badge{
 
 <script>
 const API_KEY = "AIzaSyBWSnsfSNZxY_kYG_ACxm-GQYMsCOEuIuc";
-const QUERY = "AI jobs automation";
+const QUERY = "AI jobs automation artificial intelligence";
+
+function formatViews(num) {
+  const n = Number(num || 0);
+  if (n >= 1000000000) return (n / 1000000000).toFixed(1).replace(".0","") + "B views";
+  if (n >= 1000000) return (n / 1000000).toFixed(1).replace(".0","") + "M views";
+  if (n >= 1000) return (n / 1000).toFixed(1).replace(".0","") + "K views";
+  return n + " views";
+}
+
+function formatPublished(dateString) {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now - date;
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (days < 1) return "today";
+  if (days === 1) return "1 day ago";
+  if (days < 30) return `${days} days ago`;
+
+  const months = Math.floor(days / 30);
+  if (months === 1) return "1 month ago";
+  if (months < 12) return `${months} months ago`;
+
+  const years = Math.floor(months / 12);
+  if (years === 1) return "1 year ago";
+  return `${years} years ago`;
+}
+
+function calculateSignalScore(video) {
+  const views = Number(video.statistics?.viewCount || 0);
+  const publishedAt = new Date(video.snippet?.publishedAt || 0);
+  const now = new Date();
+  const ageDays = Math.max(1, Math.floor((now - publishedAt) / (1000 * 60 * 60 * 24)));
+
+  const viewScore = Math.log10(Math.max(views, 1)) * 100;
+  const freshnessBoost = Math.max(0, 30 - Math.min(ageDays, 30));
+
+  return viewScore + freshnessBoost;
+}
 
 async function loadVideos(){
   try{
-    const res = await fetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${encodeURIComponent(QUERY)}&key=${API_KEY}`
+    const searchRes = await fetch(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=8&q=${encodeURIComponent(QUERY)}&key=${API_KEY}`
     );
+    const searchData = await searchRes.json();
 
-    const data = await res.json();
-
-    if(!data.items || !data.items.length){
-      document.getElementById("featured").innerHTML = `<div class="card-content">Error loading videos</div>`;
+    if(!searchData.items || !searchData.items.length){
+      document.getElementById("featured").innerHTML = `<div class="card-content">No videos found.</div>`;
       return;
     }
 
-    const first = data.items[0];
+    const ids = searchData.items.map(item => item.id.videoId).filter(Boolean).join(",");
+    const statsRes = await fetch(
+      `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${ids}&key=${API_KEY}`
+    );
+    const statsData = await statsRes.json();
+
+    if(!statsData.items || !statsData.items.length){
+      document.getElementById("featured").innerHTML = `<div class="card-content">Could not load video statistics.</div>`;
+      return;
+    }
+
+    const sorted = [...statsData.items]
+      .map(item => ({ ...item, signalScore: calculateSignalScore(item) }))
+      .sort((a,b) => b.signalScore - a.signalScore);
+
+    const top = sorted[0];
 
     document.getElementById("featured").innerHTML = `
-      <iframe class="featured-frame" src="https://www.youtube.com/embed/${first.id.videoId}" allowfullscreen></iframe>
+      <iframe class="featured-frame" src="https://www.youtube.com/embed/${top.id}" allowfullscreen></iframe>
       <div class="card-content">
-        <h3>${first.snippet.title}</h3>
-        <p>${first.snippet.description ? first.snippet.description.substring(0, 180) + "..." : "Featured AI discussion."}</p>
+        <h3>${top.snippet.title}</h3>
+        <p>${top.snippet.description ? top.snippet.description.substring(0, 180) + "..." : "Featured AI discussion."}</p>
+        <div class="meta-row">
+          <span>${formatViews(top.statistics?.viewCount)}</span>
+          <span>•</span>
+          <span>${formatPublished(top.snippet?.publishedAt)}</span>
+          <span>•</span>
+          <span>${top.snippet.channelTitle}</span>
+        </div>
         <div class="source-icons">
-          <a href="https://www.youtube.com" target="_blank" class="source-badge">YouTube</a>
-          <span class="source-badge">Business</span>
+          <a href="https://www.youtube.com/watch?v=${top.id}" target="_blank" class="source-badge">Open on YouTube</a>
         </div>
       </div>
     `;
 
-    const rest = data.items.slice(1,5);
+    const rest = sorted.slice(1,5);
 
     document.getElementById("videos").innerHTML = rest.map(v => `
       <div class="card video-card">
-        <iframe class="video-frame" src="https://www.youtube.com/embed/${v.id.videoId}" allowfullscreen></iframe>
+        <iframe class="video-frame" src="https://www.youtube.com/embed/${v.id}" allowfullscreen></iframe>
         <div class="card-content">
           <h3>${v.snippet.title}</h3>
-          <p>${v.snippet.description ? v.snippet.description.substring(0, 120) + "..." : "Real YouTube result."}</p>
+          <p>${v.snippet.description ? v.snippet.description.substring(0, 120) + "..." : "AI video result."}</p>
+          <div class="meta-row">
+            <span>${formatViews(v.statistics?.viewCount)}</span>
+            <span>•</span>
+            <span>${formatPublished(v.snippet?.publishedAt)}</span>
+          </div>
           <div class="source-icons">
-            <a href="https://www.youtube.com" target="_blank" class="source-badge">YouTube</a>
+            <a href="https://www.youtube.com/watch?v=${v.id}" target="_blank" class="source-badge">YouTube</a>
           </div>
         </div>
       </div>
     `).join("");
 
   }catch(e){
-    document.getElementById("featured").innerHTML = `<div class="card-content">Failed to load videos</div>`;
+    document.getElementById("featured").innerHTML = `<div class="card-content">Failed to load videos.</div>`;
     console.error(e);
   }
 }

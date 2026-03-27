@@ -40,7 +40,7 @@ a{
   display:flex;
   justify-content:center;
   align-items:center;
-  padding:40px 0 18px;
+  padding:38px 0 18px;
 }
 
 .brand{
@@ -77,9 +77,9 @@ a{
 
 .hero{
   display:grid;
-  grid-template-columns:1.25fr .95fr;
+  grid-template-columns:1.2fr .8fr;
   gap:20px;
-  margin-bottom:20px;
+  margin-bottom:18px;
 }
 
 .hero-main,
@@ -93,7 +93,7 @@ a{
 .hero-main h1{
   margin:0 0 10px;
   font-size:3rem;
-  line-height:1.1;
+  line-height:1.08;
 }
 
 .hero-main p,
@@ -113,22 +113,29 @@ a{
 .search-wrap input{
   flex:1;
   min-width:240px;
-  padding:12px 14px;
+  padding:13px 15px;
   border-radius:999px;
   border:none;
   outline:none;
   background:#2a3142;
   color:var(--text);
+  font-size:16px;
 }
 
 .search-wrap button{
-  padding:12px 18px;
+  padding:13px 18px;
   border:none;
   border-radius:999px;
   background:var(--accent);
   color:white;
   font-weight:600;
   cursor:pointer;
+}
+
+.search-hint{
+  margin-top:10px;
+  color:var(--muted);
+  font-size:.82rem;
 }
 
 .hero-pills{
@@ -153,7 +160,7 @@ a{
   display:grid;
   grid-template-columns:repeat(5, minmax(0,1fr));
   gap:12px;
-  margin-bottom:22px;
+  margin-bottom:20px;
 }
 
 .platform-link{
@@ -162,16 +169,10 @@ a{
   border-radius:16px;
   padding:14px;
   text-align:center;
-  transition:transform .18s ease, box-shadow .18s ease;
-  min-height:86px;
+  min-height:84px;
   display:flex;
   flex-direction:column;
   justify-content:center;
-}
-
-.platform-link:hover{
-  transform:translateY(-3px);
-  box-shadow:0 10px 24px rgba(0,0,0,.22);
 }
 
 .platform-link strong{
@@ -188,7 +189,7 @@ a{
 
 .layout{
   display:grid;
-  grid-template-columns:260px minmax(0,1fr) 300px;
+  grid-template-columns:250px minmax(0,1fr) 290px;
   gap:20px;
   align-items:start;
 }
@@ -229,12 +230,16 @@ a{
 }
 
 .section{
-  margin-top:28px;
+  margin-top:26px;
+}
+
+.section:first-child{
+  margin-top:0;
 }
 
 .section h2{
   margin:0 0 14px;
-  font-size:1.5rem;
+  font-size:1.45rem;
   line-height:1.2;
 }
 
@@ -244,7 +249,7 @@ a{
 
 .hero-feature-frame{
   width:100%;
-  height:420px;
+  height:390px;
   border:none;
   display:block;
   background:#31384b;
@@ -274,7 +279,7 @@ a{
 
 .shelf-grid{
   display:grid;
-  grid-template-columns:repeat(3, minmax(0,1fr));
+  grid-template-columns:repeat(2, minmax(0,1fr));
   gap:16px;
 }
 
@@ -292,7 +297,7 @@ a{
 
 .small-frame{
   width:100%;
-  height:170px;
+  height:200px;
   border:none;
   display:block;
   background:#31384b;
@@ -351,7 +356,7 @@ a{
 
 .topic-cards{
   display:grid;
-  grid-template-columns:repeat(4,minmax(0,1fr));
+  grid-template-columns:repeat(2,minmax(0,1fr));
   gap:16px;
 }
 
@@ -366,10 +371,6 @@ a{
 
 .topic-card p{
   margin:0;
-}
-
-.loading{
-  color:var(--muted);
 }
 
 .mini-list{
@@ -417,7 +418,7 @@ a{
 
 .wc-grid{
   display:grid;
-  grid-template-columns:1.2fr .9fr .9fr;
+  grid-template-columns:1fr 1fr;
   gap:16px;
 }
 
@@ -464,53 +465,45 @@ a{
 }
 
 /* tablet */
-@media(max-width:1200px){
+@media(max-width:1180px){
   .layout{
-    grid-template-columns:220px minmax(0,1fr) 260px;
+    grid-template-columns:220px minmax(0,1fr);
   }
 
-  .topic-cards{
-    grid-template-columns:repeat(2,minmax(0,1fr));
-  }
-
-  .shelf-grid,
-  .wc-grid{
-    grid-template-columns:repeat(2,minmax(0,1fr));
+  .right-sidebar{
+    grid-column:1 / -1;
+    position:static;
   }
 
   .platform-strip{
-    grid-template-columns:repeat(4,minmax(0,1fr));
+    grid-template-columns:repeat(4, minmax(0,1fr));
   }
 }
 
 /* mobile */
-@media(max-width:980px){
-  .notice-bar{
-    grid-template-columns:1fr;
+@media(max-width:860px){
+  .page{
+    width:94%;
   }
 
-  .hero{
-    grid-template-columns:1fr;
+  .topbar{
+    padding:28px 0 14px;
   }
 
-  .layout{
-    grid-template-columns:1fr;
-  }
-
-  .sidebar{
-    position:static;
-  }
-
-  .grid,
-  .topic-cards,
-  .shelf-grid,
+  .notice-bar,
+  .hero,
+  .layout,
   .platform-strip,
+  .grid,
+  .shelf-grid,
+  .topic-cards,
   .wc-grid{
     grid-template-columns:1fr;
   }
 
-  .hero-feature-frame{
-    height:240px;
+  .sidebar,
+  .right-sidebar{
+    position:static;
   }
 
   .hero-main,
@@ -522,24 +515,18 @@ a{
     border-radius:16px;
   }
 
+  .hero-main{
+    padding:20px;
+  }
+
   .hero-main h1{
     font-size:2.15rem;
   }
 
-  .topbar{
-    padding:28px 0 14px;
-  }
-
-  .page{
-    width:94%;
-  }
-
-  .video-frame{
-    height:210px;
-  }
-
+  .hero-feature-frame,
+  .video-frame,
   .small-frame{
-    height:210px;
+    height:220px;
   }
 
   .search-wrap{
@@ -550,10 +537,13 @@ a{
   .search-wrap button{
     width:100%;
   }
+
+  .platform-link{
+    min-height:auto;
+  }
 }
 </style>
 </head>
-
 <body>
 
 <div class="page">
@@ -567,7 +557,7 @@ a{
   <div class="notice-bar">
     <div class="notice-box">
       <strong>About this site</strong><br>
-      SignalBoost Live is a discovery platform designed like an entry point into many content “stores.” It is built to become AI-guided, multi-source, and constantly changing — not a static front page.
+      SignalBoost Live is a discovery platform designed like an entry point into many content “stores.” It is built to become AI-guided, multi-source, and constantly changing.
     </div>
     <div class="notice-box">
       <strong>Guidance for minors</strong><br>
@@ -578,25 +568,27 @@ a{
   <div class="hero">
     <div class="hero-main">
       <h1>Welcome to the signal mall</h1>
-      <p>The homepage is the entrance. Once inside, users should find many different “stores” — topics, platforms, categories, current events, and rotating shelves of content. This version is more mobile-friendly and includes more major platforms.</p>
+      <p>The homepage is the entrance. Once inside, users should find many different stores: topics, platforms, current events, and rotating shelves of content.</p>
 
       <div class="search-wrap">
         <input type="text" id="searchInput" placeholder="Search topics, names, events, teams, ideas...">
         <button id="searchButton">Search</button>
       </div>
+      <div class="search-hint">
+        Try: Trump, Messi, World Cup, Bitcoin, AI jobs, inflation, Musk, football
+      </div>
 
       <div class="hero-pills">
-        <span class="pill">Mobile improved</span>
-        <span class="pill">More platforms</span>
+        <span class="pill">Better search</span>
+        <span class="pill">Mobile cleaned up</span>
         <span class="pill">World Cup 2026</span>
         <span class="pill">Dynamic shelves</span>
-        <span class="pill">AI-ready structure</span>
       </div>
     </div>
 
     <div class="hero-side">
-      <h3 style="margin-top:0;">What changed</h3>
-      <p>This version fixes the mobile stacking much better, expands the platform entrances, keeps the homepage dynamic, and preserves the stronger layout you liked on desktop.</p>
+      <h3 style="margin-top:0;">What this fixes</h3>
+      <p>This version focuses only on two things: search and mobile. The layout is simpler on phone, and the search now understands many more terms and routes them more reliably.</p>
     </div>
   </div>
 
@@ -607,7 +599,7 @@ a{
     </a>
     <a class="platform-link" href="https://x.com" target="_blank">
       <strong>X</strong>
-      <span>Fast public reactions</span>
+      <span>Fast reactions</span>
     </a>
     <a class="platform-link" href="https://www.instagram.com" target="_blank">
       <strong>Instagram</strong>
@@ -615,11 +607,11 @@ a{
     </a>
     <a class="platform-link" href="https://www.tiktok.com" target="_blank">
       <strong>TikTok</strong>
-      <span>Viral short clips</span>
+      <span>Short-form clips</span>
     </a>
     <a class="platform-link" href="https://www.linkedin.com" target="_blank">
       <strong>LinkedIn</strong>
-      <span>Professional discussions</span>
+      <span>Professional discussion</span>
     </a>
     <a class="platform-link" href="https://truthsocial.com" target="_blank">
       <strong>Truth Social</strong>
@@ -635,7 +627,7 @@ a{
     </a>
     <a class="platform-link" href="https://www.facebook.com" target="_blank">
       <strong>Facebook</strong>
-      <span>Mass audience reach</span>
+      <span>Mass audience</span>
     </a>
     <a class="platform-link" href="https://www.threads.net" target="_blank">
       <strong>Threads</strong>
@@ -653,7 +645,7 @@ a{
           <div class="mini-item"><a href="topic-bitcoin.html"><strong>Bitcoin</strong><span>Crypto, markets, adoption</span></a></div>
           <div class="mini-item"><a href="topic-politics.html"><strong>Politics</strong><span>Debates, elections, policy</span></a></div>
           <div class="mini-item"><a href="topic-business.html"><strong>Business</strong><span>Markets, inflation, layoffs</span></a></div>
-          <div class="mini-item"><a href="world-cup-history.html"><strong>World Cup History</strong><span>Timeline and legends</span></a></div>
+          <div class="mini-item"><a href="world-cup-history.html"><strong>World Cup History</strong><span>Tournament timeline and legends</span></a></div>
         </div>
       </div>
 
@@ -673,7 +665,7 @@ a{
 
       <div class="section">
         <h2>Top Signal Right Now</h2>
-        <div id="featured" class="card featured loading">
+        <div id="featured" class="card featured">
           <div class="card-content">Loading featured video...</div>
         </div>
       </div>
@@ -684,25 +676,20 @@ a{
         <div class="wc-grid">
           <div class="wc-block">
             <h3>Why it matters</h3>
-            <p>The 2026 tournament is one of the biggest football events on the horizon. This section gives the homepage a live sports anchor and a direct path into World Cup content, history, and current discussion.</p>
+            <p>The 2026 tournament is one of the biggest football events on the horizon. This gives the homepage a live sports anchor and a direct path into World Cup content and history.</p>
             <div class="source-icons">
               <a href="world-cup-history.html" class="source-badge">World Cup History</a>
               <a href="https://www.fifa.com" target="_blank" class="source-badge">FIFA</a>
             </div>
           </div>
           <div class="wc-block">
-            <h3>Groups / draw / fixtures</h3>
+            <h3>Groups / fixtures / standings</h3>
             <div class="wc-list">
               <div class="wc-row"><span>Group stage</span><span>Coming</span></div>
-              <div class="wc-row"><span>Fixtures</span><span>To be followed</span></div>
-              <div class="wc-row"><span>Standings</span><span>Will be added live</span></div>
-              <div class="wc-row"><span>Latest games</span><span>World Cup block ready</span></div>
+              <div class="wc-row"><span>Fixtures</span><span>To be added live</span></div>
+              <div class="wc-row"><span>Standings</span><span>To be added live</span></div>
+              <div class="wc-row"><span>Latest games</span><span>Football block ready</span></div>
             </div>
-          </div>
-          <div class="wc-block">
-            <h3>Historic entry point</h3>
-            <p>Use the history page to connect current World Cup interest with the story of the tournament from 1930 until now.</p>
-            <a href="world-cup-history.html" class="charity-link">Open World Cup History</a>
           </div>
         </div>
       </div>
@@ -714,7 +701,6 @@ a{
 
       <div class="section">
         <h2>Today’s Dynamic Shelves</h2>
-        <p style="color:var(--muted); margin-top:0;">These shelves refresh in different order so the homepage feels more alive.</p>
         <div id="dynamicShelves"></div>
       </div>
 
@@ -753,7 +739,7 @@ a{
 
     </main>
 
-    <aside class="sidebar">
+    <aside class="sidebar right-sidebar">
       <div class="panel">
         <h3>Live Audio</h3>
         <iframe
@@ -775,8 +761,8 @@ a{
       </div>
 
       <div class="panel">
-        <h3>Future AI direction</h3>
-        <p>Real AI search and source blending still need a backend. This homepage is now structured for that next step, but today it uses smarter front-end routing and live YouTube ranking.</p>
+        <h3>Messaging note</h3>
+        <p>SignalBoost’s own Telegram-style messaging feature is not built yet. The Telegram link here is only an external platform entrance.</p>
       </div>
     </aside>
 
@@ -790,14 +776,15 @@ a{
 <script>
 const API_KEY = "AIzaSyBWSnsfSNZxY_kYG_ACxm-GQYMsCOEuIuc";
 
-/* ---------- SMARTER SEARCH ---------- */
+/* SEARCH */
 const searchPages = [
   {
     title: "AI Replacing Jobs",
     url: "topic-ai.html",
     keywords: [
       "ai","artificial intelligence","automation","jobs","job loss","future of work","openai",
-      "chatgpt","technology","tech","robot","robots","productivity","software","coding","rogan"
+      "chatgpt","technology","tech","robot","robots","productivity","software","coding",
+      "sam altman","joe rogan ai"
     ]
   },
   {
@@ -813,7 +800,7 @@ const searchPages = [
     url: "topic-politics.html",
     keywords: [
       "politics","trump","biden","election","migration","immigration","border","government",
-      "policy","europe","war","debate","president","congress","right wing","left wing"
+      "policy","europe","war","debate","president","congress","right wing","left wing","musk trump"
     ]
   },
   {
@@ -821,7 +808,7 @@ const searchPages = [
     url: "topic-business.html",
     keywords: [
       "business","economy","inflation","finance","layoffs","recession","growth","market",
-      "stocks","companies","tariffs","bezos","musk","jobs report","interest rates"
+      "stocks","companies","tariffs","bezos","musk","jobs report","interest rates","amazon","tesla"
     ]
   },
   {
@@ -829,7 +816,7 @@ const searchPages = [
     url: "world-cup-history.html",
     keywords: [
       "world cup","fifa","football","soccer","messi","ronaldo","brazil","argentina","final",
-      "groups","fixtures","history","maradona","pele","mbappe","2026 world cup"
+      "groups","fixtures","history","maradona","pele","mbappe","2026 world cup","champions league"
     ]
   }
 ];
@@ -841,17 +828,18 @@ function smartScore(query, page) {
 
   for (const keyword of page.keywords) {
     const k = keyword.toLowerCase();
-    if (q === k) score += 12;
-    if (q.includes(k)) score += 6;
-    if (k.includes(q)) score += 4;
+
+    if (q === k) score += 20;
+    if (q.includes(k)) score += 10;
+    if (k.includes(q)) score += 6;
 
     for (const token of tokens) {
-      if (k === token) score += 4;
-      else if (k.includes(token)) score += 2;
+      if (k === token) score += 6;
+      else if (k.includes(token)) score += 3;
     }
   }
 
-  if (page.title.toLowerCase().includes(q)) score += 8;
+  if (page.title.toLowerCase().includes(q)) score += 12;
   return score;
 }
 
@@ -878,7 +866,7 @@ document.getElementById("searchInput").addEventListener("keypress", function(e) 
   if (e.key === "Enter") runSearch();
 });
 
-/* ---------- VIDEO HELPERS ---------- */
+/* VIDEO HELPERS */
 function formatViews(num) {
   const n = Number(num || 0);
   if (n >= 1000000000) return (n / 1000000000).toFixed(1).replace(".0","") + "B views";
@@ -911,10 +899,8 @@ function calculateSignalScore(video) {
   const publishedAt = new Date(video.snippet?.publishedAt || 0);
   const now = new Date();
   const ageDays = Math.max(1, Math.floor((now - publishedAt) / (1000 * 60 * 60 * 24)));
-
   const viewScore = Math.log10(Math.max(views, 1)) * 100;
   const freshnessBoost = Math.max(0, 30 - Math.min(ageDays, 30));
-
   return viewScore + freshnessBoost;
 }
 
@@ -923,16 +909,13 @@ async function fetchRankedVideos(query, maxResults = 8) {
     `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResults}&q=${encodeURIComponent(query)}&key=${API_KEY}`
   );
   const searchData = await searchRes.json();
-
   if (!searchData.items || !searchData.items.length) return [];
 
   const videoIds = searchData.items.map(item => item.id.videoId).filter(Boolean).join(",");
-
   const statsRes = await fetch(
     `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoIds}&key=${API_KEY}`
   );
   const statsData = await statsRes.json();
-
   if (!statsData.items || !statsData.items.length) return [];
 
   return [...statsData.items]
@@ -978,7 +961,6 @@ function renderShelfSection(title, label, videos) {
   `;
 }
 
-/* ---------- HOMEPAGE CONTENT ---------- */
 async function loadHomepageVideos() {
   const featured = document.getElementById("featured");
   const topVideos = document.getElementById("topVideos");
@@ -1010,13 +992,10 @@ async function loadHomepageVideos() {
           <span>•</span>
           <span>${top.snippet.channelTitle}</span>
         </div>
-        <div class="source-icons">
-          <a href="https://www.youtube.com/watch?v=${top.id}" target="_blank" class="source-badge">Open on YouTube</a>
-        </div>
       </div>
     `;
 
-    const rest = shuffleArray(sorted.filter(v => v.id !== top.id)).slice(0, 6);
+    const rest = shuffleArray(sorted.filter(v => v.id !== top.id)).slice(0, 4);
 
     topVideos.innerHTML = rest.map((video, index) => `
       <div class="card video-card">
@@ -1073,7 +1052,7 @@ async function loadDynamicShelves() {
     shuffledShelves.map(async shelf => {
       try {
         const videos = await fetchRankedVideos(shelf.query, 6);
-        return { ...shelf, videos: videos.slice(0, 3) };
+        return { ...shelf, videos: videos.slice(0, 2) };
       } catch (e) {
         return { ...shelf, videos: [] };
       }
@@ -1094,69 +1073,27 @@ async function loadDynamicShelves() {
   }).join("");
 }
 
-/* ---------- CHARITY ROTATION ---------- */
+/* CHARITY */
 const charityRotation = [
-  {
-    name: "St. Jude Children's Research Hospital",
-    url: "https://www.stjude.org/",
-    note: "Supports children with cancer and other life-threatening diseases."
-  },
-  {
-    name: "American Red Cross",
-    url: "https://www.redcross.org/",
-    note: "Disaster relief, blood donation, and emergency support."
-  },
-  {
-    name: "Doctors Without Borders",
-    url: "https://www.doctorswithoutborders.org/",
-    note: "Emergency medical aid worldwide."
-  },
-  {
-    name: "Feeding America",
-    url: "https://www.feedingamerica.org/",
-    note: "Works to fight hunger across the United States."
-  },
-  {
-    name: "Charity: Water",
-    url: "https://www.charitywater.org/",
-    note: "Focuses on clean and safe drinking water."
-  },
-  {
-    name: "Save the Children",
-    url: "https://www.savethechildren.org/",
-    note: "Supports children through health, education, and emergency aid."
-  },
-  {
-    name: "The Nature Conservancy",
-    url: "https://www.nature.org/",
-    note: "Protects land, water, and biodiversity."
-  },
-  {
-    name: "World Wildlife Fund",
-    url: "https://www.worldwildlife.org/",
-    note: "Focuses on wildlife and environmental conservation."
-  },
-  {
-    name: "Habitat for Humanity",
-    url: "https://www.habitat.org/",
-    note: "Helps families build and improve homes."
-  },
-  {
-    name: "Direct Relief",
-    url: "https://www.directrelief.org/",
-    note: "Provides medical aid and humanitarian relief."
-  }
+  { name: "St. Jude Children's Research Hospital", url: "https://www.stjude.org/", note: "Supports children with cancer and other life-threatening diseases." },
+  { name: "American Red Cross", url: "https://www.redcross.org/", note: "Disaster relief, blood donation, and emergency support." },
+  { name: "Doctors Without Borders", url: "https://www.doctorswithoutborders.org/", note: "Emergency medical aid worldwide." },
+  { name: "Feeding America", url: "https://www.feedingamerica.org/", note: "Works to fight hunger across the United States." },
+  { name: "Charity: Water", url: "https://www.charitywater.org/", note: "Focuses on clean and safe drinking water." },
+  { name: "Save the Children", url: "https://www.savethechildren.org/", note: "Supports children through health, education, and emergency aid." },
+  { name: "The Nature Conservancy", url: "https://www.nature.org/", note: "Protects land, water, and biodiversity." },
+  { name: "World Wildlife Fund", url: "https://www.worldwildlife.org/", note: "Focuses on wildlife and environmental conservation." },
+  { name: "Habitat for Humanity", url: "https://www.habitat.org/", note: "Helps families build and improve homes." },
+  { name: "Direct Relief", url: "https://www.directrelief.org/", note: "Provides medical aid and humanitarian relief." }
 ];
 
 function getCharityRotationState() {
   const rotationMonths = 4;
   const startDate = new Date("2026-01-01T00:00:00Z");
   const now = new Date();
-
   const monthsElapsed =
     (now.getUTCFullYear() - startDate.getUTCFullYear()) * 12 +
     (now.getUTCMonth() - startDate.getUTCMonth());
-
   const index = Math.floor(monthsElapsed / rotationMonths) % charityRotation.length;
   return index < 0 ? 0 : index;
 }
@@ -1164,7 +1101,6 @@ function getCharityRotationState() {
 function renderCharitySpotlight() {
   const currentIndex = getCharityRotationState();
   const current = charityRotation[currentIndex];
-
   const currentBox = document.getElementById("charityCurrent");
   const historyBox = document.getElementById("charityHistory");
 

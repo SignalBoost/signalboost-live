@@ -119,41 +119,70 @@
       display:flex;
       flex-wrap:wrap;
       justify-content:center;
-      gap:8px;
-      margin-bottom:16px;
+      gap:10px;
+      margin-bottom:18px;
     }
 
-    .platform-link{
+    .platform-card{
+      width:150px;
+      min-height:102px;
       background:var(--bg-soft);
       border:1px solid var(--line);
-      border-radius:10px;
-      padding:8px 10px;
-      text-align:center;
-      width:104px;
-      min-height:52px;
+      border-radius:12px;
+      padding:10px;
       display:flex;
       flex-direction:column;
-      justify-content:center;
-      flex:0 0 auto;
-      transition:all 0.2s ease;
+      justify-content:space-between;
+      transition:all .2s ease;
     }
 
-    .platform-link:hover{
+    .platform-card:hover{
       background:#2f3648;
       transform:translateY(-2px);
     }
 
-    .platform-link strong{
+    .platform-card strong{
       display:block;
-      margin-bottom:2px;
-      font-size:.82rem;
+      font-size:.88rem;
       line-height:1.1;
+      margin-bottom:3px;
+      text-align:center;
     }
 
-    .platform-link span{
+    .platform-card span{
+      display:block;
       color:var(--muted);
       font-size:.68rem;
       line-height:1.15;
+      text-align:center;
+      min-height:28px;
+    }
+
+    .platform-actions{
+      display:flex;
+      gap:6px;
+      margin-top:8px;
+    }
+
+    .platform-btn{
+      flex:1;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      padding:6px 6px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,0.04);
+      color:var(--text);
+      font-size:.66rem;
+      line-height:1;
+      white-space:nowrap;
+    }
+
+    .platform-btn.primary{
+      background:var(--accent-soft);
+      color:#dbe6ff;
     }
 
     .layout{
@@ -222,16 +251,6 @@
       margin-bottom:10px;
     }
 
-    .hero-feature-frame{
-      width:100%;
-      height:390px;
-      border:none;
-      display:block;
-      background:#31384b;
-      border-top-left-radius:18px;
-      border-top-right-radius:18px;
-    }
-
     .featured-signal{
       background:linear-gradient(135deg, rgba(77,163,255,0.16), rgba(255,255,255,0.02));
       min-height:390px;
@@ -246,6 +265,24 @@
     .featured-signal-inner{
       max-width:760px;
       text-align:left;
+    }
+
+    .video-frame{
+      width:100%;
+      height:220px;
+      border:none;
+      display:block;
+      background:#31384b;
+      border-top-left-radius:18px;
+      border-top-right-radius:18px;
+    }
+
+    .audio-frame{
+      width:100%;
+      height:180px;
+      border:none;
+      border-radius:12px;
+      background:#31384b;
     }
 
     .card-content{
@@ -270,14 +307,23 @@
       gap:16px;
     }
 
-    .video-frame{
-      width:100%;
-      height:220px;
-      border:none;
-      display:block;
-      background:#31384b;
-      border-top-left-radius:18px;
-      border-top-right-radius:18px;
+    .topic-cards{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0,1fr));
+      gap:16px;
+    }
+
+    .topic-card{
+      padding:16px;
+      min-height:120px;
+    }
+
+    .topic-card h3{
+      margin:0 0 8px;
+    }
+
+    .topic-card p{
+      margin:0;
     }
 
     .source-icons{
@@ -357,25 +403,6 @@
       padding-top:0;
     }
 
-    .topic-cards{
-      display:grid;
-      grid-template-columns:repeat(2, minmax(0,1fr));
-      gap:16px;
-    }
-
-    .topic-card{
-      padding:16px;
-      min-height:120px;
-    }
-
-    .topic-card h3{
-      margin:0 0 8px;
-    }
-
-    .topic-card p{
-      margin:0;
-    }
-
     .mini-list{
       display:flex;
       flex-direction:column;
@@ -398,14 +425,6 @@
       font-size:.92rem;
     }
 
-    .audio-frame{
-      width:100%;
-      height:180px;
-      border:none;
-      border-radius:12px;
-      background:#31384b;
-    }
-
     .charity-link{
       display:inline-block;
       margin-top:10px;
@@ -417,16 +436,6 @@
       font-size:.82rem;
       color:var(--muted);
       margin-top:8px;
-    }
-
-    .footer-disclaimer{
-      width:min(95%, 1480px);
-      margin:34px auto 24px;
-      color:#aeb7c9;
-      font-size:12px;
-      line-height:1.55;
-      border-top:1px solid rgba(255,255,255,0.08);
-      padding-top:16px;
     }
 
     .cta-row{
@@ -452,6 +461,16 @@
       background:var(--accent);
       border-color:transparent;
       color:white;
+    }
+
+    .footer-disclaimer{
+      width:min(95%, 1480px);
+      margin:34px auto 24px;
+      color:#aeb7c9;
+      font-size:12px;
+      line-height:1.55;
+      border-top:1px solid rgba(255,255,255,0.08);
+      padding-top:16px;
     }
 
     @media(max-width:1150px){
@@ -489,20 +508,15 @@
 
       .platform-strip{
         justify-content:center;
-        gap:6px;
+        gap:8px;
       }
 
-      .platform-link{
-        width:96px;
-        min-height:48px;
-        padding:7px 8px;
+      .platform-card{
+        width:140px;
+        min-height:98px;
       }
 
-      .platform-link strong{
-        font-size:.78rem;
-      }
-
-      .platform-link span{
+      .platform-btn{
         font-size:.64rem;
       }
 
@@ -512,21 +526,19 @@
         grid-template-columns:1fr;
       }
 
-      .hero-feature-frame,
-      .video-frame,
       .featured-signal{
-        height:auto;
         min-height:220px;
+        padding:20px;
+      }
+
+      .video-frame{
+        height:220px;
       }
 
       .panel,
       .card,
       .wc-block{
         border-radius:16px;
-      }
-
-      .featured-signal{
-        padding:20px;
       }
     }
   </style>
@@ -555,17 +567,126 @@
     </div>
 
     <div class="platform-strip">
-      <a class="platform-link" href="platform-youtube.html"><strong>YouTube</strong><span>Video gateway</span></a>
-      <a class="platform-link" href="platform-x.html"><strong>X</strong><span>Fast reactions</span></a>
-      <a class="platform-link" href="https://truthsocial.com" target="_blank" rel="noopener noreferrer"><strong>Truth Social</strong><span>Political chatter</span></a>
-      <a class="platform-link" href="platform-facebook.html"><strong>Facebook</strong><span>Mass audience</span></a>
-      <a class="platform-link" href="platform-tiktok.html"><strong>TikTok</strong><span>Short clips</span></a>
-      <a class="platform-link" href="https://www.instagram.com" target="_blank" rel="noopener noreferrer"><strong>Instagram</strong><span>Visual trends</span></a>
-      <a class="platform-link" href="https://signal.org" target="_blank" rel="noopener noreferrer"><strong>Signal</strong><span>Private messaging</span></a>
-      <a class="platform-link" href="https://telegram.org" target="_blank" rel="noopener noreferrer"><strong>Telegram</strong><span>Channels</span></a>
-      <a class="platform-link" href="platform-reddit.html"><strong>Reddit</strong><span>Discussions</span></a>
-      <a class="platform-link" href="https://www.linkedin.com" target="_blank" rel="noopener noreferrer"><strong>LinkedIn</strong><span>Professional talk</span></a>
-      <a class="platform-link" href="https://www.threads.net" target="_blank" rel="noopener noreferrer"><strong>Threads</strong><span>Meta stream</span></a>
+      <div class="platform-card">
+        <div>
+          <strong>YouTube</strong>
+          <span>Gateway or direct home</span>
+        </div>
+        <div class="platform-actions">
+          <a class="platform-btn primary" href="platform-youtube.html">Gateway</a>
+          <a class="platform-btn" href="https://www.youtube.com" target="_blank" rel="noopener noreferrer">Direct</a>
+        </div>
+      </div>
+
+      <div class="platform-card">
+        <div>
+          <strong>X</strong>
+          <span>Gateway or direct home</span>
+        </div>
+        <div class="platform-actions">
+          <a class="platform-btn primary" href="platform-x.html">Gateway</a>
+          <a class="platform-btn" href="https://x.com" target="_blank" rel="noopener noreferrer">Direct</a>
+        </div>
+      </div>
+
+      <div class="platform-card">
+        <div>
+          <strong>Truth Social</strong>
+          <span>Direct platform access</span>
+        </div>
+        <div class="platform-actions">
+          <a class="platform-btn primary" href="https://truthsocial.com" target="_blank" rel="noopener noreferrer">Open</a>
+          <a class="platform-btn" href="https://truthsocial.com" target="_blank" rel="noopener noreferrer">Direct</a>
+        </div>
+      </div>
+
+      <div class="platform-card">
+        <div>
+          <strong>Facebook</strong>
+          <span>Gateway or direct home</span>
+        </div>
+        <div class="platform-actions">
+          <a class="platform-btn primary" href="platform-facebook.html">Gateway</a>
+          <a class="platform-btn" href="https://www.facebook.com" target="_blank" rel="noopener noreferrer">Direct</a>
+        </div>
+      </div>
+
+      <div class="platform-card">
+        <div>
+          <strong>TikTok</strong>
+          <span>Gateway or direct home</span>
+        </div>
+        <div class="platform-actions">
+          <a class="platform-btn primary" href="platform-tiktok.html">Gateway</a>
+          <a class="platform-btn" href="https://www.tiktok.com" target="_blank" rel="noopener noreferrer">Direct</a>
+        </div>
+      </div>
+
+      <div class="platform-card">
+        <div>
+          <strong>Instagram</strong>
+          <span>Direct platform access</span>
+        </div>
+        <div class="platform-actions">
+          <a class="platform-btn primary" href="https://www.instagram.com" target="_blank" rel="noopener noreferrer">Open</a>
+          <a class="platform-btn" href="https://www.instagram.com" target="_blank" rel="noopener noreferrer">Direct</a>
+        </div>
+      </div>
+
+      <div class="platform-card">
+        <div>
+          <strong>Signal</strong>
+          <span>Private messaging home</span>
+        </div>
+        <div class="platform-actions">
+          <a class="platform-btn primary" href="https://signal.org" target="_blank" rel="noopener noreferrer">Open</a>
+          <a class="platform-btn" href="https://signal.org" target="_blank" rel="noopener noreferrer">Direct</a>
+        </div>
+      </div>
+
+      <div class="platform-card">
+        <div>
+          <strong>Telegram</strong>
+          <span>Direct platform access</span>
+        </div>
+        <div class="platform-actions">
+          <a class="platform-btn primary" href="https://telegram.org" target="_blank" rel="noopener noreferrer">Open</a>
+          <a class="platform-btn" href="https://telegram.org" target="_blank" rel="noopener noreferrer">Direct</a>
+        </div>
+      </div>
+
+      <div class="platform-card">
+        <div>
+          <strong>Reddit</strong>
+          <span>Gateway or direct home</span>
+        </div>
+        <div class="platform-actions">
+          <a class="platform-btn primary" href="platform-reddit.html">Gateway</a>
+          <a class="platform-btn" href="https://www.reddit.com" target="_blank" rel="noopener noreferrer">Direct</a>
+        </div>
+      </div>
+
+      <div class="platform-card">
+        <div>
+          <strong>LinkedIn</strong>
+          <span>Direct platform access</span>
+        </div>
+        <div class="platform-actions">
+          <a class="platform-btn primary" href="https://www.linkedin.com" target="_blank" rel="noopener noreferrer">Open</a>
+          <a class="platform-btn" href="https://www.linkedin.com" target="_blank" rel="noopener noreferrer">Direct</a>
+        </div>
+      </div>
+
+      <div class="platform-card">
+        <div>
+          <strong>Threads</strong>
+          <span>Direct platform access</span>
+        </div>
+        <div class="platform-actions">
+          <a class="platform-btn primary" href="https://www.threads.net" target="_blank" rel="noopener noreferrer">Open</a>
+          <a class="platform-btn" href="https://www.threads.net" target="_blank" rel="noopener noreferrer">Direct</a>
+        </div>
+      </div>
     </div>
 
     <div class="layout">
@@ -584,11 +705,11 @@
         <div class="panel">
           <h3>Quick Access</h3>
           <div class="source-icons">
-            <a href="platform-youtube.html" class="source-badge">YouTube</a>
+            <a href="platform-youtube.html" class="source-badge">YouTube Gateway</a>
             <a href="https://signal.org" target="_blank" rel="noopener noreferrer" class="source-badge">Signal</a>
             <a href="https://telegram.org" target="_blank" rel="noopener noreferrer" class="source-badge">Telegram</a>
-            <a href="platform-reddit.html" class="source-badge">Reddit</a>
-            <a href="platform-facebook.html" class="source-badge">Facebook</a>
+            <a href="platform-reddit.html" class="source-badge">Reddit Gateway</a>
+            <a href="platform-facebook.html" class="source-badge">Facebook Gateway</a>
             <a href="https://www.threads.net" target="_blank" rel="noopener noreferrer" class="source-badge">Threads</a>
           </div>
         </div>
@@ -603,29 +724,28 @@
                 <span class="rank-badge">SignalBoost Featured</span>
                 <h3 style="font-size:2rem; margin:0 0 10px;">SignalBoost is now source-independent</h3>
                 <p>
-                  The homepage no longer depends on YouTube API to stay alive. Live platforms still matter,
-                  but they no longer control whether the homepage works.
+                  The homepage no longer depends on YouTube API to stay alive. Users can choose either a SignalBoost gateway
+                  or a direct platform homepage.
                 </p>
                 <div class="cta-row">
-                  <a class="cta-btn primary" href="platform-youtube.html">Open YouTube Gateway</a>
-                  <a class="cta-btn" href="platform-reddit.html">Open Reddit Gateway</a>
+                  <a class="cta-btn primary" href="platform-youtube.html">YouTube Gateway</a>
+                  <a class="cta-btn" href="https://www.youtube.com" target="_blank" rel="noopener noreferrer">YouTube Direct</a>
+                  <a class="cta-btn" href="platform-reddit.html">Reddit Gateway</a>
                   <a class="cta-btn" href="world-cup-history.html">World Cup</a>
-                  <a class="cta-btn" href="topic-ai.html">AI Topic</a>
                 </div>
                 <div class="meta-row">
                   <span>No single-source dependency</span>
                   <span>•</span>
-                  <span>Gateway-first navigation</span>
+                  <span>Gateway + direct choice</span>
                   <span>•</span>
                   <span>Stable homepage</span>
                 </div>
               </div>
             </div>
             <div class="card-content">
-              <h3>Signal first, sources second</h3>
+              <h3>Signal first, user choice second</h3>
               <p>
-                The homepage now behaves like a real hub: internal topic stores, gateway pages, sports, charity,
-                and backup discovery stay available even when outside platforms are limited.
+                Some users want the gateway. Some want the platform home page immediately. This version gives both options without weakening the homepage.
               </p>
             </div>
           </div>
@@ -775,7 +895,7 @@
 
         <div class="panel">
           <h3>Important note</h3>
-          <p>Major platform buttons now use gateway pages where available, so mobile users do not lose the path back home too easily.</p>
+          <p>Platform cards now give both choices: a SignalBoost gateway and a direct platform homepage where appropriate.</p>
         </div>
       </aside>
     </div>

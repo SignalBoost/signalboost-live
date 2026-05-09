@@ -430,6 +430,95 @@ input:focus {
     width: 100%;
   }
 }
+  
+/* --------------------------------------------------
+   Dashboard Header Checkpoint
+   -------------------------------------------------- */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing, 1rem);
+  background: var(--color-bg-alt, #f9f9f9);
+  border-bottom: 1px solid var(--color-border, #dddddd);
+}
+
+.dashboard-header h1,
+.dashboard-header h2 {
+  font-size: 1.25rem;
+  margin: 0;
+  color: var(--color-text, inherit);
+  letter-spacing: normal;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  max-width: 60%;
+}
+
+.user-email {
+  font-size: 0.9rem;
+  color: var(--color-text, inherit);
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.theme-toggle {
+  margin: 1rem 0;
+  padding: 0.5rem 1rem;
+  background: var(--color-primary, #0070f3);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius, 6px);
+  cursor: pointer;
+  font-weight: 600;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.theme-toggle:hover {
+  background: var(--color-primary-hover, #005bb5);
+  transform: translateY(-1px);
+}
+
+:root[data-theme="dark"] .theme-toggle,
+:root[data-theme="dark"] .reviews button {
+  color: #111111;
+}
+
+@media (max-width: 600px) {
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .header-right {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .theme-toggle {
+    width: 100%;
+    text-align: center;
+  }
+
+  .user-email {
+    font-size: 0.85rem;
+    opacity: 0.9;
+    max-width: 100%;
+  }
+}
+
   </style>
 
   <script src="https://js.stripe.com/v3/"></script>
@@ -602,14 +691,15 @@ input:focus {
         </div>
       </section>
 
-      <section id="dashboard" class="card" style="display:none;">
-        <div class="dashboard-header">
-          <div>
-            <h2 data-i18n="dashboard">Dashboard</h2>
-            <p id="welcomeMessage">Welcome to SignalBoost.</p>
+      <section id="dashboard" class="card dashboard" style="display:none;">
+        <header class="dashboard-header">
+          <h2 data-i18n="dashboard">Dashboard</h2>
+          <div class="header-right">
+            <span id="userEmail" class="user-email">user@example.com</span>
+            <button id="dashboardThemeToggle" type="button" class="theme-toggle">🌙 Dark Mode</button>
+            <button id="logoutBtn" type="button" data-i18n="logout">Logout</button>
           </div>
-          <button id="logoutBtn" type="button" data-i18n="logout">Logout</button>
-        </div>
+        </header>
 
         <div id="payment" class="dashboard-card">
           <h3 data-i18n="paymentTitle">Payments</h3>

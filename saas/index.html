@@ -577,6 +577,68 @@ input:focus {
   margin-bottom: 0.75rem;
 }
 
+  
+/* --------------------------------------------------
+   Voice Ads Dashboard Checkpoint
+   -------------------------------------------------- */
+.voice-ads-dashboard {
+  background: var(--color-bg, #ffffff);
+  border: 1px solid var(--color-border, #dddddd);
+  border-radius: var(--radius, 10px);
+  padding: var(--spacing, 1rem);
+  margin-top: 1rem;
+}
+
+.voice-ads-dashboard ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.voice-ad-item {
+  background: var(--color-bg-alt, #f9f9f9);
+  border: 1px solid var(--color-border, #dddddd);
+  border-radius: var(--radius, 10px);
+  padding: var(--spacing, 1rem);
+  margin-bottom: 1rem;
+}
+
+.voice-ad-item::before {
+  content: "";
+  margin: 0;
+}
+
+.voice-ad-item audio {
+  width: 100%;
+  margin: 0.75rem 0;
+}
+
+.publish-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.publish-buttons button {
+  flex: 1;
+  min-width: 180px;
+}
+
+.placeholder-note {
+  font-size: 0.9rem;
+  color: var(--color-muted, #666666);
+}
+
+@media (max-width: 600px) {
+  .publish-buttons {
+    flex-direction: column;
+  }
+
+  .publish-buttons button {
+    width: 100%;
+  }
+}
+
   </style>
 
   <script src="https://js.stripe.com/v3/"></script>
@@ -589,6 +651,7 @@ input:focus {
 </head>
 
 <body>
+  <!-- ROLLBACK CHECKPOINT: voice-ads-placeholder -->
   <!-- ROLLBACK CHECKPOINT: auth-tabs + dashboard-header -->
   <div class="layout">
     <header class="navbar">
@@ -791,6 +854,26 @@ input:focus {
           </form>
           <div id="reviews" class="reviews-list"></div>
         </div>
+
+        <section id="voiceAdsDashboard" class="dashboard-card voice-ads-dashboard">
+          <h3>🎙️ Voice Ads</h3>
+          <p class="placeholder-note">
+            Upload or generate voice ads, preview audio, and prepare future publishing workflows.
+          </p>
+
+          <ul id="voiceAdsList">
+            <li class="voice-ad-item">
+              <h4>Example voice ad</h4>
+              <audio controls></audio>
+              <div class="publish-buttons">
+                <button type="button" disabled>Publish to TikTok (placeholder)</button>
+                <button type="button" disabled>Publish to Spotify Ads (placeholder)</button>
+                <button type="button" disabled>Publish to YouTube (placeholder)</button>
+              </div>
+            </li>
+          </ul>
+        </section>
+
       </section>
 
       <section id="cta" class="section">
@@ -828,5 +911,12 @@ input:focus {
   </div>
 
   <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+  <script>
+    // Voice Ads checkpoint:
+    // React component should call /api/list-voice-ads, not /api/listVoiceAds.
+    // Publishing buttons are placeholders until official platform API integrations are implemented.
+  </script>
+
 </body>
 </html>

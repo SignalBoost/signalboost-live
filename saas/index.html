@@ -519,6 +519,64 @@ input:focus {
   }
 }
 
+  
+/* --------------------------------------------------
+   Auth Page Tabs Checkpoint
+   -------------------------------------------------- */
+.auth-page {
+  max-width: 400px;
+  margin: 2rem auto;
+  padding: 1rem;
+  background: var(--color-bg-alt, #f9f9f9);
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.auth-tabs {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 1rem;
+}
+
+.auth-tabs button {
+  flex: 1;
+  padding: 0.5rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--color-text, #333333);
+  border-radius: 0;
+}
+
+.auth-tabs button:hover {
+  background: transparent;
+  color: var(--color-primary, #0070f3);
+  transform: none;
+}
+
+.auth-tabs button.active {
+  border-bottom: 2px solid var(--color-primary, #0070f3);
+  color: var(--color-primary, #0070f3);
+}
+
+.auth-content {
+  margin-top: 1rem;
+}
+
+.confirm-email-notice {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: var(--radius, 8px);
+  border: 1px solid var(--color-border, #dddddd);
+  background: var(--color-bg, #ffffff);
+}
+
+.confirm-email-notice p {
+  margin-bottom: 0.75rem;
+}
+
   </style>
 
   <script src="https://js.stripe.com/v3/"></script>
@@ -531,6 +589,7 @@ input:focus {
 </head>
 
 <body>
+  <!-- ROLLBACK CHECKPOINT: auth-tabs + dashboard-header -->
   <div class="layout">
     <header class="navbar">
       <div class="logo">SignalBoost</div>
@@ -670,24 +729,40 @@ input:focus {
 
       <section id="auth" class="card">
         <h2 data-i18n="authTitle">Authentication</h2>
-        <div class="auth-grid">
-          <form id="loginForm" class="form-card">
-            <h3 data-i18n="login">Login</h3>
-            <label for="loginEmail" data-i18n="email">Email</label>
-            <input type="email" id="loginEmail" name="email" placeholder="Email" autocomplete="email" required />
-            <label for="loginPassword" data-i18n="password">Password</label>
-            <input type="password" id="loginPassword" name="password" placeholder="Password" autocomplete="current-password" required />
-            <button type="submit" data-i18n="login">Login</button>
-          </form>
 
-          <form id="signupForm" class="form-card">
-            <h3 data-i18n="signup">Sign up</h3>
-            <label for="signupEmail" data-i18n="email">Email</label>
-            <input type="email" id="signupEmail" name="email" placeholder="Email" autocomplete="email" required />
-            <label for="signupPassword" data-i18n="password">Password</label>
-            <input type="password" id="signupPassword" name="password" placeholder="Password" autocomplete="new-password" required />
-            <button type="submit" data-i18n="signup">Sign up</button>
-          </form>
+        <div class="auth-page">
+          <nav class="auth-tabs" aria-label="Authentication options">
+            <button type="button" class="active">Log In</button>
+            <button type="button">Sign Up</button>
+            <button type="button">Reset Password</button>
+          </nav>
+
+          <div class="auth-content">
+            <form id="loginForm" class="auth-form form-card">
+              <h3 data-i18n="login">Log In</h3>
+              <input type="email" id="loginEmail" name="email" placeholder="Email" autocomplete="email" required />
+              <input type="password" id="loginPassword" name="password" placeholder="Password" autocomplete="current-password" required />
+              <button type="submit" data-i18n="login">Log In</button>
+            </form>
+
+            <form id="signupForm" class="auth-form form-card">
+              <h3 data-i18n="signup">Sign Up</h3>
+              <input type="email" id="signupEmail" name="email" placeholder="Email" autocomplete="email" required />
+              <input type="password" id="signupPassword" name="password" placeholder="Password" autocomplete="new-password" required />
+              <button type="submit" data-i18n="signup">Sign Up</button>
+            </form>
+
+            <form id="resetPasswordForm" class="auth-form form-card">
+              <h3>Reset Password</h3>
+              <input type="email" id="resetEmail" name="email" placeholder="Email" autocomplete="email" required />
+              <button type="submit">Send Reset Email</button>
+            </form>
+
+            <div class="confirm-email-notice">
+              <p>Your account was created but is not yet confirmed. Please check your email.</p>
+              <button type="button">Resend Confirmation Email</button>
+            </div>
+          </div>
         </div>
       </section>
 

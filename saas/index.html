@@ -3,1308 +3,665 @@
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- Primary Meta Tags -->
   <title>SignalBoost — Turn Customer Reviews Into Branded Content Automatically</title>
-  <meta name="description" content="SignalBoost transforms your customer reviews into polished, branded content automatically. Create consistent, authentic social proof without design work. Perfect for service businesses, local shops, and multi-location brands.">
-  <meta name="keywords" content="SignalBoost, automated review content, customer reviews, branded content generator, social proof automation, business reputation tools, review-to-content software">
-  <meta name="robots" content="index,follow,max-image-preview:large">
-  <meta name="theme-color" content="#0d1117">
+  <meta name="description" content="SignalBoost transforms customer reviews into branded content automatically. Create consistent social proof, manage reviews, and grow trust with a simple SaaS dashboard." />
+  <meta name="robots" content="index,follow,max-image-preview:large" />
+  <link rel="canonical" href="https://saas.signalboostapp.com/" />
 
-  <link rel="canonical" href="https://www.signalboostapp.com/">
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="SignalBoost — Automated Review-to-Content SaaS" />
+  <meta property="og:description" content="Turn real customer reviews into branded content automatically." />
+  <meta property="og:url" content="https://saas.signalboostapp.com/" />
+  <meta property="og:image" content="https://saas.signalboostapp.com/og-image.jpg" />
 
-  <!-- Open Graph -->
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="SignalBoost — Automated Review-to-Content Tool">
-  <meta property="og:description" content="Automatically convert your customer reviews into branded content that builds trust and strengthens your business reputation.">
-  <meta property="og:url" content="https://www.signalboostapp.com/">
-  <meta property="og:image" content="https://www.signalboostapp.com/og-image.jpg">
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="SignalBoost — Turn Reviews Into Content" />
+  <meta name="twitter:description" content="Automatically convert customer reviews into branded content." />
+  <meta name="twitter:image" content="https://saas.signalboostapp.com/og-image.jpg" />
 
-  <!-- Twitter -->
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="SignalBoost — Turn Customer Reviews Into Branded Content Automatically">
-  <meta name="twitter:description" content="SignalBoost converts your customer reviews into polished, ready-to-use branded content with zero effort.">
-  <meta name="twitter:image" content="https://www.signalboostapp.com/og-image.jpg">
-
-  <!-- Structured Data (JSON-LD) -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "SignalBoost",
-    "url": "https://www.signalboostapp.com/",
-    "description": "SignalBoost automatically transforms customer reviews into branded content, helping businesses showcase authentic social proof effortlessly.",
+    "url": "https://saas.signalboostapp.com/",
     "applicationCategory": "MarketingApplication",
     "operatingSystem": "Web",
-    "image": "https://www.signalboostapp.com/og-image.jpg",
+    "description": "SignalBoost automatically transforms customer reviews into branded content for businesses.",
     "publisher": {
       "@type": "Organization",
       "name": "SignalBoost"
     }
   }
   </script>
+
   <style>
-/* --------------------------------------------------
-   SIGNALBOOST — PREMIUM SAAS DESIGN SYSTEM
-   -------------------------------------------------- */
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
-/* ROOT TOKENS */
 :root {
-  --sb-bg: #0d1117;
-  --sb-bg-alt: #11161d;
-  --sb-surface: #161b22;
-  --sb-surface-alt: #1c2129;
-
-  --sb-text: #e6edf3;
-  --sb-text-muted: #9ba3ae;
-  --sb-text-soft: #7d8590;
-
-  --sb-primary: #facc15;
-  --sb-primary-dark: #eab308;
-  --sb-primary-light: #fde047;
-
-  --sb-radius: 12px;
-  --sb-radius-lg: 18px;
-
-  --sb-shadow: 0 8px 24px rgba(0,0,0,0.35);
-  --sb-shadow-soft: 0 4px 12px rgba(0,0,0,0.25);
-
-  --sb-max-width: 1180px;
-
-  --sb-space-1: 6px;
-  --sb-space-2: 10px;
-  --sb-space-3: 16px;
-  --sb-space-4: 24px;
-  --sb-space-5: 32px;
-  --sb-space-6: 48px;
-  --sb-space-7: 64px;
+  --bg: #f9fafb;
+  --surface: #ffffff;
+  --surface-2: #f3f4f6;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --primary: #facc15;
+  --primary-hover: #eab308;
+  --accent: #0070f3;
+  --border: #e5e7eb;
+  --shadow: 0 12px 32px rgba(0,0,0,0.08);
+  --radius: 18px;
 }
 
-/* GLOBAL RESET */
+:root[data-theme="dark"] {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface-2: #101720;
+  --text: #e6edf3;
+  --muted: #9ba3ae;
+  --primary: #facc15;
+  --primary-hover: #eab308;
+  --accent: #58a6ff;
+  --border: rgba(255,255,255,0.1);
+  --shadow: 0 18px 48px rgba(0,0,0,0.35);
+}
+
+html { scroll-behavior: smooth; }
+
 body {
-  margin: 0;
-  padding: 0;
-  background: var(--sb-bg);
-  color: var(--sb-text);
-  font-family: Inter, system-ui, sans-serif;
+  font-family: Inter, Arial, sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(250,204,21,0.12), transparent 28%),
+    var(--bg);
+  color: var(--text);
   line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
 }
 
-.sb-container {
-  width: 100%;
-  max-width: var(--sb-max-width);
-  margin: 0 auto;
-  padding: 0 var(--sb-space-4);
-}
+.layout { min-height: 100vh; display: flex; flex-direction: column; }
 
-/* --------------------------------------------------
-   NAVBAR
-   -------------------------------------------------- */
-.sb-nav {
+.navbar {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(13,17,23,0.85);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-}
-
-.sb-nav-inner {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  height: 72px;
+  align-items: center;
+  gap: 1rem;
+  background: rgba(13,17,23,0.88);
+  backdrop-filter: blur(14px);
+  color: #fff;
+  padding: 0.85rem 1.5rem;
+  border-bottom: 1px solid var(--border);
 }
 
-.sb-logo {
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: var(--sb-primary);
+:root[data-theme="light"] .navbar {
+  background: rgba(255,255,255,0.88);
+  color: var(--text);
 }
 
-.sb-nav-links a {
-  margin: 0 var(--sb-space-3);
-  color: var(--sb-text-muted);
-  text-decoration: none;
-  font-size: 0.95rem;
-  transition: 0.2s ease;
+.logo { font-weight: 900; font-size: 1.25rem; letter-spacing: -0.02em; }
+
+.nav-links { display: flex; gap: 1rem; flex-wrap: wrap; }
+.nav-links a { color: inherit; text-decoration: none; font-weight: 700; font-size: 0.92rem; }
+.nav-links a:hover { color: var(--primary); }
+
+.nav-actions { display: flex; align-items: center; gap: 0.5rem; }
+
+select, #themeToggle {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.45rem 0.65rem;
+  cursor: pointer;
+  background: var(--surface);
+  color: var(--text);
 }
 
-.sb-nav-links a:hover {
-  color: var(--sb-primary);
-}
-
-/* --------------------------------------------------
-   BUTTONS
-   -------------------------------------------------- */
-.sb-btn {
-  display: inline-block;
-  padding: var(--sb-space-2) var(--sb-space-4);
-  border-radius: var(--sb-radius);
-  font-weight: 600;
-  text-decoration: none;
-  transition: 0.25s ease;
-  font-size: 0.95rem;
-}
-
-.sb-btn-primary {
-  background: var(--sb-primary);
-  color: #000;
-  box-shadow: var(--sb-shadow-soft);
-}
-
-.sb-btn-primary:hover {
-  background: var(--sb-primary-dark);
-}
-
-.sb-btn-outline {
-  border: 1px solid var(--sb-primary);
-  color: var(--sb-primary);
-}
-
-.sb-btn-outline:hover {
-  background: var(--sb-primary);
-  color: #000;
-}
-
-.sb-btn-ghost {
-  color: var(--sb-text-muted);
-}
-
-.sb-btn-ghost:hover {
-  color: var(--sb-primary);
-}
-
-.sb-btn-full {
+.main-content {
+  flex: 1;
   width: 100%;
-  text-align: center;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
 }
 
-/* --------------------------------------------------
-   HERO
-   -------------------------------------------------- */
-.sb-hero {
-  padding: var(--sb-space-7) 0 var(--sb-space-6);
-  background: linear-gradient(180deg, #0d1117 0%, #11161d 100%);
+.section,
+.hero-section,
+.card,
+.dashboard-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 2rem;
+  margin-bottom: 2rem;
 }
 
-.sb-hero-grid {
+.hero-section {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--sb-space-6);
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 2rem;
   align-items: center;
+  padding: 4rem 2rem;
 }
 
-.sb-hero-copy h1 {
-  font-size: 2.8rem;
-  line-height: 1.2;
-  margin-bottom: var(--sb-space-4);
+.eyebrow {
+  display: inline-block;
+  background: rgba(250,204,21,0.14);
+  border: 1px solid rgba(250,204,21,0.35);
+  color: var(--primary);
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 1rem;
 }
 
-.sb-hero-sub {
-  font-size: 1.15rem;
-  color: var(--sb-text-muted);
-  margin-bottom: var(--sb-space-5);
+h1 {
+  font-size: clamp(2.4rem, 6vw, 4.7rem);
+  line-height: 0.98;
+  letter-spacing: -0.06em;
+  margin-bottom: 1rem;
 }
 
-.sb-hero-tags {
-  margin-top: var(--sb-space-4);
+h2 {
+  font-size: clamp(1.75rem, 4vw, 2.7rem);
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+  margin-bottom: 1rem;
+}
+
+h3 { margin-bottom: 0.75rem; }
+
+p { color: var(--muted); margin-bottom: 1rem; }
+
+.hero-actions,
+.cta-actions {
   display: flex;
+  gap: 0.75rem;
   flex-wrap: wrap;
-  gap: var(--sb-space-2);
+  margin-top: 1.25rem;
 }
 
-.sb-tag {
-  background: var(--sb-surface);
-  padding: var(--sb-space-1) var(--sb-space-3);
-  border-radius: var(--sb-radius);
-  font-size: 0.85rem;
-  color: var(--sb-text-soft);
-  border: 1px solid rgba(255,255,255,0.05);
+button,
+.btn {
+  background: var(--primary);
+  color: #111;
+  border: none;
+  padding: 0.8rem 1.25rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 900;
+  text-decoration: none;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  transition: background 0.2s ease, transform 0.2s ease;
 }
 
-/* --------------------------------------------------
-   HERO VISUAL CARDS
-   -------------------------------------------------- */
-.sb-review-card,
-.sb-generated-card {
-  background: var(--sb-surface);
-  padding: var(--sb-space-4);
-  border-radius: var(--sb-radius-lg);
-  box-shadow: var(--sb-shadow);
-  border: 1px solid rgba(255,255,255,0.05);
+button:hover,
+.btn:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
 }
 
-.sb-review-stars {
-  color: var(--sb-primary);
-  font-size: 1.2rem;
-  margin-bottom: var(--sb-space-2);
+.btn-secondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
 }
 
-.sb-generated-label {
-  font-size: 0.8rem;
-  color: var(--sb-primary);
-  margin-bottom: var(--sb-space-2);
+.preview-card {
+  background: linear-gradient(145deg, rgba(250,204,21,0.16), rgba(88,166,255,0.08)), var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 1.5rem;
 }
 
-.sb-generated-footer {
-  margin-top: var(--sb-space-3);
-  display: flex;
-  gap: var(--sb-space-2);
+.review-box,
+.generated-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1rem;
+  margin-bottom: 1rem;
 }
 
-.sb-chip {
-  background: var(--sb-surface-alt);
-  padding: var(--sb-space-1) var(--sb-space-3);
-  border-radius: var(--sb-radius);
-  font-size: 0.8rem;
-}
+.stars { color: var(--primary); letter-spacing: 0.15em; font-weight: 900; }
 
-.sb-chip-primary {
-  background: var(--sb-primary);
-  color: #000;
-}
-
-/* --------------------------------------------------
-   SECTIONS
-   -------------------------------------------------- */
-.sb-section {
-  padding: var(--sb-space-7) 0;
-}
-
-.sb-section-alt {
-  background: var(--sb-bg-alt);
-}
-
-.sb-section-header {
-  text-align: center;
-  max-width: 700px;
-  margin: 0 auto var(--sb-space-6);
-}
-
-.sb-section-header h2 {
-  font-size: 2rem;
-  margin-bottom: var(--sb-space-3);
-}
-
-.sb-section-header p {
-  color: var(--sb-text-muted);
-}
-
-/* --------------------------------------------------
-   GRIDS
-   -------------------------------------------------- */
-.sb-steps-grid,
-.sb-features-grid,
-.sb-gallery-grid,
-.sb-industries-grid,
-.sb-pricing-grid,
-.sb-faq-grid {
+.grid-3,
+.grid-2,
+.pricing-grid,
+.auth-grid {
   display: grid;
-  gap: var(--sb-space-5);
+  gap: 1rem;
 }
 
-.sb-steps-grid {
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-2, .pricing-grid, .auth-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.feature,
+.step,
+.industry,
+.price-card,
+.form-card,
+.faq-item {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.25rem;
 }
 
-.sb-features-grid {
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+.price-card.highlight {
+  border-color: rgba(250,204,21,0.55);
+  box-shadow: 0 16px 40px rgba(250,204,21,0.08);
 }
 
-.sb-gallery-grid {
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+ul { list-style: none; margin: 1rem 0; }
+li { margin-bottom: 0.5rem; color: var(--muted); }
+li::before { content: "✓"; color: var(--primary); margin-right: 0.5rem; font-weight: 900; }
+
+.form-card { display: flex; flex-direction: column; gap: 0.65rem; }
+label { font-weight: 800; }
+
+input {
+  width: 100%;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
 }
 
-.sb-industries-grid {
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(250,204,21,0.15);
 }
 
-.sb-pricing-grid {
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-}
+.dashboard-visible { display: grid !important; gap: 1rem; }
 
-.sb-faq-grid {
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-}
-
-/* --------------------------------------------------
-   PRICING CARDS
-   -------------------------------------------------- */
-.sb-pricing-card {
-  background: var(--sb-surface);
-  padding: var(--sb-space-5);
-  border-radius: var(--sb-radius-lg);
-  border: 1px solid rgba(255,255,255,0.05);
-  box-shadow: var(--sb-shadow-soft);
-}
-
-.sb-pricing-card-highlight {
-  border: 1px solid var(--sb-primary);
-  background: linear-gradient(180deg, #1c2129 0%, #161b22 100%);
-}
-
-/* --------------------------------------------------
-   FAQ
-   -------------------------------------------------- */
-.sb-faq-item {
-  background: var(--sb-surface);
-  padding: var(--sb-space-4);
-  border-radius: var(--sb-radius);
-  border: 1px solid rgba(255,255,255,0.05);
-}
-
-/* --------------------------------------------------
-   CTA
-   -------------------------------------------------- */
-.sb-section-cta {
-  background: linear-gradient(180deg, #11161d 0%, #0d1117 100%);
-  padding: var(--sb-space-7) 0;
-}
-
-.sb-cta-inner {
+.dashboard-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: var(--sb-space-5);
+  gap: 1rem;
 }
 
-/* --------------------------------------------------
-   FOOTER
-   -------------------------------------------------- */
-.sb-footer {
-  padding: var(--sb-space-6) 0;
-  background: #0b0f14;
-  border-top: 1px solid rgba(255,255,255,0.05);
+.reviews-list p {
+  background: var(--surface-2);
+  padding: 0.75rem;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
 }
 
-.sb-footer-inner {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--sb-space-6);
+.footer {
+  margin-top: auto;
+  background: var(--surface);
+  color: var(--text);
+  padding: 1rem;
+  text-align: center;
+  border-top: 1px solid var(--border);
 }
 
-.sb-footer-links h4 {
-  margin-bottom: var(--sb-space-2);
-  color: var(--sb-primary);
-}
-
-.sb-footer-links a {
-  display: block;
-  color: var(--sb-text-muted);
-  margin-bottom: var(--sb-space-2);
+.footer-links { margin-bottom: 0.5rem; }
+.footer-links a {
+  margin: 0 0.75rem;
   text-decoration: none;
+  color: var(--accent);
+  font-weight: 700;
+}
+.footer-copy { font-size: 0.9rem; color: var(--muted); }
+
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
 }
 
-.sb-footer-links a:hover {
-  color: var(--sb-primary);
+.modal-content {
+  position: relative;
+  background: var(--surface);
+  margin: 10% auto;
+  padding: 2rem;
+  border-radius: var(--radius);
+  width: 90%;
+  max-width: 420px;
+  box-shadow: var(--shadow);
+  text-align: center;
 }
 
-/* --------------------------------------------------
-   RESPONSIVE
-   -------------------------------------------------- */
-@media (max-width: 900px) {
-  .sb-hero-grid {
+.close {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  background: transparent;
+  color: var(--text);
+  font-size: 1.5rem;
+  padding: 0;
+}
+
+.spinner-overlay {
+  display: none;
+  position: fixed;
+  z-index: 2000;
+  inset: 0;
+  background: rgba(15,17,21,0.55);
+  backdrop-filter: blur(4px);
+  justify-content: center;
+  align-items: center;
+}
+
+.spinner-overlay.active { display: flex; }
+
+.spinner {
+  border: 6px solid #f3f3f3;
+  border-top: 6px solid var(--primary);
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toast {
+  background: #333;
+  color: #fff;
+  padding: 0.75rem 1.25rem;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.hide { opacity: 0; transform: translateY(20px); }
+.toast.success { background: #2e7d32; }
+.toast.error { background: #c62828; }
+.toast.info { background: #1565c0; }
+
+@media (max-width: 860px) {
+  .hero-section,
+  .grid-3,
+  .grid-2,
+  .pricing-grid,
+  .auth-grid {
     grid-template-columns: 1fr;
   }
 
-  .sb-cta-inner {
+  .navbar,
+  .dashboard-header {
     flex-direction: column;
-    text-align: center;
-  }
-
-  .sb-footer-inner {
-    flex-direction: column;
-  }
-}
-
-
-/* --------------------------------------------------
-   PRODUCTION COMPLETION FIXES
-   -------------------------------------------------- */
-
-* {
-  box-sizing: border-box;
-}
-
-html {
-  scroll-behavior: smooth;
-}
-
-.sb-page {
-  min-height: 100vh;
-  overflow-x: hidden;
-}
-
-.sb-nav-cta,
-.sb-hero-actions,
-.sb-cta-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--sb-space-3);
-  flex-wrap: wrap;
-}
-
-.sb-hero-visual {
-  display: grid;
-  gap: var(--sb-space-4);
-}
-
-.sb-review-text,
-.sb-generated-text,
-.sb-price-note,
-.sb-footer-brand p {
-  color: var(--sb-text-muted);
-}
-
-.sb-generated-card h3 {
-  font-size: 2rem;
-  line-height: 1.12;
-  margin: var(--sb-space-2) 0;
-}
-
-.sb-step,
-.sb-feature,
-.sb-gallery-card,
-.sb-industry {
-  background: var(--sb-surface);
-  padding: var(--sb-space-4);
-  border-radius: var(--sb-radius-lg);
-  border: 1px solid rgba(255,255,255,0.05);
-  box-shadow: var(--sb-shadow-soft);
-}
-
-.sb-step-number {
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  background: var(--sb-primary);
-  color: #000;
-  border-radius: var(--sb-radius);
-  font-weight: 800;
-  margin-bottom: var(--sb-space-3);
-}
-
-.sb-feature h3,
-.sb-step h3,
-.sb-gallery-card h3,
-.sb-faq-item h3,
-.sb-pricing-card h3 {
-  margin-top: 0;
-}
-
-.sb-gallery-card {
-  min-height: 230px;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  position: relative;
-  overflow: hidden;
-}
-
-.sb-gallery-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(circle at top right, rgba(250,204,21,0.22), transparent 35%),
-    linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0));
-  pointer-events: none;
-}
-
-.sb-gallery-card h3,
-.sb-gallery-card p {
-  position: relative;
-  z-index: 1;
-}
-
-.sb-gallery-square { aspect-ratio: 1 / 1; }
-.sb-gallery-portrait { aspect-ratio: 4 / 5; }
-.sb-gallery-landscape { aspect-ratio: 16 / 10; }
-
-.sb-pricing-card ul {
-  padding-left: 0;
-  list-style: none;
-  margin: var(--sb-space-4) 0;
-}
-
-.sb-pricing-card li {
-  margin-bottom: var(--sb-space-2);
-  color: var(--sb-text-muted);
-}
-
-.sb-pricing-card li::before {
-  content: "✓";
-  color: var(--sb-primary);
-  margin-right: 8px;
-  font-weight: 800;
-}
-
-.sb-cta-inner h2 {
-  font-size: 2.2rem;
-  line-height: 1.15;
-  margin: 0 0 var(--sb-space-3);
-}
-
-.sb-cta-inner p {
-  color: var(--sb-text-muted);
-  max-width: 620px;
-}
-
-.sb-footer-links {
-  display: flex;
-  gap: var(--sb-space-7);
-}
-
-.sb-footer-brand {
-  max-width: 360px;
-}
-
-@media (max-width: 900px) {
-  .sb-nav-inner {
-    height: auto;
-    min-height: 72px;
-    padding-top: var(--sb-space-3);
-    padding-bottom: var(--sb-space-3);
-    gap: var(--sb-space-3);
-  }
-
-  .sb-nav-links {
-    display: none;
-  }
-
-  .sb-nav-cta {
-    justify-content: flex-end;
-  }
-
-  .sb-hero-copy h1 {
-    font-size: 2.25rem;
-  }
-
-  .sb-footer-links {
-    gap: var(--sb-space-5);
-  }
-}
-
-@media (max-width: 560px) {
-  .sb-container {
-    padding: 0 var(--sb-space-3);
-  }
-
-  .sb-nav-inner {
     align-items: flex-start;
-    flex-direction: column;
   }
 
-  .sb-nav-cta,
-  .sb-hero-actions,
-  .sb-cta-actions {
+  .nav-links {
+    gap: 0.65rem;
+  }
+
+  button,
+  .btn {
     width: 100%;
   }
 
-  .sb-btn {
+  .toast-container {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+  }
+
+  .toast {
     width: 100%;
-    text-align: center;
-  }
-
-  .sb-hero {
-    padding-top: var(--sb-space-6);
-  }
-
-  .sb-hero-copy h1 {
-    font-size: 2rem;
-  }
-
-  .sb-footer-links {
-    flex-direction: column;
   }
 }
-
-
-/* --------------------------------------------------
-   PREMIUM SAAS ANIMATION SYSTEM
-   -------------------------------------------------- */
-
-@keyframes sb-fade-up {
-  0% { opacity: 0; transform: translateY(20px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes sb-fade-in {
-  0% { opacity: 0; }
-  100% { opacity: 1; }
-}
-
-@keyframes sb-scale-in {
-  0% { opacity: 0; transform: scale(0.95); }
-  100% { opacity: 1; transform: scale(1); }
-}
-
-.sb-reveal > * {
-  opacity: 0;
-  animation: sb-fade-up 0.7s ease forwards;
-}
-
-.sb-reveal > *:nth-child(1) { animation-delay: 0.05s; }
-.sb-reveal > *:nth-child(2) { animation-delay: 0.15s; }
-.sb-reveal > *:nth-child(3) { animation-delay: 0.25s; }
-.sb-reveal > *:nth-child(4) { animation-delay: 0.35s; }
-.sb-reveal > *:nth-child(5) { animation-delay: 0.45s; }
-
-.sb-hero-copy {
-  opacity: 0;
-  animation: sb-fade-up 0.9s ease forwards;
-  animation-delay: 0.2s;
-}
-
-.sb-hero-visual {
-  opacity: 0;
-  animation: sb-scale-in 0.9s ease forwards;
-  animation-delay: 0.35s;
-}
-
-.sb-feature,
-.sb-pricing-card,
-.sb-faq-item,
-.sb-gallery-card,
-.sb-step,
-.sb-industry {
-  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
-}
-
-.sb-feature:hover,
-.sb-pricing-card:hover,
-.sb-faq-item:hover,
-.sb-gallery-card:hover,
-.sb-step:hover,
-.sb-industry:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 12px 32px rgba(0,0,0,0.35);
-  border-color: rgba(250,204,21,0.28);
-}
-
-.sb-btn {
-  transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-}
-
-.sb-btn:hover {
-  transform: translateY(-2px);
-}
-
-@keyframes sb-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(250,204,21,0.4); }
-  70% { box-shadow: 0 0 0 12px rgba(250,204,21,0); }
-  100% { box-shadow: 0 0 0 0 rgba(250,204,21,0); }
-}
-
-.sb-nav-cta .sb-btn-primary,
-.sb-hero-actions .sb-btn-primary,
-.sb-pricing-card .sb-btn-primary,
-.sb-cta-actions .sb-btn-primary {
-  animation: sb-pulse 2.8s infinite;
-}
-
-.sb-section,
-.sb-section-alt {
-  opacity: 0;
-  transform: translateY(30px);
-  transition: opacity 0.8s ease, transform 0.8s ease;
-}
-
-.sb-section.sb-visible,
-.sb-section-alt.sb-visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    scroll-behavior: auto !important;
-    transition-duration: 0.001ms !important;
-  }
-
-  .sb-section,
-  .sb-section-alt,
-  .sb-hero-copy,
-  .sb-hero-visual,
-  .sb-reveal > * {
-    opacity: 1 !important;
-    transform: none !important;
-  }
-}
-
-  
-/* --------------------------------------------------
-   LIGHT MODE THEME + THEME TOGGLE + EARLY ACCESS FORM
-   -------------------------------------------------- */
-
-:root[data-theme="light"] {
-  --sb-bg: #ffffff;
-  --sb-bg-alt: #f7f8fa;
-  --sb-surface: #ffffff;
-  --sb-surface-alt: #f2f3f5;
-
-  --sb-text: #1a1f27;
-  --sb-text-muted: #4b5563;
-  --sb-text-soft: #6b7280;
-
-  --sb-primary: #facc15;
-  --sb-primary-dark: #eab308;
-  --sb-primary-light: #fde047;
-
-  --sb-shadow: 0 8px 24px rgba(0,0,0,0.08);
-  --sb-shadow-soft: 0 4px 12px rgba(0,0,0,0.06);
-
-  --sb-border: rgba(0,0,0,0.08);
-}
-
-:root[data-theme="light"] body {
-  background: var(--sb-bg);
-}
-
-:root[data-theme="light"] .sb-nav {
-  background: rgba(255,255,255,0.85);
-  border-bottom: 1px solid var(--sb-border);
-}
-
-:root[data-theme="light"] .sb-hero {
-  background: linear-gradient(180deg, #ffffff 0%, #f7f8fa 100%);
-}
-
-:root[data-theme="light"] .sb-section-alt,
-:root[data-theme="light"] .sb-section-cta {
-  background: var(--sb-bg-alt);
-}
-
-:root[data-theme="light"] .sb-footer {
-  background: #f7f8fa;
-  border-top: 1px solid var(--sb-border);
-}
-
-:root[data-theme="light"] .sb-tag,
-:root[data-theme="light"] .sb-feature,
-:root[data-theme="light"] .sb-step,
-:root[data-theme="light"] .sb-industry,
-:root[data-theme="light"] .sb-pricing-card,
-:root[data-theme="light"] .sb-faq-item,
-:root[data-theme="light"] .sb-gallery-card,
-:root[data-theme="light"] .sb-review-card,
-:root[data-theme="light"] .sb-generated-card {
-  border: 1px solid var(--sb-border);
-}
-
-:root[data-theme="light"] .sb-review-card,
-:root[data-theme="light"] .sb-generated-card,
-:root[data-theme="light"] .sb-feature,
-:root[data-theme="light"] .sb-step,
-:root[data-theme="light"] .sb-industry,
-:root[data-theme="light"] .sb-pricing-card,
-:root[data-theme="light"] .sb-faq-item,
-:root[data-theme="light"] .sb-gallery-card {
-  background: var(--sb-surface);
-}
-
-:root[data-theme="light"] .sb-pricing-card-highlight {
-  background: linear-gradient(180deg, #ffffff 0%, #f7f8fa 100%);
-}
-
-.sb-theme-toggle {
-  background: var(--sb-surface);
-  border: 1px solid rgba(255,255,255,0.1);
-  padding: 8px 12px;
-  border-radius: var(--sb-radius);
-  cursor: pointer;
-  font-size: 1rem;
-  color: var(--sb-text);
-  transition: 0.25s ease;
-}
-
-.sb-theme-toggle:hover {
-  background: var(--sb-surface-alt);
-  transform: translateY(-2px);
-}
-
-:root[data-theme="light"] .sb-theme-toggle {
-  border: 1px solid rgba(0,0,0,0.1);
-}
-
-.sb-cta-form {
-  flex: 1;
-  min-width: min(100%, 360px);
-}
-
-.sb-cta-form-row {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-.sb-input {
-  flex: 1;
-  min-width: 0;
-  padding: 10px 14px;
-  border-radius: var(--sb-radius);
-  border: 1px solid rgba(255,255,255,0.12);
-  background: var(--sb-surface);
-  color: var(--sb-text);
-  font-size: 0.95rem;
-}
-
-.sb-input::placeholder {
-  color: var(--sb-text-soft);
-}
-
-.sb-input:focus {
-  outline: none;
-  border-color: var(--sb-primary);
-  box-shadow: 0 0 0 3px rgba(250,204,21,0.12);
-}
-
-.sb-cta-note {
-  font-size: 0.8rem;
-  color: var(--sb-text-muted);
-  margin: 0;
-}
-
-:root[data-theme="light"] .sb-input {
-  background: #ffffff;
-  border: 1px solid rgba(0,0,0,0.12);
-}
-
-@media (max-width: 700px) {
-  .sb-cta-form-row {
-    flex-direction: column;
-  }
-}
-
-  
-.sb-language-select {
-  background: var(--sb-surface);
-  color: var(--sb-text);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: var(--sb-radius);
-  padding: 8px 10px;
-  cursor: pointer;
-  font-weight: 700;
-}
-
-:root[data-theme="light"] .sb-language-select {
-  border: 1px solid rgba(0,0,0,0.1);
-}
-
   </style>
-</head>
-<body>
-  <div class="sb-page">
 
-    <!-- NAVBAR -->
-    <header class="sb-nav">
-      <div class="sb-container sb-nav-inner">
-        <div class="sb-logo">SignalBoost</div>
-        <nav class="sb-nav-links">
-          <a href="#how-it-works" data-i18n="nav_how">How it works</a>
-          <a href="#features" data-i18n="nav_features">Features</a>
-          <a href="#examples" data-i18n="nav_examples">Examples</a>
-          <a href="#pricing" data-i18n="nav_pricing">Pricing</a>
-          <a href="#faq" data-i18n="nav_faq">FAQ</a>
-        </nav>
-        <div class="sb-nav-cta">
-          <select id="sb-language-select" class="sb-language-select" aria-label="Select language">
-            <option value="en">EN</option>
-            <option value="es">ES</option>
-            <option value="pt">PT</option>
-            <option value="pl">PL</option>
-            <option value="ru">RU</option>
-          </select>
-          <button id="sb-theme-toggle" class="sb-theme-toggle" type="button" aria-label="Toggle light and dark mode">
-            <span class="sb-theme-icon" aria-hidden="true">🌙</span>
-          </button>
-          <a href="#pricing" class="sb-btn sb-btn-outline" data-i18n="nav_pricing">Pricing</a>
-          <a href="#cta" class="sb-btn sb-btn-primary" data-i18n="nav_start">Start free</a>
-        </div>
+  <script src="https://js.stripe.com/v3/"></script>
+  <script src="/js/app.js" defer></script>
+  <script type="module" src="/js/auth.js"></script>
+  <script type="module" src="/js/dashboard.js"></script>
+  <script type="module" src="/js/payments.js"></script>
+  <script type="module" src="/js/analytics.js"></script>
+  <script type="module" src="/js/error-boundary.js"></script>
+</head>
+
+<body>
+  <div class="layout">
+    <header class="navbar">
+      <div class="logo">SignalBoost</div>
+
+      <nav class="nav-links" aria-label="Main navigation">
+        <a href="/" data-i18n="home">Home</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="#features">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#auth" data-i18n="login">Login</a>
+      </nav>
+
+      <div class="nav-actions">
+        <select id="langSelect" aria-label="Select language">
+          <option value="en">EN</option>
+          <option value="es">ES</option>
+          <option value="pt">PT</option>
+          <option value="pl">PL</option>
+          <option value="ru">RU</option>
+        </select>
+
+        <button id="themeToggle" type="button" aria-label="Toggle theme">
+          <span id="themeIcon">🌙</span>
+        </button>
       </div>
     </header>
 
-    <!-- HERO -->
-    <main>
-      <section class="sb-hero">
-        <div class="sb-container sb-hero-grid">
-          <div class="sb-hero-copy">
-            <h1 data-i18n="hero_headline">Turn customer reviews into branded content automatically</h1>
-            <p class="sb-hero-sub">
-              SignalBoost transforms your real customer reviews into polished, ready‑to‑share branded content.
-              No design tools, no templates, no manual editing—just consistent, authentic social proof.
-            </p>
-
-            <div class="sb-hero-actions">
-              <a href="#cta" class="sb-btn sb-btn-primary" data-i18n="hero_cta">Start turning reviews into content</a>
-              <a href="#how-it-works" class="sb-btn sb-btn-ghost" data-i18n="hero_secondary">See how it works</a>
-            </div>
-
-            <div class="sb-hero-tags">
-              <span class="sb-tag" data-i18n="tag_detection">Automated review detection</span>
-              <span class="sb-tag" data-i18n="tag_content">Instant branded content</span>
-              <span class="sb-tag" data-i18n="tag_design">Zero design skills needed</span>
-              <span class="sb-tag" data-i18n="tag_proof">Consistent social proof</span>
-            </div>
+    <main class="main-content">
+      <section id="home" class="hero-section">
+        <div>
+          <span class="eyebrow">AI-powered review marketing</span>
+          <h1 data-i18n="headline">Turn your reviews into content</h1>
+          <p data-i18n="heroSubtitle">
+            SignalBoost helps businesses transform customer reviews into branded content, track activity, and manage their subscription from one simple dashboard.
+          </p>
+          <div class="hero-actions">
+            <button id="heroCta" type="button" data-i18n="cta">Try it now</button>
+            <a class="btn btn-secondary" href="#how-it-works">See how it works</a>
           </div>
+        </div>
 
-          <div class="sb-hero-visual">
-            <div class="sb-review-card">
-              <div class="sb-review-stars">★★★★★</div>
-              <p class="sb-review-text">
-                “The team was fast, professional, and made the whole experience easy. I recommend them to anyone.”
-              </p>
-            </div>
-
-            <div class="sb-generated-card">
-              <p class="sb-generated-label">Generated design</p>
-              <h3>Real customers. Real trust. Real results.</h3>
-              <p class="sb-generated-text">
-                “Fast, professional, and easy from start to finish.”
-              </p>
-              <div class="sb-generated-footer">
-                <span class="sb-chip">Your brand</span>
-                <span class="sb-chip sb-chip-primary">Ready to share</span>
-              </div>
-            </div>
+        <div class="preview-card">
+          <div class="review-box">
+            <div class="stars">★★★★★</div>
+            <p>“Fast, professional, and easy from start to finish.”</p>
+          </div>
+          <div class="generated-box">
+            <span class="eyebrow">Generated design</span>
+            <h3>Real customers. Real trust. Real results.</h3>
+            <p>Your best reviews become ready-to-share branded content.</p>
           </div>
         </div>
       </section>
 
-      <!-- HOW IT WORKS -->
-      <section id="how-it-works" class="sb-section sb-section-alt">
-        <div class="sb-container">
-          <header class="sb-section-header">
-            <h2 data-i18n="how_title">How SignalBoost works</h2>
-            <p>
-              From customer review to branded content in three simple steps.
-              SignalBoost removes the creative bottleneck so your best feedback becomes reusable content automatically.
-            </p>
-          </header>
-
-          <div class="sb-steps-grid">
-            <div class="sb-step">
-              <div class="sb-step-number">1</div>
-              <h3 data-i18n="step1_title">Detect your best reviews</h3>
-              <p>SignalBoost identifies high‑quality customer reviews and prepares them for content generation.</p>
-            </div>
-
-            <div class="sb-step">
-              <div class="sb-step-number">2</div>
-              <h3 data-i18n="step2_title">Transform into branded designs</h3>
-              <p>Each review becomes a clean, on‑brand visual using your colors, typography, and layout preferences.</p>
-            </div>
-
-            <div class="sb-step">
-              <div class="sb-step-number">3</div>
-              <h3>Get ready‑to‑share content</h3>
-              <p>Download or reuse your designs anywhere you communicate with customers.</p>
-            </div>
+      <section id="how-it-works" class="section">
+        <span class="eyebrow">How SignalBoost works</span>
+        <h2>From customer review to branded content in three simple steps.</h2>
+        <div class="grid-3">
+          <div class="step">
+            <h3>1. Detect reviews</h3>
+            <p>SignalBoost helps identify reviews worth turning into content.</p>
+          </div>
+          <div class="step">
+            <h3>2. Generate branded content</h3>
+            <p>Each review becomes a clean asset aligned with your brand.</p>
+          </div>
+          <div class="step">
+            <h3>3. Save and reuse</h3>
+            <p>Keep your best customer proof inside your content dashboard.</p>
           </div>
         </div>
       </section>
 
-      <!-- FEATURES -->
-      <section id="features" class="sb-section">
-        <div class="sb-container">
-          <header class="sb-section-header">
-            <h2 data-i18n="features_title">Built for consistent, authentic social proof</h2>
-            <p>Turn everyday customer feedback into a library of evergreen content.</p>
-          </header>
+      <section id="features" class="section">
+        <span class="eyebrow">Features</span>
+        <h2>Everything you need to turn reviews into reusable content.</h2>
+        <div class="grid-3">
+          <div class="feature"><h3>Review capture</h3><p>Save customer reviews inside your dashboard.</p></div>
+          <div class="feature"><h3>Content library</h3><p>Build a searchable library of reusable customer proof.</p></div>
+          <div class="feature"><h3>Brand-ready workflow</h3><p>Prepare reviews for future branded content generation.</p></div>
+          <div class="feature"><h3>Multi-language shell</h3><p>Support English, Spanish, Portuguese, Polish, and Russian.</p></div>
+          <div class="feature"><h3>Subscription-ready</h3><p>Stripe checkout structure is included for paid plans.</p></div>
+          <div class="feature"><h3>Dashboard foundation</h3><p>Supabase auth and dashboard data flow are ready to connect.</p></div>
+        </div>
+      </section>
 
-          <div class="sb-features-grid">
-            <article class="sb-feature">
-              <h3 data-i18n="feature_detection_title">Automated review detection</h3>
-              <p>SignalBoost surfaces the reviews worth turning into content.</p>
-            </article>
+      <section id="industries" class="section">
+        <span class="eyebrow">Who it is for</span>
+        <h2>Built for businesses that earn trust through customer experience.</h2>
+        <div class="grid-3">
+          <div class="industry">Service businesses</div>
+          <div class="industry">Local shops</div>
+          <div class="industry">Hospitality</div>
+          <div class="industry">Health and wellness</div>
+          <div class="industry">Home services</div>
+          <div class="industry">Professional services</div>
+        </div>
+      </section>
 
-            <article class="sb-feature">
-              <h3>Brand‑aligned visuals</h3>
-              <p>Apply your brand colors, fonts, and tone automatically.</p>
-            </article>
-
-            <article class="sb-feature">
-              <h3 data-i18n="feature_layout_title">Multiple layout options</h3>
-              <p>Square, portrait, landscape, minimal, bold—choose what fits your channels.</p>
-            </article>
-
-            <article class="sb-feature">
-              <h3 data-i18n="feature_library_title">Content library</h3>
-              <p>Build a reusable library of social proof for campaigns and landing pages.</p>
-            </article>
-
-            <article class="sb-feature">
-              <h3>Multi‑location support</h3>
-              <p>Showcase reviews from different locations while keeping your brand consistent.</p>
-            </article>
-
-            <article class="sb-feature">
-              <h3 data-i18n="feature_zero_title">Zero design skills required</h3>
-              <p>Anyone can generate high‑quality content in seconds.</p>
-            </article>
+      <section id="pricing" class="section">
+        <span class="eyebrow">Pricing</span>
+        <h2>Simple plans for growing brands.</h2>
+        <div class="pricing-grid">
+          <div class="price-card">
+            <h3>Starter</h3>
+            <p>For small businesses starting with review content.</p>
+            <ul>
+              <li>Review dashboard</li>
+              <li>Content library</li>
+              <li>Basic subscription access</li>
+            </ul>
+            <a href="#auth" class="btn">Get started</a>
+          </div>
+          <div class="price-card highlight">
+            <h3>Pro</h3>
+            <p>For growing brands and multi-location businesses.</p>
+            <ul>
+              <li>Everything in Starter</li>
+              <li>Advanced content workflow</li>
+              <li>Priority processing</li>
+            </ul>
+            <a href="#auth" class="btn">Start Pro</a>
           </div>
         </div>
       </section>
 
-      <!-- EXAMPLES -->
-      <section id="examples" class="sb-section sb-section-alt">
-        <div class="sb-container">
-          <header class="sb-section-header">
-            <h2 data-i18n="examples_title">See what SignalBoost can generate</h2>
-            <p>Examples of how real customer reviews become on‑brand content.</p>
-          </header>
-
-          <div class="sb-gallery-grid">
-            <div class="sb-gallery-card sb-gallery-square">
-              <h3>Square layout</h3>
-              <p>Perfect for feed posts.</p>
-            </div>
-
-            <div class="sb-gallery-card sb-gallery-portrait">
-              <h3>Portrait layout</h3>
-              <p>Ideal for stories and vertical placements.</p>
-            </div>
-
-            <div class="sb-gallery-card sb-gallery-landscape">
-              <h3>Landscape layout</h3>
-              <p>Great for banners and embeds.</p>
-            </div>
-          </div>
+      <section id="faq" class="section">
+        <span class="eyebrow">FAQ</span>
+        <h2>Common questions.</h2>
+        <div class="grid-2">
+          <div class="faq-item"><h3>Is this the full SaaS app?</h3><p>This is the frontend baseline. Supabase and Stripe need real keys before production.</p></div>
+          <div class="faq-item"><h3>Does it support languages?</h3><p>Yes. The structure supports English, Spanish, Portuguese, Polish, and Russian.</p></div>
+          <div class="faq-item"><h3>Does checkout work now?</h3><p>The button exists, but the backend Stripe function must be implemented.</p></div>
+          <div class="faq-item"><h3>Can users save reviews?</h3><p>Yes, once Supabase tables and RLS policies are configured.</p></div>
         </div>
       </section>
 
-      <!-- INDUSTRIES -->
-      <section id="industries" class="sb-section">
-        <div class="sb-container">
-          <header class="sb-section-header">
-            <h2>Works for any review‑driven business</h2>
-            <p>If your customers leave reviews, SignalBoost can turn them into content.</p>
-          </header>
-
-          <div class="sb-industries-grid">
-            <div class="sb-industry">Service businesses</div>
-            <div class="sb-industry">Local shops</div>
-            <div class="sb-industry">Hospitality</div>
-            <div class="sb-industry">Health & wellness</div>
-            <div class="sb-industry">Home services</div>
-            <div class="sb-industry">Professional services</div>
-          </div>
-        </div>
-      </section>
-
-      <!-- PRICING -->
-      <section id="pricing" class="sb-section sb-section-alt">
-        <div class="sb-container">
-          <header class="sb-section-header">
-            <h2 data-i18n="pricing_title">Simple pricing for growing brands</h2>
-            <p>Start with the essentials, then scale your content output.</p>
-          </header>
-
-          <div class="sb-pricing-grid">
-            <div class="sb-pricing-card">
-              <h3 data-i18n="starter_title">Starter</h3>
-              <p class="sb-price-note">For small teams and solo operators.</p>
-              <ul>
-                <li>Automated review detection</li>
-                <li>Branded content generation</li>
-                <li>Access to content library</li>
-              </ul>
-              <a href="#cta" class="sb-btn sb-btn-primary sb-btn-full" data-i18n="starter_cta">Get started</a>
-            </div>
-
-            <div class="sb-pricing-card sb-pricing-card-highlight">
-              <h3 data-i18n="pro_title">Pro</h3>
-              <p class="sb-price-note">For multi‑location and growing brands.</p>
-              <ul>
-                <li>Everything in Starter</li>
-                <li>Advanced branding options</li>
-                <li>Multi‑location support</li>
-                <li>Priority processing</li>
-              </ul>
-              <a href="#cta" class="sb-btn sb-btn-primary sb-btn-full" data-i18n="pro_cta">Talk to us</a>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- FAQ -->
-      <section id="faq" class="sb-section">
-        <div class="sb-container">
-          <header class="sb-section-header">
-            <h2 data-i18n="faq_title">Frequently asked questions</h2>
-            <p>Quick answers to common questions about SignalBoost.</p>
-          </header>
-
-          <div class="sb-faq-grid">
-            <article class="sb-faq-item">
-              <h3>Do I need design skills?</h3>
-              <p>No. SignalBoost handles all the design work automatically.</p>
-            </article>
-
-            <article class="sb-faq-item">
-              <h3>Does it work for my business?</h3>
-              <p>If your customers leave reviews, SignalBoost works for you.</p>
-            </article>
-
-            <article class="sb-faq-item">
-              <h3>Where can I use the content?</h3>
-              <p>Anywhere you communicate with customers: website, email, landing pages, and more.</p>
-            </article>
-
-            <article class="sb-faq-item">
-              <h3>Can I customize the look?</h3>
-              <p>Yes. You can configure brand colors, typography, and layout preferences.</p>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <!-- FINAL CTA -->
-      <section id="cta" class="sb-section sb-section-cta">
-        <div class="sb-container sb-cta-inner">
-          <div>
-            <h2 data-i18n="cta_title">Turn your best reviews into your best content</h2>
-            <p>
-              Join the early access list and be the first to use SignalBoost to turn real customer reviews into branded content.
-            </p>
-          </div>
-
-          <form
-            class="sb-cta-form"
-            action="https://formspree.io/f/your-id-here"
-            method="POST"
-          >
-            <div class="sb-cta-form-row">
-              <input
-                type="email"
-                name="email"
-                required
-                placeholder="you@company.com" data-i18n-placeholder="email_placeholder"
-                class="sb-input"
-                aria-label="Email address"
-              />
-              <button type="submit" class="sb-btn sb-btn-primary" data-i18n="cta_submit">Join early access</button>
-            </div>
-            <p class="sb-cta-note">
-              No spam. We’ll only email you about SignalBoost updates and access.
-            </p>
+      <section id="auth" class="card">
+        <h2 data-i18n="authTitle">Authentication</h2>
+        <div class="auth-grid">
+          <form id="loginForm" class="form-card">
+            <h3 data-i18n="login">Login</h3>
+            <label for="loginEmail" data-i18n="email">Email</label>
+            <input type="email" id="loginEmail" name="email" placeholder="Email" autocomplete="email" required />
+            <label for="loginPassword" data-i18n="password">Password</label>
+            <input type="password" id="loginPassword" name="password" placeholder="Password" autocomplete="current-password" required />
+            <button type="submit" data-i18n="login">Login</button>
           </form>
+
+          <form id="signupForm" class="form-card">
+            <h3 data-i18n="signup">Sign up</h3>
+            <label for="signupEmail" data-i18n="email">Email</label>
+            <input type="email" id="signupEmail" name="email" placeholder="Email" autocomplete="email" required />
+            <label for="signupPassword" data-i18n="password">Password</label>
+            <input type="password" id="signupPassword" name="password" placeholder="Password" autocomplete="new-password" required />
+            <button type="submit" data-i18n="signup">Sign up</button>
+          </form>
+        </div>
+      </section>
+
+      <section id="dashboard" class="card" style="display:none;">
+        <div class="dashboard-header">
+          <div>
+            <h2 data-i18n="dashboard">Dashboard</h2>
+            <p id="welcomeMessage">Welcome to SignalBoost.</p>
+          </div>
+          <button id="logoutBtn" type="button" data-i18n="logout">Logout</button>
+        </div>
+
+        <div id="payment" class="dashboard-card">
+          <h3 data-i18n="paymentTitle">Payments</h3>
+          <p id="subscriptionStatus">Subscription Status: Not loaded</p>
+          <button id="checkoutBtn" type="button" data-i18n="checkout">Checkout</button>
+        </div>
+
+        <div id="reviewPanel" class="dashboard-card">
+          <h3 data-i18n="reviewsTitle">Reviews</h3>
+          <form id="reviewForm">
+            <label for="reviewContent" data-i18n="reviewLabel">Review content</label>
+            <input type="text" id="reviewContent" name="reviewContent" placeholder="Write a review..." data-i18n-placeholder="reviewPlaceholder" required />
+            <button type="submit" data-i18n="saveReview">Save review</button>
+          </form>
+          <div id="reviews" class="reviews-list"></div>
+        </div>
+      </section>
+
+      <section id="cta" class="section">
+        <span class="eyebrow">Start now</span>
+        <h2>Turn your best reviews into your best content.</h2>
+        <p>Use this baseline to connect your real Supabase and Stripe accounts, then build the product features from here.</p>
+        <div class="cta-actions">
+          <a class="btn" href="#auth">Create account</a>
+          <a class="btn btn-secondary" href="#pricing">View pricing</a>
         </div>
       </section>
     </main>
 
-    <!-- FOOTER -->
-    <footer class="sb-footer">
-      <div class="sb-container sb-footer-inner">
-        <div class="sb-footer-brand">
-          <div class="sb-logo">SignalBoost</div>
-          <p>Turn customer reviews into branded content automatically.</p>
-        </div>
-
-        <div class="sb-footer-links">
-          <div>
-            <h4>Product</h4>
-            <a href="#how-it-works" data-i18n="nav_how">How it works</a>
-            <a href="#features" data-i18n="nav_features">Features</a>
-            <a href="#pricing" data-i18n="nav_pricing">Pricing</a>
-          </div>
-
-          <div>
-            <h4>Company</h4>
-            <a href="#faq" data-i18n="nav_faq">FAQ</a>
-          </div>
-        </div>
+    <footer class="footer">
+      <div class="footer-links">
+        <a href="/about.html" data-i18n="about">About</a>
+        <a href="/terms.html" data-i18n="terms">Terms</a>
+        <a href="/privacy.html" data-i18n="privacy">Privacy</a>
+        <a href="/contact.html" data-i18n="contact">Contact</a>
       </div>
+      <p class="footer-copy">&copy; 2026 SignalBoost. All rights reserved.</p>
     </footer>
-
   </div>
-  <script>
-    async function loadLanguage(lang) {
-      try {
-        const res = await fetch(`/i18n/${lang}.json`, { cache: "no-store" });
-        if (!res.ok) throw new Error("Missing language file: " + lang);
 
-        const translations = await res.json();
+  <div id="modal" class="modal" aria-hidden="true">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button id="modalClose" class="close" type="button" aria-label="Close modal">&times;</button>
+      <h2 id="modalTitle"></h2>
+      <p id="modalMessage"></p>
+    </div>
+  </div>
 
-        document.querySelectorAll("[data-i18n]").forEach((el) => {
-          const key = el.getAttribute("data-i18n");
-          if (translations[key]) el.textContent = translations[key];
-        });
+  <div id="spinner" class="spinner-overlay" aria-hidden="true">
+    <div class="spinner" role="status" aria-label="Loading"></div>
+  </div>
 
-        document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
-          const key = el.getAttribute("data-i18n-placeholder");
-          if (translations[key]) el.setAttribute("placeholder", translations[key]);
-        });
-
-        document.documentElement.setAttribute("lang", lang);
-        localStorage.setItem("sb-lang", lang);
-      } catch (error) {
-        console.warn("SignalBoost language load failed:", error);
-      }
-    }
-
-    (function () {
-      const root = document.documentElement;
-      const toggleBtn = document.getElementById("sb-theme-toggle");
-      const languageSelect = document.getElementById("sb-language-select");
-      const supported = ["en", "es", "pt", "pl", "ru"];
-
-      function applyTheme(theme) {
-        root.setAttribute("data-theme", theme);
-        localStorage.setItem("sb-theme", theme);
-
-        if (toggleBtn) {
-          const icon = toggleBtn.querySelector(".sb-theme-icon");
-          if (icon) icon.textContent = theme === "light" ? "🌙" : "☀️";
-        }
-      }
-
-      const savedTheme = localStorage.getItem("sb-theme");
-      if (savedTheme === "light" || savedTheme === "dark") applyTheme(savedTheme);
-
-      if (toggleBtn) {
-        toggleBtn.addEventListener("click", () => {
-          const current = root.getAttribute("data-theme") || "dark";
-          applyTheme(current === "dark" ? "light" : "dark");
-        });
-      }
-
-      let lang = localStorage.getItem("sb-lang") || navigator.language.split("-")[0] || "en";
-      if (!supported.includes(lang)) lang = "en";
-
-      if (languageSelect) {
-        languageSelect.value = lang;
-        languageSelect.addEventListener("change", () => loadLanguage(languageSelect.value));
-      }
-
-      loadLanguage(lang);
-
-      const sections = document.querySelectorAll(".sb-section, .sb-section-alt");
-
-      if (!("IntersectionObserver" in window)) {
-        sections.forEach((section) => section.classList.add("sb-visible"));
-        return;
-      }
-
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("sb-visible");
-            observer.unobserve(entry.target);
-          }
-        });
-      }, { threshold: 0.15 });
-
-      sections.forEach((section) => observer.observe(section));
-    })();
-  </script>
+  <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 </body>
 </html>

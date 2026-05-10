@@ -1,6 +1,5 @@
-
 import { useState } from 'react';
-import { supabase } from '../utils/supabaseClient';
+import { supabase } from '../lib/supabaseClient';
 
 export default function UpdatePassword() {
   const [password, setPassword] = useState('');
@@ -12,7 +11,7 @@ export default function UpdatePassword() {
   };
 
   return (
-    <div style={{ padding: '40px', color: '#f9c300', background: '#111' }}>
+    <div style={{ padding: '40px', color: '#f9c300', background: '#111', minHeight: '100vh' }}>
       <h1>Set New Password</h1>
 
       {done ? (

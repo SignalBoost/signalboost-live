@@ -1,18 +1,24 @@
 {
-  "name": "signalboost-saas",
+  "name": "signalboost-live",
+  "version": "1.0.0",
   "private": true,
+
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "lint": "next lint"
   },
+
   "dependencies": {
+    "next": "14.2.35",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+
+    "@supabase/supabase-js": "^2.50.0",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/auth-helpers-react": "^0.5.0",
-    "@supabase/supabase-js": "^2.39.0",
-    "next": "^14.2.5",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "stripe": "^14.25.0"
+
+    "stripe": "^16.12.0"
   }
 }

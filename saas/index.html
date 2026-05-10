@@ -150,22 +150,24 @@
       <div class="brand">SignalBoost</div>
       
 
+
 <nav class="nav-links">
   <a href="#home">Home</a>
   <a href="#how-it-works">How it works</a>
   <a href="#features">Features</a>
   <a href="#pricing">Pricing</a>
-  <a href="website-generator.html">Website Generator</a>
-  <a href="dashboard.html">Dashboard</a>
-  <a id="navSignup" class="signup-nav-btn" href="signup.html">Sign Up</a>
-  <a id="navLogin" href="login.html">Login</a>
+  <a href="/website-generator">Website Generator</a>
+  <a href="/dashboard">Dashboard</a>
+  <a id="navSignup" class="signup-nav-btn" href="/signup">Sign Up</a>
+  <a id="navLogin" href="/login">Login</a>
   <a id="navUser"
-     href="dashboard.html"
+     href="/dashboard"
      style="display:none;color:#f6b91a;text-decoration:none;font-weight:950;"></a>
   <a id="navLogout"
      href="#"
      style="display:none;color:#fff;text-decoration:none;font-weight:950;">Logout</a>
 </nav>
+
 
 
       <div class="nav-actions"><select aria-label="Language"><option>EN</option><option>ES</option><option>PT</option><option>PL</option><option>RU</option></select><button class="theme-button" type="button">🌙</button><span class="login-dot">▲</span></div>
@@ -1002,6 +1004,43 @@
   })();
 </script>
 
+
+<script>
+  // Route fix: this site uses /login and /signup, not /auth/login or /auth/signup.
+  (function () {
+    function normalizeSignalBoostRoute(href) {
+      if (!href) return href;
+      return href
+        .replace("/auth/login", "/login")
+        .replace("/auth/signup", "/signup");
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      document.querySelectorAll("a[href]").forEach(function (link) {
+        const current = link.getAttribute("href");
+        const fixed = normalizeSignalBoostRoute(current);
+        if (fixed !== current) link.setAttribute("href", fixed);
+      });
+    });
+
+    document.addEventListener("click", function (event) {
+      const link = event.target.closest("a[href]");
+      if (!link) return;
+
+      const href = link.getAttribute("href") || "";
+      if (href === "/auth/login" || href === "auth/login") {
+        event.preventDefault();
+        window.location.href = "/login";
+      }
+
+      if (href === "/auth/signup" || href === "auth/signup") {
+        event.preventDefault();
+        window.location.href = "/signup";
+      }
+    });
+  })();
+</script>
+
 </body></html>`;
             const blob = new Blob([content], { type: "text/html" });
             const url = URL.createObjectURL(blob);
@@ -1380,6 +1419,43 @@
     });
 
     window.refreshSignalBoostAuthUI = refreshAuthUI;
+  })();
+</script>
+
+
+<script>
+  // Route fix: this site uses /login and /signup, not /auth/login or /auth/signup.
+  (function () {
+    function normalizeSignalBoostRoute(href) {
+      if (!href) return href;
+      return href
+        .replace("/auth/login", "/login")
+        .replace("/auth/signup", "/signup");
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      document.querySelectorAll("a[href]").forEach(function (link) {
+        const current = link.getAttribute("href");
+        const fixed = normalizeSignalBoostRoute(current);
+        if (fixed !== current) link.setAttribute("href", fixed);
+      });
+    });
+
+    document.addEventListener("click", function (event) {
+      const link = event.target.closest("a[href]");
+      if (!link) return;
+
+      const href = link.getAttribute("href") || "";
+      if (href === "/auth/login" || href === "auth/login") {
+        event.preventDefault();
+        window.location.href = "/login";
+      }
+
+      if (href === "/auth/signup" || href === "auth/signup") {
+        event.preventDefault();
+        window.location.href = "/signup";
+      }
+    });
   })();
 </script>
 

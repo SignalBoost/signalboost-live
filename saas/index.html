@@ -4,6 +4,7 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+  <!-- SUPABASE CONFIG REQUIRED: replace placeholder URL and anon key before production -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SignalBoost — Reviews to Graphics, Voice Ads & Websites</title>
@@ -345,7 +346,14 @@
     </footer>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+<script>
+  /* SignalBoost Supabase Public Config */
+  window.SIGNALBOOST_SUPABASE_URL = "https://xyzcompany.supabase.co";
+  window.SIGNALBOOST_SUPABASE_ANON_KEY = "your-anon-key-here";
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     (function () {
       const SUPABASE_URL = window.SIGNALBOOST_SUPABASE_URL || "";

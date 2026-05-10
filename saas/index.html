@@ -347,11 +347,19 @@
   </div>
 
   
+
 <script>
-  /* SignalBoost Supabase Public Config */
-  window.SIGNALBOOST_SUPABASE_URL = "https://xyzcompany.supabase.co";
+  /*
+    IMPORTANT:
+    Replace these placeholder values with your REAL Supabase project credentials.
+    Example:
+    window.SIGNALBOOST_SUPABASE_URL = "https://abc123.supabase.co";
+    window.SIGNALBOOST_SUPABASE_ANON_KEY = "eyJhbGciOi...";
+  */
+  window.SIGNALBOOST_SUPABASE_URL = "https://your-project.supabase.co";
   window.SIGNALBOOST_SUPABASE_ANON_KEY = "your-anon-key-here";
 </script>
+
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
@@ -433,7 +441,7 @@
               <input type="password" id="signupPassword" required autocomplete="new-password" />
               <label>Confirm Password</label>
               <input type="password" id="signupConfirm" required autocomplete="new-password" />
-              <button type="submit">Sign Up</button>
+              <button type="submit">Sign Up</button><p class="small-muted" style="margin-top:10px;">Configure your real Supabase URL + anon key before production deployment.</p>
               <p class="form-message" id="signupMessage"></p>
               <p class="small-muted" style="margin-top:14px;">Already have an account? <a href="login.html" data-embed-route="login" style="color:#f6b91a;font-weight:900;">Login</a></p>
             </form>
@@ -587,7 +595,14 @@
             }
 
             const result = await supabaseClient.auth.signUp({ email, password });
-            if (result.error) setMessage("signupMessage", result.error.message, "error");
+            if (result.error) {
+              const msg = result.error.message || "Signup failed.";
+              if (msg.toLowerCase().includes("fetch")) {
+                setMessage("signupMessage", "Supabase connection failed. Replace the placeholder Supabase URL and anon key with your real project credentials.", "error");
+              } else {
+                setMessage("signupMessage", msg, "error");
+              }
+            }
             else setMessage("signupMessage", "Signup successful! Check your email to confirm.", "success");
           });
         }
@@ -606,7 +621,14 @@
             }
 
             const result = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (result.error) setMessage("loginMessage", result.error.message, "error");
+            if (result.error) {
+              const msg = result.error.message || "Login failed.";
+              if (msg.toLowerCase().includes("fetch")) {
+                setMessage("loginMessage", "Supabase connection failed. Replace the placeholder Supabase URL and anon key with your real project credentials.", "error");
+              } else {
+                setMessage("loginMessage", msg, "error");
+              }
+            }
             else {
               setMessage("loginMessage", "Login successful! Opening dashboard…", "success");
               setTimeout(() => openEmbedded("dashboard"), 500);

@@ -1,997 +1,276 @@
+
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SignalBoost Live</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SignalBoost — Reviews to Graphics, Voice Ads & Websites</title>
+  <meta name="description" content="SignalBoost turns customer reviews into branded graphics, voice ads, and website starter pages for small businesses." />
   <style>
-    :root{
-      --bg:#202533;
-      --bg-soft:#272d3d;
-      --text:#e9edf5;
-      --muted:#aeb7c9;
-      --line:rgba(255,255,255,0.08);
-      --accent:#4da3ff;
-      --accent-soft:rgba(77,163,255,0.14);
-      --radius:18px;
-    }
-
-    *{box-sizing:border-box;}
-
-    body{
-      margin:0;
-      font-family:Arial, Helvetica, sans-serif;
-      background:linear-gradient(180deg,#1b2130 0%, var(--bg) 100%);
-      color:var(--text);
-    }
-
-    a{
-      color:inherit;
-      text-decoration:none;
-    }
-
-    .page{
-      width:min(95%, 1480px);
-      margin:0 auto;
-    }
-
-    .topbar{
-      display:flex;
-      justify-content:center;
-      align-items:center;
-      padding:36px 0 18px;
-    }
-
-    .brand{
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      text-align:center;
-      font-weight:bold;
-    }
-
-    .brand-wave{
-      color:var(--accent);
-      letter-spacing:2px;
-      margin-bottom:4px;
-      font-weight:700;
-    }
-
-    .hero{
-      background:var(--bg-soft);
-      border:1px solid var(--line);
-      border-radius:22px;
-      padding:24px;
-      margin-bottom:18px;
-    }
-
-    .hero h1{
-      margin:0 0 10px;
-      font-size:2.9rem;
-      line-height:1.08;
-      text-align:center;
-    }
-
-    .hero p{
-      margin:0 auto;
-      color:var(--muted);
-      line-height:1.55;
-      max-width:900px;
-      text-align:center;
-    }
-
-    .search-wrap{
-      display:flex;
-      gap:10px;
-      margin:20px auto 0;
-      max-width:900px;
-    }
-
-    .search-wrap input{
-      flex:1;
-      padding:14px 16px;
-      border-radius:999px;
-      border:none;
-      outline:none;
-      background:#2a3142;
-      color:var(--text);
-      font-size:16px;
-    }
-
-    .search-wrap button{
-      padding:14px 20px;
-      border:none;
-      border-radius:999px;
-      background:var(--accent);
-      color:white;
-      font-weight:600;
-      cursor:pointer;
-    }
-
-    .search-note{
-      margin-top:10px;
-      text-align:center;
-      font-size:.84rem;
-      color:var(--muted);
-    }
-
-    .platform-strip{
-      display:flex;
-      flex-wrap:wrap;
-      justify-content:center;
-      gap:10px;
-      margin-bottom:18px;
-    }
-
-    .platform-card{
-      width:150px;
-      min-height:102px;
-      background:var(--bg-soft);
-      border:1px solid var(--line);
-      border-radius:12px;
-      padding:10px;
-      display:flex;
-      flex-direction:column;
-      justify-content:space-between;
-      transition:all .2s ease;
-    }
-
-    .platform-card:hover{
-      background:#2f3648;
-      transform:translateY(-2px);
-    }
-
-    .platform-card strong{
-      display:block;
-      font-size:.88rem;
-      line-height:1.1;
-      margin-bottom:3px;
-      text-align:center;
-    }
-
-    .platform-card span{
-      display:block;
-      color:var(--muted);
-      font-size:.68rem;
-      line-height:1.15;
-      text-align:center;
-      min-height:28px;
-    }
-
-    .platform-actions{
-      display:flex;
-      gap:6px;
-      margin-top:8px;
-    }
-
-    .platform-btn{
-      flex:1;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      text-align:center;
-      padding:6px 6px;
-      border-radius:999px;
-      border:1px solid var(--line);
-      background:rgba(255,255,255,0.04);
-      color:var(--text);
-      font-size:.66rem;
-      line-height:1;
-      white-space:nowrap;
-    }
-
-    .platform-btn.primary{
-      background:var(--accent-soft);
-      color:#dbe6ff;
-    }
-
-    .layout{
-      display:grid;
-      grid-template-columns:240px minmax(0,1fr) 280px;
-      gap:18px;
-      align-items:start;
-    }
-
-    .sidebar{
-      display:flex;
-      flex-direction:column;
-      gap:16px;
-    }
-
-    .panel,
-    .card{
-      background:var(--bg-soft);
-      border:1px solid var(--line);
-      border-radius:var(--radius);
-    }
-
-    .panel{
-      padding:16px;
-    }
-
-    .panel h3{
-      margin:0 0 12px;
-      font-size:1rem;
-    }
-
-    .panel p,
-    .panel li{
-      color:var(--muted);
-      font-size:.92rem;
-      line-height:1.45;
-    }
-
-    .main{
-      min-width:0;
-    }
-
-    .section{
-      margin-top:24px;
-    }
-
-    .section:first-child{
-      margin-top:0;
-    }
-
-    .section h2{
-      margin:0 0 14px;
-      font-size:1.45rem;
-      line-height:1.2;
-    }
-
-    .section-label{
-      display:inline-flex;
-      align-items:center;
-      padding:6px 10px;
-      border-radius:999px;
-      background:var(--accent-soft);
-      border:1px solid var(--line);
-      font-size:.8rem;
-      color:#dbe6ff;
-      margin-bottom:10px;
-    }
-
-    .featured-signal{
-      background:linear-gradient(135deg, rgba(77,163,255,0.16), rgba(255,255,255,0.02));
-      min-height:390px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:28px;
-      border-top-left-radius:18px;
-      border-top-right-radius:18px;
-    }
-
-    .featured-signal-inner{
-      max-width:760px;
-      text-align:left;
-    }
-
-    .video-frame{
-      width:100%;
-      height:220px;
-      border:none;
-      display:block;
-      background:#31384b;
-      border-top-left-radius:18px;
-      border-top-right-radius:18px;
-    }
-
-    .audio-frame{
-      width:100%;
-      height:180px;
-      border:none;
-      border-radius:12px;
-      background:#31384b;
-    }
-
-    .card-content{
-      padding:14px;
-    }
-
-    .card h3{
-      margin:0 0 8px;
-      line-height:1.25;
-    }
-
-    .card p{
-      margin:0 0 10px;
-      color:var(--muted);
-      line-height:1.5;
-      font-size:.92rem;
-    }
-
-    .grid{
-      display:grid;
-      grid-template-columns:repeat(2, minmax(0,1fr));
-      gap:16px;
-    }
-
-    .topic-cards{
-      display:grid;
-      grid-template-columns:repeat(2, minmax(0,1fr));
-      gap:16px;
-    }
-
-    .topic-card{
-      padding:16px;
-      min-height:120px;
-    }
-
-    .topic-card h3{
-      margin:0 0 8px;
-    }
-
-    .topic-card p{
-      margin:0;
-    }
-
-    .source-icons{
-      display:flex;
-      flex-wrap:wrap;
-      gap:6px;
-      margin-top:10px;
-    }
-
-    .source-badge{
-      display:inline-flex;
-      align-items:center;
-      padding:5px 9px;
-      border-radius:999px;
-      background:rgba(255,255,255,0.05);
-      border:1px solid var(--line);
-      font-size:.74rem;
-      color:#dbe6ff;
-      white-space:nowrap;
-    }
-
-    .meta-row{
-      display:flex;
-      flex-wrap:wrap;
-      gap:8px;
-      margin-top:8px;
-      color:var(--muted);
-      font-size:.82rem;
-    }
-
-    .rank-badge{
-      display:inline-block;
-      font-size:.76rem;
-      font-weight:700;
-      color:#fff;
-      background:#4da3ff;
-      padding:5px 9px;
-      border-radius:999px;
-      margin-bottom:8px;
-    }
-
-    .wc-grid{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:16px;
-    }
-
-    .wc-block{
-      background:var(--bg-soft);
-      border:1px solid var(--line);
-      border-radius:var(--radius);
-      padding:16px;
-    }
-
-    .wc-block h3{
-      margin:0 0 10px;
-    }
-
-    .wc-list{
-      display:flex;
-      flex-direction:column;
-      gap:8px;
-    }
-
-    .wc-row{
-      display:flex;
-      justify-content:space-between;
-      gap:10px;
-      padding:8px 0;
-      border-top:1px solid var(--line);
-      color:var(--muted);
-      font-size:.9rem;
-    }
-
-    .wc-row:first-child{
-      border-top:none;
-      padding-top:0;
-    }
-
-    .mini-list{
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-    }
-
-    .mini-item{
-      padding:10px 0;
-      border-top:1px solid var(--line);
-    }
-
-    .mini-item:first-child{
-      border-top:none;
-      padding-top:0;
-    }
-
-    .mini-item strong{
-      display:block;
-      margin-bottom:4px;
-      font-size:.92rem;
-    }
-
-    .charity-link{
-      display:inline-block;
-      margin-top:10px;
-      color:#dbe6ff;
-      text-decoration:underline;
-    }
-
-    .notice{
-      font-size:.82rem;
-      color:var(--muted);
-      margin-top:8px;
-    }
-
-    .cta-row{
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px;
-      margin-top:18px;
-    }
-
-    .cta-btn{
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      padding:10px 14px;
-      border-radius:999px;
-      border:1px solid var(--line);
-      background:rgba(255,255,255,0.04);
-      color:var(--text);
-      font-size:.9rem;
-    }
-
-    .cta-btn.primary{
-      background:var(--accent);
-      border-color:transparent;
-      color:white;
-    }
-
-    .footer-disclaimer{
-      width:min(95%, 1480px);
-      margin:34px auto 24px;
-      color:#aeb7c9;
-      font-size:12px;
-      line-height:1.55;
-      border-top:1px solid rgba(255,255,255,0.08);
-      padding-top:16px;
-    }
-
-    @media(max-width:1150px){
-      .layout{
-        grid-template-columns:1fr;
-      }
-    }
-
-    @media(max-width:760px){
-      .page{
-        width:94%;
-      }
-
-      .topbar{
-        padding:26px 0 14px;
-      }
-
-      .hero{
-        padding:20px;
-        border-radius:16px;
-      }
-
-      .hero h1{
-        font-size:2.05rem;
-      }
-
-      .search-wrap{
-        flex-direction:column;
-      }
-
-      .search-wrap input,
-      .search-wrap button{
-        width:100%;
-      }
-
-      .platform-strip{
-        justify-content:center;
-        gap:8px;
-      }
-
-      .platform-card{
-        width:140px;
-        min-height:98px;
-      }
-
-      .platform-btn{
-        font-size:.64rem;
-      }
-
-      .grid,
-      .wc-grid,
-      .topic-cards{
-        grid-template-columns:1fr;
-      }
-
-      .featured-signal{
-        min-height:220px;
-        padding:20px;
-      }
-
-      .video-frame{
-        height:220px;
-      }
-
-      .panel,
-      .card,
-      .wc-block{
-        border-radius:16px;
-      }
-    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#eef1f5;--shell:#070a0f;--surface:#0c1118;--surface2:#111722;--text:#fff;--muted:#a9b3c1;--yellow:#f6b91a;--yellow2:#ffd34d;--border:rgba(255,255,255,.09);--goldBorder:rgba(246,185,26,.28);--font:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    html{scroll-behavior:smooth}
+    body{min-height:100vh;font-family:var(--font);color:var(--text);background:linear-gradient(180deg,#f3f5f8,#dfe4eb);padding:24px}
+    .site-frame{max-width:1180px;margin:0 auto;background:radial-gradient(circle at 15% 18%,rgba(246,185,26,.12),transparent 28%),radial-gradient(circle at 84% 12%,rgba(59,130,246,.10),transparent 26%),var(--shell);border:1px solid rgba(255,255,255,.12);border-radius:28px;box-shadow:0 26px 80px rgba(0,0,0,.45);overflow:hidden}
+    .site-nav{height:54px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:1rem;padding:0 20px;background:rgba(5,8,12,.78);border-bottom:1px solid var(--border);backdrop-filter:blur(14px)}
+    .brand{font-weight:950;font-size:.95rem;letter-spacing:-.04em}
+    .nav-links{display:flex;gap:1.15rem;align-items:center;justify-content:center;font-size:.72rem;font-weight:850;white-space:nowrap}.nav-links a{color:#f8fafc;text-decoration:none;opacity:.92}.nav-links a:hover{color:var(--yellow2)}
+    .nav-actions{display:flex;align-items:center;justify-content:flex-end;gap:.45rem}
+    select,.theme-button,.login-dot{background:#111827;color:var(--text);border:1px solid var(--border);border-radius:999px;height:30px;font-size:.68rem;font-weight:800}select{padding:0 .55rem}.theme-button,.login-dot{width:30px;display:grid;place-items:center}.login-dot{background:rgba(246,185,26,.14);color:var(--yellow)}
+    .page{padding:26px}.app-shell{background:linear-gradient(145deg,rgba(255,255,255,.04),rgba(255,255,255,.01)),rgba(8,12,18,.94);border:1px solid var(--border);border-radius:22px;padding:24px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+    .hero{display:grid;grid-template-columns:minmax(0,1.05fr) 390px;gap:28px;align-items:center;min-height:330px}
+    .eyebrow{display:inline-flex;align-items:center;gap:.45rem;color:var(--yellow2);background:rgba(246,185,26,.12);border:1px solid var(--goldBorder);border-radius:999px;padding:.38rem .68rem;font-size:.7rem;font-weight:900;margin-bottom:1rem}
+    h1{max-width:520px;font-size:clamp(2.7rem,5.7vw,4.8rem);line-height:.88;letter-spacing:-.075em;font-weight:950;margin-bottom:1rem}
+    .hero p{color:var(--muted);max-width:500px;line-height:1.45;font-size:.98rem}
+    .hero-buttons{display:flex;flex-wrap:wrap;gap:.62rem;margin-top:1.25rem}.btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:999px;padding:.72rem .95rem;font-size:.78rem;font-weight:950;cursor:pointer;transition:.18s}.btn:hover{transform:translateY(-2px)}.btn-primary{background:linear-gradient(180deg,var(--yellow2),var(--yellow));color:#181006;box-shadow:0 10px 25px rgba(246,185,26,.16)}.btn-secondary{background:#141b25;color:#fff;border:1px solid var(--border)}
+    .trust-row{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;margin-top:1.45rem;color:var(--muted);font-size:.78rem;font-weight:800}.logo-word{color:#e5e7eb;opacity:.9;font-size:.9rem;font-weight:950;letter-spacing:-.04em}.shopify{color:#95bf47}.meta{color:#8fb6ff}.yelp{color:#ff5a5f}
+    .preview-wrap{display:grid;place-items:center}.preview-card{width:100%;background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.018)),var(--surface2);border:1px solid rgba(255,255,255,.10);border-radius:20px;padding:16px;box-shadow:0 24px 58px rgba(0,0,0,.36);position:relative;overflow:hidden}.preview-card:before{content:"";position:absolute;inset:-1px;background:radial-gradient(circle at 70% 0%,rgba(246,185,26,.16),transparent 35%);pointer-events:none}.preview-card>*{position:relative;z-index:1}.preview-badge{display:block;color:#dbe3ef;font-size:.78rem;font-weight:950;margin-bottom:.9rem}
+    .review-box{background:#0b111a;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:.8rem;margin-bottom:.8rem}.stars{color:var(--yellow2);letter-spacing:.08em;font-size:.9rem;margin-bottom:.35rem}.review-quote{color:#e7edf7;font-size:.76rem;line-height:1.35;margin:0}
+    .promo{min-height:150px;border-radius:16px;padding:14px;display:flex;align-items:flex-end;background:linear-gradient(90deg,rgba(230,91,18,.97),rgba(255,171,53,.84)),#1a1a1a;margin-bottom:.75rem;position:relative;overflow:hidden}.promo:after{content:"";position:absolute;right:18px;bottom:0;width:112px;height:138px;border-radius:70px 70px 20px 20px;background:radial-gradient(circle at 50% 20%,#ffe6d1 0 16%,transparent 17%),linear-gradient(180deg,#f7f7f7 0 42%,#f97316 43% 100%);box-shadow:0 0 0 8px rgba(255,255,255,.12)}.promo h3{font-size:1.72rem;line-height:.88;letter-spacing:-.06em;text-shadow:0 2px 12px rgba(0,0,0,.35)}.promo p{color:#fff;font-size:1.55rem;font-weight:950;margin-top:.15rem;text-shadow:0 2px 12px rgba(0,0,0,.35)}
+    .audio-bar{height:34px;background:#0a0f16;border:1px solid rgba(255,255,255,.08);border-radius:999px;display:grid;grid-template-columns:28px 1fr 28px;align-items:center;gap:.55rem;padding:0 .55rem}.play{width:22px;height:22px;border-radius:50%;background:rgba(246,185,26,.18);color:var(--yellow2);display:grid;place-items:center;font-size:.68rem}.wave{height:5px;border-radius:999px;background:linear-gradient(90deg,var(--yellow) 0 38%,rgba(255,255,255,.12) 38% 100%);position:relative}.wave:after{content:"";position:absolute;left:38%;top:50%;width:10px;height:10px;background:#fff;border-radius:50%;transform:translate(-50%,-50%)}
+    .activity{margin-top:24px;border-top:1px solid var(--border);padding-top:18px}.activity h2{font-size:1rem;letter-spacing:-.03em;margin-bottom:12px}.activity-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}.activity-card{min-height:112px;background:linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.015)),var(--surface2);border:1px solid var(--border);border-radius:17px;padding:14px;overflow:hidden;box-shadow:0 16px 35px rgba(0,0,0,.20)}.activity-card p{color:var(--muted);font-size:.76rem;line-height:1.35;margin-top:.35rem;font-weight:750}.activity-card strong{display:block;font-size:.95rem;line-height:1.1}.quote-card{background:linear-gradient(135deg,rgba(246,185,26,.18),rgba(255,255,255,.02)),var(--surface2)}.audio-card{display:grid;grid-template-columns:54px 1fr;gap:.85rem;align-items:center}.mic{width:54px;height:54px;border-radius:16px;background:linear-gradient(180deg,rgba(246,185,26,.20),rgba(246,185,26,.06));display:grid;place-items:center;font-size:1.45rem;border:1px solid var(--goldBorder)}.mini-wave{margin-top:.7rem;height:4px;border-radius:999px;background:linear-gradient(90deg,var(--yellow) 0 45%,rgba(255,255,255,.12) 45% 100%)}.chart-card{position:relative}.chart-line{position:absolute;left:14px;right:14px;bottom:15px;height:42px}.chart-line svg{width:100%;height:100%;overflow:visible}
+    .sections{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}.section-card{background:rgba(17,23,34,.86);border:1px solid var(--border);border-radius:18px;padding:18px}.section-card h2{font-size:1rem;margin-bottom:.45rem}.section-card p{color:var(--muted);font-size:.82rem;line-height:1.45}.footer{text-align:center;color:var(--muted);padding:20px 1rem 24px;font-size:.78rem}
+    
+    .sections-full{display:grid;gap:16px;margin-top:18px}
+    .wide-section{background:rgba(17,23,34,.86);border:1px solid var(--border);border-radius:18px;padding:22px}
+    .wide-section h2{font-size:1.35rem;margin-bottom:.55rem}
+    .wide-section>p{color:var(--muted);font-size:.88rem;line-height:1.55;max-width:760px}
+    .step-grid,.feature-grid,.pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}
+    .deep-card{background:#0f141d;border:1px solid var(--border);border-radius:16px;padding:16px;min-height:145px}
+    .deep-card h3{font-size:1rem;margin-bottom:.45rem;color:#fff}
+    .deep-card p,.deep-card li{color:var(--muted);font-size:.82rem;line-height:1.45}
+    .deep-card ul{list-style:none;margin-top:.7rem}
+    .deep-card li{margin-bottom:.35rem}
+    .deep-card li:before{content:"✓ ";color:var(--yellow);font-weight:900}
+    .price{font-size:1.45rem;font-weight:950;color:var(--yellow2);margin:.5rem 0}
+    .section-cta-row{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:16px}
+    .login-panel{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center}
+    
+    .generator-highlight{background:linear-gradient(145deg,rgba(246,185,26,.13),rgba(255,255,255,.02)),rgba(17,23,34,.92);border:1px solid var(--goldBorder);border-radius:18px;padding:22px;margin-top:16px}
+    .generator-highlight h2{font-size:1.35rem;margin-bottom:.55rem}
+    .generator-highlight p{color:var(--muted);font-size:.88rem;line-height:1.55;max-width:780px}
+    .generator-actions{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:16px}
+
+    
+    .website-capability{background:linear-gradient(145deg,rgba(246,185,26,.13),rgba(255,255,255,.02)),rgba(17,23,34,.92);border:1px solid var(--goldBorder);border-radius:18px;padding:22px;margin-top:16px}
+    .website-capability h2{font-size:1.35rem;margin-bottom:.55rem}
+    .website-capability p{color:var(--muted);font-size:.88rem;line-height:1.55;max-width:820px}
+    .website-capability .capability-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}
+    .website-capability .capability-card{background:#0f141d;border:1px solid var(--border);border-radius:16px;padding:16px}
+    .website-capability .capability-card h3{font-size:1rem;margin-bottom:.45rem}
+    .website-capability .capability-card p{font-size:.8rem}
+    
+    .signup-nav-btn{background:var(--yellow);color:#05070b!important;padding:.55rem .9rem;border-radius:999px;font-weight:900}
+    .signup-nav-btn:hover{background:var(--yellow2);color:#05070b!important}
+
+    @media(max-width:900px){.website-capability .capability-grid{grid-template-columns:1fr}}
+
+    @media(max-width:900px){.step-grid,.feature-grid,.pricing-grid,.login-panel{grid-template-columns:1fr}}
+
+    @media(max-width:900px){body{padding:12px}.site-nav{grid-template-columns:1fr auto}.nav-links{display:none}.hero,.activity-grid,.sections{grid-template-columns:1fr}.hero{min-height:auto}.preview-card{max-width:430px}}
+    @media(max-width:560px){.site-frame{border-radius:20px}.page{padding:14px}.app-shell{padding:16px;border-radius:18px}h1{font-size:2.75rem}.hero-buttons{flex-direction:column}.btn{width:100%}.promo{min-height:128px}.promo:after{width:92px;height:116px;right:10px}}
   </style>
 </head>
 <body>
-  <div class="page">
-    <div class="topbar">
-      <div class="brand">
-        <div class="brand-wave">~~~~~</div>
-        <div>SignalBoost Live</div>
-      </div>
-    </div>
-
-    <div class="hero">
-      <h1>Cut through the noise</h1>
-      <p>See what the world is talking about across topics, platforms, and fast-moving conversations.</p>
-
-      <div class="search-wrap">
-        <input type="text" id="searchInput" placeholder="Search topics, names, events, teams, ideas...">
-        <button id="searchButton">Search</button>
-      </div>
-
-      <div class="search-note">
-        Try: Trump, Messi, World Cup, Bitcoin, AI, inflation, football, Musk
-      </div>
-    </div>
-
-    <div class="platform-strip">
-      <div class="platform-card">
-        <div>
-          <strong>YouTube</strong>
-          <span>Gateway or direct home</span>
-        </div>
-        <div class="platform-actions">
-          <a class="platform-btn primary" href="platform-youtube.html">Gateway</a>
-          <a class="platform-btn" href="https://www.youtube.com" target="_blank" rel="noopener noreferrer">Direct</a>
-        </div>
-      </div>
-
-      <div class="platform-card">
-        <div>
-          <strong>X</strong>
-          <span>Gateway or direct home</span>
-        </div>
-        <div class="platform-actions">
-          <a class="platform-btn primary" href="platform-x.html">Gateway</a>
-          <a class="platform-btn" href="https://x.com" target="_blank" rel="noopener noreferrer">Direct</a>
-        </div>
-      </div>
-
-      <div class="platform-card">
-        <div>
-          <strong>Truth Social</strong>
-          <span>Direct platform access</span>
-        </div>
-        <div class="platform-actions">
-          <a class="platform-btn primary" href="https://truthsocial.com" target="_blank" rel="noopener noreferrer">Open</a>
-          <a class="platform-btn" href="https://truthsocial.com" target="_blank" rel="noopener noreferrer">Direct</a>
-        </div>
-      </div>
-
-      <div class="platform-card">
-        <div>
-          <strong>Facebook</strong>
-          <span>Gateway or direct home</span>
-        </div>
-        <div class="platform-actions">
-          <a class="platform-btn primary" href="platform-facebook.html">Gateway</a>
-          <a class="platform-btn" href="https://www.facebook.com" target="_blank" rel="noopener noreferrer">Direct</a>
-        </div>
-      </div>
-
-      <div class="platform-card">
-        <div>
-          <strong>TikTok</strong>
-          <span>Gateway or direct home</span>
-        </div>
-        <div class="platform-actions">
-          <a class="platform-btn primary" href="platform-tiktok.html">Gateway</a>
-          <a class="platform-btn" href="https://www.tiktok.com" target="_blank" rel="noopener noreferrer">Direct</a>
-        </div>
-      </div>
-
-      <div class="platform-card">
-        <div>
-          <strong>Instagram</strong>
-          <span>Direct platform access</span>
-        </div>
-        <div class="platform-actions">
-          <a class="platform-btn primary" href="https://www.instagram.com" target="_blank" rel="noopener noreferrer">Open</a>
-          <a class="platform-btn" href="https://www.instagram.com" target="_blank" rel="noopener noreferrer">Direct</a>
-        </div>
-      </div>
-
-      <div class="platform-card">
-        <div>
-          <strong>Signal</strong>
-          <span>Private messaging home</span>
-        </div>
-        <div class="platform-actions">
-          <a class="platform-btn primary" href="https://signal.org" target="_blank" rel="noopener noreferrer">Open</a>
-          <a class="platform-btn" href="https://signal.org" target="_blank" rel="noopener noreferrer">Direct</a>
-        </div>
-      </div>
-
-      <div class="platform-card">
-        <div>
-          <strong>Telegram</strong>
-          <span>Direct platform access</span>
-        </div>
-        <div class="platform-actions">
-          <a class="platform-btn primary" href="https://telegram.org" target="_blank" rel="noopener noreferrer">Open</a>
-          <a class="platform-btn" href="https://telegram.org" target="_blank" rel="noopener noreferrer">Direct</a>
-        </div>
-      </div>
-
-      <div class="platform-card">
-        <div>
-          <strong>Reddit</strong>
-          <span>Gateway or direct home</span>
-        </div>
-        <div class="platform-actions">
-          <a class="platform-btn primary" href="platform-reddit.html">Gateway</a>
-          <a class="platform-btn" href="https://www.reddit.com" target="_blank" rel="noopener noreferrer">Direct</a>
-        </div>
-      </div>
-
-      <div class="platform-card">
-        <div>
-          <strong>LinkedIn</strong>
-          <span>Direct platform access</span>
-        </div>
-        <div class="platform-actions">
-          <a class="platform-btn primary" href="https://www.linkedin.com" target="_blank" rel="noopener noreferrer">Open</a>
-          <a class="platform-btn" href="https://www.linkedin.com" target="_blank" rel="noopener noreferrer">Direct</a>
-        </div>
-      </div>
-
-      <div class="platform-card">
-        <div>
-          <strong>Threads</strong>
-          <span>Direct platform access</span>
-        </div>
-        <div class="platform-actions">
-          <a class="platform-btn primary" href="https://www.threads.net" target="_blank" rel="noopener noreferrer">Open</a>
-          <a class="platform-btn" href="https://www.threads.net" target="_blank" rel="noopener noreferrer">Direct</a>
-        </div>
-      </div>
-    </div>
-
-    <div class="layout">
-      <aside class="sidebar">
-        <div class="panel">
-          <h3>Topic Stores</h3>
-          <div class="mini-list">
-            <div class="mini-item"><a href="topic-ai.html"><strong>AI</strong><span>Automation, jobs, tools</span></a></div>
-            <div class="mini-item"><a href="topic-bitcoin.html"><strong>Bitcoin</strong><span>Crypto, markets, adoption</span></a></div>
-            <div class="mini-item"><a href="topic-politics.html"><strong>Politics</strong><span>Debates, elections, policy</span></a></div>
-            <div class="mini-item"><a href="topic-business.html"><strong>Business</strong><span>Markets, inflation, layoffs</span></a></div>
-            <div class="mini-item"><a href="world-cup-history.html"><strong>World Cup History</strong><span>Tournament timeline and legends</span></a></div>
+  <!-- ROLLBACK CHECKPOINT: visible-signup-button -->
+  <!-- ROLLBACK CHECKPOINT: signup-flow-homepage -->
+  <!-- ROLLBACK CHECKPOINT: website-capability-copy -->
+  <!-- RESTORED MOCKUP MATCHED INDEX: working links added -->
+  <div class="site-frame">
+    <header class="site-nav">
+      <div class="brand">SignalBoost</div>
+      <nav class="nav-links">
+        <a href="#home">Home</a><a href="#how-it-works">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="website-generator.html">Website Generator</a>
+      <a class="signup-nav-btn" href="signup.html">Sign Up</a><a href="login.html">Login</a></nav>
+      <div class="nav-actions"><select aria-label="Language"><option>EN</option><option>ES</option><option>PT</option><option>PL</option><option>RU</option></select><button class="theme-button" type="button">🌙</button><span class="login-dot">▲</span></div>
+    </header>
+    <main class="page" id="home">
+      <section class="app-shell">
+        <section class="hero">
+          <div>
+            <span class="eyebrow">⚡ AI marketing website engine</span>
+            <h1>From Reviews to Revenue</h1>
+            <p>Turn customer reviews into branded graphics, authentic voice ads, and ready-to-launch website baselines with one powerful dashboard.</p>
+            <div class="hero-buttons"><a class="btn btn-primary" href="website-generator.html">Generate a Website</a><a class="btn btn-secondary" href="graphics.html">Turn Reviews into Graphics</a><a class="btn btn-secondary" href="#how-it-works">See How It Works</a></div>
+            <div class="trust-row"><span>Trusted by:</span><span class="logo-word shopify">shopify</span><span class="logo-word meta">∞ Meta</span><span class="logo-word yelp">websites★</span></div>
           </div>
-        </div>
-
-        <div class="panel">
-          <h3>Quick Access</h3>
-          <div class="source-icons">
-            <a href="platform-youtube.html" class="source-badge">YouTube Gateway</a>
-            <a href="https://signal.org" target="_blank" rel="noopener noreferrer" class="source-badge">Signal</a>
-            <a href="https://telegram.org" target="_blank" rel="noopener noreferrer" class="source-badge">Telegram</a>
-            <a href="platform-reddit.html" class="source-badge">Reddit Gateway</a>
-            <a href="platform-facebook.html" class="source-badge">Facebook Gateway</a>
-            <a href="https://www.threads.net" target="_blank" rel="noopener noreferrer" class="source-badge">Threads</a>
-          </div>
-        </div>
-      </aside>
-
-      <main class="main">
-        <div class="section">
-          <h2>Top Signal Right Now</h2>
-          <div class="card">
-            <div class="featured-signal">
-              <div class="featured-signal-inner">
-                <span class="rank-badge">SignalBoost Featured</span>
-                <h3 style="font-size:2rem; margin:0 0 10px;">SignalBoost is now source-independent</h3>
-                <p>
-                  The homepage no longer depends on YouTube API to stay alive. Users can choose either a SignalBoost gateway
-                  or a direct platform homepage.
-                </p>
-                <div class="cta-row">
-                  <a class="cta-btn primary" href="platform-youtube.html">YouTube Gateway</a>
-                  <a class="cta-btn" href="https://www.youtube.com" target="_blank" rel="noopener noreferrer">YouTube Direct</a>
-                  <a class="cta-btn" href="platform-reddit.html">Reddit Gateway</a>
-                  <a class="cta-btn" href="world-cup-history.html">World Cup</a>
-                </div>
-                <div class="meta-row">
-                  <span>No single-source dependency</span>
-                  <span>•</span>
-                  <span>Gateway + direct choice</span>
-                  <span>•</span>
-                  <span>Stable homepage</span>
-                </div>
-              </div>
-            </div>
-            <div class="card-content">
-              <h3>Signal first, user choice second</h3>
-              <p>
-                Some users want the gateway. Some want the platform home page immediately. This version gives both options without weakening the homepage.
-              </p>
+          <div class="preview-wrap">
+            <div class="preview-card">
+              <span class="preview-badge">Generated Content</span>
+              <div class="review-box"><div class="stars">★★★★★</div><p class="review-quote">“Amazing results! Our sales skyrocketed.”</p></div>
+              <div class="promo"><div><h3>SUMMER SALE</h3><p>50% OFF</p></div></div>
+              <div class="audio-bar" aria-label="Demo voice ad player"><span class="play">▶</span><span class="wave"></span><span style="font-size:.8rem;color:var(--muted)">🔊</span></div>
             </div>
           </div>
-        </div>
-
-        <div class="section">
-          <div class="section-label">2026 World Cup</div>
-          <h2>Coming World Cup 2026</h2>
-          <div class="wc-grid">
-            <div class="wc-block">
-              <h3>Why it matters</h3>
-              <p>One of the biggest football events on the horizon. This section gives the homepage a direct path into World Cup discussion and history.</p>
-              <div class="source-icons">
-                <a href="world-cup-history.html" class="source-badge">World Cup History</a>
-                <a href="https://www.fifa.com" target="_blank" rel="noopener noreferrer" class="source-badge">FIFA</a>
-              </div>
-            </div>
-            <div class="wc-block">
-              <h3>Groups / fixtures / standings</h3>
-              <div class="wc-list">
-                <div class="wc-row"><span>Group stage</span><span>Coming</span></div>
-                <div class="wc-row"><span>Fixtures</span><span>To be added live</span></div>
-                <div class="wc-row"><span>Standings</span><span>To be added live</span></div>
-                <div class="wc-row"><span>Latest games</span><span>Football block ready</span></div>
-              </div>
-            </div>
+        </section>
+        <section class="activity">
+          <h2>See SignalBoost in Action</h2>
+          <div class="activity-grid">
+            <div class="activity-card quote-card"><div class="stars">★★★★★</div><p>“Fast, professional, easy from start to finish.”</p></div>
+            <div class="activity-card audio-card"><div class="mic">🎙️</div><div><strong>Engaging Voice Ad Created!</strong><p>Ready in seconds</p><div class="mini-wave"></div></div></div>
+            <div class="activity-card chart-card"><strong>1,200+ Plays</strong><p>This week</p><div class="chart-line"><svg viewBox="0 0 220 55" aria-hidden="true"><polyline points="0,45 35,35 70,40 105,24 140,30 175,15 220,9" fill="none" stroke="#facc15" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><g fill="#facc15"><circle cx="35" cy="35" r="4"/><circle cx="105" cy="24" r="4"/><circle cx="175" cy="15" r="4"/><circle cx="220" cy="9" r="4"/></g></svg></div></div>
           </div>
-        </div>
+        </section>
+      </section>
 
-        <div class="section">
-          <h2>Live Discovery Gateways</h2>
-          <div class="grid">
-            <a href="platform-youtube.html">
-              <div class="card topic-card">
-                <span class="rank-badge">Gateway</span>
-                <h3>YouTube gateway</h3>
-                <p>Open YouTube through SignalBoost so users can return home more easily.</p>
-              </div>
-            </a>
+      <section class="sections-full">
+        <section id="how-it-works" class="wide-section">
+          <h2>How it works</h2>
+          <p>SignalBoost turns customer reviews into reusable marketing assets in a simple workflow.</p>
 
-            <a href="platform-reddit.html">
-              <div class="card topic-card">
-                <span class="rank-badge">Gateway</span>
-                <h3>Reddit gateway</h3>
-                <p>Use Reddit as a live discussion source without losing SignalBoost as the hub.</p>
-              </div>
-            </a>
-
-            <a href="platform-x.html">
-              <div class="card topic-card">
-                <span class="rank-badge">Gateway</span>
-                <h3>X gateway</h3>
-                <p>Fast reaction and breaking discussion through a controlled entry point.</p>
-              </div>
-            </a>
-
-            <a href="platform-tiktok.html">
-              <div class="card topic-card">
-                <span class="rank-badge">Gateway</span>
-                <h3>TikTok gateway</h3>
-                <p>Short-form trends without immediately ejecting users from SignalBoost.</p>
-              </div>
-            </a>
-
-            <a href="platform-facebook.html">
-              <div class="card topic-card">
-                <span class="rank-badge">Gateway</span>
-                <h3>Facebook gateway</h3>
-                <p>Mass audience and groups through a safer mobile route.</p>
-              </div>
-            </a>
-
-            <a href="https://signal.org" target="_blank" rel="noopener noreferrer">
-              <div class="card topic-card">
-                <span class="rank-badge">Platform</span>
-                <h3>Signal</h3>
-                <p>Private messaging platform entrance.</p>
-              </div>
-            </a>
-          </div>
-        </div>
-
-        <div class="section">
-          <h2>Explore by Topic</h2>
-          <div class="topic-cards">
-            <a href="topic-ai.html"><div class="card topic-card"><h3>AI replacing jobs</h3><p>Business, tech, and automation discussion.</p></div></a>
-            <a href="topic-bitcoin.html"><div class="card topic-card"><h3>Bitcoin surge</h3><p>Crypto markets, adoption, and finance.</p></div></a>
-            <a href="topic-politics.html"><div class="card topic-card"><h3>Europe migration debate</h3><p>Political discussion and public reaction.</p></div></a>
-            <a href="topic-business.html"><div class="card topic-card"><h3>Business & economy</h3><p>Markets, inflation, layoffs, and growth.</p></div></a>
-          </div>
-        </div>
-
-        <div class="section">
-          <h2>SignalBoost Picks</h2>
-          <div class="grid">
-            <div class="card">
-              <iframe class="video-frame" src="https://www.youtube.com/embed/jfKfPfyJRdk" title="Live audio stream" allowfullscreen></iframe>
-              <div class="card-content">
-                <span class="rank-badge">Ambient</span>
-                <h3>Background audio stream</h3>
-                <p>A permanent, non-API visual anchor that keeps the homepage lively.</p>
-              </div>
+          <div class="step-grid">
+            <div class="deep-card">
+              <h3>1. Add a review</h3>
+              <p>Paste a customer review or save one inside your dashboard.</p>
             </div>
 
-            <a href="platform-youtube.html">
-              <div class="card topic-card">
-                <span class="rank-badge">Gateway</span>
-                <h3>Go deeper into YouTube</h3>
-                <p>Use the YouTube gateway for trending, search routes, and safer mobile navigation.</p>
-              </div>
-            </a>
+            <div class="deep-card">
+              <h3>2. Choose an output</h3>
+              <p>Create either a branded graphic or a voice ad from the same review.</p>
+            </div>
 
-            <a href="platform-reddit.html">
-              <div class="card topic-card">
-                <span class="rank-badge">Discussion</span>
-                <h3>Reddit discussion routes</h3>
-                <p>Jump into live communities for politics, crypto, AI, and sports.</p>
-              </div>
-            </a>
-
-            <a href="world-cup-history.html">
-              <div class="card topic-card">
-                <span class="rank-badge">Sports</span>
-                <h3>World Cup timeline</h3>
-                <p>History, legends, and tournament context in one place.</p>
-              </div>
-            </a>
+            <div class="deep-card">
+              <h3>3. Preview and save</h3>
+              <p>Store finished assets securely and reuse them for campaigns.</p>
+            </div>
           </div>
-        </div>
-      </main>
+        </section>
 
-      <aside class="sidebar">
-        <div class="panel">
-          <h3>Live Audio</h3>
-          <iframe class="audio-frame" src="https://www.youtube.com/embed/jfKfPfyJRdk" title="Live audio stream" allowfullscreen></iframe>
-          <p class="notice">Optional background listening while browsing.</p>
-        </div>
+        <section id="features" class="wide-section">
+          <h2>Features</h2>
+          <p>Built for businesses that want to turn real customer proof into branded content.</p>
 
-        <div class="panel" id="charityPanel">
-          <h3>Featured Cause</h3>
-          <div id="charityCurrent">Loading charity spotlight...</div>
-          <div id="charityHistory" style="margin-top:14px;"></div>
-          <p class="notice">
-            We rotate featured charities every 4 months. This is an independent spotlight and not an official partnership or endorsement.
+          <div class="feature-grid">
+            <div class="deep-card">
+              <h3>Branded graphics</h3>
+              <p>Turn reviews into polished visual content for social media, ads, and landing pages.</p>
+            </div>
+
+            <div class="deep-card">
+              <h3>Voice ads</h3>
+              <p>Create audio ad concepts from customer feedback and preview them in the dashboard.</p>
+            </div>
+
+            <div class="deep-card">
+              <h3>Private media storage</h3>
+              <p>Use private storage and signed URLs for uploaded audio and generated media.</p>
+            </div>
+
+            <div class="deep-card">
+              <h3>Multilingual support</h3>
+              <p>Prepare content experiences for English, Spanish, Portuguese, Polish, and Russian.</p>
+            </div>
+
+            <div class="deep-card">
+              <h3>Review dashboard</h3>
+              <p>Save, manage, and preview review content from one central workspace.</p>
+            </div>
+
+            <div class="deep-card">
+              <h3>Subscription ready</h3>
+              <p>Connect plans, billing, and customer access through your SaaS checkout flow.</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="pricing" class="wide-section">
+          <h2>Pricing</h2>
+          <p>Simple plan structure for launch. Final pricing can be adjusted before production checkout.</p>
+
+          <div class="pricing-grid">
+            <div class="deep-card">
+              <h3>Starter</h3>
+              <div class="price">$19/mo</div>
+              <ul>
+                <li>Review dashboard</li>
+                <li>Branded graphics</li>
+                <li>Basic voice previews</li>
+              </ul>
+            </div>
+
+            <div class="deep-card">
+              <h3>Pro</h3>
+              <div class="price">$49/mo</div>
+              <ul>
+                <li>Everything in Starter</li>
+                <li>More content generation</li>
+                <li>Priority processing</li>
+              </ul>
+            </div>
+
+            <div class="deep-card">
+              <h3>Multi-location</h3>
+              <div class="price">$149/mo</div>
+              <ul>
+                <li>Multiple locations</li>
+                <li>Team workflows</li>
+                <li>Advanced dashboard tools</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        
+        <section id="website-generator" class="generator-highlight">
+          <h2>Website Generator</h2>
+          <p>
+            Generate a simple website baseline from a business name, tagline,
+            customer reviews, brand color, and template choice.
           </p>
-        </div>
+          <div class="generator-actions">
+            <a class="btn btn-primary" href="website-generator.html">Open Website Generator</a>
+            <a class="btn btn-secondary" href="graphics.html">Create Branded Graphic</a>
+            <a class="btn btn-secondary" href="voice.html">Generate Voice Ad</a>
+          </div>
+        </section>
 
-        <div class="panel">
-          <h3>Important note</h3>
-          <p>Platform cards now give both choices: a SignalBoost gateway and a direct platform homepage where appropriate.</p>
-        </div>
-      </aside>
-    </div>
-  </div>
 
-  <div class="footer-disclaimer">
-    Content on this site includes links and embedded media from third-party platforms. Charity spotlights are independent selections and do not imply official partnership, endorsement, or sponsorship unless clearly stated. Viewer discretion is advised, and minors should use this site with parental or adult guidance.
-  </div>
+        
+        <section id="website-generator" class="website-capability">
+          <h2>Create Website Starters from Reviews</h2>
+          <p>
+            SignalBoost can generate simple multi-page website baselines from
+            business details, services, brand colors, customer reviews, and contact information.
+            Start with a business intake form, preview the homepage, then export a website package.
+          </p>
+          <div class="capability-grid">
+            <div class="capability-card"><h3>Business Intake</h3><p>Collect the details needed to create a useful website baseline.</p></div>
+            <div class="capability-card"><h3>Multi-page Output</h3><p>Generate homepage, features, pricing, contact, privacy, terms, and stylesheet files.</p></div>
+            <div class="capability-card"><h3>Preview + Export</h3><p>Preview the generated homepage and download the website package.</p></div>
+          </div>
+          <div class="generator-actions" style="display:flex;flex-wrap:wrap;gap:.7rem;margin-top:16px;">
+            <a class="btn btn-primary" href="signup.html">Sign Up Free</a>
+            <a class="btn btn-secondary" href="website-generator.html">Open Website Generator</a>
+            <a class="btn btn-secondary" href="intake.html">Business Intake</a>
+          </div>
+        </section>
 
-  <script>
-    const searchMap = [
-      { url: "topic-ai.html", terms: ["ai","artificial intelligence","automation","jobs","chatgpt","openai","future of work","robot","robots","technology","tech"] },
-      { url: "topic-bitcoin.html", terms: ["bitcoin","btc","crypto","cryptocurrency","blockchain","ethereum","wallet","trading","altcoin"] },
-      { url: "topic-politics.html", terms: ["politics","trump","biden","election","migration","immigration","border","government","policy","europe","war","president","congress"] },
-      { url: "topic-business.html", terms: ["business","economy","inflation","finance","layoffs","recession","growth","market","stocks","companies","bezos","musk","amazon","tesla"] },
-      { url: "world-cup-history.html", terms: ["world cup","fifa","football","soccer","messi","ronaldo","pele","maradona","mbappe","champions league","2026 world cup"] }
-    ];
 
-    function runSearch() {
-      const query = document.getElementById("searchInput").value.toLowerCase().trim();
-      if (!query) {
-        alert("Please enter a word");
-        return;
-      }
-      for (const item of searchMap) {
-        for (const term of item.terms) {
-          if (query.includes(term) || term.includes(query)) {
-            window.location.href = item.url;
-            return;
-          }
-        }
-      }
-      alert("Search is still being expanded. Try: AI, Bitcoin, Trump, inflation, Messi, World Cup.");
-    }
-
-    document.getElementById("searchButton").addEventListener("click", runSearch);
-    document.getElementById("searchInput").addEventListener("keypress", function(e) {
-      if (e.key === "Enter") runSearch();
-    });
-
-    const charityRotation = [
-      { name: "St. Jude Children's Research Hospital", url: "https://www.stjude.org/", note: "Supports children with cancer and other life-threatening diseases." },
-      { name: "American Red Cross", url: "https://www.redcross.org/", note: "Disaster relief, blood donation, and emergency support." },
-      { name: "Doctors Without Borders", url: "https://www.doctorswithoutborders.org/", note: "Emergency medical aid worldwide." },
-      { name: "Feeding America", url: "https://www.feedingamerica.org/", note: "Works to fight hunger across the United States." },
-      { name: "Charity: Water", url: "https://www.charitywater.org/", note: "Focuses on clean and safe drinking water." },
-      { name: "Save the Children", url: "https://www.savethechildren.org/", note: "Supports children through health, education, and emergency aid." },
-      { name: "The Nature Conservancy", url: "https://www.nature.org/", note: "Protects land, water, and biodiversity." },
-      { name: "World Wildlife Fund", url: "https://www.worldwildlife.org/", note: "Focuses on wildlife and environmental conservation." },
-      { name: "Habitat for Humanity", url: "https://www.habitat.org/", note: "Helps families build and improve homes." },
-      { name: "Direct Relief", url: "https://www.directrelief.org/", note: "Provides medical aid and humanitarian relief." }
-    ];
-
-    function getCharityRotationState() {
-      const rotationMonths = 4;
-      const startDate = new Date("2026-01-01T00:00:00Z");
-      const now = new Date();
-      const monthsElapsed =
-        (now.getUTCFullYear() - startDate.getUTCFullYear()) * 12 +
-        (now.getUTCMonth() - startDate.getUTCMonth());
-      const index = Math.floor(monthsElapsed / rotationMonths) % charityRotation.length;
-      return index < 0 ? 0 : index;
-    }
-
-    function renderCharitySpotlight() {
-      const currentIndex = getCharityRotationState();
-      const current = charityRotation[currentIndex];
-      const currentBox = document.getElementById("charityCurrent");
-      const historyBox = document.getElementById("charityHistory");
-
-      currentBox.innerHTML = `
-        <strong>${current.name}</strong>
-        <p style="margin:10px 0 8px; color:var(--muted);">${current.note}</p>
-        <a class="charity-link" href="${current.url}" target="_blank" rel="noopener noreferrer">Visit organization</a>
-      `;
-
-      const past = [];
-      for (let i = 1; i <= 3; i++) {
-        const idx = (currentIndex - i + charityRotation.length) % charityRotation.length;
-        past.push(charityRotation[idx]);
-      }
-
-      historyBox.innerHTML = `
-        <h4 style="margin:0 0 8px; font-size:.95rem;">Recent rotation history</h4>
-        <div class="mini-list">
-          ${past.map(item => `
-            <div class="mini-item">
-              <strong>${item.name}</strong>
-              <span>${item.note}</span>
+        <section id="login" class="wide-section">
+          <div class="login-panel">
+            <div>
+              <h2>Ready to build with SignalBoost?</h2>
+              <p>Log in or create an account to start turning reviews into branded graphics and voice ads.</p>
             </div>
-          `).join("")}
-        </div>
-      `;
-    }
 
-    renderCharitySpotlight();
-  </script>
+            <div class="section-cta-row">
+              <a class="btn btn-primary" href="login.html">Login</a>
+              <a class="btn btn-secondary" href="graphics.html">Start Graphics</a>
+              <a class="btn btn-secondary" href="voice.html">Start Voice Ad</a>
+            </div>
+          </div>
+        </section>
+      </section>
+
+    </main>
+    <footer class="footer">
+      <div style="margin-bottom:8px;">
+        <a href="privacy.html" style="color:#f6b91a;text-decoration:none;margin:0 8px;">Privacy</a>
+        <a href="terms.html" style="color:#f6b91a;text-decoration:none;margin:0 8px;">Terms</a>
+        <a href="contact.html" style="color:#f6b91a;text-decoration:none;margin:0 8px;">Contact</a>
+      </div>
+      © 2026 SignalBoost. All rights reserved.
+    </footer>
+  </div>
 </body>
 </html>

@@ -368,7 +368,7 @@
     window.SIGNALBOOST_SUPABASE_ANON_KEY = "eyJhbGciOi...";
   */
   window.SIGNALBOOST_SUPABASE_URL = "https://dwchaygtxubufxkzfpne.supabase.co";
-  window.SIGNALBOOST_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3Y2hheWd0eHVidWZ4a3pmcG5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNzEzNDEsImV4cCI6MjA5Mzk0NzM0MX0.J6GZlO3as_jBh5s4i_S6xEDSfgkNubTd0YNxqzkIXxA";
+  window.SIGNALBOOST_SUPABASE_ANON_KEY = "PASTE_YOUR_REAL_SUPABASE_ANON_KEY_HERE";
 </script>
 
 
@@ -380,12 +380,6 @@
       const supabaseClient = (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase)
         ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
         : null;
-
-      if (supabaseClient && supabaseClient.auth && supabaseClient.auth.onAuthStateChange) {
-        supabaseClient.auth.onAuthStateChange(function () {
-          updateAuthUI();
-        });
-      }
 
       const routes = {
         "signup.html": "signup",
@@ -481,7 +475,7 @@
         if (view === "dashboard") return `
           <div class="embedded-dashboard">
             <h1>Dashboard</h1>
-            <p id="dashboardStatus">Checking your login session...</p>
+            <p>Checking your login session...</p>
             <div class="dashboard-grid">
               <div class="dashboard-card"><h3>Reviews</h3><p>Manage review content and convert it into branded assets.</p></div>
               <div class="dashboard-card"><h3>Voice Ads</h3><p>Preview and save generated voice ad concepts.</p></div>
@@ -596,43 +590,6 @@
         el.className = "form-message " + (type || "");
       }
 
-      async function getCurrentUser() {
-        if (!supabaseClient) {
-          const demo = localStorage.getItem("signalboost_demo_user");
-          return demo ? JSON.parse(demo) : null;
-        }
-        const result = await supabaseClient.auth.getUser();
-        if (result.error || !result.data || !result.data.user) return null;
-        return result.data.user;
-      }
-
-      async function updateAuthUI() {
-        const user = await getCurrentUser();
-        const navSignup = qs("navSignup");
-        const navLogin = qs("navLogin");
-        const navUser = qs("navUser");
-        const navLogout = qs("navLogout");
-
-        if (user) {
-          if (navSignup) navSignup.style.display = "none";
-          if (navLogin) navLogin.style.display = "none";
-          if (navUser) {
-            navUser.style.display = "";
-            navUser.textContent = user.email || "Account";
-          }
-          if (navLogout) navLogout.style.display = "";
-        } else {
-          if (navSignup) navSignup.style.display = "";
-          if (navLogin) navLogin.style.display = "";
-          if (navUser) {
-            navUser.style.display = "none";
-            navUser.textContent = "";
-          }
-          if (navLogout) navLogout.style.display = "none";
-        }
-        return user;
-      }
-
       function bindView(view) {
         if (view === "signup") {
           qs("signupForm").addEventListener("submit", async function (event) {
@@ -691,30 +648,16 @@
             }
             else {
               setMessage("loginMessage", "Login successful! Opening dashboard…", "success");
-              updateAuthUI();
               setTimeout(() => openEmbedded("dashboard"), 500);
             }
           });
         }
 
         if (view === "dashboard") {
-          const status = qs("dashboardStatus");
-          updateAuthUI().then(function (user) {
-            if (status) {
-              if (user) {
-                status.textContent = "Welcome, " + (user.email || "your account") + ". You are logged in.";
-              } else {
-                status.textContent = "Please log in to access your protected dashboard.";
-                setTimeout(function () { openEmbedded("login"); }, 900);
-              }
-            }
-          });
-
           const btn = qs("logoutBtn");
           if (btn) btn.addEventListener("click", async function () {
             if (supabaseClient) await supabaseClient.auth.signOut();
             localStorage.removeItem("signalboost_demo_user");
-            updateAuthUI();
             openEmbedded("login");
           });
         }
@@ -776,7 +719,105 @@
             const company = escapeHtml(intake.company || "Your Business");
             const industry = escapeHtml(intake.industry || "Your Industry");
             const goals = escapeHtml(intake.goals || "Your business goals.");
-            const content = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${company}</title></head><body><h1>${company}</h1><h2>${industry}</h2><p>${goals}</p></body></html>`;
+            const content = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${company}</title></head><body><h1>${company}</h1><h2>${industry}</h2><p>${goals}</p>
+<script>
+  // Session-aware navigation patch for the static SignalBoost homepage.
+  (function () {
+    async function getSignalBoostClient() {
+      if (!window.supabase) return null;
+
+      const url = window.SIGNALBOOST_SUPABASE_URL || "";
+      const key = window.SIGNALBOOST_SUPABASE_ANON_KEY || "";
+
+      if (!url || !key || key.includes("PASTE_YOUR_REAL")) return null;
+
+      if (!window.signalBoostSupabaseClient) {
+        window.signalBoostSupabaseClient = window.supabase.createClient(url, key);
+      }
+
+      return window.signalBoostSupabaseClient;
+    }
+
+    async function getCurrentUser() {
+      const client = await getSignalBoostClient();
+      if (!client) return null;
+
+      const { data, error } = await client.auth.getUser();
+      if (error || !data || !data.user) return null;
+
+      return data.user;
+    }
+
+    async function updateSignalBoostNav() {
+      const user = await getCurrentUser();
+
+      const signup = document.getElementById("navSignup");
+      const login = document.getElementById("navLogin");
+      const navUser = document.getElementById("navUser");
+      const logout = document.getElementById("navLogout");
+
+      if (user) {
+        if (signup) signup.style.display = "none";
+        if (login) login.style.display = "none";
+
+        if (navUser) {
+          navUser.style.display = "";
+          navUser.textContent = user.email || "Account";
+        }
+
+        if (logout) logout.style.display = "";
+      } else {
+        if (signup) signup.style.display = "";
+        if (login) login.style.display = "";
+
+        if (navUser) {
+          navUser.style.display = "none";
+          navUser.textContent = "";
+        }
+
+        if (logout) logout.style.display = "none";
+      }
+
+      const dashboardStatus = document.getElementById("dashboardStatus");
+      if (dashboardStatus) {
+        dashboardStatus.textContent = user
+          ? "Welcome, " + (user.email || "your account") + ". You are logged in."
+          : "Please log in to access your dashboard.";
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", async function () {
+      const logout = document.getElementById("navLogout");
+
+      if (logout) {
+        logout.addEventListener("click", async function (event) {
+          event.preventDefault();
+
+          const client = await getSignalBoostClient();
+          if (client) await client.auth.signOut();
+
+          await updateSignalBoostNav();
+
+          const login = document.getElementById("navLogin");
+          if (login) login.click();
+        });
+      }
+
+      const client = await getSignalBoostClient();
+      if (client && client.auth && client.auth.onAuthStateChange) {
+        client.auth.onAuthStateChange(function () {
+          updateSignalBoostNav();
+        });
+      }
+
+      updateSignalBoostNav();
+    });
+
+    window.updateSignalBoostNav = updateSignalBoostNav;
+  })();
+</script>
+
+</body></html>`;
             const blob = new Blob([content], { type: "text/html" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
@@ -893,6 +934,104 @@
       }, 900);
     });
   </script>
+
+
+<script>
+  // Session-aware navigation patch for the static SignalBoost homepage.
+  (function () {
+    async function getSignalBoostClient() {
+      if (!window.supabase) return null;
+
+      const url = window.SIGNALBOOST_SUPABASE_URL || "";
+      const key = window.SIGNALBOOST_SUPABASE_ANON_KEY || "";
+
+      if (!url || !key || key.includes("PASTE_YOUR_REAL")) return null;
+
+      if (!window.signalBoostSupabaseClient) {
+        window.signalBoostSupabaseClient = window.supabase.createClient(url, key);
+      }
+
+      return window.signalBoostSupabaseClient;
+    }
+
+    async function getCurrentUser() {
+      const client = await getSignalBoostClient();
+      if (!client) return null;
+
+      const { data, error } = await client.auth.getUser();
+      if (error || !data || !data.user) return null;
+
+      return data.user;
+    }
+
+    async function updateSignalBoostNav() {
+      const user = await getCurrentUser();
+
+      const signup = document.getElementById("navSignup");
+      const login = document.getElementById("navLogin");
+      const navUser = document.getElementById("navUser");
+      const logout = document.getElementById("navLogout");
+
+      if (user) {
+        if (signup) signup.style.display = "none";
+        if (login) login.style.display = "none";
+
+        if (navUser) {
+          navUser.style.display = "";
+          navUser.textContent = user.email || "Account";
+        }
+
+        if (logout) logout.style.display = "";
+      } else {
+        if (signup) signup.style.display = "";
+        if (login) login.style.display = "";
+
+        if (navUser) {
+          navUser.style.display = "none";
+          navUser.textContent = "";
+        }
+
+        if (logout) logout.style.display = "none";
+      }
+
+      const dashboardStatus = document.getElementById("dashboardStatus");
+      if (dashboardStatus) {
+        dashboardStatus.textContent = user
+          ? "Welcome, " + (user.email || "your account") + ". You are logged in."
+          : "Please log in to access your dashboard.";
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", async function () {
+      const logout = document.getElementById("navLogout");
+
+      if (logout) {
+        logout.addEventListener("click", async function (event) {
+          event.preventDefault();
+
+          const client = await getSignalBoostClient();
+          if (client) await client.auth.signOut();
+
+          await updateSignalBoostNav();
+
+          const login = document.getElementById("navLogin");
+          if (login) login.click();
+        });
+      }
+
+      const client = await getSignalBoostClient();
+      if (client && client.auth && client.auth.onAuthStateChange) {
+        client.auth.onAuthStateChange(function () {
+          updateSignalBoostNav();
+        });
+      }
+
+      updateSignalBoostNav();
+    });
+
+    window.updateSignalBoostNav = updateSignalBoostNav;
+  })();
+</script>
 
 </body>
 </html>

@@ -128,6 +128,15 @@
   </style>
 </head>
 <body>
+
+  <!--
+    Supabase Auth URL Configuration:
+    Site URL: https://saas.signalboostapp.com
+    Additional Redirect URLs:
+      https://saas.signalboostapp.com/*
+      https://saas.signalboostapp.com/index.html#auth-callback
+  -->
+
   <!-- FIXED: embeddedApp container restored for nav buttons -->
   <!-- FIXED: mobile signup visible -->
   <!-- ROLLBACK CHECKPOINT: visible-signup-button -->
@@ -357,7 +366,7 @@
     window.SIGNALBOOST_SUPABASE_ANON_KEY = "eyJhbGciOi...";
   */
   window.SIGNALBOOST_SUPABASE_URL = "https://dwchaygtxubufxkzfpne.supabase.co";
-  window.SIGNALBOOST_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3Y2hheWd0eHVidWZ4a3pmcG5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNzEzNDEsImV4cCI6MjA5Mzk0NzM0MX0.J6GZlO3as_jBh5s4i_S6xEDSfgkNubTd0YNxqzkIXxA";
+  window.SIGNALBOOST_SUPABASE_ANON_KEY = "PASTE_YOUR_REAL_SUPABASE_ANON_KEY_HERE";
 </script>
 
 
@@ -594,7 +603,13 @@
               return;
             }
 
-            const result = await supabaseClient.auth.signUp({ email, password });
+            const result = await supabaseClient.auth.signUp({
+              email,
+              password,
+              options: {
+                emailRedirectTo: window.location.origin + window.location.pathname + "#auth-callback"
+              }
+            });
             if (result.error) {
               const msg = result.error.message || "Signup failed.";
               if (msg.toLowerCase().includes("fetch")) {
@@ -766,6 +781,59 @@
     })();
   </script>
 
+
+  <script>
+    /*
+      Supabase email-confirmation callback handler for static GitHub Pages.
+      Supabase should redirect users to:
+      https://saas.signalboostapp.com/index.html#auth-callback
+      or simply:
+      https://saas.signalboostapp.com/#auth-callback
+    */
+    document.addEventListener("DOMContentLoaded", async function () {
+      const hash = window.location.hash || "";
+      const hasSupabaseTokens =
+        hash.includes("access_token") ||
+        hash.includes("refresh_token") ||
+        hash.includes("type=signup") ||
+        hash.includes("type=recovery");
+
+      if (!hasSupabaseTokens && hash !== "#auth-callback") return;
+
+      const app = document.getElementById("embeddedApp");
+      const title = document.getElementById("embeddedAppTitle");
+      const body = document.getElementById("embeddedAppBody");
+
+      if (app && title && body) {
+        title.textContent = "Confirming Signup";
+        body.innerHTML = `
+          <div class="embedded-dashboard">
+            <h1>Confirming your signup...</h1>
+            <p>Please wait while SignalBoost checks your session.</p>
+          </div>
+        `;
+        app.dataset.open = "true";
+        app.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      setTimeout(function () {
+        const dashboardLink = document.querySelector('a[href="dashboard.html"]');
+        if (dashboardLink) {
+          dashboardLink.click();
+        } else if (app && title && body) {
+          title.textContent = "Dashboard";
+          body.innerHTML = `
+            <div class="embedded-dashboard">
+              <h1>Welcome to your dashboard</h1>
+              <p>Your email was confirmed. You can now continue in SignalBoost.</p>
+            </div>
+          `;
+          app.dataset.open = "true";
+        }
+        history.replaceState(null, "", window.location.pathname);
+      }, 900);
+    });
+  </script>
 
 </body>
 </html>

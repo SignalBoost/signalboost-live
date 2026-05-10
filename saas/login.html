@@ -1,1 +1,17 @@
 
+<script>
+  async function login(email, password) {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      alert('Login failed');
+      return;
+    }
+    const res = await fetch('/api/auth', {
+      headers: { Authorization: `Bearer ${data.session.access_token}` }
+    });
+    const user = await res.json();
+    if (user.user) {
+      window.location.href = '/dashboard.html';
+    }
+  }
+</script>

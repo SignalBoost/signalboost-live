@@ -127,6 +127,7 @@
   </style>
 </head>
 <body>
+  <!-- FIXED: embeddedApp container restored for nav buttons -->
   <!-- FIXED: mobile signup visible -->
   <!-- ROLLBACK CHECKPOINT: visible-signup-button -->
   <!-- ROLLBACK CHECKPOINT: signup-flow-homepage -->
@@ -324,7 +325,16 @@
           </div>
         </section>
       </section>
-</main>
+
+      <section id="embeddedApp" class="embedded-app" aria-live="polite">
+        <div class="embedded-app-header">
+          <div class="embedded-app-title" id="embeddedAppTitle">SignalBoost</div>
+          <button class="embedded-app-close" id="embeddedAppClose" type="button">Close</button>
+        </div>
+        <div class="embedded-app-body" id="embeddedAppBody"></div>
+      </section>
+
+    </main>
     <footer class="footer">
       <div style="margin-bottom:8px;">
         <a href="privacy.html" style="color:#f6b91a;text-decoration:none;margin:0 8px;">Privacy</a>

@@ -1,4 +1,6 @@
 
+
+
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
@@ -69,6 +71,18 @@
 
     @media(max-width:900px){body{padding:12px}.site-nav{height:auto;grid-template-columns:1fr;justify-items:center;padding:14px}.nav-links{display:flex;flex-wrap:wrap;gap:.7rem;justify-content:center;white-space:normal}.nav-actions{justify-content:center}.hero,.activity-grid,.sections{grid-template-columns:1fr}.hero{min-height:auto}.preview-card{max-width:430px}}
     @media(max-width:560px){.site-frame{border-radius:20px}.page{padding:14px}.app-shell{padding:16px;border-radius:18px}h1{font-size:2.75rem}.hero-buttons{flex-direction:column}.btn{width:100%}.promo{min-height:128px}.promo:after{width:92px;height:116px;right:10px}}
+  
+    /* Embedded-page controller */
+    .embed-panel{display:none;margin-top:18px;background:rgba(17,23,34,.92);border:1px solid var(--goldBorder);border-radius:18px;overflow:hidden}
+    .embed-panel[data-open="true"]{display:block}
+    .embed-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border);background:rgba(5,8,12,.72)}
+    .embed-title{font-size:.9rem;font-weight:950;color:var(--yellow2)}
+    .embed-actions{display:flex;gap:8px;align-items:center}
+    .embed-action{border:1px solid var(--border);background:#111827;color:#fff;border-radius:999px;padding:.45rem .7rem;font-size:.72rem;font-weight:900;text-decoration:none;cursor:pointer}
+    .embed-action:hover{border-color:var(--goldBorder);color:var(--yellow2)}
+    .embed-frame{width:100%;height:min(78vh,820px);border:0;background:#fff;display:block}
+    .embed-note{padding:14px;color:var(--muted);font-size:.85rem;line-height:1.45}
+
   </style>
 </head>
 <body>
@@ -263,6 +277,20 @@
         </section>
       </section>
 
+      <section id="embedPanel" class="embed-panel" aria-live="polite">
+        <div class="embed-toolbar">
+          <div class="embed-title" id="embedTitle">Embedded page</div>
+          <div class="embed-actions">
+            <a id="embedOpenDirect" class="embed-action" href="#" target="_self">Open page</a>
+            <button id="embedClose" class="embed-action" type="button">Close</button>
+          </div>
+        </div>
+        <iframe id="embedFrame" class="embed-frame" title="Embedded SignalBoost page"></iframe>
+        <div id="embedFallback" class="embed-note" hidden>
+          This page could not be embedded by the browser. Use “Open page” above to continue.
+        </div>
+      </section>
+
     </main>
     <footer class="footer">
       <div style="margin-bottom:8px;">
@@ -273,5 +301,164 @@
       © 2026 SignalBoost. All rights reserved.
     </footer>
   </div>
+  <script>
+    (function () {
+      const INTERNAL_PAGES = new Set([
+        "index.html",
+        "features.html",
+        "pricing.html",
+        "login.html",
+        "signup.html",
+        "website-generator.html",
+        "graphics.html",
+        "voice.html",
+        "intake.html",
+        "privacy.html",
+        "terms.html",
+        "contact.html"
+      ]);
+
+      function normalizeUrl(rawUrl) {
+        try {
+          return new URL(rawUrl, window.location.href);
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function isSameSite(url) {
+        return url && url.origin === window.location.origin;
+      }
+
+      function isHashOnly(url) {
+        return isSameSite(url) &&
+          url.pathname === window.location.pathname &&
+          url.hash &&
+          !url.search;
+      }
+
+      function pageName(url) {
+        const parts = url.pathname.split("/").filter(Boolean);
+        return parts.length ? parts[parts.length - 1] : "index.html";
+      }
+
+      function shouldEmbed(url) {
+        if (!url) return false;
+        if (url.protocol === "mailto:" || url.protocol === "tel:") return false;
+        if (isHashOnly(url)) return false;
+        const name = pageName(url);
+        return isSameSite(url) && INTERNAL_PAGES.has(name);
+      }
+
+      function titleFromUrl(url) {
+        const name = pageName(url).replace(".html", "").replace(/-/g, " ");
+        return name.replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+      }
+
+      function enforceEmbed(rawUrl) {
+        const url = normalizeUrl(rawUrl);
+        if (!url) return false;
+
+        if (isHashOnly(url)) {
+          const target = document.querySelector(url.hash);
+          if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+          history.replaceState(null, "", url.hash);
+          return true;
+        }
+
+        if (!shouldEmbed(url)) {
+          window.location.href = url.href;
+          return true;
+        }
+
+        const currentPage = pageName(new URL(window.location.href));
+        const targetPage = pageName(url);
+
+        if (targetPage === currentPage && !url.hash) {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return true;
+        }
+
+        const panel = document.getElementById("embedPanel");
+        const frame = document.getElementById("embedFrame");
+        const title = document.getElementById("embedTitle");
+        const openDirect = document.getElementById("embedOpenDirect");
+        const fallback = document.getElementById("embedFallback");
+
+        if (!panel || !frame || !title || !openDirect) {
+          window.location.href = url.href;
+          return true;
+        }
+
+        if (fallback) fallback.hidden = true;
+        title.textContent = titleFromUrl(url);
+        openDirect.href = url.href;
+        frame.src = url.href;
+        panel.dataset.open = "true";
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+        history.pushState({ embedded: url.href }, "", "#embedded-" + targetPage.replace(".html", ""));
+        return true;
+      }
+
+      document.addEventListener("click", function (event) {
+        const link = event.target.closest("a[href]");
+        if (!link) return;
+
+        const href = link.getAttribute("href");
+        if (!href || href.startsWith("mailto:") || href.startsWith("tel:")) return;
+
+        const url = normalizeUrl(href);
+        if (!url) return;
+
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+        if (shouldEmbed(url) || isHashOnly(url)) {
+          event.preventDefault();
+          enforceEmbed(url.href);
+        }
+      });
+
+      const originalOpen = window.open;
+      window.open = function (url, target, features) {
+        const normalized = normalizeUrl(url);
+        if (normalized && shouldEmbed(normalized)) {
+          enforceEmbed(normalized.href);
+          return null;
+        }
+        return originalOpen.call(window, url, target, features);
+      };
+
+      document.addEventListener("DOMContentLoaded", function () {
+        const close = document.getElementById("embedClose");
+        const panel = document.getElementById("embedPanel");
+        const frame = document.getElementById("embedFrame");
+
+        if (close && panel && frame) {
+          close.addEventListener("click", function () {
+            panel.dataset.open = "false";
+            frame.removeAttribute("src");
+            history.pushState(null, "", window.location.pathname);
+          });
+        }
+
+        if (frame) {
+          frame.addEventListener("error", function () {
+            const fallback = document.getElementById("embedFallback");
+            if (fallback) fallback.hidden = false;
+          });
+        }
+      });
+
+      window.addEventListener("popstate", function () {
+        const panel = document.getElementById("embedPanel");
+        const frame = document.getElementById("embedFrame");
+        if (panel && frame && !location.hash.startsWith("#embedded-")) {
+          panel.dataset.open = "false";
+          frame.removeAttribute("src");
+        }
+      });
+    })();
+  </script>
+
 </body>
 </html>

@@ -1,21 +1,11 @@
-{
-  "name": "signalboost",
-  "version": "1.0.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-  },
-  "dependencies": {
-    "next": "^14.1.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "@supabase/supabase-js": "^2.39.0",
-    "@supabase/auth-helpers-react": "^0.5.9",
-    "@supabase/auth-helpers-nextjs": "^0.10.0",
-    "stripe": "^14.21.0",
-    "openai": "^4.28.0",
-    "node-fetch": "^3.3.2"
-  }
+import '../styles/globals.css';
+import { SessionContextProvider } from '@supabase/auth-helpers-react';
+import { supabase } from '../lib/supabaseClient';
+
+export default function MyApp({ Component, pageProps }) {
+  return (
+    <SessionContextProvider supabaseClient={supabase}>
+      <Component {...pageProps} />
+    </SessionContextProvider>
+  );
 }

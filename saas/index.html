@@ -153,9 +153,9 @@
         <a href="#pricing">Pricing</a>
         <a href="website-generator.html">Website Generator</a>
         <a href="dashboard.html">Dashboard</a>
-        <a id="navSignup" class="signup-nav-btn" href="signup.html">Sign Up</a>
-        <a id="navLogin" href="login.html">Login</a>
-        <a id="navUser" href="dashboard.html" style="display:none;color:#f6b91a;text-decoration:none;font-weight:950;"></a>
+        <a id="navSignup" class="signup-nav-btn" href="#embedded-signup" data-embed-route="signup">Sign Up</a>
+        <a id="navLogin" href="#embedded-login" data-embed-route="login">Login</a>
+        <a id="navUser" href="#embedded-dashboard" data-embed-route="dashboard" style="display:none;color:#f6b91a;text-decoration:none;font-weight:950;"></a>
         <a id="navLogout" href="#" style="display:none;color:#fff;text-decoration:none;font-weight:950;">Logout</a>
       </nav>
       <div class="nav-actions"><select aria-label="Language"><option>EN</option><option>ES</option><option>PT</option><option>PL</option><option>RU</option></select><button class="theme-button" type="button">🌙</button><span class="login-dot">▲</span></div>
@@ -167,7 +167,7 @@
             <span class="eyebrow">⚡ AI marketing website engine</span>
             <h1>From Reviews to Revenue</h1>
             <p>Turn customer reviews into branded graphics, authentic voice ads, and ready-to-launch website baselines with one powerful dashboard.</p>
-            <div class="hero-buttons"><a class="btn btn-primary" href="signup.html">Sign Up Free</a><a class="btn btn-secondary" href="website-generator.html">Generate a Website</a><a class="btn btn-secondary" href="voice.html">Generate Voice Ad</a></div>
+            <div class="hero-buttons"><a class="btn btn-primary" href="#embedded-signup" data-embed-route="signup">Sign Up Free</a><a class="btn btn-secondary" href="website-generator.html">Generate a Website</a><a class="btn btn-secondary" href="voice.html">Generate Voice Ad</a></div>
             <div class="trust-row"><span>Trusted by:</span><span class="logo-word shopify">shopify</span><span class="logo-word meta">∞ Meta</span><span class="logo-word yelp">websites★</span></div>
           </div>
           <div class="preview-wrap">
@@ -315,7 +315,7 @@
             <div class="capability-card"><h3>Preview + Export</h3><p>Preview the generated homepage and download the website package.</p></div>
           </div>
           <div class="generator-actions" style="display:flex;flex-wrap:wrap;gap:.7rem;margin-top:16px;">
-            <a class="btn btn-primary" href="signup.html">Sign Up Free</a>
+            <a class="btn btn-primary" href="#embedded-signup" data-embed-route="signup">Sign Up Free</a>
             <a class="btn btn-secondary" href="website-generator.html">Open Website Generator</a>
             <a class="btn btn-secondary" href="intake.html">Business Intake</a>
           </div>
@@ -330,7 +330,7 @@
             </div>
 
             <div class="section-cta-row">
-              <a class="btn btn-primary" href="login.html">Login</a>
+              <a class="btn btn-primary" href="#embedded-login" data-embed-route="login">Login</a>
               <a class="btn btn-secondary" href="graphics.html">Start Graphics</a>
               <a class="btn btn-secondary" href="voice.html">Start Voice Ad</a>
             </div>
@@ -368,7 +368,7 @@
     window.SIGNALBOOST_SUPABASE_ANON_KEY = "eyJhbGciOi...";
   */
   window.SIGNALBOOST_SUPABASE_URL = "https://dwchaygtxubufxkzfpne.supabase.co";
-  window.SIGNALBOOST_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3Y2hheWd0eHVidWZ4a3pmcG5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNzEzNDEsImV4cCI6MjA5Mzk0NzM0MX0.J6GZlO3as_jBh5s4i_S6xEDSfgkNubTd0YNxqzkIXxA";
+  window.SIGNALBOOST_SUPABASE_ANON_KEY = "PASTE_YOUR_REAL_SUPABASE_ANON_KEY_HERE";
 </script>
 
 
@@ -413,7 +413,7 @@
         }
       }
 
-      function openEmbedded(view) {
+      window.openEmbedded = function openEmbedded(view) {
         const app = qs("embeddedApp");
         const title = qs("embeddedAppTitle");
         const body = qs("embeddedAppBody");
@@ -454,7 +454,7 @@
               <input type="password" id="signupConfirm" required autocomplete="new-password" />
               <button type="submit">Sign Up</button><p class="small-muted" style="margin-top:10px;">Configure your real Supabase URL + anon key before production deployment.</p>
               <p class="form-message" id="signupMessage"></p>
-              <p class="small-muted" style="margin-top:14px;">Already have an account? <a href="login.html" data-embed-route="login" style="color:#f6b91a;font-weight:900;">Login</a></p>
+              <p class="small-muted" style="margin-top:14px;">Already have an account? <a href="#embedded-login" data-embed-route="login" data-embed-route="login" style="color:#f6b91a;font-weight:900;">Login</a></p>
             </form>
           </div>`;
 
@@ -468,7 +468,7 @@
               <input type="password" id="loginPassword" required autocomplete="current-password" />
               <button type="submit">Login</button>
               <p class="form-message" id="loginMessage"></p>
-              <p class="small-muted" style="margin-top:14px;">No account yet? <a href="signup.html" data-embed-route="signup" style="color:#f6b91a;font-weight:900;">Sign up</a></p>
+              <p class="small-muted" style="margin-top:14px;">No account yet? <a href="#embedded-signup" data-embed-route="signup" data-embed-route="signup" style="color:#f6b91a;font-weight:900;">Sign up</a></p>
             </form>
           </div>`;
 
@@ -817,6 +817,38 @@
   })();
 </script>
 
+
+<script>
+  // Prevent empty .html navigation for auth links; open embedded panels instead.
+  document.addEventListener("click", function (event) {
+    const link = event.target.closest("[data-embed-route]");
+    if (!link) return;
+
+    event.preventDefault();
+
+    const route = link.getAttribute("data-embed-route");
+    const routeMap = {
+      signup: "signup",
+      login: "login",
+      dashboard: "dashboard",
+      generator: "generator",
+      intake: "intake",
+      privacy: "privacy",
+      terms: "terms",
+      contact: "contact"
+    };
+
+    if (routeMap[route] && typeof openEmbedded === "function") {
+      openEmbedded(routeMap[route]);
+      return;
+    }
+
+    // Fallback for files where openEmbedded is scoped inside another script.
+    const existing = document.querySelector('a[href="' + route + '.html"]');
+    if (existing && existing !== link) existing.click();
+  });
+</script>
+
 </body></html>`;
             const blob = new Blob([content], { type: "text/html" });
             const url = URL.createObjectURL(blob);
@@ -1031,6 +1063,38 @@
 
     window.updateSignalBoostNav = updateSignalBoostNav;
   })();
+</script>
+
+
+<script>
+  // Prevent empty .html navigation for auth links; open embedded panels instead.
+  document.addEventListener("click", function (event) {
+    const link = event.target.closest("[data-embed-route]");
+    if (!link) return;
+
+    event.preventDefault();
+
+    const route = link.getAttribute("data-embed-route");
+    const routeMap = {
+      signup: "signup",
+      login: "login",
+      dashboard: "dashboard",
+      generator: "generator",
+      intake: "intake",
+      privacy: "privacy",
+      terms: "terms",
+      contact: "contact"
+    };
+
+    if (routeMap[route] && typeof openEmbedded === "function") {
+      openEmbedded(routeMap[route]);
+      return;
+    }
+
+    // Fallback for files where openEmbedded is scoped inside another script.
+    const existing = document.querySelector('a[href="' + route + '.html"]');
+    if (existing && existing !== link) existing.click();
+  });
 </script>
 
 </body>

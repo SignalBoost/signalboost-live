@@ -45,6 +45,12 @@
     .price{font-size:1.45rem;font-weight:950;color:var(--yellow2);margin:.5rem 0}
     .section-cta-row{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:16px}
     .login-panel{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center}
+    
+    .generator-highlight{background:linear-gradient(145deg,rgba(246,185,26,.13),rgba(255,255,255,.02)),rgba(17,23,34,.92);border:1px solid var(--goldBorder);border-radius:18px;padding:22px;margin-top:16px}
+    .generator-highlight h2{font-size:1.35rem;margin-bottom:.55rem}
+    .generator-highlight p{color:var(--muted);font-size:.88rem;line-height:1.55;max-width:780px}
+    .generator-actions{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:16px}
+
     @media(max-width:900px){.step-grid,.feature-grid,.pricing-grid,.login-panel{grid-template-columns:1fr}}
 
     @media(max-width:900px){body{padding:12px}.site-nav{grid-template-columns:1fr auto}.nav-links{display:none}.hero,.activity-grid,.sections{grid-template-columns:1fr}.hero{min-height:auto}.preview-card{max-width:430px}}
@@ -57,7 +63,7 @@
     <header class="site-nav">
       <div class="brand">SignalBoost</div>
       <nav class="nav-links">
-        <a href="#home">Home</a><a href="#how-it-works">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#login">Login</a>
+        <a href="#home">Home</a><a href="#how-it-works">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="website-generator.html">Website Generator</a><a href="#login">Login</a>
       </nav>
       <div class="nav-actions"><select aria-label="Language"><option>EN</option><option>ES</option><option>PT</option><option>PL</option><option>RU</option></select><button class="theme-button" type="button">🌙</button><span class="login-dot">▲</span></div>
     </header>
@@ -186,6 +192,21 @@
             </div>
           </div>
         </section>
+
+        
+        <section id="website-generator" class="generator-highlight">
+          <h2>Website Generator</h2>
+          <p>
+            Generate a simple website baseline from a business name, tagline,
+            customer reviews, brand color, and template choice.
+          </p>
+          <div class="generator-actions">
+            <a class="btn btn-primary" href="website-generator.html">Open Website Generator</a>
+            <a class="btn btn-secondary" href="graphics.html">Create Branded Graphic</a>
+            <a class="btn btn-secondary" href="voice.html">Generate Voice Ad</a>
+          </div>
+        </section>
+
 
         <section id="login" class="wide-section">
           <div class="login-panel">

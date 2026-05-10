@@ -149,32 +149,24 @@
     <header class="site-nav">
       <div class="brand">SignalBoost</div>
       
+
 <nav class="nav-links">
   <a href="#home">Home</a>
   <a href="#how-it-works">How it works</a>
   <a href="#features">Features</a>
   <a href="#pricing">Pricing</a>
-
-  <a href="/website-generator">Website Generator</a>
-  <a href="/dashboard">Dashboard</a>
-
-  <a id="navSignup" class="signup-nav-btn" href="/signup">
-    Sign Up
-  </a>
-
-  <a id="navLogin" href="/login">Login</a>
-
+  <a href="website-generator.html">Website Generator</a>
+  <a href="dashboard.html">Dashboard</a>
+  <a id="navSignup" class="signup-nav-btn" href="signup.html">Sign Up</a>
+  <a id="navLogin" href="login.html">Login</a>
   <a id="navUser"
-     href="/dashboard"
-     style="display:none;color:#f6b91a;text-decoration:none;font-weight:950;">
-  </a>
-
+     href="dashboard.html"
+     style="display:none;color:#f6b91a;text-decoration:none;font-weight:950;"></a>
   <a id="navLogout"
      href="#"
-     style="display:none;color:#fff;text-decoration:none;font-weight:950;">
-     Logout
-  </a>
+     style="display:none;color:#fff;text-decoration:none;font-weight:950;">Logout</a>
 </nav>
+
 
       <div class="nav-actions"><select aria-label="Language"><option>EN</option><option>ES</option><option>PT</option><option>PL</option><option>RU</option></select><button class="theme-button" type="button">🌙</button><span class="login-dot">▲</span></div>
     </header>
@@ -493,13 +485,16 @@
         if (view === "dashboard") return `
           <div class="embedded-dashboard">
             <h1>Dashboard</h1>
-            <p>Checking your login session...</p>
+            <p id="dashboardStatus">Checking your login session...</p>
             <div class="dashboard-grid">
               <div class="dashboard-card"><h3>Reviews</h3><p>Manage review content and convert it into branded assets.</p></div>
               <div class="dashboard-card"><h3>Voice Ads</h3><p>Preview and save generated voice ad concepts.</p></div>
               <div class="dashboard-card"><h3>Websites</h3><p>Create website starter pages from intake data.</p></div>
             </div>
-            <button class="btn btn-primary" id="logoutBtn" style="margin-top:18px;">Logout</button>
+            <div style="display:flex;flex-wrap:wrap;gap:.7rem;margin-top:18px;">
+              <button class="btn btn-primary" id="publishSiteBtn" type="button">Publish Site</button>
+              <button class="btn btn-secondary" id="logoutBtn" type="button">Logout</button>
+            </div>
           </div>`;
 
         if (view === "profile") return `
@@ -542,26 +537,16 @@
           </div>`;
 
         if (view === "generator") {
-          const saved = JSON.parse(localStorage.getItem("signalboost_intake") || "{}");
-          const company = escapeHtml(saved.company || "Your Business");
-          const industry = escapeHtml(saved.industry || "Your Industry");
-          const goals = escapeHtml(saved.goals || "Describe your business goals in the intake form.");
           return `
             <div class="embedded-dashboard">
               <h1>Website Generator</h1>
-              <p>Preview a generated website baseline from your latest intake.</p>
-              <div class="generated-preview">
-                <h2>${company}</h2>
-                <p><strong>${industry}</strong></p>
-                <h3>Our Mission</h3>
-                <p>${goals}</p>
-                <h3>AI Copy Placeholder</h3>
-                <p>Welcome to ${company}, where innovation meets ${industry}. Our vision is to achieve: ${goals}</p>
+              <p>Enter a prompt and generate website copy securely through your backend API.</p>
+              <textarea id="generatorPrompt" placeholder="Enter prompt..." style="width:100%;min-height:140px;margin-top:16px;padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:#0f141d;color:#fff;font:inherit;"></textarea>
+              <div style="display:flex;flex-wrap:wrap;gap:.7rem;margin-top:14px;">
+                <button class="btn btn-primary" id="generateCopyBtn" type="button">Generate Copy</button>
+                <a class="btn btn-secondary" href="intake.html" data-embed-route="intake">Business Intake</a>
               </div>
-              <div style="display:flex;flex-wrap:wrap;gap:.7rem;margin-top:18px;">
-                <a class="btn btn-primary" href="intake.html" data-embed-route="intake">Business Intake</a>
-                <button class="btn btn-secondary" id="downloadPreviewBtn" type="button">Download Preview HTML</button>
-              </div>
+              <div class="generated-preview" id="generatorOutput" style="display:none;"></div>
             </div>`;
         }
 
@@ -673,6 +658,22 @@
         }
 
         if (view === "dashboard") {
+          if (window.refreshSignalBoostAuthUI) window.refreshSignalBoostAuthUI();
+
+          const publishBtn = qs("publishSiteBtn");
+          if (publishBtn) publishBtn.addEventListener("click", async function () {
+            try {
+              const res = await fetch("/api/publish", { method: "POST" });
+              if (res.ok) {
+                alert("Site published!");
+              } else {
+                alert("Publish failed.");
+              }
+            } catch (error) {
+              alert("Publish failed. Make sure /api/publish exists on your backend.");
+            }
+          });
+
           const btn = qs("logoutBtn");
           if (btn) btn.addEventListener("click", async function () {
             if (supabaseClient) await supabaseClient.auth.signOut();

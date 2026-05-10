@@ -59,15 +59,21 @@
     .website-capability .capability-card{background:#0f141d;border:1px solid var(--border);border-radius:16px;padding:16px}
     .website-capability .capability-card h3{font-size:1rem;margin-bottom:.45rem}
     .website-capability .capability-card p{font-size:.8rem}
+    
+    .signup-nav-btn{background:linear-gradient(180deg,var(--yellow2),var(--yellow));color:#05070b!important;padding:.62rem 1rem;border-radius:999px;font-weight:950;box-shadow:0 8px 24px rgba(246,185,26,.22)}
+    .signup-nav-btn:hover{background:var(--yellow2);color:#05070b!important}
+
     @media(max-width:900px){.website-capability .capability-grid{grid-template-columns:1fr}}
 
     @media(max-width:900px){.step-grid,.feature-grid,.pricing-grid,.login-panel{grid-template-columns:1fr}}
 
-    @media(max-width:900px){body{padding:12px}.site-nav{grid-template-columns:1fr auto}.nav-links{display:none}.hero,.activity-grid,.sections{grid-template-columns:1fr}.hero{min-height:auto}.preview-card{max-width:430px}}
+    @media(max-width:900px){body{padding:12px}.site-nav{height:auto;grid-template-columns:1fr;justify-items:center;padding:14px}.nav-links{display:flex;flex-wrap:wrap;gap:.7rem;justify-content:center;white-space:normal}.nav-actions{justify-content:center}.hero,.activity-grid,.sections{grid-template-columns:1fr}.hero{min-height:auto}.preview-card{max-width:430px}}
     @media(max-width:560px){.site-frame{border-radius:20px}.page{padding:14px}.app-shell{padding:16px;border-radius:18px}h1{font-size:2.75rem}.hero-buttons{flex-direction:column}.btn{width:100%}.promo{min-height:128px}.promo:after{width:92px;height:116px;right:10px}}
   </style>
 </head>
 <body>
+  <!-- FIXED: mobile signup visible -->
+  <!-- ROLLBACK CHECKPOINT: visible-signup-button -->
   <!-- ROLLBACK CHECKPOINT: signup-flow-homepage -->
   <!-- ROLLBACK CHECKPOINT: website-capability-copy -->
   <!-- RESTORED MOCKUP MATCHED INDEX: working links added -->
@@ -75,8 +81,8 @@
     <header class="site-nav">
       <div class="brand">SignalBoost</div>
       <nav class="nav-links">
-        <a href="#home">Home</a><a href="#how-it-works">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="website-generator.html">Website Generator</a><a href="login.html">Login</a>
-      <a href="signup.html">Get Started</a></nav>
+        <a href="#home">Home</a><a href="#how-it-works">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="website-generator.html">Website Generator</a>
+      <a class="signup-nav-btn" href="signup.html">Sign Up</a><a href="login.html">Login</a></nav>
       <div class="nav-actions"><select aria-label="Language"><option>EN</option><option>ES</option><option>PT</option><option>PL</option><option>RU</option></select><button class="theme-button" type="button">🌙</button><span class="login-dot">▲</span></div>
     </header>
     <main class="page" id="home">
@@ -86,7 +92,7 @@
             <span class="eyebrow">⚡ AI marketing website engine</span>
             <h1>From Reviews to Revenue</h1>
             <p>Turn customer reviews into branded graphics, authentic voice ads, and ready-to-launch website baselines with one powerful dashboard.</p>
-            <div class="hero-buttons"><a class="btn btn-primary" href="website-generator.html">Generate a Website</a><a class="btn btn-secondary" href="graphics.html">Turn Reviews into Graphics</a><a class="btn btn-secondary" href="#how-it-works">See How It Works</a></div>
+            <div class="hero-buttons"><a class="btn btn-primary" href="signup.html">Sign Up Free</a><a class="btn btn-secondary" href="website-generator.html">Generate a Website</a><a class="btn btn-secondary" href="voice.html">Generate Voice Ad</a></div>
             <div class="trust-row"><span>Trusted by:</span><span class="logo-word shopify">shopify</span><span class="logo-word meta">∞ Meta</span><span class="logo-word yelp">websites★</span></div>
           </div>
           <div class="preview-wrap">
@@ -234,7 +240,7 @@
             <div class="capability-card"><h3>Preview + Export</h3><p>Preview the generated homepage and download the website package.</p></div>
           </div>
           <div class="generator-actions" style="display:flex;flex-wrap:wrap;gap:.7rem;margin-top:16px;">
-            <a class="btn btn-primary" href="signup.html">Create Account</a>
+            <a class="btn btn-primary" href="signup.html">Sign Up Free</a>
             <a class="btn btn-secondary" href="website-generator.html">Open Website Generator</a>
             <a class="btn btn-secondary" href="intake.html">Business Intake</a>
           </div>

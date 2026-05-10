@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
@@ -72,6 +73,7 @@
   </style>
 </head>
 <body>
+  <!-- Updated for Next.js routes and /public/index.html deployment -->
   <!-- FIXED: mobile signup visible -->
   <!-- ROLLBACK CHECKPOINT: visible-signup-button -->
   <!-- ROLLBACK CHECKPOINT: signup-flow-homepage -->
@@ -81,8 +83,8 @@
     <header class="site-nav">
       <div class="brand">SignalBoost</div>
       <nav class="nav-links">
-        <a href="#home">Home</a><a href="#how-it-works">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="website-generator.html">Website Generator</a>
-      <a class="signup-nav-btn" href="signup.html">Sign Up</a><a href="login.html">Login</a></nav>
+        <a href="#home">Home</a><a href="#how-it-works">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="/website-generator">Website Generator</a><a href="/dashboard">Dashboard</a>
+      <a class="signup-nav-btn" href="/signup">Sign Up</a><a href="/login">Login</a></nav>
       <div class="nav-actions"><select aria-label="Language"><option>EN</option><option>ES</option><option>PT</option><option>PL</option><option>RU</option></select><button class="theme-button" type="button">🌙</button><span class="login-dot">▲</span></div>
     </header>
     <main class="page" id="home">
@@ -92,7 +94,7 @@
             <span class="eyebrow">⚡ AI marketing website engine</span>
             <h1>From Reviews to Revenue</h1>
             <p>Turn customer reviews into branded graphics, authentic voice ads, and ready-to-launch website baselines with one powerful dashboard.</p>
-            <div class="hero-buttons"><a class="btn btn-primary" href="signup.html">Sign Up Free</a><a class="btn btn-secondary" href="website-generator.html">Generate a Website</a><a class="btn btn-secondary" href="voice.html">Generate Voice Ad</a></div>
+            <div class="hero-buttons"><a class="btn btn-primary" href="/signup">Sign Up Free</a><a class="btn btn-secondary" href="/website-generator">Generate a Website</a><a class="btn btn-secondary" href="/voice">Generate Voice Ad</a></div>
             <div class="trust-row"><span>Trusted by:</span><span class="logo-word shopify">shopify</span><span class="logo-word meta">∞ Meta</span><span class="logo-word yelp">websites★</span></div>
           </div>
           <div class="preview-wrap">
@@ -219,9 +221,9 @@
             customer reviews, brand color, and template choice.
           </p>
           <div class="generator-actions">
-            <a class="btn btn-primary" href="website-generator.html">Open Website Generator</a>
-            <a class="btn btn-secondary" href="graphics.html">Create Branded Graphic</a>
-            <a class="btn btn-secondary" href="voice.html">Generate Voice Ad</a>
+            <a class="btn btn-primary" href="/website-generator">Open Website Generator</a>
+            <a class="btn btn-secondary" href="/graphics">Create Branded Graphic</a>
+            <a class="btn btn-secondary" href="/voice">Generate Voice Ad</a>
           </div>
         </section>
 
@@ -240,9 +242,9 @@
             <div class="capability-card"><h3>Preview + Export</h3><p>Preview the generated homepage and download the website package.</p></div>
           </div>
           <div class="generator-actions" style="display:flex;flex-wrap:wrap;gap:.7rem;margin-top:16px;">
-            <a class="btn btn-primary" href="signup.html">Sign Up Free</a>
-            <a class="btn btn-secondary" href="website-generator.html">Open Website Generator</a>
-            <a class="btn btn-secondary" href="intake.html">Business Intake</a>
+            <a class="btn btn-primary" href="/signup">Sign Up Free</a>
+            <a class="btn btn-secondary" href="/website-generator">Open Website Generator</a>
+            <a class="btn btn-secondary" href="/intake">Business Intake</a>
           </div>
         </section>
 
@@ -255,9 +257,9 @@
             </div>
 
             <div class="section-cta-row">
-              <a class="btn btn-primary" href="login.html">Login</a>
-              <a class="btn btn-secondary" href="graphics.html">Start Graphics</a>
-              <a class="btn btn-secondary" href="voice.html">Start Voice Ad</a>
+              <a class="btn btn-primary" href="/login">Login</a>
+              <a class="btn btn-secondary" href="/graphics">Start Graphics</a>
+              <a class="btn btn-secondary" href="/voice">Start Voice Ad</a>
             </div>
           </div>
         </section>
@@ -266,9 +268,9 @@
     </main>
     <footer class="footer">
       <div style="margin-bottom:8px;">
-        <a href="privacy.html" style="color:#f6b91a;text-decoration:none;margin:0 8px;">Privacy</a>
-        <a href="terms.html" style="color:#f6b91a;text-decoration:none;margin:0 8px;">Terms</a>
-        <a href="contact.html" style="color:#f6b91a;text-decoration:none;margin:0 8px;">Contact</a>
+        <a href="/privacy" style="color:#f6b91a;text-decoration:none;margin:0 8px;">Privacy</a>
+        <a href="/terms" style="color:#f6b91a;text-decoration:none;margin:0 8px;">Terms</a>
+        <a href="/contact" style="color:#f6b91a;text-decoration:none;margin:0 8px;">Contact</a>
       </div>
       © 2026 SignalBoost. All rights reserved.
     </footer>

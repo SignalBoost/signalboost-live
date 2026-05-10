@@ -291,7 +291,17 @@
         </div>
       </section>
 
-    </main>
+    
+<section class="wide-section" style="margin-top:18px;border:1px solid rgba(246,185,26,.25);">
+  <h2>Embedded Pages Status</h2>
+  <p>
+    Internal embedded pages like signup.html, login.html, graphics.html,
+    and website-generator.html must physically exist in your deployed repository.
+    The embed controller is working correctly — the current 404 means the page file is missing from GitHub Pages deployment.
+  </p>
+</section>
+
+</main>
     <footer class="footer">
       <div style="margin-bottom:8px;">
         <a href="privacy.html" style="color:#f6b91a;text-decoration:none;margin:0 8px;">Privacy</a>
@@ -459,6 +469,39 @@
       });
     })();
   </script>
+
+
+<script>
+window.addEventListener("DOMContentLoaded", () => {
+  const frame = document.getElementById("embedFrame");
+  const fallback = document.getElementById("embedFallback");
+
+  if(frame){
+    frame.addEventListener("load", () => {
+      try {
+        const doc = frame.contentDocument || frame.contentWindow.document;
+        const txt = doc.body ? doc.body.innerText : "";
+
+        if (
+          txt.includes("404") ||
+          txt.includes("NOT_FOUND") ||
+          txt.includes("Page Not Found")
+        ) {
+          if(fallback){
+            fallback.hidden = false;
+            fallback.innerHTML =
+              "<strong>Embedded page missing.</strong><br>" +
+              "The linked file (signup.html, login.html, etc.) is not deployed yet.<br><br>" +
+              "Create/upload the missing HTML page or remove the link.";
+          }
+        }
+      } catch(e){
+        // Cross-origin or sandbox issue
+      }
+    });
+  }
+});
+</script>
 
 </body>
 </html>

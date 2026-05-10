@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '../utils/supabaseClient';
+import { supabase } from '../lib/supabaseClient';
 import Link from 'next/link';
 
 export default function Login() {
@@ -27,16 +27,17 @@ export default function Login() {
   };
 
   return (
-    <div style={{
-      background: '#111',
-      minHeight: '100vh',
-      padding: '40px',
-      color: '#f9c300',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center'
-    }}>
-      
+    <div
+      style={{
+        background: '#111',
+        minHeight: '100vh',
+        padding: '40px',
+        color: '#f9c300',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center'
+      }}
+    >
       <h1 style={{ marginBottom: '20px' }}>Login</h1>
 
       <input
@@ -72,7 +73,9 @@ export default function Login() {
       />
 
       {errorMsg && (
-        <p style={{ color: 'red', marginBottom: '10px' }}>{errorMsg}</p>
+        <p style={{ color: 'red', marginBottom: '10px' }}>
+          {errorMsg}
+        </p>
       )}
 
       <button
@@ -90,26 +93,30 @@ export default function Login() {
           marginBottom: '15px'
         }}
       >
-        {loading ? 'Logging in…' : 'Login'}
+        {loading ? 'Logging in...' : 'Login'}
       </button>
 
       <Link href="/reset-password">
-        <span style={{
-          color: '#f9c300',
-          cursor: 'pointer',
-          textDecoration: 'underline',
-          marginBottom: '20px'
-        }}>
+        <span
+          style={{
+            color: '#f9c300',
+            cursor: 'pointer',
+            textDecoration: 'underline',
+            marginBottom: '20px'
+          }}
+        >
           Forgot your password
         </span>
       </Link>
 
       <Link href="/signup">
-        <span style={{
-          color: '#fff',
-          cursor: 'pointer',
-          textDecoration: 'underline'
-        }}>
+        <span
+          style={{
+            color: '#fff',
+            cursor: 'pointer',
+            textDecoration: 'underline'
+          }}
+        >
           Don’t have an account? Sign up
         </span>
       </Link>

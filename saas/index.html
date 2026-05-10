@@ -152,7 +152,7 @@
         <a href="#features">Features</a>
         <a href="#pricing">Pricing</a>
         <a href="website-generator.html">Website Generator</a>
-        <a href="dashboard.html">Dashboard</a>
+        <a href="#embedded-dashboard" data-embed-route="dashboard">Dashboard</a>
         <a id="navSignup" class="signup-nav-btn" href="#embedded-signup" data-embed-route="signup">Sign Up</a>
         <a id="navLogin" href="#embedded-login" data-embed-route="login">Login</a>
         <a id="navUser" href="#embedded-dashboard" data-embed-route="dashboard" style="display:none;color:#f6b91a;text-decoration:none;font-weight:950;"></a>
@@ -364,11 +364,11 @@
     IMPORTANT:
     Replace these placeholder values with your REAL Supabase project credentials.
     Example:
-    window.SIGNALBOOST_SUPABASE_URL = "https://abc123.supabase.co";
+    window.SIGNALBOOST_SUPABASE_URL = "https://dwchaygtxubufxkzfpne.supabase.co";
     window.SIGNALBOOST_SUPABASE_ANON_KEY = "eyJhbGciOi...";
   */
   window.SIGNALBOOST_SUPABASE_URL = "https://dwchaygtxubufxkzfpne.supabase.co";
-  window.SIGNALBOOST_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3Y2hheWd0eHVidWZ4a3pmcG5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNzEzNDEsImV4cCI6MjA5Mzk0NzM0MX0.J6GZlO3as_jBh5s4i_S6xEDSfgkNubTd0YNxqzkIXxA";
+  window.SIGNALBOOST_SUPABASE_ANON_KEY = "PASTE_YOUR_REAL_SUPABASE_ANON_KEY_HERE";
 </script>
 
 
@@ -413,7 +413,7 @@
         }
       }
 
-      window.openEmbedded = function openEmbedded(view) {
+      window.openEmbedded = window.openEmbedded = function openEmbedded(view) {
         const app = qs("embeddedApp");
         const title = qs("embeddedAppTitle");
         const body = qs("embeddedAppBody");
@@ -648,6 +648,7 @@
             }
             else {
               setMessage("loginMessage", "Login successful! Opening dashboard…", "success");
+              if (window.refreshSignalBoostAuthUI) window.refreshSignalBoostAuthUI();
               setTimeout(() => openEmbedded("dashboard"), 500);
             }
           });
@@ -849,6 +850,139 @@
   });
 </script>
 
+
+<script>
+  // Final SignalBoost session-aware auth patch.
+  (function () {
+    function getClient() {
+      if (!window.supabase) return null;
+
+      const url = window.SIGNALBOOST_SUPABASE_URL || "";
+      const key = window.SIGNALBOOST_SUPABASE_ANON_KEY || "";
+
+      if (!url || !key || key.includes("PASTE_YOUR_REAL")) return null;
+
+      if (!window.signalBoostSupabaseClient) {
+        window.signalBoostSupabaseClient = window.supabase.createClient(url, key);
+      }
+
+      return window.signalBoostSupabaseClient;
+    }
+
+    async function getUser() {
+      const client = getClient();
+      if (!client) return null;
+
+      const { data, error } = await client.auth.getUser();
+      if (error || !data || !data.user) return null;
+      return data.user;
+    }
+
+    async function refreshAuthUI() {
+      const user = await getUser();
+
+      const signup = document.getElementById("navSignup");
+      const login = document.getElementById("navLogin");
+      const userLink = document.getElementById("navUser");
+      const logout = document.getElementById("navLogout");
+      const dashboardStatus = document.getElementById("dashboardStatus");
+
+      if (user) {
+        if (signup) signup.style.display = "none";
+        if (login) login.style.display = "none";
+
+        if (userLink) {
+          userLink.style.display = "";
+          userLink.textContent = user.email || "Account";
+        }
+
+        if (logout) logout.style.display = "";
+
+        if (dashboardStatus) {
+          dashboardStatus.textContent = "Welcome, " + (user.email || "your account") + ". You are logged in.";
+        }
+      } else {
+        if (signup) signup.style.display = "";
+        if (login) login.style.display = "";
+
+        if (userLink) {
+          userLink.style.display = "none";
+          userLink.textContent = "";
+        }
+
+        if (logout) logout.style.display = "none";
+
+        if (dashboardStatus) {
+          dashboardStatus.textContent = "Please log in to access your dashboard.";
+        }
+      }
+
+      return user;
+    }
+
+    function patchAuthLinks() {
+      document.querySelectorAll('a[href*="login.html"], a[href="#embedded-login"]').forEach(function (a) {
+        a.setAttribute("href", "#embedded-login");
+        a.setAttribute("data-embed-route", "login");
+      });
+
+      document.querySelectorAll('a[href*="signup.html"], a[href="#embedded-signup"]').forEach(function (a) {
+        a.setAttribute("href", "#embedded-signup");
+        a.setAttribute("data-embed-route", "signup");
+      });
+
+      document.querySelectorAll('a[href*="dashboard.html"], a[href="#embedded-dashboard"]').forEach(function (a) {
+        a.setAttribute("href", "#embedded-dashboard");
+        a.setAttribute("data-embed-route", "dashboard");
+      });
+    }
+
+    document.addEventListener("click", async function (event) {
+      const link = event.target.closest("[data-embed-route]");
+      if (!link) return;
+
+      event.preventDefault();
+      const route = link.getAttribute("data-embed-route");
+
+      if (typeof window.openEmbedded === "function") {
+        window.openEmbedded(route);
+        setTimeout(refreshAuthUI, 50);
+      }
+    });
+
+    document.addEventListener("DOMContentLoaded", function () {
+      patchAuthLinks();
+
+      const client = getClient();
+      if (client && client.auth && client.auth.onAuthStateChange) {
+        client.auth.onAuthStateChange(function () {
+          refreshAuthUI();
+        });
+      }
+
+      const logout = document.getElementById("navLogout");
+      if (logout) {
+        logout.addEventListener("click", async function (event) {
+          event.preventDefault();
+
+          const c = getClient();
+          if (c) await c.auth.signOut();
+
+          await refreshAuthUI();
+
+          if (typeof window.openEmbedded === "function") {
+            window.openEmbedded("login");
+          }
+        });
+      }
+
+      refreshAuthUI();
+    });
+
+    window.refreshSignalBoostAuthUI = refreshAuthUI;
+  })();
+</script>
+
 </body></html>`;
             const blob = new Blob([content], { type: "text/html" });
             const url = URL.createObjectURL(blob);
@@ -949,7 +1083,7 @@
       }
 
       setTimeout(function () {
-        const dashboardLink = document.querySelector('a[href="dashboard.html"]');
+        const dashboardLink = document.querySelector('a[href="#embedded-dashboard" data-embed-route="dashboard"]');
         if (dashboardLink) {
           dashboardLink.click();
         } else if (app && title && body) {
@@ -1095,6 +1229,139 @@
     const existing = document.querySelector('a[href="' + route + '.html"]');
     if (existing && existing !== link) existing.click();
   });
+</script>
+
+
+<script>
+  // Final SignalBoost session-aware auth patch.
+  (function () {
+    function getClient() {
+      if (!window.supabase) return null;
+
+      const url = window.SIGNALBOOST_SUPABASE_URL || "";
+      const key = window.SIGNALBOOST_SUPABASE_ANON_KEY || "";
+
+      if (!url || !key || key.includes("PASTE_YOUR_REAL")) return null;
+
+      if (!window.signalBoostSupabaseClient) {
+        window.signalBoostSupabaseClient = window.supabase.createClient(url, key);
+      }
+
+      return window.signalBoostSupabaseClient;
+    }
+
+    async function getUser() {
+      const client = getClient();
+      if (!client) return null;
+
+      const { data, error } = await client.auth.getUser();
+      if (error || !data || !data.user) return null;
+      return data.user;
+    }
+
+    async function refreshAuthUI() {
+      const user = await getUser();
+
+      const signup = document.getElementById("navSignup");
+      const login = document.getElementById("navLogin");
+      const userLink = document.getElementById("navUser");
+      const logout = document.getElementById("navLogout");
+      const dashboardStatus = document.getElementById("dashboardStatus");
+
+      if (user) {
+        if (signup) signup.style.display = "none";
+        if (login) login.style.display = "none";
+
+        if (userLink) {
+          userLink.style.display = "";
+          userLink.textContent = user.email || "Account";
+        }
+
+        if (logout) logout.style.display = "";
+
+        if (dashboardStatus) {
+          dashboardStatus.textContent = "Welcome, " + (user.email || "your account") + ". You are logged in.";
+        }
+      } else {
+        if (signup) signup.style.display = "";
+        if (login) login.style.display = "";
+
+        if (userLink) {
+          userLink.style.display = "none";
+          userLink.textContent = "";
+        }
+
+        if (logout) logout.style.display = "none";
+
+        if (dashboardStatus) {
+          dashboardStatus.textContent = "Please log in to access your dashboard.";
+        }
+      }
+
+      return user;
+    }
+
+    function patchAuthLinks() {
+      document.querySelectorAll('a[href*="login.html"], a[href="#embedded-login"]').forEach(function (a) {
+        a.setAttribute("href", "#embedded-login");
+        a.setAttribute("data-embed-route", "login");
+      });
+
+      document.querySelectorAll('a[href*="signup.html"], a[href="#embedded-signup"]').forEach(function (a) {
+        a.setAttribute("href", "#embedded-signup");
+        a.setAttribute("data-embed-route", "signup");
+      });
+
+      document.querySelectorAll('a[href*="dashboard.html"], a[href="#embedded-dashboard"]').forEach(function (a) {
+        a.setAttribute("href", "#embedded-dashboard");
+        a.setAttribute("data-embed-route", "dashboard");
+      });
+    }
+
+    document.addEventListener("click", async function (event) {
+      const link = event.target.closest("[data-embed-route]");
+      if (!link) return;
+
+      event.preventDefault();
+      const route = link.getAttribute("data-embed-route");
+
+      if (typeof window.openEmbedded === "function") {
+        window.openEmbedded(route);
+        setTimeout(refreshAuthUI, 50);
+      }
+    });
+
+    document.addEventListener("DOMContentLoaded", function () {
+      patchAuthLinks();
+
+      const client = getClient();
+      if (client && client.auth && client.auth.onAuthStateChange) {
+        client.auth.onAuthStateChange(function () {
+          refreshAuthUI();
+        });
+      }
+
+      const logout = document.getElementById("navLogout");
+      if (logout) {
+        logout.addEventListener("click", async function (event) {
+          event.preventDefault();
+
+          const c = getClient();
+          if (c) await c.auth.signOut();
+
+          await refreshAuthUI();
+
+          if (typeof window.openEmbedded === "function") {
+            window.openEmbedded("login");
+          }
+        });
+      }
+
+      refreshAuthUI();
+    });
+
+    window.refreshSignalBoostAuthUI = refreshAuthUI;
+  })();
 </script>
 
 </body>

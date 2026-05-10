@@ -7,13 +7,10 @@
     "start": "next start"
   },
   "dependencies": {
-    "next": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "@supabase/supabase-js": "latest",
-    "@supabase/auth-helpers-nextjs": "latest",
-    "@supabase/auth-helpers-react": "latest",
-    "stripe": "latest",
-    "openai": "latest"
+    "@supabase/supabase-js": "^2.39.0",
+    "next": "^14.2.5",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "stripe": "^14.25.0"
   }
 }

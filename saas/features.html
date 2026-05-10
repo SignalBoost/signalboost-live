@@ -1,1 +1,16 @@
 
+<script>
+  async function generateCopy() {
+    const prompt = document.getElementById('prompt').value;
+    const res = await fetch('/api/generate-copy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    const { copy } = await res.json();
+    document.getElementById('output').innerText = copy;
+  }
+</script>
+<textarea id="prompt"></textarea>
+<button onclick="generateCopy()">Generate Copy</button>
+<div id="output"></div>

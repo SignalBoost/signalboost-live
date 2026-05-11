@@ -1,21 +1,13 @@
-const SUPPORTED_LANGUAGES = ["en", "es", "pt", "pl", "ru"];
+// /lib/i18n/detectLanguage.ts
+export function detectLanguage(): string {
+  // Browser language detection
+  const browserLang = (typeof navigator !== "undefined" && navigator.language) 
+    ? navigator.language.split("-")[0] 
+    : "en";
 
-export function detectLanguage() {
-  if (typeof window === "undefined") {
-    return "en";
-  }
+  // Supported languages
+  const supported = ["en", "es", "pt", "pl", "ru"];
 
-  const saved = localStorage.getItem("site-language");
-
-  if (saved && SUPPORTED_LANGUAGES.includes(saved)) {
-    return saved;
-  }
-
-  const browser = navigator.language.split("-")[0];
-
-  if (SUPPORTED_LANGUAGES.includes(browser)) {
-    return browser;
-  }
-
-  return "en";
+  // Default fallback
+  return supported.includes(browserLang) ? browserLang : "en";
 }

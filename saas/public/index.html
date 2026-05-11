@@ -1,6 +1,4 @@
 
-
-
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
@@ -10,330 +8,272 @@
   <meta name="description" content="SignalBoost turns customer reviews into branded graphics, voice ads, and website starter pages for small businesses." />
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    :root{--bg:#eef1f5;--shell:#070a0f;--surface:#0c1118;--surface2:#111722;--text:#fff;--muted:#a9b3c1;--yellow:#f6b91a;--yellow2:#ffd34d;--border:rgba(255,255,255,.09);--goldBorder:rgba(246,185,26,.28);--font:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    :root{--shell:#070a0f;--surface2:#111722;--text:#fff;--muted:#a9b3c1;--yellow:#f6b91a;--yellow2:#ffd34d;--border:rgba(255,255,255,.09);--goldBorder:rgba(246,185,26,.28);--font:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
     html{scroll-behavior:smooth}
     body{min-height:100vh;font-family:var(--font);color:var(--text);background:linear-gradient(180deg,#f3f5f8,#dfe4eb);padding:24px}
+    a{color:inherit}
     .site-frame{max-width:1180px;margin:0 auto;background:radial-gradient(circle at 15% 18%,rgba(246,185,26,.12),transparent 28%),radial-gradient(circle at 84% 12%,rgba(59,130,246,.10),transparent 26%),var(--shell);border:1px solid rgba(255,255,255,.12);border-radius:28px;box-shadow:0 26px 80px rgba(0,0,0,.45);overflow:hidden}
-    .site-nav{height:54px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:1rem;padding:0 20px;background:rgba(5,8,12,.78);border-bottom:1px solid var(--border);backdrop-filter:blur(14px)}
+    .site-nav{min-height:54px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:1rem;padding:10px 20px;background:rgba(5,8,12,.78);border-bottom:1px solid var(--border);backdrop-filter:blur(14px);position:sticky;top:0;z-index:50}
     .brand{font-weight:950;font-size:.95rem;letter-spacing:-.04em}
-    .nav-links{display:flex;gap:1.15rem;align-items:center;justify-content:center;font-size:.72rem;font-weight:850;white-space:nowrap}.nav-links a{color:#f8fafc;text-decoration:none;opacity:.92}.nav-links a:hover{color:var(--yellow2)}
+    .nav-links{display:flex;gap:1.15rem;align-items:center;justify-content:center;font-size:.72rem;font-weight:850;white-space:nowrap}
+    .nav-links a{color:#f8fafc;text-decoration:none;opacity:.92}.nav-links a:hover{color:var(--yellow2)}
     .nav-actions{display:flex;align-items:center;justify-content:flex-end;gap:.45rem}
-    select,.theme-button,.login-dot{background:#111827;color:var(--text);border:1px solid var(--border);border-radius:999px;height:30px;font-size:.68rem;font-weight:800}select{padding:0 .55rem}.theme-button,.login-dot{width:30px;display:grid;place-items:center}.login-dot{background:rgba(246,185,26,.14);color:var(--yellow)}
+    #language-select,.theme-button,.login-dot{background:#111827;color:var(--text);border:1px solid var(--border);border-radius:999px;height:30px;font-size:.68rem;font-weight:800}
+    #language-select{padding:0 .55rem}.theme-button,.login-dot{width:30px;display:grid;place-items:center}.login-dot{background:rgba(246,185,26,.14);color:var(--yellow)}
+    .signup-nav-btn{background:linear-gradient(180deg,var(--yellow2),var(--yellow));color:#05070b!important;padding:.62rem 1rem;border-radius:999px;font-weight:950;box-shadow:0 8px 24px rgba(246,185,26,.22)}
     .page{padding:26px}.app-shell{background:linear-gradient(145deg,rgba(255,255,255,.04),rgba(255,255,255,.01)),rgba(8,12,18,.94);border:1px solid var(--border);border-radius:22px;padding:24px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
     .hero{display:grid;grid-template-columns:minmax(0,1.05fr) 390px;gap:28px;align-items:center;min-height:330px}
     .eyebrow{display:inline-flex;align-items:center;gap:.45rem;color:var(--yellow2);background:rgba(246,185,26,.12);border:1px solid var(--goldBorder);border-radius:999px;padding:.38rem .68rem;font-size:.7rem;font-weight:900;margin-bottom:1rem}
     h1{max-width:520px;font-size:clamp(2.7rem,5.7vw,4.8rem);line-height:.88;letter-spacing:-.075em;font-weight:950;margin-bottom:1rem}
     .hero p{color:var(--muted);max-width:500px;line-height:1.45;font-size:.98rem}
-    .hero-buttons{display:flex;flex-wrap:wrap;gap:.62rem;margin-top:1.25rem}.btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:999px;padding:.72rem .95rem;font-size:.78rem;font-weight:950;cursor:pointer;transition:.18s}.btn:hover{transform:translateY(-2px)}.btn-primary{background:linear-gradient(180deg,var(--yellow2),var(--yellow));color:#181006;box-shadow:0 10px 25px rgba(246,185,26,.16)}.btn-secondary{background:#141b25;color:#fff;border:1px solid var(--border)}
-    .trust-row{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;margin-top:1.45rem;color:var(--muted);font-size:.78rem;font-weight:800}.logo-word{color:#e5e7eb;opacity:.9;font-size:.9rem;font-weight:950;letter-spacing:-.04em}.shopify{color:#95bf47}.meta{color:#8fb6ff}.yelp{color:#ff5a5f}
-    .preview-wrap{display:grid;place-items:center}.preview-card{width:100%;background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.018)),var(--surface2);border:1px solid rgba(255,255,255,.10);border-radius:20px;padding:16px;box-shadow:0 24px 58px rgba(0,0,0,.36);position:relative;overflow:hidden}.preview-card:before{content:"";position:absolute;inset:-1px;background:radial-gradient(circle at 70% 0%,rgba(246,185,26,.16),transparent 35%);pointer-events:none}.preview-card>*{position:relative;z-index:1}.preview-badge{display:block;color:#dbe3ef;font-size:.78rem;font-weight:950;margin-bottom:.9rem}
+    .hero-buttons,.section-cta-row,.generator-actions{display:flex;flex-wrap:wrap;gap:.62rem;margin-top:1.25rem}
+    .btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:999px;padding:.72rem .95rem;font-size:.78rem;font-weight:950;cursor:pointer;transition:.18s}
+    .btn:hover{transform:translateY(-2px)}.btn-primary{background:linear-gradient(180deg,var(--yellow2),var(--yellow));color:#181006;box-shadow:0 10px 25px rgba(246,185,26,.16)}.btn-secondary{background:#141b25;color:#fff;border:1px solid var(--border)}
+    .trust-row{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;margin-top:1.45rem;color:var(--muted);font-size:.78rem;font-weight:800}.logo-word{font-size:.9rem;font-weight:950;letter-spacing:-.04em}.shopify{color:#95bf47}.meta{color:#8fb6ff}.yelp{color:#ff5a5f}
+    .preview-card{width:100%;background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.018)),var(--surface2);border:1px solid rgba(255,255,255,.10);border-radius:20px;padding:16px;box-shadow:0 24px 58px rgba(0,0,0,.36);position:relative;overflow:hidden}
+    .preview-badge{display:block;color:#dbe3ef;font-size:.78rem;font-weight:950;margin-bottom:.9rem}
     .review-box{background:#0b111a;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:.8rem;margin-bottom:.8rem}.stars{color:var(--yellow2);letter-spacing:.08em;font-size:.9rem;margin-bottom:.35rem}.review-quote{color:#e7edf7;font-size:.76rem;line-height:1.35;margin:0}
-    .promo{min-height:150px;border-radius:16px;padding:14px;display:flex;align-items:flex-end;background:linear-gradient(90deg,rgba(230,91,18,.97),rgba(255,171,53,.84)),#1a1a1a;margin-bottom:.75rem;position:relative;overflow:hidden}.promo:after{content:"";position:absolute;right:18px;bottom:0;width:112px;height:138px;border-radius:70px 70px 20px 20px;background:radial-gradient(circle at 50% 20%,#ffe6d1 0 16%,transparent 17%),linear-gradient(180deg,#f7f7f7 0 42%,#f97316 43% 100%);box-shadow:0 0 0 8px rgba(255,255,255,.12)}.promo h3{font-size:1.72rem;line-height:.88;letter-spacing:-.06em;text-shadow:0 2px 12px rgba(0,0,0,.35)}.promo p{color:#fff;font-size:1.55rem;font-weight:950;margin-top:.15rem;text-shadow:0 2px 12px rgba(0,0,0,.35)}
-    .audio-bar{height:34px;background:#0a0f16;border:1px solid rgba(255,255,255,.08);border-radius:999px;display:grid;grid-template-columns:28px 1fr 28px;align-items:center;gap:.55rem;padding:0 .55rem}.play{width:22px;height:22px;border-radius:50%;background:rgba(246,185,26,.18);color:var(--yellow2);display:grid;place-items:center;font-size:.68rem}.wave{height:5px;border-radius:999px;background:linear-gradient(90deg,var(--yellow) 0 38%,rgba(255,255,255,.12) 38% 100%);position:relative}.wave:after{content:"";position:absolute;left:38%;top:50%;width:10px;height:10px;background:#fff;border-radius:50%;transform:translate(-50%,-50%)}
-    .activity{margin-top:24px;border-top:1px solid var(--border);padding-top:18px}.activity h2{font-size:1rem;letter-spacing:-.03em;margin-bottom:12px}.activity-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}.activity-card{min-height:112px;background:linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.015)),var(--surface2);border:1px solid var(--border);border-radius:17px;padding:14px;overflow:hidden;box-shadow:0 16px 35px rgba(0,0,0,.20)}.activity-card p{color:var(--muted);font-size:.76rem;line-height:1.35;margin-top:.35rem;font-weight:750}.activity-card strong{display:block;font-size:.95rem;line-height:1.1}.quote-card{background:linear-gradient(135deg,rgba(246,185,26,.18),rgba(255,255,255,.02)),var(--surface2)}.audio-card{display:grid;grid-template-columns:54px 1fr;gap:.85rem;align-items:center}.mic{width:54px;height:54px;border-radius:16px;background:linear-gradient(180deg,rgba(246,185,26,.20),rgba(246,185,26,.06));display:grid;place-items:center;font-size:1.45rem;border:1px solid var(--goldBorder)}.mini-wave{margin-top:.7rem;height:4px;border-radius:999px;background:linear-gradient(90deg,var(--yellow) 0 45%,rgba(255,255,255,.12) 45% 100%)}.chart-card{position:relative}.chart-line{position:absolute;left:14px;right:14px;bottom:15px;height:42px}.chart-line svg{width:100%;height:100%;overflow:visible}
-    .sections{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}.section-card{background:rgba(17,23,34,.86);border:1px solid var(--border);border-radius:18px;padding:18px}.section-card h2{font-size:1rem;margin-bottom:.45rem}.section-card p{color:var(--muted);font-size:.82rem;line-height:1.45}.footer{text-align:center;color:var(--muted);padding:20px 1rem 24px;font-size:.78rem}
-    
-    .sections-full{display:grid;gap:16px;margin-top:18px}
-    .wide-section{background:rgba(17,23,34,.86);border:1px solid var(--border);border-radius:18px;padding:22px}
-    .wide-section h2{font-size:1.35rem;margin-bottom:.55rem}
-    .wide-section>p{color:var(--muted);font-size:.88rem;line-height:1.55;max-width:760px}
-    .step-grid,.feature-grid,.pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}
-    .deep-card{background:#0f141d;border:1px solid var(--border);border-radius:16px;padding:16px;min-height:145px}
-    .deep-card h3{font-size:1rem;margin-bottom:.45rem;color:#fff}
-    .deep-card p,.deep-card li{color:var(--muted);font-size:.82rem;line-height:1.45}
-    .deep-card ul{list-style:none;margin-top:.7rem}
-    .deep-card li{margin-bottom:.35rem}
-    .deep-card li:before{content:"✓ ";color:var(--yellow);font-weight:900}
-    .price{font-size:1.45rem;font-weight:950;color:var(--yellow2);margin:.5rem 0}
-    .section-cta-row{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:16px}
-    .login-panel{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center}
-    
-    .generator-highlight{background:linear-gradient(145deg,rgba(246,185,26,.13),rgba(255,255,255,.02)),rgba(17,23,34,.92);border:1px solid var(--goldBorder);border-radius:18px;padding:22px;margin-top:16px}
-    .generator-highlight h2{font-size:1.35rem;margin-bottom:.55rem}
-    .generator-highlight p{color:var(--muted);font-size:.88rem;line-height:1.55;max-width:780px}
-    .generator-actions{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:16px}
-
-    
-    .website-capability{background:linear-gradient(145deg,rgba(246,185,26,.13),rgba(255,255,255,.02)),rgba(17,23,34,.92);border:1px solid var(--goldBorder);border-radius:18px;padding:22px;margin-top:16px}
-    .website-capability h2{font-size:1.35rem;margin-bottom:.55rem}
-    .website-capability p{color:var(--muted);font-size:.88rem;line-height:1.55;max-width:820px}
-    .website-capability .capability-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}
-    .website-capability .capability-card{background:#0f141d;border:1px solid var(--border);border-radius:16px;padding:16px}
-    .website-capability .capability-card h3{font-size:1rem;margin-bottom:.45rem}
-    .website-capability .capability-card p{font-size:.8rem}
-    
-    .signup-nav-btn{background:linear-gradient(180deg,var(--yellow2),var(--yellow));color:#05070b!important;padding:.62rem 1rem;border-radius:999px;font-weight:950;box-shadow:0 8px 24px rgba(246,185,26,.22)}
-    .signup-nav-btn:hover{background:var(--yellow2);color:#05070b!important}
-
-
-    /* Embedded page panels keep the original SignalBoost design while making this a true one-file site. */
-    .embedded-page{scroll-margin-top:80px;background:linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.015)),rgba(17,23,34,.9);border:1px solid var(--border);border-radius:18px;padding:22px;margin-top:16px}
-    .embedded-page h2{font-size:1.35rem;margin-bottom:.55rem}
-    .embedded-page>p{color:var(--muted);font-size:.88rem;line-height:1.55;max-width:820px}
-    .embedded-form{max-width:520px;margin-top:16px;background:#0f141d;border:1px solid var(--border);border-radius:18px;padding:18px;display:grid;gap:12px}
-    .embedded-form label{font-size:.72rem;font-weight:900;color:#dbe3ef}
-    .embedded-form input,.embedded-form textarea,.embedded-form select{width:100%;height:auto;min-height:42px;border-radius:12px;border:1px solid var(--border);background:#111827;color:#fff;padding:.75rem;font-size:.85rem;font-weight:700}
-    .embedded-form textarea{min-height:96px;resize:vertical}
-    .embedded-form .btn{width:100%}
-    .dashboard-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:16px}
-    .stat-card{background:#0f141d;border:1px solid var(--border);border-radius:16px;padding:16px}
-    .stat-card strong{display:block;font-size:1.45rem;color:var(--yellow2);letter-spacing:-.04em}.stat-card span{display:block;color:var(--muted);font-size:.78rem;font-weight:800;margin-top:.25rem}
-    @media(max-width:900px){.dashboard-stats{grid-template-columns:1fr 1fr}}
-    @media(max-width:560px){.dashboard-stats{grid-template-columns:1fr}}
-
-    @media(max-width:900px){.website-capability .capability-grid{grid-template-columns:1fr}}
-
-    @media(max-width:900px){.step-grid,.feature-grid,.pricing-grid,.login-panel{grid-template-columns:1fr}}
-
-    @media(max-width:900px){body{padding:12px}.site-nav{height:auto;grid-template-columns:1fr;justify-items:center;padding:14px}.nav-links{display:flex;flex-wrap:wrap;gap:.7rem;justify-content:center;white-space:normal}.nav-actions{justify-content:center}.hero,.activity-grid,.sections{grid-template-columns:1fr}.hero{min-height:auto}.preview-card{max-width:430px}}
-    @media(max-width:560px){.site-frame{border-radius:20px}.page{padding:14px}.app-shell{padding:16px;border-radius:18px}h1{font-size:2.75rem}.hero-buttons{flex-direction:column}.btn{width:100%}.promo{min-height:128px}.promo:after{width:92px;height:116px;right:10px}}
+    .promo{min-height:150px;border-radius:16px;padding:14px;display:flex;align-items:flex-end;background:linear-gradient(90deg,rgba(230,91,18,.97),rgba(255,171,53,.84)),#1a1a1a;margin-bottom:.75rem;position:relative;overflow:hidden}
+    .promo:after{content:"";position:absolute;right:18px;bottom:0;width:112px;height:138px;border-radius:70px 70px 20px 20px;background:radial-gradient(circle at 50% 20%,#ffe6d1 0 16%,transparent 17%),linear-gradient(180deg,#f7f7f7 0 42%,#f97316 43% 100%);box-shadow:0 0 0 8px rgba(255,255,255,.12)}
+    .promo h3{font-size:1.72rem;line-height:.88;letter-spacing:-.06em;text-shadow:0 2px 12px rgba(0,0,0,.35)}.promo p{color:#fff;font-size:1.55rem;font-weight:950;margin-top:.15rem;text-shadow:0 2px 12px rgba(0,0,0,.35)}
+    .audio-bar{height:34px;background:#0a0f16;border:1px solid rgba(255,255,255,.08);border-radius:999px;display:grid;grid-template-columns:28px 1fr 28px;align-items:center;gap:.55rem;padding:0 .55rem}.play{width:22px;height:22px;border-radius:50%;background:rgba(246,185,26,.18);color:var(--yellow2);display:grid;place-items:center;font-size:.68rem}.wave{height:5px;border-radius:999px;background:linear-gradient(90deg,var(--yellow) 0 38%,rgba(255,255,255,.12) 38% 100%)}
+    .activity{margin-top:24px;border-top:1px solid var(--border);padding-top:18px}.activity h2{font-size:1rem;letter-spacing:-.03em;margin-bottom:12px}.activity-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+    .activity-card,.deep-card,.stat-card{background:linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.015)),var(--surface2);border:1px solid var(--border);border-radius:17px;padding:14px;overflow:hidden;box-shadow:0 16px 35px rgba(0,0,0,.20)}
+    .activity-card p,.deep-card p,.deep-card li{color:var(--muted);font-size:.82rem;line-height:1.45}.activity-card strong{display:block;font-size:.95rem;line-height:1.1}
+    .audio-card{display:grid;grid-template-columns:54px 1fr;gap:.85rem;align-items:center}.mic{width:54px;height:54px;border-radius:16px;background:linear-gradient(180deg,rgba(246,185,26,.20),rgba(246,185,26,.06));display:grid;place-items:center;font-size:1.45rem;border:1px solid var(--goldBorder)}.mini-wave{margin-top:.7rem;height:4px;border-radius:999px;background:linear-gradient(90deg,var(--yellow) 0 45%,rgba(255,255,255,.12) 45% 100%)}
+    .sections-full{display:grid;gap:16px;margin-top:18px}.wide-section,.embedded-page,.generator-highlight,.website-capability{background:rgba(17,23,34,.86);border:1px solid var(--border);border-radius:18px;padding:22px}
+    .generator-highlight,.website-capability{background:linear-gradient(145deg,rgba(246,185,26,.13),rgba(255,255,255,.02)),rgba(17,23,34,.92);border:1px solid var(--goldBorder)}
+    .wide-section h2,.embedded-page h2,.generator-highlight h2,.website-capability h2{font-size:1.35rem;margin-bottom:.55rem}
+    .wide-section>p,.embedded-page>p,.generator-highlight p,.website-capability p{color:var(--muted);font-size:.88rem;line-height:1.55;max-width:820px}
+    .step-grid,.feature-grid,.pricing-grid,.capability-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}
+    .deep-card{min-height:145px}.deep-card h3{font-size:1rem;margin-bottom:.45rem;color:#fff}.deep-card ul{list-style:none;margin-top:.7rem}.deep-card li{margin-bottom:.35rem}.deep-card li:before{content:"✓ ";color:var(--yellow);font-weight:900}
+    .price{font-size:1.45rem;font-weight:950;color:var(--yellow2);margin:.5rem 0}.login-panel{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center}
+    .embedded-page{scroll-margin-top:80px;background:linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.015)),rgba(17,23,34,.9)}
+    .embedded-form{max-width:520px;margin-top:16px;background:#0f141d;border:1px solid var(--border);border-radius:18px;padding:18px;display:grid;gap:12px}.embedded-form label{font-size:.72rem;font-weight:900;color:#dbe3ef}.embedded-form input{width:100%;min-height:42px;border-radius:12px;border:1px solid var(--border);background:#111827;color:#fff;padding:.75rem;font-size:.85rem;font-weight:700}.embedded-form .btn{width:100%}
+    .dashboard-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:16px}.stat-card strong{display:block;font-size:1.45rem;color:var(--yellow2);letter-spacing:-.04em}.stat-card span{display:block;color:var(--muted);font-size:.78rem;font-weight:800;margin-top:.25rem}
+    .footer{text-align:center;color:var(--muted);padding:20px 1rem 24px;font-size:.78rem}.footer a{color:#f6b91a;text-decoration:none;margin:0 8px}
+    @media(max-width:900px){body{padding:12px}.site-nav{height:auto;grid-template-columns:1fr;justify-items:center;padding:14px}.nav-links{display:flex;flex-wrap:wrap;gap:.7rem;justify-content:center;white-space:normal}.nav-actions{justify-content:center}.hero,.activity-grid,.step-grid,.feature-grid,.pricing-grid,.capability-grid,.login-panel{grid-template-columns:1fr}.hero{min-height:auto}.preview-card{max-width:430px}.dashboard-stats{grid-template-columns:1fr 1fr}}
+    @media(max-width:560px){.site-frame{border-radius:20px}.page{padding:14px}.app-shell{padding:16px;border-radius:18px}h1{font-size:2.75rem}.hero-buttons{flex-direction:column}.btn{width:100%}.promo{min-height:128px}.promo:after{width:92px;height:116px;right:10px}.dashboard-stats{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
-  <!-- UPDATED: links changed for Next.js routes: /signup, /login, /dashboard, /website-generator -->
-  <!-- FIXED: mobile signup visible -->
-  <!-- ROLLBACK CHECKPOINT: visible-signup-button -->
-  <!-- ROLLBACK CHECKPOINT: signup-flow-homepage -->
-  <!-- ROLLBACK CHECKPOINT: website-capability-copy -->
-  <!-- RESTORED MOCKUP MATCHED INDEX: working links added -->
   <div class="site-frame">
     <header class="site-nav">
       <div class="brand">SignalBoost</div>
-      <nav class="nav-links">
-        <a href="#home">Home</a><a href="#how-it-works">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#generator-page">Website Generator</a><a href="#dashboard-page">Dashboard</a>
-      <a class="signup-nav-btn" href="#signup-page">Sign Up</a><a href="#login-page">Login</a></nav>
-      <div class="nav-actions"><select aria-label="Language"><option>EN</option><option>ES</option><option>PT</option><option>PL</option><option>RU</option></select><button class="theme-button" type="button">🌙</button><span class="login-dot">▲</span></div>
+      <nav class="nav-links" aria-label="Main navigation">
+        <a href="#home" data-i18n="nav.home">Home</a>
+        <a href="#how-it-works" data-i18n="nav.how">How it works</a>
+        <a href="#features" data-i18n="nav.features">Features</a>
+        <a href="#pricing" data-i18n="nav.pricing">Pricing</a>
+        <a href="#generator-page" data-i18n="nav.generator">Website Generator</a>
+        <a href="#dashboard-page" data-i18n="nav.dashboard">Dashboard</a>
+        <a class="signup-nav-btn" href="#signup-page" data-i18n="nav.signup">Sign Up</a>
+        <a href="#login-page" data-i18n="nav.login">Login</a>
+      </nav>
+      <div class="nav-actions">
+        <select id="language-select" aria-label="Language">
+          <option value="en">EN</option><option value="es">ES</option><option value="pt">PT</option><option value="pl">PL</option><option value="ru">RU</option>
+        </select>
+        <button class="theme-button" type="button" aria-label="Theme">🌙</button><span class="login-dot">▲</span>
+      </div>
     </header>
+
     <main class="page" id="home">
       <section class="app-shell">
         <section class="hero">
           <div>
-            <span class="eyebrow">⚡ AI marketing website engine</span>
-            <h1>From Reviews to Revenue</h1>
-            <p>Turn customer reviews into branded graphics, authentic voice ads, and ready-to-launch website baselines with one powerful dashboard.</p>
-            <div class="hero-buttons"><a class="btn btn-primary" href="#signup-page">Sign Up Free</a><a class="btn btn-secondary" href="#generator-page">Generate a Website</a><a class="btn btn-secondary" href="#dashboard-page">Generate Voice Ad</a></div>
-            <div class="trust-row"><span>Trusted by:</span><span class="logo-word shopify">shopify</span><span class="logo-word meta">∞ Meta</span><span class="logo-word yelp">websites★</span></div>
-          </div>
-          <div class="preview-wrap">
-            <div class="preview-card">
-              <span class="preview-badge">Generated Content</span>
-              <div class="review-box"><div class="stars">★★★★★</div><p class="review-quote">“Amazing results! Our sales skyrocketed.”</p></div>
-              <div class="promo"><div><h3>SUMMER SALE</h3><p>50% OFF</p></div></div>
-              <div class="audio-bar" aria-label="Demo voice ad player"><span class="play">▶</span><span class="wave"></span><span style="font-size:.8rem;color:var(--muted)">🔊</span></div>
+            <span class="eyebrow" data-i18n="hero.eyebrow">⚡ AI marketing website engine</span>
+            <h1 data-i18n="hero.headline">From Reviews to Revenue</h1>
+            <p data-i18n="hero.subheadline">Turn customer reviews into branded graphics, authentic voice ads, and ready-to-launch website baselines with one powerful dashboard.</p>
+            <div class="hero-buttons">
+              <a class="btn btn-primary" href="#signup-page" data-i18n="hero.signup">Sign Up Free</a>
+              <a class="btn btn-secondary" href="#generator-page" data-i18n="hero.generateWebsite">Generate a Website</a>
+              <a class="btn btn-secondary" href="#dashboard-page" data-i18n="hero.generateVoice">Generate Voice Ad</a>
             </div>
+            <div class="trust-row"><span data-i18n="hero.trusted">Trusted by:</span><span class="logo-word shopify">shopify</span><span class="logo-word meta">∞ Meta</span><span class="logo-word yelp">websites★</span></div>
+          </div>
+
+          <div class="preview-card">
+            <span class="preview-badge" data-i18n="preview.generated">Generated Content</span>
+            <div class="review-box"><div class="stars">★★★★★</div><p class="review-quote" data-i18n="preview.quote">“Amazing results! Our sales skyrocketed.”</p></div>
+            <div class="promo"><div><h3 data-i18n="preview.sale">SUMMER SALE</h3><p>50% OFF</p></div></div>
+            <div class="audio-bar"><span class="play">▶</span><span class="wave"></span><span style="font-size:.8rem;color:var(--muted)">🔊</span></div>
           </div>
         </section>
+
         <section class="activity">
-          <h2>See SignalBoost in Action</h2>
+          <h2 data-i18n="activity.title">See SignalBoost in Action</h2>
           <div class="activity-grid">
-            <div class="activity-card quote-card"><div class="stars">★★★★★</div><p>“Fast, professional, easy from start to finish.”</p></div>
-            <div class="activity-card audio-card"><div class="mic">🎙️</div><div><strong>Engaging Voice Ad Created!</strong><p>Ready in seconds</p><div class="mini-wave"></div></div></div>
-            <div class="activity-card chart-card"><strong>1,200+ Plays</strong><p>This week</p><div class="chart-line"><svg viewBox="0 0 220 55" aria-hidden="true"><polyline points="0,45 35,35 70,40 105,24 140,30 175,15 220,9" fill="none" stroke="#facc15" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><g fill="#facc15"><circle cx="35" cy="35" r="4"/><circle cx="105" cy="24" r="4"/><circle cx="175" cy="15" r="4"/><circle cx="220" cy="9" r="4"/></g></svg></div></div>
+            <div class="activity-card"><div class="stars">★★★★★</div><p data-i18n="activity.review">“Fast, professional, easy from start to finish.”</p></div>
+            <div class="activity-card audio-card"><div class="mic">🎙️</div><div><strong data-i18n="activity.voiceTitle">Engaging Voice Ad Created!</strong><p data-i18n="activity.voiceSub">Ready in seconds</p><div class="mini-wave"></div></div></div>
+            <div class="activity-card"><strong data-i18n="activity.plays">1,200+ Plays</strong><p data-i18n="activity.week">This week</p></div>
           </div>
         </section>
       </section>
 
       <section class="sections-full">
         <section id="how-it-works" class="wide-section">
-          <h2>How it works</h2>
-          <p>SignalBoost turns customer reviews into reusable marketing assets in a simple workflow.</p>
-
+          <h2 data-i18n="how.title">How it works</h2>
+          <p data-i18n="how.subtitle">SignalBoost turns customer reviews into reusable marketing assets in a simple workflow.</p>
           <div class="step-grid">
-            <div class="deep-card">
-              <h3>1. Add a review</h3>
-              <p>Paste a customer review or save one inside your dashboard.</p>
-            </div>
-
-            <div class="deep-card">
-              <h3>2. Choose an output</h3>
-              <p>Create either a branded graphic or a voice ad from the same review.</p>
-            </div>
-
-            <div class="deep-card">
-              <h3>3. Preview and save</h3>
-              <p>Store finished assets securely and reuse them for campaigns.</p>
-            </div>
+            <div class="deep-card"><h3 data-i18n="how.step1Title">1. Add a review</h3><p data-i18n="how.step1Text">Paste a customer review or save one inside your dashboard.</p></div>
+            <div class="deep-card"><h3 data-i18n="how.step2Title">2. Choose an output</h3><p data-i18n="how.step2Text">Create either a branded graphic or a voice ad from the same review.</p></div>
+            <div class="deep-card"><h3 data-i18n="how.step3Title">3. Preview and save</h3><p data-i18n="how.step3Text">Store finished assets securely and reuse them for campaigns.</p></div>
           </div>
         </section>
 
         <section id="features" class="wide-section">
-          <h2>Features</h2>
-          <p>Built for businesses that want to turn real customer proof into branded content.</p>
-
+          <h2 data-i18n="features.title">Features</h2>
+          <p data-i18n="features.subtitle">Built for businesses that want to turn real customer proof into branded content.</p>
           <div class="feature-grid">
-            <div class="deep-card">
-              <h3>Branded graphics</h3>
-              <p>Turn reviews into polished visual content for social media, ads, and landing pages.</p>
-            </div>
-
-            <div class="deep-card">
-              <h3>Voice ads</h3>
-              <p>Create audio ad concepts from customer feedback and preview them in the dashboard.</p>
-            </div>
-
-            <div class="deep-card">
-              <h3>Private media storage</h3>
-              <p>Use private storage and signed URLs for uploaded audio and generated media.</p>
-            </div>
-
-            <div class="deep-card">
-              <h3>Multilingual support</h3>
-              <p>Prepare content experiences for English, Spanish, Portuguese, Polish, and Russian.</p>
-            </div>
-
-            <div class="deep-card">
-              <h3>Review dashboard</h3>
-              <p>Save, manage, and preview review content from one central workspace.</p>
-            </div>
-
-            <div class="deep-card">
-              <h3>Subscription ready</h3>
-              <p>Connect plans, billing, and customer access through your SaaS checkout flow.</p>
-            </div>
+            <div class="deep-card"><h3 data-i18n="features.graphicsTitle">Branded graphics</h3><p data-i18n="features.graphicsText">Turn reviews into polished visual content for social media, ads, and landing pages.</p></div>
+            <div class="deep-card"><h3 data-i18n="features.voiceTitle">Voice ads</h3><p data-i18n="features.voiceText">Create audio ad concepts from customer feedback and preview them in the dashboard.</p></div>
+            <div class="deep-card"><h3 data-i18n="features.storageTitle">Private media storage</h3><p data-i18n="features.storageText">Use private storage and signed URLs for uploaded audio and generated media.</p></div>
+            <div class="deep-card"><h3 data-i18n="features.languageTitle">Multilingual support</h3><p data-i18n="features.languageText">Prepare content experiences for English, Spanish, Portuguese, Polish, and Russian.</p></div>
+            <div class="deep-card"><h3 data-i18n="features.dashboardTitle">Review dashboard</h3><p data-i18n="features.dashboardText">Save, manage, and preview review content from one central workspace.</p></div>
+            <div class="deep-card"><h3 data-i18n="features.billingTitle">Subscription ready</h3><p data-i18n="features.billingText">Connect plans, billing, and customer access through your SaaS checkout flow.</p></div>
           </div>
         </section>
 
         <section id="pricing" class="wide-section">
-          <h2>Pricing</h2>
-          <p>Simple plan structure for launch. Final pricing can be adjusted before production checkout.</p>
-
+          <h2 data-i18n="pricing.title">Pricing</h2>
+          <p data-i18n="pricing.subtitle">Simple plan structure for launch. Final pricing can be adjusted before production checkout.</p>
           <div class="pricing-grid">
-            <div class="deep-card">
-              <h3>Starter</h3>
-              <div class="price">$19/mo</div>
-              <ul>
-                <li>Review dashboard</li>
-                <li>Branded graphics</li>
-                <li>Basic voice previews</li>
-              </ul>
-            </div>
-
-            <div class="deep-card">
-              <h3>Pro</h3>
-              <div class="price">$49/mo</div>
-              <ul>
-                <li>Everything in Starter</li>
-                <li>More content generation</li>
-                <li>Priority processing</li>
-              </ul>
-            </div>
-
-            <div class="deep-card">
-              <h3>Multi-location</h3>
-              <div class="price">$149/mo</div>
-              <ul>
-                <li>Multiple locations</li>
-                <li>Team workflows</li>
-                <li>Advanced dashboard tools</li>
-              </ul>
-            </div>
+            <div class="deep-card"><h3>Starter</h3><div class="price">$19/mo</div><ul><li data-i18n="pricing.reviewDashboard">Review dashboard</li><li data-i18n="pricing.brandedGraphics">Branded graphics</li><li data-i18n="pricing.basicVoice">Basic voice previews</li></ul></div>
+            <div class="deep-card"><h3>Pro</h3><div class="price">$49/mo</div><ul><li data-i18n="pricing.everythingStarter">Everything in Starter</li><li data-i18n="pricing.moreGeneration">More content generation</li><li data-i18n="pricing.priority">Priority processing</li></ul></div>
+            <div class="deep-card"><h3 data-i18n="pricing.multi">Multi-location</h3><div class="price">$149/mo</div><ul><li data-i18n="pricing.locations">Multiple locations</li><li data-i18n="pricing.teams">Team workflows</li><li data-i18n="pricing.advanced">Advanced dashboard tools</li></ul></div>
           </div>
         </section>
 
-        
         <section id="generator-page" class="generator-highlight">
-          <h2>Website Generator</h2>
-          <p>
-            Generate a simple website baseline from a business name, tagline,
-            customer reviews, brand color, and template choice.
-          </p>
+          <h2 data-i18n="generator.title">Website Generator</h2>
+          <p data-i18n="generator.subtitle">Generate a simple website baseline from a business name, tagline, customer reviews, brand color, and template choice.</p>
           <div class="generator-actions">
-            <a class="btn btn-primary" href="#generator-page">Open Website Generator</a>
-            <a class="btn btn-secondary" href="#dashboard-page">Create Branded Graphic</a>
-            <a class="btn btn-secondary" href="#dashboard-page">Generate Voice Ad</a>
+            <a class="btn btn-primary" href="#generator-page" data-i18n="generator.open">Open Website Generator</a>
+            <a class="btn btn-secondary" href="#dashboard-page" data-i18n="generator.graphic">Create Branded Graphic</a>
+            <a class="btn btn-secondary" href="#dashboard-page" data-i18n="generator.voice">Generate Voice Ad</a>
           </div>
         </section>
 
-
-        
         <section id="website-capability" class="website-capability">
-          <h2>Create Website Starters from Reviews</h2>
-          <p>
-            SignalBoost can generate simple multi-page website baselines from
-            business details, services, brand colors, customer reviews, and contact information.
-            Start with a business intake form, preview the homepage, then export a website package.
-          </p>
+          <h2 data-i18n="website.title">Create Website Starters from Reviews</h2>
+          <p data-i18n="website.subtitle">SignalBoost can generate simple multi-page website baselines from business details, services, brand colors, customer reviews, and contact information.</p>
           <div class="capability-grid">
-            <div class="capability-card"><h3>Business Intake</h3><p>Collect the details needed to create a useful website baseline.</p></div>
-            <div class="capability-card"><h3>Multi-page Output</h3><p>Generate homepage, features, pricing, contact, privacy, terms, and stylesheet files.</p></div>
-            <div class="capability-card"><h3>Preview + Export</h3><p>Preview the generated homepage and download the website package.</p></div>
-          </div>
-          <div class="generator-actions" style="display:flex;flex-wrap:wrap;gap:.7rem;margin-top:16px;">
-            <a class="btn btn-primary" href="#signup-page">Sign Up Free</a>
-            <a class="btn btn-secondary" href="#generator-page">Open Website Generator</a>
-            <a class="btn btn-secondary" href="#generator-page">Business Intake</a>
+            <div class="deep-card"><h3 data-i18n="website.intakeTitle">Business Intake</h3><p data-i18n="website.intakeText">Collect the details needed to create a useful website baseline.</p></div>
+            <div class="deep-card"><h3 data-i18n="website.pagesTitle">Multi-page Output</h3><p data-i18n="website.pagesText">Generate homepage, features, pricing, contact, privacy, terms, and stylesheet files.</p></div>
+            <div class="deep-card"><h3 data-i18n="website.exportTitle">Preview + Export</h3><p data-i18n="website.exportText">Preview the generated homepage and download the website package.</p></div>
           </div>
         </section>
-
-
 
         <section id="dashboard-page" class="embedded-page">
-          <h2>Dashboard</h2>
-          <p>Manage reviews, generated graphics, voice ads, website projects, and campaign activity from one embedded workspace.</p>
+          <h2 data-i18n="dashboard.title">Dashboard</h2>
+          <p data-i18n="dashboard.subtitleFull">Manage reviews, generated graphics, voice ads, website projects, and campaign activity from one embedded workspace.</p>
           <div class="dashboard-stats">
-            <div class="stat-card"><strong>24</strong><span>Saved Reviews</span></div>
-            <div class="stat-card"><strong>12</strong><span>Graphics Created</span></div>
-            <div class="stat-card"><strong>8</strong><span>Voice Ads</span></div>
-            <div class="stat-card"><strong>3</strong><span>Website Drafts</span></div>
-          </div>
-          <div class="feature-grid">
-            <div class="deep-card"><h3>Recent Reviews</h3><p>Review new customer proof and choose which comments to turn into content.</p></div>
-            <div class="deep-card"><h3>Generated Assets</h3><p>Preview saved graphics, website drafts, and audio concepts in one place.</p></div>
-            <div class="deep-card"><h3>Campaign Tools</h3><p>Prepare content for social media, landing pages, and local advertising.</p></div>
+            <div class="stat-card"><strong>24</strong><span data-i18n="dashboard.savedReviews">Saved Reviews</span></div>
+            <div class="stat-card"><strong>12</strong><span data-i18n="dashboard.graphics">Graphics Created</span></div>
+            <div class="stat-card"><strong>8</strong><span data-i18n="dashboard.voiceAds">Voice Ads</span></div>
+            <div class="stat-card"><strong>3</strong><span data-i18n="dashboard.websiteDrafts">Website Drafts</span></div>
           </div>
         </section>
 
         <section id="signup-page" class="embedded-page">
-          <h2>Sign Up</h2>
-          <p>Create a SignalBoost account to save generated websites, graphics, reviews, and voice ads.</p>
+          <h2 data-i18n="signup.title">Sign Up</h2>
+          <p data-i18n="signup.subtitle">Create a SignalBoost account to save generated websites, graphics, reviews, and voice ads.</p>
           <form class="embedded-form">
-            <label for="signup-name">Full name</label>
-            <input id="signup-name" type="text" placeholder="Your name" />
-            <label for="signup-email">Email</label>
-            <input id="signup-email" type="email" placeholder="you@example.com" />
-            <label for="signup-password">Password</label>
-            <input id="signup-password" type="password" placeholder="Create a password" />
-            <button class="btn btn-primary" type="button">Create Account</button>
+            <label for="signup-name" data-i18n="signup.name">Full name</label><input id="signup-name" type="text" placeholder="Your name" data-i18n-placeholder="signup.namePlaceholder" />
+            <label for="signup-email" data-i18n="signup.email">Email</label><input id="signup-email" type="email" placeholder="you@example.com" />
+            <label for="signup-password" data-i18n="signup.password">Password</label><input id="signup-password" type="password" placeholder="Create a password" data-i18n-placeholder="signup.passwordPlaceholder" />
+            <button class="btn btn-primary" type="button" data-i18n="signup.button">Create Account</button>
           </form>
         </section>
 
         <section id="login-page" class="embedded-page">
-          <h2>Login</h2>
-          <p>Access your SignalBoost dashboard and continue working on your saved marketing assets.</p>
+          <h2 data-i18n="login.title">Login</h2>
+          <p data-i18n="login.subtitle">Access your SignalBoost dashboard and continue working on your saved marketing assets.</p>
           <form class="embedded-form">
-            <label for="login-email">Email</label>
-            <input id="login-email" type="email" placeholder="you@example.com" />
-            <label for="login-password">Password</label>
-            <input id="login-password" type="password" placeholder="Your password" />
-            <button class="btn btn-primary" type="button">Login</button>
+            <label for="login-email" data-i18n="signup.email">Email</label><input id="login-email" type="email" placeholder="you@example.com" />
+            <label for="login-password" data-i18n="signup.password">Password</label><input id="login-password" type="password" placeholder="Your password" data-i18n-placeholder="login.passwordPlaceholder" />
+            <button class="btn btn-primary" type="button" data-i18n="login.button">Login</button>
           </form>
         </section>
 
-        <section id="login-cta" class="wide-section">
+        <section class="wide-section">
           <div class="login-panel">
-            <div>
-              <h2>Ready to build with SignalBoost?</h2>
-              <p>Log in or create an account to start turning reviews into branded graphics and voice ads.</p>
-            </div>
-
-            <div class="section-cta-row">
-              <a class="btn btn-primary" href="#login-page">Login</a>
-              <a class="btn btn-secondary" href="#dashboard-page">Start Graphics</a>
-              <a class="btn btn-secondary" href="#dashboard-page">Start Voice Ad</a>
-            </div>
+            <div><h2 data-i18n="cta.title">Ready to build with SignalBoost?</h2><p data-i18n="cta.subtitle">Log in or create an account to start turning reviews into branded graphics and voice ads.</p></div>
+            <div class="section-cta-row"><a class="btn btn-primary" href="#login-page" data-i18n="login.button">Login</a><a class="btn btn-secondary" href="#dashboard-page" data-i18n="cta.graphics">Start Graphics</a><a class="btn btn-secondary" href="#dashboard-page" data-i18n="cta.voice">Start Voice Ad</a></div>
           </div>
         </section>
       </section>
-
     </main>
+
     <footer class="footer">
-      <div style="margin-bottom:8px;">
-        <a href="/privacy" style="color:#f6b91a;text-decoration:none;margin:0 8px;">Privacy</a>
-        <a href="/terms" style="color:#f6b91a;text-decoration:none;margin:0 8px;">Terms</a>
-        <a href="/contact" style="color:#f6b91a;text-decoration:none;margin:0 8px;">Contact</a>
-      </div>
-      © 2026 SignalBoost. All rights reserved.
+      <div><a href="/privacy" data-i18n="footer.privacy">Privacy</a><a href="/terms" data-i18n="footer.terms">Terms</a><a href="/contact" data-i18n="footer.contact">Contact</a></div>
+      <span data-i18n="footer.rights">© 2026 SignalBoost. All rights reserved.</span>
     </footer>
   </div>
+
+  <script>
+    const FALLBACK_TRANSLATIONS = {
+      en: {
+        "nav.home":"Home","nav.how":"How it works","nav.features":"Features","nav.pricing":"Pricing","nav.generator":"Website Generator","nav.dashboard":"Dashboard","nav.signup":"Sign Up","nav.login":"Login",
+        "hero.eyebrow":"⚡ AI marketing website engine","hero.headline":"From Reviews to Revenue","hero.subheadline":"Turn customer reviews into branded graphics, authentic voice ads, and ready-to-launch website baselines with one powerful dashboard.","hero.signup":"Sign Up Free","hero.generateWebsite":"Generate a Website","hero.generateVoice":"Generate Voice Ad","hero.trusted":"Trusted by:",
+        "preview.generated":"Generated Content","preview.quote":"“Amazing results! Our sales skyrocketed.”","preview.sale":"SUMMER SALE",
+        "activity.title":"See SignalBoost in Action","activity.review":"“Fast, professional, easy from start to finish.”","activity.voiceTitle":"Engaging Voice Ad Created!","activity.voiceSub":"Ready in seconds","activity.plays":"1,200+ Plays","activity.week":"This week",
+        "how.title":"How it works","how.subtitle":"SignalBoost turns customer reviews into reusable marketing assets in a simple workflow.","how.step1Title":"1. Add a review","how.step1Text":"Paste a customer review or save one inside your dashboard.","how.step2Title":"2. Choose an output","how.step2Text":"Create either a branded graphic or a voice ad from the same review.","how.step3Title":"3. Preview and save","how.step3Text":"Store finished assets securely and reuse them for campaigns.",
+        "features.title":"Features","features.subtitle":"Built for businesses that want to turn real customer proof into branded content.","features.graphicsTitle":"Branded graphics","features.graphicsText":"Turn reviews into polished visual content for social media, ads, and landing pages.","features.voiceTitle":"Voice ads","features.voiceText":"Create audio ad concepts from customer feedback and preview them in the dashboard.","features.storageTitle":"Private media storage","features.storageText":"Use private storage and signed URLs for uploaded audio and generated media.","features.languageTitle":"Multilingual support","features.languageText":"Prepare content experiences for English, Spanish, Portuguese, Polish, and Russian.","features.dashboardTitle":"Review dashboard","features.dashboardText":"Save, manage, and preview review content from one central workspace.","features.billingTitle":"Subscription ready","features.billingText":"Connect plans, billing, and customer access through your SaaS checkout flow.",
+        "pricing.title":"Pricing","pricing.subtitle":"Simple plan structure for launch. Final pricing can be adjusted before production checkout.","pricing.reviewDashboard":"Review dashboard","pricing.brandedGraphics":"Branded graphics","pricing.basicVoice":"Basic voice previews","pricing.everythingStarter":"Everything in Starter","pricing.moreGeneration":"More content generation","pricing.priority":"Priority processing","pricing.multi":"Multi-location","pricing.locations":"Multiple locations","pricing.teams":"Team workflows","pricing.advanced":"Advanced dashboard tools",
+        "generator.title":"Website Generator","generator.subtitle":"Generate a simple website baseline from a business name, tagline, customer reviews, brand color, and template choice.","generator.open":"Open Website Generator","generator.graphic":"Create Branded Graphic","generator.voice":"Generate Voice Ad",
+        "website.title":"Create Website Starters from Reviews","website.subtitle":"SignalBoost can generate simple multi-page website baselines from business details, services, brand colors, customer reviews, and contact information.","website.intakeTitle":"Business Intake","website.intakeText":"Collect the details needed to create a useful website baseline.","website.pagesTitle":"Multi-page Output","website.pagesText":"Generate homepage, features, pricing, contact, privacy, terms, and stylesheet files.","website.exportTitle":"Preview + Export","website.exportText":"Preview the generated homepage and download the website package.",
+        "dashboard.title":"Dashboard","dashboard.subtitleFull":"Manage reviews, generated graphics, voice ads, website projects, and campaign activity from one embedded workspace.","dashboard.savedReviews":"Saved Reviews","dashboard.graphics":"Graphics Created","dashboard.voiceAds":"Voice Ads","dashboard.websiteDrafts":"Website Drafts",
+        "signup.title":"Sign Up","signup.subtitle":"Create a SignalBoost account to save generated websites, graphics, reviews, and voice ads.","signup.name":"Full name","signup.namePlaceholder":"Your name","signup.email":"Email","signup.password":"Password","signup.passwordPlaceholder":"Create a password","signup.button":"Create Account",
+        "login.title":"Login","login.subtitle":"Access your SignalBoost dashboard and continue working on your saved marketing assets.","login.passwordPlaceholder":"Your password","login.button":"Login",
+        "cta.title":"Ready to build with SignalBoost?","cta.subtitle":"Log in or create an account to start turning reviews into branded graphics and voice ads.","cta.graphics":"Start Graphics","cta.voice":"Start Voice Ad",
+        "footer.privacy":"Privacy","footer.terms":"Terms","footer.contact":"Contact","footer.rights":"© 2026 SignalBoost. All rights reserved."
+      }
+    };
+
+    async function loadLang(lang) {
+      try {
+        const res = await fetch(`/i18n/${lang}.json`, { cache: "no-store" });
+        if (!res.ok) throw new Error("missing language file");
+        const external = await res.json();
+        return { ...FALLBACK_TRANSLATIONS.en, ...external };
+      } catch (e) {
+        return FALLBACK_TRANSLATIONS.en;
+      }
+    }
+
+    function detectLang() {
+      const supported = ["en","es","pt","pl","ru"];
+      const saved = localStorage.getItem("site-language");
+      if (saved && supported.includes(saved)) return saved;
+      const browser = (navigator.language || "en").split("-")[0];
+      return supported.includes(browser) ? browser : "en";
+    }
+
+    async function applyLanguage(lang) {
+      const dict = await loadLang(lang);
+      document.documentElement.lang = lang;
+      localStorage.setItem("site-language", lang);
+      const selector = document.getElementById("language-select");
+      if (selector) selector.value = lang;
+
+      document.querySelectorAll("[data-i18n]").forEach(el => {
+        const key = el.getAttribute("data-i18n");
+        if (dict[key]) el.textContent = dict[key];
+      });
+
+      document.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
+        const key = el.getAttribute("data-i18n-placeholder");
+        if (dict[key]) el.setAttribute("placeholder", dict[key]);
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const selector = document.getElementById("language-select");
+      applyLanguage(detectLang());
+      if (selector) selector.addEventListener("change", e => applyLanguage(e.target.value));
+    });
+  </script>
 </body>
 </html>

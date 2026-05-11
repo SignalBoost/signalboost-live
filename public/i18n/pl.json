@@ -1,0 +1,30 @@
+{
+  "dashboard.title": "Panel główny",
+  "dashboard.subtitle": "Zarządzaj swoimi projektami i automatyzacjami",
+
+  "nav.dashboard": "Panel",
+  "nav.projects": "Projekty",
+  "nav.automations": "Automatyzacje",
+  "nav.courses": "Kursy",
+  "nav.billing": "Płatności",
+  "nav.settings": "Ustawienia",
+
+  "projects.title": "Projekty",
+  "projects.create": "Utwórz projekt",
+  "projects.empty": "Brak projektów.",
+
+  "editor.save": "Zapisz",
+  "editor.generating": "Generowanie...",
+  "editor.preview": "Podgląd",
+
+  "billing.title": "Płatności i plany",
+  "billing.upgrade": "Ulepsz plan",
+  "billing.current": "Aktualny plan",
+
+  "mobile.install": "Zainstaluj aplikację",
+
+  "common.loading": "Ładowanie...",
+  "common.cancel": "Anuluj",
+  "common.delete": "Usuń",
+  "common.edit": "Edytuj"
+}

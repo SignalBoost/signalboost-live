@@ -1,10 +1,4 @@
-const SUPPORTED_LANGUAGES = [
-  "en",
-  "es",
-  "pt",
-  "pl",
-  "ru"
-];
+const SUPPORTED_LANGUAGES = ["en", "es", "pt", "pl", "ru"];
 
 export function detectLanguage() {
   if (typeof window === "undefined") {
@@ -13,18 +7,13 @@ export function detectLanguage() {
 
   const saved = localStorage.getItem("site-language");
 
-  if (
-    saved &&
-    SUPPORTED_LANGUAGES.includes(saved)
-  ) {
+  if (saved && SUPPORTED_LANGUAGES.includes(saved)) {
     return saved;
   }
 
   const browser = navigator.language.split("-")[0];
 
-  if (
-    SUPPORTED_LANGUAGES.includes(browser)
-  ) {
+  if (SUPPORTED_LANGUAGES.includes(browser)) {
     return browser;
   }
 

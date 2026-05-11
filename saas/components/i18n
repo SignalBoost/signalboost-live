@@ -1,0 +1,23 @@
+saas/
+  app/
+
+  components/
+    Nav.js
+    i18n/
+      I18nProvider.tsx
+      LanguageSwitcher.tsx
+
+  lib/
+    supabaseClient.js
+    i18n/
+      detectLanguage.ts
+      loadLanguage.ts
+      useTranslation.ts
+
+  public/
+    i18n/
+      en.json
+      es.json
+      pt.json
+      pl.json
+      ru.json

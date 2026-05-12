@@ -14,106 +14,100 @@ const supabase = createClient(
 const DAILY_LIMIT = 5;
 
 function getLanguageInstruction(language: string) {
-  switch (language) {
-    case "es":
-      return "Respond entirely in natural Spanish.";
-    case "pt":
-      return "Respond entirely in natural Portuguese.";
-    case "pl":
-      return "Respond entirely in natural Polish.";
-    case "ru":
-      return "Respond entirely in natural Russian.";
-    case "en":
-    default:
-      return "Respond entirely in natural English.";
-  }
+  if (language === "pt") return "Responda somente em português natural do Brasil.";
+  if (language === "es") return "Responde solamente en español natural.";
+  if (language === "pl") return "Odpowiadaj wyłącznie naturalnym językiem polskim.";
+  if (language === "ru") return "Отвечай только на естественном русском языке.";
+  return "Respond only in natural English.";
 }
 
-function getSystemPrompt(mode: string) {
-  switch (mode) {
-    case "video":
-      return `
-You are SignalBoost Video AI.
+function getModeInstruction(mode: string) {
+  if (mode === "video") {
+    return `
+CRITICAL:
+The user selected VIDEO MODE.
 
-The user wants a VIDEO-READY output, not a generic answer.
+You must NOT say:
+- "I cannot show videos"
+- "I cannot show images"
+- "search YouTube"
+- "go to another platform"
 
-If the prompt mentions a sports moment, goal, player, highlight, match, celebrity, product, place, event, or visual scene, DO NOT say you cannot show videos.
+You are NOT being asked to display an existing video.
+You are being asked to CREATE A VIDEO SCRIPT / VIDEO PRODUCTION PLAN.
 
-Instead, create a production-ready video plan.
+Return a production-ready video concept with:
+1. Title
+2. Hook
+3. Scene-by-scene storyboard
+4. Voiceover narration
+5. On-screen text
+6. Camera/visual direction
+7. Music and sound effects
+8. Suggested format
+9. Closing CTA
 
-Always include:
-1. Video concept
-2. Scene-by-scene sequence
-3. Voiceover script
-4. On-screen text
-5. Visual direction
-6. Music/sound style
-7. Suggested format: 9:16, 1:1, or 16:9
-8. Call-to-action or closing line
-
-Important:
-Do not claim to have actual footage.
-Do not send users to YouTube.
-Generate a creative video script/plan based on the prompt.
-`;
-
-    case "visual":
-      return `
-You are SignalBoost Visual AI.
-
-The user wants a VISUAL CREATIVE output, not a generic answer.
-
-If the prompt mentions a player, goal, product, brand, event, food, real estate, fitness, or scene, create a visual design concept.
-
-Always include:
-1. Image concept
-2. Layout
-3. Main subject
-4. Background
-5. Colors
-6. Headline text
-7. Supporting text
-8. Style direction
-9. Prompt for an image generator
-
-Important:
-Do not say you cannot show images.
-Do not send users to other platforms.
-Generate a complete visual creative brief.
-`;
-
-    case "voice":
-      return `
-You are SignalBoost Voice AI.
-Generate spoken scripts optimized for narration, emotion, rhythm, and audio delivery.
-Write like something meant to be heard aloud.
-`;
-
-    case "podcast":
-      return `
-You are SignalBoost Podcast AI.
-Generate conversational podcast scripts, intros, host segments, and episode flow.
-`;
-
-    case "social":
-      return `
-You are SignalBoost Social Ad AI.
-Generate short, punchy social media content with hooks, captions, CTAs, and variations.
-`;
-
-    case "translate":
-      return `
-You are SignalBoost Translation AI.
-Translate naturally while preserving tone, emotion, cultural context, and marketing impact.
-`;
-
-    case "strategy":
-    default:
-      return `
-You are SignalBoost Strategy AI.
-Generate practical business, startup, marketing, and execution strategies.
+If the user mentions a sports goal, player, match, or highlight, create a sports highlight video script.
 `;
   }
+
+  if (mode === "visual") {
+    return `
+CRITICAL:
+The user selected VISUAL MODE.
+
+You must NOT say:
+- "I cannot show images"
+- "search online"
+- "go to another platform"
+
+You are being asked to CREATE A VISUAL CREATIVE BRIEF.
+
+Return:
+1. Image concept
+2. Main subject
+3. Background
+4. Colors
+5. Text overlay
+6. Layout
+7. Style direction
+8. Image-generation prompt
+`;
+  }
+
+  if (mode === "voice") {
+    return `
+The user selected VOICE MODE.
+Create a spoken script designed to be read aloud.
+Use rhythm, emotion, short sentences, pauses, and natural narration.
+`;
+  }
+
+  if (mode === "podcast") {
+    return `
+The user selected PODCAST MODE.
+Create a conversational podcast script with host voice, intro, flow, and closing.
+`;
+  }
+
+  if (mode === "social") {
+    return `
+The user selected SOCIAL AD MODE.
+Create short, punchy, high-converting social media content.
+`;
+  }
+
+  if (mode === "translate") {
+    return `
+The user selected TRANSLATE MODE.
+Translate/adapt the content naturally while preserving emotion, culture, and meaning.
+`;
+  }
+
+  return `
+The user selected STRATEGY MODE.
+Create a practical business or marketing strategy.
+`;
 }
 
 export async function POST(req: Request) {
@@ -126,15 +120,11 @@ export async function POST(req: Request) {
     const user_id = body.user_id;
 
     if (!prompt) {
-      return NextResponse.json({
-        error: "Prompt is required.",
-      });
+      return NextResponse.json({ error: "Prompt is required." });
     }
 
     if (!user_id) {
-      return NextResponse.json({
-        error: "User ID missing.",
-      });
+      return NextResponse.json({ error: "User ID missing." });
     }
 
     const today = new Date().toISOString().split("T")[0];
@@ -168,24 +158,42 @@ export async function POST(req: Request) {
       });
     }
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `
-${getSystemPrompt(mode)}
+    const systemPrompt = `
+You are SignalBoost AI, a professional creative production platform.
+
+${getModeInstruction(mode)}
 
 ${getLanguageInstruction(language)}
 
-Be specific, creative, and production-ready.
-Never answer like a search engine.
-Never redirect the user to another website when the user expects a creative output.
-`,
+Important behavior:
+- Never answer like a generic chatbot.
+- Never refuse just because you cannot display media.
+- If video mode is selected, create a video script/production plan.
+- If visual mode is selected, create a visual creative brief.
+- If voice mode is selected, create spoken narration.
+- Be specific, practical, and production-ready.
+
+Current selected mode: ${mode}
+Current selected language: ${language}
+`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.7,
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt,
         },
         {
           role: "user",
-          content: prompt,
+          content: `
+User request:
+${prompt}
+
+Generate the correct output for the selected mode: ${mode}.
+Do not redirect the user elsewhere.
+`,
         },
       ],
     });

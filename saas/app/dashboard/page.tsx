@@ -9,7 +9,7 @@ export default function DashboardPage() {
 
   return (
     <section style={{ padding: "40px", background: "#05070b", minHeight: "100vh", color: "white" }}>
-      <p style={{ color: "red", fontSize: "20px" }}>TEST VERSION 123</p>
+      <p style={{ color: "red", fontSize: "20px" 
 
       <h1 style={{ fontSize: "40px", color: "#FFD700" }}>Dashboard</h1>
 

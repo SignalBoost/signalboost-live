@@ -1,24 +1,38 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+export async function GET(
+  req: Request,
+  { params }: { params: { provider: string } }
+) {
+  try {
+    const provider = params.provider as any;
 
-export async function GET(req: Request, { params }: { params: { provider: string } }) {
-  const { provider } = params;
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      },
+    });
 
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider, // "github", "google", "facebook", "azure", etc.
-    options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
-    },
-  });
+    if (error) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: error.message,
+        },
+        { status: 500 }
+      );
+    }
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.redirect(data.url);
+  } catch (error: any) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message,
+      },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.redirect(data.url);
 }

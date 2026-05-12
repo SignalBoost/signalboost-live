@@ -16,16 +16,16 @@ const DAILY_LIMIT = 5;
 function getLanguageInstruction(language: string) {
   switch (language) {
     case "es":
-      return "Respond entirely in natural Spanish.";
+      return "Always respond in fluent Spanish. Never use English.";
     case "pt":
-      return "Respond entirely in natural Portuguese.";
+      return "Always respond in fluent Brazilian Portuguese. Never use English.";
     case "pl":
-      return "Respond entirely in natural Polish.";
+      return "Always respond in fluent Polish. Never use English.";
     case "ru":
-      return "Respond entirely in natural Russian.";
+      return "Always respond in fluent Russian. Never use English.";
     case "en":
     default:
-      return "Respond entirely in natural English.";
+      return "Always respond in fluent English.";
   }
 }
 
@@ -35,23 +35,39 @@ function getSystemPrompt(mode: string) {
       return "You are SignalBoost Voice AI. Generate spoken scripts optimized for narration, rhythm, emotion, and audio delivery.";
 
     case "video":
-      return "You are SignalBoost Video AI. Generate a video script and production plan. Do not claim to display actual video footage.";
+      return "You are SignalBoost Video AI. Generate video scripts and production plans. Do not claim to display or show actual video footage.";
 
     case "podcast":
       return "You are SignalBoost Podcast AI. Generate conversational podcast scripts, intros, host segments, and episode flow.";
 
     case "social":
-      return "You are SignalBoost Social Ad AI. Generate short, punchy social media content, hooks, captions, CTAs, and ad variations.";
+      return "You are SignalBoost Social Ad AI. Generate social media ads, hooks, captions, CTAs, and short campaign variations.";
 
     case "visual":
-      return "You are SignalBoost Visual AI. Generate visual creative direction, image concepts, layouts, colors, headlines, and design prompts.";
+      return "You are SignalBoost Visual AI. Generate visual creative briefs, image concepts, layouts, colors, headlines, and image prompts.";
 
     case "translate":
-      return "You are SignalBoost Translation AI. Translate and culturally adapt content while preserving tone, meaning, and marketing impact.";
+      return "You are SignalBoost Translation AI. Translate and culturally adapt content while preserving tone, meaning, and emotional impact.";
 
     case "strategy":
     default:
       return "You are SignalBoost Strategy AI. Generate practical business, startup, marketing, and execution strategies.";
+  }
+}
+
+function getLanguageName(language: string) {
+  switch (language) {
+    case "es":
+      return "Spanish";
+    case "pt":
+      return "Brazilian Portuguese";
+    case "pl":
+      return "Polish";
+    case "ru":
+      return "Russian";
+    case "en":
+    default:
+      return "English";
   }
 }
 
@@ -65,11 +81,15 @@ export async function POST(req: Request) {
     const user_id = body.user_id;
 
     if (!prompt) {
-      return NextResponse.json({ error: "Prompt is required." });
+      return NextResponse.json({
+        error: "Prompt is required.",
+      });
     }
 
     if (!user_id) {
-      return NextResponse.json({ error: "User ID missing." });
+      return NextResponse.json({
+        error: "User ID missing.",
+      });
     }
 
     const today = new Date().toISOString().split("T")[0];
@@ -105,16 +125,19 @@ export async function POST(req: Request) {
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
+      temperature: 0.3,
       messages: [
         {
           role: "system",
-          content: `
-${getSystemPrompt(mode)}
-
-${getLanguageInstruction(language)}
-
-Adapt naturally for the selected language and audience.
-`,
+          content: `${getSystemPrompt(mode)}\n${getLanguageInstruction(
+            language
+          )}`,
+        },
+        {
+          role: "system",
+          content: `IMPORTANT: Respond ONLY in ${getLanguageName(
+            language
+          )}. Never use another language.`,
         },
         {
           role: "user",

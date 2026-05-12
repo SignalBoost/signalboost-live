@@ -1,51 +1,33 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
-  async function handleLogin() {
-    alert("LOGIN BUTTON WORKS");
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
 
-    try {
-      setMessage("Logging in...");
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password }),
+    });
 
-      const { data, error } =
-        await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+    const data = await res.json();
 
-      console.log("LOGIN RESPONSE:", data);
-      console.log("LOGIN ERROR:", error);
-
-      if (error) {
-        setMessage(error.message);
-        alert(error.message);
-        return;
-      }
-
-      if (!data.session) {
-        setMessage("No session created.");
-        alert("No session created.");
-        return;
-      }
-
-      setMessage("SUCCESS");
-
-      alert("LOGIN SUCCESS");
-
-      window.location.href = "/dashboard";
-    } catch (err) {
-      console.error(err);
-
-      alert("LOGIN CRASHED");
-
-      setMessage("Something crashed.");
+    if (data.success) {
+      router.push(data.redirect);
+    } else {
+      setError(data.error || "Login failed");
     }
   }
 
@@ -60,7 +42,8 @@ export default function LoginPage() {
         padding: "20px",
       }}
     >
-      <div
+      <form
+        onSubmit={handleLogin}
         style={{
           width: "100%",
           maxWidth: "420px",
@@ -79,52 +62,37 @@ export default function LoginPage() {
         </h1>
 
         <input
-          placeholder="Email"
+          type="email"
           value={email}
-          onChange={(e) =>
-            setEmail(e.target.value)
-          }
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email"
+          required
           style={input}
         />
 
         <input
           type="password"
-          placeholder="Password"
           value={password}
-          onChange={(e) =>
-            setPassword(e.target.value)
-          }
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
+          required
           style={input}
         />
 
-        <button
-          onClick={handleLogin}
-          style={button}
-        >
+        <button type="submit" style={button}>
           Login
         </button>
 
-        <p
-          style={{
-            marginTop: "20px",
-            color: "#FFD700",
-          }}
-        >
-          {message}
-        </p>
+        {error && (
+          <p style={{ color: "red", marginTop: "16px" }}>
+            {error}
+          </p>
+        )}
 
-        <p
-          style={{
-            marginTop: "20px",
-            color: "#999",
-          }}
-        >
-          No account?{" "}
-          <a href="/signup">
-            Create one
-          </a>
+        <p style={{ marginTop: "20px", color: "#999" }}>
+          No account? <a href="/signup">Create one</a>
         </p>
-      </div>
+      </form>
     </main>
   );
 }

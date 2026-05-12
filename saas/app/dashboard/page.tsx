@@ -33,13 +33,19 @@ export default function DashboardPage() {
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
-    if (!error && data) {
-      setHistory(data);
+    if (error) {
+      console.error(error.message);
+      return;
     }
+
+    setHistory(data || []);
   }
 
   async function generateAI() {
-    if (!prompt.trim()) return;
+    if (!prompt.trim()) {
+      setResult("Please enter an idea first.");
+      return;
+    }
 
     setLoading(true);
     setResult("");
@@ -48,28 +54,43 @@ export default function DashboardPage() {
       data: { user },
     } = await supabase.auth.getUser();
 
-    const res = await fetch("/api/generate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        prompt,
-        user_id: user?.id,
-      }),
-    });
+    if (!user) {
+      setResult("You must be logged in.");
+      setLoading(false);
+      return;
+    }
 
-    const data = await res.json();
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt,
+          user_id: user.id,
+        }),
+      });
 
-    if (data.result) {
-      setResult(data.result);
-      setPrompt("");
-      loadHistory();
-    } else {
-      setResult(data.error || "Something went wrong.");
+      const data = await res.json();
+
+      if (data.result) {
+        setResult(data.result);
+        setPrompt("");
+        await loadHistory();
+      } else {
+        setResult(data.error || "AI generation failed.");
+      }
+    } catch (error) {
+      console.error(error);
+      setResult("Something went wrong.");
     }
 
     setLoading(false);
+  }
+
+  async function refreshHistory() {
+    await loadHistory();
   }
 
   async function logout() {
@@ -84,6 +105,7 @@ export default function DashboardPage() {
         background: "#05070b",
         color: "white",
         padding: "40px",
+        fontFamily: "Arial, sans-serif",
       }}
     >
       <header
@@ -92,11 +114,25 @@ export default function DashboardPage() {
           justifyContent: "space-between",
           alignItems: "center",
           marginBottom: "36px",
+          gap: "20px",
+          flexWrap: "wrap",
         }}
       >
-        <h1 style={{ color: "#FFD700", fontSize: "48px" }}>
-          SignalBoost AI
-        </h1>
+        <div>
+          <h1
+            style={{
+              color: "#FFD700",
+              fontSize: "48px",
+              marginBottom: "8px",
+            }}
+          >
+            SignalBoost AI
+          </h1>
+
+          <p style={{ color: "#999" }}>
+            Generate and save AI strategies for your projects.
+          </p>
+        </div>
 
         <button onClick={logout} style={secondaryButton}>
           Logout
@@ -104,7 +140,9 @@ export default function DashboardPage() {
       </header>
 
       <section style={card}>
-        <h2 style={{ marginBottom: "16px" }}>What do you want to build?</h2>
+        <h2 style={{ marginBottom: "16px" }}>
+          What do you want to build?
+        </h2>
 
         <textarea
           value={prompt}
@@ -113,9 +151,19 @@ export default function DashboardPage() {
           style={textarea}
         />
 
-        <button onClick={generateAI} disabled={loading} style={button}>
-          {loading ? "Generating..." : "Generate AI Strategy"}
-        </button>
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+          <button onClick={generateAI} disabled={loading} style={button}>
+            {loading ? "Generating..." : "Generate AI Strategy"}
+          </button>
+
+          <button
+            onClick={refreshHistory}
+            disabled={loading}
+            style={secondaryButton}
+          >
+            Refresh History
+          </button>
+        </div>
       </section>
 
       {result && (
@@ -139,16 +187,22 @@ export default function DashboardPage() {
           <div style={{ display: "grid", gap: "18px" }}>
             {history.map((item) => (
               <div key={item.id} style={historyCard}>
-                <p style={{ color: "#FFD700", fontWeight: "bold" }}>
+                <p
+                  style={{
+                    color: "#FFD700",
+                    fontWeight: "bold",
+                    marginBottom: "10px",
+                  }}
+                >
                   {item.prompt}
                 </p>
 
                 <p
                   style={{
                     color: "#aaa",
-                    marginTop: "10px",
                     whiteSpace: "pre-wrap",
                     lineHeight: 1.6,
+                    marginBottom: "12px",
                   }}
                 >
                   {item.result}
@@ -196,7 +250,7 @@ const button = {
 };
 
 const secondaryButton = {
-  padding: "12px 18px",
+  padding: "14px 22px",
   borderRadius: "10px",
   border: "1px solid #333",
   background: "#0b111a",

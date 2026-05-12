@@ -18,6 +18,7 @@ export default function DashboardPage() {
   const [history, setHistory] = useState<Generation[]>([]);
   const [loading, setLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
 
   useEffect(() => {
     loadHistory();
@@ -50,6 +51,7 @@ export default function DashboardPage() {
     setLoading(true);
     setResult("");
     setAudioUrl("");
+    setVideoUrl("");
 
     const {
       data: { user },
@@ -79,6 +81,11 @@ export default function DashboardPage() {
 
       if (data.result) {
         setResult(data.result);
+
+        if (data.video_url) {
+          setVideoUrl(data.video_url);
+        }
+
         setPrompt("");
         await loadHistory();
       } else {
@@ -141,39 +148,11 @@ export default function DashboardPage() {
   ];
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#05070b",
-        color: "white",
-        padding: "40px",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "36px",
-          gap: "20px",
-          flexWrap: "wrap",
-        }}
-      >
+    <main style={main}>
+      <header style={header}>
         <div>
-          <h1
-            style={{
-              color: "#FFD700",
-              fontSize: "48px",
-              marginBottom: "8px",
-            }}
-          >
-            SignalBoost AI
-          </h1>
-
-          <p style={{ color: "#999" }}>
-            Multilingual AI generation platform.
-          </p>
+          <h1 style={title}>SignalBoost AI</h1>
+          <p style={{ color: "#999" }}>Multilingual AI generation platform.</p>
         </div>
 
         <button onClick={logout} style={secondaryButton}>
@@ -182,9 +161,7 @@ export default function DashboardPage() {
       </header>
 
       <section style={card}>
-        <h2 style={{ marginBottom: "16px" }}>
-          What do you want to create?
-        </h2>
+        <h2 style={{ marginBottom: "16px" }}>What do you want to create?</h2>
 
         <div style={{ marginBottom: "20px" }}>
           <label style={{ marginBottom: "8px", display: "block" }}>
@@ -204,14 +181,7 @@ export default function DashboardPage() {
           </select>
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-            gap: "12px",
-            marginBottom: "20px",
-          }}
-        >
+        <div style={modeGrid}>
           {modes.map((item) => (
             <button
               key={item}
@@ -220,9 +190,7 @@ export default function DashboardPage() {
                 padding: "14px",
                 borderRadius: "12px",
                 border:
-                  mode === item
-                    ? "2px solid #FFD700"
-                    : "1px solid #333",
+                  mode === item ? "2px solid #FFD700" : "1px solid #333",
                 background: mode === item ? "#FFD700" : "#0b111a",
                 color: mode === item ? "#000" : "#fff",
                 cursor: "pointer",
@@ -247,11 +215,7 @@ export default function DashboardPage() {
             {loading ? "Generating..." : "Generate"}
           </button>
 
-          <button
-            onClick={refreshHistory}
-            disabled={loading}
-            style={secondaryButton}
-          >
+          <button onClick={refreshHistory} disabled={loading} style={secondaryButton}>
             Refresh
           </button>
         </div>
@@ -263,15 +227,16 @@ export default function DashboardPage() {
             AI Response
           </h2>
 
-          <div
-            style={{
-              whiteSpace: "pre-wrap",
-              lineHeight: 1.7,
-              marginBottom: "20px",
-            }}
-          >
-            {result}
-          </div>
+          <div style={responseText}>{result}</div>
+
+          {videoUrl && (
+            <video
+              src={videoUrl}
+              controls
+              autoPlay
+              style={video}
+            />
+          )}
 
           <button onClick={() => playVoice(result)} style={button}>
             🔊 Play Voice
@@ -300,26 +265,9 @@ export default function DashboardPage() {
           <div style={{ display: "grid", gap: "18px" }}>
             {history.map((item) => (
               <div key={item.id} style={historyCard}>
-                <p
-                  style={{
-                    color: "#FFD700",
-                    fontWeight: "bold",
-                    marginBottom: "10px",
-                  }}
-                >
-                  {item.prompt}
-                </p>
+                <p style={historyPrompt}>{item.prompt}</p>
 
-                <p
-                  style={{
-                    color: "#aaa",
-                    whiteSpace: "pre-wrap",
-                    lineHeight: 1.6,
-                    marginBottom: "14px",
-                  }}
-                >
-                  {item.result}
-                </p>
+                <p style={historyResult}>{item.result}</p>
 
                 <button
                   onClick={() => playVoice(item.result)}
@@ -328,13 +276,7 @@ export default function DashboardPage() {
                   🔊 Play Voice
                 </button>
 
-                <div
-                  style={{
-                    marginTop: "12px",
-                    color: "#777",
-                    fontSize: "12px",
-                  }}
-                >
+                <div style={historyDate}>
                   {new Date(item.created_at).toLocaleString()}
                 </div>
               </div>
@@ -346,11 +288,41 @@ export default function DashboardPage() {
   );
 }
 
+const main = {
+  minHeight: "100vh",
+  background: "#05070b",
+  color: "white",
+  padding: "40px",
+  fontFamily: "Arial, sans-serif",
+};
+
+const header = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: "36px",
+  gap: "20px",
+  flexWrap: "wrap" as const,
+};
+
+const title = {
+  color: "#FFD700",
+  fontSize: "48px",
+  marginBottom: "8px",
+};
+
 const card = {
   background: "#111722",
   padding: "28px",
   borderRadius: "20px",
   marginBottom: "28px",
+};
+
+const modeGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+  gap: "12px",
+  marginBottom: "20px",
 };
 
 const textarea = {
@@ -395,9 +367,41 @@ const secondaryButton = {
   cursor: "pointer",
 };
 
+const responseText = {
+  whiteSpace: "pre-wrap" as const,
+  lineHeight: 1.7,
+  marginBottom: "20px",
+};
+
+const video = {
+  width: "100%",
+  borderRadius: "12px",
+  marginBottom: "20px",
+  background: "#000",
+};
+
 const historyCard = {
   background: "#0b111a",
   padding: "20px",
   borderRadius: "14px",
   border: "1px solid #222",
+};
+
+const historyPrompt = {
+  color: "#FFD700",
+  fontWeight: "bold",
+  marginBottom: "10px",
+};
+
+const historyResult = {
+  color: "#aaa",
+  whiteSpace: "pre-wrap" as const,
+  lineHeight: 1.6,
+  marginBottom: "14px",
+};
+
+const historyDate = {
+  marginTop: "12px",
+  color: "#777",
+  fontSize: "12px",
 };

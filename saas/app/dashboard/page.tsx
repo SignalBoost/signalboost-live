@@ -1,24 +1,11 @@
 import DashboardCard from "@/components/DashboardCard";
 
 async function getDashboardData() {
-  try {
-    const res = await fetch(
-      "https://saas.signalboostapp.com/api/dashboard",
-      {
-        cache: "no-store",
-      }
-    );
+  const res = await fetch("https://saas.signalboostapp.com/api/dashboard", {
+    cache: "no-store",
+  });
 
-    return await res.json();
-  } catch (error) {
-    return {
-      stats: {
-        projects: 0,
-        automations: 0,
-        content: 0,
-      },
-    };
-  }
+  return res.json();
 }
 
 export default async function DashboardPage() {
@@ -33,30 +20,22 @@ export default async function DashboardPage() {
         color: "white",
       }}
     >
-      <h1
-        style={{
-          fontSize: "40px",
-          color: "#FFD700",
-          marginBottom: "12px",
-        }}
-      >
+      <p style={{ color: "red", fontSize: "20px" }}>
+        TEST VERSION 123
+      </p>
+
+      <h1 style={{ fontSize: "40px", color: "#FFD700" }}>
         Dashboard
       </h1>
 
-      <p
-        style={{
-          color: "#999",
-          marginBottom: "40px",
-        }}
-      >
+      <p style={{ color: "#999", marginBottom: "40px" }}>
         Welcome to SignalBoost.
       </p>
 
       <div
         style={{
           display: "grid",
-          gridTemplateColumns:
-            "repeat(auto-fit, minmax(260px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
           gap: "20px",
         }}
       >

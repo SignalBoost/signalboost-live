@@ -168,41 +168,28 @@ export default function DashboardPage() {
           What do you want to create?
         </h2>
 
-        {/* LANGUAGE BUTTONS */}
+        {/* LANGUAGE SELECT */}
 
-        <div style={{ marginBottom: "20px" }}>
-          <label style={{ marginBottom: "10px", display: "block" }}>
-            🌍 Select Language
+        <div style={{ marginBottom: "24px" }}>
+          <label style={label}>
+            🌍 Language
           </label>
 
-          <div style={languageGrid}>
-            {languages.map((lang) => (
-              <button
-                key={lang.code}
-                type="button"
-                onClick={() => setLanguage(lang.code)}
-                style={{
-                  padding: "14px",
-                  borderRadius: "12px",
-                  border:
-                    language === lang.code
-                      ? "2px solid #FFD700"
-                      : "1px solid #333",
-                  background:
-                    language === lang.code
-                      ? "#FFD700"
-                      : "#0b111a",
-                  color:
-                    language === lang.code
-                      ? "#000"
-                      : "#fff",
-                  cursor: "pointer",
-                  fontWeight: "bold",
-                }}
-              >
-                {lang.label}
-              </button>
-            ))}
+          <div style={selectWrapper}>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              style={languageSelect}
+            >
+              {languages.map((lang) => (
+                <option
+                  key={lang.code}
+                  value={lang.code}
+                >
+                  {lang.label}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -386,12 +373,28 @@ const card = {
   marginBottom: "28px",
 };
 
-const languageGrid = {
-  display: "grid",
-  gridTemplateColumns:
-    "repeat(auto-fit, minmax(130px, 1fr))",
-  gap: "12px",
-  marginBottom: "24px",
+const label = {
+  marginBottom: "10px",
+  display: "block",
+  fontWeight: "bold",
+};
+
+const selectWrapper = {
+  width: "280px",
+  maxWidth: "100%",
+};
+
+const languageSelect = {
+  width: "100%",
+  padding: "14px",
+  borderRadius: "12px",
+  border: "1px solid #333",
+  background: "#0b111a",
+  color: "#ffffff",
+  fontSize: "16px",
+  fontWeight: "bold",
+  cursor: "pointer",
+  outline: "none",
 };
 
 const modeGrid = {

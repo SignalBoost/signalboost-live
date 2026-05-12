@@ -14,13 +14,10 @@ export default function DashboardPage() {
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState("strategy");
   const [language, setLanguage] = useState("en");
-
   const [result, setResult] = useState("");
   const [history, setHistory] = useState<Generation[]>([]);
-
   const [loading, setLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState("");
-  const [videoUrl, setVideoUrl] = useState("");
 
   useEffect(() => {
     loadHistory();
@@ -33,13 +30,15 @@ export default function DashboardPage() {
 
     if (!user) return;
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("generations")
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
-    setHistory(data || []);
+    if (!error && data) {
+      setHistory(data);
+    }
   }
 
   async function generateAI() {
@@ -51,7 +50,6 @@ export default function DashboardPage() {
     setLoading(true);
     setResult("");
     setAudioUrl("");
-    setVideoUrl("");
 
     const {
       data: { user },
@@ -83,10 +81,6 @@ export default function DashboardPage() {
         setResult(data.result);
         setPrompt("");
         await loadHistory();
-
-        if (mode === "video") {
-          await generateVideo();
-        }
       } else {
         setResult(data.error || "Something went wrong.");
       }
@@ -113,27 +107,14 @@ export default function DashboardPage() {
 
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-
       setAudioUrl(url);
     } catch (error) {
       console.error(error);
     }
   }
 
-  async function generateVideo() {
-    try {
-      const res = await fetch("/api/video", {
-        method: "POST",
-      });
-
-      const data = await res.json();
-
-      if (data.videoUrl) {
-        setVideoUrl(data.videoUrl);
-      }
-    } catch (error) {
-      console.error(error);
-    }
+  async function refreshHistory() {
+    await loadHistory();
   }
 
   async function logout() {
@@ -205,29 +186,30 @@ export default function DashboardPage() {
           What do you want to create?
         </h2>
 
-        <label style={{ marginBottom: "8px", display: "block" }}>
-          🌍 Language
-        </label>
+        <div style={{ marginBottom: "20px" }}>
+          <label style={{ marginBottom: "8px", display: "block" }}>
+            🌍 Language
+          </label>
 
-        <select
-          value={language}
-          onChange={(e) => setLanguage(e.target.value)}
-          style={select}
-        >
-          {languages.map((lang) => (
-            <option key={lang.code} value={lang.code}>
-              {lang.label}
-            </option>
-          ))}
-        </select>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            style={select}
+          >
+            {languages.map((lang) => (
+              <option key={lang.code} value={lang.code}>
+                {lang.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
             gap: "12px",
             marginBottom: "20px",
-            marginTop: "20px",
           }}
         >
           {modes.map((item) => (
@@ -260,12 +242,16 @@ export default function DashboardPage() {
           style={textarea}
         />
 
-        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "12px" }}>
           <button onClick={generateAI} disabled={loading} style={button}>
             {loading ? "Generating..." : "Generate"}
           </button>
 
-          <button onClick={loadHistory} disabled={loading} style={secondaryButton}>
+          <button
+            onClick={refreshHistory}
+            disabled={loading}
+            style={secondaryButton}
+          >
             Refresh
           </button>
         </div>
@@ -287,17 +273,9 @@ export default function DashboardPage() {
             {result}
           </div>
 
-          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-            <button onClick={() => playVoice(result)} style={button}>
-              🔊 Play Voice
-            </button>
-
-            {mode === "video" && (
-              <button onClick={generateVideo} style={button}>
-                🎬 Generate Video Preview
-              </button>
-            )}
-          </div>
+          <button onClick={() => playVoice(result)} style={button}>
+            🔊 Play Voice
+          </button>
 
           {audioUrl && (
             <audio
@@ -307,19 +285,6 @@ export default function DashboardPage() {
               style={{
                 marginTop: "20px",
                 width: "100%",
-              }}
-            />
-          )}
-
-          {videoUrl && (
-            <video
-              src={videoUrl}
-              controls
-              autoPlay
-              style={{
-                marginTop: "20px",
-                width: "100%",
-                borderRadius: "14px",
               }}
             />
           )}

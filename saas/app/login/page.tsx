@@ -6,18 +6,27 @@ import { supabase } from "@/lib/supabase";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
 
   async function handleLogin() {
-    const { error } = await supabase.auth.signInWithPassword({
+    setMessage("Logging in...");
+
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
-      alert(error.message);
+      setMessage(error.message);
       return;
     }
 
+    if (!data.session) {
+      setMessage("Login succeeded, but no session was created.");
+      return;
+    }
+
+    setMessage("Login successful. Redirecting...");
     window.location.href = "/dashboard";
   }
 
@@ -29,6 +38,7 @@ export default function LoginPage() {
         color: "white",
         display: "grid",
         placeItems: "center",
+        padding: "20px",
       }}
     >
       <div
@@ -40,14 +50,7 @@ export default function LoginPage() {
           borderRadius: "20px",
         }}
       >
-        <h1
-          style={{
-            color: "#FFD700",
-            marginBottom: "24px",
-          }}
-        >
-          Login
-        </h1>
+        <h1 style={{ color: "#FFD700", marginBottom: "24px" }}>Login</h1>
 
         <input
           placeholder="Email"
@@ -67,6 +70,10 @@ export default function LoginPage() {
         <button onClick={handleLogin} style={button}>
           Login
         </button>
+
+        {message && (
+          <p style={{ marginTop: "16px", color: "#FFD700" }}>{message}</p>
+        )}
 
         <p style={{ marginTop: "20px", color: "#999" }}>
           No account? <a href="/signup">Create one</a>

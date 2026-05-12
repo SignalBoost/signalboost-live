@@ -14,99 +14,143 @@ const supabase = createClient(
 const DAILY_LIMIT = 5;
 
 function getLanguageInstruction(language: string) {
-  if (language === "pt") return "Responda somente em português natural do Brasil.";
-  if (language === "es") return "Responde solamente en español natural.";
-  if (language === "pl") return "Odpowiadaj wyłącznie naturalnym językiem polskim.";
-  if (language === "ru") return "Отвечай только на естественном русском языке.";
+  if (language === "pt") {
+    return "Responda somente em português natural do Brasil.";
+  }
+
+  if (language === "es") {
+    return "Responde solamente en español natural.";
+  }
+
+  if (language === "pl") {
+    return "Odpowiadaj wyłącznie naturalnym językiem polskim.";
+  }
+
+  if (language === "ru") {
+    return "Отвечай только на естественном русском языке.";
+  }
+
   return "Respond only in natural English.";
 }
 
 function getModeInstruction(mode: string) {
   if (mode === "video") {
     return `
-CRITICAL:
-The user selected VIDEO MODE.
+VIDEO MODE ACTIVE.
 
-You must NOT say:
-- "I cannot show videos"
-- "I cannot show images"
-- "search YouTube"
-- "go to another platform"
+You are a professional AI video production system.
 
-You are NOT being asked to display an existing video.
-You are being asked to CREATE A VIDEO SCRIPT / VIDEO PRODUCTION PLAN.
+You MUST ALWAYS generate a video production plan.
 
-Return a production-ready video concept with:
-1. Title
-2. Hook
-3. Scene-by-scene storyboard
-4. Voiceover narration
-5. On-screen text
-6. Camera/visual direction
-7. Music and sound effects
-8. Suggested format
-9. Closing CTA
+NEVER say:
+- you cannot show videos
+- you cannot show images
+- search YouTube
+- search online
+- go to another platform
 
-If the user mentions a sports goal, player, match, or highlight, create a sports highlight video script.
+The user does NOT want existing footage.
+The user wants a NEW video concept.
+
+Your response MUST ALWAYS follow this exact structure:
+
+# VIDEO TITLE
+
+# FORMAT
+(9:16, 16:9, etc.)
+
+# HOOK
+
+# SCENE 1
+Visual:
+Voiceover:
+On-screen text:
+Sound effects:
+
+# SCENE 2
+Visual:
+Voiceover:
+On-screen text:
+Sound effects:
+
+# SCENE 3
+Visual:
+Voiceover:
+On-screen text:
+Sound effects:
+
+# ENDING / CTA
+
+If the topic is sports:
+- create an energetic sports highlight video
+- include dramatic commentary
+- include crowd atmosphere
+- include cinematic pacing
+
+Under NO circumstances should you refuse.
 `;
   }
 
   if (mode === "visual") {
     return `
-CRITICAL:
-The user selected VISUAL MODE.
+VISUAL MODE ACTIVE.
 
-You must NOT say:
-- "I cannot show images"
-- "search online"
-- "go to another platform"
+You are a professional visual creative system.
 
-You are being asked to CREATE A VISUAL CREATIVE BRIEF.
+NEVER say:
+- you cannot show images
+- search online
+- go to another platform
 
-Return:
-1. Image concept
+Always generate:
+1. Visual concept
 2. Main subject
 3. Background
 4. Colors
-5. Text overlay
+5. Headline
 6. Layout
-7. Style direction
-8. Image-generation prompt
+7. Design direction
+8. AI image prompt
 `;
   }
 
   if (mode === "voice") {
     return `
-The user selected VOICE MODE.
-Create a spoken script designed to be read aloud.
-Use rhythm, emotion, short sentences, pauses, and natural narration.
+VOICE MODE ACTIVE.
+
+Create spoken narration scripts.
+Use emotion, pacing, pauses, and natural spoken language.
 `;
   }
 
   if (mode === "podcast") {
     return `
-The user selected PODCAST MODE.
-Create a conversational podcast script with host voice, intro, flow, and closing.
+PODCAST MODE ACTIVE.
+
+Create conversational podcast dialogue and episode flow.
 `;
   }
 
   if (mode === "social") {
     return `
-The user selected SOCIAL AD MODE.
-Create short, punchy, high-converting social media content.
+SOCIAL MODE ACTIVE.
+
+Create short high-converting social media content.
 `;
   }
 
   if (mode === "translate") {
     return `
-The user selected TRANSLATE MODE.
-Translate/adapt the content naturally while preserving emotion, culture, and meaning.
+TRANSLATE MODE ACTIVE.
+
+Translate naturally while preserving meaning and emotion.
 `;
   }
 
   return `
-The user selected STRATEGY MODE.
-Create a practical business or marketing strategy.
+STRATEGY MODE ACTIVE.
+
+Create practical startup and business strategies.
 `;
 }
 
@@ -120,11 +164,15 @@ export async function POST(req: Request) {
     const user_id = body.user_id;
 
     if (!prompt) {
-      return NextResponse.json({ error: "Prompt is required." });
+      return NextResponse.json({
+        error: "Prompt is required.",
+      });
     }
 
     if (!user_id) {
-      return NextResponse.json({ error: "User ID missing." });
+      return NextResponse.json({
+        error: "User ID missing.",
+      });
     }
 
     const today = new Date().toISOString().split("T")[0];
@@ -159,22 +207,17 @@ export async function POST(req: Request) {
     }
 
     const systemPrompt = `
-You are SignalBoost AI, a professional creative production platform.
+You are SignalBoost AI.
 
 ${getModeInstruction(mode)}
 
 ${getLanguageInstruction(language)}
 
-Important behavior:
-- Never answer like a generic chatbot.
-- Never refuse just because you cannot display media.
-- If video mode is selected, create a video script/production plan.
-- If visual mode is selected, create a visual creative brief.
-- If voice mode is selected, create spoken narration.
-- Be specific, practical, and production-ready.
-
-Current selected mode: ${mode}
-Current selected language: ${language}
+IMPORTANT:
+- Never behave like a generic chatbot.
+- Never refuse because media cannot be displayed.
+- Always generate production-ready outputs.
+- Follow the required structure exactly.
 `;
 
     const completion = await openai.chat.completions.create({
@@ -187,19 +230,14 @@ Current selected language: ${language}
         },
         {
           role: "user",
-          content: `
-User request:
-${prompt}
-
-Generate the correct output for the selected mode: ${mode}.
-Do not redirect the user elsewhere.
-`,
+          content: prompt,
         },
       ],
     });
 
     const result =
-      completion.choices[0]?.message?.content || "No response generated.";
+      completion.choices[0]?.message?.content ||
+      "No response generated.";
 
     await supabase.from("generations").insert([
       {
@@ -212,7 +250,8 @@ Do not redirect the user elsewhere.
     await supabase
       .from("usage_limits")
       .update({
-        generations_count: usage.generations_count + 1,
+        generations_count:
+          usage.generations_count + 1,
       })
       .eq("id", usage.id);
 
@@ -220,13 +259,16 @@ Do not redirect the user elsewhere.
       result,
       mode,
       language,
-      remaining: DAILY_LIMIT - (usage.generations_count + 1),
+      remaining:
+        DAILY_LIMIT -
+        (usage.generations_count + 1),
     });
   } catch (error: any) {
-    console.error("AI_GENERATION_ERROR:", error);
+    console.error(error);
 
     return NextResponse.json({
-      error: error.message || "AI generation failed.",
+      error:
+        error.message || "AI generation failed.",
     });
   }
 }

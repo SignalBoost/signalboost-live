@@ -11,23 +11,25 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+const DAILY_LIMIT = 5;
+
 function getSystemPrompt(mode: string) {
   switch (mode) {
     case "voice":
-      return "You are SignalBoost Voice AI. Generate spoken scripts optimized for narration, pacing, emotion, pauses, and audio delivery. Avoid long paragraphs and write like something meant to be heard aloud.";
+      return "You are SignalBoost Voice AI. Generate spoken scripts optimized for narration and audio.";
 
     case "video":
-      return "You are SignalBoost Video AI. Generate video scripts with scenes, narration, visual direction, hooks, pacing, camera feel, and strong storytelling. Format it clearly for video production.";
+      return "You are SignalBoost Video AI. Generate cinematic video scripts with scenes and narration.";
 
     case "podcast":
-      return "You are SignalBoost Podcast AI. Generate conversational podcast scripts, intros, host segments, discussion flow, and natural spoken language.";
+      return "You are SignalBoost Podcast AI. Generate natural podcast dialogue and conversational audio.";
 
     case "social":
-      return "You are SignalBoost Social Ad AI. Generate short, punchy marketing copy for social ads, hooks, captions, CTAs, and platform-friendly content.";
+      return "You are SignalBoost Social Ad AI. Generate short high-converting marketing content.";
 
     case "strategy":
     default:
-      return "You are SignalBoost Strategy AI. Generate clear business strategies, product ideas, launch plans, marketing plans, and execution steps for startups and businesses.";
+      return "You are SignalBoost Strategy AI. Generate startup and business strategies.";
   }
 }
 
@@ -41,32 +43,76 @@ export async function POST(req: Request) {
 
     if (!prompt) {
       return NextResponse.json({
-        error: "Prompt is required",
+        error: "Prompt is required.",
       });
     }
 
     if (!user_id) {
       return NextResponse.json({
-        error: "User ID is required",
+        error: "User ID missing.",
       });
     }
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: getSystemPrompt(mode),
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-    });
+    // CHECK DAILY USAGE
+
+    const today = new Date().toISOString().split("T")[0];
+
+    let { data: usage } = await supabase
+      .from("usage_limits")
+      .select("*")
+      .eq("user_id", user_id)
+      .eq("usage_date", today)
+      .single();
+
+    // CREATE NEW DAILY ROW
+
+    if (!usage) {
+      const { data: newUsage } = await supabase
+        .from("usage_limits")
+        .insert([
+          {
+            user_id,
+            usage_date: today,
+            generations_count: 0,
+          },
+        ])
+        .select()
+        .single();
+
+      usage = newUsage;
+    }
+
+    // BLOCK USER IF LIMIT REACHED
+
+    if (usage.generations_count >= DAILY_LIMIT) {
+      return NextResponse.json({
+        error:
+          "Daily free limit reached. Upgrade coming soon.",
+      });
+    }
+
+    // GENERATE AI
+
+    const completion =
+      await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: getSystemPrompt(mode),
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+      });
 
     const result =
-      completion.choices[0]?.message?.content || "No response generated.";
+      completion.choices[0]?.message?.content ||
+      "No response generated.";
+
+    // SAVE GENERATION
 
     await supabase.from("generations").insert([
       {
@@ -76,15 +122,28 @@ export async function POST(req: Request) {
       },
     ]);
 
-    return NextResponse.json({
-      result,
-      mode,
-    });
-  } catch (error: any) {
-    console.error("AI_GENERATION_ERROR:", error);
+    // UPDATE USAGE COUNT
+
+    await supabase
+      .from("usage_limits")
+      .update({
+        generations_count:
+          usage.generations_count + 1,
+      })
+      .eq("id", usage.id);
 
     return NextResponse.json({
-      error: error.message || "AI generation failed",
+      result,
+      remaining:
+        DAILY_LIMIT -
+        (usage.generations_count + 1),
+    });
+  } catch (error: any) {
+    console.error(error);
+
+    return NextResponse.json({
+      error:
+        error.message || "AI generation failed.",
     });
   }
 }

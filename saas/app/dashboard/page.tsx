@@ -141,10 +141,10 @@ export default function DashboardPage() {
 
   const languages = [
     { code: "en", label: "English" },
-    { code: "es", label: "Español" },
-    { code: "pt", label: "Português" },
-    { code: "pl", label: "Polski" },
-    { code: "ru", label: "Русский" },
+    { code: "es", label: "Spanish" },
+    { code: "pt", label: "Portuguese" },
+    { code: "pl", label: "Polish" },
+    { code: "ru", label: "Russian" },
   ];
 
   return (
@@ -215,7 +215,11 @@ export default function DashboardPage() {
             {loading ? "Generating..." : "Generate"}
           </button>
 
-          <button onClick={refreshHistory} disabled={loading} style={secondaryButton}>
+          <button
+            onClick={refreshHistory}
+            disabled={loading}
+            style={secondaryButton}
+          >
             Refresh
           </button>
         </div>
@@ -229,14 +233,7 @@ export default function DashboardPage() {
 
           <div style={responseText}>{result}</div>
 
-          {videoUrl && (
-            <video
-              src={videoUrl}
-              controls
-              autoPlay
-              style={video}
-            />
-          )}
+          {videoUrl && <video src={videoUrl} controls autoPlay style={video} />}
 
           <button onClick={() => playVoice(result)} style={button}>
             🔊 Play Voice
@@ -342,9 +339,10 @@ const select = {
   padding: "14px",
   borderRadius: "10px",
   border: "1px solid #333",
-  background: "#0b111a",
-  color: "white",
+  background: "#ffffff",
+  color: "#000000",
   fontSize: "16px",
+  appearance: "auto" as const,
 };
 
 const button = {

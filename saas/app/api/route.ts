@@ -13,72 +13,80 @@ const supabase = createClient(
 
 const DAILY_LIMIT = 5;
 
+function getLanguageInstruction(language: string) {
+  switch (language) {
+    case "es":
+      return "Respond entirely in natural Spanish.";
+
+    case "pt":
+      return "Respond entirely in natural Portuguese.";
+
+    case "pl":
+      return "Respond entirely in natural Polish.";
+
+    case "ru":
+      return "Respond entirely in natural Russian.";
+
+    case "en":
+    default:
+      return "Respond entirely in natural English.";
+  }
+}
+
 function getSystemPrompt(mode: string) {
   switch (mode) {
     case "voice":
       return `
 You are SignalBoost Voice AI.
-Generate spoken scripts optimized for audio narration.
-Use natural spoken language, short sentences, emotional pacing, and clear pauses.
-Do not write like an essay or business report.
+Generate spoken scripts optimized for narration.
+Use emotional pacing, natural pauses, and spoken language.
 `;
 
     case "video":
       return `
 You are SignalBoost Video AI.
-Generate a video script with:
-- scene-by-scene structure
-- narrator voiceover
+Generate cinematic video scripts with:
+- scenes
+- narration
 - visual direction
 - pacing
-- emotional hook
-- closing call-to-action
-This creates scripts for video production, not an actual video file.
+- emotional storytelling
 `;
 
     case "podcast":
       return `
 You are SignalBoost Podcast AI.
-Generate podcast intros, host scripts, episode outlines, and conversational segments.
-Use natural spoken language.
+Generate conversational podcast dialogue and host narration.
 `;
 
     case "social":
       return `
 You are SignalBoost Social Ad AI.
-Generate short, punchy social media ad content.
-Include hooks, captions, CTAs, and variations.
+Generate short high-converting social media marketing content.
 `;
 
     case "visual":
       return `
 You are SignalBoost Visual AI.
-Generate visual creative direction.
-Include:
-- image concept
+Generate visual creative direction including:
 - layout
 - colors
-- headline
-- visual elements
+- image concept
 - CTA
-This is for creating marketing graphics.
+- design structure
 `;
 
     case "translate":
       return `
 You are SignalBoost Translation AI.
-Translate and adapt the user's content for a target audience.
-Preserve meaning, tone, and marketing impact.
-If no target language is specified, translate to Spanish by default.
-Make the output natural for speech and business use.
+Translate naturally while preserving tone, emotion, and marketing impact.
 `;
 
     case "strategy":
     default:
       return `
 You are SignalBoost Strategy AI.
-Generate startup, business, product, and marketing strategies.
-Be practical, structured, and execution-focused.
+Generate business, startup, marketing, and execution strategies.
 `;
   }
 }
@@ -89,6 +97,7 @@ export async function POST(req: Request) {
 
     const prompt = body.prompt;
     const mode = body.mode || "strategy";
+    const language = body.language || "en";
     const user_id = body.user_id;
 
     if (!prompt) {
@@ -102,6 +111,8 @@ export async function POST(req: Request) {
         error: "User ID missing.",
       });
     }
+
+    // DAILY LIMIT
 
     const today = new Date().toISOString().split("T")[0];
 
@@ -130,16 +141,24 @@ export async function POST(req: Request) {
 
     if (usage.generations_count >= DAILY_LIMIT) {
       return NextResponse.json({
-        error: "Daily free limit reached. Upgrade coming soon.",
+        error: "Daily free limit reached.",
       });
     }
+
+    // AI GENERATION
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: getSystemPrompt(mode),
+          content: `
+${getSystemPrompt(mode)}
+
+${getLanguageInstruction(language)}
+
+Adapt naturally for the target audience and region.
+`,
         },
         {
           role: "user",
@@ -152,31 +171,40 @@ export async function POST(req: Request) {
       completion.choices[0]?.message?.content ||
       "No response generated.";
 
+    // SAVE
+
     await supabase.from("generations").insert([
       {
         user_id,
-        prompt: `[${mode.toUpperCase()}] ${prompt}`,
+        prompt: `[${language.toUpperCase()}][${mode.toUpperCase()}] ${prompt}`,
         result,
       },
     ]);
 
+    // UPDATE LIMITS
+
     await supabase
       .from("usage_limits")
       .update({
-        generations_count: usage.generations_count + 1,
+        generations_count:
+          usage.generations_count + 1,
       })
       .eq("id", usage.id);
 
     return NextResponse.json({
       result,
       mode,
-      remaining: DAILY_LIMIT - (usage.generations_count + 1),
+      language,
+      remaining:
+        DAILY_LIMIT -
+        (usage.generations_count + 1),
     });
   } catch (error: any) {
-    console.error("AI_GENERATION_ERROR:", error);
+    console.error(error);
 
     return NextResponse.json({
-      error: error.message || "AI generation failed.",
+      error:
+        error.message || "AI generation failed.",
     });
   }
 }

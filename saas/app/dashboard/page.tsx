@@ -14,11 +14,33 @@ export default function DashboardPage() {
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState("strategy");
   const [language, setLanguage] = useState("en");
+  const [languageOpen, setLanguageOpen] = useState(false);
   const [result, setResult] = useState("");
   const [history, setHistory] = useState<Generation[]>([]);
   const [loading, setLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
+
+  const modes = [
+    "strategy",
+    "voice",
+    "video",
+    "podcast",
+    "social",
+    "visual",
+    "translate",
+  ];
+
+  const languages = [
+    { code: "en", label: "English" },
+    { code: "es", label: "Spanish" },
+    { code: "pt", label: "Portuguese" },
+    { code: "pl", label: "Polish" },
+    { code: "ru", label: "Russian" },
+  ];
+
+  const selectedLanguage =
+    languages.find((lang) => lang.code === language)?.label || "English";
 
   useEffect(() => {
     loadHistory();
@@ -129,33 +151,12 @@ export default function DashboardPage() {
     window.location.href = "/";
   }
 
-  const modes = [
-    "strategy",
-    "voice",
-    "video",
-    "podcast",
-    "social",
-    "visual",
-    "translate",
-  ];
-
-  const languages = [
-    { code: "en", label: "English" },
-    { code: "es", label: "Spanish" },
-    { code: "pt", label: "Portuguese" },
-    { code: "pl", label: "Polish" },
-    { code: "ru", label: "Russian" },
-  ];
-
   return (
     <main style={main}>
       <header style={header}>
         <div>
           <h1 style={title}>SignalBoost AI</h1>
-
-          <p style={{ color: "#999" }}>
-            Multilingual AI generation platform.
-          </p>
+          <p style={{ color: "#999" }}>Multilingual AI generation platform.</p>
         </div>
 
         <button onClick={logout} style={secondaryButton}>
@@ -164,36 +165,43 @@ export default function DashboardPage() {
       </header>
 
       <section style={card}>
-        <h2 style={{ marginBottom: "16px" }}>
-          What do you want to create?
-        </h2>
+        <h2 style={{ marginBottom: "16px" }}>What do you want to create?</h2>
 
-        {/* LANGUAGE SELECT */}
+        <div style={{ marginBottom: "24px", position: "relative" }}>
+          <label style={label}>🌍 Language</label>
 
-        <div style={{ marginBottom: "24px" }}>
-          <label style={label}>
-            🌍 Language
-          </label>
+          <button
+            type="button"
+            onClick={() => setLanguageOpen(!languageOpen)}
+            style={languageButton}
+          >
+            <span>{selectedLanguage}</span>
+            <span>{languageOpen ? "▲" : "▼"}</span>
+          </button>
 
-          <div style={selectWrapper}>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              style={languageSelect}
-            >
+          {languageOpen && (
+            <div style={languageMenu}>
               {languages.map((lang) => (
-                <option
+                <button
                   key={lang.code}
-                  value={lang.code}
+                  type="button"
+                  onClick={() => {
+                    setLanguage(lang.code);
+                    setLanguageOpen(false);
+                  }}
+                  style={{
+                    ...languageOption,
+                    background:
+                      language === lang.code ? "#FFD700" : "#0b111a",
+                    color: language === lang.code ? "#000" : "#fff",
+                  }}
                 >
                   {lang.label}
-                </option>
+                </button>
               ))}
-            </select>
-          </div>
+            </div>
+          )}
         </div>
-
-        {/* MODE BUTTONS */}
 
         <div style={modeGrid}>
           {modes.map((item) => (
@@ -204,17 +212,9 @@ export default function DashboardPage() {
                 padding: "14px",
                 borderRadius: "12px",
                 border:
-                  mode === item
-                    ? "2px solid #FFD700"
-                    : "1px solid #333",
-                background:
-                  mode === item
-                    ? "#FFD700"
-                    : "#0b111a",
-                color:
-                  mode === item
-                    ? "#000"
-                    : "#fff",
+                  mode === item ? "2px solid #FFD700" : "1px solid #333",
+                background: mode === item ? "#FFD700" : "#0b111a",
+                color: mode === item ? "#000" : "#fff",
                 cursor: "pointer",
                 fontWeight: "bold",
                 textTransform: "capitalize",
@@ -233,19 +233,11 @@ export default function DashboardPage() {
         />
 
         <div style={{ display: "flex", gap: "12px" }}>
-          <button
-            onClick={generateAI}
-            disabled={loading}
-            style={button}
-          >
+          <button onClick={generateAI} disabled={loading} style={button}>
             {loading ? "Generating..." : "Generate"}
           </button>
 
-          <button
-            onClick={refreshHistory}
-            disabled={loading}
-            style={secondaryButton}
-          >
+          <button onClick={refreshHistory} disabled={loading} style={secondaryButton}>
             Refresh
           </button>
         </div>
@@ -253,86 +245,42 @@ export default function DashboardPage() {
 
       {result && (
         <section style={card}>
-          <h2
-            style={{
-              color: "#FFD700",
-              marginBottom: "16px",
-            }}
-          >
+          <h2 style={{ color: "#FFD700", marginBottom: "16px" }}>
             AI Response
           </h2>
 
-          <div style={responseText}>
-            {result}
-          </div>
+          <div style={responseText}>{result}</div>
 
-          {videoUrl && (
-            <video
-              src={videoUrl}
-              controls
-              autoPlay
-              style={video}
-            />
-          )}
+          {videoUrl && <video src={videoUrl} controls autoPlay style={video} />}
 
-          <button
-            onClick={() => playVoice(result)}
-            style={button}
-          >
+          <button onClick={() => playVoice(result)} style={button}>
             🔊 Play Voice
           </button>
 
           {audioUrl && (
-            <audio
-              src={audioUrl}
-              controls
-              autoPlay
-              style={{
-                marginTop: "20px",
-                width: "100%",
-              }}
-            />
+            <audio src={audioUrl} controls autoPlay style={{ marginTop: "20px", width: "100%" }} />
           )}
         </section>
       )}
 
       <section style={card}>
-        <h2 style={{ marginBottom: "20px" }}>
-          Saved AI History
-        </h2>
+        <h2 style={{ marginBottom: "20px" }}>Saved AI History</h2>
 
         {history.length === 0 ? (
-          <p style={{ color: "#999" }}>
-            No saved AI responses yet.
-          </p>
+          <p style={{ color: "#999" }}>No saved AI responses yet.</p>
         ) : (
           <div style={{ display: "grid", gap: "18px" }}>
             {history.map((item) => (
-              <div
-                key={item.id}
-                style={historyCard}
-              >
-                <p style={historyPrompt}>
-                  {item.prompt}
-                </p>
+              <div key={item.id} style={historyCard}>
+                <p style={historyPrompt}>{item.prompt}</p>
+                <p style={historyResult}>{item.result}</p>
 
-                <p style={historyResult}>
-                  {item.result}
-                </p>
-
-                <button
-                  onClick={() =>
-                    playVoice(item.result)
-                  }
-                  style={secondaryButton}
-                >
+                <button onClick={() => playVoice(item.result)} style={secondaryButton}>
                   🔊 Play Voice
                 </button>
 
                 <div style={historyDate}>
-                  {new Date(
-                    item.created_at
-                  ).toLocaleString()}
+                  {new Date(item.created_at).toLocaleString()}
                 </div>
               </div>
             ))}
@@ -379,14 +327,10 @@ const label = {
   fontWeight: "bold",
 };
 
-const selectWrapper = {
+const languageButton = {
   width: "280px",
   maxWidth: "100%",
-};
-
-const languageSelect = {
-  width: "100%",
-  padding: "14px",
+  padding: "14px 16px",
   borderRadius: "12px",
   border: "1px solid #333",
   background: "#0b111a",
@@ -394,13 +338,39 @@ const languageSelect = {
   fontSize: "16px",
   fontWeight: "bold",
   cursor: "pointer",
-  outline: "none",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+};
+
+const languageMenu = {
+  position: "absolute" as const,
+  top: "78px",
+  left: 0,
+  width: "280px",
+  maxWidth: "100%",
+  background: "#0b111a",
+  border: "1px solid #333",
+  borderRadius: "12px",
+  overflow: "hidden",
+  zIndex: 50,
+  boxShadow: "0 12px 30px rgba(0,0,0,0.45)",
+};
+
+const languageOption = {
+  width: "100%",
+  padding: "14px 16px",
+  border: "none",
+  borderBottom: "1px solid #222",
+  textAlign: "left" as const,
+  fontSize: "15px",
+  fontWeight: "bold",
+  cursor: "pointer",
 };
 
 const modeGrid = {
   display: "grid",
-  gridTemplateColumns:
-    "repeat(auto-fit, minmax(160px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
   gap: "12px",
   marginBottom: "20px",
 };

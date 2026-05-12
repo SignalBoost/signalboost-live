@@ -1,35 +1,36 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY!,
 });
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export async function POST(req: Request) {
   try {
-    const { prompt } = await req.json();
+    const body = await req.json();
+
+    const prompt = body.prompt;
+    const user_id = body.user_id;
 
     if (!prompt) {
       return NextResponse.json({
-        success: false,
         error: "Prompt is required",
       });
     }
 
-    if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json({
-        success: false,
-        error: "Missing OPENAI_API_KEY in Vercel.",
-      });
-    }
-
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-3.5-turbo",
       messages: [
         {
           role: "system",
           content:
-            "You are SignalBoost AI. Generate clear startup, website, marketing, and SaaS strategies for users.",
+            "You are an expert SaaS startup strategist helping users build successful AI businesses.",
         },
         {
           role: "user",
@@ -38,20 +39,26 @@ export async function POST(req: Request) {
       ],
     });
 
-    return NextResponse.json({
-      success: true,
-      result:
-        completion.choices[0]?.message?.content ||
-        "No response generated.",
-    });
-  } catch (error: any) {
-    console.error("AI_GENERATION_ERROR:", error);
+    const result =
+      completion.choices[0].message.content || "No response";
+
+    // SAVE TO SUPABASE
+    await supabase.from("generations").insert([
+      {
+        user_id,
+        prompt,
+        result,
+      },
+    ]);
 
     return NextResponse.json({
-      success: false,
-      error:
-        error?.message ||
-        "AI generation failed. Check Vercel logs.",
+      result,
+    });
+  } catch (error: any) {
+    console.error(error);
+
+    return NextResponse.json({
+      error: error.message,
     });
   }
 }

@@ -1,54 +1,80 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+
+type Generation = {
+  id: string;
+  prompt: string;
+  result: string;
+  created_at: string;
+};
 
 export default function DashboardPage() {
   const [prompt, setPrompt] = useState("");
   const [result, setResult] = useState("");
+  const [history, setHistory] = useState<Generation[]>([]);
   const [loading, setLoading] = useState(false);
-  const [lastPrompt, setLastPrompt] = useState("");
 
-  async function generateAI(customPrompt?: string) {
-    const finalPrompt = customPrompt || prompt;
+  useEffect(() => {
+    loadHistory();
+  }, []);
 
-    if (!finalPrompt.trim()) {
-      setResult("Please describe what you want to build.");
-      return;
-    }
+  async function loadHistory() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    setLoading(true);
-    setResult("");
-    setLastPrompt(finalPrompt);
+    if (!user) return;
 
-    try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          prompt: finalPrompt,
-        }),
-      });
+    const { data, error } = await supabase
+      .from("generations")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
 
-      const data = await res.json();
-
-      if (data.success) {
-        setResult(data.result);
-      } else {
-        setResult(data.error || "AI generation failed.");
-      }
-    } catch {
-      setResult("Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
+    if (!error && data) {
+      setHistory(data);
     }
   }
 
-  function clearAll() {
-    setPrompt("");
+  async function generateAI() {
+    if (!prompt.trim()) return;
+
+    setLoading(true);
     setResult("");
-    setLastPrompt("");
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const res = await fetch("/api/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        prompt,
+        user_id: user?.id,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (data.result) {
+      setResult(data.result);
+      setPrompt("");
+      loadHistory();
+    } else {
+      setResult(data.error || "Something went wrong.");
+    }
+
+    setLoading(false);
+  }
+
+  async function logout() {
+    await supabase.auth.signOut();
+    window.location.href = "/";
   }
 
   return (
@@ -60,87 +86,104 @@ export default function DashboardPage() {
         padding: "40px",
       }}
     >
-      <h1
+      <header
         style={{
-          color: "#FFD700",
-          fontSize: "56px",
-          marginBottom: "30px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "36px",
         }}
       >
-        SignalBoost AI
-      </h1>
+        <h1 style={{ color: "#FFD700", fontSize: "48px" }}>
+          SignalBoost AI
+        </h1>
 
-      <section
-        style={{
-          background: "#111722",
-          padding: "28px",
-          borderRadius: "20px",
-          marginBottom: "28px",
-        }}
-      >
-        <h2 style={{ marginBottom: "16px" }}>
-          What do you want to build?
-        </h2>
+        <button onClick={logout} style={secondaryButton}>
+          Logout
+        </button>
+      </header>
+
+      <section style={card}>
+        <h2 style={{ marginBottom: "16px" }}>What do you want to build?</h2>
 
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           placeholder="Example: Build an AI SaaS for restaurant marketing..."
-          style={{
-            width: "100%",
-            minHeight: "150px",
-            padding: "16px",
-            borderRadius: "12px",
-            border: "1px solid #333",
-            background: "#0b111a",
-            color: "white",
-            marginBottom: "18px",
-            fontSize: "16px",
-          }}
+          style={textarea}
         />
 
-        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-          <button
-            onClick={() => generateAI()}
-            disabled={loading}
-            style={button}
-          >
-            {loading ? "Generating..." : "Generate AI Strategy"}
-          </button>
-
-          <button
-            onClick={() => generateAI(lastPrompt)}
-            disabled={loading || !lastPrompt}
-            style={secondaryButton}
-          >
-            Refresh / Generate Again
-          </button>
-
-          <button onClick={clearAll} disabled={loading} style={secondaryButton}>
-            Clear
-          </button>
-        </div>
+        <button onClick={generateAI} disabled={loading} style={button}>
+          {loading ? "Generating..." : "Generate AI Strategy"}
+        </button>
       </section>
 
-      {loading && (
-        <section style={resultBox}>
-          Generating your AI strategy...
-        </section>
-      )}
-
-      {result && !loading && (
-        <section style={resultBox}>
+      {result && (
+        <section style={card}>
           <h2 style={{ color: "#FFD700", marginBottom: "16px" }}>
-            AI Response
+            Latest AI Response
           </h2>
+
           <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
             {result}
           </div>
         </section>
       )}
+
+      <section style={card}>
+        <h2 style={{ marginBottom: "20px" }}>Saved AI History</h2>
+
+        {history.length === 0 ? (
+          <p style={{ color: "#999" }}>No saved AI responses yet.</p>
+        ) : (
+          <div style={{ display: "grid", gap: "18px" }}>
+            {history.map((item) => (
+              <div key={item.id} style={historyCard}>
+                <p style={{ color: "#FFD700", fontWeight: "bold" }}>
+                  {item.prompt}
+                </p>
+
+                <p
+                  style={{
+                    color: "#aaa",
+                    marginTop: "10px",
+                    whiteSpace: "pre-wrap",
+                    lineHeight: 1.6,
+                  }}
+                >
+                  {item.result}
+                </p>
+
+                <small style={{ color: "#777" }}>
+                  {new Date(item.created_at).toLocaleString()}
+                </small>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </main>
   );
 }
+
+const card = {
+  background: "#111722",
+  padding: "28px",
+  borderRadius: "20px",
+  marginBottom: "28px",
+};
+
+const textarea = {
+  width: "100%",
+  minHeight: "150px",
+  padding: "16px",
+  borderRadius: "12px",
+  border: "1px solid #333",
+  background: "#0b111a",
+  color: "white",
+  marginBottom: "18px",
+  fontSize: "16px",
+};
 
 const button = {
   padding: "14px 22px",
@@ -153,7 +196,7 @@ const button = {
 };
 
 const secondaryButton = {
-  padding: "14px 22px",
+  padding: "12px 18px",
   borderRadius: "10px",
   border: "1px solid #333",
   background: "#0b111a",
@@ -162,8 +205,9 @@ const secondaryButton = {
   cursor: "pointer",
 };
 
-const resultBox = {
-  background: "#111722",
-  padding: "28px",
-  borderRadius: "20px",
+const historyCard = {
+  background: "#0b111a",
+  padding: "20px",
+  borderRadius: "14px",
+  border: "1px solid #222",
 };

@@ -15,6 +15,10 @@ export async function POST(req: Request) {
 
   const { prompt, language, type } = await req.json();
 
+  if (!prompt) {
+    return NextResponse.json({ error: "Missing prompt" }, { status: 400 });
+  }
+
   const output = `AI response for: ${prompt} (${language}, ${type})`;
 
   return NextResponse.json({

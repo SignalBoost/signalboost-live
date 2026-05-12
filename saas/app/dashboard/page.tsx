@@ -15,6 +15,7 @@ export default function DashboardPage() {
   const [result, setResult] = useState("");
   const [history, setHistory] = useState<Generation[]>([]);
   const [loading, setLoading] = useState(false);
+  const [audioUrl, setAudioUrl] = useState("");
 
   useEffect(() => {
     loadHistory();
@@ -33,19 +34,13 @@ export default function DashboardPage() {
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error(error.message);
-      return;
+    if (!error && data) {
+      setHistory(data);
     }
-
-    setHistory(data || []);
   }
 
   async function generateAI() {
-    if (!prompt.trim()) {
-      setResult("Please enter an idea first.");
-      return;
-    }
+    if (!prompt.trim()) return;
 
     setLoading(true);
     setResult("");
@@ -54,43 +49,50 @@ export default function DashboardPage() {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user) {
-      setResult("You must be logged in.");
-      setLoading(false);
-      return;
-    }
+    const res = await fetch("/api/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        prompt,
+        user_id: user?.id,
+      }),
+    });
 
-    try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          prompt,
-          user_id: user.id,
-        }),
-      });
+    const data = await res.json();
 
-      const data = await res.json();
-
-      if (data.result) {
-        setResult(data.result);
-        setPrompt("");
-        await loadHistory();
-      } else {
-        setResult(data.error || "AI generation failed.");
-      }
-    } catch (error) {
-      console.error(error);
-      setResult("Something went wrong.");
+    if (data.result) {
+      setResult(data.result);
+      setPrompt("");
+      loadHistory();
+    } else {
+      setResult(data.error || "Something went wrong.");
     }
 
     setLoading(false);
   }
 
-  async function refreshHistory() {
-    await loadHistory();
+  async function playVoice(text: string) {
+    try {
+      const res = await fetch("/api/voice", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text,
+        }),
+      });
+
+      const blob = await res.blob();
+
+      const url = URL.createObjectURL(blob);
+
+      setAudioUrl(url);
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   async function logout() {
@@ -105,7 +107,6 @@ export default function DashboardPage() {
         background: "#05070b",
         color: "white",
         padding: "40px",
-        fontFamily: "Arial, sans-serif",
       }}
     >
       <header
@@ -114,25 +115,11 @@ export default function DashboardPage() {
           justifyContent: "space-between",
           alignItems: "center",
           marginBottom: "36px",
-          gap: "20px",
-          flexWrap: "wrap",
         }}
       >
-        <div>
-          <h1
-            style={{
-              color: "#FFD700",
-              fontSize: "48px",
-              marginBottom: "8px",
-            }}
-          >
-            SignalBoost AI
-          </h1>
-
-          <p style={{ color: "#999" }}>
-            Generate and save AI strategies for your projects.
-          </p>
-        </div>
+        <h1 style={{ color: "#FFD700", fontSize: "48px" }}>
+          SignalBoost AI
+        </h1>
 
         <button onClick={logout} style={secondaryButton}>
           Logout
@@ -151,19 +138,9 @@ export default function DashboardPage() {
           style={textarea}
         />
 
-        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-          <button onClick={generateAI} disabled={loading} style={button}>
-            {loading ? "Generating..." : "Generate AI Strategy"}
-          </button>
-
-          <button
-            onClick={refreshHistory}
-            disabled={loading}
-            style={secondaryButton}
-          >
-            Refresh History
-          </button>
-        </div>
+        <button onClick={generateAI} disabled={loading} style={button}>
+          {loading ? "Generating..." : "Generate AI Strategy"}
+        </button>
       </section>
 
       {result && (
@@ -172,17 +149,46 @@ export default function DashboardPage() {
             Latest AI Response
           </h2>
 
-          <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
+          <div
+            style={{
+              whiteSpace: "pre-wrap",
+              lineHeight: 1.7,
+              marginBottom: "20px",
+            }}
+          >
             {result}
           </div>
+
+          <button
+            onClick={() => playVoice(result)}
+            style={button}
+          >
+            🔊 Play Voice
+          </button>
+
+          {audioUrl && (
+            <audio
+              src={audioUrl}
+              controls
+              autoPlay
+              style={{
+                marginTop: "20px",
+                width: "100%",
+              }}
+            />
+          )}
         </section>
       )}
 
       <section style={card}>
-        <h2 style={{ marginBottom: "20px" }}>Saved AI History</h2>
+        <h2 style={{ marginBottom: "20px" }}>
+          Saved AI History
+        </h2>
 
         {history.length === 0 ? (
-          <p style={{ color: "#999" }}>No saved AI responses yet.</p>
+          <p style={{ color: "#999" }}>
+            No saved AI responses yet.
+          </p>
         ) : (
           <div style={{ display: "grid", gap: "18px" }}>
             {history.map((item) => (
@@ -202,15 +208,30 @@ export default function DashboardPage() {
                     color: "#aaa",
                     whiteSpace: "pre-wrap",
                     lineHeight: 1.6,
-                    marginBottom: "12px",
+                    marginBottom: "14px",
                   }}
                 >
                   {item.result}
                 </p>
 
-                <small style={{ color: "#777" }}>
-                  {new Date(item.created_at).toLocaleString()}
-                </small>
+                <button
+                  onClick={() => playVoice(item.result)}
+                  style={secondaryButton}
+                >
+                  🔊 Play Voice
+                </button>
+
+                <div
+                  style={{
+                    marginTop: "12px",
+                    color: "#777",
+                    fontSize: "12px",
+                  }}
+                >
+                  {new Date(
+                    item.created_at
+                  ).toLocaleString()}
+                </div>
               </div>
             ))}
           </div>
@@ -250,7 +271,7 @@ const button = {
 };
 
 const secondaryButton = {
-  padding: "14px 22px",
+  padding: "12px 18px",
   borderRadius: "10px",
   border: "1px solid #333",
   background: "#0b111a",

@@ -1,215 +1,115 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
-
-type Project = {
-  id: string;
-  name: string;
-  description: string;
-};
+import { useState } from "react";
 
 export default function DashboardPage() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [prompt, setPrompt] = useState("");
+  const [result, setResult] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    loadProjects();
-  }, []);
+  async function handleGenerate() {
+    try {
+      setLoading(true);
 
-  async function loadProjects() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt,
+        }),
+      });
 
-    if (!user) return;
+      const data = await res.json();
 
-    const { data, error } = await supabase
-      .from("projects")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-
-    if (error) {
+      if (data.success) {
+        setResult(data.result);
+      } else {
+        setResult(data.error);
+      }
+    } catch (error) {
       console.error(error);
-      return;
+      setResult("Something went wrong");
+    } finally {
+      setLoading(false);
     }
-
-    setProjects(data || []);
-  }
-
-  async function createProject() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      alert("You must be logged in.");
-      return;
-    }
-
-    const { error } = await supabase.from("projects").insert({
-      user_id: user.id,
-      name,
-      description,
-    });
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    setName("");
-    setDescription("");
-
-    loadProjects();
-  }
-
-  async function logout() {
-    await supabase.auth.signOut();
-    window.location.href = "/";
   }
 
   return (
     <main
       style={{
         minHeight: "100vh",
-        background: "#05070b",
+        background: "#000814",
         color: "white",
         padding: "40px",
       }}
     >
-      <div
+      <h1
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
+          color: "#FFD700",
+          fontSize: "64px",
+          fontWeight: "bold",
           marginBottom: "40px",
         }}
       >
-        <h1
-          style={{
-            fontSize: "48px",
-            color: "#FFD700",
-          }}
-        >
-          Dashboard
-        </h1>
-
-        <button onClick={logout} style={button}>
-          Logout
-        </button>
-      </div>
+        SignalBoost AI
+      </h1>
 
       <div
         style={{
-          background: "#111722",
+          background: "#071126",
           padding: "24px",
-          borderRadius: "20px",
-          marginBottom: "40px",
+          borderRadius: "16px",
+          marginBottom: "24px",
         }}
       >
-        <h2
+        <textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder="Describe your startup idea..."
           style={{
+            width: "100%",
+            height: "140px",
+            background: "#000814",
+            color: "white",
+            border: "1px solid #333",
+            borderRadius: "8px",
+            padding: "16px",
             marginBottom: "20px",
           }}
-        >
-          Create Project
-        </h2>
-
-        <input
-          placeholder="Project Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          style={input}
         />
 
-        <textarea
-          placeholder="Project Description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
+        <button
+          onClick={handleGenerate}
+          disabled={loading}
           style={{
-            ...input,
-            minHeight: "120px",
+            background: "#FFD700",
+            color: "black",
+            padding: "14px 24px",
+            borderRadius: "8px",
+            border: "none",
+            fontWeight: "bold",
+            cursor: "pointer",
           }}
-        />
-
-        <button onClick={createProject} style={button}>
-          Create Project
+        >
+          {loading ? "Generating..." : "Generate AI Strategy"}
         </button>
       </div>
 
-      <div>
-        <h2
+      {result && (
+        <div
           style={{
-            marginBottom: "20px",
+            background: "#071126",
+            padding: "24px",
+            borderRadius: "16px",
+            whiteSpace: "pre-wrap",
+            lineHeight: "1.7",
           }}
         >
-          Your Projects
-        </h2>
-
-        {projects.length === 0 ? (
-          <p style={{ color: "#999" }}>
-            No projects yet.
-          </p>
-        ) : (
-          <div
-            style={{
-              display: "grid",
-              gap: "20px",
-            }}
-          >
-            {projects.map((project) => (
-              <div
-                key={project.id}
-                style={{
-                  background: "#111722",
-                  padding: "24px",
-                  borderRadius: "18px",
-                }}
-              >
-                <h3
-                  style={{
-                    color: "#FFD700",
-                    marginBottom: "10px",
-                  }}
-                >
-                  {project.name}
-                </h3>
-
-                <p
-                  style={{
-                    color: "#999",
-                  }}
-                >
-                  {project.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+          {result}
+        </div>
+      )}
     </main>
   );
 }
-
-const input = {
-  width: "100%",
-  padding: "14px",
-  marginBottom: "14px",
-  borderRadius: "10px",
-  border: "1px solid #333",
-  background: "#0b111a",
-  color: "white",
-};
-
-const button = {
-  padding: "14px 20px",
-  borderRadius: "10px",
-  border: 0,
-  background: "#FFD700",
-  color: "#000",
-  fontWeight: "bold",
-  cursor: "pointer",
-};

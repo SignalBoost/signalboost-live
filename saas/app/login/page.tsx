@@ -9,25 +9,44 @@ export default function LoginPage() {
   const [message, setMessage] = useState("");
 
   async function handleLogin() {
-    setMessage("Logging in...");
+    alert("LOGIN BUTTON WORKS");
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      setMessage("Logging in...");
 
-    if (error) {
-      setMessage(error.message);
-      return;
+      const { data, error } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+      console.log("LOGIN RESPONSE:", data);
+      console.log("LOGIN ERROR:", error);
+
+      if (error) {
+        setMessage(error.message);
+        alert(error.message);
+        return;
+      }
+
+      if (!data.session) {
+        setMessage("No session created.");
+        alert("No session created.");
+        return;
+      }
+
+      setMessage("SUCCESS");
+
+      alert("LOGIN SUCCESS");
+
+      window.location.href = "/dashboard";
+    } catch (err) {
+      console.error(err);
+
+      alert("LOGIN CRASHED");
+
+      setMessage("Something crashed.");
     }
-
-    if (!data.session) {
-      setMessage("Login succeeded, but no session was created.");
-      return;
-    }
-
-    setMessage("Login successful. Redirecting...");
-    window.location.href = "/dashboard";
   }
 
   return (
@@ -50,12 +69,21 @@ export default function LoginPage() {
           borderRadius: "20px",
         }}
       >
-        <h1 style={{ color: "#FFD700", marginBottom: "24px" }}>Login</h1>
+        <h1
+          style={{
+            color: "#FFD700",
+            marginBottom: "24px",
+          }}
+        >
+          Login
+        </h1>
 
         <input
           placeholder="Email"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) =>
+            setEmail(e.target.value)
+          }
           style={input}
         />
 
@@ -63,20 +91,38 @@ export default function LoginPage() {
           type="password"
           placeholder="Password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) =>
+            setPassword(e.target.value)
+          }
           style={input}
         />
 
-        <button onClick={handleLogin} style={button}>
+        <button
+          onClick={handleLogin}
+          style={button}
+        >
           Login
         </button>
 
-        {message && (
-          <p style={{ marginTop: "16px", color: "#FFD700" }}>{message}</p>
-        )}
+        <p
+          style={{
+            marginTop: "20px",
+            color: "#FFD700",
+          }}
+        >
+          {message}
+        </p>
 
-        <p style={{ marginTop: "20px", color: "#999" }}>
-          No account? <a href="/signup">Create one</a>
+        <p
+          style={{
+            marginTop: "20px",
+            color: "#999",
+          }}
+        >
+          No account?{" "}
+          <a href="/signup">
+            Create one
+          </a>
         </p>
       </div>
     </main>

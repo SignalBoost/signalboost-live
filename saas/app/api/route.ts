@@ -39,129 +39,123 @@ function forcedVideoFallback(prompt: string, language: string) {
   if (language === "pt") {
     return `
 # TÍTULO DO VÍDEO
-Gol do Flaco López — Momento de Explosão
+Vídeo Criativo Gerado por IA
 
 # FORMATO
 Vídeo vertical 9:16 para TikTok, Instagram Reels e YouTube Shorts.
 
 # HOOK
-"Quando a bola encontra o atacante certo, o estádio prende a respiração."
+"Um momento. Uma emoção. Uma história em movimento."
 
 # CENA 1
 Visual:
-Entrada dramática do estádio, torcida vibrando, luzes fortes e clima de decisão.
+Abertura cinematográfica com luz intensa, movimento de câmera e energia dramática.
 
 Voiceover:
-"É dia de jogo grande. A tensão está no ar. Cada toque na bola pode mudar tudo."
+"Tudo começa com uma ideia simples, mas cheia de impacto."
 
 On-screen text:
-FLACO LÓPEZ EM AÇÃO
+UM MOMENTO ÉPICO
 
 Sound effects:
-Som de torcida crescendo, batida cinematográfica, apito distante.
+Batida cinematográfica, som ambiente e crescimento de tensão.
 
 # CENA 2
 Visual:
-Sequência em câmera lenta: aproximação da área, defensor tentando bloquear, movimento explosivo do atacante.
+Sequência principal com ação, emoção e foco no personagem ou tema solicitado.
 
 Voiceover:
-"A bola chega. O espaço aparece. Flaco López lê a jogada antes de todo mundo."
+"A cena cresce, a emoção aumenta e cada detalhe chama atenção."
 
 On-screen text:
-UM TOQUE. UMA CHANCE.
+AÇÃO. EMOÇÃO. IMPACTO.
 
 Sound effects:
-Batida forte, som de chute, respiração suspensa.
+Impactos suaves, transições rápidas e música crescente.
 
 # CENA 3
 Visual:
-Chute final em câmera lenta, rede balançando, torcida explodindo em comemoração.
+Momento final poderoso, com câmera lenta, brilho e sensação de conquista.
 
 Voiceover:
-"Finalização precisa. Explosão da torcida. Um gol para levantar o estádio."
+"Esse é o tipo de conteúdo que prende o olhar e fica na memória."
 
 On-screen text:
-GOL! MOMENTO DECISIVO.
+CRIADO COM SIGNALBOOST AI
 
 Sound effects:
-Torcida em volume máximo, música épica, impacto da bola.
+Explosão musical, impacto final e fade out.
 
 # ENDING / CTA
 Visual:
-Flaco comemorando, estádio em festa, tela escurecendo com logo ou chamada final.
+Tela final com logo, frase de impacto e chamada para ação.
 
 Voiceover:
-"Flaco López. Presença de área. Decisão. Emoção."
-
-On-screen text:
-SIGA PARA MAIS MOMENTOS DO FUTEBOL
+"Transforme qualquer ideia em conteúdo poderoso."
 
 CTA:
-"Quer transformar qualquer momento em um vídeo épico? Crie com SignalBoost AI."
+"Crie agora com SignalBoost AI."
 `;
   }
 
   return `
 # VIDEO TITLE
-Flaco López Goal — Explosive Highlight Moment
+AI Generated Creative Video
 
 # FORMAT
-Vertical 9:16 for TikTok, Instagram Reels, and YouTube Shorts.
+Vertical 9:16 video for TikTok, Instagram Reels, and YouTube Shorts.
 
 # HOOK
-"When the ball meets the right striker, the whole stadium holds its breath."
+"One moment. One emotion. One story in motion."
 
 # SCENE 1
 Visual:
-A dramatic stadium opening, fans roaring, lights flashing, match-day tension.
+A cinematic opening with dramatic lighting, camera movement, and strong visual energy.
 
 Voiceover:
-"It's a big match. The energy is rising. One moment can change everything."
+"Every powerful piece of content starts with one simple idea."
 
 On-screen text:
-FLACO LÓPEZ IN ACTION
+AN EPIC MOMENT
 
 Sound effects:
-Crowd swell, cinematic drums, distant whistle.
+Cinematic hit, ambient sound, rising tension.
 
 # SCENE 2
 Visual:
-Slow-motion attacking sequence, defender closing in, striker finding space.
+Main action sequence focused on the requested subject, emotion, or story.
 
 Voiceover:
-"The ball arrives. The space opens. Flaco López sees the chance before anyone else."
+"The scene builds. The emotion rises. Every detail pulls the viewer in."
 
 On-screen text:
-ONE TOUCH. ONE CHANCE.
+ACTION. EMOTION. IMPACT.
 
 Sound effects:
-Heartbeat bass, kick impact, crowd silence.
+Soft impacts, quick transitions, rising music.
 
 # SCENE 3
 Visual:
-The shot, the net shaking, fans exploding in celebration.
+Powerful final moment with slow motion, glow, and a feeling of victory.
 
 Voiceover:
-"Clean finish. Pure emotion. A goal that lifts the stadium."
+"This is the kind of content that captures attention and stays remembered."
 
 On-screen text:
-GOAL! DECISIVE MOMENT.
+CREATED WITH SIGNALBOOST AI
 
 Sound effects:
-Crowd explosion, epic music hit, ball impact.
+Music swell, final impact, fade out.
 
 # ENDING / CTA
 Visual:
-Celebration shot, stadium lights, final branded frame.
+Final branded screen with logo, bold text, and call to action.
 
 Voiceover:
-"Flaco López. Power. Timing. Emotion."
-
-On-screen text:
-FOLLOW FOR MORE FOOTBALL MOMENTS
+"Turn any idea into powerful content."
 
 CTA:
-"Turn any moment into an epic video with SignalBoost AI."
+"Create now with SignalBoost AI."
 `;
 }
 
@@ -172,21 +166,20 @@ function buildPrompt(mode: string, prompt: string, language: string) {
     return `
 You must write in ${lang}.
 
-Create a NEW VIDEO PRODUCTION PLAN for this request:
+Create a short video generation prompt and production script for this request:
 
 "${prompt}"
 
-This is NOT a request to show real footage.
-This is NOT a request to browse.
-This is NOT a request to find an existing video.
+The output will be sent to a video generation API.
 
-The user wants a creative video script and production plan.
-
-You must never say you cannot show videos or images.
+Do not say you cannot show videos.
+Do not mention browsing, YouTube, or real footage.
+Do not apologize.
 
 Use exactly this structure:
 
 # VIDEO TITLE
+# VIDEO GENERATION PROMPT
 # FORMAT
 # HOOK
 # SCENE 1
@@ -254,6 +247,51 @@ Create a useful, professional response for:
 `;
 }
 
+async function generateVideo(videoPrompt: string) {
+  if (!process.env.VIDEO_API_KEY) {
+    throw new Error("VIDEO_API_KEY is missing in .env.local");
+  }
+
+  /*
+    IMPORTANT:
+    Replace this URL and response parsing with your real video provider.
+
+    Examples of providers:
+    - Runway
+    - Luma
+    - Pika
+    - Kling
+    - Replicate video models
+    - Stability video models
+  */
+
+  const res = await fetch("https://api.example-video-provider.com/v1/videos", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.VIDEO_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      prompt: videoPrompt,
+      aspect_ratio: "9:16",
+      duration: 8,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Video generation failed: ${errorText}`);
+  }
+
+  const data = await res.json();
+
+  if (!data.video_url) {
+    throw new Error("Video provider did not return video_url.");
+  }
+
+  return data.video_url;
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -309,7 +347,7 @@ export async function POST(req: Request) {
         {
           role: "system",
           content:
-            "You are SignalBoost AI, a creative production platform. You create scripts, production plans, creative briefs, voice scripts, visual concepts, and marketing assets. Never behave like a search assistant.",
+            "You are SignalBoost AI, a creative production platform. You create scripts, production plans, creative briefs, voice scripts, visual concepts, video generation prompts, and marketing assets. Never behave like a search assistant.",
         },
         {
           role: "user",
@@ -323,6 +361,25 @@ export async function POST(req: Request) {
 
     if (mode === "video" && isRefusal(result)) {
       result = forcedVideoFallback(prompt, language);
+    }
+
+    let video_url = "";
+
+    if (mode === "video") {
+      try {
+        video_url = await generateVideo(result);
+      } catch (videoError: any) {
+        console.error("VIDEO_GENERATION_ERROR:", videoError);
+
+        result += `
+
+# VIDEO STATUS
+Video script created successfully, but video rendering is not connected yet.
+
+Technical message:
+${videoError.message}
+`;
+      }
     }
 
     await supabase.from("generations").insert([
@@ -342,6 +399,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       result,
+      video_url,
       mode,
       language,
       remaining: DAILY_LIMIT - (usage.generations_count + 1),

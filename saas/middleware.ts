@@ -21,14 +21,15 @@ export async function middleware(req: NextRequest) {
   );
 
   if (isProtected && !session) {
-    return NextResponse.redirect(
-      new URL("/login", req.url)
-    );
+    return NextResponse.redirect(new URL("/login", req.url));
   }
 
   return res;
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*"],
+  matcher: [
+    "/dashboard/:path*",
+    "/((?!api).*)", // ← Fix #1: exclude API routes
+  ],
 };

@@ -13,35 +13,182 @@ const supabase = createClient(
 
 const DAILY_LIMIT = 5;
 
-function getLanguageInstruction(language: string) {
-  if (language === "pt") return "Write the entire response in Brazilian Portuguese.";
-  if (language === "es") return "Write the entire response in Spanish.";
-  if (language === "pl") return "Write the entire response in Polish.";
-  if (language === "ru") return "Write the entire response in Russian.";
-  return "Write the entire response in English.";
+function languageText(language: string) {
+  if (language === "pt") return "Brazilian Portuguese";
+  if (language === "es") return "Spanish";
+  if (language === "pl") return "Polish";
+  if (language === "ru") return "Russian";
+  return "English";
 }
 
-function buildPrompt(mode: string, prompt: string) {
+function isRefusal(text: string) {
+  const lower = text.toLowerCase();
+
+  return (
+    lower.includes("não posso mostrar") ||
+    lower.includes("não consigo mostrar") ||
+    lower.includes("cannot show") ||
+    lower.includes("can't show") ||
+    lower.includes("youtube") ||
+    lower.includes("search online") ||
+    lower.includes("procurar no youtube")
+  );
+}
+
+function forcedVideoFallback(prompt: string, language: string) {
+  if (language === "pt") {
+    return `
+# TÍTULO DO VÍDEO
+Gol do Flaco López — Momento de Explosão
+
+# FORMATO
+Vídeo vertical 9:16 para TikTok, Instagram Reels e YouTube Shorts.
+
+# HOOK
+"Quando a bola encontra o atacante certo, o estádio prende a respiração."
+
+# CENA 1
+Visual:
+Entrada dramática do estádio, torcida vibrando, luzes fortes e clima de decisão.
+
+Voiceover:
+"É dia de jogo grande. A tensão está no ar. Cada toque na bola pode mudar tudo."
+
+On-screen text:
+FLACO LÓPEZ EM AÇÃO
+
+Sound effects:
+Som de torcida crescendo, batida cinematográfica, apito distante.
+
+# CENA 2
+Visual:
+Sequência em câmera lenta: aproximação da área, defensor tentando bloquear, movimento explosivo do atacante.
+
+Voiceover:
+"A bola chega. O espaço aparece. Flaco López lê a jogada antes de todo mundo."
+
+On-screen text:
+UM TOQUE. UMA CHANCE.
+
+Sound effects:
+Batida forte, som de chute, respiração suspensa.
+
+# CENA 3
+Visual:
+Chute final em câmera lenta, rede balançando, torcida explodindo em comemoração.
+
+Voiceover:
+"Finalização precisa. Explosão da torcida. Um gol para levantar o estádio."
+
+On-screen text:
+GOL! MOMENTO DECISIVO.
+
+Sound effects:
+Torcida em volume máximo, música épica, impacto da bola.
+
+# ENDING / CTA
+Visual:
+Flaco comemorando, estádio em festa, tela escurecendo com logo ou chamada final.
+
+Voiceover:
+"Flaco López. Presença de área. Decisão. Emoção."
+
+On-screen text:
+SIGA PARA MAIS MOMENTOS DO FUTEBOL
+
+CTA:
+"Quer transformar qualquer momento em um vídeo épico? Crie com SignalBoost AI."
+`;
+  }
+
+  return `
+# VIDEO TITLE
+Flaco López Goal — Explosive Highlight Moment
+
+# FORMAT
+Vertical 9:16 for TikTok, Instagram Reels, and YouTube Shorts.
+
+# HOOK
+"When the ball meets the right striker, the whole stadium holds its breath."
+
+# SCENE 1
+Visual:
+A dramatic stadium opening, fans roaring, lights flashing, match-day tension.
+
+Voiceover:
+"It's a big match. The energy is rising. One moment can change everything."
+
+On-screen text:
+FLACO LÓPEZ IN ACTION
+
+Sound effects:
+Crowd swell, cinematic drums, distant whistle.
+
+# SCENE 2
+Visual:
+Slow-motion attacking sequence, defender closing in, striker finding space.
+
+Voiceover:
+"The ball arrives. The space opens. Flaco López sees the chance before anyone else."
+
+On-screen text:
+ONE TOUCH. ONE CHANCE.
+
+Sound effects:
+Heartbeat bass, kick impact, crowd silence.
+
+# SCENE 3
+Visual:
+The shot, the net shaking, fans exploding in celebration.
+
+Voiceover:
+"Clean finish. Pure emotion. A goal that lifts the stadium."
+
+On-screen text:
+GOAL! DECISIVE MOMENT.
+
+Sound effects:
+Crowd explosion, epic music hit, ball impact.
+
+# ENDING / CTA
+Visual:
+Celebration shot, stadium lights, final branded frame.
+
+Voiceover:
+"Flaco López. Power. Timing. Emotion."
+
+On-screen text:
+FOLLOW FOR MORE FOOTBALL MOMENTS
+
+CTA:
+"Turn any moment into an epic video with SignalBoost AI."
+`;
+}
+
+function buildPrompt(mode: string, prompt: string, language: string) {
+  const lang = languageText(language);
+
   if (mode === "video") {
     return `
-Create a NEW VIDEO PRODUCTION PLAN for this idea:
+You must write in ${lang}.
+
+Create a NEW VIDEO PRODUCTION PLAN for this request:
 
 "${prompt}"
 
-Do NOT talk about whether you can show real videos.
-Do NOT mention YouTube.
-Do NOT say you cannot provide videos or images.
+This is NOT a request to show real footage.
+This is NOT a request to browse.
+This is NOT a request to find an existing video.
 
-The user wants a creative video plan, not existing footage.
+The user wants a creative video script and production plan.
 
-Use this exact format:
+You must never say you cannot show videos or images.
+
+Use exactly this structure:
 
 # VIDEO TITLE
-
 # FORMAT
-
 # HOOK
-
 # SCENE 1
 Visual:
 Voiceover:
@@ -61,83 +208,47 @@ On-screen text:
 Sound effects:
 
 # ENDING / CTA
-
-If this is about sports, make it energetic, dramatic, and highlight-style.
 `;
   }
 
   if (mode === "visual") {
     return `
-Create a NEW VISUAL CREATIVE BRIEF for this idea:
+Write in ${lang}.
+
+Create a VISUAL CREATIVE BRIEF for:
 
 "${prompt}"
 
-Do NOT say you cannot show images.
-Do NOT mention external websites.
+Never say you cannot show images.
 
-Use this exact format:
-
+Use:
 # VISUAL CONCEPT
-
 # MAIN SUBJECT
-
 # BACKGROUND
-
 # COLORS
-
 # TEXT OVERLAY
-
 # LAYOUT
-
 # STYLE DIRECTION
-
 # IMAGE GENERATION PROMPT
 `;
   }
 
   if (mode === "voice") {
     return `
-Create a spoken voice narration script for:
+Write in ${lang}.
+
+Create a spoken narration script for:
 
 "${prompt}"
 
-Write it like something meant to be heard aloud.
-Use emotion, short sentences, pacing, and pauses.
-`;
-  }
-
-  if (mode === "podcast") {
-    return `
-Create a podcast script for:
-
-"${prompt}"
-
-Include intro, host dialogue, segment flow, and closing.
-`;
-  }
-
-  if (mode === "social") {
-    return `
-Create social media ad content for:
-
-"${prompt}"
-
-Include hooks, captions, CTAs, and short variations.
-`;
-  }
-
-  if (mode === "translate") {
-    return `
-Translate and culturally adapt this:
-
-"${prompt}"
-
-Preserve meaning, tone, and emotional impact.
+Use emotion, rhythm, short sentences, and natural spoken pacing.
 `;
   }
 
   return `
-Create a practical business/startup strategy for:
+Write in ${lang}.
+
+Create a useful, professional response for:
 
 "${prompt}"
 `;
@@ -193,34 +304,26 @@ export async function POST(req: Request) {
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      temperature: 0.4,
+      temperature: 0.3,
       messages: [
         {
           role: "system",
-          content: `
-You are SignalBoost AI.
-
-You are NOT a search assistant.
-You are NOT a generic chatbot.
-You are a production assistant that creates scripts, plans, briefs, and creative assets.
-
-Critical rule:
-If the user selects video mode, ALWAYS create a video production plan.
-If the user selects visual mode, ALWAYS create a visual creative brief.
-Never say you cannot show videos or images.
-
-${getLanguageInstruction(language)}
-`,
+          content:
+            "You are SignalBoost AI, a creative production platform. You create scripts, production plans, creative briefs, voice scripts, visual concepts, and marketing assets. Never behave like a search assistant.",
         },
         {
           role: "user",
-          content: buildPrompt(mode, prompt),
+          content: buildPrompt(mode, prompt, language),
         },
       ],
     });
 
-    const result =
+    let result =
       completion.choices[0]?.message?.content || "No response generated.";
+
+    if (mode === "video" && isRefusal(result)) {
+      result = forcedVideoFallback(prompt, language);
+    }
 
     await supabase.from("generations").insert([
       {

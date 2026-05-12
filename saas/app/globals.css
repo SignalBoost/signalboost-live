@@ -1,15 +1,9 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
 body {
+  padding: 0;
   margin: 0;
-  background: #05070b;
-  color: white;
-  font-family: Arial, sans-serif;
-}
-
-a {
-  text-decoration: none;
-  color: #ffd700;
-}
-
-a:hover {
-  color: white;
 }

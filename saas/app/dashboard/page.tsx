@@ -13,9 +13,13 @@ type Generation = {
 export default function DashboardPage() {
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState("strategy");
+  const [language, setLanguage] = useState("en");
+
   const [result, setResult] = useState("");
   const [history, setHistory] = useState<Generation[]>([]);
+
   const [loading, setLoading] = useState(false);
+
   const [audioUrl, setAudioUrl] = useState("");
 
   useEffect(() => {
@@ -69,6 +73,7 @@ export default function DashboardPage() {
         body: JSON.stringify({
           prompt,
           mode,
+          language,
           user_id: user.id,
         }),
       });
@@ -99,10 +104,12 @@ export default function DashboardPage() {
         },
         body: JSON.stringify({
           text,
+          language,
         }),
       });
 
       const blob = await res.blob();
+
       const url = URL.createObjectURL(blob);
 
       setAudioUrl(url);
@@ -121,31 +128,21 @@ export default function DashboardPage() {
   }
 
   const modes = [
-    {
-      id: "strategy",
-      label: "Strategy",
-      description: "Business plan, roadmap, and execution steps.",
-    },
-    {
-      id: "voice",
-      label: "Voice",
-      description: "Spoken script optimized for narration and audio.",
-    },
-    {
-      id: "video",
-      label: "Video",
-      description: "Cinematic script with scenes, pacing, and narration.",
-    },
-    {
-      id: "podcast",
-      label: "Podcast",
-      description: "Conversational intro, episode, or host script.",
-    },
-    {
-      id: "social",
-      label: "Social Ad",
-      description: "Short-form marketing copy for social platforms.",
-    },
+    "strategy",
+    "voice",
+    "video",
+    "podcast",
+    "social",
+    "visual",
+    "translate",
+  ];
+
+  const languages = [
+    { code: "en", label: "English" },
+    { code: "es", label: "Español" },
+    { code: "pt", label: "Português" },
+    { code: "pl", label: "Polski" },
+    { code: "ru", label: "Русский" },
   ];
 
   return (
@@ -180,8 +177,7 @@ export default function DashboardPage() {
           </h1>
 
           <p style={{ color: "#999" }}>
-            Choose an output type, describe your idea, and generate a
-            professional result.
+            Multilingual AI generation platform.
           </p>
         </div>
 
@@ -195,56 +191,81 @@ export default function DashboardPage() {
           What do you want to create?
         </h2>
 
+        {/* LANGUAGE */}
+
+        <div style={{ marginBottom: "20px" }}>
+          <label style={{ marginBottom: "8px", display: "block" }}>
+            🌍 Language
+          </label>
+
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            style={select}
+          >
+            {languages.map((lang) => (
+              <option key={lang.code} value={lang.code}>
+                {lang.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* MODES */}
+
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(160px, 1fr))",
             gap: "12px",
             marginBottom: "20px",
           }}
         >
           {modes.map((item) => (
             <button
-              key={item.id}
-              onClick={() => setMode(item.id)}
+              key={item}
+              onClick={() => setMode(item)}
               style={{
-                textAlign: "left",
-                padding: "16px",
-                borderRadius: "14px",
+                padding: "14px",
+                borderRadius: "12px",
                 border:
-                  mode === item.id
+                  mode === item
                     ? "2px solid #FFD700"
                     : "1px solid #333",
                 background:
-                  mode === item.id ? "#FFD700" : "#0b111a",
-                color: mode === item.id ? "#000" : "#fff",
+                  mode === item
+                    ? "#FFD700"
+                    : "#0b111a",
+                color:
+                  mode === item
+                    ? "#000"
+                    : "#fff",
                 cursor: "pointer",
+                fontWeight: "bold",
+                textTransform: "capitalize",
               }}
             >
-              <strong>{item.label}</strong>
-              <p
-                style={{
-                  marginTop: "6px",
-                  fontSize: "12px",
-                  color: mode === item.id ? "#222" : "#999",
-                  lineHeight: 1.4,
-                }}
-              >
-                {item.description}
-              </p>
+              {item}
             </button>
           ))}
         </div>
 
+        {/* PROMPT */}
+
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Example: Create a motivational startup pitch for an AI fitness company..."
+          placeholder="Describe what you want to create..."
           style={textarea}
         />
 
-        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-          <button onClick={generateAI} disabled={loading} style={button}>
+        <div style={{ display: "flex", gap: "12px" }}>
+          <button
+            onClick={generateAI}
+            disabled={loading}
+            style={button}
+          >
             {loading ? "Generating..." : "Generate"}
           </button>
 
@@ -253,15 +274,22 @@ export default function DashboardPage() {
             disabled={loading}
             style={secondaryButton}
           >
-            Refresh History
+            Refresh
           </button>
         </div>
       </section>
 
+      {/* RESULT */}
+
       {result && (
         <section style={card}>
-          <h2 style={{ color: "#FFD700", marginBottom: "16px" }}>
-            Latest {modes.find((item) => item.id === mode)?.label} Response
+          <h2
+            style={{
+              color: "#FFD700",
+              marginBottom: "16px",
+            }}
+          >
+            AI Response
           </h2>
 
           <div
@@ -274,7 +302,10 @@ export default function DashboardPage() {
             {result}
           </div>
 
-          <button onClick={() => playVoice(result)} style={button}>
+          <button
+            onClick={() => playVoice(result)}
+            style={button}
+          >
             🔊 Play Voice
           </button>
 
@@ -292,8 +323,12 @@ export default function DashboardPage() {
         </section>
       )}
 
+      {/* HISTORY */}
+
       <section style={card}>
-        <h2 style={{ marginBottom: "20px" }}>Saved AI History</h2>
+        <h2 style={{ marginBottom: "20px" }}>
+          Saved AI History
+        </h2>
 
         {history.length === 0 ? (
           <p style={{ color: "#999" }}>
@@ -338,7 +373,9 @@ export default function DashboardPage() {
                     fontSize: "12px",
                   }}
                 >
-                  {new Date(item.created_at).toLocaleString()}
+                  {new Date(
+                    item.created_at
+                  ).toLocaleString()}
                 </div>
               </div>
             ))}
@@ -365,6 +402,16 @@ const textarea = {
   background: "#0b111a",
   color: "white",
   marginBottom: "18px",
+  fontSize: "16px",
+};
+
+const select = {
+  width: "100%",
+  padding: "14px",
+  borderRadius: "10px",
+  border: "1px solid #333",
+  background: "#0b111a",
+  color: "white",
   fontSize: "16px",
 };
 

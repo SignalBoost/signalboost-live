@@ -24,49 +24,44 @@ export default function RootLayout({
           style={{
             padding: "20px",
             borderBottom: "1px solid #222",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
           }}
         >
-          <h1 style={{ color: "#FFD700", margin: 0 }}>
+          <h1
+            style={{
+              color: "#FFD700",
+              margin: 0,
+              fontSize: "28px",
+            }}
+          >
             SignalBoost
           </h1>
 
-          <nav style={{ marginTop: "12px" }}>
-            <a
-              href="/dashboard"
-              style={{
-                marginRight: "20px",
-                color: "#aaa",
-              }}
-            >
+          <nav
+            style={{
+              display: "flex",
+              gap: "20px",
+            }}
+          >
+            <a href="/" style={navLink}>
+              Home
+            </a>
+
+            <a href="/dashboard" style={navLink}>
               Dashboard
             </a>
 
-            <a
-              href="/website-generator"
-              style={{
-                marginRight: "20px",
-                color: "#aaa",
-              }}
-            >
+            <a href="/website-generator" style={navLink}>
               Website Generator
             </a>
 
-            <a
-              href="/automations"
-              style={{
-                marginRight: "20px",
-                color: "#aaa",
-              }}
-            >
+            <a href="/automations" style={navLink}>
               Automations
             </a>
 
-            <a
-              href="/settings"
-              style={{
-                color: "#aaa",
-              }}
-            >
+            <a href="/settings" style={navLink}>
               Settings
             </a>
           </nav>
@@ -77,3 +72,9 @@ export default function RootLayout({
     </html>
   );
 }
+
+const navLink = {
+  color: "#aaa",
+  textDecoration: "none",
+  fontSize: "15px",
+};

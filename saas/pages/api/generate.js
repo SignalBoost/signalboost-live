@@ -13,6 +13,10 @@ export default async function handler(req, res) {
 
   const { prompt, language, type } = req.body;
 
+  if (!prompt) {
+    return res.status(400).json({ error: "Missing prompt" });
+  }
+
   const output = `AI response for: ${prompt} (${language}, ${type})`;
 
   return res.status(200).json({

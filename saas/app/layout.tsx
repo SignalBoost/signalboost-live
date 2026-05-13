@@ -18,7 +18,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         {/* Main content */}
         <main className="flex-1 p-10 overflow-y-auto">
-          {/* Topbar */}
           <header className="flex justify-between items-center bg-white shadow px-6 py-4 mb-6 rounded-lg">
             <h2 className="text-xl font-bold text-gray-800">Dashboard</h2>
             <div className="flex items-center space-x-6">

@@ -2,10 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
-html,
+/* Custom theme overrides */
 body {
-  margin: 0;
-  padding: 0;
-  background: #070a0f;
-  color: white;
+  @apply bg-gray-100 text-gray-900;
+}
+
+h1, h2, h3 {
+  @apply font-bold text-gray-800;
+}
+
+.card {
+  @apply bg-white shadow rounded-lg p-6;
+}
+
+.btn-primary {
+  @apply bg-yellow-500 text-white px-6 py-2 rounded-md font-semibold hover:bg-yellow-600;
 }

@@ -1,7 +1,6 @@
 export default function DashboardPage() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-      {/* Video Generator */}
       <div className="card">
         <h2 className="text-xl mb-4">AI Video Generator</h2>
         <div className="flex space-x-4">
@@ -14,13 +13,11 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Credits */}
       <div className="card">
         <h2 className="text-xl mb-4">Credits</h2>
         <p className="text-gray-600">You have 50 credits available.</p>
       </div>
 
-      {/* History */}
       <div className="card col-span-1 md:col-span-2">
         <h2 className="text-xl mb-4">Recent History</h2>
         <ul className="space-y-2 text-gray-700">

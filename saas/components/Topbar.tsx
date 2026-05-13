@@ -1,22 +1,37 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
+import { getCredits } from "@/lib/credits";
+
 export default function Topbar() {
+  const [credits, setCredits] = useState<{ used: number; credit_limit: number } | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserEmail(user.email);
+        const creditData = await getCredits(user.id);
+        setCredits(creditData);
+      }
+    };
+    fetchData();
+  }, []);
+
   return (
-    <header className="flex h-16 items-center justify-between border-b border-white/10 bg-black/20 px-6">
-      <div>
-        <p className="text-sm font-bold text-white">Workspace</p>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <select className="rounded-full border border-white/10 bg-gray-900 px-3 py-2 text-sm text-white">
-          <option>EN</option>
-          <option>ES</option>
-          <option>PT</option>
-        </select>
-
-        <div className="grid h-9 w-9 place-items-center rounded-full bg-yellow-400 font-black text-black">
-          S
-        </div>
+    <header className="flex justify-between items-center bg-white shadow px-6 py-4 mb-6">
+      <h2 className="text-xl font-bold text-gray-800">Dashboard</h2>
+      <div className="flex items-center space-x-6">
+        {credits && (
+          <span className="text-sm font-semibold text-yellow-600">
+            Credits: {credits.used} / {credits.credit_limit}
+          </span>
+        )}
+        {userEmail && (
+          <span className="text-sm text-gray-600">{userEmail}</span>
+        )}
       </div>
     </header>
   );

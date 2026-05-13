@@ -1,9 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "SignalBoost — Turn Reviews Into Content",
-  description:
-    "SignalBoost transforms customer reviews into branded graphics and voice ads from one simple dashboard.",
+  title: "SignalBoost Dashboard",
+  description: "Create AI content from reviews, prompts, and campaigns.",
 };
 
 export default function RootLayout({
@@ -12,7 +11,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" data-theme="dark">
+    <html lang="en">
       <body>{children}</body>
     </html>
   );

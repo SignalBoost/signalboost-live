@@ -1,89 +1,47 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
-import { getCredits } from "@/lib/credits";
-import { addHistory } from "@/lib/history";
-
 export default function DashboardPage() {
-  const [prompt, setPrompt] = useState("");
-  const [output, setOutput] = useState("");
-  const [credits, setCredits] = useState<{ used: number; credit_limit: number } | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchCredits = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const creditData = await getCredits(user.id);
-        setCredits(creditData);
-      }
-      setLoading(false);
-    };
-    fetchCredits();
-  }, []);
-
-  const handleGenerate = async () => {
-    if (!credits) return;
-
-    // Cost per video generation
-    const cost = 5;
-
-    if (credits.used + cost > credits.credit_limit) {
-      setOutput("❌ Not enough credits. Please upgrade or purchase more.");
-      return;
-    }
-
-    // Placeholder AI output
-    const newOutput = `Generated video for: "${prompt}"`;
-    setOutput(newOutput);
-
-    // Save to history + deduct credits
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      await addHistory(user.id, "video", prompt, newOutput, "/videos/path.mp4");
-      await supabase.rpc("increment_credits", { target_user_id: user.id, amount: cost });
-      const updatedCredits = await getCredits(user.id);
-      setCredits(updatedCredits);
-    }
-  };
-
-  if (loading) return <p className="text-gray-400">Loading dashboard...</p>;
-
   return (
-    <div className="space-y-6">
-      <h2 className="text-3xl font-bold text-yellow-400">AI Video Generator</h2>
-
-      <textarea
-        className="w-full h-32 p-4 bg-gray-800 text-gray-100 rounded"
-        placeholder="Describe your video..."
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-      />
-
-      <button
-        onClick={handleGenerate}
-        className="bg-yellow-400 text-black px-6 py-2 rounded font-semibold"
-      >
-        Generate Video
-      </button>
-
-      <div className="bg-gray-800 p-6 rounded">
-        <h3 className="text-xl font-semibold mb-4">Output Preview</h3>
-        {output ? (
-          <p className="text-gray-100">{output}</p>
-        ) : (
-          <p className="text-gray-400">Your generated video will appear here...</p>
-        )}
-      </div>
-
-      {credits && (
-        <div className="bg-gray-900 p-4 rounded">
-          <p className="text-yellow-400 font-bold">
-            Credits: {credits.used} / {credits.credit_limit}
+    <main className="min-h-screen bg-[#070a0f] p-6 text-white">
+      <section className="mx-auto max-w-6xl space-y-6">
+        <div>
+          <p className="text-sm font-bold text-yellow-400">SignalBoost AI</p>
+          <h1 className="mt-2 text-4xl font-black">Dashboard</h1>
+          <p className="mt-2 text-gray-400">
+            Create content, track credits, and manage your AI workspace.
           </p>
         </div>
-      )}
-    </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-white/10 bg-[#111722] p-6">
+            <p className="text-sm text-gray-400">Credits Used</p>
+            <p className="mt-2 text-3xl font-black text-yellow-400">0</p>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-[#111722] p-6">
+            <p className="text-sm text-gray-400">Plan</p>
+            <p className="mt-2 text-3xl font-black">Starter</p>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-[#111722] p-6">
+            <p className="text-sm text-gray-400">Status</p>
+            <p className="mt-2 text-3xl font-black text-green-400">Ready</p>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-[#111722] p-6">
+          <h2 className="text-2xl font-black text-yellow-400">
+            Create Content
+          </h2>
+
+          <textarea
+            className="mt-4 h-36 w-full rounded-2xl border border-white/10 bg-gray-950 p-4 text-white outline-none focus:border-yellow-400"
+            placeholder="Describe what you want to create..."
+          />
+
+          <button className="mt-4 rounded-full bg-yellow-400 px-6 py-3 font-black text-black hover:bg-yellow-300">
+            Generate
+          </button>
+        </div>
+      </section>
+    </main>
   );
 }

@@ -1,7 +1,7 @@
 // saas/app/api/brand-profile/route.ts
 
 import { NextResponse } from "next/server";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { createRouteHandlerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 export async function GET() {
@@ -10,6 +10,7 @@ export async function GET() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
@@ -61,9 +63,7 @@ export async function POST(req: Request) {
 
   const { data, error } = await supabase
     .from("brand_profiles")
-    .upsert(payload, {
-      onConflict: "user_id",
-    })
+    .upsert(payload, { onConflict: "user_id" })
     .select("*")
     .single();
 

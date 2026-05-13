@@ -2,15 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --bg: #070a0f;
-  --surface: #111722;
-  --yellow: #f6b91a;
-}
-
 html,
 body {
-  min-height: 100%;
+  margin: 0;
+  padding: 0;
   background: #070a0f;
-  color: #f9fafb;
+  color: white;
 }

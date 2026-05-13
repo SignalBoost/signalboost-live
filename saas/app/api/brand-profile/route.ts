@@ -1,26 +1,79 @@
-// Auto-adjust brand memory based on behavioral patterns
-const { data: behaviors } = await supabase
-  .from("behavioral_memory")
-  .select("*")
-  .eq("user_id", user.id)
-  .order("created_at", { ascending: false })
-  .limit(10);
+// saas/app/api/brand-profile/route.ts
 
-if (behaviors && behaviors.length > 0) {
-  const recent = behaviors[0];
+import { NextResponse } from "next/server";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { cookies } from "next/headers";
 
-  const updates: any = {};
+export async function GET() {
+  const supabase = createRouteHandlerClient({ cookies });
 
-  if (recent.tone_shift) updates.brand_tone = recent.tone_shift;
-  if (recent.formality_shift) updates.formality_level = recent.formality_shift;
-  if (recent.structure_shift) updates.layout_style = recent.structure_shift;
-
-  if (recent.vocabulary_changes?.length > 0) {
-    updates.brand_personality = `Prefers vocabulary: ${recent.vocabulary_changes.join(", ")}`;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  await supabase
+  const { data, error } = await supabase
     .from("brand_profiles")
-    .update(updates)
-    .eq("user_id", user.id);
+    .select("*")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("GET brand_profile error:", error);
+    return NextResponse.json(
+      { error: "Failed to load brand profile" },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({ profile: data });
+}
+
+export async function POST(req: Request) {
+  const supabase = createRouteHandlerClient({ cookies });
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  const body = await req.json();
+
+  const payload = {
+    user_id: user.id,
+    brand_name: body.brand_name ?? null,
+    brand_tagline: body.brand_tagline ?? null,
+    brand_tone: body.brand_tone ?? null,
+    formality_level: body.formality_level ?? null,
+    primary_audience: body.primary_audience ?? null,
+    brand_personality: body.brand_personality ?? null,
+    primary_language: body.primary_language ?? null,
+    secondary_languages: body.secondary_languages ?? null,
+    cultural_notes: body.cultural_notes ?? null,
+    preferred_colors: body.preferred_colors ?? null,
+    layout_style: body.layout_style ?? null,
+    visual_notes: body.visual_notes ?? null,
+  };
+
+  const { data, error } = await supabase
+    .from("brand_profiles")
+    .upsert(payload, {
+      onConflict: "user_id",
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error("POST brand_profile error:", error);
+    return NextResponse.json(
+      { error: "Failed to save brand profile" },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({ profile: data });
 }

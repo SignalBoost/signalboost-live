@@ -2,7 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom theme overrides */
 body {
   @apply bg-gray-100 text-gray-900;
 }

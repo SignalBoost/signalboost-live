@@ -1,27 +1,22 @@
+"use client";
+
 export default function Topbar() {
   return (
-    <header className="flex items-center justify-between border-b border-neutral-800 bg-[#05070b] px-6 py-4">
+    <header className="flex h-16 items-center justify-between border-b border-white/10 bg-black/20 px-6">
       <div>
-        <h2 className="text-lg font-semibold text-white">Dashboard</h2>
-        <p className="text-xs text-neutral-500">
-          Manage your SignalBoost workspace
-        </p>
+        <p className="text-sm font-bold text-white">Workspace</p>
       </div>
 
       <div className="flex items-center gap-3">
-        <a
-          href="/"
-          className="rounded-lg border border-neutral-700 px-3 py-2 text-xs text-neutral-300 hover:bg-neutral-900"
-        >
-          View Site
-        </a>
+        <select className="rounded-full border border-white/10 bg-gray-900 px-3 py-2 text-sm text-white">
+          <option>EN</option>
+          <option>ES</option>
+          <option>PT</option>
+        </select>
 
-        <a
-          href="/billing"
-          className="rounded-lg bg-[#FFD700] px-3 py-2 text-xs font-semibold text-black hover:bg-yellow-400"
-        >
-          Upgrade
-        </a>
+        <div className="grid h-9 w-9 place-items-center rounded-full bg-yellow-400 font-black text-black">
+          S
+        </div>
       </div>
     </header>
   );

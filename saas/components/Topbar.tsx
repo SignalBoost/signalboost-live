@@ -15,9 +15,15 @@ export default function Topbar() {
         // ✅ Normalize undefined to null
         setUserEmail(user.email ?? null);
 
-        // ✅ Extract numeric field from CreditRow
+        // ✅ Handle both number and object return types
         const creditData = await getCredits(user.id);
-        setCredits(creditData.credits);
+        if (typeof creditData === "number") {
+          setCredits(creditData);
+        } else if ("credits" in creditData) {
+          setCredits(creditData.credits);
+        } else if ("amount" in creditData) {
+          setCredits(creditData.amount);
+        }
       }
     };
     fetchUser();

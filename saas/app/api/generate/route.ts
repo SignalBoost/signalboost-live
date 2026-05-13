@@ -2,7 +2,7 @@
 
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { createRouteHandlerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 export async function POST(req: Request) {

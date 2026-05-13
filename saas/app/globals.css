@@ -2,31 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Base body styles */
+html,
 body {
-  @apply bg-gray-50 text-gray-800 font-sans;
-}
-
-/* Headings */
-h1, h2, h3, h4, h5, h6 {
-  @apply font-bold text-gray-900;
-}
-
-/* Links */
-a {
-  @apply text-brand hover:text-brand-dark transition;
-}
-
-/* Cards */
-.card {
-  @apply bg-white rounded-lg shadow-card p-6;
-}
-
-/* Buttons */
-.btn-primary {
-  @apply bg-brand text-white font-semibold px-4 py-2 rounded hover:bg-brand-dark transition;
-}
-
-.btn-secondary {
-  @apply bg-gray-200 text-gray-800 font-semibold px-4 py-2 rounded hover:bg-gray-300 transition;
+  margin: 0;
+  padding: 0;
+  background: #070a0f;
+  color: white;
+  font-family: Arial, Helvetica, sans-serif;
 }

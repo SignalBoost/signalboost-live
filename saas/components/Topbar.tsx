@@ -12,10 +12,12 @@ export default function Topbar() {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        // ✅ Fix: normalize undefined to null
+        // ✅ Normalize undefined to null
         setUserEmail(user.email ?? null);
+
+        // ✅ Extract numeric field from CreditRow
         const creditData = await getCredits(user.id);
-        setCredits(creditData);
+        setCredits(creditData.credits);
       }
     };
     fetchUser();

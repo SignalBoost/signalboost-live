@@ -12,7 +12,6 @@ export default function GeneratePage() {
   const [brand, setBrand] = useState<any>(null);
   const [brandLoading, setBrandLoading] = useState(true);
 
-  // Load brand memory
   useEffect(() => {
     async function loadBrand() {
       const res = await fetch("/api/brand-profile");
@@ -62,7 +61,6 @@ export default function GeneratePage() {
           {loading ? "Generating…" : "Generate"}
         </button>
 
-        {/* ⭐ Editable Result + Behavioral Memory */}
         {result && (
           <div className="mt-6 p-6 bg-white rounded-md shadow space-y-4">
             <h2 className="text-xl font-semibold">Result</h2>
@@ -102,7 +100,7 @@ export default function GeneratePage() {
 
         {!brandLoading && !brand && (
           <p className="text-gray-500">
-            No brand profile set.  
+            No brand profile set.{" "}
             Go to <strong>Brand Settings</strong> to configure your brand.
           </p>
         )}

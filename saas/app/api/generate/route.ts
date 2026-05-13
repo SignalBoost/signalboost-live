@@ -9,7 +9,9 @@ export async function POST(req: Request) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) {
       return NextResponse.json(
@@ -31,25 +33,57 @@ export async function POST(req: Request) {
       apiKey: process.env.OPENAI_API_KEY!,
     });
 
-    // ⭐ Generate text
+    // Load brand profile memory
+    const { data: brandProfile } = await supabase
+      .from("brand_profiles")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const brandContext = brandProfile
+      ? `
+You are speaking on behalf of a brand with these traits:
+- Name: ${brandProfile.brand_name || "Unknown"}
+- Tagline: ${brandProfile.brand_tagline || "N/A"}
+- Tone: ${brandProfile.brand_tone || "neutral"}
+- Formality: ${brandProfile.formality_level || "neutral"}
+- Primary audience: ${brandProfile.primary_audience || "general"}
+- Personality: ${brandProfile.brand_personality || "not specified"}
+- Primary language: ${brandProfile.primary_language || language}
+- Cultural notes: ${brandProfile.cultural_notes || "none"}
+`
+      : `
+No specific brand profile is set. Use a friendly, clear, and trustworthy tone.
+`;
+
+    const messages = [
+      {
+        role: "system",
+        content: `
+You are SignalBoost AI.
+
+Your job is to generate content that matches the brand's identity and audience.
+
+${brandContext}
+
+Mode: ${mode}
+Respond in language: ${language}
+`.trim(),
+      },
+      {
+        role: "user",
+        content: prompt,
+      },
+    ];
+
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `You are SignalBoost AI. Respond in ${language}. Mode: ${mode}.`
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
+      messages,
       temperature: 0.8,
     });
 
     const result = completion.choices[0].message?.content || "No response.";
 
-    // ⭐ Save to history
     await supabase.from("generations").insert({
       user_id: user.id,
       prompt,
@@ -58,7 +92,6 @@ export async function POST(req: Request) {
       language,
     });
 
-    // ⭐ Deduct 1 credit
     await supabase.rpc("deduct_credits", {
       uid: user.id,
       used: 1,

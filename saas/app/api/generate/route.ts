@@ -31,7 +31,7 @@ export async function POST(req: Request) {
       apiKey: process.env.OPENAI_API_KEY!,
     });
 
-    // ⭐ Core AI text generation
+    // ⭐ Generate text
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -49,13 +49,19 @@ export async function POST(req: Request) {
 
     const result = completion.choices[0].message?.content || "No response.";
 
-    // ⭐ Save to Supabase history
+    // ⭐ Save to history
     await supabase.from("generations").insert({
       user_id: user.id,
       prompt,
       result,
       mode,
       language,
+    });
+
+    // ⭐ Deduct 1 credit
+    await supabase.rpc("deduct_credits", {
+      uid: user.id,
+      used: 1,
     });
 
     return NextResponse.json({ result });

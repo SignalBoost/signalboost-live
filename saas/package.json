@@ -21,8 +21,8 @@
   },
   "devDependencies": {
     "typescript": "^5.4.5",
-    "eslint": "^8.57.0",          // ✅ downgraded for compatibility
-    "eslint-config-next": "^14.2.35",
+    "eslint": "8.57.0",          // ✅ pinned to v8 for compatibility
+    "eslint-config-next": "14.2.35",
     "rimraf": "^5.0.5"
   }
 }

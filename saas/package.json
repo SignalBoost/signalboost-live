@@ -1,9 +1,10 @@
 {
   "name": "signalboost-dashboard",
-  "version": "1.0.0",
+  "version": "0.1.0",
+  "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev --turbo",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start"
   },
@@ -11,17 +12,8 @@
     "next": "16.2.6",
     "react": "latest",
     "react-dom": "latest",
-    "openai": "latest",
     "tailwindcss": "latest",
     "postcss": "latest",
-    "autoprefixer": "latest",
-    "@supabase/supabase-js": "latest",
-    "@supabase/ssr": "latest"
-  },
-  "devDependencies": {
-    "typescript": "latest",
-    "@types/node": "latest",
-    "@types/react": "latest",
-    "@types/react-dom": "latest"
+    "autoprefixer": "latest"
   }
 }

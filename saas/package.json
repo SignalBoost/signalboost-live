@@ -5,8 +5,7 @@
   "scripts": {
     "dev": "next dev --turbo",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "start": "next start"
   },
   "dependencies": {
     "next": "16.2.6",
@@ -16,7 +15,6 @@
     "tailwindcss": "latest",
     "postcss": "latest",
     "autoprefixer": "latest",
-    "lucide-react": "latest",
     "@supabase/supabase-js": "latest",
     "@supabase/ssr": "latest"
   },

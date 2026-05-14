@@ -16,11 +16,13 @@
     "@supabase/supabase-js": "^2.43.4",
     "tailwindcss": "^3.4.3",
     "postcss": "^8.4.38",
-    "autoprefixer": "^10.4.19"
+    "autoprefixer": "^10.4.19",
+    "glob": "^11.0.0"
   },
   "devDependencies": {
     "typescript": "^5.4.5",
-    "eslint": "^8.57.0",
-    "eslint-config-next": "^14.2.35"
+    "eslint": "^9.4.0",
+    "eslint-config-next": "^14.2.35",
+    "rimraf": "^5.0.5"
   }
 }

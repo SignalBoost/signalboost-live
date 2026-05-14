@@ -2,6 +2,7 @@
   "name": "signalboost-clean",
   "version": "0.0.1",
   "private": true,
+  "type": "module",
   "scripts": {
     "build": "next build",
     "start": "next start",
@@ -11,5 +12,10 @@
     "next": "16.2.6",
     "react": "19.2.6",
     "react-dom": "19.2.6"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/react": "^19.0.0",
+    "@types/node": "^22.0.0"
   }
 }

@@ -1,7 +1,14 @@
+import "./globals.css";
+
+export const metadata = {
+  title: "SignalBoost",
+  description: "SignalBoost foundation"
+};
+
 export default function RootLayout({
-  children,
+  children
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <html lang="en">

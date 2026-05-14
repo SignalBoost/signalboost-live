@@ -1,17 +1,19 @@
-// saas/app/api/voice/route.ts
-
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
+import { createClient } from "@/lib/supabase/server";
+
+type OpenAIVoice = "alloy" | "ash" | "coral" | "echo" | "fable" | "onyx" | "nova" | "sage" | "shimmer";
 
 export async function POST(req: Request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = createClient();
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (userError || !user) {
       return new NextResponse("Not authenticated", { status: 401 });
     }
 
@@ -21,22 +23,24 @@ export async function POST(req: Request) {
       return new NextResponse("Missing text", { status: 400 });
     }
 
+    if (!process.env.OPENAI_API_KEY) {
+      return new NextResponse("Missing OPENAI_API_KEY", { status: 500 });
+    }
+
     const client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY!,
+      apiKey: process.env.OPENAI_API_KEY,
     });
 
-    // ⭐ Language → Voice mapping
-    const voiceMap: Record<string, string> = {
+    const voiceMap: Record<string, OpenAIVoice> = {
       en: "alloy",
-      es: "es-ES-Standard-A",
-      pt: "pt-BR-Standard-A",
-      pl: "pl-PL-Standard-A",
-      ru: "ru-RU-Standard-A",
+      es: "nova",
+      pt: "coral",
+      pl: "sage",
+      ru: "onyx",
     };
 
     const selectedVoice = voiceMap[language] || "alloy";
 
-    // ⭐ Generate speech
     const speech = await client.audio.speech.create({
       model: "gpt-4o-mini-tts",
       voice: selectedVoice,
@@ -46,7 +50,6 @@ export async function POST(req: Request) {
 
     const buffer = Buffer.from(await speech.arrayBuffer());
 
-    // ⭐ Deduct 1 credit for voice generation
     await supabase.rpc("deduct_credits", {
       uid: user.id,
       used: 1,
@@ -59,7 +62,7 @@ export async function POST(req: Request) {
         "Content-Length": buffer.length.toString(),
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Voice API error:", error);
     return new NextResponse("Voice generation failed", { status: 500 });
   }

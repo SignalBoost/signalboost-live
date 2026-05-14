@@ -1,3 +1,13 @@
-git add next.config.js
-git commit -m "chore: update next.config.js with build ignores"
-git push
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+
+  // Optional: Vercel build ignore patterns
+  experimental: {
+    serverActions: {
+      allowedOrigins: ["*"],
+    },
+  },
+};
+
+module.exports = nextConfig;

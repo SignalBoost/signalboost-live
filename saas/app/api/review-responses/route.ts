@@ -1,15 +1,16 @@
-// saas/app/api/review-responses/route.ts
-
 import { NextResponse } from "next/server";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
 import OpenAI from "openai";
+import { createClient } from "@/lib/supabase/server";
 
 export async function GET() {
-  const supabase = createRouteHandlerClient({ cookies });
+  const supabase = createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
@@ -22,17 +23,24 @@ export async function GET() {
 
   if (error) {
     console.error("GET review_responses error:", error);
-    return NextResponse.json({ error: "Failed to load review responses" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to load review responses" },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ reviews: data || [] });
 }
 
 export async function POST(req: Request) {
-  const supabase = createRouteHandlerClient({ cookies });
+  const supabase = createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
@@ -54,12 +62,21 @@ export async function POST(req: Request) {
     );
   }
 
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json(
+      { error: "Missing OPENAI_API_KEY" },
+      { status: 500 }
+    );
+  }
 
-  // Analyze review + reply to extract sentiment, topic, style
+  const client = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+
   const analysis = await client.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0.2,
+    response_format: { type: "json_object" },
     messages: [
       {
         role: "system",
@@ -93,10 +110,11 @@ ${final_reply}
   });
 
   let parsed: any = {};
+
   try {
     parsed = JSON.parse(analysis.choices[0].message?.content || "{}");
-  } catch (e) {
-    console.error("Failed to parse review analysis JSON:", e);
+  } catch (error) {
+    console.error("Failed to parse review analysis JSON:", error);
   }
 
   const sentiment = parsed.sentiment || null;
@@ -105,9 +123,10 @@ ${final_reply}
   const preferred_tone = parsed.preferred_tone || null;
   const preferred_formality = parsed.preferred_formality || null;
   const preferred_structure = parsed.preferred_structure || null;
-  const example_phrases = parsed.example_phrases || [];
+  const example_phrases = Array.isArray(parsed.example_phrases)
+    ? parsed.example_phrases
+    : [];
 
-  // Save raw review response
   const { data: saved, error: saveError } = await supabase
     .from("review_responses")
     .insert({
@@ -127,13 +146,14 @@ ${final_reply}
 
   if (saveError) {
     console.error("POST review_responses error:", saveError);
-    return NextResponse.json({ error: "Failed to save review response" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to save review response" },
+      { status: 500 }
+    );
   }
 
-  // Build situation_type key, e.g. "negative_delay"
   const situation_type = `${sentiment || "unknown"}_${topic || "general"}`;
 
-  // Upsert pattern memory
   const { data: existingPatterns } = await supabase
     .from("review_response_patterns")
     .select("*")
@@ -166,5 +186,8 @@ ${final_reply}
     await supabase.from("review_response_patterns").insert(patternPayload);
   }
 
-  return NextResponse.json({ review: saved, pattern: patternPayload });
+  return NextResponse.json({
+    review: saved,
+    pattern: patternPayload,
+  });
 }

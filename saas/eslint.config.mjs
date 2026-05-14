@@ -9,7 +9,6 @@ const compat = new FlatCompat({
 
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals"),
-  // Add your custom rules here
 ];
 
 export default eslintConfig;

@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "next build",
-    "lint": "eslint .",
+    "dev": "next dev",
+    "build": "npm run lint && next build",
+    "start": "next start",
+    "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {

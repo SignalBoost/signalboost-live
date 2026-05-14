@@ -1,19 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: true
   },
   eslint: {
-    ignoreDuringBuilds: true,
-  },
-  experimental: {
-    turbo: {
-      resolveAlias: {
-        openai: false,
-        stripe: false,
-      },
-    },
-  },
+    ignoreDuringBuilds: true
+  }
 };
 
 export default nextConfig;

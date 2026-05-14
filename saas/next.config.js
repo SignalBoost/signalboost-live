@@ -1,5 +1,7 @@
-Failed to load next.config.js
-/vercel/path0/saas/next.config.js:2
-  "dependencies": {
-                 ^
-SyntaxError: Unexpected token ':'
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+  swcMinify: true
+};
+
+module.exports = nextConfig;

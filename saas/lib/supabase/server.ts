@@ -9,11 +9,26 @@ export function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
         get(name: string) {
           return cookieStore.get(name)?.value;
         },
-        set() {},
-        remove() {},
+        set(name: string, value: string, options: any) {
+          try {
+            cookieStore.set({ name, value, ...options });
+          } catch (error) {
+            // Ignore cookie errors in some contexts (e.g. middleware)
+          }
+        },
+        remove(name: string, options: any) {
+          try {
+            cookieStore.delete({ name, ...options });
+          } catch (error) {
+            // Ignore cookie errors
+          }
+        },
       },
     }
   );

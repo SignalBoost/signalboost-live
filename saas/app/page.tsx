@@ -1,32 +1,36 @@
-// Final Sync 17:15 - Initializing New Project
-export default function Page() {
+export default function HomePage() {
   return (
-    <main style={{ 
-      height: '100vh', 
-      display: 'flex', 
-      flexDirection: 'column',
-      alignItems: 'center', 
-      justifyContent: 'center', 
-      fontFamily: 'sans-serif',
-      backgroundColor: 'white',
-      color: 'black',
-      textAlign: 'center',
-      padding: '20px'
-    }}>
-      <h1 style={{ fontSize: '3rem', marginBottom: '10px' }}>
-        SIGNALBOOST LIVE
-      </h1>
-      <p style={{ fontSize: '1.2rem', color: '#666' }}>
-        The new project is successfully connected.
-      </p>
-      <div style={{ 
-        marginTop: '20px', 
-        padding: '10px 20px', 
-        border: '1px solid #000', 
-        borderRadius: '5px' 
-      }}>
-        Build Status: <strong>Online</strong>
-      </div>
+    <main className="min-h-screen bg-black text-white">
+      <section className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center px-6 text-center">
+        <p className="mb-4 rounded-full border border-white/20 px-4 py-2 text-sm text-white/70">
+          Foundation is live
+        </p>
+
+        <h1 className="max-w-3xl text-5xl font-bold tracking-tight md:text-7xl">
+          SignalBoost
+        </h1>
+
+        <p className="mt-6 max-w-2xl text-lg text-white/70 md:text-xl">
+          The base app is deployed. Now we add each brick one by one.
+        </p>
+
+        <div className="mt-10 grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+            <h2 className="font-semibold">Step 1</h2>
+            <p className="mt-2 text-sm text-white/60">Landing page</p>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+            <h2 className="font-semibold">Step 2</h2>
+            <p className="mt-2 text-sm text-white/60">Dashboard shell</p>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+            <h2 className="font-semibold">Step 3</h2>
+            <p className="mt-2 text-sm text-white/60">Auth + APIs</p>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

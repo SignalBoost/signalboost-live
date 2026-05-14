@@ -1,7 +1,3 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  reactStrictMode: true,
-  swcMinify: true
-};
-
-module.exports = nextConfig;
+git add next.config.js
+git commit -m "chore: update next.config.js with build ignores"
+git push

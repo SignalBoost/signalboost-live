@@ -1,24 +1,21 @@
-// 1. IMPORT YOUR CSS (This is what fixes the "1995" look)
-import "./globals.css"; 
+// saas/app/layout.tsx
+import React from 'react';
+import '../globals.css'; // Bulletproof relative path to restore your styles instantly
 
-import { Inter } from "next/font/google";
-import { I18nProvider } from "@/components/i18n/I18nProvider";
-
-const inter = Inter({ subsets: ["latin"] });
+export const metadata = {
+  title: 'SignalBoost App Suite',
+  description: 'AI Multi-Language Platform Generator',
+};
 
 export default function RootLayout({
-  children
+  children,
 }: {
   children: React.ReactNode;
 }) {
   return (
     <html lang="en">
-      {/* 2. ADD THE FONT CLASS TO BODY */}
-      <body className={inter.className}>
-        {/* 3. WRAP CHILDREN IN THE PROVIDER (If using i18n) */}
-        <I18nProvider>
-          {children}
-        </I18nProvider>
+      <body className="bg-[#060913] min-h-screen text-slate-100 antialiased">
+        {children}
       </body>
     </html>
   );

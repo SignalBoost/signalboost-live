@@ -1,23 +1,12 @@
 /* saas/app/globals.css */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
-:root {
-  --background: #060913;
-  --foreground: #f8fafc;
-}
-
-/* Force the body frame to inherit the exact theme color code */
-body {
-  color: #f8fafc !important;
-  background-color: #060913 !important;
-}
-
-/* Your custom glassmorphic overlay utility class */
+/* Elevated translucent glass layer for maximum contrast */
 .fathom-glass {
-  background-color: rgba(11, 15, 25, 0.6) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  background-color: rgba(22, 28, 45, 0.7) !important; 
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  
+  /* Brightens the borders of your cards/sidebars so they pop */
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
 }

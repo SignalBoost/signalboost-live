@@ -24,7 +24,7 @@ export default function Hero() {
         setPlayingCode(null);
       } else {
         audioRef.current.pause();
-        // Add a small timestamp to bypass potential browser caching
+        // The timestamp helps prevent the browser from using a cached "empty" file
         audioRef.current.src = `${src}?v=${Date.now()}`;
         audioRef.current.load();
         
@@ -32,25 +32,24 @@ export default function Hero() {
         setPlayingCode(code);
       }
     } catch (err) {
-      console.error("Playback failed. Is the file at " + src + " valid?", err);
+      console.error("Audio failed to play. Check if file is valid:", err);
     }
   };
 
   return (
     <section className="w-full bg-black py-20 px-6 text-white text-center">
+      {/* The invisible audio engine */}
       <audio 
         ref={audioRef} 
         onEnded={() => setPlayingCode(null)} 
-        onCanPlayThrough={() => console.log("Audio ready!")}
       />
       
       <div className="max-w-5xl mx-auto">
-        <h1 className="text-5xl md:text-7xl font-extrabold mb-6">
+        <h1 className="text-5xl md:text-7xl font-extrabold mb-6 tracking-tight">
           Turn reviews into <span className="text-yellow-400">global content</span>
         </h1>
-        <p className="text-gray-400 mb-12 text-xl">Click a language below to hear the AI preview.</p>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-12">
           {languages.map((lang) => (
             <button
               key={lang.code}
@@ -62,11 +61,14 @@ export default function Hero() {
               }`}
             >
               <span className="text-2xl font-bold">{lang.code}</span>
-              <div className={`mt-4 w-10 h-10 rounded-full flex items-center justify-center ${playingCode === lang.code ? "bg-black" : "bg-yellow-400"}`}>
+              
+              <div className={`mt-4 w-10 h-10 rounded-full flex items-center justify-center ${
+                playingCode === lang.code ? "bg-black" : "bg-yellow-400"
+              }`}>
                  {playingCode === lang.code ? (
                    <div className="flex gap-1">
-                     <div className="w-1 h-3 bg-yellow-400 animate-pulse" />
-                     <div className="w-1 h-3 bg-yellow-400 animate-pulse" />
+                     <div className="w-1 h-3 bg-yellow-400" />
+                     <div className="w-1 h-3 bg-yellow-400" />
                    </div>
                  ) : (
                    <div className="w-0 h-0 border-t-[5px] border-t-transparent border-l-[9px] border-l-black border-b-[5px] border-b-transparent ml-1" />

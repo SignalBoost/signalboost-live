@@ -13,6 +13,7 @@
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "@supabase/supabase-js": "^2.49.4",
+    "openai": "^4.24.1",
     "tailwindcss": "^3.4.1",
     "postcss": "^8.4.31",
     "autoprefixer": "^10.4.16"

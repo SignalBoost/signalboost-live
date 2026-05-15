@@ -1,20 +1,19 @@
 // saas/lib/supabaseClient.ts
 
-// Complete mock engine to satisfy auth profile fields and query chaining
 const mockSingleResult = {
   data: { credits: 750 },
   error: null
 };
 
+// Fixed: Added (...args: any[]) to functions so TypeScript allows passing columns, values, etc.
 const mockQueryBuilder = {
-  select: () => mockQueryBuilder,
-  eq: () => mockQueryBuilder,
+  select: (...args: any[]) => mockQueryBuilder,
+  eq: (...args: any[]) => mockQueryBuilder,
   single: async () => mockSingleResult
 };
 
 export const supabase = {
   auth: {
-    // Added email property to satisfy components extraction inside Topbar.tsx
     getUser: async () => ({ 
       data: { 
         user: { 

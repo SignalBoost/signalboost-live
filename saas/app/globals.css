@@ -1,12 +1,23 @@
 /* saas/app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-/* Elevated translucent glass layer for maximum contrast */
+:root {
+  --background: #060913;
+  --foreground: #f8fafc;
+}
+
+body {
+  color: var(--foreground);
+  background-color: var(--background);
+}
+
+/* Sanitized glass layer - free of hidden character tokens */
 .fathom-glass {
-  background-color: rgba(22, 28, 45, 0.7) !important; 
+  background-color: rgba(22, 28, 45, 0.7) !important;
   backdrop-filter: blur(16px) !important;
   -webkit-backdrop-filter: blur(16px) !important;
-  
-  /* Brightens the borders of your cards/sidebars so they pop */
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
 }

@@ -2,14 +2,7 @@
 import WaveformPlayer from '@/components/WaveformPlayer'
 
 export default function Hero() {
-  const languages = [
-    { code: 'EN', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
-    { code: 'ES', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3' },
-    { code: 'PT', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3' },
-    { code: 'PL', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3' },
-    { code: 'RU', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3' },
-    { code: 'JP', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3' },
-  ]
+  const languages = ['EN','ES','PT','PL','RU','JP']
 
   return (
     <section className="w-full bg-black text-center py-20 px-4 text-white">
@@ -25,11 +18,11 @@ export default function Hero() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-12">
           {languages.map(lang => (
             <div 
-              key={lang.code} 
+              key={lang} 
               className="border border-white/10 rounded-xl p-6 bg-white/5 backdrop-blur-sm hover:border-yellow-400/50 transition-colors"
             >
-              <span className="text-2xl font-bold block mb-3">{lang.code}</span>
-              <WaveformPlayer src={lang.url} />
+              <span className="text-2xl font-bold block mb-3">{lang}</span>
+              <WaveformPlayer src={`/api/tts?lang=${lang}`} />
             </div>
           ))}
         </div>

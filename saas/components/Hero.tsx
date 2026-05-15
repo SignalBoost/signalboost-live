@@ -1,25 +1,34 @@
 // saas/components/Hero.tsx
 export default function Hero() {
   const languages = ['EN', 'ES', 'PT', 'PL', 'RU', 'JP']
+  
   return (
-    <section className="w-full bg-black text-center py-16 text-white">
-      <h1 className="text-4xl font-bold mb-4">
-        Create Engaging Ads in 6 Languages Instantly!
-      </h1>
-      <p className="text-lg text-gray-300 mb-8">
-        Transform reviews into native voice and graphic ads in English, Spanish, Portuguese, Polish, Russian, and Japanese.
-      </p>
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-4 mb-8 px-8">
-        {languages.map(lang => (
-          <div key={lang} className="border rounded-lg p-4 shadow-sm bg-white text-black">
-            <span className="font-semibold">{lang}</span>
-            <p className="text-sm mt-2">Sample Ad Preview</p>
-          </div>
-        ))}
+    <section className="w-full bg-black text-center py-20 px-4 text-white">
+      <div className="max-w-5xl mx-auto"> {/* Centered content wrapper */}
+        <h1 className="text-4xl md:text-6xl font-extrabold mb-6 tracking-tight">
+          Create Engaging Ads in <span className="text-yellow-400">6 Languages</span> Instantly!
+        </h1>
+        
+        <p className="text-xl text-gray-400 mb-12 max-w-2xl mx-auto">
+          Transform reviews into native voice and graphic ads in English, Spanish, Portuguese, Polish, Russian, and Japanese.
+        </p>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-12">
+          {languages.map(lang => (
+            <div 
+              key={lang} 
+              className="border border-white/10 rounded-xl p-6 bg-white/5 backdrop-blur-sm hover:border-yellow-400/50 transition-colors"
+            >
+              <span className="text-2xl font-bold block mb-1">{lang}</span>
+              <p className="text-xs text-gray-500 uppercase tracking-widest">Native AI</p>
+            </div>
+          ))}
+        </div>
+
+        <button className="bg-yellow-400 hover:bg-yellow-350 transform hover:scale-105 transition-all px-8 py-4 rounded-full font-bold text-black text-lg shadow-lg shadow-yellow-400/20">
+          Get Started Now
+        </button>
       </div>
-      <button className="bg-yellow-400 px-6 py-3 rounded font-semibold text-black">
-        Get Started Now
-      </button>
     </section>
   )
 }

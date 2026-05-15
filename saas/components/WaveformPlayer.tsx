@@ -1,44 +1,36 @@
-"use client"; // CRITICAL: This allows useRef and useState to work
+"use client"
+import WaveformPlayer from '@/components/WaveformPlayer'
 
-import { useRef, useState } from 'react';
-
-export default function WaveformPlayer({ src }: { src: string }) {
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-
-  const togglePlay = () => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-      } else {
-        audioRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
+export default function Hero() {
+  const languages = ['EN', 'ES', 'PT', 'PL', 'RU', 'JP']
 
   return (
-    <div className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-full px-6 py-3 min-w-[280px] md:min-w-[400px]">
-      <audio ref={audioRef} src={src} onEnded={() => setIsPlaying(false)} />
-      
-      <button 
-        onClick={togglePlay}
-        className="w-8 h-8 rounded-full bg-yellow-400 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
-      >
-        {isPlaying ? (
-          <div className="flex gap-1">
-            <div className="w-1 h-3 bg-black" />
-            <div className="w-1 h-3 bg-black" />
-          </div>
-        ) : (
-          <div className="w-0 h-0 border-t-[5px] border-t-transparent border-l-[9px] border-l-black border-b-[5px] border-b-transparent ml-1" />
-        )}
-      </button>
+    <section className="w-full bg-black text-center py-20 px-4 text-white">
+      <div className="max-w-5xl mx-auto">
+        <h1 className="text-4xl md:text-6xl font-extrabold mb-6 tracking-tight">
+          Create Engaging Ads in <span className="text-yellow-400">6 Languages</span> Instantly!
+        </h1>
 
-      <div className="flex-1 h-1 bg-white/20 rounded-full overflow-hidden">
-        <div className="w-1/3 h-full bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.6)]" />
+        <p className="text-xl text-gray-400 mb-12 max-w-2xl mx-auto">
+          Transform reviews into native voice and graphic ads in English, Spanish, Portuguese, Polish, Russian, and Japanese.
+        </p>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-12">
+          {languages.map(lang => (
+            <div 
+              key={lang} 
+              className="border border-white/10 rounded-xl p-6 bg-white/5 backdrop-blur-sm hover:border-yellow-400/50 transition-colors"
+            >
+              <span className="text-2xl font-bold block mb-3">{lang}</span>
+              <WaveformPlayer src={`/audio/${lang}.mp3`} />
+            </div>
+          ))}
+        </div>
+
+        <button className="bg-yellow-400 hover:bg-yellow-350 transform hover:scale-105 transition-all px-8 py-4 rounded-full font-bold text-black text-lg shadow-lg shadow-yellow-400/20">
+          Get Started Now
+        </button>
       </div>
-      <span className="text-[10px] font-mono text-gray-500">0:14 / 0:30</span>
-    </div>
-  );
+    </section>
+  )
 }

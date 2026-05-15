@@ -1,6 +1,6 @@
 // saas/app/layout.tsx
 import React from 'react';
-import '../globals.css'; // Bulletproof relative path to restore your styles instantly
+import './globals.css'; // This points directly to the file in the same folder
 
 export const metadata = {
   title: 'SignalBoost App Suite',
@@ -14,7 +14,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-[#060913] min-h-screen text-slate-100 antialiased">
+      <body>
         {children}
       </body>
     </html>

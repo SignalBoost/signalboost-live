@@ -1,62 +1,38 @@
-"use client";
+"use client"
+import { useRef, useState } from 'react'
 
-import React, { useRef, useState } from 'react';
+export default function WaveformPlayer({ src }: { src: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
 
-// This tells TypeScript that "src" is a required string
-interface WaveformPlayerProps {
-  src: string;
-}
-
-export default function WaveformPlayer({ src }: WaveformPlayerProps) {
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-
-  const togglePlay = (e: React.MouseEvent) => {
-    // Prevent the click from bubbling up to parent elements
-    e.stopPropagation(); 
-    
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-      } else {
-        audioRef.current.play();
+  const togglePlay = async () => {
+    if (!audioRef.current) return
+    if (isPlaying) {
+      audioRef.current.pause()
+      setIsPlaying(false)
+    } else {
+      try {
+        await audioRef.current.play()   // ✅ await ensures browser handles autoplay restrictions
+        setIsPlaying(true)
+      } catch (err) {
+        console.error("Playback failed:", err)
       }
-      setIsPlaying(!isPlaying);
     }
-  };
+  }
 
   return (
-    <div className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-full px-6 py-3 min-w-[300px]">
-      <audio 
-        ref={audioRef} 
-        src={src} 
-        onEnded={() => setIsPlaying(false)} 
-        preload="auto"
-      />
+    <div className="flex flex-col items-center">
+      {/* Simple animated waveform bar */}
+      <div className={`w-full h-12 rounded mb-2 ${isPlaying ? 'bg-gradient-to-r from-yellow-400 to-yellow-200 animate-pulse' : 'bg-gray-700'}`}></div>
       
-      {/* This button is now clickable */}
-      <button 
+      <button
         onClick={togglePlay}
-        type="button"
-        className="w-10 h-10 rounded-full bg-yellow-400 flex items-center justify-center cursor-pointer hover:scale-110 active:scale-95 transition-all z-10"
-        aria-label={isPlaying ? "Pause" : "Play"}
+        className="bg-yellow-400 text-black px-4 py-2 rounded-full font-bold hover:scale-105 transition-transform"
       >
-        {isPlaying ? (
-          <div className="flex gap-1">
-            <div className="w-1.5 h-4 bg-black rounded-full" />
-            <div className="w-1.5 h-4 bg-black rounded-full" />
-          </div>
-        ) : (
-          <div className="w-0 h-0 border-t-[6px] border-t-transparent border-l-[10px] border-l-black border-b-[6px] border-b-transparent ml-1" />
-        )}
+        {isPlaying ? 'Pause' : 'Play'}
       </button>
 
-      {/* Progress Bar Visual */}
-      <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
-        <div 
-          className={`h-full bg-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.5)] transition-all duration-300 ${isPlaying ? 'w-full' : 'w-0'}`} 
-        />
-      </div>
+      <audio ref={audioRef} src={src} preload="none" />
     </div>
-  );
+  )
 }

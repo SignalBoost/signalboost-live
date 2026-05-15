@@ -17,6 +17,8 @@ export default function WaveformPlayer({ src }: WaveformPlayerProps) {
       audio.pause()
       setIsPlaying(false)
     } else {
+      // reload ensures fresh campaign text plays each time
+      audio.load()
       audio.play()
       setIsPlaying(true)
     }
@@ -30,7 +32,12 @@ export default function WaveformPlayer({ src }: WaveformPlayerProps) {
       >
         {isPlaying ? "Pause" : "Play"}
       </button>
-      <audio ref={audioRef} src={src} preload="auto" onEnded={() => setIsPlaying(false)} />
+      <audio
+        ref={audioRef}
+        src={src}
+        preload="auto"
+        onEnded={() => setIsPlaying(false)}
+      />
     </div>
   )
 }

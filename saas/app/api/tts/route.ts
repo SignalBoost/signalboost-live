@@ -7,10 +7,9 @@ const client = new OpenAI({
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
-  const text = searchParams.get('text') || 'This is the future of marketing!'
   const lang = searchParams.get('lang') || 'EN'
 
-  // Map language codes to text
+  // Static ad phrases per language
   const phrases: Record<string, string> = {
     EN: 'This is the future of marketing!',
     ES: '¡Este es el futuro del marketing!',
@@ -20,7 +19,7 @@ export async function GET(req: Request) {
     JP: 'これはマーケティングの未来です！',
   }
 
-  const spokenText = phrases[lang] || text
+  const spokenText = phrases[lang] || phrases['EN']
 
   const response = await client.audio.speech.create({
     model: 'gpt-4o-mini-tts',

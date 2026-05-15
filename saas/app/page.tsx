@@ -1,14 +1,16 @@
-import Header from '../components/Header'
-import Hero from '../components/Hero'
-import TrustSignals from '../components/TrustSignals'
-import Metrics from '../components/Metrics'
-import FeaturesFlow from '../components/FeaturesFlow'
-import Testimonials from '../components/Testimonials'
-import Footer from '../components/Footer'
+"use client"
+
+import Header from '@/components/Header'
+import Hero from '@/components/Hero'
+import TrustSignals from '@/components/TrustSignals'
+import Metrics from '@/components/Metrics'
+import FeaturesFlow from '@/components/FeaturesFlow'
+import Testimonials from '@/components/Testimonials'
+import Footer from '@/components/Footer'
 
 export default function HomePage() {
   return (
-    <main>
+    <>
       <Header />
       <Hero />
       <TrustSignals />
@@ -16,6 +18,6 @@ export default function HomePage() {
       <FeaturesFlow />
       <Testimonials />
       <Footer />
-    </main>
+    </>
   )
 }

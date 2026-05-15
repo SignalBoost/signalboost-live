@@ -9,22 +9,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: "#060913",
-        foreground: "#f8fafc",
+        background: "var(--background)",
+        foreground: "var(--foreground)",
       },
     },
   },
-  plugins: [
-    function ({ addUtilities }) {
-      addUtilities({
-        '.fathom-glass': {
-          'background-color': 'rgba(22, 28, 45, 0.70)',
-          'backdrop-filter': 'blur(16px)',
-          '-webkit-backdrop-filter': 'blur(16px)',
-          'border': '1px solid rgba(255, 255, 255, 0.15)',
-          'box-shadow': '0 4px 30px rgba(0, 0, 0, 0.40)',
-        },
-      })
-    },
-  ],
+  plugins: [],
 };

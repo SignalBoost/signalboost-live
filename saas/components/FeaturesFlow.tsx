@@ -1,26 +1,23 @@
-// saas/components/FeaturesFlow.tsx
-export default function FeaturesFlow() {
-  const steps = [
-    { title: 'Review', icon: '💬', description: 'Start with a customer review.' },
-    { title: 'Video Ad', icon: '🎥', description: 'Turn it into a visual ad.' },
-    { title: 'Voice Ad', icon: '🎙️', description: 'Add native-language voice narration.' },
-    { title: 'Publish', icon: '🚀', description: 'Push your ad live instantly.' },
-  ]
+const steps = [
+  { number: '01', title: 'Paste a review', description: 'Copy any customer review from Google, Yelp, Shopify, or anywhere.' },
+  { number: '02', title: 'Choose a format', description: 'Pick from branded graphic, voice ad, social post, or video script.' },
+  { number: '03', title: 'Generate & publish', description: 'Get polished content in seconds, ready to post or run as an ad.' },
+]
 
+export default function FeaturesFlow() {
   return (
-    <section className="py-16 bg-gray-50 text-center">
-      <h2 className="text-2xl font-bold mb-10">How It Works</h2>
-      <div className="flex flex-col md:flex-row justify-center items-center gap-8">
-        {steps.map((step, idx) => (
-          <div key={idx} className="flex flex-col items-center max-w-[180px]">
-            <div className="text-4xl mb-4">{step.icon}</div>
-            <h3 className="font-semibold">{step.title}</h3>
-            <p className="text-sm text-gray-600 mt-2">{step.description}</p>
-            {idx < steps.length - 1 && (
-              <div className="hidden md:block text-2xl mx-4">➡️</div>
-            )}
-          </div>
-        ))}
+    <section id="how-it-works" className="bg-[#0f0f0f] px-6 py-20">
+      <div className="max-w-6xl mx-auto">
+        <h2 className="text-3xl font-bold text-white mb-12">How it works</h2>
+        <div className="grid md:grid-cols-3 gap-6">
+          {steps.map((step) => (
+            <div key={step.number} className="bg-white/5 border border-white/10 rounded-2xl p-8">
+              <div className="text-yellow-400 font-black text-4xl mb-4">{step.number}</div>
+              <h3 className="text-white font-bold text-xl mb-2">{step.title}</h3>
+              <p className="text-white/50 text-sm">{step.description}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   )

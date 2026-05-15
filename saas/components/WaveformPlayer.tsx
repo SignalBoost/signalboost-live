@@ -1,38 +1,36 @@
 "use client"
-import { useRef, useState } from 'react'
+import { useRef, useState } from "react"
 
-export default function WaveformPlayer({ src }: { src: string }) {
-  const audioRef = useRef<HTMLAudioElement>(null)
+interface WaveformPlayerProps {
+  src: string
+}
+
+export default function WaveformPlayer({ src }: WaveformPlayerProps) {
+  const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
 
-  const togglePlay = async () => {
-    if (!audioRef.current) return
+  const togglePlay = () => {
+    const audio = audioRef.current
+    if (!audio) return
+
     if (isPlaying) {
-      audioRef.current.pause()
+      audio.pause()
       setIsPlaying(false)
     } else {
-      try {
-        await audioRef.current.play()   // ✅ await ensures browser handles autoplay restrictions
-        setIsPlaying(true)
-      } catch (err) {
-        console.error("Playback failed:", err)
-      }
+      audio.play()
+      setIsPlaying(true)
     }
   }
 
   return (
     <div className="flex flex-col items-center">
-      {/* Simple animated waveform bar */}
-      <div className={`w-full h-12 rounded mb-2 ${isPlaying ? 'bg-gradient-to-r from-yellow-400 to-yellow-200 animate-pulse' : 'bg-gray-700'}`}></div>
-      
       <button
         onClick={togglePlay}
-        className="bg-yellow-400 text-black px-4 py-2 rounded-full font-bold hover:scale-105 transition-transform"
+        className="px-4 py-2 bg-yellow-400 text-black font-bold rounded-lg hover:bg-yellow-500 transition"
       >
-        {isPlaying ? 'Pause' : 'Play'}
+        {isPlaying ? "Pause" : "Play"}
       </button>
-
-      <audio ref={audioRef} src={src} preload="none" />
+      <audio ref={audioRef} src={src} preload="auto" onEnded={() => setIsPlaying(false)} />
     </div>
   )
 }

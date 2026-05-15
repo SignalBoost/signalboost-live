@@ -1,8 +1,8 @@
 // saas/lib/supabaseClient.ts
 
-// Enhanced mock engine to satisfy authentication and database table calls
+// Complete mock engine to satisfy auth profile fields and query chaining
 const mockSingleResult = {
-  data: { credits: 750 }, // Matches the default balance we want to show on screen
+  data: { credits: 750 },
   error: null
 };
 
@@ -14,12 +14,20 @@ const mockQueryBuilder = {
 
 export const supabase = {
   auth: {
-    getUser: async () => ({ data: { user: { id: "mock-user-id" } }, error: null }),
+    // Added email property to satisfy components extraction inside Topbar.tsx
+    getUser: async () => ({ 
+      data: { 
+        user: { 
+          id: "mock-user-id",
+          email: "sandbox-developer@signalboostapp.com" 
+        } 
+      }, 
+      error: null 
+    }),
     signOut: async () => ({ error: null }),
     onAuthStateChange: () => ({ 
       data: { subscription: { unsubscribe: () => {} } } 
     })
   },
-  // Mocks database operations like .from('users').select('credits').eq(...)
   from: (tableName: string) => mockQueryBuilder
 };

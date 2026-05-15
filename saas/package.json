@@ -11,11 +11,13 @@
   "dependencies": {
     "next": "16.2.6",
     "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "react-dom": "19.2.6",
+    "@supabase/supabase-js": "^2.49.4"
   },
   "devDependencies": {
     "typescript": "^5.4.0",
     "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "@types/node": "^22.0.0"
   }
 }

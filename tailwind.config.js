@@ -1,10 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
-    // Scans your original site files
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
-    // Scans your new saas folder files
     "./saas/app/**/*.{js,ts,jsx,tsx,mdx}",
     "./saas/components/**/*.{js,ts,jsx,tsx,mdx}",
   ],
@@ -13,6 +11,9 @@ export default {
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
+        // Explicitly naming your custom dark backdrop values
+        "dark-base": "#060913",
+        "dark-panel": "#0B0F19",
       },
     },
   },

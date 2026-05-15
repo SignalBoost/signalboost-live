@@ -14,8 +14,8 @@ interface VideoProject {
 
 const INITIAL_PROJECTS: VideoProject[] = [
   { id: '1', title: 'Summer Travel Deal Promo', language: 'Spanish (es)', voice: 'Alloy', status: 'Completed', timestamp: '2026-05-15' },
-  { id: '2', name: 'Marketplace Product Launch', language: 'English (en)', voice: 'Echo', status: 'Completed', timestamp: '2026-05-14' },
-  { id: '3', name: 'SaaS Platform Onboarding Walkthrough', language: 'Russian (ru)', voice: 'Onyx', status: 'Processing', timestamp: '2026-05-15' },
+  { id: '2', title: 'Marketplace Product Launch', language: 'English (en)', voice: 'Echo', status: 'Completed', timestamp: '2026-05-14' },
+  { id: '3', title: 'SaaS Platform Onboarding Walkthrough', language: 'Russian (ru)', voice: 'Onyx', status: 'Processing', timestamp: '2026-05-15' },
 ];
 
 export default function VideoGeneratorPage() {
@@ -31,7 +31,6 @@ export default function VideoGeneratorPage() {
 
     setIsGenerating(true);
     
-    // Simulate generation pipeline addition
     setTimeout(() => {
       const newProject: VideoProject = {
         id: (projects.length + 1).toString(),

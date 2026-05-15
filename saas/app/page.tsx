@@ -7,12 +7,10 @@ import Footer from '../components/Footer'
 
 export default function Page() {
   return (
-    <main className="bg-black min-h-screen overflow-x-hidden">
+    <main className="bg-black min-h-screen">
       <Header />
       <Hero />
-      <div className="bg-black py-10">
-        <TrustSignals />
-      </div>
+      <TrustSignals />
       <Metrics />
       <FeaturesFlow />
       <Footer />

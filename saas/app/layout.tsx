@@ -1,6 +1,6 @@
 // saas/app/layout.tsx
 import React from 'react';
-import './globals.css'; // This points directly to the file in the same folder
+import './globals.css'; // Direct relative resolution inside the app directory
 
 export const metadata = {
   title: 'SignalBoost App Suite',

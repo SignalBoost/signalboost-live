@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import AudioPlayer from '@/components/AudioPlayer';
 
 interface VideoProject {
   id: string;
@@ -52,6 +53,16 @@ export default function VideoGeneratorPage() {
       <div className="border-b border-slate-200 pb-5">
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">AI Video & Voice Generator</h1>
         <p className="text-sm text-slate-500 mt-1">Convert affiliate script copy into localized, speech-synthesized marketing assets.</p>
+      </div>
+
+      {/* Embedded Live Media Control Station */}
+      <div className="space-y-2">
+        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Audio Monitor</h3>
+        <AudioPlayer 
+          audioUrl="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" 
+          title="Latest Render: Summer Travel Deal Promo (es)" 
+          voiceModel="Alloy Engine" 
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

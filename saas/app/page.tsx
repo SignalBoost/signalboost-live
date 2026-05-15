@@ -1,23 +1,21 @@
-"use client"
+import Header from '../components/Header'
+import Hero from '../components/Hero'
+import TrustSignals from '../components/TrustSignals'
+import Metrics from '../components/Metrics'
+import FeaturesFlow from '../components/FeaturesFlow'
+import Footer from '../components/Footer'
 
-import Header from '@/components/Header'
-import Hero from '@/components/Hero'
-import TrustSignals from '@/components/TrustSignals'
-import Metrics from '@/components/Metrics'
-import FeaturesFlow from '@/components/FeaturesFlow'
-import Testimonials from '@/components/Testimonials'
-import Footer from '@/components/Footer'
-
-export default function HomePage() {
+export default function Page() {
   return (
-    <>
+    <main className="bg-black min-h-screen overflow-x-hidden">
       <Header />
       <Hero />
-      <TrustSignals />
+      <div className="bg-black py-10">
+        <TrustSignals />
+      </div>
       <Metrics />
       <FeaturesFlow />
-      <Testimonials />
       <Footer />
-    </>
+    </main>
   )
 }

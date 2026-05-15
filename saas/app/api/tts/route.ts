@@ -1,38 +1,48 @@
-import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
+import { NextResponse } from 'next/server';
+import OpenAI from 'openai';
 
+// Initialize the OpenAI client using the secure environment variable
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-})
+});
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
-  const lang = searchParams.get('lang') || 'EN'
+export async function POST(request: Request) {
+  try {
+    // 1. Parse the incoming request data
+    const { text, voice } = await request.json();
 
-  // Static ad phrases per language
-  const phrases: Record<string, string> = {
-    EN: 'Get started now with SignalBoost!',
-    ES: '¡Comienza ahora con SignalBoost!',
-    PT: 'Comece agora com o SignalBoost!',
-    PL: 'Rozpocznij teraz z SignalBoost!',
-    RU: 'Начните прямо сейчас с SignalBoost!',
-    JP: '今すぐSignalBoostを始めましょう！',
+    // Validation check
+    if (!text) {
+      return NextResponse.json(
+        { error: 'Text content is required for text-to-speech generation.' },
+        { status: 400 }
+      );
+    }
+
+    // 2. Request audio generation from OpenAI's TTS engine
+    // Defaulting to 'alloy' if no specific voice mapping is passed
+    const mp3Response = await client.audio.speech.create({
+      model: 'tts-1',
+      voice: voice || 'alloy',
+      input: text,
+    });
+
+    // 3. Convert the audio binary data into a buffer
+    const buffer = Buffer.from(await mp3Response.arrayBuffer());
+
+    // 4. Return the raw audio stream directly to your frontend components
+    return new NextResponse(buffer, {
+      headers: {
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': buffer.length.toString(),
+      },
+    });
+
+  } catch (error: any) {
+    console.error('Error generating text-to-speech:', error);
+    return NextResponse.json(
+      { error: 'Failed to process Text-to-Speech request', details: error.message },
+      { status: 500 }
+    );
   }
-
-  const spokenText = phrases[lang] || phrases['EN']
-
-  const response = await client.audio.speech.create({
-    model: 'gpt-4o-mini-tts',
-    voice: 'alloy',
-    input: spokenText,
-  })
-
-  const buffer = Buffer.from(await response.arrayBuffer())
-
-  return new NextResponse(buffer, {
-    headers: {
-      'Content-Type': 'audio/mpeg',
-      'Content-Length': buffer.length.toString(),
-    },
-  })
 }

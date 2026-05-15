@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 
-// Explicitly define the props interface
+// This tells TypeScript that "src" is a required string
 interface WaveformPlayerProps {
   src: string;
 }
@@ -11,7 +11,10 @@ export default function WaveformPlayer({ src }: WaveformPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const togglePlay = () => {
+  const togglePlay = (e: React.MouseEvent) => {
+    // Prevent the click from bubbling up to parent elements
+    e.stopPropagation(); 
+    
     if (audioRef.current) {
       if (isPlaying) {
         audioRef.current.pause();
@@ -23,25 +26,36 @@ export default function WaveformPlayer({ src }: WaveformPlayerProps) {
   };
 
   return (
-    <div className="flex items-center gap-2 mt-2">
+    <div className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-full px-6 py-3 min-w-[300px]">
       <audio 
         ref={audioRef} 
         src={src} 
         onEnded={() => setIsPlaying(false)} 
-        preload="none"
+        preload="auto"
       />
+      
+      {/* This button is now clickable */}
       <button 
         onClick={togglePlay}
-        className="w-8 h-8 rounded-full bg-yellow-400 flex items-center justify-center hover:scale-110 transition-transform"
+        type="button"
+        className="w-10 h-10 rounded-full bg-yellow-400 flex items-center justify-center cursor-pointer hover:scale-110 active:scale-95 transition-all z-10"
+        aria-label={isPlaying ? "Pause" : "Play"}
       >
         {isPlaying ? (
-          <div className="flex gap-1"><div className="w-1 h-3 bg-black" /><div className="w-1 h-3 bg-black" /></div>
+          <div className="flex gap-1">
+            <div className="w-1.5 h-4 bg-black rounded-full" />
+            <div className="w-1.5 h-4 bg-black rounded-full" />
+          </div>
         ) : (
-          <div className="w-0 h-0 border-t-[5px] border-t-transparent border-l-[8px] border-l-black border-b-[5px] border-b-transparent ml-0.5" />
+          <div className="w-0 h-0 border-t-[6px] border-t-transparent border-l-[10px] border-l-black border-b-[6px] border-b-transparent ml-1" />
         )}
       </button>
-      <div className="flex-1 h-1 bg-white/20 rounded-full overflow-hidden min-w-[60px]">
-        <div className={`h-full bg-yellow-400 ${isPlaying ? 'w-full transition-all duration-[30s] ease-linear' : 'w-0'}`} />
+
+      {/* Progress Bar Visual */}
+      <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+        <div 
+          className={`h-full bg-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.5)] transition-all duration-300 ${isPlaying ? 'w-full' : 'w-0'}`} 
+        />
       </div>
     </div>
   );

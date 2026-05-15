@@ -1,16 +1,11 @@
-// saas/components/TrustSignals.tsx
 export default function TrustSignals() {
-  const partners = ['Shopify', 'Meta', 'Yelp', 'Rakuten', 'Mercado Libre']
-
   return (
-    <section className="py-12 bg-gray-50 text-center">
-      <h2 className="text-xl font-semibold mb-6">Trusted by businesses worldwide</h2>
-      <div className="flex justify-center gap-8 flex-wrap">
-        {partners.map((partner, idx) => (
-          <div key={idx} className="w-24 h-12 bg-gray-200 flex items-center justify-center rounded">
-            {partner}
-          </div>
-        ))}
+    <section className="bg-[#0f0f0f] px-6 py-10 border-t border-white/10">
+      <div className="max-w-6xl mx-auto flex flex-wrap items-center gap-6">
+        <span className="text-white/30 text-sm">Trusted by</span>
+        <span className="text-green-400 font-bold text-lg">shopify</span>
+        <span className="text-blue-400 font-bold text-lg">∞ Meta</span>
+        <span className="text-red-400 font-bold text-lg">yelp★</span>
       </div>
     </section>
   )

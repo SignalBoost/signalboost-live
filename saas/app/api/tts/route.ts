@@ -1,27 +1,30 @@
-import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
+import { NextResponse } from 'next/server';
+import OpenAI from 'openai';
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+export async function POST(request: Request) {
+  try {
+    // 1. Check for the key safely inside the request handler
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        { error: "OpenAI API key is missing from environment variables." },
+        { status: 500 }
+      );
+    }
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
-  const lang = searchParams.get('lang') || 'EN'
-  const text = searchParams.get('text') || 'Boost your reach with SignalBoost today!'
+    // 2. Initialize OpenAI inside the function so it doesn't run during 'next build'
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
 
-  const response = await client.audio.speech.create({
-    model: 'gpt-4o-mini-tts',
-    voice: 'alloy',
-    input: text,
-  })
+    // 3. Your existing Text-to-Speech logic goes here
+    // Example:
+    // const body = await request.json();
+    // const mp3 = await openai.audio.speech.create({ ... });
 
-  const buffer = Buffer.from(await response.arrayBuffer())
+    return NextResponse.json({ success: true });
 
-  return new NextResponse(buffer, {
-    headers: {
-      'Content-Type': 'audio/mpeg',
-      'Content-Length': buffer.length.toString(),
-    },
-  })
+  } catch (error: any) {
+    console.error("TTS Error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }

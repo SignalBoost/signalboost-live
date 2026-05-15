@@ -1,109 +1,74 @@
-// saas/app/dashboard/layout.tsx
+// saas/app/dashboard/page.tsx
 'use client';
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const pathname = usePathname();
-  const isActive = (path: string) => pathname === path;
-
+export default function DashboardOverviewPage() {
   return (
-    <div className="min-h-screen bg-[#060913] text-slate-100 antialiased relative overflow-x-hidden flex flex-col md:flex-row">
-      
-      {/* Premium Ambient Background Lighting (Glow behind the glass) */}
-      <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-blue-600/10 blur-[120px] pointer-events-none z-0 animate-pulse" style={{ animationDuration: '8s' }} />
-      <div className="absolute bottom-[10%] right-[-10%] w-[45vw] h-[45vw] rounded-full bg-purple-600/5 blur-[100px] pointer-events-none z-0" />
+    <div className="space-y-6 text-slate-100 relative z-10">
+      {/* Header Section */}
+      <div className="border-b border-white/[0.06] pb-5">
+        <h1 className="text-2xl font-bold text-white tracking-tight">System Overview</h1>
+        <p className="text-sm text-slate-400 mt-1">Welcome back. Here is the operational status of your marketing platforms.</p>
+      </div>
 
-      {/* 1. Fathom Frosted Glass Sidebar */}
-      <aside className="w-full md:w-64 bg-[#111726]/30 backdrop-blur-xl border-b md:border-b-0 md:border-r border-white/[0.06] flex flex-col shrink-0 z-10 shadow-2xl shadow-black/40">
+      {/* Main Grid Panels */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
-        {/* Brand Banner */}
-        <div className="p-6 border-b border-white/[0.06] flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 group">
-            <span className="text-lg font-black tracking-tight text-white group-hover:text-blue-400 transition-colors">SignalBoost</span>
-            <span className="text-[9px] uppercase font-bold tracking-widest bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded border border-blue-500/30 backdrop-blur-sm">Live</span>
-          </Link>
-        </div>
+        {/* Panel 1: Frosted Fathom Glass Navigation Station */}
+        <div className="bg-[#111726]/30 backdrop-blur-md p-6 rounded-xl border border-white/[0.06] shadow-xl shadow-black/20 space-y-4">
+          <div>
+            <h2 className="text-sm font-semibold text-white uppercase tracking-wider">Quick Actions</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Jump directly to your modular control networks.</p>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            <Link href="/dashboard/video" className="p-4 bg-black/20 hover:bg-white/[0.04] border border-white/[0.05] rounded-lg group transition-all duration-200">
+              <span className="text-lg block mb-1">🎙️</span>
+              <span className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors">Video Generator</span>
+              <p className="text-[11px] text-slate-500 mt-0.5">Synthesize neural voice audio copy.</p>
+            </Link>
 
-        {/* Glassmorphic Navigation Menu Links */}
-        <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
-          <Link 
-            href="/dashboard" 
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border ${
-              isActive('/dashboard') 
-                ? 'bg-blue-600/80 text-white font-semibold border-blue-400/30 shadow-lg shadow-blue-600/20 backdrop-blur-md' 
-                : 'text-slate-400 border-transparent hover:bg-white/[0.04] hover:text-white hover:border-white/[0.05]'
-            }`}
-          >
-            <span className="opacity-80">📊</span> Overview
-          </Link>
-
-          <Link 
-            href="/dashboard/feeds" 
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border ${
-              isActive('/dashboard/feeds') 
-                ? 'bg-blue-600/80 text-white font-semibold border-blue-400/30 shadow-lg shadow-blue-600/20 backdrop-blur-md' 
-                : 'text-slate-400 border-transparent hover:bg-white/[0.04] hover:text-white hover:border-white/[0.05]'
-            }`}
-          >
-            <span className="opacity-80">📰</span> Feeds & Affiliates
-          </Link>
-
-          <Link 
-            href="/dashboard/video" 
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border ${
-              isActive('/dashboard/video') 
-                ? 'bg-blue-600/80 text-white font-semibold border-blue-400/30 shadow-lg shadow-blue-600/20 backdrop-blur-md' 
-                : 'text-slate-400 border-transparent hover:bg-white/[0.04] hover:text-white hover:border-white/[0.05]'
-            }`}
-          >
-            <span className="opacity-80">🎙️</span> Video Generator
-          </Link>
-
-          <Link 
-            href="/dashboard/metrics" 
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border ${
-              isActive('/dashboard/metrics') 
-                ? 'bg-blue-600/80 text-white font-semibold border-blue-400/30 shadow-lg shadow-blue-600/20 backdrop-blur-md' 
-                : 'text-slate-400 border-transparent hover:bg-white/[0.04] hover:text-white hover:border-white/[0.05]'
-            }`}
-          >
-            <span className="opacity-80">🪙</span> Metrics & Credits
-          </Link>
-
-          <Link 
-            href="/dashboard/settings" 
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border ${
-              isActive('/dashboard/settings') 
-                ? 'bg-blue-600/80 text-white font-semibold border-blue-400/30 shadow-lg shadow-blue-600/20 backdrop-blur-md' 
-                : 'text-slate-400 border-transparent hover:bg-white/[0.04] hover:text-white hover:border-white/[0.05]'
-            }`}
-          >
-            <span className="opacity-80">⚙️</span> Settings
-          </Link>
-        </nav>
-
-        {/* Glass Status Widget */}
-        <div className="p-4 border-t border-white/[0.06] bg-white/[0.01] text-center backdrop-blur-sm">
-          <p className="text-[10px] uppercase font-semibold text-slate-500 tracking-wider">System Node Status</p>
-          <div className="mt-1 flex items-center justify-center gap-1.5">
-            <span className="w-2 h-2 bg-green-500 rounded-full shadow-lg shadow-green-500/50 animate-pulse" />
-            <span className="text-xs text-slate-400 font-medium tracking-wide">Production Online</span>
+            <Link href="/dashboard/feeds" className="p-4 bg-black/20 hover:bg-white/[0.04] border border-white/[0.05] rounded-lg group transition-all duration-200">
+              <span className="text-lg block mb-1">📰</span>
+              <span className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors">Feeds & Affiliates</span>
+              <p className="text-[11px] text-slate-500 mt-0.5">Track active marketing campaigns.</p>
+            </Link>
           </div>
         </div>
-      </aside>
 
-      {/* 2. Main Workspace Display Ingestion Area */}
-      <main className="flex-1 p-6 md:p-10 max-w-7xl mx-auto w-full overflow-y-auto z-10 relative">
-        {children}
-      </main>
+        {/* Panel 2: Frosted Fathom Glass Metrics Snapshot */}
+        <div className="bg-[#111726]/30 backdrop-blur-md p-6 rounded-xl border border-white/[0.06] shadow-xl shadow-black/20 flex flex-col justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-white uppercase tracking-wider">Account Balance Status</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Live token calculations for processing tasks.</p>
+          </div>
 
+          <div className="my-4">
+            <div className="text-xs text-slate-500">Remaining Balance</div>
+            <div className="text-4xl font-black text-white tracking-tight font-mono mt-1">
+              750 <span className="text-sm font-medium text-blue-400">Credits</span>
+            </div>
+          </div>
+
+          <Link href="/dashboard/metrics" className="text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1">
+            View full analytic ledgers &rarr;
+          </Link>
+        </div>
+
+      </div>
+
+      {/* Glass System Alert Banner */}
+      <div className="bg-blue-500/5 backdrop-blur-sm border border-blue-500/20 p-4 rounded-xl flex items-start gap-3">
+        <span className="text-base text-blue-400 mt-0.5">💡</span>
+        <div>
+          <h4 className="text-xs font-bold text-blue-300">Sandbox Environment Active</h4>
+          <p className="text-[11px] text-slate-400 mt-0.5">
+            The frontend layout nodes are working correctly. Next up, we can wire these components directly to your database once you are back at your main workspace computer.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

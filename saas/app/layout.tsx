@@ -1,6 +1,6 @@
 // saas/app/layout.tsx
 import React from 'react';
-import './globals.css'; // Direct relative resolution inside the app directory
+import './globals.css'; 
 
 export const metadata = {
   title: 'SignalBoost App Suite',
@@ -14,7 +14,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
+      <body className="bg-[#060913] min-h-screen text-slate-100 antialiased">
         {children}
       </body>
     </html>

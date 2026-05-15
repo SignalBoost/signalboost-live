@@ -1,7 +1,9 @@
-export default function Home() {
+import Hero from '../components/Hero'
+
+export default function Page() {
   return (
-    <div className="bg-white text-black ..."> 
-      {/* Hero content */}
-    </div>
-  );
+    <main className="bg-black min-h-screen w-full">
+      <Hero />
+    </main>
+  )
 }

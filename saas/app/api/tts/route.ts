@@ -11,12 +11,12 @@ export async function GET(req: Request) {
 
   // Static ad phrases per language
   const phrases: Record<string, string> = {
-    EN: 'This is the future of marketing!',
-    ES: '¡Este es el futuro del marketing!',
-    PT: 'Este é o futuro do marketing!',
-    PL: 'To jest przyszłość marketingu!',
-    RU: 'Это будущее маркетинга!',
-    JP: 'これはマーケティングの未来です！',
+    EN: 'Get started now with SignalBoost!',
+    ES: '¡Comienza ahora con SignalBoost!',
+    PT: 'Comece agora com o SignalBoost!',
+    PL: 'Rozpocznij teraz z SignalBoost!',
+    RU: 'Начните прямо сейчас с SignalBoost!',
+    JP: '今すぐSignalBoostを始めましょう！',
   }
 
   const spokenText = phrases[lang] || phrases['EN']

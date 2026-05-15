@@ -4,12 +4,12 @@ import React, { useState, useRef } from "react";
 
 export default function Hero() {
   const languages = [
-    { code: "EN", label: "English", src: "/audio/EN.mp3" },
-    { code: "ES", label: "Spanish", src: "/audio/ES.mp3" },
-    { code: "PT", label: "Portuguese", src: "/audio/PT.mp3" },
-    { code: "PL", label: "Polish", src: "/audio/PL.mp3" },
-    { code: "RU", label: "Russian", src: "/audio/RU.mp3" },
-    { code: "JP", label: "Japanese", src: "/audio/JP.mp3" },
+    { code: "EN", label: "English", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
+    { code: "ES", label: "Spanish", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
+    { code: "PT", label: "Portuguese", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
+    { code: "PL", label: "Polish", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" },
+    { code: "RU", label: "Russian", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3" },
+    { code: "JP", label: "Japanese", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3" },
   ];
 
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -24,32 +24,29 @@ export default function Hero() {
         setPlayingCode(null);
       } else {
         audioRef.current.pause();
-        // The timestamp helps prevent the browser from using a cached "empty" file
-        audioRef.current.src = `${src}?v=${Date.now()}`;
+        // Since we are using external links, we set the source directly
+        audioRef.current.src = src;
         audioRef.current.load();
         
         await audioRef.current.play();
         setPlayingCode(code);
       }
     } catch (err) {
-      console.error("Audio failed to play. Check if file is valid:", err);
+      console.error("Playback failed:", err);
     }
   };
 
   return (
     <section className="w-full bg-black py-20 px-6 text-white text-center">
-      {/* The invisible audio engine */}
-      <audio 
-        ref={audioRef} 
-        onEnded={() => setPlayingCode(null)} 
-      />
+      <audio ref={audioRef} onEnded={() => setPlayingCode(null)} />
       
       <div className="max-w-5xl mx-auto">
-        <h1 className="text-5xl md:text-7xl font-extrabold mb-6 tracking-tight">
+        <h1 className="text-5xl md:text-7xl font-extrabold mb-6">
           Turn reviews into <span className="text-yellow-400">global content</span>
         </h1>
+        <p className="text-gray-400 mb-12">Click a language to hear a live demo from the web.</p>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-12">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {languages.map((lang) => (
             <button
               key={lang.code}
@@ -61,15 +58,14 @@ export default function Hero() {
               }`}
             >
               <span className="text-2xl font-bold">{lang.code}</span>
-              
               <div className={`mt-4 w-10 h-10 rounded-full flex items-center justify-center ${
                 playingCode === lang.code ? "bg-black" : "bg-yellow-400"
               }`}>
                  {playingCode === lang.code ? (
-                   <div className="flex gap-1">
-                     <div className="w-1 h-3 bg-yellow-400" />
-                     <div className="w-1 h-3 bg-yellow-400" />
-                   </div>
+                    <div className="flex gap-1">
+                      <div className="w-1 h-3 bg-yellow-400 animate-pulse" />
+                      <div className="w-1 h-3 bg-yellow-400 animate-pulse" />
+                    </div>
                  ) : (
                    <div className="w-0 h-0 border-t-[5px] border-t-transparent border-l-[9px] border-l-black border-b-[5px] border-b-transparent ml-1" />
                  )}

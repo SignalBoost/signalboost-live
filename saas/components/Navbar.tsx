@@ -31,11 +31,9 @@ export default function Navbar() {
       for (const r of rings) {
         r.r += 0.8
         r.alpha -= 0.012
-
         const arcs   = [1, 0.65]
         const widths = [1.2, 0.8]
         const alphas = [0.9, 0.5]
-
         for (let i = 0; i < 2; i++) {
           if (r.r * arcs[i] < 3) continue
           ctx.globalAlpha = Math.max(0, r.alpha * alphas[i])
@@ -78,6 +76,7 @@ export default function Navbar() {
       top: 0,
       zIndex: 100,
     }}>
+
       <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ position: 'relative', width: 40, height: 40, flexShrink: 0 }}>
           <canvas ref={canvasRef}
@@ -89,28 +88,36 @@ export default function Navbar() {
       </Link>
 
       <div style={{ display: 'flex', gap: 28 }}>
-        {['Home', 'Dashboard', 'Pricing', 'Docs'].map(item => (
-          <Link key={item} href={item === 'Home' ? '/' : `/${item.toLowerCase()}`}
-            style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)', textDecoration: 'none', transition: 'color 0.15s' }}
+        {[
+          { label: 'Home',      href: '/' },
+          { label: 'Dashboard', href: '/dashboard' },
+          { label: 'Pricing',   href: '/pricing' },
+          { label: 'Docs',      href: '/docs' },
+        ].map(item => (
+          <Link key={item.label} href={item.href}
+            style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)', textDecoration: 'none' }}
             onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
             onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.45)')}>
-            {item}
+            {item.label}
           </Link>
         ))}
       </div>
 
-      <button style={{
-        background: '#ffc300',
-        color: '#000',
-        fontSize: 13,
-        fontWeight: 800,
-        padding: '9px 22px',
-        borderRadius: 999,
-        border: 'none',
-        cursor: 'pointer',
-      }}>
-        Get started
-      </button>
+      <Link href="/dashboard">
+        <button style={{
+          background: '#ffc300',
+          color: '#000',
+          fontSize: 13,
+          fontWeight: 800,
+          padding: '9px 22px',
+          borderRadius: 999,
+          border: 'none',
+          cursor: 'pointer',
+        }}>
+          Get started
+        </button>
+      </Link>
+
     </nav>
   )
 }

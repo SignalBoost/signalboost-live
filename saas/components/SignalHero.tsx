@@ -113,42 +113,63 @@ export default function SignalHero() {
 
       {/* LEFT */}
       <div className="flex flex-col gap-7 px-16">
+
         <div
           className="flex items-center gap-2 w-fit rounded-full px-4 py-2 text-xs font-bold tracking-widest uppercase"
           style={{ background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.25)', color: '#ffc300' }}>
           <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#ffc300' }} />
-          Live transmissions
+          Build · Review · Broadcast
         </div>
 
         <h1
           className="font-black leading-none"
-          style={{ fontSize: 'clamp(40px, 5vw, 72px)', letterSpacing: '-0.03em' }}>
-          Your reviews,<br />
-          heard <span style={{ color: '#ffc300' }}>everywhere</span>
+          style={{ fontSize: 'clamp(40px, 5vw, 68px)', letterSpacing: '-0.03em' }}>
+          Build your brand<br />
+          in any <span style={{ color: '#ffc300' }}>language</span>
         </h1>
 
-        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 16, lineHeight: 1.7, maxWidth: 320 }}>
-          We broadcast your content to global audiences — translated, voiced, and delivered instantly.
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 16, lineHeight: 1.7, maxWidth: 340 }}>
+          Create your website, collect customer reviews, and produce native audio & video content — all in your language, not a translation.
         </p>
 
         <div className="flex items-center gap-4">
           <button
-            className="font-bold rounded-full text-black transition-all"
-            style={{ background: '#ffc300', padding: '12px 32px', fontSize: 15 }}>
+            className="font-bold rounded-full text-black transition-all hover:scale-105"
+            style={{ background: '#ffc300', padding: '12px 32px', fontSize: 15, border: 'none', cursor: 'pointer' }}>
             Get started
           </button>
           <button
             style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15, background: 'none', border: 'none', cursor: 'pointer' }}
             onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
             onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.4)')}>
-            See how it works →
+            Watch a demo →
           </button>
         </div>
 
+        {/* Feature strip */}
+        <div
+          className="flex gap-6 flex-wrap"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 24 }}>
+          {[
+            { icon: '🌐', label: 'Site builder' },
+            { icon: '⭐', label: 'Review collector' },
+            { icon: '🎙️', label: 'Native audio' },
+            { icon: '🎬', label: 'Video editor' },
+          ].map(f => (
+            <div key={f.label} className="flex items-center gap-2">
+              <span style={{ fontSize: 16 }}>{f.icon}</span>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>
+                {f.label}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Selected languages */}
         <div className="flex flex-wrap gap-2" style={{ minHeight: 36 }}>
           {selected.length === 0 ? (
             <p style={{ color: 'rgba(255,255,255,0.18)', fontSize: 13 }}>
-              Click a language signal to select it
+              Click a language signal to add it to your project
             </p>
           ) : selected.map(name => {
             const l = LANGS.find(x => x.name === name)!
@@ -167,7 +188,7 @@ export default function SignalHero() {
                 <span>{l.name}</span>
                 <button
                   onClick={() => toggleLang(name)}
-                  style={{ color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', marginLeft: 4 }}>
+                  style={{ color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', marginLeft: 4, fontSize: 16 }}>
                   ×
                 </button>
               </div>

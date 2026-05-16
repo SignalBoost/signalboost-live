@@ -2,7 +2,12 @@
 const nextConfig = {
   turbopack: {},
   images: {
-    domains: ['signalboostapp.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'signalboostapp.com',
+      },
+    ],
   },
 }
 

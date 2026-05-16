@@ -3,250 +3,272 @@ import Navbar from '@/components/Navbar'
 import Link from 'next/link'
 import { useState } from 'react'
 
+const BLUE = '#3b82f6'
+const GOLD = '#ffc300'
+
 const SECTIONS = [
   {
-    category: 'Getting started',
-    icon: '🚀',
-    articles: [
-      { title: 'Quick start guide', slug: 'quick-start', time: '3 min read' },
-      { title: 'Creating your first project', slug: 'first-project', time: '5 min read' },
-      { title: 'Connecting your domain', slug: 'domain', time: '4 min read' },
-      { title: 'Inviting team members', slug: 'team', time: '2 min read' },
-    ],
+    id: 'how-it-works',
+    icon: '⚡',
+    title: 'How SignalBoost works',
+    content: [
+      {
+        q: 'What is SignalBoost?',
+        a: 'SignalBoost is a multilingual content platform. We help businesses build websites, collect customer reviews, produce native audio and video content, and reach global audiences in 5 languages: English, Portuguese, Spanish, Polish and Russian. We are not a translation service — we create native content that sounds and reads like it was made by a local.'
+      },
+      {
+        q: 'Who is SignalBoost for?',
+        a: 'Anyone who wants to reach an international audience. From a bakery in Lisbon that wants a website in Portuguese and English, to a podcast network that wants to reach listeners in Brazil, Poland and Russia. We serve both complete beginners and technical developers — the experience adapts to your level.'
+      },
+      {
+        q: 'What does SignalBoost NOT do?',
+        a: 'We do not do hardware or recording equipment. We do not edit raw audio (removing background noise, cutting mistakes). We do not host podcast RSS feeds or submit to Spotify/Apple Podcasts. We do not produce music or intros. We are honest about our limits.'
+      },
+      {
+        q: 'How does the AI work?',
+        a: 'SignalBoost uses AI to generate native voiceover, captions, social clips, show notes, website content and more. Our AI support agent monitors your activity and proactively helps when it detects you are stuck — without you having to ask. If the AI cannot solve something, it brings in additional AI support silently, then escalates to Luis (our founder) if still unresolved.'
+      },
+    ]
   },
   {
-    category: 'Site builder',
-    icon: '🌐',
-    articles: [
-      { title: 'Building your first page', slug: 'site-builder', time: '6 min read' },
-      { title: 'Adding multilingual content', slug: 'multilingual', time: '5 min read' },
-      { title: 'Customizing your design', slug: 'design', time: '4 min read' },
-      { title: 'Publishing your site', slug: 'publish', time: '2 min read' },
-    ],
+    id: 'partners',
+    icon: '🤝',
+    title: 'Our partners — full transparency',
+    content: [
+      {
+        q: 'Why does SignalBoost recommend certain providers?',
+        a: 'We recommend providers based on quality, reliability and value. We have tested all of them. Some of our recommendations include affiliate links — meaning SignalBoost earns a commission if you sign up through our link, at no extra cost to you. We always disclose this clearly.'
+      },
+      {
+        q: 'Which providers do you recommend and why?',
+        a: 'Domain names: Namecheap (best value, easy DNS), Cloudflare (at-cost pricing, free SSL). Hosting: Vercel (best performance, free tier), Netlify (great for static sites). Audio AI: ElevenLabs (most natural voices available). We do not recommend providers we have not tested ourselves.'
+      },
+      {
+        q: 'Do partner commissions affect your recommendations?',
+        a: 'No. We list Cloudflare as a domain option even though they do not pay commissions, because they are genuinely good. If a provider becomes worse than their competitors we will say so and remove them from our recommendations, regardless of commission. Our users trust matters more than commission income.'
+      },
+      {
+        q: 'Can SignalBoost get a partnership deal that benefits me?',
+        a: 'Yes — we actively seek partnerships that give SignalBoost users discounts or extended trials. If we secure a deal, we pass the benefit to you. Check our pricing page for current partner benefits.'
+      },
+    ]
   },
   {
-    category: 'Reviews',
-    icon: '⭐',
-    articles: [
-      { title: 'Setting up review collection', slug: 'reviews-setup', time: '3 min read' },
-      { title: 'Embedding review widgets', slug: 'review-widgets', time: '4 min read' },
-      { title: 'Moderating reviews', slug: 'review-moderation', time: '3 min read' },
-    ],
+    id: 'your-data',
+    icon: '🔒',
+    title: 'Your data and privacy',
+    content: [
+      {
+        q: 'Where is my data stored?',
+        a: 'Your account data and project metadata are stored in Supabase — a secure, open-source database platform hosted on AWS. Your audio and video files are stored in Supabase Storage. Your site files are deployed via Vercel. We do not store your API keys in plain text — they are encrypted at rest.'
+      },
+      {
+        q: 'Who can see my data?',
+        a: 'Only you can see your projects and files. Luis (founder) has admin access for support purposes only and does not access user data unless you request help. We do not sell your data to anyone. We do not share it with third parties except the infrastructure providers listed above.'
+      },
+      {
+        q: 'What happens if I cancel?',
+        a: 'You keep access until the end of your billing period. After that your data is kept for 30 days in case you want to return. After 30 days it is permanently deleted. You can request immediate deletion at any time by emailing cadomos@gmail.com.'
+      },
+      {
+        q: 'How do I delete my account?',
+        a: 'Email cadomos@gmail.com with the subject "Delete my account" from your registered email address. We will delete everything within 48 hours and confirm when done. No questions asked.'
+      },
+    ]
   },
   {
-    category: 'Native audio',
-    icon: '🎙️',
-    articles: [
-      { title: 'Generating your first voiceover', slug: 'audio-start', time: '4 min read' },
-      { title: 'Supported languages', slug: 'audio-languages', time: '2 min read' },
-      { title: 'Audio credits explained', slug: 'audio-credits', time: '3 min read' },
-      { title: 'Downloading audio files', slug: 'audio-download', time: '2 min read' },
-    ],
+    id: 'ai-support',
+    icon: '🤖',
+    title: 'AI support — how it works',
+    content: [
+      {
+        q: 'How does the AI support system work?',
+        a: 'SignalBoost monitors your activity in real time. If you spend more than 3 minutes on the same page, click repeatedly without progress, or encounter an error — the AI proactively opens and offers help. It already knows your account, your plan, your current page, and what went wrong. You never have to explain your situation from scratch.'
+      },
+      {
+        q: 'What happens when the AI cannot solve my problem?',
+        a: 'The AI escalates seamlessly. First it brings in additional AI reasoning (Claude by Anthropic) to analyze the problem from a different angle. The two AIs work together silently and present you with a combined solution. If still unresolved, Luis is notified automatically with the full conversation context and will respond personally.'
+      },
+      {
+        q: 'What can the AI NOT do?',
+        a: 'The AI cannot make purchasing decisions for you, access your bank or credit card, submit things on your behalf to third-party services, or guarantee resolution of issues caused by third-party providers (like Vercel outages or Namecheap DNS delays). In these cases it will explain clearly what is happening and what you need to do.'
+      },
+      {
+        q: 'Is my support conversation private?',
+        a: 'Yes. Your support conversations are private and only visible to you and SignalBoost support (Luis). They are not used to train AI models. Conversations are kept for 90 days for quality purposes then deleted.'
+      },
+    ]
   },
   {
-    category: 'Video editor',
-    icon: '🎬',
-    articles: [
-      { title: 'Creating your first video', slug: 'video-start', time: '5 min read' },
-      { title: 'Adding captions and subtitles', slug: 'captions', time: '4 min read' },
-      { title: 'Exporting for social media', slug: 'video-export', time: '3 min read' },
-      { title: 'Caption formats (SRT, VTT)', slug: 'caption-formats', time: '2 min read' },
-    ],
-  },
-  {
-    category: 'Podcasters',
-    icon: '🎧',
-    articles: [
-      { title: 'Getting started as a podcaster', slug: 'podcast-start', time: '4 min read' },
-      { title: 'Uploading your episode', slug: 'podcast-upload', time: '3 min read' },
-      { title: 'Generating multilingual audio', slug: 'podcast-audio', time: '4 min read' },
-      { title: 'Creating social clips', slug: 'podcast-clips', time: '3 min read' },
-    ],
-  },
-  {
-    category: 'Billing & plans',
+    id: 'pricing',
     icon: '💳',
-    articles: [
-      { title: 'Understanding your plan', slug: 'plans', time: '3 min read' },
-      { title: 'Managing your subscription', slug: 'subscription', time: '3 min read' },
-      { title: 'Partner benefits', slug: 'partner-benefits', time: '2 min read' },
-      { title: 'Cancelling your plan', slug: 'cancel', time: '2 min read' },
-    ],
+    title: 'Plans, pricing and storage',
+    content: [
+      {
+        q: 'What are the plan limits?',
+        a: 'Free: 3 projects, 1 language, 100MB storage. Starter ($10/mo): 10 projects, 2 languages, 1GB. Pro ($30/mo): 30 projects, all 5 languages, 10GB, video editor. Business ($90/mo): unlimited projects, 50GB. Podcast plans are separate — see the Podcasters page for details.'
+      },
+      {
+        q: 'Why are there project and storage limits?',
+        a: 'Storage costs money. Audio and video files can be large — a 10-minute podcast episode can be 50-100MB. Without limits a small number of heavy users would make the platform unaffordable for everyone else. The limits are designed so the free plan covers most people getting started, and paid plans cover professional use.'
+      },
+      {
+        q: 'What happens when I reach my limit?',
+        a: 'You will see a clear warning before you hit the limit. When you reach it, you cannot create new projects until you either delete an existing one or upgrade. We never delete your data or lock you out — we just pause new creation until resolved.'
+      },
+      {
+        q: 'How do I cancel?',
+        a: 'Cancel anytime from your dashboard under Settings → Billing, or email cadomos@gmail.com. No cancellation fees. You keep access until the end of your billing period. We do not make cancellation difficult on purpose — if you want to leave, we make it easy.'
+      },
+    ]
   },
   {
-    category: 'Account & team',
-    icon: '👥',
-    articles: [
-      { title: 'Managing team members', slug: 'team-manage', time: '3 min read' },
-      { title: 'Seat limits by plan', slug: 'seats', time: '2 min read' },
-      { title: 'Account settings', slug: 'account', time: '2 min read' },
-      { title: 'Deleting your account', slug: 'delete-account', time: '2 min read' },
-    ],
+    id: 'getting-started',
+    icon: '🚀',
+    title: 'Getting started guides',
+    content: [
+      {
+        q: 'How do I build my first website?',
+        a: 'Go to Dashboard → click "Site builder". If you are a beginner, the AI will guide you through the process conversationally — just tell it about your business. If you are technical, you can use the full builder directly. Either way, the AI is there to help at every step.'
+      },
+      {
+        q: 'How do I set up a podcast?',
+        a: 'Go to the Podcasters page and pick a plan. Once subscribed, go to Dashboard → Native audio → Upload your episode. We support MP3, MP4, WAV and more. Important: bring us your finished, edited episode. We do not do raw audio editing. We generate voiceover, captions, clips and show notes from your final file.'
+      },
+      {
+        q: 'How do I collect reviews?',
+        a: 'Go to Dashboard → Review collector. You will get a review link to share with your customers. Reviews appear in your chosen languages automatically. You can embed the review widget on your SignalBoost site or any external site.'
+      },
+      {
+        q: 'How do I connect my own domain?',
+        a: 'Go through the onboarding wizard or go to Dashboard → Settings → Domain. You will need to update your DNS records at your domain provider (Namecheap, GoDaddy etc.) to point to SignalBoost. The AI will give you the exact records to copy. DNS changes take 15 minutes to 48 hours to propagate worldwide.'
+      },
+    ]
   },
 ]
 
 export default function DocsPage() {
   const [search, setSearch] = useState('')
+  const [openSection, setOpenSection] = useState<string | null>(null)
+  const [openQ, setOpenQ] = useState<string | null>(null)
 
   const filtered = SECTIONS.map(s => ({
     ...s,
-    articles: s.articles.filter(a =>
-      a.title.toLowerCase().includes(search.toLowerCase())
-    ),
-  })).filter(s => s.articles.length > 0)
+    content: s.content.filter(c =>
+      c.q.toLowerCase().includes(search.toLowerCase()) ||
+      c.a.toLowerCase().includes(search.toLowerCase())
+    )
+  })).filter(s => s.content.length > 0)
 
   return (
-    <main style={{ minHeight: '100vh', background: '#0a0a0f', color: '#fff', fontFamily: 'system-ui' }}>
+    <main style={{ minHeight: '100vh', background: '#1e1e2e', color: '#fff', fontFamily: 'system-ui' }}>
       <Navbar />
 
       {/* Header */}
-      <section style={{ maxWidth: 800, margin: '0 auto', padding: '80px 24px 60px', textAlign: 'center' }}>
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8,
-          background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.25)',
-          borderRadius: 999, padding: '4px 16px', marginBottom: 24,
-          fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
-          textTransform: 'uppercase', color: '#ffc300',
-        }}>
+      <section style={{ maxWidth: 760, margin: '0 auto', padding: '60px 24px 48px', textAlign: 'center' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 999, padding: '4px 16px', marginBottom: 20, fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: GOLD }}>
           Documentation
         </div>
-        <h1 style={{ fontSize: 'clamp(32px, 5vw, 56px)', fontWeight: 900, letterSpacing: '-0.03em', margin: '0 0 16px' }}>
-          How can we help?
+        <h1 style={{ fontSize: 'clamp(28px, 5vw, 48px)', fontWeight: 900, letterSpacing: '-0.03em', margin: '0 0 12px' }}>
+          We hide nothing
         </h1>
-        <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 16, margin: '0 0 32px' }}>
-          Everything you need to get the most out of SignalBoost.
+        <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 15, margin: '0 0 8px', lineHeight: 1.6 }}>
+          Everything about how SignalBoost works, who our partners are, how we make money, and what we can and cannot do — all here, openly.
+        </p>
+        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 13, margin: '0 0 32px' }}>
+          Trust is built through transparency. If you have a question that is not answered here, email <a href="mailto:cadomos@gmail.com" style={{ color: BLUE, textDecoration: 'none' }}>cadomos@gmail.com</a> and we will add it.
         </p>
 
-        {/* Search */}
         <div style={{ position: 'relative', maxWidth: 480, margin: '0 auto' }}>
-          <span style={{
-            position: 'absolute', left: 16, top: '50%',
-            transform: 'translateY(-50%)', fontSize: 16,
-            pointerEvents: 'none',
-          }}>🔍</span>
+          <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 16, pointerEvents: 'none' }}>🔍</span>
           <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
+            type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search docs..."
-            style={{
-              width: '100%', padding: '14px 16px 14px 44px',
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 12, fontSize: 15, color: '#fff',
-              outline: 'none', boxSizing: 'border-box',
-            }}
-            onFocus={e => (e.currentTarget.style.borderColor = 'rgba(255,195,0,0.4)')}
+            style={{ width: '100%', padding: '13px 16px 13px 44px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 15, color: '#fff', outline: 'none', boxSizing: 'border-box' }}
+            onFocus={e => (e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)')}
             onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)')}
           />
         </div>
       </section>
 
-      {/* Quick links */}
+      {/* Quick nav */}
       {!search && (
-        <section style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 60px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-            {[
-              { icon: '🚀', label: 'Quick start', href: '#getting-started' },
-              { icon: '🎙️', label: 'Native audio', href: '#native-audio' },
-              { icon: '🎬', label: 'Video editor', href: '#video-editor' },
-              { icon: '💳', label: 'Billing', href: '#billing--plans' },
-            ].map(q => (
-              <a key={q.label} href={q.href}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  background: 'rgba(255,255,255,0.02)',
-                  border: '1px solid rgba(255,255,255,0.07)',
-                  borderRadius: 12, padding: '16px 20px',
-                  textDecoration: 'none', color: '#fff',
-                  transition: 'border-color 0.15s',
-                }}
+        <section style={{ maxWidth: 760, margin: '0 auto', padding: '0 24px 40px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+            {SECTIONS.map(s => (
+              <a key={s.id} href={`#${s.id}`}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, textDecoration: 'none', color: '#fff', transition: 'border-color 0.15s' }}
                 onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(255,195,0,0.3)')}
                 onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)')}>
-                <span style={{ fontSize: 22 }}>{q.icon}</span>
-                <span style={{ fontSize: 14, fontWeight: 600 }}>{q.label}</span>
+                <span style={{ fontSize: 20 }}>{s.icon}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>{s.title}</span>
               </a>
             ))}
           </div>
         </section>
       )}
 
-      {/* Sections */}
-      <section style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 120px' }}>
+      {/* Content */}
+      <section style={{ maxWidth: 760, margin: '0 auto', padding: '0 24px 80px' }}>
         {filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: 'rgba(255,255,255,0.25)', fontSize: 15 }}>
-            No results for "{search}" — try a different search term.
+          <div style={{ textAlign: 'center', padding: '48px 0', color: 'rgba(255,255,255,0.3)', fontSize: 15 }}>
+            No results for "{search}"
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 20 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             {filtered.map(section => (
-              <div key={section.category}
-                id={section.category.toLowerCase().replace(/\s+/g, '-').replace(/&/g, '')}
-                style={{
-                  background: 'rgba(255,255,255,0.02)',
-                  border: '1px solid rgba(255,255,255,0.07)',
-                  borderRadius: 16, padding: '24px',
-                }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-                  <div style={{
-                    width: 36, height: 36, borderRadius: 10,
-                    background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.2)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
-                  }}>
+              <div key={section.id} id={section.id}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, cursor: 'pointer' }}
+                  onClick={() => setOpenSection(openSection === section.id ? null : section.id)}>
+                  <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
                     {section.icon}
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>
-                    {section.category}
-                  </div>
+                  <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, flex: 1 }}>{section.title}</h2>
+                  <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 18 }}>
+                    {openSection === section.id ? '−' : '+'}
+                  </span>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {section.articles.map(article => (
-                    <div key={article.slug}
-                      style={{
-                        display: 'flex', alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '10px 12px', borderRadius: 8,
-                        cursor: 'pointer', transition: 'background 0.15s',
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ color: 'rgba(255,195,0,0.5)', fontSize: 12 }}>→</span>
-                        <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)' }}>
-                          {article.title}
-                        </span>
+                {(openSection === section.id || search) && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 52 }}>
+                    {section.content.map(item => (
+                      <div key={item.q}
+                        style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, overflow: 'hidden' }}>
+                        <div
+                          onClick={() => setOpenQ(openQ === item.q ? null : item.q)}
+                          style={{ padding: '14px 18px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{item.q}</span>
+                          <span style={{ color: BLUE, fontSize: 16, flexShrink: 0 }}>
+                            {openQ === item.q ? '−' : '+'}
+                          </span>
+                        </div>
+                        {(openQ === item.q || search) && (
+                          <div style={{ padding: '0 18px 16px', fontSize: 13, color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                            <div style={{ paddingTop: 12 }}>{item.a}</div>
+                          </div>
+                        )}
                       </div>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', whiteSpace: 'nowrap', marginLeft: 12 }}>
-                        {article.time}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
       </section>
 
-      {/* Contact */}
-      <section style={{ maxWidth: 700, margin: '0 auto', padding: '0 24px 80px', textAlign: 'center' }}>
-        <div style={{
-          background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)',
-          borderRadius: 20, padding: '40px 32px',
-        }}>
-          <div style={{ fontSize: 36, marginBottom: 16 }}>💬</div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 10px' }}>
-            Can't find what you need?
-          </h2>
+      {/* Footer CTA */}
+      <section style={{ maxWidth: 600, margin: '0 auto', padding: '0 24px 80px', textAlign: 'center' }}>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: '40px 32px' }}>
+          <div style={{ fontSize: 32, marginBottom: 16 }}>💬</div>
+          <h2 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 10px' }}>Still have a question?</h2>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, margin: '0 0 24px', lineHeight: 1.6 }}>
-            Our team is happy to help. Send us a message and we'll get back to you within 24 hours.
+            Email Luis directly. Every question that is not answered in the docs gets added here so the next person does not have to ask.
           </p>
-          <button
-            onClick={() => window.location.href = 'mailto:cadomos@gmail.com?subject=SignalBoost Support'}
-            style={{ background: '#ffc300', color: '#000', fontWeight: 800, fontSize: 14, padding: '12px 32px', borderRadius: 999, border: 'none', cursor: 'pointer' }}>
-            Contact support
-          </button>
+          <a href="mailto:cadomos@gmail.com?subject=SignalBoost Question"
+            style={{ background: GOLD, color: '#000', fontWeight: 800, fontSize: 14, padding: '12px 32px', borderRadius: 999, textDecoration: 'none', display: 'inline-block' }}>
+            Email cadomos@gmail.com
+          </a>
         </div>
       </section>
 

@@ -1,8 +1,13 @@
+import type { Metadata } from 'next'
+import { Geist } from 'next/font/google'
 import './globals.css'
 
-export const metadata = {
-  title: 'SignalBoost',
-  description: 'Turn reviews into global content',
+const geist = Geist({ subsets: ['latin'] })
+
+export const metadata: Metadata = {
+  title: 'SignalBoost — Turn reviews into global content',
+  description: 'Build your multilingual presence with native-language written, audio, and video content.',
+  themeColor: '#0a0a0f',
 }
 
 export default function RootLayout({
@@ -12,8 +17,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      {/* Make sure there isn't a style here like bg-black text-black hiding everything */}
-      <body>{children}</body>
+      <body className={geist.className}>
+        {children}
+      </body>
     </html>
   )
 }

@@ -87,12 +87,13 @@ export default function Navbar() {
         </span>
       </Link>
 
-      <div style={{ display: 'flex', gap: 28 }}>
+      <div style={{ display: 'flex', gap: 24 }}>
         {[
-          { label: 'Home',      href: '/' },
-          { label: 'Dashboard', href: '/dashboard' },
-          { label: 'Pricing',   href: '/pricing' },
-          { label: 'Docs',      href: '/docs' },
+          { label: 'Home',        href: '/' },
+          { label: 'Podcasters',  href: '/podcasters' },
+          { label: 'Dashboard',   href: '/dashboard' },
+          { label: 'Pricing',     href: '/pricing' },
+          { label: 'Docs',        href: '/docs' },
         ].map(item => (
           <Link key={item.label} href={item.href}
             style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)', textDecoration: 'none' }}

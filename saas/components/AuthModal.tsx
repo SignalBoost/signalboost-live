@@ -6,6 +6,7 @@ type Mode = 'login' | 'signup'
 
 export default function AuthModal({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<Mode>('login')
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -18,10 +19,14 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
     setLoading(true)
 
     if (mode === 'signup') {
+      if (!name.trim()) { setError('Please enter your name.'); setLoading(false); return }
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: `${window.location.origin}/dashboard` }
+        options: {
+          data: { full_name: name.trim() },
+          emailRedirectTo: `${window.location.origin}/dashboard`,
+        }
       })
       if (error) setError(error.message)
       else setSuccess('Check your email to confirm your account!')
@@ -43,30 +48,30 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 1000,
-      background: 'rgba(0,0,0,0.7)',
+      background: 'rgba(0,0,0,0.75)',
       backdropFilter: 'blur(8px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: 24,
     }} onClick={onClose}>
       <div style={{
         background: '#111118', border: '1px solid rgba(255,255,255,0.1)',
-        borderRadius: 20, padding: '36px 32px', width: '100%', maxWidth: 400,
+        borderRadius: 20, padding: '36px 32px', width: '100%', maxWidth: 420,
         position: 'relative',
       }} onClick={e => e.stopPropagation()}>
 
         {/* Close */}
         <button onClick={onClose}
-          style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>
+          style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>
           ×
         </button>
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <div style={{ fontSize: 17, fontWeight: 800, color: '#fff' }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>
             signal<span style={{ color: '#ffc300' }}>boost</span>
           </div>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>
-            {mode === 'login' ? 'Welcome back' : 'Create your account'}
+            {mode === 'login' ? 'Welcome back' : 'Create your free account'}
           </div>
         </div>
 
@@ -93,78 +98,13 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
           <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
         </div>
 
-        {/* Email */}
-        <div style={{ marginBottom: 12 }}>
-          <input
-            type="email" placeholder="Email address" value={email}
-            onChange={e => setEmail(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-            style={{
-              width: '100%', padding: '11px 14px', borderRadius: 10, fontSize: 14,
-              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-              color: '#fff', outline: 'none', boxSizing: 'border-box',
-            }}
-            onFocus={e => (e.currentTarget.style.borderColor = 'rgba(255,195,0,0.5)')}
-            onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)')}
-          />
-        </div>
-
-        {/* Password */}
-        <div style={{ marginBottom: 20 }}>
-          <input
-            type="password" placeholder="Password" value={password}
-            onChange={e => setPassword(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-            style={{
-              width: '100%', padding: '11px 14px', borderRadius: 10, fontSize: 14,
-              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-              color: '#fff', outline: 'none', boxSizing: 'border-box',
-            }}
-            onFocus={e => (e.currentTarget.style.borderColor = 'rgba(255,195,0,0.5)')}
-            onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)')}
-          />
-        </div>
-
-        {error && (
-          <div style={{ fontSize: 13, color: '#f87171', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div style={{ fontSize: 13, color: '#4ade80', background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
-            {success}
-          </div>
-        )}
-
-        <button onClick={handleSubmit} disabled={loading}
-          style={{
-            width: '100%', padding: '12px 0', borderRadius: 10, fontSize: 14, fontWeight: 800,
-            background: '#ffc300', color: '#000', border: 'none', cursor: loading ? 'wait' : 'pointer',
-            opacity: loading ? 0.7 : 1,
-          }}>
-          {loading ? 'Please wait...' : mode === 'login' ? 'Log in' : 'Create account'}
-        </button>
-
-        <div style={{ textAlign: 'center', marginTop: 16, fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>
-          {mode === 'login' ? (
-            <>Don't have an account?{' '}
-              <button onClick={() => setMode('signup')}
-                style={{ color: '#ffc300', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
-                Sign up
-              </button>
-            </>
-          ) : (
-            <>Already have an account?{' '}
-              <button onClick={() => setMode('login')}
-                style={{ color: '#ffc300', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
-                Log in
-              </button>
-            </>
-          )}
-        </div>
-
-      </div>
-    </div>
-  )
-}
+        {/* Name — only on signup */}
+        {mode === 'signup' && (
+          <div style={{ marginBottom: 12 }}>
+            <input
+              type="text" placeholder="Your full name" value={name}
+              onChange={e => setName(e.target.value)}
+              style={{
+                width: '100%', padding: '11px 14px', borderRadius: 10, fontSize: 14,
+                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                color: '#fff', outline: 'none', boxSizing: 'bo

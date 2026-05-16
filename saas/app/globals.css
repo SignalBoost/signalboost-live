@@ -4,24 +4,15 @@
 
 :root {
   --gold: #ffc300;
-  --gold-dim: rgba(255, 195, 0, 0.15);
   --bg-base: #0a0a0f;
   --glass-bg: rgba(255, 255, 255, 0.04);
   --glass-border: rgba(255, 255, 255, 0.08);
   --glass-hover: rgba(255, 255, 255, 0.07);
-  --text-primary: #ffffff;
-  --text-muted: rgba(255, 255, 255, 0.4);
-}
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
 }
 
 html, body {
   background-color: var(--bg-base);
-  color: var(--text-primary);
+  color: #ffffff;
   min-height: 100vh;
   overflow-x: hidden;
 }
@@ -32,8 +23,8 @@ body::before {
   inset: 0;
   z-index: 0;
   background:
-    radial-gradient(ellipse 80% 50% at 20% 20%, rgba(255, 195, 0, 0.07) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 80% 70%, rgba(255, 195, 0, 0.05) 0%, transparent 55%);
+    radial-gradient(ellipse 80% 50% at 20% 20%, rgba(255,195,0,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 70%, rgba(255,195,0,0.05) 0%, transparent 55%);
   pointer-events: none;
 }
 
@@ -46,16 +37,17 @@ body::before {
 
 .glass:hover {
   background: var(--glass-hover);
-  border-color: rgba(255, 195, 0, 0.2);
+  border-color: rgba(255,195,0,0.2);
 }
 
 .text-gold { color: var(--gold); }
 .bg-gold { background: var(--gold); }
 
-#__next, main, nav, section, footer {
+main, nav, section, footer {
   position: relative;
   z-index: 1;
 }
 
 ::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollba
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,195,0,0.3); border-radius: 2px; }

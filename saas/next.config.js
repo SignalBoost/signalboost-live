@@ -1,18 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  turbopack: {},
   images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'signalboostapp.com',
-      },
-    ],
-  },
-  webpack: (config) => {
-    config.watchOptions = {
-      ignored: /saas\/node_modules/,
-    };
-    return config;
+    domains: ['signalboostapp.com'],
   },
 }
+
 export default nextConfig

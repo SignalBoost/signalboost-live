@@ -43,7 +43,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
     })
   }
 
-  const inputStyle = {
+  const inp: React.CSSProperties = {
     width: '100%',
     padding: '11px 14px',
     borderRadius: 10,
@@ -52,5 +52,16 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
     border: '1px solid rgba(255,255,255,0.1)',
     color: '#fff',
     outline: 'none',
-    boxSizing: 'border-box' as const,
+    boxSizing: 'border-box',
+    marginBottom: 12,
   }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1000,
+      background: 'rgba(0,0,0,0.75)',
+      backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+    }} onClick={onClose}>
+      <div style={{
+        background: '#111118', border: '1px soli

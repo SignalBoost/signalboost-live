@@ -1,4 +1,4 @@
-import { createClient } from '@/utils/supabase/client'
+import { supabase } from '@/utils/supabase/client'
 
 export const PLAN_SEATS: Record<string, number> = {
   free:     1,
@@ -8,7 +8,6 @@ export const PLAN_SEATS: Record<string, number> = {
 }
 
 export async function getUserSubscription(userId: string) {
-  const supabase = createClient()
   const { data, error } = await supabase
     .from('subscriptions')
     .select('*')
@@ -20,7 +19,6 @@ export async function getUserSubscription(userId: string) {
 }
 
 export async function getTeamMembers(ownerId: string) {
-  const supabase = createClient()
   const { data, error } = await supabase
     .from('team_members')
     .select('*')
@@ -32,7 +30,6 @@ export async function getTeamMembers(ownerId: string) {
 }
 
 export async function canAddMember(ownerId: string): Promise<boolean> {
-  const supabase = createClient()
   const { data, error } = await supabase
     .rpc('can_add_member', { owner: ownerId })
 
@@ -41,8 +38,6 @@ export async function canAddMember(ownerId: string): Promise<boolean> {
 }
 
 export async function inviteMember(ownerId: string, email: string) {
-  const supabase = createClient()
-
   const canAdd = await canAddMember(ownerId)
   if (!canAdd) {
     return { error: 'Seat limit reached. Upgrade your plan to add more members.' }
@@ -61,7 +56,6 @@ export async function inviteMember(ownerId: string, email: string) {
 }
 
 export async function removeMember(ownerId: string, memberId: string) {
-  const supabase = createClient()
   const { error } = await supabase
     .from('team_members')
     .update({ status: 'removed' })

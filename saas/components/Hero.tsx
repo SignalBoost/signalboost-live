@@ -1,83 +1,149 @@
-"use client";
+'use client'
 
-import React, { useState, useRef } from "react";
+import { useEffect, useRef, useState } from 'react'
 
-export default function Hero() {
-  const languages = [
-    { code: "EN", label: "English", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
-    { code: "ES", label: "Spanish", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.2mp3" },
-    { code: "PT", label: "Portuguese", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
-    { code: "PL", label: "Polish", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" },
-    { code: "RU", label: "Russian", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3" },
-    { code: "JP", label: "Japanese", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3" },
-  ];
+const LANGS = [
+  { name: 'English',   flag: '🇺🇸' },
+  { name: 'Português', flag: '🇧🇷' },
+  { name: 'Español',   flag: '🇪🇸' },
+  { name: 'Polski',    flag: '🇵🇱' },
+  { name: 'Русский',   flag: '🇷🇺' },
+]
 
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [playingCode, setPlayingCode] = useState<string | null>(null);
+const POSITIONS = [
+  { tx:  130, ty: -160 },
+  { tx: -130, ty: -160 },
+  { tx:  160, ty:  -80 },
+  { tx: -160, ty:  -80 },
+  { tx:   50, ty: -190 },
+]
 
-  const playAudio = async (src: string, code: string) => {
-    if (!audioRef.current) return;
-    try {
-      if (playingCode === code) {
-        audioRef.current.pause();
-        setPlayingCode(null);
-      } else {
-        audioRef.current.pause();
-        audioRef.current.src = src;
-        audioRef.current.load();
-        await audioRef.current.play();
-        setPlayingCode(code);
+export default function SignalHero() {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [selected, setSelected] = useState<string[]>([])
+  const [tags, setTags] = useState<{ id: number; lang: typeof LANGS[0]; pos: typeof POSITIONS[0] }[]>([])
+  const tagIdRef = useRef(0)
+  const langIdxRef = useRef(0)
+  const posIdxRef = useRef(0)
+  const lastSpawnRef = useRef(0)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')!
+    const W = 500, H = 420
+    canvas.width = W
+    canvas.height = H
+    const cx = W / 2, cy = H - 80
+
+    let rings: { r: number; alpha: number }[] = []
+    let raf: number
+
+    function draw(ts: number) {
+      ctx.clearRect(0, 0, W, H)
+
+      if (!lastSpawnRef.current || ts - lastSpawnRef.current > 2200) {
+        rings.push({ r: 0, alpha: 1 })
+        lastSpawnRef.current = ts
+        spawnTag()
       }
-    } catch (err) {
-      console.error("Playback failed:", err);
+
+      rings = rings.filter(r => r.alpha > 0.005)
+      for (const r of rings) {
+        r.r += 1.8
+        r.alpha -= 0.005
+
+        const arcs   = [1, 0.70, 0.44]
+        const widths = [2.5, 1.6, 1.0]
+        const alphas = [0.85, 0.50, 0.28]
+
+        for (let i = 0; i < 3; i++) {
+          if (r.r * arcs[i] < 10) continue
+          ctx.globalAlpha = Math.max(0, r.alpha * alphas[i])
+          ctx.strokeStyle = '#ffc300'
+          ctx.lineWidth = widths[i]
+          ctx.beginPath()
+          ctx.arc(cx, cy, r.r * arcs[i], Math.PI, 0)
+          ctx.stroke()
+        }
+      }
+
+      // Base glow
+      ctx.globalAlpha = 0.18
+      ctx.fillStyle = '#ffc300'
+      ctx.beginPath()
+      ctx.arc(cx, cy, 28, 0, Math.PI * 2)
+      ctx.fill()
+
+      // Dot
+      ctx.globalAlpha = 1
+      ctx.fillStyle = '#ffc300'
+      ctx.beginPath()
+      ctx.arc(cx, cy, 9, 0, Math.PI * 2)
+      ctx.fill()
+
+      ctx.fillStyle = '#0a0a0f'
+      ctx.beginPath()
+      ctx.arc(cx, cy, 4, 0, Math.PI * 2)
+      ctx.fill()
+
+      raf = requestAnimationFrame(draw)
     }
-  };
+
+    raf = requestAnimationFrame(draw)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
+  function spawnTag() {
+    const lang = LANGS[langIdxRef.current % LANGS.length]
+    const pos  = POSITIONS[posIdxRef.current % POSITIONS.length]
+    langIdxRef.current++
+    posIdxRef.current++
+    const id = tagIdRef.current++
+    setTags(prev => [...prev, { id, lang, pos }])
+    setTimeout(() => setTags(prev => prev.filter(t => t.id !== id)), 3500)
+  }
+
+  function toggleLang(name: string) {
+    setSelected(prev =>
+      prev.includes(name) ? prev.filter(l => l !== name) : [...prev, name]
+    )
+  }
 
   return (
-    // Outer section with a dark base and a subtle deep radial accent so the frost pops
-    <section className="relative w-full bg-[#0a0a0a] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-neutral-900 via-black to-black py-24 px-6 text-white text-center overflow-hidden">
-      <audio ref={audioRef} onEnded={() => setPlayingCode(null)} />
-      
-      {/* Main Container featuring the Frosted Glassmorphism look */}
-      <div className="relative max-w-5xl mx-auto p-12 rounded-3xl bg-white/[0.02] border border-white/[0.08] backdrop-blur-xl shadow-2xl">
-        
-        <h1 className="text-5xl md:text-7xl font-extrabold mb-6 tracking-tight bg-gradient-to-b from-white to-neutral-400 bg-clip-text text-transparent">
-          Turn reviews into <span className="text-yellow-400">global content</span>
+    <section style={{ minHeight: 'calc(100vh - 65px)' }}
+      className="grid grid-cols-2 items-center px-6">
+
+      {/* LEFT */}
+      <div className="flex flex-col gap-6 pl-8 pr-4">
+        <div className="flex items-center gap-2 w-fit rounded-full px-4 py-2 text-xs font-bold tracking-widest uppercase"
+          style={{ background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.25)', color: '#ffc300' }}>
+          <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
+          Live transmissions
+        </div>
+
+        <h1 className="text-6xl font-black leading-tight" style={{ letterSpacing: '-0.02em' }}>
+          Your reviews,<br />
+          heard <span style={{ color: '#ffc300' }}>everywhere</span>
         </h1>
-        
-        <p className="text-neutral-400 mb-12 text-lg max-w-xl mx-auto">
-          Click a language below to sample our dynamic cloud-streamed audio tracks.
+
+        <p className="text-lg max-w-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>
+          We broadcast your content to global audiences — translated, voiced, and delivered instantly.
         </p>
 
-        {/* Grid for language selection items */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {languages.map((lang) => (
-            <button
-              key={lang.code}
-              onClick={() => playAudio(lang.src, lang.code)}
-              className={`p-6 rounded-2xl border transition-all duration-300 flex flex-col items-center ${
-                playingCode === lang.code 
-                ? "bg-yellow-400 text-black border-yellow-400 scale-105 shadow-yellow-400/10 shadow-2xl" 
-                : "bg-white/[0.03] border-white/[0.06] backdrop-blur-md hover:bg-white/[0.08] hover:border-white/[0.15]"
-              }`}
-            >
-              <span className="text-2xl font-bold tracking-wider">{lang.code}</span>
-              <div className={`mt-4 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                playingCode === lang.code ? "bg-black" : "bg-yellow-400 hover:bg-yellow-300"
-              }`}>
-                 {playingCode === lang.code ? (
-                    <div className="flex gap-1 items-center justify-center">
-                      <div className="w-1 h-3 bg-yellow-400 animate-pulse" />
-                      <div className="w-1 h-3 bg-yellow-400 animate-pulse delay-75" />
-                    </div>
-                 ) : (
-                   <div className="w-0 h-0 border-t-[5px] border-t-transparent border-l-[9px] border-l-black border-b-[5px] border-b-transparent ml-1" />
-                 )}
-              </div>
-            </button>
-          ))}
+        <div className="flex items-center gap-4">
+          <button className="font-bold px-8 py-3 rounded-full text-black text-base transition-all hover:scale-105"
+            style={{ background: '#ffc300' }}>
+            Get started
+          </button>
+          <button className="text-base transition-colors" style={{ color: 'rgba(255,255,255,0.45)' }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.45)')}>
+            See how it works →
+          </button>
         </div>
-      </div>
-    </section>
-  );
-}
+
+        {/* Selected tags */}
+        <div className="flex flex-wrap gap-2 min-h-[36px]">
+          {selected.length === 0 ? (
+            <p

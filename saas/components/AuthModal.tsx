@@ -24,15 +24,29 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
         password,
         options: {
           data: { full_name: name.trim() },
-          emailRedirectTo: `${window.location.origin}/dashboard`,
+          emailRedirectTo: `${window.location.origin}/onboarding`,
         }
       })
       if (error) setError(error.message)
       else setSuccess('Check your email to confirm your account!')
     } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) setError(error.message)
-      else { onClose(); window.location.href = '/dashboard' }
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        setError(error.message)
+      } else {
+        onClose()
+        // Check if user has been onboarded
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('onboarded')
+          .eq('id', data.user.id)
+          .single()
+        if (profile?.onboarded) {
+          window.location.href = '/dashboard'
+        } else {
+          window.location.href = '/onboarding'
+        }
+      }
     }
     setLoading(false)
   }
@@ -40,7 +54,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
   async function handleGoogle() {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/dashboard` }
+      options: { redirectTo: `${window.location.origin}/onboarding` }
     })
   }
 

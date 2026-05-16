@@ -18,9 +18,8 @@ export default function DashboardOverviewPage() {
   }, [])
 
   return (
-    <div style={{ color: '#fff', fontFamily: 'system-ui', padding: '32px', maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ color: '#fff', fontFamily: 'system-ui' }}>
 
-      {/* Header */}
       <div style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', paddingBottom: 20, marginBottom: 32 }}>
         <h1 style={{ fontSize: 24, fontWeight: 900, letterSpacing: '-0.02em', margin: 0 }}>
           System overview
@@ -30,10 +29,7 @@ export default function DashboardOverviewPage() {
         </p>
       </div>
 
-      {/* Top grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
-
-        {/* Quick actions */}
         <div style={{
           background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)',
           borderRadius: 16, padding: '24px',
@@ -54,7 +50,6 @@ export default function DashboardOverviewPage() {
                   background: 'rgba(255,255,255,0.02)',
                   border: '1px solid rgba(255,255,255,0.06)',
                   borderRadius: 12, textDecoration: 'none',
-                  transition: 'border-color 0.15s',
                 }}
                 onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(255,195,0,0.3)')}
                 onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)')}>
@@ -65,7 +60,6 @@ export default function DashboardOverviewPage() {
           </div>
         </div>
 
-        {/* Credits */}
         <div style={{
           background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)',
           borderRadius: 16, padding: '24px',
@@ -91,13 +85,12 @@ export default function DashboardOverviewPage() {
         </div>
       </div>
 
-      {/* Stats row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
         {[
-          { label: 'Active sites',     value: '0' },
+          { label: 'Active sites',      value: '0' },
           { label: 'Reviews collected', value: '0' },
-          { label: 'Audio generated',  value: '0 min' },
-          { label: 'Videos created',   value: '0' },
+          { label: 'Audio generated',   value: '0 min' },
+          { label: 'Videos created',    value: '0' },
         ].map(stat => (
           <div key={stat.label} style={{
             background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
@@ -113,7 +106,6 @@ export default function DashboardOverviewPage() {
         ))}
       </div>
 
-      {/* Team manager */}
       <div style={{
         background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)',
         borderRadius: 16, padding: '24px',

@@ -42,19 +42,15 @@ export default function SignalHero() {
     canvas.height = H
     const cx = W / 2
     const cy = H - 100
-
     let rings: { r: number; alpha: number }[] = []
     let raf: number
-
     function draw(ts: number) {
       ctx.clearRect(0, 0, W, H)
-
       if (!lastSpawnRef.current || ts - lastSpawnRef.current > 2200) {
         rings.push({ r: 0, alpha: 1 })
         lastSpawnRef.current = ts
         spawnTag()
       }
-
       rings = rings.filter(r => r.alpha > 0.005)
       for (const r of rings) {
         r.r += 1.8
@@ -72,13 +68,11 @@ export default function SignalHero() {
           ctx.stroke()
         }
       }
-
       ctx.globalAlpha = 0.2
       ctx.fillStyle = '#ffc300'
       ctx.beginPath()
       ctx.arc(cx, cy, 32, 0, Math.PI * 2)
       ctx.fill()
-
       ctx.globalAlpha = 1
       ctx.fillStyle = '#ffc300'
       ctx.beginPath()
@@ -88,10 +82,8 @@ export default function SignalHero() {
       ctx.beginPath()
       ctx.arc(cx, cy, 5, 0, Math.PI * 2)
       ctx.fill()
-
       raf = requestAnimationFrame(draw)
     }
-
     raf = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(raf)
   }, [])
@@ -111,37 +103,3 @@ export default function SignalHero() {
       prev.includes(name) ? prev.filter(l => l !== name) : [...prev, name]
     )
   }
-
-  return (
-    <section
-      style={{ minHeight: 'calc(100vh - 65px)' }}
-      className="grid grid-cols-2 items-center">
-
-      {/* LEFT */}
-      <div className="flex flex-col gap-7 px-16">
-
-        <div
-          className="flex items-center gap-2 w-fit rounded-full px-4 py-2 text-xs font-bold tracking-widest uppercase"
-          style={{ background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.25)', color: '#ffc300' }}>
-          <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#ffc300' }} />
-          Build · Review · Broadcast
-        </div>
-
-        <h1
-          className="font-black leading-none"
-          style={{ fontSize: 'clamp(40px, 5vw, 68px)', letterSpacing: '-0.03em' }}>
-          Build your brand<br />
-          in{' '}
-          <span
-            key={headlineLang}
-            style={{
-              color: '#ffc300',
-              display: 'inline-block',
-              animation: 'fadeSlide 0.4s ease-out',
-            }}>
-            {LANGS[headlineLang].name}
-          </span>
-        </h1>
-
-        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 16, lineHeight: 1.7, maxWidth: 340 }}>
-          Create your website, collect customer reviews, and produce native audio & video content — all in your language,

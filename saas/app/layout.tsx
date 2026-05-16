@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import SupportChat from '@/components/SupportChat'
 
 export const metadata: Metadata = {
   title: 'SignalBoost',
@@ -16,7 +15,6 @@ export default function RootLayout({
     <html lang="en">
       <body>
         {children}
-        <SupportChat />
       </body>
     </html>
   )

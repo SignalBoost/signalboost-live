@@ -7,12 +7,14 @@ import { getProjects, createProject, deleteProject, updateProjectStatus, TYPE_IC
 
 const LANGS = ['English', 'Português', 'Español', 'Polski', 'Русский']
 const BLUE = '#3b82f6'
-const BLUE_DIM = 'rgba(59,130,246,0.15)'
+const BLUE_DIM = 'rgba(59,130,246,0.12)'
 const BLUE_BORDER = 'rgba(59,130,246,0.3)'
 
 export default function DashboardOverviewPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [firstName, setFirstName] = useState<string | null>(null)
+  const [isNewUser, setIsNewUser] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
   const [showNewProject, setShowNewProject] = useState(false)
   const [newName, setNewName] = useState('')
@@ -26,6 +28,18 @@ export default function DashboardOverviewPage() {
       if (data?.user) {
         setUserId(data.user.id)
         setUserEmail(data.user.email ?? null)
+
+        // Get first name from metadata
+        const meta = data.user.user_metadata
+        const fullName = meta?.full_name || meta?.name || ''
+        const first = fullName.split(' ')[0] || null
+        setFirstName(first)
+
+        // Check if new user — created within last 30 seconds
+        const createdAt = new Date(data.user.created_at).getTime()
+        const isNew = Date.now() - createdAt < 30000
+        setIsNewUser(isNew)
+
         getProjects(data.user.id).then(setProjects)
       }
     })
@@ -66,16 +80,24 @@ export default function DashboardOverviewPage() {
     return 'Just now'
   }
 
+  const greeting = isNewUser
+    ? `Welcome to SignalBoost${firstName ? `, ${firstName}` : ''}! 🎉`
+    : `Welcome back${firstName ? `, ${firstName}` : ''}! 👋`
+
+  const projectsTitle = firstName ? `${firstName}'s projects` : 'Your projects'
+
   return (
     <div style={{ color: '#fff', fontFamily: 'system-ui' }}>
 
       {/* Header */}
       <div style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', paddingBottom: 20, marginBottom: 32 }}>
         <h1 style={{ fontSize: 24, fontWeight: 900, letterSpacing: '-0.02em', margin: 0 }}>
-          System overview
+          {greeting}
         </h1>
         <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>
-          Welcome back{userEmail ? `, ${userEmail}` : ''}. Continue where you left off.
+          {isNewUser
+            ? 'Your account is ready. Create your first project below to get started.'
+            : 'Here is the operational status of your SignalBoost platform.'}
         </p>
       </div>
 
@@ -83,7 +105,7 @@ export default function DashboardOverviewPage() {
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <div>
-            <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: '#fff' }}>Your projects</h2>
+            <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: '#fff' }}>{projectsTitle}</h2>
             <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>Click any project to continue working</p>
           </div>
           <button onClick={() => setShowNewProject(true)}
@@ -126,7 +148,7 @@ export default function DashboardOverviewPage() {
           </div>
         )}
 
-        {/* Projects grid — hovering cards */}
+        {/* Projects grid */}
         {projects.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '48px 0', background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 20 }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>📁</div>
@@ -147,9 +169,129 @@ export default function DashboardOverviewPage() {
                   borderRadius: 16, padding: '20px',
                   display: 'flex', flexDirection: 'column', gap: 14,
                   cursor: 'pointer',
-                  transition: 'transform 0.15s, box-shadow 0.15s, border-color 0.15s',
-                  boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+                  transition: 'transform 0.18s, box-shadow 0.18s, border-color 0.18s',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.transform = 'translateY(-4px)'
-                  e.currentTarget.style.boxShadow = '0 12px 40px rgba(59,130,246,0.2)
+                  e.currentTarget.style.transform = 'translateY(-5px)'
+                  e.currentTarget.style.boxShadow = '0 16px 48px rgba(59,130,246,0.2)'
+                  e.currentTarget.style.borderColor = BLUE_BORDER
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.25)'
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
+                }}>
+
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 12, background: BLUE_DIM, border: `1px solid ${BLUE_BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
+                      {TYPE_ICONS[p.type]}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{p.name}</div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>{p.language} · {p.type}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.05)', borderRadius: 999, padding: '3px 10px' }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_COLORS[p.status], flexShrink: 0 }} />
+                    <span style={{ fontSize: 10, color: STATUS_COLORS[p.status], fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      {p.status}
+                    </span>
+                  </div>
+                </div>
+
+                {p.description && (
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>{p.description}</div>
+                )}
+
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 12 }}>
+                  Last edited {timeAgo(p.last_edited_at)}
+                </div>
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button style={{ flex: 1, padding: '8px 0', borderRadius: 8, background: BLUE, color: '#fff', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+                    Open →
+                  </button>
+                  <select value={p.status} onChange={e => handleStatus(p.id, e.target.value as Project['status'])}
+                    style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 11, cursor: 'pointer', outline: 'none' }}>
+                    <option value="draft">Draft</option>
+                    <option value="live">Live</option>
+                    <option value="paused">Paused</option>
+                  </select>
+                  <button onClick={() => handleDelete(p.id)}
+                    style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171', fontSize: 12, cursor: 'pointer' }}>
+                    🗑
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Quick actions */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: '24px' }}>
+          <h2 style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16 }}>
+            Quick actions
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {[
+              { href: '/dashboard/builder',  icon: '🌐', label: 'Site builder' },
+              { href: '/dashboard/reviews',  icon: '⭐', label: 'Review collector' },
+              { href: '/dashboard/audio',    icon: '🎙️', label: 'Native audio' },
+              { href: '/dashboard/video',    icon: '🎬', label: 'Video editor' },
+            ].map(item => (
+              <Link key={item.href} href={item.href}
+                style={{ display: 'block', padding: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, textDecoration: 'none', transition: 'border-color 0.15s' }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = BLUE_BORDER)}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)')}>
+                <span style={{ fontSize: 20, display: 'block', marginBottom: 6 }}>{item.icon}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{item.label}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <h2 style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16 }}>
+            Account balance
+          </h2>
+          <div style={{ fontSize: 48, fontWeight: 900, letterSpacing: '-0.03em', color: BLUE }}>
+            750
+            <span style={{ fontSize: 16, fontWeight: 500, color: 'rgba(255,255,255,0.4)', marginLeft: 8 }}>credits</span>
+          </div>
+          <div style={{ marginTop: 16, display: 'flex', gap: 12 }}>
+            <Link href="/dashboard/metrics" style={{ fontSize: 12, fontWeight: 600, color: BLUE, textDecoration: 'none' }}>View analytics →</Link>
+            <Link href="/pricing" style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.35)', textDecoration: 'none' }}>Buy more credits →</Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+        {[
+          { label: 'Active sites',      value: projects.filter(p => p.status === 'live').length.toString() },
+          { label: 'Reviews collected', value: '0' },
+          { label: 'Audio generated',   value: '0 min' },
+          { label: 'Videos created',    value: '0' },
+        ].map(stat => (
+          <div key={stat.label} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '16px 20px' }}>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 8, fontWeight: 500 }}>{stat.label}</div>
+            <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.02em', color: BLUE }}>{stat.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Team */}
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: '24px' }}>
+        <h2 style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 20 }}>
+          Team members
+        </h2>
+        {userId ? <TeamManager userId={userId} /> : <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>Loading team...</p>}
+      </div>
+
+    </div>
+  )
+}

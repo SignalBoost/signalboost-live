@@ -11,11 +11,11 @@ const LANGS = [
 ]
 
 const POSITIONS = [
-  { tx:  150, ty: -130 },
-  { tx: -150, ty: -130 },
-  { tx:  160, ty:  -40 },
-  { tx: -160, ty:  -40 },
-  { tx:   50, ty: -175 },
+  { tx:  140, ty: -160 },
+  { tx: -140, ty: -160 },
+  { tx:  170, ty:  -80 },
+  { tx: -170, ty:  -80 },
+  { tx:   60, ty: -200 },
 ]
 
 type Tag = { id: number; lang: typeof LANGS[0]; pos: typeof POSITIONS[0] }
@@ -48,28 +48,30 @@ export default function SignalHero() {
 
   return (
     <section
-      style={{ minHeight: 'calc(100vh - 65px)', padding: '0' }}
+      style={{ minHeight: 'calc(100vh - 65px)', maxHeight: '92vh', overflow: 'hidden', position: 'relative' }}
       className="grid grid-cols-2 items-center">
 
       {/* LEFT */}
-      <div className="flex flex-col gap-6 px-16 py-12">
+      <div className="flex flex-col gap-7 px-16">
 
         <div className="flex items-center gap-2 w-fit rounded-full px-4 py-2"
-          style={{ background: 'rgba(255,195,0,0.12)', border: '1px solid rgba(255,195,0,0.3)', color: '#ffc300', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+          style={{ background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.25)', color: '#ffc300', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ffc300', display: 'inline-block', animation: 'pulse 2s infinite' }} />
           Build · Review · Broadcast
         </div>
 
-        <h1 style={{ fontSize: 'clamp(44px, 5.5vw, 76px)', fontWeight: 900, lineHeight: 1.05, letterSpacing: '-0.03em', margin: 0 }}>
+        <h1 className="font-black leading-none"
+          style={{ fontSize: 'clamp(40px, 5vw, 68px)', letterSpacing: '-0.03em' }}>
           Build your brand<br />
           in{' '}
-          <span key={headlineLang}
+          <span
+            key={headlineLang}
             style={{ color: '#ffc300', display: 'inline-block', animation: 'fadeSlide 0.35s ease-out' }}>
             {LANGS[headlineLang].name}
           </span>
         </h1>
 
-        <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 17, lineHeight: 1.7, maxWidth: 360, margin: 0 }}>
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 16, lineHeight: 1.7, maxWidth: 340, margin: 0 }}>
           Create your website, collect customer reviews, and produce native audio & video content — in your language, not a translation.
         </p>
 
@@ -105,11 +107,11 @@ export default function SignalHero() {
             : selected.map(name => {
                 const l = LANGS.find(x => x.name === name)!
                 return (
-                  <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', fontSize: 13, fontWeight: 600, background: 'rgba(255,195,0,0.12)', border: '1px solid rgba(255,195,0,0.35)', color: '#ffc300', borderRadius: 999 }}>
+                  <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', fontSize: 13, fontWeight: 600, background: 'rgba(255,195,0,0.12)', border: '1px solid rgba(255,195,0,0.3)', color: '#ffc300', borderRadius: 999 }}>
                     <span>{l.flag}</span>
                     <span>{l.name}</span>
                     <button onClick={() => toggleLang(name)}
-                      style={{ color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0, marginLeft: 4 }}>×</button>
+                      style={{ color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0, marginLeft: 4 }}>×</button>
                   </div>
                 )
               })
@@ -117,8 +119,8 @@ export default function SignalHero() {
         </div>
       </div>
 
-      {/* RIGHT — signal perfectly centered */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
+      {/* RIGHT — signal */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', borderLeft: '1px solid rgba(255,255,255,0.05)' }}>
         <div style={{ position: 'relative', width: 500, height: 500 }}>
           <SignalCanvas onSpawn={spawnTag} />
           {tags.map(t => (
@@ -132,18 +134,33 @@ export default function SignalHero() {
                 background: selected.includes(t.lang.name) ? '#ffc300' : 'rgba(255,255,255,0.08)',
                 border: `1px solid ${selected.includes(t.lang.name) ? '#ffc300' : 'rgba(255,255,255,0.3)'}`,
                 color: selected.includes(t.lang.name) ? '#000' : '#ffffff',
-                borderRadius: 999,
-                padding: '9px 20px',
-                fontSize: 14,
-                fontWeight: 700,
-                letterSpacing: '0.04em',
-                whiteSpace: 'nowrap',
-                cursor: 'pointer',
+                borderRadius: 999, padding: '9px 20px', fontSize: 14, fontWeight: 700,
+                letterSpacing: '0.04em', whiteSpace: 'nowrap', cursor: 'pointer',
               }}>
               {t.lang.flag} {t.lang.name}
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Scroll hint */}
+      <div style={{
+        position: 'absolute',
+        bottom: 24,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 6,
+        opacity: 0.4,
+        animation: 'bounce 2s ease-in-out infinite',
+        pointerEvents: 'none',
+      }}>
+        <span style={{ fontSize: 11, color: '#fff', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          Scroll
+        </span>
+        <span style={{ color: '#ffc300', fontSize: 18 }}>↓</span>
       </div>
 
       <style>{`
@@ -160,6 +177,10 @@ export default function SignalHero() {
         @keyframes pulse {
           0%,100% { opacity:1; }
           50%     { opacity:0.4; }
+        }
+        @keyframes bounce {
+          0%,100% { transform:translateX(-50%) translateY(0); }
+          50%     { transform:translateX(-50%) translateY(6px); }
         }
       `}</style>
     </section>

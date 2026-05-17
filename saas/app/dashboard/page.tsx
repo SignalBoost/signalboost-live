@@ -5,7 +5,7 @@ import TeamManager from '@/components/TeamManager'
 import { supabase } from '@/utils/supabase/client'
 import { getProjects, createProject, canCreateProject, deleteProject, updateProjectStatus, TYPE_ICONS, STATUS_COLORS, Project } from '@/lib/projects'
 
-const LANGS = ['English', 'Portugues', 'Espanol', 'Polski', 'Russkiy']
+const LANGS = ['English', 'Portugues (BR + PT)', 'Espanol (ES + LATAM)', 'Polski', 'Russkiy']
 const BLUE = '#3b82f6'
 const BLUE_DIM = 'rgba(59,130,246,0.12)'
 const BLUE_BORDER = 'rgba(59,130,246,0.3)'
@@ -278,8 +278,8 @@ export default function DashboardOverviewPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 20 }}>💬</span>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: GOLD }}>We are in development — your feedback matters!</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Tell us what you love, what is missing, or what is broken. Luis reads every submission.</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: GOLD }}>We are always improving — your feedback is welcome!</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Share what you love, what is missing, or any suggestions. Luis reads every submission.</div>
           </div>
         </div>
         <Link href="/dashboard/feedback" style={{ background: GOLD, color: '#000', fontWeight: 800, fontSize: 13, padding: '9px 22px', borderRadius: 999, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>

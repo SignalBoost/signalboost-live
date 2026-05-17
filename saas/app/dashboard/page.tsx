@@ -143,6 +143,7 @@ export default function DashboardOverviewPage() {
         </div>
       )}
 
+      {/* Header */}
       <div style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', paddingBottom: 20, marginBottom: 32 }}>
         <h1 style={{
           fontSize: 32, fontWeight: 900, letterSpacing: '-0.02em', margin: 0,
@@ -162,6 +163,7 @@ export default function DashboardOverviewPage() {
         </p>
       </div>
 
+      {/* Quick actions */}
       <div style={{ marginBottom: 28 }}>
         <h2 style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 14 }}>
           Start a new project
@@ -203,6 +205,7 @@ export default function DashboardOverviewPage() {
         </div>
       </div>
 
+      {/* Projects section */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div>
@@ -305,7 +308,6 @@ export default function DashboardOverviewPage() {
                   e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.25)'
                   e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
                 }}>
-
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={{ width: 44, height: 44, borderRadius: 12, background: BLUE_DIM, border: `1px solid ${BLUE_BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
@@ -323,15 +325,12 @@ export default function DashboardOverviewPage() {
                     </span>
                   </div>
                 </div>
-
                 {p.description && (
                   <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>{p.description}</div>
                 )}
-
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 12 }}>
                   Last edited {timeAgo(p.last_edited_at)}
                 </div>
-
                 <div style={{ display: 'flex', gap: 8 }}>
                   <Link
                     href={`/dashboard/${p.type === 'website' ? 'builder' : p.type === 'review' ? 'reviews' : p.type === 'podcast' ? 'audio' : 'video'}`}
@@ -355,6 +354,7 @@ export default function DashboardOverviewPage() {
         )}
       </div>
 
+      {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
         {[
           { label: 'Active sites',    value: projects.filter(p => p.status === 'live').length.toString() },
@@ -369,14 +369,15 @@ export default function DashboardOverviewPage() {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 20 }}>
+      {/* Account + Team + Feedback */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, marginBottom: 20 }}>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <h2 style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16 }}>
             Account balance
           </h2>
-          <div style={{ fontSize: 48, fontWeight: 900, letterSpacing: '-0.03em', color: BLUE }}>
+          <div style={{ fontSize: 44, fontWeight: 900, letterSpacing: '-0.03em', color: BLUE }}>
             750
-            <span style={{ fontSize: 16, fontWeight: 500, color: 'rgba(255,255,255,0.4)', marginLeft: 8 }}>credits</span>
+            <span style={{ fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.4)', marginLeft: 8 }}>credits</span>
           </div>
           <div style={{ marginTop: 16, display: 'flex', gap: 12 }}>
             <Link href="/dashboard/metrics" style={{ fontSize: 12, fontWeight: 600, color: BLUE, textDecoration: 'none' }}>View analytics</Link>
@@ -385,11 +386,47 @@ export default function DashboardOverviewPage() {
         </div>
 
         <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: '24px' }}>
-          <h2 style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 20 }}>
-            Team members
+          <h2 style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16 }}>
+            Quick links
           </h2>
-          {userId ? <TeamManager userId={userId} /> : <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>Loading team...</p>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[
+              { href: '/dashboard/feedback', icon: '💬', label: 'Give feedback' },
+              { href: '/docs',               icon: '📖', label: 'Documentation' },
+              { href: '/pricing',            icon: '💳', label: 'Upgrade plan' },
+              { href: '/podcasters',         icon: '🎙️', label: 'Podcast plans' },
+            ].map(item => (
+              <Link key={item.href} href={item.href}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'rgba(255,255,255,0.5)', textDecoration: 'none', padding: '6px 0', transition: 'color 0.15s' }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.5)')}>
+                <span>{item.icon}</span>
+                <span>{item.label}</span>
+              </Link>
+            ))}
+          </div>
         </div>
+
+        <div style={{ background: 'rgba(255,195,0,0.04)', border: '1px solid rgba(255,195,0,0.15)', borderRadius: 16, padding: '24px' }}>
+          <h2 style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,195,0,0.6)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>
+            Share your feedback
+          </h2>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', lineHeight: 1.6, marginBottom: 16 }}>
+            We are in development. Your feedback shapes what we build next.
+          </p>
+          <Link href="/dashboard/feedback"
+            style={{ display: 'block', textAlign: 'center', background: '#ffc300', color: '#000', fontWeight: 800, fontSize: 13, padding: '10px 0', borderRadius: 10, textDecoration: 'none' }}>
+            💬 Give feedback
+          </Link>
+        </div>
+      </div>
+
+      {/* Team */}
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: '24px' }}>
+        <h2 style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 20 }}>
+          Team members
+        </h2>
+        {userId ? <TeamManager userId={userId} /> : <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>Loading team...</p>}
       </div>
 
     </div>

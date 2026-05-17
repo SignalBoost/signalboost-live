@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import crypto from 'crypto'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,22 +13,37 @@ const PLAN_MAP: Record<string, string> = {
   [process.env.STRIPE_PRICE_BUSINESS!]:'business',
 }
 
+function verifyStripeSignature(payload: string, sig: string, secret: string): boolean {
+  try {
+    const parts = sig.split(',').reduce((acc: Record<string, string>, part) => {
+      const [key, val] = part.split('=')
+      acc[key] = val
+      return acc
+    }, {})
+    const timestamp = parts['t']
+    const signature = parts['v1']
+    const signed = `${timestamp}.${payload}`
+    const expected = crypto.createHmac('sha256', secret).update(signed).digest('hex')
+    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature))
+  } catch {
+    return false
+  }
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.text()
-  const sig  = req.headers.get('stripe-signature')
+  const sig  = req.headers.get('stripe-signature') || ''
+  const secret = process.env.STRIPE_WEBHOOK_SECRET!
 
-  if (!sig) return NextResponse.json({ error: 'No signature' }, { status: 400 })
+  if (!verifyStripeSignature(body, sig, secret)) {
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+  }
 
   let event: any
-
   try {
-    // Dynamically import stripe to avoid edge runtime issues
-    const Stripe = (await import('stripe')).default
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-04-10' })
-    event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET!)
-  } catch (err: any) {
-    console.error('Webhook signature error:', err.message)
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+    event = JSON.parse(body)
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   try {
@@ -36,18 +52,17 @@ export async function POST(req: NextRequest) {
       case 'checkout.session.completed': {
         const session = event.data.object
         const userId  = session.metadata?.userId
-        const priceId = session.line_items?.data?.[0]?.price?.id || session.metadata?.priceId
+        const priceId = session.metadata?.priceId
         const plan    = PLAN_MAP[priceId] || 'starter'
 
         if (userId) {
           await supabase.from('subscriptions').upsert({
-            user_id:              userId,
+            user_id:                userId,
             plan,
-            status:               'active',
-            stripe_customer_id:   session.customer,
+            status:                 'active',
+            stripe_customer_id:     session.customer,
             stripe_subscription_id: session.subscription,
-            current_period_end:   null,
-            updated_at:           new Date().toISOString(),
+            updated_at:             new Date().toISOString(),
           }, { onConflict: 'user_id' })
         }
         break
@@ -99,8 +114,4 @@ export async function POST(req: NextRequest) {
     console.error('Webhook handler error:', err.message)
     return NextResponse.json({ error: 'Handler error' }, { status: 500 })
   }
-}
-
-export const config = {
-  api: { bodyParser: false }
 }

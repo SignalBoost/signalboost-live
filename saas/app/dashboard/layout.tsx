@@ -6,10 +6,8 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   return (
-    <div style={{ minHeight: '100vh', background: '#1e1e2e' }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px' }}>
-        {children}
-      </div>
+    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px' }}>
+      {children}
     </div>
   )
 }

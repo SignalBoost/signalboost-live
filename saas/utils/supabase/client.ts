@@ -1,11 +1,9 @@
-// saas/utils/supabase/client.ts
-// Browser-side Supabase client using @supabase/ssr.
-// Stores the session in cookies (NOT localStorage) so server routes
-// can read it via createServerClient.
+// saas/lib/supabaseClient.ts
+// Re-exports the real browser Supabase client from utils/supabase/client.
+// Previously this file contained a mock that returned fake user data and
+// hardcoded credits. The mock has been removed — this is now a real client.
+//
+// New code should import directly from "@/utils/supabase/client".
+// This file exists only for backwards compatibility with existing imports.
 
-import { createBrowserClient } from "@supabase/ssr";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
+export { supabase } from "@/utils/supabase/client";

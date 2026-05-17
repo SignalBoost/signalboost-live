@@ -52,14 +52,13 @@ export default function OnboardingPage() {
 
       // Check if already onboarded — if yes skip to dashboard
       supabase.from('profiles').select('onboarded').eq('id', data.user.id).single()
-        .then(({ data: profile }) => {
-          if (profile?.onboarded) {
-            router.push('/dashboard')
-          } else {
+        .then(({ data: profile, error }) => {
+          if (error || !profile?.onboarded) {
             setChecking(false)
+          } else {
+            router.push('/dashboard')
           }
         })
-        .catch(() => setChecking(false))
     })
   }, [])
 

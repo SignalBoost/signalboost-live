@@ -5,7 +5,7 @@ import TeamManager from '@/components/TeamManager'
 import { supabase } from '@/utils/supabase/client'
 import { getProjects, createProject, canCreateProject, deleteProject, updateProjectStatus, TYPE_ICONS, STATUS_COLORS, Project } from '@/lib/projects'
 
-const LANGS = ['English', 'Portugues (BR + PT)', 'Espanol (ES + LATAM)', 'Polski', 'Russkiy']
+const LANGS = ['English', 'Portugues (BR + PT)', 'Espanol (ES + LATAM)', 'Polski', 'Russkiy']    
 const BLUE = '#3b82f6'
 const BLUE_DIM = 'rgba(59,130,246,0.12)'
 const BLUE_BORDER = 'rgba(59,130,246,0.3)'

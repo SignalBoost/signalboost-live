@@ -1,7 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
+// saas/utils/supabase/client.ts
+// Browser-side Supabase client using @supabase/ssr.
+// Stores the session in cookies (NOT localStorage) so server routes
+// can read it via createServerClient.
+
+import { createBrowserClient } from "@supabase/ssr";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-// Notice the "export const" here. This makes it a named export!
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);

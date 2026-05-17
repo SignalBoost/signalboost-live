@@ -1,17 +1,25 @@
+import type { Metadata } from 'next'
+import './globals.css'
 import Navbar from '@/components/Navbar'
-import React from 'react'
+import Footer from '@/components/Footer'
 
-export default function DashboardLayout({
+export const metadata: Metadata = {
+  title: 'SignalBoost',
+  description: 'Build your brand in every language',
+}
+
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   return (
-    <div style={{ minHeight: '100vh', background: '#1e1e2e' }}>
-      <Navbar />
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px' }}>
+    <html lang="en">
+      <body style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <Navbar />
         {children}
-      </div>
-    </div>
+        <Footer />
+      </body>
+    </html>
   )
 }

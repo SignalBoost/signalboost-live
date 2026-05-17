@@ -1,14 +1,15 @@
 'use client'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import TeamManager from '@/components/TeamManager'
 import { supabase } from '@/utils/supabase/client'
-import { getProjects, createProject, canCreateProject, deleteProject, updateProjectStatus, TYPE_ICONS, STATUS_COLORS, PLAN_PROJECT_LIMITS, Project } from '@/lib/projects'
+import { getProjects, createProject, canCreateProject, deleteProject, updateProjectStatus, TYPE_ICONS, STATUS_COLORS, Project } from '@/lib/projects'
 
 const LANGS = ['English', 'Portugues', 'Espanol', 'Polski', 'Russkiy']
 const BLUE = '#3b82f6'
 const BLUE_DIM = 'rgba(59,130,246,0.12)'
 const BLUE_BORDER = 'rgba(59,130,246,0.3)'
+const GOLD = '#ffc300'
 
 const QUICK_ACTIONS = [
   { type: 'website' as const, icon: '🌐', label: 'Site builder',     href: '/dashboard/builder' },
@@ -16,6 +17,22 @@ const QUICK_ACTIONS = [
   { type: 'podcast' as const, icon: '🎙️', label: 'Native audio',     href: '/dashboard/audio'  },
   { type: 'video'   as const, icon: '🎬', label: 'Video editor',     href: '/dashboard/video'  },
 ]
+
+const NEW_USER_PROMPTS = [
+  'What plan is right for me?',
+  'How do I build my first website?',
+  'What languages do you support?',
+  'How does the free trial work?',
+]
+
+const RETURNING_PROMPTS = [
+  'How do I add a new language?',
+  'How do I upload a podcast episode?',
+  'How do I collect reviews?',
+  'How do I upgrade my plan?',
+]
+
+type Message = { role: 'user' | 'assistant'; content: string }
 
 export default function DashboardOverviewPage() {
   const [userId, setUserId] = useState<string | null>(null)
@@ -34,6 +51,13 @@ export default function DashboardOverviewPage() {
   const [newDesc, setNewDesc] = useState('')
   const [creating, setCreating] = useState(false)
 
+  // AI prompt
+  const [promptInput, setPromptInput] = useState('')
+  const [promptMessages, setPromptMessages] = useState<Message[]>([])
+  const [promptLoading, setPromptLoading] = useState(false)
+  const [promptOpen, setPromptOpen] = useState(false)
+  const promptRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data?.user) {
@@ -42,7 +66,7 @@ export default function DashboardOverviewPage() {
         const fullName = meta?.full_name || meta?.name || ''
         setFirstName(fullName.split(' ')[0] || null)
         const createdAt = new Date(data.user.created_at).getTime()
-        setIsNewUser(Date.now() - createdAt < 30000)
+        setIsNewUser(Date.now() - createdAt < 60000)
         getProjects(data.user.id).then(setProjects)
         canCreateProject(data.user.id).then(res => {
           setPlan(res.plan)
@@ -51,6 +75,37 @@ export default function DashboardOverviewPage() {
       }
     })
   }, [])
+
+  useEffect(() => {
+    if (promptRef.current) {
+      promptRef.current.scrollTop = promptRef.current.scrollHeight
+    }
+  }, [promptMessages])
+
+  async function sendPrompt(text?: string) {
+    const content = text || promptInput.trim()
+    if (!content || promptLoading) return
+    setPromptInput('')
+    setPromptOpen(true)
+    const newMessages: Message[] = [...promptMessages, { role: 'user', content }]
+    setPromptMessages(newMessages)
+    setPromptLoading(true)
+    try {
+      const res = await fetch('/api/support', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: newMessages,
+          context: { userName: firstName, currentPage: 'Dashboard', userPlan: plan }
+        })
+      })
+      const data = await res.json()
+      setPromptMessages(prev => [...prev, { role: 'assistant', content: data.reply }])
+    } catch {
+      setPromptMessages(prev => [...prev, { role: 'assistant', content: 'Having trouble connecting. Please try again.' }])
+    }
+    setPromptLoading(false)
+  }
 
   async function tryCreate(type: Project['type'], name: string, language = 'English', description = '') {
     if (!userId) return
@@ -93,6 +148,11 @@ export default function DashboardOverviewPage() {
     ? `Welcome to SignalBoost${firstName ? ', ' + firstName : ''}!`
     : `Welcome back${firstName ? ', ' + firstName : ''}!`
 
+  const subGreeting = isNewUser
+    ? 'Great to have you here. Ask me anything or explore your dashboard below.'
+    : 'Good to see you again. Ask me anything or pick up where you left off.'
+
+  const promptSuggestions = isNewUser ? NEW_USER_PROMPTS : RETURNING_PROMPTS
   const projectsTitle = firstName ? `${firstName}'s projects` : 'Your projects'
   const atLimit = projects.length >= projectLimit
   const usagePercent = Math.min((projects.length / projectLimit) * 100, 100)
@@ -105,20 +165,13 @@ export default function DashboardOverviewPage() {
           0% { background-position: 0% center; }
           100% { background-position: 300% center; }
         }
-        @keyframes blink {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.65; transform: scale(0.99); }
-        }
         @keyframes cardIn {
           from { opacity: 0; transform: translateY(10px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-10px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
       `}</style>
 
+      {/* Upgrade modal */}
       {showUpgrade && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
           onClick={() => setShowUpgrade(false)}>
@@ -127,53 +180,109 @@ export default function DashboardOverviewPage() {
             <h2 style={{ fontSize: 22, fontWeight: 900, margin: '0 0 12px' }}>Project limit reached</h2>
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginBottom: 8, lineHeight: 1.6 }}>{upgradeMsg}</p>
             <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginBottom: 28, lineHeight: 1.6 }}>
-              You are on the <strong style={{ color: '#ffc300' }}>{plan}</strong> plan ({projects.length}/{projectLimit === 999 ? 'unlimited' : projectLimit} projects).
-              Upgrade to store more projects and media files.
+              You are on the <strong style={{ color: GOLD }}>{plan}</strong> plan ({projects.length}/{projectLimit === 999 ? 'unlimited' : projectLimit} projects). Upgrade to store more.
             </p>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              <Link href="/pricing" style={{ background: '#ffc300', color: '#000', fontWeight: 800, fontSize: 14, padding: '12px 28px', borderRadius: 999, textDecoration: 'none' }}>
-                See upgrade plans
-              </Link>
-              <button onClick={() => setShowUpgrade(false)}
-                style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.5)', fontSize: 14, padding: '12px 24px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}>
-                Cancel
-              </button>
+              <Link href="/pricing" style={{ background: GOLD, color: '#000', fontWeight: 800, fontSize: 14, padding: '12px 28px', borderRadius: 999, textDecoration: 'none' }}>See upgrade plans</Link>
+              <button onClick={() => setShowUpgrade(false)} style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.5)', fontSize: 14, padding: '12px 24px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}>Cancel</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Header */}
-      <div style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', paddingBottom: 20, marginBottom: 32 }}>
+      {/* GREETING + AI PROMPT */}
+      <div style={{ marginBottom: 28, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: '28px 28px 24px' }}>
         <h1 style={{
-          fontSize: 32, fontWeight: 900, letterSpacing: '-0.02em', margin: 0,
+          fontSize: 28, fontWeight: 900, letterSpacing: '-0.02em', margin: '0 0 6px',
           background: 'linear-gradient(90deg, #3b82f6, #ffc300, #4ade80, #3b82f6)',
           backgroundSize: '300% auto',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
-          animation: 'shimmer 2.5s linear infinite, blink 2s ease-in-out infinite',
+          animation: 'shimmer 3s linear infinite',
           display: 'inline-block',
         }}>
           {greeting} {isNewUser ? '🎉' : '👋'}
         </h1>
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>
-          {isNewUser
-            ? 'Your account is ready. Click a tool below to start your first project.'
-            : 'Click any tool to start a new project, or pick up where you left off.'}
-        </p>
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 20 }}>{subGreeting}</p>
+
+        {/* AI prompt input */}
+        <div style={{ display: 'flex', gap: 10, marginBottom: promptOpen ? 16 : 0 }}>
+          <input
+            value={promptInput}
+            onChange={e => setPromptInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && sendPrompt()}
+            placeholder={isNewUser ? 'Ask me anything — e.g. What plan is right for me?' : 'Ask me anything — e.g. How do I add a language?'}
+            style={{
+              flex: 1, padding: '12px 16px', borderRadius: 12,
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+              color: '#fff', fontSize: 14, outline: 'none',
+            }}
+            onFocus={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.5)'; setPromptOpen(true) }}
+            onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)')}
+          />
+          <button onClick={() => sendPrompt()} disabled={!promptInput.trim() || promptLoading}
+            style={{ padding: '12px 20px', borderRadius: 12, background: promptInput.trim() && !promptLoading ? BLUE : 'rgba(255,255,255,0.05)', border: 'none', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            {promptLoading ? '...' : 'Ask →'}
+          </button>
+        </div>
+
+        {/* Suggested prompts */}
+        {!promptOpen && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {promptSuggestions.map(q => (
+              <button key={q} onClick={() => sendPrompt(q)}
+                style={{ padding: '6px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', transition: 'all 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)'; e.currentTarget.style.color = '#fff' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)' }}>
+                {q}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Conversation */}
+        {promptOpen && promptMessages.length > 0 && (
+          <div ref={promptRef} style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {promptMessages.map((msg, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                <div style={{
+                  maxWidth: '80%', padding: '10px 14px', fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap',
+                  borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                  background: msg.role === 'user' ? BLUE : 'rgba(255,255,255,0.06)',
+                  border: msg.role === 'assistant' ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                }}>
+                  {msg.content}
+                </div>
+              </div>
+            ))}
+            {promptLoading && (
+              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                <div style={{ padding: '10px 16px', borderRadius: '16px 16px 16px 4px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>
+                  Thinking...
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {promptOpen && (
+          <button onClick={() => { setPromptOpen(false); setPromptMessages([]) }}
+            style={{ marginTop: 12, fontSize: 11, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+            Clear conversation
+          </button>
+        )}
       </div>
 
       {/* Feedback banner */}
       <div style={{ background: 'rgba(255,195,0,0.06)', border: '1px solid rgba(255,195,0,0.2)', borderRadius: 14, padding: '14px 20px', marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 24 }}>💬</span>
+          <span style={{ fontSize: 20 }}>💬</span>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#ffc300' }}>We are in development — your feedback matters!</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: GOLD }}>We are in development — your feedback matters!</div>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Tell us what you love, what is missing, or what is broken. Luis reads every submission.</div>
           </div>
         </div>
-        <Link href="/dashboard/feedback"
-          style={{ background: '#ffc300', color: '#000', fontWeight: 800, fontSize: 13, padding: '9px 22px', borderRadius: 999, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
+        <Link href="/dashboard/feedback" style={{ background: GOLD, color: '#000', fontWeight: 800, fontSize: 13, padding: '9px 22px', borderRadius: 999, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
           Give feedback
         </Link>
       </div>
@@ -189,7 +298,7 @@ export default function DashboardOverviewPage() {
               onMouseEnter={() => setHoveredAction(item.type)}
               onMouseLeave={() => setHoveredAction(null)}
               onClick={() => atLimit
-                ? (setUpgradeMsg(`You have reached the ${projectLimit} project limit on the ${plan} plan. Upgrade to add more projects.`), setShowUpgrade(true))
+                ? (setUpgradeMsg(`You have reached the ${projectLimit} project limit on the ${plan} plan.`), setShowUpgrade(true))
                 : tryCreate(item.type, `New ${item.label}`)
               }
               style={{
@@ -220,7 +329,7 @@ export default function DashboardOverviewPage() {
         </div>
       </div>
 
-      {/* Projects section */}
+      {/* Projects */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div>
@@ -238,11 +347,7 @@ export default function DashboardOverviewPage() {
                 <div style={{ width: `${usagePercent}%`, height: '100%', background: atLimit ? '#ef4444' : BLUE, borderRadius: 999, transition: 'width 0.3s' }} />
               </div>
             </div>
-            <button
-              onClick={() => atLimit
-                ? (setUpgradeMsg(`You have reached the ${projectLimit} project limit. Upgrade to add more.`), setShowUpgrade(true))
-                : setShowNewProject(true)
-              }
+            <button onClick={() => atLimit ? (setUpgradeMsg(`You have reached the ${projectLimit} project limit.`), setShowUpgrade(true)) : setShowNewProject(true)}
               style={{ background: atLimit ? 'rgba(239,68,68,0.15)' : BLUE, color: atLimit ? '#f87171' : '#fff', fontWeight: 800, fontSize: 12, padding: '8px 18px', borderRadius: 999, border: atLimit ? '1px solid rgba(239,68,68,0.3)' : 'none', cursor: 'pointer' }}>
               {atLimit ? 'Limit reached' : '+ New project'}
             </button>
@@ -252,11 +357,9 @@ export default function DashboardOverviewPage() {
         {atLimit && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 12, padding: '12px 18px', marginBottom: 16 }}>
             <div style={{ fontSize: 13, color: 'rgba(255,100,100,0.9)' }}>
-              You have reached the <strong>{projectLimit}-project limit</strong> on the <strong>{plan}</strong> plan. Delete a project or upgrade to continue.
+              You have reached the <strong>{projectLimit}-project limit</strong> on the <strong>{plan}</strong> plan.
             </div>
-            <Link href="/pricing" style={{ color: '#ffc300', fontWeight: 700, textDecoration: 'none', fontSize: 13, whiteSpace: 'nowrap', marginLeft: 16 }}>
-              Upgrade now
-            </Link>
+            <Link href="/pricing" style={{ color: GOLD, fontWeight: 700, textDecoration: 'none', fontSize: 13, whiteSpace: 'nowrap', marginLeft: 16 }}>Upgrade now</Link>
           </div>
         )}
 
@@ -303,26 +406,9 @@ export default function DashboardOverviewPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
             {projects.map((p, i) => (
               <div key={p.id}
-                style={{
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: 16, padding: '20px',
-                  display: 'flex', flexDirection: 'column', gap: 14,
-                  cursor: 'pointer',
-                  transition: 'transform 0.18s, box-shadow 0.18s, border-color 0.18s',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
-                  animation: `cardIn 0.3s ease-out ${i * 0.06}s both`,
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.transform = 'translateY(-5px)'
-                  e.currentTarget.style.boxShadow = '0 16px 48px rgba(59,130,246,0.2)'
-                  e.currentTarget.style.borderColor = BLUE_BORDER
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.25)'
-                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
-                }}>
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: '20px', display: 'flex', flexDirection: 'column', gap: 14, cursor: 'pointer', transition: 'transform 0.18s, box-shadow 0.18s, border-color 0.18s', boxShadow: '0 4px 20px rgba(0,0,0,0.25)', animation: `cardIn 0.3s ease-out ${i * 0.06}s both` }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 16px 48px rgba(59,130,246,0.2)'; e.currentTarget.style.borderColor = BLUE_BORDER }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.25)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={{ width: 44, height: 44, borderRadius: 12, background: BLUE_DIM, border: `1px solid ${BLUE_BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
@@ -335,20 +421,13 @@ export default function DashboardOverviewPage() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.05)', borderRadius: 999, padding: '3px 10px' }}>
                     <div style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_COLORS[p.status], flexShrink: 0 }} />
-                    <span style={{ fontSize: 10, color: STATUS_COLORS[p.status], fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      {p.status}
-                    </span>
+                    <span style={{ fontSize: 10, color: STATUS_COLORS[p.status], fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{p.status}</span>
                   </div>
                 </div>
-                {p.description && (
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>{p.description}</div>
-                )}
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 12 }}>
-                  Last edited {timeAgo(p.last_edited_at)}
-                </div>
+                {p.description && <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>{p.description}</div>}
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 12 }}>Last edited {timeAgo(p.last_edited_at)}</div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <Link
-                    href={`/dashboard/${p.type === 'website' ? 'builder' : p.type === 'review' ? 'reviews' : p.type === 'podcast' ? 'audio' : 'video'}`}
+                  <Link href={`/dashboard/${p.type === 'website' ? 'builder' : p.type === 'review' ? 'reviews' : p.type === 'podcast' ? 'audio' : 'video'}`}
                     style={{ flex: 1, padding: '8px 0', borderRadius: 8, background: BLUE, color: '#fff', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', textAlign: 'center', textDecoration: 'none', display: 'block' }}>
                     Open
                   </Link>
@@ -384,15 +463,12 @@ export default function DashboardOverviewPage() {
         ))}
       </div>
 
-      {/* Account + Team + Feedback */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, marginBottom: 20 }}>
+      {/* Account + Quick links */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
         <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <h2 style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16 }}>
-            Account balance
-          </h2>
+          <h2 style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16 }}>Account balance</h2>
           <div style={{ fontSize: 44, fontWeight: 900, letterSpacing: '-0.03em', color: BLUE }}>
-            750
-            <span style={{ fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.4)', marginLeft: 8 }}>credits</span>
+            750<span style={{ fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.4)', marginLeft: 8 }}>credits</span>
           </div>
           <div style={{ marginTop: 16, display: 'flex', gap: 12 }}>
             <Link href="/dashboard/metrics" style={{ fontSize: 12, fontWeight: 600, color: BLUE, textDecoration: 'none' }}>View analytics</Link>
@@ -401,9 +477,7 @@ export default function DashboardOverviewPage() {
         </div>
 
         <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: '24px' }}>
-          <h2 style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16 }}>
-            Quick links
-          </h2>
+          <h2 style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16 }}>Quick links</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {[
               { href: '/dashboard/feedback', icon: '💬', label: 'Give feedback' },
@@ -415,32 +489,17 @@ export default function DashboardOverviewPage() {
                 style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'rgba(255,255,255,0.5)', textDecoration: 'none', padding: '6px 0', transition: 'color 0.15s' }}
                 onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
                 onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.5)')}>
-                <span>{item.icon}</span>
+                <span style={{ fontSize: 16 }}>{item.icon}</span>
                 <span>{item.label}</span>
               </Link>
             ))}
           </div>
         </div>
-
-        <div style={{ background: 'rgba(255,195,0,0.04)', border: '1px solid rgba(255,195,0,0.15)', borderRadius: 16, padding: '24px' }}>
-          <h2 style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,195,0,0.6)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>
-            Share your feedback
-          </h2>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', lineHeight: 1.6, marginBottom: 16 }}>
-            We are in development. Your feedback shapes what we build next.
-          </p>
-          <Link href="/dashboard/feedback"
-            style={{ display: 'block', textAlign: 'center', background: '#ffc300', color: '#000', fontWeight: 800, fontSize: 13, padding: '10px 0', borderRadius: 10, textDecoration: 'none' }}>
-            💬 Give feedback
-          </Link>
-        </div>
       </div>
 
       {/* Team */}
       <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: '24px' }}>
-        <h2 style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 20 }}>
-          Team members
-        </h2>
+        <h2 style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 20 }}>Team members</h2>
         {userId ? <TeamManager userId={userId} /> : <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>Loading team...</p>}
       </div>
 

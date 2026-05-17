@@ -3,6 +3,10 @@
 import { TTSPlayer } from "@/components/audio/TTSPlayer";
 import { useTranslation } from "@/components/i18n/useTranslation";
 
+// Skip static prerendering — this page needs the user session and i18n context,
+// both of which are only available at request time.
+export const dynamic = "force-dynamic";
+
 export default function AudioPage() {
   const { t } = useTranslation();
 

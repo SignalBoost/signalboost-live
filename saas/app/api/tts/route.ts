@@ -2,14 +2,6 @@
 // POST /api/tts
 // Body: { text: string, voiceId: string }
 // Returns: { audioUrl, cached, characters, remaining }
-//
-// Flow:
-//   1. Validate input (length cap, allowed voice)
-//   2. Authenticate user via Supabase session cookie
-//   3. Check monthly character cap for the user's plan
-//   4. Cache lookup — if hit, return cached signed URL
-//   5. Otherwise call ElevenLabs, store MP3 in Supabase Storage
-//   6. Record usage row (counted against quota even on cache hits)
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -25,7 +17,7 @@ import {
 } from "@/lib/elevenlabs/limits";
 
 const STORAGE_BUCKET = "tts-cache";
-const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hour
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
 export async function POST(req: NextRequest) {
   // ----- 1. Parse and validate body -----
@@ -54,8 +46,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Voice not allowed" }, { status: 400 });
   }
 
-  // ----- 2. Authenticate user -----
-  const cookieStore = cookies();
+  // ----- 2. Authenticate user (Next 16: cookies() is async) -----
+  const cookieStore = await cookies();
   const supabaseUser = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -211,11 +203,6 @@ async function getSignedUrl(
   return data.signedUrl;
 }
 
-/**
- * Determine the user's current plan. Adjust the table/column names
- * here to match your actual subscription schema.
- * Falls back to 'trial' if no active subscription is found.
- */
 async function getUserPlan(
   supabase: ReturnType<typeof createClient>,
   userId: string,

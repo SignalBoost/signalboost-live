@@ -115,7 +115,7 @@ export default function PodcastersPage() {
 
       <section id="plans" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 80px' }}>
         <h2 style={{ fontSize: 36, fontWeight: 900, textAlign: 'center', marginBottom: 12 }}>Podcast plans</h2>
-        <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 15, marginBottom: 32 }}>All plans include a 30-day free trial.</p>
+        <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 15, marginBottom: 32 }}>All plans include a 30-day free trial. Business partners get 30 days free on the Indie plan only.</p>
         <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 32 }}>
           {CURRENCIES.map(c => (
             <button key={c} onClick={() => setCurrency(c)}

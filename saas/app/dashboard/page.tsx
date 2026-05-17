@@ -163,6 +163,21 @@ export default function DashboardOverviewPage() {
         </p>
       </div>
 
+      {/* Feedback banner */}
+      <div style={{ background: 'rgba(255,195,0,0.06)', border: '1px solid rgba(255,195,0,0.2)', borderRadius: 14, padding: '14px 20px', marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 24 }}>💬</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#ffc300' }}>We are in development — your feedback matters!</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Tell us what you love, what is missing, or what is broken. Luis reads every submission.</div>
+          </div>
+        </div>
+        <Link href="/dashboard/feedback"
+          style={{ background: '#ffc300', color: '#000', fontWeight: 800, fontSize: 13, padding: '9px 22px', borderRadius: 999, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
+          Give feedback
+        </Link>
+      </div>
+
       {/* Quick actions */}
       <div style={{ marginBottom: 28 }}>
         <h2 style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 14 }}>

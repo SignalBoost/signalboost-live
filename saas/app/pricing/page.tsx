@@ -89,7 +89,7 @@ export default function PricingPage() {
             Plans that grow with you
           </h1>
           <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 15, maxWidth: 460, margin: '0 auto 8px' }}>
-            Start free. Upgrade when you are ready. Partners get 30 days free on any paid plan.
+            Start free. Upgrade when you are ready. Partners get 30 days free on the Starter plan.
           </p>
           <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 13, margin: '0 auto 20px' }}>
             Prices shown in USD. You can pay in your local currency at checkout.

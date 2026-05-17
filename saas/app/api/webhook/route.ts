@@ -2,11 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 const PLAN_MAP: Record<string, string> = {
   [process.env.STRIPE_PRICE_STARTER!]: 'starter',
   [process.env.STRIPE_PRICE_PRO!]:     'pro',
@@ -31,6 +26,12 @@ function verifyStripeSignature(payload: string, sig: string, secret: string): bo
 }
 
 export async function POST(req: NextRequest) {
+  // Create supabase client inside function so env vars are available at runtime
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   const body = await req.text()
   const sig  = req.headers.get('stripe-signature') || ''
   const secret = process.env.STRIPE_WEBHOOK_SECRET!

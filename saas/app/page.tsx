@@ -6,7 +6,7 @@ export default function Home() {
     <main style={{ minHeight: '100vh', background: '#0a0a0f' }}>
       <SignalHero />
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <PodcastSection />
+        <PodcastSection />  
       </div>
     </main>
   )

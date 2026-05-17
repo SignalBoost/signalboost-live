@@ -1,15 +1,25 @@
+import type { Metadata } from 'next'
+import './globals.css'
 import Navbar from '@/components/Navbar'
-import SignalHero from '@/components/SignalHero'
-import PodcastSection from '@/components/PodcastSection'
+import Footer from '@/components/Footer'
 
-export default function Home() {
+export const metadata: Metadata = {
+  title: 'SignalBoost',
+  description: 'Build your brand in every language',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <main style={{ minHeight: '100vh', background: '#0a0a0f' }}>
-      <Navbar />
-      <SignalHero />
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <PodcastSection />
-      </div>
-    </main>
+    <html lang="en">
+      <body style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <Navbar />
+        {children}
+        <Footer />
+      </body>
+    </html>
   )
 }

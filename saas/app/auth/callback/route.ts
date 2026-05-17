@@ -23,12 +23,18 @@ export async function GET(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: (name) => cookieStore.get(name)?.value,
-        set: (name, value, options) => {
-          cookieStore.set({ name, value, ...options });
+        getAll() {
+          return cookieStore.getAll();
         },
-        remove: (name, options) => {
-          cookieStore.set({ name, value: "", ...options, maxAge: 0 });
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options),
+            );
+          } catch {
+            // Called from a Server Component — safe to ignore;
+            // middleware/route handlers will refresh the session.
+          }
         },
       },
     },

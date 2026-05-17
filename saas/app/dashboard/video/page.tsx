@@ -1,164 +1,259 @@
-// saas/app/dashboard/video/page.tsx
-'use client';
+'use client'
+import { useState, useRef } from 'react'
 
-import React, { useState } from 'react';
-import AudioPlayer from '@/components/AudioPlayer';
+const BLUE = '#3b82f6'
+const GOLD = '#ffc300'
 
-interface VideoProject {
-  id: string;
-  title: string;
-  language: string;
-  voice: string;
-  status: 'Completed' | 'Processing' | 'Failed';
-  timestamp: string;
-}
+const CAPTION_FORMATS = [
+  { id: 'srt', name: 'SRT', desc: 'Standard subtitle format. Works on most platforms.' },
+  { id: 'vtt', name: 'VTT', desc: 'Web Video Text Tracks. Best for web players.' },
+  { id: 'ass', name: 'ASS', desc: 'Advanced styling. Best for burned-in captions.' },
+  { id: 'burned', name: 'Burned in', desc: 'Captions embedded directly into the video file.' },
+]
 
-const INITIAL_PROJECTS: VideoProject[] = [
-  { id: '1', title: 'Summer Travel Deal Promo', language: 'Spanish (es)', voice: 'Alloy', status: 'Completed', timestamp: '2026-05-15' },
-  { id: '2', title: 'Marketplace Product Launch', language: 'English (en)', voice: 'Echo', status: 'Completed', timestamp: '2026-05-14' },
-  { id: '3', title: 'SaaS Platform Onboarding Walkthrough', language: 'Russian (ru)', voice: 'Onyx', status: 'Processing', timestamp: '2026-05-15' },
-];
+const CLIP_FORMATS = [
+  { id: 'tiktok',   icon: '🎵', name: 'TikTok',          size: '9:16 · 60s max' },
+  { id: 'reels',    icon: '📱', name: 'Instagram Reels',  size: '9:16 · 90s max' },
+  { id: 'shorts',   icon: '▶️', name: 'YouTube Shorts',   size: '9:16 · 60s max' },
+  { id: 'twitter',  icon: '🐦', name: 'X / Twitter',      size: '16:9 · 2:20 max' },
+  { id: 'linkedin', icon: '💼', name: 'LinkedIn',         size: '1:1 · 10min max' },
+]
 
-export default function VideoGeneratorPage() {
-  const [projects, setProjects] = useState<VideoProject[]>(INITIAL_PROJECTS);
-  const [script, setScript] = useState('');
-  const [selectedLanguage, setSelectedLanguage] = useState('en');
-  const [selectedVoice, setSelectedVoice] = useState('alloy');
-  const [isGenerating, setIsGenerating] = useState(false);
+const LANGS = [
+  { code: 'en', flag: '🇺🇸', name: 'English' },
+  { code: 'pt', flag: '🇧🇷', name: 'Português' },
+  { code: 'es', flag: '🇪🇸', name: 'Español' },
+  { code: 'pl', flag: '🇵🇱', name: 'Polski' },
+  { code: 'ru', flag: '🇷🇺', name: 'Русский' },
+]
 
-  const handleGenerate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!script.trim()) return;
+export default function VideoPage() {
+  const [tab, setTab] = useState<'captions' | 'clips' | 'jobs'>('captions')
+  const [uploadedFile, setUploadedFile] = useState('')
+  const [selectedLangs, setSelectedLangs] = useState<string[]>(['en'])
+  const [selectedFormats, setSelectedFormats] = useState<string[]>(['srt'])
+  const [selectedClipFormats, setSelectedClipFormats] = useState<string[]>(['tiktok'])
+  const [processing, setProcessing] = useState(false)
+  const [jobs, setJobs] = useState<any[]>([])
+  const fileRef = useRef<HTMLInputElement>(null)
 
-    setIsGenerating(true);
-    
-    setTimeout(() => {
-      const newProject: VideoProject = {
-        id: (projects.length + 1).toString(),
-        title: script.split(' ').slice(0, 4).join(' ') + '...',
-        language: selectedLanguage === 'en' ? 'English (en)' : selectedLanguage === 'es' ? 'Spanish (es)' : 'Portuguese (pt)',
-        voice: selectedVoice.charAt(0).toUpperCase() + selectedVoice.slice(1),
-        status: 'Processing',
-        timestamp: new Date().toISOString().split('T')[0]
-      };
-      setProjects([newProject, ...projects]);
-      setScript('');
-      setIsGenerating(false);
-    }, 1500);
-  };
+  function toggleLang(code: string) {
+    setSelectedLangs(prev =>
+      prev.includes(code) && prev.length > 1 ? prev.filter(l => l !== code) : prev.includes(code) ? prev : [...prev, code]
+    )
+  }
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="border-b border-slate-200 pb-5">
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">AI Video & Voice Generator</h1>
-        <p className="text-sm text-slate-500 mt-1">Convert affiliate script copy into localized, speech-synthesized marketing assets.</p>
-      </div>
+  function toggleFormat(id: string) {
+    setSelectedFormats(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id])
+  }
 
-      {/* Embedded Live Media Control Station */}
-      <div className="space-y-2">
-        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Audio Monitor</h3>
-        <AudioPlayer 
-          audioUrl="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" 
-          title="Latest Render: Summer Travel Deal Promo (es)" 
-          voiceModel="Alloy Engine" 
-        />
-      </div>
+  function toggleClipFormat(id: string) {
+    setSelectedClipFormats(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id])
+  }
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Generator Controls */}
-        <div className="lg:col-span-1 bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-fit">
-          <form onSubmit={handleGenerate} className="space-y-4">
-            <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Asset Configuration</h2>
-            
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Target Language</label>
-              <select 
-                value={selectedLanguage}
-                onChange={(e) => setSelectedLanguage(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              >
-                <option value="en">English (en)</option>
-                <option value="es">Spanish (es)</option>
-                <option value="pt">Portuguese (pt)</option>
-                <option value="pl">Polish (pl)</option>
-                <option value="ru">Russian (ru)</option>
-              </select>
-            </div>
+  async function process() {
+    if (!uploadedFile) return
+    setProcessing(true)
+    const newJob = {
+      id: Date.now().toString(),
+      file: uploadedFile,
+      type: tab,
+      langs: selectedLangs,
+      formats: tab === 'captions' ? selectedFormats : selectedClipFormats,
+      status: 'processing',
+      progress: 0,
+      created: new Date().toISOString().split('T')[0],
+    }
+    setJobs(prev => [newJob, ...prev])
+    setTab('jobs')
 
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">OpenAI Voice Engine</label>
-              <select 
-                value={selectedVoice}
-                onChange={(e) => setSelectedVoice(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              >
-                <option value="alloy">Alloy (Neutral / Balanced)</option>
-                <option value="echo">Echo (Warm / Crisp)</option>
-                <option value="onyx">Onyx (Deep / Professional)</option>
-                <option value="shimmer">Shimmer (Bright / Dynamic)</option>
-              </select>
-            </div>
+    let progress = 0
+    const interval = setInterval(() => {
+      progress += Math.random() * 15
+      if (progress >= 100) {
+        progress = 100
+        clearInterval(interval)
+        setJobs(prev => prev.map(j => j.id === newJob.id ? { ...j, status: 'done', progress: 100 } : j))
+        setProcessing(false)
+      }
+      setJobs(prev => prev.map(j => j.id === newJob.id ? { ...j, progress: Math.min(progress, 99) } : j))
+    }, 600)
+  }
 
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Voiceover Script Text</label>
-              <textarea
-                rows={5}
-                value={script}
-                onChange={(e) => setScript(e.target.value)}
-                placeholder="Paste affiliate offer information or video text script here..."
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isGenerating}
-              className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-60 shadow-sm"
-            >
-              {isGenerating ? 'Synthesizing Audio Engine...' : 'Generate Voice Track'}
-            </button>
-          </form>
-        </div>
-
-        {/* Generation Queue & History Table */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-slate-200">
-            <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Production Queue History</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                  <th className="px-6 py-4">Generated Clip Content</th>
-                  <th className="px-6 py-4">Locale</th>
-                  <th className="px-6 py-4">Voice Model</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Created Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-                {projects.map((project) => (
-                  <tr key={project.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-900">{project.title || 'Untitled Audio Generation'}</td>
-                    <td className="px-6 py-4 text-xs font-mono">{project.language}</td>
-                    <td className="px-6 py-4 text-slate-600">{project.voice}</td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        project.status === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {project.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-xs text-slate-400 font-mono">{project.timestamp}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+  const FileUpload = () => (
+    <div>
+      <input ref={fileRef} type="file" accept=".mp4,.mov,.avi,.mkv,.webm" style={{ display: 'none' }}
+        onChange={e => setUploadedFile(e.target.files?.[0]?.name || '')} />
+      <div onClick={() => fileRef.current?.click()}
+        style={{ border: `2px dashed ${uploadedFile ? 'rgba(74,222,128,0.4)' : 'rgba(255,255,255,0.15)'}`, borderRadius: 12, padding: '28px 24px', textAlign: 'center', cursor: 'pointer', marginBottom: 20, transition: 'border-color 0.15s' }}
+        onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)')}
+        onMouseLeave={e => (e.currentTarget.style.borderColor = uploadedFile ? 'rgba(74,222,128,0.4)' : 'rgba(255,255,255,0.15)')}>
+        <div style={{ fontSize: 32, marginBottom: 10 }}>{uploadedFile ? '✅' : '🎬'}</div>
+        {uploadedFile ? (
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#4ade80' }}>{uploadedFile}</div>
+        ) : (
+          <>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Drop your video here or click to browse</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>Supports MP4, MOV, AVI, MKV, WebM</div>
+          </>
+        )}
       </div>
     </div>
-  );
+  )
+
+  return (
+    <div style={{ color: '#fff', fontFamily: 'system-ui' }}>
+
+      <div style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', paddingBottom: 20, marginBottom: 28 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 900, margin: 0, letterSpacing: '-0.02em' }}>🎬 Video editor</h1>
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>
+          Generate multilingual captions and social media clips from your videos.
+        </p>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 24, background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: 4, width: 'fit-content' }}>
+        {[
+          { id: 'captions', label: '💬 Captions' },
+          { id: 'clips',    label: '✂️ Social clips' },
+          { id: 'jobs',     label: `📁 My files ${jobs.length > 0 ? `(${jobs.length})` : ''}` },
+        ].map(t => (
+          <button key={t.id} onClick={() => setTab(t.id as any)}
+            style={{ padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', background: tab === t.id ? BLUE : 'transparent', color: tab === t.id ? '#fff' : 'rgba(255,255,255,0.45)' }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Captions */}
+      {tab === 'captions' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 20 }}>
+          <div>
+            <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Generate captions</h2>
+            <FileUpload />
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 10 }}>Languages</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {LANGS.map(lang => (
+                  <button key={lang.code} onClick={() => toggleLang(lang.code)}
+                    style={{ padding: '7px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', background: selectedLangs.includes(lang.code) ? BLUE : 'rgba(255,255,255,0.06)', color: selectedLangs.includes(lang.code) ? '#fff' : 'rgba(255,255,255,0.5)', transition: 'all 0.15s' }}>
+                    {lang.flag} {lang.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button onClick={process} disabled={!uploadedFile || processing}
+              style={{ background: uploadedFile && !processing ? GOLD : 'rgba(255,255,255,0.05)', color: uploadedFile && !processing ? '#000' : 'rgba(255,255,255,0.4)', fontWeight: 800, fontSize: 14, padding: '13px 32px', borderRadius: 12, border: 'none', cursor: uploadedFile && !processing ? 'pointer' : 'default', transition: 'all 0.15s' }}>
+              {processing ? 'Processing...' : '💬 Generate captions'}
+            </button>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 10 }}>Caption format</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {CAPTION_FORMATS.map(fmt => (
+                <div key={fmt.id} onClick={() => toggleFormat(fmt.id)}
+                  style={{ padding: '12px 14px', borderRadius: 10, cursor: 'pointer', background: selectedFormats.includes(fmt.id) ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.02)', border: `1px solid ${selectedFormats.includes(fmt.id) ? BLUE : 'rgba(255,255,255,0.07)'}`, transition: 'all 0.15s' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700 }}>{fmt.name}</span>
+                    {selectedFormats.includes(fmt.id) && <span style={{ color: BLUE, fontSize: 14 }}>✓</span>}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{fmt.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clips */}
+      {tab === 'clips' && (
+        <div>
+          <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Generate social clips</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+            <div>
+              <FileUpload />
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 10 }}>Languages for captions</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {LANGS.map(lang => (
+                    <button key={lang.code} onClick={() => toggleLang(lang.code)}
+                      style={{ padding: '7px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', background: selectedLangs.includes(lang.code) ? BLUE : 'rgba(255,255,255,0.06)', color: selectedLangs.includes(lang.code) ? '#fff' : 'rgba(255,255,255,0.5)', transition: 'all 0.15s' }}>
+                      {lang.flag} {lang.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button onClick={process} disabled={!uploadedFile || processing}
+                style={{ background: uploadedFile && !processing ? GOLD : 'rgba(255,255,255,0.05)', color: uploadedFile && !processing ? '#000' : 'rgba(255,255,255,0.4)', fontWeight: 800, fontSize: 14, padding: '13px 32px', borderRadius: 12, border: 'none', cursor: uploadedFile && !processing ? 'pointer' : 'default' }}>
+                {processing ? 'Processing...' : '✂️ Generate clips'}
+              </button>
+            </div>
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 10 }}>Export for</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {CLIP_FORMATS.map(fmt => (
+                  <div key={fmt.id} onClick={() => toggleClipFormat(fmt.id)}
+                    style={{ padding: '12px 14px', borderRadius: 10, cursor: 'pointer', background: selectedClipFormats.includes(fmt.id) ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.02)', border: `1px solid ${selectedClipFormats.includes(fmt.id) ? BLUE : 'rgba(255,255,255,0.07)'}`, display: 'flex', alignItems: 'center', gap: 12, transition: 'all 0.15s' }}>
+                    <span style={{ fontSize: 20 }}>{fmt.icon}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{fmt.name}</div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{fmt.size}</div>
+                    </div>
+                    {selectedClipFormats.includes(fmt.id) && <span style={{ color: BLUE }}>✓</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Jobs */}
+      {tab === 'jobs' && (
+        <div>
+          <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>My video files</h2>
+          {jobs.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '48px 0', color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 16 }}>
+              <div style={{ fontSize: 36, marginBottom: 12 }}>🎬</div>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>No files yet</div>
+              <div style={{ fontSize: 13 }}>Generate captions or clips to see them here</div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {jobs.map(job => (
+                <div key={job.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: job.status === 'processing' ? 10 : 0 }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{job.file}</div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
+                        {job.type === 'captions' ? 'Captions' : 'Social clips'} · {job.langs.length} language{job.langs.length > 1 ? 's' : ''} · {job.created}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: job.status === 'done' ? 'rgba(74,222,128,0.1)' : 'rgba(59,130,246,0.1)', color: job.status === 'done' ? '#4ade80' : BLUE }}>
+                        {job.status === 'done' ? '✓ Ready' : `Processing ${Math.round(job.progress)}%`}
+                      </span>
+                      {job.status === 'done' && (
+                        <button style={{ padding: '6px 14px', borderRadius: 8, background: BLUE, color: '#fff', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+                          Download
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {job.status === 'processing' && (
+                    <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 999 }}>
+                      <div style={{ height: '100%', background: BLUE, borderRadius: 999, width: `${job.progress}%`, transition: 'width 0.5s' }} />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }

@@ -8,7 +8,7 @@ export default function DashboardLayout({
 }) {
   return (
     <I18nProvider>
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 24px" }}>
+      <div style={{ padding: "32px 24px" }}>
         {children}
       </div>
     </I18nProvider>

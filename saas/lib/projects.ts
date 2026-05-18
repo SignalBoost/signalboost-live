@@ -46,7 +46,6 @@ export async function getProjects(userId: string): Promise<Project[]> {
     .select('*')
     .eq('user_id', userId)
     .order('last_edited_at', { ascending: false })
-
   if (error) return []
   return data as Project[]
 }
@@ -56,8 +55,7 @@ export async function getUserPlan(userId: string): Promise<string> {
     .from('subscriptions')
     .select('plan')
     .eq('user_id', userId)
-    .single()
-
+    .maybeSingle()
   if (error || !data) return 'free'
   return data.plan
 }
@@ -72,11 +70,9 @@ export async function canCreateProject(userId: string): Promise<{
     getProjects(userId),
     getUserPlan(userId),
   ])
-
   const limit = PLAN_PROJECT_LIMITS[plan] ?? 3
   const current = projects.length
   const allowed = current < limit
-
   return { allowed, plan, limit, current }
 }
 
@@ -87,7 +83,6 @@ export async function createProject(userId: string, project: {
   description?: string
 }) {
   const { allowed, plan, limit, current } = await canCreateProject(userId)
-
   if (!allowed) {
     return {
       error: `You have reached the ${limit} project limit on the ${plan} plan. Upgrade to add more projects.`,
@@ -97,7 +92,6 @@ export async function createProject(userId: string, project: {
       current,
     }
   }
-
   const { data, error } = await supabase
     .from('projects')
     .insert({
@@ -111,7 +105,6 @@ export async function createProject(userId: string, project: {
     })
     .select()
     .single()
-
   if (error) return { error: error.message }
   return { data }
 }
@@ -121,7 +114,6 @@ export async function deleteProject(projectId: string) {
     .from('projects')
     .delete()
     .eq('id', projectId)
-
   if (error) return { error: error.message }
   return { success: true }
 }
@@ -131,7 +123,6 @@ export async function updateProjectStatus(projectId: string, status: Project['st
     .from('projects')
     .update({ status, last_edited_at: new Date().toISOString() })
     .eq('id', projectId)
-
   if (error) return { error: error.message }
   return { success: true }
 }

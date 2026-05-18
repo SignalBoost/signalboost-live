@@ -10,14 +10,14 @@ const GOLD = "#ffc300";
 const BLUE = "#3b82f6";
 
 const LOCALE_LABELS: Record<VoiceLocale | "all", { flag: string; label: string }> = {
-  "all":      { flag: "🌐", label: "All languages" },
-  "en":       { flag: "🇺🇸", label: "English" },
-  "pt-BR":    { flag: "🇧🇷", label: "Português (BR)" },
-  "pt-PT":    { flag: "🇵🇹", label: "Português (PT)" },
-  "es-LATAM": { flag: "🇲🇽", label: "Español (LATAM)" },
-  "es-ES":    { flag: "🇪🇸", label: "Español (ES)" },
-  "pl":       { flag: "🇵🇱", label: "Polski" },
-  "ru":       { flag: "🇷🇺", label: "Русский" },
+  "all":      { flag: "globe", label: "All languages" },
+  "en":       { flag: "US", label: "English" },
+  "pt-BR":    { flag: "BR", label: "Portugues (BR)" },
+  "pt-PT":    { flag: "PT", label: "Portugues (PT)" },
+  "es-LATAM": { flag: "MX", label: "Espanol (LATAM)" },
+  "es-ES":    { flag: "ES", label: "Espanol (ES)" },
+  "pl":       { flag: "PL", label: "Polski" },
+  "ru":       { flag: "RU", label: "Russkiy" },
 };
 
 const LOCALE_ORDER: (VoiceLocale | "all")[] = ["all", "en", "pt-BR", "pt-PT", "es-LATAM", "es-ES", "pl", "ru"];
@@ -36,7 +36,6 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const langDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close language dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (langDropdownRef.current && !langDropdownRef.current.contains(e.target as Node)) {
@@ -52,7 +51,6 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
     return CURATED_VOICES.filter((v) => v.locale === localeFilter);
   }, [localeFilter]);
 
-  // Auto-select first voice when filter changes
   useEffect(() => {
     if (!visibleVoices.some((v) => v.id === selectedVoiceId)) {
       setSelectedVoiceId(visibleVoices[0]?.id ?? "");
@@ -76,7 +74,6 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
 
   return (
     <div style={{ color: "#fff", fontFamily: "system-ui" }}>
-      {/* Header with title + language dropdown */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28, gap: 16 }}>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 900, letterSpacing: "-0.02em", margin: "0 0 6px" }}>
@@ -87,7 +84,6 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
           </p>
         </div>
 
-        {/* Language dropdown */}
         <div ref={langDropdownRef} style={{ position: "relative" }}>
           <button
             onClick={() => setLangDropdownOpen((o) => !o)}
@@ -102,16 +98,16 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.25)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
           >
-            <span style={{ fontSize: 16 }}>{currentLangLabel.flag}</span>
+            <span style={{ fontSize: 11, fontWeight: 800, opacity: 0.7 }}>{currentLangLabel.flag}</span>
             <span>{currentLangLabel.label}</span>
-            <span style={{ fontSize: 10, opacity: 0.6 }}>▼</span>
+            <span style={{ fontSize: 10, opacity: 0.6 }}>v</span>
           </button>
 
           {langDropdownOpen && (
             <div style={{
               position: "absolute", top: "100%", right: 0, marginTop: 8,
               background: "#111118", border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 12, padding: 6, minWidth: 200, zIndex: 50,
+              borderRadius: 12, padding: 6, minWidth: 220, zIndex: 50,
               boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
             }}>
               {LOCALE_ORDER.map((loc) => {
@@ -132,9 +128,9 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
                     onMouseEnter={(e) => { if (!selected) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
                     onMouseLeave={(e) => { if (!selected) e.currentTarget.style.background = "transparent"; }}
                   >
-                    <span style={{ fontSize: 16 }}>{opt.flag}</span>
+                    <span style={{ fontSize: 11, fontWeight: 800, opacity: 0.7, minWidth: 28 }}>{opt.flag}</span>
                     <span>{opt.label}</span>
-                    {selected && <span style={{ marginLeft: "auto", color: BLUE }}>✓</span>}
+                    {selected && <span style={{ marginLeft: "auto", color: BLUE }}>OK</span>}
                   </button>
                 );
               })}
@@ -143,7 +139,6 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
         </div>
       </div>
 
-      {/* Voice grid */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }}>
           <h2 style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.08em", textTransform: "uppercase", margin: 0 }}>
@@ -181,9 +176,9 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
                   onMouseLeave={(e) => { if (!selected) e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                    <span style={{ fontSize: 22 }}>{flag}</span>
+                    <span style={{ fontSize: 11, fontWeight: 800, opacity: 0.7, minWidth: 24 }}>{flag}</span>
                     <span style={{ fontSize: 15, fontWeight: 700 }}>{v.name}</span>
-                    {selected && <span style={{ marginLeft: "auto", color: BLUE, fontSize: 14 }}>✓</span>}
+                    {selected && <span style={{ marginLeft: "auto", color: BLUE, fontSize: 12, fontWeight: 700 }}>OK</span>}
                   </div>
                   <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>
                     {description}
@@ -198,7 +193,6 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
         )}
       </div>
 
-      {/* Text input */}
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
           {t("audio.yourText", "Your text")}
@@ -206,7 +200,7 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder={t("audio.textPlaceholder", "Type or paste what you want to say…")}
+          placeholder={t("audio.textPlaceholder", "Type or paste what you want to say...")}
           rows={5}
           style={{
             width: "100%", padding: "14px 16px",
@@ -231,7 +225,6 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
         </div>
       </div>
 
-      {/* Generate button */}
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 28 }}>
         <button
           onClick={handleGenerate}
@@ -249,11 +242,10 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
           onMouseEnter={(e) => { if (canSubmit) e.currentTarget.style.transform = "translateY(-2px)"; }}
           onMouseLeave={(e) => { if (canSubmit) e.currentTarget.style.transform = "translateY(0)"; }}
         >
-          {loading ? `★  ${t("audio.generating", "Generating…")}` : `★  ${t("audio.generate", "Generate audio")}`}
+          {loading ? t("audio.generating", "Generating...") : t("audio.generate", "Generate audio")}
         </button>
       </div>
 
-      {/* Error */}
       {error && (
         <div style={{
           background: "rgba(239,68,68,0.08)",
@@ -274,7 +266,6 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
         </div>
       )}
 
-      {/* Result player */}
       {result && (
         <div style={{
           background: "rgba(255,195,0,0.04)",
@@ -288,7 +279,7 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
               </div>
               {selectedVoice && (
                 <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", marginTop: 4 }}>
-                  {LOCALE_LABELS[selectedVoice.locale].flag} {selectedVoice.name} · {text.length.toLocaleString()} {t("audio.chars", "chars")}
+                  {LOCALE_LABELS[selectedVoice.locale].flag} {selectedVoice.name}
                 </div>
               )}
             </div>
@@ -302,7 +293,7 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
                 textDecoration: "none", border: "1px solid rgba(255,195,0,0.3)",
               }}
             >
-              ⬇ {t("audio.download", "Download")}
+              {t("audio.download", "Download")}
             </a>
           </div>
           <audio

@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 @keyframes meshFloat1 {
   0%, 100% { transform: translate(0, 0) scale(1); }
   50%      { transform: translate(8vw, 6vh) scale(1.1); }

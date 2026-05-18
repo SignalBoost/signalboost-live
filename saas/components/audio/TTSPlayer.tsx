@@ -1,186 +1,317 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useTranslation } from "@/components/i18n/useTranslation";
 import { useTTS } from "@/hooks/useTTS";
 import { CURATED_VOICES, type CuratedVoice, type VoiceLocale } from "@/lib/elevenlabs/voices";
 
 const MAX_CHARS = 5000;
+const GOLD = "#ffc300";
+const BLUE = "#3b82f6";
+
+const LOCALE_LABELS: Record<VoiceLocale | "all", { flag: string; label: string }> = {
+  "all":      { flag: "🌐", label: "All languages" },
+  "en":       { flag: "🇺🇸", label: "English" },
+  "pt-BR":    { flag: "🇧🇷", label: "Português (BR)" },
+  "pt-PT":    { flag: "🇵🇹", label: "Português (PT)" },
+  "es-LATAM": { flag: "🇲🇽", label: "Español (LATAM)" },
+  "es-ES":    { flag: "🇪🇸", label: "Español (ES)" },
+  "pl":       { flag: "🇵🇱", label: "Polski" },
+  "ru":       { flag: "🇷🇺", label: "Русский" },
+};
+
+const LOCALE_ORDER: (VoiceLocale | "all")[] = ["all", "en", "pt-BR", "pt-PT", "es-LATAM", "es-ES", "pl", "ru"];
 
 interface Props {
   initialLocale?: VoiceLocale | "all";
 }
 
-export function TTSPlayer({ initialLocale = "all" }: Props) {
+export function TTSPlayer({ initialLocale = "en" }: Props) {
   const { t } = useTranslation();
   const { generate, loading, error, result } = useTTS();
+
   const [text, setText] = useState("");
   const [localeFilter, setLocaleFilter] = useState<VoiceLocale | "all">(initialLocale);
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(CURATED_VOICES[0]?.id ?? "");
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>("");
+  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+  const langDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close language dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (langDropdownRef.current && !langDropdownRef.current.contains(e.target as Node)) {
+        setLangDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const visibleVoices = useMemo(() => {
     if (localeFilter === "all") return CURATED_VOICES;
-    return CURATED_VOICES.filter((v) => {
-      const vl = v.locale.toLowerCase();
-      const f = String(localeFilter).toLowerCase();
-      return vl === f || vl.startsWith(`${f}-`);
-    });
+    return CURATED_VOICES.filter((v) => v.locale === localeFilter);
   }, [localeFilter]);
 
-  const effectiveVoiceId = useMemo(() => {
-    if (visibleVoices.some((v) => v.id === selectedVoiceId)) return selectedVoiceId;
-    return visibleVoices[0]?.id ?? "";
+  // Auto-select first voice when filter changes
+  useEffect(() => {
+    if (!visibleVoices.some((v) => v.id === selectedVoiceId)) {
+      setSelectedVoiceId(visibleVoices[0]?.id ?? "");
+    }
   }, [visibleVoices, selectedVoiceId]);
 
+  const selectedVoice = useMemo(
+    () => CURATED_VOICES.find((v) => v.id === selectedVoiceId),
+    [selectedVoiceId]
+  );
+
   const overLimit = text.length > MAX_CHARS;
-  const canSubmit = text.trim().length > 0 && !overLimit && !loading;
+  const canSubmit = text.trim().length > 0 && !overLimit && !loading && !!selectedVoiceId;
 
   const handleGenerate = async () => {
-    if (!canSubmit || !effectiveVoiceId) return;
-    await generate(text.trim(), effectiveVoiceId);
+    if (!canSubmit) return;
+    await generate(text.trim(), selectedVoiceId);
   };
 
-  const localeOptions: Array<[VoiceLocale | "all", string]> = [
-    ["all", "All"],
-    ["en", "English"],
-    ["pt-BR", "Português (BR)"],
-    ["pt-PT", "Português (PT)"],
-    ["es-LATAM", "Español (LATAM)"],
-    ["es-ES", "Español (ES)"],
-    ["pl", "Polski"],
-    ["ru", "Русский"],
-  ];
+  const currentLangLabel = LOCALE_LABELS[localeFilter];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
-          {t("tts.language", "Language")}:
-        </span>
-        {localeOptions.map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setLocaleFilter(value)}
-            className={
-              "rounded-full px-3 py-1 text-xs font-medium transition " +
-              (localeFilter === value
-                ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700")
-            }
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div>
-        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">
-          {t("tts.voice", "Voice")}
-        </label>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {visibleVoices.map((v) => (
-            <VoiceCard
-              key={v.id}
-              voice={v}
-              selected={effectiveVoiceId === v.id}
-              onSelect={() => setSelectedVoiceId(v.id)}
-              t={t}
-            />
-          ))}
-        </div>
-        {visibleVoices.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            {t("tts.noVoices", "No voices available for this language.")}
+    <div style={{ color: "#fff", fontFamily: "system-ui" }}>
+      {/* Header with title + language dropdown */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28, gap: 16 }}>
+        <div>
+          <h1 style={{ fontSize: 28, fontWeight: 900, letterSpacing: "-0.02em", margin: "0 0 6px" }}>
+            {t("audio.title", "Audio")}
+          </h1>
+          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", margin: 0 }}>
+            {t("audio.subtitle", "Turn any text into native-sounding audio.")}
           </p>
-        ) : null}
+        </div>
+
+        {/* Language dropdown */}
+        <div ref={langDropdownRef} style={{ position: "relative" }}>
+          <button
+            onClick={() => setLangDropdownOpen((o) => !o)}
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "10px 16px", borderRadius: 999,
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              color: "#fff", fontSize: 13, fontWeight: 600,
+              cursor: "pointer", transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.25)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
+          >
+            <span style={{ fontSize: 16 }}>{currentLangLabel.flag}</span>
+            <span>{currentLangLabel.label}</span>
+            <span style={{ fontSize: 10, opacity: 0.6 }}>▼</span>
+          </button>
+
+          {langDropdownOpen && (
+            <div style={{
+              position: "absolute", top: "100%", right: 0, marginTop: 8,
+              background: "#111118", border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 12, padding: 6, minWidth: 200, zIndex: 50,
+              boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
+            }}>
+              {LOCALE_ORDER.map((loc) => {
+                const opt = LOCALE_LABELS[loc];
+                const selected = loc === localeFilter;
+                return (
+                  <button
+                    key={loc}
+                    onClick={() => { setLocaleFilter(loc); setLangDropdownOpen(false); }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10, width: "100%",
+                      padding: "8px 12px", borderRadius: 8, border: "none",
+                      background: selected ? "rgba(59,130,246,0.15)" : "transparent",
+                      color: selected ? BLUE : "rgba(255,255,255,0.7)",
+                      fontSize: 13, fontWeight: selected ? 700 : 500,
+                      cursor: "pointer", textAlign: "left",
+                    }}
+                    onMouseEnter={(e) => { if (!selected) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+                    onMouseLeave={(e) => { if (!selected) e.currentTarget.style.background = "transparent"; }}
+                  >
+                    <span style={{ fontSize: 16 }}>{opt.flag}</span>
+                    <span>{opt.label}</span>
+                    {selected && <span style={{ marginLeft: "auto", color: BLUE }}>✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div>
-        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">
-          {t("tts.text", "Text")}
-        </label>
+      {/* Voice grid */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }}>
+          <h2 style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.08em", textTransform: "uppercase", margin: 0 }}>
+            {t("audio.pickVoice", "Pick a voice")}
+          </h2>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>
+            {visibleVoices.length} {t("audio.voicesAvailable", "available")}
+          </span>
+        </div>
+
+        {visibleVoices.length === 0 ? (
+          <div style={{ padding: 24, background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.1)", borderRadius: 14, textAlign: "center", color: "rgba(255,255,255,0.4)", fontSize: 13 }}>
+            {t("audio.noVoices", "No voices available for this language.")}
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+            {visibleVoices.map((v) => {
+              const selected = selectedVoiceId === v.id;
+              const flag = LOCALE_LABELS[v.locale].flag;
+              const description = t(v.descriptionKey, v.descriptionFallback);
+              return (
+                <button
+                  key={v.id}
+                  onClick={() => setSelectedVoiceId(v.id)}
+                  style={{
+                    padding: "16px",
+                    background: selected ? "rgba(59,130,246,0.12)" : "rgba(255,255,255,0.02)",
+                    border: `1px solid ${selected ? "rgba(59,130,246,0.5)" : "rgba(255,255,255,0.07)"}`,
+                    borderRadius: 14, cursor: "pointer", transition: "all 0.18s",
+                    transform: selected ? "translateY(-2px)" : "translateY(0)",
+                    boxShadow: selected ? "0 6px 20px rgba(59,130,246,0.2)" : "none",
+                    textAlign: "left", color: "#fff",
+                  }}
+                  onMouseEnter={(e) => { if (!selected) e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; }}
+                  onMouseLeave={(e) => { if (!selected) e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 22 }}>{flag}</span>
+                    <span style={{ fontSize: 15, fontWeight: 700 }}>{v.name}</span>
+                    {selected && <span style={{ marginLeft: "auto", color: BLUE, fontSize: 14 }}>✓</span>}
+                  </div>
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>
+                    {description}
+                  </div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginTop: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    {v.gender}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Text input */}
+      <div style={{ marginBottom: 20 }}>
+        <h2 style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
+          {t("audio.yourText", "Your text")}
+        </h2>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          rows={6}
-          placeholder={t("tts.placeholder", "Type or paste your text here.")}
-          className="w-full rounded-lg border border-slate-300 bg-white p-3 text-sm leading-relaxed text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          placeholder={t("audio.textPlaceholder", "Type or paste what you want to say…")}
+          rows={5}
+          style={{
+            width: "100%", padding: "14px 16px",
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: 14, color: "#fff", fontSize: 14, lineHeight: 1.6,
+            fontFamily: "inherit", outline: "none", resize: "vertical",
+            boxSizing: "border-box",
+          }}
+          onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(59,130,246,0.5)"; }}
+          onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
         />
-        <div className="mt-1 flex items-center justify-between text-xs">
-          <span className={overLimit ? "font-medium text-red-600" : "text-slate-500 dark:text-slate-400"}>
-            {text.length} / {MAX_CHARS}
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 11 }}>
+          <span style={{ color: overLimit ? "#f87171" : "rgba(255,255,255,0.4)" }}>
+            {text.length.toLocaleString()} / {MAX_CHARS.toLocaleString()} {t("audio.characters", "characters")}
           </span>
-          {overLimit ? (
-            <span className="text-red-600">{t("tts.overLimit", "Over character limit")}</span>
-          ) : null}
+          {overLimit && (
+            <span style={{ color: "#f87171", fontWeight: 600 }}>
+              {t("audio.overLimit", "Over the character limit")}
+            </span>
+          )}
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={handleGenerate}
-        disabled={!canSubmit}
-        className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
-      >
-        {loading ? t("tts.generating", "Generating...") : t("tts.generate", "Generate audio")}
-      </button>
+      {/* Generate button */}
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 28 }}>
+        <button
+          onClick={handleGenerate}
+          disabled={!canSubmit}
+          style={{
+            padding: "14px 36px", borderRadius: 999,
+            background: canSubmit ? GOLD : "rgba(255,255,255,0.06)",
+            color: canSubmit ? "#000" : "rgba(255,255,255,0.3)",
+            border: "none", fontSize: 15, fontWeight: 800,
+            cursor: canSubmit ? "pointer" : "not-allowed",
+            transition: "all 0.15s",
+            boxShadow: canSubmit ? "0 6px 24px rgba(255,195,0,0.25)" : "none",
+            minWidth: 220,
+          }}
+          onMouseEnter={(e) => { if (canSubmit) e.currentTarget.style.transform = "translateY(-2px)"; }}
+          onMouseLeave={(e) => { if (canSubmit) e.currentTarget.style.transform = "translateY(0)"; }}
+        >
+          {loading ? `★  ${t("audio.generating", "Generating…")}` : `★  ${t("audio.generate", "Generate audio")}`}
+        </button>
+      </div>
 
-      {error ? (
-        <div role="alert" className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/40 dark:text-red-100">
-          <p className="font-medium">{t("tts.error", "Generation failed")}</p>
-          <p className="mt-1 opacity-90">{error.message}</p>
-          {typeof error.remaining === "number" && typeof error.monthlyLimit === "number" ? (
-            <p className="mt-1 text-xs opacity-75">
-              {t("tts.remaining", "Remaining")}: {error.remaining} / {error.monthlyLimit}
-            </p>
-          ) : null}
+      {/* Error */}
+      {error && (
+        <div style={{
+          background: "rgba(239,68,68,0.08)",
+          border: "1px solid rgba(239,68,68,0.3)",
+          borderRadius: 14, padding: "14px 18px", marginBottom: 20,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#f87171", marginBottom: 4 }}>
+            {t("audio.error", "Generation failed")}
+          </div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
+            {error.message}
+          </div>
+          {typeof error.remaining === "number" && typeof error.monthlyLimit === "number" && (
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 6 }}>
+              {t("audio.remaining", "Remaining")}: {error.remaining} / {error.monthlyLimit}
+            </div>
+          )}
         </div>
-      ) : null}
+      )}
 
-      {result ? (
-        <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
-          <audio controls src={result.audioUrl} className="w-full" />
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-400">
-            <span>
-              {result.cached ? t("tts.fromCache", "Served from cache") : t("tts.justGenerated", "Just generated")}
-            </span>
-            <a href={result.audioUrl} download="signalboost-audio.mp3" className="font-medium text-slate-900 underline-offset-2 hover:underline dark:text-white">
-              {t("tts.download", "Download")}
+      {/* Result player */}
+      {result && (
+        <div style={{
+          background: "rgba(255,195,0,0.04)",
+          border: "1px solid rgba(255,195,0,0.25)",
+          borderRadius: 16, padding: 20, marginBottom: 20,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: GOLD, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                {result.cached ? t("audio.servedFromCache", "Served from cache") : t("audio.justGenerated", "Just generated")}
+              </div>
+              {selectedVoice && (
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", marginTop: 4 }}>
+                  {LOCALE_LABELS[selectedVoice.locale].flag} {selectedVoice.name} · {text.length.toLocaleString()} {t("audio.chars", "chars")}
+                </div>
+              )}
+            </div>
+            
+              href={result.audioUrl}
+              download="signalboost-audio.mp3"
+              style={{
+                padding: "8px 18px", borderRadius: 999,
+                background: "rgba(255,195,0,0.15)", color: GOLD,
+                fontSize: 12, fontWeight: 700,
+                textDecoration: "none", border: "1px solid rgba(255,195,0,0.3)",
+              }}
+            >
+              ⬇ {t("audio.download", "Download")}
             </a>
           </div>
+          <audio
+            controls
+            src={result.audioUrl}
+            style={{ width: "100%", borderRadius: 8 }}
+          />
         </div>
-      ) : null}
+      )}
     </div>
-  );
-}
-
-interface VoiceCardProps {
-  voice: CuratedVoice;
-  selected: boolean;
-  onSelect: () => void;
-  t: (key: string, fallback?: string) => string;
-}
-
-function VoiceCard({ voice, selected, onSelect, t }: VoiceCardProps) {
-  const description = t(voice.descriptionKey, voice.descriptionFallback);
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={selected}
-      className={
-        "rounded-lg border p-3 text-left transition " +
-        (selected
-          ? "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900"
-          : "border-slate-200 bg-white hover:border-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-600")
-      }
-    >
-      <div className="flex items-center justify-between">
-        <span className="font-semibold">{voice.name}</span>
-        <span className="text-xs opacity-70">{voice.locale}</span>
-      </div>
-      <p className="mt-1 text-xs opacity-80">{description}</p>
-    </button>
   );
 }

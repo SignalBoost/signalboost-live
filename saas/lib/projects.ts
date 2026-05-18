@@ -27,7 +27,7 @@ export const STATUS_COLORS: Record<string, string> = {
 }
 
 export const PLAN_PROJECT_LIMITS: Record<string, number> = {
-  free:     3,
+  free:     1,
   starter:  10,
   pro:      30,
   business: Infinity,
@@ -38,6 +38,13 @@ export const PLAN_STORAGE_LIMITS: Record<string, string> = {
   starter:  '1GB',
   pro:      '10GB',
   business: '50GB',
+}
+
+export const PLAN_LANGUAGE_LIMITS: Record<string, number> = {
+  free:     1,
+  starter:  2,
+  pro:      5,
+  business: Infinity,
 }
 
 export async function getProjects(userId: string): Promise<Project[]> {
@@ -70,7 +77,7 @@ export async function canCreateProject(userId: string): Promise<{
     getProjects(userId),
     getUserPlan(userId),
   ])
-  const limit = PLAN_PROJECT_LIMITS[plan] ?? 3
+  const limit = PLAN_PROJECT_LIMITS[plan] ?? 1
   const current = projects.length
   const allowed = current < limit
   return { allowed, plan, limit, current }

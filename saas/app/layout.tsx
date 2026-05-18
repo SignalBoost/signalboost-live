@@ -18,8 +18,7 @@ export default function RootLayout({
     <html lang="en">
       <body
         style={{
-          display: "flex",
-          flexDirection: "column",
+          margin: 0,
           minHeight: "100vh",
           background: "#0f1117",
           color: "#fff",
@@ -88,8 +87,17 @@ export default function RootLayout({
           />
         </div>
 
-        {/* Page content sits on top of the gradient */}
-        <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+        {/* Page content layer */}
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            display: "flex",
+            flexDirection: "column",
+            minHeight: "100vh",
+            width: "100%",
+          }}
+        >
           <I18nProvider>
             <Navbar />
             {children}

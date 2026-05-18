@@ -3,24 +3,24 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useTranslation } from "@/components/i18n/useTranslation";
 import { useTTS } from "@/hooks/useTTS";
-import { CURATED_VOICES, type CuratedVoice, type VoiceLocale } from "@/lib/elevenlabs/voices";
+import { CURATED_VOICES, type VoiceLocale } from "@/lib/elevenlabs/voices";
 
 const MAX_CHARS = 5000;
 const GOLD = "#ffc300";
 const BLUE = "#3b82f6";
 
-const LOCALE_LABELS: Record<VoiceLocale | "all", { flag: string; label: string }> = {
-  "all":      { flag: "globe", label: "All languages" },
-  "en":       { flag: "US", label: "English" },
-  "pt-BR":    { flag: "BR", label: "Portugues (BR)" },
-  "pt-PT":    { flag: "PT", label: "Portugues (PT)" },
+const LOCALE_LABELS: Record<string, { flag: string; label: string }> = {
+  "all": { flag: "ALL", label: "All languages" },
+  "en": { flag: "EN", label: "English" },
+  "pt-BR": { flag: "BR", label: "Portugues (BR)" },
+  "pt-PT": { flag: "PT", label: "Portugues (PT)" },
   "es-LATAM": { flag: "MX", label: "Espanol (LATAM)" },
-  "es-ES":    { flag: "ES", label: "Espanol (ES)" },
-  "pl":       { flag: "PL", label: "Polski" },
-  "ru":       { flag: "RU", label: "Russkiy" },
+  "es-ES": { flag: "ES", label: "Espanol (ES)" },
+  "pl": { flag: "PL", label: "Polski" },
+  "ru": { flag: "RU", label: "Russkiy" },
 };
 
-const LOCALE_ORDER: (VoiceLocale | "all")[] = ["all", "en", "pt-BR", "pt-PT", "es-LATAM", "es-ES", "pl", "ru"];
+const LOCALE_ORDER = ["all", "en", "pt-BR", "pt-PT", "es-LATAM", "es-ES", "pl", "ru"];
 
 interface Props {
   initialLocale?: VoiceLocale | "all";
@@ -31,7 +31,7 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
   const { generate, loading, error, result } = useTTS();
 
   const [text, setText] = useState("");
-  const [localeFilter, setLocaleFilter] = useState<VoiceLocale | "all">(initialLocale);
+  const [localeFilter, setLocaleFilter] = useState<string>(initialLocale);
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>("");
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const langDropdownRef = useRef<HTMLDivElement>(null);
@@ -70,6 +70,16 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
     await generate(text.trim(), selectedVoiceId);
   };
 
+  const handleDownload = () => {
+    if (!result) return;
+    const link = document.createElement("a");
+    link.href = result.audioUrl;
+    link.download = "signalboost-audio.mp3";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const currentLangLabel = LOCALE_LABELS[localeFilter];
 
   return (
@@ -88,15 +98,18 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
           <button
             onClick={() => setLangDropdownOpen((o) => !o)}
             style={{
-              display: "flex", alignItems: "center", gap: 8,
-              padding: "10px 16px", borderRadius: 999,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "10px 16px",
+              borderRadius: 999,
               background: "rgba(255,255,255,0.05)",
               border: "1px solid rgba(255,255,255,0.1)",
-              color: "#fff", fontSize: 13, fontWeight: 600,
-              cursor: "pointer", transition: "all 0.15s",
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.25)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
           >
             <span style={{ fontSize: 11, fontWeight: 800, opacity: 0.7 }}>{currentLangLabel.flag}</span>
             <span>{currentLangLabel.label}</span>
@@ -104,33 +117,49 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
           </button>
 
           {langDropdownOpen && (
-            <div style={{
-              position: "absolute", top: "100%", right: 0, marginTop: 8,
-              background: "#111118", border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 12, padding: 6, minWidth: 220, zIndex: 50,
-              boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
-            }}>
+            <div
+              style={{
+                position: "absolute",
+                top: "100%",
+                right: 0,
+                marginTop: 8,
+                background: "#111118",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: 12,
+                padding: 6,
+                minWidth: 220,
+                zIndex: 50,
+                boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
+              }}
+            >
               {LOCALE_ORDER.map((loc) => {
                 const opt = LOCALE_LABELS[loc];
                 const selected = loc === localeFilter;
                 return (
                   <button
                     key={loc}
-                    onClick={() => { setLocaleFilter(loc); setLangDropdownOpen(false); }}
+                    onClick={() => {
+                      setLocaleFilter(loc);
+                      setLangDropdownOpen(false);
+                    }}
                     style={{
-                      display: "flex", alignItems: "center", gap: 10, width: "100%",
-                      padding: "8px 12px", borderRadius: 8, border: "none",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      width: "100%",
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      border: "none",
                       background: selected ? "rgba(59,130,246,0.15)" : "transparent",
                       color: selected ? BLUE : "rgba(255,255,255,0.7)",
-                      fontSize: 13, fontWeight: selected ? 700 : 500,
-                      cursor: "pointer", textAlign: "left",
+                      fontSize: 13,
+                      fontWeight: selected ? 700 : 500,
+                      cursor: "pointer",
+                      textAlign: "left",
                     }}
-                    onMouseEnter={(e) => { if (!selected) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
-                    onMouseLeave={(e) => { if (!selected) e.currentTarget.style.background = "transparent"; }}
                   >
                     <span style={{ fontSize: 11, fontWeight: 800, opacity: 0.7, minWidth: 28 }}>{opt.flag}</span>
                     <span>{opt.label}</span>
-                    {selected && <span style={{ marginLeft: "auto", color: BLUE }}>OK</span>}
                   </button>
                 );
               })}
@@ -150,14 +179,24 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
         </div>
 
         {visibleVoices.length === 0 ? (
-          <div style={{ padding: 24, background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.1)", borderRadius: 14, textAlign: "center", color: "rgba(255,255,255,0.4)", fontSize: 13 }}>
+          <div
+            style={{
+              padding: 24,
+              background: "rgba(255,255,255,0.02)",
+              border: "1px dashed rgba(255,255,255,0.1)",
+              borderRadius: 14,
+              textAlign: "center",
+              color: "rgba(255,255,255,0.4)",
+              fontSize: 13,
+            }}
+          >
             {t("audio.noVoices", "No voices available for this language.")}
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
             {visibleVoices.map((v) => {
               const selected = selectedVoiceId === v.id;
-              const flag = LOCALE_LABELS[v.locale].flag;
+              const flag = LOCALE_LABELS[v.locale]?.flag || "";
               const description = t(v.descriptionKey, v.descriptionFallback);
               return (
                 <button
@@ -166,19 +205,16 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
                   style={{
                     padding: "16px",
                     background: selected ? "rgba(59,130,246,0.12)" : "rgba(255,255,255,0.02)",
-                    border: `1px solid ${selected ? "rgba(59,130,246,0.5)" : "rgba(255,255,255,0.07)"}`,
-                    borderRadius: 14, cursor: "pointer", transition: "all 0.18s",
-                    transform: selected ? "translateY(-2px)" : "translateY(0)",
-                    boxShadow: selected ? "0 6px 20px rgba(59,130,246,0.2)" : "none",
-                    textAlign: "left", color: "#fff",
+                    border: "1px solid " + (selected ? "rgba(59,130,246,0.5)" : "rgba(255,255,255,0.07)"),
+                    borderRadius: 14,
+                    cursor: "pointer",
+                    textAlign: "left",
+                    color: "#fff",
                   }}
-                  onMouseEnter={(e) => { if (!selected) e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; }}
-                  onMouseLeave={(e) => { if (!selected) e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                     <span style={{ fontSize: 11, fontWeight: 800, opacity: 0.7, minWidth: 24 }}>{flag}</span>
                     <span style={{ fontSize: 15, fontWeight: 700 }}>{v.name}</span>
-                    {selected && <span style={{ marginLeft: "auto", color: BLUE, fontSize: 12, fontWeight: 700 }}>OK</span>}
                   </div>
                   <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>
                     {description}
@@ -203,25 +239,29 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
           placeholder={t("audio.textPlaceholder", "Type or paste what you want to say...")}
           rows={5}
           style={{
-            width: "100%", padding: "14px 16px",
+            width: "100%",
+            padding: "14px 16px",
             background: "rgba(255,255,255,0.04)",
             border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: 14, color: "#fff", fontSize: 14, lineHeight: 1.6,
-            fontFamily: "inherit", outline: "none", resize: "vertical",
+            borderRadius: 14,
+            color: "#fff",
+            fontSize: 14,
+            lineHeight: 1.6,
+            fontFamily: "inherit",
+            outline: "none",
+            resize: "vertical",
             boxSizing: "border-box",
           }}
-          onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(59,130,246,0.5)"; }}
-          onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
         />
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 11 }}>
           <span style={{ color: overLimit ? "#f87171" : "rgba(255,255,255,0.4)" }}>
-            {text.length.toLocaleString()} / {MAX_CHARS.toLocaleString()} {t("audio.characters", "characters")}
+            {text.length} / {MAX_CHARS} {t("audio.characters", "characters")}
           </span>
-          {overLimit && (
+          {overLimit ? (
             <span style={{ color: "#f87171", fontWeight: 600 }}>
               {t("audio.overLimit", "Over the character limit")}
             </span>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -230,79 +270,80 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
           onClick={handleGenerate}
           disabled={!canSubmit}
           style={{
-            padding: "14px 36px", borderRadius: 999,
+            padding: "14px 36px",
+            borderRadius: 999,
             background: canSubmit ? GOLD : "rgba(255,255,255,0.06)",
             color: canSubmit ? "#000" : "rgba(255,255,255,0.3)",
-            border: "none", fontSize: 15, fontWeight: 800,
+            border: "none",
+            fontSize: 15,
+            fontWeight: 800,
             cursor: canSubmit ? "pointer" : "not-allowed",
-            transition: "all 0.15s",
-            boxShadow: canSubmit ? "0 6px 24px rgba(255,195,0,0.25)" : "none",
             minWidth: 220,
           }}
-          onMouseEnter={(e) => { if (canSubmit) e.currentTarget.style.transform = "translateY(-2px)"; }}
-          onMouseLeave={(e) => { if (canSubmit) e.currentTarget.style.transform = "translateY(0)"; }}
         >
           {loading ? t("audio.generating", "Generating...") : t("audio.generate", "Generate audio")}
         </button>
       </div>
 
-      {error && (
-        <div style={{
-          background: "rgba(239,68,68,0.08)",
-          border: "1px solid rgba(239,68,68,0.3)",
-          borderRadius: 14, padding: "14px 18px", marginBottom: 20,
-        }}>
+      {error ? (
+        <div
+          style={{
+            background: "rgba(239,68,68,0.08)",
+            border: "1px solid rgba(239,68,68,0.3)",
+            borderRadius: 14,
+            padding: "14px 18px",
+            marginBottom: 20,
+          }}
+        >
           <div style={{ fontSize: 13, fontWeight: 700, color: "#f87171", marginBottom: 4 }}>
             {t("audio.error", "Generation failed")}
           </div>
           <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
             {error.message}
           </div>
-          {typeof error.remaining === "number" && typeof error.monthlyLimit === "number" && (
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 6 }}>
-              {t("audio.remaining", "Remaining")}: {error.remaining} / {error.monthlyLimit}
-            </div>
-          )}
         </div>
-      )}
+      ) : null}
 
-      {result && (
-        <div style={{
-          background: "rgba(255,195,0,0.04)",
-          border: "1px solid rgba(255,195,0,0.25)",
-          borderRadius: 16, padding: 20, marginBottom: 20,
-        }}>
+      {result ? (
+        <div
+          style={{
+            background: "rgba(255,195,0,0.04)",
+            border: "1px solid rgba(255,195,0,0.25)",
+            borderRadius: 16,
+            padding: 20,
+            marginBottom: 20,
+          }}
+        >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: GOLD, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                 {result.cached ? t("audio.servedFromCache", "Served from cache") : t("audio.justGenerated", "Just generated")}
               </div>
-              {selectedVoice && (
+              {selectedVoice ? (
                 <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", marginTop: 4 }}>
-                  {LOCALE_LABELS[selectedVoice.locale].flag} {selectedVoice.name}
+                  {selectedVoice.name}
                 </div>
-              )}
+              ) : null}
             </div>
-            
-              href={result.audioUrl}
-              download="signalboost-audio.mp3"
+            <button
+              onClick={handleDownload}
               style={{
-                padding: "8px 18px", borderRadius: 999,
-                background: "rgba(255,195,0,0.15)", color: GOLD,
-                fontSize: 12, fontWeight: 700,
-                textDecoration: "none", border: "1px solid rgba(255,195,0,0.3)",
+                padding: "8px 18px",
+                borderRadius: 999,
+                background: "rgba(255,195,0,0.15)",
+                color: GOLD,
+                fontSize: 12,
+                fontWeight: 700,
+                border: "1px solid rgba(255,195,0,0.3)",
+                cursor: "pointer",
               }}
             >
               {t("audio.download", "Download")}
-            </a>
+            </button>
           </div>
-          <audio
-            controls
-            src={result.audioUrl}
-            style={{ width: "100%", borderRadius: 8 }}
-          />
+          <audio controls src={result.audioUrl} style={{ width: "100%", borderRadius: 8 }} />
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

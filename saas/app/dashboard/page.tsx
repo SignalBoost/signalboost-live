@@ -40,7 +40,7 @@ export default function DashboardOverviewPage() {
   const [isNewUser, setIsNewUser] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
   const [plan, setPlan] = useState('free')
-  const [projectLimit, setProjectLimit] = useState(3)
+  const [projectLimit, setProjectLimit] = useState(1)
   const [hoveredAction, setHoveredAction] = useState<string | null>(null)
   const [showNewProject, setShowNewProject] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
@@ -241,7 +241,6 @@ export default function DashboardOverviewPage() {
           </button>
         </div>
 
-        {/* Suggested prompts */}
         {!promptOpen && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {promptSuggestions.map(q => (
@@ -255,7 +254,6 @@ export default function DashboardOverviewPage() {
           </div>
         )}
 
-        {/* Conversation */}
         {promptOpen && promptMessages.length > 0 && (
           <div ref={promptRef} style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {promptMessages.map((msg, i) => (
@@ -288,95 +286,37 @@ export default function DashboardOverviewPage() {
         )}
       </div>
 
-      {/* Feedback banner */}
-      <div style={{ background: 'rgba(255,195,0,0.06)', border: '1px solid rgba(255,195,0,0.2)', borderRadius: 14, padding: '14px 20px', marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 20 }}>💬</span>
+      {/* 🥇 PRIMARY: PROJECTS (moved UP, prominent gold New Project / Upgrade button) */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: GOLD }}>We are always improving — your feedback is welcome!</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Share what you love, what is missing, or any suggestions. Luis reads every submission.</div>
-          </div>
-        </div>
-        <Link href="/dashboard/feedback" style={{ background: GOLD, color: '#000', fontWeight: 800, fontSize: 13, padding: '9px 22px', borderRadius: 999, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
-          Give feedback
-        </Link>
-      </div>
-
-      {/* Quick actions */}
-      <div style={{ marginBottom: 28 }}>
-        <h2 style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 14 }}>
-          Start a new project
-        </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-          {QUICK_ACTIONS.map(item => (
-            <div key={item.type}
-              onMouseEnter={() => setHoveredAction(item.type)}
-              onMouseLeave={() => setHoveredAction(null)}
-              onClick={() => atLimit
-                ? (setUpgradeMsg(`You have reached the ${projectLimit} project limit on the ${plan} plan.`), setShowUpgrade(true))
-                : tryCreate(item.type, `New ${item.label}`)
-              }
-              style={{
-                padding: '20px 16px',
-                background: hoveredAction === item.type ? BLUE_DIM : 'rgba(255,255,255,0.02)',
-                border: `1px solid ${atLimit ? 'rgba(239,68,68,0.2)' : hoveredAction === item.type ? BLUE_BORDER : 'rgba(255,255,255,0.06)'}`,
-                borderRadius: 14, cursor: 'pointer', transition: 'all 0.18s',
-                transform: hoveredAction === item.type ? 'translateY(-3px)' : 'translateY(0)',
-                boxShadow: hoveredAction === item.type ? '0 8px 32px rgba(59,130,246,0.2)' : 'none',
-                textAlign: 'center', position: 'relative',
-              }}>
-              {atLimit && hoveredAction === item.type && (
-                <div style={{ position: 'absolute', top: -8, left: '50%', transform: 'translateX(-50%)', background: '#ef4444', color: '#fff', fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 999, whiteSpace: 'nowrap' }}>
-                  LIMIT REACHED
-                </div>
-              )}
-              <span style={{ fontSize: 28, display: 'block', marginBottom: 10 }}>{item.icon}</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: hoveredAction === item.type ? '#fff' : 'rgba(255,255,255,0.7)', display: 'block', marginBottom: 6 }}>
-                {item.label}
-              </span>
-              {hoveredAction === item.type && (
-                <span style={{ fontSize: 10, color: atLimit ? '#f87171' : BLUE, fontWeight: 600 }}>
-                  {atLimit ? 'Upgrade to add more' : 'Click to create project'}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Projects */}
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <div>
-            <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: BLUE }}>{projectsTitle}</h2>
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>
-              {projects.length === 0 ? 'Click a tool above to create your first project' : 'Click any project to continue working'}
+            <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, letterSpacing: '-0.01em' }}>{projectsTitle}</h2>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
+              {projects.length === 0 ? 'Click below to create your first project' : 'Click any project to continue working'}
             </p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 11, color: atLimit ? '#f87171' : 'rgba(255,255,255,0.35)', marginBottom: 4 }}>
+              <div style={{ fontSize: 11, color: atLimit ? '#f87171' : 'rgba(255,255,255,0.4)', marginBottom: 4 }}>
                 {projects.length} / {projectLimit === 999 ? 'unlimited' : projectLimit} projects
               </div>
               <div style={{ width: 100, height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 999 }}>
                 <div style={{ width: `${usagePercent}%`, height: '100%', background: atLimit ? '#ef4444' : BLUE, borderRadius: 999, transition: 'width 0.3s' }} />
               </div>
             </div>
-            <button onClick={() => atLimit ? (setUpgradeMsg(`You have reached the ${projectLimit} project limit.`), setShowUpgrade(true)) : setShowNewProject(true)}
-              style={{ background: atLimit ? 'rgba(239,68,68,0.15)' : BLUE, color: atLimit ? '#f87171' : '#fff', fontWeight: 800, fontSize: 12, padding: '8px 18px', borderRadius: 999, border: atLimit ? '1px solid rgba(239,68,68,0.3)' : 'none', cursor: 'pointer' }}>
-              {atLimit ? 'Limit reached' : '+ New project'}
-            </button>
+            {atLimit ? (
+              <Link href="/pricing"
+                style={{ background: GOLD, color: '#000', fontWeight: 800, fontSize: 14, padding: '12px 24px', borderRadius: 999, textDecoration: 'none', boxShadow: '0 4px 20px rgba(255,195,0,0.25)' }}>
+                ⬆ Upgrade to add more
+              </Link>
+            ) : (
+              <button onClick={() => setShowNewProject(true)}
+                style={{ background: GOLD, color: '#000', fontWeight: 800, fontSize: 14, padding: '12px 24px', borderRadius: 999, border: 'none', cursor: 'pointer', boxShadow: '0 4px 20px rgba(255,195,0,0.25)' }}>
+                + New project
+              </button>
+            )}
           </div>
         </div>
-
-        {atLimit && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 12, padding: '12px 18px', marginBottom: 16 }}>
-            <div style={{ fontSize: 13, color: 'rgba(255,100,100,0.9)' }}>
-              You have reached the <strong>{projectLimit}-project limit</strong> on the <strong>{plan}</strong> plan.
-            </div>
-            <Link href="/pricing" style={{ color: GOLD, fontWeight: 700, textDecoration: 'none', fontSize: 13, whiteSpace: 'nowrap', marginLeft: 16 }}>Upgrade now</Link>
-          </div>
-        )}
 
         {showNewProject && (
           <div style={{ background: 'rgba(59,130,246,0.05)', border: `1px solid ${BLUE_BORDER}`, borderRadius: 16, padding: '20px', marginBottom: 20 }}>
@@ -411,11 +351,20 @@ export default function DashboardOverviewPage() {
           </div>
         )}
 
+        {atLimit && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 12, padding: '12px 18px', marginBottom: 16 }}>
+            <div style={{ fontSize: 13, color: 'rgba(255,100,100,0.9)' }}>
+              You have reached the <strong>{projectLimit}-project limit</strong> on the <strong>{plan}</strong> plan.
+            </div>
+            <Link href="/pricing" style={{ color: GOLD, fontWeight: 700, textDecoration: 'none', fontSize: 13, whiteSpace: 'nowrap', marginLeft: 16 }}>Upgrade now</Link>
+          </div>
+        )}
+
         {projects.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 0', background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 20 }}>
             <div style={{ fontSize: 36, marginBottom: 10 }}>📁</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', marginBottom: 6 }}>No projects yet</div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>Click a tool above to get started instantly</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>Click + New project above to get started</div>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
@@ -461,6 +410,36 @@ export default function DashboardOverviewPage() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* 🥈 SECONDARY: Quick actions (subtle outlined, demoted from gold tiles) */}
+      <div style={{ marginBottom: 28 }}>
+        <h2 style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 14 }}>
+          Or start with a tool
+        </h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+          {QUICK_ACTIONS.map(item => (
+            <div key={item.type}
+              onMouseEnter={() => setHoveredAction(item.type)}
+              onMouseLeave={() => setHoveredAction(null)}
+              onClick={() => atLimit
+                ? (setUpgradeMsg(`You have reached the ${projectLimit} project limit on the ${plan} plan.`), setShowUpgrade(true))
+                : tryCreate(item.type, `New ${item.label}`)
+              }
+              style={{
+                padding: '14px 14px',
+                background: hoveredAction === item.type ? BLUE_DIM : 'rgba(255,255,255,0.02)',
+                border: `1px solid ${atLimit ? 'rgba(239,68,68,0.2)' : hoveredAction === item.type ? BLUE_BORDER : 'rgba(255,255,255,0.06)'}`,
+                borderRadius: 12, cursor: 'pointer', transition: 'all 0.18s',
+                display: 'flex', alignItems: 'center', gap: 12,
+              }}>
+              <span style={{ fontSize: 22 }}>{item.icon}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: hoveredAction === item.type ? '#fff' : 'rgba(255,255,255,0.65)' }}>
+                {item.label}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Stats */}
@@ -513,10 +492,16 @@ export default function DashboardOverviewPage() {
       </div>
 
       {/* Team */}
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: '24px' }}>
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: '24px', marginBottom: 20 }}>
         <h2 style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 20 }}>Team members</h2>
         {userId ? <TeamManager userId={userId} /> : <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>Loading team...</p>}
       </div>
+
+      {/* 🥉 TERTIARY: Feedback footer (demoted from gold banner to thin subtle strip) */}
+      <Link href="/dashboard/feedback"
+        style={{ display: 'block', textAlign: 'center', padding: '14px', background: 'rgba(255,195,0,0.04)', border: '1px solid rgba(255,195,0,0.15)', borderRadius: 12, textDecoration: 'none', color: 'rgba(255,195,0,0.7)', fontSize: 12, fontWeight: 600 }}>
+        💬 Found a bug or have a suggestion? Share your feedback — Luis reads every one
+      </Link>
 
     </div>
   )

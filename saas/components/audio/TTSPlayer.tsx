@@ -28,13 +28,14 @@ interface Props {
 
 export function TTSPlayer({ initialLocale = "en" }: Props) {
   const { t } = useTranslation();
-  const { generate, loading, error, result } = useTTS();
+  const { generate, loading, error, result, reset } = useTTS();
 
   const [text, setText] = useState("");
   const [localeFilter, setLocaleFilter] = useState<string>(initialLocale);
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>("");
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const langDropdownRef = useRef<HTMLDivElement>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -57,6 +58,13 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
     }
   }, [visibleVoices, selectedVoiceId]);
 
+  // Auto-scroll to result card when generated
+  useEffect(() => {
+    if (result && resultRef.current) {
+      resultRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [result]);
+
   const selectedVoice = useMemo(
     () => CURATED_VOICES.find((v) => v.id === selectedVoiceId),
     [selectedVoiceId]
@@ -68,6 +76,11 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
   const handleGenerate = async () => {
     if (!canSubmit) return;
     await generate(text.trim(), selectedVoiceId);
+  };
+
+  const handleClearText = () => {
+    setText("");
+    reset();
   };
 
   const handleDownload = () => {
@@ -84,6 +97,7 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
 
   return (
     <div style={{ color: "#fff", fontFamily: "system-ui" }}>
+      {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28, gap: 16 }}>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 900, letterSpacing: "-0.02em", margin: "0 0 6px" }}>
@@ -116,7 +130,7 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
             <span style={{ fontSize: 10, opacity: 0.6 }}>v</span>
           </button>
 
-          {langDropdownOpen && (
+          {langDropdownOpen ? (
             <div
               style={{
                 position: "absolute",
@@ -164,186 +178,5 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
                 );
               })}
             </div>
-          )}
-        </div>
-      </div>
-
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }}>
-          <h2 style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.08em", textTransform: "uppercase", margin: 0 }}>
-            {t("audio.pickVoice", "Pick a voice")}
-          </h2>
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>
-            {visibleVoices.length} {t("audio.voicesAvailable", "available")}
-          </span>
-        </div>
-
-        {visibleVoices.length === 0 ? (
-          <div
-            style={{
-              padding: 24,
-              background: "rgba(255,255,255,0.02)",
-              border: "1px dashed rgba(255,255,255,0.1)",
-              borderRadius: 14,
-              textAlign: "center",
-              color: "rgba(255,255,255,0.4)",
-              fontSize: 13,
-            }}
-          >
-            {t("audio.noVoices", "No voices available for this language.")}
-          </div>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
-            {visibleVoices.map((v) => {
-              const selected = selectedVoiceId === v.id;
-              const flag = LOCALE_LABELS[v.locale]?.flag || "";
-              const description = t(v.descriptionKey, v.descriptionFallback);
-              return (
-                <button
-                  key={v.id}
-                  onClick={() => setSelectedVoiceId(v.id)}
-                  style={{
-                    padding: "16px",
-                    background: selected ? "rgba(59,130,246,0.12)" : "rgba(255,255,255,0.02)",
-                    border: "1px solid " + (selected ? "rgba(59,130,246,0.5)" : "rgba(255,255,255,0.07)"),
-                    borderRadius: 14,
-                    cursor: "pointer",
-                    textAlign: "left",
-                    color: "#fff",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, opacity: 0.7, minWidth: 24 }}>{flag}</span>
-                    <span style={{ fontSize: 15, fontWeight: 700 }}>{v.name}</span>
-                  </div>
-                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>
-                    {description}
-                  </div>
-                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginTop: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                    {v.gender}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
-          {t("audio.yourText", "Your text")}
-        </h2>
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder={t("audio.textPlaceholder", "Type or paste what you want to say...")}
-          rows={5}
-          style={{
-            width: "100%",
-            padding: "14px 16px",
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: 14,
-            color: "#fff",
-            fontSize: 14,
-            lineHeight: 1.6,
-            fontFamily: "inherit",
-            outline: "none",
-            resize: "vertical",
-            boxSizing: "border-box",
-          }}
-        />
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 11 }}>
-          <span style={{ color: overLimit ? "#f87171" : "rgba(255,255,255,0.4)" }}>
-            {text.length} / {MAX_CHARS} {t("audio.characters", "characters")}
-          </span>
-          {overLimit ? (
-            <span style={{ color: "#f87171", fontWeight: 600 }}>
-              {t("audio.overLimit", "Over the character limit")}
-            </span>
           ) : null}
         </div>
-      </div>
-
-      <div style={{ display: "flex", justifyContent: "center", marginBottom: 28 }}>
-        <button
-          onClick={handleGenerate}
-          disabled={!canSubmit}
-          style={{
-            padding: "14px 36px",
-            borderRadius: 999,
-            background: canSubmit ? GOLD : "rgba(255,255,255,0.06)",
-            color: canSubmit ? "#000" : "rgba(255,255,255,0.3)",
-            border: "none",
-            fontSize: 15,
-            fontWeight: 800,
-            cursor: canSubmit ? "pointer" : "not-allowed",
-            minWidth: 220,
-          }}
-        >
-          {loading ? t("audio.generating", "Generating...") : t("audio.generate", "Generate audio")}
-        </button>
-      </div>
-
-      {error ? (
-        <div
-          style={{
-            background: "rgba(239,68,68,0.08)",
-            border: "1px solid rgba(239,68,68,0.3)",
-            borderRadius: 14,
-            padding: "14px 18px",
-            marginBottom: 20,
-          }}
-        >
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#f87171", marginBottom: 4 }}>
-            {t("audio.error", "Generation failed")}
-          </div>
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
-            {error.message}
-          </div>
-        </div>
-      ) : null}
-
-      {result ? (
-        <div
-          style={{
-            background: "rgba(255,195,0,0.04)",
-            border: "1px solid rgba(255,195,0,0.25)",
-            borderRadius: 16,
-            padding: 20,
-            marginBottom: 20,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: GOLD, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                {result.cached ? t("audio.servedFromCache", "Served from cache") : t("audio.justGenerated", "Just generated")}
-              </div>
-              {selectedVoice ? (
-                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", marginTop: 4 }}>
-                  {selectedVoice.name}
-                </div>
-              ) : null}
-            </div>
-            <button
-              onClick={handleDownload}
-              style={{
-                padding: "8px 18px",
-                borderRadius: 999,
-                background: "rgba(255,195,0,0.15)",
-                color: GOLD,
-                fontSize: 12,
-                fontWeight: 700,
-                border: "1px solid rgba(255,195,0,0.3)",
-                cursor: "pointer",
-              }}
-            >
-              {t("audio.download", "Download")}
-            </button>
-          </div>
-          <audio controls src={result.audioUrl} style={{ width: "100%", borderRadius: 8 }} />
-        </div>
-      ) : null}
-    </div>
-  );
-}

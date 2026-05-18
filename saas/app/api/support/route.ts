@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server'
 
 const SIGNALBOOST_KNOWLEDGE = `
@@ -72,6 +71,8 @@ CURRENT USER CONTEXT (do not ask user to repeat this):
     })
 
     if (!response.ok) {
+      const errorBody = await response.text()
+      console.error('Anthropic API error:', response.status, errorBody)
       return NextResponse.json({
         reply: 'I am having trouble connecting. Please email cadomos@gmail.com and Luis will help you personally.'
       })

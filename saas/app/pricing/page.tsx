@@ -4,9 +4,9 @@ import { useState } from 'react'
 const INDIVIDUAL_PLANS = [
   {
     index: 0, name: 'Free', plan: 'free',
-    description: 'Try SignalBoost with no commitment.',
-    features: ['1 website', '1 language', 'Review collector (basic)', 'SignalBoost watermark', 'Community support'],
-    cta: 'Start free', highlight: false, seats: '1 user', price: 'Free',
+    description: 'Sketch your idea. See SignalBoost in action before you commit.',
+    features: ['Sketch 1 website (preview only)', 'Sample native audio', 'Test review collector (up to 3 reviews)', 'SignalBoost watermark on outputs', 'Community support'],
+    cta: 'Start sketching', highlight: false, seats: '1 user', price: 'Free',
   },
   {
     index: 1, name: 'Starter', plan: 'starter',

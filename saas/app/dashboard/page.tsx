@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import TeamManager from '@/components/TeamManager'
+import AuthModal from '@/components/AuthModal'
 import { supabase } from '@/utils/supabase/client'
 import { getProjects, createProject, canCreateProject, deleteProject, updateProjectStatus, TYPE_ICONS, STATUS_COLORS, Project } from '@/lib/projects'
 import { getGreetingForUser } from '@/lib/cultural-calendar'
@@ -39,6 +40,7 @@ export default function DashboardOverviewPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [firstName, setFirstName] = useState<string | null>(null)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [authChecked, setAuthChecked] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
   const [projectsLoaded, setProjectsLoaded] = useState(false)
   const [plan, setPlan] = useState('free')
@@ -81,6 +83,7 @@ export default function DashboardOverviewPage() {
         setIsLoggedIn(false)
         setProjectsLoaded(true)
       }
+      setAuthChecked(true)
     })
   }, [])
 
@@ -171,8 +174,12 @@ export default function DashboardOverviewPage() {
   // Hide the greeting once the user engages with the prompt — fades out smoothly.
   const greetingHidden = hasTyped || promptMessages.length > 0
 
+  // Logged-out users see the auth modal on top of the dashboard layout.
+  // We darken the dashboard behind, then AuthModal renders on top.
+  const showLoginGate = authChecked && !isLoggedIn
+
   return (
-    <div style={{ color: '#fff', fontFamily: 'system-ui' }}>
+    <div style={{ color: '#fff', fontFamily: 'system-ui', position: 'relative' }}>
 
       <style>{`
         @keyframes shimmer {
@@ -184,6 +191,20 @@ export default function DashboardOverviewPage() {
           to   { opacity: 1; transform: translateY(0); }
         }
       `}</style>
+
+      {/* LOGIN GATE — appears for logged-out visitors who hit /dashboard directly.
+          Shows the existing AuthModal; on success it redirects back to /dashboard. */}
+      {showLoginGate && (
+        <AuthModal onClose={() => { /* gate cannot be dismissed without logging in */ }} />
+      )}
+
+      {/* Dim the dashboard content while the gate is open */}
+      <div style={{
+        opacity: showLoginGate ? 0.2 : 1,
+        pointerEvents: showLoginGate ? 'none' : 'auto',
+        filter: showLoginGate ? 'blur(2px)' : 'none',
+        transition: 'opacity 0.3s ease, filter 0.3s ease',
+      }}>
 
       {/* Upgrade modal */}
       {showUpgrade && (
@@ -202,9 +223,7 @@ export default function DashboardOverviewPage() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* GREETING + AI PROMPT */}
+      )}{/* GREETING + AI PROMPT */}
       <div style={{ marginBottom: 28, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: '28px 28px 24px' }}>
         <div style={{
           overflow: 'hidden',
@@ -509,10 +528,11 @@ export default function DashboardOverviewPage() {
 
       {/* TERTIARY: Feedback footer */}
       <Link href="/dashboard/feedback"
-        style={{ display: 'block', textAlign: 'center', padding: '14px', background: 'rgba(255,195,0,0.04)', border: '1px solid rgba(255,195,0,0.15)', borderRadius: 12, textDecoration: 'none', color: 'rgba(255,195,0,0.7)', fontSize: 12, fontWeight: 600 }}>
+        style={{ display: 'block', textAlign: 'center', padding: '14px', background: 'rgba(255,195,0,0.04)', border: '1px solid rgba(255,255,195,0.15)', borderRadius: 12, textDecoration: 'none', color: 'rgba(255,195,0,0.7)', fontSize: 12, fontWeight: 600 }}>
         💬 Found a bug or have a suggestion? Share your feedback — Luis reads every one
       </Link>
 
+      </div>
     </div>
   )
 }

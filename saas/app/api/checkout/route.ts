@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
 const PRICE_IDS: Record<string, string> = {
   starter:  process.env.STRIPE_PRICE_STARTER  as string,
@@ -11,25 +12,47 @@ export async function POST(req: NextRequest) {
   try {
     const { plan } = await req.json()
     const priceId = PRICE_IDS[plan]
-
     if (!priceId) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
     }
 
-    // Get the current user from Supabase auth
-    const supabase = createClient(
+    // Read the logged-in user from Supabase cookies (Next.js SSR pattern)
+    const cookieStore = await cookies()
+    const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll()
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              )
+            } catch {
+              // Called from a Server Component — safe to ignore
+            }
+          },
+        },
+      }
     )
 
-    const authHeader = req.headers.get('authorization') || ''
-    const token = authHeader.replace('Bearer ', '')
-    let userId = ''
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-    if (token) {
-      const { data } = await supabase.auth.getUser(token)
-      userId = data?.user?.id || ''
+    if (authError || !user?.id) {
+      console.error('Checkout: no authenticated user', authError?.message)
+      return NextResponse.json(
+        { error: 'You must be signed in to subscribe.' },
+        { status: 401 }
+      )
     }
+
+    const userId = user.id
+    const userEmail = user.email || ''
+
+    console.log('Checkout: creating session for', { userId, plan, priceId })
 
     const params: Record<string, string> = {
       mode:                          'subscription',
@@ -41,16 +64,20 @@ export async function POST(req: NextRequest) {
       'metadata[userId]':            userId,
       'metadata[priceId]':           priceId,
       'metadata[plan]':              plan,
+      // Attach the userId to the subscription too, so future subscription events have it
+      'subscription_data[metadata][userId]':  userId,
+      'subscription_data[metadata][priceId]': priceId,
+      'subscription_data[metadata][plan]':    plan,
+    }
+
+    // Pre-fill the email on the Stripe Checkout form for a smoother UX
+    if (userEmail) {
+      params['customer_email'] = userEmail
     }
 
     // Only add trial for Starter plan
     if (plan === 'starter') {
       params['subscription_data[trial_period_days]'] = '30'
-      params['subscription_data[metadata][userId]']  = userId
-      params['subscription_data[metadata][priceId]'] = priceId
-    } else {
-      params['subscription_data[metadata][userId]']  = userId
-      params['subscription_data[metadata][priceId]'] = priceId
     }
 
     const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
@@ -65,13 +92,19 @@ export async function POST(req: NextRequest) {
     const session = await stripeRes.json()
 
     if (!stripeRes.ok) {
-      return NextResponse.json({ error: session.error?.message }, { status: 400 })
+      console.error('Stripe checkout creation failed', session.error)
+      return NextResponse.json(
+        { error: session.error?.message || 'Stripe error' },
+        { status: 400 }
+      )
     }
 
-    return NextResponse.json({ url: session.url })
+    console.log('Checkout: session created', session.id)
 
+    return NextResponse.json({ url: session.url })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
+    console.error('Checkout route error:', message)
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

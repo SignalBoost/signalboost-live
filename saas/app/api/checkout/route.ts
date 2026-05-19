@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-
 const PRICE_IDS: Record<string, string> = {
   starter:  process.env.STRIPE_PRICE_STARTER  as string,
   pro:      process.env.STRIPE_PRICE_PRO      as string,
   business: process.env.STRIPE_PRICE_BUSINESS as string,
 }
-
 export async function POST(req: NextRequest) {
   try {
     const { plan } = await req.json()
@@ -15,7 +13,6 @@ export async function POST(req: NextRequest) {
     if (!priceId) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
     }
-
     // Read the logged-in user from Supabase cookies (Next.js SSR pattern)
     const cookieStore = await cookies()
     const supabase = createServerClient(
@@ -38,9 +35,7 @@ export async function POST(req: NextRequest) {
         },
       }
     )
-
     const { data: { user }, error: authError } = await supabase.auth.getUser()
-
     if (authError || !user?.id) {
       console.error('Checkout: no authenticated user', authError?.message)
       return NextResponse.json(
@@ -48,12 +43,9 @@ export async function POST(req: NextRequest) {
         { status: 401 }
       )
     }
-
     const userId = user.id
     const userEmail = user.email || ''
-
     console.log('Checkout: creating session for', { userId, plan, priceId })
-
     const params: Record<string, string> = {
       mode:                          'subscription',
       'payment_method_types[0]':     'card',
@@ -69,17 +61,10 @@ export async function POST(req: NextRequest) {
       'subscription_data[metadata][priceId]': priceId,
       'subscription_data[metadata][plan]':    plan,
     }
-
     // Pre-fill the email on the Stripe Checkout form for a smoother UX
     if (userEmail) {
       params['customer_email'] = userEmail
     }
-
-    // Only add trial for Starter plan
-    if (plan === 'starter') {
-      params['subscription_data[trial_period_days]'] = '30'
-    }
-
     const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
       headers: {
@@ -88,9 +73,7 @@ export async function POST(req: NextRequest) {
       },
       body: new URLSearchParams(params).toString(),
     })
-
     const session = await stripeRes.json()
-
     if (!stripeRes.ok) {
       console.error('Stripe checkout creation failed', session.error)
       return NextResponse.json(
@@ -98,9 +81,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       )
     }
-
     console.log('Checkout: session created', session.id)
-
     return NextResponse.json({ url: session.url })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'

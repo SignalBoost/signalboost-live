@@ -1,40 +1,132 @@
 'use client'
-import { useState, useEffect } from 'react'
+
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/utils/supabase/client'
 
 const BLUE = '#3b82f6'
 const GOLD = '#ffc300'
+const GREEN = '#4ade80'
+const RED = '#f87171'
 
 type Review = {
   id: string
-  author: string
+  author_name: string
+  author_email: string
   rating: number
   content: string
   language: string
-  date: string
   approved: boolean
+  created_at: string
 }
 
-const SAMPLE_REVIEWS: Review[] = [
-  { id: '1', author: 'Maria S.', rating: 5, content: 'Excellent service! Very professional and fast.', language: 'English', date: '2026-05-10', approved: true },
-  { id: '2', author: 'João P.', rating: 5, content: 'Serviço excelente! Muito profissional e rápido.', language: 'Português', date: '2026-05-09', approved: true },
-  { id: '3', author: 'Carlos M.', rating: 4, content: 'Muy buen servicio, lo recomiendo totalmente.', language: 'Español', date: '2026-05-08', approved: false },
-]
+type SlugState =
+  | { kind: 'loading' }
+  | { kind: 'none' }
+  | { kind: 'set', slug: string }
 
 export default function ReviewsPage() {
   const [tab, setTab] = useState<'overview' | 'collect' | 'manage' | 'widget'>('overview')
-  const [reviews, setReviews] = useState<Review[]>(SAMPLE_REVIEWS)
-  const [copied, setCopied] = useState(false)
-  const [userId, setUserId] = useState('')
 
+  const [reviews, setReviews] = useState<Review[]>([])
+  const [reviewsLoading, setReviewsLoading] = useState(true)
+  const [reviewsError, setReviewsError] = useState<string | null>(null)
+
+  const [slug, setSlug] = useState<SlugState>({ kind: 'loading' })
+  const [slugDraft, setSlugDraft] = useState('')
+  const [slugSaving, setSlugSaving] = useState(false)
+  const [slugError, setSlugError] = useState<string | null>(null)
+
+  const [copied, setCopied] = useState(false)
+
+  // Load slug
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data?.user) setUserId(data.user.id)
-    })
+    let cancelled = false
+    fetch('/api/profile/slug')
+      .then(r => r.json())
+      .then(j => {
+        if (cancelled) return
+        if (j?.slug) setSlug({ kind: 'set', slug: j.slug })
+        else setSlug({ kind: 'none' })
+      })
+      .catch(() => { if (!cancelled) setSlug({ kind: 'none' }) })
+    return () => { cancelled = true }
   }, [])
 
-  const reviewLink = `https://saas.signalboostapp.com/review/${userId || 'your-id'}`
-  const widgetCode = `<script src="https://saas.signalboostapp.com/widget.js" data-id="${userId || 'your-id'}"></script>`
+  // Load reviews
+  const loadReviews = useCallback(async () => {
+    setReviewsLoading(true)
+    setReviewsError(null)
+    try {
+      const res = await fetch('/api/reviews')
+      if (res.status === 401) {
+        setReviewsError('Please sign in to see your reviews.')
+        setReviews([])
+        return
+      }
+      const j = await res.json()
+      if (!res.ok) {
+        setReviewsError(j?.error || 'Could not load reviews.')
+        return
+      }
+      setReviews(j.reviews ?? [])
+    } catch {
+      setReviewsError('Could not load reviews.')
+    } finally {
+      setReviewsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadReviews() }, [loadReviews])
+
+  async function saveSlug() {
+    const candidate = slugDraft.trim().toLowerCase()
+    if (!candidate) { setSlugError('Pick a slug to continue.'); return }
+    setSlugSaving(true)
+    setSlugError(null)
+    try {
+      const res = await fetch('/api/profile/slug', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: candidate }),
+      })
+      const j = await res.json()
+      if (!res.ok) { setSlugError(j?.error || 'Could not save slug.'); return }
+      setSlug({ kind: 'set', slug: j.slug })
+      setSlugDraft('')
+    } catch {
+      setSlugError('Could not save slug.')
+    } finally {
+      setSlugSaving(false)
+    }
+  }
+
+  async function toggleApprove(id: string, current: boolean) {
+    setReviews(prev => prev.map(r => r.id === id ? { ...r, approved: !current } : r))
+    try {
+      const res = await fetch(`/api/reviews?id=${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approved: !current }),
+      })
+      if (!res.ok) {
+        setReviews(prev => prev.map(r => r.id === id ? { ...r, approved: current } : r))
+      }
+    } catch {
+      setReviews(prev => prev.map(r => r.id === id ? { ...r, approved: current } : r))
+    }
+  }
+
+  async function deleteReview(id: string) {
+    if (!confirm('Delete this review? This cannot be undone.')) return
+    const snapshot = reviews
+    setReviews(prev => prev.filter(r => r.id !== id))
+    try {
+      const res = await fetch(`/api/reviews?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+      if (!res.ok) setReviews(snapshot)
+    } catch {
+      setReviews(snapshot)
+    }
+  }
 
   function copyToClipboard(text: string) {
     navigator.clipboard.writeText(text)
@@ -42,15 +134,19 @@ export default function ReviewsPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  function toggleApprove(id: string) {
-    setReviews(prev => prev.map(r => r.id === id ? { ...r, approved: !r.approved } : r))
-  }
+  const reviewLink = slug.kind === 'set'
+    ? `https://saas.signalboostapp.com/review/${slug.slug}`
+    : ''
 
-  function deleteReview(id: string) {
-    setReviews(prev => prev.filter(r => r.id !== id))
-  }
+  const approvedReviews = reviews.filter(r => r.approved)
+  const avgRating = approvedReviews.length
+    ? approvedReviews.reduce((sum, r) => sum + r.rating, 0) / approvedReviews.length
+    : 0
+  const uniqueLanguages = new Set(reviews.map(r => r.language)).size
 
-  const avgRating = reviews.filter(r => r.approved).reduce((sum, r) => sum + r.rating, 0) / (reviews.filter(r => r.approved).length || 1)
+  function fmtDate(iso: string): string {
+    try { return new Date(iso).toISOString().slice(0, 10) } catch { return '' }
+  }
 
   return (
     <div style={{ color: '#fff', fontFamily: 'system-ui' }}>
@@ -65,10 +161,10 @@ export default function ReviewsPage() {
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
         {[
-          { label: 'Total reviews', value: reviews.length.toString() },
-          { label: 'Approved', value: reviews.filter(r => r.approved).length.toString() },
-          { label: 'Avg rating', value: avgRating.toFixed(1) + ' ★' },
-          { label: 'Languages', value: [...new Set(reviews.map(r => r.language))].length.toString() },
+          { label: 'Total reviews', value: reviewsLoading ? '—' : reviews.length.toString() },
+          { label: 'Approved',      value: reviewsLoading ? '—' : approvedReviews.length.toString() },
+          { label: 'Avg rating',    value: reviewsLoading ? '—' : (approvedReviews.length ? avgRating.toFixed(1) + ' ★' : '—') },
+          { label: 'Languages',     value: reviewsLoading ? '—' : uniqueLanguages.toString() },
         ].map(stat => (
           <div key={stat.label} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '16px 20px' }}>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 8, fontWeight: 500 }}>{stat.label}</div>
@@ -92,60 +188,101 @@ export default function ReviewsPage() {
         ))}
       </div>
 
+      {reviewsError && (
+        <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 12, padding: '12px 16px', fontSize: 13, color: RED, marginBottom: 16 }}>
+          {reviewsError}
+        </div>
+      )}
+
       {/* Overview */}
       {tab === 'overview' && (
         <div>
           <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Recent reviews</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {reviews.filter(r => r.approved).map(review => (
-              <div key={review.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '18px 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700 }}>
-                      {review.author[0]}
+          {reviewsLoading ? (
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Loading…</div>
+          ) : approvedReviews.length === 0 ? (
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 14, padding: '32px 20px', textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
+              No approved reviews yet. Approved reviews from your customers will appear here.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {approvedReviews.map(review => (
+                <div key={review.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '18px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: '50%', background: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700 }}>
+                        {review.author_name[0]?.toUpperCase() || '?'}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>{review.author_name}</div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>{review.language} · {fmtDate(review.created_at)}</div>
+                      </div>
                     </div>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700 }}>{review.author}</div>
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>{review.language} · {review.date}</div>
-                    </div>
+                    <div style={{ fontSize: 16, color: GOLD }}>{'★'.repeat(review.rating)}<span style={{ color: 'rgba(255,255,255,0.15)' }}>{'★'.repeat(5 - review.rating)}</span></div>
                   </div>
-                  <div style={{ fontSize: 16 }}>{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</div>
+                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: 0 }}>{review.content}</p>
                 </div>
-                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: 0 }}>{review.content}</p>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {/* Collect */}
       {tab === 'collect' && (
         <div style={{ maxWidth: 560 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Your review link</h2>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 20 }}>Share this link with your customers. They can leave a review in their own language.</p>
-          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-            <span style={{ flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.7)', wordBreak: 'break-all' }}>{reviewLink}</span>
-            <button onClick={() => copyToClipboard(reviewLink)}
-              style={{ background: copied ? '#4ade80' : BLUE, color: '#fff', fontSize: 12, fontWeight: 700, padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
-              {copied ? 'Copied!' : 'Copy link'}
-            </button>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {[
-              { icon: '📧', label: 'Send by email', desc: 'Include in your follow-up emails' },
-              { icon: '📱', label: 'WhatsApp', desc: 'Share directly with customers' },
-              { icon: '🖨️', label: 'Print QR code', desc: 'Add to receipts or tables' },
-              { icon: '🌐', label: 'Add to website', desc: 'Use the embed widget' },
-            ].map(item => (
-              <div key={item.label} style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, cursor: 'pointer' }}
-                onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(59,130,246,0.3)')}
-                onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)')}>
-                <div style={{ fontSize: 24, marginBottom: 8 }}>{item.icon}</div>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{item.label}</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>{item.desc}</div>
+
+          {slug.kind === 'loading' && (
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 24 }}>Loading…</div>
+          )}
+
+          {slug.kind === 'none' && (
+            <div style={{ background: 'rgba(255,195,0,0.06)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 14, padding: '20px 22px', marginBottom: 24 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0, marginBottom: 8 }}>Choose your review handle</h2>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 14, lineHeight: 1.5 }}>
+                Your review page lives at <code style={{ background: 'rgba(0,0,0,0.3)', padding: '1px 6px', borderRadius: 4 }}>signalboostapp.com/review/<b>your-handle</b></code>. Pick anything you want — your name, your business, anything. 3–30 lowercase letters, digits, and hyphens.
+              </p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  type="text"
+                  value={slugDraft}
+                  onChange={e => setSlugDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  placeholder="acme-coffee"
+                  maxLength={30}
+                  style={{ flex: 1, background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 12px', color: '#fff', fontSize: 14, fontFamily: 'inherit' }}
+                />
+                <button
+                  onClick={saveSlug}
+                  disabled={slugSaving}
+                  style={{ background: BLUE, color: '#fff', fontSize: 13, fontWeight: 700, padding: '0 18px', borderRadius: 8, border: 'none', cursor: slugSaving ? 'wait' : 'pointer', opacity: slugSaving ? 0.6 : 1 }}
+                >
+                  {slugSaving ? 'Saving…' : 'Claim'}
+                </button>
               </div>
-            ))}
-          </div>
+              {slugError && (
+                <div style={{ fontSize: 12, color: RED, marginTop: 10 }}>{slugError}</div>
+              )}
+            </div>
+          )}
+
+          {slug.kind === 'set' && (
+            <>
+              <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Your review link</h2>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 20 }}>
+                Share this link with your customers. They can leave a review in their own language.
+              </p>
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <span style={{ flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.7)', wordBreak: 'break-all' }}>{reviewLink}</span>
+                <button onClick={() => copyToClipboard(reviewLink)}
+                  style={{ background: copied ? GREEN : BLUE, color: '#fff', fontSize: 12, fontWeight: 700, padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  {copied ? 'Copied!' : 'Copy link'}
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 20 }}>
+                Handle: <code style={{ background: 'rgba(255,255,255,0.04)', padding: '1px 6px', borderRadius: 4 }}>{slug.slug}</code>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -153,50 +290,54 @@ export default function ReviewsPage() {
       {tab === 'manage' && (
         <div>
           <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>All reviews</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {reviews.map(review => (
-              <div key={review.id} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${review.approved ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 14, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700 }}>{review.author}</span>
-                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>{review.language}</span>
-                    <span style={{ fontSize: 12 }}>{'★'.repeat(review.rating)}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: review.approved ? 'rgba(74,222,128,0.1)' : 'rgba(255,255,255,0.05)', color: review.approved ? '#4ade80' : 'rgba(255,255,255,0.4)' }}>
-                      {review.approved ? 'Approved' : 'Pending'}
-                    </span>
+          {reviewsLoading ? (
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Loading…</div>
+          ) : reviews.length === 0 ? (
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 14, padding: '32px 20px', textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
+              No reviews yet. Share your link from the Collect tab to start receiving reviews.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {reviews.map(review => (
+                <div key={review.id} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${review.approved ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 14, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 13, fontWeight: 700 }}>{review.author_name}</span>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>{review.language} · {fmtDate(review.created_at)}</span>
+                      <span style={{ fontSize: 12, color: GOLD }}>{'★'.repeat(review.rating)}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: review.approved ? 'rgba(74,222,128,0.1)' : 'rgba(255,255,255,0.05)', color: review.approved ? GREEN : 'rgba(255,255,255,0.4)' }}>
+                        {review.approved ? 'Approved' : 'Pending'}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', margin: 0, lineHeight: 1.5 }}>{review.content}</p>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 6 }}>{review.author_email}</div>
                   </div>
-                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', margin: 0, lineHeight: 1.5 }}>{review.content}</p>
+                  <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                    <button onClick={() => toggleApprove(review.id, review.approved)}
+                      style={{ padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', background: review.approved ? 'rgba(255,255,255,0.05)' : 'rgba(74,222,128,0.15)', color: review.approved ? 'rgba(255,255,255,0.5)' : GREEN }}>
+                      {review.approved ? 'Unpublish' : 'Approve'}
+                    </button>
+                    <button onClick={() => deleteReview(review.id)}
+                      style={{ padding: '7px 12px', borderRadius: 8, fontSize: 12, border: 'none', cursor: 'pointer', background: 'rgba(239,68,68,0.1)', color: RED }}>
+                      🗑
+                    </button>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                  <button onClick={() => toggleApprove(review.id)}
-                    style={{ padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', background: review.approved ? 'rgba(255,255,255,0.05)' : 'rgba(74,222,128,0.15)', color: review.approved ? 'rgba(255,255,255,0.5)' : '#4ade80' }}>
-                    {review.approved ? 'Unpublish' : 'Approve'}
-                  </button>
-                  <button onClick={() => deleteReview(review.id)}
-                    style={{ padding: '7px 12px', borderRadius: 8, fontSize: 12, border: 'none', cursor: 'pointer', background: 'rgba(239,68,68,0.1)', color: '#f87171' }}>
-                    🗑
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Widget */}
+      {/* Widget — honestly deferred */}
       {tab === 'widget' && (
         <div style={{ maxWidth: 560 }}>
           <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Embed on your website</h2>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 20 }}>Add this code to any website to display your reviews automatically.</p>
-          <div style={{ background: '#0a0a14', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '16px', marginBottom: 16, position: 'relative' }}>
-            <pre style={{ fontSize: 12, color: '#4ade80', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontFamily: 'monospace' }}>{widgetCode}</pre>
-            <button onClick={() => copyToClipboard(widgetCode)}
-              style={{ position: 'absolute', top: 12, right: 12, background: BLUE, color: '#fff', fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 6, border: 'none', cursor: 'pointer' }}>
-              Copy
-            </button>
-          </div>
-          <div style={{ background: 'rgba(255,195,0,0.06)', border: '1px solid rgba(255,195,0,0.2)', borderRadius: 12, padding: '14px 16px', fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
-            💡 Paste this code just before the closing &lt;/body&gt; tag on any page where you want reviews to appear. The widget automatically shows your approved reviews and updates in real time.
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 20 }}>
+            Drop a snippet on your site to display your approved reviews automatically.
+          </p>
+          <div style={{ background: 'rgba(255,195,0,0.06)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 12, padding: '18px 20px', fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
+            The embeddable widget isn't ready yet. For now, share your review link from the Collect tab and manage reviews from the Manage tab. The widget is on the roadmap.
           </div>
         </div>
       )}

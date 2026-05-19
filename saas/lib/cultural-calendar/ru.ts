@@ -1,7 +1,7 @@
 // saas/lib/cultural-calendar/ru.ts
 // Russian greetings - includes именины (name days), Russian holidays, day-of-week.
 
-import { GreetingContext, Greeting, pick, fill, inRange } from './helpers'
+import { GreetingContext, Greeting, pick, fill, inRange, timeOfDay } from './helpers'
 import { getRussianNamedaysForDate } from './ru-namedays'
 
 export function russianGreeting(now: Date, ctx: GreetingContext): Greeting {
@@ -182,37 +182,37 @@ export function russianGreeting(now: Date, ctx: GreetingContext): Greeting {
     }
   }
 
-  // DAY OF WEEK
-  if (dow === 6 || dow === 0) {
+  // ВРЕМЯ СУТОК — приветствие по местному времени пользователя
+  const tod = timeOfDay(now)
+  const weekendFlavor = (dow === 0 || dow === 6) ? ' Хороших выходных.' : ''
+  const mondayFlavor  = (dow === 1) ? ' Новая неделя началась.' : ''
+  const fridayFlavor  = (dow === 5) ? ' Скоро выходные.' : ''
+
+  if (tod === 'morning') {
     return {
-      headline: fill(pick(['Хороших выходных, {name}', 'Работаем в выходные, {name}?', 'С возвращением, {name}']), firstName),
-      subline:  pick(['Без спешки.', 'Рады Вас видеть.']),
+      headline: fill(pick(['Доброе утро, {name}', 'Доброе утро, {name}', 'С добрым утром, {name}']), firstName),
+      subline:  pick(['Готовы начать день?', 'Над чем работаем этим утром?', 'Надеюсь, Вы хорошо отдохнули.']) + mondayFlavor + weekendFlavor,
+      emoji: '☀️',
+    }
+  }
+  if (tod === 'afternoon') {
+    return {
+      headline: fill(pick(['Добрый день, {name}', 'Добрый день, {name}', 'С возвращением, {name}']), firstName),
+      subline:  pick(['Над чем сегодня работаем?', 'Надеюсь, день идёт хорошо.', 'Готов, когда Вы будете.']) + fridayFlavor + weekendFlavor,
       emoji: '👋',
     }
   }
-  if (dow === 1) {
+  if (tod === 'evening') {
     return {
-      headline: fill(pick(['С понедельником, {name}', 'Доброй недели, {name}', 'С возвращением, {name}']), firstName),
-      subline:  pick(['Новая неделя — новые возможности.', 'С чего начнём?']),
-      emoji: '☕',
+      headline: fill(pick(['Добрый вечер, {name}', 'Добрый вечер, {name}', 'С возвращением, {name}']), firstName),
+      subline:  pick(['Завершаете день или только начинаете?', 'Чем могу помочь сегодня вечером?', 'Рады, что зашли.']) + fridayFlavor,
+      emoji: '🌆',
     }
   }
-  if (dow === 5) {
-    return {
-      headline: fill(pick(['С пятницей, {name}', 'Наконец пятница, {name}', 'С возвращением, {name}']), firstName),
-      subline:  pick(['Скоро выходные.', 'Что хотите закончить до выходных?']),
-      emoji: '🌅',
-    }
-  }
-
-  // DEFAULT (Tue/Wed/Thu)
+  // ночь (22-04)
   return {
-    headline: fill(pick(['С возвращением, {name}', 'Рады видеть Вас, {name}', 'Здравствуйте, {name}']), firstName),
-    subline:  pick([
-      'Спросите меня о чём угодно или продолжайте работу.',
-      'Над чем сегодня работаем?',
-      'Готов, когда Вы будете.',
-    ]),
-    emoji: '👋',
+    headline: fill(pick(['Работаете допоздна, {name}?', 'Ещё не спите, {name}', 'Здравствуйте, {name}']), firstName),
+    subline:  pick(['Без осуждения. Что строим?', 'Лучшие идеи приходят ночью.', 'Я здесь, когда Вы готовы.']),
+    emoji: '🌙',
   }
 }

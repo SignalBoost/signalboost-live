@@ -62,7 +62,6 @@ export default function PricingPage() {
     }
     try {
       setLoading(plan)
-      // Get auth token to pass userId to checkout
       const { createClient } = await import('@supabase/supabase-js')
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -87,9 +86,7 @@ export default function PricingPage() {
     } finally {
       setLoading(null)
     }
-  }
-
-  return (
+  }return (
     <main style={{ minHeight: '100vh', background: '#0a0a0f', color: '#fff', fontFamily: 'system-ui' }}>
       <section style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 24px 80px' }}>
 
@@ -107,4 +104,65 @@ export default function PricingPage() {
             Prices shown in USD.
           </p>
 
-          <d
+          <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: 4, marginBottom: 16 }}>
+            {(['individual', 'team'] as const).map(t => (
+              <button key={t} onClick={() => setTab(t)}
+                style={{ padding: '7px 20px', borderRadius: 999, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', transition: 'all 0.2s', background: tab === t ? '#ffc300' : 'transparent', color: tab === t ? '#000' : 'rgba(255,255,255,0.5)' }}>
+                {t === 'individual' ? 'Individual' : 'Team & Enterprise'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${plans.length}, 1fr)`, gap: 16 }}>
+          {plans.map(plan => (
+            <div key={plan.name} style={{ background: plan.highlight ? 'rgba(255,195,0,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${plan.highlight ? 'rgba(255,195,0,0.4)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 20, padding: '28px 22px', display: 'flex', flexDirection: 'column', gap: 18, position: 'relative' }}>
+              {plan.highlight && (
+                <div style={{ position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)', background: '#ffc300', color: '#000', fontSize: 10, fontWeight: 800, padding: '3px 14px', borderRadius: 999, letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                  Most popular
+                </div>
+              )}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: plan.highlight ? '#ffc300' : 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{plan.name}</div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,195,0,0.7)', background: 'rgba(255,195,0,0.08)', border: '1px solid rgba(255,195,0,0.15)', borderRadius: 999, padding: '2px 8px' }}>{plan.seats}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                  <span style={{ fontSize: 40, fontWeight: 900, letterSpacing: '-0.03em' }}>{plan.price}</span>
+                  {plan.price !== 'Free' && plan.price !== 'Custom' && <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>/mo</span>}
+                </div>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', margin: '6px 0 0', lineHeight: 1.5 }}>{plan.description}</p>
+              </div>
+              <div>
+                <button onClick={() => handleCheckout(plan.plan)} disabled={loading === plan.plan}
+                  style={{ background: plan.highlight ? '#ffc300' : 'rgba(255,255,255,0.05)', color: plan.highlight ? '#000' : '#fff', border: `1px solid ${plan.highlight ? '#ffc300' : 'rgba(255,255,255,0.1)'}`, borderRadius: 999, padding: '11px 0', fontSize: 13, fontWeight: 800, cursor: loading === plan.plan ? 'wait' : 'pointer', width: '100%', opacity: loading === plan.plan ? 0.7 : 1 }}>
+                  {loading === plan.plan ? 'Loading...' : plan.cta}
+                </button>
+                <div style={{ textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 8 }}>Cancel anytime</div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                {plan.features.map(f => (
+                  <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>
+                    <span style={{ color: '#ffc300', flexShrink: 0, marginTop: 1 }}>✓</span>{f}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ textAlign: 'center', marginTop: 32, padding: '32px 28px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 20 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 10px' }}>Have questions about which plan is right for you?</h2>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, margin: '0 0 20px' }}>We are happy to help you choose the right plan for your business.</p>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button onClick={() => window.location.href = 'mailto:cadomos@gmail.com?subject=SignalBoost Sales Inquiry'}
+              style={{ background: '#ffc300', color: '#000', fontWeight: 800, fontSize: 13, padding: '11px 28px', borderRadius: 999, border: 'none', cursor: 'pointer' }}>
+              Contact sales
+            </button>
+          </div>
+        </div>
+
+      </section>
+    </main>
+  )
+}

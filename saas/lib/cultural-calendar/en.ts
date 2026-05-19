@@ -1,7 +1,7 @@
 // saas/lib/cultural-calendar/en.ts
 // English greetings + US federal holidays + day-of-week flavor.
 
-import { GreetingContext, Greeting, pick, fill, inRange, nthWeekdayOfMonth, lastWeekdayOfMonth } from './helpers'
+import { GreetingContext, Greeting, pick, fill, inRange, nthWeekdayOfMonth, lastWeekdayOfMonth, timeOfDay } from './helpers'
 
 export function englishGreeting(now: Date, ctx: GreetingContext): Greeting {
   const { firstName, isNewUser, isLoggedIn } = ctx
@@ -143,37 +143,38 @@ export function englishGreeting(now: Date, ctx: GreetingContext): Greeting {
     }
   }
 
-  // DAY OF WEEK
-  if (dow === 6 || dow === 0) {
+  // TIME OF DAY (default greeting for returning users)
+  // The hour comes from the user's browser, so it reflects their local time.
+  const tod = timeOfDay(now)
+  const weekendFlavor = (dow === 0 || dow === 6) ? ' Hope your weekend is going well.' : ''
+  const mondayFlavor  = (dow === 1) ? ' A new week ahead.' : ''
+  const fridayFlavor  = (dow === 5) ? ' Almost the weekend.' : ''
+
+  if (tod === 'morning') {
     return {
-      headline: fill(pick(['Hope your weekend is going well, {name}', 'Working on the weekend, {name}?', 'Welcome back, {name}']), firstName),
-      subline:  pick(['Whatever brings you here today, glad you are back.', 'No pressure, no rush.', 'Good to see you.']),
+      headline: fill(pick(['Good morning, {name}', 'Morning, {name}', 'Good morning, {name}']), firstName),
+      subline:  pick(['Ready to make today count?', 'What are we working on this morning?', 'Hope you slept well.']) + mondayFlavor + weekendFlavor,
+      emoji: '☀️',
+    }
+  }
+  if (tod === 'afternoon') {
+    return {
+      headline: fill(pick(['Good afternoon, {name}', 'Afternoon, {name}', 'Welcome back, {name}']), firstName),
+      subline:  pick(['What are we working on?', 'Hope your day is going well.', 'Ready when you are.']) + fridayFlavor + weekendFlavor,
       emoji: '👋',
     }
   }
-  if (dow === 1) {
+  if (tod === 'evening') {
     return {
-      headline: fill(pick(['Happy Monday, {name}', 'Welcome back, {name}', 'Fresh week, {name}']), firstName),
-      subline:  pick(['A new week of possibilities.', 'Hope your week is off to a good start.', 'Let us make this one count.']),
-      emoji: '☕',
+      headline: fill(pick(['Good evening, {name}', 'Evening, {name}', 'Welcome back, {name}']), firstName),
+      subline:  pick(['Winding down the day, or just getting started?', 'What can I help with tonight?', 'Glad you stopped by.']) + fridayFlavor,
+      emoji: '🌆',
     }
   }
-  if (dow === 5) {
-    return {
-      headline: fill(pick(['Happy Friday, {name}', 'Welcome back, {name}', 'Friday is here, {name}']), firstName),
-      subline:  pick(['Almost the weekend. What do you want to ship today?', 'Wrap something up before the weekend, or just check in.']),
-      emoji: '🌅',
-    }
-  }
-
-  // DEFAULT RETURNING (Tue/Wed/Thu)
+  // night (22-04)
   return {
-    headline: fill(pick(['Welcome back, {name}', 'Good to see you, {name}', 'Hey {name}', 'Back at it, {name}']), firstName),
-    subline:  pick([
-      'Good to see you again. Ask me anything or pick up where you left off.',
-      'What are we working on today?',
-      'Ready when you are.',
-    ]),
-    emoji: '👋',
+    headline: fill(pick(['Working late, {name}?', 'Still up, {name}', 'Hello, {name}']), firstName),
+    subline:  pick(['No judgment. What are we building?', 'Late nights are when the best ideas happen.', 'I am here whenever you are.']),
+    emoji: '🌙',
   }
 }

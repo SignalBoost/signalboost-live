@@ -85,7 +85,8 @@ export default function Navbar() {
     ...(user ? [] : [{ label: 'Dashboard', href: '/dashboard' }]),
     { label: 'Pricing',    href: '/pricing' },
     { label: 'Docs',       href: '/docs' },
-  ]return (
+  ]
+    return (
     <>
       <nav style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',

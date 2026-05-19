@@ -1,50 +1,30 @@
-// saas/app/api/tts/route.ts
-// POST /api/tts
-// Body: { text: string, voiceId: string }
-// Returns: { audioUrl, cached, characters, remaining }
+// saas/app/api/reviews/route.ts
+//
+// Reviews API. Auth pattern matches /api/tts.
+//
+//   GET    /api/reviews              → owner lists their reviews (auth required)
+//   POST   /api/reviews              → public submission via slug (no auth)
+//   PATCH  /api/reviews?id=...       → owner toggles approved (auth required)
+//   DELETE /api/reviews?id=...       → owner deletes a review (auth required)
 
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
-import crypto from "node:crypto";
-import { generateSpeech } from "@/lib/elevenlabs/client";
-import { isAllowedVoice, DEFAULT_MODEL_ID } from "@/lib/elevenlabs/voices";
-import {
-  HARD_PER_REQUEST_CHAR_LIMIT,
-  getMonthlyLimit,
-  type PlanId,
-} from "@/lib/elevenlabs/limits";
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
-const STORAGE_BUCKET = "tts-cache";
-const SIGNED_URL_TTL_SECONDS = 60 * 60;
+const FREE_TIER_REVIEW_CAP = 3
 
-export async function POST(req: NextRequest) {
-  let body: { text?: string; voiceId?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+function admin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  )
+}
 
-  const text = (body.text ?? "").trim();
-  const voiceId = body.voiceId ?? "";
-
-  if (!text) {
-    return NextResponse.json({ error: "Text is required" }, { status: 400 });
-  }
-  if (text.length > HARD_PER_REQUEST_CHAR_LIMIT) {
-    return NextResponse.json(
-      { error: `Text exceeds the per-request limit of ${HARD_PER_REQUEST_CHAR_LIMIT} characters` },
-      { status: 400 },
-    );
-  }
-  if (!isAllowedVoice(voiceId)) {
-    return NextResponse.json({ error: "Voice not allowed" }, { status: 400 });
-  }
-
-  const cookieStore = await cookies();
-  const supabaseUser = createServerClient(
+async function getAuthedUser() {
+  const cookieStore = await cookies()
+  const sb = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -53,162 +33,266 @@ export async function POST(req: NextRequest) {
         set: () => {},
         remove: () => {},
       },
-    },
-  );
+    }
+  )
+  const { data: { user } } = await sb.auth.getUser()
+  return user
+}
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabaseUser.auth.getUser();
+function getIp(req: NextRequest): string {
+  const fwd = req.headers.get('x-forwarded-for') || ''
+  return fwd.split(',')[0].trim() || req.headers.get('x-real-ip') || 'unknown'
+}
 
-  if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+function isValidEmail(s: string): boolean {
+  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s)
+}
+
+
+// ============================================================
+// GET — owner reads their own reviews.
+// Uses service role + manual user filter (matches TTS pattern).
+// ============================================================
+export async function GET() {
+  const user = await getAuthedUser()
+  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
+  const a = admin()
+  const { data, error } = await a
+    .from('reviews')
+    .select('id, author_name, author_email, rating, content, language, approved, created_at')
+    .eq('owner_id', user.id)
+    .order('created_at', { ascending: false })
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ reviews: data ?? [] })
+}
+
+
+// ============================================================
+// POST — public submission. No auth. Resolves slug → owner.
+// ============================================================
+export async function POST(req: NextRequest) {
+  let body: any
+  try { body = await req.json() } catch { return NextResponse.json({ error: 'bad json' }, { status: 400 }) }
+
+  const slug         = String(body?.slug ?? '').trim().toLowerCase()
+  const author_name  = String(body?.author_name ?? '').trim()
+  const author_email = String(body?.author_email ?? '').trim().toLowerCase()
+  const rating       = Number(body?.rating)
+  const content      = String(body?.content ?? '').trim()
+  const language     = String(body?.language ?? 'en').trim().toLowerCase().slice(0, 8)
+
+  if (!slug)                                              return NextResponse.json({ error: 'missing slug' }, { status: 400 })
+  if (author_name.length < 1 || author_name.length > 80)  return NextResponse.json({ error: 'name must be 1–80 chars' }, { status: 400 })
+  if (!isValidEmail(author_email))                        return NextResponse.json({ error: 'invalid email' }, { status: 400 })
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) return NextResponse.json({ error: 'rating must be 1–5' }, { status: 400 })
+  if (content.length < 1 || content.length > 2000)        return NextResponse.json({ error: 'content must be 1–2000 chars' }, { status: 400 })
+
+  const a = admin()
+
+  const { data: profile, error: profileErr } = await a
+    .from('profiles')
+    .select('id')
+    .eq('slug', slug)
+    .maybeSingle()
+
+  if (profileErr) return NextResponse.json({ error: 'lookup failed' }, { status: 500 })
+  if (!profile)   return NextResponse.json({ error: 'not found' }, { status: 404 })
+
+  const owner_id = profile.id as string
+  const ip = getIp(req)
+
+  // Rate limit: max 5 submissions per IP per owner per day.
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const { count: recentFromIp } = await a
+    .from('reviews')
+    .select('id', { count: 'exact', head: true })
+    .eq('owner_id', owner_id)
+    .eq('submitter_ip', ip)
+    .gte('created_at', since)
+
+  if ((recentFromIp ?? 0) >= 5) {
+    return NextResponse.json({ error: 'too many submissions, try again tomorrow' }, { status: 429 })
   }
 
-  const supabaseAdmin = createClient(
+  // Free-tier cap. Matches TTS route convention: only "active" subs are paying.
+  const { data: sub } = await a
+    .from('subscriptions')
+    .select('plan')
+    .eq('user_id', owner_id)
+    .eq('status', 'active')
+    .maybeSingle()
+
+  const plan = (sub?.plan ?? 'trial') as string
+  const isPaying = ['starter', 'pro', 'business'].includes(plan.toLowerCase())
+
+  if (!isPaying) {
+    const { data: countData } = await a.rpc('count_reviews_for_owner', { p_owner: owner_id })
+    const existing = Number(countData ?? 0)
+    if (existing >= FREE_TIER_REVIEW_CAP) {
+      return NextResponse.json(
+        { error: 'this person is not accepting more reviews on their current plan' },
+        { status: 403 }
+      )
+    }
+  }
+
+  const { error: insertErr } = await a.from('reviews').insert({
+    owner_id,
+    author_name,
+    author_email,
+    rating,
+    content,
+    language,
+    approved: false,
+    submitter_ip: ip,
+  })
+
+  if (insertErr) return NextResponse.json({ error: 'could not save review' }, { status: 500 })
+
+  return NextResponse.json({ ok: true })
+}
+
+
+// ============================================================
+// PATCH — owner toggles approved.
+// ============================================================
+export async function PATCH(req: NextRequest) {
+  const user = await getAuthedUser()
+  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
+  const id = req.nextUrl.searchParams.get('id')
+  if (!id) return NextResponse.json({ error: 'missing id' }, { status: 400 })
+
+  let body: any
+  try { body = await req.json() } catch { return NextResponse.json({ error: 'bad json' }, { status: 400 }) }
+  if (typeof body?.approved !== 'boolean') return NextResponse.json({ error: 'approved must be boolean' }, { status: 400 })
+
+  const a = admin()
+  const { error } = await a
+    .from('reviews')
+    .update({ approved: body.approved })
+    .eq('id', id)
+    .eq('owner_id', user.id)  // belt-and-suspenders: can only update own
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}
+
+
+// ============================================================
+// DELETE — owner deletes a review.
+// ============================================================
+export async function DELETE(req: NextRequest) {
+  const user = await getAuthedUser()
+  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
+  const id = req.nextUrl.searchParams.get('id')
+  if (!id) return NextResponse.json({ error: 'missing id' }, { status: 400 })
+
+  const a = admin()
+  const { error } = await a
+    .from('reviews')
+    .delete()
+    .eq('id', id)
+    .eq('owner_id', user.id)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}// saas/app/api/profile/slug/route.ts
+//
+// Lets the signed-in user claim or change their public slug.
+// Auth pattern matches /api/tts.
+
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+
+const RESERVED = new Set([
+  'admin', 'administrator', 'api', 'app', 'auth', 'billing', 'dashboard',
+  'docs', 'help', 'home', 'login', 'logout', 'me', 'onboarding', 'pricing',
+  'privacy', 'profile', 'review', 'reviews', 'root', 'settings', 'signup',
+  'signin', 'sign-in', 'sign-up', 'static', 'support', 'team', 'terms',
+  'tos', 'user', 'users', 'webhook', 'www', 'signalboost',
+])
+
+const SLUG_RE = /^[a-z0-9]([a-z0-9-]{1,28}[a-z0-9])?$/
+
+function admin() {
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  );
-
-  const plan = await getUserPlan(supabaseAdmin, user.id);
-  const monthlyLimit = getMonthlyLimit(plan);
-  const usedThisMonth = await getMonthlyUsage(supabaseAdmin, user.id);
-  const remaining = monthlyLimit - usedThisMonth;
-
-  if (remaining < text.length) {
-    return NextResponse.json(
-      { error: "Monthly character limit reached", remaining, monthlyLimit, plan },
-      { status: 429 },
-    );
-  }
-
-  const hash = sha256(`${text}::${voiceId}::${DEFAULT_MODEL_ID}`);
-
-  const { data: cached } = await supabaseAdmin
-    .from("tts_cache")
-    .select("storage_key, hit_count")
-    .eq("hash", hash)
-    .maybeSingle();
-
-  if (cached) {
-    void supabaseAdmin
-      .from("tts_cache")
-      .update({
-        last_used_at: new Date().toISOString(),
-        hit_count: (cached.hit_count ?? 0) + 1,
-      })
-      .eq("hash", hash);
-
-    await supabaseAdmin.from("tts_usage").insert({
-      user_id: user.id,
-      characters: text.length,
-      voice_id: voiceId,
-      model_id: DEFAULT_MODEL_ID,
-      cache_hit: true,
-    });
-
-    const signedUrl = await getSignedUrl(supabaseAdmin, cached.storage_key);
-    return NextResponse.json({
-      audioUrl: signedUrl,
-      cached: true,
-      characters: text.length,
-      remaining: remaining - text.length,
-    });
-  }let audioBuffer: ArrayBuffer;
-  try {
-    audioBuffer = await generateSpeech({ text, voiceId });
-  } catch (err) {
-    console.error("ElevenLabs generation failed:", err);
-    return NextResponse.json(
-      { error: "Speech generation failed" },
-      { status: 502 },
-    );
-  }
-
-  const storageKey = `${hash}.mp3`;
-  const { error: uploadError } = await supabaseAdmin.storage
-    .from(STORAGE_BUCKET)
-    .upload(storageKey, audioBuffer, {
-      contentType: "audio/mpeg",
-      upsert: true,
-    });
-
-  if (uploadError) {
-    console.error("Storage upload failed:", uploadError);
-    return NextResponse.json(
-      { error: "Failed to store generated audio" },
-      { status: 500 },
-    );
-  }
-
-  await supabaseAdmin.from("tts_cache").insert({
-    hash,
-    storage_key: storageKey,
-    characters: text.length,
-  });
-
-  await supabaseAdmin.from("tts_usage").insert({
-    user_id: user.id,
-    characters: text.length,
-    voice_id: voiceId,
-    model_id: DEFAULT_MODEL_ID,
-    cache_hit: false,
-  });
-
-  const signedUrl = await getSignedUrl(supabaseAdmin, storageKey);
-
-  return NextResponse.json({
-    audioUrl: signedUrl,
-    cached: false,
-    characters: text.length,
-    remaining: remaining - text.length,
-  });
+    { auth: { persistSession: false } }
+  )
 }
 
-// ---------- Helpers ----------
-
-function sha256(input: string): string {
-  return crypto.createHash("sha256").update(input).digest("hex");
+async function getAuthedUser() {
+  const cookieStore = await cookies()
+  const sb = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get: (name) => cookieStore.get(name)?.value,
+        set: () => {},
+        remove: () => {},
+      },
+    }
+  )
+  const { data: { user } } = await sb.auth.getUser()
+  return user
 }
 
-async function getSignedUrl(supabase: any, storageKey: string): Promise<string> {
-  const { data, error } = await supabase.storage
-    .from(STORAGE_BUCKET)
-    .createSignedUrl(storageKey, SIGNED_URL_TTL_SECONDS);
-  if (error || !data) {
-    throw new Error(`Failed to sign URL: ${error?.message ?? "unknown"}`);
+
+export async function GET() {
+  const user = await getAuthedUser()
+  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
+  const a = admin()
+  const { data, error } = await a
+    .from('profiles')
+    .select('slug')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ slug: data?.slug ?? null })
+}
+
+
+export async function POST(req: NextRequest) {
+  const user = await getAuthedUser()
+  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
+  let body: any
+  try { body = await req.json() } catch { return NextResponse.json({ error: 'bad json' }, { status: 400 }) }
+
+  const slug = String(body?.slug ?? '').trim().toLowerCase()
+
+  if (!slug)                return NextResponse.json({ error: 'slug required' }, { status: 400 })
+  if (!SLUG_RE.test(slug))  return NextResponse.json({ error: '3–30 chars, lowercase letters/digits/hyphens, no edges' }, { status: 400 })
+  if (RESERVED.has(slug))   return NextResponse.json({ error: 'this slug is reserved' }, { status: 400 })
+
+  const a = admin()
+
+  const { data: existing, error: lookupErr } = await a
+    .from('profiles')
+    .select('id')
+    .eq('slug', slug)
+    .maybeSingle()
+
+  if (lookupErr) return NextResponse.json({ error: 'lookup failed' }, { status: 500 })
+  if (existing && existing.id !== user.id) {
+    return NextResponse.json({ error: 'this slug is already taken' }, { status: 409 })
   }
-  return data.signedUrl;
-}
 
-async function getUserPlan(supabase: any, userId: string): Promise<PlanId> {
-  const { data } = await supabase
-    .from("subscriptions")
-    .select("plan, status")
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .maybeSingle();
+  const { error: upsertErr } = await a
+    .from('profiles')
+    .upsert({ id: user.id, slug }, { onConflict: 'id' })
 
-  if (!data?.plan) return "trial";
-  const plan = String(data.plan).toLowerCase();
-  if (["trial", "starter", "pro", "business"].includes(plan)) {
-    return plan as PlanId;
-  }
-  return "trial";
-}
+  if (upsertErr) return NextResponse.json({ error: upsertErr.message }, { status: 500 })
 
-async function getMonthlyUsage(supabase: any, userId: string): Promise<number> {
-  const startOfMonth = new Date();
-  startOfMonth.setUTCDate(1);
-  startOfMonth.setUTCHours(0, 0, 0, 0);
-
-  const { data } = await supabase
-    .from("tts_usage")
-    .select("characters")
-    .eq("user_id", userId)
-    .gte("created_at", startOfMonth.toISOString());
-
-  if (!data) return 0;
-  return data.reduce((sum: number, row: any) => sum + (row.characters ?? 0), 0);
+  return NextResponse.json({ ok: true, slug })
 }

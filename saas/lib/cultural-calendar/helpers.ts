@@ -30,6 +30,17 @@ export function fill(template: string, name: string | null): string {
     .replace(/\{name\}/g, '')
 }
 
+// Time of day in the user's local timezone (browser uses user's clock automatically).
+// Returns one of: 'morning' | 'afternoon' | 'evening' | 'night'
+export type TimeOfDay = 'morning' | 'afternoon' | 'evening' | 'night'
+export function timeOfDay(now: Date): TimeOfDay {
+  const h = now.getHours()  // local hours, not UTC
+  if (h >= 5  && h < 12) return 'morning'
+  if (h >= 12 && h < 18) return 'afternoon'
+  if (h >= 18 && h < 22) return 'evening'
+  return 'night' // 22-04
+}
+
 // Compute Easter Sunday for a given year (Gregorian, Meeus/Jones/Butcher algorithm)
 export function easterSunday(year: number): { month: number; day: number } {
   const a = year % 19

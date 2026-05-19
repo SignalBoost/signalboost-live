@@ -59,7 +59,33 @@ export default function DashboardOverviewPage() {
   const [promptLoading, setPromptLoading] = useState(false)
   const [promptOpen, setPromptOpen] = useState(false)
   const [hasTyped, setHasTyped] = useState(false)
+  // Track whether we've already shown the greeting to this user today.
+  // Starts as null (= still checking localStorage) so we don't flash the greeting on mount.
+  const [alreadyGreetedToday, setAlreadyGreetedToday] = useState<boolean | null>(null)
   const promptRef = useRef<HTMLDivElement>(null)
+
+  // On mount, check localStorage: have we already greeted this user today?
+  useEffect(() => {
+    try {
+      const today = new Date().toISOString().slice(0, 10) // "2026-05-18"
+      const lastGreeted = localStorage.getItem('signalboost.lastGreetedDate')
+      setAlreadyGreetedToday(lastGreeted === today)
+    } catch {
+      // localStorage might be disabled (private browsing, etc) — fall back to showing greeting
+      setAlreadyGreetedToday(false)
+    }
+  }, [])
+
+  // Helper: remember that we've greeted the user today.
+  function markGreetedToday() {
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      localStorage.setItem('signalboost.lastGreetedDate', today)
+      setAlreadyGreetedToday(true)
+    } catch {
+      // silently ignore if localStorage isn't available
+    }
+  }
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -96,6 +122,7 @@ export default function DashboardOverviewPage() {
     setPromptInput('')
     setPromptOpen(true)
     setHasTyped(true)
+    markGreetedToday()
     const newMessages: Message[] = [...promptMessages, { role: 'user', content }]
     setPromptMessages(newMessages)
     setPromptLoading(true)
@@ -168,7 +195,12 @@ export default function DashboardOverviewPage() {
   const atLimit = projects.length >= projectLimit
   const usagePercent = Math.min((projects.length / projectLimit) * 100, 100)
 
-  const greetingHidden = hasTyped || promptMessages.length > 0
+  // Hide the greeting if:
+  //  - User has typed something (engaged with the prompt)
+  //  - User has messages in the conversation
+  //  - We've already greeted them today (per localStorage)
+  //  - We haven't finished checking localStorage yet (avoids flash on mount)
+  const greetingHidden = hasTyped || promptMessages.length > 0 || alreadyGreetedToday !== false
 
   return (
     <div style={{ color: '#fff', fontFamily: 'system-ui' }}>
@@ -232,7 +264,10 @@ export default function DashboardOverviewPage() {
             value={promptInput}
             onChange={e => {
               setPromptInput(e.target.value)
-              if (e.target.value.length > 0 && !hasTyped) setHasTyped(true)
+              if (e.target.value.length > 0 && !hasTyped) {
+                setHasTyped(true)
+                markGreetedToday()
+              }
             }}
             onKeyDown={e => e.key === 'Enter' && sendPrompt()}
             placeholder={isNewUser ? 'Ask me anything — e.g. What plan is right for me?' : 'Ask me anything — e.g. How do I add a language?'}

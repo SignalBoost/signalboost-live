@@ -1,48 +1,39 @@
 import { supabase } from '@/utils/supabase/client'
-
 export const PLAN_SEATS: Record<string, number> = {
   free:     1,
   starter:  1,
   pro:      3,
   business: 10,
 }
-
 export async function getUserSubscription(userId: string) {
   const { data, error } = await supabase
     .from('subscriptions')
     .select('*')
     .eq('user_id', userId)
-    .single()
-
-  if (error) return null
+    .maybeSingle()
+  if (error || !data) return null
   return data
 }
-
 export async function getTeamMembers(ownerId: string) {
   const { data, error } = await supabase
     .from('team_members')
     .select('*')
     .eq('owner_id', ownerId)
     .eq('status', 'active')
-
   if (error) return []
   return data
 }
-
 export async function canAddMember(ownerId: string): Promise<boolean> {
   const { data, error } = await supabase
     .rpc('can_add_member', { owner: ownerId })
-
   if (error) return false
   return data
 }
-
 export async function inviteMember(ownerId: string, email: string) {
   const canAdd = await canAddMember(ownerId)
   if (!canAdd) {
     return { error: 'Seat limit reached. Upgrade your plan to add more members.' }
   }
-
   const { error } = await supabase
     .from('team_members')
     .insert({
@@ -50,18 +41,15 @@ export async function inviteMember(ownerId: string, email: string) {
       member_email: email,
       status: 'pending',
     })
-
   if (error) return { error: error.message }
   return { success: true }
 }
-
 export async function removeMember(ownerId: string, memberId: string) {
   const { error } = await supabase
     .from('team_members')
     .update({ status: 'removed' })
     .eq('owner_id', ownerId)
     .eq('id', memberId)
-
   if (error) return { error: error.message }
   return { success: true }
 }

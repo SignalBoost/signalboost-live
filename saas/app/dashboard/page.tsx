@@ -1,9 +1,10 @@
 'use client'
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import TeamManager from '@/components/TeamManager'
 import { supabase } from '@/utils/supabase/client'
 import { getProjects, createProject, canCreateProject, deleteProject, updateProjectStatus, TYPE_ICONS, STATUS_COLORS, Project } from '@/lib/projects'
+import { getGreetingForUser } from '@/lib/cultural-calendar'
 
 const LANGS = ['English', 'Portugues (BR + PT)', 'Espanol (ES + LATAM)', 'Polski', 'Russkiy']
 const BLUE = '#3b82f6'
@@ -37,8 +38,9 @@ type Message = { role: 'user' | 'assistant'; content: string }
 export default function DashboardOverviewPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [firstName, setFirstName] = useState<string | null>(null)
-  const [isNewUser, setIsNewUser] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
+  const [projectsLoaded, setProjectsLoaded] = useState(false)
   const [plan, setPlan] = useState('free')
   const [projectLimit, setProjectLimit] = useState(1)
   const [hoveredAction, setHoveredAction] = useState<string | null>(null)
@@ -62,17 +64,22 @@ export default function DashboardOverviewPage() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data?.user) {
+        setIsLoggedIn(true)
         setUserId(data.user.id)
         const meta = data.user.user_metadata
         const fullName = meta?.full_name || meta?.name || ''
         setFirstName(fullName.split(' ')[0] || null)
-        const createdAt = new Date(data.user.created_at).getTime()
-        setIsNewUser(Date.now() - createdAt < 60000)
-        getProjects(data.user.id).then(setProjects)
+        getProjects(data.user.id).then(p => {
+          setProjects(p)
+          setProjectsLoaded(true)
+        })
         canCreateProject(data.user.id).then(res => {
           setPlan(res.plan)
           setProjectLimit(res.limit === Infinity ? 999 : res.limit)
         })
+      } else {
+        setIsLoggedIn(false)
+        setProjectsLoaded(true)
       }
     })
   }, [])
@@ -146,13 +153,15 @@ export default function DashboardOverviewPage() {
     return 'Just now'
   }
 
-  const greeting = isNewUser
-    ? `Welcome to SignalBoost${firstName ? ', ' + firstName : ''}!`
-    : `Welcome back${firstName ? ', ' + firstName : ''}!`
+  // "New user" = no projects yet. Wait for projects to load before deciding.
+  const isNewUser = projectsLoaded && projects.length === 0
 
-  const subGreeting = isNewUser
-    ? 'Great to have you here. Ask me anything or explore your dashboard below.'
-    : 'Good to see you again. Ask me anything or pick up where you left off.'
+  // Compute greeting once per page load using cultural calendar (browser locale-aware).
+  const greetingData = useMemo(
+    () => getGreetingForUser({ firstName, isNewUser, isLoggedIn }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [projectsLoaded, isLoggedIn, firstName]
+  )
 
   const promptSuggestions = isNewUser ? NEW_USER_PROMPTS : RETURNING_PROMPTS
   const projectsTitle = firstName ? `${firstName}'s projects` : 'Your projects'
@@ -212,9 +221,9 @@ export default function DashboardOverviewPage() {
             animation: 'shimmer 3s linear infinite',
             display: 'inline-block',
           }}>
-            {greeting} {isNewUser ? '🎉' : '👋'}
+            {greetingData.headline} {greetingData.emoji}
           </h1>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: 0 }}>{subGreeting}</p>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: 0 }}>{greetingData.subline}</p>
         </div>
 
         {/* AI prompt input */}
@@ -286,7 +295,7 @@ export default function DashboardOverviewPage() {
         )}
       </div>
 
-      {/* 🥇 PRIMARY: PROJECTS (moved UP, prominent gold New Project / Upgrade button) */}
+      {/* PRIMARY: PROJECTS */}
       <div style={{ marginBottom: 32 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div>
@@ -412,7 +421,7 @@ export default function DashboardOverviewPage() {
         )}
       </div>
 
-      {/* 🥈 SECONDARY: Quick actions (subtle outlined, demoted from gold tiles) */}
+      {/* SECONDARY: Quick actions */}
       <div style={{ marginBottom: 28 }}>
         <h2 style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 14 }}>
           Or start with a tool
@@ -497,7 +506,7 @@ export default function DashboardOverviewPage() {
         {userId ? <TeamManager userId={userId} /> : <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }}>Loading team...</p>}
       </div>
 
-      {/* 🥉 TERTIARY: Feedback footer (demoted from gold banner to thin subtle strip) */}
+      {/* TERTIARY: Feedback footer */}
       <Link href="/dashboard/feedback"
         style={{ display: 'block', textAlign: 'center', padding: '14px', background: 'rgba(255,195,0,0.04)', border: '1px solid rgba(255,195,0,0.15)', borderRadius: 12, textDecoration: 'none', color: 'rgba(255,195,0,0.7)', fontSize: 12, fontWeight: 600 }}>
         💬 Found a bug or have a suggestion? Share your feedback — Luis reads every one

@@ -77,6 +77,16 @@ export default function Navbar() {
   function openLogin() { setAuthMode('login'); setShowAuth(true) }
   function openSignup() { setAuthMode('signup'); setShowAuth(true) }
 
+  // Main nav links. "Dashboard" is hidden when user is logged in
+  // because they already have a prominent Dashboard button next to their email.
+  const navLinks = [
+    { label: 'Home',       href: '/' },
+    { label: 'Podcasters', href: '/podcasters' },
+    ...(user ? [] : [{ label: 'Dashboard', href: '/dashboard' }]),
+    { label: 'Pricing',    href: '/pricing' },
+    { label: 'Docs',       href: '/docs' },
+  ]
+
   return (
     <>
       <nav style={{
@@ -95,13 +105,7 @@ export default function Navbar() {
         </Link>
 
         <div style={{ display: 'flex', gap: 24 }}>
-          {[
-            { label: 'Home',       href: '/' },
-            { label: 'Podcasters', href: '/podcasters' },
-            { label: 'Dashboard',  href: '/dashboard' },
-            { label: 'Pricing',    href: '/pricing' },
-            { label: 'Docs',       href: '/docs' },
-          ].map(item => (
+          {navLinks.map(item => (
             <Link key={item.label} href={item.href}
               style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)', textDecoration: 'none' }}
               onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
@@ -114,35 +118,4 @@ export default function Navbar() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {user ? (
             <>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {user.email}
-              </div>
-              <Link href="/dashboard">
-                <button style={{ background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 13, fontWeight: 700, padding: '8px 18px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}>
-                  Dashboard
-                </button>
-              </Link>
-              <button onClick={handleLogout}
-                style={{ background: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}>
-                Log out
-              </button>
-            </>
-          ) : (
-            <>
-              <button onClick={openLogin}
-                style={{ background: 'none', color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: 600, padding: '8px 18px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}>
-                Log in
-              </button>
-              <button onClick={openSignup}
-                style={{ background: '#ffc300', color: '#000', fontSize: 13, fontWeight: 800, padding: '9px 22px', borderRadius: 999, border: 'none', cursor: 'pointer' }}>
-                Get started
-              </button>
-            </>
-          )}
-        </div>
-      </nav>
-
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
-    </>
-  )
-}
+              <div style={{ fon

@@ -2,7 +2,7 @@
 // Spanish greetings + Latin American / Iberian holidays + day-of-week.
 // Phrasing kept standard / neutral Latin American Spanish.
 
-import { GreetingContext, Greeting, pick, fill, inRange, easterSunday } from './helpers'
+import { GreetingContext, Greeting, pick, fill, inRange, easterSunday, timeOfDay } from './helpers'
 
 export function spanishGreeting(now: Date, ctx: GreetingContext): Greeting {
   const { firstName, isNewUser, isLoggedIn } = ctx
@@ -127,37 +127,37 @@ export function spanishGreeting(now: Date, ctx: GreetingContext): Greeting {
     }
   }
 
-  // DAY OF WEEK
-  if (dow === 6 || dow === 0) {
+  // TIEMPO DEL DÍA — saludo por defecto según la hora local del usuario
+  const tod = timeOfDay(now)
+  const weekendFlavor = (dow === 0 || dow === 6) ? ' Espero que disfrutes tu fin de semana.' : ''
+  const mondayFlavor  = (dow === 1) ? ' Empieza una nueva semana.' : ''
+  const fridayFlavor  = (dow === 5) ? ' Ya casi es fin de semana.' : ''
+
+  if (tod === 'morning') {
     return {
-      headline: fill(pick(['Buen fin de semana, {name}', 'Trabajando el fin de semana, {name}?', 'Hola de nuevo, {name}']), firstName),
-      subline:  pick(['Sin prisa, sin presión.', 'Qué bueno verte por aquí.']),
+      headline: fill(pick(['Buenos días, {name}', 'Buen día, {name}', 'Buenos días, {name}']), firstName),
+      subline:  pick(['¿Listo para empezar el día?', '¿En qué trabajamos esta mañana?', 'Espero que hayas descansado bien.']) + mondayFlavor + weekendFlavor,
+      emoji: '☀️',
+    }
+  }
+  if (tod === 'afternoon') {
+    return {
+      headline: fill(pick(['Buenas tardes, {name}', 'Buena tarde, {name}', 'Bienvenido de vuelta, {name}']), firstName),
+      subline:  pick(['¿En qué trabajamos hoy?', 'Espero que tu día vaya bien.', 'Listo cuando tú lo estés.']) + fridayFlavor + weekendFlavor,
       emoji: '👋',
     }
   }
-  if (dow === 1) {
+  if (tod === 'evening') {
     return {
-      headline: fill(pick(['Feliz lunes, {name}', 'Buen comienzo de semana, {name}', 'Hola de nuevo, {name}']), firstName),
-      subline:  pick(['Una nueva semana, nuevas posibilidades.', '¿Por dónde quieres empezar?']),
-      emoji: '☕',
+      headline: fill(pick(['Buenas noches, {name}', 'Buena tarde, {name}', 'Bienvenido de vuelta, {name}']), firstName),
+      subline:  pick(['¿Cerrando el día o apenas empezando?', '¿En qué te puedo ayudar esta noche?', 'Qué bueno que pasaste por aquí.']) + fridayFlavor,
+      emoji: '🌆',
     }
   }
-  if (dow === 5) {
-    return {
-      headline: fill(pick(['Feliz viernes, {name}', 'Por fin viernes, {name}', 'Hola de nuevo, {name}']), firstName),
-      subline:  pick(['Ya casi es fin de semana.', '¿Qué quieres terminar antes del finde?']),
-      emoji: '🌅',
-    }
-  }
-
-  // DEFAULT (Tue/Wed/Thu)
+  // noche tarde (22-04)
   return {
-    headline: fill(pick(['Bienvenido de vuelta, {name}', 'Qué bueno verte, {name}', 'Hola, {name}']), firstName),
-    subline:  pick([
-      'Pregúntame lo que sea o continúa donde lo dejaste.',
-      '¿En qué trabajamos hoy?',
-      'Listo cuando tú lo estés.',
-    ]),
-    emoji: '👋',
+    headline: fill(pick(['Trabajando hasta tarde, {name}?', 'Aún despierto, {name}', 'Hola, {name}']), firstName),
+    subline:  pick(['Sin juicio. ¿Qué estamos construyendo?', 'Las mejores ideas llegan de noche.', 'Aquí estoy cuando me necesites.']),
+    emoji: '🌙',
   }
 }

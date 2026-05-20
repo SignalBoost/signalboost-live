@@ -3,10 +3,20 @@ import PodcastSection from '@/components/PodcastSection'
 
 export default function Home() {
   return (
-    <main style={{ minHeight: '100vh', background: '#0a0a0f' }}>
+    <main
+      style={{
+        minHeight: '100vh',
+        background: 'var(--bg-base)',
+      }}
+    >
       <SignalHero />
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <PodcastSection />  
+
+      <div
+        style={{
+          borderTop: '1px solid var(--border-soft)',
+        }}
+      >
+        <PodcastSection />
       </div>
     </main>
   )

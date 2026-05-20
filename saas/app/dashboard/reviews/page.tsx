@@ -1,10 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '@/utils/supabase/client'
 
-const BLUE = '#3b82f6'
-const GOLD = '#ffc300'
 const GREEN = '#4ade80'
 const RED = '#f87171'
 
@@ -25,8 +22,6 @@ type SlugState =
   | { kind: 'set', slug: string }
 
 export default function ReviewsPage() {
-  const [tab, setTab] = useState<'overview' | 'collect' | 'manage' | 'widget'>('overview')
-
   const [reviews, setReviews] = useState<Review[]>([])
   const [reviewsLoading, setReviewsLoading] = useState(true)
   const [reviewsError, setReviewsError] = useState<string | null>(null)
@@ -37,6 +32,7 @@ export default function ReviewsPage() {
   const [slugError, setSlugError] = useState<string | null>(null)
 
   const [copied, setCopied] = useState(false)
+  const [filter, setFilter] = useState<'all' | 'pending' | 'approved'>('all')
 
   // Load slug
   useEffect(() => {
@@ -80,7 +76,7 @@ export default function ReviewsPage() {
 
   async function saveSlug() {
     const candidate = slugDraft.trim().toLowerCase()
-    if (!candidate) { setSlugError('Pick a slug to continue.'); return }
+    if (!candidate) { setSlugError('Pick a handle to continue.'); return }
     setSlugSaving(true)
     setSlugError(null)
     try {
@@ -90,11 +86,11 @@ export default function ReviewsPage() {
         body: JSON.stringify({ slug: candidate }),
       })
       const j = await res.json()
-      if (!res.ok) { setSlugError(j?.error || 'Could not save slug.'); return }
+      if (!res.ok) { setSlugError(j?.error || 'Could not save handle.'); return }
       setSlug({ kind: 'set', slug: j.slug })
       setSlugDraft('')
     } catch {
-      setSlugError('Could not save slug.')
+      setSlugError('Could not save handle.')
     } finally {
       setSlugSaving(false)
     }
@@ -138,209 +134,268 @@ export default function ReviewsPage() {
     ? `https://saas.signalboostapp.com/review/${slug.slug}`
     : ''
 
-  const approvedReviews = reviews.filter(r => r.approved)
-  const avgRating = approvedReviews.length
-    ? approvedReviews.reduce((sum, r) => sum + r.rating, 0) / approvedReviews.length
+  const approvedCount = reviews.filter(r => r.approved).length
+  const pendingCount = reviews.length - approvedCount
+  const avgRating = approvedCount
+    ? reviews.filter(r => r.approved).reduce((sum, r) => sum + r.rating, 0) / approvedCount
     : 0
-  const uniqueLanguages = new Set(reviews.map(r => r.language)).size
+
+  const visibleReviews = reviews.filter(r => {
+    if (filter === 'pending') return !r.approved
+    if (filter === 'approved') return r.approved
+    return true
+  })
 
   function fmtDate(iso: string): string {
     try { return new Date(iso).toISOString().slice(0, 10) } catch { return '' }
   }
 
-  return (
-    <div style={{ color: '#fff', fontFamily: 'system-ui' }}>
+  // === Token-based styles ===
+  // All surfaces use the new globals.css tokens so iterating the look
+  // is a single-file change in globals.css.
+  const card: React.CSSProperties = {
+    background: 'var(--surface-1)',
+    border: '1px solid var(--border-medium)',
+    borderRadius: 14,
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
+  }
 
-      <div style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', paddingBottom: 20, marginBottom: 28 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 900, margin: 0, letterSpacing: '-0.02em' }}>⭐ Review collector</h1>
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>
-          Collect and display customer reviews in multiple languages.
+  const input: React.CSSProperties = {
+    background: 'var(--surface-3)',
+    border: '1px solid var(--border-medium)',
+    borderRadius: 8,
+    padding: '10px 14px',
+    color: 'var(--text-primary)',
+    fontSize: 14,
+    fontFamily: 'inherit',
+    outline: 'none',
+  }
+
+  return (
+    <div style={{ color: 'var(--text-primary)', fontFamily: 'system-ui', maxWidth: 880, margin: '0 auto' }}>
+
+      {/* Header */}
+      <div style={{ marginBottom: 28 }}>
+        <h1 style={{ fontSize: 26, fontWeight: 900, margin: 0, letterSpacing: '-0.02em' }}>⭐ Review collector</h1>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6, margin: '6px 0 0' }}>
+          Share one link. Customers leave reviews in their own language. You approve what shows up publicly.
         </p>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
-        {[
-          { label: 'Total reviews', value: reviewsLoading ? '—' : reviews.length.toString() },
-          { label: 'Approved',      value: reviewsLoading ? '—' : approvedReviews.length.toString() },
-          { label: 'Avg rating',    value: reviewsLoading ? '—' : (approvedReviews.length ? avgRating.toFixed(1) + ' ★' : '—') },
-          { label: 'Languages',     value: reviewsLoading ? '—' : uniqueLanguages.toString() },
-        ].map(stat => (
-          <div key={stat.label} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '16px 20px' }}>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 8, fontWeight: 500 }}>{stat.label}</div>
-            <div style={{ fontSize: 24, fontWeight: 900, color: BLUE }}>{stat.value}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 24, background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: 4, width: 'fit-content' }}>
-        {[
-          { id: 'overview', label: 'Overview' },
-          { id: 'collect',  label: 'Collect reviews' },
-          { id: 'manage',   label: 'Manage reviews' },
-          { id: 'widget',   label: 'Embed widget' },
-        ].map(t => (
-          <button key={t.id} onClick={() => setTab(t.id as any)}
-            style={{ padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', transition: 'all 0.15s', background: tab === t.id ? BLUE : 'transparent', color: tab === t.id ? '#fff' : 'rgba(255,255,255,0.45)' }}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-
       {reviewsError && (
-        <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 12, padding: '12px 16px', fontSize: 13, color: RED, marginBottom: 16 }}>
+        <div style={{
+          background: 'rgba(239,68,68,0.08)',
+          border: '1px solid rgba(239,68,68,0.3)',
+          borderRadius: 12,
+          padding: '12px 16px',
+          fontSize: 13,
+          color: RED,
+          marginBottom: 20,
+        }}>
           {reviewsError}
         </div>
       )}
+      {/* === SECTION 1: Your review link === */}
+      <section style={{ ...card, padding: '24px 26px', marginBottom: 24 }}>
+        <h2 style={{ fontSize: 16, fontWeight: 800, margin: '0 0 4px', letterSpacing: '-0.01em' }}>
+          Send this link to your customers
+        </h2>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 18px' }}>
+          They click it, leave a review in their own language, and it appears below as Pending until you approve it.
+        </p>
 
-      {/* Overview */}
-      {tab === 'overview' && (
-        <div>
-          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Recent reviews</h2>
-          {reviewsLoading ? (
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Loading…</div>
-          ) : approvedReviews.length === 0 ? (
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 14, padding: '32px 20px', textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
-              No approved reviews yet. Approved reviews from your customers will appear here.
+        {slug.kind === 'loading' && (
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Loading…</div>
+        )}
+
+        {slug.kind === 'none' && (
+          <div>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 12px', lineHeight: 1.5 }}>
+              Pick a handle for your review link. It can be your name, your business, anything — 3 to 30 lowercase letters, digits, and hyphens.
+            </p>
+            <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border-medium)', background: 'var(--surface-3)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', padding: '0 12px', fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border-soft)' }}>
+                signalboostapp.com/review/
+              </span>
+              <input
+                type="text"
+                value={slugDraft}
+                onChange={e => setSlugDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                placeholder="your-handle"
+                maxLength={30}
+                onKeyDown={e => e.key === 'Enter' && saveSlug()}
+                style={{ flex: 1, background: 'transparent', border: 'none', padding: '12px 14px', color: 'var(--text-primary)', fontSize: 14, fontFamily: 'inherit', outline: 'none' }}
+              />
+              <button
+                onClick={saveSlug}
+                disabled={slugSaving || !slugDraft.trim()}
+                style={{ background: 'var(--blue)', color: '#fff', fontSize: 13, fontWeight: 700, padding: '0 22px', border: 'none', cursor: slugSaving || !slugDraft.trim() ? 'not-allowed' : 'pointer', opacity: slugSaving || !slugDraft.trim() ? 0.6 : 1 }}
+              >
+                {slugSaving ? 'Saving…' : 'Claim'}
+              </button>
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {approvedReviews.map(review => (
-                <div key={review.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '18px 20px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: '50%', background: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700 }}>
-                        {review.author_name[0]?.toUpperCase() || '?'}
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700 }}>{review.author_name}</div>
-                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>{review.language} · {fmtDate(review.created_at)}</div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: 16, color: GOLD }}>{'★'.repeat(review.rating)}<span style={{ color: 'rgba(255,255,255,0.15)' }}>{'★'.repeat(5 - review.rating)}</span></div>
-                  </div>
-                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: 0 }}>{review.content}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Collect */}
-      {tab === 'collect' && (
-        <div style={{ maxWidth: 560 }}>
-
-          {slug.kind === 'loading' && (
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 24 }}>Loading…</div>
-          )}
-
-          {slug.kind === 'none' && (
-            <div style={{ background: 'rgba(255,195,0,0.06)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 14, padding: '20px 22px', marginBottom: 24 }}>
-              <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0, marginBottom: 8 }}>Choose your review handle</h2>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 14, lineHeight: 1.5 }}>
-                Your review page lives at <code style={{ background: 'rgba(0,0,0,0.3)', padding: '1px 6px', borderRadius: 4 }}>signalboostapp.com/review/<b>your-handle</b></code>. Pick anything you want — your name, your business, anything. 3–30 lowercase letters, digits, and hyphens.
-              </p>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  type="text"
-                  value={slugDraft}
-                  onChange={e => setSlugDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                  placeholder="acme-coffee"
-                  maxLength={30}
-                  style={{ flex: 1, background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 12px', color: '#fff', fontSize: 14, fontFamily: 'inherit' }}
-                />
-                <button
-                  onClick={saveSlug}
-                  disabled={slugSaving}
-                  style={{ background: BLUE, color: '#fff', fontSize: 13, fontWeight: 700, padding: '0 18px', borderRadius: 8, border: 'none', cursor: slugSaving ? 'wait' : 'pointer', opacity: slugSaving ? 0.6 : 1 }}
-                >
-                  {slugSaving ? 'Saving…' : 'Claim'}
-                </button>
-              </div>
-              {slugError && (
-                <div style={{ fontSize: 12, color: RED, marginTop: 10 }}>{slugError}</div>
-              )}
-            </div>
-          )}
-
-          {slug.kind === 'set' && (
-            <>
-              <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Your review link</h2>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 20 }}>
-                Share this link with your customers. They can leave a review in their own language.
-              </p>
-              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                <span style={{ flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.7)', wordBreak: 'break-all' }}>{reviewLink}</span>
-                <button onClick={() => copyToClipboard(reviewLink)}
-                  style={{ background: copied ? GREEN : BLUE, color: '#fff', fontSize: 12, fontWeight: 700, padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  {copied ? 'Copied!' : 'Copy link'}
-                </button>
-              </div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 20 }}>
-                Handle: <code style={{ background: 'rgba(255,255,255,0.04)', padding: '1px 6px', borderRadius: 4 }}>{slug.slug}</code>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Manage */}
-      {tab === 'manage' && (
-        <div>
-          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>All reviews</h2>
-          {reviewsLoading ? (
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>Loading…</div>
-          ) : reviews.length === 0 ? (
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 14, padding: '32px 20px', textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
-              No reviews yet. Share your link from the Collect tab to start receiving reviews.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {reviews.map(review => (
-                <div key={review.id} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${review.approved ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 14, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 13, fontWeight: 700 }}>{review.author_name}</span>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>{review.language} · {fmtDate(review.created_at)}</span>
-                      <span style={{ fontSize: 12, color: GOLD }}>{'★'.repeat(review.rating)}</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: review.approved ? 'rgba(74,222,128,0.1)' : 'rgba(255,255,255,0.05)', color: review.approved ? GREEN : 'rgba(255,255,255,0.4)' }}>
-                        {review.approved ? 'Approved' : 'Pending'}
-                      </span>
-                    </div>
-                    <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', margin: 0, lineHeight: 1.5 }}>{review.content}</p>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 6 }}>{review.author_email}</div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                    <button onClick={() => toggleApprove(review.id, review.approved)}
-                      style={{ padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', background: review.approved ? 'rgba(255,255,255,0.05)' : 'rgba(74,222,128,0.15)', color: review.approved ? 'rgba(255,255,255,0.5)' : GREEN }}>
-                      {review.approved ? 'Unpublish' : 'Approve'}
-                    </button>
-                    <button onClick={() => deleteReview(review.id)}
-                      style={{ padding: '7px 12px', borderRadius: 8, fontSize: 12, border: 'none', cursor: 'pointer', background: 'rgba(239,68,68,0.1)', color: RED }}>
-                      🗑
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Widget — honestly deferred */}
-      {tab === 'widget' && (
-        <div style={{ maxWidth: 560 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Embed on your website</h2>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 20 }}>
-            Drop a snippet on your site to display your approved reviews automatically.
-          </p>
-          <div style={{ background: 'rgba(255,195,0,0.06)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 12, padding: '18px 20px', fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
-            The embeddable widget isn't ready yet. For now, share your review link from the Collect tab and manage reviews from the Manage tab. The widget is on the roadmap.
+            {slugError && (
+              <div style={{ fontSize: 12, color: RED, marginTop: 10 }}>{slugError}</div>
+            )}
           </div>
+        )}
+
+        {slug.kind === 'set' && (
+          <div>
+            <div style={{
+              background: 'var(--surface-3)',
+              border: '1px solid var(--border-medium)',
+              borderRadius: 10,
+              padding: '14px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              marginBottom: 12,
+            }}>
+              <span style={{ flex: 1, fontSize: 14, color: 'var(--text-primary)', wordBreak: 'break-all', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+                {reviewLink}
+              </span>
+              <button onClick={() => copyToClipboard(reviewLink)}
+                style={{
+                  background: copied ? GREEN : 'var(--blue)',
+                  color: '#fff', fontSize: 12, fontWeight: 700,
+                  padding: '9px 18px', borderRadius: 8, border: 'none',
+                  cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                  transition: 'background 0.15s',
+                }}>
+                {copied ? '✓ Copied' : 'Copy link'}
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <a href={reviewLink} target="_blank" rel="noopener noreferrer"
+                style={{ fontSize: 12, color: 'var(--blue)', textDecoration: 'none', fontWeight: 600 }}>
+                Open in new tab ↗
+              </a>
+              <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>·</span>
+              <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>
+                Handle: <code style={{ background: 'var(--surface-2)', padding: '2px 6px', borderRadius: 4, color: 'var(--text-secondary)' }}>{slug.slug}</code>
+              </span>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* === SECTION 2: Reviews feed === */}
+      <section>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14, gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0, letterSpacing: '-0.01em' }}>Your reviews</h2>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+              {reviewsLoading ? 'Loading…' : (
+                reviews.length === 0
+                  ? 'Nothing yet. Share the link above to start.'
+                  : `${reviews.length} total · ${pendingCount} pending · ${approvedCount} approved${approvedCount > 0 ? ` · ${avgRating.toFixed(1)} ★ avg` : ''}`
+              )}
+            </p>
+          </div>
+
+          {reviews.length > 0 && (
+            <div style={{ display: 'flex', gap: 4, background: 'var(--surface-2)', borderRadius: 999, padding: 3, border: '1px solid var(--border-soft)' }}>
+              {([
+                { id: 'all', label: `All (${reviews.length})` },
+                { id: 'pending', label: `Pending (${pendingCount})` },
+                { id: 'approved', label: `Approved (${approvedCount})` },
+              ] as const).map(f => (
+                <button key={f.id} onClick={() => setFilter(f.id)}
+                  style={{
+                    padding: '6px 14px', borderRadius: 999,
+                    fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer',
+                    background: filter === f.id ? 'var(--blue)' : 'transparent',
+                    color: filter === f.id ? '#fff' : 'var(--text-muted)',
+                    transition: 'all 0.15s',
+                  }}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+
+        {reviewsLoading ? (
+          <div style={{ ...card, padding: '32px 20px', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
+            Loading…
+          </div>
+        ) : reviews.length === 0 ? (
+          <div style={{ ...card, padding: '40px 24px', textAlign: 'center', borderStyle: 'dashed' }}>
+            <div style={{ fontSize: 32, marginBottom: 10 }}>📭</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>No reviews yet</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+              {slug.kind === 'set' ? 'Send your link above to a customer to receive your first review.' : 'Claim a handle above to get your review link.'}
+            </div>
+          </div>
+        ) : visibleReviews.length === 0 ? (
+          <div style={{ ...card, padding: '24px 20px', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
+            No {filter} reviews.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {visibleReviews.map(review => {
+              const isPending = !review.approved
+              return (
+                <div key={review.id}
+                  style={{
+                    ...card,
+                    padding: '16px 20px',
+                    borderColor: isPending ? 'var(--border-gold)' : 'var(--border-medium)',
+                    background: isPending ? 'rgba(255,195,0,0.05)' : 'var(--surface-1)',
+                  }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{review.author_name}</span>
+                        <span style={{ fontSize: 14, color: 'var(--gold)' }}>
+                          {'★'.repeat(review.rating)}<span style={{ color: 'var(--border-strong)' }}>{'★'.repeat(5 - review.rating)}</span>
+                        </span>
+                        <span style={{
+                          fontSize: 10, fontWeight: 800, padding: '3px 9px', borderRadius: 999,
+                          background: isPending ? 'rgba(255,195,0,0.18)' : 'rgba(74,222,128,0.15)',
+                          color: isPending ? 'var(--gold)' : GREEN,
+                          textTransform: 'uppercase', letterSpacing: '0.04em',
+                        }}>
+                          {isPending ? 'Pending' : 'Approved'}
+                        </span>
+                        <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>
+                          {review.language} · {fmtDate(review.created_at)}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 6px', lineHeight: 1.55 }}>
+                        {review.content}
+                      </p>
+                      <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{review.author_email}</div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+                      <button onClick={() => toggleApprove(review.id, review.approved)}
+                        style={{
+                          padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                          border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+                          background: review.approved ? 'var(--surface-3)' : GREEN,
+                          color: review.approved ? 'var(--text-muted)' : '#062512',
+                        }}>
+                        {review.approved ? 'Unpublish' : 'Approve'}
+                      </button>
+                      <button onClick={() => deleteReview(review.id)}
+                        title="Delete review"
+                        style={{
+                          padding: '8px 14px', borderRadius: 8, fontSize: 12,
+                          border: '1px solid rgba(239,68,68,0.25)', cursor: 'pointer',
+                          background: 'rgba(239,68,68,0.08)', color: RED, fontWeight: 600,
+                        }}>
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </section>
     </div>
   )
 }

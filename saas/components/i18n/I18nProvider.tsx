@@ -1,67 +1,159 @@
-"use client";
+'use client'
 
 import {
   createContext,
   useContext,
   useEffect,
-  useState
-} from "react";
+  useState,
+} from 'react'
 
-import { detectLanguage } from "@/lib/i18n/detectLanguage";
-import { loadLanguage } from "@/lib/i18n/loadLanguage";
+import { detectLanguage } from '@/lib/i18n/detectLanguage'
+import { loadLanguage } from '@/lib/i18n/loadLanguage'
 
-type Dict = Record<string, string>;
+type Dict = Record<string, string>
 
 type I18nContextType = {
-  lang: string;
-  dict: Dict;
-  setLang: (lang: string) => void;
-};
+  lang: string
+  dict: Dict
+  setLang: (lang: string) => void
+}
 
-const I18nContext = createContext<I18nContextType | null>(null);
+const I18nContext =
+  createContext<I18nContextType | null>(null)
+
+const SUPPORTED_LANGS = [
+  'en',
+  'pt',
+  'es',
+  'pl',
+  'ru',
+]
+
+function normalizeLang(value: string | null) {
+  if (!value) return 'en'
+
+  const lower = value.toLowerCase()
+
+  if (lower.startsWith('pt')) return 'pt'
+  if (lower.startsWith('es')) return 'es'
+  if (lower.startsWith('pl')) return 'pl'
+  if (lower.startsWith('ru')) return 'ru'
+  if (lower.startsWith('en')) return 'en'
+
+  return 'en'
+}
+
+function getInitialLanguage() {
+  if (typeof window === 'undefined') {
+    return 'en'
+  }
+
+  const saved =
+    localStorage.getItem('signalboost_language') ||
+    localStorage.getItem('site-language')
+
+  if (saved && SUPPORTED_LANGS.includes(saved)) {
+    return saved
+  }
+
+  const browser =
+    navigator.languages?.[0] ||
+    navigator.language ||
+    null
+
+  const browserLang = normalizeLang(browser)
+
+  if (SUPPORTED_LANGS.includes(browserLang)) {
+    return browserLang
+  }
+
+  const detected = normalizeLang(detectLanguage())
+
+  if (SUPPORTED_LANGS.includes(detected)) {
+    return detected
+  }
+
+  return 'en'
+}
 
 export function I18nProvider({
-  children
+  children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
-  const [lang, setLangState] = useState("en");
-  const [dict, setDict] = useState<Dict>({});
+  const [lang, setLangState] = useState('en')
+  const [dict, setDict] = useState<Dict>({})
 
   useEffect(() => {
     async function init() {
-      const detected = detectLanguage();
-      const loaded = await loadLanguage(detected);
+      const initialLang = getInitialLanguage()
+      const loaded = await loadLanguage(initialLang)
 
-      setLangState(detected);
-      setDict(loaded);
+      setLangState(initialLang)
+      setDict(loaded)
+
+      localStorage.setItem(
+        'signalboost_language',
+        initialLang
+      )
+
+      localStorage.setItem(
+        'site-language',
+        initialLang
+      )
     }
 
-    init();
-  }, []);
+    init()
+  }, [])
 
   const setLang = async (newLang: string) => {
-    localStorage.setItem("site-language", newLang);
+    const normalized = normalizeLang(newLang)
+    const safeLang = SUPPORTED_LANGS.includes(normalized)
+      ? normalized
+      : 'en'
 
-    const loaded = await loadLanguage(newLang);
+    localStorage.setItem(
+      'signalboost_language',
+      safeLang
+    )
 
-    setLangState(newLang);
-    setDict(loaded);
-  };
+    localStorage.setItem(
+      'site-language',
+      safeLang
+    )
+
+    localStorage.setItem(
+      'signalboost_language_prompted',
+      '1'
+    )
+
+    const loaded = await loadLanguage(safeLang)
+
+    setLangState(safeLang)
+    setDict(loaded)
+  }
 
   return (
-    <I18nContext.Provider value={{ lang, dict, setLang }}>
+    <I18nContext.Provider
+      value={{
+        lang,
+        dict,
+        setLang,
+      }}
+    >
       {children}
     </I18nContext.Provider>
-  );
+  )
 }
 
 export function useI18n() {
-  const ctx = useContext(I18nContext);
+  const ctx = useContext(I18nContext)
 
   if (!ctx) {
-    throw new Error("useI18n must be used inside I18nProvider");
+    throw new Error(
+      'useI18n must be used inside I18nProvider'
+    )
   }
 
-  return ctx;
+  return ctx
 }

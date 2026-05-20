@@ -117,5 +117,170 @@
       "f6": "Informes avanzados",
       "f7": "API e integraciones"
     }
+  },
+  "podcasters_page": {
+    "badge": "Para podcasters",
+    "heroLine1": "Tú grabas.",
+    "heroLine2Pre": "Nosotros lo llevamos al",
+    "heroLine2Highlight": "mundo.",
+    "heroSubhead": "Locución nativa con IA, subtítulos multilingües, generación de clips y un sitio de podcast con tu marca — todo en una plataforma.",
+    "heroNote": "No hacemos hardware ni edición de audio en bruto. Tráenos tu episodio terminado y nos encargamos de todo lo demás.",
+    "ctaSeePlans": "Ver planes",
+    "ctaHow": "Cómo funciona",
+    "howTitle": "Cómo funciona",
+    "deliverTitle": "Qué entregamos",
+    "deliverSubtitle": "Todo después de la grabación. Tú te enfocas en el contenido y nosotros nos encargamos de la distribución global.",
+    "plansTitle": "Planes para podcasts",
+    "plansSubtitle": "Esboza tu idea gratis con nuestro plan de vista previa, luego elige un plan de podcast cuando estés listo para publicar.",
+    "mostPopular": "Más popular",
+    "perMonth": "/mes",
+    "noCommitment": "Sin compromiso, cancela cuando quieras",
+    "readyTitle": "¿Listo para llegar al mundo?",
+    "readyDesc": "Tú grabas. Nosotros nos encargamos del resto — locución, subtítulos, clips, sitio web y reseñas en 5 idiomas.",
+    "readyCta": "Ver planes para podcasts",
+    "stats": {
+      "languages": "Idiomas",
+      "turnaround": "Tiempo de entrega",
+      "captionFormats": "Formatos de subtítulos",
+      "freeSketch": "Esbozo gratis",
+      "noCommitment": "Sin compromiso"
+    },
+    "how": {
+      "s1": { "title": "Sube tu episodio", "desc": "Suelta tu archivo de audio o video terminado. Soportamos MP3, MP4, WAV y más. No se necesita edición en bruto." },
+      "s2": { "title": "Elige tus idiomas", "desc": "Selecciona qué idiomas quieres. Elige entre inglés, portugués, español, polaco y ruso." },
+      "s3": { "title": "Generamos todo", "desc": "Locución nativa con IA, subtítulos, clips cortos, notas del programa traducidas — todo automático." },
+      "s4": { "title": "Publica en todas partes", "desc": "Descarga tus episodios multilingües o publica directamente en tu sitio SignalBoost." }
+    },
+    "deliver": {
+      "d1": { "title": "Locución nativa con IA", "desc": "Tu episodio doblado en portugués, español, polaco y ruso con voces de IA con sonido natural." },
+      "d2": { "title": "Subtítulos multilingües", "desc": "Subtítulos generados automáticamente en todos tus idiomas. Descarga como SRT, VTT o intégralos en tu video." },
+      "d3": { "title": "Clips sociales", "desc": "Clips cortos para TikTok, Instagram Reels y YouTube Shorts — en todos los idiomas." },
+      "d4": { "title": "Notas del programa traducidas", "desc": "Resúmenes de episodios escritos nativamente en cada idioma — no traducidos automáticamente." },
+      "d5": { "title": "Sitio de podcast", "desc": "Un sitio con tu marca, reproductor de episodios, notas del programa y selector de idiomas multilingüe." },
+      "d6": { "title": "Reseñas de oyentes", "desc": "Recopila y muestra testimonios de oyentes en su idioma nativo." }
+    },
+    "plans": {
+      "indie": {
+        "name": "Indie",
+        "description": "Perfecto para podcasters independientes empezando globalmente.",
+        "cta": "Empezar",
+        "f1": "1 programa", "f2": "4 episodios por mes", "f3": "2 idiomas", "f4": "Locución nativa con IA",
+        "f5": "Subtítulos en 2 idiomas", "f6": "Generación básica de clips (5 clips por episodio)",
+        "f7": "Sitio de podcast", "f8": "Reseñas de oyentes", "f9": "Soporte por correo"
+      },
+      "pro": {
+        "name": "Pro",
+        "description": "Para podcasters serios que quieren alcance global.",
+        "cta": "Empezar",
+        "f1": "3 programas", "f2": "Episodios ilimitados", "f3": "Los 5 idiomas",
+        "f4": "Locución nativa con IA (prioridad)", "f5": "Subtítulos en los 5 idiomas",
+        "f6": "Fábrica de clips (clips ilimitados)", "f7": "Sitio de podcast multilingüe",
+        "f8": "Reseñas de oyentes y analíticas", "f9": "Transcripción en todos los idiomas",
+        "f10": "Soporte prioritario"
+      },
+      "network": {
+        "name": "Red",
+        "description": "Para redes de podcasts gestionando múltiples programas.",
+        "cta": "Contáctanos",
+        "f1": "Programas ilimitados", "f2": "Episodios ilimitados", "f3": "Los 5 idiomas más personalizados",
+        "f4": "Locución nativa con IA (dedicada)", "f5": "Formatos de subtítulos personalizados (SRT, VTT, ASS)",
+        "f6": "Fábrica de clips (ilimitado)", "f7": "Sitio marca blanca", "f8": "Suite completa de analíticas",
+        "f9": "Acceso a API", "f10": "Gerente de cuenta dedicado", "f11": "Garantía SLA"
+      }
+    }
+  },
+  "podcastSection": {
+    "badge": "Para podcasters",
+    "headlineLine1": "Tú grabas.",
+    "headlineLine2Pre": "Nosotros lo llevamos al",
+    "headlineLine2Highlight": "mundo.",
+    "intro": "Una vez grabado tu episodio, SignalBoost se encarga de todo lo demás — locución nativa en 5 idiomas, subtítulos, clips sociales, tu sitio de podcast y reseñas de oyentes.",
+    "note": "No hacemos hardware ni edición de audio en bruto — solo tráenos tu episodio terminado.",
+    "ctaPlans": "Ver planes para podcasts",
+    "ctaHow": "Cómo funciona",
+    "f1": { "title": "Suena como un local", "desc": "Convertimos tu episodio en audio con sonido nativo en portugués, español, polaco y ruso. No son subtítulos — son voces reales." },
+    "f2": { "title": "Viralízate en 5 idiomas", "desc": "Genera automáticamente clips cortos para TikTok, Reels y YouTube Shorts de cada episodio — en todos tus idiomas." },
+    "f3": { "title": "Subtítulos en cada idioma", "desc": "Genera automáticamente subtítulos para tus videos — incorporados o como archivos separados. Perfecto para los que ven sin sonido." },
+    "f4": { "title": "Tu programa, tu sitio", "desc": "Un sitio de podcast con tu marca, reproductor de episodios, notas multilingües y reseñas de oyentes." },
+    "f5": { "title": "Construye tu comunidad", "desc": "Recopila reseñas y testimonios de oyentes en su idioma nativo. Muestra al mundo que tu audiencia te ama." },
+    "podcaster1": { "reach": "190M de oyentes" },
+    "podcaster2": { "reach": "#1 en Brasil" },
+    "podcaster3": { "reach": "Top LATAM" }
+  },
+  "docs": {
+    "label": "Documentación",
+    "searchPlaceholder": "Buscar documentación...",
+    "noResults": "Sin resultados para",
+    "stillTitle": "¿Aún tienes una pregunta?",
+    "stillBody": "Abre un ticket de soporte. Cada pregunta que no se responde en la documentación se agrega aquí para que la próxima persona no tenga que preguntar.",
+    "stillCta": "Abrir ticket de soporte",
+    "howItWorks": {
+      "title": "Cómo funciona SignalBoost",
+      "q1": "¿Qué es SignalBoost?",
+      "a1": "SignalBoost es una plataforma de contenido multilingüe. Ayudamos a las empresas a construir sitios web, recopilar reseñas de clientes, producir contenido nativo de audio y video, y llegar a audiencias globales en 5 idiomas: inglés, portugués, español, polaco y ruso. No somos un servicio de traducción — creamos contenido nativo que suena y se lee como si fuera hecho por un local.",
+      "q2": "¿Para quién es SignalBoost?",
+      "a2": "Cualquiera que quiera llegar a una audiencia internacional. Desde una panadería en Lisboa que quiere un sitio web en portugués e inglés, hasta una red de podcasts que quiere llegar a oyentes en Brasil, Polonia y Rusia. Atendemos tanto a principiantes completos como a desarrolladores técnicos — la experiencia se adapta a tu nivel.",
+      "q3": "¿Qué NO hace SignalBoost?",
+      "a3": "No hacemos hardware ni equipo de grabación. No editamos audio en bruto (eliminar ruido de fondo, cortar errores). No alojamos feeds RSS de podcasts ni los enviamos a Spotify/Apple Podcasts. No producimos música ni intros. Somos honestos sobre nuestros límites.",
+      "q4": "¿Cómo funciona la IA?",
+      "a4": "SignalBoost usa IA para generar locución nativa, subtítulos, clips sociales, notas del programa, contenido del sitio y más. Nuestro agente de soporte con IA monitorea tu actividad y ayuda proactivamente cuando detecta que estás atascado — sin que tengas que pedirlo. Si la IA no puede resolver algo, trae soporte de IA adicional silenciosamente y luego escala a Luis (nuestro fundador) si aún no se resuelve."
+    },
+    "partners": {
+      "title": "Nuestros socios — total transparencia",
+      "q1": "¿Por qué SignalBoost recomienda ciertos proveedores?",
+      "a1": "Recomendamos proveedores en función de calidad, fiabilidad y valor. Los hemos probado todos. Algunas de nuestras recomendaciones incluyen enlaces de afiliados — significa que SignalBoost gana una comisión si te inscribes a través de nuestro enlace, sin costo adicional para ti. Siempre lo divulgamos claramente.",
+      "q2": "¿Qué proveedores recomiendan y por qué?",
+      "a2": "Dominios: Namecheap (mejor valor, DNS fácil), Cloudflare (precios al costo, SSL gratis). Hosting: Vercel (mejor rendimiento, plan gratuito), Netlify (excelente para sitios estáticos). IA de audio: ElevenLabs (las voces más naturales disponibles). No recomendamos proveedores que no hayamos probado nosotros mismos.",
+      "q3": "¿Las comisiones de socios afectan sus recomendaciones?",
+      "a3": "No. Listamos Cloudflare como opción de dominio aunque no paguen comisiones, porque son genuinamente buenos. Si un proveedor empeora respecto a sus competidores, lo diremos y los eliminaremos de nuestras recomendaciones, sin importar la comisión. La confianza de nuestros usuarios importa más que los ingresos por comisión.",
+      "q4": "¿SignalBoost puede conseguir un acuerdo de asociación que me beneficie?",
+      "a4": "Sí — buscamos activamente asociaciones que den a los usuarios de SignalBoost descuentos o pruebas extendidas. Si conseguimos un acuerdo, te pasamos el beneficio. Consulta nuestra página de precios para ver los beneficios actuales de socios."
+    },
+    "yourData": {
+      "title": "Tus datos y privacidad",
+      "q1": "¿Dónde se almacenan mis datos?",
+      "a1": "Los datos de tu cuenta y metadatos de proyecto se almacenan en Supabase — una plataforma de base de datos segura y de código abierto alojada en AWS. Tus archivos de audio y video se almacenan en Supabase Storage. Los archivos de tu sitio se despliegan vía Vercel. No almacenamos tus claves API en texto plano — están cifradas en reposo.",
+      "q2": "¿Quién puede ver mis datos?",
+      "a2": "Solo tú puedes ver tus proyectos y archivos. Luis (fundador) tiene acceso de administrador solo para fines de soporte y no accede a los datos de usuarios a menos que pidas ayuda. No vendemos tus datos a nadie. No los compartimos con terceros excepto los proveedores de infraestructura listados arriba.",
+      "q3": "¿Qué pasa si cancelo?",
+      "a3": "Mantienes el acceso hasta el final de tu período de facturación. Después de eso, tus datos se conservan 30 días por si quieres volver. Después de 30 días se eliminan permanentemente. Puedes solicitar la eliminación inmediata en cualquier momento abriendo un ticket de soporte en esta página.",
+      "q4": "¿Cómo elimino mi cuenta?",
+      "a4": "Abre un ticket de soporte desde esta página con el asunto \"Eliminar mi cuenta\" enviado desde tu correo registrado. Eliminaremos todo en 48 horas y confirmaremos cuando esté hecho. Sin preguntas."
+    },
+    "aiSupport": {
+      "title": "Soporte con IA — cómo funciona",
+      "q1": "¿Cómo funciona el sistema de soporte con IA?",
+      "a1": "SignalBoost monitorea tu actividad en tiempo real. Si pasas más de 3 minutos en la misma página, haces clic repetidamente sin progreso, o encuentras un error — la IA se abre proactivamente y ofrece ayuda. Ya conoce tu cuenta, tu plan, tu página actual y lo que salió mal. Nunca tienes que explicar tu situación desde cero.",
+      "q2": "¿Qué pasa cuando la IA no puede resolver mi problema?",
+      "a2": "La IA escala sin problemas. Primero trae razonamiento adicional de IA para analizar el problema desde otro ángulo. Las dos IA trabajan juntas silenciosamente y te presentan una solución combinada. Si aún no se resuelve, Luis es notificado automáticamente con el contexto completo de la conversación y responderá personalmente.",
+      "q3": "¿Qué NO puede hacer la IA?",
+      "a3": "La IA no puede tomar decisiones de compra por ti, acceder a tu banco o tarjeta de crédito, enviar cosas en tu nombre a servicios de terceros, o garantizar la resolución de problemas causados por proveedores terceros (como caídas de Vercel o retrasos de DNS de Namecheap). En esos casos te explicará claramente qué está pasando y qué necesitas hacer.",
+      "q4": "¿Mi conversación de soporte es privada?",
+      "a4": "Sí. Tus conversaciones de soporte son privadas y solo visibles para ti y el soporte de SignalBoost (Luis). No se usan para entrenar modelos de IA. Las conversaciones se conservan 90 días por motivos de calidad y luego se eliminan."
+    },
+    "pricing": {
+      "title": "Planes, precios y almacenamiento",
+      "q1": "¿Cuáles son los límites del plan?",
+      "a1": "Gratis: 1 proyecto, 1 idioma, solo vista previa con marca de agua, créditos de IA limitados. Inicial ($15/mes): 1 sitio publicado, 2 idiomas, ~50 generaciones de audio/mes. Pro ($39/mes): 5 sitios, los 5 idiomas, ~200 generaciones de audio/mes, herramientas de video. Empresarial ($99/mes): sitios ilimitados, todos los idiomas más personalizados, marca blanca. Los planes de podcast son separados — consulta la página Podcasters para más detalles.",
+      "q2": "¿Los socios empresariales obtienen prueba gratuita?",
+      "a2": "Sí — los socios empresariales obtienen 30 días gratis en el plan Inicial únicamente. Esto te da acceso a 2 idiomas, recolector de reseñas y audio nativo para probar la plataforma. Si necesitas funciones Pro o Empresarial, esos planes requieren pago desde el primer día.",
+      "q3": "¿Por qué hay límites de proyecto y almacenamiento?",
+      "a3": "El almacenamiento cuesta dinero. Los archivos de audio y video pueden ser grandes — un episodio de podcast de 10 minutos puede tener 50-100MB. Sin límites, un pequeño número de usuarios pesados haría la plataforma inviable para todos los demás. Los límites están diseñados para que el plan gratuito cubra a la mayoría de las personas que empiezan, y los planes pagos cubran el uso profesional.",
+      "q4": "¿Qué pasa cuando alcanzo mi límite?",
+      "a4": "Verás un aviso claro antes de alcanzar el límite. Cuando lo alcances, no podrás crear nuevos proyectos hasta que elimines uno existente o hagas upgrade. Nunca eliminamos tus datos ni te bloqueamos — solo pausamos la creación de nuevos hasta resolverlo.",
+      "q5": "¿Cómo cancelo?",
+      "a5": "Cancela en cualquier momento desde tu panel en Configuración, o abre un ticket de soporte desde esta página. Sin tarifas de cancelación. Mantienes el acceso hasta el final del período de facturación. No dificultamos la cancelación a propósito — si quieres irte, lo hacemos fácil."
+    },
+    "gettingStarted": {
+      "title": "Guías para empezar",
+      "q1": "¿Cómo construyo mi primer sitio web?",
+      "a1": "Ve al Panel y haz clic en Constructor de sitios. Si eres principiante, la IA te guiará por el proceso de forma conversacional — solo cuéntale sobre tu negocio. Si eres técnico, puedes usar el constructor completo directamente. De cualquier forma, la IA está ahí para ayudar en cada paso.",
+      "q2": "¿Cómo configuro un podcast?",
+      "a2": "Ve a la página Podcasters y elige un plan. Una vez suscrito, ve al Panel, luego Audio nativo, luego sube tu episodio. Soportamos MP3, MP4, WAV y más. Importante: tráenos tu episodio terminado y editado. No hacemos edición de audio en bruto. Generamos locución, subtítulos, clips y notas del programa desde tu archivo final.",
+      "q3": "¿Cómo recopilo reseñas?",
+      "a3": "Ve al Panel y luego al Recolector de reseñas. Recibirás un enlace de reseña para compartir con tus clientes. Las reseñas aparecen en los idiomas elegidos automáticamente. Puedes incrustar el widget de reseñas en tu sitio SignalBoost o en cualquier sitio externo.",
+      "q4": "¿Cómo conecto mi propio dominio?",
+      "a4": "Pasa por el asistente de onboarding o ve al Panel, luego Configuración, luego Dominio. Necesitarás actualizar tus registros DNS en tu proveedor de dominio para apuntar a SignalBoost. La IA te dará los registros exactos para copiar. Los cambios DNS tardan de 15 minutos a 48 horas en propagarse mundialmente."
+    }
   }
 }

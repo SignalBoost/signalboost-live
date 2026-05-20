@@ -63,7 +63,10 @@ export default function DashboardOverviewPage() {
   const [hasTyped, setHasTyped] = useState(false)
   // Greeting shows once per browser tab session. Persisted via sessionStorage
   // so navigating away and back does NOT re-show it.
-  const [greetingTimedOut, setGreetingTimedOut] = useState(false)
+  const [greetingTimedOut, setGreetingTimedOut] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return sessionStorage.getItem('greetingDismissed') === '1'
+  })
   const promptRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {

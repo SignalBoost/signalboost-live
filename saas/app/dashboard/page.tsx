@@ -1,7 +1,6 @@
 'use client'
 import React, { useEffect, useState, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import TeamManager from '@/components/TeamManager'
 import AuthModal from '@/components/AuthModal'
 import { supabase } from '@/utils/supabase/client'
@@ -38,7 +37,6 @@ const RETURNING_PROMPTS = [
 type Message = { role: 'user' | 'assistant'; content: string }
 
 export default function DashboardOverviewPage() {
-  const router = useRouter()
   const [userId, setUserId] = useState<string | null>(null)
   const [firstName, setFirstName] = useState<string | null>(null)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -303,7 +301,11 @@ export default function DashboardOverviewPage() {
           <button onClick={() => { setPromptOpen(false); setPromptMessages([]); setHasTyped(false) }}
             style={{ marginTop: 12, fontSize: 11, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
             Clear conversation
-          </button> <div style={{ marginBottom: 32 }}>
+          </button>
+        )}
+      </div>
+
+      <div style={{ marginBottom: 32 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div>
             <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, letterSpacing: '-0.01em' }}>{projectsTitle}</h2>
@@ -514,5 +516,3 @@ export default function DashboardOverviewPage() {
     </div>
   )
 }
-        )}
-      </div>

@@ -12,6 +12,26 @@
   "collectReviews": "Recopilar reseñas",
   "generateAudio": "Generar audio",
   "createVideos": "Crear videos",
+  "auth": {
+    "welcomeBack": "Bienvenido de nuevo",
+    "createAccount": "Crea tu cuenta gratis",
+    "continueGoogle": "Continuar con Google",
+    "continueGitHub": "Continuar con GitHub",
+    "or": "o",
+    "namePlaceholder": "Tu nombre completo",
+    "emailPlaceholder": "Correo electrónico",
+    "passwordPlaceholder": "Contraseña",
+    "freePlanNote": "Empezarás en el plan Gratis — esboza un sitio en un idioma con marca de agua. Mejora cuando quieras para publicar de verdad.",
+    "errorNoName": "Por favor, introduce tu nombre.",
+    "checkEmail": "¡Revisa tu correo para confirmar tu cuenta!",
+    "pleaseWait": "Espera...",
+    "logIn": "Iniciar sesión",
+    "createFreeAccount": "Crear cuenta gratis",
+    "noAccount": "¿No tienes una cuenta?",
+    "signUpFree": "Regístrate gratis",
+    "haveAccount": "¿Ya tienes una cuenta?",
+    "logInLink": "Iniciar sesión"
+  },
   "hero": {
     "badge": "Construye · Reseña · Difunde",
     "headlines": [

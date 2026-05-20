@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/utils/supabase/client'
 import AuthModal from './AuthModal'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { t } from '@/lib/i18n/t'
 
 const GOLD = '#ffc300'
 
@@ -106,27 +107,27 @@ export default function Navbar() {
 
   const navLinks = [
     {
-      label: dict.home || 'Home',
+      label: t(dict, 'home', 'Home'),
       href: '/',
     },
     {
-      label: dict.podcasters || 'Podcasters',
+      label: t(dict, 'podcasters', 'Podcasters'),
       href: '/podcasters',
     },
     ...(user
       ? []
       : [
           {
-            label: dict.dashboard || 'Dashboard',
+            label: t(dict, 'dashboard', 'Dashboard'),
             href: '/dashboard',
           },
         ]),
     {
-      label: dict.pricing || 'Pricing',
+      label: t(dict, 'pricing', 'Pricing'),
       href: '/pricing',
     },
     {
-      label: dict.docs || 'Docs',
+      label: t(dict, 'docs', 'Docs'),
       href: '/docs',
     },
   ]
@@ -134,22 +135,22 @@ export default function Navbar() {
   const toolLinks = [
     {
       icon: '🌐',
-      label: dict.buildWebsite || 'Build a website',
+      label: t(dict, 'buildWebsite', 'Build a website'),
       href: '/dashboard/builder',
     },
     {
       icon: '⭐',
-      label: dict.collectReviews || 'Collect reviews',
+      label: t(dict, 'collectReviews', 'Collect reviews'),
       href: '/dashboard/reviews',
     },
     {
       icon: '🎙️',
-      label: dict.generateAudio || 'Generate audio',
+      label: t(dict, 'generateAudio', 'Generate audio'),
       href: '/dashboard/audio',
     },
     {
       icon: '🎬',
-      label: dict.createVideos || 'Create videos',
+      label: t(dict, 'createVideos', 'Create videos'),
       href: '/dashboard/video',
     },
   ]
@@ -197,7 +198,8 @@ export default function Navbar() {
             signal<span style={{ color: GOLD }}>boost</span>
           </span>
         </Link>
-                <div
+
+        <div
           style={{
             display: 'flex',
             gap: 24,
@@ -264,7 +266,7 @@ export default function Navbar() {
                 cursor: 'pointer',
               }}
             >
-              {dict.logout || 'Log out'}
+              {t(dict, 'logout', 'Log out')}
             </button>
           ) : (
             <button
@@ -279,7 +281,7 @@ export default function Navbar() {
                 cursor: 'pointer',
               }}
             >
-              {dict.getStarted || 'Get started'}
+              {t(dict, 'getStarted', 'Get started')}
             </button>
           )}
         </div>

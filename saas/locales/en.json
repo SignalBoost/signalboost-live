@@ -12,6 +12,58 @@
   "collectReviews": "Collect reviews",
   "generateAudio": "Generate audio",
   "createVideos": "Create videos",
+  "dash": {
+    "askPlaceholder": "Ask SignalBoost anything...",
+    "askButton": "Ask",
+    "startHere": "Start here",
+    "continueWhere": "Continue where you left off",
+    "projectsTitle": "Your projects",
+    "projectsTitleNamed": "{name}'s projects",
+    "upgrade": "Upgrade",
+    "newProject": "+ New project",
+    "noProjects": "No projects yet",
+    "noProjectsSub": "Create your first project above",
+    "lastEdited": "Last edited",
+    "open": "Open",
+    "team": "Team",
+    "loadingTeam": "Loading team...",
+    "feedback": "Share feedback — every message helps improve SignalBoost",
+    "connectionError": "Having trouble connecting. Please try again.",
+    "actions": {
+      "website": { "label": "Build a website", "subline": "Create or edit your online presence" },
+      "review": { "label": "Collect reviews", "subline": "Get feedback and testimonials" },
+      "podcast": { "label": "Generate native audio", "subline": "Create voice content in multiple languages" },
+      "video": { "label": "Create videos", "subline": "Turn content into visual assets" }
+    },
+    "prompts": {
+      "new": {
+        "p1": "What plan is right for me?",
+        "p2": "How do I build my first website?",
+        "p3": "What languages do you support?",
+        "p4": "How does the free plan work?"
+      },
+      "returning": {
+        "p1": "How do I add a new language?",
+        "p2": "How do I upload a podcast episode?",
+        "p3": "How do I collect reviews?",
+        "p4": "How do I upgrade my plan?"
+      }
+    },
+    "stats": {
+      "activeSites": "Active sites",
+      "projects": "Projects",
+      "audioGenerated": "Audio generated",
+      "videosCreated": "Videos created",
+      "min": "min"
+    },
+    "time": {
+      "daysShort": "d",
+      "hoursShort": "h",
+      "minsShort": "m",
+      "ago": "ago",
+      "justNow": "Just now"
+    }
+  },
   "auth": {
     "welcomeBack": "Welcome back",
     "createAccount": "Create your free account",

@@ -12,6 +12,26 @@
   "collectReviews": "Zbieraj opinie",
   "generateAudio": "Generuj audio",
   "createVideos": "Twórz wideo",
+  "auth": {
+    "welcomeBack": "Witaj ponownie",
+    "createAccount": "Stwórz darmowe konto",
+    "continueGoogle": "Kontynuuj z Google",
+    "continueGitHub": "Kontynuuj z GitHub",
+    "or": "lub",
+    "namePlaceholder": "Twoje imię i nazwisko",
+    "emailPlaceholder": "Adres e-mail",
+    "passwordPlaceholder": "Hasło",
+    "freePlanNote": "Zaczniesz od planu Darmowego — naszkicuj jedną stronę w jednym języku ze znakiem wodnym. Ulepsz w dowolnym momencie, aby opublikować na poważnie.",
+    "errorNoName": "Proszę podać swoje imię.",
+    "checkEmail": "Sprawdź swój e-mail, aby potwierdzić konto!",
+    "pleaseWait": "Proszę czekać...",
+    "logIn": "Zaloguj się",
+    "createFreeAccount": "Stwórz darmowe konto",
+    "noAccount": "Nie masz konta?",
+    "signUpFree": "Zarejestruj się za darmo",
+    "haveAccount": "Masz już konto?",
+    "logInLink": "Zaloguj się"
+  },
   "hero": {
     "badge": "Twórz · Recenzuj · Nadawaj",
     "headlines": [

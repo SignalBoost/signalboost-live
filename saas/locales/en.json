@@ -12,6 +12,26 @@
   "collectReviews": "Collect reviews",
   "generateAudio": "Generate audio",
   "createVideos": "Create videos",
+  "auth": {
+    "welcomeBack": "Welcome back",
+    "createAccount": "Create your free account",
+    "continueGoogle": "Continue with Google",
+    "continueGitHub": "Continue with GitHub",
+    "or": "or",
+    "namePlaceholder": "Your full name",
+    "emailPlaceholder": "Email address",
+    "passwordPlaceholder": "Password",
+    "freePlanNote": "You will start on the Free plan — sketch one website in one language with a watermark. Upgrade anytime to publish for real.",
+    "errorNoName": "Please enter your name.",
+    "checkEmail": "Check your email to confirm your account!",
+    "pleaseWait": "Please wait...",
+    "logIn": "Log in",
+    "createFreeAccount": "Create free account",
+    "noAccount": "Do not have an account?",
+    "signUpFree": "Sign up free",
+    "haveAccount": "Already have an account?",
+    "logInLink": "Log in"
+  },
   "hero": {
     "badge": "Build · Review · Broadcast",
     "headlines": [

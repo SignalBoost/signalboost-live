@@ -117,5 +117,104 @@
       "f6": "Relatórios avançados",
       "f7": "API e integrações"
     }
-  }
-}
+  },
+  "podcasters_page": {
+    "badge": "Para podcasters",
+    "heroLine1": "Você grava.",
+    "heroLine2Pre": "Nós levamos para o",
+    "heroLine2Highlight": "mundo.",
+    "heroSubhead": "Locução nativa com IA, legendas multilíngues, geração de clipes e um site de podcast com sua marca — tudo em uma plataforma.",
+    "heroNote": "Nós não fazemos hardware ou edição de áudio bruto. Traga seu episódio finalizado e cuidamos de tudo depois disso.",
+    "ctaSeePlans": "Ver planos",
+    "ctaHow": "Como funciona",
+    "howTitle": "Como funciona",
+    "deliverTitle": "O que entregamos",
+    "deliverSubtitle": "Tudo depois da gravação. Você foca no conteúdo e nós cuidamos da distribuição global.",
+    "plansTitle": "Planos para podcasts",
+    "plansSubtitle": "Esboce sua ideia gratuitamente com nosso plano de prévia, depois escolha um plano de podcast quando estiver pronto para publicar.",
+    "mostPopular": "Mais popular",
+    "perMonth": "/mês",
+    "noCommitment": "Sem compromisso, cancele a qualquer momento",
+    "readyTitle": "Pronto para alcançar o mundo?",
+    "readyDesc": "Você grava. Nós cuidamos do resto — locução, legendas, clipes, site e avaliações em 5 idiomas.",
+    "readyCta": "Ver planos para podcasts",
+    "stats": {
+      "languages": "Idiomas",
+      "turnaround": "Tempo de entrega",
+      "captionFormats": "Formatos de legendas",
+      "freeSketch": "Esboço grátis",
+      "noCommitment": "Sem compromisso"
+    },
+    "how": {
+      "s1": { "title": "Envie seu episódio", "desc": "Solte seu arquivo de áudio ou vídeo finalizado. Suportamos MP3, MP4, WAV e mais. Sem edição bruta necessária." },
+      "s2": { "title": "Escolha seus idiomas", "desc": "Selecione quais idiomas você quer. Escolha entre inglês, português, espanhol, polonês e russo." },
+      "s3": { "title": "Nós geramos tudo", "desc": "Locução nativa com IA, legendas, clipes curtos, notas do programa traduzidas — tudo automático." },
+      "s4": { "title": "Publique em todo lugar", "desc": "Baixe seus episódios multilíngues ou publique diretamente no seu site SignalBoost." }
+    },
+    "deliver": {
+      "d1": { "title": "Locução nativa com IA", "desc": "Seu episódio dublado em português, espanhol, polonês e russo com vozes de IA com som natural." },
+      "d2": { "title": "Legendas multilíngues", "desc": "Legendas geradas automaticamente em todos os seus idiomas. Baixe como SRT, VTT ou queime no vídeo." },
+      "d3": { "title": "Clipes sociais", "desc": "Clipes curtos para TikTok, Instagram Reels e YouTube Shorts — em todos os idiomas." },
+      "d4": { "title": "Notas do programa traduzidas", "desc": "Resumos de episódios escritos nativamente em cada idioma — não traduzidos automaticamente." },
+      "d5": { "title": "Site de podcast", "desc": "Um site com sua marca, player de episódios, notas do programa e seletor de idiomas multilíngue." },
+      "d6": { "title": "Avaliações de ouvintes", "desc": "Colete e exiba depoimentos de ouvintes em seu idioma nativo." }
+    },
+    "plans": {
+      "indie": {
+        "name": "Indie",
+        "description": "Perfeito para podcasters independentes começando globalmente.",
+        "cta": "Começar",
+        "f1": "1 programa", "f2": "4 episódios por mês", "f3": "2 idiomas", "f4": "Locução nativa com IA",
+        "f5": "Legendas em 2 idiomas", "f6": "Geração básica de clipes (5 clipes por episódio)",
+        "f7": "Site de podcast", "f8": "Avaliações de ouvintes", "f9": "Suporte por e-mail"
+      },
+      "pro": {
+        "name": "Pro",
+        "description": "Para podcasters sérios que querem alcance global.",
+        "cta": "Começar",
+        "f1": "3 programas", "f2": "Episódios ilimitados", "f3": "Todos os 5 idiomas",
+        "f4": "Locução nativa com IA (prioridade)", "f5": "Legendas em todos os 5 idiomas",
+        "f6": "Fábrica de clipes (clipes ilimitados)", "f7": "Site de podcast multilíngue",
+        "f8": "Avaliações de ouvintes e análises", "f9": "Transcrição em todos os idiomas",
+        "f10": "Suporte prioritário"
+      },
+      "network": {
+        "name": "Rede",
+        "description": "Para redes de podcasts gerenciando múltiplos programas.",
+        "cta": "Fale conosco",
+        "f1": "Programas ilimitados", "f2": "Episódios ilimitados", "f3": "Todos os 5 idiomas mais personalizados",
+        "f4": "Locução nativa com IA (dedicada)", "f5": "Formatos de legenda personalizados (SRT, VTT, ASS)",
+        "f6": "Fábrica de clipes (ilimitado)", "f7": "Site marca branca", "f8": "Suite completa de análises",
+        "f9": "Acesso à API", "f10": "Gerente de conta dedicado", "f11": "Garantia SLA"
+      }
+    }
+  },
+  "podcastSection": {
+    "badge": "Para podcasters",
+    "headlineLine1": "Você grava.",
+    "headlineLine2Pre": "Nós levamos para o",
+    "headlineLine2Highlight": "mundo.",
+    "intro": "Quando seu episódio é gravado, a SignalBoost cuida de todo o resto — locução nativa em 5 idiomas, legendas, clipes sociais, seu site de podcast e avaliações de ouvintes.",
+    "note": "Nós não fazemos hardware ou edição de áudio bruto — apenas traga seu episódio finalizado.",
+    "ctaPlans": "Ver planos para podcasts",
+    "ctaHow": "Como funciona",
+    "f1": { "title": "Soe como um local", "desc": "Convertemos seu episódio em áudio com som nativo em português, espanhol, polonês e russo. Não são legendas — são vozes reais." },
+    "f2": { "title": "Viralize em 5 idiomas", "desc": "Gere automaticamente clipes curtos para TikTok, Reels e YouTube Shorts de cada episódio — em todos os seus idiomas." },
+    "f3": { "title": "Legendas em todos os idiomas", "desc": "Gere automaticamente legendas para seus vídeos — incorporadas ou como arquivos separados. Perfeito para quem assiste sem som." },
+    "f4": { "title": "Seu programa, seu site", "desc": "Um site de podcast com sua marca, player de episódios, notas multilíngues e avaliações de ouvintes." },
+    "f5": { "title": "Construa sua comunidade", "desc": "Colete avaliações e depoimentos de ouvintes em seu idioma nativo. Mostre ao mundo que seu público te ama." },
+    "podcaster1": { "reach": "190M de ouvintes" },
+    "podcaster2": { "reach": "#1 no Brasil" },
+    "podcaster3": { "reach": "Top LATAM" }
+  },
+  "docs": {
+    "label": "Documentação",
+    "searchPlaceholder": "Pesquisar documentação...",
+    "noResults": "Nenhum resultado para",
+    "stillTitle": "Ainda tem uma pergunta?",
+    "stillBody": "Abra um ticket de suporte. Toda pergunta que não é respondida na documentação é adicionada aqui para que a próxima pessoa não precise perguntar.",
+    "stillCta": "Abrir ticket de suporte",
+    "howItWorks": {
+      "title": "Como a SignalBoost funciona",
+      "q1": "O que é a SignalBoost?",
+      "a1": "A SignalBoost é uma plataforma de conteúdo multilíngue. Ajudamos emp

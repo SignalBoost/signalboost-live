@@ -12,6 +12,58 @@
   "collectReviews": "Coletar avaliações",
   "generateAudio": "Gerar áudio",
   "createVideos": "Criar vídeos",
+  "dash": {
+    "askPlaceholder": "Pergunte qualquer coisa à SignalBoost...",
+    "askButton": "Perguntar",
+    "startHere": "Comece aqui",
+    "continueWhere": "Continue de onde parou",
+    "projectsTitle": "Seus projetos",
+    "projectsTitleNamed": "Projetos de {name}",
+    "upgrade": "Fazer upgrade",
+    "newProject": "+ Novo projeto",
+    "noProjects": "Nenhum projeto ainda",
+    "noProjectsSub": "Crie seu primeiro projeto acima",
+    "lastEdited": "Editado",
+    "open": "Abrir",
+    "team": "Equipe",
+    "loadingTeam": "Carregando equipe...",
+    "feedback": "Compartilhe feedback — cada mensagem ajuda a melhorar a SignalBoost",
+    "connectionError": "Problema de conexão. Tente novamente.",
+    "actions": {
+      "website": { "label": "Criar um site", "subline": "Crie ou edite sua presença online" },
+      "review": { "label": "Coletar avaliações", "subline": "Receba feedback e depoimentos" },
+      "podcast": { "label": "Gerar áudio nativo", "subline": "Crie conteúdo de voz em vários idiomas" },
+      "video": { "label": "Criar vídeos", "subline": "Transforme conteúdo em recursos visuais" }
+    },
+    "prompts": {
+      "new": {
+        "p1": "Qual plano é ideal para mim?",
+        "p2": "Como construo meu primeiro site?",
+        "p3": "Quais idiomas vocês suportam?",
+        "p4": "Como funciona o plano grátis?"
+      },
+      "returning": {
+        "p1": "Como adiciono um novo idioma?",
+        "p2": "Como envio um episódio de podcast?",
+        "p3": "Como coleto avaliações?",
+        "p4": "Como faço upgrade do meu plano?"
+      }
+    },
+    "stats": {
+      "activeSites": "Sites ativos",
+      "projects": "Projetos",
+      "audioGenerated": "Áudio gerado",
+      "videosCreated": "Vídeos criados",
+      "min": "min"
+    },
+    "time": {
+      "daysShort": "d",
+      "hoursShort": "h",
+      "minsShort": "min",
+      "ago": "atrás",
+      "justNow": "Agora mesmo"
+    }
+  },
   "auth": {
     "welcomeBack": "Bem-vindo de volta",
     "createAccount": "Crie sua conta grátis",

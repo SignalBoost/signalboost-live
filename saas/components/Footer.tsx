@@ -1,11 +1,14 @@
 'use client'
 import Link from 'next/link'
+import { useI18n } from '@/components/i18n/I18nProvider'
+import { t } from '@/lib/i18n/t'
 
 const GOLD = '#ffc300'
 
 const CONTACT_EMAIL = 'support@signalboostapp.com'
 
 export default function Footer() {
+  const { dict } = useI18n()
   const year = new Date().getFullYear()
 
   return (
@@ -47,9 +50,11 @@ export default function Footer() {
               marginBottom: 10,
             }}
           >
-            SignalBoost helps businesses grow with native websites,
-            customer reviews, audio, video and AI-powered content —
-            built for how people actually speak.
+            {t(
+              dict,
+              'footer.tagline',
+              'SignalBoost helps businesses grow with native websites, customer reviews, audio, video and AI-powered content — built for how people actually speak.'
+            )}
           </p>
 
           <div
@@ -58,7 +63,7 @@ export default function Footer() {
               color: 'var(--text-faint)',
             }}
           >
-            Learn how SignalBoost works —{' '}
+            {t(dict, 'footer.learnHow', 'Learn how SignalBoost works')} —{' '}
             <Link
               href="/docs"
               style={{
@@ -66,7 +71,7 @@ export default function Footer() {
                 textDecoration: 'none',
               }}
             >
-              read the documentation
+              {t(dict, 'footer.readDocs', 'read the documentation')}
             </Link>
           </div>
         </div>
@@ -93,7 +98,7 @@ export default function Footer() {
                 marginBottom: 14,
               }}
             >
-              Product
+              {t(dict, 'footer.product', 'Product')}
             </div>
 
             <div
@@ -104,11 +109,11 @@ export default function Footer() {
               }}
             >
               {[
-                { label: 'Home', href: '/' },
-                { label: 'Pricing', href: '/pricing' },
-                { label: 'Dashboard', href: '/dashboard' },
-                { label: 'Documentation', href: '/docs' },
-                { label: 'Podcasters', href: '/podcasters' },
+                { label: t(dict, 'home', 'Home'), href: '/' },
+                { label: t(dict, 'pricing', 'Pricing'), href: '/pricing' },
+                { label: t(dict, 'dashboard', 'Dashboard'), href: '/dashboard' },
+                { label: t(dict, 'footer.documentation', 'Documentation'), href: '/docs' },
+                { label: t(dict, 'podcasters', 'Podcasters'), href: '/podcasters' },
               ].map(item => (
                 <Link
                   key={item.href}
@@ -144,7 +149,7 @@ export default function Footer() {
                 marginBottom: 14,
               }}
             >
-              Build
+              {t(dict, 'footer.build', 'Build')}
             </div>
 
             <div
@@ -156,19 +161,19 @@ export default function Footer() {
             >
               {[
                 {
-                  label: 'Build a website',
+                  label: t(dict, 'buildWebsite', 'Build a website'),
                   href: '/dashboard/builder',
                 },
                 {
-                  label: 'Collect reviews',
+                  label: t(dict, 'collectReviews', 'Collect reviews'),
                   href: '/dashboard/reviews',
                 },
                 {
-                  label: 'Generate native audio',
+                  label: t(dict, 'footer.generateNativeAudio', 'Generate native audio'),
                   href: '/dashboard/audio',
                 },
                 {
-                  label: 'Create videos',
+                  label: t(dict, 'createVideos', 'Create videos'),
                   href: '/dashboard/video',
                 },
               ].map(item => (
@@ -206,7 +211,7 @@ export default function Footer() {
                 marginBottom: 14,
               }}
             >
-              Company
+              {t(dict, 'footer.company', 'Company')}
             </div>
 
             <div
@@ -218,19 +223,19 @@ export default function Footer() {
             >
               {[
                 {
-                  label: 'About',
+                  label: t(dict, 'footer.about', 'About'),
                   href: '/docs#how-it-works',
                 },
                 {
-                  label: 'Partners',
+                  label: t(dict, 'footer.partners', 'Partners'),
                   href: '/docs#partners',
                 },
                 {
-                  label: 'Privacy',
+                  label: t(dict, 'footer.privacy', 'Privacy'),
                   href: '/docs#your-data',
                 },
                 {
-                  label: 'Contact',
+                  label: t(dict, 'footer.contact', 'Contact'),
                   href: `mailto:${CONTACT_EMAIL}`,
                 },
               ].map(item => (
@@ -276,7 +281,7 @@ export default function Footer() {
               marginBottom: 10,
             }}
           >
-            Native experiences available in
+            {t(dict, 'footer.nativeExperiences', 'Native experiences available in')}
           </div>
 
           <div
@@ -336,7 +341,7 @@ export default function Footer() {
               color: 'var(--text-faint)',
             }}
           >
-            Powered by{' '}
+            {t(dict, 'footer.poweredBy', 'Powered by')}{' '}
             <span style={{ color: GOLD }}>
               SignalBoost AI
             </span>

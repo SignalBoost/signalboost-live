@@ -4,6 +4,8 @@ import Link from 'next/link'
 import TeamManager from '@/components/TeamManager'
 import AuthModal from '@/components/AuthModal'
 import { supabase } from '@/utils/supabase/client'
+import { useI18n } from '@/components/i18n/I18nProvider'
+import { t } from '@/lib/i18n/t'
 import {
   getProjects,
   createProject,
@@ -14,7 +16,7 @@ import {
   STATUS_COLORS,
   Project,
 } from '@/lib/projects'
-import { getGreetingForUser } from '@/lib/cultural-calendar'
+import { getGreeting, SupportedLocale } from '@/lib/cultural-calendar'
 
 const LANGS = [
   'English',
@@ -29,57 +31,14 @@ const BLUE_DIM = 'rgba(59,130,246,0.12)'
 const BLUE_BORDER = 'rgba(59,130,246,0.3)'
 const GOLD = '#ffc300'
 
-const QUICK_ACTIONS = [
-  {
-    type: 'website' as const,
-    icon: '🌐',
-    label: 'Build a website',
-    subline: 'Create or edit your online presence',
-    href: '/dashboard/builder',
-  },
-  {
-    type: 'review' as const,
-    icon: '⭐',
-    label: 'Collect reviews',
-    subline: 'Get feedback and testimonials',
-    href: '/dashboard/reviews',
-  },
-  {
-    type: 'podcast' as const,
-    icon: '🎙️',
-    label: 'Generate native audio',
-    subline: 'Create voice content in multiple languages',
-    href: '/dashboard/audio',
-  },
-  {
-    type: 'video' as const,
-    icon: '🎬',
-    label: 'Create videos',
-    subline: 'Turn content into visual assets',
-    href: '/dashboard/video',
-  },
-]
-
-const NEW_USER_PROMPTS = [
-  'What plan is right for me?',
-  'How do I build my first website?',
-  'What languages do you support?',
-  'How does the free plan work?',
-]
-
-const RETURNING_PROMPTS = [
-  'How do I add a new language?',
-  'How do I upload a podcast episode?',
-  'How do I collect reviews?',
-  'How do I upgrade my plan?',
-]
-
 type Message = {
   role: 'user' | 'assistant'
   content: string
 }
 
 export default function DashboardOverviewPage() {
+  const { dict, lang } = useI18n()
+
   const [userId, setUserId] = useState<string | null>(null)
   const [firstName, setFirstName] = useState<string | null>(null)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -105,6 +64,51 @@ export default function DashboardOverviewPage() {
   const [hasTyped, setHasTyped] = useState(false)
 
   const promptRef = useRef<HTMLDivElement>(null)
+
+  const QUICK_ACTIONS = [
+    {
+      type: 'website' as const,
+      icon: '🌐',
+      label: t(dict, 'dash.actions.website.label', 'Build a website'),
+      subline: t(dict, 'dash.actions.website.subline', 'Create or edit your online presence'),
+      href: '/dashboard/builder',
+    },
+    {
+      type: 'review' as const,
+      icon: '⭐',
+      label: t(dict, 'dash.actions.review.label', 'Collect reviews'),
+      subline: t(dict, 'dash.actions.review.subline', 'Get feedback and testimonials'),
+      href: '/dashboard/reviews',
+    },
+    {
+      type: 'podcast' as const,
+      icon: '🎙️',
+      label: t(dict, 'dash.actions.podcast.label', 'Generate native audio'),
+      subline: t(dict, 'dash.actions.podcast.subline', 'Create voice content in multiple languages'),
+      href: '/dashboard/audio',
+    },
+    {
+      type: 'video' as const,
+      icon: '🎬',
+      label: t(dict, 'dash.actions.video.label', 'Create videos'),
+      subline: t(dict, 'dash.actions.video.subline', 'Turn content into visual assets'),
+      href: '/dashboard/video',
+    },
+  ]
+
+  const NEW_USER_PROMPTS = [
+    t(dict, 'dash.prompts.new.p1', 'What plan is right for me?'),
+    t(dict, 'dash.prompts.new.p2', 'How do I build my first website?'),
+    t(dict, 'dash.prompts.new.p3', 'What languages do you support?'),
+    t(dict, 'dash.prompts.new.p4', 'How does the free plan work?'),
+  ]
+
+  const RETURNING_PROMPTS = [
+    t(dict, 'dash.prompts.returning.p1', 'How do I add a new language?'),
+    t(dict, 'dash.prompts.returning.p2', 'How do I upload a podcast episode?'),
+    t(dict, 'dash.prompts.returning.p3', 'How do I collect reviews?'),
+    t(dict, 'dash.prompts.returning.p4', 'How do I upgrade my plan?'),
+  ]
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -168,6 +172,7 @@ export default function DashboardOverviewPage() {
             userName: firstName,
             currentPage: 'Dashboard',
             userPlan: plan,
+            language: lang,
           },
         }),
       })
@@ -186,7 +191,7 @@ export default function DashboardOverviewPage() {
         ...prev,
         {
           role: 'assistant',
-          content: 'Having trouble connecting. Please try again.',
+          content: t(dict, 'dash.connectionError', 'Having trouble connecting. Please try again.'),
         },
       ])
     }
@@ -242,19 +247,19 @@ export default function DashboardOverviewPage() {
     const hours = Math.floor(mins / 60)
     const days = Math.floor(hours / 24)
 
-    if (days > 0) return `${days}d ago`
-    if (hours > 0) return `${hours}h ago`
-    if (mins > 0) return `${mins}m ago`
+    if (days > 0) return `${days}${t(dict, 'dash.time.daysShort', 'd')} ${t(dict, 'dash.time.ago', 'ago')}`
+    if (hours > 0) return `${hours}${t(dict, 'dash.time.hoursShort', 'h')} ${t(dict, 'dash.time.ago', 'ago')}`
+    if (mins > 0) return `${mins}${t(dict, 'dash.time.minsShort', 'm')} ${t(dict, 'dash.time.ago', 'ago')}`
 
-    return 'Just now'
+    return t(dict, 'dash.time.justNow', 'Just now')
   }
 
   const isNewUser = projectsLoaded && projects.length === 0
 
   const greetingData = useMemo(
-    () => getGreetingForUser({ firstName, isNewUser, isLoggedIn }),
+    () => getGreeting(lang as SupportedLocale, { firstName, isNewUser, isLoggedIn }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [projectsLoaded, isLoggedIn, firstName]
+    [projectsLoaded, isLoggedIn, firstName, lang]
   )
 
   const promptSuggestions = isNewUser
@@ -262,8 +267,8 @@ export default function DashboardOverviewPage() {
     : RETURNING_PROMPTS
 
   const projectsTitle = firstName
-    ? `${firstName}'s projects`
-    : 'Your projects'
+    ? t(dict, 'dash.projectsTitleNamed', "{name}'s projects").replace('{name}', firstName)
+    : t(dict, 'dash.projectsTitle', 'Your projects')
 
   const atLimit = projects.length >= projectLimit
   const usagePercent = Math.min((projects.length / projectLimit) * 100, 100)
@@ -382,7 +387,7 @@ export default function DashboardOverviewPage() {
               onKeyDown={(e)=>
                 e.key==='Enter' && sendPrompt()
               }
-              placeholder="Ask SignalBoost anything..."
+              placeholder={t(dict, 'dash.askPlaceholder', 'Ask SignalBoost anything...')}
               style={{
                 flex:1,
                 padding:'12px 16px',
@@ -406,7 +411,7 @@ export default function DashboardOverviewPage() {
                 cursor:'pointer'
               }}
             >
-              Ask →
+              {t(dict, 'dash.askButton', 'Ask')} →
             </button>
           </div>
 
@@ -448,7 +453,7 @@ export default function DashboardOverviewPage() {
               textTransform:'uppercase'
             }}
           >
-            Start here
+            {t(dict, 'dash.startHere', 'Start here')}
           </h2>
 
           <div
@@ -526,21 +531,21 @@ export default function DashboardOverviewPage() {
         >
           {[
             {
-              label:'Active sites',
+              label:t(dict, 'dash.stats.activeSites', 'Active sites'),
               value:projects.filter(
                 p=>p.status==='live'
               ).length
             },
             {
-              label:'Projects',
+              label:t(dict, 'dash.stats.projects', 'Projects'),
               value:`${projects.length}/${projectLimit===999?'∞':projectLimit}`
             },
             {
-              label:'Audio generated',
-              value:'0 min'
+              label:t(dict, 'dash.stats.audioGenerated', 'Audio generated'),
+              value:`0 ${t(dict, 'dash.stats.min', 'min')}`
             },
             {
-              label:'Videos created',
+              label:t(dict, 'dash.stats.videosCreated', 'Videos created'),
               value:'0'
             }
           ].map(stat=>(
@@ -603,7 +608,7 @@ export default function DashboardOverviewPage() {
                   marginTop:4
                 }}
               >
-                Continue where you left off
+                {t(dict, 'dash.continueWhere', 'Continue where you left off')}
               </p>
             </div>
 
@@ -619,7 +624,7 @@ export default function DashboardOverviewPage() {
                   fontWeight:800
                 }}
               >
-                Upgrade
+                {t(dict, 'dash.upgrade', 'Upgrade')}
               </Link>
             ) : (
               <button
@@ -634,7 +639,7 @@ export default function DashboardOverviewPage() {
                   cursor:'pointer'
                 }}
               >
-                + New project
+                {t(dict, 'dash.newProject', '+ New project')}
               </button>
             )}
           </div>
@@ -659,7 +664,7 @@ export default function DashboardOverviewPage() {
                   fontWeight:700
                 }}
               >
-                No projects yet
+                {t(dict, 'dash.noProjects', 'No projects yet')}
               </div>
 
               <div
@@ -668,7 +673,7 @@ export default function DashboardOverviewPage() {
                   marginTop:6
                 }}
               >
-                Create your first project above
+                {t(dict, 'dash.noProjectsSub', 'Create your first project above')}
               </div>
             </div>
           ) : (
@@ -754,7 +759,7 @@ export default function DashboardOverviewPage() {
                       color:'var(--text-muted)'
                     }}
                   >
-                    Last edited {timeAgo(p.last_edited_at)}
+                    {t(dict, 'dash.lastEdited', 'Last edited')} {timeAgo(p.last_edited_at)}
                   </div>
 
                   <Link
@@ -779,7 +784,7 @@ export default function DashboardOverviewPage() {
                       fontWeight:700
                     }}
                   >
-                    Open
+                    {t(dict, 'dash.open', 'Open')}
                   </Link>
                 </div>
               ))}
@@ -805,7 +810,7 @@ export default function DashboardOverviewPage() {
               marginBottom:20
             }}
           >
-            Team
+            {t(dict, 'dash.team', 'Team')}
           </h2>
 
           {userId ? (
@@ -816,7 +821,7 @@ export default function DashboardOverviewPage() {
                 color:'var(--text-muted)'
               }}
             >
-              Loading team...
+              {t(dict, 'dash.loadingTeam', 'Loading team...')}
             </div>
           )}
         </div>
@@ -835,7 +840,7 @@ export default function DashboardOverviewPage() {
             fontWeight:700
           }}
         >
-          💬 Share feedback — every message helps improve SignalBoost
+          💬 {t(dict, 'dash.feedback', 'Share feedback — every message helps improve SignalBoost')}
         </Link>
 
       </div>

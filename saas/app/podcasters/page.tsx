@@ -8,7 +8,7 @@ const PLANS = [
     price: { USD: 29, BRL: 149, PLN: 120, MXN: 540, EUR: 27 },
     description: 'Perfect for independent podcasters getting started globally.',
     features: ['1 show', '4 episodes per month', '2 languages', 'Native AI voiceover', 'Captions in 2 languages', 'Basic clip generation (5 clips/ep)', 'Podcast website', 'Listener reviews', 'Email support'],
-    cta: 'Start free trial',
+    cta: 'Get started',
     highlight: false,
   },
   {
@@ -16,7 +16,7 @@ const PLANS = [
     price: { USD: 79, BRL: 399, PLN: 320, MXN: 1450, EUR: 74 },
     description: 'For serious podcasters who want global reach.',
     features: ['3 shows', 'Unlimited episodes', 'All 5 languages', 'Native AI voiceover (priority)', 'Captions in all 5 languages', 'Clip factory (unlimited clips)', 'Multi-language podcast website', 'Listener reviews + analytics', 'Transcript in all languages', 'Priority support'],
-    cta: 'Start free trial',
+    cta: 'Get started',
     highlight: true,
   },
   {
@@ -63,7 +63,7 @@ export default function PodcastersPage() {
           <Link href="#how-it-works" style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', fontWeight: 600, fontSize: 15, padding: '14px 36px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.12)', textDecoration: 'none' }}>How it works →</Link>
         </div>
         <div style={{ display: 'flex', justifyContent: 'center', gap: 48, marginTop: 56, flexWrap: 'wrap' }}>
-          {[{ value: '5', label: 'Languages' }, { value: '< 2hr', label: 'Turnaround' }, { value: 'SRT/VTT', label: 'Caption formats' }, { value: '30 days', label: 'Free trial' }].map(s => (
+          {[{ value: '5', label: 'Languages' }, { value: '< 2hr', label: 'Turnaround' }, { value: 'SRT/VTT', label: 'Caption formats' }, { value: 'Free sketch', label: 'No commitment' }].map(s => (
             <div key={s.label} style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 32, fontWeight: 900, color: '#ffc300' }}>{s.value}</div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>{s.label}</div>
@@ -115,7 +115,7 @@ export default function PodcastersPage() {
 
       <section id="plans" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 80px' }}>
         <h2 style={{ fontSize: 36, fontWeight: 900, textAlign: 'center', marginBottom: 12 }}>Podcast plans</h2>
-        <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 15, marginBottom: 32 }}>All plans include a 30-day free trial. Business partners get 30 days free on the Indie plan only.</p>
+        <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 15, marginBottom: 32 }}>Sketch your idea for free with our preview tier, then pick a podcast plan when you are ready to publish.</p>
         <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 32 }}>
           {CURRENCIES.map(c => (
             <button key={c} onClick={() => setCurrency(c)}
@@ -163,7 +163,7 @@ export default function PodcastersPage() {
           <h2 style={{ fontSize: 32, fontWeight: 900, margin: '0 0 14px' }}>Ready to go global?</h2>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15, margin: '0 0 32px', lineHeight: 1.6 }}>You record it. We handle the rest — voiceover, captions, clips, website and reviews in 5 languages.</p>
           <Link href="/pricing" style={{ background: '#ffc300', color: '#000', fontWeight: 800, fontSize: 15, padding: '14px 40px', borderRadius: 999, textDecoration: 'none', display: 'inline-block' }}>
-            Start your free trial
+            See podcast plans
           </Link>
         </div>
       </section>

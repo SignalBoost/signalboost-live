@@ -61,6 +61,8 @@ export default function DashboardOverviewPage() {
   const [promptLoading, setPromptLoading] = useState(false)
   const [promptOpen, setPromptOpen] = useState(false)
   const [hasTyped, setHasTyped] = useState(false)
+  // Greeting auto-fades after 5s OR when user starts typing, whichever comes first.
+  const [greetingTimedOut, setGreetingTimedOut] = useState(false)
   const promptRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -85,6 +87,12 @@ export default function DashboardOverviewPage() {
       }
       setAuthChecked(true)
     })
+  }, [])
+
+  // Auto-fade the greeting after 5 seconds, regardless of user activity.
+  useEffect(() => {
+    const t = setTimeout(() => setGreetingTimedOut(true), 5000)
+    return () => clearTimeout(t)
   }, [])
 
   useEffect(() => {
@@ -169,7 +177,8 @@ export default function DashboardOverviewPage() {
   const atLimit = projects.length >= projectLimit
   const usagePercent = Math.min((projects.length / projectLimit) * 100, 100)
 
-  const greetingHidden = hasTyped || promptMessages.length > 0
+  // Greeting hides when: timer fires (5s), user starts typing, or AI conversation is open.
+  const greetingHidden = greetingTimedOut || hasTyped || promptMessages.length > 0
   const showLoginGate = authChecked && !isLoggedIn
 
   return (
@@ -221,7 +230,7 @@ export default function DashboardOverviewPage() {
           maxHeight: greetingHidden ? 0 : 200,
           opacity: greetingHidden ? 0 : 1,
           marginBottom: greetingHidden ? 0 : 20,
-          transition: 'max-height 0.4s ease, opacity 0.3s ease, margin-bottom 0.4s ease',
+          transition: 'max-height 0.5s ease, opacity 0.4s ease, margin-bottom 0.5s ease',
         }}>
           <h1 style={{
             fontSize: 28, fontWeight: 900, letterSpacing: '-0.02em', margin: '0 0 6px',
@@ -304,8 +313,7 @@ export default function DashboardOverviewPage() {
           </button>
         )}
       </div>
-
-      <div style={{ marginBottom: 32 }}>
+        <div style={{ marginBottom: 32 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div>
             <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, letterSpacing: '-0.01em' }}>{projectsTitle}</h2>

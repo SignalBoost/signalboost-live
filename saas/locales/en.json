@@ -1,5 +1,21 @@
-
 {
   "hello": "Hello",
-  "welcome": "Welcome"
+  "welcome": "Welcome to SignalBoost",
+
+  "home": "Home",
+  "pricing": "Pricing",
+  "dashboard": "Dashboard",
+  "docs": "Docs",
+  "podcasters": "Podcasters",
+
+  "buildWebsite": "Build a website",
+  "collectReviews": "Collect reviews",
+  "generateAudio": "Generate audio",
+  "createVideos": "Create videos",
+
+  "getStarted": "Get started",
+  "login": "Log in",
+  "logout": "Log out",
+
+  "growBusiness": "Grow your business in every language"
 }

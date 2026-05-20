@@ -104,11 +104,6 @@ export default function DashboardOverviewPage() {
   const [promptOpen, setPromptOpen] = useState(false)
   const [hasTyped, setHasTyped] = useState(false)
 
-  const [greetingTimedOut, setGreetingTimedOut] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return sessionStorage.getItem('greetingDismissed') === '1'
-  })
-
   const promptRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -141,22 +136,6 @@ export default function DashboardOverviewPage() {
   }, [])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    if (sessionStorage.getItem('greetingDismissed') === '1') {
-      setGreetingTimedOut(true)
-      return
-    }
-
-    const timer = setTimeout(() => {
-      setGreetingTimedOut(true)
-      sessionStorage.setItem('greetingDismissed', '1')
-    }, 5000)
-
-    return () => clearTimeout(timer)
-  }, [])
-
-  useEffect(() => {
     if (promptRef.current) {
       promptRef.current.scrollTop = promptRef.current.scrollHeight
     }
@@ -170,10 +149,6 @@ export default function DashboardOverviewPage() {
     setPromptInput('')
     setPromptOpen(true)
     setHasTyped(true)
-
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('greetingDismissed', '1')
-    }
 
     const newMessages: Message[] = [
       ...promptMessages,
@@ -293,8 +268,7 @@ export default function DashboardOverviewPage() {
   const atLimit = projects.length >= projectLimit
   const usagePercent = Math.min((projects.length / projectLimit) * 100, 100)
 
-  const greetingHidden =
-    greetingTimedOut || hasTyped || promptMessages.length > 0
+  const greetingHidden = hasTyped || promptMessages.length > 0
 
   const showLoginGate = authChecked && !isLoggedIn
 
@@ -340,7 +314,7 @@ export default function DashboardOverviewPage() {
           transition: 'opacity 0.3s ease, filter 0.3s ease',
         }}
       >
-                <div
+        <div
           style={{
             marginBottom: 28,
             background: 'var(--surface-1)',
@@ -403,13 +377,6 @@ export default function DashboardOverviewPage() {
                   !hasTyped
                 ) {
                   setHasTyped(true)
-
-                  if(typeof window!=='undefined'){
-                    sessionStorage.setItem(
-                      'greetingDismissed',
-                      '1'
-                    )
-                  }
                 }
               }}
               onKeyDown={(e)=>
@@ -608,7 +575,8 @@ export default function DashboardOverviewPage() {
             </div>
           ))}
         </div>
-                <div style={{ marginBottom: 28 }}>
+
+        <div style={{ marginBottom: 28 }}>
           <div
             style={{
               display:'flex',

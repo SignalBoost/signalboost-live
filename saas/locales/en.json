@@ -1,21 +1,34 @@
 {
   "hello": "Hello",
-  "welcome": "Welcome to SignalBoost",
-
-  "home": "Home",
-  "pricing": "Pricing",
-  "dashboard": "Dashboard",
-  "docs": "Docs",
-  "podcasters": "Podcasters",
-
-  "buildWebsite": "Build a website",
-  "collectReviews": "Collect reviews",
-  "generateAudio": "Generate audio",
-  "createVideos": "Create videos",
-
-  "getStarted": "Get started",
-  "login": "Log in",
-  "logout": "Log out",
-
-  "growBusiness": "Grow your business in every language"
+  "welcome": "Welcome",
+  "hero": {
+    "badge": "Build · Review · Broadcast",
+    "headlines": [
+      "Build your brand in English",
+      "Construa sua marca em Português",
+      "Construye tu marca en Español",
+      "Twórz swoją markę po Polsku",
+      "Создайте свой бренд на Русском"
+    ],
+    "subhead": "Create your website, collect customer reviews, and produce native audio & video content — in your language, not a translation.",
+    "ctaPrimary": "Get started",
+    "ctaSecondary": "Watch a demo",
+    "features": {
+      "site": "Site builder",
+      "reviews": "Review collector",
+      "audio": "Native audio",
+      "video": "Video editor"
+    },
+    "tagHint": "Click a language signal to add it to your project",
+    "ticker": [
+      "New review · São Paulo",
+      "Site published · Madrid",
+      "Audio generated · pl-PL",
+      "Video rendered · ru-RU",
+      "Review collected · Lisbon",
+      "Site live · Mexico City",
+      "Broadcast sent · 5 languages"
+    ],
+    "scroll": "Scroll"
+  }
 }

@@ -1,16 +1,12 @@
 'use client'
-
 import {
   createContext,
   useContext,
   useEffect,
   useState,
 } from 'react'
-
 import { detectLanguage } from '@/lib/i18n/detectLanguage'
-import { loadLanguage } from '@/lib/i18n/loadLanguage'
-
-type Dict = Record<string, string>
+import { loadLanguage, type Dict } from '@/lib/i18n/loadLanguage'
 
 type I18nContextType = {
   lang: string
@@ -31,15 +27,12 @@ const SUPPORTED_LANGS = [
 
 function normalizeLang(value: string | null) {
   if (!value) return 'en'
-
   const lower = value.toLowerCase()
-
   if (lower.startsWith('pt')) return 'pt'
   if (lower.startsWith('es')) return 'es'
   if (lower.startsWith('pl')) return 'pl'
   if (lower.startsWith('ru')) return 'ru'
   if (lower.startsWith('en')) return 'en'
-
   return 'en'
 }
 
@@ -47,32 +40,24 @@ function getInitialLanguage() {
   if (typeof window === 'undefined') {
     return 'en'
   }
-
   const saved =
     localStorage.getItem('signalboost_language') ||
     localStorage.getItem('site-language')
-
   if (saved && SUPPORTED_LANGS.includes(saved)) {
     return saved
   }
-
   const browser =
     navigator.languages?.[0] ||
     navigator.language ||
     null
-
   const browserLang = normalizeLang(browser)
-
   if (SUPPORTED_LANGS.includes(browserLang)) {
     return browserLang
   }
-
   const detected = normalizeLang(detectLanguage())
-
   if (SUPPORTED_LANGS.includes(detected)) {
     return detected
   }
-
   return 'en'
 }
 
@@ -88,21 +73,17 @@ export function I18nProvider({
     async function init() {
       const initialLang = getInitialLanguage()
       const loaded = await loadLanguage(initialLang)
-
       setLangState(initialLang)
       setDict(loaded)
-
       localStorage.setItem(
         'signalboost_language',
         initialLang
       )
-
       localStorage.setItem(
         'site-language',
         initialLang
       )
     }
-
     init()
   }, [])
 
@@ -111,24 +92,19 @@ export function I18nProvider({
     const safeLang = SUPPORTED_LANGS.includes(normalized)
       ? normalized
       : 'en'
-
     localStorage.setItem(
       'signalboost_language',
       safeLang
     )
-
     localStorage.setItem(
       'site-language',
       safeLang
     )
-
     localStorage.setItem(
       'signalboost_language_prompted',
       '1'
     )
-
     const loaded = await loadLanguage(safeLang)
-
     setLangState(safeLang)
     setDict(loaded)
   }
@@ -148,12 +124,10 @@ export function I18nProvider({
 
 export function useI18n() {
   const ctx = useContext(I18nContext)
-
   if (!ctx) {
     throw new Error(
       'useI18n must be used inside I18nProvider'
     )
   }
-
   return ctx
 }

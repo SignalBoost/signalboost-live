@@ -8,13 +8,6 @@ import { useI18n } from '@/components/i18n/I18nProvider'
 
 const GOLD='#ffc300'
 
-const TOOL_LINKS=[
-{icon:'🌐',label:'Build a website',href:'/dashboard/builder'},
-{icon:'⭐',label:'Collect reviews',href:'/dashboard/reviews'},
-{icon:'🎙️',label:'Generate audio',href:'/dashboard/audio'},
-{icon:'🎬',label:'Create videos',href:'/dashboard/video'},
-]
-
 const LANGUAGES=[
 {code:'en',label:'English'},
 {code:'pt',label:'Português'},
@@ -31,7 +24,11 @@ useRef<HTMLCanvasElement>(null)
 const pathname=
 usePathname()
 
-const {lang,setLang}=useI18n()
+const {
+lang,
+setLang,
+dict
+}=useI18n()
 
 const [showAuth,setShowAuth]=
 useState(false)
@@ -69,7 +66,7 @@ useEffect(()=>{
 const canvas=
 canvasRef.current
 
-if(!canvas) return
+if(!canvas)return
 
 const ctx=
 canvas.getContext('2d')!
@@ -93,7 +90,12 @@ let raf:number
 
 function draw(ts:number){
 
-ctx.clearRect(0,0,W,H)
+ctx.clearRect(
+0,
+0,
+W,
+H
+)
 
 if(
 !last ||
@@ -113,7 +115,9 @@ rings.filter(
 r=>r.alpha>.01
 )
 
-for(const r of rings){
+for(
+const r of rings
+){
 
 r.r+=.8
 r.alpha-=.012
@@ -159,12 +163,16 @@ Math.PI*2
 ctx.fill()
 
 raf=
-requestAnimationFrame(draw)
+requestAnimationFrame(
+draw
+)
 
 }
 
 raf=
-requestAnimationFrame(draw)
+requestAnimationFrame(
+draw
+)
 
 return()=>{
 cancelAnimationFrame(
@@ -185,19 +193,42 @@ window.location.href='/'
 }
 
 const navLinks=[
-{label:'Home',href:'/'},
-{label:'Podcasters',href:'/podcasters'},
-...(user?[]:[{
-label:'Dashboard',
+{
+label:
+dict.home ||
+'Home',
+href:'/'
+},
+{
+label:
+dict.podcasters ||
+'Podcasters',
+href:'/podcasters'
+},
+...(user
+?[]
+:[{
+label:
+dict.dashboard ||
+'Dashboard',
 href:'/dashboard'
 }]),
-{label:'Pricing',href:'/pricing'},
-{label:'Docs',href:'/docs'}
+{
+label:
+dict.pricing ||
+'Pricing',
+href:'/pricing'
+},
+{
+label:
+dict.docs ||
+'Docs',
+href:'/docs'
+}
 ]
 
 return(
 <>
-
 <nav
 style={{
 display:'flex',
@@ -235,9 +266,11 @@ fontWeight:800
 }}
 >
 signal
-<span style={{
+<span
+style={{
 color:GOLD
-}}>
+}}
+>
 boost
 </span>
 </span>
@@ -251,23 +284,29 @@ gap:24
 }}
 >
 
-{navLinks.map(item=>(
+{navLinks.map(
+item=>(
 
 <Link
 key={item.label}
 href={item.href}
 style={{
-textDecoration:'none',
+textDecoration:
+'none',
 color:
-pathname===item.href
+pathname===
+item.href
 ?'#fff'
 :'var(--text-muted)'
 }}
 >
+
 {item.label}
+
 </Link>
 
-))}
+)
+)}
 
 </div>
 
@@ -281,13 +320,12 @@ gap:10
 
 <select
 value={lang}
-onChange={(e)=>
+onChange={e=>
 setLang(
 e.target.value
 )
 }
 >
-
 {LANGUAGES.map(
 l=>(
 <option
@@ -298,7 +336,6 @@ value={l.code}
 </option>
 )
 )}
-
 </select>
 
 {user ? (
@@ -308,10 +345,13 @@ onClick={
 handleLogout
 }
 >
-Log out
+{
+dict.logout ||
+'Log out'
+}
 </button>
 
-):(
+) : (
 
 <button
 onClick={()=>
@@ -322,7 +362,10 @@ background:GOLD,
 color:'#000'
 }}
 >
-Get started
+{
+dict.getStarted ||
+'Get started'
+}
 </button>
 
 )}
@@ -331,7 +374,7 @@ Get started
 
 </nav>
 
-{showAuth && (
+{showAuth&&(
 <AuthModal
 onClose={()=>
 setShowAuth(false)

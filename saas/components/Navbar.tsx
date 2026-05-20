@@ -1,479 +1,344 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect,useRef,useState } from 'react'
 import { supabase } from '@/utils/supabase/client'
 import AuthModal from './AuthModal'
+import { useI18n } from '@/components/i18n/I18nProvider'
 
-const GOLD = '#ffc300'
+const GOLD='#ffc300'
 
-const TOOL_LINKS = [
-  { icon:'🌐',label:'Build a website',href:'/dashboard/builder'},
-  { icon:'⭐',label:'Collect reviews',href:'/dashboard/reviews'},
-  { icon:'🎙️',label:'Generate audio',href:'/dashboard/audio'},
-  { icon:'🎬',label:'Create videos',href:'/dashboard/video'},
+const TOOL_LINKS=[
+{icon:'🌐',label:'Build a website',href:'/dashboard/builder'},
+{icon:'⭐',label:'Collect reviews',href:'/dashboard/reviews'},
+{icon:'🎙️',label:'Generate audio',href:'/dashboard/audio'},
+{icon:'🎬',label:'Create videos',href:'/dashboard/video'},
 ]
 
-const LANGUAGES = [
-  {code:'en',label:'English'},
-  {code:'pt',label:'Português'},
-  {code:'es',label:'Español'},
-  {code:'pl',label:'Polski'},
-  {code:'ru',label:'Русский'},
+const LANGUAGES=[
+{code:'en',label:'English'},
+{code:'pt',label:'Português'},
+{code:'es',label:'Español'},
+{code:'pl',label:'Polski'},
+{code:'ru',label:'Русский'},
 ]
 
-export default function Navbar() {
-  const canvasRef=useRef<HTMLCanvasElement>(null)
-  const pathname=usePathname()
+export default function Navbar(){
 
-  const [showAuth,setShowAuth]=useState(false)
-  const [user,setUser]=useState<any>(null)
-  const [language,setLanguage]=useState('en')
+const canvasRef=
+useRef<HTMLCanvasElement>(null)
 
-  useEffect(()=>{
-    if(typeof window==='undefined') return
+const pathname=
+usePathname()
 
-    const saved=
-      localStorage.getItem(
-        'signalboost_language'
-      )
+const {lang,setLang}=useI18n()
 
-    if(saved){
-      setLanguage(saved)
-    }
-  },[])
+const [showAuth,setShowAuth]=
+useState(false)
 
-  useEffect(()=>{
-    supabase.auth.getUser().then(
-      ({data})=>{
-        setUser(data?.user ?? null)
-      }
-    )
+const [user,setUser]=
+useState<any>(null)
 
-    const {data:listener}=
-      supabase.auth.onAuthStateChange(
-        (_e,session)=>{
-          setUser(session?.user ?? null)
-        }
-      )
+useEffect(()=>{
 
-    return ()=>listener.subscription.unsubscribe()
-  },[])
+supabase.auth.getUser().then(
+({data})=>{
+setUser(
+data?.user ?? null
+)
+}
+)
 
-  useEffect(()=>{
-    const canvas=canvasRef.current
-    if(!canvas) return
+const {data:listener}=
+supabase.auth.onAuthStateChange(
+(_e,session)=>{
+setUser(
+session?.user ?? null
+)
+}
+)
 
-    const ctx=canvas.getContext('2d')!
+return()=>{
+listener.subscription.unsubscribe()
+}
 
-    const W=40
-    const H=40
+},[])
 
-    canvas.width=W
-    canvas.height=H
+useEffect(()=>{
 
-    const cx=W/2
-    const cy=H-8
+const canvas=
+canvasRef.current
 
-    let rings:{
-      r:number
-      alpha:number
-    }[]=[]
+if(!canvas) return
 
-    let last=0
-    let raf:number
+const ctx=
+canvas.getContext('2d')!
 
-    function draw(ts:number){
+const W=40
+const H=40
 
-      ctx.clearRect(0,0,W,H)
+canvas.width=W
+canvas.height=H
 
-      if(!last || ts-last>2000){
-        rings.push({
-          r:0,
-          alpha:1
-        })
+const cx=W/2
+const cy=H-8
 
-        last=ts
-      }
+let rings:{
+r:number
+alpha:number
+}[]=[]
 
-      rings=rings.filter(
-        r=>r.alpha>.01
-      )
+let last=0
+let raf:number
 
-      for(const r of rings){
+function draw(ts:number){
 
-        r.r+=.8
-        r.alpha-=.012
+ctx.clearRect(0,0,W,H)
 
-        const arcs=[1,.65]
-        const widths=[1.2,.8]
-        const alphas=[.9,.5]
+if(
+!last ||
+ts-last>2000
+){
 
-        for(let i=0;i<2;i++){
+rings.push({
+r:0,
+alpha:1
+})
 
-          if(r.r*arcs[i]<3)
-            continue
+last=ts
+}
 
-          ctx.globalAlpha=
-            Math.max(
-              0,
-              r.alpha*alphas[i]
-            )
+rings=
+rings.filter(
+r=>r.alpha>.01
+)
 
-          ctx.strokeStyle=GOLD
-          ctx.lineWidth=widths[i]
+for(const r of rings){
 
-          ctx.beginPath()
+r.r+=.8
+r.alpha-=.012
 
-          ctx.arc(
-            cx,
-            cy,
-            r.r*arcs[i],
-            Math.PI,
-            0
-          )
+ctx.globalAlpha=
+Math.max(
+0,
+r.alpha
+)
 
-          ctx.stroke()
-        }
-      }
+ctx.strokeStyle=
+GOLD
 
-      ctx.globalAlpha=1
+ctx.lineWidth=1
 
-      ctx.fillStyle=GOLD
+ctx.beginPath()
 
-      ctx.beginPath()
-      ctx.arc(
-        cx,
-        cy,
-        3,
-        0,
-        Math.PI*2
-      )
+ctx.arc(
+cx,
+cy,
+r.r,
+Math.PI,
+0
+)
 
-      ctx.fill()
+ctx.stroke()
+}
 
-      ctx.fillStyle='#0a0a0f'
+ctx.globalAlpha=1
 
-      ctx.beginPath()
+ctx.fillStyle=GOLD
 
-      ctx.arc(
-        cx,
-        cy,
-        1.5,
-        0,
-        Math.PI*2
-      )
+ctx.beginPath()
 
-      ctx.fill()
+ctx.arc(
+cx,
+cy,
+3,
+0,
+Math.PI*2
+)
 
-      raf=requestAnimationFrame(draw)
-    }
+ctx.fill()
 
-    raf=requestAnimationFrame(draw)
+raf=
+requestAnimationFrame(draw)
 
-    return()=>{
-      cancelAnimationFrame(raf)
-    }
+}
 
-  },[])
+raf=
+requestAnimationFrame(draw)
 
+return()=>{
+cancelAnimationFrame(
+raf
+)
+}
+
+},[])
   async function handleLogout(){
 
-    if(
-      typeof window!=='undefined'
-    ){
-      sessionStorage.removeItem(
-        'greetingDismissed'
-      )
+sessionStorage.removeItem(
+'greetingDismissed'
+)
 
-      localStorage.removeItem(
-        'signalboost_language_prompted'
-      )
-    }
+await supabase.auth.signOut()
 
-    await supabase.auth.signOut()
+window.location.href='/'
+}
 
-    window.location.href='/'
-  }
+const navLinks=[
+{label:'Home',href:'/'},
+{label:'Podcasters',href:'/podcasters'},
+...(user?[]:[{
+label:'Dashboard',
+href:'/dashboard'
+}]),
+{label:'Pricing',href:'/pricing'},
+{label:'Docs',href:'/docs'}
+]
 
-  function openLogin(){
-    setShowAuth(true)
-  }
+return(
+<>
 
-  function openSignup(){
-    setShowAuth(true)
-  }
+<nav
+style={{
+display:'flex',
+alignItems:'center',
+justifyContent:'space-between',
+padding:'16px 32px',
+background:
+'rgba(10,10,15,.88)',
+borderBottom:
+'1px solid var(--border-soft)'
+}}
+>
 
-  function changeLanguage(
-    next:string
-  ){
-    setLanguage(next)
+<Link
+href="/"
+style={{
+display:'flex',
+gap:10,
+textDecoration:'none'
+}}
+>
 
-    localStorage.setItem(
-      'signalboost_language',
-      next
-    )
-  }
+<canvas
+ref={canvasRef}
+style={{
+width:40,
+height:40
+}}
+/>
 
-  const navLinks=[
-    {
-      label:'Home',
-      href:'/'
-    },
-    {
-      label:'Podcasters',
-      href:'/podcasters'
-    },
+<span
+style={{
+color:'#fff',
+fontWeight:800
+}}
+>
+signal
+<span style={{
+color:GOLD
+}}>
+boost
+</span>
+</span>
 
-    ...(user
-      ?[]
-      :[
-        {
-          label:'Dashboard',
-          href:'/dashboard'
-        }
-      ]),
+</Link>
 
-    {
-      label:'Pricing',
-      href:'/pricing'
-    },
-    {
-      label:'Docs',
-      href:'/docs'
-    }
-  ]
+<div
+style={{
+display:'flex',
+gap:24
+}}
+>
 
-  return(
-    <>
-      <nav
-      style={{
-        display:'flex',
-        alignItems:'center',
-        justifyContent:'space-between',
-        padding:'16px 32px',
-        background:
-        'rgba(10,10,15,.88)',
-        backdropFilter:'blur(12px)',
-        borderBottom:
-        '1px solid var(--border-soft)',
-        position:'sticky',
-        top:0,
-        zIndex:100
-      }}
-      >
+{navLinks.map(item=>(
 
-      <Link
-      href="/"
-      style={{
-        display:'flex',
-        alignItems:'center',
-        gap:10,
-        textDecoration:'none'
-      }}
-      >
+<Link
+key={item.label}
+href={item.href}
+style={{
+textDecoration:'none',
+color:
+pathname===item.href
+?'#fff'
+:'var(--text-muted)'
+}}
+>
+{item.label}
+</Link>
 
-      <div
-      style={{
-        width:40,
-        height:40,
-        position:'relative'
-      }}
-      >
+))}
 
-      <canvas
-      ref={canvasRef}
-      style={{
-        width:'100%',
-        height:'100%'
-      }}
-      />
+</div>
 
-      </div>
+<div
+style={{
+display:'flex',
+alignItems:'center',
+gap:10
+}}
+>
 
-      <span
-      style={{
-        color:'#fff',
-        fontWeight:800
-      }}
-      >
-      signal
-      <span
-      style={{
-        color:GOLD
-      }}>
-      boost
-      </span>
-      </span>
+<select
+value={lang}
+onChange={(e)=>
+setLang(
+e.target.value
+)
+}
+>
 
-      </Link>
-              <div
-      style={{
-        display:'flex',
-        gap:24
-      }}
-      >
+{LANGUAGES.map(
+l=>(
+<option
+key={l.code}
+value={l.code}
+>
+{l.label}
+</option>
+)
+)}
 
-      {navLinks.map(item=>{
+</select>
 
-        const isActive=
-        pathname===item.href ||
-        (
-          item.href!=='/' &&
-          pathname?.startsWith(
-            item.href
-          )
-        )
+{user ? (
 
-        return(
+<button
+onClick={
+handleLogout
+}
+>
+Log out
+</button>
 
-        <Link
-        key={item.label}
-        href={item.href}
-        style={{
-          textDecoration:'none',
-          color:
-          isActive
-          ?'#fff'
-          :'var(--text-muted)'
-        }}
-        >
-        {item.label}
-        </Link>
+):(
 
-        )
-      })}
+<button
+onClick={()=>
+setShowAuth(true)
+}
+style={{
+background:GOLD,
+color:'#000'
+}}
+>
+Get started
+</button>
 
-      </div>
+)}
 
-      <div
-      style={{
-        display:'flex',
-        alignItems:'center',
-        gap:10
-      }}
-      >
+</div>
 
-      <select
-      value={language}
-      onChange={e=>
-      changeLanguage(
-        e.target.value
-      )}
-      >
-      {LANGUAGES.map(
-        lang=>(
-        <option
-        key={lang.code}
-        value={lang.code}
-        >
-        {lang.label}
-        </option>
-      ))}
-      </select>
+</nav>
 
-      {user ? (
+{showAuth && (
+<AuthModal
+onClose={()=>
+setShowAuth(false)
+}
+/>
+)}
 
-      <>
-      <Link href="/dashboard">
-
-      <button>
-      Dashboard
-      </button>
-
-      </Link>
-
-      <button
-      onClick={
-        handleLogout
-      }
-      >
-      Log out
-      </button>
-
-      </>
-
-      ):(
-
-      <>
-      <button
-      onClick={
-        openLogin
-      }
-      >
-      Log in
-      </button>
-
-      <button
-      onClick={
-        openSignup
-      }
-      style={{
-        background:GOLD,
-        color:'#000'
-      }}
-      >
-      Get started
-      </button>
-
-      </>
-      )}
-
-      </div>
-
-      </nav>
-
-      {user && (
-
-      <div
-      style={{
-        display:'flex',
-        justifyContent:'center',
-        gap:8,
-        padding:'8px 24px',
-        flexWrap:'wrap'
-      }}
-      >
-
-      {TOOL_LINKS.map(
-        tool=>{
-
-        const isActive=
-        pathname===
-        tool.href
-
-        return(
-        <Link
-        key={tool.href}
-        href={tool.href}
-        style={{
-          textDecoration:'none',
-          color:
-          isActive
-          ?'#fff'
-          :'var(--text-muted)'
-        }}
-        >
-        {tool.icon}
-        {' '}
-        {tool.label}
-        </Link>
-        )
-
-      })}
-
-      </div>
-
-      )}
-
-      {showAuth && (
-        <AuthModal
-          onClose={()=>
-            setShowAuth(false)
-          }
-        />
-      )}
-
-    </>
-  )
+</>
+)
 }

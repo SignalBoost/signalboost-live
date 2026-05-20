@@ -1,6 +1,17 @@
 {
   "hello": "Hello",
   "welcome": "Welcome",
+  "home": "Home",
+  "podcasters": "Podcasters",
+  "dashboard": "Dashboard",
+  "pricing": "Pricing",
+  "docs": "Docs",
+  "logout": "Log out",
+  "getStarted": "Get started",
+  "buildWebsite": "Build a website",
+  "collectReviews": "Collect reviews",
+  "generateAudio": "Generate audio",
+  "createVideos": "Create videos",
   "hero": {
     "badge": "Build · Review · Broadcast",
     "headlines": [
@@ -30,5 +41,81 @@
       "Broadcast sent · 5 languages"
     ],
     "scroll": "Scroll"
+  },
+  "footer": {
+    "tagline": "SignalBoost helps businesses grow with native websites, customer reviews, audio, video and AI-powered content — built for how people actually speak.",
+    "learnHow": "Learn how SignalBoost works",
+    "readDocs": "read the documentation",
+    "product": "Product",
+    "build": "Build",
+    "company": "Company",
+    "documentation": "Documentation",
+    "generateNativeAudio": "Generate native audio",
+    "about": "About",
+    "partners": "Partners",
+    "privacy": "Privacy",
+    "contact": "Contact",
+    "nativeExperiences": "Native experiences available in",
+    "poweredBy": "Powered by"
+  },
+  "pricing_page": {
+    "badge": "Simple pricing",
+    "headline": "Start free. Publish when ready.",
+    "subhead": "SignalBoost helps businesses grow with AI-powered websites, reviews, audio and content tools.",
+    "mostPopular": "MOST POPULAR",
+    "perMonth": "/mo",
+    "priceFree": "Free",
+    "seats1": "1 seat",
+    "seats3": "3 seats",
+    "seats10": "10+ seats",
+    "loading": "Loading...",
+    "errorGeneric": "Something went wrong.",
+    "free": {
+      "name": "Free",
+      "description": "Build and preview your idea before publishing.",
+      "cta": "Start building",
+      "f1": "1 website preview",
+      "f2": "1 language",
+      "f3": "Limited AI credits",
+      "f4": "Review collector (up to 3 reviews)",
+      "f5": "SignalBoost watermark",
+      "f6": "Community support"
+    },
+    "starter": {
+      "name": "Starter",
+      "description": "For solo businesses ready to launch.",
+      "cta": "Launch my business",
+      "f1": "Publish 1 website",
+      "f2": "2 languages",
+      "f3": "Review collection",
+      "f4": "~50 audio generations/month",
+      "f5": "Captions in 2 languages",
+      "f6": "No watermark",
+      "f7": "Email support"
+    },
+    "pro": {
+      "name": "Pro",
+      "description": "For growing businesses expanding reach.",
+      "cta": "Scale faster",
+      "f1": "5 websites",
+      "f2": "All 5 languages",
+      "f3": "Review suite + video",
+      "f4": "~200 audio generations/month",
+      "f5": "Video creation tools",
+      "f6": "Priority support",
+      "f7": "Team collaboration"
+    },
+    "business": {
+      "name": "Business",
+      "description": "For agencies and multi-location brands.",
+      "cta": "Contact us",
+      "f1": "Unlimited websites",
+      "f2": "All languages + custom",
+      "f3": "White label",
+      "f4": "Dedicated onboarding",
+      "f5": "Priority processing",
+      "f6": "Advanced reporting",
+      "f7": "API & integrations"
+    }
   }
 }

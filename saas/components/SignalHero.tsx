@@ -1,13 +1,14 @@
 'use client'
-import { useCallback, useState, useEffect, useRef } from 'react'
+import { useCallback, useState, useEffect, useRef, useMemo } from 'react'
 import SignalCanvas from './SignalCanvas'
+import { useI18n } from '@/components/i18n/I18nProvider'
 
 const LANGS = [
-  { name: 'English', flag: '🇺🇸' },
-  { name: 'Português', flag: '🇧🇷' },
-  { name: 'Español', flag: '🇪🇸' },
-  { name: 'Polski', flag: '🇵🇱' },
-  { name: 'Русский', flag: '🇷🇺' },
+  { code: 'en', name: 'English', flag: '🇺🇸' },
+  { code: 'pt', name: 'Português', flag: '🇧🇷' },
+  { code: 'es', name: 'Español', flag: '🇪🇸' },
+  { code: 'pl', name: 'Polski', flag: '🇵🇱' },
+  { code: 'ru', name: 'Русский', flag: '🇷🇺' },
 ]
 
 const POSITIONS = [
@@ -24,25 +25,107 @@ type Tag = {
   pos: typeof POSITIONS[0]
 }
 
+const HEADLINE_INTERVAL = 7000
+const TICKER_DURATION = 40 // seconds for one full loop
+
 export default function SignalHero() {
+  const { dict, lang } = useI18n() as { dict: any; lang?: string }
+
   const [selected, setSelected] = useState<string[]>([])
   const [tags, setTags] = useState<Tag[]>([])
-  const [headlineLang, setHeadlineLang] = useState(0)
+  const [headlineIndex, setHeadlineIndex] = useState(0)
+  const [paused, setPaused] = useState(false)
 
   const langRef = useRef(0)
   const posRef = useRef(0)
   const idRef = useRef(0)
 
+  // ---- text with English fallbacks ----
+  const hero = dict?.hero ?? {}
+
+  const badge = hero.badge ?? 'Build · Review · Broadcast'
+  const subhead =
+    hero.subhead ??
+    'Create your website, collect customer reviews, and produce native audio & video content — in your language, not a translation.'
+  const ctaPrimary = hero.ctaPrimary ?? 'Get started'
+  const ctaSecondary = hero.ctaSecondary ?? 'Watch a demo'
+  const tagHint =
+    hero.tagHint ?? 'Click a language signal to add it to your project'
+  const scrollLabel = hero.scroll ?? 'Scroll'
+
+  const features = [
+    { icon: '🌐', label: hero?.features?.site ?? 'Site builder' },
+    { icon: '⭐', label: hero?.features?.reviews ?? 'Review collector' },
+    { icon: '🎙️', label: hero?.features?.audio ?? 'Native audio' },
+    { icon: '🎬', label: hero?.features?.video ?? 'Video editor' },
+  ]
+
+  // ---- region-aware headlines: current language first, then the rest ----
+  const headlines: string[] = useMemo(() => {
+    const fallback = [
+      'Build your brand in English',
+      'Construa sua marca em Português',
+      'Construye tu marca en Español',
+      'Twórz swoją markę po Polsku',
+      'Создайте свой бренд на Русском',
+    ]
+    const list: string[] =
+      Array.isArray(hero.headlines) && hero.headlines.length > 0
+        ? hero.headlines
+        : fallback
+
+    // Move the headline matching the user's current language to the front.
+    const currentIdx = LANGS.findIndex(l => l.code === lang)
+    if (currentIdx > 0 && currentIdx < list.length) {
+      const reordered = [...list]
+      const [native] = reordered.splice(currentIdx, 1)
+      reordered.unshift(native)
+      return reordered
+    }
+    return list
+  }, [hero.headlines, lang])
+
+  // Reset to first headline whenever the ordering changes (language switch).
   useEffect(() => {
+    setHeadlineIndex(0)
+  }, [headlines])
+
+  // Rotate headlines (paused on hover/tap).
+  useEffect(() => {
+    if (paused) return
+    if (headlines.length <= 1) return
+
     const t = setInterval(() => {
-      setHeadlineLang(i => (i + 1) % LANGS.length)
-    }, 2000)
+      setHeadlineIndex(i => (i + 1) % headlines.length)
+    }, HEADLINE_INTERVAL)
 
     return () => clearInterval(t)
-  }, [])
+  }, [paused, headlines.length])
+
+  // ---- ticker items (static now, feed-ready later) ----
+  const tickerItems: string[] = useMemo(() => {
+    const fallback = [
+      'New review · São Paulo',
+      'Site published · Madrid',
+      'Audio generated · pl-PL',
+      'Video rendered · ru-RU',
+      'Review collected · Lisbon',
+      'Site live · Mexico City',
+      'Broadcast sent · 5 languages',
+    ]
+    return Array.isArray(hero.ticker) && hero.ticker.length > 0
+      ? hero.ticker
+      : fallback
+  }, [hero.ticker])
+
+  // Duplicate for seamless marquee loop.
+  const tickerLoop = useMemo(
+    () => [...tickerItems, ...tickerItems],
+    [tickerItems]
+  )
 
   const spawnTag = useCallback(() => {
-    const lang = LANGS[langRef.current % LANGS.length]
+    const langItem = LANGS[langRef.current % LANGS.length]
     const pos = POSITIONS[posRef.current % POSITIONS.length]
 
     langRef.current++
@@ -50,7 +133,7 @@ export default function SignalHero() {
 
     const id = idRef.current++
 
-    setTags(prev => [...prev, { id, lang, pos }])
+    setTags(prev => [...prev, { id, lang: langItem, pos }])
 
     setTimeout(() => {
       setTags(prev => prev.filter(t => t.id !== id))
@@ -99,30 +182,85 @@ export default function SignalHero() {
               animation: 'pulse 2s infinite',
             }}
           />
-          Build · Review · Broadcast
+          {badge}
         </div>
 
-        <h1
-          className="font-black leading-none"
+        {/* Rotating headline — hover/tap to pause */}
+        <div
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+          onTouchStart={() => setPaused(true)}
+          onTouchEnd={() => setPaused(false)}
           style={{
-            fontSize: 'clamp(40px, 5vw, 68px)',
-            letterSpacing: '-0.03em',
+            position: 'relative',
+            minHeight: 'clamp(96px, 12vw, 168px)',
+            cursor: 'default',
           }}
+          aria-live="polite"
         >
-          Build your brand
-          <br />
-          in{' '}
-          <span
-            key={headlineLang}
+          <h1
+            key={headlineIndex}
+            className="font-black leading-none"
             style={{
-              color: '#ffc300',
-              display: 'inline-block',
-              animation: 'fadeSlide 0.35s ease-out',
+              fontSize: 'clamp(40px, 5vw, 68px)',
+              letterSpacing: '-0.03em',
+              animation: 'fadeSlide 0.6s ease-out',
+              margin: 0,
+              color: '#fff',
             }}
           >
-            {LANGS[headlineLang].name}
-          </span>
-        </h1>
+            {headlines[headlineIndex]}
+          </h1>
+
+          {/* Subtle ticker underneath */}
+          <div
+            style={{
+              marginTop: 14,
+              maxWidth: 480,
+              overflow: 'hidden',
+              maskImage:
+                'linear-gradient(to right, transparent, #000 12%, #000 88%, transparent)',
+              WebkitMaskImage:
+                'linear-gradient(to right, transparent, #000 12%, #000 88%, transparent)',
+              height: 22,
+            }}
+          >
+            <div
+              style={{
+                display: 'inline-flex',
+                gap: 28,
+                whiteSpace: 'nowrap',
+                animation: `tickerScroll ${TICKER_DURATION}s linear infinite`,
+                animationPlayState: paused ? 'paused' : 'running',
+              }}
+            >
+              {tickerLoop.map((item, i) => (
+                <span
+                  key={i}
+                  style={{
+                    fontSize: 12,
+                    color: 'rgba(255,255,255,0.35)',
+                    letterSpacing: '0.04em',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 5,
+                      height: 5,
+                      borderRadius: '50%',
+                      background: '#ffc300',
+                      display: 'inline-block',
+                    }}
+                  />
+                  {item}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
 
         <p
           style={{
@@ -133,8 +271,7 @@ export default function SignalHero() {
             margin: 0,
           }}
         >
-          Create your website, collect customer reviews, and produce native
-          audio & video content — in your language, not a translation.
+          {subhead}
         </p>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -150,7 +287,7 @@ export default function SignalHero() {
               cursor: 'pointer',
             }}
           >
-            Get started
+            {ctaPrimary}
           </button>
 
           <button
@@ -168,7 +305,7 @@ export default function SignalHero() {
               e.currentTarget.style.color = 'rgba(255,255,255,0.5)'
             }}
           >
-            Watch a demo →
+            {ctaSecondary} →
           </button>
         </div>
 
@@ -181,12 +318,7 @@ export default function SignalHero() {
             paddingTop: 20,
           }}
         >
-          {[
-            { icon: '🌐', label: 'Site builder' },
-            { icon: '⭐', label: 'Review collector' },
-            { icon: '🎙️', label: 'Native audio' },
-            { icon: '🎬', label: 'Video editor' },
-          ].map(f => (
+          {features.map(f => (
             <div
               key={f.label}
               style={{
@@ -225,7 +357,7 @@ export default function SignalHero() {
                 margin: 0,
               }}
             >
-              Click a language signal to add it to your project
+              {tagHint}
             </p>
           ) : (
             selected.map(name => {
@@ -343,7 +475,7 @@ export default function SignalHero() {
             textTransform: 'uppercase',
           }}
         >
-          Scroll
+          {scrollLabel}
         </span>
 
         <span style={{ color: '#ffc300', fontSize: 18 }}>↓</span>
@@ -355,44 +487,29 @@ export default function SignalHero() {
             opacity: 0;
             transform: translate(calc(-50% + 0px), calc(-50% + 0px)) scale(0.8);
           }
-          12% {
-            opacity: 1;
-          }
-          75% {
-            opacity: 1;
-          }
-          100% {
-            opacity: 0;
-          }
+          12% { opacity: 1; }
+          75% { opacity: 1; }
+          100% { opacity: 0; }
         }
 
         @keyframes fadeSlide {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
 
         @keyframes pulse {
-          0%, 100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.4;
-          }
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
         }
 
         @keyframes bounce {
-          0%, 100% {
-            transform: translateX(-50%) translateY(0);
-          }
-          50% {
-            transform: translateX(-50%) translateY(6px);
-          }
+          0%, 100% { transform: translateX(-50%) translateY(0); }
+          50% { transform: translateX(-50%) translateY(6px); }
+        }
+
+        @keyframes tickerScroll {
+          0%   { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
         }
       `}</style>
     </section>

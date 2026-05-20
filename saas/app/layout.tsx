@@ -1,59 +1,86 @@
-import type { Metadata } from "next";
-import "./globals.css";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import { I18nProvider } from "@/components/i18n/I18nProvider";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-export const metadata: Metadata = {
-  title: "SignalBoost",
-  description: "Build your brand in every language",
-};
+/* =========================================================
+   CONTRAST TOKENS — single source of truth for surfaces.
+   Iterate values here, all components inherit the change.
+   ========================================================= */
+:root {
+  /* Page background (matches body bg in layout.tsx) */
+  --bg-base: #0f1117;
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <html lang="en">
-      <body
-        style={{
-          margin: 0,
-          minHeight: "100vh",
-          background: "#0f1117",
-          color: "#fff",
-          display: "flex",
-          flexDirection: "column",
-          position: "relative",
-          overflowX: "hidden",
-        }}
-      >
-        {/* Animated ambient mesh gradient layer */}
-        <div
-          aria-hidden="true"
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 0,
-            pointerEvents: "none",
-            overflow: "hidden",
-          }}
-        >
-          <div style={{ position: "absolute", top: "-20%", left: "-10%", width: "60vw", height: "60vw", background: "radial-gradient(circle, rgba(255,195,0,0.18) 0%, rgba(255,195,0,0) 70%)", filter: "blur(60px)", animation: "meshFloat1 22s ease-in-out infinite" }} />
-          <div style={{ position: "absolute", top: "30%", right: "-15%", width: "55vw", height: "55vw", background: "radial-gradient(circle, rgba(59,130,246,0.18) 0%, rgba(59,130,246,0) 70%)", filter: "blur(60px)", animation: "meshFloat2 26s ease-in-out infinite" }} />
-          <div style={{ position: "absolute", bottom: "-15%", left: "20%", width: "50vw", height: "50vw", background: "radial-gradient(circle, rgba(74,222,128,0.10) 0%, rgba(74,222,128,0) 70%)", filter: "blur(60px)", animation: "meshFloat3 28s ease-in-out infinite" }} />
-          <div style={{ position: "absolute", top: "55%", left: "5%", width: "45vw", height: "45vw", background: "radial-gradient(circle, rgba(168,85,247,0.10) 0%, rgba(168,85,247,0) 70%)", filter: "blur(60px)", animation: "meshFloat4 30s ease-in-out infinite" }} />
-        </div>
+  /* Card surfaces — layered above the animated mesh.
+     Each level is more opaque than the last so cards stand out
+     against the colored fog from the mesh gradients.        */
+  --surface-1: rgba(20, 24, 36, 0.72);   /* primary cards (projects, panels) */
+  --surface-2: rgba(28, 32, 46, 0.78);   /* nested elements inside cards    */
+  --surface-3: rgba(36, 42, 58, 0.85);   /* inputs, selects, interactive    */
 
-        {/* Content layer */}
-        <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", flex: 1, width: "100%" }}>
-          <I18nProvider>
-            <Navbar />
-            {children}
-            <Footer />
-          </I18nProvider>
-        </div>
-      </body>
-    </html>
-  );
+  /* Hover/active states — slightly brighter than their base */
+  --surface-1-hover: rgba(28, 34, 48, 0.85);
+  --surface-3-hover: rgba(44, 52, 70, 0.92);
+
+  /* Borders — strong enough to be visible against surfaces */
+  --border-soft:   rgba(255, 255, 255, 0.10);
+  --border-medium: rgba(255, 255, 255, 0.16);
+  --border-strong: rgba(255, 255, 255, 0.24);
+
+  /* Accent borders for focus/active */
+  --border-blue:  rgba(59, 130, 246, 0.55);
+  --border-gold:  rgba(255, 195, 0, 0.45);
+
+  /* Text */
+  --text-primary:   #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.72);
+  --text-muted:     rgba(255, 255, 255, 0.50);
+  --text-faint:     rgba(255, 255, 255, 0.32);
+
+  /* Brand */
+  --blue: #3b82f6;
+  --gold: #ffc300;
+  --green: #4ade80;
+  --red: #ef4444;
+}
+
+/* Utility class — apply to any container that needs to sit cleanly
+   above the mesh. Adds a subtle backdrop blur + dark wash so the
+   colored mesh fog does not leak through.                       */
+.sb-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.sb-card:hover {
+  border-color: var(--border-medium);
+}
+
+.sb-input {
+  background: var(--surface-3);
+  border: 1px solid var(--border-medium);
+  color: var(--text-primary);
+}
+
+.sb-input:focus {
+  border-color: var(--border-blue);
+  outline: none;
+}
+
+@keyframes meshFloat1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(8vw, 6vh) scale(1.1); }
+}
+@keyframes meshFloat2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(-7vw, 4vh) scale(1.08); }
+}
+@keyframes meshFloat3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(5vw, -5vh) scale(1.05); }
+}
+@keyframes meshFloat4 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(-6vw, -4vh) scale(1.1); }
 }

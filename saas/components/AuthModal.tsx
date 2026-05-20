@@ -13,6 +13,12 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  function clearGreetingFlag() {
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('greetingDismissed')
+    }
+  }
+
   async function handleSubmit() {
     setError('')
     setSuccess('')
@@ -34,6 +40,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
       if (error) {
         setError(error.message)
       } else {
+        clearGreetingFlag()
         onClose()
         const { data: profile } = await supabase
           .from('profiles')
@@ -51,6 +58,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
   }
 
   async function handleGoogle() {
+    clearGreetingFlag()
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/onboarding` }
@@ -58,6 +66,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
   }
 
   async function handleGitHub() {
+    clearGreetingFlag()
     await supabase.auth.signInWithOAuth({
       provider: 'github',
       options: { redirectTo: `${window.location.origin}/onboarding` }

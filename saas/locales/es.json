@@ -1,5 +1,121 @@
-
 {
   "hello": "Hola",
-  "welcome": "Bienvenido"
+  "welcome": "Bienvenido",
+  "home": "Inicio",
+  "podcasters": "Podcasters",
+  "dashboard": "Panel",
+  "pricing": "Precios",
+  "docs": "Documentación",
+  "logout": "Cerrar sesión",
+  "getStarted": "Empezar",
+  "buildWebsite": "Crear un sitio",
+  "collectReviews": "Recopilar reseñas",
+  "generateAudio": "Generar audio",
+  "createVideos": "Crear videos",
+  "hero": {
+    "badge": "Construye · Reseña · Difunde",
+    "headlines": [
+      "Construye tu marca en Español",
+      "Build your brand in English",
+      "Construa sua marca em Português",
+      "Twórz swoją markę po Polsku",
+      "Создайте свой бренд на Русском"
+    ],
+    "subhead": "Crea tu sitio web, recopila reseñas de clientes y produce audio y video nativos — en tu idioma, no una traducción.",
+    "ctaPrimary": "Empezar",
+    "ctaSecondary": "Ver demo",
+    "features": {
+      "site": "Constructor de sitios",
+      "reviews": "Recolector de reseñas",
+      "audio": "Audio nativo",
+      "video": "Editor de video"
+    },
+    "tagHint": "Haz clic en una señal de idioma para añadirla a tu proyecto",
+    "ticker": [
+      "Nueva reseña · São Paulo",
+      "Sitio publicado · Madrid",
+      "Audio generado · pl-PL",
+      "Video renderizado · ru-RU",
+      "Reseña recopilada · Lisboa",
+      "Sitio en vivo · Ciudad de México",
+      "Difusión enviada · 5 idiomas"
+    ],
+    "scroll": "Desliza"
+  },
+  "footer": {
+    "tagline": "SignalBoost ayuda a las empresas a crecer con sitios web nativos, reseñas de clientes, audio, video y contenido con IA — creado para cómo la gente realmente habla.",
+    "learnHow": "Descubre cómo funciona SignalBoost",
+    "readDocs": "lee la documentación",
+    "product": "Producto",
+    "build": "Crear",
+    "company": "Empresa",
+    "documentation": "Documentación",
+    "generateNativeAudio": "Generar audio nativo",
+    "about": "Acerca de",
+    "partners": "Socios",
+    "privacy": "Privacidad",
+    "contact": "Contacto",
+    "nativeExperiences": "Experiencias nativas disponibles en",
+    "poweredBy": "Desarrollado por"
+  },
+  "pricing_page": {
+    "badge": "Precios simples",
+    "headline": "Empieza gratis. Publica cuando estés listo.",
+    "subhead": "SignalBoost ayuda a las empresas a crecer con sitios web, reseñas, audio y herramientas de contenido con IA.",
+    "mostPopular": "MÁS POPULAR",
+    "perMonth": "/mes",
+    "priceFree": "Gratis",
+    "seats1": "1 usuario",
+    "seats3": "3 usuarios",
+    "seats10": "10+ usuarios",
+    "loading": "Cargando...",
+    "errorGeneric": "Algo salió mal.",
+    "free": {
+      "name": "Gratis",
+      "description": "Construye y previsualiza tu idea antes de publicar.",
+      "cta": "Empezar a construir",
+      "f1": "1 vista previa de sitio",
+      "f2": "1 idioma",
+      "f3": "Créditos de IA limitados",
+      "f4": "Recolector de reseñas (hasta 3 reseñas)",
+      "f5": "Marca de agua SignalBoost",
+      "f6": "Soporte de la comunidad"
+    },
+    "starter": {
+      "name": "Inicial",
+      "description": "Para negocios individuales listos para lanzar.",
+      "cta": "Lanzar mi negocio",
+      "f1": "Publica 1 sitio",
+      "f2": "2 idiomas",
+      "f3": "Recolección de reseñas",
+      "f4": "~50 generaciones de audio/mes",
+      "f5": "Subtítulos en 2 idiomas",
+      "f6": "Sin marca de agua",
+      "f7": "Soporte por correo"
+    },
+    "pro": {
+      "name": "Pro",
+      "description": "Para empresas en crecimiento expandiendo su alcance.",
+      "cta": "Crecer más rápido",
+      "f1": "5 sitios web",
+      "f2": "Los 5 idiomas",
+      "f3": "Suite de reseñas + video",
+      "f4": "~200 generaciones de audio/mes",
+      "f5": "Herramientas de creación de video",
+      "f6": "Soporte prioritario",
+      "f7": "Colaboración en equipo"
+    },
+    "business": {
+      "name": "Empresarial",
+      "description": "Para agencias y marcas con múltiples ubicaciones.",
+      "cta": "Contáctanos",
+      "f1": "Sitios web ilimitados",
+      "f2": "Todos los idiomas + personalizados",
+      "f3": "Marca blanca",
+      "f4": "Incorporación dedicada",
+      "f5": "Procesamiento prioritario",
+      "f6": "Informes avanzados",
+      "f7": "API e integraciones"
+    }
+  }
 }

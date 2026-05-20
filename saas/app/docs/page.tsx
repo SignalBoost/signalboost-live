@@ -92,3 +92,106 @@ const SECTIONS = [
       {
         q: 'What happens when the AI cannot solve my problem?',
         a: 'The AI escalates seamlessly.
+export default function DocsPage() {
+  const [search, setSearch] = useState('')
+  const [openSection, setOpenSection] = useState<string | null>(null)
+  const [openQ, setOpenQ] = useState<string | null>(null)
+
+  const filtered = SECTIONS.map(s => ({
+    ...s,
+    content: s.content.filter(c =>
+      c.q.toLowerCase().includes(search.toLowerCase()) ||
+      c.a.toLowerCase().includes(search.toLowerCase())
+    )
+  })).filter(s => s.content.length > 0)
+
+  return (
+    <main style={{ minHeight: '100vh', background: '#1e1e2e', color: '#fff', fontFamily: 'system-ui' }}>
+
+      <section style={{ maxWidth: 760, margin: '0 auto', padding: '60px 24px 32px', textAlign: 'center' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 999, padding: '4px 16px', marginBottom: 24, fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: GOLD }}>
+          Documentation
+        </div>
+        <div style={{ position: 'relative', maxWidth: 480, margin: '0 auto' }}>
+          <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 16, pointerEvents: 'none' }}>🔍</span>
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search docs..."
+            style={{ width: '100%', padding: '13px 16px 13px 44px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 15, color: '#fff', outline: 'none', boxSizing: 'border-box' }}
+            onFocus={e => (e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)')}
+            onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)')} />
+        </div>
+      </section>
+
+      {!search && (
+        <section style={{ maxWidth: 760, margin: '0 auto', padding: '0 24px 40px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+            {SECTIONS.map(s => (
+              <a key={s.id} href={`#${s.id}`}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, textDecoration: 'none', color: '#fff', transition: 'border-color 0.15s' }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(255,195,0,0.3)')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)')}>
+                <span style={{ fontSize: 20 }}>{s.icon}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>{s.title}</span>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section style={{ maxWidth: 760, margin: '0 auto', padding: '0 24px 80px' }}>
+        {filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '48px 0', color: 'rgba(255,255,255,0.3)', fontSize: 15 }}>
+            No results for "{search}"
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            {filtered.map(section => (
+              <div key={section.id} id={section.id}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, cursor: 'pointer' }}
+                  onClick={() => setOpenSection(openSection === section.id ? null : section.id)}>
+                  <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
+                    {section.icon}
+                  </div>
+                  <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, flex: 1 }}>{section.title}</h2>
+                  <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 18 }}>{openSection === section.id ? '−' : '+'}</span>
+                </div>
+                {(openSection === section.id || search) && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 52 }}>
+                    {section.content.map(item => (
+                      <div key={item.q} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, overflow: 'hidden' }}>
+                        <div onClick={() => setOpenQ(openQ === item.q ? null : item.q)}
+                          style={{ padding: '14px 18px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{item.q}</span>
+                          <span style={{ color: BLUE, fontSize: 16, flexShrink: 0 }}>{openQ === item.q ? '−' : '+'}</span>
+                        </div>
+                        {(openQ === item.q || search) && (
+                          <div style={{ padding: '0 18px 16px', fontSize: 13, color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                            <div style={{ paddingTop: 12 }}>{item.a}</div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section style={{ maxWidth: 600, margin: '0 auto', padding: '0 24px 80px', textAlign: 'center' }}>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: '40px 32px' }}>
+          <div style={{ fontSize: 32, marginBottom: 16 }}>💬</div>
+          <h2 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 10px' }}>Still have a question?</h2>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, margin: '0 0 24px', lineHeight: 1.6 }}>
+            Open a support ticket. Every question that is not answered in the docs gets added here so the next person does not have to ask.
+          </p>
+          <a href={`mailto:${CONTACT_EMAIL}?subject=SignalBoost%20Question`}
+            style={{ background: GOLD, color: '#000', fontWeight: 800, fontSize: 14, padding: '12px 32px', borderRadius: 999, textDecoration: 'none', display: 'inline-block' }}>
+            Open a support ticket
+          </a>
+        </div>
+      </section>
+
+    </main>
+  )
+}

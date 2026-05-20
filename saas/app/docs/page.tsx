@@ -5,9 +5,6 @@ import { useState } from 'react'
 const BLUE = '#3b82f6'
 const GOLD = '#ffc300'
 
-// Internal contact address. NEVER rendered as text on the page — only used inside
-// mailto: links so the user's mail client opens with the right recipient.
-// Bots scraping the rendered HTML do not see this string.
 const CONTACT_EMAIL = 'cadomos@gmail.com'
 
 const SECTIONS = [
@@ -91,7 +88,70 @@ const SECTIONS = [
       },
       {
         q: 'What happens when the AI cannot solve my problem?',
-        a: 'The AI escalates seamlessly.
+        a: 'The AI escalates seamlessly. First it brings in additional AI reasoning to analyze the problem from a different angle. The two AIs work together silently and present you with a combined solution. If still unresolved, Luis is notified automatically with the full conversation context and will respond personally.'
+      },
+      {
+        q: 'What can the AI NOT do?',
+        a: 'The AI cannot make purchasing decisions for you, access your bank or credit card, submit things on your behalf to third-party services, or guarantee resolution of issues caused by third-party providers (like Vercel outages or Namecheap DNS delays). In these cases it will explain clearly what is happening and what you need to do.'
+      },
+      {
+        q: 'Is my support conversation private?',
+        a: 'Yes. Your support conversations are private and only visible to you and SignalBoost support (Luis). They are not used to train AI models. Conversations are kept for 90 days for quality purposes then deleted.'
+      },
+    ]
+  },
+  {
+    id: 'pricing',
+    icon: '💳',
+    title: 'Plans, pricing and storage',
+    content: [
+      {
+        q: 'What are the plan limits?',
+        a: 'Free: 3 projects, 1 language, 100MB storage. Starter ($10/mo): 10 projects, 2 languages, 1GB. Pro ($30/mo): 30 projects, all 5 languages, 10GB, video editor. Business ($90/mo): unlimited projects, 50GB. Podcast plans are separate — see the Podcasters page for details.'
+      },
+      {
+        q: 'Do business partners get a free trial?',
+        a: 'Yes — business partners get 30 days free on the Starter plan only. This gives you access to 2 languages, review collector, and native audio to try the platform. If you need Pro or Business features, those plans require payment from day one.'
+      },
+      {
+        q: 'Why are there project and storage limits?',
+        a: 'Storage costs money. Audio and video files can be large — a 10-minute podcast episode can be 50-100MB. Without limits a small number of heavy users would make the platform unaffordable for everyone else. The limits are designed so the free plan covers most people getting started, and paid plans cover professional use.'
+      },
+      {
+        q: 'What happens when I reach my limit?',
+        a: 'You will see a clear warning before you hit the limit. When you reach it, you cannot create new projects until you either delete an existing one or upgrade. We never delete your data or lock you out — we just pause new creation until resolved.'
+      },
+      {
+        q: 'How do I cancel?',
+        a: 'Cancel anytime from your dashboard under Settings, or open a support ticket from this page. No cancellation fees. You keep access until the end of your billing period. We do not make cancellation difficult on purpose — if you want to leave, we make it easy.'
+      },
+    ]
+  },
+  {
+    id: 'getting-started',
+    icon: '🚀',
+    title: 'Getting started guides',
+    content: [
+      {
+        q: 'How do I build my first website?',
+        a: 'Go to Dashboard and click Site builder. If you are a beginner, the AI will guide you through the process conversationally — just tell it about your business. If you are technical, you can use the full builder directly. Either way, the AI is there to help at every step.'
+      },
+      {
+        q: 'How do I set up a podcast?',
+        a: 'Go to the Podcasters page and pick a plan. Once subscribed, go to Dashboard, then Native audio, then upload your episode. We support MP3, MP4, WAV and more. Important: bring us your finished, edited episode. We do not do raw audio editing. We generate voiceover, captions, clips and show notes from your final file.'
+      },
+      {
+        q: 'How do I collect reviews?',
+        a: 'Go to Dashboard then Review collector. You will get a review link to share with your customers. Reviews appear in your chosen languages automatically. You can embed the review widget on your SignalBoost site or any external site.'
+      },
+      {
+        q: 'How do I connect my own domain?',
+        a: 'Go through the onboarding wizard or go to Dashboard, then Settings, then Domain. You will need to update your DNS records at your domain provider to point to SignalBoost. The AI will give you the exact records to copy. DNS changes take 15 minutes to 48 hours to propagate worldwide.'
+      },
+    ]
+  },
+]
+
 export default function DocsPage() {
   const [search, setSearch] = useState('')
   const [openSection, setOpenSection] = useState<string | null>(null)

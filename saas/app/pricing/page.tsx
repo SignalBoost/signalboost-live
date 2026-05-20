@@ -1,167 +1,360 @@
 'use client'
 import { useState } from 'react'
 
+const CONTACT_EMAIL = 'support@signalboostapp.com'
+
 const INDIVIDUAL_PLANS = [
   {
-    index: 0, name: 'Free', plan: 'free',
-    description: 'Sketch your idea. See SignalBoost in action before you commit.',
-    features: ['Sketch 1 website (preview only)', 'Sample native audio', 'Test review collector (up to 3 reviews)', 'SignalBoost watermark on outputs', 'Community support'],
-    cta: 'Start sketching', highlight: false, seats: '1 user', price: 'Free',
+    name: 'Free',
+    plan: 'free',
+    description: 'Build and preview your idea before publishing.',
+    features: [
+      '1 website preview',
+      '1 language',
+      'Create audio previews',
+      'Review collector (up to 3 reviews)',
+      'SignalBoost watermark',
+      'Community support',
+    ],
+    cta: 'Start building',
+    highlight: false,
+    seats: '1 seat',
+    price: 'Free',
   },
-  {
-    index: 1, name: 'Starter', plan: 'starter',
-    description: 'Perfect for small businesses getting started.',
-    features: ['1 website', '2 languages', 'Review collector', 'Native audio (50 credits/mo)', 'Captions (2 languages)', 'No watermark', 'Email support'],
-    cta: 'Get Starter', highlight: false, seats: '1 user', price: '$10',
-  },
-  {
-    index: 2, name: 'Pro', plan: 'pro',
-    description: 'For growing businesses that need more reach.',
-    features: ['5 websites', 'All 5 languages', 'Review collector + video', 'Native audio (200 credits/mo)', 'Captions in all 5 languages', 'Video editor', 'Priority support'],
-    cta: 'Get Pro', highlight: true, seats: '1 user', price: '$30',
-  },
-  {
-    index: 3, name: 'Business', plan: 'business',
-    description: 'For agencies and multi-location brands.',
-    features: ['Unlimited websites', 'All 5 languages + custom', 'Full review & video suite', 'Native audio (unlimited)', 'Custom caption formats (SRT, VTT)', 'Video editor + export', 'Dedicated account manager', 'White label option'],
-    cta: 'Contact us', highlight: false, seats: '1 user', price: '$90',
-  },
-]
 
-const TEAM_PLANS = [
   {
-    index: 2, name: 'Pro Team', plan: 'pro',
-    description: 'For teams that need to collaborate and scale.',
-    features: ['5 websites', 'All 5 languages', 'Review collector + video', 'Native audio (200 credits/mo)', 'Captions in all 5 languages', 'Video editor', 'Priority support', 'Team management'],
-    cta: 'Get Pro Team', highlight: false, seats: '3 users', price: '$30',
+    name: 'Starter',
+    plan: 'starter',
+    description: 'For solo businesses ready to launch.',
+    features: [
+      'Publish 1 website',
+      '2 languages',
+      'Review collection',
+      '~50 audio generations/month',
+      'Captions in 2 languages',
+      'No watermark',
+      'Email support',
+    ],
+    cta: 'Launch my business',
+    highlight: false,
+    seats: '1 seat',
+    price: '$15',
   },
+
   {
-    index: 3, name: 'Business Team', plan: 'business',
-    description: 'For agencies managing multiple brands.',
-    features: ['Unlimited websites', 'All 5 languages + custom', 'Full review & video suite', 'Native audio (unlimited)', 'Custom caption formats (SRT, VTT)', 'Video editor + export', 'Dedicated account manager', 'White label option', 'Team management'],
-    cta: 'Get Business Team', highlight: true, seats: '10 users', price: '$90',
+    name: 'Pro',
+    plan: 'pro',
+    description: 'For growing businesses expanding reach.',
+    features: [
+      '5 websites',
+      'All 5 languages',
+      'Review suite + video',
+      '~200 audio generations/month',
+      'Video creation tools',
+      'Priority support',
+      'Team collaboration',
+    ],
+    cta: 'Scale faster',
+    highlight: true,
+    seats: '3 seats',
+    price: '$39',
   },
+
   {
-    index: 0, name: 'Enterprise', plan: 'enterprise',
-    description: 'Custom solution for large organizations.',
-    features: ['Unlimited everything', 'Custom languages', 'Custom integrations', 'SLA guarantee', 'Dedicated infrastructure', 'Custom onboarding', 'Volume discounts'],
-    cta: 'Contact sales', highlight: false, seats: 'Unlimited users', price: 'Custom',
+    name: 'Business',
+    plan: 'business',
+    description: 'For agencies and multi-location brands.',
+    features: [
+      'Unlimited websites',
+      'All languages + custom',
+      'White label',
+      'Dedicated onboarding',
+      'Priority processing',
+      'Advanced reporting',
+      'API & integrations',
+    ],
+    cta: 'Contact us',
+    highlight: false,
+    seats: '10+ seats',
+    price: '$99',
   },
 ]
 
 export default function PricingPage() {
-  const [tab, setTab] = useState<'individual' | 'team'>('individual')
   const [loading, setLoading] = useState<string | null>(null)
-  const plans = tab === 'individual' ? INDIVIDUAL_PLANS : TEAM_PLANS
 
   async function handleCheckout(plan: string) {
-    if (plan === 'free') { window.location.href = '/dashboard'; return }
-    if (plan === 'business' || plan === 'enterprise') {
-      window.location.href = 'mailto:cadomos@gmail.com?subject=SignalBoost Plan Inquiry'
+    if (plan === 'free') {
+      window.location.href = '/dashboard'
       return
     }
+
+    if (plan === 'business') {
+      window.location.href =
+        `mailto:${CONTACT_EMAIL}?subject=SignalBoost Business Inquiry`
+      return
+    }
+
     try {
       setLoading(plan)
-      const { createClient } = await import('@supabase/supabase-js')
+
+      const { createClient } =
+        await import('@supabase/supabase-js')
+
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       )
-      const { data: { session } } = await supabase.auth.getSession()
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
       const token = session?.access_token || ''
 
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ plan }),
       })
+
       const data = await res.json()
-      if (data.url) window.location.href = data.url
-      else alert('Something went wrong. Please try again.')
+
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        alert('Something went wrong.')
+      }
+
     } catch {
-      alert('Something went wrong. Please try again.')
+      alert('Something went wrong.')
     } finally {
       setLoading(null)
     }
-  }return (
-    <main style={{ minHeight: '100vh', background: '#0a0a0f', color: '#fff', fontFamily: 'system-ui' }}>
-      <section style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 24px 80px' }}>
+  }
 
-        <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 999, padding: '4px 16px', marginBottom: 14, fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#ffc300' }}>
+  return (
+    <main
+      style={{
+        minHeight: '100vh',
+        background: 'var(--bg-base)',
+        color: 'var(--text-primary)',
+        fontFamily: 'system-ui',
+      }}
+    >
+      <section
+        style={{
+          maxWidth: 1100,
+          margin: '0 auto',
+          padding: '28px 24px 80px',
+        }}
+      >
+        <div
+          style={{
+            textAlign: 'center',
+            marginBottom: 40,
+          }}
+        >
+          <div
+            style={{
+              display: 'inline-flex',
+              padding: '6px 14px',
+              borderRadius: 999,
+              marginBottom: 16,
+              background: 'rgba(255,195,0,.08)',
+              border: '1px solid rgba(255,195,0,.2)',
+              color: '#ffc300',
+              fontWeight: 700,
+              fontSize: 11,
+              letterSpacing: '.08em',
+              textTransform: 'uppercase',
+            }}
+          >
             Simple pricing
           </div>
-          <h1 style={{ fontSize: 'clamp(28px, 4vw, 48px)', fontWeight: 900, letterSpacing: '-0.03em', margin: '0 0 10px' }}>
-            Plans that grow with you
-          </h1>
-          <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 15, maxWidth: 460, margin: '0 auto 8px' }}>
-            Start free. Upgrade when you are ready.
-          </p>
-          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 13, margin: '0 auto 20px' }}>
-            Prices shown in USD.
-          </p>
 
-          <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: 4, marginBottom: 16 }}>
-            {(['individual', 'team'] as const).map(t => (
-              <button key={t} onClick={() => setTab(t)}
-                style={{ padding: '7px 20px', borderRadius: 999, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', transition: 'all 0.2s', background: tab === t ? '#ffc300' : 'transparent', color: tab === t ? '#000' : 'rgba(255,255,255,0.5)' }}>
-                {t === 'individual' ? 'Individual' : 'Team & Enterprise'}
-              </button>
-            ))}
-          </div>
+          <h1
+            style={{
+              fontSize:'clamp(32px,5vw,54px)',
+              fontWeight:900,
+              letterSpacing:'-.04em',
+              margin:'0 0 14px'
+            }}
+          >
+            Start free. Publish when ready.
+          </h1>
+
+          <p
+            style={{
+              maxWidth:550,
+              margin:'0 auto',
+              color:'var(--text-muted)',
+              lineHeight:1.7
+            }}
+          >
+            SignalBoost helps businesses grow with AI-powered
+            websites, reviews, audio and content tools.
+          </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${plans.length}, 1fr)`, gap: 16 }}>
-          {plans.map(plan => (
-            <div key={plan.name} style={{ background: plan.highlight ? 'rgba(255,195,0,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${plan.highlight ? 'rgba(255,195,0,0.4)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 20, padding: '28px 22px', display: 'flex', flexDirection: 'column', gap: 18, position: 'relative' }}>
+        <div
+          style={{
+            display:'grid',
+            gridTemplateColumns:'repeat(4,1fr)',
+            gap:18
+          }}
+        >
+          {INDIVIDUAL_PLANS.map(plan=>(
+            <div
+              key={plan.name}
+              style={{
+                background:plan.highlight
+                ?'rgba(255,195,0,.05)'
+                :'var(--surface-1)',
+
+                border:`1px solid ${
+                  plan.highlight
+                  ?'rgba(255,195,0,.35)'
+                  :'var(--border-medium)'
+                }`,
+
+                borderRadius:20,
+                padding:24,
+                display:'flex',
+                flexDirection:'column',
+                gap:18,
+                position:'relative'
+              }}
+            >
               {plan.highlight && (
-                <div style={{ position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)', background: '#ffc300', color: '#000', fontSize: 10, fontWeight: 800, padding: '3px 14px', borderRadius: 999, letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
-                  Most popular
+                <div
+                  style={{
+                    position:'absolute',
+                    top:-12,
+                    left:'50%',
+                    transform:'translateX(-50%)',
+                    background:'#ffc300',
+                    color:'#000',
+                    padding:'4px 12px',
+                    borderRadius:999,
+                    fontSize:10,
+                    fontWeight:800
+                  }}
+                >
+                  MOST POPULAR
                 </div>
               )}
+
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: plan.highlight ? '#ffc300' : 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{plan.name}</div>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,195,0,0.7)', background: 'rgba(255,195,0,0.08)', border: '1px solid rgba(255,195,0,0.15)', borderRadius: 999, padding: '2px 8px' }}>{plan.seats}</div>
+                <div
+                  style={{
+                    display:'flex',
+                    justifyContent:'space-between',
+                    marginBottom:10
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight:800
+                    }}
+                  >
+                    {plan.name}
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize:11,
+                      color:'var(--text-muted)'
+                    }}
+                  >
+                    {plan.seats}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                  <span style={{ fontSize: 40, fontWeight: 900, letterSpacing: '-0.03em' }}>{plan.price}</span>
-                  {plan.price !== 'Free' && plan.price !== 'Custom' && <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>/mo</span>}
+
+                <div
+                  style={{
+                    fontSize:42,
+                    fontWeight:900
+                  }}
+                >
+                  {plan.price}
+                  {plan.price !== 'Free' && (
+                    <span
+                      style={{
+                        fontSize:12,
+                        color:'var(--text-faint)'
+                      }}
+                    >
+                      /mo
+                    </span>
+                  )}
                 </div>
-                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', margin: '6px 0 0', lineHeight: 1.5 }}>{plan.description}</p>
+
+                <p
+                  style={{
+                    color:'var(--text-muted)',
+                    fontSize:13,
+                    lineHeight:1.6
+                  }}
+                >
+                  {plan.description}
+                </p>
               </div>
-              <div>
-                <button onClick={() => handleCheckout(plan.plan)} disabled={loading === plan.plan}
-                  style={{ background: plan.highlight ? '#ffc300' : 'rgba(255,255,255,0.05)', color: plan.highlight ? '#000' : '#fff', border: `1px solid ${plan.highlight ? '#ffc300' : 'rgba(255,255,255,0.1)'}`, borderRadius: 999, padding: '11px 0', fontSize: 13, fontWeight: 800, cursor: loading === plan.plan ? 'wait' : 'pointer', width: '100%', opacity: loading === plan.plan ? 0.7 : 1 }}>
-                  {loading === plan.plan ? 'Loading...' : plan.cta}
-                </button>
-                <div style={{ textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 8 }}>Cancel anytime</div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-                {plan.features.map(f => (
-                  <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>
-                    <span style={{ color: '#ffc300', flexShrink: 0, marginTop: 1 }}>✓</span>{f}
+
+              <button
+                onClick={()=>handleCheckout(plan.plan)}
+                disabled={loading===plan.plan}
+                style={{
+                  width:'100%',
+                  padding:'12px',
+                  borderRadius:999,
+                  border:'none',
+                  cursor:'pointer',
+                  fontWeight:800,
+                  background:plan.highlight
+                  ?'#ffc300'
+                  :'var(--surface-3)',
+                  color:plan.highlight
+                  ?'#000'
+                  :'#fff'
+                }}
+              >
+                {loading===plan.plan
+                  ?'Loading...'
+                  :plan.cta}
+              </button>
+
+              <div
+                style={{
+                  display:'flex',
+                  flexDirection:'column',
+                  gap:10
+                }}
+              >
+                {plan.features.map(feature=>(
+                  <div
+                    key={feature}
+                    style={{
+                      display:'flex',
+                      gap:8,
+                      color:'var(--text-secondary)',
+                      fontSize:13
+                    }}
+                  >
+                    <span style={{color:'#ffc300'}}>
+                      ✓
+                    </span>
+                    {feature}
                   </div>
                 ))}
               </div>
+
             </div>
           ))}
         </div>
-
-        <div style={{ textAlign: 'center', marginTop: 32, padding: '32px 28px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 20 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 10px' }}>Have questions about which plan is right for you?</h2>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, margin: '0 0 20px' }}>We are happy to help you choose the right plan for your business.</p>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button onClick={() => window.location.href = 'mailto:cadomos@gmail.com?subject=SignalBoost Sales Inquiry'}
-              style={{ background: '#ffc300', color: '#000', fontWeight: 800, fontSize: 13, padding: '11px 28px', borderRadius: 999, border: 'none', cursor: 'pointer' }}>
-              Contact sales
-            </button>
-          </div>
-        </div>
-
       </section>
     </main>
   )

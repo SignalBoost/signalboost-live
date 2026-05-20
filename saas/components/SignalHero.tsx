@@ -1,152 +1,400 @@
 'use client'
+import { useCallback, useState, useEffect, useRef } from 'react'
+import SignalCanvas from './SignalCanvas'
 
-import Link from 'next/link'
-import { useI18n } from '@/components/i18n/I18nProvider'
+const LANGS = [
+  { name: 'English', flag: '🇺🇸' },
+  { name: 'Português', flag: '🇧🇷' },
+  { name: 'Español', flag: '🇪🇸' },
+  { name: 'Polski', flag: '🇵🇱' },
+  { name: 'Русский', flag: '🇷🇺' },
+]
 
-const GOLD = '#ffc300'
-const BLUE = '#3b82f6'
+const POSITIONS = [
+  { tx: 140, ty: -160 },
+  { tx: -140, ty: -160 },
+  { tx: 170, ty: -80 },
+  { tx: -170, ty: -80 },
+  { tx: 60, ty: -200 },
+]
+
+type Tag = {
+  id: number
+  lang: typeof LANGS[0]
+  pos: typeof POSITIONS[0]
+}
 
 export default function SignalHero() {
-  const { dict, lang } = useI18n()
+  const [selected, setSelected] = useState<string[]>([])
+  const [tags, setTags] = useState<Tag[]>([])
+  const [headlineLang, setHeadlineLang] = useState(0)
 
-  const features = [
-    dict.buildWebsite || 'Build a website',
-    dict.collectReviews || 'Collect reviews',
-    dict.generateAudio || 'Generate audio',
-    dict.createVideos || 'Create videos',
-    dict.aiAssistant || 'AI assistant',
-    dict.multilingualContent || 'Multilingual content',
-  ]
+  const langRef = useRef(0)
+  const posRef = useRef(0)
+  const idRef = useRef(0)
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      setHeadlineLang(i => (i + 1) % LANGS.length)
+    }, 2000)
+
+    return () => clearInterval(t)
+  }, [])
+
+  const spawnTag = useCallback(() => {
+    const lang = LANGS[langRef.current % LANGS.length]
+    const pos = POSITIONS[posRef.current % POSITIONS.length]
+
+    langRef.current++
+    posRef.current++
+
+    const id = idRef.current++
+
+    setTags(prev => [...prev, { id, lang, pos }])
+
+    setTimeout(() => {
+      setTags(prev => prev.filter(t => t.id !== id))
+    }, 3500)
+  }, [])
+
+  const toggleLang = (name: string) => {
+    setSelected(prev =>
+      prev.includes(name)
+        ? prev.filter(l => l !== name)
+        : [...prev, name]
+    )
+  }
 
   return (
     <section
       style={{
-        padding: '90px 24px 80px',
-        color: '#fff',
-        fontFamily: 'system-ui',
+        minHeight: 'calc(100vh - 65px)',
+        maxHeight: '92vh',
+        overflow: 'hidden',
+        position: 'relative',
       }}
+      className="grid grid-cols-2 items-center"
     >
-      <div
-        style={{
-          maxWidth: 1100,
-          margin: '0 auto',
-          textAlign: 'center',
-        }}
-      >
+      {/* LEFT */}
+      <div className="flex flex-col gap-7 px-16">
         <div
+          className="flex items-center gap-2 w-fit rounded-full px-4 py-2"
           style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            border: '1px solid var(--border-medium)',
-            background: 'var(--surface-1)',
-            borderRadius: 999,
-            padding: '7px 16px',
-            color: 'var(--text-muted)',
-            fontSize: 13,
-            marginBottom: 22,
+            background: 'rgba(255,195,0,0.1)',
+            border: '1px solid rgba(255,195,0,0.25)',
+            color: '#ffc300',
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
           }}
         >
-          🌎 {dict.languageBadge || `Native experience • ${lang.toUpperCase()}`}
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: '#ffc300',
+              display: 'inline-block',
+              animation: 'pulse 2s infinite',
+            }}
+          />
+          Build · Review · Broadcast
         </div>
 
         <h1
+          className="font-black leading-none"
           style={{
-            fontSize: 'clamp(42px, 7vw, 82px)',
-            lineHeight: 1,
-            fontWeight: 950,
-            letterSpacing: '-0.06em',
-            margin: '0 auto 20px',
-            maxWidth: 900,
+            fontSize: 'clamp(40px, 5vw, 68px)',
+            letterSpacing: '-0.03em',
           }}
         >
-          {dict.heroTitle || 'Build your brand'}
+          Build your brand
           <br />
-          <span style={{ color: GOLD }}>
-            {dict.heroTitleAccent || 'in every language'}
+          in{' '}
+          <span
+            key={headlineLang}
+            style={{
+              color: '#ffc300',
+              display: 'inline-block',
+              animation: 'fadeSlide 0.35s ease-out',
+            }}
+          >
+            {LANGS[headlineLang].name}
           </span>
         </h1>
 
         <p
           style={{
-            maxWidth: 650,
-            margin: '0 auto 34px',
-            color: 'var(--text-secondary)',
-            fontSize: 18,
+            color: 'rgba(255,255,255,0.4)',
+            fontSize: 16,
             lineHeight: 1.7,
+            maxWidth: 340,
+            margin: 0,
           }}
         >
-          {dict.heroSubtitle ||
-            'Create websites, reviews, audio and video content that feels native — not translated.'}
+          Create your website, collect customer reviews, and produce native
+          audio & video content — in your language, not a translation.
         </p>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <button
+            style={{
+              background: '#ffc300',
+              color: '#000',
+              fontWeight: 800,
+              fontSize: 15,
+              padding: '13px 34px',
+              borderRadius: 999,
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            Get started
+          </button>
+
+          <button
+            style={{
+              color: 'rgba(255,255,255,0.5)',
+              fontSize: 15,
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.color = '#fff'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.color = 'rgba(255,255,255,0.5)'
+            }}
+          >
+            Watch a demo →
+          </button>
+        </div>
 
         <div
           style={{
             display: 'flex',
-            gap: 14,
-            justifyContent: 'center',
+            gap: 28,
             flexWrap: 'wrap',
-            marginBottom: 46,
+            borderTop: '1px solid rgba(255,255,255,0.08)',
+            paddingTop: 20,
           }}
         >
-          <Link
-            href="/dashboard"
-            style={{
-              background: GOLD,
-              color: '#000',
-              padding: '14px 28px',
-              borderRadius: 999,
-              fontWeight: 900,
-              textDecoration: 'none',
-              boxShadow: '0 10px 35px rgba(255,195,0,.22)',
-            }}
-          >
-            {dict.getStarted || 'Get started'}
-          </Link>
-
-          <Link
-            href="/docs"
-            style={{
-              background: 'var(--surface-2)',
-              color: '#fff',
-              padding: '14px 28px',
-              borderRadius: 999,
-              border: '1px solid var(--border-medium)',
-              fontWeight: 800,
-              textDecoration: 'none',
-            }}
-          >
-            {dict.watchDemo || 'Watch demo'}
-          </Link>
+          {[
+            { icon: '🌐', label: 'Site builder' },
+            { icon: '⭐', label: 'Review collector' },
+            { icon: '🎙️', label: 'Native audio' },
+            { icon: '🎬', label: 'Video editor' },
+          ].map(f => (
+            <div
+              key={f.label}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <span style={{ fontSize: 18 }}>{f.icon}</span>
+              <span
+                style={{
+                  fontSize: 13,
+                  color: 'rgba(255,255,255,0.6)',
+                  fontWeight: 500,
+                }}
+              >
+                {f.label}
+              </span>
+            </div>
+          ))}
         </div>
 
         <div
           style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 14,
-            maxWidth: 860,
-            margin: '0 auto',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 8,
+            minHeight: 36,
           }}
         >
-          {features.map(item => (
-            <div
-              key={item}
+          {selected.length === 0 ? (
+            <p
               style={{
-                background: 'var(--surface-1)',
-                border: '1px solid var(--border-medium)',
-                borderRadius: 16,
-                padding: '18px 16px',
-                color: 'var(--text-secondary)',
-                fontSize: 14,
-                fontWeight: 700,
+                color: 'rgba(255,255,255,0.2)',
+                fontSize: 13,
+                margin: 0,
               }}
             >
-              {item}
-            </div>
+              Click a language signal to add it to your project
+            </p>
+          ) : (
+            selected.map(name => {
+              const l = LANGS.find(x => x.name === name)!
+
+              return (
+                <div
+                  key={name}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '6px 14px',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    background: 'rgba(255,195,0,0.12)',
+                    border: '1px solid rgba(255,195,0,0.3)',
+                    color: '#ffc300',
+                    borderRadius: 999,
+                  }}
+                >
+                  <span>{l.flag}</span>
+                  <span>{l.name}</span>
+
+                  <button
+                    onClick={() => toggleLang(name)}
+                    style={{
+                      color: 'rgba(255,255,255,0.3)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: 18,
+                      lineHeight: 1,
+                      padding: 0,
+                      marginLeft: 4,
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </div>
+
+      {/* RIGHT — signal */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          borderLeft: '1px solid rgba(255,255,255,0.05)',
+        }}
+      >
+        <div style={{ position: 'relative', width: 500, height: 500 }}>
+          <SignalCanvas onSpawn={spawnTag} />
+
+          {tags.map(t => (
+            <button
+              key={t.id}
+              onClick={() => toggleLang(t.lang.name)}
+              style={{
+                position: 'absolute',
+                left: '50%',
+                top: '50%',
+                transform: `translate(calc(-50% + ${t.pos.tx}px), calc(-50% + ${t.pos.ty}px))`,
+                animation: 'tagFloat 3.5s ease-out forwards',
+                background: selected.includes(t.lang.name)
+                  ? '#ffc300'
+                  : 'rgba(255,255,255,0.08)',
+                border: `1px solid ${
+                  selected.includes(t.lang.name)
+                    ? '#ffc300'
+                    : 'rgba(255,255,255,0.3)'
+                }`,
+                color: selected.includes(t.lang.name) ? '#000' : '#ffffff',
+                borderRadius: 999,
+                padding: '9px 20px',
+                fontSize: 14,
+                fontWeight: 700,
+                letterSpacing: '0.04em',
+                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+              }}
+            >
+              {t.lang.flag} {t.lang.name}
+            </button>
           ))}
         </div>
       </div>
+
+      {/* Scroll hint */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 24,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 6,
+          opacity: 0.4,
+          animation: 'bounce 2s ease-in-out infinite',
+          pointerEvents: 'none',
+        }}
+      >
+        <span
+          style={{
+            fontSize: 11,
+            color: '#fff',
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+          }}
+        >
+          Scroll
+        </span>
+
+        <span style={{ color: '#ffc300', fontSize: 18 }}>↓</span>
+      </div>
+
+      <style>{`
+        @keyframes tagFloat {
+          0% {
+            opacity: 0;
+            transform: translate(calc(-50% + 0px), calc(-50% + 0px)) scale(0.8);
+          }
+          12% {
+            opacity: 1;
+          }
+          75% {
+            opacity: 1;
+          }
+          100% {
+            opacity: 0;
+          }
+        }
+
+        @keyframes fadeSlide {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.4;
+          }
+        }
+
+        @keyframes bounce {
+          0%, 100% {
+            transform: translateX(-50%) translateY(0);
+          }
+          50% {
+            transform: translateX(-50%) translateY(6px);
+          }
+        }
+      `}</style>
     </section>
   )
 }

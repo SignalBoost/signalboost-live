@@ -217,4 +217,70 @@
     "howItWorks": {
       "title": "Como a SignalBoost funciona",
       "q1": "O que é a SignalBoost?",
-      "a1": "A SignalBoost é uma plataforma de conteúdo multilíngue. Ajudamos emp
+      "a1": "A SignalBoost é uma plataforma de conteúdo multilíngue. Ajudamos empresas a construir sites, coletar avaliações de clientes, produzir conteúdo nativo de áudio e vídeo, e alcançar audiências globais em 5 idiomas: inglês, português, espanhol, polonês e russo. Não somos um serviço de tradução — criamos conteúdo nativo que soa e lê como se fosse feito por um local.",
+      "q2": "Para quem é a SignalBoost?",
+      "a2": "Qualquer pessoa que queira alcançar uma audiência internacional. De uma padaria em Lisboa que quer um site em português e inglês, a uma rede de podcasts que quer alcançar ouvintes no Brasil, Polônia e Rússia. Atendemos tanto iniciantes completos quanto desenvolvedores técnicos — a experiência se adapta ao seu nível.",
+      "q3": "O que a SignalBoost NÃO faz?",
+      "a3": "Não fazemos hardware ou equipamento de gravação. Não editamos áudio bruto (remover ruído de fundo, cortar erros). Não hospedamos feeds RSS de podcast nem enviamos para Spotify/Apple Podcasts. Não produzimos música ou vinhetas. Somos honestos sobre nossos limites.",
+      "q4": "Como funciona a IA?",
+      "a4": "A SignalBoost usa IA para gerar locução nativa, legendas, clipes sociais, notas do programa, conteúdo de site e mais. Nosso agente de suporte com IA monitora sua atividade e ajuda proativamente quando detecta que você está travado — sem você precisar pedir. Se a IA não consegue resolver algo, ela traz suporte de IA adicional silenciosamente e depois escala para o Luis (nosso fundador) se ainda não resolver."
+    },
+    "partners": {
+      "title": "Nossos parceiros — total transparência",
+      "q1": "Por que a SignalBoost recomenda certos provedores?",
+      "a1": "Recomendamos provedores com base em qualidade, confiabilidade e valor. Testamos todos eles. Algumas de nossas recomendações incluem links de afiliados — significa que a SignalBoost ganha uma comissão se você se inscrever pelo nosso link, sem custo extra para você. Sempre divulgamos isso claramente.",
+      "q2": "Quais provedores vocês recomendam e por quê?",
+      "a2": "Domínios: Namecheap (melhor valor, DNS fácil), Cloudflare (preços de custo, SSL grátis). Hospedagem: Vercel (melhor desempenho, plano gratuito), Netlify (ótimo para sites estáticos). IA de áudio: ElevenLabs (vozes mais naturais disponíveis). Não recomendamos provedores que não testamos nós mesmos.",
+      "q3": "As comissões de parceiros afetam suas recomendações?",
+      "a3": "Não. Listamos a Cloudflare como opção de domínio mesmo eles não pagando comissão, porque são genuinamente bons. Se um provedor ficar pior que seus concorrentes, diremos isso e o removeremos de nossas recomendações, independentemente de comissão. A confiança dos nossos usuários importa mais que a renda de comissões.",
+      "q4": "A SignalBoost pode conseguir um acordo de parceria que me beneficie?",
+      "a4": "Sim — ativamente buscamos parcerias que dão aos usuários da SignalBoost descontos ou avaliações estendidas. Se garantirmos um acordo, passamos o benefício para você. Confira nossa página de preços para benefícios atuais de parceiros."
+    },
+    "yourData": {
+      "title": "Seus dados e privacidade",
+      "q1": "Onde meus dados são armazenados?",
+      "a1": "Seus dados de conta e metadados de projeto são armazenados no Supabase — uma plataforma de banco de dados segura e de código aberto hospedada na AWS. Seus arquivos de áudio e vídeo são armazenados no Supabase Storage. Seus arquivos de site são implantados via Vercel. Não armazenamos suas chaves de API em texto simples — elas são criptografadas em repouso.",
+      "q2": "Quem pode ver meus dados?",
+      "a2": "Apenas você pode ver seus projetos e arquivos. O Luis (fundador) tem acesso de administrador apenas para fins de suporte e não acessa dados de usuários a menos que você peça ajuda. Não vendemos seus dados para ninguém. Não compartilhamos com terceiros, exceto os provedores de infraestrutura listados acima.",
+      "q3": "O que acontece se eu cancelar?",
+      "a3": "Você mantém o acesso até o fim do seu período de cobrança. Depois disso, seus dados são mantidos por 30 dias caso você queira voltar. Após 30 dias são permanentemente excluídos. Você pode solicitar exclusão imediata a qualquer momento abrindo um ticket de suporte nesta página.",
+      "q4": "Como excluo minha conta?",
+      "a4": "Abra um ticket de suporte nesta página com o assunto \"Excluir minha conta\" enviado do seu e-mail registrado. Excluiremos tudo em 48 horas e confirmaremos quando feito. Sem perguntas."
+    },
+    "aiSupport": {
+      "title": "Suporte com IA — como funciona",
+      "q1": "Como funciona o sistema de suporte com IA?",
+      "a1": "A SignalBoost monitora sua atividade em tempo real. Se você passar mais de 3 minutos na mesma página, clicar repetidamente sem progresso, ou encontrar um erro — a IA abre proativamente e oferece ajuda. Ela já conhece sua conta, seu plano, sua página atual, e o que deu errado. Você nunca precisa explicar sua situação do zero.",
+      "q2": "O que acontece quando a IA não consegue resolver meu problema?",
+      "a2": "A IA escala perfeitamente. Primeiro traz raciocínio de IA adicional para analisar o problema de outro ângulo. As duas IAs trabalham juntas silenciosamente e apresentam uma solução combinada. Se ainda não resolver, o Luis é notificado automaticamente com o contexto completo da conversa e responderá pessoalmente.",
+      "q3": "O que a IA NÃO pode fazer?",
+      "a3": "A IA não pode tomar decisões de compra por você, acessar seu banco ou cartão de crédito, enviar coisas em seu nome para serviços de terceiros, ou garantir resolução de problemas causados por provedores terceiros (como quedas da Vercel ou atrasos de DNS do Namecheap). Nesses casos, ela explicará claramente o que está acontecendo e o que você precisa fazer.",
+      "q4": "Minha conversa de suporte é privada?",
+      "a4": "Sim. Suas conversas de suporte são privadas e visíveis apenas para você e o suporte da SignalBoost (Luis). Não são usadas para treinar modelos de IA. Conversas são mantidas por 90 dias para fins de qualidade e depois excluídas."
+    },
+    "pricing": {
+      "title": "Planos, preços e armazenamento",
+      "q1": "Quais são os limites do plano?",
+      "a1": "Grátis: 1 projeto, 1 idioma, apenas prévia com marca d'água, créditos de IA limitados. Inicial ($15/mês): 1 site publicado, 2 idiomas, ~50 gerações de áudio/mês. Pro ($39/mês): 5 sites, todos os 5 idiomas, ~200 gerações de áudio/mês, ferramentas de vídeo. Empresarial ($99/mês): sites ilimitados, todos os idiomas mais personalizados, marca branca. Planos de podcast são separados — veja a página Podcasters para detalhes.",
+      "q2": "Parceiros empresariais ganham avaliação gratuita?",
+      "a2": "Sim — parceiros empresariais ganham 30 dias grátis no plano Inicial apenas. Isso dá acesso a 2 idiomas, coletor de avaliações e áudio nativo para experimentar a plataforma. Se você precisa de recursos Pro ou Empresarial, esses planos exigem pagamento desde o primeiro dia.",
+      "q3": "Por que há limites de projeto e armazenamento?",
+      "a3": "Armazenamento custa dinheiro. Arquivos de áudio e vídeo podem ser grandes — um episódio de podcast de 10 minutos pode ter 50-100MB. Sem limites, um pequeno número de usuários pesados tornaria a plataforma inviável para todos os outros. Os limites são projetados para que o plano gratuito cubra a maioria das pessoas que estão começando, e os planos pagos cubram uso profissional.",
+      "q4": "O que acontece quando atinjo meu limite?",
+      "a4": "Você verá um aviso claro antes de atingir o limite. Quando atingir, não poderá criar novos projetos até excluir um existente ou fazer upgrade. Nunca excluímos seus dados nem te bloqueamos — apenas pausamos a criação de novos até resolver.",
+      "q5": "Como cancelo?",
+      "a5": "Cancele a qualquer momento pelo seu painel em Configurações, ou abra um ticket de suporte nesta página. Sem taxas de cancelamento. Você mantém o acesso até o fim do período de cobrança. Não dificultamos o cancelamento de propósito — se quiser sair, facilitamos."
+    },
+    "gettingStarted": {
+      "title": "Guias para começar",
+      "q1": "Como construo meu primeiro site?",
+      "a1": "Vá para o Painel e clique em Criador de sites. Se você é iniciante, a IA vai te guiar pelo processo conversacionalmente — apenas conte sobre seu negócio. Se você é técnico, pode usar o construtor completo diretamente. De qualquer forma, a IA está lá para ajudar em cada passo.",
+      "q2": "Como configuro um podcast?",
+      "a2": "Vá para a página Podcasters e escolha um plano. Após assinar, vá para o Painel, depois Áudio nativo, depois envie seu episódio. Suportamos MP3, MP4, WAV e mais. Importante: traga seu episódio finalizado e editado. Não fazemos edição de áudio bruto. Geramos locução, legendas, clipes e notas a partir do seu arquivo final.",
+      "q3": "Como coleto avaliações?",
+      "a3": "Vá para o Painel e depois Coletor de avaliações. Você receberá um link de avaliação para compartilhar com seus clientes. Avaliações aparecem nos idiomas escolhidos automaticamente. Você pode incorporar o widget de avaliações no seu site SignalBoost ou em qualquer site externo.",
+      "q4": "Como conecto meu próprio domínio?",
+      "a4": "Passe pelo assistente de onboarding ou vá para o Painel, depois Configurações, depois Domínio. Você precisará atualizar seus registros DNS no seu provedor de domínio para apontar para a SignalBoost. A IA vai te dar os registros exatos para copiar. Mudanças DNS levam de 15 minutos a 48 horas para propagar mundialmente."
+    }
+  }
+}

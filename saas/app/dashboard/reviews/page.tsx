@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useI18n } from '@/components/i18n/I18nProvider'
+import { t } from '@/lib/i18n/t'
 
 const GREEN = '#4ade80'
 const RED = '#f87171'
@@ -22,6 +24,8 @@ type SlugState =
   | { kind: 'set', slug: string }
 
 export default function ReviewsPage() {
+  const { dict } = useI18n()
+
   const [reviews, setReviews] = useState<Review[]>([])
   const [reviewsLoading, setReviewsLoading] = useState(true)
   const [reviewsError, setReviewsError] = useState<string | null>(null)
@@ -55,28 +59,28 @@ export default function ReviewsPage() {
     try {
       const res = await fetch('/api/reviews')
       if (res.status === 401) {
-        setReviewsError('Please sign in to see your reviews.')
+        setReviewsError(t(dict, 'reviews_page.errSignIn', 'Please sign in to see your reviews.'))
         setReviews([])
         return
       }
       const j = await res.json()
       if (!res.ok) {
-        setReviewsError(j?.error || 'Could not load reviews.')
+        setReviewsError(j?.error || t(dict, 'reviews_page.errLoad', 'Could not load reviews.'))
         return
       }
       setReviews(j.reviews ?? [])
     } catch {
-      setReviewsError('Could not load reviews.')
+      setReviewsError(t(dict, 'reviews_page.errLoad', 'Could not load reviews.'))
     } finally {
       setReviewsLoading(false)
     }
-  }, [])
+  }, [dict])
 
   useEffect(() => { loadReviews() }, [loadReviews])
 
   async function saveSlug() {
     const candidate = slugDraft.trim().toLowerCase()
-    if (!candidate) { setSlugError('Pick a handle to continue.'); return }
+    if (!candidate) { setSlugError(t(dict, 'reviews_page.errPickHandle', 'Pick a handle to continue.')); return }
     setSlugSaving(true)
     setSlugError(null)
     try {
@@ -86,11 +90,11 @@ export default function ReviewsPage() {
         body: JSON.stringify({ slug: candidate }),
       })
       const j = await res.json()
-      if (!res.ok) { setSlugError(j?.error || 'Could not save handle.'); return }
+      if (!res.ok) { setSlugError(j?.error || t(dict, 'reviews_page.errSaveHandle', 'Could not save handle.')); return }
       setSlug({ kind: 'set', slug: j.slug })
       setSlugDraft('')
     } catch {
-      setSlugError('Could not save handle.')
+      setSlugError(t(dict, 'reviews_page.errSaveHandle', 'Could not save handle.'))
     } finally {
       setSlugSaving(false)
     }
@@ -113,7 +117,7 @@ export default function ReviewsPage() {
   }
 
   async function deleteReview(id: string) {
-    if (!confirm('Delete this review? This cannot be undone.')) return
+    if (!confirm(t(dict, 'reviews_page.confirmDelete', 'Delete this review? This cannot be undone.'))) return
     const snapshot = reviews
     setReviews(prev => prev.filter(r => r.id !== id))
     try {
@@ -150,9 +154,12 @@ export default function ReviewsPage() {
     try { return new Date(iso).toISOString().slice(0, 10) } catch { return '' }
   }
 
+  // Summary line, built from translated word-fragments around the numbers
+  const summaryLine = reviews.length === 0
+    ? t(dict, 'reviews_page.summaryEmpty', 'Nothing yet. Share the link above to start.')
+    : `${reviews.length} ${t(dict, 'reviews_page.total', 'total')} · ${pendingCount} ${t(dict, 'reviews_page.pending', 'pending')} · ${approvedCount} ${t(dict, 'reviews_page.approved', 'approved')}${approvedCount > 0 ? ` · ${avgRating.toFixed(1)} ★ ${t(dict, 'reviews_page.avg', 'avg')}` : ''}`
+
   // === Token-based styles ===
-  // All surfaces use the new globals.css tokens so iterating the look
-  // is a single-file change in globals.css.
   const card: React.CSSProperties = {
     background: 'var(--surface-1)',
     border: '1px solid var(--border-medium)',
@@ -161,25 +168,14 @@ export default function ReviewsPage() {
     WebkitBackdropFilter: 'blur(8px)',
   }
 
-  const input: React.CSSProperties = {
-    background: 'var(--surface-3)',
-    border: '1px solid var(--border-medium)',
-    borderRadius: 8,
-    padding: '10px 14px',
-    color: 'var(--text-primary)',
-    fontSize: 14,
-    fontFamily: 'inherit',
-    outline: 'none',
-  }
-
   return (
     <div style={{ color: 'var(--text-primary)', fontFamily: 'system-ui', maxWidth: 880, margin: '0 auto' }}>
 
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 900, margin: 0, letterSpacing: '-0.02em' }}>⭐ Review collector</h1>
+        <h1 style={{ fontSize: 26, fontWeight: 900, margin: 0, letterSpacing: '-0.02em' }}>⭐ {t(dict, 'reviews_page.title', 'Review collector')}</h1>
         <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6, margin: '6px 0 0' }}>
-          Share one link. Customers leave reviews in their own language. You approve what shows up publicly.
+          {t(dict, 'reviews_page.subtitle', 'Share one link. Customers leave reviews in their own language. You approve what shows up publicly.')}
         </p>
       </div>
 
@@ -199,20 +195,20 @@ export default function ReviewsPage() {
       {/* === SECTION 1: Your review link === */}
       <section style={{ ...card, padding: '24px 26px', marginBottom: 24 }}>
         <h2 style={{ fontSize: 16, fontWeight: 800, margin: '0 0 4px', letterSpacing: '-0.01em' }}>
-          Send this link to your customers
+          {t(dict, 'reviews_page.sendLinkTitle', 'Send this link to your customers')}
         </h2>
         <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 18px' }}>
-          They click it, leave a review in their own language, and it appears below as Pending until you approve it.
+          {t(dict, 'reviews_page.sendLinkDesc', 'They click it, leave a review in their own language, and it appears below as Pending until you approve it.')}
         </p>
 
         {slug.kind === 'loading' && (
-          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Loading…</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t(dict, 'reviews_page.loading', 'Loading…')}</div>
         )}
 
         {slug.kind === 'none' && (
           <div>
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 12px', lineHeight: 1.5 }}>
-              Pick a handle for your review link. It can be your name, your business, anything — 3 to 30 lowercase letters, digits, and hyphens.
+              {t(dict, 'reviews_page.pickHandleDesc', 'Pick a handle for your review link. It can be your name, your business, anything — 3 to 30 lowercase letters, digits, and hyphens.')}
             </p>
             <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border-medium)', background: 'var(--surface-3)' }}>
               <span style={{ display: 'flex', alignItems: 'center', padding: '0 12px', fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'nowrap', borderRight: '1px solid var(--border-soft)' }}>
@@ -222,7 +218,7 @@ export default function ReviewsPage() {
                 type="text"
                 value={slugDraft}
                 onChange={e => setSlugDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                placeholder="your-handle"
+                placeholder={t(dict, 'reviews_page.handlePlaceholder', 'your-handle')}
                 maxLength={30}
                 onKeyDown={e => e.key === 'Enter' && saveSlug()}
                 style={{ flex: 1, background: 'transparent', border: 'none', padding: '12px 14px', color: 'var(--text-primary)', fontSize: 14, fontFamily: 'inherit', outline: 'none' }}
@@ -232,7 +228,7 @@ export default function ReviewsPage() {
                 disabled={slugSaving || !slugDraft.trim()}
                 style={{ background: 'var(--blue)', color: '#fff', fontSize: 13, fontWeight: 700, padding: '0 22px', border: 'none', cursor: slugSaving || !slugDraft.trim() ? 'not-allowed' : 'pointer', opacity: slugSaving || !slugDraft.trim() ? 0.6 : 1 }}
               >
-                {slugSaving ? 'Saving…' : 'Claim'}
+                {slugSaving ? t(dict, 'reviews_page.saving', 'Saving…') : t(dict, 'reviews_page.claim', 'Claim')}
               </button>
             </div>
             {slugError && (
@@ -264,17 +260,17 @@ export default function ReviewsPage() {
                   cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
                   transition: 'background 0.15s',
                 }}>
-                {copied ? '✓ Copied' : 'Copy link'}
+                {copied ? `✓ ${t(dict, 'reviews_page.copied', 'Copied')}` : t(dict, 'reviews_page.copyLink', 'Copy link')}
               </button>
             </div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <a href={reviewLink} target="_blank" rel="noopener noreferrer"
                 style={{ fontSize: 12, color: 'var(--blue)', textDecoration: 'none', fontWeight: 600 }}>
-                Open in new tab ↗
+                {t(dict, 'reviews_page.openNewTab', 'Open in new tab')} ↗
               </a>
               <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>·</span>
               <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>
-                Handle: <code style={{ background: 'var(--surface-2)', padding: '2px 6px', borderRadius: 4, color: 'var(--text-secondary)' }}>{slug.slug}</code>
+                {t(dict, 'reviews_page.handleLabel', 'Handle:')} <code style={{ background: 'var(--surface-2)', padding: '2px 6px', borderRadius: 4, color: 'var(--text-secondary)' }}>{slug.slug}</code>
               </span>
             </div>
           </div>
@@ -285,22 +281,18 @@ export default function ReviewsPage() {
       <section>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14, gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0, letterSpacing: '-0.01em' }}>Your reviews</h2>
+            <h2 style={{ fontSize: 16, fontWeight: 800, margin: 0, letterSpacing: '-0.01em' }}>{t(dict, 'reviews_page.yourReviews', 'Your reviews')}</h2>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0' }}>
-              {reviewsLoading ? 'Loading…' : (
-                reviews.length === 0
-                  ? 'Nothing yet. Share the link above to start.'
-                  : `${reviews.length} total · ${pendingCount} pending · ${approvedCount} approved${approvedCount > 0 ? ` · ${avgRating.toFixed(1)} ★ avg` : ''}`
-              )}
+              {reviewsLoading ? t(dict, 'reviews_page.loading', 'Loading…') : summaryLine}
             </p>
           </div>
 
           {reviews.length > 0 && (
             <div style={{ display: 'flex', gap: 4, background: 'var(--surface-2)', borderRadius: 999, padding: 3, border: '1px solid var(--border-soft)' }}>
               {([
-                { id: 'all', label: `All (${reviews.length})` },
-                { id: 'pending', label: `Pending (${pendingCount})` },
-                { id: 'approved', label: `Approved (${approvedCount})` },
+                { id: 'all', label: `${t(dict, 'reviews_page.filterAll', 'All')} (${reviews.length})` },
+                { id: 'pending', label: `${t(dict, 'reviews_page.filterPending', 'Pending')} (${pendingCount})` },
+                { id: 'approved', label: `${t(dict, 'reviews_page.filterApproved', 'Approved')} (${approvedCount})` },
               ] as const).map(f => (
                 <button key={f.id} onClick={() => setFilter(f.id)}
                   style={{
@@ -319,19 +311,21 @@ export default function ReviewsPage() {
 
         {reviewsLoading ? (
           <div style={{ ...card, padding: '32px 20px', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
-            Loading…
+            {t(dict, 'reviews_page.loading', 'Loading…')}
           </div>
         ) : reviews.length === 0 ? (
           <div style={{ ...card, padding: '40px 24px', textAlign: 'center', borderStyle: 'dashed' }}>
             <div style={{ fontSize: 32, marginBottom: 10 }}>📭</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>No reviews yet</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>{t(dict, 'reviews_page.noReviewsYet', 'No reviews yet')}</div>
             <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-              {slug.kind === 'set' ? 'Send your link above to a customer to receive your first review.' : 'Claim a handle above to get your review link.'}
+              {slug.kind === 'set' ? t(dict, 'reviews_page.noReviewsHaveLink', 'Send your link above to a customer to receive your first review.') : t(dict, 'reviews_page.noReviewsNoLink', 'Claim a handle above to get your review link.')}
             </div>
           </div>
         ) : visibleReviews.length === 0 ? (
           <div style={{ ...card, padding: '24px 20px', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
-            No {filter} reviews.
+            {filter === 'pending'
+              ? t(dict, 'reviews_page.nonePending', 'No pending reviews.')
+              : t(dict, 'reviews_page.noneApproved', 'No approved reviews.')}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -358,7 +352,7 @@ export default function ReviewsPage() {
                           color: isPending ? 'var(--gold)' : GREEN,
                           textTransform: 'uppercase', letterSpacing: '0.04em',
                         }}>
-                          {isPending ? 'Pending' : 'Approved'}
+                          {isPending ? t(dict, 'reviews_page.statusPending', 'Pending') : t(dict, 'reviews_page.statusApproved', 'Approved')}
                         </span>
                         <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>
                           {review.language} · {fmtDate(review.created_at)}
@@ -377,16 +371,16 @@ export default function ReviewsPage() {
                           background: review.approved ? 'var(--surface-3)' : GREEN,
                           color: review.approved ? 'var(--text-muted)' : '#062512',
                         }}>
-                        {review.approved ? 'Unpublish' : 'Approve'}
+                        {review.approved ? t(dict, 'reviews_page.unpublish', 'Unpublish') : t(dict, 'reviews_page.approve', 'Approve')}
                       </button>
                       <button onClick={() => deleteReview(review.id)}
-                        title="Delete review"
+                        title={t(dict, 'reviews_page.deleteTitle', 'Delete review')}
                         style={{
                           padding: '8px 14px', borderRadius: 8, fontSize: 12,
                           border: '1px solid rgba(239,68,68,0.25)', cursor: 'pointer',
                           background: 'rgba(239,68,68,0.08)', color: RED, fontWeight: 600,
                         }}>
-                        Delete
+                        {t(dict, 'reviews_page.delete', 'Delete')}
                       </button>
                     </div>
                   </div>

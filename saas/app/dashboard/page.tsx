@@ -61,7 +61,8 @@ export default function DashboardOverviewPage() {
   const [promptLoading, setPromptLoading] = useState(false)
   const [promptOpen, setPromptOpen] = useState(false)
   const [hasTyped, setHasTyped] = useState(false)
-  // Greeting auto-fades after 5s OR when user starts typing, whichever comes first.
+  // Greeting shows once per browser tab session. Persisted via sessionStorage
+  // so navigating away and back does NOT re-show it.
   const [greetingTimedOut, setGreetingTimedOut] = useState(false)
   const promptRef = useRef<HTMLDivElement>(null)
 
@@ -89,9 +90,19 @@ export default function DashboardOverviewPage() {
     })
   }, [])
 
-  // Auto-fade the greeting after 5 seconds, regardless of user activity.
+  // Greeting: read sessionStorage on mount. If already dismissed this session,
+  // hide immediately. Otherwise start 5s timer and mark as dismissed when it fires.
+  // sessionStorage clears on tab close; explicit clear happens on logout (Navbar).
   useEffect(() => {
-    const t = setTimeout(() => setGreetingTimedOut(true), 5000)
+    if (typeof window === 'undefined') return
+    if (sessionStorage.getItem('greetingDismissed') === '1') {
+      setGreetingTimedOut(true)
+      return
+    }
+    const t = setTimeout(() => {
+      setGreetingTimedOut(true)
+      sessionStorage.setItem('greetingDismissed', '1')
+    }, 5000)
     return () => clearTimeout(t)
   }, [])
 
@@ -107,6 +118,7 @@ export default function DashboardOverviewPage() {
     setPromptInput('')
     setPromptOpen(true)
     setHasTyped(true)
+    if (typeof window !== 'undefined') sessionStorage.setItem('greetingDismissed', '1')
     const newMessages: Message[] = [...promptMessages, { role: 'user', content }]
     setPromptMessages(newMessages)
     setPromptLoading(true)
@@ -177,7 +189,6 @@ export default function DashboardOverviewPage() {
   const atLimit = projects.length >= projectLimit
   const usagePercent = Math.min((projects.length / projectLimit) * 100, 100)
 
-  // Greeting hides when: timer fires (5s), user starts typing, or AI conversation is open.
   const greetingHidden = greetingTimedOut || hasTyped || promptMessages.length > 0
   const showLoginGate = authChecked && !isLoggedIn
 
@@ -251,7 +262,10 @@ export default function DashboardOverviewPage() {
             value={promptInput}
             onChange={e => {
               setPromptInput(e.target.value)
-              if (e.target.value.length > 0 && !hasTyped) setHasTyped(true)
+              if (e.target.value.length > 0 && !hasTyped) {
+                setHasTyped(true)
+                if (typeof window !== 'undefined') sessionStorage.setItem('greetingDismissed', '1')
+              }
             }}
             onKeyDown={e => e.key === 'Enter' && sendPrompt()}
             placeholder={isNewUser ? 'Ask me anything — e.g. What plan is right for me?' : 'Ask me anything — e.g. How do I add a language?'}

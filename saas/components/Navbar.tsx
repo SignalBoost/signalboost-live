@@ -1,11 +1,20 @@
 'use client'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/utils/supabase/client'
 import AuthModal from './AuthModal'
 
+const TOOL_LINKS = [
+  { icon: '🌐', label: 'Site builder',     href: '/dashboard/builder' },
+  { icon: '⭐', label: 'Review collector', href: '/dashboard/reviews' },
+  { icon: '🎙️', label: 'Native audio',     href: '/dashboard/audio'   },
+  { icon: '🎬', label: 'Video editor',     href: '/dashboard/video'   },
+]
+
 export default function Navbar() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const pathname = usePathname()
   const [showAuth, setShowAuth] = useState(false)
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login')
   const [user, setUser] = useState<any>(null)
@@ -77,8 +86,6 @@ export default function Navbar() {
   function openLogin() { setAuthMode('login'); setShowAuth(true) }
   function openSignup() { setAuthMode('signup'); setShowAuth(true) }
 
-  // Main nav links. "Dashboard" is hidden when user is logged in
-  // because they already have a prominent Dashboard button next to their email.
   const navLinks = [
     { label: 'Home',       href: '/' },
     { label: 'Podcasters', href: '/podcasters' },
@@ -86,11 +93,12 @@ export default function Navbar() {
     { label: 'Pricing',    href: '/pricing' },
     { label: 'Docs',       href: '/docs' },
   ]
-    return (
+
+  return (
     <>
       <nav style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '16px 32px', borderBottom: '1px solid rgba(255,255,255,0.06)',
+        padding: '16px 32px', borderBottom: user ? 'none' : '1px solid rgba(255,255,255,0.06)',
         background: 'rgba(10,10,15,0.85)', backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)', position: 'sticky', top: 0, zIndex: 100,
       }}>
@@ -144,6 +152,48 @@ export default function Navbar() {
           )}
         </div>
       </nav>
+
+      {/* Secondary tool bar — only shown when logged in. Sits directly under the main nav. */}
+      {user && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          padding: '8px 32px', borderBottom: '1px solid rgba(255,255,255,0.06)',
+          background: 'rgba(10,10,15,0.85)', backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)', position: 'sticky', top: 73, zIndex: 99,
+          flexWrap: 'wrap',
+        }}>
+          {TOOL_LINKS.map(tool => {
+            const isActive = pathname === tool.href || pathname?.startsWith(tool.href + '/')
+            return (
+              <Link key={tool.href} href={tool.href}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '6px 14px', borderRadius: 999,
+                  fontSize: 12, fontWeight: 600, textDecoration: 'none',
+                  background: isActive ? 'rgba(59,130,246,0.15)' : 'transparent',
+                  border: `1px solid ${isActive ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                  color: isActive ? '#fff' : 'rgba(255,255,255,0.55)',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => {
+                  if (!isActive) {
+                    e.currentTarget.style.color = '#fff'
+                    e.currentTarget.style.borderColor = 'rgba(59,130,246,0.3)'
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!isActive) {
+                    e.currentTarget.style.color = 'rgba(255,255,255,0.55)'
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
+                  }
+                }}>
+                <span style={{ fontSize: 14 }}>{tool.icon}</span>
+                <span>{tool.label}</span>
+              </Link>
+            )
+          })}
+        </div>
+      )}
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
     </>

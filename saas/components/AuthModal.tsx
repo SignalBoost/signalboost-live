@@ -174,7 +174,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
 
         {mode === 'signup' && (
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginBottom: 16, lineHeight: 1.5 }}>
-            You will start on the Free plan. 1 website, 1 language. Upgrade anytime. Business partners get 30 days on Starter free.
+            You will start on the Free plan — sketch one website in one language with a watermark. Upgrade anytime to publish for real.
           </div>
         )}
 
@@ -223,4 +223,3 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
     </div>
   )
 }
-

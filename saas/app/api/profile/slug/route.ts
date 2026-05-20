@@ -1,90 +1,117 @@
-// saas/app/api/profile/slug/route.ts
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { NextRequest, NextResponse } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
+import { cookies } from 'next/headers';
 
-const RESERVED = new Set([
-  'admin', 'administrator', 'api', 'app', 'auth', 'billing', 'dashboard',
-  'docs', 'help', 'home', 'login', 'logout', 'me', 'onboarding', 'pricing',
-  'privacy', 'profile', 'review', 'reviews', 'root', 'settings', 'signup',
-  'signin', 'sign-in', 'sign-up', 'static', 'support', 'team', 'terms',
-  'tos', 'user', 'users', 'webhook', 'www', 'signalboost',
-])
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-const SLUG_RE = /^[a-z0-9]([a-z0-9-]{1,28}[a-z0-9])?$/
+const RESERVED_SLUGS = new Set([
+  'admin', 'api', 'app', 'dashboard', 'login', 'signup', 'signin',
+  'logout', 'auth', 'account', 'settings', 'profile', 'pricing',
+  'about', 'contact', 'support', 'help', 'terms', 'privacy',
+  'legal', 'blog', 'docs', 'review', 'reviews', 'www', 'mail',
+  'ftp', 'root', 'null', 'undefined', 'test', 'staging', 'dev',
+  'signalboost', 'signal-boost', 'signalboostapp',
+]);
 
-function admin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  )
-}
+const SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])?$/;
 
 async function getAuthedUser() {
-  const cookieStore = await cookies()
-  const sb = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get: (name) => cookieStore.get(name)?.value,
-        set: () => {},
-        remove: () => {},
-      },
-    }
-  )
-  const { data: { user } } = await sb.auth.getUser()
-  return user
+  const cookieStore = await cookies();
+  const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    cookies: {
+      get: (name: string) => cookieStore.get(name)?.value,
+      set: () => {},
+      remove: () => {},
+    },
+  });
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) return null;
+  return user;
+}
+
+function admin() {
+  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 }
 
 export async function GET() {
-  const user = await getAuthedUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const user = await getAuthedUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
-  const a = admin()
-  const { data, error } = await a
+  const db = admin();
+  const { data, error } = await db
     .from('profiles')
     .select('slug')
     .eq('id', user.id)
-    .maybeSingle()
+    .maybeSingle();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ slug: data?.slug ?? null })
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ slug: data?.slug ?? null });
 }
 
 export async function POST(req: NextRequest) {
-  const user = await getAuthedUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-
-  let body: any
-  try { body = await req.json() } catch { return NextResponse.json({ error: 'bad json' }, { status: 400 }) }
-
-  const slug = String(body?.slug ?? '').trim().toLowerCase()
-
-  if (!slug)                return NextResponse.json({ error: 'slug required' }, { status: 400 })
-  if (!SLUG_RE.test(slug))  return NextResponse.json({ error: '3-30 chars, lowercase letters/digits/hyphens, no edges' }, { status: 400 })
-  if (RESERVED.has(slug))   return NextResponse.json({ error: 'this slug is reserved' }, { status: 400 })
-
-  const a = admin()
-
-  const { data: existing, error: lookupErr } = await a
-    .from('profiles')
-    .select('id')
-    .eq('slug', slug)
-    .maybeSingle()
-
-  if (lookupErr) return NextResponse.json({ error: 'lookup failed' }, { status: 500 })
-  if (existing && existing.id !== user.id) {
-    return NextResponse.json({ error: 'this slug is already taken' }, { status: 409 })
+  const user = await getAuthedUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { error: upsertErr } = await a
+  let body: { slug?: unknown };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+
+  const raw = typeof body.slug === 'string' ? body.slug.trim().toLowerCase() : '';
+  if (!raw) {
+    return NextResponse.json({ error: 'Slug is required' }, { status: 400 });
+  }
+
+  if (!SLUG_REGEX.test(raw)) {
+    return NextResponse.json(
+      { error: 'Slug must be 3–32 chars, lowercase letters, numbers, and hyphens. No leading/trailing hyphen.' },
+      { status: 400 }
+    );
+  }
+
+  if (RESERVED_SLUGS.has(raw)) {
+    return NextResponse.json({ error: 'That slug is reserved. Please choose another.' }, { status: 400 });
+  }
+
+  const db = admin();
+
+  // Check if slug is already taken by someone else
+  const { data: existing, error: existingErr } = await db
     .from('profiles')
-    .upsert({ id: user.id, slug }, { onConflict: 'id' })
+    .select('id')
+    .eq('slug', raw)
+    .maybeSingle();
 
-  if (upsertErr) return NextResponse.json({ error: upsertErr.message }, { status: 500 })
+  if (existingErr) {
+    return NextResponse.json({ error: existingErr.message }, { status: 500 });
+  }
 
-  return NextResponse.json({ ok: true, slug })
+  if (existing && existing.id !== user.id) {
+    return NextResponse.json({ error: 'That slug is already taken.' }, { status: 409 });
+  }
+
+  // Upsert into profiles
+  const { error: upsertErr } = await db
+    .from('profiles')
+    .upsert({ id: user.id, slug: raw }, { onConflict: 'id' });
+
+  if (upsertErr) {
+    return NextResponse.json({ error: upsertErr.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ slug: raw });
 }

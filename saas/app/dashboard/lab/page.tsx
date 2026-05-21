@@ -1,7 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { t } from '@/lib/i18n/t'
 
 const BLUE = '#3b82f6'
 const GOLD = '#ffc300'
@@ -37,7 +36,7 @@ type GenerateData = {
 type Asset = {
   id: string
   title: string
-  source: string
+  source: 'youtube' | 'archive'
   embedUrl: string
   watchUrl: string
   license: 'public' | 'embeddable' | 'restricted'
@@ -152,14 +151,17 @@ function VideoOverlay({
           >
             💬 Add captions in 5 languages
           </button>
-          
-            href={asset.watchUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ display: 'block', width: '100%', padding: '13px', borderRadius: 14, background: 'rgba(255,255,255,0.06)', color: '#fff', fontWeight: 700, fontSize: 14, textAlign: 'center', textDecoration: 'none' }}
-          >
-            ↗ Open original
-          </a>
+
+          {asset.watchUrl && (
+            <a
+              href={asset.watchUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: 'block', width: '100%', padding: '13px', borderRadius: 14, background: 'rgba(255,255,255,0.06)', color: '#fff', fontWeight: 700, fontSize: 14, textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}
+            >
+              ↗ Open original
+            </a>
+          )}
         </div>
       </div>
     </div>
@@ -272,7 +274,7 @@ function GeneratePanel({
 }// ── Main Lab page ─────────────────────────────────────────────────────────────
 
 export default function LabPage() {
-  const { dict } = useI18n()
+  useI18n()
   const [mode, setMode] = useState<Mode>('auto')
   const [prompt, setPrompt] = useState('')
   const [loading, setLoading] = useState(false)

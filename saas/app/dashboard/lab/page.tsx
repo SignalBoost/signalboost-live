@@ -159,7 +159,7 @@ function VideoOverlay({
           </button>
 
           {asset.watchUrl && (
-            
+            <a
               href={asset.watchUrl}
               target="_blank"
               rel="noopener noreferrer"

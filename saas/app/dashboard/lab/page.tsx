@@ -111,7 +111,7 @@ function VideoOverlay({
 
         {/* Phone frame with embedded video */}
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
-          <div style={{ width: 200, background: '#111', borderRadius: 32, border: '3px solid #2a2a2a', overflow: 'hidden' }}>
+          <div style={{ width: 220, background: '#111', borderRadius: 32, border: '3px solid #2a2a2a', overflow: 'hidden' }}>
             <div style={{ background: '#111', height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ width: 60, height: 7, background: '#222', borderRadius: 4 }} />
             </div>
@@ -131,16 +131,22 @@ function VideoOverlay({
         </div>
 
         {/* Title + source */}
-        <div style={{ textAlign: 'center', marginBottom: 16 }}>
+        <div style={{ textAlign: 'center', marginBottom: 8 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{asset.title}</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{asset.source === 'youtube' ? 'YouTube' : 'Archive.org'}</div>
         </div>
 
         {/* License badge */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 700, padding: '5px 14px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', color: licenseColor }}>
             {licenseLabel}
           </div>
+        </div>
+
+        {/* Caption info box */}
+        <div style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 12, padding: '12px 14px', marginBottom: 16, fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+          <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>💡 How captions work for found footage</div>
+          The AI will transcribe the original audio (detecting the spoken language automatically), then translate the transcript into your chosen languages and generate subtitle files (SRT, VTT, ASS) you can download and use anywhere.
         </div>
 
         {/* Actions */}
@@ -149,17 +155,17 @@ function VideoOverlay({
             onClick={() => { onCaption(asset); handleClose() }}
             style={{ width: '100%', padding: '13px', borderRadius: 14, background: GOLD, color: '#000', fontWeight: 800, fontSize: 14, border: 'none', cursor: 'pointer' }}
           >
-            💬 Add captions in 5 languages
+            💬 Generate subtitles in 5 languages
           </button>
 
           {asset.watchUrl && (
-            <a
+            
               href={asset.watchUrl}
               target="_blank"
               rel="noopener noreferrer"
               style={{ display: 'block', width: '100%', padding: '13px', borderRadius: 14, background: 'rgba(255,255,255,0.06)', color: '#fff', fontWeight: 700, fontSize: 14, textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}
             >
-              ↗ Open original
+              ↗ Open original on {asset.source === 'youtube' ? 'YouTube' : 'Archive.org'}
             </a>
           )}
         </div>
@@ -217,7 +223,6 @@ function GeneratePanel({
         </div>
       </div>
 
-      {/* Script editor */}
       <div style={{ marginBottom: 16 }}>
         <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 8 }}>Script</label>
         <textarea
@@ -228,7 +233,6 @@ function GeneratePanel({
         />
       </div>
 
-      {/* Avatar + Format */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
         <div>
           <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 8 }}>AI Avatar</label>
@@ -255,7 +259,6 @@ function GeneratePanel({
         </div>
       </div>
 
-      {/* HeyGen notice if not ready */}
       {!data.heygenReady && (
         <div style={{ background: 'rgba(255,195,0,0.06)', border: '1px solid rgba(255,195,0,0.2)', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: 'rgba(255,195,0,0.8)', marginBottom: 16 }}>
           ⚠️ HeyGen API key not configured. Add <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: 4 }}>HEYGEN_API_KEY</code> to Vercel to enable generation.
@@ -271,7 +274,8 @@ function GeneratePanel({
       </button>
     </div>
   )
-}// ── Main Lab page ─────────────────────────────────────────────────────────────
+} 
+// ── Main Lab page ─────────────────────────────────────────────────────────────
 
 export default function LabPage() {
   useI18n()
@@ -287,6 +291,17 @@ export default function LabPage() {
   const [hasSearched, setHasSearched] = useState(false)
   const [project, setProject] = useState('My project')
   const inputRef = useRef<HTMLInputElement>(null)
+
+  function reset() {
+    setPrompt('')
+    setHasSearched(false)
+    setResults([])
+    setGenerateData(null)
+    setIntentText('')
+    setMessage(null)
+    setMode('auto')
+    setTimeout(() => inputRef.current?.focus(), 50)
+  }
 
   async function runSearch(overridePrompt?: string) {
     const q = (overridePrompt ?? prompt).trim()
@@ -308,7 +323,6 @@ export default function LabPage() {
       })
 
       const data = await res.json()
-
       if (!res.ok) throw new Error(data.error ?? 'Search failed')
 
       setIntentText(data.intent ?? '')
@@ -370,7 +384,6 @@ export default function LabPage() {
   return (
     <div style={{ color: '#fff', fontFamily: 'system-ui', maxWidth: 900, margin: '0 auto' }}>
 
-      {/* Overlay */}
       {overlayAsset && (
         <VideoOverlay
           asset={overlayAsset}
@@ -385,7 +398,7 @@ export default function LabPage() {
           <h1 style={{ fontSize: 26, fontWeight: 900, margin: 0, letterSpacing: '-0.02em' }}>
             🧪 The Lab
           </h1>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 6, margin: '6px 0 0' }}>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: '6px 0 0' }}>
             Find footage, generate videos, add captions, dub in 5 languages.
           </p>
         </div>
@@ -410,6 +423,16 @@ export default function LabPage() {
             placeholder='Try "show me the last goal of Pelé" or "create a 30s ad in Spanish"...'
             style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '12px 16px', color: '#fff', fontSize: 14, fontFamily: 'inherit', outline: 'none' }}
           />
+          {hasSearched && (
+            <button
+              onClick={reset}
+              style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', fontWeight: 700, fontSize: 13, border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)' }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.5)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)' }}
+            >
+              ↺ Reset
+            </button>
+          )}
           <button
             onClick={() => runSearch()}
             disabled={loading || !prompt.trim()}
@@ -434,7 +457,7 @@ export default function LabPage() {
         </div>
       </div>
 
-      {/* Suggestion chips */}
+      {/* Suggestion chips — only before first search */}
       {!hasSearched && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 28 }}>
           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', padding: '6px 0' }}>Try:</span>
@@ -460,7 +483,7 @@ export default function LabPage() {
         </div>
       )}
 
-      {/* Warning message */}
+      {/* Warning/info message */}
       {message && (
         <div style={{ padding: '10px 14px', background: 'rgba(255,195,0,0.06)', border: '1px solid rgba(255,195,0,0.2)', borderRadius: 10, fontSize: 12, color: 'rgba(255,195,0,0.8)', marginBottom: 20 }}>
           ⚠️ {message}
@@ -508,7 +531,6 @@ export default function LabPage() {
                   onMouseEnter={e => { if (!isRestricted) { e.currentTarget.style.transform = 'scale(1.03)'; e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)' } }}
                   onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
                 >
-                  {/* Thumbnail */}
                   <div style={{ aspectRatio: '9/16', background: '#0d1b2a', position: 'relative', overflow: 'hidden' }}>
                     {result.thumbnail ? (
                       <img
@@ -521,42 +543,37 @@ export default function LabPage() {
                       <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, opacity: 0.3 }}>🎬</div>
                     )}
 
-                    {/* Lock overlay for restricted */}
                     {isRestricted && (
                       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🔒</div>
                     )}
 
-                    {/* License badge */}
                     <div style={{ position: 'absolute', top: 6, left: 6 }}>
                       <div style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: licenseBg(result.license), color: licenseColor(result.license) }}>
                         {result.license === 'public' ? 'Public domain' : result.license === 'embeddable' ? 'Embeddable' : 'Restricted'}
                       </div>
                     </div>
 
-                    {/* Source badge */}
                     <div style={{ position: 'absolute', top: 6, right: 6 }}>
                       <div style={{ fontSize: 9, padding: '2px 6px', borderRadius: 999, background: 'rgba(0,0,0,0.6)', color: 'rgba(255,255,255,0.7)' }}>
                         {result.source === 'youtube' ? 'YT' : 'Arc'}
                       </div>
                     </div>
 
-                    {/* Duration */}
                     <div style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: 9, padding: '2px 6px', borderRadius: 4 }}>
                       {result.duration}
                     </div>
 
-                    {/* Play icon */}
                     {!isRestricted && (
-                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.15s' }}
+                      <div
+                        style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.15s', background: 'rgba(0,0,0,0.2)' }}
                         onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
                         onMouseLeave={e => (e.currentTarget.style.opacity = '0')}
                       >
-                        <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>▶</div>
+                        <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>▶</div>
                       </div>
                     )}
                   </div>
 
-                  {/* Card info */}
                   <div style={{ padding: '8px 10px' }}>
                     <div style={{ fontSize: 11, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.4, marginBottom: 6 }}>
                       {result.title}
@@ -594,8 +611,16 @@ export default function LabPage() {
       {/* Project asset tray */}
       {assets.length > 0 && (
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 20, marginTop: 8 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>
-            {project} · {assets.length} asset{assets.length !== 1 ? 's' : ''}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              {project} · {assets.length} asset{assets.length !== 1 ? 's' : ''}
+            </div>
+            <button
+              onClick={() => setAssets([])}
+              style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+            >
+              Clear all
+            </button>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {assets.map(asset => (

@@ -245,7 +245,7 @@ function GeneratePanel({
           <div style={{ display: 'flex', gap: 6 }}>
             {(['9:16', '16:9', '1:1'] as const).map(f => (
               <button key={f} onClick={() => setSelectedFormat(f)}
-                style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: selectedFormat === f ? 'rgba(59,130,246,0.15)' : 'rgba(0,0,0,0.2)', bordercolor: selectedFormat === f ? BLUE : 'rgba(255,255,255,0.08)', color: selectedFormat === f ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: 11, fontFamily: 'monospace', fontWeight: 700, cursor: 'pointer' }}>
+                style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: selectedFormat === f ? 'rgba(59,130,246,0.15)' : 'rgba(0,0,0,0.2)', borderColor: selectedFormat === f ? BLUE : 'rgba(255,255,255,0.08)', color: selectedFormat === f ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: 11, fontFamily: 'monospace', fontWeight: 700, cursor: 'pointer' }}>
                 {f}
               </button>
             ))}
@@ -600,7 +600,7 @@ export default function LabPage() {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {assets.map(asset => (
-                  <div key={asset.id} style={{ display: 'flex', alignItems: 'center', justifycontent: 'space-between', gap: 6, padding: '8px', borderRadius: 6, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.04)', fontSize: 11 }}>
+                  <div key={asset.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, padding: '8px', borderRadius: 6, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.04)', fontSize: 11 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
                       <span style={{ color: BLUE }}>⚡</span>
                       <span className="terminal-text" style={{ color: 'rgba(255,255,255,0.8)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{asset.title}</span>

@@ -1,8 +1,6 @@
-dashoard layout
-
-
 'use client'
-import React, { useEffect, useState, useRef, useMemo } from 'react'
+
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import TeamManager from '@/components/TeamManager'
 import AuthModal from '@/components/AuthModal'
@@ -20,14 +18,6 @@ import {
   Project,
 } from '@/lib/projects'
 import { getGreeting, SupportedLocale } from '@/lib/cultural-calendar'
-
-const LANGS = [
-  'English',
-  'Portugues (BR + PT)',
-  'Espanol (ES + LATAM)',
-  'Polski',
-  'Russkiy',
-]
 
 const BLUE = '#3b82f6'
 const BLUE_DIM = 'rgba(59,130,246,0.12)'
@@ -124,12 +114,12 @@ export default function DashboardOverviewPage() {
 
         setFirstName(fullName.split(' ')[0] || null)
 
-        getProjects(data.user.id).then(p => {
+        getProjects(data.user.id).then((p) => {
           setProjects(p)
           setProjectsLoaded(true)
         })
 
-        canCreateProject(data.user.id).then(res => {
+        canCreateProject(data.user.id).then((res) => {
           setPlan(res.plan)
           setProjectLimit(res.limit === Infinity ? 999 : res.limit)
         })
@@ -157,10 +147,7 @@ export default function DashboardOverviewPage() {
     setPromptOpen(true)
     setHasTyped(true)
 
-    const newMessages: Message[] = [
-      ...promptMessages,
-      { role: 'user', content },
-    ]
+    const newMessages: Message[] = [...promptMessages, { role: 'user', content }]
 
     setPromptMessages(newMessages)
     setPromptLoading(true)
@@ -182,7 +169,7 @@ export default function DashboardOverviewPage() {
 
       const data = await res.json()
 
-      setPromptMessages(prev => [
+      setPromptMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
@@ -190,7 +177,7 @@ export default function DashboardOverviewPage() {
         },
       ])
     } catch {
-      setPromptMessages(prev => [
+      setPromptMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
@@ -223,7 +210,7 @@ export default function DashboardOverviewPage() {
       setUpgradeMsg((result as any).error)
       setShowUpgrade(true)
     } else if ((result as any).data) {
-      setProjects(prev => [(result as any).data, ...prev])
+      setProjects((prev) => [(result as any).data, ...prev])
       setShowNewProject(false)
       setNewName('')
       setNewDesc('')
@@ -234,14 +221,12 @@ export default function DashboardOverviewPage() {
 
   async function handleDelete(id: string) {
     await deleteProject(id)
-    setProjects(prev => prev.filter(p => p.id !== id))
+    setProjects((prev) => prev.filter((p) => p.id !== id))
   }
 
   async function handleStatus(id: string, status: Project['status']) {
     await updateProjectStatus(id, status)
-    setProjects(prev =>
-      prev.map(p => (p.id === id ? { ...p, status } : p))
-    )
+    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)))
   }
 
   function timeAgo(date: string) {
@@ -261,23 +246,17 @@ export default function DashboardOverviewPage() {
 
   const greetingData = useMemo(
     () => getGreeting(lang as SupportedLocale, { firstName, isNewUser, isLoggedIn }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [projectsLoaded, isLoggedIn, firstName, lang]
+    [projectsLoaded, isLoggedIn, firstName, lang, isNewUser]
   )
 
-  const promptSuggestions = isNewUser
-    ? NEW_USER_PROMPTS
-    : RETURNING_PROMPTS
+  const promptSuggestions = isNewUser ? NEW_USER_PROMPTS : RETURNING_PROMPTS
 
   const projectsTitle = firstName
     ? t(dict, 'dash.projectsTitleNamed', "{name}'s projects").replace('{name}', firstName)
     : t(dict, 'dash.projectsTitle', 'Your projects')
 
   const atLimit = projects.length >= projectLimit
-  const usagePercent = Math.min((projects.length / projectLimit) * 100, 100)
-
   const greetingHidden = hasTyped || promptMessages.length > 0
-
   const showLoginGate = authChecked && !isLoggedIn
 
   return (
@@ -306,13 +285,7 @@ export default function DashboardOverviewPage() {
         }
       `}</style>
 
-      {showLoginGate && (
-        <AuthModal
-          onClose={() => {
-            /* gate cannot be dismissed without logging in */
-          }}
-        />
-      )}
+      {showLoginGate && <AuthModal onClose={() => {}} />}
 
       <div
         style={{
@@ -337,8 +310,7 @@ export default function DashboardOverviewPage() {
               maxHeight: greetingHidden ? 0 : 200,
               opacity: greetingHidden ? 0 : 1,
               marginBottom: greetingHidden ? 0 : 20,
-              transition:
-                'max-height .5s ease, opacity .4s ease, margin-bottom .5s ease',
+              transition: 'max-height .5s ease, opacity .4s ease, margin-bottom .5s ease',
             }}
           >
             <h1
@@ -346,8 +318,7 @@ export default function DashboardOverviewPage() {
                 fontSize: 28,
                 fontWeight: 900,
                 margin: '0 0 6px',
-                background:
-                  'linear-gradient(90deg,#3b82f6,#ffc300,#4ade80,#3b82f6)',
+                background: 'linear-gradient(90deg,#3b82f6,#ffc300,#4ade80,#3b82f6)',
                 backgroundSize: '300% auto',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
@@ -358,60 +329,41 @@ export default function DashboardOverviewPage() {
               {greetingData.headline} {greetingData.emoji}
             </h1>
 
-            <p
-              style={{
-                fontSize: 13,
-                color: 'var(--text-muted)',
-              }}
-            >
+            <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
               {greetingData.subline}
             </p>
           </div>
 
-          <div
-            style={{
-              display:'flex',
-              gap:10,
-              marginBottom: promptOpen ? 16 : 0
-            }}
-          >
+          <div style={{ display: 'flex', gap: 10, marginBottom: promptOpen ? 16 : 0 }}>
             <input
               value={promptInput}
-              onChange={(e)=>{
+              onChange={(e) => {
                 setPromptInput(e.target.value)
-
-                if (
-                  e.target.value.length > 0 &&
-                  !hasTyped
-                ) {
-                  setHasTyped(true)
-                }
+                if (e.target.value.length > 0 && !hasTyped) setHasTyped(true)
               }}
-              onKeyDown={(e)=>
-                e.key==='Enter' && sendPrompt()
-              }
+              onKeyDown={(e) => e.key === 'Enter' && sendPrompt()}
               placeholder={t(dict, 'dash.askPlaceholder', 'Ask SignalBoost anything...')}
               style={{
-                flex:1,
-                padding:'12px 16px',
-                borderRadius:12,
-                background:'var(--surface-3)',
-                border:'1px solid var(--border-medium)',
-                color:'#fff',
-                outline:'none'
+                flex: 1,
+                padding: '12px 16px',
+                borderRadius: 12,
+                background: 'var(--surface-3)',
+                border: '1px solid var(--border-medium)',
+                color: '#fff',
+                outline: 'none',
               }}
             />
 
             <button
-              onClick={()=>sendPrompt()}
+              onClick={() => sendPrompt()}
               style={{
-                padding:'12px 20px',
-                borderRadius:12,
-                border:'none',
-                background:BLUE,
-                color:'#fff',
-                fontWeight:700,
-                cursor:'pointer'
+                padding: '12px 20px',
+                borderRadius: 12,
+                border: 'none',
+                background: BLUE,
+                color: '#fff',
+                fontWeight: 700,
+                cursor: 'pointer',
               }}
             >
               {t(dict, 'dash.askButton', 'Ask')} →
@@ -419,24 +371,18 @@ export default function DashboardOverviewPage() {
           </div>
 
           {!promptOpen && (
-            <div
-              style={{
-                display:'flex',
-                gap:8,
-                flexWrap:'wrap'
-              }}
-            >
-              {promptSuggestions.map(q=>(
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {promptSuggestions.map((q) => (
                 <button
                   key={q}
-                  onClick={()=>sendPrompt(q)}
+                  onClick={() => sendPrompt(q)}
                   style={{
-                    padding:'6px 14px',
-                    borderRadius:999,
-                    border:'1px solid var(--border-medium)',
-                    background:'var(--surface-2)',
-                    color:'var(--text-muted)',
-                    cursor:'pointer'
+                    padding: '6px 14px',
+                    borderRadius: 999,
+                    border: '1px solid var(--border-medium)',
+                    background: 'var(--surface-2)',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
                   }}
                 >
                   {q}
@@ -446,14 +392,14 @@ export default function DashboardOverviewPage() {
           )}
         </div>
 
-        <div style={{marginBottom:32}}>
+        <div style={{ marginBottom: 32 }}>
           <h2
             style={{
-              fontSize:11,
-              color:'var(--text-muted)',
-              marginBottom:16,
-              letterSpacing:'.08em',
-              textTransform:'uppercase'
+              fontSize: 11,
+              color: 'var(--text-muted)',
+              marginBottom: 16,
+              letterSpacing: '.08em',
+              textTransform: 'uppercase',
             }}
           >
             {t(dict, 'dash.startHere', 'Start here')}
@@ -461,49 +407,36 @@ export default function DashboardOverviewPage() {
 
           <div
             style={{
-              display:'grid',
-              gridTemplateColumns:'repeat(4,1fr)',
-              gap:14
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4,1fr)',
+              gap: 14,
             }}
           >
-            {QUICK_ACTIONS.map(item=>(
+            {QUICK_ACTIONS.map((item) => (
               <Link
                 key={item.type}
                 href={item.href}
-                onMouseEnter={()=>
-                  setHoveredAction(item.type)
-                }
-                onMouseLeave={()=>
-                  setHoveredAction(null)
-                }
+                onMouseEnter={() => setHoveredAction(item.type)}
+                onMouseLeave={() => setHoveredAction(null)}
                 style={{
-                  background:
-                    hoveredAction===item.type
-                    ?BLUE_DIM
-                    :'var(--surface-1)',
-
-                  border:`1px solid ${
-                    hoveredAction===item.type
-                    ?BLUE_BORDER
-                    :'var(--border-medium)'
+                  background: hoveredAction === item.type ? BLUE_DIM : 'var(--surface-1)',
+                  border: `1px solid ${
+                    hoveredAction === item.type ? BLUE_BORDER : 'var(--border-medium)'
                   }`,
-
-                  borderRadius:16,
-                  padding:20,
-                  textDecoration:'none',
-                  transition:'all .2s'
+                  borderRadius: 16,
+                  padding: 20,
+                  textDecoration: 'none',
+                  transition: 'all .2s',
                 }}
               >
-                <div style={{fontSize:28}}>
-                  {item.icon}
-                </div>
+                <div style={{ fontSize: 28 }}>{item.icon}</div>
 
                 <div
                   style={{
-                    fontSize:14,
-                    fontWeight:800,
-                    color:'#fff',
-                    marginTop:10
+                    fontSize: 14,
+                    fontWeight: 800,
+                    color: '#fff',
+                    marginTop: 10,
                   }}
                 >
                   {item.label}
@@ -511,10 +444,10 @@ export default function DashboardOverviewPage() {
 
                 <div
                   style={{
-                    fontSize:12,
-                    color:'var(--text-muted)',
-                    marginTop:6,
-                    lineHeight:1.5
+                    fontSize: 12,
+                    color: 'var(--text-muted)',
+                    marginTop: 6,
+                    lineHeight: 1.5,
                   }}
                 >
                   {item.subline}
@@ -526,60 +459,44 @@ export default function DashboardOverviewPage() {
 
         <div
           style={{
-            display:'grid',
-            gridTemplateColumns:'repeat(4,1fr)',
-            gap:12,
-            marginBottom:28
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4,1fr)',
+            gap: 12,
+            marginBottom: 28,
           }}
         >
           {[
             {
-              label:t(dict, 'dash.stats.activeSites', 'Active sites'),
-              value:projects.filter(
-                p=>p.status==='live'
-              ).length
+              label: t(dict, 'dash.stats.activeSites', 'Active sites'),
+              value: projects.filter((p) => p.status === 'live').length,
             },
             {
-              label:t(dict, 'dash.stats.projects', 'Projects'),
-              value:`${projects.length}/${projectLimit===999?'∞':projectLimit}`
+              label: t(dict, 'dash.stats.projects', 'Projects'),
+              value: `${projects.length}/${projectLimit === 999 ? '∞' : projectLimit}`,
             },
             {
-              label:t(dict, 'dash.stats.audioGenerated', 'Audio generated'),
-              value:`0 ${t(dict, 'dash.stats.min', 'min')}`
+              label: t(dict, 'dash.stats.audioGenerated', 'Audio generated'),
+              value: `0 ${t(dict, 'dash.stats.min', 'min')}`,
             },
             {
-              label:t(dict, 'dash.stats.videosCreated', 'Videos created'),
-              value:'0'
-            }
-          ].map(stat=>(
+              label: t(dict, 'dash.stats.videosCreated', 'Videos created'),
+              value: '0',
+            },
+          ].map((stat) => (
             <div
               key={stat.label}
               style={{
-                background:'var(--surface-1)',
-                border:'1px solid var(--border-medium)',
-                borderRadius:16,
-                padding:20
+                background: 'var(--surface-1)',
+                border: '1px solid var(--border-medium)',
+                borderRadius: 16,
+                padding: 20,
               }}
             >
-              <div
-                style={{
-                  fontSize:11,
-                  color:'var(--text-muted)',
-                  marginBottom:10
-                }}
-              >
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10 }}>
                 {stat.label}
               </div>
 
-              <div
-                style={{
-                  fontSize:28,
-                  fontWeight:900,
-                  color:BLUE
-                }}
-              >
-                {stat.value}
-              </div>
+              <div style={{ fontSize: 28, fontWeight: 900, color: BLUE }}>{stat.value}</div>
             </div>
           ))}
         </div>
@@ -587,30 +504,16 @@ export default function DashboardOverviewPage() {
         <div style={{ marginBottom: 28 }}>
           <div
             style={{
-              display:'flex',
-              alignItems:'center',
-              justifyContent:'space-between',
-              marginBottom:16
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 16,
             }}
           >
             <div>
-              <h2
-                style={{
-                  fontSize:18,
-                  fontWeight:800,
-                  margin:0
-                }}
-              >
-                {projectsTitle}
-              </h2>
+              <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>{projectsTitle}</h2>
 
-              <p
-                style={{
-                  fontSize:12,
-                  color:'var(--text-muted)',
-                  marginTop:4
-                }}
-              >
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                 {t(dict, 'dash.continueWhere', 'Continue where you left off')}
               </p>
             </div>
@@ -619,27 +522,27 @@ export default function DashboardOverviewPage() {
               <Link
                 href="/pricing"
                 style={{
-                  background:GOLD,
-                  color:'#000',
-                  padding:'12px 24px',
-                  borderRadius:999,
-                  textDecoration:'none',
-                  fontWeight:800
+                  background: GOLD,
+                  color: '#000',
+                  padding: '12px 24px',
+                  borderRadius: 999,
+                  textDecoration: 'none',
+                  fontWeight: 800,
                 }}
               >
                 {t(dict, 'dash.upgrade', 'Upgrade')}
               </Link>
             ) : (
               <button
-                onClick={()=>setShowNewProject(true)}
+                onClick={() => setShowNewProject(true)}
                 style={{
-                  background:GOLD,
-                  color:'#000',
-                  padding:'12px 24px',
-                  border:'none',
-                  borderRadius:999,
-                  fontWeight:800,
-                  cursor:'pointer'
+                  background: GOLD,
+                  color: '#000',
+                  padding: '12px 24px',
+                  border: 'none',
+                  borderRadius: 999,
+                  fontWeight: 800,
+                  cursor: 'pointer',
                 }}
               >
                 {t(dict, 'dash.newProject', '+ New project')}
@@ -647,144 +550,99 @@ export default function DashboardOverviewPage() {
             )}
           </div>
 
-          {projects.length===0 ? (
+          {projects.length === 0 ? (
             <div
               style={{
-                background:'var(--surface-1)',
-                border:'1px dashed var(--border-medium)',
-                borderRadius:20,
-                padding:'50px',
-                textAlign:'center'
+                background: 'var(--surface-1)',
+                border: '1px dashed var(--border-medium)',
+                borderRadius: 20,
+                padding: '50px',
+                textAlign: 'center',
               }}
             >
-              <div style={{fontSize:40}}>
-                📁
-              </div>
+              <div style={{ fontSize: 40 }}>📁</div>
 
-              <div
-                style={{
-                  marginTop:10,
-                  fontWeight:700
-                }}
-              >
+              <div style={{ marginTop: 10, fontWeight: 700 }}>
                 {t(dict, 'dash.noProjects', 'No projects yet')}
               </div>
 
-              <div
-                style={{
-                  color:'var(--text-muted)',
-                  marginTop:6
-                }}
-              >
+              <div style={{ color: 'var(--text-muted)', marginTop: 6 }}>
                 {t(dict, 'dash.noProjectsSub', 'Create your first project above')}
               </div>
             </div>
           ) : (
             <div
               style={{
-                display:'grid',
-                gridTemplateColumns:'repeat(3,1fr)',
-                gap:16
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3,1fr)',
+                gap: 16,
               }}
             >
-              {projects.map((p,i)=>(
+              {projects.map((p, i) => (
                 <div
                   key={p.id}
                   style={{
-                    background:'var(--surface-1)',
-                    border:'1px solid var(--border-medium)',
-                    borderRadius:16,
-                    padding:20,
-                    animation:
-                      `cardIn .3s ease ${i*.06}s both`
+                    background: 'var(--surface-1)',
+                    border: '1px solid var(--border-medium)',
+                    borderRadius: 16,
+                    padding: 20,
+                    animation: `cardIn .3s ease ${i * 0.06}s both`,
                   }}
                 >
-                  <div
-                    style={{
-                      display:'flex',
-                      justifyContent:'space-between'
-                    }}
-                  >
-                    <div
-                      style={{
-                        display:'flex',
-                        gap:10
-                      }}
-                    >
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', gap: 10 }}>
                       <div
                         style={{
-                          width:42,
-                          height:42,
-                          borderRadius:12,
-                          background:BLUE_DIM,
-                          display:'flex',
-                          alignItems:'center',
-                          justifyContent:'center'
+                          width: 42,
+                          height: 42,
+                          borderRadius: 12,
+                          background: BLUE_DIM,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
                         }}
                       >
                         {TYPE_ICONS[p.type]}
                       </div>
 
                       <div>
-                        <div
-                          style={{
-                            fontWeight:700
-                          }}
-                        >
-                          {p.name}
-                        </div>
+                        <div style={{ fontWeight: 700 }}>{p.name}</div>
 
-                        <div
-                          style={{
-                            fontSize:11,
-                            color:'var(--text-muted)'
-                          }}
-                        >
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                           {p.language}
                         </div>
                       </div>
                     </div>
 
-                    <div
-                      style={{
-                        color:STATUS_COLORS[p.status],
-                        fontSize:11
-                      }}
-                    >
+                    <div style={{ color: STATUS_COLORS[p.status], fontSize: 11 }}>
                       {p.status}
                     </div>
                   </div>
 
-                  <div
-                    style={{
-                      marginTop:14,
-                      fontSize:12,
-                      color:'var(--text-muted)'
-                    }}
-                  >
+                  <div style={{ marginTop: 14, fontSize: 12, color: 'var(--text-muted)' }}>
                     {t(dict, 'dash.lastEdited', 'Last edited')} {timeAgo(p.last_edited_at)}
                   </div>
 
                   <Link
                     href={`/dashboard/${
-                      p.type==='website'
-                      ?'builder'
-                      :p.type==='review'
-                      ?'reviews'
-                      :p.type==='podcast'
-                      ?'audio'
-                      :'video'
+                      p.type === 'website'
+                        ? 'builder'
+                        : p.type === 'review'
+                          ? 'reviews'
+                          : p.type === 'podcast'
+                            ? 'audio'
+                            : 'video'
                     }`}
                     style={{
-                      display:'block',
-                      marginTop:14,
-                      textAlign:'center',
-                      background:BLUE,
-                      color:'#fff',
-                      padding:'10px',
-                      borderRadius:10,
-                      textDecoration:'none',
-                      fontWeight:700
+                      display: 'block',
+                      marginTop: 14,
+                      textAlign: 'center',
+                      background: BLUE,
+                      color: '#fff',
+                      padding: '10px',
+                      borderRadius: 10,
+                      textDecoration: 'none',
+                      fontWeight: 700,
                     }}
                   >
                     {t(dict, 'dash.open', 'Open')}
@@ -797,33 +655,29 @@ export default function DashboardOverviewPage() {
 
         <div
           style={{
-            background:'var(--surface-1)',
-            border:'1px solid var(--border-medium)',
-            borderRadius:16,
-            padding:24,
-            marginBottom:24
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border-medium)',
+            borderRadius: 16,
+            padding: 24,
+            marginBottom: 24,
           }}
         >
           <h2
             style={{
-              fontSize:11,
-              letterSpacing:'.08em',
-              textTransform:'uppercase',
-              color:'var(--text-muted)',
-              marginBottom:20
+              fontSize: 11,
+              letterSpacing: '.08em',
+              textTransform: 'uppercase',
+              color: 'var(--text-muted)',
+              marginBottom: 20,
             }}
           >
             {t(dict, 'dash.team', 'Team')}
           </h2>
 
           {userId ? (
-            <TeamManager userId={userId}/>
+            <TeamManager userId={userId} />
           ) : (
-            <div
-              style={{
-                color:'var(--text-muted)'
-              }}
-            >
+            <div style={{ color: 'var(--text-muted)' }}>
               {t(dict, 'dash.loadingTeam', 'Loading team...')}
             </div>
           )}
@@ -832,20 +686,201 @@ export default function DashboardOverviewPage() {
         <Link
           href="/dashboard/feedback"
           style={{
-            display:'block',
-            textAlign:'center',
-            padding:16,
-            background:'rgba(255,195,0,.05)',
-            border:'1px solid rgba(255,195,0,.2)',
-            borderRadius:14,
-            textDecoration:'none',
-            color:'rgba(255,195,0,.8)',
-            fontWeight:700
+            display: 'block',
+            textAlign: 'center',
+            padding: 16,
+            background: 'rgba(255,195,0,.05)',
+            border: '1px solid rgba(255,195,0,.2)',
+            borderRadius: 14,
+            textDecoration: 'none',
+            color: 'rgba(255,195,0,.8)',
+            fontWeight: 700,
           }}
         >
           💬 {t(dict, 'dash.feedback', 'Share feedback — every message helps improve SignalBoost')}
         </Link>
 
+        {showNewProject && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,.65)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 50,
+            }}
+          >
+            <div
+              style={{
+                width: '100%',
+                maxWidth: 460,
+                background: 'var(--surface-1)',
+                border: '1px solid var(--border-medium)',
+                borderRadius: 20,
+                padding: 24,
+              }}
+            >
+              <h2 style={{ marginTop: 0 }}>{t(dict, 'dash.newProject', '+ New project')}</h2>
+
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Project name"
+                style={{
+                  width: '100%',
+                  padding: 12,
+                  borderRadius: 10,
+                  background: 'var(--surface-3)',
+                  color: '#fff',
+                  border: '1px solid var(--border-medium)',
+                  marginBottom: 12,
+                }}
+              />
+
+              <select
+                value={newType}
+                onChange={(e) => setNewType(e.target.value as Project['type'])}
+                style={{
+                  width: '100%',
+                  padding: 12,
+                  borderRadius: 10,
+                  background: 'var(--surface-3)',
+                  color: '#fff',
+                  border: '1px solid var(--border-medium)',
+                  marginBottom: 12,
+                }}
+              >
+                <option value="website">Website</option>
+                <option value="review">Review</option>
+                <option value="podcast">Podcast</option>
+                <option value="video">Video</option>
+              </select>
+
+              <input
+                value={newLang}
+                onChange={(e) => setNewLang(e.target.value)}
+                placeholder="Language"
+                style={{
+                  width: '100%',
+                  padding: 12,
+                  borderRadius: 10,
+                  background: 'var(--surface-3)',
+                  color: '#fff',
+                  border: '1px solid var(--border-medium)',
+                  marginBottom: 12,
+                }}
+              />
+
+              <textarea
+                value={newDesc}
+                onChange={(e) => setNewDesc(e.target.value)}
+                placeholder="Description"
+                rows={3}
+                style={{
+                  width: '100%',
+                  padding: 12,
+                  borderRadius: 10,
+                  background: 'var(--surface-3)',
+                  color: '#fff',
+                  border: '1px solid var(--border-medium)',
+                  marginBottom: 16,
+                }}
+              />
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setShowNewProject(false)}
+                  style={{
+                    padding: '10px 16px',
+                    borderRadius: 10,
+                    border: '1px solid var(--border-medium)',
+                    background: 'transparent',
+                    color: '#fff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  disabled={creating || !newName.trim()}
+                  onClick={() => tryCreate(newType, newName.trim(), newLang, newDesc)}
+                  style={{
+                    padding: '10px 16px',
+                    borderRadius: 10,
+                    border: 'none',
+                    background: GOLD,
+                    color: '#000',
+                    fontWeight: 800,
+                    cursor: creating ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {creating ? 'Creating...' : 'Create'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showUpgrade && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,.65)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 60,
+            }}
+          >
+            <div
+              style={{
+                width: '100%',
+                maxWidth: 420,
+                background: 'var(--surface-1)',
+                border: '1px solid var(--border-medium)',
+                borderRadius: 20,
+                padding: 24,
+              }}
+            >
+              <h2 style={{ marginTop: 0 }}>Upgrade required</h2>
+              <p style={{ color: 'var(--text-muted)' }}>{upgradeMsg}</p>
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setShowUpgrade(false)}
+                  style={{
+                    padding: '10px 16px',
+                    borderRadius: 10,
+                    border: '1px solid var(--border-medium)',
+                    background: 'transparent',
+                    color: '#fff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Close
+                </button>
+
+                <Link
+                  href="/pricing"
+                  style={{
+                    padding: '10px 16px',
+                    borderRadius: 10,
+                    background: GOLD,
+                    color: '#000',
+                    fontWeight: 800,
+                    textDecoration: 'none',
+                  }}
+                >
+                  Upgrade
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

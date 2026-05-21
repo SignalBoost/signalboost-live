@@ -29,53 +29,6 @@ export default function Footer() {
         }}
       >
 
-        {/* Brand */}
-        <div style={{ marginBottom: 36 }}>
-          <div
-            style={{
-              fontSize: 20,
-              fontWeight: 800,
-              marginBottom: 10,
-            }}
-          >
-            signal<span style={{ color: GOLD }}>boost</span>
-          </div>
-
-          <p
-            style={{
-              fontSize: 13,
-              color: 'var(--text-muted)',
-              lineHeight: 1.7,
-              maxWidth: 500,
-              marginBottom: 10,
-            }}
-          >
-            {t(
-              dict,
-              'footer.tagline',
-              'SignalBoost helps businesses grow with native websites, customer reviews, audio, video and AI-powered content — built for how people actually speak.'
-            )}
-          </p>
-
-          <div
-            style={{
-              fontSize: 12,
-              color: 'var(--text-faint)',
-            }}
-          >
-            {t(dict, 'footer.learnHow', 'Learn how SignalBoost works')} —{' '}
-            <Link
-              href="/docs"
-              style={{
-                color: 'var(--text-secondary)',
-                textDecoration: 'none',
-              }}
-            >
-              {t(dict, 'footer.readDocs', 'read the documentation')}
-            </Link>
-          </div>
-        </div>
-
         {/* Main grid */}
         <div
           style={{

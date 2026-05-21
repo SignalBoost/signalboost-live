@@ -13,6 +13,31 @@ type Channel = {
   description: string
 }
 
+type Campaign = {
+  headline?: string
+  website?: {
+    title?: string
+    body?: string
+    cta?: string
+  }
+  social?: {
+    facebook?: string
+    instagram?: string
+    tiktok?: string
+  }
+  email?: {
+    subject?: string
+    body?: string
+  }
+  video?: {
+    hook?: string
+    script?: string
+    cta?: string
+  }
+  reviewFollowUp?: string
+  languageIdeas?: string[]
+}
+
 export default function PromotePage() {
   const { dict } = useI18n()
 
@@ -21,6 +46,8 @@ export default function PromotePage() {
   const [audience, setAudience] = useState('')
   const [tone, setTone] = useState('friendly')
   const [generated, setGenerated] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [campaign, setCampaign] = useState<Campaign | null>(null)
 
   const channels: Channel[] = useMemo(
     () => [
@@ -88,18 +115,60 @@ export default function PromotePage() {
     [dict]
   )
 
-  function handleGenerate() {
-    setGenerated(true)
+  async function handleGenerate() {
+    try {
+      if (!promotion.trim()) {
+        alert('Please enter what you want to promote.')
+        return
+      }
+
+      setLoading(true)
+      setGenerated(false)
+      setCampaign(null)
+
+      const response = await fetch('/api/promote', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          businessName,
+          promotion,
+          audience,
+          tone,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Generation failed')
+      }
+
+      setCampaign(data.campaign)
+      setGenerated(true)
+    } catch (err) {
+      console.error(err)
+
+      alert(
+        err instanceof Error
+          ? err.message
+          : 'Could not generate campaign'
+      )
+    } finally {
+      setLoading(false)
+    }
   }
 
   const sampleHeadline =
-    promotion.trim().length > 0
+    campaign?.headline ||
+    (promotion.trim().length > 0
       ? promotion.trim()
       : t(
           dict,
           'promote_page.preview.sampleHeadline',
           'Weekend special for new and returning customers'
-        )
+        ))
 
   const sampleBusiness =
     businessName.trim().length > 0
@@ -203,7 +272,11 @@ export default function PromotePage() {
                 <input
                   value={businessName}
                   onChange={e => setBusinessName(e.target.value)}
-                  placeholder={t(dict, 'promote_page.businessPlaceholder', 'Example: Luna Travel')}
+                  placeholder={t(
+                    dict,
+                    'promote_page.businessPlaceholder',
+                    'Example: Luna Travel'
+                  )}
                   style={inputStyle}
                 />
               </label>
@@ -215,7 +288,11 @@ export default function PromotePage() {
                 <input
                   value={audience}
                   onChange={e => setAudience(e.target.value)}
-                  placeholder={t(dict, 'promote_page.audiencePlaceholder', 'Example: families, travelers, local customers')}
+                  placeholder={t(
+                    dict,
+                    'promote_page.audiencePlaceholder',
+                    'Example: families, travelers, local customers'
+                  )}
                   style={inputStyle}
                 />
               </label>
@@ -288,6 +365,7 @@ export default function PromotePage() {
 
               <button
                 onClick={handleGenerate}
+                disabled={loading}
                 style={{
                   marginLeft: 'auto',
                   border: 'none',
@@ -296,11 +374,14 @@ export default function PromotePage() {
                   background: GOLD,
                   color: '#000',
                   fontWeight: 900,
-                  cursor: 'pointer',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.7 : 1,
                   boxShadow: '0 18px 40px rgba(255,195,0,.20)',
                 }}
               >
-                {t(dict, 'promote_page.generate', 'Generate campaign')}
+                {loading
+                  ? 'Generating...'
+                  : t(dict, 'promote_page.generate', 'Generate campaign')}
               </button>
             </div>
           </div>
@@ -356,12 +437,34 @@ export default function PromotePage() {
                   margin: 0,
                 }}
               >
-                {t(dict, 'promote_page.preview.copyPrefix', 'A ready-to-adapt campaign for')}{' '}
-                <strong style={{ color: '#fff' }}>{sampleBusiness}</strong>
-                {audience.trim()
-                  ? ` ${t(dict, 'promote_page.preview.forAudience', 'for')} ${audience.trim()}.`
-                  : '.'}
+                {campaign?.website?.body ||
+                  t(dict, 'promote_page.preview.copyPrefix', 'A ready-to-adapt campaign for')}{' '}
+                {!campaign?.website?.body && (
+                  <>
+                    <strong style={{ color: '#fff' }}>{sampleBusiness}</strong>
+                    {audience.trim()
+                      ? ` ${t(dict, 'promote_page.preview.forAudience', 'for')} ${audience.trim()}.`
+                      : '.'}
+                  </>
+                )}
               </p>
+
+              {campaign?.website?.cta && (
+                <div
+                  style={{
+                    marginTop: 16,
+                    display: 'inline-flex',
+                    borderRadius: 999,
+                    padding: '9px 14px',
+                    background: GOLD,
+                    color: '#000',
+                    fontWeight: 900,
+                    fontSize: 13,
+                  }}
+                >
+                  {campaign.website.cta}
+                </div>
+              )}
 
               <div
                 style={{
@@ -394,7 +497,24 @@ export default function PromotePage() {
               </div>
             </div>
 
-            {generated && (
+            {loading && (
+              <div
+                style={{
+                  marginTop: 16,
+                  borderRadius: 20,
+                  padding: 16,
+                  background: 'rgba(255,195,0,.10)',
+                  border: '1px solid rgba(255,195,0,.25)',
+                  color: '#fff7cc',
+                  lineHeight: 1.5,
+                  fontSize: 14,
+                }}
+              >
+                SignalBoost is creating your campaign...
+              </div>
+            )}
+
+            {generated && campaign && (
               <div
                 style={{
                   marginTop: 16,
@@ -407,59 +527,178 @@ export default function PromotePage() {
                   fontSize: 14,
                 }}
               >
-                {t(
-                  dict,
-                  'promote_page.generatedNote',
-                  'Campaign draft created. Next step: connect this page to the AI campaign generator.'
-                )}
+                Campaign generated successfully.
               </div>
             )}
           </aside>
         </section>
 
-        <section
-          style={{
-            marginTop: 26,
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-            gap: 14,
-          }}
-        >
-          {channels.map(channel => (
-            <div
-              key={channel.id}
-              style={{
-                border: '1px solid var(--border-soft)',
-                borderRadius: 22,
-                padding: 18,
-                background: 'rgba(255,255,255,.04)',
-              }}
-            >
-              <div style={{ fontSize: 28 }}>{channel.icon}</div>
-              <h3
+        {campaign && (
+          <section
+            style={{
+              marginTop: 26,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: 14,
+            }}
+          >
+            <CampaignCard
+              icon="🌐"
+              title="Website"
+              items={[
+                campaign.website?.title,
+                campaign.website?.body,
+                campaign.website?.cta,
+              ]}
+            />
+
+            <CampaignCard
+              icon="📱"
+              title="Social posts"
+              items={[
+                campaign.social?.facebook,
+                campaign.social?.instagram,
+                campaign.social?.tiktok,
+              ]}
+            />
+
+            <CampaignCard
+              icon="✉️"
+              title="Email"
+              items={[
+                campaign.email?.subject,
+                campaign.email?.body,
+              ]}
+            />
+
+            <CampaignCard
+              icon="🎬"
+              title="Video"
+              items={[
+                campaign.video?.hook,
+                campaign.video?.script,
+                campaign.video?.cta,
+              ]}
+            />
+
+            <CampaignCard
+              icon="⭐"
+              title="Review follow-up"
+              items={[campaign.reviewFollowUp]}
+            />
+
+            <CampaignCard
+              icon="🌍"
+              title="Language ideas"
+              items={campaign.languageIdeas || []}
+            />
+          </section>
+        )}
+
+        {!campaign && (
+          <section
+            style={{
+              marginTop: 26,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+              gap: 14,
+            }}
+          >
+            {channels.map(channel => (
+              <div
+                key={channel.id}
                 style={{
-                  color: '#fff',
-                  margin: '12px 0 6px',
-                  fontSize: 17,
+                  border: '1px solid var(--border-soft)',
+                  borderRadius: 22,
+                  padding: 18,
+                  background: 'rgba(255,255,255,.04)',
                 }}
               >
-                {channel.title}
-              </h3>
-              <p
-                style={{
-                  color: 'var(--text-muted)',
-                  margin: 0,
-                  lineHeight: 1.55,
-                  fontSize: 14,
-                }}
-              >
-                {channel.description}
-              </p>
-            </div>
-          ))}
-        </section>
+                <div style={{ fontSize: 28 }}>{channel.icon}</div>
+                <h3
+                  style={{
+                    color: '#fff',
+                    margin: '12px 0 6px',
+                    fontSize: 17,
+                  }}
+                >
+                  {channel.title}
+                </h3>
+                <p
+                  style={{
+                    color: 'var(--text-muted)',
+                    margin: 0,
+                    lineHeight: 1.55,
+                    fontSize: 14,
+                  }}
+                >
+                  {channel.description}
+                </p>
+              </div>
+            ))}
+          </section>
+        )}
       </div>
     </main>
+  )
+}
+
+function CampaignCard({
+  icon,
+  title,
+  items,
+}: {
+  icon: string
+  title: string
+  items: Array<string | undefined>
+}) {
+  const cleanItems = items.filter(Boolean)
+
+  if (cleanItems.length === 0) return null
+
+  return (
+    <div
+      style={{
+        border: '1px solid var(--border-soft)',
+        borderRadius: 22,
+        padding: 18,
+        background: 'rgba(255,255,255,.04)',
+      }}
+    >
+      <div style={{ fontSize: 28 }}>{icon}</div>
+
+      <h3
+        style={{
+          color: '#fff',
+          margin: '12px 0 10px',
+          fontSize: 17,
+        }}
+      >
+        {title}
+      </h3>
+
+      <div
+        style={{
+          display: 'grid',
+          gap: 10,
+        }}
+      >
+        {cleanItems.map((item, index) => (
+          <p
+            key={`${title}-${index}`}
+            style={{
+              color: 'var(--text-muted)',
+              margin: 0,
+              lineHeight: 1.55,
+              fontSize: 14,
+              whiteSpace: 'pre-wrap',
+            }}
+          >
+            {item}
+          </p>
+        ))}
+      </div>
+    </div>
   )
 }
 

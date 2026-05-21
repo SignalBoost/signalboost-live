@@ -1,14 +1,29 @@
-"lab": {
+{
+  "hello": "Olá",
+  "welcome": "Bem-vindo",
+  "home": "Início",
+  "podcasters": "Podcasters",
+  "dashboard": "Painel",
+  "pricing": "Preços",
+  "docs": "Documentação",
+  "logout": "Sair",
+  "getStarted": "Começar",
+  "buildWebsite": "Criar site",
+  "collectReviews": "Coletar avaliações",
+  "generateAudio": "Gerar áudio",
+  "createVideos": "Criar vídeos",
+  "promoteBusiness": "Promover negócio",
+  "lab": {
     "title": "MOTOR_CENTRAL // O Laboratório",
     "subtitle": "Sintetizar parâmetros: análise de filmagem, streaming de avatar generativo, orquestração de dublagem de áudio.",
-    "placeholder": "Consulta de injeção... por exemplo, \"criar um anúncio de 30s em espanhol\" ou \"mostrar último gol do Pelé\"",
+    "placeholder": "Consulta... por exemplo, \"criar um anúncio de 30s em espanhol\"",
     "attach": "ANEXAR",
     "abort": "ABORTAR",
-    "runPrompt": "EXECUTAR_PROMPT",
+    "runPrompt": "EXECUTAR",
     "compiling": "COMPILANDO...",
-    "status": "FUNDIÇÃO_SIGNALBOOST // STATUS",
+    "status": "STATUS",
     "online": "ONLINE",
-    "systemLoad": "CARGA_SISTEMA",
+    "systemLoad": "CARGA",
     "compute": "COMPUTAÇÃO",
     "active": "ATIVO",
     "mode": {
@@ -19,47 +34,106 @@
       "dub": "Dublar áudio"
     },
     "agentReasoning": "RACIOCÍNIO_AGENTE",
-    "warnConstraints": "AVISAR_RESTRIÇÕES",
-    "evaluating": "Avaliando restrições neurais...",
+    "warnConstraints": "AVISOS",
+    "evaluating": "Avaliando...",
     "searchFailed": "Pesquisa falhou",
     "somethingWrong": "Algo deu errado",
-    "generatedMatrix": "MATRIZ_GERADA",
+    "generatedMatrix": "RESULTADOS",
     "nodesDetected": "NÓS_DETECTADOS",
-    "restrictedNode": "NÓ_RESTRITO",
+    "restrictedNode": "RESTRITO",
     "pipeline": "PIPELINE",
-    "inject": "INJETAR",
-    "synthesisCore": "NÚCLEO_CONTENÇÃO_SÍNTESE",
-    "awaitingDirectives": "Aguardando diretivas algorítmicas de prompt. As entradas de filmagem transmitidas de nós de arquivo e nós de avatar vetorial serão consolidadas aqui.",
-    "coreScope": "ESCOPO_NÚCLEO",
-    "targetProjectId": "ID_PROJETO_ALVO",
+    "inject": "EXECUTAR",
+    "synthesisCore": "CENTRO_DE_SÍNTESE",
+    "awaitingDirectives": "Aguardando instruções.",
+    "coreScope": "ESCOPO",
+    "targetProjectId": "ID_DO_PROJETO",
     "defaultProject": "Meu projeto",
-    "recipeTemplates": "MODELOS_RECEITA",
+    "recipeTemplates": "MODELOS",
     "suggestion1": "Último gol do Pelé",
     "suggestion2": "Pouso na Lua 1969",
     "suggestion3": "Discurso Churchill WWII",
     "suggestion4": "Criar anúncio de podcast em espanhol",
     "suggestion5": "Queda do Muro de Berlim 1989",
     "suggestion6": "Criar promo TikTok",
-    "pipelineStaging": "PREPARAÇÃO_PIPELINE",
-    "purgeAll": "PURGAR_TUDO",
+    "pipelineStaging": "PREPARAÇÃO",
+    "purgeAll": "LIMPAR",
     "run": "EXECUTAR",
     "license": {
       "public": "Domínio público",
-      "embeddable": "Incorporável livremente",
+      "embeddable": "Incorporável",
       "restricted": "Restrito por direitos"
     },
     "captionInfo": {
-      "title": "DIAGNÓSTICO_LAB: AUTOMAÇÃO_LEGENDA",
-      "description": "A IA transcreverá o áudio original (detectando o idioma falado automaticamente), traduzirá a transcrição para os idiomas escolhidos e gerará arquivos de legenda (SRT, VTT, ASS) que você pode baixar e usar em qualquer lugar."
+      "title": "Automação de legendas",
+      "description": "A IA transcreve o áudio, traduz o texto e gera arquivos SRT, VTT e ASS."
     },
     "generateSubtitles": "Gerar legendas em 5 idiomas",
     "openOriginal": "Abrir original em",
-    "videoSynthesis": "UNIDADE_SÍNTESE_VÍDEO",
-    "inputScript": "SCRIPT_ENTRADA",
-    "avatarNode": "NÓ_AVATAR",
-    "aspectRatio": "PROPORÇÃO_ASPECTO",
-    "heygenWarning": "CRÍTICO: nó de ambiente HEYGEN_API_KEY não configurado.",
-    "heygenNotConfigured": "Chave de API HeyGen ainda não configurada. Adicione HEYGEN_API_KEY às variáveis de ambiente do Vercel para habilitar a geração de vídeo.",
-    "renderComplete": "RENDERIZAÇÃO_COMPLETA — Verificado na Bandeja",
-    "initializeSynthesis": "INICIALIZAR_SÍNTESE"
+    "videoSynthesis": "Síntese de vídeo",
+    "inputScript": "Roteiro",
+    "avatarNode": "Avatar",
+    "aspectRatio": "Proporção",
+    "heygenWarning": "HEYGEN_API_KEY não configurada.",
+    "heygenNotConfigured": "Adicione HEYGEN_API_KEY no Vercel para ativar geração de vídeo.",
+    "renderComplete": "Renderização concluída",
+    "initializeSynthesis": "Iniciar síntese"
   },
+  "promote_page": {
+    "badge": "Promover meu negócio",
+    "title": "Crie uma promoção. Transforme em uma campanha completa.",
+    "subtitle": "Diga ao SignalBoost o que você quer promover. Vamos ajudar a criar texto para site, posts sociais, email, ideias de vídeo e versões nativas por idioma.",
+    "businessName": "Nome do negócio",
+    "businessPlaceholder": "Exemplo: Luna Travel",
+    "audience": "Público",
+    "audiencePlaceholder": "Exemplo: famílias, viajantes, clientes locais",
+    "offer": "O que você quer promover?",
+    "offerPlaceholder": "Exemplo: 20% de desconto em pacotes de fim de semana para Cancún.",
+    "tone": "Tom",
+    "tones": {
+      "friendly": "Amigável",
+      "premium": "Premium",
+      "urgent": "Urgente",
+      "local": "Local"
+    },
+    "generate": "Gerar campanha",
+    "generatedNote": "Rascunho de campanha criado. Próximo passo: conectar esta página ao gerador de IA.",
+    "preview": {
+      "title": "Prévia da campanha",
+      "sampleHeadline": "Oferta especial de fim de semana",
+      "sampleBusiness": "Seu negócio",
+      "copyPrefix": "Uma campanha pronta para adaptar para",
+      "forAudience": "para",
+      "item1": "Banner do site",
+      "item2": "Posts sociais",
+      "item3": "Texto de email",
+      "item4": "Ideia de vídeo curto",
+      "item5": "Versões nativas por idioma"
+    },
+    "channels": {
+      "website": {
+        "title": "Atualização do site",
+        "description": "Transforme sua oferta em um banner ou seção de página."
+      },
+      "social": {
+        "title": "Posts sociais",
+        "description": "Crie textos para Facebook, Instagram, TikTok e mais."
+      },
+      "email": {
+        "title": "Campanha de email",
+        "description": "Gere um email curto para seus clientes."
+      },
+      "video": {
+        "title": "Ideia de vídeo",
+        "description": "Crie um roteiro curto para reels, shorts ou anúncios."
+      },
+      "languages": {
+        "title": "Idiomas nativos",
+        "description": "Adapte sua mensagem para soar natural em cada idioma."
+      },
+      "reviews": {
+        "title": "Avaliações",
+        "description": "Peça avaliações a clientes satisfeitos após a promoção."
+      }
+    }
+  }
+}

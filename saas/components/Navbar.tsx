@@ -99,9 +99,7 @@ export default function Navbar() {
 
   async function handleLogout() {
     sessionStorage.removeItem('greetingDismissed')
-
     await supabase.auth.signOut()
-
     window.location.href = '/'
   }
 
@@ -152,6 +150,11 @@ export default function Navbar() {
       icon: '🎬',
       label: t(dict, 'createVideos', 'Create videos'),
       href: '/dashboard/video',
+    },
+    {
+      icon: '🧪',
+      label: t(dict, 'lab', 'Lab'),
+      href: '/dashboard/lab',
     },
   ]
 

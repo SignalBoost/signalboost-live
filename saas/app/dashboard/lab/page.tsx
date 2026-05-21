@@ -90,12 +90,12 @@ function VideoOverlay({
   return (
     <div
       onClick={e => { if (e.target === e.currentTarget) handleClose() }}
-      style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(2, 3, 6, 0.85)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(2, 3, 6, 0.9)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
     >
       <div style={{
         width: '100%', maxWidth: 600,
-        background: 'rgba(10, 11, 18, 0.9)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
+        background: 'rgba(10, 14, 26, 0.95)',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
         borderRadius: '24px 24px 0 0',
         padding: '16px 20px 40px',
         transform: slideIn ? 'translateY(0)' : 'translateY(100%)',
@@ -208,7 +208,7 @@ function GeneratePanel({
   }
 
   return (
-    <div style={{ background: 'rgba(22, 28, 45, 0.4)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 20, marginBottom: 20, backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' }}>
+    <div style={{ background: 'rgba(16, 22, 42, 0.65)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: 12, padding: 20, marginBottom: 20, backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
         <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🪄</div>
         <div>
@@ -223,7 +223,7 @@ function GeneratePanel({
           value={script}
           onChange={e => setScript(e.target.value)}
           rows={4}
-          style={{ width: '100%', background: 'rgba(4, 5, 10, 0.75)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '10px 14px', color: '#fff', fontSize: 13, fontFamily: 'monospace', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
+          style={{ width: '100%', background: 'rgba(4, 5, 11, 0.85)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: 8, padding: '10px 14px', color: '#fff', fontSize: 13, fontFamily: 'monospace', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
         />
       </div>
 
@@ -233,7 +233,7 @@ function GeneratePanel({
           <select
             value={selectedAvatar}
             onChange={e => setSelectedAvatar(e.target.value)}
-            style={{ width: '100%', background: 'rgba(4, 5, 10, 0.75)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '9px 12px', color: '#fff', fontSize: 12, fontFamily: 'monospace' }}
+            style={{ width: '100%', background: 'rgba(4, 5, 11, 0.85)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: 6, padding: '9px 12px', color: '#fff', fontSize: 12, fontFamily: 'monospace' }}
           >
             {data.avatars.map(a => (
               <option key={a.id} value={a.id} style={{ background: '#060913' }}>{a.name}</option>
@@ -245,7 +245,7 @@ function GeneratePanel({
           <div style={{ display: 'flex', gap: 6 }}>
             {(['9:16', '16:9', '1:1'] as const).map(f => (
               <button key={f} onClick={() => setSelectedFormat(f)}
-                style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: selectedFormat === f ? 'rgba(59,130,246,0.25)' : 'rgba(4, 5, 10, 0.5)', color: selectedFormat === f ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: 11, fontFamily: 'monospace', fontWeight: 700, cursor: 'pointer' }}>
+                style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: selectedFormat === f ? 'rgba(59,130,246,0.25)' : 'rgba(4, 5, 11, 0.5)', color: selectedFormat === f ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: 11, fontFamily: 'monospace', fontWeight: 700, cursor: 'pointer' }}>
                 {f}
               </button>
             ))}
@@ -377,72 +377,75 @@ export default function LabPage() {
     l === 'public' ? 'rgba(74,222,128,0.06)' : l === 'embeddable' ? 'rgba(255,195,0,0.06)' : 'rgba(239,68,68,0.04)'
 
   return (
-    <div style={{ color: '#fff', fontFamily: 'system-ui, -apple-system, sans-serif', maxWidth: 1200, margin: '0 auto', padding: '0 20px' }}>
+    <div style={{ color: '#fff', fontFamily: 'system-ui, -apple-system, sans-serif', maxWidth: 1300, margin: '0 auto', padding: '24px 20px' }}>
       
+      {/* Absolute Specificity Override Hooks */}
       <style>{`
         body {
           background-color: #060913 !important;
           background-image: 
-            radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.18) 0px, transparent 50%),
-            radial-gradient(at 100% 100%, rgba(255, 195, 0, 0.08) 0px, transparent 50%),
-            radial-gradient(at 50% 50%, rgba(139, 92, 246, 0.04) 0px, transparent 40%) !important;
-          background-attachment: fixed;
+            radial-gradient(at 5% 5%, rgba(59, 130, 246, 0.25) 0px, transparent 45%),
+            radial-gradient(at 95% 95%, rgba(255, 195, 0, 0.12) 0px, transparent 50%),
+            radial-gradient(at 50% 40%, rgba(139, 92, 246, 0.06) 0px, transparent 40%) !important;
+          background-attachment: fixed !important;
         }
         .fathom-glass {
-          background: rgba(22, 28, 45, 0.4) !important;
-          backdrop-filter: blur(24px) !important;
-          -webkit-backdrop-filter: blur(24px) !important;
-          border: 1px solid rgba(255, 255, 255, 0.08) !important;
-          box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4) !important;
+          background: rgba(13, 19, 36, 0.68) !important;
+          backdrop-filter: blur(30px) !important;
+          -webkit-backdrop-filter: blur(30px) !important;
+          border: 1px solid rgba(59, 130, 246, 0.25) !important;
+          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6) !important;
+        }
+        .recipe-node {
+          background: rgba(4, 5, 11, 0.4) !important;
+          border: 1px solid rgba(255, 255, 255, 0.05) !important;
+          transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .recipe-node:hover {
+          background: rgba(16, 22, 42, 0.7) !important;
+          border-color: rgba(59, 130, 246, 0.4) !important;
+          transform: translateY(-1px);
         }
         .terminal-text {
-          font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+          font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace !important;
         }
         @keyframes pulse-slow {
-          0%, 100% { opacity: 0.2; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(1.08); }
+          0%, 100% { opacity: 0.3; transform: scale(1); filter: drop-shadow(0 0 10px rgba(59,130,246,0.3)); }
+          50% { opacity: 0.7; transform: scale(1.1); filter: drop-shadow(0 0 25px rgba(59,130,246,0.6)); }
         }
       `}</style>
 
-      {overlayAsset && (
-        <VideoOverlay
-          asset={overlayAsset}
-          onClose={() => setOverlayAsset(null)}
-          onCaption={handleCaption}
-        />
-      )}
-
       {/* Top Status & Diagnostics bar */}
-      <div className="fathom-glass terminal-text" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', borderRadius: 8, marginBottom: 28, fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.05em' }}>
+      <div className="fathom-glass terminal-text" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderRadius: 8, marginBottom: 28, fontSize: 11, color: '#6178a3', letterSpacing: '0.05em' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ color: GREEN }}>●</span> SIGNALBOOST_FOUNDRY // STATUS: ONLINE
+          <span style={{ color: GREEN, filter: 'drop-shadow(0 0 4px #4ade80)' }}>●</span> SIGNALBOOST_FOUNDRY // STATUS: <span style={{ color: '#fff' }}>ONLINE</span>
         </div>
         <div style={{ display: 'flex', gap: 16 }}>
-          <span>[SYSTEM_LOAD: 14%]</span>
-          <span>[COMPUTE: ACTIVE]</span>
+          <span>[SYSTEM_LOAD: <span style={{ color: GOLD }}>14%</span>]</span>
+          <span>[COMPUTE: <span style={{ color: BLUE }}>ACTIVE</span>]</span>
         </div>
       </div>
 
       {/* Layout Split System */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 24, alignItems: 'start' }}>
         
         {/* Left Control Column */}
         <div>
-          <div className="fathom-glass" style={{ borderRadius: 16, padding: 24, marginBottom: 20 }}>
+          <div className="fathom-glass" style={{ borderRadius: 16, padding: '28px', marginBottom: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
               <div>
-                <h1 className="terminal-text" style={{ fontSize: 20, fontWeight: 800, margin: 0, letterSpacing: '-0.02em' }}>
+                <h1 className="terminal-text" style={{ fontSize: 20, fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#fff' }}>
                   CORE_ENGINE // The Lab
                 </h1>
-                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
+                <p style={{ fontSize: 12, color: '#6178a3', marginTop: 4 }}>
                   Synthesize parameters: footage parsing, generative avatar streaming, audio dub orchestration.
                 </p>
               </div>
             </div>
 
             {/* Terminal Command Injector Bar */}
-            <div style={{ background: 'rgba(4, 5, 10, 0.75)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: 4, display: 'flex', gap: 4, alignItems: 'center', marginBottom: 16 }}>
-              <span className="terminal-text" style={{ color: BLUE, paddingLeft: 12, fontWeight: 700, fontSize: 14 }}>$</span>
+            <div style={{ background: 'rgba(4, 5, 11, 0.85)', border: '1px solid rgba(59, 130, 246, 0.35)', borderRadius: 10, padding: '6px', display: 'flex', gap: 4, alignItems: 'center', marginBottom: 20, boxShadow: 'inset 0 4px 12px rgba(0,0,0,0.5)' }}>
+              <span className="terminal-text" style={{ color: BLUE, paddingLeft: 12, fontWeight: 700, fontSize: 15 }}>$</span>
               <input
                 ref={inputRef}
                 value={prompt}
@@ -453,23 +456,23 @@ export default function LabPage() {
                 style={{ flex: 1, background: 'transparent', border: 'none', padding: '10px 8px', color: '#fff', fontSize: 13, outline: 'none' }}
               />
               {hasSearched && (
-                <button onClick={reset} className="terminal-text" style={{ padding: '8px 14px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', fontSize: 11, cursor: 'pointer' }}>
+                <button onClick={reset} className="terminal-text" style={{ padding: '8px 14px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', fontSize: 11, cursor: 'pointer' }}>
                   ABORT
                 </button>
               )}
-              <button onClick={() => runSearch()} disabled={loading || !prompt.trim()} className="terminal-text" style={{ padding: '8px 18px', borderRadius: 6, background: prompt.trim() && !loading ? BLUE : 'rgba(255,255,255,0.02)', color: prompt.trim() && !loading ? '#fff' : 'rgba(255,255,255,0.2)', fontWeight: 700, fontSize: 11, border: 'none', cursor: prompt.trim() && !loading ? 'pointer' : 'default' }}>
+              <button onClick={() => runSearch()} disabled={loading || !prompt.trim()} className="terminal-text" style={{ padding: '10px 20px', borderRadius: 6, background: prompt.trim() && !loading ? BLUE : 'rgba(255,255,255,0.02)', color: prompt.trim() && !loading ? '#fff' : 'rgba(255,255,255,0.2)', fontWeight: 700, fontSize: 11, border: 'none', cursor: prompt.trim() && !loading ? 'pointer' : 'default', filter: prompt.trim() && !loading ? 'drop-shadow(0 0 8px rgba(59,130,246,0.4))' : 'none' }}>
                 {loading ? 'COMPILING...' : 'RUN_PROMPT'}
               </button>
             </div>
 
             {/* Segmented Control Switches (Modes) */}
-            <div style={{ display: 'flex', gap: 4, background: 'rgba(4, 5, 10, 0.5)', padding: 4, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ display: 'flex', gap: 6, background: 'rgba(4, 5, 11, 0.6)', padding: 6, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)' }}>
               {MODES.map(m => (
                 <button
                   key={m.id}
                   onClick={() => setMode(m.id)}
                   className="terminal-text"
-                  style={{ flex: 1, padding: '8px', borderRadius: 6, fontSize: 11, border: 'none', cursor: 'pointer', background: mode === m.id ? 'rgba(59,130,246,0.18)' : 'transparent', color: mode === m.id ? '#fff' : 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.15s' }}
+                  style={{ flex: 1, padding: '10px 8px', borderRadius: 6, fontSize: 11, border: 'none', cursor: 'pointer', background: mode === m.id ? 'rgba(59,130,246,0.2)' : 'transparent', color: mode === m.id ? '#fff' : '#6178a3', bordercolor: mode === m.id ? BLUE : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.15s', fontWeight: mode === m.id ? 700 : 500 }}
                 >
                   <span style={{ color: mode === m.id ? BLUE : 'inherit' }}>{m.icon}</span>
                   <span>{m.label.toUpperCase().replace(' ', '_')}</span>
@@ -479,14 +482,14 @@ export default function LabPage() {
           </div>
 
           {intentText && (
-            <div className="terminal-text" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: 'rgba(59,130,246,0.03)', border: '1px solid rgba(59,130,246,0.12)', borderRadius: 10, marginBottom: 20, fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
-              <span style={{ color: BLUE }}>▶ AGENT_REASONING:</span>
+            <div className="terminal-text" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 10, marginBottom: 20, fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
+              <span style={{ color: BLUE, fontWeight: 700 }}>▶ AGENT_REASONING:</span>
               <span>{intentText}</span>
             </div>
           )}
 
           {message && (
-            <div className="terminal-text" style={{ padding: '12px 16px', background: 'rgba(255,195,0,0.02)', border: '1px solid rgba(255,195,0,0.15)', borderRadius: 10, fontSize: 11, color: 'rgba(255,195,0,0.8)', marginBottom: 20 }}>
+            <div className="terminal-text" style={{ padding: '12px 16px', background: 'rgba(255,195,0,0.02)', border: '1px solid rgba(255,195,0,0.2)', borderRadius: 10, fontSize: 11, color: 'rgba(255,195,0,0.8)', marginBottom: 20 }}>
               ⚠️ [WARN_CONSTRAINTS] {message}
             </div>
           )}
@@ -511,7 +514,7 @@ export default function LabPage() {
 
           {results.length > 0 && !loading && (
             <div style={{ marginBottom: 32 }}>
-              <div className="terminal-text" style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.08em', marginBottom: 14 }}>
+              <div className="terminal-text" style={{ fontSize: 11, fontWeight: 700, color: '#6178a3', letterSpacing: '0.08em', marginBottom: 14 }}>
                 // GENERATED_MATRIX: {results.length} NODES_DETECTED
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 14 }}>
@@ -521,9 +524,9 @@ export default function LabPage() {
                     <div
                       key={result.id}
                       onClick={() => !isRestricted && openOverlay(result)}
-                      style={{ borderRadius: 12, overflow: 'hidden', background: 'rgba(4, 5, 10, 0.4)', border: '1px solid rgba(255,255,255,0.08)', cursor: isRestricted ? 'default' : 'pointer', transition: 'all 0.2s', opacity: isRestricted ? 0.4 : 1 }}
-                      onMouseEnter={e => { if (!isRestricted) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)' } }}
-                      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
+                      style={{ borderRadius: 12, overflow: 'hidden', background: 'rgba(4, 5, 11, 0.6)', border: '1px solid rgba(59, 130, 246, 0.2)', cursor: isRestricted ? 'default' : 'pointer', transition: 'all 0.2s', opacity: isRestricted ? 0.4 : 1 }}
+                      onMouseEnter={e => { if (!isRestricted) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'rgba(59,130,246,0.5)' } }}
+                      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.2)' }}
                     >
                       <div style={{ aspectRatio: '9/16', background: '#030407', position: 'relative', overflow: 'hidden' }}>
                         {result.thumbnail ? (
@@ -540,12 +543,12 @@ export default function LabPage() {
                         </div>
                         <div className="terminal-text" style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: 9, padding: '2px 5px', borderRadius: 4 }}>{result.duration}</div>
                       </div>
-                      <div style={{ padding: 10, background: 'rgba(4, 5, 10, 0.4)' }}>
+                      <div style={{ padding: 10, background: 'rgba(4, 5, 11, 0.4)' }}>
                         <div style={{ fontSize: 11, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.4, marginBottom: 8, height: 30 }}>{result.title}</div>
                         {isRestricted ? (
                           <div className="terminal-text" style={{ fontSize: 9, color: '#f87171' }}>RESTRICTED_NODE</div>
                         ) : (
-                          <button onClick={e => { e.stopPropagation(); addAsset(result) }} className="terminal-text" style={{ width: '100%', fontSize: 10, padding: '5px 0', borderRadius: 4, border: `1px solid rgba(255,255,255,0.12)`, background: assets.find(a => a.id === result.id) ? 'rgba(74,222,128,0.06)' : 'rgba(255,255,255,0.02)', color: assets.find(a => a.id === result.id) ? GREEN : 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
+                          <button onClick={e => { e.stopPropagation(); addAsset(result) }} className="terminal-text" style={{ width: '100%', fontSize: 10, padding: '5px 0', borderRadius: 4, border: `1px solid rgba(255,255,255,0.15)`, background: assets.find(a => a.id === result.id) ? 'rgba(74,222,128,0.06)' : 'rgba(255,255,255,0.02)', color: assets.find(a => a.id === result.id) ? GREEN : 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
                             {assets.find(a => a.id === result.id) ? '✓ PIPELINE' : '+ INJECT'}
                           </button>
                         )}
@@ -558,13 +561,13 @@ export default function LabPage() {
           )}
 
           {!hasSearched && !loading && (
-            <div style={{ textAlign: 'center', padding: '80px 20px', position: 'relative' }}>
+            <div style={{ textAlign: 'center', padding: '90px 20px', position: 'relative' }}>
               <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                <div style={{ width: 180, height: 180, background: 'radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%)', animation: 'pulse-slow 4s infinite ease-in-out' }} />
+                <div style={{ width: 220, height: 220, background: 'radial-gradient(circle, rgba(59,130,246,0.16) 0%, transparent 70%)', animation: 'pulse-slow 4s infinite ease-in-out' }} />
               </div>
-              <div style={{ fontSize: 44, marginBottom: 16, filter: 'drop-shadow(0 0 15px rgba(59,130,246,0.4))' }}>🧬</div>
-              <div className="terminal-text" style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.1em', marginBottom: 6 }}>SYNTHESIS_CONTAINMENT_CORE</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', lineHeight: 1.6, maxWidth: 400, margin: '0 auto' }}>
+              <div style={{ fontSize: 54, marginBottom: 16, animation: 'pulse-slow 4s infinite ease-in-out' }}>🧬</div>
+              <div className="terminal-text" style={{ fontSize: 13, fontWeight: 700, color: '#6178a3', letterSpacing: '0.15em', marginBottom: 8 }}>SYNTHESIS_CONTAINMENT_CORE</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', lineHeight: 1.6, maxWidth: 420, margin: '0 auto' }}>
                 Awaiting algorithmic prompt directives. Streamed footage inputs from archival nodes and vector avatar nodes will consolidate here.
               </div>
             </div>
@@ -573,21 +576,21 @@ export default function LabPage() {
 
         {/* Right Parameters Sidebar */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div className="fathom-glass" style={{ borderRadius: 14, padding: 16 }}>
-            <div className="terminal-text" style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 12, fontWeight: 700 }}>// CORE_SCOPE</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div className="fathom-glass" style={{ borderRadius: 14, padding: 18 }}>
+            <div className="terminal-text" style={{ fontSize: 11, color: '#6178a3', marginBottom: 12, fontWeight: 700 }}>// CORE_SCOPE</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <span className="terminal-text" style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>TARGET_PROJECT_ID:</span>
-              <input value={project} onChange={e => setProject(e.target.value)} className="terminal-text" style={{ background: 'rgba(4, 5, 10, 0.75)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '8px 10px', color: GOLD, fontSize: 12, width: '100%', boxSizing: 'border-box', outline: 'none' }} />
+              <input value={project} onChange={e => setProject(e.target.value)} className="terminal-text" style={{ background: 'rgba(4, 5, 11, 0.85)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: 6, padding: '10px 12px', color: GOLD, fontSize: 12, width: '100%', boxSizing: 'border-box', outline: 'none', fontWeight: 700 }} />
             </div>
           </div>
 
           {!hasSearched && (
-            <div className="fathom-glass" style={{ borderRadius: 14, padding: 16 }}>
-              <div className="terminal-text" style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 12, fontWeight: 700 }}>// RECIPE_TEMPLATES</div>
+            <div className="fathom-glass" style={{ borderRadius: 14, padding: 18 }}>
+              <div className="terminal-text" style={{ fontSize: 11, color: '#6178a3', marginBottom: 14, fontWeight: 700 }}>// RECIPE_TEMPLATES</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {SUGGESTIONS.map(s => (
-                  <button key={s.label} onClick={() => runSearch(s.prompt)} className="terminal-text" style={{ width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 6, fontSize: 11, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(4, 5, 10, 0.4)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', transition: 'all 0.15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)'; e.currentTarget.style.color = '#fff' }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)' }}>
-                    $ {s.label}
+                  <button key={s.label} onClick={() => runSearch(s.prompt)} className="terminal-text recipe-node" style={{ width: '100%', textAlign: 'left', padding: '10px 12px', borderRadius: 6, fontSize: 11, color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
+                    <span style={{ color: BLUE, marginRight: 4 }}>$</span> {s.label}
                   </button>
                 ))}
               </div>
@@ -595,14 +598,14 @@ export default function LabPage() {
           )}
 
           {assets.length > 0 && (
-            <div className="fathom-glass" style={{ borderRadius: 14, padding: 16, borderLeft: `2px solid ${BLUE}` }}>
+            <div className="fathom-glass" style={{ borderRadius: 14, padding: 18, borderLeft: `3px solid ${BLUE}` }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                 <div className="terminal-text" style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>PIPELINE_STAGING ({assets.length})</div>
                 <button onClick={() => setAssets([])} className="terminal-text" style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>PURGE_ALL</button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {assets.map(asset => (
-                  <div key={asset.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, padding: '8px', borderRadius: 6, background: 'rgba(4, 5, 10, 0.4)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 11 }}>
+                  <div key={asset.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, padding: '8px', borderRadius: 6, background: 'rgba(4, 5, 11, 0.5)', border: '1px solid rgba(59, 130, 246, 0.2)', fontSize: 11 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
                       <span style={{ color: BLUE }}>⚡</span>
                       <span className="terminal-text" style={{ color: 'rgba(255,255,255,0.8)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{asset.title}</span>

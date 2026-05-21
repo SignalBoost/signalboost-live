@@ -1,4 +1,18 @@
-"lab": {
+{
+  "hello": "Hola",
+  "welcome": "Bienvenido",
+  "home": "Inicio",
+  "podcasters": "Podcasters",
+  "dashboard": "Panel",
+  "pricing": "Precios",
+  "docs": "Documentación",
+  "logout": "Cerrar sesión",
+  "getStarted": "Empezar",
+  "buildWebsite": "Crear un sitio",
+  "collectReviews": "Recopilar reseñas",
+  "generateAudio": "Generar audio",
+  "createVideos": "Crear videos",
+  "lab": {
     "title": "MOTOR_CENTRAL // El Laboratorio",
     "subtitle": "Sintetizar parámetros: análisis de metraje, transmisión de avatar generativo, orquestación de doblaje de audio.",
     "placeholder": "Consulta de inyección... por ejemplo, \"crear un anuncio de 30s en español\" o \"mostrar último gol de Pelé\"",
@@ -50,7 +64,7 @@
     },
     "captionInfo": {
       "title": "DIAGNÓSTICO_LAB: AUTOMATIZACIÓN_SUBTÍTULOS",
-      "description": "La IA transcribirá el audio original (detectando el idioma hablado automáticamente), luego traducirá la transcripción a los idiomas elegidos y generará archivos de subtítulos (SRT, VTT, ASS) que puede descargar y usar en cualquier lugar."
+      "description": "La IA transcribirá el audio original, detectará el idioma hablado automáticamente, traducirá la transcripción a los idiomas elegidos y generará archivos SRT, VTT y ASS."
     },
     "generateSubtitles": "Generar subtítulos en 5 idiomas",
     "openOriginal": "Abrir original en",
@@ -59,7 +73,290 @@
     "avatarNode": "NODO_AVATAR",
     "aspectRatio": "RELACIÓN_ASPECTO",
     "heygenWarning": "CRÍTICO: nodo de entorno HEYGEN_API_KEY no configurado.",
-    "heygenNotConfigured": "Clave API de HeyGen aún no configurada. Agregue HEYGEN_API_KEY a las variables de entorno de Vercel para habilitar la generación de video.",
+    "heygenNotConfigured": "Clave API de HeyGen aún no configurada. Agrega HEYGEN_API_KEY a Vercel para activar la generación de video.",
     "renderComplete": "RENDERIZACIÓN_COMPLETA — Verificado en Bandeja",
     "initializeSynthesis": "INICIALIZAR_SÍNTESIS"
   },
+  "promoteBusiness": "Promover negocio",
+  "promote_page": {
+    "badge": "Promover mi negocio",
+    "title": "Crea una promoción. Conviértela en una campaña completa.",
+    "subtitle": "Dile a SignalBoost qué quieres promover. Te ayudaremos a convertirlo en texto para tu web, publicaciones sociales, email, ideas de video y versiones nativas por idioma.",
+    "businessName": "Nombre del negocio",
+    "businessPlaceholder": "Ejemplo: Luna Travel",
+    "audience": "Audiencia",
+    "audiencePlaceholder": "Ejemplo: familias, viajeros, clientes locales",
+    "offer": "¿Qué quieres promover?",
+    "offerPlaceholder": "Ejemplo: 20% de descuento en paquetes de fin de semana a Cancún. Cupos limitados.",
+    "tone": "Tono",
+    "tones": {
+      "friendly": "Amigable",
+      "premium": "Premium",
+      "urgent": "Urgente",
+      "local": "Local"
+    },
+    "generate": "Generar campaña",
+    "generatedNote": "Borrador de campaña creado. Siguiente paso: conectar esta página al generador de campañas con IA.",
+    "preview": {
+      "title": "Vista previa de campaña",
+      "sampleHeadline": "Especial de fin de semana para clientes nuevos y recurrentes",
+      "sampleBusiness": "Tu negocio",
+      "copyPrefix": "Una campaña lista para adaptar para",
+      "forAudience": "para",
+      "item1": "Banner para sitio web",
+      "item2": "Textos para redes sociales",
+      "item3": "Texto de email",
+      "item4": "Idea de video corto",
+      "item5": "Versiones nativas por idioma"
+    },
+    "channels": {
+      "website": {
+        "title": "Actualización del sitio",
+        "description": "Convierte tu oferta en un banner de inicio o una sección de aterrizaje."
+      },
+      "social": {
+        "title": "Publicaciones sociales",
+        "description": "Crea textos para Facebook, Instagram, TikTok y más."
+      },
+      "email": {
+        "title": "Campaña de email",
+        "description": "Genera un email breve que tus clientes entiendan rápido."
+      },
+      "video": {
+        "title": "Idea de video",
+        "description": "Crea un guion corto para reels, shorts o anuncios."
+      },
+      "languages": {
+        "title": "Idiomas nativos",
+        "description": "Adapta tu mensaje para que suene natural en cada idioma."
+      },
+      "reviews": {
+        "title": "Seguimiento de reseñas",
+        "description": "Pide a clientes satisfechos que dejen una reseña después de la promoción."
+      }
+    }
+  },
+  "audio": {
+    "pageTitle": "Audio",
+    "pageSubtitle": "Convierte tu texto en audio con sonido natural. Elige un idioma, escoge una voz, genera.",
+    "title": "Audio",
+    "subtitle": "Convierte cualquier texto en audio con sonido nativo.",
+    "pickVoice": "Elige una voz",
+    "voicesAvailable": "disponibles",
+    "noVoices": "No hay voces disponibles para este idioma.",
+    "yourText": "Tu texto",
+    "clear": "Borrar",
+    "textPlaceholder": "Escribe o pega lo que quieres decir...",
+    "characters": "caracteres",
+    "overLimit": "Supera el límite de caracteres",
+    "servedFromCache": "Servido desde caché",
+    "justGenerated": "Recién generado",
+    "download": "Descargar",
+    "error": "Error al generar",
+    "generating": "Generando...",
+    "generateAgain": "Generar de nuevo",
+    "generate": "Generar audio"
+  },
+  "reviews_page": {
+    "title": "Recolector de reseñas",
+    "subtitle": "Comparte un enlace. Los clientes dejan reseñas en su propio idioma. Tú apruebas lo que aparece públicamente.",
+    "sendLinkTitle": "Envía este enlace a tus clientes",
+    "sendLinkDesc": "Hacen clic, dejan una reseña en su propio idioma, y aparece abajo como Pendiente hasta que la apruebes.",
+    "loading": "Cargando…",
+    "pickHandleDesc": "Elige un identificador para tu enlace de reseñas. Puede ser tu nombre, tu negocio, lo que sea — 3 a 30 letras minúsculas, dígitos y guiones.",
+    "handlePlaceholder": "tu-identificador",
+    "saving": "Guardando…",
+    "claim": "Reclamar",
+    "copied": "Copiado",
+    "copyLink": "Copiar enlace",
+    "openNewTab": "Abrir en nueva pestaña",
+    "handleLabel": "Identificador:",
+    "yourReviews": "Tus reseñas",
+    "summaryEmpty": "Nada todavía. Comparte el enlace de arriba para empezar.",
+    "total": "en total",
+    "pending": "pendientes",
+    "approved": "aprobadas",
+    "avg": "promedio",
+    "filterAll": "Todas",
+    "filterPending": "Pendientes",
+    "filterApproved": "Aprobadas",
+    "noReviewsYet": "Aún no hay reseñas",
+    "noReviewsHaveLink": "Envía tu enlace de arriba a un cliente para recibir tu primera reseña.",
+    "noReviewsNoLink": "Reclama un identificador arriba para obtener tu enlace de reseñas.",
+    "nonePending": "No hay reseñas pendientes.",
+    "noneApproved": "No hay reseñas aprobadas.",
+    "statusPending": "Pendiente",
+    "statusApproved": "Aprobada",
+    "unpublish": "Despublicar",
+    "approve": "Aprobar",
+    "delete": "Eliminar",
+    "deleteTitle": "Eliminar reseña",
+    "confirmDelete": "¿Eliminar esta reseña? Esto no se puede deshacer.",
+    "errSignIn": "Inicia sesión para ver tus reseñas.",
+    "errLoad": "No se pudieron cargar las reseñas.",
+    "errPickHandle": "Elige un identificador para continuar.",
+    "errSaveHandle": "No se pudo guardar el identificador."
+  },
+  "team": {
+    "teamSeats": "Asientos del equipo",
+    "used": "usados",
+    "planSuffix": "plan",
+    "seatLimitReached": "Límite de asientos alcanzado. Mejora tu plan para añadir más miembros al equipo.",
+    "upgrade": "Mejorar plan",
+    "emailPlaceholder": "compañero@email.com",
+    "sending": "Enviando...",
+    "invite": "Invitar",
+    "inviteSent": "¡Invitación enviada!",
+    "noMembers": "Aún no hay miembros en el equipo. Invita a alguien arriba.",
+    "remove": "Quitar"
+  },
+  "video_page": {
+    "title": "Editor de video",
+    "subtitle": "Genera subtítulos multilingües y clips para redes sociales a partir de tus videos.",
+    "tabCaptions": "Subtítulos",
+    "tabClips": "Clips sociales",
+    "tabFiles": "Mis archivos",
+    "generateCaptions": "Generar subtítulos",
+    "generateClips": "Generar clips sociales",
+    "generateClipsBtn": "Generar clips",
+    "languages": "Idiomas",
+    "langsForCaptions": "Idiomas para subtítulos",
+    "captionFormat": "Formato de subtítulos",
+    "exportFor": "Exportar para",
+    "processing": "Procesando...",
+    "processingShort": "Procesando",
+    "ready": "Listo",
+    "download": "Descargar",
+    "myFiles": "Mis archivos de video",
+    "noFiles": "Aún no hay archivos",
+    "noFilesSub": "Genera subtítulos o clips para verlos aquí",
+    "langCount": "idiomas",
+    "dropVideo": "Suelta tu video aquí o haz clic para buscar",
+    "supports": "Soporta MP4, MOV, AVI, MKV, WebM",
+    "captionFmt": {
+      "srt": "Formato de subtítulos estándar. Funciona en la mayoría de plataformas.",
+      "vtt": "Web Video Text Tracks. Mejor para reproductores web.",
+      "ass": "Estilización avanzada. Mejor para subtítulos incrustados.",
+      "burnedName": "Incrustado",
+      "burned": "Subtítulos integrados directamente en el archivo de video."
+    }
+  },
+  "dash": {
+    "askPlaceholder": "Pregúntale lo que sea a SignalBoost...",
+    "askButton": "Preguntar",
+    "startHere": "Empieza aquí",
+    "continueWhere": "Continúa donde lo dejaste",
+    "projectsTitle": "Tus proyectos",
+    "projectsTitleNamed": "Proyectos de {name}",
+    "upgrade": "Mejorar plan",
+    "newProject": "+ Nuevo proyecto",
+    "noProjects": "Aún no hay proyectos",
+    "noProjectsSub": "Crea tu primer proyecto arriba",
+    "lastEdited": "Editado",
+    "open": "Abrir",
+    "team": "Equipo",
+    "loadingTeam": "Cargando equipo...",
+    "feedback": "Comparte tu opinión — cada mensaje ayuda a mejorar SignalBoost",
+    "connectionError": "Problema de conexión. Inténtalo de nuevo.",
+    "actions": {
+      "website": { "label": "Crear un sitio", "subline": "Crea o edita tu presencia en línea" },
+      "review": { "label": "Recopilar reseñas", "subline": "Recibe comentarios y testimonios" },
+      "podcast": { "label": "Generar audio nativo", "subline": "Crea contenido de voz en varios idiomas" },
+      "video": { "label": "Crear videos", "subline": "Convierte contenido en recursos visuales" }
+    },
+    "prompts": {
+      "new": {
+        "p1": "¿Qué plan es adecuado para mí?",
+        "p2": "¿Cómo construyo mi primer sitio web?",
+        "p3": "¿Qué idiomas soportan?",
+        "p4": "¿Cómo funciona el plan gratis?"
+      },
+      "returning": {
+        "p1": "¿Cómo agrego un nuevo idioma?",
+        "p2": "¿Cómo subo un episodio de podcast?",
+        "p3": "¿Cómo recopilo reseñas?",
+        "p4": "¿Cómo mejoro mi plan?"
+      }
+    },
+    "stats": {
+      "activeSites": "Sitios activos",
+      "projects": "Proyectos",
+      "audioGenerated": "Audio generado",
+      "videosCreated": "Videos creados",
+      "min": "min"
+    },
+    "time": {
+      "daysShort": "d",
+      "hoursShort": "h",
+      "minsShort": "min",
+      "ago": "atrás",
+      "justNow": "Justo ahora"
+    }
+  },
+  "auth": {
+    "welcomeBack": "Bienvenido de nuevo",
+    "createAccount": "Crea tu cuenta gratis",
+    "continueGoogle": "Continuar con Google",
+    "continueGitHub": "Continuar con GitHub",
+    "or": "o",
+    "namePlaceholder": "Tu nombre completo",
+    "emailPlaceholder": "Correo electrónico",
+    "passwordPlaceholder": "Contraseña",
+    "freePlanNote": "Empezarás en el plan Gratis — esboza un sitio en un idioma con marca de agua. Mejora cuando quieras para publicar de verdad.",
+    "errorNoName": "Por favor, introduce tu nombre.",
+    "checkEmail": "¡Revisa tu correo para confirmar tu cuenta!",
+    "pleaseWait": "Espera...",
+    "logIn": "Iniciar sesión",
+    "createFreeAccount": "Crear cuenta gratis",
+    "noAccount": "¿No tienes una cuenta?",
+    "signUpFree": "Regístrate gratis",
+    "haveAccount": "¿Ya tienes una cuenta?",
+    "logInLink": "Iniciar sesión"
+  },
+  "hero": {
+    "badge": "Construye · Reseña · Difunde",
+    "headlines": [
+      "Construye tu marca en Español",
+      "Build your brand in English",
+      "Construa sua marca em Português",
+      "Twórz swoją markę po Polsku",
+      "Создайте свой бренд на Русском"
+    ],
+    "subhead": "Crea tu sitio web, recopila reseñas de clientes y produce audio y video nativos — en tu idioma, no una traducción.",
+    "ctaPrimary": "Empezar",
+    "ctaSecondary": "Ver demo",
+    "features": {
+      "site": "Constructor de sitios",
+      "reviews": "Recolector de reseñas",
+      "audio": "Audio nativo",
+      "video": "Editor de video"
+    },
+    "tagHint": "Haz clic en una señal de idioma para añadirla a tu proyecto",
+    "ticker": [
+      "Nueva reseña · São Paulo",
+      "Sitio publicado · Madrid",
+      "Audio generado · pl-PL",
+      "Video renderizado · ru-RU",
+      "Reseña recopilada · Lisboa",
+      "Sitio en vivo · Ciudad de México",
+      "Difusión enviada · 5 idiomas"
+    ],
+    "scroll": "Desliza"
+  },
+  "footer": {
+    "tagline": "SignalBoost ayuda a las empresas a crecer con sitios web nativos, reseñas de clientes, audio, video y contenido con IA — creado para cómo la gente realmente habla.",
+    "learnHow": "Descubre cómo funciona SignalBoost",
+    "readDocs": "lee la documentación",
+    "product": "Producto",
+    "build": "Crear",
+    "company": "Empresa",
+    "documentation": "Documentación",
+    "generateNativeAudio": "Generar audio nativo",
+    "about": "Acerca de",
+    "partners": "Socios",
+    "privacy": "Privacidad",
+    "contact": "Contacto",
+    "nativeExperiences": "Experiencias nativas disponibles en",
+    "poweredBy": "Desarrollado por"
+  }
+}

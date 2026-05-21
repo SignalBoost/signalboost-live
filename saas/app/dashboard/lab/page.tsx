@@ -211,46 +211,9 @@ function GeneratePanel({
 
 function LabScene() {
   return (
-    <div className="lab-scene" aria-hidden="true">
-      <div className="lab-floor" />
-
-      <div className="lab-scr lab-scr-left">
-        <div className="lab-scr-head">AGENT_854 // ANALYSIS</div>
-        <div className="lab-codeline"><span /><span /></div>
-        <div className="lab-codeline"><span /><span /><span /></div>
-        <div className="lab-codeline"><span /></div>
-        <div className="lab-codeline"><span /><span /></div>
-        <div className="lab-bargraph"><i /><i /><i /><i /><i /><i /></div>
-      </div>
-
-      <div className="lab-scr lab-scr-right">
-        <div className="lab-scr-head">GENERATION_STREAM [14/22]</div>
-        <div className="lab-codeline"><span /><span /></div>
-        <div className="lab-codeline"><span /></div>
-        <div className="lab-codeline"><span /><span /><span /></div>
-        <div className="lab-wave"><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /></div>
-      </div>
-
-      <div className="lab-cables"><span /><span /><span /></div>
-
-      <div className="lab-bench">
-        <div className="lab-bench-top" />
-        <div className="lab-leds"><i /><i /><i /><i /><i /><i /><i /><i /></div>
-        <div className="lab-vent lab-v1" /><div className="lab-vent lab-v2" /><div className="lab-vent lab-v3" /><div className="lab-vent lab-v4" />
-      </div>
-
-      <div className="lab-chamber">
-        <div className="lab-holo">TARGET_LOCKED</div>
-        <div className="lab-cap-top" />
-        <div className="lab-glass">
-          <div className="lab-bubbles"><span /><span /><span /><span /></div>
-          <div className="lab-specimen-glow" />
-          <div className="lab-specimen" />
-          <div className="lab-ring lab-r1" />
-          <div className="lab-ring lab-r2" />
-        </div>
-        <div className="lab-cap-base" />
-        <div className="lab-base-glow" />
+    <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', background: 'rgba(255, 0, 0, 0.1)' }}>
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'cyan', padding: '20px', fontSize: '24px', fontWeight: 'bold', pointerEvents: 'auto', color: '#000' }}>
+        LAB SCENE IS RENDERING
       </div>
     </div>
   )
@@ -386,84 +349,6 @@ export default function LabPage() {
           @keyframes pulse-slow {
             0%, 100% { opacity: 0.3; transform: scale(1); filter: drop-shadow(0 0 10px rgba(59,130,246,0.3)); }
             50% { opacity: 0.7; transform: scale(1.1); filter: drop-shadow(0 0 25px rgba(59,130,246,0.6)); }
-          }
-
-          .lab-scene {
-            position: fixed; inset: 0; z-index: 0;
-            pointer-events: none; overflow: hidden;
-            font-family: 'JetBrains Mono', 'Courier New', monospace;
-          }
-          .lab-floor {
-            position: absolute; left: 0; right: 0; bottom: 0; height: 42%;
-            background: linear-gradient(180deg, transparent 0%, rgba(0,90,150,0.06) 60%, rgba(0,120,200,0.10) 100%);
-            background-image: repeating-linear-gradient(90deg, transparent, transparent 70px, rgba(0,180,255,0.04) 70px, rgba(0,180,255,0.04) 71px);
-          }
-          .lab-scr {
-            position: absolute; bottom: 22%; width: 170px; height: 168px;
-            border-radius: 10px; background: rgba(6,12,24,0.7);
-            border: 1px solid rgba(70,130,200,0.3);
-            box-shadow: 0 0 30px rgba(0,150,255,0.12), inset 0 0 24px rgba(0,120,255,0.08);
-            padding: 12px; overflow: hidden; opacity: 0.55;
-          }
-          .lab-scr-left { left: 4%; transform: perspective(700px) rotateY(20deg); }
-          .lab-scr-right { right: 4%; transform: perspective(700px) rotateY(-20deg); }
-          .lab-scr-head { font-size: 9px; color: #5cc8ff; letter-spacing: 0.05em; margin-bottom: 9px; text-shadow: 0 0 6px rgba(0,180,255,0.5); }
-          .lab-codeline { display: flex; gap: 4px; margin-bottom: 7px; }
-          .lab-codeline span { height: 4px; border-radius: 2px; background: rgba(0,180,255,0.3); animation: lab-type 3s ease-in-out infinite; }
-          .lab-codeline span:nth-child(1) { width: 44px; }
-          .lab-codeline span:nth-child(2) { width: 26px; }
-          .lab-codeline span:nth-child(3) { width: 16px; }
-          .lab-codeline:nth-child(3) span { animation-delay: -0.5s; }
-          .lab-codeline:nth-child(4) span { animation-delay: -1s; }
-          .lab-codeline:nth-child(5) span { animation-delay: -1.5s; }
-          .lab-bargraph { display: flex; align-items: flex-end; gap: 5px; height: 46px; margin-top: 12px; }
-          .lab-bargraph i { flex: 1; background: linear-gradient(180deg,#5cc8ff,#0a6cff); border-radius: 2px; box-shadow: 0 0 6px rgba(0,180,255,0.5); animation: lab-eq 1.4s ease-in-out infinite; }
-          .lab-bargraph i:nth-child(odd) { animation-delay: -0.4s; }
-          .lab-bargraph i:nth-child(3n) { animation-delay: -0.8s; }
-          .lab-wave { display: flex; align-items: center; gap: 3px; height: 50px; margin-top: 14px; }
-          .lab-wave i { flex: 1; background: #5cc8ff; border-radius: 2px; box-shadow: 0 0 5px rgba(0,180,255,0.5); animation: lab-eq 1.1s ease-in-out infinite; }
-          .lab-wave i:nth-child(even) { animation-delay: -0.3s; }
-          .lab-wave i:nth-child(3n) { animation-delay: -0.6s; }
-          .lab-wave i:nth-child(4n) { animation-delay: -0.9s; }
-          .lab-cables { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 340px; height: 90px; }
-          .lab-cables span { position: absolute; top: -4px; width: 2px; background: rgba(70,130,200,0.4); border-radius: 0 0 4px 4px; }
-          .lab-cables span:nth-child(1) { left: 30%; height: 72px; }
-          .lab-cables span:nth-child(2) { left: 50%; height: 56px; }
-          .lab-cables span:nth-child(3) { left: 68%; height: 84px; }
-          .lab-cables span::after { content: ''; position: absolute; bottom: -3px; left: -2px; width: 6px; height: 6px; border-radius: 50%; background: #33c8ff; box-shadow: 0 0 8px rgba(0,200,255,0.8); animation: pulse-slow 3s ease-in-out infinite; }
-          .lab-bench { position: absolute; left: 50%; bottom: 10%; transform: translateX(-50%); width: 460px; height: 90px; }
-          .lab-bench-top { position: absolute; top: 0; left: 0; right: 0; height: 18px; border-radius: 8px; background: linear-gradient(180deg, rgba(30,45,75,0.9), rgba(10,16,30,0.95)); border: 1px solid rgba(80,140,210,0.25); box-shadow: 0 0 30px rgba(0,160,255,0.12); }
-          .lab-leds { position: absolute; top: 5px; left: 22px; display: flex; gap: 11px; }
-          .lab-leds i { width: 5px; height: 5px; border-radius: 50%; background: #33c8ff; box-shadow: 0 0 6px rgba(0,200,255,0.8); animation: lab-blink 2s ease-in-out infinite; }
-          .lab-leds i:nth-child(2n) { background: #4ade80; box-shadow: 0 0 6px rgba(74,222,128,0.8); animation-delay: -0.4s; }
-          .lab-leds i:nth-child(3n) { background: #ffc300; box-shadow: 0 0 6px rgba(255,195,0,0.8); animation-delay: -0.8s; }
-          .lab-leds i:nth-child(5n) { animation-delay: -1.2s; }
-          .lab-vent { position: absolute; top: 28px; width: 74px; height: 5px; border-radius: 3px; background: rgba(0,170,255,0.18); box-shadow: 0 0 10px rgba(0,170,255,0.35); }
-          .lab-v1 { left: 26px; } .lab-v2 { left: 128px; } .lab-v3 { right: 128px; } .lab-v4 { right: 26px; }
-          .lab-chamber { position: absolute; left: 50%; bottom: calc(10% + 16px); transform: translateX(-50%); width: 150px; height: 240px; }
-          .lab-holo { position: absolute; top: -26px; left: 50%; transform: translateX(-50%); font-size: 9px; color: #5cc8ff; letter-spacing: 0.1em; padding: 3px 9px; border: 1px solid rgba(0,180,255,0.3); border-radius: 4px; background: rgba(0,120,255,0.06); text-shadow: 0 0 6px rgba(0,180,255,0.6); white-space: nowrap; animation: pulse-slow 3s ease-in-out infinite; }
-          .lab-cap-top { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 96px; height: 20px; border-radius: 8px 8px 4px 4px; background: linear-gradient(180deg, rgba(60,90,140,0.95), rgba(20,30,55,0.95)); border: 1px solid rgba(90,150,220,0.3); box-shadow: 0 0 16px rgba(0,170,255,0.25); }
-          .lab-glass { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); width: 104px; height: 196px; border-radius: 14px; background: linear-gradient(100deg, rgba(150,225,255,0.10) 0%, rgba(0,150,255,0.05) 40%, rgba(120,200,255,0.12) 100%); border: 1px solid rgba(120,200,255,0.3); box-shadow: inset 0 0 30px rgba(0,180,255,0.18), 0 0 40px rgba(0,170,255,0.18); overflow: hidden; }
-          .lab-specimen { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 64px; height: 64px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #bdf6ff 0%, #33c8ff 35%, #0a78ff 72%, #062a4d 100%); box-shadow: 0 0 40px 12px rgba(0,200,255,0.55); animation: lab-float 5s ease-in-out infinite, pulse-slow 4s ease-in-out infinite; }
-          .lab-specimen-glow { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 130px; height: 130px; border-radius: 50%; background: radial-gradient(circle, rgba(0,200,255,0.25) 0%, transparent 65%); animation: pulse-slow 4s ease-in-out infinite; }
-          .lab-ring { position: absolute; top: 50%; left: 50%; border-radius: 50%; border: 1px solid rgba(120,225,255,0.5); }
-          .lab-r1 { width: 82px; height: 82px; transform: translate(-50%,-50%); animation: lab-spin 9s linear infinite; border-top-color: rgba(170,240,255,0.9); }
-          .lab-r2 { width: 104px; height: 104px; transform: translate(-50%,-50%); animation: lab-spin 16s linear infinite reverse; border-left-color: rgba(80,160,255,0.7); }
-          .lab-bubbles span { position: absolute; bottom: 0; width: 4px; height: 4px; border-radius: 50%; background: rgba(170,240,255,0.7); box-shadow: 0 0 6px rgba(0,200,255,0.6); }
-          .lab-bubbles span:nth-child(1) { left: 30px; animation: lab-rise 4s linear infinite; }
-          .lab-bubbles span:nth-child(2) { left: 54px; animation: lab-rise 5.5s linear infinite; animation-delay: -2s; }
-          .lab-bubbles span:nth-child(3) { left: 70px; animation: lab-rise 4.8s linear infinite; animation-delay: -1s; }
-          .lab-bubbles span:nth-child(4) { left: 44px; animation: lab-rise 6s linear infinite; animation-delay: -3s; }
-          .lab-cap-base { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 120px; height: 26px; border-radius: 6px; background: linear-gradient(180deg, rgba(50,75,120,0.95), rgba(12,20,40,0.98)); border: 1px solid rgba(90,150,220,0.3); box-shadow: 0 0 20px rgba(0,170,255,0.3); }
-          .lab-base-glow { position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); width: 170px; height: 24px; border-radius: 50%; background: radial-gradient(ellipse, rgba(0,200,255,0.4) 0%, transparent 70%); filter: blur(4px); animation: pulse-slow 4s ease-in-out infinite; }
-          @keyframes lab-float { 0%,100% { margin-top: 0; } 50% { margin-top: -10px; } }
-          @keyframes lab-spin { to { transform: translate(-50%,-50%) rotate(360deg); } }
-          @keyframes lab-rise { 0% { bottom: 0; opacity: 0; } 10% { opacity: 1; } 100% { bottom: 186px; opacity: 0; } }
-          @keyframes lab-eq { 0%,100% { height: 30%; } 50% { height: 100%; } }
-          @keyframes lab-blink { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
-          @keyframes lab-type { 0%,100% { opacity: 0.3; } 50% { opacity: 0.9; } }
-          @media (max-width: 900px) {
-            .lab-scr { display: none; }
           }
         `}</style>
 

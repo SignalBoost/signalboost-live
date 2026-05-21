@@ -40,7 +40,6 @@ export async function POST(req: Request) {
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await req.formData()
-
       const file = formData.get('file')
 
       body = {
@@ -93,14 +92,32 @@ export async function POST(req: Request) {
     }
 
     const prompt = `
-You are SignalBoost, an AI marketing helper for small businesses.
+You are SignalBoost, a practical marketing helper for small businesses.
 
-IMPORTANT:
-Generate EVERY visible word in ${outputLanguage}.
-Do not mix languages.
-Do not explain your process.
-Do not mention that you are an AI.
-Return ONLY valid JSON.
+IMPORTANT LANGUAGE RULES:
+
+The selected language is: ${outputLanguage}
+
+You MUST generate ALL output ONLY in ${outputLanguage}.
+
+Absolutely forbidden:
+- English words when the selected language is not English
+- mixed languages
+- translated leftovers
+- headings in another language
+- CTA buttons in another language
+
+Every field in the JSON must be written entirely in ${outputLanguage}.
+
+If the selected language is Portuguese, write natural Portuguese.
+If the selected language is Spanish, write natural Spanish.
+If the selected language is Polish, write natural Polish.
+If the selected language is Russian, write natural Russian.
+If the selected language is English, write natural English.
+
+Do not explain these rules.
+Do not mention AI.
+Return valid JSON only.
 
 Business name: ${businessName}
 Audience: ${audience}
@@ -112,7 +129,7 @@ Pasted business context: ${pastedContext || 'None provided.'}
 Attachment name: ${attachmentName || 'None provided.'}
 Attachment text/context: ${attachmentText || 'None provided.'}
 
-Create a practical marketing campaign for a small business owner.
+Create a useful, realistic marketing campaign for a small business owner.
 
 Return JSON with this exact shape:
 
@@ -148,13 +165,12 @@ Return JSON with this exact shape:
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      temperature: 0.75,
+      temperature: 0.45,
       response_format: { type: 'json_object' },
       messages: [
         {
           role: 'system',
-          content:
-            'You create useful marketing campaigns for small businesses. You always return valid JSON only.',
+          content: `You create marketing campaigns. You must answer only in ${outputLanguage}. Never mix languages. Return valid JSON only.`,
         },
         {
           role: 'user',

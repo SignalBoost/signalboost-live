@@ -269,8 +269,7 @@ function GeneratePanel({
       </button>
     </div>
   )
-}
-// ── Main Lab page ─────────────────────────────────────────────────────────────
+}// ── Main Lab page ─────────────────────────────────────────────────────────────
 
 export default function LabPage() {
   const { dict } = useI18n()

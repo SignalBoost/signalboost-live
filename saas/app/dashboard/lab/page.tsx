@@ -208,7 +208,7 @@ function GeneratePanel({
   }
 
   return (
-    <div style={{ background: 'rgba(6, 9, 19, 0.4)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 20, marginBottom: 20, backdropFilter: 'blur(8px)' }}>
+    <div style={{ background: 'rgba(22, 28, 45, 0.4)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 20, marginBottom: 20, backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
         <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🪄</div>
         <div>
@@ -223,7 +223,7 @@ function GeneratePanel({
           value={script}
           onChange={e => setScript(e.target.value)}
           rows={4}
-          style={{ width: '100%', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 14px', color: '#fff', fontSize: 13, fontFamily: 'monospace', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
+          style={{ width: '100%', background: 'rgba(4, 5, 10, 0.75)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '10px 14px', color: '#fff', fontSize: 13, fontFamily: 'monospace', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
         />
       </div>
 
@@ -233,10 +233,10 @@ function GeneratePanel({
           <select
             value={selectedAvatar}
             onChange={e => setSelectedAvatar(e.target.value)}
-            style={{ width: '100%', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '9px 12px', color: '#fff', fontSize: 12, fontFamily: 'monospace' }}
+            style={{ width: '100%', background: 'rgba(4, 5, 10, 0.75)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '9px 12px', color: '#fff', fontSize: 12, fontFamily: 'monospace' }}
           >
             {data.avatars.map(a => (
-              <option key={a.id} value={a.id} style={{ background: '#0a0b12' }}>{a.name}</option>
+              <option key={a.id} value={a.id} style={{ background: '#060913' }}>{a.name}</option>
             ))}
           </select>
         </div>
@@ -245,7 +245,7 @@ function GeneratePanel({
           <div style={{ display: 'flex', gap: 6 }}>
             {(['9:16', '16:9', '1:1'] as const).map(f => (
               <button key={f} onClick={() => setSelectedFormat(f)}
-                style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: selectedFormat === f ? 'rgba(59,130,246,0.15)' : 'rgba(0,0,0,0.2)', borderColor: selectedFormat === f ? BLUE : 'rgba(255,255,255,0.08)', color: selectedFormat === f ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: 11, fontFamily: 'monospace', fontWeight: 700, cursor: 'pointer' }}>
+                style={{ flex: 1, padding: '9px 0', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: selectedFormat === f ? 'rgba(59,130,246,0.25)' : 'rgba(4, 5, 10, 0.5)', color: selectedFormat === f ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: 11, fontFamily: 'monospace', fontWeight: 700, cursor: 'pointer' }}>
                 {f}
               </button>
             ))}
@@ -383,22 +383,24 @@ export default function LabPage() {
         body {
           background-color: #060913 !important;
           background-image: 
-            radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.12) 0px, transparent 50%),
-            radial-gradient(at 100% 100%, rgba(255, 195, 0, 0.05) 0px, transparent 50%) !important;
+            radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.18) 0px, transparent 50%),
+            radial-gradient(at 100% 100%, rgba(255, 195, 0, 0.08) 0px, transparent 50%),
+            radial-gradient(at 50% 50%, rgba(139, 92, 246, 0.04) 0px, transparent 40%) !important;
           background-attachment: fixed;
         }
         .fathom-glass {
-          background: rgba(6, 9, 19, 0.61);
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
-          border: 1px solid rgba(255, 255, 255, 0.06);
+          background: rgba(22, 28, 45, 0.4) !important;
+          backdrop-filter: blur(24px) !important;
+          -webkit-backdrop-filter: blur(24px) !important;
+          border: 1px solid rgba(255, 255, 255, 0.08) !important;
+          box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4) !important;
         }
         .terminal-text {
           font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
         }
         @keyframes pulse-slow {
           0%, 100% { opacity: 0.2; transform: scale(1); }
-          50% { opacity: 0.4; transform: scale(1.05); }
+          50% { opacity: 0.5; transform: scale(1.08); }
         }
       `}</style>
 
@@ -411,7 +413,7 @@ export default function LabPage() {
       )}
 
       {/* Top Status & Diagnostics bar */}
-      <div className="fathom-glass terminal-text" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 18px', borderRadius: 8, marginBottom: 28, fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.05em' }}>
+      <div className="fathom-glass terminal-text" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', borderRadius: 8, marginBottom: 28, fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.05em' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ color: GREEN }}>●</span> SIGNALBOOST_FOUNDRY // STATUS: ONLINE
         </div>
@@ -439,7 +441,7 @@ export default function LabPage() {
             </div>
 
             {/* Terminal Command Injector Bar */}
-            <div style={{ background: 'rgba(0, 0, 0, 0.25)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: 4, display: 'flex', gap: 4, alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ background: 'rgba(4, 5, 10, 0.75)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: 4, display: 'flex', gap: 4, alignItems: 'center', marginBottom: 16 }}>
               <span className="terminal-text" style={{ color: BLUE, paddingLeft: 12, fontWeight: 700, fontSize: 14 }}>$</span>
               <input
                 ref={inputRef}
@@ -461,13 +463,13 @@ export default function LabPage() {
             </div>
 
             {/* Segmented Control Switches (Modes) */}
-            <div style={{ display: 'flex', gap: 4, background: 'rgba(0,0,0,0.2)', padding: 4, borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ display: 'flex', gap: 4, background: 'rgba(4, 5, 10, 0.5)', padding: 4, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)' }}>
               {MODES.map(m => (
                 <button
                   key={m.id}
                   onClick={() => setMode(m.id)}
                   className="terminal-text"
-                  style={{ flex: 1, padding: '8px', borderRadius: 6, fontSize: 11, border: 'none', cursor: 'pointer', background: mode === m.id ? 'rgba(59,130,246,0.11)' : 'transparent', color: mode === m.id ? '#fff' : 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.15s' }}
+                  style={{ flex: 1, padding: '8px', borderRadius: 6, fontSize: 11, border: 'none', cursor: 'pointer', background: mode === m.id ? 'rgba(59,130,246,0.18)' : 'transparent', color: mode === m.id ? '#fff' : 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.15s' }}
                 >
                   <span style={{ color: mode === m.id ? BLUE : 'inherit' }}>{m.icon}</span>
                   <span>{m.label.toUpperCase().replace(' ', '_')}</span>
@@ -519,9 +521,9 @@ export default function LabPage() {
                     <div
                       key={result.id}
                       onClick={() => !isRestricted && openOverlay(result)}
-                      style={{ borderRadius: 12, overflow: 'hidden', background: 'rgba(6, 9, 19, 0.4)', border: '1px solid rgba(255,255,255,0.06)', cursor: isRestricted ? 'default' : 'pointer', transition: 'all 0.2s', opacity: isRestricted ? 0.4 : 1 }}
-                      onMouseEnter={e => { if (!isRestricted) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'rgba(59,130,246,0.3)' } }}
-                      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)' }}
+                      style={{ borderRadius: 12, overflow: 'hidden', background: 'rgba(4, 5, 10, 0.4)', border: '1px solid rgba(255,255,255,0.08)', cursor: isRestricted ? 'default' : 'pointer', transition: 'all 0.2s', opacity: isRestricted ? 0.4 : 1 }}
+                      onMouseEnter={e => { if (!isRestricted) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)' } }}
+                      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
                     >
                       <div style={{ aspectRatio: '9/16', background: '#030407', position: 'relative', overflow: 'hidden' }}>
                         {result.thumbnail ? (
@@ -538,12 +540,12 @@ export default function LabPage() {
                         </div>
                         <div className="terminal-text" style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: 9, padding: '2px 5px', borderRadius: 4 }}>{result.duration}</div>
                       </div>
-                      <div style={{ padding: 10, background: 'rgba(0, 0, 0, 0.15)' }}>
+                      <div style={{ padding: 10, background: 'rgba(4, 5, 10, 0.4)' }}>
                         <div style={{ fontSize: 11, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.4, marginBottom: 8, height: 30 }}>{result.title}</div>
                         {isRestricted ? (
                           <div className="terminal-text" style={{ fontSize: 9, color: '#f87171' }}>RESTRICTED_NODE</div>
                         ) : (
-                          <button onClick={e => { e.stopPropagation(); addAsset(result) }} className="terminal-text" style={{ width: '100%', fontSize: 10, padding: '5px 0', borderRadius: 4, border: `1px solid rgba(255,255,255,0.1)`, background: assets.find(a => a.id === result.id) ? 'rgba(74,222,128,0.06)' : 'rgba(255,255,255,0.02)', color: assets.find(a => a.id === result.id) ? GREEN : 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
+                          <button onClick={e => { e.stopPropagation(); addAsset(result) }} className="terminal-text" style={{ width: '100%', fontSize: 10, padding: '5px 0', borderRadius: 4, border: `1px solid rgba(255,255,255,0.12)`, background: assets.find(a => a.id === result.id) ? 'rgba(74,222,128,0.06)' : 'rgba(255,255,255,0.02)', color: assets.find(a => a.id === result.id) ? GREEN : 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
                             {assets.find(a => a.id === result.id) ? '✓ PIPELINE' : '+ INJECT'}
                           </button>
                         )}
@@ -558,9 +560,9 @@ export default function LabPage() {
           {!hasSearched && !loading && (
             <div style={{ textAlign: 'center', padding: '80px 20px', position: 'relative' }}>
               <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                <div style={{ width: 140, height: 140, background: 'radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)', animation: 'pulse-slow 4s infinite ease-in-out' }} />
+                <div style={{ width: 180, height: 180, background: 'radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%)', animation: 'pulse-slow 4s infinite ease-in-out' }} />
               </div>
-              <div style={{ fontSize: 44, marginBottom: 16, filter: 'drop-shadow(0 0 10px rgba(59,130,246,0.3))' }}>🧬</div>
+              <div style={{ fontSize: 44, marginBottom: 16, filter: 'drop-shadow(0 0 15px rgba(59,130,246,0.4))' }}>🧬</div>
               <div className="terminal-text" style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.1em', marginBottom: 6 }}>SYNTHESIS_CONTAINMENT_CORE</div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', lineHeight: 1.6, maxWidth: 400, margin: '0 auto' }}>
                 Awaiting algorithmic prompt directives. Streamed footage inputs from archival nodes and vector avatar nodes will consolidate here.
@@ -575,7 +577,7 @@ export default function LabPage() {
             <div className="terminal-text" style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 12, fontWeight: 700 }}>// CORE_SCOPE</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <span className="terminal-text" style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>TARGET_PROJECT_ID:</span>
-              <input value={project} onChange={e => setProject(e.target.value)} className="terminal-text" style={{ background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '8px 10px', color: GOLD, fontSize: 12, width: '100%', boxSizing: 'border-box', outline: 'none' }} />
+              <input value={project} onChange={e => setProject(e.target.value)} className="terminal-text" style={{ background: 'rgba(4, 5, 10, 0.75)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '8px 10px', color: GOLD, fontSize: 12, width: '100%', boxSizing: 'border-box', outline: 'none' }} />
             </div>
           </div>
 
@@ -584,7 +586,7 @@ export default function LabPage() {
               <div className="terminal-text" style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 12, fontWeight: 700 }}>// RECIPE_TEMPLATES</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {SUGGESTIONS.map(s => (
-                  <button key={s.label} onClick={() => runSearch(s.prompt)} className="terminal-text" style={{ width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 6, fontSize: 11, border: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0, 0, 0, 0.2)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', transition: 'all 0.15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.3)'; e.currentTarget.style.color = '#fff' }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)' }}>
+                  <button key={s.label} onClick={() => runSearch(s.prompt)} className="terminal-text" style={{ width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 6, fontSize: 11, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(4, 5, 10, 0.4)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', transition: 'all 0.15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)'; e.currentTarget.style.color = '#fff' }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)' }}>
                     $ {s.label}
                   </button>
                 ))}
@@ -600,7 +602,7 @@ export default function LabPage() {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {assets.map(asset => (
-                  <div key={asset.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, padding: '8px', borderRadius: 6, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.04)', fontSize: 11 }}>
+                  <div key={asset.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, padding: '8px', borderRadius: 6, background: 'rgba(4, 5, 10, 0.4)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 11 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
                       <span style={{ color: BLUE }}>⚡</span>
                       <span className="terminal-text" style={{ color: 'rgba(255,255,255,0.8)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{asset.title}</span>

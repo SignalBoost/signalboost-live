@@ -17,13 +17,14 @@ const UI: Record<string, Record<string, string>> = {
     generating: 'Generating...',
     success: 'Campaign generated successfully.',
     working: 'SignalBoost is creating your campaign...',
+    reset: 'Reset',
     enterSomething: 'Please enter what you want to promote, paste context, attach a file, or add a website URL.',
     website: 'Website',
     socialPosts: 'Social posts',
     email: 'Email',
     video: 'Video',
     reviewFollowUp: 'Review follow-up',
-    languageIdeas: 'Language ideas'
+    languageIdeas: 'Language ideas',
   },
   pt: {
     attach: 'Anexar documento',
@@ -35,13 +36,14 @@ const UI: Record<string, Record<string, string>> = {
     generating: 'Gerando...',
     success: 'Campanha gerada com sucesso.',
     working: 'SignalBoost está criando sua campanha...',
+    reset: 'Limpar',
     enterSomething: 'Digite o que deseja promover, cole contexto, anexe um arquivo ou adicione a URL do site.',
     website: 'Site',
     socialPosts: 'Posts sociais',
     email: 'Email',
     video: 'Vídeo',
     reviewFollowUp: 'Pedido de avaliação',
-    languageIdeas: 'Ideias por idioma'
+    languageIdeas: 'Ideias por idioma',
   },
   es: {
     attach: 'Adjuntar documento',
@@ -53,13 +55,14 @@ const UI: Record<string, Record<string, string>> = {
     generating: 'Generando...',
     success: 'Campaña generada correctamente.',
     working: 'SignalBoost está creando tu campaña...',
+    reset: 'Restablecer',
     enterSomething: 'Escribe lo que quieres promover, pega contexto, adjunta un archivo o añade la URL del sitio.',
     website: 'Sitio web',
     socialPosts: 'Publicaciones sociales',
     email: 'Email',
     video: 'Video',
     reviewFollowUp: 'Seguimiento de reseñas',
-    languageIdeas: 'Ideas por idioma'
+    languageIdeas: 'Ideas por idioma',
   },
   pl: {
     attach: 'Załącz dokument',
@@ -71,13 +74,14 @@ const UI: Record<string, Record<string, string>> = {
     generating: 'Generowanie...',
     success: 'Kampania wygenerowana.',
     working: 'SignalBoost tworzy kampanię...',
+    reset: 'Reset',
     enterSomething: 'Wpisz promocję, wklej kontekst, załącz plik lub dodaj adres strony.',
     website: 'Strona',
     socialPosts: 'Posty społecznościowe',
     email: 'Email',
     video: 'Wideo',
     reviewFollowUp: 'Prośba o opinię',
-    languageIdeas: 'Pomysły językowe'
+    languageIdeas: 'Pomysły językowe',
   },
   ru: {
     attach: 'Прикрепить документ',
@@ -89,14 +93,15 @@ const UI: Record<string, Record<string, string>> = {
     generating: 'Создание...',
     success: 'Кампания успешно создана.',
     working: 'SignalBoost создает кампанию...',
+    reset: 'Сбросить',
     enterSomething: 'Введите акцию, вставьте контекст, прикрепите файл или добавьте URL сайта.',
     website: 'Сайт',
     socialPosts: 'Соцсети',
     email: 'Email',
     video: 'Видео',
     reviewFollowUp: 'Запрос отзыва',
-    languageIdeas: 'Идеи по языкам'
-  }
+    languageIdeas: 'Идеи по языкам',
+  },
 }
 
 type Channel = {
@@ -211,6 +216,18 @@ export default function PromotePage() {
     ],
     [dict]
   )
+
+  function handleReset() {
+    setBusinessName('')
+    setPromotion('')
+    setAudience('')
+    setTone('friendly')
+    setWebsiteUrl('')
+    setPastedContext('')
+    setFile(null)
+    setCampaign(null)
+    setGenerated(false)
+  }
 
   async function handleGenerate() {
     try {
@@ -479,26 +496,50 @@ export default function PromotePage() {
                 </select>
               </label>
 
-              <button
-                onClick={handleGenerate}
-                disabled={loading}
+              <div
                 style={{
                   marginLeft: 'auto',
-                  border: 'none',
-                  borderRadius: 999,
-                  padding: '13px 20px',
-                  background: GOLD,
-                  color: '#000',
-                  fontWeight: 900,
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  opacity: loading ? 0.7 : 1,
-                  boxShadow: '0 18px 40px rgba(255,195,0,.20)',
+                  display: 'flex',
+                  gap: 10,
                 }}
               >
-                {loading
-                  ? ui.generating
-                  : t(dict, 'promote_page.generate', 'Generate campaign')}
-              </button>
+                <button
+                  onClick={handleReset}
+                  disabled={loading}
+                  style={{
+                    border: '1px solid rgba(255,255,255,.15)',
+                    borderRadius: 999,
+                    padding: '13px 18px',
+                    background: 'rgba(255,255,255,.06)',
+                    color: '#fff',
+                    fontWeight: 800,
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    opacity: loading ? 0.7 : 1,
+                  }}
+                >
+                  {ui.reset}
+                </button>
+
+                <button
+                  onClick={handleGenerate}
+                  disabled={loading}
+                  style={{
+                    border: 'none',
+                    borderRadius: 999,
+                    padding: '13px 20px',
+                    background: GOLD,
+                    color: '#000',
+                    fontWeight: 900,
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    opacity: loading ? 0.7 : 1,
+                    boxShadow: '0 18px 40px rgba(255,195,0,.20)',
+                  }}
+                >
+                  {loading
+                    ? ui.generating
+                    : t(dict, 'promote_page.generate', 'Generate campaign')}
+                </button>
+              </div>
             </div>
           </div>
 

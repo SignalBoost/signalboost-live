@@ -268,7 +268,9 @@ function GeneratePanel({
         {generated ? '✓ Generated — check My files in the video page' : generating ? '⏳ Generating...' : `🪄 Generate video · ${data.estimatedCost}`}
       </button>
     </div>
-    // ── Main Lab page ─────────────────────────────────────────────────────────────
+  )
+}
+// ── Main Lab page ─────────────────────────────────────────────────────────────
 
 export default function LabPage() {
   const { dict } = useI18n()
@@ -619,7 +621,5 @@ export default function LabPage() {
         </div>
       )}
     </div>
-  )
-}
   )
 }

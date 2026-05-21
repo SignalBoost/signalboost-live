@@ -8,7 +8,7 @@ export type VideoResult = {
   id: string
   title: string
   description: string
-  duration: string        // human-readable e.g. "4:32"
+  duration: string
   durationSeconds: number
   thumbnail: string
   embedUrl: string
@@ -19,6 +19,21 @@ export type VideoResult = {
   channelName?: string
   viewCount?: number
   publishedAt?: string
+}
+
+// ── Decode HTML entities ──────────────────────────────────────────────────────
+
+function decodeHtml(str: string): string {
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#x2F;/g, '/')
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(Number(dec)))
+    .replace(/&#x([0-9A-Fa-f]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
 }
 
 // ── YouTube ───────────────────────────────────────────────────────────────────
@@ -74,8 +89,8 @@ async function searchYouTube(query: string, maxResults = 8): Promise<VideoResult
 
     return {
       id: `yt-${videoId}`,
-      title: snippet.title ?? '',
-      description: (snippet.description ?? '').slice(0, 200),
+      title: decodeHtml(snippet.title ?? ''),
+      description: decodeHtml((snippet.description ?? '').slice(0, 200)),
       duration: parseDuration(rawDuration),
       durationSeconds: parseDurationSeconds(rawDuration),
       thumbnail: snippet.thumbnails?.medium?.url ?? snippet.thumbnails?.default?.url ?? '',
@@ -84,7 +99,7 @@ async function searchYouTube(query: string, maxResults = 8): Promise<VideoResult
       source: 'youtube' as const,
       license,
       licenseLabel: embeddable ? 'Freely embeddable' : 'Rights-restricted',
-      channelName: snippet.channelTitle ?? '',
+      channelName: decodeHtml(snippet.channelTitle ?? ''),
       viewCount: parseInt(stats.viewCount ?? '0', 10),
       publishedAt: snippet.publishedAt ?? '',
     }
@@ -113,8 +128,8 @@ async function searchArchive(query: string, maxResults = 4): Promise<VideoResult
     const runtime = doc.runtime ?? ''
     return {
       id: `arc-${id}`,
-      title: doc.title ?? id,
-      description: (doc.description ?? '').replace(/<[^>]+>/g, '').slice(0, 200),
+      title: decodeHtml(doc.title ?? id),
+      description: decodeHtml((doc.description ?? '').replace(/<[^>]+>/g, '').slice(0, 200)),
       duration: runtime || 'Unknown',
       durationSeconds: 0,
       thumbnail: `https://archive.org/services/img/${id}`,
@@ -139,7 +154,6 @@ export async function searchVideos(query: string): Promise<VideoResult[]> {
   const yt = ytResults.status === 'fulfilled' ? ytResults.value : []
   const arc = archiveResults.status === 'fulfilled' ? archiveResults.value : []
 
-  // Interleave: public domain first, then embeddable, then restricted last
   const publicDomain = [...arc, ...yt.filter(r => r.license === 'public')]
   const embeddable = yt.filter(r => r.license === 'embeddable')
   const restricted = yt.filter(r => r.license === 'restricted')

@@ -168,7 +168,7 @@ function VideoOverlay({
   )
 }
 
-// ── Generate panel ────────────────────────────────────────────────────────────
+// ── TikTok video player overlay ───────────────────────────────────────────────
 
 function GeneratePanel({
   data,
@@ -472,7 +472,7 @@ export default function LabPage() {
                   key={m.id}
                   onClick={() => setMode(m.id)}
                   className="terminal-text"
-                  style={{ flex: 1, padding: '10px 8px', borderRadius: 6, fontSize: 11, border: 'none', cursor: 'pointer', background: mode === m.id ? 'rgba(59,130,246,0.2)' : 'transparent', color: mode === m.id ? '#fff' : '#6178a3', bordercolor: mode === m.id ? BLUE : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.15s', fontWeight: mode === m.id ? 700 : 500 }}
+                  style={{ flex: 1, padding: '10px 8px', borderRadius: 6, fontSize: 11, border: 'none', cursor: 'pointer', background: mode === m.id ? 'rgba(59,130,246,0.2)' : 'transparent', color: mode === m.id ? '#fff' : '#6178a3', borderColor: mode === m.id ? BLUE : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.15s', fontWeight: mode === m.id ? 700 : 500 }}
                 >
                   <span style={{ color: mode === m.id ? BLUE : 'inherit' }}>{m.icon}</span>
                   <span>{m.label.toUpperCase().replace(' ', '_')}</span>

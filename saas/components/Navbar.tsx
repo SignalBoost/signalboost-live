@@ -128,10 +128,6 @@ export default function Navbar() {
       label: t(dict, 'docs', 'Docs'),
       href: '/docs',
     },
-    {
-      label: `🧪 ${t(dict, 'lab', 'Lab')}`,
-      href: '/dashboard/lab',
-    },
   ]
 
   const toolLinks = [
@@ -218,24 +214,14 @@ export default function Navbar() {
               pathname === item.href ||
               (item.href !== '/' && pathname?.startsWith(item.href))
 
-            const isLab = item.href === '/dashboard/lab'
-
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 style={{
                   textDecoration: 'none',
-                  color: isActive ? '#fff' : isLab ? GOLD : 'var(--text-muted)',
-                  fontWeight: isActive || isLab ? 700 : 500,
-                  background: isLab && !isActive
-                    ? 'rgba(255,195,0,0.08)'
-                    : isLab && isActive
-                    ? 'rgba(255,195,0,0.15)'
-                    : 'transparent',
-                  padding: isLab ? '6px 14px' : '0',
-                  borderRadius: isLab ? 999 : 0,
-                  border: isLab ? `1px solid rgba(255,195,0,0.25)` : 'none',
+                  color: isActive ? '#fff' : 'var(--text-muted)',
+                  fontWeight: isActive ? 700 : 500,
                   transition: 'all 0.15s',
                 }}
               >

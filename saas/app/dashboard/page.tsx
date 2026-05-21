@@ -282,7 +282,7 @@ export default function DashboardOverviewPage() {
       <style>{`
         body {
           background-color: #060913 !important;
-          background-image: 
+          background-image:
             radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.12) 0px, transparent 50%),
             radial-gradient(at 100% 100%, rgba(255, 195, 0, 0.05) 0px, transparent 50%) !important;
           background-attachment: fixed;
@@ -309,7 +309,7 @@ export default function DashboardOverviewPage() {
       {showLoginGate && <AuthModal onClose={() => {}} />}
 
       <div style={{ opacity: showLoginGate ? 0.2 : 1, pointerEvents: showLoginGate ? 'none' : 'auto', filter: showLoginGate ? 'blur(2px)' : 'none', transition: 'all 0.3s' }}>
-        
+
         {/* Main Agent Support Command Module */}
         <div className="fathom-glass" style={{ marginBottom: 28, borderRadius: 16, padding: '24px' }}>
           <div style={{ overflow: 'hidden', maxHeight: greetingHidden ? 0 : 200, opacity: greetingHidden ? 0 : 1, marginBottom: greetingHidden ? 0 : 20, transition: 'all .4s ease' }}>
@@ -381,7 +381,9 @@ export default function DashboardOverviewPage() {
             { label: t(dict, 'dash.stats.videosCreated', 'Videos created'), value: '0' }
           ].map(stat => (
             <div key={stat.label} className="fathom-glass" style={{ borderRadius: 12, padding: 16, background: 'rgba(6, 9, 19, 0.3)' }}>
-              <div className="terminal-text" style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 8, uppercase: true }}>[{stat.label.toUpperCase().replace(' ', '_')}]</div>
+              <div className="terminal-text" style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 8 }}>
+                [{stat.label.toUpperCase().replace(' ', '_')}]
+              </div>
               <div className="terminal-text" style={{ fontSize: 22, fontWeight: 900, color: BLUE }}>{stat.value}</div>
             </div>
           ))}

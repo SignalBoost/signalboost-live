@@ -6,6 +6,99 @@ import { t } from '@/lib/i18n/t'
 
 const GOLD = '#ffc300'
 
+const UI: Record<string, Record<string, string>> = {
+  en: {
+    attach: 'Attach document',
+    attached: 'Attached',
+    pasteContext: 'Paste extra context',
+    pastePlaceholder: 'Paste a flyer, product description, menu, offer details, or notes here...',
+    websiteUrl: 'Website URL',
+    websitePlaceholder: 'https://yourbusiness.com',
+    generating: 'Generating...',
+    success: 'Campaign generated successfully.',
+    working: 'SignalBoost is creating your campaign...',
+    enterSomething: 'Please enter what you want to promote, paste context, attach a file, or add a website URL.',
+    website: 'Website',
+    socialPosts: 'Social posts',
+    email: 'Email',
+    video: 'Video',
+    reviewFollowUp: 'Review follow-up',
+    languageIdeas: 'Language ideas'
+  },
+  pt: {
+    attach: 'Anexar documento',
+    attached: 'Anexado',
+    pasteContext: 'Colar contexto extra',
+    pastePlaceholder: 'Cole um flyer, descrição de produto, menu, detalhes da oferta ou notas aqui...',
+    websiteUrl: 'URL do site',
+    websitePlaceholder: 'https://seudominio.com',
+    generating: 'Gerando...',
+    success: 'Campanha gerada com sucesso.',
+    working: 'SignalBoost está criando sua campanha...',
+    enterSomething: 'Digite o que deseja promover, cole contexto, anexe um arquivo ou adicione a URL do site.',
+    website: 'Site',
+    socialPosts: 'Posts sociais',
+    email: 'Email',
+    video: 'Vídeo',
+    reviewFollowUp: 'Pedido de avaliação',
+    languageIdeas: 'Ideias por idioma'
+  },
+  es: {
+    attach: 'Adjuntar documento',
+    attached: 'Adjunto',
+    pasteContext: 'Pegar contexto extra',
+    pastePlaceholder: 'Pega un flyer, descripción de producto, menú, detalles de la oferta o notas aquí...',
+    websiteUrl: 'URL del sitio',
+    websitePlaceholder: 'https://tunegocio.com',
+    generating: 'Generando...',
+    success: 'Campaña generada correctamente.',
+    working: 'SignalBoost está creando tu campaña...',
+    enterSomething: 'Escribe lo que quieres promover, pega contexto, adjunta un archivo o añade la URL del sitio.',
+    website: 'Sitio web',
+    socialPosts: 'Publicaciones sociales',
+    email: 'Email',
+    video: 'Video',
+    reviewFollowUp: 'Seguimiento de reseñas',
+    languageIdeas: 'Ideas por idioma'
+  },
+  pl: {
+    attach: 'Załącz dokument',
+    attached: 'Załączono',
+    pasteContext: 'Wklej dodatkowy kontekst',
+    pastePlaceholder: 'Wklej ulotkę, opis produktu, menu, szczegóły oferty lub notatki...',
+    websiteUrl: 'Adres strony',
+    websitePlaceholder: 'https://twojafirma.com',
+    generating: 'Generowanie...',
+    success: 'Kampania wygenerowana.',
+    working: 'SignalBoost tworzy kampanię...',
+    enterSomething: 'Wpisz promocję, wklej kontekst, załącz plik lub dodaj adres strony.',
+    website: 'Strona',
+    socialPosts: 'Posty społecznościowe',
+    email: 'Email',
+    video: 'Wideo',
+    reviewFollowUp: 'Prośba o opinię',
+    languageIdeas: 'Pomysły językowe'
+  },
+  ru: {
+    attach: 'Прикрепить документ',
+    attached: 'Прикреплено',
+    pasteContext: 'Вставить контекст',
+    pastePlaceholder: 'Вставьте флаер, описание продукта, меню, детали предложения или заметки...',
+    websiteUrl: 'URL сайта',
+    websitePlaceholder: 'https://вашбизнес.com',
+    generating: 'Создание...',
+    success: 'Кампания успешно создана.',
+    working: 'SignalBoost создает кампанию...',
+    enterSomething: 'Введите акцию, вставьте контекст, прикрепите файл или добавьте URL сайта.',
+    website: 'Сайт',
+    socialPosts: 'Соцсети',
+    email: 'Email',
+    video: 'Видео',
+    reviewFollowUp: 'Запрос отзыва',
+    languageIdeas: 'Идеи по языкам'
+  }
+}
+
 type Channel = {
   id: string
   icon: string
@@ -39,12 +132,16 @@ type Campaign = {
 }
 
 export default function PromotePage() {
-  const { dict } = useI18n()
+  const { dict, lang } = useI18n()
+  const ui = UI[lang] || UI.en
 
   const [businessName, setBusinessName] = useState('')
   const [promotion, setPromotion] = useState('')
   const [audience, setAudience] = useState('')
   const [tone, setTone] = useState('friendly')
+  const [websiteUrl, setWebsiteUrl] = useState('')
+  const [pastedContext, setPastedContext] = useState('')
+  const [file, setFile] = useState<File | null>(null)
   const [generated, setGenerated] = useState(false)
   const [loading, setLoading] = useState(false)
   const [campaign, setCampaign] = useState<Campaign | null>(null)
@@ -117,8 +214,8 @@ export default function PromotePage() {
 
   async function handleGenerate() {
     try {
-      if (!promotion.trim()) {
-        alert('Please enter what you want to promote.')
+      if (!promotion.trim() && !pastedContext.trim() && !websiteUrl.trim() && !file) {
+        alert(ui.enterSomething)
         return
       }
 
@@ -126,17 +223,22 @@ export default function PromotePage() {
       setGenerated(false)
       setCampaign(null)
 
+      const formData = new FormData()
+      formData.append('businessName', businessName)
+      formData.append('promotion', promotion)
+      formData.append('audience', audience)
+      formData.append('tone', tone)
+      formData.append('lang', lang)
+      formData.append('websiteUrl', websiteUrl)
+      formData.append('pastedContext', pastedContext)
+
+      if (file) {
+        formData.append('file', file)
+      }
+
       const response = await fetch('/api/promote', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          businessName,
-          promotion,
-          audience,
-          tone,
-        }),
+        body: formData,
       })
 
       const data = await response.json()
@@ -184,12 +286,7 @@ export default function PromotePage() {
           'radial-gradient(circle at top left, rgba(255,195,0,.10), transparent 32%), radial-gradient(circle at top right, rgba(59,130,246,.10), transparent 30%)',
       }}
     >
-      <div
-        style={{
-          maxWidth: 1180,
-          margin: '0 auto',
-        }}
-      >
+      <div style={{ maxWidth: 1180, margin: '0 auto' }}>
         <section
           style={{
             display: 'grid',
@@ -257,49 +354,61 @@ export default function PromotePage() {
               )}
             </p>
 
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: 14,
-                marginTop: 26,
-              }}
-            >
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 26 }}>
               <label style={{ display: 'grid', gap: 8 }}>
-                <span style={{ color: '#fff', fontWeight: 800, fontSize: 13 }}>
+                <span style={labelStyle}>
                   {t(dict, 'promote_page.businessName', 'Business name')}
                 </span>
                 <input
                   value={businessName}
                   onChange={e => setBusinessName(e.target.value)}
-                  placeholder={t(
-                    dict,
-                    'promote_page.businessPlaceholder',
-                    'Example: Luna Travel'
-                  )}
+                  placeholder={t(dict, 'promote_page.businessPlaceholder', 'Example: Luna Travel')}
                   style={inputStyle}
                 />
               </label>
 
               <label style={{ display: 'grid', gap: 8 }}>
-                <span style={{ color: '#fff', fontWeight: 800, fontSize: 13 }}>
+                <span style={labelStyle}>
                   {t(dict, 'promote_page.audience', 'Audience')}
                 </span>
                 <input
                   value={audience}
                   onChange={e => setAudience(e.target.value)}
-                  placeholder={t(
-                    dict,
-                    'promote_page.audiencePlaceholder',
-                    'Example: families, travelers, local customers'
-                  )}
+                  placeholder={t(dict, 'promote_page.audiencePlaceholder', 'Example: families, travelers, local customers')}
                   style={inputStyle}
                 />
               </label>
             </div>
 
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
+              <label style={{ display: 'grid', gap: 8 }}>
+                <span style={labelStyle}>{ui.websiteUrl}</span>
+                <input
+                  value={websiteUrl}
+                  onChange={e => setWebsiteUrl(e.target.value)}
+                  placeholder={ui.websitePlaceholder}
+                  style={inputStyle}
+                />
+              </label>
+
+              <label style={{ display: 'grid', gap: 8 }}>
+                <span style={labelStyle}>{ui.attach}</span>
+                <input
+                  type="file"
+                  accept=".txt,.csv,.json,.md,.pdf,.doc,.docx"
+                  onChange={e => setFile(e.target.files?.[0] || null)}
+                  style={inputStyle}
+                />
+                {file && (
+                  <span style={{ color: GOLD, fontSize: 12, fontWeight: 800 }}>
+                    {ui.attached}: {file.name}
+                  </span>
+                )}
+              </label>
+            </div>
+
             <label style={{ display: 'grid', gap: 8, marginTop: 14 }}>
-              <span style={{ color: '#fff', fontWeight: 800, fontSize: 13 }}>
+              <span style={labelStyle}>
                 {t(dict, 'promote_page.offer', 'What do you want to promote?')}
               </span>
               <textarea
@@ -312,22 +421,29 @@ export default function PromotePage() {
                 )}
                 style={{
                   ...inputStyle,
-                  minHeight: 150,
+                  minHeight: 120,
                   resize: 'vertical',
                   lineHeight: 1.6,
                 }}
               />
             </label>
 
-            <div
-              style={{
-                display: 'flex',
-                gap: 12,
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                marginTop: 16,
-              }}
-            >
+            <label style={{ display: 'grid', gap: 8, marginTop: 14 }}>
+              <span style={labelStyle}>{ui.pasteContext}</span>
+              <textarea
+                value={pastedContext}
+                onChange={e => setPastedContext(e.target.value)}
+                placeholder={ui.pastePlaceholder}
+                style={{
+                  ...inputStyle,
+                  minHeight: 95,
+                  resize: 'vertical',
+                  lineHeight: 1.6,
+                }}
+              />
+            </label>
+
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginTop: 16 }}>
               <label
                 style={{
                   display: 'flex',
@@ -380,7 +496,7 @@ export default function PromotePage() {
                 }}
               >
                 {loading
-                  ? 'Generating...'
+                  ? ui.generating
                   : t(dict, 'promote_page.generate', 'Generate campaign')}
               </button>
             </div>
@@ -389,22 +505,13 @@ export default function PromotePage() {
           <aside
             style={{
               border: '1px solid rgba(255,195,0,.22)',
-              background:
-                'linear-gradient(180deg, rgba(255,195,0,.10), rgba(255,255,255,.04))',
+              background: 'linear-gradient(180deg, rgba(255,195,0,.10), rgba(255,255,255,.04))',
               borderRadius: 28,
               padding: 24,
               minHeight: 420,
             }}
           >
-            <div
-              style={{
-                color: GOLD,
-                fontSize: 12,
-                fontWeight: 900,
-                textTransform: 'uppercase',
-                letterSpacing: '.12em',
-              }}
-            >
+            <div style={{ color: GOLD, fontSize: 12, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.12em' }}>
               {t(dict, 'promote_page.preview.title', 'Campaign preview')}
             </div>
 
@@ -419,24 +526,11 @@ export default function PromotePage() {
             >
               <div style={{ fontSize: 34 }}>📣</div>
 
-              <h2
-                style={{
-                  margin: '16px 0 8px',
-                  color: '#fff',
-                  fontSize: 26,
-                  lineHeight: 1.1,
-                }}
-              >
+              <h2 style={{ margin: '16px 0 8px', color: '#fff', fontSize: 26, lineHeight: 1.1 }}>
                 {sampleHeadline}
               </h2>
 
-              <p
-                style={{
-                  color: 'var(--text-secondary)',
-                  lineHeight: 1.6,
-                  margin: 0,
-                }}
-              >
+              <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
                 {campaign?.website?.body ||
                   t(dict, 'promote_page.preview.copyPrefix', 'A ready-to-adapt campaign for')}{' '}
                 {!campaign?.website?.body && (
@@ -465,71 +559,10 @@ export default function PromotePage() {
                   {campaign.website.cta}
                 </div>
               )}
-
-              <div
-                style={{
-                  display: 'grid',
-                  gap: 8,
-                  marginTop: 20,
-                }}
-              >
-                {[
-                  t(dict, 'promote_page.preview.item1', 'Website banner'),
-                  t(dict, 'promote_page.preview.item2', 'Social media captions'),
-                  t(dict, 'promote_page.preview.item3', 'Email text'),
-                  t(dict, 'promote_page.preview.item4', 'Short video idea'),
-                  t(dict, 'promote_page.preview.item5', 'Native language versions'),
-                ].map(item => (
-                  <div
-                    key={item}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      color: 'var(--text-secondary)',
-                      fontSize: 13,
-                    }}
-                  >
-                    <span style={{ color: GOLD }}>✓</span>
-                    {item}
-                  </div>
-                ))}
-              </div>
             </div>
 
-            {loading && (
-              <div
-                style={{
-                  marginTop: 16,
-                  borderRadius: 20,
-                  padding: 16,
-                  background: 'rgba(255,195,0,.10)',
-                  border: '1px solid rgba(255,195,0,.25)',
-                  color: '#fff7cc',
-                  lineHeight: 1.5,
-                  fontSize: 14,
-                }}
-              >
-                SignalBoost is creating your campaign...
-              </div>
-            )}
-
-            {generated && campaign && (
-              <div
-                style={{
-                  marginTop: 16,
-                  borderRadius: 20,
-                  padding: 16,
-                  background: 'rgba(16,185,129,.10)',
-                  border: '1px solid rgba(16,185,129,.25)',
-                  color: '#d1fae5',
-                  lineHeight: 1.5,
-                  fontSize: 14,
-                }}
-              >
-                Campaign generated successfully.
-              </div>
-            )}
+            {loading && <StatusBox type="loading" text={ui.working} />}
+            {generated && campaign && <StatusBox type="success" text={ui.success} />}
           </aside>
         </section>
 
@@ -542,56 +575,12 @@ export default function PromotePage() {
               gap: 14,
             }}
           >
-            <CampaignCard
-              icon="🌐"
-              title="Website"
-              items={[
-                campaign.website?.title,
-                campaign.website?.body,
-                campaign.website?.cta,
-              ]}
-            />
-
-            <CampaignCard
-              icon="📱"
-              title="Social posts"
-              items={[
-                campaign.social?.facebook,
-                campaign.social?.instagram,
-                campaign.social?.tiktok,
-              ]}
-            />
-
-            <CampaignCard
-              icon="✉️"
-              title="Email"
-              items={[
-                campaign.email?.subject,
-                campaign.email?.body,
-              ]}
-            />
-
-            <CampaignCard
-              icon="🎬"
-              title="Video"
-              items={[
-                campaign.video?.hook,
-                campaign.video?.script,
-                campaign.video?.cta,
-              ]}
-            />
-
-            <CampaignCard
-              icon="⭐"
-              title="Review follow-up"
-              items={[campaign.reviewFollowUp]}
-            />
-
-            <CampaignCard
-              icon="🌍"
-              title="Language ideas"
-              items={campaign.languageIdeas || []}
-            />
+            <CampaignCard icon="🌐" title={ui.website} items={[campaign.website?.title, campaign.website?.body, campaign.website?.cta]} />
+            <CampaignCard icon="📱" title={ui.socialPosts} items={[campaign.social?.facebook, campaign.social?.instagram, campaign.social?.tiktok]} />
+            <CampaignCard icon="✉️" title={ui.email} items={[campaign.email?.subject, campaign.email?.body]} />
+            <CampaignCard icon="🎬" title={ui.video} items={[campaign.video?.hook, campaign.video?.script, campaign.video?.cta]} />
+            <CampaignCard icon="⭐" title={ui.reviewFollowUp} items={[campaign.reviewFollowUp]} />
+            <CampaignCard icon="🌍" title={ui.languageIdeas} items={campaign.languageIdeas || []} />
           </section>
         )}
 
@@ -615,23 +604,10 @@ export default function PromotePage() {
                 }}
               >
                 <div style={{ fontSize: 28 }}>{channel.icon}</div>
-                <h3
-                  style={{
-                    color: '#fff',
-                    margin: '12px 0 6px',
-                    fontSize: 17,
-                  }}
-                >
+                <h3 style={{ color: '#fff', margin: '12px 0 6px', fontSize: 17 }}>
                   {channel.title}
                 </h3>
-                <p
-                  style={{
-                    color: 'var(--text-muted)',
-                    margin: 0,
-                    lineHeight: 1.55,
-                    fontSize: 14,
-                  }}
-                >
+                <p style={{ color: 'var(--text-muted)', margin: 0, lineHeight: 1.55, fontSize: 14 }}>
                   {channel.description}
                 </p>
               </div>
@@ -640,6 +616,25 @@ export default function PromotePage() {
         )}
       </div>
     </main>
+  )
+}
+
+function StatusBox({ type, text }: { type: 'loading' | 'success'; text: string }) {
+  return (
+    <div
+      style={{
+        marginTop: 16,
+        borderRadius: 20,
+        padding: 16,
+        background: type === 'success' ? 'rgba(16,185,129,.10)' : 'rgba(255,195,0,.10)',
+        border: type === 'success' ? '1px solid rgba(16,185,129,.25)' : '1px solid rgba(255,195,0,.25)',
+        color: type === 'success' ? '#d1fae5' : '#fff7cc',
+        lineHeight: 1.5,
+        fontSize: 14,
+      }}
+    >
+      {text}
+    </div>
   )
 }
 
@@ -666,23 +661,11 @@ function CampaignCard({
       }}
     >
       <div style={{ fontSize: 28 }}>{icon}</div>
-
-      <h3
-        style={{
-          color: '#fff',
-          margin: '12px 0 10px',
-          fontSize: 17,
-        }}
-      >
+      <h3 style={{ color: '#fff', margin: '12px 0 10px', fontSize: 17 }}>
         {title}
       </h3>
 
-      <div
-        style={{
-          display: 'grid',
-          gap: 10,
-        }}
-      >
+      <div style={{ display: 'grid', gap: 10 }}>
         {cleanItems.map((item, index) => (
           <p
             key={`${title}-${index}`}
@@ -700,6 +683,12 @@ function CampaignCard({
       </div>
     </div>
   )
+}
+
+const labelStyle: React.CSSProperties = {
+  color: '#fff',
+  fontWeight: 800,
+  fontSize: 13,
 }
 
 const inputStyle: React.CSSProperties = {

@@ -1,4 +1,3 @@
-
 export default function BusinessLaunchpadPage() {
   return (
     <main style={{ minHeight: '100vh', padding: 40, color: '#fff' }}>

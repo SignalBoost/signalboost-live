@@ -10,6 +10,9 @@ type Sketch = {
 
 export default function PodcastStudioPage() {
   const [podcastName, setPodcastName] = useState('My Podcast')
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [loadingTranscript, setLoadingTranscript] = useState(false)
+  const [transcript, setTranscript] = useState('')
 
   useEffect(() => {
     const saved = localStorage.getItem('podcastSketch')
@@ -27,11 +30,41 @@ export default function PodcastStudioPage() {
     }
   }, [])
 
+  async function generateTranscript() {
+    if (!selectedFile) return
+
+    try {
+      setLoadingTranscript(true)
+
+      const formData = new FormData()
+      formData.append('file', selectedFile)
+
+      const response = await fetch(
+        '/api/podcast/transcript',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      )
+
+      const data = await response.json()
+
+      if (data.text) {
+        setTranscript(data.text)
+      }
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setLoadingTranscript(false)
+    }
+  }
+
   const agents = [
     {
       icon: '📝',
       title: 'Transcript Agent',
       desc: 'Turn recordings into text',
+      action: generateTranscript,
     },
     {
       icon: '✂️',
@@ -55,7 +88,8 @@ export default function PodcastStudioPage() {
       style={{
         minHeight: '100vh',
         padding: '40px 24px',
-        background: 'linear-gradient(180deg,#050505,#10141f)',
+        background:
+          'linear-gradient(180deg,#050505,#10141f)',
         color: '#fff',
       }}
     >
@@ -111,75 +145,135 @@ export default function PodcastStudioPage() {
         >
           <h2>Upload Episode</h2>
 
-          <p
-            style={{
-              color: 'rgba(255,255,255,.5)',
-              marginBottom: 18,
-            }}
-          >
-            Upload audio or video files to begin processing.
-          </p>
-
           <input
             type="file"
             accept="audio/*,video/*"
+            onChange={e => {
+              const file = e.target.files?.[0]
+              if (file) {
+                setSelectedFile(file)
+              }
+            }}
             style={{
-              marginTop: 10,
+              marginTop: 20,
             }}
           />
+
+          {selectedFile && (
+            <div
+              style={{
+                marginTop: 15,
+                color: 'rgba(255,255,255,.6)',
+              }}
+            >
+              Selected: {selectedFile.name}
+            </div>
+          )}
         </div>
 
         <div
           style={{
-            display: 'grid',
+            display:'grid',
             gridTemplateColumns:
               'repeat(auto-fit,minmax(240px,1fr))',
-            gap: 20,
-            marginTop: 35,
+            gap:20,
+            marginTop:35
           }}
         >
           {agents.map(agent => (
+
             <button
               key={agent.title}
+              onClick={()=>{
+                if(agent.action){
+                  agent.action()
+                }
+              }}
               style={{
-                padding: 24,
-                borderRadius: 22,
-                border: '1px solid rgba(255,255,255,.08)',
-                background: 'rgba(255,255,255,.04)',
-                color: '#fff',
-                cursor: 'pointer',
-                textAlign: 'left',
+                padding:24,
+                borderRadius:22,
+                border:'1px solid rgba(255,255,255,.08)',
+                background:'rgba(255,255,255,.04)',
+                color:'#fff',
+                cursor:'pointer',
+                textAlign:'left'
               }}
             >
               <div
                 style={{
-                  fontSize: 36,
-                  marginBottom: 15,
+                  fontSize:36,
+                  marginBottom:15
                 }}
               >
                 {agent.icon}
               </div>
 
-              <h3
-                style={{
-                  marginBottom: 10,
-                }}
-              >
+              <h3>
                 {agent.title}
               </h3>
 
               <p
                 style={{
-                  color: 'rgba(255,255,255,.5)',
-                  lineHeight: 1.6,
-                  margin: 0,
+                  color:'rgba(255,255,255,.5)',
+                  lineHeight:1.6
                 }}
               >
                 {agent.desc}
               </p>
+
             </button>
+
           ))}
         </div>
+
+        {loadingTranscript && (
+
+          <div
+            style={{
+              marginTop:35,
+              padding:20,
+              borderRadius:20,
+              background:
+                'rgba(255,195,0,.08)'
+            }}
+          >
+            Generating transcript...
+          </div>
+
+        )}
+
+        {transcript && (
+
+          <div
+            style={{
+              marginTop:35,
+              padding:24,
+              borderRadius:24,
+              background:
+                'rgba(255,255,255,.04)',
+              border:
+                '1px solid rgba(255,255,255,.08)'
+            }}
+          >
+            <h2>
+              Transcript
+            </h2>
+
+            <div
+              style={{
+                color:
+                  'rgba(255,255,255,.75)',
+                lineHeight:1.8,
+                whiteSpace:'pre-wrap'
+              }}
+            >
+              {transcript}
+            </div>
+
+          </div>
+
+        )}
+
       </div>
     </main>
   )

@@ -36,10 +36,34 @@ const PATHS = [
   },
 ]
 
+const EXPERIENCE_LEVELS = [
+  {
+    id: 'guided',
+    icon: '🌱',
+    title: 'Guided',
+    desc: 'Keep it simple. Walk me through each step and handle the technical parts.',
+  },
+  {
+    id: 'assisted',
+    icon: '⚙️',
+    title: 'Assisted',
+    desc: 'Guide me, but let me make some decisions along the way.',
+  },
+  {
+    id: 'power',
+    icon: '🚀',
+    title: 'Power User',
+    desc: 'Show advanced options and give me more technical control.',
+  },
+]
+
 export default function LaunchpadPage() {
   const [selected, setSelected] = useState('')
+  const [experience, setExperience] = useState('')
 
   const selectedPath = PATHS.find(path => path.id === selected)
+
+  const canContinue = Boolean(selectedPath && experience)
 
   const podcastSteps = [
     'Choose your podcast topic',
@@ -100,7 +124,7 @@ export default function LaunchpadPage() {
 
           <p
             style={{
-              maxWidth: 700,
+              maxWidth: 720,
               margin: '20px auto',
               color: 'rgba(255,255,255,.5)',
               lineHeight: 1.8,
@@ -108,58 +132,132 @@ export default function LaunchpadPage() {
             }}
           >
             You bring the idea. SignalBoost helps build and launch it.
+            To help you better, choose how much guidance you want.
           </p>
         </div>
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))',
-            gap: 20,
-            marginBottom: 40,
-          }}
-        >
-          {PATHS.map(path => {
-            const active = selected === path.id
+        <section style={{ marginBottom: 44 }}>
+          <h2 style={{ marginBottom: 14 }}>
+            1. What do you want to launch?
+          </h2>
 
-            return (
-              <button
-                key={path.id}
-                onClick={() => setSelected(path.id)}
-                style={{
-                  cursor: 'pointer',
-                  padding: 28,
-                  borderRadius: 24,
-                  background: active
-                    ? 'rgba(255,195,0,.08)'
-                    : 'rgba(255,255,255,.03)',
-                  border: active
-                    ? '1px solid rgba(255,195,0,.4)'
-                    : '1px solid rgba(255,255,255,.08)',
-                  transition: 'all .2s',
-                  color: '#fff',
-                  textAlign: 'left',
-                }}
-              >
-                <div style={{ fontSize: 38, marginBottom: 12 }}>
-                  {path.icon}
-                </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))',
+              gap: 20,
+            }}
+          >
+            {PATHS.map(path => {
+              const active = selected === path.id
 
-                <h2>{path.title}</h2>
-
-                <p
+              return (
+                <button
+                  key={path.id}
+                  onClick={() => setSelected(path.id)}
                   style={{
-                    fontSize: 14,
-                    lineHeight: 1.6,
-                    color: 'rgba(255,255,255,.45)',
+                    cursor: 'pointer',
+                    padding: 28,
+                    borderRadius: 24,
+                    background: active
+                      ? 'rgba(255,195,0,.08)'
+                      : 'rgba(255,255,255,.03)',
+                    border: active
+                      ? '1px solid rgba(255,195,0,.4)'
+                      : '1px solid rgba(255,255,255,.08)',
+                    transition: 'all .2s',
+                    color: '#fff',
+                    textAlign: 'left',
                   }}
                 >
-                  {path.desc}
-                </p>
-              </button>
-            )
-          })}
-        </div>
+                  <div style={{ fontSize: 38, marginBottom: 12 }}>
+                    {path.icon}
+                  </div>
+
+                  <h3>{path.title}</h3>
+
+                  <p
+                    style={{
+                      fontSize: 14,
+                      lineHeight: 1.6,
+                      color: 'rgba(255,255,255,.45)',
+                    }}
+                  >
+                    {path.desc}
+                  </p>
+                </button>
+              )
+            })}
+          </div>
+        </section>
+
+        <section style={{ marginBottom: 44 }}>
+          <h2 style={{ marginBottom: 8 }}>
+            2. How should SignalBoost help you?
+          </h2>
+
+          <p
+            style={{
+              color: 'rgba(255,255,255,.45)',
+              lineHeight: 1.6,
+              maxWidth: 720,
+              marginTop: 0,
+              marginBottom: 18,
+            }}
+          >
+            This helps SignalBoost adjust the language, steps and technical
+            details shown to you.
+          </p>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))',
+              gap: 20,
+            }}
+          >
+            {EXPERIENCE_LEVELS.map(level => {
+              const active = experience === level.id
+
+              return (
+                <button
+                  key={level.id}
+                  onClick={() => setExperience(level.id)}
+                  style={{
+                    cursor: 'pointer',
+                    padding: 24,
+                    borderRadius: 22,
+                    background: active
+                      ? 'rgba(59,130,246,.12)'
+                      : 'rgba(255,255,255,.03)',
+                    border: active
+                      ? '1px solid rgba(59,130,246,.45)'
+                      : '1px solid rgba(255,255,255,.08)',
+                    transition: 'all .2s',
+                    color: '#fff',
+                    textAlign: 'left',
+                  }}
+                >
+                  <div style={{ fontSize: 32, marginBottom: 10 }}>
+                    {level.icon}
+                  </div>
+
+                  <h3>{level.title}</h3>
+
+                  <p
+                    style={{
+                      fontSize: 14,
+                      lineHeight: 1.6,
+                      color: 'rgba(255,255,255,.45)',
+                    }}
+                  >
+                    {level.desc}
+                  </p>
+                </button>
+              )
+            })}
+          </div>
+        </section>
 
         {selectedPath && (
           <div
@@ -215,23 +313,58 @@ export default function LaunchpadPage() {
               )}
             </div>
 
-            <Link
-              href={selectedPath.href}
-              style={{
-                display: 'inline-flex',
-                marginTop: 30,
-                border: 'none',
-                padding: '14px 28px',
-                borderRadius: 999,
-                background: GOLD,
-                color: '#000',
-                fontWeight: 900,
-                cursor: 'pointer',
-                textDecoration: 'none',
-              }}
-            >
-              Continue →
-            </Link>
+            {experience && (
+              <div
+                style={{
+                  marginTop: 22,
+                  padding: 14,
+                  borderRadius: 16,
+                  background: 'rgba(59,130,246,.08)',
+                  border: '1px solid rgba(59,130,246,.22)',
+                  color: 'rgba(255,255,255,.72)',
+                  lineHeight: 1.6,
+                  fontSize: 14,
+                }}
+              >
+                SignalBoost will use your selected experience level to keep the
+                next steps clear and appropriate for you.
+              </div>
+            )}
+
+            {canContinue ? (
+              <Link
+                href={`${selectedPath.href}?experience=${experience}`}
+                style={{
+                  display: 'inline-flex',
+                  marginTop: 30,
+                  padding: '14px 28px',
+                  borderRadius: 999,
+                  background: GOLD,
+                  color: '#000',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                }}
+              >
+                Continue →
+              </Link>
+            ) : (
+              <button
+                disabled
+                style={{
+                  marginTop: 30,
+                  padding: '14px 28px',
+                  borderRadius: 999,
+                  background: 'rgba(255,255,255,.08)',
+                  color: 'rgba(255,255,255,.35)',
+                  fontWeight: 900,
+                  border: 'none',
+                  cursor: 'not-allowed',
+                }}
+              >
+                Choose a path and guidance level
+              </button>
+            )}
           </div>
         )}
       </div>

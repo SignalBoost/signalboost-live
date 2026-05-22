@@ -18,7 +18,6 @@ export default function PodcastLaunchpad() {
   const [experience, setExperience] = useState('guided')
   const [topic, setTopic] = useState('')
   const [format, setFormat] = useState('solo')
-
   const [loading, setLoading] = useState(false)
   const [sketch, setSketch] = useState<Sketch | null>(null)
 
@@ -33,25 +32,26 @@ export default function PodcastLaunchpad() {
     try {
       setLoading(true)
 
-      const response = await fetch(
-        '/api/launchpad/podcast',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            topic,
-            format,
-            experience,
-          }),
-        }
-      )
+      const response = await fetch('/api/launchpad/podcast', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          topic,
+          format,
+          experience,
+        }),
+      })
 
       const data = await response.json()
 
       if (data.sketch) {
         setSketch(data.sketch)
+        localStorage.setItem(
+          'podcastSketch',
+          JSON.stringify(data.sketch)
+        )
       }
     } catch (error) {
       console.error(error)
@@ -70,12 +70,7 @@ export default function PodcastLaunchpad() {
         color: '#fff',
       }}
     >
-      <div
-        style={{
-          maxWidth: 1100,
-          margin: '0 auto',
-        }}
-      >
+      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
         <h1
           style={{
             fontSize: 'clamp(38px,7vw,70px)',
@@ -104,10 +99,8 @@ export default function PodcastLaunchpad() {
         >
           <textarea
             value={topic}
-            onChange={e =>
-              setTopic(e.target.value)
-            }
-            placeholder='Describe your podcast idea'
+            onChange={e => setTopic(e.target.value)}
+            placeholder="Describe your podcast idea"
             style={{
               width: '100%',
               minHeight: 120,
@@ -115,63 +108,100 @@ export default function PodcastLaunchpad() {
               borderRadius: 16,
               border: 'none',
               resize: 'vertical',
-              background:
-                'rgba(255,255,255,.05)',
+              background: 'rgba(255,255,255,.05)',
               color: '#fff',
             }}
           />
 
           <select
             value={format}
-            onChange={e =>
-              setFormat(
-                e.target.value
-              )
-            }
+            onChange={e => setFormat(e.target.value)}
             style={{
               width: '100%',
               marginTop: 20,
               padding: 14,
               borderRadius: 16,
-              background:
-                'rgba(255,255,255,.05)',
+              background: 'rgba(255,255,255,.05)',
               color: '#fff',
             }}
           >
-            <option value='solo'>
-              Solo
-            </option>
-
-            <option value='interview'>
-              Interview
-            </option>
-
-            <option value='cohost'>
-              Co-host
-            </option>
-
-            <option value='story'>
-              Storytelling
-            </option>
+            <option value="solo">Solo</option>
+            <option value="interview">Interview</option>
+            <option value="cohost">Co-host</option>
+            <option value="story">Storytelling</option>
           </select>
 
-          <button
-            onClick={generateSketch}
-            disabled={loading}
+          <div
             style={{
+              display: 'flex',
+              gap: 12,
+              flexWrap: 'wrap',
               marginTop: 25,
-              border: 'none',
-              padding: '14px 30px',
-              borderRadius: 999,
-              background: GOLD,
-              fontWeight: 900,
-              cursor: 'pointer',
             }}
           >
-            {loading
-              ? 'Generating...'
-              : 'Generate Podcast Sketch'}
-          </button>
+            <button
+              onClick={generateSketch}
+              disabled={loading || !topic.trim()}
+              style={{
+                border: 'none',
+                padding: '14px 30px',
+                borderRadius: 999,
+                background:
+                  loading || !topic.trim()
+                    ? 'rgba(255,255,255,.08)'
+                    : GOLD,
+                color:
+                  loading || !topic.trim()
+                    ? 'rgba(255,255,255,.35)'
+                    : '#000',
+                fontWeight: 900,
+                cursor:
+                  loading || !topic.trim()
+                    ? 'not-allowed'
+                    : 'pointer',
+              }}
+            >
+              {loading ? 'Generating...' : 'Generate Podcast Sketch'}
+            </button>
+
+            {sketch && (
+              <>
+                <button
+                  onClick={() => {
+                    window.location.href = '/dashboard/podcast'
+                  }}
+                  style={{
+                    border: 'none',
+                    padding: '14px 30px',
+                    borderRadius: 999,
+                    background: 'rgba(255,255,255,.08)',
+                    color: '#fff',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Create Podcast Page
+                </button>
+
+                <button
+                  onClick={() => {
+                    window.location.href = '/dashboard/podcast/studio'
+                  }}
+                  style={{
+                    border: 'none',
+                    padding: '14px 30px',
+                    borderRadius: 999,
+                    background: 'rgba(59,130,246,.2)',
+                    color: '#fff',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Open Podcast Studio
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {sketch && (
@@ -182,47 +212,13 @@ export default function PodcastLaunchpad() {
               gap: 20,
             }}
           >
-            <Card
-              title='🎙️ Podcast Names'
-              items={
-                sketch.showNames
-              }
-            />
-
-            <Card
-              title='📝 Description'
-              text={
-                sketch.showDescription
-              }
-            />
-
-            <Card
-              title='👥 Audience'
-              text={
-                sketch.targetAudience
-              }
-            />
-
-            <Card
-              title='🎬 First Episodes'
-              items={
-                sketch.firstEpisodes
-              }
-            />
-
-            <Card
-              title='🎤 Intro Script'
-              text={
-                sketch.introScript
-              }
-            />
-
-            <Card
-              title='✅ Launch Checklist'
-              items={
-                sketch.launchChecklist
-              }
-            />
+            <Card title="🎙️ Podcast Names" items={sketch.showNames} />
+            <Card title="📝 Description" text={sketch.showDescription} />
+            <Card title="👥 Audience" text={sketch.targetAudience} />
+            <Card title="🎬 First Episodes" items={sketch.firstEpisodes} />
+            <Card title="🎤 Intro Script" text={sketch.introScript} />
+            <Card title="✅ Launch Checklist" items={sketch.launchChecklist} />
+            <Card title="➡️ Next Step" text={sketch.nextStep} />
           </div>
         )}
       </div>
@@ -234,54 +230,44 @@ function Card({
   title,
   items,
   text,
-}:{
-title:string
-items?:string[]
-text?:string
-}){
+}: {
+  title: string
+  items?: string[]
+  text?: string
+}) {
+  return (
+    <div
+      style={{
+        padding: 20,
+        borderRadius: 20,
+        background: 'rgba(255,255,255,.03)',
+        border: '1px solid rgba(255,255,255,.08)',
+      }}
+    >
+      <h3>{title}</h3>
 
-return(
+      {text && (
+        <p
+          style={{
+            color: 'rgba(255,255,255,.7)',
+            lineHeight: 1.6,
+          }}
+        >
+          {text}
+        </p>
+      )}
 
-<div
-style={{
-padding:20,
-borderRadius:20,
-background:
-'rgba(255,255,255,.03)',
-border:
-'1px solid rgba(255,255,255,.08)'
-}}
->
-
-<h3>{title}</h3>
-
-{text && (
-<p
-style={{
-color:
-'rgba(255,255,255,.7)',
-lineHeight:1.6
-}}
->
-{text}
-</p>
-)}
-
-{items?.map(item=>(
-<div
-key={item}
-style={{
-marginBottom:8,
-color:
-'rgba(255,255,255,.7)'
-}}
->
-• {item}
-</div>
-))}
-
-</div>
-
-)
-
+      {items?.map(item => (
+        <div
+          key={item}
+          style={{
+            marginBottom: 8,
+            color: 'rgba(255,255,255,.7)',
+          }}
+        >
+          • {item}
+        </div>
+      ))}
+    </div>
+  )
 }

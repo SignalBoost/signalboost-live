@@ -1,4 +1,5 @@
 'use client'
+
 import Link from 'next/link'
 import { useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
@@ -6,8 +7,19 @@ import { t } from '@/lib/i18n/t'
 
 const CONTACT_EMAIL = 'support@signalboostapp.com'
 
+const GOLD = '#ffc300'
+const BLUE = '#3b82f6'
+const PURPLE = '#a855f7'
+const GREEN = '#4ade80'
+
 const CURRENCIES = ['USD', 'BRL', 'PLN', 'MXN', 'EUR']
-const SYMBOLS: Record<string, string> = { USD: '$', BRL: 'R$', PLN: 'zl', MXN: '$', EUR: 'EUR' }
+const SYMBOLS: Record<string, string> = {
+  USD: '$',
+  BRL: 'R$',
+  PLN: 'zl',
+  MXN: '$',
+  EUR: 'EUR',
+}
 
 export default function PodcastersPage() {
   const { dict } = useI18n()
@@ -18,17 +30,20 @@ export default function PodcastersPage() {
       name: t(dict, 'podcasters_page.plans.indie.name', 'Indie'),
       key: 'indie',
       price: { USD: 29, BRL: 149, PLN: 120, MXN: 540, EUR: 27 },
-      description: t(dict, 'podcasters_page.plans.indie.description', 'Perfect for independent podcasters getting started globally.'),
+      description: t(
+        dict,
+        'podcasters_page.plans.indie.description',
+        'Perfect for independent podcasters getting started globally.'
+      ),
       features: [
         t(dict, 'podcasters_page.plans.indie.f1', '1 show'),
         t(dict, 'podcasters_page.plans.indie.f2', '4 episodes per month'),
         t(dict, 'podcasters_page.plans.indie.f3', '2 languages'),
         t(dict, 'podcasters_page.plans.indie.f4', 'Native AI voiceover'),
         t(dict, 'podcasters_page.plans.indie.f5', 'Captions in 2 languages'),
-        t(dict, 'podcasters_page.plans.indie.f6', 'Basic clip generation (5 clips per episode)'),
+        t(dict, 'podcasters_page.plans.indie.f6', 'Basic clip generation'),
         t(dict, 'podcasters_page.plans.indie.f7', 'Podcast website'),
         t(dict, 'podcasters_page.plans.indie.f8', 'Listener reviews'),
-        t(dict, 'podcasters_page.plans.indie.f9', 'Email support'),
       ],
       cta: t(dict, 'podcasters_page.plans.indie.cta', 'Get started'),
       highlight: false,
@@ -37,18 +52,20 @@ export default function PodcastersPage() {
       name: t(dict, 'podcasters_page.plans.pro.name', 'Pro'),
       key: 'pro',
       price: { USD: 79, BRL: 399, PLN: 320, MXN: 1450, EUR: 74 },
-      description: t(dict, 'podcasters_page.plans.pro.description', 'For serious podcasters who want global reach.'),
+      description: t(
+        dict,
+        'podcasters_page.plans.pro.description',
+        'For serious podcasters who want global reach.'
+      ),
       features: [
         t(dict, 'podcasters_page.plans.pro.f1', '3 shows'),
         t(dict, 'podcasters_page.plans.pro.f2', 'Unlimited episodes'),
         t(dict, 'podcasters_page.plans.pro.f3', 'All 5 languages'),
-        t(dict, 'podcasters_page.plans.pro.f4', 'Native AI voiceover (priority)'),
+        t(dict, 'podcasters_page.plans.pro.f4', 'Native AI voiceover'),
         t(dict, 'podcasters_page.plans.pro.f5', 'Captions in all 5 languages'),
-        t(dict, 'podcasters_page.plans.pro.f6', 'Clip factory (unlimited clips)'),
+        t(dict, 'podcasters_page.plans.pro.f6', 'Clip factory'),
         t(dict, 'podcasters_page.plans.pro.f7', 'Multi-language podcast website'),
-        t(dict, 'podcasters_page.plans.pro.f8', 'Listener reviews and analytics'),
-        t(dict, 'podcasters_page.plans.pro.f9', 'Transcript in all languages'),
-        t(dict, 'podcasters_page.plans.pro.f10', 'Priority support'),
+        t(dict, 'podcasters_page.plans.pro.f8', 'Analytics'),
       ],
       cta: t(dict, 'podcasters_page.plans.pro.cta', 'Get started'),
       highlight: true,
@@ -57,184 +74,595 @@ export default function PodcastersPage() {
       name: t(dict, 'podcasters_page.plans.network.name', 'Network'),
       key: 'network',
       price: { USD: 299, BRL: 1490, PLN: 1200, MXN: 5400, EUR: 279 },
-      description: t(dict, 'podcasters_page.plans.network.description', 'For podcast networks managing multiple shows.'),
+      description: t(
+        dict,
+        'podcasters_page.plans.network.description',
+        'For podcast networks managing multiple shows.'
+      ),
       features: [
         t(dict, 'podcasters_page.plans.network.f1', 'Unlimited shows'),
         t(dict, 'podcasters_page.plans.network.f2', 'Unlimited episodes'),
-        t(dict, 'podcasters_page.plans.network.f3', 'All 5 languages plus custom'),
-        t(dict, 'podcasters_page.plans.network.f4', 'Native AI voiceover (dedicated)'),
-        t(dict, 'podcasters_page.plans.network.f5', 'Custom caption formats (SRT, VTT, ASS)'),
-        t(dict, 'podcasters_page.plans.network.f6', 'Clip factory (unlimited)'),
-        t(dict, 'podcasters_page.plans.network.f7', 'White label website'),
-        t(dict, 'podcasters_page.plans.network.f8', 'Full analytics suite'),
-        t(dict, 'podcasters_page.plans.network.f9', 'API access'),
-        t(dict, 'podcasters_page.plans.network.f10', 'Dedicated account manager'),
-        t(dict, 'podcasters_page.plans.network.f11', 'SLA guarantee'),
+        t(dict, 'podcasters_page.plans.network.f3', 'All languages plus custom'),
+        t(dict, 'podcasters_page.plans.network.f4', 'Dedicated processing'),
+        t(dict, 'podcasters_page.plans.network.f5', 'Custom caption formats'),
+        t(dict, 'podcasters_page.plans.network.f6', 'White label website'),
+        t(dict, 'podcasters_page.plans.network.f7', 'API access'),
+        t(dict, 'podcasters_page.plans.network.f8', 'Dedicated account manager'),
       ],
       cta: t(dict, 'podcasters_page.plans.network.cta', 'Contact us'),
       highlight: false,
     },
   ]
 
-  const HOW_IT_WORKS = [
-    {
-      step: '01',
-      title: t(dict, 'podcasters_page.how.s1.title', 'Upload your episode'),
-      desc: t(dict, 'podcasters_page.how.s1.desc', 'Drop your finished audio or video file. We support MP3, MP4, WAV and more. No raw editing needed.'),
-    },
-    {
-      step: '02',
-      title: t(dict, 'podcasters_page.how.s2.title', 'Choose your languages'),
-      desc: t(dict, 'podcasters_page.how.s2.desc', 'Select which languages you want. Pick from English, Portuguese, Spanish, Polish and Russian.'),
-    },
-    {
-      step: '03',
-      title: t(dict, 'podcasters_page.how.s3.title', 'We generate everything'),
-      desc: t(dict, 'podcasters_page.how.s3.desc', 'Native AI voiceover, captions, short clips, translated show notes — all automatic.'),
-    },
-    {
-      step: '04',
-      title: t(dict, 'podcasters_page.how.s4.title', 'Publish everywhere'),
-      desc: t(dict, 'podcasters_page.how.s4.desc', 'Download your multilingual episodes or publish directly to your SignalBoost podcast website.'),
-    },
+  const studioAgents = [
+    { icon: '📝', name: 'Transcript Agent', status: 'ACTIVE', color: GREEN },
+    { icon: '✂️', name: 'Viral Clip Agent', status: 'SCANNING', color: GOLD },
+    { icon: '🌍', name: 'Translation Agent', status: '5 LANG', color: BLUE },
+    { icon: '🎙️', name: 'Voice Agent', status: 'READY', color: PURPLE },
+    { icon: '📣', name: 'Distribution Agent', status: 'STANDBY', color: '#fb7185' },
   ]
 
-  const DELIVERABLES = [
-    {
-      icon: '🎙️',
-      title: t(dict, 'podcasters_page.deliver.d1.title', 'Native AI voiceover'),
-      desc: t(dict, 'podcasters_page.deliver.d1.desc', 'Your episode dubbed in Portuguese, Spanish, Polish and Russian with natural-sounding AI voices.'),
-    },
-    {
-      icon: '💬',
-      title: t(dict, 'podcasters_page.deliver.d2.title', 'Multilingual captions'),
-      desc: t(dict, 'podcasters_page.deliver.d2.desc', 'Auto-generated subtitles in all your languages. Download as SRT, VTT or burn them into your video.'),
-    },
-    {
-      icon: '✂️',
-      title: t(dict, 'podcasters_page.deliver.d3.title', 'Social clips'),
-      desc: t(dict, 'podcasters_page.deliver.d3.desc', 'Short-form clips for TikTok, Instagram Reels and YouTube Shorts — in every language.'),
-    },
-    {
-      icon: '📝',
-      title: t(dict, 'podcasters_page.deliver.d4.title', 'Translated show notes'),
-      desc: t(dict, 'podcasters_page.deliver.d4.desc', 'Episode summaries written natively in each language — not machine translated.'),
-    },
-    {
-      icon: '🌐',
-      title: t(dict, 'podcasters_page.deliver.d5.title', 'Podcast website'),
-      desc: t(dict, 'podcasters_page.deliver.d5.desc', 'A branded site with episode player, show notes, and a multilingual language switcher.'),
-    },
-    {
-      icon: '⭐',
-      title: t(dict, 'podcasters_page.deliver.d6.title', 'Listener reviews'),
-      desc: t(dict, 'podcasters_page.deliver.d6.desc', 'Collect and display listener testimonials in their native language.'),
-    },
+  const productions = [
+    { title: 'Episode 34', clips: '8 clips', langs: '5 languages', status: 'Published' },
+    { title: 'Episode 33', clips: '6 clips', langs: '3 languages', status: 'Scheduled' },
+    { title: 'Episode 32', clips: '4 clips', langs: '2 languages', status: 'Draft' },
   ]
 
-  const STATS = [
-    { value: '5', label: t(dict, 'podcasters_page.stats.languages', 'Languages') },
-    { value: 'under 2 hours', label: t(dict, 'podcasters_page.stats.turnaround', 'Turnaround') },
-    { value: 'SRT and VTT', label: t(dict, 'podcasters_page.stats.captionFormats', 'Caption formats') },
-    { value: t(dict, 'podcasters_page.stats.freeSketch', 'Free sketch'), label: t(dict, 'podcasters_page.stats.noCommitment', 'No commitment') },
+  const deliverables = [
+    { icon: '🎙️', title: 'Native voiceover', desc: 'Turn one episode into natural voice versions in multiple languages.' },
+    { icon: '✂️', title: 'Clip factory', desc: 'Find the best moments and turn them into Shorts, Reels and TikToks.' },
+    { icon: '💬', title: 'Captions', desc: 'Generate subtitles, transcripts and social captions automatically.' },
+    { icon: '🌐', title: 'Podcast website', desc: 'A branded home for episodes, show notes, reviews and languages.' },
+    { icon: '📣', title: 'Distribution', desc: 'Prepare content for YouTube, TikTok, Instagram, email and more.' },
+    { icon: '⭐', title: 'Listener growth', desc: 'Collect reviews, testimonials and audience signals.' },
   ]
 
   return (
-    <main style={{ minHeight: '100vh', background: '#0a0a0f', color: '#fff', fontFamily: 'system-ui' }}>
+    <main
+      style={{
+        minHeight: '100vh',
+        background:
+          'radial-gradient(circle at 15% 10%, rgba(168,85,247,.18), transparent 28%), radial-gradient(circle at 85% 0%, rgba(59,130,246,.16), transparent 28%), linear-gradient(180deg, #07070d 0%, #0b0b14 45%, #08080d 100%)',
+        color: '#fff',
+        fontFamily: 'system-ui',
+        overflow: 'hidden',
+      }}
+    >
+      <style>{`
+        @keyframes wave {
+          0%,100% { height: 18%; opacity: .45; }
+          50% { height: 100%; opacity: 1; }
+        }
 
-      <section style={{ maxWidth: 800, margin: '0 auto', padding: '80px 24px 60px', textAlign: 'center' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 999, padding: '4px 16px', marginBottom: 24, fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#ffc300' }}>
-          <span>🎙️</span>
-          <span>{t(dict, 'podcasters_page.badge', 'For podcasters')}</span>
+        @keyframes pulseGlow {
+          0%,100% { opacity: .45; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.04); }
+        }
+
+        @keyframes floatPanel {
+          0%,100% { transform: translateY(0); }
+          50% { transform: translateY(-8px); }
+        }
+
+        @media (max-width: 900px) {
+          .studio-hero {
+            grid-template-columns: 1fr !important;
+          }
+          .pricing-grid,
+          .deliver-grid,
+          .how-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .studio-card {
+            min-height: auto !important;
+          }
+        }
+      `}</style>
+
+      <section
+        className="studio-hero"
+        style={{
+          maxWidth: 1180,
+          margin: '0 auto',
+          padding: '72px 24px 44px',
+          display: 'grid',
+          gridTemplateColumns: '1fr 1.05fr',
+          gap: 34,
+          alignItems: 'center',
+        }}
+      >
+        <div>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              background: 'rgba(255,195,0,0.1)',
+              border: '1px solid rgba(255,195,0,0.28)',
+              borderRadius: 999,
+              padding: '6px 14px',
+              marginBottom: 22,
+              fontSize: 11,
+              fontWeight: 900,
+              letterSpacing: '.1em',
+              color: GOLD,
+              textTransform: 'uppercase',
+            }}
+          >
+            <span style={{ color: '#ef4444' }}>●</span>
+            PODCAST_STUDIO // LIVE
+          </div>
+
+          <h1
+            style={{
+              fontSize: 'clamp(42px, 7vw, 84px)',
+              lineHeight: .96,
+              letterSpacing: '-.06em',
+              margin: 0,
+              fontWeight: 950,
+            }}
+          >
+            Your podcast.
+            <br />
+            Your studio.
+            <br />
+            <span style={{ color: GOLD }}>Your global audience.</span>
+          </h1>
+
+          <p
+            style={{
+              marginTop: 22,
+              color: 'rgba(255,255,255,.58)',
+              fontSize: 18,
+              lineHeight: 1.7,
+              maxWidth: 620,
+            }}
+          >
+            Upload one episode and let SignalBoost help create transcripts,
+            clips, captions, multilingual audio, show notes and distribution
+            assets from a single studio workspace.
+          </p>
+
+          <div
+            style={{
+              display: 'flex',
+              gap: 12,
+              flexWrap: 'wrap',
+              marginTop: 30,
+            }}
+          >
+            <Link
+              href="#plans"
+              style={{
+                background: GOLD,
+                color: '#000',
+                fontWeight: 900,
+                padding: '14px 28px',
+                borderRadius: 999,
+                textDecoration: 'none',
+              }}
+            >
+              Open Studio
+            </Link>
+
+            <Link
+              href="#how-it-works"
+              style={{
+                background: 'rgba(255,255,255,.06)',
+                color: '#fff',
+                fontWeight: 800,
+                padding: '14px 28px',
+                borderRadius: 999,
+                border: '1px solid rgba(255,255,255,.12)',
+                textDecoration: 'none',
+              }}
+            >
+              How it works →
+            </Link>
+          </div>
         </div>
 
-        <h1 style={{ fontSize: 'clamp(36px, 6vw, 72px)', fontWeight: 900, letterSpacing: '-0.03em', margin: '0 0 20px', lineHeight: 1.05 }}>
-          {t(dict, 'podcasters_page.heroLine1', 'You record it.')}
-          <br />
-          {t(dict, 'podcasters_page.heroLine2Pre', 'We take it')}{' '}
-          <span style={{ color: '#ffc300' }}>{t(dict, 'podcasters_page.heroLine2Highlight', 'global.')}</span>
-        </h1>
+        <div
+          className="studio-card"
+          style={{
+            position: 'relative',
+            minHeight: 560,
+            borderRadius: 34,
+            padding: 22,
+            background:
+              'linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03))',
+            border: '1px solid rgba(255,255,255,.12)',
+            boxShadow: '0 40px 120px rgba(0,0,0,.55)',
+            overflow: 'hidden',
+            animation: 'floatPanel 6s ease-in-out infinite',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              inset: -80,
+              background:
+                'radial-gradient(circle at 50% 30%, rgba(168,85,247,.24), transparent 34%), radial-gradient(circle at 30% 70%, rgba(59,130,246,.22), transparent 32%)',
+              filter: 'blur(8px)',
+            }}
+          />
 
-        <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 18, lineHeight: 1.7, maxWidth: 560, margin: '0 auto 16px' }}>
-          {t(dict, 'podcasters_page.heroSubhead', 'Native AI voiceover, multilingual captions, clip generation, and a branded podcast website — all in one platform.')}
-        </p>
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 18,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    letterSpacing: '.12em',
+                    color: 'rgba(255,255,255,.45)',
+                    fontWeight: 900,
+                  }}
+                >
+                  SIGNALBOOST AUDIO FOUNDRY
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 900, marginTop: 4 }}>
+                  Episode_034.wav
+                </div>
+              </div>
 
-        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 13, lineHeight: 1.6, maxWidth: 480, margin: '0 auto 40px', fontStyle: 'italic' }}>
-          {t(dict, 'podcasters_page.heroNote', 'We do not do hardware or raw audio editing. Bring us your finished episode and we handle everything after that.')}
-        </p>
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  borderRadius: 999,
+                  padding: '7px 12px',
+                  background: 'rgba(239,68,68,.12)',
+                  border: '1px solid rgba(239,68,68,.28)',
+                  color: '#fecaca',
+                  fontSize: 12,
+                  fontWeight: 900,
+                }}
+              >
+                🔴 ON AIR
+              </div>
+            </div>
 
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Link href="#plans" style={{ background: '#ffc300', color: '#000', fontWeight: 800, fontSize: 15, padding: '14px 36px', borderRadius: 999, textDecoration: 'none' }}>
-            {t(dict, 'podcasters_page.ctaSeePlans', 'See plans')}
-          </Link>
-          <Link href="#how-it-works" style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', fontWeight: 600, fontSize: 15, padding: '14px 36px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.12)', textDecoration: 'none' }}>
-            {t(dict, 'podcasters_page.ctaHow', 'How it works')} →
-          </Link>
+            <div
+              style={{
+                borderRadius: 26,
+                padding: 22,
+                background: 'rgba(0,0,0,.34)',
+                border: '1px solid rgba(255,255,255,.1)',
+                marginBottom: 16,
+              }}
+            >
+              <div
+                style={{
+                  height: 110,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  justifyContent: 'center',
+                }}
+              >
+                {Array.from({ length: 34 }).map((_, i) => (
+                  <span
+                    key={i}
+                    style={{
+                      width: 6,
+                      height: `${18 + ((i * 17) % 76)}%`,
+                      borderRadius: 999,
+                      background:
+                        i % 3 === 0
+                          ? GOLD
+                          : i % 3 === 1
+                            ? BLUE
+                            : PURPLE,
+                      animation: `wave ${1 + (i % 5) * .18}s ease-in-out infinite`,
+                      animationDelay: `${i * .04}s`,
+                      boxShadow: '0 0 18px rgba(255,195,0,.25)',
+                    }}
+                  />
+                ))}
+              </div>
+
+              <div
+                style={{
+                  marginTop: 18,
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: 10,
+                }}
+              >
+                <StudioMetric label="Transcript" value="Ready" />
+                <StudioMetric label="Clips found" value="08" />
+                <StudioMetric label="Languages" value="5" />
+                <StudioMetric label="Publish pack" value="86%" />
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gap: 10,
+              }}
+            >
+              {studioAgents.map(agent => (
+                <div
+                  key={agent.name}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 14px',
+                    borderRadius: 16,
+                    background: 'rgba(255,255,255,.055)',
+                    border: '1px solid rgba(255,255,255,.08)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 20 }}>{agent.icon}</span>
+                    <span style={{ fontWeight: 800 }}>{agent.name}</span>
+                  </div>
+
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: agent.color,
+                      fontWeight: 900,
+                      letterSpacing: '.08em',
+                    }}
+                  >
+                    {agent.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 10,
+                marginTop: 18,
+              }}
+            >
+              <button
+                style={{
+                  border: 'none',
+                  borderRadius: 999,
+                  padding: '13px 14px',
+                  background: GOLD,
+                  color: '#000',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                }}
+              >
+                Generate clips
+              </button>
+
+              <button
+                style={{
+                  border: '1px solid rgba(255,255,255,.14)',
+                  borderRadius: 999,
+                  padding: '13px 14px',
+                  background: 'rgba(255,255,255,.06)',
+                  color: '#fff',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                }}
+              >
+                Upload episode
+              </button>
+            </div>
+          </div>
         </div>
+      </section>
 
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 48, marginTop: 56, flexWrap: 'wrap' }}>
-          {STATS.map(s => (
-            <div key={s.label} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 32, fontWeight: 900, color: '#ffc300' }}>{s.value}</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>{s.label}</div>
+      <section
+        style={{
+          maxWidth: 1180,
+          margin: '0 auto',
+          padding: '18px 24px 56px',
+        }}
+      >
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 14,
+          }}
+          className="how-grid"
+        >
+          {productions.map(item => (
+            <div
+              key={item.title}
+              style={{
+                borderRadius: 22,
+                padding: 18,
+                background: 'rgba(255,255,255,.04)',
+                border: '1px solid rgba(255,255,255,.08)',
+              }}
+            >
+              <div style={{ fontSize: 28, marginBottom: 12 }}>🎧</div>
+              <h3 style={{ margin: 0, fontSize: 18 }}>{item.title}</h3>
+              <p style={{ color: 'rgba(255,255,255,.45)', lineHeight: 1.6 }}>
+                {item.clips} · {item.langs}
+              </p>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  padding: '6px 10px',
+                  borderRadius: 999,
+                  background: 'rgba(74,222,128,.10)',
+                  color: GREEN,
+                  fontSize: 12,
+                  fontWeight: 900,
+                }}
+              >
+                {item.status}
+              </span>
             </div>
           ))}
         </div>
       </section>
 
-      <section id="how-it-works" style={{ maxWidth: 1100, margin: '0 auto', padding: '60px 24px' }}>
-        <h2 style={{ fontSize: 36, fontWeight: 900, textAlign: 'center', marginBottom: 48 }}>
+      <section
+        style={{
+          maxWidth: 1180,
+          margin: '0 auto',
+          padding: '20px 24px 70px',
+        }}
+      >
+        <h2
+          style={{
+            fontSize: 'clamp(30px, 5vw, 52px)',
+            margin: '0 0 14px',
+            letterSpacing: '-.04em',
+            textAlign: 'center',
+          }}
+        >
+          A full production studio after you record
+        </h2>
+
+        <p
+          style={{
+            textAlign: 'center',
+            color: 'rgba(255,255,255,.48)',
+            maxWidth: 620,
+            margin: '0 auto 36px',
+            lineHeight: 1.7,
+          }}
+        >
+          You focus on the conversation. SignalBoost helps turn that episode
+          into clips, captions, translated content, voiceovers, pages and
+          promotional assets.
+        </p>
+
+        <div
+          className="deliver-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 16,
+          }}
+        >
+          {deliverables.map(item => (
+            <div
+              key={item.title}
+              style={{
+                borderRadius: 22,
+                padding: 22,
+                background: 'rgba(255,255,255,.035)',
+                border: '1px solid rgba(255,255,255,.08)',
+              }}
+            >
+              <div style={{ fontSize: 30, marginBottom: 14 }}>{item.icon}</div>
+              <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>{item.title}</h3>
+              <p
+                style={{
+                  color: 'rgba(255,255,255,.45)',
+                  lineHeight: 1.6,
+                  margin: 0,
+                  fontSize: 14,
+                }}
+              >
+                {item.desc}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section
+        id="how-it-works"
+        style={{
+          maxWidth: 1100,
+          margin: '0 auto',
+          padding: '0 24px 70px',
+        }}
+      >
+        <h2 style={{ textAlign: 'center', fontSize: 38, marginBottom: 36 }}>
           {t(dict, 'podcasters_page.howTitle', 'How it works')}
         </h2>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20 }}>
-          {HOW_IT_WORKS.map((step, i) => (
-            <div key={step.step} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: '24px 20px', position: 'relative' }}>
-              <div style={{ fontSize: 48, fontWeight: 900, color: 'rgba(255,195,0,0.15)', marginBottom: 12 }}>{step.step}</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 8 }}>{step.title}</div>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', lineHeight: 1.6 }}>{step.desc}</div>
-              {i < HOW_IT_WORKS.length - 1 && (
-                <div style={{ position: 'absolute', right: -12, top: '50%', transform: 'translateY(-50%)', fontSize: 20, color: 'rgba(255,195,0,0.3)' }}>→</div>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 60px' }}>
-        <h2 style={{ fontSize: 36, fontWeight: 900, textAlign: 'center', marginBottom: 16 }}>
-          {t(dict, 'podcasters_page.deliverTitle', 'What we deliver')}
-        </h2>
-
-        <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 15, maxWidth: 500, margin: '0 auto 48px' }}>
-          {t(dict, 'podcasters_page.deliverSubtitle', 'Everything after the recording. You focus on content and we handle global distribution.')}
-        </p>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-          {DELIVERABLES.map(item => (
+        <div
+          className="how-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: 16,
+          }}
+        >
+          {[
+            ['01', 'Upload your episode', 'Bring the finished audio or video.'],
+            ['02', 'Choose outputs', 'Clips, captions, languages, voiceover and show notes.'],
+            ['03', 'AI crew works', 'Transcript, clip, translation and distribution agents prepare assets.'],
+            ['04', 'Publish everywhere', 'Download or prepare content for every channel.'],
+          ].map(step => (
             <div
-              key={item.title}
-              style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: '24px 20px', display: 'flex', gap: 16, alignItems: 'flex-start' }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(255,195,0,0.25)')}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)')}
+              key={step[0]}
+              style={{
+                borderRadius: 20,
+                padding: 20,
+                background: 'rgba(255,255,255,.035)',
+                border: '1px solid rgba(255,255,255,.08)',
+              }}
             >
-              <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{item.icon}</div>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 6 }}>{item.title}</div>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', lineHeight: 1.55 }}>{item.desc}</div>
+              <div
+                style={{
+                  fontSize: 44,
+                  color: 'rgba(255,195,0,.18)',
+                  fontWeight: 950,
+                  marginBottom: 8,
+                }}
+              >
+                {step[0]}
               </div>
+              <h3 style={{ margin: '0 0 8px', fontSize: 16 }}>{step[1]}</h3>
+              <p
+                style={{
+                  color: 'rgba(255,255,255,.45)',
+                  margin: 0,
+                  lineHeight: 1.6,
+                  fontSize: 13,
+                }}
+              >
+                {step[2]}
+              </p>
             </div>
           ))}
         </div>
       </section>
 
-      <section id="plans" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 80px' }}>
-        <h2 style={{ fontSize: 36, fontWeight: 900, textAlign: 'center', marginBottom: 12 }}>
+      <section
+        id="plans"
+        style={{
+          maxWidth: 1100,
+          margin: '0 auto',
+          padding: '0 24px 90px',
+        }}
+      >
+        <h2 style={{ fontSize: 38, fontWeight: 900, textAlign: 'center', marginBottom: 12 }}>
           {t(dict, 'podcasters_page.plansTitle', 'Podcast plans')}
         </h2>
 
-        <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 15, marginBottom: 32 }}>
-          {t(dict, 'podcasters_page.plansSubtitle', 'Sketch your idea for free with our preview tier, then pick a podcast plan when you are ready to publish.')}
+        <p
+          style={{
+            textAlign: 'center',
+            color: 'rgba(255,255,255,0.45)',
+            fontSize: 15,
+            marginBottom: 32,
+          }}
+        >
+          {t(
+            dict,
+            'podcasters_page.plansSubtitle',
+            'Sketch your idea for free with our preview tier, then pick a podcast plan when you are ready to publish.'
+          )}
         </p>
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 32 }}>
@@ -242,62 +670,131 @@ export default function PodcastersPage() {
             <button
               key={c}
               onClick={() => setCurrency(c)}
-              style={{ padding: '5px 14px', borderRadius: 999, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${currency === c ? '#ffc300' : 'rgba(255,255,255,0.1)'}`, background: currency === c ? 'rgba(255,195,0,0.12)' : 'transparent', color: currency === c ? '#ffc300' : 'rgba(255,255,255,0.4)' }}
+              style={{
+                padding: '5px 14px',
+                borderRadius: 999,
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: 'pointer',
+                border: `1px solid ${currency === c ? GOLD : 'rgba(255,255,255,0.1)'}`,
+                background: currency === c ? 'rgba(255,195,0,0.12)' : 'transparent',
+                color: currency === c ? GOLD : 'rgba(255,255,255,0.4)',
+              }}
             >
               {c}
             </button>
           ))}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
+        <div
+          className="pricing-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 20,
+          }}
+        >
           {PLANS.map(plan => (
             <div
               key={plan.key}
-              style={{ background: plan.highlight ? 'rgba(255,195,0,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${plan.highlight ? 'rgba(255,195,0,0.4)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 20, padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 20, position: 'relative' }}
+              style={{
+                background: plan.highlight ? 'rgba(255,195,0,0.07)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${plan.highlight ? 'rgba(255,195,0,0.38)' : 'rgba(255,255,255,0.08)'}`,
+                borderRadius: 24,
+                padding: '30px 24px',
+                position: 'relative',
+              }}
             >
               {plan.highlight && (
-                <div style={{ position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)', background: '#ffc300', color: '#000', fontSize: 10, fontWeight: 800, padding: '3px 14px', borderRadius: 999, whiteSpace: 'nowrap', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: -13,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: GOLD,
+                    color: '#000',
+                    fontSize: 10,
+                    fontWeight: 900,
+                    padding: '4px 14px',
+                    borderRadius: 999,
+                  }}
+                >
                   {t(dict, 'podcasters_page.mostPopular', 'Most popular')}
                 </div>
               )}
 
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: plan.highlight ? '#ffc300' : 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
-                  {plan.name}
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                  <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', fontWeight: 700 }}>{SYMBOLS[currency]}</span>
-                  <span style={{ fontSize: 40, fontWeight: 900, letterSpacing: '-0.03em' }}>{(plan.price as any)[currency]}</span>
-                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>{t(dict, 'podcasters_page.perMonth', '/mo')}</span>
-                </div>
-
-                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', margin: '8px 0 0', lineHeight: 1.5 }}>
-                  {plan.description}
-                </p>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 900,
+                  color: plan.highlight ? GOLD : 'rgba(255,255,255,.46)',
+                  letterSpacing: '.1em',
+                  textTransform: 'uppercase',
+                  marginBottom: 12,
+                }}
+              >
+                {plan.name}
               </div>
 
-              <div>
-                <button
-                  onClick={() => {
-                    window.location.href =
-                      plan.key === 'network'
-                        ? `mailto:${CONTACT_EMAIL}?subject=SignalBoost Network Plan`
-                        : '/pricing'
-                  }}
-                  style={{ background: plan.highlight ? '#ffc300' : 'rgba(255,255,255,0.05)', color: plan.highlight ? '#000' : '#fff', border: `1px solid ${plan.highlight ? '#ffc300' : 'rgba(255,255,255,0.1)'}`, borderRadius: 999, padding: '12px 0', fontSize: 13, fontWeight: 800, cursor: 'pointer', width: '100%' }}
-                >
-                  {plan.cta}
-                </button>
-                <div style={{ textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 8 }}>
-                  {t(dict, 'podcasters_page.noCommitment', 'No commitment, cancel anytime')}
-                </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                <span style={{ fontSize: 14, color: 'rgba(255,255,255,.5)', fontWeight: 700 }}>
+                  {SYMBOLS[currency]}
+                </span>
+                <span style={{ fontSize: 44, fontWeight: 950 }}>
+                  {(plan.price as any)[currency]}
+                </span>
+                <span style={{ color: 'rgba(255,255,255,.35)', fontSize: 13 }}>
+                  {t(dict, 'podcasters_page.perMonth', '/mo')}
+                </span>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <p
+                style={{
+                  color: 'rgba(255,255,255,.46)',
+                  lineHeight: 1.6,
+                  minHeight: 46,
+                  fontSize: 13,
+                }}
+              >
+                {plan.description}
+              </p>
+
+              <button
+                onClick={() => {
+                  window.location.href =
+                    plan.key === 'network'
+                      ? `mailto:${CONTACT_EMAIL}?subject=SignalBoost Network Plan`
+                      : '/pricing'
+                }}
+                style={{
+                  width: '100%',
+                  borderRadius: 999,
+                  padding: '13px 0',
+                  border: `1px solid ${plan.highlight ? GOLD : 'rgba(255,255,255,.12)'}`,
+                  background: plan.highlight ? GOLD : 'rgba(255,255,255,.06)',
+                  color: plan.highlight ? '#000' : '#fff',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  marginBottom: 20,
+                }}
+              >
+                {plan.cta}
+              </button>
+
+              <div style={{ display: 'grid', gap: 10 }}>
                 {plan.features.map(f => (
-                  <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>
-                    <span style={{ color: '#ffc300', flexShrink: 0 }}>✓</span>
+                  <div
+                    key={f}
+                    style={{
+                      display: 'flex',
+                      gap: 9,
+                      alignItems: 'flex-start',
+                      color: 'rgba(255,255,255,.62)',
+                      fontSize: 13,
+                    }}
+                  >
+                    <span style={{ color: GOLD }}>✓</span>
                     <span>{f}</span>
                   </div>
                 ))}
@@ -306,20 +803,39 @@ export default function PodcastersPage() {
           ))}
         </div>
       </section>
-
-      <section style={{ maxWidth: 700, margin: '0 auto', padding: '0 24px 120px', textAlign: 'center' }}>
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 24, padding: '56px 40px' }}>
-          <h2 style={{ fontSize: 32, fontWeight: 900, margin: '0 0 14px' }}>
-            {t(dict, 'podcasters_page.readyTitle', 'Ready to go global?')}
-          </h2>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15, margin: '0 0 32px', lineHeight: 1.6 }}>
-            {t(dict, 'podcasters_page.readyDesc', 'You record it. We handle the rest — voiceover, captions, clips, website and reviews in 5 languages.')}
-          </p>
-          <Link href="/pricing" style={{ background: '#ffc300', color: '#000', fontWeight: 800, fontSize: 15, padding: '14px 40px', borderRadius: 999, textDecoration: 'none', display: 'inline-block' }}>
-            {t(dict, 'podcasters_page.readyCta', 'See podcast plans')}
-          </Link>
-        </div>
-      </section>
     </main>
+  )
+}
+
+function StudioMetric({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
+  return (
+    <div
+      style={{
+        borderRadius: 16,
+        padding: 12,
+        background: 'rgba(255,255,255,.055)',
+        border: '1px solid rgba(255,255,255,.08)',
+      }}
+    >
+      <div
+        style={{
+          fontSize: 10,
+          color: 'rgba(255,255,255,.42)',
+          fontWeight: 900,
+          letterSpacing: '.08em',
+          textTransform: 'uppercase',
+          marginBottom: 5,
+        }}
+      >
+        {label}
+      </div>
+      <div style={{ fontSize: 18, fontWeight: 900 }}>{value}</div>
+    </div>
   )
 }

@@ -1,17 +1,18 @@
 'use client'
 
-import { useSearchParams } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 const GOLD = '#ffc300'
-const BLUE = '#3b82f6'
 
 export default function PodcastLaunchpad() {
-  const searchParams = useSearchParams()
-  const experience = searchParams.get('experience') || 'guided'
-
+  const [experience, setExperience] = useState('guided')
   const [topic, setTopic] = useState('')
   const [format, setFormat] = useState('solo')
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    setExperience(params.get('experience') || 'guided')
+  }, [])
 
   const isGuided = experience === 'guided'
   const isPower = experience === 'power'
@@ -45,30 +46,35 @@ export default function PodcastLaunchpad() {
     : isPower
       ? [
           'Define show positioning',
-          'Generate brand and naming options',
+          'Generate brand options',
           'Create episode structure',
           'Prepare publishing assets',
-          'Configure studio workflow',
+          'Configure workflow',
         ]
       : [
-          'Choose your topic',
-          'Pick your podcast name',
-          'Create episode ideas',
-          'Generate your podcast page',
-          'Open Podcast Studio',
+          'Choose topic',
+          'Pick podcast name',
+          'Generate episode ideas',
+          'Create podcast page',
+          'Open Studio',
         ]
 
   return (
     <main
       style={{
         minHeight: '100vh',
-        padding: '40px 24px 80px',
+        padding: '40px 24px',
         background:
-          'radial-gradient(circle at top right, rgba(255,195,0,.12), transparent 25%),linear-gradient(180deg,#06070c,#0e1119)',
+          'radial-gradient(circle at top right, rgba(255,195,0,.12), transparent 25%), linear-gradient(180deg,#06070c,#0e1119)',
         color: '#fff',
       }}
     >
-      <div style={{ maxWidth: 1120, margin: '0 auto' }}>
+      <div
+        style={{
+          maxWidth: 1100,
+          margin: '0 auto',
+        }}
+      >
         <div style={{ marginBottom: 40 }}>
           <div
             style={{
@@ -88,333 +94,263 @@ export default function PodcastLaunchpad() {
 
           <h1
             style={{
-              fontSize: 'clamp(38px,7vw,72px)',
+              fontSize: 'clamp(38px,7vw,70px)',
               lineHeight: 1,
               margin: 0,
-              letterSpacing: '-.05em',
             }}
           >
-            {isGuided ? 'Start your podcast' : 'Build your podcast'}
+            {isGuided
+              ? 'Start your podcast'
+              : 'Build your podcast'}
+
             <br />
+
             <span style={{ color: GOLD }}>
-              {isGuided ? 'one step at a time' : 'in 5 steps'}
+              {isGuided
+                ? 'one step at a time'
+                : 'in 5 steps'}
             </span>
           </h1>
 
           <p
             style={{
               marginTop: 20,
-              fontSize: 16,
+              maxWidth: 700,
+              color: 'rgba(255,255,255,.55)',
               lineHeight: 1.7,
-              color: 'rgba(255,255,255,.52)',
-              maxWidth: 740,
             }}
           >
             {isGuided
-              ? 'No technical experience needed. SignalBoost will guide you through the basics and help create your podcast idea, name, first episodes and podcast page.'
-              : isPower
-                ? 'Use SignalBoost to define the show concept, generate production assets and prepare a more advanced podcast workflow.'
-                : 'SignalBoost helps you shape your podcast idea, generate names, plan episodes and prepare your studio workspace.'}
+              ? 'No technical experience needed. SignalBoost guides you through every step.'
+              : 'Build and organize your podcast with AI assistance.'}
           </p>
         </div>
 
-        <section
+        <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'minmax(0,1fr) minmax(320px,.9fr)',
+            gridTemplateColumns:
+              '1fr minmax(320px,.8fr)',
             gap: 24,
           }}
         >
           <div
             style={{
-              padding: 26,
-              borderRadius: 26,
-              background: 'rgba(255,255,255,.035)',
+              padding: 25,
+              borderRadius: 24,
+              background: 'rgba(255,255,255,.03)',
               border: '1px solid rgba(255,255,255,.08)',
             }}
           >
-            <h2 style={{ marginTop: 0 }}>
-              {isGuided ? 'Step 1: What do you want to talk about?' : 'Step 1: Define your show'}
-            </h2>
+            <h2>Podcast topic</h2>
 
-            <p
+            <textarea
+              value={topic}
+              onChange={e =>
+                setTopic(e.target.value)
+              }
+              placeholder='What do you want your podcast to talk about?'
               style={{
-                color: 'rgba(255,255,255,.45)',
-                lineHeight: 1.6,
-                marginTop: -4,
+                width: '100%',
+                minHeight: 120,
+                padding: 14,
+                borderRadius: 14,
+                border: 'none',
+                background:
+                  'rgba(255,255,255,.05)',
+                color: '#fff',
+                resize: 'vertical',
+              }}
+            />
+
+            <div
+              style={{
+                marginTop: 20,
               }}
             >
-              {isGuided
-                ? 'A podcast starts with a topic. Write it in your own words.'
-                : 'Describe the core topic, audience and angle for the podcast.'}
-            </p>
-
-            <label style={{ display: 'grid', gap: 8, marginTop: 18 }}>
-              <span style={labelStyle}>
-                {isGuided ? 'Your podcast idea' : 'Podcast positioning'}
-              </span>
-
-              <textarea
-                value={topic}
-                onChange={e => setTopic(e.target.value)}
-                placeholder={
-                  isGuided
-                    ? 'Example: I want to talk about travel stories, family, food, or business lessons...'
-                    : 'Example: A weekly interview show for founders building AI-powered small businesses...'
-                }
+              <div
                 style={{
-                  ...inputStyle,
-                  minHeight: 130,
-                  resize: 'vertical',
-                  lineHeight: 1.6,
+                  marginBottom: 8,
                 }}
-              />
-            </label>
-
-            <label style={{ display: 'grid', gap: 8, marginTop: 16 }}>
-              <span style={labelStyle}>
-                {isGuided ? 'How do you want to record?' : 'Show format'}
-              </span>
+              >
+                Podcast format
+              </div>
 
               <select
                 value={format}
-                onChange={e => setFormat(e.target.value)}
-                style={inputStyle}
+                onChange={e =>
+                  setFormat(
+                    e.target.value
+                  )
+                }
+                style={{
+                  width: '100%',
+                  padding: 14,
+                  borderRadius: 14,
+                  background:
+                    'rgba(255,255,255,.05)',
+                  color: '#fff',
+                }}
               >
-                <option value="solo">Solo podcast</option>
-                <option value="interview">Interview podcast</option>
-                <option value="cohost">Two hosts</option>
-                <option value="story">Storytelling</option>
-                <option value="education">Educational show</option>
+                <option value='solo'>
+                  Solo
+                </option>
+
+                <option value='interview'>
+                  Interview
+                </option>
+
+                <option value='cohost'>
+                  Co-host
+                </option>
+
+                <option value='story'>
+                  Storytelling
+                </option>
               </select>
-            </label>
+            </div>
 
             <div
               style={{
                 display: 'flex',
                 gap: 10,
                 flexWrap: 'wrap',
-                marginTop: 20,
+                marginTop: 25,
               }}
             >
-              {ideas.map(idea => (
+              {ideas.map(item => (
                 <button
-                  key={idea}
-                  onClick={() => setTopic(idea)}
+                  key={item}
+                  onClick={() =>
+                    setTopic(item)
+                  }
                   style={{
-                    border: '1px solid rgba(255,195,0,.22)',
-                    background: 'rgba(255,195,0,.08)',
-                    color: '#fff',
-                    padding: '8px 12px',
+                    border: 'none',
+                    padding:
+                      '8px 12px',
                     borderRadius: 999,
                     cursor: 'pointer',
-                    fontSize: 13,
+                    background:
+                      'rgba(255,195,0,.08)',
+                    color: '#fff',
                   }}
                 >
-                  {idea}
+                  {item}
                 </button>
               ))}
             </div>
           </div>
 
-          <aside
+          <div
             style={{
-              padding: 26,
-              borderRadius: 26,
+              padding: 25,
+              borderRadius: 24,
               background:
-                'linear-gradient(180deg, rgba(255,195,0,.10), rgba(255,255,255,.035))',
-              border: '1px solid rgba(255,195,0,.22)',
+                'rgba(255,255,255,.03)',
+              border:
+                '1px solid rgba(255,255,255,.08)',
             }}
           >
+            <h2>5-step path</h2>
+
             <div
               style={{
-                fontSize: 12,
-                fontWeight: 900,
-                letterSpacing: '.12em',
-                color: GOLD,
-                marginBottom: 16,
+                display: 'grid',
+                gap: 14,
+                marginTop: 20,
               }}
             >
-              YOUR 5-STEP PATH
-            </div>
-
-            <div style={{ display: 'grid', gap: 12 }}>
-              {steps.map((step, index) => (
-                <div
-                  key={step}
-                  style={{
-                    display: 'flex',
-                    gap: 12,
-                    alignItems: 'center',
-                    color: 'rgba(255,255,255,.72)',
-                  }}
-                >
+              {steps.map(
+                (step, index) => (
                   <div
+                    key={step}
                     style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: '50%',
-                      background:
-                        index === 0 ? 'rgba(255,195,0,.18)' : 'rgba(255,255,255,.06)',
-                      color: index === 0 ? GOLD : 'rgba(255,255,255,.5)',
                       display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 900,
+                      gap: 12,
+                      alignItems:
+                        'center',
                     }}
                   >
-                    {index + 1}
+                    <div
+                      style={{
+                        width: 30,
+                        height: 30,
+                        borderRadius:
+                          '50%',
+                        background:
+                          'rgba(255,195,0,.1)',
+                        display:
+                          'flex',
+                        alignItems:
+                          'center',
+                        justifyContent:
+                          'center',
+                        color:
+                          GOLD,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {index + 1}
+                    </div>
+
+                    <span>
+                      {step}
+                    </span>
                   </div>
-                  <span>{step}</span>
-                </div>
-              ))}
+                )
+              )}
             </div>
 
             <div
               style={{
-                marginTop: 22,
-                padding: 14,
-                borderRadius: 18,
-                background: 'rgba(59,130,246,.08)',
-                border: '1px solid rgba(59,130,246,.22)',
-                color: 'rgba(255,255,255,.68)',
-                lineHeight: 1.55,
-                fontSize: 14,
+                marginTop: 25,
+                padding: 15,
+                borderRadius: 16,
+                background:
+                  'rgba(255,195,0,.08)',
               }}
             >
-              {isGuided
-                ? 'We will keep the process simple and avoid technical language.'
-                : isPower
-                  ? 'Advanced options can include publishing workflow, distribution strategy and technical configuration.'
-                  : 'SignalBoost will guide you while still giving you room to decide.'}
-            </div>
-          </aside>
-        </section>
+              <strong>
+                Suggested names
+              </strong>
 
-        <section
+              <div
+                style={{
+                  marginTop: 10,
+                  display: 'grid',
+                  gap: 8,
+                  color:
+                    'rgba(255,255,255,.7)',
+                }}
+              >
+                {generatedNames.map(
+                  name => (
+                    <div
+                      key={name}
+                    >
+                      🎙️ {name}
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button
           style={{
-            marginTop: 26,
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))',
-            gap: 14,
+            marginTop: 30,
+            border: 'none',
+            padding: '14px 30px',
+            borderRadius: 999,
+            background: GOLD,
+            fontWeight: 900,
+            cursor: 'pointer',
           }}
         >
-          <LaunchCard
-            icon="🎙️"
-            title="Possible podcast names"
-            items={generatedNames}
-          />
-
-          <LaunchCard
-            icon="🧠"
-            title="What SignalBoost helps create"
-            items={[
-              'Podcast concept',
-              'Show name',
-              'Episode ideas',
-              'Intro script',
-              'Podcast page',
-            ]}
-          />
-
-          <LaunchCard
-            icon="🎬"
-            title="Later in Podcast Studio"
-            items={[
-              'Upload episodes',
-              'Find short clips',
-              'Create captions',
-              'Translate content',
-              'Prepare distribution',
-            ]}
-          />
-        </section>
-
-        <div style={{ marginTop: 30 }}>
-          <button
-            style={{
-              border: 'none',
-              padding: '14px 28px',
-              borderRadius: 999,
-              background: GOLD,
-              color: '#000',
-              fontWeight: 900,
-              cursor: 'pointer',
-            }}
-          >
-            Generate podcast sketch →
-          </button>
-
-          <button
-            style={{
-              marginLeft: 12,
-              border: '1px solid rgba(255,255,255,.14)',
-              padding: '14px 28px',
-              borderRadius: 999,
-              background: 'rgba(255,255,255,.05)',
-              color: '#fff',
-              fontWeight: 800,
-              cursor: 'pointer',
-            }}
-          >
-            Open Podcast Studio
-          </button>
-        </div>
+          Generate Podcast Sketch →
+        </button>
       </div>
     </main>
   )
-}
-
-function LaunchCard({
-  icon,
-  title,
-  items,
-}: {
-  icon: string
-  title: string
-  items: string[]
-}) {
-  return (
-    <div
-      style={{
-        padding: 20,
-        borderRadius: 22,
-        background: 'rgba(255,255,255,.035)',
-        border: '1px solid rgba(255,255,255,.08)',
-      }}
-    >
-      <div style={{ fontSize: 28 }}>{icon}</div>
-      <h3 style={{ margin: '12px 0 10px' }}>{title}</h3>
-      <div style={{ display: 'grid', gap: 8 }}>
-        {items.map(item => (
-          <div
-            key={item}
-            style={{
-              color: 'rgba(255,255,255,.5)',
-              fontSize: 14,
-              lineHeight: 1.5,
-            }}
-          >
-            {item}
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-const labelStyle: React.CSSProperties = {
-  color: '#fff',
-  fontWeight: 850,
-  fontSize: 13,
-}
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  borderRadius: 16,
-  border: '1px solid rgba(255,255,255,.10)',
-  background: 'rgba(0,0,0,.25)',
-  color: '#fff',
-  padding: '13px 14px',
-  outline: 'none',
 }

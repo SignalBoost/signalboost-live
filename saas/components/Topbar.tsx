@@ -1,8 +1,6 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { getCredits } from "../lib/credits";
 
 export default function Topbar() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -13,10 +11,15 @@ export default function Topbar() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserEmail(user.email ?? null);
-
-        // ✅ Now always a number
-        const creditAmount = await getCredits(user.id);
-        setCredits(creditAmount);
+        // Fetch credits from the server-side API route.
+        // The service-role key stays on the server and never reaches the browser.
+        try {
+          const res = await fetch("/api/credits");
+          const data = await res.json();
+          setCredits(typeof data.credits === "number" ? data.credits : 0);
+        } catch {
+          setCredits(0);
+        }
       }
     };
     fetchUser();

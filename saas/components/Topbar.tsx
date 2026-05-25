@@ -2,40 +2,79 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 
+const PLAN_STYLES: Record<string, { label: string; bg: string; color: string }> = {
+  free:     { label: "FREE",     bg: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)" },
+  starter:  { label: "STARTER",  bg: "rgba(59,130,246,0.18)",  color: "#7ab8ff" },
+  pro:      { label: "PRO",      bg: "rgba(255,195,0,0.18)",   color: "#ffc300" },
+  business: { label: "BUSINESS", bg: "rgba(74,222,128,0.18)",  color: "#4ade80" },
+};
+
 export default function Topbar() {
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [name, setName] = useState<string | null>(null);
+  const [plan, setPlan] = useState<string>("free");
   const [credits, setCredits] = useState<number>(0);
+  const [signedIn, setSignedIn] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserEmail(user.email ?? null);
-        // Fetch credits from the server-side API route.
-        // The service-role key stays on the server and never reaches the browser.
-        try {
-          const res = await fetch("/api/credits");
-          const data = await res.json();
-          setCredits(typeof data.credits === "number" ? data.credits : 0);
-        } catch {
-          setCredits(0);
-        }
+      if (!user) return;
+      setSignedIn(true);
+      try {
+        const res = await fetch("/api/credits");
+        const data = await res.json();
+        if (typeof data.credits === "number") setCredits(data.credits);
+        if (data.plan) setPlan(data.plan);
+        if (data.name) setName(data.name);
+        else setName(user.email ?? null);
+      } catch {
+        setName(user.email ?? null);
       }
     };
     fetchUser();
   }, []);
 
+  if (!signedIn) return null;
+
+  const planStyle = PLAN_STYLES[plan] || PLAN_STYLES.free;
+
   return (
-    <header className="flex justify-between items-center bg-white shadow px-6 py-4 mb-6 rounded-lg">
-      <h2 className="text-xl font-bold text-gray-800">Dashboard</h2>
-      <div className="flex items-center space-x-6">
-        <span className="text-sm font-semibold text-yellow-600">
-          Credits: {credits}
-        </span>
-        <span className="text-sm text-gray-600">
-          {userEmail ?? "Not signed in"}
-        </span>
-      </div>
+    <header
+      style={{
+        display: "flex",
+        justifyContent: "flex-end",
+        alignItems: "center",
+        gap: 16,
+        padding: "10px 20px",
+        background: "rgba(10, 14, 26, 0.6)",
+        borderBottom: "1px solid rgba(255,255,255,0.08)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
+        fontFamily: "system-ui, -apple-system, sans-serif",
+      }}
+    >
+      <span style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,195,0,0.95)", fontFamily: "monospace" }}>
+        ⚡ {credits} {credits === 1 ? "credit" : "credits"}
+      </span>
+
+      <span
+        style={{
+          fontSize: 11,
+          fontWeight: 800,
+          letterSpacing: "0.06em",
+          padding: "4px 10px",
+          borderRadius: 999,
+          background: planStyle.bg,
+          color: planStyle.color,
+          fontFamily: "monospace",
+        }}
+      >
+        {planStyle.label}
+      </span>
+
+      <span style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>
+        {name ?? "Account"}
+      </span>
     </header>
   );
 }

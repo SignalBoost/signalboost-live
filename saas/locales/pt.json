@@ -78,6 +78,16 @@
     "renderComplete": "Renderização concluída",
     "initializeSynthesis": "Iniciar síntese"
   },
+  "builder": {
+    "tpl": {
+      "restaurant": { "name": "Restaurante", "desc": "Cardápio, horários, reservas, localização" },
+      "retail": { "name": "Loja de varejo", "desc": "Produtos, preços, contato, sobre" },
+      "services": { "name": "Serviços", "desc": "O que você oferece, preços, agendamento" },
+      "podcast": { "name": "Podcast", "desc": "Episódios, sobre, links de inscrição" },
+      "portfolio": { "name": "Portfólio", "desc": "Mostra de trabalhos, bio, contato" },
+      "blank": { "name": "Começar do zero", "desc": "Crie do zero com ajuda da IA" }
+    }
+  },
   "audio": {
     "pageTitle": "Áudio",
     "pageSubtitle": "Transforme seu texto em áudio com som natural. Escolha um idioma, escolha uma voz, gere.",
@@ -183,7 +193,7 @@
       "burned": "Legendas integradas diretamente no arquivo de vídeo."
     }
   },
-"dash": {
+  "dash": {
     "askPlaceholder": "Pergunte qualquer coisa ao SignalBoost...",
     "askButton": "Perguntar",
     "startHere": "Comece aqui",
@@ -301,32 +311,8 @@
     "tagHint": "Clique em um sinal de idioma para adicioná-lo ao seu projeto",
     "ticker": [
       "Nova avaliação · São Paulo",
-      "Site publicado · Madri",
-      "Áudio gerado · pl-PL",
-      "Vídeo renderizado · ru-RU",
-      "Avaliação coletada · Lisboa",
-      "Site no ar · Cidade do México",
-      "Transmissão enviada · 5 idiomas"
-    ],
-    "scroll": "Rolar"
-  },
-  "footer": {
-    "tagline": "O SignalBoost ajuda empresas a crescer com sites nativos, avaliações de clientes, áudio, vídeo e conteúdo com IA — feito para como as pessoas realmente falam.",
-    "learnHow": "Descubra como o SignalBoost funciona",
-    "readDocs": "leia a documentação",
-    "product": "Produto",
-    "build": "Criar",
-    "company": "Empresa",
-    "documentation": "Documentação",
-    "generateNativeAudio": "Gerar áudio nativo",
-    "about": "Sobre",
-    "partners": "Parceiros",
-    "privacy": "Privacidade",
-    "contact": "Contato",
-    "nativeExperiences": "Experiências nativas disponíveis em",
-    "poweredBy": "Desenvolvido por"
-  },
-"pricing_page": {
+      "Site pub
+    "pricing_page": {
     "badge": "Preços simples",
     "headline": "Comece grátis. Publique quando estiver pronto.",
     "subhead": "O SignalBoost ajuda empresas a crescer com sites, avaliações, áudio e ferramentas de conteúdo com IA.",

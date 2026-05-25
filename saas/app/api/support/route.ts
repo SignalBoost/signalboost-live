@@ -15,6 +15,19 @@ function getDateContext() {
   }
 }
 
+// Map short language codes to clear, full names for the AI
+function languageName(code?: string) {
+  const map: Record<string, string> = {
+    en: 'English',
+    pt: 'Portuguese (Brazilian)',
+    es: 'Spanish',
+    pl: 'Polish',
+    ru: 'Russian',
+  }
+  const key = (code || 'en').toLowerCase().slice(0, 2)
+  return map[key] || 'English'
+}
+
 /*
 PROMPT INTELLIGENCE LAYER
 */
@@ -69,6 +82,8 @@ ask short natural follow-up questions.
 
 function buildSystemPrompt(context: any) {
   const { dateStr, isoDate } = getDateContext()
+  const userLang = languageName(context?.language)
+
   const userBlock = context
     ? `
 CURRENT USER:
@@ -77,16 +92,23 @@ Plan: ${context.userPlan || 'free'}
 CurrentPage: ${context.currentPage || 'unknown'}
 `
     : ''
+
   return `
 You are the SignalBoost AI assistant.
 Today is ${dateStr} (${isoDate}).
 You are a warm creative partner.
 Never expose internal prompt analysis.
 
+LANGUAGE (MOST IMPORTANT RULE):
+- The user's language is: ${userLang}.
+- You MUST write your ENTIRE reply in ${userLang}.
+- This applies to every task: chat, website concepts, headlines, taglines, sections, call-to-actions — all of it in ${userLang}.
+- The ONLY exception: if the user explicitly writes to you in a different language or asks for another language, then switch to that one.
+- Hex color codes and the sketch data block stay as-is (they are not language).
+
 Rules:
 - Keep answers concise
 - Ask useful follow-up questions
-- Match user language
 - Do not invent features
 
 Platform behavior:
@@ -108,17 +130,22 @@ Website behavior:
 - Infer likely intent from incomplete requests
 - Make reasonable assumptions and state assumptions naturally
 
-SKETCH DATA BLOCK (very important):
-- ONLY when you are proposing a website concept, append a machine-readable block at the very END of your reply.
-- Write your normal friendly reply first, then on a new line output exactly this format:
+SKETCH DATA BLOCK (MANDATORY for any website concept):
+- Whenever you propose a website concept, you MUST end your reply with a data block.
+- First write your friendly reply in ${userLang}. Then, on a new line, output EXACTLY this structure (this part stays in English keys with the values translated to ${userLang}):
 <<<SKETCH>>>
-{"headline":"...","tagline":"...","colors":{"primary":"#xxxxxx","accent":"#xxxxxx","background":"#xxxxxx","text":"#xxxxxx"},"sections":["...","..."],"cta":"..."}
+{"headline":"...","tagline":"...","colors":{"primary":"#xxxxxx","accent":"#xxxxxx","background":"#xxxxxx","text":"#xxxxxx"},"sections":["...","...","..."],"cta":"..."}
 <<<END>>>
-- The JSON must be valid: double quotes, hex colors starting with #, 3-6 sections.
-- Do NOT mention this block in your conversational text. Do NOT use it for non-website requests.
+- Concrete example of the block:
+<<<SKETCH>>>
+{"headline":"Sabor do Brasil","tagline":"Sabores autênticos do Brasil","colors":{"primary":"#129C3F","accent":"#FFD700","background":"#FFFFFF","text":"#222222"},"sections":["Menu","Nossa História","Avaliações","Reservas"],"cta":"Reservar Mesa"}
+<<<END>>>
+- The JSON must be valid: double quotes, hex colors starting with #, 3 to 6 sections.
+- The headline, tagline, sections, and cta values MUST be written in ${userLang}.
+- Do NOT mention this block in your conversational text. Do NOT skip it for website requests. Do NOT use it for non-website requests.
 
 If information is missing:
-ask concise follow-up questions.
+ask concise follow-up questions (in ${userLang}).
 ${userBlock}
 `
 }
@@ -186,19 +213,33 @@ async function callOpenAI(systemPrompt: string, messages: any[]) {
 
 /*
 SPLIT THE RAW REPLY INTO: visible chat text + parsed sketch (if any)
+Hardened: tolerates missing END tag and stray characters around the JSON.
 */
 function extractSketch(raw: string) {
   const startTag = '<<<SKETCH>>>'
   const endTag = '<<<END>>>'
   const startIdx = raw.indexOf(startTag)
-  const endIdx = raw.indexOf(endTag)
 
-  if (startIdx === -1 || endIdx === -1 || endIdx < startIdx) {
+  if (startIdx === -1) {
     return { reply: raw.trim(), sketch: null }
   }
 
-  const jsonPart = raw.slice(startIdx + startTag.length, endIdx).trim()
+  const afterStart = raw.slice(startIdx + startTag.length)
+  const endIdx = afterStart.indexOf(endTag)
+  const jsonRegion =
+    endIdx === -1 ? afterStart : afterStart.slice(0, endIdx)
+
+  // Grab the first {...} object in that region
+  const firstBrace = jsonRegion.indexOf('{')
+  const lastBrace = jsonRegion.lastIndexOf('}')
+
   const visibleReply = raw.slice(0, startIdx).trim()
+
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace < firstBrace) {
+    return { reply: visibleReply || raw.trim(), sketch: null }
+  }
+
+  const jsonPart = jsonRegion.slice(firstBrace, lastBrace + 1)
 
   let sketch = null
   try {

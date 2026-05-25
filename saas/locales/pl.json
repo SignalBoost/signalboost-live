@@ -234,6 +234,18 @@
       "ago": "temu",
       "justNow": "Przed chwilą"
     },
+    "status": {
+      "draft": "SZKIC",
+      "live": "NA ŻYWO",
+      "paused": "WSTRZYMANY"
+    },
+    "lang": {
+      "english": "ANGIELSKI",
+      "portuguese": "PORTUGALSKI",
+      "spanish": "HISZPAŃSKI",
+      "polish": "POLSKI",
+      "russian": "ROSYJSKI"
+    },
     "preview": {
       "label": "PODGLĄD_NA_ŻYWO",
       "close": "ZAMKNIJ",

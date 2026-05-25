@@ -26,6 +26,19 @@ type Message = {
   content: string
 }
 
+type Sketch = {
+  headline?: string
+  tagline?: string
+  colors?: {
+    primary?: string
+    accent?: string
+    background?: string
+    text?: string
+  }
+  sections?: string[]
+  cta?: string
+}
+
 export default function DashboardOverviewPage() {
   const { dict, lang } = useI18n()
 
@@ -44,6 +57,8 @@ export default function DashboardOverviewPage() {
   const [promptLoading, setPromptLoading] = useState(false)
   const [promptOpen, setPromptOpen] = useState(false)
   const [hasTyped, setHasTyped] = useState(false)
+
+  const [sketch, setSketch] = useState<Sketch | null>(null)
 
   const promptRef = useRef<HTMLDivElement>(null)
 
@@ -142,6 +157,10 @@ export default function DashboardOverviewPage() {
           content: data.reply || t(dict, 'dash.connectionError', 'Having trouble connecting. Please try again.'),
         },
       ])
+
+      if (data.sketch) {
+        setSketch(data.sketch)
+      }
     } catch {
       setPromptMessages(prev => [
         ...prev,
@@ -195,6 +214,34 @@ export default function DashboardOverviewPage() {
   const greetingHidden = hasTyped || promptMessages.length > 0
   const showLoginGate = authChecked && !isLoggedIn
 
+  const sketchColors = {
+    primary: sketch?.colors?.primary || '#1B4332',
+    accent: sketch?.colors?.accent || '#F4A400',
+    background: sketch?.colors?.background || '#FDF6EC',
+    text: sketch?.colors?.text || '#2C1A0E',
+  }
+
+  // Translated labels
+  const L = {
+    quickActions: t(dict, 'dash.preview.quickActions', 'QUICK_ACTIONS'),
+    yourProjects: t(dict, 'dash.preview.yourProjects', 'YOUR_PROJECTS'),
+    createProject: t(dict, 'dash.preview.createProject', '+ CREATE_PROJECT'),
+    openProject: t(dict, 'dash.preview.openProject', 'OPEN_PROJECT'),
+    updated: t(dict, 'dash.preview.updated', 'UPDATED'),
+    execute: t(dict, 'dash.preview.execute', 'EXECUTE_INQUIRY'),
+    thinking: t(dict, 'dash.preview.thinking', 'THINKING...'),
+    thinkingMsg: t(dict, 'dash.preview.thinkingMsg', 'SignalBoost is thinking...'),
+    livePreview: t(dict, 'dash.preview.label', 'LIVE_PREVIEW'),
+    close: t(dict, 'dash.preview.close', 'CLOSE'),
+    openInBuilder: t(dict, 'dash.preview.openInBuilder', 'OPEN_IN_BUILDER →'),
+    upgrade: t(dict, 'dash.upgrade', 'Upgrade'),
+    team: t(dict, 'dash.team', 'Team'),
+    loadingTeam: t(dict, 'dash.loadingTeam', 'Loading team...'),
+    noProjects: t(dict, 'dash.noProjects', 'No projects yet'),
+    noProjectsSub: t(dict, 'dash.noProjectsSub', 'Create your first project above'),
+    feedback: t(dict, 'dash.feedback', 'Share feedback — every message helps improve SignalBoost'),
+  }
+
   return (
     <div style={{ color: '#fff', fontFamily: 'system-ui, -apple-system, sans-serif', maxWidth: 1200, margin: '0 auto', padding: '0 20px' }}>
       <style>{`
@@ -227,74 +274,150 @@ export default function DashboardOverviewPage() {
       {showLoginGate && <AuthModal onClose={() => {}} />}
 
       <div style={{ opacity: showLoginGate ? 0.2 : 1, pointerEvents: showLoginGate ? 'none' : 'auto', filter: showLoginGate ? 'blur(2px)' : 'none', transition: 'all 0.3s' }}>
-        <div className="fathom-glass" style={{ marginBottom: 28, borderRadius: 16, padding: 24 }}>
-          <div style={{ overflow: 'hidden', maxHeight: greetingHidden ? 0 : 200, opacity: greetingHidden ? 0 : 1, marginBottom: greetingHidden ? 0 : 20, transition: 'all .4s ease' }}>
-            <h1 className="terminal-text" style={{ fontSize: 24, fontWeight: 900, margin: '0 0 6px', background: 'linear-gradient(90deg,#3b82f6,#ffc300,#4ade80,#3b82f6)', backgroundSize: '300% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'shimmer 3s linear infinite', display: 'inline-block' }}>
-              {greetingData.headline.toUpperCase()} {greetingData.emoji}
-            </h1>
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', margin: 0 }}>
-              {greetingData.subline}
-            </p>
-          </div>
 
-          <div style={{ display: 'flex', gap: 10, marginBottom: promptOpen ? 16 : 0 }}>
-            <span className="terminal-text" style={{ color: BLUE, display: 'flex', alignItems: 'center', fontWeight: 700 }}>$</span>
-            <input
-              value={promptInput}
-              onChange={(e) => {
-                setPromptInput(e.target.value)
-                if (e.target.value.length > 0 && !hasTyped) setHasTyped(true)
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') sendPrompt()
-              }}
-              placeholder={t(dict, 'dash.askPlaceholder', 'Ask SignalBoost anything...')}
-              className="terminal-text"
-              style={{ flex: 1, padding: '12px 16px', borderRadius: 8, background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, outline: 'none' }}
-            />
+        <div style={{ display: 'flex', gap: 16, marginBottom: 28, alignItems: 'flex-start', flexWrap: 'wrap' }}>
 
-            <button
-              onClick={() => sendPrompt()}
-              disabled={promptLoading}
-              className="terminal-text"
-              style={{ padding: '0 20px', borderRadius: 8, border: 'none', background: BLUE, color: '#fff', fontWeight: 700, fontSize: 12, cursor: promptLoading ? 'wait' : 'pointer', opacity: promptLoading ? 0.7 : 1 }}
-            >
-              {promptLoading ? 'THINKING...' : 'EXECUTE_INQUIRY'}
-            </button>
-          </div>
-
-          {promptOpen && (
-            <div ref={promptRef} style={{ maxHeight: 320, overflowY: 'auto', padding: 14, borderRadius: 12, background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(255,255,255,0.08)', marginTop: 14 }}>
-              {promptMessages.map((m, idx) => (
-                <div key={`${m.role}-${idx}`} style={{ marginBottom: 12, display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                  <div style={{ maxWidth: '82%', whiteSpace: 'pre-wrap', lineHeight: 1.6, padding: '10px 12px', borderRadius: 12, background: m.role === 'user' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13 }}>
-                    {m.content}
-                  </div>
-                </div>
-              ))}
-
-              {promptLoading && (
-                <div style={{ color: 'rgba(255,255,255,.45)', fontSize: 13 }}>
-                  SignalBoost is thinking...
-                </div>
-              )}
+          <div className="fathom-glass" style={{ flex: sketch ? '1 1 380px' : '1 1 100%', minWidth: 320, borderRadius: 16, padding: 24 }}>
+            <div style={{ overflow: 'hidden', maxHeight: greetingHidden ? 0 : 200, opacity: greetingHidden ? 0 : 1, marginBottom: greetingHidden ? 0 : 20, transition: 'all .4s ease' }}>
+              <h1 className="terminal-text" style={{ fontSize: 24, fontWeight: 900, margin: '0 0 6px', background: 'linear-gradient(90deg,#3b82f6,#ffc300,#4ade80,#3b82f6)', backgroundSize: '300% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'shimmer 3s linear infinite', display: 'inline-block' }}>
+                {greetingData.headline.toUpperCase()} {greetingData.emoji}
+              </h1>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', margin: 0 }}>
+                {greetingData.subline}
+              </p>
             </div>
-          )}
 
-          {!promptOpen && (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
-              {promptSuggestions.map(q => (
-                <button key={q} onClick={() => sendPrompt(q)} className="terminal-text" style={{ padding: '6px 12px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.15)', color: 'rgba(255,255,255,0.4)', fontSize: 11, cursor: 'pointer' }}>
-                  {q}
+            <div style={{ display: 'flex', gap: 10, marginBottom: promptOpen ? 16 : 0 }}>
+              <span className="terminal-text" style={{ color: BLUE, display: 'flex', alignItems: 'center', fontWeight: 700 }}>$</span>
+              <input
+                value={promptInput}
+                onChange={(e) => {
+                  setPromptInput(e.target.value)
+                  if (e.target.value.length > 0 && !hasTyped) setHasTyped(true)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') sendPrompt()
+                }}
+                placeholder={t(dict, 'dash.askPlaceholder', 'Ask SignalBoost anything...')}
+                className="terminal-text"
+                style={{ flex: 1, padding: '12px 16px', borderRadius: 8, background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, outline: 'none' }}
+              />
+
+              <button
+                onClick={() => sendPrompt()}
+                disabled={promptLoading}
+                className="terminal-text"
+                style={{ padding: '0 20px', borderRadius: 8, border: 'none', background: BLUE, color: '#fff', fontWeight: 700, fontSize: 12, cursor: promptLoading ? 'wait' : 'pointer', opacity: promptLoading ? 0.7 : 1 }}
+              >
+                {promptLoading ? L.thinking : L.execute}
+              </button>
+            </div>
+
+            {promptOpen && (
+              <div ref={promptRef} style={{ maxHeight: 320, overflowY: 'auto', padding: 14, borderRadius: 12, background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(255,255,255,0.08)', marginTop: 14 }}>
+                {promptMessages.map((m, idx) => (
+                  <div key={`${m.role}-${idx}`} style={{ marginBottom: 12, display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                    <div style={{ maxWidth: '82%', whiteSpace: 'pre-wrap', lineHeight: 1.6, padding: '10px 12px', borderRadius: 12, background: m.role === 'user' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13 }}>
+                      {m.content}
+                    </div>
+                  </div>
+                ))}
+
+                {promptLoading && (
+                  <div style={{ color: 'rgba(255,255,255,.45)', fontSize: 13 }}>
+                    {L.thinkingMsg}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!promptOpen && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
+                {promptSuggestions.map(q => (
+                  <button key={q} onClick={() => sendPrompt(q)} className="terminal-text" style={{ padding: '6px 12px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.15)', color: 'rgba(255,255,255,0.4)', fontSize: 11, cursor: 'pointer' }}>
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {sketch && (
+            <div className="fathom-glass" style={{ flex: '1 1 420px', minWidth: 340, borderRadius: 16, padding: 16, animation: 'cardIn .4s ease both' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div className="terminal-text" style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: '.08em' }}>
+                  // {L.livePreview}
+                </div>
+                <button
+                  onClick={() => setSketch(null)}
+                  className="terminal-text"
+                  style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.4)', borderRadius: 4, fontSize: 10, padding: '3px 8px', cursor: 'pointer' }}
+                >
+                  {L.close}
                 </button>
-              ))}
+              </div>
+
+              <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ background: '#1a1a1a', padding: '8px 12px', display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff5f56', display: 'inline-block' }} />
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ffbd2e', display: 'inline-block' }} />
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#27c93f', display: 'inline-block' }} />
+                </div>
+
+                <div style={{ background: sketchColors.background, color: sketchColors.text, padding: '32px 24px', minHeight: 360 }}>
+                  <div style={{ textAlign: 'center', marginBottom: 28 }}>
+                    <div style={{ fontSize: 26, fontWeight: 900, color: sketchColors.primary, lineHeight: 1.2 }}>
+                      {sketch.headline || 'Your Headline Here'}
+                    </div>
+                    {sketch.tagline && (
+                      <div style={{ fontSize: 14, marginTop: 8, opacity: 0.8 }}>
+                        {sketch.tagline}
+                      </div>
+                    )}
+                    {sketch.cta && (
+                      <button style={{ marginTop: 18, background: sketchColors.accent, color: '#fff', border: 'none', borderRadius: 6, padding: '10px 22px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                        {sketch.cta}
+                      </button>
+                    )}
+                  </div>
+
+                  {sketch.sections && sketch.sections.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {sketch.sections.map((s, i) => (
+                        <div key={i} style={{ background: 'rgba(0,0,0,0.06)', borderLeft: `4px solid ${sketchColors.primary}`, padding: '12px 14px', borderRadius: 4, fontWeight: 600, fontSize: 14 }}>
+                          {s}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                {Object.entries(sketchColors).map(([name, hex]) => (
+                  <div key={name} style={{ flex: 1, textAlign: 'center' }}>
+                    <div style={{ height: 28, borderRadius: 4, background: hex, border: '1px solid rgba(255,255,255,0.1)' }} />
+                    <div className="terminal-text" style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
+                      {hex}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <Link
+                href="/dashboard/builder"
+                className="terminal-text"
+                style={{ display: 'block', textAlign: 'center', marginTop: 14, background: GOLD, color: '#000', padding: 12, borderRadius: 6, textDecoration: 'none', fontWeight: 800, fontSize: 12 }}
+              >
+                {L.openInBuilder}
+              </Link>
             </div>
           )}
         </div>
 
         <div style={{ marginBottom: 32 }}>
           <h2 className="terminal-text" style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginBottom: 16, letterSpacing: '.08em' }}>
-            // QUICK_ACTIONS
+            // {L.quickActions}
           </h2>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
@@ -340,16 +463,16 @@ export default function DashboardOverviewPage() {
         <div style={{ marginBottom: 28 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <h2 className="terminal-text" style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>
-              // YOUR_PROJECTS: {projectsTitle.toUpperCase()}
+              // {L.yourProjects}: {projectsTitle.toUpperCase()}
             </h2>
 
             {atLimit ? (
               <Link href="/pricing" style={{ background: GOLD, color: '#000', padding: '10px 20px', borderRadius: 6, textDecoration: 'none', fontWeight: 800, fontSize: 12, fontFamily: 'monospace' }}>
-                UPGRADE
+                {L.upgrade.toUpperCase()}
               </Link>
             ) : (
               <Link href="/dashboard/builder" className="terminal-text" style={{ background: GOLD, color: '#000', padding: '10px 20px', border: 'none', borderRadius: 6, fontWeight: 800, fontSize: 11, textDecoration: 'none' }}>
-                + CREATE_PROJECT
+                {L.createProject}
               </Link>
             )}
           </div>
@@ -358,7 +481,7 @@ export default function DashboardOverviewPage() {
             <div className="fathom-glass" style={{ borderStyle: 'dashed', borderRadius: 16, padding: 50, textAlign: 'center' }}>
               <div style={{ fontSize: 32, opacity: 0.3 }}>📁</div>
               <div className="terminal-text" style={{ marginTop: 10, fontWeight: 700, fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>
-                No projects yet. Start your first one.
+                {L.noProjects}. {L.noProjectsSub}
               </div>
             </div>
           ) : (
@@ -386,7 +509,7 @@ export default function DashboardOverviewPage() {
                   </div>
 
                   <div className="terminal-text" style={{ marginTop: 14, fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>
-                    UPDATED: {timeAgo(p.last_edited_at).toUpperCase()}
+                    {L.updated}: {timeAgo(p.last_edited_at).toUpperCase()}
                   </div>
 
                   <Link
@@ -394,7 +517,7 @@ export default function DashboardOverviewPage() {
                     className="terminal-text"
                     style={{ display: 'block', marginTop: 14, textAlign: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: 8, borderRadius: 6, textDecoration: 'none', fontSize: 11, fontWeight: 700 }}
                   >
-                    OPEN_PROJECT
+                    {L.openProject}
                   </Link>
                 </div>
               ))}
@@ -404,13 +527,13 @@ export default function DashboardOverviewPage() {
 
         <div className="fathom-glass" style={{ borderRadius: 14, padding: 20, marginBottom: 24 }}>
           <h2 className="terminal-text" style={{ fontSize: 11, letterSpacing: '.08em', color: 'rgba(255,255,255,0.3)', marginBottom: 20 }}>
-            // TEAM
+            // {L.team.toUpperCase()}
           </h2>
-          {userId ? <TeamManager userId={userId} /> : <div className="terminal-text" style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>Loading team...</div>}
+          {userId ? <TeamManager userId={userId} /> : <div className="terminal-text" style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>{L.loadingTeam}</div>}
         </div>
 
         <Link href="/dashboard/feedback" style={{ display: 'block', textAlign: 'center', padding: 14, background: 'rgba(255,195,0,.03)', border: '1px solid rgba(255,195,0,.15)', borderRadius: 10, textDecoration: 'none', color: 'rgba(255,195,0,.8)', fontWeight: 700, fontSize: 12, fontFamily: 'monospace' }}>
-          + SEND_FEEDBACK
+          {L.feedback}
         </Link>
       </div>
     </div>

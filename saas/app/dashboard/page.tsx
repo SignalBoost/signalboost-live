@@ -8,7 +8,6 @@ import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 import {
   getProjects,
-  createProject,
   canCreateProject,
   deleteProject,
   updateProjectStatus,
@@ -18,16 +17,7 @@ import {
 } from '@/lib/projects'
 import { getGreeting, SupportedLocale } from '@/lib/cultural-calendar'
 
-const LANGS = [
-  'English',
-  'Portugues (BR + PT)',
-  'Espanol (ES + LATAM)',
-  'Polski',
-  'Russkiy',
-]
-
 const BLUE = '#3b82f6'
-const BLUE_DIM = 'rgba(59,130,246,0.06)'
 const BLUE_BORDER = 'rgba(59,130,246,0.3)'
 const GOLD = '#ffc300'
 
@@ -48,14 +38,6 @@ export default function DashboardOverviewPage() {
   const [plan, setPlan] = useState('free')
   const [projectLimit, setProjectLimit] = useState(1)
   const [hoveredAction, setHoveredAction] = useState<string | null>(null)
-  const [showNewProject, setShowNewProject] = useState(false)
-  const [showUpgrade, setShowUpgrade] = useState(false)
-  const [upgradeMsg, setUpgradeMsg] = useState('')
-  const [newName, setNewName] = useState('')
-  const [newType, setNewType] = useState<Project['type']>('website')
-  const [newLang, setNewLang] = useState('English')
-  const [newDesc, setNewDesc] = useState('')
-  const [creating, setCreating] = useState(false)
 
   const [promptInput, setPromptInput] = useState('')
   const [promptMessages, setPromptMessages] = useState<Message[]>([])
@@ -66,34 +48,10 @@ export default function DashboardOverviewPage() {
   const promptRef = useRef<HTMLDivElement>(null)
 
   const QUICK_ACTIONS = [
-    {
-      type: 'website' as const,
-      icon: '🌐',
-      label: t(dict, 'dash.actions.website.label', 'Build a website'),
-      subline: t(dict, 'dash.actions.website.subline', 'Create or edit your online presence'),
-      href: '/dashboard/builder',
-    },
-    {
-      type: 'review' as const,
-      icon: '⭐',
-      label: t(dict, 'dash.actions.review.label', 'Collect reviews'),
-      subline: t(dict, 'dash.actions.review.subline', 'Get feedback and testimonials'),
-      href: '/dashboard/reviews',
-    },
-    {
-      type: 'podcast' as const,
-      icon: '🎙️',
-      label: t(dict, 'dash.actions.podcast.label', 'Generate native audio'),
-      subline: t(dict, 'dash.actions.podcast.subline', 'Create voice content in multiple languages'),
-      href: '/dashboard/audio',
-    },
-    {
-      type: 'video' as const,
-      icon: '🎬',
-      label: t(dict, 'dash.actions.video.label', 'Create videos'),
-      subline: t(dict, 'dash.actions.video.subline', 'Turn content into visual assets'),
-      href: '/dashboard/video',
-    },
+    { type: 'website' as const, icon: '🌐', label: t(dict, 'dash.actions.website.label', 'Build a website'), subline: t(dict, 'dash.actions.website.subline', 'Create or edit your online presence'), href: '/dashboard/builder' },
+    { type: 'review' as const, icon: '⭐', label: t(dict, 'dash.actions.review.label', 'Collect reviews'), subline: t(dict, 'dash.actions.review.subline', 'Get feedback and testimonials'), href: '/dashboard/reviews' },
+    { type: 'podcast' as const, icon: '🎙️', label: t(dict, 'dash.actions.podcast.label', 'Generate native audio'), subline: t(dict, 'dash.actions.podcast.subline', 'Create voice content in multiple languages'), href: '/dashboard/audio' },
+    { type: 'video' as const, icon: '🎬', label: t(dict, 'dash.actions.video.label', 'Create videos'), subline: t(dict, 'dash.actions.video.subline', 'Turn content into visual assets'), href: '/dashboard/video' },
   ]
 
   const NEW_USER_PROMPTS = [
@@ -118,7 +76,6 @@ export default function DashboardOverviewPage() {
 
         const meta = data.user.user_metadata
         const fullName = meta?.full_name || meta?.name || ''
-
         setFirstName(fullName.split(' ')[0] || null)
 
         getProjects(data.user.id).then(p => {
@@ -143,11 +100,10 @@ export default function DashboardOverviewPage() {
     if (promptRef.current) {
       promptRef.current.scrollTop = promptRef.current.scrollHeight
     }
-  }, [promptMessages])
+  }, [promptMessages, promptLoading])
 
   async function sendPrompt(text?: string) {
     const content = text || promptInput.trim()
-
     if (!content || promptLoading) return
 
     setPromptInput('')
@@ -183,7 +139,7 @@ export default function DashboardOverviewPage() {
         ...prev,
         {
           role: 'assistant',
-          content: data.reply,
+          content: data.reply || t(dict, 'dash.connectionError', 'Having trouble connecting. Please try again.'),
         },
       ])
     } catch {
@@ -199,36 +155,6 @@ export default function DashboardOverviewPage() {
     setPromptLoading(false)
   }
 
-  async function tryCreate(
-    type: Project['type'],
-    name: string,
-    language = 'English',
-    description = ''
-  ) {
-    if (!userId) return
-
-    setCreating(true)
-
-    const result = await createProject(userId, {
-      name,
-      type,
-      language,
-      description,
-    })
-
-    if ((result as any).limitReached) {
-      setUpgradeMsg((result as any).error)
-      setShowUpgrade(true)
-    } else if ((result as any).data) {
-      setProjects(prev => [(result as any).data, ...prev])
-      setShowNewProject(false)
-      setNewName('')
-      setNewDesc('')
-    }
-
-    setCreating(false)
-  }
-
   async function handleDelete(id: string) {
     await deleteProject(id)
     setProjects(prev => prev.filter(p => p.id !== id))
@@ -236,9 +162,7 @@ export default function DashboardOverviewPage() {
 
   async function handleStatus(id: string, status: Project['status']) {
     await updateProjectStatus(id, status)
-    setProjects(prev =>
-      prev.map(p => (p.id === id ? { ...p, status } : p))
-    )
+    setProjects(prev => prev.map(p => (p.id === id ? { ...p, status } : p)))
   }
 
   function timeAgo(date: string) {
@@ -258,23 +182,17 @@ export default function DashboardOverviewPage() {
 
   const greetingData = useMemo(
     () => getGreeting(lang as SupportedLocale, { firstName, isNewUser, isLoggedIn }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [projectsLoaded, isLoggedIn, firstName, lang]
   )
 
-  const promptSuggestions = isNewUser
-    ? NEW_USER_PROMPTS
-    : RETURNING_PROMPTS
+  const promptSuggestions = isNewUser ? NEW_USER_PROMPTS : RETURNING_PROMPTS
 
   const projectsTitle = firstName
     ? t(dict, 'dash.projectsTitleNamed', "{name}'s projects").replace('{name}', firstName)
     : t(dict, 'dash.projectsTitle', 'Your projects')
 
   const atLimit = projects.length >= projectLimit
-  const usagePercent = Math.min((projects.length / projectLimit) * 100, 100)
-
   const greetingHidden = hasTyped || promptMessages.length > 0
-
   const showLoginGate = authChecked && !isLoggedIn
 
   return (
@@ -309,17 +227,16 @@ export default function DashboardOverviewPage() {
       {showLoginGate && <AuthModal onClose={() => {}} />}
 
       <div style={{ opacity: showLoginGate ? 0.2 : 1, pointerEvents: showLoginGate ? 'none' : 'auto', filter: showLoginGate ? 'blur(2px)' : 'none', transition: 'all 0.3s' }}>
-
-        {/* Main Agent Support Command Module */}
-        <div className="fathom-glass" style={{ marginBottom: 28, borderRadius: 16, padding: '24px' }}>
+        <div className="fathom-glass" style={{ marginBottom: 28, borderRadius: 16, padding: 24 }}>
           <div style={{ overflow: 'hidden', maxHeight: greetingHidden ? 0 : 200, opacity: greetingHidden ? 0 : 1, marginBottom: greetingHidden ? 0 : 20, transition: 'all .4s ease' }}>
             <h1 className="terminal-text" style={{ fontSize: 24, fontWeight: 900, margin: '0 0 6px', background: 'linear-gradient(90deg,#3b82f6,#ffc300,#4ade80,#3b82f6)', backgroundSize: '300% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'shimmer 3s linear infinite', display: 'inline-block' }}>
               {greetingData.headline.toUpperCase()} {greetingData.emoji}
             </h1>
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', margin: 0 }}>{greetingData.subline}</p>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', margin: 0 }}>
+              {greetingData.subline}
+            </p>
           </div>
 
-          {/* Assistant Injection Feed */}
           <div style={{ display: 'flex', gap: 10, marginBottom: promptOpen ? 16 : 0 }}>
             <span className="terminal-text" style={{ color: BLUE, display: 'flex', alignItems: 'center', fontWeight: 700 }}>$</span>
             <input
@@ -328,15 +245,41 @@ export default function DashboardOverviewPage() {
                 setPromptInput(e.target.value)
                 if (e.target.value.length > 0 && !hasTyped) setHasTyped(true)
               }}
-              onKeyDown={(e) => e.key === 'Enter' && sendPrompt()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') sendPrompt()
+              }}
               placeholder={t(dict, 'dash.askPlaceholder', 'Ask SignalBoost anything...')}
               className="terminal-text"
               style={{ flex: 1, padding: '12px 16px', borderRadius: 8, background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, outline: 'none' }}
             />
-            <button onClick={() => sendPrompt()} className="terminal-text" style={{ padding: '0 20px', borderRadius: 8, border: 'none', background: BLUE, color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
-              EXECUTE_INQUIRY
+
+            <button
+              onClick={() => sendPrompt()}
+              disabled={promptLoading}
+              className="terminal-text"
+              style={{ padding: '0 20px', borderRadius: 8, border: 'none', background: BLUE, color: '#fff', fontWeight: 700, fontSize: 12, cursor: promptLoading ? 'wait' : 'pointer', opacity: promptLoading ? 0.7 : 1 }}
+            >
+              {promptLoading ? 'THINKING...' : 'EXECUTE_INQUIRY'}
             </button>
           </div>
+
+          {promptOpen && (
+            <div ref={promptRef} style={{ maxHeight: 320, overflowY: 'auto', padding: 14, borderRadius: 12, background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(255,255,255,0.08)', marginTop: 14 }}>
+              {promptMessages.map((m, idx) => (
+                <div key={`${m.role}-${idx}`} style={{ marginBottom: 12, display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                  <div style={{ maxWidth: '82%', whiteSpace: 'pre-wrap', lineHeight: 1.6, padding: '10px 12px', borderRadius: 12, background: m.role === 'user' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13 }}>
+                    {m.content}
+                  </div>
+                </div>
+              ))}
+
+              {promptLoading && (
+                <div style={{ color: 'rgba(255,255,255,.45)', fontSize: 13 }}>
+                  SignalBoost is thinking...
+                </div>
+              )}
+            </div>
+          )}
 
           {!promptOpen && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
@@ -349,11 +292,11 @@ export default function DashboardOverviewPage() {
           )}
         </div>
 
-        {/* Quick Launch Action Matrices */}
         <div style={{ marginBottom: 32 }}>
           <h2 className="terminal-text" style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginBottom: 16, letterSpacing: '.08em' }}>
-            // FUNCTION_ROUTING_MODULES
+            // QUICK_ACTIONS
           </h2>
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
             {QUICK_ACTIONS.map(item => (
               <Link
@@ -365,47 +308,58 @@ export default function DashboardOverviewPage() {
                 style={{ borderRadius: 12, padding: 20, textDecoration: 'none', transition: 'all .2s', borderColor: hoveredAction === item.type ? BLUE_BORDER : 'rgba(255,255,255,0.06)', background: hoveredAction === item.type ? 'rgba(59,130,246,0.04)' : 'rgba(6, 9, 19, 0.4)' }}
               >
                 <div style={{ fontSize: 24 }}>{item.icon}</div>
-                <div className="terminal-text" style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginTop: 10 }}>{item.label.toUpperCase().replace(' ', '_')}</div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 6, lineHeight: 1.4 }}>{item.subline}</div>
+                <div className="terminal-text" style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginTop: 10 }}>
+                  {item.label.toUpperCase().replace(' ', '_')}
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 6, lineHeight: 1.4 }}>
+                  {item.subline}
+                </div>
               </Link>
             ))}
           </div>
         </div>
 
-        {/* Environmental System Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 28 }}>
           {[
             { label: t(dict, 'dash.stats.activeSites', 'Active sites'), value: projects.filter(p => p.status === 'live').length },
             { label: t(dict, 'dash.stats.projects', 'Projects'), value: `${projects.length}/${projectLimit === 999 ? '∞' : projectLimit}` },
             { label: t(dict, 'dash.stats.audioGenerated', 'Audio generated'), value: `0 ${t(dict, 'dash.stats.min', 'min')}` },
-            { label: t(dict, 'dash.stats.videosCreated', 'Videos created'), value: '0' }
+            { label: t(dict, 'dash.stats.videosCreated', 'Videos created'), value: '0' },
           ].map(stat => (
             <div key={stat.label} className="fathom-glass" style={{ borderRadius: 12, padding: 16, background: 'rgba(6, 9, 19, 0.3)' }}>
               <div className="terminal-text" style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 8 }}>
                 [{stat.label.toUpperCase().replace(' ', '_')}]
               </div>
-              <div className="terminal-text" style={{ fontSize: 22, fontWeight: 900, color: BLUE }}>{stat.value}</div>
+              <div className="terminal-text" style={{ fontSize: 22, fontWeight: 900, color: BLUE }}>
+                {stat.value}
+              </div>
             </div>
           ))}
         </div>
 
-        {/* Core Matrix Project Database Row */}
         <div style={{ marginBottom: 28 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <div>
-              <h2 className="terminal-text" style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>// MANIFEST_REGISTRY: {projectsTitle.toUpperCase()}</h2>
-            </div>
+            <h2 className="terminal-text" style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>
+              // YOUR_PROJECTS: {projectsTitle.toUpperCase()}
+            </h2>
+
             {atLimit ? (
-              <Link href="/pricing" style={{ background: GOLD, color: '#000', padding: '10px 20px', borderRadius: 6, textDecoration: 'none', fontWeight: 800, fontSize: 12, fontFamily: 'monospace' }}>UPGRADE_ALLOCATION</Link>
+              <Link href="/pricing" style={{ background: GOLD, color: '#000', padding: '10px 20px', borderRadius: 6, textDecoration: 'none', fontWeight: 800, fontSize: 12, fontFamily: 'monospace' }}>
+                UPGRADE
+              </Link>
             ) : (
-              <button onClick={() => setShowNewProject(true)} className="terminal-text" style={{ background: GOLD, color: '#000', padding: '10px 20px', border: 'none', borderRadius: 6, fontWeight: 800, fontSize: 11, cursor: 'pointer' }}>+ ALLOCATE_PROJECT</button>
+              <Link href="/dashboard/builder" className="terminal-text" style={{ background: GOLD, color: '#000', padding: '10px 20px', border: 'none', borderRadius: 6, fontWeight: 800, fontSize: 11, textDecoration: 'none' }}>
+                + CREATE_PROJECT
+              </Link>
             )}
           </div>
 
           {projects.length === 0 ? (
-            <div className="fathom-glass" style={{ borderStyle: 'dashed', borderRadius: 16, padding: '50px', textAlign: 'center' }}>
+            <div className="fathom-glass" style={{ borderStyle: 'dashed', borderRadius: 16, padding: 50, textAlign: 'center' }}>
               <div style={{ fontSize: 32, opacity: 0.3 }}>📁</div>
-              <div className="terminal-text" style={{ marginTop: 10, fontWeight: 700, fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>EMPTY_MANIFEST: NO_NODES_FOUND</div>
+              <div className="terminal-text" style={{ marginTop: 10, fontWeight: 700, fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>
+                No projects yet. Start your first one.
+              </div>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
@@ -417,23 +371,30 @@ export default function DashboardOverviewPage() {
                         {TYPE_ICONS[p.type]}
                       </div>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, fontSize: 14, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                        <div className="terminal-text" style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{p.language.toUpperCase()}</div>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {p.name}
+                        </div>
+                        <div className="terminal-text" style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                          {p.language.toUpperCase()}
+                        </div>
                       </div>
                     </div>
+
                     <div className="terminal-text" style={{ color: STATUS_COLORS[p.status], fontSize: 10, fontWeight: 700 }}>
                       [{p.status.toUpperCase()}]
                     </div>
                   </div>
+
                   <div className="terminal-text" style={{ marginTop: 14, fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>
-                    MUTATED: {timeAgo(p.last_edited_at).toUpperCase()}
+                    UPDATED: {timeAgo(p.last_edited_at).toUpperCase()}
                   </div>
+
                   <Link
                     href={`/dashboard/${p.type === 'website' ? 'builder' : p.type === 'review' ? 'reviews' : p.type === 'podcast' ? 'audio' : 'video'}`}
                     className="terminal-text"
-                    style={{ display: 'block', marginTop: 14, textAlign: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '8px', borderRadius: 6, textDecoration: 'none', fontSize: 11, fontWeight: 700 }}
+                    style={{ display: 'block', marginTop: 14, textAlign: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: 8, borderRadius: 6, textDecoration: 'none', fontSize: 11, fontWeight: 700 }}
                   >
-                    ACCESS_INSTANCE
+                    OPEN_PROJECT
                   </Link>
                 </div>
               ))}
@@ -441,16 +402,15 @@ export default function DashboardOverviewPage() {
           )}
         </div>
 
-        {/* Global Team Infrastructure Node Block */}
         <div className="fathom-glass" style={{ borderRadius: 14, padding: 20, marginBottom: 24 }}>
           <h2 className="terminal-text" style={{ fontSize: 11, letterSpacing: '.08em', color: 'rgba(255,255,255,0.3)', marginBottom: 20 }}>
-            // SECURITY_ORCHESTRATION_TEAM
+            // TEAM
           </h2>
-          {userId ? <TeamManager userId={userId} /> : <div className="terminal-text" style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>SYNCING_TEAM_CLUSTERS...</div>}
+          {userId ? <TeamManager userId={userId} /> : <div className="terminal-text" style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>Loading team...</div>}
         </div>
 
         <Link href="/dashboard/feedback" style={{ display: 'block', textAlign: 'center', padding: 14, background: 'rgba(255,195,0,.03)', border: '1px solid rgba(255,195,0,.15)', borderRadius: 10, textDecoration: 'none', color: 'rgba(255,195,0,.8)', fontWeight: 700, fontSize: 12, fontFamily: 'monospace' }}>
-          + TRANSMIT_FEEDBACK_DATA_STREAM
+          + SEND_FEEDBACK
         </Link>
       </div>
     </div>

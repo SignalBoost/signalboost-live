@@ -50,6 +50,7 @@ type UploadedFile = {
   size: number
   type: string
   preview?: string
+  file?: File
 }
 
 const MODES: { id: Mode; icon: string; labelKey: string }[] = [
@@ -149,68 +150,169 @@ function VideoOverlay({
   )
 }
 
+function fileToDataUri(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
 function GeneratePanel({
-  data, prompt, onGenerated, dict,
+  prompt, uploadedFiles, onCreditsChange, dict,
 }: {
-  data: GenerateData
   prompt: string
-  onGenerated: (asset: Asset) => void
+  uploadedFiles: UploadedFile[]
+  onCreditsChange: (n: number) => void
   dict: any
 }) {
-  const [selectedAvatar, setSelectedAvatar] = useState(data.avatars[0]?.id ?? '')
-  const [selectedFormat, setSelectedFormat] = useState<'9:16' | '16:9' | '1:1'>((data.format as '9:16' | '16:9' | '1:1') ?? '9:16')
-  const [script, setScript] = useState(data.script)
-  const [generating, setGenerating] = useState(false)
-  const [generated, setGenerated] = useState(false)
+  const firstImage = uploadedFiles.find(f => f.type.startsWith('image/'))
+  const [vmode, setVmode] = useState<'text' | 'image'>(firstImage ? 'image' : 'text')
+  const [selectedFormat, setSelectedFormat] = useState<'9:16' | '16:9' | '1:1'>('9:16')
+  const [script, setScript] = useState(prompt)
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'rendering' | 'done' | 'failed'>('idle')
+  const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const pollRef = useRef<any>(null)
 
-  async function handleGenerate() {
-    if (!data.heygenReady) {
-      alert(t(dict, 'lab.heygenNotConfigured', 'HeyGen API key not configured yet. Add HEYGEN_API_KEY to Vercel environment variables to enable video generation.'))
-      return
-    }
-    setGenerating(true)
-    await new Promise(r => setTimeout(r, 2000))
-    setGenerating(false)
-    setGenerated(true)
-    onGenerated({ id: `gen-${Date.now()}`, title: prompt.slice(0, 60), source: 'youtube', embedUrl: '', watchUrl: '', license: 'public', addedAt: new Date().toISOString() })
+  useEffect(() => {
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
+  }, [])
+
+  function pollStatus(requestId: string, model: string) {
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch('/api/video-status', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ request_id: requestId, model }),
+        })
+        const data = await res.json()
+        if (data.status === 'done' && data.videoUrl) {
+          clearInterval(pollRef.current)
+          setVideoUrl(data.videoUrl)
+          setStatus('done')
+        } else if (data.status === 'failed') {
+          clearInterval(pollRef.current)
+          setStatus('failed')
+          setErrorMsg(t(dict, 'lab.genFailed', 'Generation failed. Your credit was refunded.'))
+        }
+        // otherwise keep polling (rendering)
+      } catch {
+        // transient — keep polling
+      }
+    }, 5000)
   }
 
-  return (
+  async function handleGenerate() {
+    setErrorMsg(null)
+    setVideoUrl(null)
+    setStatus('submitting')
+
+    try {
+      let imageDataUri: string | undefined
+      if (vmode === 'image') {
+        if (!firstImage?.file) {
+          setStatus('idle')
+          setErrorMsg(t(dict, 'lab.needImage', 'Attach an image first (use the 📎 button or paste one).'))
+          return
+        }
+        imageDataUri = await fileToDataUri(firstImage.file)
+      }
+
+      const res = await fetch('/api/video-generate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          mode: vmode,
+          prompt: script,
+          imageDataUri,
+          aspectRatio: selectedFormat,
+        }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setStatus('failed')
+        setErrorMsg(data.error || t(dict, 'lab.genFailed', 'Generation failed.'))
+        return
+      }
+
+      if (typeof data.remaining === 'number') onCreditsChange(data.remaining)
+      setStatus('rendering')
+      pollStatus(data.request_id, data.model)
+    } catch (err: any) {
+      setStatus('failed')
+      setErrorMsg(err.message || t(dict, 'lab.genFailed', 'Generation failed.'))
+    }
+  }
+
+  const busy = status === 'submitting' || status === 'rendering'
+return (
     <div style={{ background: 'rgba(20, 28, 50, 0.75)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: 12, padding: 22, marginBottom: 20, backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
         <div style={{ width: 38, height: 38, borderRadius: 8, background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🪄</div>
         <div>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', fontFamily: 'monospace' }}>{t(dict, 'lab.videoSynthesis', 'VIDEO_SYNTHESIS_UNIT')}</div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace' }}>AVATAR_ENGINE · {data.estimatedCost} · {selectedFormat}</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace' }}>KLING_ENGINE · {selectedFormat}</div>
         </div>
       </div>
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 8, fontFamily: 'monospace' }}>[{t(dict, 'lab.inputScript', 'INPUT_SCRIPT')}]</label>
-        <textarea value={script} onChange={e => setScript(e.target.value)} rows={4} style={{ width: '100%', background: 'rgba(4, 5, 11, 0.9)', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: 8, padding: '12px 16px', color: '#fff', fontSize: 14, fontFamily: 'monospace', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
+
+      <div style={{ display: 'flex', gap: 6, background: 'rgba(4, 5, 11, 0.7)', padding: 6, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', marginBottom: 16 }}>
+        {(['text', 'image'] as const).map(vm => (
+          <button key={vm} onClick={() => setVmode(vm)} disabled={busy} style={{ flex: 1, padding: '10px 8px', borderRadius: 6, fontSize: 12, fontFamily: 'monospace', fontWeight: 700, border: 'none', cursor: busy ? 'default' : 'pointer', background: vmode === vm ? 'rgba(59,130,246,0.25)' : 'transparent', color: vmode === vm ? '#fff' : '#7a90b8' }}>
+            {vm === 'text' ? `📝 ${t(dict, 'lab.textToVideo', 'TEXT → VIDEO')}` : `🖼️ ${t(dict, 'lab.imageToVideo', 'IMAGE → VIDEO')}`}
+          </button>
+        ))}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-        <div>
-          <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 8, fontFamily: 'monospace' }}>[{t(dict, 'lab.avatarNode', 'AVATAR_NODE')}]</label>
-          <select value={selectedAvatar} onChange={e => setSelectedAvatar(e.target.value)} style={{ width: '100%', background: 'rgba(4, 5, 11, 0.9)', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: 6, padding: '10px 14px', color: '#fff', fontSize: 13, fontFamily: 'monospace' }}>
-            {data.avatars.map(a => <option key={a.id} value={a.id} style={{ background: '#060913' }}>{a.name}</option>)}
-          </select>
-        </div>
-        <div>
-          <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 8, fontFamily: 'monospace' }}>[{t(dict, 'lab.aspectRatio', 'ASPECT_RATIO')}]</label>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {(['9:16', '16:9', '1:1'] as const).map(f => (
-              <button key={f} onClick={() => setSelectedFormat(f)} style={{ flex: 1, padding: '10px 0', borderRadius: 6, border: '1px solid rgba(255,255,255,0.2)', background: selectedFormat === f ? 'rgba(59,130,246,0.3)' : 'rgba(4, 5, 11, 0.6)', color: selectedFormat === f ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'monospace', fontWeight: 700, cursor: 'pointer' }}>{f}</button>
-            ))}
-          </div>
-        </div>
-      </div>
-      {!data.heygenReady && (
-        <div style={{ background: 'rgba(255,195,0,0.04)', border: '1px solid rgba(255,195,0,0.2)', borderRadius: 8, padding: '12px 16px', fontSize: 12, color: 'rgba(255,195,0,0.9)', marginBottom: 16, fontFamily: 'monospace' }}>
-          {t(dict, 'lab.heygenWarning', 'CRITICAL: HEYGEN_API_KEY environment node unconfigured.')}
+
+      {vmode === 'image' && (
+        <div style={{ marginBottom: 16, fontSize: 12, fontFamily: 'monospace', color: firstImage ? GREEN : 'rgba(255,195,0,0.9)' }}>
+          {firstImage
+            ? `🖼️ ${t(dict, 'lab.usingImage', 'Using attached image')}: ${firstImage.name}`
+            : `⚠️ ${t(dict, 'lab.attachImagePrompt', 'Attach an image above (📎 or paste) to animate it.')}`}
         </div>
       )}
-      <button onClick={handleGenerate} disabled={generating || generated} style={{ width: '100%', padding: '14px', borderRadius: 8, background: generated ? 'rgba(74,222,128,0.12)' : generating ? 'rgba(255,255,255,0.04)' : GOLD, border: generated ? '1px solid rgba(74,222,128,0.35)' : 'none', color: generated ? GREEN : generating ? 'rgba(255,255,255,0.4)' : '#000', fontFamily: 'monospace', fontWeight: 800, fontSize: 14, cursor: generating || generated ? 'default' : 'pointer', transition: 'all 0.15s' }}>
-        {generated ? `✓ ${t(dict, 'lab.renderComplete', 'RENDER_COMPLETE — Verified in Tray')}` : generating ? `⏳ ${t(dict, 'lab.compiling', 'PIPELINE_COMPILING...')}` : `⚡ ${t(dict, 'lab.initializeSynthesis', 'INITIALIZE_SYNTHESIS')} · ${data.estimatedCost}`}
+
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 8, fontFamily: 'monospace' }}>[{vmode === 'image' ? t(dict, 'lab.motionPrompt', 'MOTION_PROMPT') : t(dict, 'lab.videoPrompt', 'VIDEO_PROMPT')}]</label>
+        <textarea value={script} onChange={e => setScript(e.target.value)} rows={4} placeholder={vmode === 'image' ? t(dict, 'lab.motionPlaceholder', 'Describe the motion, e.g. "slow cinematic zoom in, gentle camera pan"') : t(dict, 'lab.promptPlaceholder', 'Describe the video you want to generate...')} style={{ width: '100%', background: 'rgba(4, 5, 11, 0.9)', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: 8, padding: '12px 16px', color: '#fff', fontSize: 14, fontFamily: 'monospace', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: 8, fontFamily: 'monospace' }}>[{t(dict, 'lab.aspectRatio', 'ASPECT_RATIO')}]</label>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {(['9:16', '16:9', '1:1'] as const).map(f => (
+            <button key={f} onClick={() => setSelectedFormat(f)} disabled={busy} style={{ flex: 1, padding: '10px 0', borderRadius: 6, border: '1px solid rgba(255,255,255,0.2)', background: selectedFormat === f ? 'rgba(59,130,246,0.3)' : 'rgba(4, 5, 11, 0.6)', color: selectedFormat === f ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'monospace', fontWeight: 700, cursor: busy ? 'default' : 'pointer' }}>{f}</button>
+          ))}
+        </div>
+      </div>
+
+      {status === 'rendering' && (
+        <div style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 8, padding: '14px 16px', marginBottom: 16, fontSize: 13, fontFamily: 'monospace', color: 'rgba(255,255,255,0.8)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(59,130,246,0.4)', borderTopColor: BLUE, borderRadius: '50%', animation: 'lab-spin 0.9s linear infinite' }} />
+          {t(dict, 'lab.renderingNote', 'Rendering your video — this usually takes 2–4 minutes. You can keep working; it will appear here when ready.')}
+        </div>
+      )}
+
+      {errorMsg && (
+        <div style={{ background: 'rgba(255,195,0,0.06)', border: '1px solid rgba(255,195,0,0.3)', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 12, fontFamily: 'monospace', color: 'rgba(255,195,0,0.95)' }}>
+          {errorMsg}
+        </div>
+      )}
+
+      {status === 'done' && videoUrl && (
+        <div style={{ marginBottom: 16 }}>
+          <video src={videoUrl} controls autoPlay loop style={{ width: '100%', borderRadius: 10, background: '#000', maxHeight: 360 }} />
+          <a href={videoUrl} download target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginTop: 10, width: '100%', padding: '12px', borderRadius: 8, background: GREEN, color: '#000', fontWeight: 800, fontSize: 14, textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box', fontFamily: 'monospace' }}>
+            ⬇ {t(dict, 'lab.downloadVideo', 'DOWNLOAD VIDEO')}
+          </a>
+        </div>
+      )}
+
+      <button onClick={handleGenerate} disabled={busy} style={{ width: '100%', padding: '14px', borderRadius: 8, background: busy ? 'rgba(255,255,255,0.04)' : status === 'done' ? 'rgba(74,222,128,0.12)' : GOLD, border: status === 'done' ? '1px solid rgba(74,222,128,0.35)' : 'none', color: busy ? 'rgba(255,255,255,0.4)' : status === 'done' ? GREEN : '#000', fontFamily: 'monospace', fontWeight: 800, fontSize: 14, cursor: busy ? 'default' : 'pointer', transition: 'all 0.15s' }}>
+        {status === 'submitting' ? `⏳ ${t(dict, 'lab.submitting', 'SUBMITTING...')}` : status === 'rendering' ? `⏳ ${t(dict, 'lab.rendering', 'RENDERING...')}` : status === 'done' ? `✓ ${t(dict, 'lab.generateAnother', 'GENERATE ANOTHER')}` : `⚡ ${t(dict, 'lab.generateVideo', 'GENERATE VIDEO')} (1 ${t(dict, 'lab.credit', 'credit')})`}
       </button>
     </div>
   )
@@ -262,6 +364,7 @@ function LabScene() {
     </div>
   )
 }
+
 export default function LabPage() {
   const { dict } = useI18n()
   const [mode, setMode] = useState<Mode>('auto')
@@ -276,8 +379,16 @@ export default function LabPage() {
   const [hasSearched, setHasSearched] = useState(false)
   const [project, setProject] = useState(t(dict, 'lab.defaultProject', 'My project'))
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
+  const [credits, setCredits] = useState<number | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    fetch('/api/credits')
+      .then(r => r.json())
+      .then(d => { if (typeof d.credits === 'number') setCredits(d.credits) })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     function handlePaste(e: ClipboardEvent) {
@@ -296,6 +407,7 @@ export default function LabPage() {
               size: file.size,
               type: file.type,
               preview: URL.createObjectURL(file),
+              file,
             }
             setUploadedFiles(prev => [...prev, newFile])
           }
@@ -327,6 +439,7 @@ export default function LabPage() {
       size: file.size,
       type: file.type,
       preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
+      file,
     }))
     setUploadedFiles(prev => [...prev, ...newFiles])
   }
@@ -535,7 +648,7 @@ export default function LabPage() {
             <span style={{ color: GREEN, filter: 'drop-shadow(0 0 4px #4ade80)' }}>●</span> {t(dict, 'lab.status', 'SIGNALBOOST_FOUNDRY // STATUS')}: <span style={{ color: '#fff' }}>{t(dict, 'lab.online', 'ONLINE')}</span>
           </div>
           <div style={{ display: 'flex', gap: 16 }}>
-            <span>[{t(dict, 'lab.systemLoad', 'SYSTEM_LOAD')}: <span style={{ color: GOLD }}>14%</span>]</span>
+            <span>[{t(dict, 'lab.videoCredits', 'VIDEO_CREDITS')}: <span style={{ color: GOLD }}>{credits === null ? '—' : credits}</span>]</span>
             <span>[{t(dict, 'lab.compute', 'COMPUTE')}: <span style={{ color: BLUE }}>{t(dict, 'lab.active', 'ACTIVE')}</span>]</span>
           </div>
         </div>
@@ -616,7 +729,7 @@ export default function LabPage() {
             )}
 
             {generateData && !loading && (
-              <GeneratePanel data={generateData} prompt={prompt} onGenerated={asset => addAsset(asset as any)} dict={dict} />
+              <GeneratePanel prompt={prompt} uploadedFiles={uploadedFiles} onCreditsChange={setCredits} dict={dict} />
             )}
 
             {results.length > 0 && !loading && (

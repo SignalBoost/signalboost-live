@@ -234,6 +234,18 @@
       "ago": "atrás",
       "justNow": "Agora mesmo"
     },
+    "status": {
+      "draft": "RASCUNHO",
+      "live": "NO AR",
+      "paused": "PAUSADO"
+    },
+    "lang": {
+      "english": "INGLÊS",
+      "portuguese": "PORTUGUÊS",
+      "spanish": "ESPANHOL",
+      "polish": "POLONÊS",
+      "russian": "RUSSO"
+    },
     "preview": {
       "label": "PRÉVIA_AO_VIVO",
       "close": "FECHAR",

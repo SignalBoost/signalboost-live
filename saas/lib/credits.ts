@@ -79,6 +79,15 @@ export async function getCreditState(userId: string): Promise<CreditState> {
 }
 
 /*
+  Convenience helper: returns just the current credit number.
+  Used by server-side API routes (never call directly from the browser).
+*/
+export async function getCredits(userId: string): Promise<number> {
+  const state = await getCreditState(userId)
+  return state.credits
+}
+
+/*
   Attempts to spend ONE video credit. Returns success + remaining balance.
   Applies monthly reset first via getCreditState, so balances are always current.
 */

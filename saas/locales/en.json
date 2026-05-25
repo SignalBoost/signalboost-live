@@ -182,7 +182,7 @@
       "burned": "Captions embedded directly into the video file."
     }
   },
-  "dash": {
+"dash": {
     "askPlaceholder": "Ask SignalBoost anything...",
     "askButton": "Ask",
     "startHere": "Start here",
@@ -232,6 +232,31 @@
       "minsShort": "m",
       "ago": "ago",
       "justNow": "Just now"
+    },
+    "status": {
+      "draft": "DRAFT",
+      "live": "LIVE",
+      "paused": "PAUSED"
+    },
+    "lang": {
+      "english": "ENGLISH",
+      "portuguese": "PORTUGUESE",
+      "spanish": "SPANISH",
+      "polish": "POLISH",
+      "russian": "RUSSIAN"
+    },
+    "preview": {
+      "label": "LIVE_PREVIEW",
+      "close": "CLOSE",
+      "openInBuilder": "OPEN_IN_BUILDER →",
+      "quickActions": "QUICK_ACTIONS",
+      "yourProjects": "YOUR_PROJECTS",
+      "createProject": "+ CREATE_PROJECT",
+      "openProject": "OPEN_PROJECT",
+      "updated": "UPDATED",
+      "execute": "EXECUTE_INQUIRY",
+      "thinking": "THINKING...",
+      "thinkingMsg": "SignalBoost is thinking..."
     }
   },
   "auth": {
@@ -300,7 +325,7 @@
     "nativeExperiences": "Native experiences available in",
     "poweredBy": "Powered by"
   },
-  "pricing_page": {
+"pricing_page": {
     "badge": "Simple pricing",
     "headline": "Start free. Publish when ready.",
     "subhead": "SignalBoost helps businesses grow with AI-powered websites, reviews, audio and content tools.",

@@ -19,6 +19,7 @@ export default function PricingPage() {
         t(dict, 'pricing_page.free.f2', '1 language'),
         t(dict, 'pricing_page.free.f3', 'Limited AI credits'),
         t(dict, 'pricing_page.free.f4', 'Review collector (up to 3 reviews)'),
+        t(dict, 'pricing_page.free.video', '2 AI video credits (watermarked, for testing)'),
         t(dict, 'pricing_page.free.f5', 'SignalBoost watermark'),
         t(dict, 'pricing_page.free.f6', 'Community support'),
       ],
@@ -38,6 +39,7 @@ export default function PricingPage() {
         t(dict, 'pricing_page.starter.f3', 'Review collection'),
         t(dict, 'pricing_page.starter.f4', '~50 audio generations/month'),
         t(dict, 'pricing_page.starter.f5', 'Captions in 2 languages'),
+        t(dict, 'pricing_page.starter.video', '15 AI video credits/month'),
         t(dict, 'pricing_page.starter.f6', 'No watermark'),
         t(dict, 'pricing_page.starter.f7', 'Email support'),
       ],
@@ -57,6 +59,7 @@ export default function PricingPage() {
         t(dict, 'pricing_page.pro.f3', 'Review suite + video'),
         t(dict, 'pricing_page.pro.f4', '~200 audio generations/month'),
         t(dict, 'pricing_page.pro.f5', 'Video creation tools'),
+        t(dict, 'pricing_page.pro.video', '50 AI video credits/month'),
         t(dict, 'pricing_page.pro.f6', 'Priority support'),
         t(dict, 'pricing_page.pro.f7', 'Team collaboration'),
       ],
@@ -76,6 +79,7 @@ export default function PricingPage() {
         t(dict, 'pricing_page.business.f3', 'White label'),
         t(dict, 'pricing_page.business.f4', 'Dedicated onboarding'),
         t(dict, 'pricing_page.business.f5', 'Priority processing'),
+        t(dict, 'pricing_page.business.video', '200 AI video credits/month'),
         t(dict, 'pricing_page.business.f6', 'Advanced reporting'),
         t(dict, 'pricing_page.business.f7', 'API & integrations'),
       ],
@@ -140,8 +144,7 @@ export default function PricingPage() {
   }
 
   const freePriceLabel = t(dict, 'pricing_page.priceFree', 'Free')
-
-  return (
+return (
     <main
       style={{
         minHeight: '100vh',

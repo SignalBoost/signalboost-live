@@ -77,6 +77,16 @@
     "renderComplete": "RENDER_COMPLETE — Verified in Tray",
     "initializeSynthesis": "INITIALIZE_SYNTHESIS"
   },
+  "builder": {
+    "tpl": {
+      "restaurant": { "name": "Restaurant", "desc": "Menu, hours, reservations, location" },
+      "retail": { "name": "Retail Shop", "desc": "Products, pricing, contact, about" },
+      "services": { "name": "Services", "desc": "What you offer, pricing, booking" },
+      "podcast": { "name": "Podcast", "desc": "Episodes, about, subscribe links" },
+      "portfolio": { "name": "Portfolio", "desc": "Work showcase, bio, contact" },
+      "blank": { "name": "Start blank", "desc": "Build from scratch with AI help" }
+    }
+  },
   "audio": {
     "pageTitle": "Audio",
     "pageSubtitle": "Turn your text into natural-sounding audio. Pick a language, choose a voice, generate.",
@@ -182,7 +192,7 @@
       "burned": "Captions embedded directly into the video file."
     }
   },
-"dash": {
+  "dash": {
     "askPlaceholder": "Ask SignalBoost anything...",
     "askButton": "Ask",
     "startHere": "Start here",
@@ -325,7 +335,7 @@
     "nativeExperiences": "Native experiences available in",
     "poweredBy": "Powered by"
   },
-"pricing_page": {
+  "pricing_page": {
     "badge": "Simple pricing",
     "headline": "Start free. Publish when ready.",
     "subhead": "SignalBoost helps businesses grow with AI-powered websites, reviews, audio and content tools.",

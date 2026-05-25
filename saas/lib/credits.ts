@@ -116,3 +116,29 @@ export async function spendVideoCredit(userId: string): Promise<{
 
   return { ok: true, remaining, plan: state.plan }
 }
+
+/*
+  Refunds ONE video credit (used when a generation fails after a credit was spent).
+  Never exceeds the plan's monthly allowance, so a refund can't inflate a balance.
+*/
+export async function refundVideoCredit(userId: string): Promise<void> {
+  const supabase = adminClient()
+
+  const { data } = await supabase
+    .from('subscriptions')
+    .select('plan, video_credits')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (!data) return
+
+  const plan = data.plan || 'free'
+  const allowance = PLAN_VIDEO_CREDITS[plan] ?? PLAN_VIDEO_CREDITS['free']
+  const current = data.video_credits ?? 0
+  const refunded = Math.min(current + 1, allowance)
+
+  await supabase
+    .from('subscriptions')
+    .update({ video_credits: refunded })
+    .eq('user_id', userId)
+}

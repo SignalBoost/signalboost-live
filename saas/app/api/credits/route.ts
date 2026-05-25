@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { getCredits } from '@/lib/credits'
+import { getCreditState } from '@/lib/credits'
 
 export async function GET() {
   try {
@@ -29,12 +29,24 @@ export async function GET() {
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user?.id) {
-      return NextResponse.json({ credits: 0 }, { status: 401 })
+      return NextResponse.json({ credits: 0, plan: 'free', name: null }, { status: 401 })
     }
 
-    const credits = await getCredits(user.id)
-    return NextResponse.json({ credits })
+    const state = await getCreditState(user.id)
+
+    // Derive a friendly display name from user metadata, falling back to email
+    const meta = (user.user_metadata || {}) as Record<string, any>
+    const name =
+      meta.full_name ||
+      meta.name ||
+      (user.email ? user.email.split('@')[0] : null)
+
+    return NextResponse.json({
+      credits: state.credits,
+      plan: state.plan,
+      name,
+    })
   } catch {
-    return NextResponse.json({ credits: 0 }, { status: 500 })
+    return NextResponse.json({ credits: 0, plan: 'free', name: null }, { status: 500 })
   }
 }

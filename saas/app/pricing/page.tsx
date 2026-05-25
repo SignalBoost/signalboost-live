@@ -83,7 +83,7 @@ export default function PricingPage() {
         t(dict, 'pricing_page.business.f6', 'Advanced reporting'),
         t(dict, 'pricing_page.business.f7', 'API & integrations'),
       ],
-      cta: t(dict, 'pricing_page.business.cta', 'Contact us'),
+      cta: t(dict, 'pricing_page.business.cta', 'Get Business'),
       highlight: false,
       seats: t(dict, 'pricing_page.seats10', '10+ seats'),
       price: '$149',
@@ -93,12 +93,6 @@ export default function PricingPage() {
   async function handleCheckout(plan: string) {
     if (plan === 'free') {
       window.location.href = '/dashboard'
-      return
-    }
-
-    if (plan === 'business') {
-      window.location.href =
-        `mailto:${CONTACT_EMAIL}?subject=SignalBoost Business Inquiry`
       return
     }
 

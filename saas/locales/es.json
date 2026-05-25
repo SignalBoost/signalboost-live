@@ -78,6 +78,16 @@
     "renderComplete": "RENDERIZACIÓN_COMPLETA — Verificado en Bandeja",
     "initializeSynthesis": "INICIALIZAR_SÍNTESIS"
   },
+  "builder": {
+    "tpl": {
+      "restaurant": { "name": "Restaurante", "desc": "Menú, horarios, reservas, ubicación" },
+      "retail": { "name": "Tienda minorista", "desc": "Productos, precios, contacto, acerca de" },
+      "services": { "name": "Servicios", "desc": "Lo que ofreces, precios, reservas" },
+      "podcast": { "name": "Podcast", "desc": "Episodios, acerca de, enlaces de suscripción" },
+      "portfolio": { "name": "Portafolio", "desc": "Muestra de trabajos, bio, contacto" },
+      "blank": { "name": "Empezar desde cero", "desc": "Crea desde cero con ayuda de la IA" }
+    }
+  },
   "audio": {
     "pageTitle": "Audio",
     "pageSubtitle": "Convierte tu texto en audio con sonido natural. Elige un idioma, escoge una voz, genera.",
@@ -183,7 +193,7 @@
       "burned": "Subtítulos integrados directamente en el archivo de video."
     }
   },
-"dash": {
+  "dash": {
     "askPlaceholder": "Pregúntale lo que sea a SignalBoost...",
     "askButton": "Preguntar",
     "startHere": "Empieza aquí",
@@ -260,64 +270,6 @@
       "thinkingMsg": "SignalBoost está pensando..."
     }
   },
-  "promote_page": {
-    "badge": "Promover mi negocio",
-    "title": "Crea una promoción. Conviértela en una campaña completa.",
-    "subtitle": "Dile a SignalBoost qué quieres promover. Te ayudaremos a convertirlo en texto para tu web, publicaciones sociales, email, ideas de video y versiones nativas por idioma.",
-    "businessName": "Nombre del negocio",
-    "businessPlaceholder": "Ejemplo: Luna Travel",
-    "audience": "Audiencia",
-    "audiencePlaceholder": "Ejemplo: familias, viajeros, clientes locales",
-    "offer": "¿Qué quieres promover?",
-    "offerPlaceholder": "Ejemplo: 20% de descuento en paquetes de fin de semana a Cancún. Cupos limitados.",
-    "tone": "Tono",
-    "tones": {
-      "friendly": "Amigable",
-      "premium": "Premium",
-      "urgent": "Urgente",
-      "local": "Local"
-    },
-    "generate": "Generar campaña",
-    "generatedNote": "Borrador de campaña creado. Siguiente paso: conectar esta página al generador de campañas con IA.",
-    "preview": {
-      "title": "Vista previa de campaña",
-      "sampleHeadline": "Especial de fin de semana para clientes nuevos y recurrentes",
-      "sampleBusiness": "Tu negocio",
-      "copyPrefix": "Una campaña lista para adaptar para",
-      "forAudience": "para",
-      "item1": "Banner para sitio web",
-      "item2": "Textos para redes sociales",
-      "item3": "Texto de email",
-      "item4": "Idea de video corto",
-      "item5": "Versiones nativas por idioma"
-    },
-    "channels": {
-      "website": {
-        "title": "Actualización del sitio",
-        "description": "Convierte tu oferta en un banner de inicio o una sección de aterrizaje."
-      },
-      "social": {
-        "title": "Publicaciones sociales",
-        "description": "Crea textos para Facebook, Instagram, TikTok y más."
-      },
-      "email": {
-        "title": "Campaña de email",
-        "description": "Genera un email breve que tus clientes entiendan rápido."
-      },
-      "video": {
-        "title": "Idea de video",
-        "description": "Crea un guion corto para reels, shorts o anuncios."
-      },
-      "languages": {
-        "title": "Idiomas nativos",
-        "description": "Adapta tu mensaje para que suene natural en cada idioma."
-      },
-      "reviews": {
-        "title": "Seguimiento de reseñas",
-        "description": "Pide a clientes satisfechos que dejen una reseña después de la promoción."
-      }
-    }
-  },
   "auth": {
     "welcomeBack": "Bienvenido de nuevo",
     "createAccount": "Crea tu cuenta gratis",
@@ -384,7 +336,65 @@
     "nativeExperiences": "Experiencias nativas disponibles en",
     "poweredBy": "Desarrollado por"
   },
-"pricing_page": {
+"promote_page": {
+    "badge": "Promover mi negocio",
+    "title": "Crea una promoción. Conviértela en una campaña completa.",
+    "subtitle": "Dile a SignalBoost qué quieres promover. Te ayudaremos a convertirlo en texto para tu web, publicaciones sociales, email, ideas de video y versiones nativas por idioma.",
+    "businessName": "Nombre del negocio",
+    "businessPlaceholder": "Ejemplo: Luna Travel",
+    "audience": "Audiencia",
+    "audiencePlaceholder": "Ejemplo: familias, viajeros, clientes locales",
+    "offer": "¿Qué quieres promover?",
+    "offerPlaceholder": "Ejemplo: 20% de descuento en paquetes de fin de semana a Cancún. Cupos limitados.",
+    "tone": "Tono",
+    "tones": {
+      "friendly": "Amigable",
+      "premium": "Premium",
+      "urgent": "Urgente",
+      "local": "Local"
+    },
+    "generate": "Generar campaña",
+    "generatedNote": "Borrador de campaña creado. Siguiente paso: conectar esta página al generador de campañas con IA.",
+    "preview": {
+      "title": "Vista previa de campaña",
+      "sampleHeadline": "Especial de fin de semana para clientes nuevos y recurrentes",
+      "sampleBusiness": "Tu negocio",
+      "copyPrefix": "Una campaña lista para adaptar para",
+      "forAudience": "para",
+      "item1": "Banner para sitio web",
+      "item2": "Textos para redes sociales",
+      "item3": "Texto de email",
+      "item4": "Idea de video corto",
+      "item5": "Versiones nativas por idioma"
+    },
+    "channels": {
+      "website": {
+        "title": "Actualización del sitio",
+        "description": "Convierte tu oferta en un banner de inicio o una sección de aterrizaje."
+      },
+      "social": {
+        "title": "Publicaciones sociales",
+        "description": "Crea textos para Facebook, Instagram, TikTok y más."
+      },
+      "email": {
+        "title": "Campaña de email",
+        "description": "Genera un email breve que tus clientes entiendan rápido."
+      },
+      "video": {
+        "title": "Idea de video",
+        "description": "Crea un guion corto para reels, shorts o anuncios."
+      },
+      "languages": {
+        "title": "Idiomas nativos",
+        "description": "Adapta tu mensaje para que suene natural en cada idioma."
+      },
+      "reviews": {
+        "title": "Seguimiento de reseñas",
+        "description": "Pide a clientes satisfechos que dejen una reseña después de la promoción."
+      }
+    }
+  },
+  "pricing_page": {
     "badge": "Precios simples",
     "headline": "Empieza gratis. Publica cuando estés listo.",
     "subhead": "SignalBoost ayuda a las empresas a crecer con sitios web, reseñas, audio y herramientas de contenido con IA.",

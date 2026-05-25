@@ -37,14 +37,15 @@ type CreditState = {
 /*
   Reads the user's subscription, applies a monthly reset if due,
   and returns the current credit state. Creates a row if none exists
-  (defaults to the free plan).
+  (defaults to the free plan). Also grants the initial allowance to any
+  row that has never been initialized (credits_initialized = false).
 */
 export async function getCreditState(userId: string): Promise<CreditState> {
   const supabase = adminClient()
 
   const { data, error } = await supabase
     .from('subscriptions')
-    .select('plan, video_credits, credits_reset_at')
+    .select('plan, video_credits, credits_reset_at, credits_initialized')
     .eq('user_id', userId)
     .maybeSingle()
 
@@ -56,6 +57,7 @@ export async function getCreditState(userId: string): Promise<CreditState> {
       plan: 'free',
       video_credits: allowance,
       credits_reset_at: new Date().toISOString(),
+      credits_initialized: true,
     }, { onConflict: 'user_id' })
     return { plan: 'free', credits: allowance, allowance }
   }
@@ -63,13 +65,15 @@ export async function getCreditState(userId: string): Promise<CreditState> {
   const plan = data.plan || 'free'
   const allowance = PLAN_VIDEO_CREDITS[plan] ?? PLAN_VIDEO_CREDITS['free']
 
-  // Monthly reset due → refill to the plan's allowance
-  if (monthElapsed(data.credits_reset_at)) {
+  // Never initialized (e.g. row created before credits existed) OR monthly reset due
+  // → grant the plan's allowance and mark initialized.
+  if (!data.credits_initialized || monthElapsed(data.credits_reset_at)) {
     await supabase
       .from('subscriptions')
       .update({
         video_credits: allowance,
         credits_reset_at: new Date().toISOString(),
+        credits_initialized: true,
       })
       .eq('user_id', userId)
     return { plan, credits: allowance, allowance }

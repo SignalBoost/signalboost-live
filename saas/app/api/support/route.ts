@@ -108,6 +108,15 @@ Website behavior:
 - Infer likely intent from incomplete requests
 - Make reasonable assumptions and state assumptions naturally
 
+SKETCH DATA BLOCK (very important):
+- ONLY when you are proposing a website concept, append a machine-readable block at the very END of your reply.
+- Write your normal friendly reply first, then on a new line output exactly this format:
+<<<SKETCH>>>
+{"headline":"...","tagline":"...","colors":{"primary":"#xxxxxx","accent":"#xxxxxx","background":"#xxxxxx","text":"#xxxxxx"},"sections":["...","..."],"cta":"..."}
+<<<END>>>
+- The JSON must be valid: double quotes, hex colors starting with #, 3-6 sections.
+- Do NOT mention this block in your conversational text. Do NOT use it for non-website requests.
+
 If information is missing:
 ask concise follow-up questions.
 ${userBlock}
@@ -117,10 +126,7 @@ ${userBlock}
 /*
 CALL CLAUDE (Anthropic)
 */
-async function callClaude(
-  systemPrompt: string,
-  messages: any[]
-) {
+async function callClaude(systemPrompt: string, messages: any[]) {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -149,11 +155,7 @@ async function callClaude(
 /*
 CALL OPENAI
 */
-async function callOpenAI(
-  systemPrompt: string,
-  messages: any[]
-) {
-  // OpenAI takes the system prompt as the first message
+async function callOpenAI(systemPrompt: string, messages: any[]) {
   const openAiMessages = [
     { role: 'system', content: systemPrompt },
     ...messages,
@@ -182,14 +184,37 @@ async function callOpenAI(
   return data.choices?.[0]?.message?.content || ''
 }
 
+/*
+SPLIT THE RAW REPLY INTO: visible chat text + parsed sketch (if any)
+*/
+function extractSketch(raw: string) {
+  const startTag = '<<<SKETCH>>>'
+  const endTag = '<<<END>>>'
+  const startIdx = raw.indexOf(startTag)
+  const endIdx = raw.indexOf(endTag)
+
+  if (startIdx === -1 || endIdx === -1 || endIdx < startIdx) {
+    return { reply: raw.trim(), sketch: null }
+  }
+
+  const jsonPart = raw.slice(startIdx + startTag.length, endIdx).trim()
+  const visibleReply = raw.slice(0, startIdx).trim()
+
+  let sketch = null
+  try {
+    sketch = JSON.parse(jsonPart)
+  } catch {
+    sketch = null
+  }
+
+  return { reply: visibleReply || raw.trim(), sketch }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { messages, context } = await req.json()
     if (!messages || !Array.isArray(messages)) {
-      return NextResponse.json(
-        { error: 'Invalid request' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
     }
 
     const systemPrompt = buildSystemPrompt(context)
@@ -198,42 +223,30 @@ export async function POST(req: NextRequest) {
 
     const modifiedMessages = [
       ...messages.slice(0, messages.length - 1),
-      {
-        role: 'user',
-        content: enhancedPrompt,
-      },
+      { role: 'user', content: enhancedPrompt },
     ]
 
-    // Decide which AI provider to use based on the user's message
     const route = chooseAIProvider(lastMessage.content)
 
-    let reply: string | null = null
+    let raw: string | null = null
 
     if (route.provider === 'openai') {
-      reply = await callOpenAI(systemPrompt, modifiedMessages)
-      // If OpenAI fails, fall back to Claude so the user still gets an answer
-      if (reply === null) {
-        reply = await callClaude(systemPrompt, modifiedMessages)
-      }
+      raw = await callOpenAI(systemPrompt, modifiedMessages)
+      if (raw === null) raw = await callClaude(systemPrompt, modifiedMessages)
     } else {
-      reply = await callClaude(systemPrompt, modifiedMessages)
-      // If Claude fails, fall back to OpenAI
-      if (reply === null) {
-        reply = await callOpenAI(systemPrompt, modifiedMessages)
-      }
+      raw = await callClaude(systemPrompt, modifiedMessages)
+      if (raw === null) raw = await callOpenAI(systemPrompt, modifiedMessages)
     }
 
-    if (reply === null) {
-      return NextResponse.json({
-        reply: 'I am having trouble connecting right now.',
-      })
+    if (raw === null) {
+      return NextResponse.json({ reply: 'I am having trouble connecting right now.', sketch: null })
     }
 
-    return NextResponse.json({ reply })
+    const { reply, sketch } = extractSketch(raw)
+
+    return NextResponse.json({ reply, sketch })
   } catch (error) {
     console.error(error)
-    return NextResponse.json({
-      reply: 'Something went wrong.',
-    })
+    return NextResponse.json({ reply: 'Something went wrong.', sketch: null })
   }
 }

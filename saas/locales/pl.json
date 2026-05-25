@@ -78,6 +78,16 @@
     "renderComplete": "Renderowanie zakończone",
     "initializeSynthesis": "Rozpocznij syntezę"
   },
+  "builder": {
+    "tpl": {
+      "restaurant": { "name": "Restauracja", "desc": "Menu, godziny, rezerwacje, lokalizacja" },
+      "retail": { "name": "Sklep detaliczny", "desc": "Produkty, ceny, kontakt, o nas" },
+      "services": { "name": "Usługi", "desc": "Co oferujesz, ceny, rezerwacje" },
+      "podcast": { "name": "Podcast", "desc": "Odcinki, o nas, linki do subskrypcji" },
+      "portfolio": { "name": "Portfolio", "desc": "Prezentacja prac, bio, kontakt" },
+      "blank": { "name": "Zacznij od zera", "desc": "Twórz od podstaw z pomocą AI" }
+    }
+  },
   "audio": {
     "pageTitle": "Audio",
     "pageSubtitle": "Zamień swój tekst na naturalnie brzmiące audio. Wybierz język, wybierz głos, generuj.",
@@ -183,7 +193,7 @@
       "burned": "Napisy zintegrowane bezpośrednio w pliku wideo."
     }
   },
-"dash": {
+  "dash": {
     "askPlaceholder": "Zapytaj SignalBoost o cokolwiek...",
     "askButton": "Zapytaj",
     "startHere": "Zacznij tutaj",

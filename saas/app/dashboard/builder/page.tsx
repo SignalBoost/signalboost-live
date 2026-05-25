@@ -6,15 +6,6 @@ import { useI18n } from '@/components/i18n/I18nProvider'
 const BLUE = '#3b82f6'
 const GOLD = '#ffc300'
 
-const TEMPLATES = [
-  { id: 'restaurant', icon: '🍽️', name: 'Restaurant', desc: 'Menu, hours, reservations, location' },
-  { id: 'retail', icon: '🛍️', name: 'Retail Shop', desc: 'Products, pricing, contact, about' },
-  { id: 'services', icon: '💼', name: 'Services', desc: 'What you offer, pricing, booking' },
-  { id: 'podcast', icon: '🎙️', name: 'Podcast', desc: 'Episodes, about, subscribe links' },
-  { id: 'portfolio', icon: '🎨', name: 'Portfolio', desc: 'Work showcase, bio, contact' },
-  { id: 'blank', icon: '✨', name: 'Start blank', desc: 'Build from scratch with AI help' },
-]
-
 const LANGS = [
   { code: 'en', flag: '🇺🇸', name: 'English' },
   { code: 'pt', flag: '🇧🇷', name: 'Português' },
@@ -24,7 +15,6 @@ const LANGS = [
 ]
 
 // Safe translation helper — always returns a string.
-// Accepts dot paths like 'hero.features.site' and a guaranteed-string fallback.
 function makeT(dict: any) {
   return function t(path: string, fallback: string): string {
     const value = path
@@ -37,6 +27,16 @@ function makeT(dict: any) {
 export default function BuilderPage() {
   const { dict } = useI18n()
   const t = makeT(dict)
+
+  // Templates defined inside the component so names/descriptions can be translated
+  const TEMPLATES = [
+    { id: 'restaurant', icon: '🍽️', name: t('builder.tpl.restaurant.name', 'Restaurant'), desc: t('builder.tpl.restaurant.desc', 'Menu, hours, reservations, location') },
+    { id: 'retail', icon: '🛍️', name: t('builder.tpl.retail.name', 'Retail Shop'), desc: t('builder.tpl.retail.desc', 'Products, pricing, contact, about') },
+    { id: 'services', icon: '💼', name: t('builder.tpl.services.name', 'Services'), desc: t('builder.tpl.services.desc', 'What you offer, pricing, booking') },
+    { id: 'podcast', icon: '🎙️', name: t('builder.tpl.podcast.name', 'Podcast'), desc: t('builder.tpl.podcast.desc', 'Episodes, about, subscribe links') },
+    { id: 'portfolio', icon: '🎨', name: t('builder.tpl.portfolio.name', 'Portfolio'), desc: t('builder.tpl.portfolio.desc', 'Work showcase, bio, contact') },
+    { id: 'blank', icon: '✨', name: t('builder.tpl.blank.name', 'Start blank'), desc: t('builder.tpl.blank.desc', 'Build from scratch with AI help') },
+  ]
 
   const [step, setStep] = useState<'template' | 'info' | 'languages' | 'building' | 'done'>('template')
   const [template, setTemplate] = useState('')

@@ -13,6 +13,8 @@
   "generateAudio": "Generuj audio",
   "createVideos": "Twórz wideo",
   "promoteBusiness": "Promuj firmę",
+  "aiOperator": "Operator AI",
+  "workshopApprentice": "Warsztat Ucznia",
   "lab": {
     "title": "RDZEŃ_SILNIKA // Laboratorium",
     "subtitle": "Synteza parametrów: parsowanie materiału, streaming awatara generatywnego, orkiestracja dubbingu audio.",

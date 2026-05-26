@@ -13,6 +13,8 @@
   "generateAudio": "Generar audio",
   "createVideos": "Crear videos",
   "promoteBusiness": "Promover negocio",
+  "aiOperator": "Operador de IA",
+  "workshopApprentice": "Taller de aprendiz",
   "lab": {
     "title": "MOTOR_CENTRAL // El Laboratorio",
     "subtitle": "Sintetizar parámetros: análisis de metraje, transmisión de avatar generativo, orquestación de doblaje de audio.",

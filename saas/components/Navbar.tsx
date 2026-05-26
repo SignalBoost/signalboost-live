@@ -170,8 +170,14 @@ export default function Navbar() {
     },
     {
       icon: '🤖',
-      label: 'AI Operator',
+      label: t(dict, 'aiOperator', 'AI Operator'),
       href: '/dashboard/operator',
+      featured: false,
+    },
+    {
+      icon: '🛠️',
+      label: t(dict, 'workshopApprentice', 'Workshop Apprentice'),
+      href: '/dashboard/apprentice',
       featured: false,
     },
   ]

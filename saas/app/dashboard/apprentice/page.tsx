@@ -23,6 +23,11 @@ const COPY: Record<Lang, {
   title: string
   subtitle: string
   promise: string
+  workshopTitle: string
+  workshopTagline: string
+  goalTitle: string
+  goalItems: string[]
+  examplesTitle: string
   pick: string
   experienceTitle: string
   experienceSubtitle: string
@@ -41,6 +46,11 @@ const COPY: Record<Lang, {
     title: 'Learn while building.',
     subtitle: 'No technical experience needed. Choose what you want to create and SignalBoost will guide you one simple step at a time.',
     promise: 'Start from zero. Leave with something real.',
+    workshopTitle: 'SignalBoost Apprentice Workshop',
+    workshopTagline: 'Learn while building.',
+    goalTitle: 'Goal',
+    goalItems: ['Teach while creating', 'Guide step-by-step', 'Remove technical fear', 'Convert goals into workflows'],
+    examplesTitle: 'Examples',
     pick: 'What do you want to build first?',
     experienceTitle: 'How much experience do you have?',
     experienceSubtitle: 'This helps SignalBoost decide how much explanation to show. You can change it later.',
@@ -59,6 +69,11 @@ const COPY: Record<Lang, {
     title: 'Aprenda enquanto constrói.',
     subtitle: 'Não precisa ter experiência técnica. Escolha o que quer criar e a SignalBoost guia você passo a passo.',
     promise: 'Comece do zero. Termine com algo real.',
+    workshopTitle: 'Oficina de Aprendiz SignalBoost',
+    workshopTagline: 'Aprenda enquanto constrói.',
+    goalTitle: 'Objetivo',
+    goalItems: ['Ensinar enquanto cria','Guiar passo a passo','Remover medo técnico','Converter metas em fluxos'],
+    examplesTitle: 'Exemplos',
     pick: 'O que você quer construir primeiro?',
     experienceTitle: 'Quanta experiência você tem?',
     experienceSubtitle: 'Isso ajuda a SignalBoost a decidir quanta explicação mostrar. Você pode mudar depois.',
@@ -77,6 +92,11 @@ const COPY: Record<Lang, {
     title: 'Aprende mientras construyes.',
     subtitle: 'No necesitas experiencia técnica. Elige lo que quieres crear y SignalBoost te guía paso a paso.',
     promise: 'Empieza desde cero. Termina con algo real.',
+    workshopTitle: 'Taller de Aprendiz SignalBoost',
+    workshopTagline: 'Aprende mientras construyes.',
+    goalTitle: 'Objetivo',
+    goalItems: ['Enseñar mientras creas','Guiar paso a paso','Eliminar el miedo técnico','Convertir metas en flujos'],
+    examplesTitle: 'Ejemplos',
     pick: '¿Qué quieres construir primero?',
     experienceTitle: '¿Cuánta experiencia tienes?',
     experienceSubtitle: 'Esto ayuda a SignalBoost a decidir cuánta explicación mostrar. Puedes cambiarlo después.',
@@ -95,6 +115,11 @@ const COPY: Record<Lang, {
     title: 'Ucz się, budując.',
     subtitle: 'Nie potrzebujesz doświadczenia technicznego. Wybierz, co chcesz stworzyć, a SignalBoost poprowadzi Cię krok po kroku.',
     promise: 'Zacznij od zera. Zakończ z czymś prawdziwym.',
+    workshopTitle: 'Warsztat Ucznia SignalBoost',
+    workshopTagline: 'Ucz się, budując.',
+    goalTitle: 'Cel',
+    goalItems: ['Uczyć podczas tworzenia','Prowadzić krok po kroku','Usunąć techniczny lęk','Zamieniać cele w przepływy pracy'],
+    examplesTitle: 'Przykłady',
     pick: 'Co chcesz zbudować najpierw?',
     experienceTitle: 'Jakie masz doświadczenie?',
     experienceSubtitle: 'To pomaga SignalBoost dobrać poziom wyjaśnień. Możesz zmienić to później.',
@@ -113,6 +138,11 @@ const COPY: Record<Lang, {
     title: 'Учитесь, создавая.',
     subtitle: 'Технический опыт не нужен. Выберите, что хотите создать, и SignalBoost проведёт вас простыми шагами.',
     promise: 'Начните с нуля. Получите реальный результат.',
+    workshopTitle: 'Мастерская ученика SignalBoost',
+    workshopTagline: 'Учитесь, создавая.',
+    goalTitle: 'Цель',
+    goalItems: ['Учить в процессе создания','Вести шаг за шагом','Убрать технический страх','Преобразовывать цели в рабочие процессы'],
+    examplesTitle: 'Примеры',
     pick: 'Что вы хотите создать сначала?',
     experienceTitle: 'Какой у вас уровень опыта?',
     experienceSubtitle: 'Это помогает SignalBoost выбрать уровень объяснений. Вы сможете изменить это позже.',
@@ -243,6 +273,32 @@ export default function ApprenticeWorkshopPage() {
           </div>
           <div style={{ marginTop: 18, color: 'var(--text-muted)', fontSize: 13 }}>
             {copy.promise}
+          </div>
+        </div>
+      </section>
+
+
+      <section className="sb-card" style={{ marginTop: 28, padding: 24 }}>
+        <div style={{ color: 'var(--gold)', fontWeight: 950, letterSpacing: '.04em', textTransform: 'uppercase', fontSize: 12 }}>New Core Feature</div>
+        <h2 style={{ color: '#fff', fontSize: 32, margin: '8px 0 6px' }}>✨ {copy.workshopTitle}</h2>
+        <p style={{ color: 'var(--text-secondary)', marginTop: 0, fontWeight: 700 }}>{copy.workshopTagline}</p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginTop: 12 }}>
+          <div>
+            <h3 style={{ color: '#fff', marginBottom: 8 }}>{copy.goalTitle}</h3>
+            <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
+              {copy.goalItems.map((item) => <li key={item}>{item}</li>)}
+            </ul>
+          </div>
+          <div>
+            <h3 style={{ color: '#fff', marginBottom: 8 }}>{copy.examplesTitle}</h3>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {MODULES.map((item) => (
+                <div key={`example-${item.id}`} style={{ color: 'var(--text-secondary)', border: '1px solid var(--border-soft)', borderRadius: 12, padding: '8px 10px', background: 'rgba(255,255,255,.03)' }}>
+                  {item.icon} {item.title[activeLang]}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>

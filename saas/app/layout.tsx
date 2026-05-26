@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
+import Concierge from '@/components/Concierge'
 import LanguageSuggestion from '@/components/LanguageSuggestion'
 import { I18nProvider } from '@/components/i18n/I18nProvider'
 
@@ -112,6 +113,7 @@ export default function RootLayout({
             {children}
             <Footer />
             <LanguageSuggestion />
+            <Concierge />
           </I18nProvider>
         </div>
       </body>

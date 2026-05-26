@@ -1,62 +1,158 @@
+{
+  "hello": "Hello",
+  "welcome": "Welcome",
+  "home": "Home",
+  "podcasters": "Podcasters",
+  "dashboard": "Dashboard",
+  "pricing": "Pricing",
+  "docs": "Docs",
+  "logout": "Log out",
+  "getStarted": "Get started",
+  "buildWebsite": "Build a website",
+  "collectReviews": "Collect reviews",
+  "generateAudio": "Generate audio",
+  "createVideos": "Create videos",
+
+  "hero": {
+    "badge": "Build · Review · Broadcast",
+    "headlines": [
+      "Build your brand in English",
+      "Construa sua marca em Português",
+      "Construye tu marca en Español"
+    ],
+    "subhead": "Create your website, collect customer reviews, and produce content.",
+    "ctaPrimary": "Get started",
+    "ctaSecondary": "Watch demo"
+  },
+
+  "footer": {
+    "tagline": "SignalBoost helps businesses grow with AI tools.",
+    "product": "Product",
+    "company": "Company",
+    "about": "About",
+    "contact": "Contact",
+    "privacy": "Privacy"
+  },
+
+  "lab": {
+    "title": "CORE_ENGINE // The Lab",
+    "subtitle": "Create and generate content",
+    "attach": "ATTACH",
+    "abort": "ABORT",
+    "runPrompt": "RUN_PROMPT"
+  },
+
+  "dash": {
+    "projectsTitle": "Your projects",
+    "newProject": "+ New project",
+    "open": "Open",
+    "upgrade": "Upgrade"
+  },
+
+  "audio": {
+    "title": "Audio",
+    "generate": "Generate audio",
+    "download": "Download"
+  },
+
+  "video_page": {
+    "title": "Video editor",
+    "generateCaptions": "Generate captions",
+    "generateClips": "Generate clips"
+  },
+
+  "reviews_page": {
+    "title": "Review collector",
+    "approve": "Approve",
+    "delete": "Delete"
+  },
+
+  "pricing_page": {
+    "badge": "Simple pricing",
+    "headline": "Start free. Publish when ready.",
+
+    "free": {
+      "name": "Free"
+    },
+
+    "starter": {
+      "name": "Starter"
+    },
+
+    "pro": {
+      "name": "Pro"
+    },
+
+    "business": {
+      "name": "Business"
     }
   },
+
   "promote_page": {
     "badge": "Promote My Business",
+
     "title": "Create one promotion. Turn it into a full campaign.",
-    "subtitle": "Tell SignalBoost what you want to promote. We will help turn it into website copy, social posts, email text, video ideas and native language versions.",
+
+    "subtitle": "Tell SignalBoost what you want to promote. We help turn it into website copy, social posts, emails and videos.",
+
     "businessName": "Business name",
     "businessPlaceholder": "Example: Luna Travel",
+
     "audience": "Audience",
-    "audiencePlaceholder": "Example: families, travelers, local customers",
+    "audiencePlaceholder": "Families, travelers, local customers",
+
     "offer": "What do you want to promote?",
-    "offerPlaceholder": "Example: 20% off weekend travel packages to Cancun. Limited spots available.",
+    "offerPlaceholder": "20% off weekend travel packages",
+
     "tone": "Tone",
+
     "tones": {
       "friendly": "Friendly",
       "premium": "Premium",
       "urgent": "Urgent",
       "local": "Local"
     },
+
     "generate": "Generate campaign",
-    "generatedNote": "Campaign draft created. Next step: connect this page to the AI generator.",
+
     "preview": {
       "title": "Campaign preview",
-      "sampleHeadline": "Weekend special for new and returning customers",
+      "sampleHeadline": "Weekend special",
       "sampleBusiness": "Your business",
-      "copyPrefix": "A ready-to-adapt campaign for",
-      "forAudience": "for",
-      "item1": "Website banner",
-      "item2": "Social posts",
-      "item3": "Email text",
-      "item4": "Short video idea",
-      "item5": "Native language versions"
+      "copyPrefix": "Campaign for",
+      "forAudience": "for"
     },
+
     "channels": {
       "website": {
         "title": "Website update",
-        "description": "Turn your offer into a homepage banner or landing section."
+        "description": "Turn your offer into website copy."
       },
+
       "social": {
         "title": "Social posts",
-        "description": "Create captions for Facebook, Instagram, TikTok and more."
+        "description": "Generate social content."
       },
+
       "email": {
         "title": "Email campaign",
-        "description": "Generate a short email your customers can understand quickly."
+        "description": "Generate email copy."
       },
+
       "video": {
         "title": "Video idea",
-        "description": "Create a short video script for reels, shorts or ads."
+        "description": "Create a short video script."
       },
+
       "languages": {
         "title": "Native languages",
-        "description": "Adapt your message so it feels natural in each language."
+        "description": "Adapt your message naturally."
       },
+
       "reviews": {
         "title": "Review follow-up",
-        "description": "Ask happy customers to leave a review after the promotion."
+        "description": "Request customer reviews."
       }
     }
   }
-}
 }

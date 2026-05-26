@@ -399,7 +399,10 @@ export default function VideoPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        throw new Error(data.error ?? 'Processing failed')
+        if (res.status === 401) {
+          throw new Error(t(dict, 'video_page.authExpired', 'Your session expired. Please sign in again and try once more.'))
+        }
+        throw new Error(data.error ?? t(dict, 'video_page.processingFailed', 'Processing failed'))
       }
 
       setUploadProgress(100)
@@ -436,10 +439,12 @@ export default function VideoPage() {
 
       setUploadedFile(null)
     } catch (err: any) {
-      setError(err.message ?? 'Something went wrong')
-      setJobs(prev => prev.map(j =>
-        j.id === tempId ? { ...j, status: 'error', error: err.message } : j
-      ))
+      const safeMessage = err?.message ?? t(dict, 'video_page.genericError', 'Something went wrong')
+      setError(safeMessage)
+      setJobs(prev => prev
+        .map(j => j.id === tempId ? { ...j, status: 'error', error: safeMessage } : j)
+        .filter(j => !(j.id === tempId && safeMessage.toLowerCase().includes('session expired')))
+      )
     } finally {
       setProcessing(false)
       setUploadProgress(0)

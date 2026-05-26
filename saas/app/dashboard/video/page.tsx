@@ -15,19 +15,6 @@ const LANGS = [
   { code: 'ru', flag: '🇷🇺', name: 'Русский' },
 ]
 
-const CAPTION_FORMATS = [
-  { id: 'srt', name: 'SRT', desc: 'Standard subtitle format. Works on most platforms.' },
-  { id: 'vtt', name: 'VTT', desc: 'Web Video Text Tracks. Best for web players.' },
-  { id: 'ass', name: 'ASS', desc: 'Advanced styling. Best for burned-in captions.' },
-]
-
-const CLIP_FORMATS = [
-  { id: 'tiktok',   icon: '🎵', name: 'TikTok',         size: '9:16 · 60s max' },
-  { id: 'reels',    icon: '📱', name: 'Instagram Reels', size: '9:16 · 90s max' },
-  { id: 'shorts',   icon: '▶️', name: 'YouTube Shorts',  size: '9:16 · 60s max' },
-  { id: 'twitter',  icon: '🐦', name: 'X / Twitter',     size: '16:9 · 2:20 max' },
-  { id: 'linkedin', icon: '💼', name: 'LinkedIn',        size: '1:1 · 10min max' },
-]
 
 type CaptionResult = {
   lang: string
@@ -335,6 +322,31 @@ export default function VideoPage() {
 
   const doneJobs = jobs.filter(j => j.status === 'done')
 
+  const captionFormats = [
+    { id: 'srt', name: 'SRT', desc: t(dict, 'video_page.captionFormat.srt', 'Standard subtitle format. Works on most platforms.') },
+    { id: 'vtt', name: 'VTT', desc: t(dict, 'video_page.captionFormat.vtt', 'Web Video Text Tracks. Best for web players.') },
+    { id: 'ass', name: 'ASS', desc: t(dict, 'video_page.captionFormat.ass', 'Advanced styling. Best for burned-in captions.') },
+  ]
+
+  const clipFormats = [
+    { id: 'tiktok', icon: '🎵', name: t(dict, 'video_page.clipFormat.tiktok', 'TikTok'), size: t(dict, 'video_page.clipFormat.tiktokSize', '9:16 · 60s max') },
+    { id: 'reels', icon: '📱', name: t(dict, 'video_page.clipFormat.reels', 'Instagram Reels'), size: t(dict, 'video_page.clipFormat.reelsSize', '9:16 · 90s max') },
+    { id: 'shorts', icon: '▶️', name: t(dict, 'video_page.clipFormat.shorts', 'YouTube Shorts'), size: t(dict, 'video_page.clipFormat.shortsSize', '9:16 · 60s max') },
+    { id: 'twitter', icon: '🐦', name: t(dict, 'video_page.clipFormat.twitter', 'X / Twitter'), size: t(dict, 'video_page.clipFormat.twitterSize', '16:9 · 2:20 max') },
+    { id: 'linkedin', icon: '💼', name: t(dict, 'video_page.clipFormat.linkedin', 'LinkedIn'), size: t(dict, 'video_page.clipFormat.linkedinSize', '1:1 · 10min max') },
+  ]
+
+
+  function localizeVideoError(raw: string) {
+    const msg = (raw || '').toLowerCase()
+    if (msg.includes('unsupported file type')) return t(dict, 'video_page.errorUnsupportedType', 'Unsupported file type')
+    if (msg.includes('no file provided')) return t(dict, 'video_page.errorNoFile', 'No file selected')
+    if (msg.includes('invalid form data')) return t(dict, 'video_page.errorInvalidForm', 'Invalid upload data')
+    if (msg.includes('processing failed')) return t(dict, 'video_page.processingFailed', 'Processing failed')
+    if (msg.includes('session expired')) return t(dict, 'video_page.authExpired', 'Your session expired. Please sign in again and try once more.')
+    if (msg.includes('unauthorized')) return t(dict, 'video_page.authExpired', 'Your session expired. Please sign in again and try once more.')
+    return raw || t(dict, 'video_page.genericError', 'Something went wrong')
+  }
   function toggleLang(code: string) {
     setSelectedLangs(prev =>
       prev.includes(code) && prev.length > 1
@@ -399,7 +411,10 @@ export default function VideoPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        throw new Error(data.error ?? 'Processing failed')
+        if (res.status === 401) {
+          throw new Error(t(dict, 'video_page.authExpired', 'Your session expired. Please sign in again and try once more.'))
+        }
+        throw new Error(data.error ?? t(dict, 'video_page.processingFailed', 'Processing failed'))
       }
 
       setUploadProgress(100)
@@ -436,10 +451,12 @@ export default function VideoPage() {
 
       setUploadedFile(null)
     } catch (err: any) {
-      setError(err.message ?? 'Something went wrong')
-      setJobs(prev => prev.map(j =>
-        j.id === tempId ? { ...j, status: 'error', error: err.message } : j
-      ))
+      const safeMessage = localizeVideoError(err?.message ?? '')
+      setError(safeMessage)
+      setJobs(prev => prev
+        .map(j => j.id === tempId ? { ...j, status: 'error', error: safeMessage } : j)
+        .filter(j => !(j.id === tempId && localizeVideoError(safeMessage).toLowerCase().includes('session expired')))
+      )
     } finally {
       setProcessing(false)
       setUploadProgress(0)
@@ -576,7 +593,7 @@ export default function VideoPage() {
               {t(dict, 'video_page.captionFormat', 'Caption format')}
             </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {CAPTION_FORMATS.map(fmt => (
+              {captionFormats.map(fmt => (
                 <div key={fmt.id} onClick={() => toggleFormat(fmt.id)}
                   style={{ padding: '12px 14px', borderRadius: 10, cursor: 'pointer', background: selectedFormats.includes(fmt.id) ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.02)', border: `1px solid ${selectedFormats.includes(fmt.id) ? BLUE : 'rgba(255,255,255,0.07)'}`, transition: 'all 0.15s' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -639,7 +656,7 @@ export default function VideoPage() {
                 {t(dict, 'video_page.exportFor', 'Export for')}
               </label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {CLIP_FORMATS.map(fmt => (
+                {clipFormats.map(fmt => (
                   <div key={fmt.id} onClick={() => toggleClipFormat(fmt.id)}
                     style={{ padding: '12px 14px', borderRadius: 10, cursor: 'pointer', background: selectedClipFormats.includes(fmt.id) ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.02)', border: `1px solid ${selectedClipFormats.includes(fmt.id) ? BLUE : 'rgba(255,255,255,0.07)'}`, display: 'flex', alignItems: 'center', gap: 12 }}>
                     <span style={{ fontSize: 20 }}>{fmt.icon}</span>
@@ -745,7 +762,7 @@ export default function VideoPage() {
                         </div>
                       )}
                       {job.status === 'error' && job.error && (
-                        <div style={{ fontSize: 12, color: '#f87171', marginTop: 6 }}>{job.error}</div>
+                        <div style={{ fontSize: 12, color: '#f87171', marginTop: 6 }}>{localizeVideoError(job.error)}</div>
                       )}
                     </div>
                   ))}

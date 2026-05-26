@@ -21,6 +21,53 @@ type IntentResult = {
   explanation: string
 }
 
+class TimeoutError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'TimeoutError'
+  }
+}
+
+function timeoutResponse(message = 'This request took too long. Please try again with a shorter or more specific request.') {
+  return NextResponse.json(
+    {
+      error: message,
+      timeout: true,
+      recoverable: true,
+    },
+    { status: 504 }
+  )
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new TimeoutError(message)), ms)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+async function timedFetch(url: string, init: RequestInit, ms: number) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), ms)
+  try {
+    return await fetch(url, { ...init, signal: controller.signal })
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new TimeoutError('The AI service took too long to respond.')
+    }
+    throw error
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
 async function getUser(req: NextRequest) {
@@ -72,7 +119,7 @@ Return this exact shape:
   "explanation": "one sentence explaining what you understood and what you're doing"
 }`
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await timedFetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -88,7 +135,7 @@ Return this exact shape:
       max_tokens: 256,
       response_format: { type: 'json_object' },
     }),
-  })
+  }, 12000)
 
   if (!res.ok) {
     throw new Error(`OpenAI intent extraction failed: ${res.status}`)
@@ -119,11 +166,10 @@ Return this exact shape:
   }
 }
 
-// ── Generate intent (HeyGen placeholder) ─────────────────────────────────────
+// ── Generate intent ───────────────────────────────────────────────────────────
 
 async function buildGenerateResponse(intent: IntentResult, prompt: string) {
-  // GPT writes the script
-  const scriptRes = await fetch('https://api.openai.com/v1/chat/completions', {
+  const scriptRes = await timedFetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -141,7 +187,7 @@ async function buildGenerateResponse(intent: IntentResult, prompt: string) {
       temperature: 0.7,
       max_tokens: 300,
     }),
-  })
+  }, 12000)
 
   const scriptData = scriptRes.ok ? await scriptRes.json() : null
   const script = scriptData?.choices?.[0]?.message?.content?.trim() ?? ''
@@ -191,13 +237,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Prompt is required' }, { status: 400 })
   }
 
-  // Extract intent
   let intent: IntentResult
   try {
     intent = await extractIntent(prompt, mode)
   } catch (err) {
+    if (err instanceof TimeoutError) {
+      return timeoutResponse('The AI took too long to understand this request. Please try a shorter or more specific request.')
+    }
     console.error('Intent extraction failed:', err)
-    // Fall back to search
     intent = {
       mode: 'search',
       query: prompt,
@@ -208,7 +255,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Route by mode
   if (intent.mode === 'generate') {
     try {
       const generateData = await buildGenerateResponse(intent, prompt)
@@ -221,14 +267,20 @@ export async function POST(req: NextRequest) {
         message: null,
       })
     } catch (err) {
+      if (err instanceof TimeoutError) {
+        return timeoutResponse('Script generation took too long. Please try a shorter request.')
+      }
       console.error('Generate response failed:', err)
       return NextResponse.json({ error: 'Failed to generate script' }, { status: 502 })
     }
   }
 
-  // Search mode (default)
   try {
-    const results = await searchVideos(intent.query)
+    const results = await withTimeout(
+      searchVideos(intent.query),
+      15000,
+      'Video search took too long.'
+    )
 
     const hasPublic = results.some(r => r.license === 'public')
     const hasEmbeddable = results.some(r => r.license === 'embeddable')
@@ -250,6 +302,9 @@ export async function POST(req: NextRequest) {
       message,
     })
   } catch (err) {
+    if (err instanceof TimeoutError) {
+      return timeoutResponse('Video search took too long. Try a more specific search or a shorter request.')
+    }
     console.error('Video search failed:', err)
     return NextResponse.json({ error: 'Search failed' }, { status: 502 })
   }

@@ -1,29 +1,34 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { useI18n } from '@/components/i18n/I18nProvider'
 
 type Lang = 'en' | 'pt' | 'es' | 'pl' | 'ru'
+type Message = { role: 'user' | 'assistant'; content: string }
 
-const COPY: Record<Lang, {
+type Copy = {
   title: string
   button: string
   greeting: string
   placeholder: string
   send: string
+  reset: string
   thinking: string
   fallback: string
   connectionError: string
   close: string
   quick: { label: string; prompt: string }[]
-}> = {
+}
+
+const COPY: Record<Lang, Copy> = {
   en: {
     title: 'AI Concierge',
     button: 'Concierge',
     greeting: "Hi, I'm your SignalBoost concierge. Ask me anything about your workspace.",
     placeholder: 'Ask anything...',
     send: 'Send',
+    reset: 'Reset',
     thinking: 'Thinking...',
     fallback: 'I could not generate a response.',
     connectionError: 'Connection problem. Please try again.',
@@ -41,6 +46,7 @@ const COPY: Record<Lang, {
     greeting: 'Olá, eu sou o concierge da SignalBoost. Pergunte qualquer coisa sobre seu espaço de trabalho.',
     placeholder: 'Pergunte qualquer coisa...',
     send: 'Enviar',
+    reset: 'Reiniciar',
     thinking: 'Pensando...',
     fallback: 'Não consegui gerar uma resposta.',
     connectionError: 'Problema de conexão. Tente novamente.',
@@ -58,6 +64,7 @@ const COPY: Record<Lang, {
     greeting: 'Hola, soy tu concierge de SignalBoost. Pregúntame cualquier cosa sobre tu espacio de trabajo.',
     placeholder: 'Pregunta cualquier cosa...',
     send: 'Enviar',
+    reset: 'Reiniciar',
     thinking: 'Pensando...',
     fallback: 'No pude generar una respuesta.',
     connectionError: 'Problema de conexión. Inténtalo de nuevo.',
@@ -75,6 +82,7 @@ const COPY: Record<Lang, {
     greeting: 'Cześć, jestem konsjerżem SignalBoost. Zapytaj mnie o wszystko w swoim obszarze roboczym.',
     placeholder: 'Zapytaj o cokolwiek...',
     send: 'Wyślij',
+    reset: 'Resetuj',
     thinking: 'Myślę...',
     fallback: 'Nie udało się wygenerować odpowiedzi.',
     connectionError: 'Problem z połączeniem. Spróbuj ponownie.',
@@ -92,6 +100,7 @@ const COPY: Record<Lang, {
     greeting: 'Здравствуйте, я консьерж SignalBoost. Спросите меня о вашем рабочем пространстве.',
     placeholder: 'Спросите что угодно...',
     send: 'Отправить',
+    reset: 'Сбросить',
     thinking: 'Думаю...',
     fallback: 'Не удалось создать ответ.',
     connectionError: 'Проблема с подключением. Попробуйте снова.',
@@ -105,11 +114,6 @@ const COPY: Record<Lang, {
   },
 }
 
-type Message = {
-  role: 'user' | 'assistant'
-  content: string
-}
-
 export default function Concierge() {
   const pathname = usePathname()
   const { lang } = useI18n()
@@ -117,20 +121,25 @@ export default function Concierge() {
   const copy = COPY[activeLang]
 
   const [open, setOpen] = useState(false)
+  const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const initialMessages = useMemo<Message[]>(() => [{ role: 'assistant', content: copy.greeting }], [copy.greeting])
-  const [messages, setMessages] = useState<Message[]>(initialMessages)
+
+  const visibleMessages = messages.length
+    ? messages
+    : [{ role: 'assistant' as const, content: copy.greeting }]
+
+  function resetVisibleChat() {
+    setInput('')
+    setLoading(false)
+    setMessages([])
+  }
 
   async function ask(text: string) {
     const content = text.trim()
     if (!content || loading) return
 
-    const nextMessages: Message[] = [
-      ...messages,
-      { role: 'user', content },
-    ]
-
+    const nextMessages: Message[] = [...messages, { role: 'user', content }]
     setMessages(nextMessages)
     setInput('')
     setLoading(true)
@@ -149,22 +158,12 @@ export default function Concierge() {
       })
 
       const data = await res.json()
-
       setMessages(prev => [
         ...prev,
-        {
-          role: 'assistant',
-          content: data.reply || data.error || copy.fallback,
-        },
+        { role: 'assistant', content: data.reply || data.error || copy.fallback },
       ])
     } catch {
-      setMessages(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: copy.connectionError,
-        },
-      ])
+      setMessages(prev => [...prev, { role: 'assistant', content: copy.connectionError }])
     } finally {
       setLoading(false)
     }
@@ -172,152 +171,48 @@ export default function Concierge() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(value => !value)}
-        style={{
-          position: 'fixed',
-          right: 24,
-          bottom: 24,
-          zIndex: 999999,
-          border: 'none',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          padding: '14px 18px',
-          borderRadius: 999,
-          background: 'linear-gradient(135deg,#ffc300,#ff9500)',
-          color: '#111',
-          fontWeight: 900,
-          boxShadow: '0 20px 50px rgba(255,149,0,.35)',
-        }}
-      >
+      <button type="button" onClick={() => setOpen(value => !value)} style={{ position: 'fixed', right: 24, bottom: 24, zIndex: 999999, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderRadius: 999, background: 'linear-gradient(135deg,#ffc300,#ff9500)', color: '#111', fontWeight: 900, boxShadow: '0 20px 50px rgba(255,149,0,.35)' }}>
         <span style={{ fontSize: 24 }}>✨</span>
         {copy.button}
       </button>
 
       {open && (
-        <div
-          className="sb-card"
-          style={{
-            position: 'fixed',
-            right: 24,
-            bottom: 100,
-            zIndex: 999999,
-            width: 420,
-            maxWidth: 'calc(100vw - 30px)',
-            padding: 20,
-            color: 'white',
-            borderRadius: 24,
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: 12,
-            }}
-          >
+        <div className="sb-card" style={{ position: 'fixed', right: 24, bottom: 100, zIndex: 999999, width: 420, maxWidth: 'calc(100vw - 30px)', padding: 20, color: 'white', borderRadius: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div>
               <div style={{ color: 'var(--text-faint)', fontSize: 12 }}>SignalBoost</div>
               <strong style={{ fontSize: 18 }}>{copy.title}</strong>
             </div>
-            <button
-              onClick={() => setOpen(false)}
-              aria-label={copy.close}
-              style={{
-                background: 'transparent',
-                border: '1px solid var(--border-soft)',
-                color: 'white',
-                width: 34,
-                height: 34,
-                borderRadius: 999,
-                fontSize: 20,
-              }}
-            >
-              ×
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" onClick={resetVisibleChat} style={{ background: 'rgba(255,255,255,.06)', border: '1px solid var(--border-soft)', color: 'white', borderRadius: 999, padding: '7px 10px', fontSize: 12 }}>
+                {copy.reset}
+              </button>
+              <button onClick={() => setOpen(false)} aria-label={copy.close} style={{ background: 'transparent', border: '1px solid var(--border-soft)', color: 'white', width: 34, height: 34, borderRadius: 999, fontSize: 20 }}>
+                ×
+              </button>
+            </div>
           </div>
 
-          <div
-            style={{
-              maxHeight: 280,
-              overflowY: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 10,
-              marginBottom: 14,
-            }}
-          >
-            {messages.map((message, index) => (
-              <div
-                key={`${message.role}-${index}`}
-                style={{
-                  alignSelf: message.role === 'user' ? 'flex-end' : 'flex-start',
-                  maxWidth: '86%',
-                  padding: '10px 12px',
-                  borderRadius: 14,
-                  background:
-                    message.role === 'user'
-                      ? 'rgba(59,130,246,.18)'
-                      : 'rgba(255,255,255,.06)',
-                  border: '1px solid rgba(255,255,255,.08)',
-                  lineHeight: 1.55,
-                  fontSize: 13,
-                  whiteSpace: 'pre-wrap',
-                }}
-              >
+          <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+            {visibleMessages.map((message, index) => (
+              <div key={`${message.role}-${index}`} style={{ alignSelf: message.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '86%', padding: '10px 12px', borderRadius: 14, background: message.role === 'user' ? 'rgba(59,130,246,.18)' : 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.08)', lineHeight: 1.55, fontSize: 13, whiteSpace: 'pre-wrap' }}>
                 {message.content}
               </div>
             ))}
-
-            {loading && (
-              <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-                {copy.thinking}
-              </div>
-            )}
+            {loading && <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>{copy.thinking}</div>}
           </div>
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: 8,
-              marginBottom: 12,
-            }}
-          >
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
             {copy.quick.map(item => (
-              <button
-                key={item.label}
-                type="button"
-                onClick={() => ask(item.prompt)}
-                className="sb-button-ghost"
-                style={{ padding: '9px 10px', fontSize: 12 }}
-              >
+              <button key={item.label} type="button" onClick={() => ask(item.prompt)} className="sb-button-ghost" style={{ padding: '9px 10px', fontSize: 12 }}>
                 {item.label}
               </button>
             ))}
           </div>
 
           <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              value={input}
-              onChange={event => setInput(event.target.value)}
-              onKeyDown={event => {
-                if (event.key === 'Enter') ask(input)
-              }}
-              className="sb-input"
-              style={{ flex: 1, padding: 12, minWidth: 0 }}
-              placeholder={copy.placeholder}
-            />
-            <button
-              type="button"
-              className="sb-button-primary"
-              onClick={() => ask(input)}
-              disabled={loading || !input.trim()}
-            >
+            <input value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') ask(input) }} className="sb-input" style={{ flex: 1, padding: 12, minWidth: 0 }} placeholder={copy.placeholder} />
+            <button type="button" className="sb-button-primary" onClick={() => ask(input)} disabled={loading || !input.trim()}>
               {copy.send}
             </button>
           </div>

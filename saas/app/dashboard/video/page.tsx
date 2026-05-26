@@ -442,7 +442,7 @@ export default function VideoPage() {
       const safeMessage = err?.message ?? t(dict, 'video_page.genericError', 'Something went wrong')
       setError(safeMessage)
       setJobs(prev => prev
-        .map(j => j.id === tempId ? { ...j, status: 'error', error: safeMessage } : j)
+        .map(j => j.id === tempId ? { ...j, status: 'error' as const, error: safeMessage } : j)
         .filter(j => !(j.id === tempId && safeMessage.toLowerCase().includes('session expired')))
       )
     } finally {

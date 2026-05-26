@@ -1,16 +1,74 @@
 'use client'
 
 import { useState } from 'react'
+import { useI18n } from '@/components/i18n/I18nProvider'
+
+const COPY = {
+  en: {
+    label: 'AI Concierge',
+    title: 'AI Concierge',
+    intro:
+      "Hi, I'm your SignalBoost concierge. I can help with videos, credits, pricing, reviews, outreach, and support.",
+    videos: '🎥 Videos',
+    credits: '⚡ Credits',
+    growth: '📈 Growth',
+    support: '💬 Support',
+  },
+  pt: {
+    label: 'Concierge IA',
+    title: 'Concierge IA',
+    intro:
+      'Olá, sou o concierge da SignalBoost. Posso ajudar com vídeos, créditos, preços, avaliações, divulgação e suporte.',
+    videos: '🎥 Vídeos',
+    credits: '⚡ Créditos',
+    growth: '📈 Crescimento',
+    support: '💬 Suporte',
+  },
+  es: {
+    label: 'Conserje IA',
+    title: 'Conserje IA',
+    intro:
+      'Hola, soy tu conserje de SignalBoost. Puedo ayudarte con videos, créditos, precios, reseñas, alcance y soporte.',
+    videos: '🎥 Videos',
+    credits: '⚡ Créditos',
+    growth: '📈 Crecimiento',
+    support: '💬 Soporte',
+  },
+  pl: {
+    label: 'Konsjerż AI',
+    title: 'Konsjerż AI',
+    intro:
+      'Cześć, jestem konsjerżem SignalBoost. Pomogę z filmami, kredytami, cenami, opiniami, promocją i wsparciem.',
+    videos: '🎥 Wideo',
+    credits: '⚡ Kredyty',
+    growth: '📈 Wzrost',
+    support: '💬 Wsparcie',
+  },
+  ru: {
+    label: 'AI-консьерж',
+    title: 'AI-консьерж',
+    intro:
+      'Здравствуйте, я консьерж SignalBoost. Я помогу с видео, кредитами, тарифами, отзывами, продвижением и поддержкой.',
+    videos: '🎥 Видео',
+    credits: '⚡ Кредиты',
+    growth: '📈 Рост',
+    support: '💬 Поддержка',
+  },
+}
 
 export default function Concierge() {
   const [open, setOpen] = useState(false)
+  const { lang } = useI18n()
+
+  const copy =
+    COPY[lang as keyof typeof COPY] || COPY.en
 
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="Open AI Concierge"
+        aria-label={copy.label}
         style={{
           position: 'fixed',
           right: 30,
@@ -31,13 +89,13 @@ export default function Concierge() {
         }}
       >
         <span style={{ fontSize: 26 }}>✨</span>
-        <span>AI Concierge</span>
+        <span>{copy.label}</span>
       </button>
 
       {open ? (
         <div
           role="dialog"
-          aria-label="SignalBoost AI Concierge"
+          aria-label={copy.title}
           style={{
             position: 'fixed',
             right: 30,
@@ -64,14 +122,14 @@ export default function Concierge() {
             <div>
               <div style={{ fontSize: 12, opacity: 0.6 }}>SignalBoost</div>
               <div style={{ fontSize: 22, fontWeight: 800 }}>
-                AI Concierge
+                {copy.title}
               </div>
             </div>
 
             <button
               type="button"
               onClick={() => setOpen(false)}
-              aria-label="Close AI Concierge"
+              aria-label="Close"
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -94,12 +152,11 @@ export default function Concierge() {
               lineHeight: 1.45,
             }}
           >
-            Hi, I&apos;m your SignalBoost concierge. I can help with videos,
-            credits, pricing, reviews, outreach, and support.
+            {copy.intro}
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {['🎥 Videos', '⚡ Credits', '📈 Growth', '💬 Support'].map(
+            {[copy.videos, copy.credits, copy.growth, copy.support].map(
               (label) => (
                 <button
                   key={label}

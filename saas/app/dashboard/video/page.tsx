@@ -441,10 +441,13 @@ export default function VideoPage() {
     } catch (err: any) {
       const safeMessage = err?.message ?? t(dict, 'video_page.genericError', 'Something went wrong')
       setError(safeMessage)
-      setJobs(prev => prev
-        .map(j => j.id === tempId ? { ...j, status: 'error' as const, error: safeMessage } : j)
-        .filter(j => !(j.id === tempId && safeMessage.toLowerCase().includes('session expired')))
-      )
+      setJobs(prev => {
+        const updated: Job[] = prev
+          .map((j): Job => (j.id === tempId ? { ...j, status: 'error', error: safeMessage } : j))
+          .filter(j => !(j.id === tempId && safeMessage.toLowerCase().includes('session expired')))
+
+        return updated
+      })
     } finally {
       setProcessing(false)
       setUploadProgress(0)

@@ -23,8 +23,19 @@ const COPY = {
     growth:
       'Looking to increase traffic, leads or visibility?',
     thinking: 'Thinking...',
+    videosBtn: '🎥 Videos',
+    creditsBtn: '⚡ Credits',
+    growthBtn: '📈 Growth',
+    supportBtn: '💬 Support',
+    videoReply:
+      '🎥 Video Studio helps create AI videos, hooks, captions and shorts.',
+    growthReply:
+      '📈 Growth tools help with outreach, reviews, traffic and visibility.',
+    supportPrompt:
+      'Give me a short welcome and ask how you can help.',
+    unableCredits: '⚡ Unable to load credits.',
+    unableSupport: '💬 Unable to connect.',
   },
-
   pt: {
     label: 'Concierge IA',
     title: 'Concierge IA',
@@ -43,8 +54,19 @@ const COPY = {
     growth:
       'Quer aumentar tráfego, leads ou visibilidade?',
     thinking: 'Pensando...',
+    videosBtn: '🎥 Vídeos',
+    creditsBtn: '⚡ Créditos',
+    growthBtn: '📈 Crescimento',
+    supportBtn: '💬 Suporte',
+    videoReply:
+      '🎥 O Video Studio ajuda a criar vídeos com IA, ganchos, legendas e shorts.',
+    growthReply:
+      '📈 As ferramentas de crescimento ajudam com divulgação, avaliações, tráfego e visibilidade.',
+    supportPrompt:
+      'Faça uma saudação curta e pergunte como pode ajudar.',
+    unableCredits: '⚡ Não foi possível carregar os créditos.',
+    unableSupport: '💬 Não foi possível conectar.',
   },
-
   es: {
     label: 'Conserje IA',
     title: 'Conserje IA',
@@ -63,8 +85,19 @@ const COPY = {
     growth:
       '¿Quieres aumentar tráfico, clientes o visibilidad?',
     thinking: 'Pensando...',
+    videosBtn: '🎥 Videos',
+    creditsBtn: '⚡ Créditos',
+    growthBtn: '📈 Crecimiento',
+    supportBtn: '💬 Soporte',
+    videoReply:
+      '🎥 Video Studio ayuda a crear videos con IA, ganchos, subtítulos y shorts.',
+    growthReply:
+      '📈 Las herramientas de crecimiento ayudan con alcance, reseñas, tráfico y visibilidad.',
+    supportPrompt:
+      'Da una bienvenida breve y pregunta cómo puedes ayudar.',
+    unableCredits: '⚡ No se pudieron cargar los créditos.',
+    unableSupport: '💬 No se pudo conectar.',
   },
-
   pl: {
     label: 'Konsjerż AI',
     title: 'Konsjerż AI',
@@ -83,8 +116,19 @@ const COPY = {
     growth:
       'Chcesz zwiększyć ruch lub widoczność?',
     thinking: 'Myślę...',
+    videosBtn: '🎥 Wideo',
+    creditsBtn: '⚡ Kredyty',
+    growthBtn: '📈 Wzrost',
+    supportBtn: '💬 Wsparcie',
+    videoReply:
+      '🎥 Video Studio pomaga tworzyć filmy AI, scenariusze, napisy i krótkie materiały.',
+    growthReply:
+      '📈 Narzędzia wzrostu pomagają w promocji, opiniach, ruchu i widoczności.',
+    supportPrompt:
+      'Krótko przywitaj użytkownika i zapytaj, jak możesz pomóc.',
+    unableCredits: '⚡ Nie udało się załadować kredytów.',
+    unableSupport: '💬 Nie udało się połączyć.',
   },
-
   ru: {
     label: 'AI-консьерж',
     title: 'AI-консьерж',
@@ -103,6 +147,18 @@ const COPY = {
     growth:
       'Хотите увеличить трафик или видимость?',
     thinking: 'Думаю...',
+    videosBtn: '🎥 Видео',
+    creditsBtn: '⚡ Кредиты',
+    growthBtn: '📈 Рост',
+    supportBtn: '💬 Поддержка',
+    videoReply:
+      '🎥 Video Studio помогает создавать AI-видео, сценарии, субтитры и короткие ролики.',
+    growthReply:
+      '📈 Инструменты роста помогают с продвижением, отзывами, трафиком и видимостью.',
+    supportPrompt:
+      'Коротко поприветствуйте пользователя и спросите, как можете помочь.',
+    unableCredits: '⚡ Не удалось загрузить кредиты.',
+    unableSupport: '💬 Не удалось подключиться.',
   },
 }
 
@@ -127,19 +183,13 @@ export default function Concierge() {
     if (path.includes('pricing'))
       return copy.pricing
 
-    if (
-      path.includes('video') ||
-      path.includes('studio')
-    )
+    if (path.includes('video') || path.includes('studio'))
       return copy.video
 
     if (path.includes('review'))
       return copy.reviews
 
-    if (
-      path.includes('website') ||
-      path.includes('builder')
-    )
+    if (path.includes('website') || path.includes('builder'))
       return copy.website
 
     if (path.includes('growth'))
@@ -148,26 +198,85 @@ export default function Concierge() {
     return copy.default
   }
 
+  async function action(type: string) {
+    if (type === 'video') {
+      setMessage(copy.videoReply)
+    }
+
+    if (type === 'credits') {
+      try {
+        const response = await fetch('/api/credits')
+        const data = await response.json()
+
+        setMessage(
+          `⚡ ${data.credits} credits · ${data.plan} plan`
+        )
+      } catch {
+        setMessage(copy.unableCredits)
+      }
+    }
+
+    if (type === 'growth') {
+      setMessage(copy.growthReply)
+    }
+
+    if (type === 'support') {
+      try {
+        setLoading(true)
+
+        const response = await fetch('/api/ai', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messages: [
+              {
+                role: 'user',
+                content: copy.supportPrompt,
+              },
+            ],
+            context: {
+              language: lang,
+              currentPage: pathname,
+            },
+          }),
+        })
+
+        const data = await response.json()
+
+        setMessage(
+          data.reply || copy.unableSupport
+        )
+      } catch {
+        setMessage(copy.unableSupport)
+      } finally {
+        setLoading(false)
+      }
+    }
+  }
+
   return (
     <>
       <button
+        type="button"
         onClick={() => setOpen(true)}
         style={{
-          position:'fixed',
-          right:30,
-          bottom:30,
-          zIndex:999999,
-          border:'none',
-          cursor:'pointer',
-          display:'flex',
-          alignItems:'center',
-          gap:10,
-          padding:'14px 18px',
-          borderRadius:999,
+          position: 'fixed',
+          right: 30,
+          bottom: 30,
+          zIndex: 999999,
+          border: 'none',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '14px 18px',
+          borderRadius: 999,
           background:
             'linear-gradient(135deg,#ffc300,#ff9500)',
-          color:'#111',
-          fontWeight:800,
+          color: '#111',
+          fontWeight: 800,
         }}
       >
         ✨ {copy.label}
@@ -176,34 +285,30 @@ export default function Concierge() {
       {open && (
         <div
           style={{
-            position:'fixed',
-            right:30,
-            bottom:105,
-            zIndex:999999,
-            width:380,
-            maxWidth:'calc(100vw - 40px)',
-            borderRadius:24,
-            background:
-              'rgba(15,15,20,.96)',
-            color:'white',
-            padding:24,
+            position: 'fixed',
+            right: 30,
+            bottom: 105,
+            zIndex: 999999,
+            width: 380,
+            maxWidth: 'calc(100vw - 40px)',
+            borderRadius: 24,
+            background: 'rgba(15,15,20,.96)',
+            color: 'white',
+            padding: 24,
           }}
         >
           <div
             style={{
-              display:'flex',
-              justifyContent:'space-between',
-              marginBottom:16,
+              display: 'flex',
+              justifyContent: 'space-between',
+              marginBottom: 16,
             }}
           >
-            <strong>
-              {copy.title}
-            </strong>
+            <strong>{copy.title}</strong>
 
             <button
-              onClick={() =>
-                setOpen(false)
-              }
+              type="button"
+              onClick={() => setOpen(false)}
             >
               ×
             </button>
@@ -211,16 +316,52 @@ export default function Concierge() {
 
           <div
             style={{
-              padding:16,
-              borderRadius:16,
+              padding: 16,
+              borderRadius: 16,
               background:
                 'rgba(255,255,255,.08)',
+              marginBottom: 16,
             }}
           >
             {loading
               ? copy.thinking
-              : message ||
-                getPageGreeting()}
+              : message || getPageGreeting()}
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 8,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => action('video')}
+            >
+              {copy.videosBtn}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => action('credits')}
+            >
+              {copy.creditsBtn}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => action('growth')}
+            >
+              {copy.growthBtn}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => action('support')}
+            >
+              {copy.supportBtn}
+            </button>
           </div>
         </div>
       )}

@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 
-const CONTACT_EMAIL = 'support@signalboostapp.com'
+const CONTACT_EMAIL = 'saassupport@signalboostapp.com'
 
 const GOLD = '#ffc300'
 const BLUE = '#3b82f6'
@@ -23,6 +23,7 @@ const SYMBOLS: Record<string, string> = {
 
 export default function PodcastersPage() {
   const { dict } = useI18n()
+  const P = (key: string, fallback: string) => t(dict, `podcasters_page.${key}`, fallback)
   const [currency, setCurrency] = useState('USD')
 
   const PLANS = [
@@ -95,17 +96,17 @@ export default function PodcastersPage() {
   ]
 
   const studioAgents = [
-    { icon: '📝', name: 'Transcript Agent', status: 'ACTIVE', color: GREEN },
-    { icon: '✂️', name: 'Viral Clip Agent', status: 'SCANNING', color: GOLD },
-    { icon: '🌍', name: 'Translation Agent', status: '5 LANG', color: BLUE },
-    { icon: '🎙️', name: 'Voice Agent', status: 'READY', color: PURPLE },
-    { icon: '📣', name: 'Distribution Agent', status: 'STANDBY', color: '#fb7185' },
+    { icon: '📝', name: P('agents.transcript','Transcript Agent'), status: P('status.active','ACTIVE'), color: GREEN },
+    { icon: '✂️', name: P('agents.clip','Viral Clip Agent'), status: P('status.scanning','SCANNING'), color: GOLD },
+    { icon: '🌍', name: P('agents.translation','Translation Agent'), status: P('status.lang5','5 LANG'), color: BLUE },
+    { icon: '🎙️', name: P('agents.voice','Voice Agent'), status: P('status.ready','READY'), color: PURPLE },
+    { icon: '📣', name: P('agents.distribution','Distribution Agent'), status: P('status.standby','STANDBY'), color: '#fb7185' },
   ]
 
   const productions = [
-    { title: 'Episode 34', clips: '8 clips', langs: '5 languages', status: 'Published' },
-    { title: 'Episode 33', clips: '6 clips', langs: '3 languages', status: 'Scheduled' },
-    { title: 'Episode 32', clips: '4 clips', langs: '2 languages', status: 'Draft' },
+    { title: P('episodes.e34','Episode 34'), clips: P('episodes.e34Clips','8 clips'), langs: P('episodes.e34Langs','5 languages'), status: P('episodes.published','Published') },
+    { title: P('episodes.e33','Episode 33'), clips: P('episodes.e33Clips','6 clips'), langs: P('episodes.e33Langs','3 languages'), status: P('episodes.scheduled','Scheduled') },
+    { title: P('episodes.e32','Episode 32'), clips: P('episodes.e32Clips','4 clips'), langs: P('episodes.e32Langs','2 languages'), status: P('episodes.draft','Draft') },
   ]
 
   const deliverables = [
@@ -190,7 +191,7 @@ export default function PodcastersPage() {
             }}
           >
             <span style={{ color: '#ef4444' }}>●</span>
-            PODCAST_STUDIO // LIVE
+            {P('hero.liveBadge', 'PODCAST_STUDIO // LIVE')}
           </div>
 
           <h1
@@ -202,11 +203,11 @@ export default function PodcastersPage() {
               fontWeight: 950,
             }}
           >
-            Your podcast.
+            {P('hero.line1','Your podcast.')}
             <br />
-            Your studio.
+            {P('hero.line2','Your studio.')}
             <br />
-            <span style={{ color: GOLD }}>Your global audience.</span>
+            <span style={{ color: GOLD }}>{P('hero.line3','Your global audience.')}</span>
           </h1>
 
           <p
@@ -218,9 +219,7 @@ export default function PodcastersPage() {
               maxWidth: 620,
             }}
           >
-            Upload one episode and let SignalBoost help create transcripts,
-            clips, captions, multilingual audio, show notes and distribution
-            assets from a single studio workspace.
+            {P('hero.subtitle','Upload one episode and let SignalBoost help create transcripts, clips, captions, multilingual audio, show notes and distribution assets from a single studio workspace.')}
           </p>
 
           <div
@@ -232,7 +231,7 @@ export default function PodcastersPage() {
             }}
           >
             <Link
-              href="#plans"
+              href="/dashboard/podcast/studio"
               style={{
                 background: GOLD,
                 color: '#000',
@@ -242,7 +241,7 @@ export default function PodcastersPage() {
                 textDecoration: 'none',
               }}
             >
-              Open Studio
+              {P('hero.openStudio','Open Studio')}
             </Link>
 
             <Link
@@ -257,7 +256,7 @@ export default function PodcastersPage() {
                 textDecoration: 'none',
               }}
             >
-              How it works →
+              {P('hero.howItWorks','How it works')} →
             </Link>
           </div>
         </div>
@@ -305,10 +304,10 @@ export default function PodcastersPage() {
                     fontWeight: 900,
                   }}
                 >
-                  SIGNALBOOST AUDIO FOUNDRY
+                  {P('panel.foundry','SIGNALBOOST AUDIO FOUNDRY')}
                 </div>
                 <div style={{ fontSize: 22, fontWeight: 900, marginTop: 4 }}>
-                  Episode_034.wav
+                  {P('panel.episodeFile','Episode_034.wav')}
                 </div>
               </div>
 
@@ -326,7 +325,7 @@ export default function PodcastersPage() {
                   fontWeight: 900,
                 }}
               >
-                🔴 ON AIR
+                🔴 {P('panel.onAir','ON AIR')}
               </div>
             </div>
 
@@ -377,10 +376,10 @@ export default function PodcastersPage() {
                   gap: 10,
                 }}
               >
-                <StudioMetric label="Transcript" value="Ready" />
-                <StudioMetric label="Clips found" value="08" />
-                <StudioMetric label="Languages" value="5" />
-                <StudioMetric label="Publish pack" value="86%" />
+                <StudioMetric label={P('metrics.transcript','Transcript')} value={P('metrics.ready','Ready')} />
+                <StudioMetric label={P('metrics.clipsFound','Clips found')} value="08" />
+                <StudioMetric label={P('metrics.languages','Languages')} value="5" />
+                <StudioMetric label={P('metrics.publishPack','Publish pack')} value="86%" />
               </div>
             </div>
 
@@ -430,7 +429,7 @@ export default function PodcastersPage() {
                 marginTop: 18,
               }}
             >
-              <button
+              <Link href="/dashboard/video"
                 style={{
                   border: 'none',
                   borderRadius: 999,
@@ -441,10 +440,10 @@ export default function PodcastersPage() {
                   cursor: 'pointer',
                 }}
               >
-                Generate clips
-              </button>
+                {P('actions.generateClips','Generate clips')}
+              </Link>
 
-              <button
+              <Link href="/dashboard/video"
                 style={{
                   border: '1px solid rgba(255,255,255,.14)',
                   borderRadius: 999,
@@ -455,8 +454,8 @@ export default function PodcastersPage() {
                   cursor: 'pointer',
                 }}
               >
-                Upload episode
-              </button>
+                {P('actions.uploadEpisode','Upload episode')}
+              </Link>
             </div>
           </div>
         </div>
@@ -525,7 +524,7 @@ export default function PodcastersPage() {
             textAlign: 'center',
           }}
         >
-          A full production studio after you record
+          {P('section.fullStudioTitle','A full production studio after you record')}
         </h2>
 
         <p
@@ -537,9 +536,7 @@ export default function PodcastersPage() {
             lineHeight: 1.7,
           }}
         >
-          You focus on the conversation. SignalBoost helps turn that episode
-          into clips, captions, translated content, voiceovers, pages and
-          promotional assets.
+          {P('section.fullStudioSubtitle','You focus on the conversation. SignalBoost helps turn that episode into clips, captions, translated content, voiceovers, pages and promotional assets.')}
         </p>
 
         <div

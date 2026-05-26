@@ -168,6 +168,12 @@ export default function Navbar() {
       href: '/dashboard/lab',
       featured: false,
     },
+    {
+      icon: '🤖',
+      label: 'AI Operator',
+      href: '/dashboard/operator',
+      featured: false,
+    },
   ]
 
   return (

@@ -184,7 +184,7 @@ const MODULES: WorkshopModule[] = [
     },
   },
   {
-    id: 'customers', icon: '📈', time: '8–12 min', href: '/dashboard/prospects',
+    id: 'customers', icon: '📈', time: '8–12 min', href: '/dashboard/sales/pipeline',
     title: { en: 'Get my first customers', pt: 'Conseguir meus primeiros clientes', es: 'Conseguir mis primeros clientes', pl: 'Zdobyć pierwszych klientów', ru: 'Получить первых клиентов' },
     description: { en: 'Find prospects and prepare friendly outreach.', pt: 'Encontre prospects e prepare uma abordagem amigável.', es: 'Encuentra prospectos y prepara un contacto amigable.', pl: 'Znajdź potencjalnych klientów i przygotuj kontakt.', ru: 'Найдите клиентов и подготовьте дружелюбное обращение.' },
     steps: {

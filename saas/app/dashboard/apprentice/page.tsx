@@ -242,8 +242,30 @@ export default function ApprenticeWorkshopPage() {
   const activeModule = useMemo(() => MODULES.find(item => item.id === selected) || MODULES[0], [selected])
   const levels = [copy.beginner, copy.intermediate, copy.comfortable, copy.advanced]
 
+  const workshopNav = [
+    { label: 'Promote business', href: '/dashboard/promote' },
+    { label: 'Create site', href: '/dashboard/builder' },
+    { label: 'Collect reviews', href: '/dashboard/reviews' },
+    { label: 'Generate audio', href: '/dashboard/audio' },
+    { label: 'Create videos', href: '/dashboard/video' },
+    { label: 'Lab', href: '/dashboard/lab' },
+  ]
+
   return (
-    <main className="sb-page">
+    <main className="sb-page" style={{ background: 'radial-gradient(circle at 12% 10%, rgba(255,195,0,.09), transparent 25%), radial-gradient(circle at 90% 0%, rgba(59,130,246,.10), transparent 28%), linear-gradient(180deg, #07080f 0%, #0a0b14 48%, #090b12 100%)' }}>
+      <section style={{ marginBottom: 18, border: '1px solid var(--border-soft)', borderRadius: 18, background: 'rgba(7,10,18,.72)', backdropFilter: 'blur(8px)', padding: '14px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ color: '#fff', fontWeight: 900, letterSpacing: '.03em' }}>✨ SignalBoost Apprentice Workshop</div>
+          <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Workshop environment · guided tracks · real tools</div>
+        </div>
+        <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {workshopNav.map(item => (
+            <Link key={item.href} href={item.href} style={{ textDecoration: 'none', border: '1px solid rgba(255,255,255,.14)', color: '#dbe3ff', borderRadius: 999, padding: '7px 12px', fontSize: 12, fontWeight: 800, background: 'rgba(255,255,255,.03)' }}>
+              {item.label}
+            </Link>
+          ))}
+        </div>
+      </section>
       <section style={{ display: 'grid', gridTemplateColumns: '1.05fr .95fr', gap: 22, alignItems: 'stretch' }}>
         <div className="sb-card" style={{ padding: 28 }}>
           <div className="sb-kicker">✨ {copy.badge}</div>

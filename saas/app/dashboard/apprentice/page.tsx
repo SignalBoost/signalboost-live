@@ -243,17 +243,17 @@ export default function ApprenticeWorkshopPage() {
   const levels = [copy.beginner, copy.intermediate, copy.comfortable, copy.advanced]
 
   const workshopNav = [
-    { label: 'Promote business', href: '/dashboard/promote' },
-    { label: 'Create site', href: '/dashboard/builder' },
-    { label: 'Collect reviews', href: '/dashboard/reviews' },
-    { label: 'Generate audio', href: '/dashboard/audio' },
-    { label: 'Create videos', href: '/dashboard/video' },
+    { label: activeLang === 'pt' ? 'Promover negócio' : activeLang === 'es' ? 'Promocionar negocio' : activeLang === 'pl' ? 'Promuj firmę' : activeLang === 'ru' ? 'Продвигать бизнес' : 'Promote business', href: '/dashboard/promote' },
+    { label: activeLang === 'pt' ? 'Criar site' : activeLang === 'es' ? 'Crear sitio' : activeLang === 'pl' ? 'Stwórz stronę' : activeLang === 'ru' ? 'Создать сайт' : 'Create site', href: '/dashboard/builder' },
+    { label: activeLang === 'pt' ? 'Coletar avaliações' : activeLang === 'es' ? 'Recopilar reseñas' : activeLang === 'pl' ? 'Zbieraj opinie' : activeLang === 'ru' ? 'Собирать отзывы' : 'Collect reviews', href: '/dashboard/reviews' },
+    { label: activeLang === 'pt' ? 'Gerar áudio' : activeLang === 'es' ? 'Generar audio' : activeLang === 'pl' ? 'Generuj audio' : activeLang === 'ru' ? 'Создать аудио' : 'Generate audio', href: '/dashboard/audio' },
+    { label: activeLang === 'pt' ? 'Criar vídeos' : activeLang === 'es' ? 'Crear videos' : activeLang === 'pl' ? 'Twórz wideo' : activeLang === 'ru' ? 'Создать видео' : 'Create videos', href: '/dashboard/video' },
     { label: 'Lab', href: '/dashboard/lab' },
   ]
 
   return (
     <main className="sb-page" style={{ background: 'radial-gradient(circle at 12% 10%, rgba(255,195,0,.09), transparent 25%), radial-gradient(circle at 90% 0%, rgba(59,130,246,.10), transparent 28%), linear-gradient(180deg, #07080f 0%, #0a0b14 48%, #090b12 100%)' }}>
-      <section style={{ marginBottom: 18, border: '1px solid var(--border-soft)', borderRadius: 18, background: 'rgba(7,10,18,.72)', backdropFilter: 'blur(8px)', padding: '14px 16px' }}>
+      <section style={{ position: 'sticky', top: 8, zIndex: 20, marginBottom: 18, border: '1px solid var(--border-soft)', borderRadius: 18, background: 'rgba(7,10,18,.92)', backdropFilter: 'blur(10px)', padding: '14px 16px', boxShadow: '0 10px 30px rgba(0,0,0,.35)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ color: '#fff', fontWeight: 900, letterSpacing: '.03em' }}>✨ SignalBoost Apprentice Workshop</div>
           <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Workshop environment · guided tracks · real tools</div>

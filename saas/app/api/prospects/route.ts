@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
   const a = admin()
   let query = a
     .from('prospects')
-    .select('id, business_name, category, location, website, phone, contact_email, source, source_id, status, web_presence_score, assessment, created_at, updated_at')
+    .select('id, business_name, category, location, website, phone, source, source_id, status, web_presence_score, assessment, created_at, updated_at')
     .order('created_at', { ascending: false })
     .limit(limit)
 
@@ -88,7 +88,7 @@ export async function PATCH(req: NextRequest) {
   const a = admin()
   const { error } = await a
     .from('prospects')
-    .update({ status, updated_at: new Date().toISOString() })
+    .update({ status })
     .eq('id', id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -1,140 +1,89 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
-const DAILY_LIMIT = 25
-
-type DiscoveryRequest = {
-  industry?: string
-  country?: string
-  city?: string
-  language?: string
-  limit?: number
+function admin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  )
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as DiscoveryRequest
-
-    const limit = Math.min(
-      Math.max(Number(body.limit || DAILY_LIMIT), 1),
-      50
-    )
-
-    const prospects = await generateProspectIdeas({
-      industry: body.industry || 'small business',
-      country: body.country || 'United States',
-      city: body.city || '',
-      language: body.language || 'English',
-      limit,
-    })
-
-    return NextResponse.json({
-      status: 'discovered',
-      count: prospects.length,
-      prospects,
-      note:
-        'These are AI-generated prospect ideas. Review and verify before outreach.',
-    })
-  } catch (error) {
-    console.error('Sales discovery error:', error)
-
-    return NextResponse.json(
-      { error: 'Could not discover prospects.' },
-      { status: 500 }
-    )
-  }
-}
-
-async function generateProspectIdeas(input: Required<DiscoveryRequest>) {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY is missing.')
-  }
-
-  const prompt = `
-You are the SignalBoost SaaS Prospect Discovery Agent.
-
-Goal:
-Generate a list of potential business prospects that could benefit from SignalBoost SaaS.
-
-SignalBoost SaaS helps with:
-- multilingual websites
-- review collection
-- podcast support
-- native AI voiceovers
-- video captions
-- social clips
-- business content
-- AI-guided creation
-
-Discovery target:
-Industry: ${input.industry}
-Country: ${input.country}
-City: ${input.city}
-Language: ${input.language}
-Limit: ${input.limit}
-
-Important rules:
-- Generate realistic prospect profiles.
-- Do NOT invent private personal emails.
-- Prefer business/public contact patterns only.
-- Use website/contact_page fields as placeholders for verification.
-- These must be treated as leads to verify, not confirmed contacts.
-- Respect local culture and language.
-- Return only prospects that reasonably fit SignalBoost services.
-
-Return ONLY valid JSON:
-
-{
-  "prospects": [
-    {
-      "company": "business name",
-      "industry": "industry",
-      "country": "country",
-      "city": "city",
-      "language": "language",
-      "website": "possible website or empty string",
-      "contact_page": "possible contact page or empty string",
-      "public_email": "",
-      "fit_reason": "why this prospect may benefit from SignalBoost",
-      "suggested_offer": "free website sketch / review system / podcast support / multilingual content",
-      "confidence": "low | medium | high"
+    const { query, maxResults } = await req.json()
+    if (!query || typeof query !== 'string') {
+      return NextResponse.json({ error: 'Provide a "query" like "restaurants in Merida".' }, { status: 400 })
     }
-  ]
-}
-`
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      temperature: 0.7,
-      max_tokens: 1800,
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are a careful B2B prospect discovery assistant. You create prospect ideas for human review. You do not invent private personal contact information.',
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-    }),
-  })
+    const key = process.env.GOOGLE_PLACES_API_KEY
+    if (!key) {
+      return NextResponse.json({ error: 'GOOGLE_PLACES_API_KEY is not set.' }, { status: 500 })
+    }
 
-  if (!res.ok) {
-    const body = await res.text()
-    throw new Error(`OpenAI discovery failed: ${body}`)
+    // Google Places API (New) - Text Search
+    const placesRes = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': key,
+        // Only request the fields we need (keeps cost low)
+        'X-Goog-FieldMask':
+          'places.id,places.displayName,places.formattedAddress,places.websiteUri,places.nationalPhoneNumber,places.primaryTypeDisplayName,places.rating,places.userRatingCount',
+      },
+      body: JSON.stringify({
+        textQuery: query,
+        maxResultCount: Math.min(maxResults || 20, 20),
+      }),
+    })
+
+    const data = await placesRes.json()
+    if (!placesRes.ok) {
+      return NextResponse.json(
+        { error: data.error?.message || 'Places API error', details: data },
+        { status: 500 }
+      )
+    }
+
+    const places = data.places || []
+    if (places.length === 0) {
+      return NextResponse.json({ found: 0, saved: 0, message: 'No businesses found for that query.' })
+    }
+
+    const supabase = admin()
+    let saved = 0
+
+    for (const p of places) {
+      const row = {
+        business_name: p.displayName?.text || 'Unknown',
+        category: p.primaryTypeDisplayName?.text || null,
+        location: p.formattedAddress || null,
+        website: p.websiteUri || null,
+        phone: p.nationalPhoneNumber || null,
+        source: 'google_places',
+        source_id: p.id || null,
+        status: 'discovered',
+        // A simple opportunity signal: no website OR few reviews = bigger opportunity
+        web_presence_score:
+          (p.websiteUri ? 50 : 0) + Math.min((p.userRatingCount || 0), 50),
+        assessment: [
+          p.websiteUri ? 'has website' : 'NO website',
+          p.userRatingCount ? `${p.userRatingCount} reviews` : 'no reviews',
+          p.rating ? `rating ${p.rating}` : 'no rating',
+        ].join(', '),
+      }
+
+      // Upsert by (source, source_id) so re-running doesn't create duplicates
+      const { error } = await supabase
+        .from('prospects')
+        .upsert(row, { onConflict: 'source,source_id', ignoreDuplicates: true })
+
+      if (!error) saved++
+    }
+
+    return NextResponse.json({ found: places.length, saved, query })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'discovery failed'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
-
-  const data = await res.json()
-  const raw = data.choices?.[0]?.message?.content || '{}'
-  const parsed = JSON.parse(raw)
-
-  return Array.isArray(parsed.prospects) ? parsed.prospects : []
 }

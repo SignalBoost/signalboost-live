@@ -1,0 +1,509 @@
+{
+  "generatedAt": "2026-05-26T22:31:49.716Z",
+  "localeKeyCount": 83,
+  "missingKeysByLang": {
+    "en": 0,
+    "pt": 1,
+    "es": 1,
+    "pl": 1,
+    "ru": 1
+  },
+  "hardcodedSamples": [
+    {
+      "file": "app/dashboard/apprentice/page.tsx",
+      "text": "description: Record"
+    },
+    {
+      "file": "app/dashboard/apprentice/page.tsx",
+      "text": "time: string\n  href: string\n  steps: Record"
+    },
+    {
+      "file": "app/dashboard/apprentice/page.tsx",
+      "text": "Workshop environment · guided tracks · real tools"
+    },
+    {
+      "file": "app/dashboard/apprentice/page.tsx",
+      "text": "New Core Feature"
+    },
+    {
+      "file": "app/dashboard/builder/page.tsx",
+      "text": "x.code === l)\n                  return lang ? ("
+    },
+    {
+      "file": "app/dashboard/feedback/page.tsx",
+      "text": "f.category === filterCategory)\r\n\r\n  return ("
+    },
+    {
+      "file": "app/dashboard/feedback/page.tsx",
+      "text": "Help us build SignalBoost better. Your feedback goes directly to Luis."
+    },
+    {
+      "file": "app/dashboard/feedback/page.tsx",
+      "text": "Your feedback has been received. Luis reads every single submission personally."
+    },
+    {
+      "file": "app/dashboard/feedback/page.tsx",
+      "text": "Submit more feedback"
+    },
+    {
+      "file": "app/dashboard/feedback/page.tsx",
+      "text": "View feedback board"
+    },
+    {
+      "file": "app/dashboard/feedback/page.tsx",
+      "text": "How would you rate SignalBoost overall? *"
+    },
+    {
+      "file": "app/dashboard/feedback/page.tsx",
+      "text": "What kind of feedback is this? *"
+    },
+    {
+      "file": "app/dashboard/feedback/page.tsx",
+      "text": "Your feedback *"
+    },
+    {
+      "file": "app/dashboard/feedback/page.tsx",
+      "text": "Community feedback"
+    },
+    {
+      "file": "app/dashboard/feedback/page.tsx",
+      "text": "Loading feedback..."
+    },
+    {
+      "file": "app/dashboard/feedback/page.tsx",
+      "text": "No feedback yet"
+    },
+    {
+      "file": "app/dashboard/feedback/page.tsx",
+      "text": "Be the first to share your thoughts!"
+    },
+    {
+      "file": "app/dashboard/feedback/page.tsx",
+      "text": "Submit feedback"
+    },
+    {
+      "file": "app/dashboard/feedback/page.tsx",
+      "text": "c.id === item.category)\r\n                const isOwn = item.user_id === userId\r\n"
+    },
+    {
+      "file": "app/dashboard/feedback/page.tsx",
+      "text": "You"
+    },
+    {
+      "file": "app/dashboard/lab/page.tsx",
+      "text": "f.type.startsWith('image/'))\n  const [vmode, setVmode] = useState"
+    },
+    {
+      "file": "app/dashboard/lab/page.tsx",
+      "text": "AGENT_854 // ANALYSIS"
+    },
+    {
+      "file": "app/dashboard/lab/page.tsx",
+      "text": "GENERATION_STREAM [14/22]"
+    },
+    {
+      "file": "app/dashboard/lab/page.tsx",
+      "text": "TARGET_LOCKED"
+    },
+    {
+      "file": "app/dashboard/launchpad/business/page.tsx",
+      "text": "This guided business launch flow is coming next."
+    },
+    {
+      "file": "app/dashboard/launchpad/creator/page.tsx",
+      "text": "This guided creator launch flow is coming next."
+    },
+    {
+      "file": "app/dashboard/launchpad/page.tsx",
+      "text": "path.id === selected)\n\n  const canContinue = Boolean(selectedPath && experience)"
+    },
+    {
+      "file": "app/dashboard/launchpad/page.tsx",
+      "text": "Tell us what you want"
+    },
+    {
+      "file": "app/dashboard/launchpad/page.tsx",
+      "text": "to build"
+    },
+    {
+      "file": "app/dashboard/launchpad/page.tsx",
+      "text": "You bring the idea. SignalBoost helps build and launch it.\n            To help y"
+    },
+    {
+      "file": "app/dashboard/launchpad/page.tsx",
+      "text": "This helps SignalBoost adjust the language, steps and technical\n            deta"
+    },
+    {
+      "file": "app/dashboard/launchpad/page.tsx",
+      "text": "SignalBoost will use your selected experience level to keep the\n                "
+    },
+    {
+      "file": "app/dashboard/launchpad/page.tsx",
+      "text": "Continue →"
+    },
+    {
+      "file": "app/dashboard/launchpad/page.tsx",
+      "text": "Choose a path and guidance level"
+    },
+    {
+      "file": "app/dashboard/launchpad/podcast/page.tsx",
+      "text": "Build your podcast in guided steps"
+    },
+    {
+      "file": "app/dashboard/launchpad/podcast/page.tsx",
+      "text": "Solo"
+    },
+    {
+      "file": "app/dashboard/launchpad/podcast/page.tsx",
+      "text": "Interview"
+    },
+    {
+      "file": "app/dashboard/launchpad/podcast/page.tsx",
+      "text": "Co-host"
+    },
+    {
+      "file": "app/dashboard/launchpad/podcast/page.tsx",
+      "text": "Storytelling"
+    },
+    {
+      "file": "app/dashboard/launchpad/podcast/page.tsx",
+      "text": "Create Podcast Page"
+    },
+    {
+      "file": "app/dashboard/launchpad/podcast/page.tsx",
+      "text": "Open Podcast Studio"
+    },
+    {
+      "file": "app/dashboard/launchpad/store/page.tsx",
+      "text": "This guided store launch flow is coming next."
+    },
+    {
+      "file": "app/dashboard/metrics/page.tsx",
+      "text": "Metrics & Credits Control"
+    },
+    {
+      "file": "app/dashboard/metrics/page.tsx",
+      "text": "Monitor real-time infrastructure processing data and account balance states."
+    },
+    {
+      "file": "app/dashboard/metrics/page.tsx",
+      "text": "Account Access Tier"
+    },
+    {
+      "file": "app/dashboard/metrics/page.tsx",
+      "text": "Developer Pro"
+    },
+    {
+      "file": "app/dashboard/metrics/page.tsx",
+      "text": "SaaS Compute Units"
+    },
+    {
+      "file": "app/dashboard/metrics/page.tsx",
+      "text": "Tokens consumed whenever translation modules or voice generation engines run."
+    },
+    {
+      "file": "app/dashboard/metrics/page.tsx",
+      "text": "Remaining Balance"
+    },
+    {
+      "file": "app/dashboard/metrics/page.tsx",
+      "text": "Credits"
+    },
+    {
+      "file": "app/dashboard/metrics/page.tsx",
+      "text": "Next Auto-Refill: 2026-06-01"
+    },
+    {
+      "file": "app/dashboard/metrics/page.tsx",
+      "text": "Add Top-up"
+    },
+    {
+      "file": "app/dashboard/metrics/page.tsx",
+      "text": "Recent Infrastructure Logs"
+    },
+    {
+      "file": "app/dashboard/metrics/page.tsx",
+      "text": "OpenAI Voice Synthesis Deducted"
+    },
+    {
+      "file": "app/dashboard/metrics/page.tsx",
+      "text": "Project ID: #SummerTravelDeal • Voice Model: Alloy"
+    },
+    {
+      "file": "app/dashboard/metrics/page.tsx",
+      "text": "OpenAI Voice Synthesis Deducted"
+    },
+    {
+      "file": "app/dashboard/metrics/page.tsx",
+      "text": "Project ID: #MarketplaceProduct • Voice Model: Echo"
+    },
+    {
+      "file": "app/dashboard/metrics/page.tsx",
+      "text": "System Account Activation Bonus"
+    },
+    {
+      "file": "app/dashboard/metrics/page.tsx",
+      "text": "Database Sign-up Allocation Trigger"
+    },
+    {
+      "file": "app/dashboard/operator/page.tsx",
+      "text": "Describe what you want to change"
+    },
+    {
+      "file": "app/dashboard/operator/page.tsx",
+      "text": "No code needed. I will create a plan, show changes, ask approval, and then publi"
+    },
+    {
+      "file": "app/dashboard/operator/page.tsx",
+      "text": "Here is my plan"
+    },
+    {
+      "file": "app/dashboard/operator/page.tsx",
+      "text": "Approve update"
+    },
+    {
+      "file": "app/dashboard/operator/page.tsx",
+      "text": "Restore previous version"
+    },
+    {
+      "file": "app/dashboard/operator/page.tsx",
+      "text": "Review changes"
+    },
+    {
+      "file": "app/dashboard/operator/page.tsx",
+      "text": "What will change"
+    },
+    {
+      "file": "app/dashboard/operator/page.tsx",
+      "text": "Publish status"
+    },
+    {
+      "file": "app/dashboard/operator/page.tsx",
+      "text": "State:"
+    },
+    {
+      "file": "app/dashboard/page.tsx",
+      "text": "ASK_NEXT"
+    },
+    {
+      "file": "app/dashboard/podcast/page.tsx",
+      "text": "About the show"
+    },
+    {
+      "file": "app/dashboard/podcast/page.tsx",
+      "text": "Audience"
+    },
+    {
+      "file": "app/dashboard/podcast/page.tsx",
+      "text": "Episodes"
+    },
+    {
+      "file": "app/dashboard/podcast/page.tsx",
+      "text": "Host"
+    },
+    {
+      "file": "app/dashboard/podcast/page.tsx",
+      "text": "Host information will appear here."
+    },
+    {
+      "file": "app/dashboard/podcast/page.tsx",
+      "text": "Intro Script"
+    },
+    {
+      "file": "app/dashboard/podcast/page.tsx",
+      "text": "Open Podcast Studio"
+    },
+    {
+      "file": "app/dashboard/podcast/studio/page.tsx",
+      "text": "Upload Episode"
+    },
+    {
+      "file": "app/dashboard/podcast/studio/page.tsx",
+      "text": "Transcript"
+    },
+    {
+      "file": "app/dashboard/podcast/studio/page.tsx",
+      "text": "Suggested Clips"
+    },
+    {
+      "file": "app/dashboard/podcast/studio/page.tsx",
+      "text": "Hook:"
+    },
+    {
+      "file": "app/dashboard/podcast/studio/page.tsx",
+      "text": "Why:"
+    },
+    {
+      "file": "app/dashboard/podcast/studio/page.tsx",
+      "text": "Caption:"
+    },
+    {
+      "file": "app/dashboard/reviews/page.tsx",
+      "text": "signalboostapp.com/review/"
+    },
+    {
+      "file": "app/dashboard/sales/page.tsx",
+      "text": "Give the AI a prospect. It drafts a professional sales email for you to review a"
+    },
+    {
+      "file": "app/dashboard/sales/page.tsx",
+      "text": "Prospect"
+    },
+    {
+      "file": "app/dashboard/sales/page.tsx",
+      "text": "AI Draft"
+    },
+    {
+      "file": "app/dashboard/sales/page.tsx",
+      "text": "The sales email will appear here."
+    },
+    {
+      "file": "app/dashboard/sales/page.tsx",
+      "text": "Subject"
+    },
+    {
+      "file": "app/dashboard/sales/page.tsx",
+      "text": "Email"
+    },
+    {
+      "file": "app/dashboard/sales/page.tsx",
+      "text": "Open in Email"
+    },
+    {
+      "file": "app/dashboard/sales/pipeline/page.tsx",
+      "text": "Sales Pipeline"
+    },
+    {
+      "file": "app/dashboard/sales/pipeline/page.tsx",
+      "text": "Track prospects from discovery to client."
+    },
+    {
+      "file": "app/dashboard/sales/pipeline/page.tsx",
+      "text": "Loading pipeline..."
+    },
+    {
+      "file": "app/dashboard/sales/pipeline/page.tsx",
+      "text": "No leads"
+    },
+    {
+      "file": "app/dashboard/sales/pipeline/page.tsx",
+      "text": "Draft:"
+    },
+    {
+      "file": "app/dashboard/settings/page.tsx",
+      "text": "System Settings"
+    },
+    {
+      "file": "app/dashboard/settings/page.tsx",
+      "text": "Configure account options, data sync webhooks, and routing rules."
+    },
+    {
+      "file": "app/dashboard/settings/page.tsx",
+      "text": "General Workspace Settings"
+    },
+    {
+      "file": "app/dashboard/settings/page.tsx",
+      "text": "Platform Instance Label"
+    },
+    {
+      "file": "app/dashboard/settings/page.tsx",
+      "text": "setPlatformName(e.target.value)}\n                className=\"w-full px-3 py-2 bor"
+    },
+    {
+      "file": "app/dashboard/settings/page.tsx",
+      "text": "Data Ingestion Channels"
+    },
+    {
+      "file": "app/dashboard/settings/page.tsx",
+      "text": "Affiliate Ingest Webhook Target"
+    },
+    {
+      "file": "app/dashboard/settings/page.tsx",
+      "text": "setWebhookUrl(e.target.value)}\n                className=\"w-full px-3 py-2 borde"
+    },
+    {
+      "file": "app/dashboard/settings/page.tsx",
+      "text": "Direct destination address for processing traffic hooks from third-party travel "
+    },
+    {
+      "file": "app/dashboard/settings/page.tsx",
+      "text": "Automation & Triggers"
+    },
+    {
+      "file": "app/dashboard/settings/page.tsx",
+      "text": "Email Generation Summaries"
+    },
+    {
+      "file": "app/dashboard/settings/page.tsx",
+      "text": "Receive automated activity logs whenever video assets complete processing."
+    },
+    {
+      "file": "app/dashboard/settings/page.tsx",
+      "text": "setEmailAlerts(e.target.checked)}\n                className=\"h-4 w-4 text-blue-6"
+    },
+    {
+      "file": "app/dashboard/settings/page.tsx",
+      "text": "Automatic Compute Top-up"
+    },
+    {
+      "file": "app/dashboard/settings/page.tsx",
+      "text": "Automatically reload system balance credits when balance falls below 50 units."
+    },
+    {
+      "file": "app/dashboard/settings/page.tsx",
+      "text": "setAutoRefill(e.target.checked)}\n                className=\"h-4 w-4 text-blue-60"
+    },
+    {
+      "file": "app/dashboard/video/page.tsx",
+      "text": "i + 1)\n  }\n\n  // Phone frame aspect ratio dimensions\n  const phoneWidth = aspect"
+    },
+    {
+      "file": "app/dashboard/video/page.tsx",
+      "text": "l.code === c.lang)\n              return ("
+    },
+    {
+      "file": "app/dashboard/video/page.tsx",
+      "text": "Chapters"
+    },
+    {
+      "file": "app/dashboard/video/page.tsx",
+      "text": "No download available for this format"
+    },
+    {
+      "file": "app/dashboard/video/page.tsx",
+      "text": "Transcript"
+    },
+    {
+      "file": "app/dashboard/video/page.tsx",
+      "text": "setUploadedFile(e.target.files?.[0] ?? null)}\n      />"
+    },
+    {
+      "file": "app/dashboard/video/page.tsx",
+      "text": "Ready · tap to preview"
+    },
+    {
+      "file": "app/dashboard/video/page.tsx",
+      "text": "x.code === l)\n                              return ("
+    },
+    {
+      "file": "app/dashboard/video/page.tsx",
+      "text": "j.status !== 'done').length > 0 && ("
+    }
+  ],
+  "hardcodedCount": 248,
+  "deadLinks": [
+    {
+      "file": "components/Header.tsx",
+      "href": "/login"
+    },
+    {
+      "file": "components/Header.tsx",
+      "href": "/signup"
+    },
+    {
+      "file": "components/PodcastSection.tsx",
+      "href": "/podcasters#how-it-works"
+    }
+  ],
+  "deadLinksCount": 3
+}

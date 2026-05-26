@@ -10,24 +10,99 @@ const COPY = {
     title: 'AI Concierge',
     default:
       "Hi, I'm your SignalBoost concierge. I can help with videos, credits, pricing, reviews, outreach and support.",
-
     dashboard:
       'Welcome back. Want to create content or grow traffic today?',
-
     pricing:
       'Need help choosing the right SignalBoost plan?',
-
     reviews:
       'Want more reviews or help responding to customers?',
-
     video:
       'Need hooks, scripts, captions or voice ideas?',
-
     website:
       'Describe your business and I can help draft a website.',
-
     growth:
       'Looking to increase traffic, leads or visibility?',
+    thinking: 'Thinking...',
+  },
+
+  pt: {
+    label: 'Concierge IA',
+    title: 'Concierge IA',
+    default:
+      'Olá, sou o concierge da SignalBoost. Posso ajudar com vídeos, créditos, preços, avaliações, divulgação e suporte.',
+    dashboard:
+      'Bem-vindo de volta. Quer criar conteúdo ou aumentar tráfego hoje?',
+    pricing:
+      'Precisa de ajuda para escolher o plano ideal?',
+    reviews:
+      'Quer mais avaliações ou ajuda para responder clientes?',
+    video:
+      'Precisa de ideias para roteiro, gancho, legendas ou voz?',
+    website:
+      'Descreva seu negócio e posso ajudar a criar um site.',
+    growth:
+      'Quer aumentar tráfego, leads ou visibilidade?',
+    thinking: 'Pensando...',
+  },
+
+  es: {
+    label: 'Conserje IA',
+    title: 'Conserje IA',
+    default:
+      'Hola, soy tu conserje de SignalBoost. Puedo ayudarte con videos, créditos, reseñas y soporte.',
+    dashboard:
+      'Bienvenido otra vez. ¿Quieres crear contenido o aumentar tráfico?',
+    pricing:
+      '¿Necesitas ayuda para elegir el mejor plan?',
+    reviews:
+      '¿Quieres más reseñas o ayuda para responder clientes?',
+    video:
+      '¿Necesitas ideas para guiones, ganchos o voz?',
+    website:
+      'Describe tu negocio y puedo ayudarte a crear un sitio.',
+    growth:
+      '¿Quieres aumentar tráfico, clientes o visibilidad?',
+    thinking: 'Pensando...',
+  },
+
+  pl: {
+    label: 'Konsjerż AI',
+    title: 'Konsjerż AI',
+    default:
+      'Cześć, jestem konsjerżem SignalBoost.',
+    dashboard:
+      'Witamy ponownie. Chcesz tworzyć treści lub zwiększyć ruch?',
+    pricing:
+      'Potrzebujesz pomocy w wyborze planu?',
+    reviews:
+      'Chcesz więcej opinii lub pomocy z odpowiedziami?',
+    video:
+      'Potrzebujesz pomysłów na scenariusz lub napisy?',
+    website:
+      'Opisz swój biznes, a pomogę stworzyć stronę.',
+    growth:
+      'Chcesz zwiększyć ruch lub widoczność?',
+    thinking: 'Myślę...',
+  },
+
+  ru: {
+    label: 'AI-консьерж',
+    title: 'AI-консьерж',
+    default:
+      'Здравствуйте, я консьерж SignalBoost.',
+    dashboard:
+      'С возвращением. Хотите создать контент или увеличить трафик?',
+    pricing:
+      'Нужна помощь с выбором тарифа?',
+    reviews:
+      'Хотите больше отзывов или помощь с ответами?',
+    video:
+      'Нужны идеи для сценариев, заголовков или озвучки?',
+    website:
+      'Опишите ваш бизнес, и я помогу создать сайт.',
+    growth:
+      'Хотите увеличить трафик или видимость?',
+    thinking: 'Думаю...',
   },
 }
 
@@ -39,118 +114,38 @@ export default function Concierge() {
   const pathname = usePathname()
   const { lang } = useI18n()
 
-  const copy = COPY.en
+  const copy =
+    COPY[lang as keyof typeof COPY] || COPY.en
 
   function getPageGreeting() {
-    const path = pathname?.toLowerCase() || ''
+    const path =
+      pathname?.toLowerCase() || ''
 
-    if (path.includes('dashboard')) {
+    if (path.includes('dashboard'))
       return copy.dashboard
-    }
 
-    if (path.includes('pricing')) {
+    if (path.includes('pricing'))
       return copy.pricing
-    }
 
     if (
       path.includes('video') ||
       path.includes('studio')
-    ) {
+    )
       return copy.video
-    }
 
-    if (
-      path.includes('review')
-    ) {
+    if (path.includes('review'))
       return copy.reviews
-    }
 
     if (
       path.includes('website') ||
       path.includes('builder')
-    ) {
+    )
       return copy.website
-    }
 
-    if (
-      path.includes('growth')
-    ) {
+    if (path.includes('growth'))
       return copy.growth
-    }
 
     return copy.default
-  }
-
-  async function action(type: string) {
-    if (type === 'video') {
-      setMessage(
-        '🎥 Video Studio helps create AI videos and shorts.'
-      )
-    }
-
-    if (type === 'credits') {
-      fetch('/api/credits')
-        .then((r) => r.json())
-        .then((data) => {
-          setMessage(
-            `⚡ You have ${data.credits} credits (${data.plan} plan)`
-          )
-        })
-        .catch(() => {
-          setMessage(
-            '⚡ Unable to load credits'
-          )
-        })
-    }
-
-    if (type === 'growth') {
-      setMessage(
-        '📈 Growth tools help with outreach, reviews and traffic.'
-      )
-    }
-
-    if (type === 'support') {
-      try {
-        setLoading(true)
-
-        const response =
-          await fetch('/api/ai', {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json',
-            },
-            body: JSON.stringify({
-              messages: [
-                {
-                  role:'user',
-                  content:
-                    'Give me a short welcome and ask how you can help.',
-                },
-              ],
-              context: {
-                language: lang,
-                currentPage:
-                  pathname,
-              },
-            }),
-          })
-
-        const data =
-          await response.json()
-
-        setMessage(
-          data.reply ||
-          '💬 Connected.'
-        )
-      } catch {
-        setMessage(
-          '💬 Unable to connect.'
-        )
-      } finally {
-        setLoading(false)
-      }
-    }
   }
 
   return (
@@ -197,8 +192,7 @@ export default function Concierge() {
           <div
             style={{
               display:'flex',
-              justifyContent:
-                'space-between',
+              justifyContent:'space-between',
               marginBottom:16,
             }}
           >
@@ -221,53 +215,12 @@ export default function Concierge() {
               borderRadius:16,
               background:
                 'rgba(255,255,255,.08)',
-              marginBottom:16,
             }}
           >
             {loading
-              ? 'Thinking...'
+              ? copy.thinking
               : message ||
                 getPageGreeting()}
-          </div>
-
-          <div
-            style={{
-              display:'flex',
-              flexWrap:'wrap',
-              gap:8,
-            }}
-          >
-            <button
-              onClick={() =>
-                action('video')
-              }
-            >
-              🎥 Videos
-            </button>
-
-            <button
-              onClick={() =>
-                action('credits')
-              }
-            >
-              ⚡ Credits
-            </button>
-
-            <button
-              onClick={() =>
-                action('growth')
-              }
-            >
-              📈 Growth
-            </button>
-
-            <button
-              onClick={() =>
-                action('support')
-              }
-            >
-              💬 Support
-            </button>
           </div>
         </div>
       )}

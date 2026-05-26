@@ -200,7 +200,7 @@ export default function BuilderPage() {
       {step === 'template' && (
         <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
           <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
-            {t('siteTypeQuestion', 'What kind of site do you need?')}
+            {t('siteTypeQuestion', 'Que tipo de site você precisa?')}
           </h2>
 
           <p
@@ -210,7 +210,7 @@ export default function BuilderPage() {
               marginBottom: 24,
             }}
           >
-            {t('chooseStartingPoint', 'Choose a starting point — you can customize everything after.')}
+            {t('chooseStartingPoint', 'Escolha um ponto de partida — você pode personalizar tudo depois.')}
           </p>
 
           <div

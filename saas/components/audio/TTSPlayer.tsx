@@ -9,15 +9,15 @@ const MAX_CHARS = 5000;
 const GOLD = "#ffc300";
 const BLUE = "#3b82f6";
 
-const LOCALE_LABELS: Record<string, { flag: string; label: string }> = {
-  "all": { flag: "ALL", label: "All languages" },
-  "en": { flag: "EN", label: "English" },
-  "pt-BR": { flag: "BR", label: "Portugues (BR)" },
-  "pt-PT": { flag: "PT", label: "Portugues (PT)" },
-  "es-LATAM": { flag: "MX", label: "Espanol (LATAM)" },
-  "es-ES": { flag: "ES", label: "Espanol (ES)" },
+const LOCALE_LABELS: Record<string, { flag: string; label: string; labelPt?: string }> = {
+  "all": { flag: "ALL", label: "All languages", labelPt: "Todos os idiomas" },
+  "en": { flag: "EN", label: "English", labelPt: "Inglês" },
+  "pt-BR": { flag: "BR", label: "Português (BR)", labelPt: "Português (BR)" },
+  "pt-PT": { flag: "PT", label: "Português (PT)", labelPt: "Português (PT)" },
+  "es-LATAM": { flag: "MX", label: "Español (LATAM)", labelPt: "Espanhol (LATAM)" },
+  "es-ES": { flag: "ES", label: "Español (ES)", labelPt: "Espanhol (ES)" },
   "pl": { flag: "PL", label: "Polski" },
-  "ru": { flag: "RU", label: "Russkiy" },
+  "ru": { flag: "RU", label: "Russkiy", labelPt: "Russo" },
 };
 
 const LOCALE_ORDER = ["all", "en", "pt-BR", "pt-PT", "es-LATAM", "es-ES", "pl", "ru"];
@@ -27,7 +27,7 @@ interface Props {
 }
 
 export function TTSPlayer({ initialLocale = "en" }: Props) {
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   const { generate, loading, error, result, reset } = useTTS();
 
   const [text, setText] = useState("");
@@ -126,7 +126,7 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
             }}
           >
             <span style={{ fontSize: 11, fontWeight: 800, opacity: 0.7 }}>{currentLangLabel.flag}</span>
-            <span>{currentLangLabel.label}</span>
+            <span>{lang === "pt" ? (currentLangLabel.labelPt ?? currentLangLabel.label) : currentLangLabel.label}</span>
             <span style={{ fontSize: 10, opacity: 0.6 }}>v</span>
           </button>
 
@@ -173,7 +173,7 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
                     }}
                   >
                     <span style={{ fontSize: 11, fontWeight: 800, opacity: 0.7, minWidth: 28 }}>{opt.flag}</span>
-                    <span>{opt.label}</span>
+                    <span>{lang === "pt" ? (opt.labelPt ?? opt.label) : opt.label}</span>
                   </button>
                 );
               })}
@@ -235,7 +235,7 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
                     {description}
                   </div>
                   <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginTop: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                    {v.gender}
+                    {v.gender === "female" ? t("audio.genderFemale", "Feminino") : t("audio.genderMale", "Masculino")}
                   </div>
                 </button>
               );

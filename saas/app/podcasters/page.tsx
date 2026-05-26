@@ -22,8 +22,8 @@ const SYMBOLS: Record<string, string> = {
 }
 
 export default function PodcastersPage() {
-  const { dict } = useI18n()
-  const P = (key: string, fallback: string) => t(dict, `podcasters_page.${key}`, fallback)
+  const { dict, lang } = useI18n()
+  const P = (key: string, fallback: string, pt?: string) => t(dict, `podcasters_page.${key}`, lang === 'pt' && pt ? pt : fallback)
   const [currency, setCurrency] = useState('USD')
 
   const PLANS = [
@@ -191,7 +191,7 @@ export default function PodcastersPage() {
             }}
           >
             <span style={{ color: '#ef4444' }}>●</span>
-            {P('hero.liveBadge', 'PODCAST_STUDIO // LIVE')}
+            {P('hero.liveBadge', 'PODCAST_STUDIO // LIVE', 'ESTÚDIO_PODCAST // AO VIVO')}
           </div>
 
           <h1
@@ -203,11 +203,11 @@ export default function PodcastersPage() {
               fontWeight: 950,
             }}
           >
-            {P('hero.line1','Your podcast.')}
+            {P('hero.line1','Your podcast.','Seu podcast.')}
             <br />
-            {P('hero.line2','Your studio.')}
+            {P('hero.line2','Your studio.','Seu estúdio.')}
             <br />
-            <span style={{ color: GOLD }}>{P('hero.line3','Your global audience.')}</span>
+            <span style={{ color: GOLD }}>{P('hero.line3','Your global audience.','Sua audiência global.')}</span>
           </h1>
 
           <p
@@ -219,7 +219,7 @@ export default function PodcastersPage() {
               maxWidth: 620,
             }}
           >
-            {P('hero.subtitle','Upload one episode and let SignalBoost help create transcripts, clips, captions, multilingual audio, show notes and distribution assets from a single studio workspace.')}
+            {P('hero.subtitle','Upload one episode and let SignalBoost help create transcripts, clips, captions, multilingual audio, show notes and distribution assets from a single studio workspace.','Envie um episódio e deixe a SignalBoost criar transcrições, clipes, legendas, áudio multilíngue, show notes e materiais de distribuição em um único estúdio.')}
           </p>
 
           <div
@@ -241,7 +241,7 @@ export default function PodcastersPage() {
                 textDecoration: 'none',
               }}
             >
-              {P('hero.openStudio','Open Studio')}
+              {P('hero.openStudio','Open Studio','Abrir estúdio')}
             </Link>
 
             <Link
@@ -256,7 +256,7 @@ export default function PodcastersPage() {
                 textDecoration: 'none',
               }}
             >
-              {P('hero.howItWorks','How it works')} →
+              {P('hero.howItWorks','How it works','Como funciona')} →
             </Link>
           </div>
         </div>
@@ -325,7 +325,7 @@ export default function PodcastersPage() {
                   fontWeight: 900,
                 }}
               >
-                🔴 {P('panel.onAir','ON AIR')}
+                🔴 {P('panel.onAir','ON AIR','NO AR')}
               </div>
             </div>
 
@@ -440,7 +440,7 @@ export default function PodcastersPage() {
                   cursor: 'pointer',
                 }}
               >
-                {P('actions.generateClips','Generate clips')}
+                {P('actions.generateClips','Generate clips','Gerar clipes')}
               </Link>
 
               <Link href="/dashboard/video"
@@ -454,7 +454,7 @@ export default function PodcastersPage() {
                   cursor: 'pointer',
                 }}
               >
-                {P('actions.uploadEpisode','Upload episode')}
+                {P('actions.uploadEpisode','Upload episode','Enviar episódio')}
               </Link>
             </div>
           </div>

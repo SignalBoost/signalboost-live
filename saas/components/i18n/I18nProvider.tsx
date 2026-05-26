@@ -1,125 +1,144 @@
 'use client'
 
-import { useState } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from 'react'
 
-export default function Concierge() {
-  const [open, setOpen] = useState(false)
+import { detectLanguage } from '@/lib/i18n/detectLanguage'
+import { loadLanguage, type Dict } from '@/lib/i18n/loadLanguage'
+
+type I18nContextType = {
+  lang: string
+  dict: Dict
+  setLang: (lang: string) => void
+}
+
+const I18nContext =
+  createContext<I18nContextType | null>(null)
+
+const SUPPORTED_LANGS = [
+  'en',
+  'pt',
+  'es',
+  'pl',
+  'ru',
+]
+
+function normalizeLang(value: string | null) {
+  if (!value) return 'en'
+
+  const lower = value.toLowerCase()
+
+  if (lower.startsWith('pt')) return 'pt'
+  if (lower.startsWith('es')) return 'es'
+  if (lower.startsWith('pl')) return 'pl'
+  if (lower.startsWith('ru')) return 'ru'
+  if (lower.startsWith('en')) return 'en'
+
+  return 'en'
+}
+
+function getInitialLanguage() {
+  if (typeof window === 'undefined') {
+    return 'en'
+  }
+
+  const saved =
+    localStorage.getItem('signalboost_language') ||
+    localStorage.getItem('site-language')
+
+  if (
+    saved &&
+    SUPPORTED_LANGS.includes(saved)
+  ) {
+    return saved
+  }
+
+  const browser =
+    navigator.languages?.[0] ||
+    navigator.language ||
+    null
+
+  const browserLang =
+    normalizeLang(browser)
+
+  return browserLang
+}
+
+export function I18nProvider({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const [lang, setLangState] =
+    useState('en')
+
+  const [dict, setDict] =
+    useState<Dict>({})
+
+  useEffect(() => {
+    async function init() {
+      const initialLang =
+        getInitialLanguage()
+
+      const loaded =
+        await loadLanguage(initialLang)
+
+      setLangState(initialLang)
+      setDict(loaded)
+    }
+
+    init()
+  }, [])
+
+  const setLang = async (
+    newLang: string
+  ) => {
+    const safeLang =
+      normalizeLang(newLang)
+
+    localStorage.setItem(
+      'signalboost_language',
+      safeLang
+    )
+
+    localStorage.setItem(
+      'site-language',
+      safeLang
+    )
+
+    const loaded =
+      await loadLanguage(safeLang)
+
+    setLangState(safeLang)
+    setDict(loaded)
+  }
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Open AI Concierge"
-        style={{
-          position: 'fixed',
-          right: 30,
-          bottom: 30,
-          zIndex: 999999,
-          border: 'none',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          padding: '14px 18px',
-          borderRadius: 999,
-          background: 'linear-gradient(135deg,#ffc300,#ff9500)',
-          color: '#111',
-          fontSize: 16,
-          fontWeight: 800,
-          boxShadow: '0 10px 35px rgba(0,0,0,.35)',
-        }}
-      >
-        <span style={{ fontSize: 26 }}>✨</span>
-        <span>AI Concierge</span>
-      </button>
-
-      {open ? (
-        <div
-          role="dialog"
-          aria-label="SignalBoost AI Concierge"
-          style={{
-            position: 'fixed',
-            right: 30,
-            bottom: 105,
-            zIndex: 999999,
-            width: 380,
-            maxWidth: 'calc(100vw - 40px)',
-            borderRadius: 24,
-            background: 'rgba(15,15,20,.96)',
-            color: 'white',
-            padding: 24,
-            boxShadow: '0 20px 60px rgba(0,0,0,.45)',
-            border: '1px solid rgba(255,255,255,.15)',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              gap: 16,
-              marginBottom: 18,
-            }}
-          >
-            <div>
-              <div style={{ fontSize: 12, opacity: 0.6 }}>SignalBoost</div>
-              <div style={{ fontSize: 22, fontWeight: 800 }}>
-                AI Concierge
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              aria-label="Close AI Concierge"
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'white',
-                cursor: 'pointer',
-                fontSize: 24,
-                lineHeight: 1,
-              }}
-            >
-              ×
-            </button>
-          </div>
-
-          <div
-            style={{
-              background: 'rgba(255,255,255,.08)',
-              padding: 16,
-              borderRadius: 16,
-              marginBottom: 16,
-              lineHeight: 1.45,
-            }}
-          >
-            Hi, I&apos;m your SignalBoost concierge. I can help with videos,
-            credits, pricing, reviews, outreach, and support.
-          </div>
-
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {['🎥 Videos', '⚡ Credits', '📈 Growth', '💬 Support'].map(
-              (label) => (
-                <button
-                  key={label}
-                  type="button"
-                  style={{
-                    border: '1px solid rgba(255,255,255,.18)',
-                    background: 'rgba(255,255,255,.08)',
-                    color: 'white',
-                    borderRadius: 999,
-                    padding: '9px 12px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {label}
-                </button>
-              )
-            )}
-          </div>
-        </div>
-      ) : null}
-    </>
+    <I18nContext.Provider
+      value={{
+        lang,
+        dict,
+        setLang,
+      }}
+    >
+      {children}
+    </I18nContext.Provider>
   )
+}
+
+export function useI18n() {
+  const ctx =
+    useContext(I18nContext)
+
+  if (!ctx) {
+    throw new Error(
+      'useI18n must be used inside I18nProvider'
+    )
+  }
+
+  return ctx
 }

@@ -52,9 +52,18 @@ export default function Concierge() {
     }
 
     if (type === 'credits') {
-      setMessage(
-        '⚡ Credits power AI tools. Soon this will display your live credit balance.'
-      )
+      fetch('/api/credits')
+        .then((r) => r.json())
+        .then((data) => {
+          setMessage(
+            `⚡ You have ${data.credits} credits (${data.plan} plan)`
+          )
+        })
+        .catch(() => {
+          setMessage(
+            '⚡ Unable to load credits'
+          )
+        })
     }
 
     if (type === 'growth') {
@@ -112,8 +121,6 @@ export default function Concierge() {
             background: 'rgba(15,15,20,.96)',
             color: 'white',
             padding: 24,
-            boxShadow:
-              '0 20px 60px rgba(0,0,0,.45)',
           }}
         >
           <div
@@ -126,6 +133,7 @@ export default function Concierge() {
             <strong>{copy.title}</strong>
 
             <button
+              type="button"
               onClick={() => setOpen(false)}
               style={{
                 background:'transparent',
@@ -143,8 +151,7 @@ export default function Concierge() {
             style={{
               padding:16,
               borderRadius:16,
-              background:
-                'rgba(255,255,255,.08)',
+              background:'rgba(255,255,255,.08)',
               marginBottom:16,
             }}
           >
@@ -158,19 +165,19 @@ export default function Concierge() {
               gap:8,
             }}
           >
-            <button onClick={() => action('video')}>
+            <button type="button" onClick={() => action('video')}>
               🎥 Videos
             </button>
 
-            <button onClick={() => action('credits')}>
+            <button type="button" onClick={() => action('credits')}>
               ⚡ Credits
             </button>
 
-            <button onClick={() => action('growth')}>
+            <button type="button" onClick={() => action('growth')}>
               📈 Growth
             </button>
 
-            <button onClick={() => action('support')}>
+            <button type="button" onClick={() => action('support')}>
               💬 Support
             </button>
           </div>

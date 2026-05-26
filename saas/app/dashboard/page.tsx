@@ -60,6 +60,49 @@ export default function DashboardOverviewPage() {
 
   const [sketch, setSketch] = useState<Sketch | null>(null)
 
+  const conciergeMessage = useMemo(() => {
+    if (!projectsLoaded) {
+      return {
+        icon: '🛰️',
+        title: 'SignalBoost Concierge',
+        message: 'Loading your workspace and checking what needs attention.'
+      }
+    }
+
+    if (projects.length === 0) {
+      return {
+        icon: '👋',
+        title: 'SignalBoost Concierge',
+        message: 'Welcome. Start by creating your first project, or ask SignalBoost what to build first.'
+      }
+    }
+
+    const liveProjects = projects.filter(p => p.status === 'live')
+    const draftProjects = projects.filter(p => p.status === 'draft')
+
+    if (draftProjects.length > 0) {
+      return {
+        icon: '🧭',
+        title: 'SignalBoost Concierge',
+        message: `You have ${draftProjects.length} draft project${draftProjects.length > 1 ? 's' : ''}. Open one and publish when ready.`
+      }
+    }
+
+    if (liveProjects.length > 0) {
+      return {
+        icon: '🚀',
+        title: 'SignalBoost Concierge',
+        message: `You have ${liveProjects.length} live project${liveProjects.length > 1 ? 's' : ''}. Next step: promote, collect reviews, or create content.`
+      }
+    }
+
+    return {
+      icon: '💡',
+      title: 'SignalBoost Concierge',
+      message: 'Need help choosing the next move? Ask SignalBoost below.'
+    }
+  }, [projects, projectsLoaded])
+
   const promptRef = useRef<HTMLDivElement>(null)
 
   const QUICK_ACTIONS = [
@@ -276,6 +319,87 @@ export default function DashboardOverviewPage() {
       <div style={{ opacity: showLoginGate ? 0.2 : 1, pointerEvents: showLoginGate ? 'none' : 'auto', filter: showLoginGate ? 'blur(2px)' : 'none', transition: 'all 0.3s' }}>
 
         <div style={{ display: 'flex', gap: 16, marginBottom: 28, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+
+
+          <div
+            className="fathom-glass"
+            style={{
+              width: '100%',
+              borderRadius: 16,
+              padding: '16px 18px',
+              marginBottom: 18,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              background: 'linear-gradient(90deg, rgba(59,130,246,.10), rgba(255,195,0,.05))',
+              border: '1px solid rgba(59,130,246,.18)',
+              boxShadow: '0 18px 50px rgba(0,0,0,.18)',
+            }}
+          >
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 14,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(255,255,255,.06)',
+                border: '1px solid rgba(255,255,255,.08)',
+                fontSize: 24,
+                flex: '0 0 auto',
+              }}
+            >
+              {conciergeMessage.icon}
+            </div>
+
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div
+                className="terminal-text"
+                style={{
+                  fontSize: 11,
+                  fontWeight: 900,
+                  color: BLUE,
+                  letterSpacing: '.08em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {conciergeMessage.title}
+              </div>
+
+              <div
+                style={{
+                  marginTop: 5,
+                  fontSize: 13,
+                  color: 'rgba(255,255,255,.72)',
+                  lineHeight: 1.45,
+                }}
+              >
+                {conciergeMessage.message}
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setPromptOpen(true)
+                setPromptInput('What should I do next?')
+              }}
+              className="terminal-text"
+              style={{
+                border: '1px solid rgba(255,195,0,.25)',
+                background: 'rgba(255,195,0,.08)',
+                color: GOLD,
+                borderRadius: 999,
+                padding: '9px 12px',
+                fontSize: 10,
+                fontWeight: 900,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              ASK_NEXT
+            </button>
+          </div>
 
           <div className="fathom-glass" style={{ flex: sketch ? '1 1 380px' : '1 1 100%', minWidth: 320, borderRadius: 16, padding: 24 }}>
             <div style={{ overflow: 'hidden', maxHeight: greetingHidden ? 0 : 200, opacity: greetingHidden ? 0 : 1, marginBottom: greetingHidden ? 0 : 20, transition: 'all .4s ease' }}>

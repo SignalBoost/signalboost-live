@@ -1,15 +1,109 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { useI18n } from '@/components/i18n/I18nProvider'
 
-const QUICK = [
-  { label: '🎥 Videos', prompt: 'How do I create videos in SignalBoost?' },
-  { label: '⚡ Credits', prompt: 'Explain how credits work in SignalBoost.' },
-  { label: '📈 Growth', prompt: 'Give me growth ideas using SignalBoost.' },
-  { label: '💬 Support', prompt: 'I need help using SignalBoost.' },
-]
+type Lang = 'en' | 'pt' | 'es' | 'pl' | 'ru'
+
+const COPY: Record<Lang, {
+  title: string
+  button: string
+  greeting: string
+  placeholder: string
+  send: string
+  thinking: string
+  fallback: string
+  connectionError: string
+  close: string
+  quick: { label: string; prompt: string }[]
+}> = {
+  en: {
+    title: 'AI Concierge',
+    button: 'Concierge',
+    greeting: "Hi, I'm your SignalBoost concierge. Ask me anything about your workspace.",
+    placeholder: 'Ask anything...',
+    send: 'Send',
+    thinking: 'Thinking...',
+    fallback: 'I could not generate a response.',
+    connectionError: 'Connection problem. Please try again.',
+    close: 'Close concierge',
+    quick: [
+      { label: '🎥 Videos', prompt: 'How do I create videos in SignalBoost?' },
+      { label: '⚡ Credits', prompt: 'Explain how credits work in SignalBoost.' },
+      { label: '📈 Growth', prompt: 'Give me growth ideas using SignalBoost.' },
+      { label: '💬 Support', prompt: 'I need help using SignalBoost.' },
+    ],
+  },
+  pt: {
+    title: 'Concierge IA',
+    button: 'Concierge',
+    greeting: 'Olá, eu sou o concierge da SignalBoost. Pergunte qualquer coisa sobre seu espaço de trabalho.',
+    placeholder: 'Pergunte qualquer coisa...',
+    send: 'Enviar',
+    thinking: 'Pensando...',
+    fallback: 'Não consegui gerar uma resposta.',
+    connectionError: 'Problema de conexão. Tente novamente.',
+    close: 'Fechar concierge',
+    quick: [
+      { label: '🎥 Vídeos', prompt: 'Como eu crio vídeos na SignalBoost?' },
+      { label: '⚡ Créditos', prompt: 'Explique como funcionam os créditos na SignalBoost.' },
+      { label: '📈 Crescimento', prompt: 'Me dê ideias de crescimento usando a SignalBoost.' },
+      { label: '💬 Suporte', prompt: 'Preciso de ajuda para usar a SignalBoost.' },
+    ],
+  },
+  es: {
+    title: 'Concierge IA',
+    button: 'Concierge',
+    greeting: 'Hola, soy tu concierge de SignalBoost. Pregúntame cualquier cosa sobre tu espacio de trabajo.',
+    placeholder: 'Pregunta cualquier cosa...',
+    send: 'Enviar',
+    thinking: 'Pensando...',
+    fallback: 'No pude generar una respuesta.',
+    connectionError: 'Problema de conexión. Inténtalo de nuevo.',
+    close: 'Cerrar concierge',
+    quick: [
+      { label: '🎥 Videos', prompt: '¿Cómo creo videos en SignalBoost?' },
+      { label: '⚡ Créditos', prompt: 'Explica cómo funcionan los créditos en SignalBoost.' },
+      { label: '📈 Crecimiento', prompt: 'Dame ideas de crecimiento usando SignalBoost.' },
+      { label: '💬 Soporte', prompt: 'Necesito ayuda para usar SignalBoost.' },
+    ],
+  },
+  pl: {
+    title: 'Konsjerż AI',
+    button: 'Konsjerż',
+    greeting: 'Cześć, jestem konsjerżem SignalBoost. Zapytaj mnie o wszystko w swoim obszarze roboczym.',
+    placeholder: 'Zapytaj o cokolwiek...',
+    send: 'Wyślij',
+    thinking: 'Myślę...',
+    fallback: 'Nie udało się wygenerować odpowiedzi.',
+    connectionError: 'Problem z połączeniem. Spróbuj ponownie.',
+    close: 'Zamknij konsjerża',
+    quick: [
+      { label: '🎥 Wideo', prompt: 'Jak tworzyć wideo w SignalBoost?' },
+      { label: '⚡ Kredyty', prompt: 'Wyjaśnij, jak działają kredyty w SignalBoost.' },
+      { label: '📈 Wzrost', prompt: 'Podaj pomysły na wzrost z użyciem SignalBoost.' },
+      { label: '💬 Pomoc', prompt: 'Potrzebuję pomocy w korzystaniu z SignalBoost.' },
+    ],
+  },
+  ru: {
+    title: 'AI-консьерж',
+    button: 'Консьерж',
+    greeting: 'Здравствуйте, я консьерж SignalBoost. Спросите меня о вашем рабочем пространстве.',
+    placeholder: 'Спросите что угодно...',
+    send: 'Отправить',
+    thinking: 'Думаю...',
+    fallback: 'Не удалось создать ответ.',
+    connectionError: 'Проблема с подключением. Попробуйте снова.',
+    close: 'Закрыть консьерж',
+    quick: [
+      { label: '🎥 Видео', prompt: 'Как создавать видео в SignalBoost?' },
+      { label: '⚡ Кредиты', prompt: 'Объясните, как работают кредиты в SignalBoost.' },
+      { label: '📈 Рост', prompt: 'Дайте идеи роста с помощью SignalBoost.' },
+      { label: '💬 Поддержка', prompt: 'Мне нужна помощь с SignalBoost.' },
+    ],
+  },
+}
 
 type Message = {
   role: 'user' | 'assistant'
@@ -19,16 +113,14 @@ type Message = {
 export default function Concierge() {
   const pathname = usePathname()
   const { lang } = useI18n()
+  const activeLang = (['en', 'pt', 'es', 'pl', 'ru'].includes(lang) ? lang : 'en') as Lang
+  const copy = COPY[activeLang]
 
   const [open, setOpen] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: "Hi, I'm your SignalBoost concierge. Ask me anything about your workspace.",
-    },
-  ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const initialMessages = useMemo<Message[]>(() => [{ role: 'assistant', content: copy.greeting }], [copy.greeting])
+  const [messages, setMessages] = useState<Message[]>(initialMessages)
 
   async function ask(text: string) {
     const content = text.trim()
@@ -51,7 +143,7 @@ export default function Concierge() {
           messages: nextMessages,
           context: {
             currentPage: pathname,
-            language: lang,
+            language: activeLang,
           },
         }),
       })
@@ -62,7 +154,7 @@ export default function Concierge() {
         ...prev,
         {
           role: 'assistant',
-          content: data.reply || data.error || 'I could not generate a response.',
+          content: data.reply || data.error || copy.fallback,
         },
       ])
     } catch {
@@ -70,7 +162,7 @@ export default function Concierge() {
         ...prev,
         {
           role: 'assistant',
-          content: 'Connection problem. Please try again.',
+          content: copy.connectionError,
         },
       ])
     } finally {
@@ -102,7 +194,7 @@ export default function Concierge() {
         }}
       >
         <span style={{ fontSize: 24 }}>✨</span>
-        Concierge
+        {copy.button}
       </button>
 
       {open && (
@@ -130,11 +222,11 @@ export default function Concierge() {
           >
             <div>
               <div style={{ color: 'var(--text-faint)', fontSize: 12 }}>SignalBoost</div>
-              <strong style={{ fontSize: 18 }}>AI Concierge</strong>
+              <strong style={{ fontSize: 18 }}>{copy.title}</strong>
             </div>
             <button
               onClick={() => setOpen(false)}
-              aria-label="Close concierge"
+              aria-label={copy.close}
               style={{
                 background: 'transparent',
                 border: '1px solid var(--border-soft)',
@@ -183,7 +275,7 @@ export default function Concierge() {
 
             {loading && (
               <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-                Thinking...
+                {copy.thinking}
               </div>
             )}
           </div>
@@ -196,7 +288,7 @@ export default function Concierge() {
               marginBottom: 12,
             }}
           >
-            {QUICK.map(item => (
+            {copy.quick.map(item => (
               <button
                 key={item.label}
                 type="button"
@@ -218,7 +310,7 @@ export default function Concierge() {
               }}
               className="sb-input"
               style={{ flex: 1, padding: 12, minWidth: 0 }}
-              placeholder="Ask anything..."
+              placeholder={copy.placeholder}
             />
             <button
               type="button"
@@ -226,7 +318,7 @@ export default function Concierge() {
               onClick={() => ask(input)}
               disabled={loading || !input.trim()}
             >
-              Send
+              {copy.send}
             </button>
           </div>
         </div>

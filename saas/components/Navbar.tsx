@@ -174,6 +174,12 @@ export default function Navbar() {
       href: '/dashboard/operator',
       featured: false,
     },
+    {
+      icon: '🛠️',
+      label: 'Workshop Apprentice',
+      href: '/dashboard/apprentice',
+      featured: false,
+    },
   ]
 
   return (

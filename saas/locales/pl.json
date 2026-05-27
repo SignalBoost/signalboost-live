@@ -184,6 +184,13 @@
       "currentPage": "Site Builder",
       "userPlan": "free",
       "taskContext": "Building a {template} website called \"{businessName}\". Description: {businessDesc}. Languages: {languages}."
+    },
+    "lang": {
+      "en": "Angielski",
+      "pt": "Portugalski",
+      "es": "Hiszpański",
+      "pl": "Polski",
+      "ru": "Rosyjski"
     }
   },
   "audio": {

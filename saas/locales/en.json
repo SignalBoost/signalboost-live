@@ -355,6 +355,68 @@
     "languagesSelectedFull": "{count} languages selected — requires Starter plan or above"
   },
   "podcasters_page": {
+    "hero": {
+      "liveBadge": "PODCAST_STUDIO // LIVE",
+      "line1": "Your podcast.",
+      "line2": "Your studio.",
+      "line3": "Your global audience.",
+      "subtitle": "Upload one episode and let SignalBoost help create transcripts, clips, captions, multilingual audio, show notes and distribution assets from a single studio workspace.",
+      "openStudio": "Open Studio",
+      "howItWorks": "How it works"
+    },
+    "panel": {
+      "foundry": "SIGNALBOOST AUDIO FOUNDRY",
+      "episodeFile": "Episode_034.wav",
+      "onAir": "ON AIR"
+    },
+    "metrics": {
+      "transcript": "Transcript",
+      "ready": "Ready",
+      "clipsFound": "Clips found",
+      "languages": "Languages",
+      "publishPack": "Publish pack"
+    },
+    "agents": {
+      "transcript": "Transcript Agent",
+      "clip": "Viral Clip Agent",
+      "translation": "Translation Agent",
+      "voice": "Voice Agent",
+      "distribution": "Distribution Agent"
+    },
+    "status": {
+      "active": "ACTIVE",
+      "scanning": "SCANNING",
+      "lang5": "5 LANG",
+      "ready": "READY",
+      "standby": "STANDBY"
+    },
+    "actions": {
+      "generateClips": "Generate clips",
+      "uploadEpisode": "Upload episode"
+    },
+    "episodes": {
+      "e34": "Episode 34",
+      "e34Clips": "8 clips",
+      "e34Langs": "5 languages",
+      "e33": "Episode 33",
+      "e33Clips": "6 clips",
+      "e33Langs": "3 languages",
+      "e32": "Episode 32",
+      "e32Clips": "4 clips",
+      "e32Langs": "2 languages",
+      "published": "Published",
+      "scheduled": "Scheduled",
+      "draft": "Draft"
+    },
+    "section": {
+      "fullStudioTitle": "A full production studio after you record",
+      "fullStudioSubtitle": "You focus on the conversation. SignalBoost helps turn that episode into clips, captions, translated content, voiceovers, pages and promotional assets."
+    },
+    "howTitle": "How it works",
+    "plansTitle": "Podcast plans",
+    "plansSubtitle": "Sketch your idea for free with our preview tier, then pick a podcast plan when you are ready to publish.",
+    "mostPopular": "Most popular",
+    "perMonth": "/mo",
     "deliverables": {
       "voiceover": {
         "title": "Native voiceover",
@@ -400,6 +462,45 @@
       }
     },
     "plans": {
+      "indie": {
+        "name": "Indie",
+        "description": "Perfect for independent podcasters getting started globally.",
+        "cta": "Get started",
+        "f1": "1 show",
+        "f2": "4 episodes per month",
+        "f3": "2 languages",
+        "f4": "Native AI voiceover",
+        "f5": "Captions in 2 languages",
+        "f6": "Basic clip generation",
+        "f7": "Podcast website",
+        "f8": "Listener reviews"
+      },
+      "pro": {
+        "name": "Pro",
+        "description": "For serious podcasters who want global reach.",
+        "cta": "Get started",
+        "f1": "3 shows",
+        "f2": "Unlimited episodes",
+        "f3": "All 5 languages",
+        "f4": "Native AI voiceover",
+        "f5": "Captions in all 5 languages",
+        "f6": "Clip factory",
+        "f7": "Multi-language podcast website",
+        "f8": "Analytics"
+      },
+      "network": {
+        "name": "Network",
+        "description": "For podcast networks managing multiple shows.",
+        "cta": "Contact us",
+        "f1": "Unlimited shows",
+        "f2": "Unlimited episodes",
+        "f3": "All languages plus custom",
+        "f4": "Dedicated processing",
+        "f5": "Custom caption formats",
+        "f6": "White label website",
+        "f7": "API access",
+        "f8": "Dedicated account manager"
+      },
       "networkEmailSubject": "SignalBoost Network Plan"
     }
   },

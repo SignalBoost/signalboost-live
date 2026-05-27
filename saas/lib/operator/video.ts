@@ -52,13 +52,13 @@ export function buildSiteVideoPrompt(opts: { businessName?: string; description?
 // Kick off a render. Returns a requestId + model to poll later.
 export async function startSiteVideo(
   prompt: string,
-  aspectRatio: string = '16:9'
+  aspectRatio: '9:16' | '16:9' | '1:1' = '16:9'
 ): Promise<StartVideoResult> {
   try {
     ensureConfigured()
     const input = {
       prompt: prompt.trim(),
-      duration: '5',
+      duration: '5' as const,
       aspect_ratio: aspectRatio,
     }
     const submitted = await fal.queue.submit(SITE_VIDEO_MODEL, { input })

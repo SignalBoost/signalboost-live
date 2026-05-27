@@ -52,7 +52,7 @@ function isValidEmail(s: string): boolean {
 // GET — owner reads their own reviews.
 export async function GET() {
   const user = await getAuthedUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'reviews.errors.unauthorized' }, { status: 401 })
 
   const a = admin()
   const { data, error } = await a
@@ -69,7 +69,7 @@ export async function GET() {
 // POST — public submission. No auth. Resolves slug → owner.
 export async function POST(req: NextRequest) {
   let body: any
-  try { body = await req.json() } catch { return NextResponse.json({ error: 'bad json' }, { status: 400 }) }
+  try { body = await req.json() } catch { return NextResponse.json({ error: 'api.invalidJson' }, { status: 400 }) }
 
   const slug         = String(body?.slug ?? '').trim().toLowerCase()
   const author_name  = String(body?.author_name ?? '').trim()
@@ -78,11 +78,11 @@ export async function POST(req: NextRequest) {
   const content      = String(body?.content ?? '').trim()
   const language     = String(body?.language ?? 'en').trim().toLowerCase().slice(0, 8)
 
-  if (!slug)                                              return NextResponse.json({ error: 'missing slug' }, { status: 400 })
-  if (author_name.length < 1 || author_name.length > 80)  return NextResponse.json({ error: 'name must be 1–80 chars' }, { status: 400 })
-  if (!isValidEmail(author_email))                        return NextResponse.json({ error: 'invalid email' }, { status: 400 })
-  if (!Number.isInteger(rating) || rating < 1 || rating > 5) return NextResponse.json({ error: 'rating must be 1–5' }, { status: 400 })
-  if (content.length < 1 || content.length > 2000)        return NextResponse.json({ error: 'content must be 1–2000 chars' }, { status: 400 })
+  if (!slug)                                              return NextResponse.json({ error: 'reviews.errors.missingSlug' }, { status: 400 })
+  if (author_name.length < 1 || author_name.length > 80)  return NextResponse.json({ error: 'reviews.errors.invalidNameLength' }, { status: 400 })
+  if (!isValidEmail(author_email))                        return NextResponse.json({ error: 'reviews.errors.invalidEmail' }, { status: 400 })
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) return NextResponse.json({ error: 'reviews.errors.invalidRating' }, { status: 400 })
+  if (content.length < 1 || content.length > 2000)        return NextResponse.json({ error: 'reviews.errors.invalidContentLength' }, { status: 400 })
 
   const a = admin()
 
@@ -92,8 +92,8 @@ export async function POST(req: NextRequest) {
     .eq('slug', slug)
     .maybeSingle()
 
-  if (profileErr) return NextResponse.json({ error: 'lookup failed' }, { status: 500 })
-  if (!profile)   return NextResponse.json({ error: 'not found' }, { status: 404 })
+  if (profileErr) return NextResponse.json({ error: 'reviews.errors.lookupFailed' }, { status: 500 })
+  if (!profile)   return NextResponse.json({ error: 'reviews.errors.notFound' }, { status: 404 })
 
   const owner_id = profile.id as string
   const ip = getIp(req)
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
     .gte('created_at', since)
 
   if ((recentFromIp ?? 0) >= 5) {
-    return NextResponse.json({ error: 'too many submissions, try again tomorrow' }, { status: 429 })
+    return NextResponse.json({ error: 'reviews.errors.tooManySubmissions' }, { status: 429 })
   }
 
   const { data: sub } = await a
@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
     const existing = Number(countData ?? 0)
     if (existing >= FREE_TIER_REVIEW_CAP) {
       return NextResponse.json(
-        { error: 'this person is not accepting more reviews on their current plan' },
+        { error: 'reviews.errors.reviewCapReached' },
         { status: 403 }
       )
     }
@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
     submitter_ip: ip,
   })
 
-  if (insertErr) return NextResponse.json({ error: 'could not save review' }, { status: 500 })
+  if (insertErr) return NextResponse.json({ error: 'reviews.errors.saveFailed' }, { status: 500 })
 
   return NextResponse.json({ ok: true })
 }
@@ -151,14 +151,14 @@ export async function POST(req: NextRequest) {
 // PATCH — owner toggles approved.
 export async function PATCH(req: NextRequest) {
   const user = await getAuthedUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'reviews.errors.unauthorized' }, { status: 401 })
 
   const id = req.nextUrl.searchParams.get('id')
-  if (!id) return NextResponse.json({ error: 'missing id' }, { status: 400 })
+  if (!id) return NextResponse.json({ error: 'reviews.errors.missingId' }, { status: 400 })
 
   let body: any
-  try { body = await req.json() } catch { return NextResponse.json({ error: 'bad json' }, { status: 400 }) }
-  if (typeof body?.approved !== 'boolean') return NextResponse.json({ error: 'approved must be boolean' }, { status: 400 })
+  try { body = await req.json() } catch { return NextResponse.json({ error: 'api.invalidJson' }, { status: 400 }) }
+  if (typeof body?.approved !== 'boolean') return NextResponse.json({ error: 'reviews.errors.approvedMustBeBoolean' }, { status: 400 })
 
   const a = admin()
   const { error } = await a
@@ -175,10 +175,10 @@ export async function PATCH(req: NextRequest) {
 // DELETE — owner deletes a review.
 export async function DELETE(req: NextRequest) {
   const user = await getAuthedUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'reviews.errors.unauthorized' }, { status: 401 })
 
   const id = req.nextUrl.searchParams.get('id')
-  if (!id) return NextResponse.json({ error: 'missing id' }, { status: 400 })
+  if (!id) return NextResponse.json({ error: 'reviews.errors.missingId' }, { status: 400 })
 
   const a = admin()
   const { error } = await a

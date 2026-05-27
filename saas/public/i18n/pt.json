@@ -21,5 +21,98 @@
   "common.cancel": "Cancelar",
   "common.delete": "Excluir",
   "common.edit": "Editar",
-  "reset": "Reiniciar"
+  "reset": "Reiniciar",
+  "errors": {
+    "generationFailed": "Generation failed",
+    "networkError": "Network error",
+    "unauthorized": "Unauthorized"
+  },
+  "api": {
+    "invalidJson": "Invalid JSON",
+    "promptRequired": "Prompt is required"
+  },
+  "projects": {
+    "limitReached": "Project limit reached for your plan."
+  },
+  "actionRouter": {
+    "openWebsiteBuilder": "Open Website Builder",
+    "openReviewCollector": "Open Review Collector",
+    "openAudioStudio": "Open Audio Studio",
+    "openVideoStudio": "Open Video Studio",
+    "openSalesAgent": "Open Sales Agent",
+    "openSalesPipeline": "Open Sales Pipeline",
+    "answerInChat": "Answer in chat"
+  },
+  "videoSearch": {
+    "timeout": {
+      "generic": "Request timed out.",
+      "aiService": "AI service timed out.",
+      "intent": "Intent processing timed out.",
+      "script": "Script generation timed out.",
+      "search": "Video search timed out.",
+      "searchDetailed": "Video search timed out. Try a shorter request."
+    },
+    "status": {
+      "searching": "Searching for videos...",
+      "searchingPromptMatch": "Searching for videos matching your prompt..."
+    },
+    "errors": {
+      "generateScriptFailed": "Failed to generate script",
+      "searchFailed": "Search failed"
+    },
+    "rights": {
+      "restricted": "All results are rights-restricted for this query.",
+      "embeddableOnly": "Only embeddable results were found."
+    }
+  },
+  "videoGenerate": {
+    "errors": {
+      "authRequired": "You must be signed in.",
+      "promptRequired": "Please enter a prompt.",
+      "imageRequired": "Please attach an image.",
+      "noCredits": "No video credits left this month.",
+      "creditCheckFailed": "Could not check your credits."
+    },
+    "defaults": {
+      "imagePrompt": "Add natural, subtle motion to this image."
+    }
+  },
+  "operator": {
+    "commitPrefix": "Website Operator update:",
+    "errors": {
+      "requestRequired": "Please describe what you want to change.",
+      "planCreateFailed": "Could not create the plan right now.",
+      "planIdRequired": "Plan ID is required.",
+      "planNotFound": "Plan not found.",
+      "approvalRequired": "Approval required before applying changes.",
+      "applyFailed": "Could not apply approved update.",
+      "jobIdRequired": "Job ID is required.",
+      "jobNotFound": "Job not found.",
+      "rollbackUnavailable": "Rollback is not available for this update.",
+      "rollbackFailed": "Could not complete rollback.",
+      "statusNotFound": "Status not found."
+    },
+    "success": {
+      "published": "Changes published. Rollback is available.",
+      "approvedAndPublished": "Update approved and published with rollback point.",
+      "rollbackComplete": "Rollback complete. Previous version restored."
+    }
+  },
+  "reviews": {
+    "errors": {
+      "unauthorized": "Unauthorized",
+      "missingSlug": "Missing slug",
+      "invalidNameLength": "Name must be 1-80 characters",
+      "invalidEmail": "Invalid email",
+      "invalidRating": "Rating must be 1-5",
+      "invalidContentLength": "Content must be 1-2000 characters",
+      "lookupFailed": "Lookup failed",
+      "notFound": "Not found",
+      "tooManySubmissions": "Too many submissions. Try again tomorrow.",
+      "reviewCapReached": "Not accepting more reviews on current plan.",
+      "saveFailed": "Could not save review",
+      "missingId": "Missing ID",
+      "approvedMustBeBoolean": "Approved must be boolean"
+    }
+  }
 }

@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
     const request = body?.request
 
     if (!request || typeof request !== 'string') {
-      return NextResponse.json({ error: 'Please describe what you want to change.' }, { status: 400 })
+      return NextResponse.json({ error: 'operator.errors.requestRequired' }, { status: 400 })
     }
 
     const plan = await buildPlan(request)
@@ -17,6 +17,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ plan })
   } catch (error) {
     console.error('Operator plan error', error)
-    return NextResponse.json({ error: 'I could not create the plan right now.' }, { status: 500 })
+    return NextResponse.json({ error: 'operator.errors.planCreateFailed' }, { status: 500 })
   }
 }

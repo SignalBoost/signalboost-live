@@ -30,7 +30,7 @@ export function routeUserAction(input: string): ActionRoute {
     return {
       intent: 'website',
       href: '/dashboard/builder',
-      label: 'Open Website Builder',
+      label: 'actionRouter.openWebsiteBuilder',
       confidence: 0.9,
       reason: 'website_request',
     }
@@ -46,7 +46,7 @@ export function routeUserAction(input: string): ActionRoute {
     return {
       intent: 'reviews',
       href: '/dashboard/reviews',
-      label: 'Open Review Collector',
+      label: 'actionRouter.openReviewCollector',
       confidence: 0.9,
       reason: 'review_request',
     }
@@ -62,7 +62,7 @@ export function routeUserAction(input: string): ActionRoute {
     return {
       intent: 'podcast',
       href: '/dashboard/audio',
-      label: 'Open Audio Studio',
+      label: 'actionRouter.openAudioStudio',
       confidence: 0.9,
       reason: 'audio_or_podcast_request',
     }
@@ -81,7 +81,7 @@ export function routeUserAction(input: string): ActionRoute {
     return {
       intent: 'video',
       href: '/dashboard/video',
-      label: 'Open Video Studio',
+      label: 'actionRouter.openVideoStudio',
       confidence: 0.9,
       reason: 'video_request',
     }
@@ -98,7 +98,7 @@ export function routeUserAction(input: string): ActionRoute {
     return {
       intent: 'sales',
       href: '/dashboard/sales',
-      label: 'Open Sales Agent',
+      label: 'actionRouter.openSalesAgent',
       confidence: 0.85,
       reason: 'sales_request',
     }
@@ -115,7 +115,7 @@ export function routeUserAction(input: string): ActionRoute {
     return {
       intent: 'pipeline',
       href: '/dashboard/sales/pipeline',
-      label: 'Open Sales Pipeline',
+      label: 'actionRouter.openSalesPipeline',
       confidence: 0.85,
       reason: 'pipeline_request',
     }
@@ -124,7 +124,7 @@ export function routeUserAction(input: string): ActionRoute {
   return {
     intent: 'general',
     href: null,
-    label: 'Answer in chat',
+    label: 'actionRouter.answerInChat',
     confidence: 0.3,
     reason: 'general_question',
   }

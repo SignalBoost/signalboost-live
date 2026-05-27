@@ -50,7 +50,7 @@ export function useTTS(): UseTTSReturn {
 
         if (!res.ok) {
           const err: TTSError = {
-            message: data.error ?? "Generation failed",
+            message: data.error ?? "errors.generationFailed",
             status: res.status,
             remaining: data.remaining,
             monthlyLimit: data.monthlyLimit,
@@ -63,7 +63,7 @@ export function useTTS(): UseTTSReturn {
         return data;
       } catch (err) {
         const message =
-          err instanceof Error ? err.message : "Network error";
+          err instanceof Error ? err.message : "errors.networkError";
         setError({ message });
         return null;
       } finally {

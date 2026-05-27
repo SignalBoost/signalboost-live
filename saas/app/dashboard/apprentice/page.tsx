@@ -1,23 +1,3 @@
-'use client'
-
-import Link from 'next/link'
-import { useMemo, useState } from 'react'
-import { useI18n } from '@/components/i18n/I18nProvider'
-
-type Lang = 'en' | 'pt' | 'es' | 'pl' | 'ru'
-
-type WorkshopModule = {
-  id: string
-  icon: string
-  title: Record<Lang, string>
-  description: Record<Lang, string>
-  time: string
-  href: string
-  steps: Record<Lang, string[]>
-}
-
-const LANGS: Lang[] = ['en', 'pt', 'es', 'pl', 'ru']
-
 const COPY: Record<Lang, {
   badge: string
   title: string
@@ -63,7 +43,7 @@ const COPY: Record<Lang, {
     workshopTitle: 'SignalBoost Apprentice Workshop',
     workshopTagline: 'Learn while building.',
     goalTitle: 'Goal',
-    goalItems: ['Teach while creating', 'Guide step-by-step', 'Remove technical fear', 'Convert goals into workflows'],
+    goalItems: ['Teach while creating','Guide step-by-step','Remove technical fear','Convert goals into workflows'],
     examplesTitle: 'Examples',
     pick: 'What do you want to build first?',
     experienceTitle: 'How much experience do you have?',
@@ -92,38 +72,124 @@ const COPY: Record<Lang, {
       lab: 'Lab'
     }
   },
-  // …repeat for pt, es, pl, ru with localized text (including stepHints + nav)
-}
-
-const MODULES: WorkshopModule[] = [
-  // …your modules (website, podcast, customers, reviews, campaign, video)
-]
-
-export default function ApprenticeWorkshopPage() {
-  const { lang } = useI18n()
-  const activeLang = (LANGS.includes(lang as Lang) ? lang : 'en') as Lang
-  const copy = COPY[activeLang]
-  const [level, setLevel] = useState<'beginner' | 'intermediate' | 'comfortable' | 'advanced'>('beginner')
-  const [selected, setSelected] = useState(MODULES[0].id)
-  const activeModule = useMemo(() => MODULES.find(item => item.id === selected) || MODULES[0], [selected])
-  const levels = [copy.beginner, copy.intermediate, copy.comfortable, copy.advanced]
-
-  const workshopNav = [
-    { label: copy.nav.promote, href: '/dashboard/promote' },
-    { label: copy.nav.site, href: '/dashboard/builder' },
-    { label: copy.nav.reviews, href: '/dashboard/reviews' },
-    { label: copy.nav.audio, href: '/dashboard/audio' },
-    { label: copy.nav.video, href: '/dashboard/video' },
-    { label: copy.nav.lab, href: '/dashboard/lab' },
-  ]
-
-  return (
-    <main className="sb-page">
-      {/* Experience selector */}
-      {/* Core feature section */}
-      {/* Module grid */}
-      {/* Step tracker with localized hints */}
-      {/* Navigation bar */}
-    </main>
-  )
-}
+  pt: {
+    badge: 'Oficina de Aprendiz',
+    title: 'Aprenda enquanto constrói.',
+    subtitle: 'Não precisa ter experiência técnica. Escolha o que quer criar e a SignalBoost guia você passo a passo.',
+    promise: 'Comece do zero. Termine com algo real.',
+    workshopTitle: 'Oficina de Aprendiz SignalBoost',
+    workshopTagline: 'Aprenda enquanto constrói.',
+    goalTitle: 'Objetivo',
+    goalItems: ['Ensinar enquanto cria','Guiar passo a passo','Remover medo técnico','Converter metas em fluxos'],
+    examplesTitle: 'Exemplos',
+    pick: 'O que você quer construir primeiro?',
+    experienceTitle: 'Quanta experiência você tem?',
+    experienceSubtitle: 'Isso ajuda a SignalBoost a decidir quanta explicação mostrar. Você pode mudar depois.',
+    start: 'Começar guia',
+    stepLabel: 'Primeiros passos',
+    beginner: 'Nunca usei essas ferramentas',
+    intermediate: 'Tenho um pouco de experiência',
+    comfortable: 'Me sinto confortável',
+    advanced: 'Avançado',
+    noTech: 'Sem termos técnicos no começo',
+    guided: 'Passos simples e guiados',
+    realOutput: 'Conectado às ferramentas reais da SignalBoost',
+    stepHints: {
+      beginner: 'Explicaremos cada etapa com exemplos simples.',
+      intermediate: 'Adicionaremos dicas rápidas e atalhos.',
+      comfortable: 'Você verá etapas concisas sem detalhes extras.',
+      advanced: 'Apenas a lista de verificação — sem explicações.'
+    },
+    nav: {
+      promote: 'Promover negócio',
+      site: 'Criar site',
+      reviews: 'Coletar avaliações',
+      audio: 'Gerar áudio',
+      video: 'Criar vídeos',
+      lab: 'Laboratório'
+    }
+  },
+  es: {
+    badge: 'Taller de Aprendiz',
+    title: 'Aprende mientras construyes.',
+    subtitle: 'No necesitas experiencia técnica. Elige lo que quieres crear y SignalBoost te guía paso a paso.',
+    promise: 'Empieza desde cero. Termina con algo real.',
+    workshopTitle: 'Taller de Aprendiz SignalBoost',
+    workshopTagline: 'Aprende mientras construyes.',
+    goalTitle: 'Objetivo',
+    goalItems: ['Enseñar mientras creas','Guiar paso a paso','Eliminar el miedo técnico','Convertir metas en flujos'],
+    examplesTitle: 'Ejemplos',
+    pick: '¿Qué quieres construir primero?',
+    experienceTitle: '¿Cuánta experiencia tienes?',
+    experienceSubtitle: 'Esto ayuda a SignalBoost a decidir cuánta explicación mostrar. Puedes cambiarlo después.',
+    start: 'Empezar guía',
+    stepLabel: 'Primeros pasos',
+    beginner: 'Nunca usé estas herramientas',
+    intermediate: 'Tengo algo de experiencia',
+    comfortable: 'Me siento cómodo',
+    advanced: 'Avanzado',
+    noTech: 'Sin términos técnicos al inicio',
+    guided: 'Pasos simples y guiados',
+    realOutput: 'Conectado a herramientas reales de SignalBoost',
+    stepHints: {
+      beginner: 'Explicaremos cada paso con ejemplos sencillos.',
+      intermediate: 'Agregaremos consejos rápidos y atajos.',
+      comfortable: 'Verás pasos concisos sin detalles adicionales.',
+      advanced: 'Solo la lista de pasos — sin explicaciones.'
+    },
+    nav: {
+      promote: 'Promocionar negocio',
+      site: 'Crear sitio',
+      reviews: 'Recopilar reseñas',
+      audio: 'Generar audio',
+      video: 'Crear videos',
+      lab: 'Laboratorio'
+    }
+  },
+  pl: {
+    badge: 'Warsztat Ucznia',
+    title: 'Ucz się, budując.',
+    subtitle: 'Nie potrzebujesz doświadczenia technicznego. Wybierz, co chcesz stworzyć, a SignalBoost poprowadzi Cię krok po kroku.',
+    promise: 'Zacznij od zera. Zakończ z czymś prawdziwym.',
+    workshopTitle: 'Warsztat Ucznia SignalBoost',
+    workshopTagline: 'Ucz się, budując.',
+    goalTitle: 'Cel',
+    goalItems: ['Uczyć podczas tworzenia','Prowadzić krok po kroku','Usunąć techniczny lęk','Zamieniać cele w przepływy pracy'],
+    examplesTitle: 'Przykłady',
+    pick: 'Co chcesz zbudować najpierw?',
+    experienceTitle: 'Jakie masz doświadczenie?',
+    experienceSubtitle: 'To pomaga SignalBoost dobrać poziom wyjaśnień. Możesz zmienić to później.',
+    start: 'Rozpocznij przewodnik',
+    stepLabel: 'Pierwsze kroki',
+    beginner: 'Nigdy nie używałem tych narzędzi',
+    intermediate: 'Mam trochę doświadczenia',
+    comfortable: 'Czuję się pewnie',
+    advanced: 'Zaawansowany',
+    noTech: 'Bez technicznych terminów na start',
+    guided: 'Proste kroki z prowadzeniem',
+    realOutput: 'Połączone z prawdziwymi narzędziami SignalBoost',
+    stepHints: {
+      beginner: 'Wyjaśnimy każdy krok prostymi przykładami.',
+      intermediate: 'Dodamy szybkie wskazówki i skróty.',
+      comfortable: 'Zobaczysz zwięzłe kroki bez dodatkowych szczegółów.',
+      advanced: 'Tylko lista kroków — bez wyjaśnień.'
+    },
+    nav: {
+      promote: 'Promować biznes',
+      site: 'Stworzyć stronę',
+      reviews: 'Zbierać opinie',
+      audio: 'Generować audio',
+      video: 'Tworzyć filmy',
+      lab: 'Laboratorium'
+    }
+  },
+  ru: {
+    badge: 'Мастерская ученика',
+    title: 'Учитесь, создавая.',
+    subtitle: 'Технический опыт не нужен. Выберите, что хотите создать, и SignalBoost проведёт вас простыми шагами.',
+    promise: 'Начните с нуля. Получите реальный результат.',
+    workshopTitle: 'Мастерская ученика SignalBoost',
+    workshopTagline: 'Учитесь, создавая.',
+    goalTitle: 'Цель',
+    goalItems: ['Учить в процессе создания','Вести шаг за шагом','Убрать технический страх','Преобразовывать цели в рабочие процессы'],
+    examplesTitle: 'Примеры',

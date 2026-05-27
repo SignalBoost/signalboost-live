@@ -555,6 +555,63 @@
     "readyTitle": "Pronto para ir global?",
     "readyDesc": "Você grava. Nós cuidamos do resto — locução, legendas, clipes, site e avaliações em 5 idiomas.",
     "readyCta": "Ver planos de podcast",
+    "hero": {
+      "liveBadge": "PODCAST_STUDIO // AO VIVO",
+      "line1": "Seu podcast.",
+      "line2": "Seu estúdio.",
+      "line3": "Sua audiência global.",
+      "subtitle": "Envie um episódio e deixe o SignalBoost ajudar a criar transcrições, clipes, legendas, áudio multilíngue, notas do programa e materiais de distribuição em um único estúdio.",
+      "openStudio": "Abrir estúdio",
+      "howItWorks": "Como funciona"
+    },
+    "panel": {
+      "foundry": "SIGNALBOOST AUDIO FOUNDRY",
+      "episodeFile": "Episodio_034.wav",
+      "onAir": "NO AR"
+    },
+    "metrics": {
+      "transcript": "Transcrição",
+      "ready": "Pronto",
+      "clipsFound": "Clipes encontrados",
+      "languages": "Idiomas",
+      "publishPack": "Pacote de publicação"
+    },
+    "agents": {
+      "transcript": "Agente de Transcrição",
+      "clip": "Agente de Clipe Viral",
+      "translation": "Agente de Tradução",
+      "voice": "Agente de Voz",
+      "distribution": "Agente de Distribuição"
+    },
+    "status": {
+      "active": "ATIVO",
+      "scanning": "ESCANEANDO",
+      "lang5": "5 IDIOMAS",
+      "ready": "PRONTO",
+      "standby": "EM ESPERA"
+    },
+    "actions": {
+      "generateClips": "Gerar clipes",
+      "uploadEpisode": "Enviar episódio"
+    },
+    "episodes": {
+      "e34": "Episódio 34",
+      "e34Clips": "8 clipes",
+      "e34Langs": "5 idiomas",
+      "e33": "Episódio 33",
+      "e33Clips": "6 clipes",
+      "e33Langs": "3 idiomas",
+      "e32": "Episódio 32",
+      "e32Clips": "4 clipes",
+      "e32Langs": "2 idiomas",
+      "published": "Publicado",
+      "scheduled": "Agendado",
+      "draft": "Rascunho"
+    },
+    "section": {
+      "fullStudioTitle": "Um estúdio de produção completo depois que você grava",
+      "fullStudioSubtitle": "Você foca na conversa. O SignalBoost ajuda a transformar esse episódio em clipes, legendas, conteúdo traduzido, locuções, páginas e materiais promocionais."
+    },
     "stats": {
       "languages": "Idiomas",
       "turnaround": "Prazo de entrega",
@@ -632,10 +689,9 @@
         "f3": "2 idiomas",
         "f4": "Locução nativa com IA",
         "f5": "Legendas em 2 idiomas",
-        "f6": "Geração básica de clipes (5 clipes por episódio)",
+        "f6": "Geração básica de clipes",
         "f7": "Site de podcast",
-        "f8": "Avaliações de ouvintes",
-        "f9": "Suporte por email"
+        "f8": "Avaliações de ouvintes"
       },
       "pro": {
         "name": "Pro",
@@ -644,13 +700,11 @@
         "f1": "3 programas",
         "f2": "Episódios ilimitados",
         "f3": "Todos os 5 idiomas",
-        "f4": "Locução nativa com IA (prioritária)",
+        "f4": "Locução nativa com IA",
         "f5": "Legendas em todos os 5 idiomas",
-        "f6": "Fábrica de clipes (clipes ilimitados)",
+        "f6": "Fábrica de clipes",
         "f7": "Site de podcast multilíngue",
-        "f8": "Avaliações e análises de ouvintes",
-        "f9": "Transcrição em todos os idiomas",
-        "f10": "Suporte prioritário"
+        "f8": "Análises"
       },
       "network": {
         "name": "Network",
@@ -658,15 +712,12 @@
         "cta": "Fale conosco",
         "f1": "Programas ilimitados",
         "f2": "Episódios ilimitados",
-        "f3": "Todos os 5 idiomas mais personalizados",
-        "f4": "Locução nativa com IA (dedicada)",
-        "f5": "Formatos de legenda personalizados (SRT, VTT, ASS)",
-        "f6": "Fábrica de clipes (ilimitada)",
-        "f7": "Site com marca branca",
-        "f8": "Suíte completa de análises",
-        "f9": "Acesso à API",
-        "f10": "Gerente de conta dedicado",
-        "f11": "Garantia de SLA"
+        "f3": "Todos os idiomas mais personalizados",
+        "f4": "Processamento dedicado",
+        "f5": "Formatos de legenda personalizados",
+        "f6": "Site com marca branca",
+        "f7": "Acesso à API",
+        "f8": "Gerente de conta dedicado"
       },
       "networkEmailSubject": "SignalBoost Network Plan"
     },

@@ -21,7 +21,7 @@ function guessFileTargets(request: string): string[] {
 }
 
 // ── Safe fallback: the original template, used if the AI call fails ──
-function templatePlan(request: string): OperatorPlan {
+function templatePlan(request: string, language?: string): OperatorPlan {
   const lower = request.toLowerCase()
   const visualFirst = lower.includes('website') || lower.includes('homepage') || lower.includes('restaurant') || lower.includes('real estate')
   return {
@@ -108,11 +108,15 @@ RULES:
 - Keep each string concise.
 - clarificationQuestion must be a string (use "" if none).`
 
-export async function buildPlan(request: string): Promise<OperatorPlan> {
-  const raw = await callClaude(SYSTEM_PROMPT, request)
+export async function buildPlan(request: string, language?: string): Promise<OperatorPlan> {
+  const requestedLanguage = (language || '').trim().toLowerCase()
+  const languageDirective = requestedLanguage
+    ? `\n\nSELECTED LANGUAGE OVERRIDE:\n- The app-selected language is "${requestedLanguage}".\n- You MUST respond entirely in this selected language, even if the user's request text is in a different language.`
+    : ''
+  const raw = await callClaude(`${SYSTEM_PROMPT}${languageDirective}`, request)
 
   // If the AI is unavailable, fall back to the safe template so the page never breaks.
-  if (!raw) return templatePlan(request)
+  if (!raw) return templatePlan(request, language)
 
   // Parse the AI's JSON. Tolerate stray text/backticks around the object.
   let parsed: any = null
@@ -127,7 +131,7 @@ export async function buildPlan(request: string): Promise<OperatorPlan> {
   }
 
   if (!parsed || typeof parsed.summary !== 'string' || !Array.isArray(parsed.steps)) {
-    return templatePlan(request)
+    return templatePlan(request, language)
   }
 
   const steps = parsed.steps.filter((s: any) => typeof s === 'string' && s.trim().length > 0)
@@ -141,9 +145,9 @@ export async function buildPlan(request: string): Promise<OperatorPlan> {
     request,
     clarificationQuestion: clarification.length > 0 ? clarification : undefined,
     summary: parsed.summary.trim(),
-    steps: steps.length > 0 ? steps : templatePlan(request).steps,
+    steps: steps.length > 0 ? steps : templatePlan(request, language).steps,
     fileTargets: guessFileTargets(request),
-    preview: preview.length > 0 ? preview : templatePlan(request).preview,
+    preview: preview.length > 0 ? preview : templatePlan(request, language).preview,
     requiresApproval: true,
     createdAt: new Date().toISOString(),
   }

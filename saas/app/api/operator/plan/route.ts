@@ -6,12 +6,13 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const request = body?.request
+    const language = body?.language
 
     if (!request || typeof request !== 'string') {
       return NextResponse.json({ error: 'operator.errors.requestRequired' }, { status: 400 })
     }
 
-    const plan = await buildPlan(request)
+    const plan = await buildPlan(request, typeof language === 'string' ? language : undefined)
     operatorStore.plans.set(plan.id, plan)
 
     return NextResponse.json({ plan })

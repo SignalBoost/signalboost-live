@@ -40,6 +40,8 @@ const COPY: Record<Lang, {
   noTech: string
   guided: string
   realOutput: string
+  stepHints: { beginner: string; intermediate: string; comfortable: string; advanced: string }
+  nav: { promote: string; site: string; reviews: string; audio: string; video: string; lab: string }
 }> = {
   en: {
     badge: 'Apprentice Workshop',
@@ -63,6 +65,8 @@ const COPY: Record<Lang, {
     noTech: 'No technical terms first',
     guided: 'Simple guided steps',
     realOutput: 'Built into real SignalBoost tools',
+    stepHints: { beginner: 'We’ll explain each step with simple examples.', intermediate: 'We’ll add quick tips and shortcuts.', comfortable: 'You’ll see concise steps without extra detail.', advanced: 'Just the checklist — no explanations.' },
+    nav: { promote: 'Promote business', site: 'Create site', reviews: 'Collect reviews', audio: 'Generate audio', video: 'Create videos', lab: 'Lab' },
   },
   pt: {
     badge: 'Oficina de Aprendiz',
@@ -86,6 +90,8 @@ const COPY: Record<Lang, {
     noTech: 'Sem termos técnicos no começo',
     guided: 'Passos simples e guiados',
     realOutput: 'Conectado às ferramentas reais da SignalBoost',
+    stepHints: { beginner: 'Explicaremos cada etapa com exemplos simples.', intermediate: 'Adicionaremos dicas rápidas e atalhos.', comfortable: 'Você verá etapas concisas sem detalhes extras.', advanced: 'Apenas a lista de verificação — sem explicações.' },
+    nav: { promote: 'Promover negócio', site: 'Criar site', reviews: 'Coletar avaliações', audio: 'Gerar áudio', video: 'Criar vídeos', lab: 'Laboratório' },
   },
   es: {
     badge: 'Taller de Aprendiz',
@@ -109,6 +115,8 @@ const COPY: Record<Lang, {
     noTech: 'Sin términos técnicos al inicio',
     guided: 'Pasos simples y guiados',
     realOutput: 'Conectado a herramientas reales de SignalBoost',
+    stepHints: { beginner: 'Explicaremos cada paso con ejemplos sencillos.', intermediate: 'Agregaremos consejos rápidos y atajos.', comfortable: 'Verás pasos concisos sin detalles adicionales.', advanced: 'Solo la lista de pasos — sin explicaciones.' },
+    nav: { promote: 'Promocionar negocio', site: 'Crear sitio', reviews: 'Recopilar reseñas', audio: 'Generar audio', video: 'Crear videos', lab: 'Laboratorio' },
   },
   pl: {
     badge: 'Warsztat Ucznia',
@@ -132,6 +140,8 @@ const COPY: Record<Lang, {
     noTech: 'Bez technicznych terminów na start',
     guided: 'Proste kroki z prowadzeniem',
     realOutput: 'Połączone z prawdziwymi narzędziami SignalBoost',
+    stepHints: { beginner: 'Wyjaśnimy każdy krok prostymi przykładami.', intermediate: 'Dodamy szybkie wskazówki i skróty.', comfortable: 'Zobaczysz zwięzłe kroki bez dodatkowych szczegółów.', advanced: 'Tylko lista kroków — bez wyjaśnień.' },
+    nav: { promote: 'Promować biznes', site: 'Stworzyć stronę', reviews: 'Zbierać opinie', audio: 'Generować audio', video: 'Tworzyć filmy', lab: 'Laboratorium' },
   },
   ru: {
     badge: 'Мастерская ученика',
@@ -155,6 +165,8 @@ const COPY: Record<Lang, {
     noTech: 'Без технических терминов в начале',
     guided: 'Простые пошаговые инструкции',
     realOutput: 'Подключено к реальным инструментам SignalBoost',
+    stepHints: { beginner: 'Мы объясним каждый шаг простыми примерами.', intermediate: 'Добавим быстрые советы и сокращения.', comfortable: 'Вы увидите краткие шаги без лишних деталей.', advanced: 'Только список действий — без объяснений.' },
+    nav: { promote: 'Продвигать бизнес', site: 'Создать сайт', reviews: 'Собирать отзывы', audio: 'Генерировать аудио', video: 'Создавать видео', lab: 'Лаборатория' },
   },
 }
 
@@ -240,15 +252,20 @@ export default function ApprenticeWorkshopPage() {
   const [level, setLevel] = useState('beginner')
   const [selected, setSelected] = useState(MODULES[0].id)
   const activeModule = useMemo(() => MODULES.find(item => item.id === selected) || MODULES[0], [selected])
-  const levels = [copy.beginner, copy.intermediate, copy.comfortable, copy.advanced]
+  const levels = [
+    { id: 'beginner', label: copy.beginner },
+    { id: 'intermediate', label: copy.intermediate },
+    { id: 'comfortable', label: copy.comfortable },
+    { id: 'advanced', label: copy.advanced },
+  ]
 
   const workshopNav = [
-    { label: 'Promote business', href: '/dashboard/promote' },
-    { label: 'Create site', href: '/dashboard/builder' },
-    { label: 'Collect reviews', href: '/dashboard/reviews' },
-    { label: 'Generate audio', href: '/dashboard/audio' },
-    { label: 'Create videos', href: '/dashboard/video' },
-    { label: 'Lab', href: '/dashboard/lab' },
+    { label: copy.nav.promote, href: '/dashboard/promote' },
+    { label: copy.nav.site, href: '/dashboard/builder' },
+    { label: copy.nav.reviews, href: '/dashboard/reviews' },
+    { label: copy.nav.audio, href: '/dashboard/audio' },
+    { label: copy.nav.video, href: '/dashboard/video' },
+    { label: copy.nav.lab, href: '/dashboard/lab' },
   ]
 
   return (
@@ -267,7 +284,7 @@ export default function ApprenticeWorkshopPage() {
         </div>
       </section>
       <section style={{ display: 'grid', gridTemplateColumns: '1.05fr .95fr', gap: 22, alignItems: 'stretch' }}>
-        <div className="sb-card" style={{ padding: 28 }}>
+        <div className="hero-panel" style={{ padding: 28 }}>
           <div className="sb-kicker">✨ {copy.badge}</div>
           <h1 className="sb-title" style={{ fontSize: 'clamp(42px, 6vw, 76px)' }}>{copy.title}</h1>
           <p className="sb-subtitle">{copy.subtitle}</p>
@@ -280,27 +297,27 @@ export default function ApprenticeWorkshopPage() {
           </div>
         </div>
 
-        <div className="sb-card" style={{ padding: 24 }}>
+        <div className="hero-panel" style={{ padding: 24 }}>
           <div style={{ color: 'var(--gold)', fontWeight: 950, fontSize: 13, marginBottom: 8 }}>{copy.experienceTitle}</div>
           <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 0 }}>{copy.experienceSubtitle}</p>
           <div style={{ display: 'grid', gap: 8 }}>
-            {levels.map((item, index) => {
-              const value = ['beginner', 'intermediate', 'comfortable', 'advanced'][index]
+            {levels.map((item) => {
+              const value = item.id
               return (
-                <button key={item} onClick={() => setLevel(value)} className={level === value ? 'sb-button-primary' : 'sb-button-ghost'} style={{ justifyContent: 'flex-start' }}>
-                  {item}
+                <button key={item.id} onClick={() => setLevel(value)} className={level === value ? 'sb-button-primary' : 'sb-button-ghost'} style={{ justifyContent: 'flex-start' }}>
+                  {item.label}
                 </button>
               )
             })}
           </div>
           <div style={{ marginTop: 18, color: 'var(--text-muted)', fontSize: 13 }}>
-            {copy.promise}
+            {copy.stepHints[level as keyof typeof copy.stepHints]}
           </div>
         </div>
       </section>
 
 
-      <section className="sb-card" style={{ marginTop: 28, padding: 24 }}>
+      <section className="hero-panel" style={{ marginTop: 28, padding: 24 }}>
         <div style={{ color: 'var(--gold)', fontWeight: 950, letterSpacing: '.04em', textTransform: 'uppercase', fontSize: 12 }}>New Core Feature</div>
         <h2 style={{ color: '#fff', fontSize: 32, margin: '8px 0 6px' }}>✨ {copy.workshopTitle}</h2>
         <p style={{ color: 'var(--text-secondary)', marginTop: 0, fontWeight: 700 }}>{copy.workshopTagline}</p>
@@ -329,7 +346,7 @@ export default function ApprenticeWorkshopPage() {
         <h2 style={{ color: '#fff', fontSize: 24, marginBottom: 14 }}>{copy.pick}</h2>
         <div className="sb-grid-3">
           {MODULES.map(item => (
-            <button key={item.id} onClick={() => setSelected(item.id)} className="sb-card" style={{ textAlign: 'left', padding: 20, borderColor: selected === item.id ? 'var(--border-gold)' : 'var(--border-soft)' }}>
+            <button key={item.id} onClick={() => setSelected(item.id)} className="hero-panel" style={{ textAlign: 'left', padding: 20, borderColor: selected === item.id ? 'var(--border-gold)' : 'var(--border-soft)' }}>
               <div style={{ fontSize: 34 }}>{item.icon}</div>
               <div style={{ color: '#fff', fontWeight: 950, fontSize: 18, marginTop: 10 }}>{item.title[activeLang]}</div>
               <div style={{ color: 'var(--text-muted)', lineHeight: 1.55, marginTop: 8 }}>{item.description[activeLang]}</div>
@@ -339,7 +356,7 @@ export default function ApprenticeWorkshopPage() {
         </div>
       </section>
 
-      <section className="sb-card" style={{ marginTop: 28, padding: 24, display: 'grid', gridTemplateColumns: '1fr 280px', gap: 22 }}>
+      <section className="hero-panel" style={{ marginTop: 28, padding: 24, display: 'grid', gridTemplateColumns: '1fr 280px', gap: 22 }}>
         <div>
           <div style={{ color: 'var(--text-faint)', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>{copy.stepLabel}</div>
           <h3 style={{ color: '#fff', fontSize: 26, margin: '8px 0 16px' }}>{activeModule.icon} {activeModule.title[activeLang]}</h3>

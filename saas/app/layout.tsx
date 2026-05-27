@@ -110,7 +110,7 @@ export default function RootLayout({
         >
           <I18nProvider>
             <Navbar />
-            {children}
+            <main className="hero-layout">{children}</main>
             <Footer />
             <LanguageSuggestion />
             <Concierge />

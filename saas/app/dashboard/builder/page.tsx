@@ -25,7 +25,7 @@ function makeT(dict: any) {
 }
 
 export default function BuilderPage() {
-  const { dict } = useI18n()
+  const { dict, lang } = useI18n()
   const t = makeT(dict)
 
   // Templates defined inside the component so names/descriptions can be translated
@@ -76,9 +76,14 @@ export default function BuilderPage() {
           messages: newMessages,
           context: {
             userName,
-            currentPage: 'Site Builder',
-            userPlan: 'free',
-            task: `Building a ${template} website called "${businessName}". Description: ${businessDesc}. Languages: ${languages.join(', ')}`,
+            currentPage: t('builder.ai.currentPage', 'Site Builder'),
+            userPlan: t('builder.ai.userPlan', 'free'),
+            language: lang,
+            task: t('builder.ai.taskContext', 'Building a {template} website called "{businessName}". Description: {businessDesc}. Languages: {languages}.')
+              .replace('{template}', template)
+              .replace('{businessName}', businessName)
+              .replace('{businessDesc}', businessDesc)
+              .replace('{languages}', languages.join(', ')),
           },
         }),
       })

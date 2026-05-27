@@ -110,12 +110,12 @@ export default function PodcastersPage() {
   ]
 
   const deliverables = [
-    { icon: '🎙️', title: 'Native voiceover', desc: 'Turn one episode into natural voice versions in multiple languages.' },
-    { icon: '✂️', title: 'Clip factory', desc: 'Find the best moments and turn them into Shorts, Reels and TikToks.' },
-    { icon: '💬', title: 'Captions', desc: 'Generate subtitles, transcripts and social captions automatically.' },
-    { icon: '🌐', title: 'Podcast website', desc: 'A branded home for episodes, show notes, reviews and languages.' },
-    { icon: '📣', title: 'Distribution', desc: 'Prepare content for YouTube, TikTok, Instagram, email and more.' },
-    { icon: '⭐', title: 'Listener growth', desc: 'Collect reviews, testimonials and audience signals.' },
+    { icon: '🎙️', title: P('deliverables.voiceover.title', 'Native voiceover'), desc: P('deliverables.voiceover.desc', 'Turn one episode into natural voice versions in multiple languages.') },
+    { icon: '✂️', title: P('deliverables.clips.title', 'Clip factory'), desc: P('deliverables.clips.desc', 'Find the best moments and turn them into Shorts, Reels and TikToks.') },
+    { icon: '💬', title: P('deliverables.captions.title', 'Captions'), desc: P('deliverables.captions.desc', 'Generate subtitles, transcripts and social captions automatically.') },
+    { icon: '🌐', title: P('deliverables.website.title', 'Podcast website'), desc: P('deliverables.website.desc', 'A branded home for episodes, show notes, reviews and languages.') },
+    { icon: '📣', title: P('deliverables.distribution.title', 'Distribution'), desc: P('deliverables.distribution.desc', 'Prepare content for YouTube, TikTok, Instagram, email and more.') },
+    { icon: '⭐', title: P('deliverables.growth.title', 'Listener growth'), desc: P('deliverables.growth.desc', 'Collect reviews, testimonials and audience signals.') },
   ]
 
   return (
@@ -595,10 +595,10 @@ export default function PodcastersPage() {
           }}
         >
           {[
-            ['01', 'Upload your episode', 'Bring the finished audio or video.'],
-            ['02', 'Choose outputs', 'Clips, captions, languages, voiceover and show notes.'],
-            ['03', 'AI crew works', 'Transcript, clip, translation and distribution agents prepare assets.'],
-            ['04', 'Publish everywhere', 'Download or prepare content for every channel.'],
+            ['01', P('how.step1.title', 'Upload your episode'), P('how.step1.desc', 'Bring the finished audio or video.')],
+            ['02', P('how.step2.title', 'Choose outputs'), P('how.step2.desc', 'Clips, captions, languages, voiceover and show notes.')],
+            ['03', P('how.step3.title', 'AI crew works'), P('how.step3.desc', 'Transcript, clip, translation and distribution agents prepare assets.')],
+            ['04', P('how.step4.title', 'Publish everywhere'), P('how.step4.desc', 'Download or prepare content for every channel.')],
           ].map(step => (
             <div
               key={step[0]}
@@ -761,7 +761,7 @@ export default function PodcastersPage() {
                 onClick={() => {
                   window.location.href =
                     plan.key === 'network'
-                      ? `mailto:${CONTACT_EMAIL}?subject=SignalBoost Network Plan`
+                      ? `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(P('plans.networkEmailSubject', 'SignalBoost Network Plan'))}`
                       : '/pricing'
                 }}
                 style={{

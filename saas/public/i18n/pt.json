@@ -205,5 +205,10 @@
       "networkEmailSubject": "SignalBoost Network Plan"
     }
   },
-  "singleLanguageContent": "Conteúdo em {language}"
+  "singleLanguageContent": "Conteúdo em {language}",
+  "docs": {
+    "pricing": {
+      "a1": "Website: $19 / $49 / $149 · Podcast: $29 / $79 / $299 · Network starting at $299/mo"
+    }
+  }
 }

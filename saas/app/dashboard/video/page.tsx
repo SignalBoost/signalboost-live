@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
+import ResetButton from '@/components/ResetButton'
 
 const BLUE = '#3b82f6'
 const GOLD = '#ffc300'
@@ -335,6 +336,22 @@ export default function VideoPage() {
 
   const doneJobs = jobs.filter(j => j.status === 'done')
 
+  function resetAll() {
+    setUploadedFile(null)
+    setSelectedLangs(['en'])
+    setSelectedFormats(['srt'])
+    setSelectedClipFormats(['tiktok'])
+    setProcessing(false)
+    setUploadProgress(0)
+    setStatusMsg('')
+    setJobs([])
+    setOverlayIndex(null)
+    setError(null)
+    setTab('captions')
+    fileRef.current && (fileRef.current.value = '')
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   function toggleLang(code: string) {
     setSelectedLangs(prev =>
       prev.includes(code) && prev.length > 1
@@ -360,7 +377,7 @@ export default function VideoPage() {
     setError(null)
     setProcessing(true)
     setUploadProgress(10)
-    setStatusMsg('Uploading...')
+    setStatusMsg(t(dict, 'video_page.status.uploading', 'Uploading...'))
 
     // Create a placeholder job while processing
     const tempId = Date.now().toString()
@@ -387,7 +404,7 @@ export default function VideoPage() {
       formData.append('formats', selectedFormats.join(','))
 
       setUploadProgress(20)
-      setStatusMsg('Transcribing... this may take a minute')
+      setStatusMsg(t(dict, 'video_page.status.transcribing', 'Transcribing... this may take a minute'))
 
       const res = await fetch('/api/video', {
         method: 'POST',
@@ -406,7 +423,7 @@ export default function VideoPage() {
       }
 
       setUploadProgress(100)
-      setStatusMsg('Done!')
+      setStatusMsg(t(dict, 'video_page.status.done', 'Done!'))
 
       // Replace placeholder with real job
       const completedJob: Job = {
@@ -518,6 +535,12 @@ export default function VideoPage() {
         <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 12, padding: '12px 16px', fontSize: 13, color: '#f87171', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>{error}</span>
           <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: 16 }}>✕</button>
+        </div>
+      )}
+
+      {(jobs.length > 0 || error || uploadedFile || processing) && (
+        <div style={{ marginBottom: 16 }}>
+          <ResetButton onReset={resetAll} className="sb-button-ghost" />
         </div>
       )}
 

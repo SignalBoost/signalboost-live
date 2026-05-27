@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { useTranslation } from "@/components/i18n/useTranslation";
 import { useTTS } from "@/hooks/useTTS";
 import { CURATED_VOICES, type VoiceLocale } from "@/lib/elevenlabs/voices";
+import ResetButton from "@/components/ResetButton";
 
 const MAX_CHARS = 5000;
 const GOLD = "#ffc300";
@@ -81,6 +82,14 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
   const handleClearText = () => {
     setText("");
     reset();
+  };
+
+  const handleFullReset = () => {
+    setText("");
+    setLocaleFilter(initialLocale);
+    setLangDropdownOpen(false);
+    reset();
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleDownload = () => {
@@ -250,6 +259,9 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
           <h2 style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.08em", textTransform: "uppercase", margin: 0 }}>
             {t("audio.yourText", "Your text")}
           </h2>
+          {(text.length > 0 || error || result || loading) ? (
+            <ResetButton onReset={handleFullReset} className="sb-button-ghost" />
+          ) : null}
           {text.length > 0 ? (
             <button
               onClick={handleClearText}

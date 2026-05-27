@@ -1,32 +1,27 @@
-// saas/lib/supabaseClient.ts
+import { createBrowserClient } from '@supabase/ssr'
 
-const mockSingleResult = {
-  data: { credits: 750 },
-  error: null
-};
+let browserClient: ReturnType<typeof createBrowserClient> | null = null
 
-// Fixed: Added (...args: any[]) to functions so TypeScript allows passing columns, values, etc.
-const mockQueryBuilder = {
-  select: (...args: any[]) => mockQueryBuilder,
-  eq: (...args: any[]) => mockQueryBuilder,
-  single: async () => mockSingleResult
-};
+export const supabase = (() => {
+  if (typeof window === 'undefined') {
+    return {
+      auth: {
+        getUser: async () => ({ data: { user: null }, error: null }),
+        signOut: async () => ({ error: null }),
+        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      },
+      from: () => ({
+        select: () => ({ eq: () => ({ single: async () => ({ data: null, error: null }) }) }),
+      }),
+    } as any
+  }
 
-export const supabase = {
-  auth: {
-    getUser: async () => ({ 
-      data: { 
-        user: { 
-          id: "mock-user-id",
-          email: "sandbox-developer@signalboostapp.com" 
-        } 
-      }, 
-      error: null 
-    }),
-    signOut: async () => ({ error: null }),
-    onAuthStateChange: () => ({ 
-      data: { subscription: { unsubscribe: () => {} } } 
-    })
-  },
-  from: (tableName: string) => mockQueryBuilder
-};
+  if (!browserClient) {
+    browserClient = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+  }
+
+  return browserClient
+})()

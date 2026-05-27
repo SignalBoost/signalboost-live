@@ -92,7 +92,7 @@ export async function createProject(userId: string, project: {
   const { allowed, plan, limit, current } = await canCreateProject(userId)
   if (!allowed) {
     return {
-      error: `You have reached the ${limit} project limit on the ${plan} plan. Upgrade to add more projects.`,
+      error: 'projects.limitReached',
       limitReached: true,
       plan,
       limit,

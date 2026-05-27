@@ -8,16 +8,16 @@ export async function POST(req: NextRequest) {
     const approved = body?.approved
 
     if (!planId || typeof planId !== 'string') {
-      return NextResponse.json({ error: 'Plan ID is required.' }, { status: 400 })
+      return NextResponse.json({ error: 'operator.errors.planIdRequired' }, { status: 400 })
     }
 
     const plan = operatorStore.plans.get(planId)
     if (!plan) {
-      return NextResponse.json({ error: 'Plan not found. Please create a new plan.' }, { status: 404 })
+      return NextResponse.json({ error: 'operator.errors.planNotFound' }, { status: 404 })
     }
 
     if (!approved) {
-      return NextResponse.json({ error: 'Approval is required before applying changes.' }, { status: 400 })
+      return NextResponse.json({ error: 'operator.errors.approvalRequired' }, { status: 400 })
     }
 
     const now = new Date().toISOString()
@@ -25,8 +25,8 @@ export async function POST(req: NextRequest) {
       id: newId('job'),
       planId,
       state: 'published',
-      commitMessage: `Website Operator update: ${plan.request.slice(0, 72)}`,
-      publishMessage: 'Changes published successfully. Rollback is available.',
+      commitMessage: `operator.commitPrefix ${plan.request.slice(0, 72)}`,
+      publishMessage: 'operator.success.published',
       rollbackAvailable: true,
       createdAt: now,
       updatedAt: now,
@@ -36,10 +36,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       job,
-      userMessage: 'Update approved and published. I also kept a rollback point in case you want to restore the previous version.',
+      userMessage: 'operator.success.approvedAndPublished',
     })
   } catch (error) {
     console.error('Operator apply error', error)
-    return NextResponse.json({ error: 'I could not apply the approved update.' }, { status: 500 })
+    return NextResponse.json({ error: 'operator.errors.applyFailed' }, { status: 500 })
   }
 }

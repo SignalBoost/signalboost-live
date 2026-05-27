@@ -28,7 +28,7 @@ class TimeoutError extends Error {
   }
 }
 
-function timeoutResponse(message = 'This request took too long. Please try again with a shorter or more specific request.') {
+function timeoutResponse(message = 'videoSearch.timeout.generic') {
   return NextResponse.json(
     {
       error: message,
@@ -60,7 +60,7 @@ async function timedFetch(url: string, init: RequestInit, ms: number) {
     return await fetch(url, { ...init, signal: controller.signal })
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new TimeoutError('The AI service took too long to respond.')
+      throw new TimeoutError('videoSearch.timeout.aiService')
     }
     throw error
   } finally {
@@ -152,7 +152,7 @@ Return this exact shape:
       language: parsed.language ?? 'en',
       duration: parsed.duration ?? 30,
       format: parsed.format ?? '9:16',
-      explanation: parsed.explanation ?? 'Searching for videos...',
+      explanation: parsed.explanation ?? 'videoSearch.status.searching',
     }
   } catch {
     return {
@@ -161,7 +161,7 @@ Return this exact shape:
       language: 'en',
       duration: 30,
       format: '9:16',
-      explanation: 'Searching for videos matching your prompt...',
+      explanation: 'videoSearch.status.searchingPromptMatch',
     }
   }
 }
@@ -220,21 +220,21 @@ async function buildGenerateResponse(intent: IntentResult, prompt: string) {
 export async function POST(req: NextRequest) {
   const user = await getUser(req)
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'errors.unauthorized' }, { status: 401 })
   }
 
   let body: { prompt?: string; mode?: Mode }
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return NextResponse.json({ error: 'api.invalidJson' }, { status: 400 })
   }
 
   const prompt = (body.prompt ?? '').trim()
   const mode: Mode = body.mode ?? 'auto'
 
   if (!prompt) {
-    return NextResponse.json({ error: 'Prompt is required' }, { status: 400 })
+    return NextResponse.json({ error: 'api.promptRequired' }, { status: 400 })
   }
 
   let intent: IntentResult
@@ -242,7 +242,7 @@ export async function POST(req: NextRequest) {
     intent = await extractIntent(prompt, mode)
   } catch (err) {
     if (err instanceof TimeoutError) {
-      return timeoutResponse('The AI took too long to understand this request. Please try a shorter or more specific request.')
+      return timeoutResponse('videoSearch.timeout.intent')
     }
     console.error('Intent extraction failed:', err)
     intent = {
@@ -251,7 +251,7 @@ export async function POST(req: NextRequest) {
       language: 'en',
       duration: 30,
       format: '9:16',
-      explanation: 'Searching for videos matching your prompt...',
+      explanation: 'videoSearch.status.searchingPromptMatch',
     }
   }
 
@@ -268,10 +268,10 @@ export async function POST(req: NextRequest) {
       })
     } catch (err) {
       if (err instanceof TimeoutError) {
-        return timeoutResponse('Script generation took too long. Please try a shorter request.')
+        return timeoutResponse('videoSearch.timeout.script')
       }
       console.error('Generate response failed:', err)
-      return NextResponse.json({ error: 'Failed to generate script' }, { status: 502 })
+      return NextResponse.json({ error: 'videoSearch.errors.generateScriptFailed' }, { status: 502 })
     }
   }
 
@@ -279,7 +279,7 @@ export async function POST(req: NextRequest) {
     const results = await withTimeout(
       searchVideos(intent.query),
       15000,
-      'Video search took too long.'
+      'videoSearch.timeout.search'
     )
 
     const hasPublic = results.some(r => r.license === 'public')
@@ -288,9 +288,9 @@ export async function POST(req: NextRequest) {
 
     let message: string | null = null
     if (allRestricted) {
-      message = 'All results found are rights-restricted for this query. Try a more specific search, or look for public domain alternatives.'
+      message = 'videoSearch.rights.restricted'
     } else if (!hasPublic && hasEmbeddable) {
-      message = 'Results are freely embeddable from YouTube. No public domain versions found for this query.'
+      message = 'videoSearch.rights.embeddableOnly'
     }
 
     return NextResponse.json({
@@ -303,9 +303,9 @@ export async function POST(req: NextRequest) {
     })
   } catch (err) {
     if (err instanceof TimeoutError) {
-      return timeoutResponse('Video search took too long. Try a more specific search or a shorter request.')
+      return timeoutResponse('videoSearch.timeout.searchDetailed')
     }
     console.error('Video search failed:', err)
-    return NextResponse.json({ error: 'Search failed' }, { status: 502 })
+    return NextResponse.json({ error: 'videoSearch.errors.searchFailed' }, { status: 502 })
   }
 }

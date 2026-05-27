@@ -37,14 +37,14 @@ export async function POST(req: NextRequest) {
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user?.id) {
-      return NextResponse.json({ error: 'You must be signed in.' }, { status: 401 })
+      return NextResponse.json({ error: 'videoGenerate.errors.authRequired' }, { status: 401 })
     }
 
     if (mode === 'text' && !prompt) {
-      return NextResponse.json({ error: 'Please enter a prompt.' }, { status: 400 })
+      return NextResponse.json({ error: 'videoGenerate.errors.promptRequired' }, { status: 400 })
     }
     if (mode === 'image' && !imageDataUri) {
-      return NextResponse.json({ error: 'Please attach an image.' }, { status: 400 })
+      return NextResponse.json({ error: 'videoGenerate.errors.imageRequired' }, { status: 400 })
     }
 
     // Spend a credit BEFORE generating (refunded later by video-status if it fails)
@@ -52,11 +52,11 @@ export async function POST(req: NextRequest) {
     if (!spend.ok) {
       if (spend.reason === 'no_credits') {
         return NextResponse.json(
-          { error: 'You have no video credits left this month. Upgrade your plan for more.' },
+          { error: 'videoGenerate.errors.noCredits' },
           { status: 402 }
         )
       }
-      return NextResponse.json({ error: 'Could not check your credits.' }, { status: 500 })
+      return NextResponse.json({ error: 'videoGenerate.errors.creditCheckFailed' }, { status: 500 })
     }
 
     // Build the input for the chosen model
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
       model = IMAGE_MODEL
       input = {
         image_url: imageUrl,
-        prompt: prompt || 'Add natural, subtle motion to this image.',
+        prompt: prompt || 'videoGenerate.defaults.imagePrompt',
         duration: '5',
       }
     } else {
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
       remaining: spend.remaining,
     })
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Generation failed'
+    const message = err instanceof Error ? err.message : 'errors.generationFailed'
     console.error('video-generate error:', message)
     return NextResponse.json({ error: message }, { status: 500 })
   }

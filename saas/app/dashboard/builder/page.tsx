@@ -7,11 +7,11 @@ const BLUE = '#3b82f6'
 const GOLD = '#ffc300'
 
 const LANGS = [
-  { code: 'en', flag: '🇺🇸', name: 'English' },
-  { code: 'pt', flag: '🇧🇷', name: 'Português' },
-  { code: 'es', flag: '🇪🇸', name: 'Español' },
-  { code: 'pl', flag: '🇵🇱', name: 'Polski' },
-  { code: 'ru', flag: '🇷🇺', name: 'Русский' },
+  { code: 'en', flag: '🇺🇸', nameKey: 'builder.lang.en', fallback: 'English' },
+  { code: 'pt', flag: '🇧🇷', nameKey: 'builder.lang.pt', fallback: 'Português' },
+  { code: 'es', flag: '🇪🇸', nameKey: 'builder.lang.es', fallback: 'Español' },
+  { code: 'pl', flag: '🇵🇱', nameKey: 'builder.lang.pl', fallback: 'Polski' },
+  { code: 'ru', flag: '🇷🇺', nameKey: 'builder.lang.ru', fallback: 'Русский' },
 ]
 
 // Safe translation helper — always returns a string.
@@ -42,7 +42,8 @@ export default function BuilderPage() {
   const [template, setTemplate] = useState('')
   const [businessName, setBusinessName] = useState('')
   const [businessDesc, setBusinessDesc] = useState('')
-  const [languages, setLanguages] = useState<string[]>([lang])
+  const initialLang = LANGS.some(item => item.code === lang) ? lang : 'en'
+  const [languages, setLanguages] = useState<string[]>([initialLang])
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<{ role: string; content: string }[]>([])
   const [loading, setLoading] = useState(false)
@@ -429,7 +430,7 @@ export default function BuilderPage() {
                 }}
               >
                 <span style={{ fontSize: 24 }}>{lang.flag}</span>
-                <span style={{ fontSize: 14, fontWeight: 600 }}>{lang.name}</span>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{t(lang.nameKey, lang.fallback)}</span>
                 {languages.includes(lang.code) && (
                   <span style={{ marginLeft: 'auto', color: BLUE, fontWeight: 700 }}>✓</span>
                 )}
@@ -512,8 +513,8 @@ export default function BuilderPage() {
 
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
                 {languages.map(l => {
-                  const lang = LANGS.find(x => x.code === l)
-                  return lang ? (
+                  const selectedLang = LANGS.find(x => x.code === l)
+                  return selectedLang ? (
                     <div
                       key={l}
                       style={{
@@ -525,7 +526,7 @@ export default function BuilderPage() {
                         fontWeight: 600,
                       }}
                     >
-                      {lang.flag} {lang.name}
+                      {selectedLang.flag} {t(selectedLang.nameKey, selectedLang.fallback)}
                     </div>
                   ) : null
                 })}

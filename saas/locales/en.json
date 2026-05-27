@@ -258,6 +258,13 @@
       "currentPage": "Site Builder",
       "userPlan": "free",
       "taskContext": "Building a {template} website called \"{businessName}\". Description: {businessDesc}. Languages: {languages}."
+    },
+    "lang": {
+      "en": "English",
+      "pt": "Português",
+      "es": "Español",
+      "pl": "Polski",
+      "ru": "Русский"
     }
   },
   "podcasters_page": {

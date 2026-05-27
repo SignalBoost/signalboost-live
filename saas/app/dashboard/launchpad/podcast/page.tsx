@@ -95,7 +95,7 @@ export default function PodcastLaunchpad() {
             marginBottom: 10,
           }}
         >
-          🎙️ Podcast Launchpad
+          {t('podcast.launchpad.title', '🎙️ Podcast Launchpad')}
         </h1>
 
         <p
@@ -104,7 +104,7 @@ export default function PodcastLaunchpad() {
             marginBottom: 30,
           }}
         >
-          Build your podcast in guided steps
+          {t('podcast.launchpad.subtitle', 'Build your podcast in guided steps')}
         </p>
 
         <div
@@ -118,7 +118,7 @@ export default function PodcastLaunchpad() {
           <textarea
             value={topic}
             onChange={e => setTopic(e.target.value)}
-            placeholder="Describe your podcast idea"
+            placeholder={t('podcast.launchpad.input.placeholder', 'Describe your podcast idea')}
             style={{
               width: '100%',
               minHeight: 120,
@@ -143,10 +143,10 @@ export default function PodcastLaunchpad() {
               color: '#fff',
             }}
           >
-            <option value="solo">Solo</option>
-            <option value="interview">Interview</option>
-            <option value="cohost">Co-host</option>
-            <option value="story">Storytelling</option>
+            <option value="solo">{t('podcast.launchpad.format.solo', 'Solo')}</option>
+            <option value="interview">{t('podcast.launchpad.format.interview', 'Interview')}</option>
+            <option value="cohost">{t('podcast.launchpad.format.cohost', 'Co-host')}</option>
+            <option value="story">{t('podcast.launchpad.format.story', 'Storytelling')}</option>
           </select>
 
           <div
@@ -179,7 +179,7 @@ export default function PodcastLaunchpad() {
                     : 'pointer',
               }}
             >
-              {loading ? 'Generating...' : 'Generate Podcast Sketch'}
+              {loading ? t('podcast.launchpad.cta.loading', 'Generating...') : t('podcast.launchpad.cta.generate', 'Generate Podcast Sketch')}
             </button>
             {(sketch || error) && <ResetButton onReset={reset} />}
 
@@ -199,7 +199,7 @@ export default function PodcastLaunchpad() {
                     cursor: 'pointer',
                   }}
                 >
-                  Create Podcast Page
+                  {t('podcast.launchpad.cta.createPage', 'Create Podcast Page')}
                 </button>
 
                 <button
@@ -216,7 +216,7 @@ export default function PodcastLaunchpad() {
                     cursor: 'pointer',
                   }}
                 >
-                  Open Podcast Studio
+                  {t('podcast.launchpad.cta.openStudio', 'Open Podcast Studio')}
                 </button>
               </>
             )}
@@ -232,13 +232,13 @@ export default function PodcastLaunchpad() {
               gap: 20,
             }}
           >
-            <Card title="🎙️ Podcast Names" items={sketch.showNames} />
-            <Card title="📝 Description" text={sketch.showDescription} />
-            <Card title="👥 Audience" text={sketch.targetAudience} />
-            <Card title="🎬 First Episodes" items={sketch.firstEpisodes} />
-            <Card title="🎤 Intro Script" text={sketch.introScript} />
-            <Card title="✅ Launch Checklist" items={sketch.launchChecklist} />
-            <Card title="➡️ Next Step" text={sketch.nextStep} />
+            <Card title={t('podcast.launchpad.cards.names', '🎙️ Podcast Names')} items={sketch.showNames} />
+            <Card title={t('podcast.launchpad.cards.description', '📝 Description')} text={sketch.showDescription} />
+            <Card title={t('podcast.launchpad.cards.audience', '👥 Audience')} text={sketch.targetAudience} />
+            <Card title={t('podcast.launchpad.cards.episodes', '🎬 First Episodes')} items={sketch.firstEpisodes} />
+            <Card title={t('podcast.launchpad.cards.intro', '🎤 Intro Script')} text={sketch.introScript} />
+            <Card title={t('podcast.launchpad.cards.checklist', '✅ Launch Checklist')} items={sketch.launchChecklist} />
+            <Card title={t('podcast.launchpad.cards.next', '➡️ Next Step')} text={sketch.nextStep} />
           </div>
         )}
       </div>

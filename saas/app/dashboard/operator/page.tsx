@@ -7,6 +7,8 @@ export default function OperatorPage() {
   const [request, setRequest] = useState('A high-end rooftop cocktail bar in Rio with bottle service and DJ nights')
   const [content, setContent] = useState<SitePreviewContent | null>(null)
   const [liveUrl, setLiveUrl] = useState<string | null>(null)
+  const [planId, setPlanId] = useState<string | null>(null)
+  const [jobId, setJobId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [message, setMessage] = useState('')
@@ -14,14 +16,27 @@ export default function OperatorPage() {
   async function generate() {
     setLoading(true); setMessage(''); setLiveUrl(null); setContent(null)
     try {
-      const res = await fetch('/api/sites/generate', {
+      const res = await fetch('/api/operator/plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description: request }),
+        body: JSON.stringify({ request }),
       })
       const data = await res.json()
-      if (!res.ok) setMessage(data.error || 'Could not generate the website.')
-      else setContent(data.content)
+      if (!res.ok) setMessage(data.error || 'Could not generate the plan.')
+      else { setPlanId(data.plan?.id || null); setContent({
+        businessName: 'Operator Plan',
+        headline: data.plan?.summary || 'Planned update',
+        subheadline: data.plan?.steps?.map((s: any) => `• ${s.title}`).join('\n') || '',
+        ctaText: 'Approve update',
+        sections: (data.plan?.steps || []).map((step: any, i: number) => ({
+          id: String(i),
+          type: 'features',
+          title: step.title,
+          body: step.description || '',
+          bullets: step.files || [],
+        })),
+        theme: 'dark',
+      } as any) }
     } catch {
       setMessage('Could not connect. Please try again.')
     } finally {
@@ -33,14 +48,14 @@ export default function OperatorPage() {
     if (!content) return
     setPublishing(true); setMessage('')
     try {
-      const res = await fetch('/api/sites/publish', {
+      const res = await fetch('/api/operator/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ planId, approved: true }),
       })
       const data = await res.json()
       if (!res.ok) setMessage(data.error || 'Could not publish the website.')
-      else { setLiveUrl(data.url || null); setMessage(data.userMessage || 'Your website is live.') }
+      else { setJobId(data.job?.id || null); setLiveUrl('/dashboard/operator'); setMessage(data.userMessage || 'Update published.') }
     } catch {
       setMessage('Could not connect. Please try again.')
     } finally {

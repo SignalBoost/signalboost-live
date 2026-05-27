@@ -24,6 +24,11 @@ function makeT(dict: any) {
   }
 }
 
+// Tiny interpolation helper for {placeholders}.
+function interpolate(template: string, values: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? ''))
+}
+
 export default function BuilderPage() {
   const { dict, lang } = useI18n()
   const t = makeT(dict)
@@ -48,6 +53,7 @@ export default function BuilderPage() {
   const [messages, setMessages] = useState<{ role: string; content: string }[]>([])
   const [loading, setLoading] = useState(false)
   const [userName, setUserName] = useState('')
+  const [userPlan, setUserPlan] = useState('free')
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -77,14 +83,13 @@ export default function BuilderPage() {
           messages: newMessages,
           context: {
             userName,
-            currentPage: t('builder.ai.currentPage', 'Site Builder'),
-            userPlan: t('builder.ai.userPlan', 'free'),
+            // System context to the AI stays in English so the model parses it
+            // reliably. The AI's user-facing reply still respects the `language`
+            // field below and replies in the user's selected language.
+            currentPage: 'Site Builder',
+            userPlan,
             language: lang,
-            task: t('builder.ai.taskContext', 'Building a {template} website called "{businessName}". Description: {businessDesc}. Languages: {languages}.')
-              .replace('{template}', template)
-              .replace('{businessName}', businessName)
-              .replace('{businessDesc}', businessDesc)
-              .replace('{languages}', languages.join(', ')),
+            task: `Building a "${template}" website called "${businessName}". Description: ${businessDesc}. Site languages: ${languages.join(', ')}.`,
           },
         }),
       })
@@ -111,40 +116,24 @@ export default function BuilderPage() {
   async function startBuilding() {
     setStep('building')
 
-    const langWord =
-      languages.length > 1
-        ? t('languages', 'languages')
-        : t('language', 'language')
+    // ONE full-sentence template per case, with {name}/{businessName}/{count}
+    // interpolation. Locale JSON files provide grammatically natural
+    // sentences per language — no fragment concatenation. English fallbacks
+    // here so the page works even if the keys are missing from a locale.
+    const isMultilingual = languages.length > 1
+    const greetingKey = isMultilingual ? 'builder.firstMessage.multilingual' : 'builder.firstMessage.single'
+    const englishFallback = isMultilingual
+      ? 'Great{nameWithSpace}! I am building your website for "{businessName}" in {count} languages.\n\nHere is what I am creating:\n\n✓ Homepage with your business info\n✓ About section\n✓ Contact details\n✓ Content in multiple languages\n\nTell me more about your business — the more details you give me, the better your site will be.'
+      : 'Great{nameWithSpace}! I am building your website for "{businessName}".\n\nHere is what I am creating:\n\n✓ Homepage with your business info\n✓ About section\n✓ Contact details\n✓ Content in your chosen language\n\nTell me more about your business — the more details you give me, the better your site will be.'
 
-    const singleLanguageName =
-      LANGS.find((item) => item.code === languages[0])?.nameKey
-        ? t(
-            LANGS.find((item) => item.code === languages[0])!.nameKey,
-            LANGS.find((item) => item.code === languages[0])!.fallback
-          )
-        : t('builder.lang.en', 'English')
+    const template = t(greetingKey, englishFallback)
+    const firstMessage = interpolate(template, {
+      nameWithSpace: userName ? ` ${userName}` : '',
+      businessName,
+      count: languages.length,
+    })
 
-    const contentBlock =
-      languages.length > 1
-        ? t('multilingualContent', 'Content in multiple languages')
-        : t('singleLanguageContent', '{language} content').replace('{language}', singleLanguageName)
-
-    setMessages([
-      {
-        role: 'assistant',
-        content:
-          `${t('builderGreat', 'Great')}${userName ? ' ' + userName : ''}! ` +
-          `${t('builderStarting', 'I am building your website for')} "${businessName}" ` +
-          `${t('builderLanguageCount', 'in')} ${languages.length} ` +
-          `${langWord}.\n\n` +
-          `${t('builderCreating', 'Here is what I am creating')}:\n\n` +
-          `✓ ${t('homepageBusinessInfo', 'Homepage with your business info')}\n` +
-          `✓ ${t('aboutSection', 'About section')}\n` +
-          `✓ ${t('contactDetails', 'Contact details')}\n` +
-          `✓ ${contentBlock}\n\n` +
-          `${t('builderMoreDetails', 'Tell me more about your business — the more details you give me, the better your site will be.')}`,
-      },
-    ])
+    setMessages([{ role: 'assistant', content: firstMessage }])
   }
 
   return (
@@ -171,24 +160,11 @@ export default function BuilderPage() {
         }}
       >
         <div>
-          <h1
-            style={{
-              fontSize: 24,
-              fontWeight: 900,
-              margin: 0,
-              letterSpacing: '-0.02em',
-            }}
-          >
+          <h1 style={{ fontSize: 24, fontWeight: 900, margin: 0, letterSpacing: '-0.02em' }}>
             🌐 {t('buildWebsite', 'Site builder')}
           </h1>
 
-          <p
-            style={{
-              fontSize: 13,
-              color: 'var(--text-muted)',
-              marginTop: 6,
-            }}
-          >
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6 }}>
             {t('builderSubline', 'Tell me about your business and I will build your multilingual website automatically.')}
           </p>
         </div>
@@ -217,38 +193,19 @@ export default function BuilderPage() {
             {t('siteTypeQuestion', 'What kind of site do you need?')}
           </h2>
 
-          <p
-            style={{
-              fontSize: 13,
-              color: 'var(--text-muted)',
-              marginBottom: 24,
-            }}
-          >
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>
             {t('chooseStartingPoint', 'Choose a starting point — you can customize everything after.')}
           </p>
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: 12,
-            }}
-          >
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
             {TEMPLATES.map(tpl => (
               <div
                 key={tpl.id}
-                onClick={() => {
-                  setTemplate(tpl.id)
-                  setStep('info')
-                }}
+                onClick={() => { setTemplate(tpl.id); setStep('info') }}
                 style={{
-                  padding: '24px 20px',
-                  borderRadius: 16,
-                  cursor: 'pointer',
-                  background: 'var(--surface-1)',
-                  border: '1px solid var(--border-medium)',
-                  transition: 'all 0.15s',
-                  textAlign: 'center',
+                  padding: '24px 20px', borderRadius: 16, cursor: 'pointer',
+                  background: 'var(--surface-1)', border: '1px solid var(--border-medium)',
+                  transition: 'all 0.15s', textAlign: 'center',
                 }}
                 onMouseEnter={e => {
                   e.currentTarget.style.background = 'rgba(59,130,246,0.08)'
@@ -271,94 +228,48 @@ export default function BuilderPage() {
           </div>
         </div>
       )}
+
       {step === 'info' && (
         <div style={{ maxWidth: 560, animation: 'fadeIn 0.3s ease-out' }}>
           <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
             {t('tellBusiness', 'Tell me about your business')}
           </h2>
 
-          <p
-            style={{
-              fontSize: 13,
-              color: 'var(--text-muted)',
-              marginBottom: 28,
-            }}
-          >
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 28 }}>
             {t('aiWillGenerate', 'The AI will use this to generate your entire site automatically.')}
           </p>
 
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 16,
-              marginBottom: 28,
-            }}
-          >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 28 }}>
             <div>
-              <label
-                style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: 'var(--text-secondary)',
-                  display: 'block',
-                  marginBottom: 8,
-                }}
-              >
+              <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 8 }}>
                 {t('businessName', 'Business name')} *
               </label>
-
               <input
                 value={businessName}
                 onChange={e => setBusinessName(e.target.value)}
                 placeholder={t('businessNameExample', "e.g. Maria's Bakery")}
                 style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  borderRadius: 10,
-                  background: 'var(--surface-3)',
-                  border: '1px solid var(--border-medium)',
-                  color: '#fff',
-                  fontSize: 14,
-                  outline: 'none',
-                  boxSizing: 'border-box',
+                  width: '100%', padding: '12px 14px', borderRadius: 10,
+                  background: 'var(--surface-3)', border: '1px solid var(--border-medium)',
+                  color: '#fff', fontSize: 14, outline: 'none', boxSizing: 'border-box',
                 }}
               />
             </div>
 
             <div>
-              <label
-                style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: 'var(--text-secondary)',
-                  display: 'block',
-                  marginBottom: 8,
-                }}
-              >
+              <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 8 }}>
                 {t('describeBusiness', 'Describe your business')}
               </label>
-
               <textarea
                 value={businessDesc}
                 onChange={e => setBusinessDesc(e.target.value)}
-                placeholder={t(
-                  'businessDescriptionExample',
-                  'e.g. We sell handmade Portuguese pastries in Lisbon. We are open Monday to Saturday 7am-6pm. We also do custom orders for events.'
-                )}
+                placeholder={t('businessDescriptionExample', 'e.g. We sell handmade Portuguese pastries in Lisbon. We are open Monday to Saturday 7am-6pm. We also do custom orders for events.')}
                 rows={4}
                 style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  borderRadius: 10,
-                  background: 'var(--surface-3)',
-                  border: '1px solid var(--border-medium)',
-                  color: '#fff',
-                  fontSize: 14,
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  resize: 'vertical',
-                  fontFamily: 'system-ui',
+                  width: '100%', padding: '12px 14px', borderRadius: 10,
+                  background: 'var(--surface-3)', border: '1px solid var(--border-medium)',
+                  color: '#fff', fontSize: 14, outline: 'none', boxSizing: 'border-box',
+                  resize: 'vertical', fontFamily: 'system-ui',
                 }}
               />
             </div>
@@ -368,13 +279,9 @@ export default function BuilderPage() {
             <button
               onClick={() => setStep('template')}
               style={{
-                background: 'var(--surface-2)',
-                color: 'var(--text-muted)',
-                fontSize: 14,
-                padding: '12px 24px',
-                borderRadius: 999,
-                border: '1px solid var(--border-medium)',
-                cursor: 'pointer',
+                background: 'var(--surface-2)', color: 'var(--text-muted)',
+                fontSize: 14, padding: '12px 24px', borderRadius: 999,
+                border: '1px solid var(--border-medium)', cursor: 'pointer',
               }}
             >
               ← {t('back', 'Back')}
@@ -384,14 +291,9 @@ export default function BuilderPage() {
               onClick={() => businessName && setStep('languages')}
               disabled={!businessName}
               style={{
-                background: businessName ? BLUE : 'var(--surface-2)',
-                color: '#fff',
-                fontWeight: 800,
-                fontSize: 14,
-                padding: '12px 32px',
-                borderRadius: 999,
-                border: 'none',
-                cursor: businessName ? 'pointer' : 'default',
+                background: businessName ? BLUE : 'var(--surface-2)', color: '#fff',
+                fontWeight: 800, fontSize: 14, padding: '12px 32px', borderRadius: 999,
+                border: 'none', cursor: businessName ? 'pointer' : 'default',
                 opacity: businessName ? 1 : 0.5,
               }}
             >
@@ -412,34 +314,28 @@ export default function BuilderPage() {
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
-            {LANGS.map(lang => (
+            {LANGS.map(item => (
               <div
-                key={lang.code}
+                key={item.code}
                 onClick={() =>
                   setLanguages(prev =>
-                    prev.includes(lang.code) && prev.length > 1
-                      ? prev.filter(l => l !== lang.code)
-                      : prev.includes(lang.code)
+                    prev.includes(item.code) && prev.length > 1
+                      ? prev.filter(l => l !== item.code)
+                      : prev.includes(item.code)
                         ? prev
-                        : [...prev, lang.code]
+                        : [...prev, item.code]
                   )
                 }
                 style={{
-                  padding: '14px 20px',
-                  borderRadius: 12,
-                  cursor: 'pointer',
-                  background: languages.includes(lang.code)
-                    ? 'rgba(59,130,246,0.1)'
-                    : 'var(--surface-1)',
-                  border: `1px solid ${languages.includes(lang.code) ? BLUE : 'var(--border-medium)'}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 14,
+                  padding: '14px 20px', borderRadius: 12, cursor: 'pointer',
+                  background: languages.includes(item.code) ? 'rgba(59,130,246,0.1)' : 'var(--surface-1)',
+                  border: `1px solid ${languages.includes(item.code) ? BLUE : 'var(--border-medium)'}`,
+                  display: 'flex', alignItems: 'center', gap: 14,
                 }}
               >
-                <span style={{ fontSize: 24 }}>{lang.flag}</span>
-                <span style={{ fontSize: 14, fontWeight: 600 }}>{t(lang.nameKey, lang.fallback)}</span>
-                {languages.includes(lang.code) && (
+                <span style={{ fontSize: 24 }}>{item.flag}</span>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{t(item.nameKey, item.fallback)}</span>
+                {languages.includes(item.code) && (
                   <span style={{ marginLeft: 'auto', color: BLUE, fontWeight: 700 }}>✓</span>
                 )}
               </div>
@@ -449,20 +345,19 @@ export default function BuilderPage() {
           <div style={{ fontSize: 12, color: 'var(--text-faint)', marginBottom: 24 }}>
             {languages.length === 1
               ? t('freePlanOneLanguage', 'Free plan: 1 language included')
-              : `${languages.length} ${t('languagesSelected', 'languages selected — requires Starter plan or above')}`}
+              : interpolate(
+                  t('languagesSelectedFull', '{count} languages selected — requires Starter plan or above'),
+                  { count: languages.length }
+                )}
           </div>
 
           <div style={{ display: 'flex', gap: 12 }}>
             <button
               onClick={() => setStep('info')}
               style={{
-                background: 'var(--surface-2)',
-                color: 'var(--text-muted)',
-                fontSize: 14,
-                padding: '12px 24px',
-                borderRadius: 999,
-                border: '1px solid var(--border-medium)',
-                cursor: 'pointer',
+                background: 'var(--surface-2)', color: 'var(--text-muted)',
+                fontSize: 14, padding: '12px 24px', borderRadius: 999,
+                border: '1px solid var(--border-medium)', cursor: 'pointer',
               }}
             >
               ← {t('back', 'Back')}
@@ -471,14 +366,8 @@ export default function BuilderPage() {
             <button
               onClick={startBuilding}
               style={{
-                background: GOLD,
-                color: '#000',
-                fontWeight: 800,
-                fontSize: 14,
-                padding: '12px 32px',
-                borderRadius: 999,
-                border: 'none',
-                cursor: 'pointer',
+                background: GOLD, color: '#000', fontWeight: 800, fontSize: 14,
+                padding: '12px 32px', borderRadius: 999, border: 'none', cursor: 'pointer',
               }}
             >
               {t('buildMySite', 'Build my site')} →
@@ -492,30 +381,19 @@ export default function BuilderPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20 }}>
             <div
               style={{
-                background: 'var(--surface-1)',
-                border: '1px solid var(--border-medium)',
-                borderRadius: 16,
-                padding: 24,
-                minHeight: 500,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
+                background: 'var(--surface-1)', border: '1px solid var(--border-medium)',
+                borderRadius: 16, padding: 24, minHeight: 500,
+                display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center',
               }}
             >
               <div style={{ fontSize: 48, marginBottom: 16 }}>🌐</div>
               <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{businessName}</div>
 
-              <div
-                style={{
-                  fontSize: 13,
-                  color: 'var(--text-muted)',
-                  marginBottom: 24,
-                  textAlign: 'center',
-                  maxWidth: 300,
-                  lineHeight: 1.6,
-                }}
-              >
+              <div style={{
+                fontSize: 13, color: 'var(--text-muted)', marginBottom: 24,
+                textAlign: 'center', maxWidth: 300, lineHeight: 1.6,
+              }}>
                 {t('siteBeingBuilt', 'Your site is being built. Tell the AI more about your business in the chat to customize it.')}
               </div>
 
@@ -526,12 +404,9 @@ export default function BuilderPage() {
                     <div
                       key={l}
                       style={{
-                        padding: '6px 14px',
-                        borderRadius: 999,
-                        background: 'rgba(59,130,246,0.1)',
-                        border: '1px solid rgba(59,130,246,0.2)',
-                        fontSize: 12,
-                        fontWeight: 600,
+                        padding: '6px 14px', borderRadius: 999,
+                        background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)',
+                        fontSize: 12, fontWeight: 600,
                       }}
                     >
                       {selectedLang.flag} {t(selectedLang.nameKey, selectedLang.fallback)}
@@ -543,63 +418,33 @@ export default function BuilderPage() {
 
             <div
               style={{
-                background: 'var(--surface-1)',
-                border: '1px solid var(--border-medium)',
-                borderRadius: 16,
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-                height: 560,
+                background: 'var(--surface-1)', border: '1px solid var(--border-medium)',
+                borderRadius: 16, display: 'flex', flexDirection: 'column',
+                overflow: 'hidden', height: 560,
               }}
             >
-              <div
-                style={{
-                  padding: '14px 16px',
-                  borderBottom: '1px solid var(--border-soft)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                }}
-              >
+              <div style={{
+                padding: '14px 16px', borderBottom: '1px solid var(--border-soft)',
+                display: 'flex', alignItems: 'center', gap: 10,
+              }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#4ade80' }} />
                 <span style={{ fontSize: 13, fontWeight: 700 }}>
                   {t('aiBuilderAssistant', 'AI Builder Assistant')}
                 </span>
               </div>
 
-              <div
-                style={{
-                  flex: 1,
-                  overflowY: 'auto',
-                  padding: 16,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 12,
-                }}
-              >
+              <div style={{
+                flex: 1, overflowY: 'auto', padding: 16,
+                display: 'flex', flexDirection: 'column', gap: 12,
+              }}>
                 {messages.map((msg, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: 'flex',
-                      justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                    }}
-                  >
-                    <div
-                      style={{
-                        maxWidth: '85%',
-                        padding: '10px 14px',
-                        fontSize: 13,
-                        lineHeight: 1.55,
-                        whiteSpace: 'pre-wrap',
-                        borderRadius:
-                          msg.role === 'user'
-                            ? '16px 16px 4px 16px'
-                            : '16px 16px 16px 4px',
-                        background: msg.role === 'user' ? BLUE : 'var(--surface-2)',
-                        border: msg.role === 'assistant' ? '1px solid var(--border-soft)' : 'none',
-                      }}
-                    >
+                  <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                    <div style={{
+                      maxWidth: '85%', padding: '10px 14px', fontSize: 13, lineHeight: 1.55, whiteSpace: 'pre-wrap',
+                      borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                      background: msg.role === 'user' ? BLUE : 'var(--surface-2)',
+                      border: msg.role === 'assistant' ? '1px solid var(--border-soft)' : 'none',
+                    }}>
                       {msg.content}
                     </div>
                   </div>
@@ -607,55 +452,36 @@ export default function BuilderPage() {
 
                 {loading && (
                   <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                    <div
-                      style={{
-                        padding: '10px 14px',
-                        borderRadius: '16px 16px 16px 4px',
-                        background: 'var(--surface-2)',
-                        border: '1px solid var(--border-soft)',
-                        display: 'flex',
-                        gap: 4,
-                      }}
-                    >
+                    <div style={{
+                      padding: '10px 14px', borderRadius: '16px 16px 16px 4px',
+                      background: 'var(--surface-2)', border: '1px solid var(--border-soft)',
+                      display: 'flex', gap: 4,
+                    }}>
                       {[0, 1, 2].map(i => (
-                        <div
-                          key={i}
-                          style={{
-                            width: 6,
-                            height: 6,
-                            borderRadius: '50%',
-                            background: 'var(--text-muted)',
-                            animation: `pulseDots 1s ease-in-out ${i * 0.15}s infinite`,
-                          }}
-                        />
+                        <div key={i} style={{
+                          width: 6, height: 6, borderRadius: '50%',
+                          background: 'var(--text-muted)',
+                          animation: `pulseDots 1s ease-in-out ${i * 0.15}s infinite`,
+                        }} />
                       ))}
                     </div>
                   </div>
                 )}
               </div>
 
-              <div
-                style={{
-                  padding: '12px 14px',
-                  borderTop: '1px solid var(--border-soft)',
-                  display: 'flex',
-                  gap: 8,
-                }}
-              >
+              <div style={{
+                padding: '12px 14px', borderTop: '1px solid var(--border-soft)',
+                display: 'flex', gap: 8,
+              }}>
                 <input
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && sendMessage()}
-                  placeholder={t('tellMeMore', 'Tell me more about your business...')}
+                  placeholder={t('tellMeMore', 'Tell me more about your business…')}
                   style={{
-                    flex: 1,
-                    padding: '9px 12px',
-                    borderRadius: 8,
-                    background: 'var(--surface-3)',
-                    border: '1px solid var(--border-medium)',
-                    color: '#fff',
-                    fontSize: 13,
-                    outline: 'none',
+                    flex: 1, padding: '9px 12px', borderRadius: 8,
+                    background: 'var(--surface-3)', border: '1px solid var(--border-medium)',
+                    color: '#fff', fontSize: 13, outline: 'none',
                   }}
                 />
 
@@ -663,14 +489,9 @@ export default function BuilderPage() {
                   onClick={() => sendMessage()}
                   disabled={!input.trim() || loading}
                   style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 8,
+                    width: 36, height: 36, borderRadius: 8,
                     background: input.trim() && !loading ? BLUE : 'var(--surface-2)',
-                    border: 'none',
-                    color: '#fff',
-                    cursor: 'pointer',
-                    fontSize: 16,
+                    border: 'none', color: '#fff', cursor: 'pointer', fontSize: 16,
                   }}
                 >
                   ↑

@@ -3,7 +3,11 @@ import { NextRequest, NextResponse } from 'next/server'
 
 type SupportMessage = { role?: 'user' | 'assistant' | 'system'; content?: string }
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) return null
+  return new OpenAI({ apiKey })
+}
 
 const LANGUAGE_LABELS: Record<string, string> = {
   en: 'English',
@@ -31,6 +35,11 @@ export async function POST(req: NextRequest) {
     }
 
     if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json({ error: 'AI backend is not configured.' }, { status: 500 })
+    }
+
+    const openai = getOpenAIClient()
+    if (!openai) {
       return NextResponse.json({ error: 'AI backend is not configured.' }, { status: 500 })
     }
 

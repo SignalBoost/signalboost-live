@@ -43,20 +43,6 @@
   --red: #ef4444;
 }
 
-/* Utility class — apply to any container that needs to sit cleanly
-   above the mesh. Adds a subtle backdrop blur + dark wash so the
-   colored mesh fog does not leak through.                       */
-.sb-card {
-  background: var(--surface-1);
-  border: 1px solid var(--border-soft);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
-.sb-card:hover {
-  border-color: var(--border-medium);
-}
-
 .sb-input {
   background: var(--surface-3);
   border: 1px solid var(--border-medium);
@@ -84,3 +70,27 @@
   0%, 100% { transform: translate(0, 0) scale(1); }
   50%      { transform: translate(-6vw, -4vh) scale(1.1); }
 }
+
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, sans-serif;
+  background: linear-gradient(180deg, #07080f 0%, #0a0b14 48%, #090b12 100%);
+  color: #fff;
+}
+
+.hero-layout {
+  min-height: 100vh;
+  padding: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.hero-layout h1 { font-size: clamp(42px, 6vw, 76px); font-weight: 900; margin: 0; }
+.hero-layout h2 { font-size: clamp(28px, 4vw, 48px); font-weight: 700; color: #dbe3ff; margin-top: 20px; }
+.hero-layout p { color: #dbe3ff; max-width: 720px; line-height: 1.6; }
+.hero-panel { background: rgba(255,255,255,.05); border-radius: 16px; padding: 24px; backdrop-filter: blur(8px); }
+.hero-buttons { display:flex; gap:12px; margin-top:24px; flex-wrap:wrap; }
+.hero-feature { background: rgba(255,255,255,.05); padding: 12px; border-radius: 12px; color: #dbe3ff; }

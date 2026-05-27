@@ -177,7 +177,7 @@ export default function Concierge() {
       </button>
 
       {open && (
-        <div className="sb-card" style={{ position: 'fixed', right: 24, bottom: 100, zIndex: 999999, width: 420, maxWidth: 'calc(100vw - 30px)', padding: 20, color: 'white', borderRadius: 24 }}>
+        <div className="hero-panel" style={{ position: 'fixed', right: 24, bottom: 100, zIndex: 999999, width: 420, maxWidth: 'calc(100vw - 30px)', padding: 20, color: 'white', borderRadius: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div>
               <div style={{ color: 'var(--text-faint)', fontSize: 12 }}>SignalBoost</div>

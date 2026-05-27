@@ -73,7 +73,7 @@ export default function OperatorPage() {
 
   return (
     <main className="sb-page" style={{ maxWidth: 980 }}>
-      <section className="sb-card" style={{ padding: 24 }}>
+      <section className="hero-panel" style={{ padding: 24 }}>
         <div className="sb-kicker">🤖 AI Website Operator</div>
         <h1 className="sb-title" style={{ marginBottom: 8 }}>Describe what you want to change</h1>
         <p className="sb-subtitle">No code needed. I will create a plan, show changes, ask approval, and then publish safely.</p>
@@ -94,7 +94,7 @@ export default function OperatorPage() {
       </section>
 
       {plan && (
-        <section className="sb-card" style={{ marginTop: 16, padding: 22 }}>
+        <section className="hero-panel" style={{ marginTop: 16, padding: 22 }}>
           <h2 style={{ color: '#fff' }}>Review changes</h2>
           <p style={{ color: 'var(--text-secondary)' }}>{plan.summary}</p>
           {plan.clarificationQuestion && (
@@ -113,7 +113,7 @@ export default function OperatorPage() {
       )}
 
       {job && (
-        <section className="sb-card" style={{ marginTop: 16, padding: 20 }}>
+        <section className="hero-panel" style={{ marginTop: 16, padding: 20 }}>
           <h3 style={{ color: '#fff' }}>Publish status</h3>
           <p style={{ color: 'var(--text-secondary)' }}>State: <strong>{job.state}</strong></p>
           <p style={{ color: 'var(--text-secondary)' }}>{job.publishMessage}</p>

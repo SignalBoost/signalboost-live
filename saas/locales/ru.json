@@ -5,6 +5,7 @@
   "podcasters": "Подкастеры",
   "dashboard": "Панель",
   "pricing": "Цены",
+  "reset": "Начать заново",
   "docs": {
     "label": "Документация",
     "searchPlaceholder": "Поиск в документации...",
@@ -186,7 +187,12 @@
       "es": "Испанский",
       "pl": "Польский",
       "ru": "Русский"
-    }
+    },
+    "firstMessage": {
+      "single": "Отлично{nameWithSpace}! Я создаю ваш сайт для \"{businessName}\".\n\nВот что я создаю:\n\n✓ Главная страница с информацией о вашем бизнесе\n✓ Раздел \"О нас\"\n✓ Контактные данные\n✓ Контент на выбранном языке\n\nРасскажите мне больше о своём бизнесе — чем больше деталей вы дадите, тем лучше будет ваш сайт.",
+      "multilingual": "Отлично{nameWithSpace}! Я создаю ваш сайт для \"{businessName}\" на {count} языках.\n\nВот что я создаю:\n\n✓ Главная страница с информацией о вашем бизнесе\n✓ Раздел \"О нас\"\n✓ Контактные данные\n✓ Контент на нескольких языках\n\nРасскажите мне больше о своём бизнесе — чем больше деталей вы дадите, тем лучше будет ваш сайт."
+    },
+    "languagesSelectedFull": "Выбрано {count} языков — требуется план Starter или выше"
   },
   "audio": {
     "pageTitle": "Аудио",
@@ -294,7 +300,7 @@
     }
   },
   "dash": {
-    "askPlaceholder": "Спросите SignalBoost о чём угодно...",
+    "askPlaceholder": "Спросите SignalBoost о чём угодно…",
     "askButton": "Спросить",
     "startHere": "Начните здесь",
     "continueWhere": "Продолжите с того места, где остановились",
@@ -307,9 +313,12 @@
     "lastEdited": "Изменено",
     "open": "Открыть",
     "team": "Команда",
-    "loadingTeam": "Загрузка команды...",
+    "loadingTeam": "Загрузка команды…",
     "feedback": "Поделитесь мнением — каждое сообщение помогает улучшать SignalBoost",
     "connectionError": "Проблема с подключением. Попробуйте снова.",
+    "sketch": {
+      "headlineFallback": "Ваш заголовок здесь"
+    },
     "actions": {
       "website": {
         "label": "Создать сайт",
@@ -369,17 +378,35 @@
       "russian": "РУССКИЙ"
     },
     "preview": {
-      "label": "ЖИВОЙ_ПРЕДПРОСМОТР",
-      "close": "ЗАКРЫТЬ",
-      "openInBuilder": "ОТКРЫТЬ_В_КОНСТРУКТОРЕ →",
-      "quickActions": "БЫСТРЫЕ_ДЕЙСТВИЯ",
-      "yourProjects": "ВАШИ_ПРОЕКТЫ",
-      "createProject": "+ СОЗДАТЬ_ПРОЕКТ",
-      "openProject": "ОТКРЫТЬ_ПРОЕКТ",
-      "updated": "ОБНОВЛЕНО",
-      "execute": "ОТПРАВИТЬ",
-      "thinking": "ДУМАЮ...",
-      "thinkingMsg": "SignalBoost думает..."
+      "label": "Живой предпросмотр",
+      "close": "Закрыть",
+      "openInBuilder": "Открыть в конструкторе →",
+      "quickActions": "Быстрые действия",
+      "yourProjects": "Ваши проекты",
+      "createProject": "+ Создать проект",
+      "openProject": "Открыть проект",
+      "updated": "Обновлено",
+      "execute": "Отправить",
+      "thinking": "Думаю…",
+      "thinkingMsg": "SignalBoost думает…"
+    },
+    "concierge": {
+      "title": "SignalBoost Concierge",
+      "loading": "Загружаем ваше рабочее пространство и проверяем, что требует внимания.",
+      "welcome": "Добро пожаловать. Начните с создания вашего первого проекта или спросите SignalBoost, что построить первым.",
+      "drafts": {
+        "one": "У вас 1 проект в черновике. Откройте его и опубликуйте, когда будете готовы.",
+        "many": "У вас {count} проектов в черновике. Откройте один и опубликуйте, когда будете готовы."
+      },
+      "live": {
+        "one": "У вас 1 проект в эфире. Следующий шаг: продвигайте, собирайте отзывы или создавайте контент.",
+        "many": "У вас {count} проектов в эфире. Следующий шаг: продвигайте, собирайте отзывы или создавайте контент."
+      },
+      "help": "Нужна помощь в выборе следующего шага? Спросите SignalBoost ниже.",
+      "askNext": "Следующий шаг"
+    },
+    "prompt": {
+      "nextAction": "Что мне делать дальше?"
     }
   },
   "auth": {
@@ -551,6 +578,22 @@
       "s4": {
         "title": "Публикуйте везде",
         "desc": "Скачайте свои многоязычные эпизоды или публикуйте прямо на сайте подкаста SignalBoost."
+      },
+      "step1": {
+        "title": "Загрузите свой эпизод",
+        "desc": "Принесите готовое аудио или видео."
+      },
+      "step2": {
+        "title": "Выберите выходы",
+        "desc": "Клипы, субтитры, языки, озвучка и заметки программы."
+      },
+      "step3": {
+        "title": "Команда ИИ работает",
+        "desc": "Агенты транскрипции, клипов, перевода и дистрибуции готовят материалы."
+      },
+      "step4": {
+        "title": "Публикуйте везде",
+        "desc": "Скачайте или подготовьте контент для каждого канала."
       }
     },
     "deliver": {
@@ -624,6 +667,33 @@
         "f9": "Доступ к API",
         "f10": "Выделенный менеджер аккаунта",
         "f11": "Гарантия SLA"
+      },
+      "networkEmailSubject": "SignalBoost Network Plan"
+    },
+    "deliverables": {
+      "voiceover": {
+        "title": "Нативная озвучка",
+        "desc": "Превратите один эпизод в естественные голосовые версии на нескольких языках."
+      },
+      "clips": {
+        "title": "Фабрика клипов",
+        "desc": "Найдите лучшие моменты и превратите их в Shorts, Reels и TikToks."
+      },
+      "captions": {
+        "title": "Субтитры",
+        "desc": "Создавайте субтитры, транскрипции и подписи для соцсетей автоматически."
+      },
+      "website": {
+        "title": "Сайт подкаста",
+        "desc": "Брендированный дом для эпизодов, заметок, отзывов и языков."
+      },
+      "distribution": {
+        "title": "Дистрибуция",
+        "desc": "Готовьте контент для YouTube, TikTok, Instagram, email и более."
+      },
+      "growth": {
+        "title": "Рост слушателей",
+        "desc": "Собирайте отзывы, рекомендации и сигналы аудитории."
       }
     }
   },
@@ -725,96 +795,150 @@
     }
   },
   "errors": {
-    "generationFailed": "Generation failed",
-    "networkError": "Network error",
-    "unauthorized": "Unauthorized"
+    "generationFailed": "Ошибка генерации",
+    "networkError": "Ошибка сети",
+    "unauthorized": "Не авторизован"
   },
   "api": {
-    "invalidJson": "Invalid JSON",
-    "promptRequired": "Prompt is required"
+    "invalidJson": "Недопустимый JSON",
+    "promptRequired": "Промпт обязателен"
   },
   "projects": {
-    "limitReached": "Project limit reached for your plan."
+    "limitReached": "Достигнут лимит проектов для вашего плана."
   },
   "actionRouter": {
-    "openWebsiteBuilder": "Open Website Builder",
-    "openReviewCollector": "Open Review Collector",
-    "openAudioStudio": "Open Audio Studio",
-    "openVideoStudio": "Open Video Studio",
-    "openSalesAgent": "Open Sales Agent",
-    "openSalesPipeline": "Open Sales Pipeline",
-    "answerInChat": "Answer in chat"
+    "openWebsiteBuilder": "Открыть конструктор сайтов",
+    "openReviewCollector": "Открыть сборщик отзывов",
+    "openAudioStudio": "Открыть аудиостудию",
+    "openVideoStudio": "Открыть видеостудию",
+    "openSalesAgent": "Открыть агента продаж",
+    "openSalesPipeline": "Открыть воронку продаж",
+    "answerInChat": "Ответить в чате"
   },
   "videoSearch": {
     "timeout": {
-      "generic": "Request timed out.",
-      "aiService": "AI service timed out.",
-      "intent": "Intent processing timed out.",
-      "script": "Script generation timed out.",
-      "search": "Video search timed out.",
-      "searchDetailed": "Video search timed out. Try a shorter request."
+      "generic": "Превышено время ожидания запроса.",
+      "aiService": "Превышено время ожидания службы ИИ.",
+      "intent": "Превышено время обработки намерения.",
+      "script": "Превышено время генерации сценария.",
+      "search": "Превышено время поиска видео.",
+      "searchDetailed": "Превышено время поиска видео. Попробуйте более короткий запрос."
     },
     "status": {
-      "searching": "Searching for videos...",
-      "searchingPromptMatch": "Searching for videos matching your prompt..."
+      "searching": "Поиск видео...",
+      "searchingPromptMatch": "Поиск видео, соответствующих вашему промпту..."
     },
     "errors": {
-      "generateScriptFailed": "Failed to generate script",
-      "searchFailed": "Search failed"
+      "generateScriptFailed": "Не удалось создать сценарий",
+      "searchFailed": "Поиск не удался"
     },
     "rights": {
-      "restricted": "All results are rights-restricted for this query.",
-      "embeddableOnly": "Only embeddable results were found."
+      "restricted": "Все результаты ограничены правами для этого запроса.",
+      "embeddableOnly": "Найдены только встраиваемые результаты."
     }
   },
   "videoGenerate": {
     "errors": {
-      "authRequired": "You must be signed in.",
-      "promptRequired": "Please enter a prompt.",
-      "imageRequired": "Please attach an image.",
-      "noCredits": "No video credits left this month.",
-      "creditCheckFailed": "Could not check your credits."
+      "authRequired": "Вы должны войти в систему.",
+      "promptRequired": "Пожалуйста, введите промпт.",
+      "imageRequired": "Пожалуйста, прикрепите изображение.",
+      "noCredits": "Не осталось видеокредитов в этом месяце.",
+      "creditCheckFailed": "Не удалось проверить ваши кредиты."
     },
     "defaults": {
-      "imagePrompt": "Add natural, subtle motion to this image."
+      "imagePrompt": "Добавьте естественное, лёгкое движение к этому изображению."
     }
   },
   "operator": {
-    "commitPrefix": "Website Operator update:",
+    "commitPrefix": "Обновление Оператора:",
     "errors": {
-      "requestRequired": "Please describe what you want to change.",
-      "planCreateFailed": "Could not create the plan right now.",
-      "planIdRequired": "Plan ID is required.",
-      "planNotFound": "Plan not found.",
-      "approvalRequired": "Approval required before applying changes.",
-      "applyFailed": "Could not apply approved update.",
-      "jobIdRequired": "Job ID is required.",
-      "jobNotFound": "Job not found.",
-      "rollbackUnavailable": "Rollback is not available for this update.",
-      "rollbackFailed": "Could not complete rollback.",
-      "statusNotFound": "Status not found."
+      "requestRequired": "Пожалуйста, опишите, что вы хотите изменить.",
+      "planCreateFailed": "Не удалось создать план сейчас.",
+      "plan": "Не удалось создать сайт.",
+      "publish": "Не удалось опубликовать сайт.",
+      "connect": "Не удалось подключиться. Попробуйте снова.",
+      "planIdRequired": "Требуется ID плана.",
+      "planNotFound": "План не найден.",
+      "approvalRequired": "Требуется одобрение перед применением изменений.",
+      "applyFailed": "Не удалось применить одобренное обновление.",
+      "jobIdRequired": "Требуется ID задачи.",
+      "jobNotFound": "Задача не найдена.",
+      "rollbackUnavailable": "Откат недоступен для этого обновления.",
+      "rollbackFailed": "Не удалось завершить откат.",
+      "statusNotFound": "Статус не найден."
     },
     "success": {
-      "published": "Changes published. Rollback is available.",
-      "approvedAndPublished": "Update approved and published with rollback point.",
-      "rollbackComplete": "Rollback complete. Previous version restored."
+      "published": "Ваш сайт в эфире.",
+      "approvedAndPublished": "Обновление одобрено и опубликовано с точкой отката.",
+      "rollbackComplete": "Откат завершён. Восстановлена предыдущая версия."
+    },
+    "title": {
+      "kicker": "Оператор сайтов с ИИ",
+      "main": "Опишите ваш сайт",
+      "subtitle": "Расскажите мне о вашем бизнесе. Я разработаю полный сайт — и вы сможете опубликовать его в один клик."
+    },
+    "input": {
+      "placeholder": "напр. Уютный итальянский ресторан в Москве с меню, нашей историей и кнопкой бронирования"
+    },
+    "cta": {
+      "design": "Создать мой сайт",
+      "designing": "Создаём…",
+      "regenerate": "Создать заново"
+    },
+    "publish": {
+      "hint": "Нравится? Опубликуйте по живому веб-адресу.",
+      "cta": "Опубликовать сайт",
+      "loading": "Публикация…"
+    },
+    "live": "Ваш сайт в эфире",
+    "preview": {
+      "liveLabel": "Живой предпросмотр",
+      "dark": "тёмный",
+      "light": "светлый",
+      "sections": "разделы",
+      "empty": "Ваш разработанный сайт появится здесь.",
+      "loading": "Создаём ваш сайт…"
     }
   },
   "reviews": {
     "errors": {
-      "unauthorized": "Unauthorized",
-      "missingSlug": "Missing slug",
-      "invalidNameLength": "Name must be 1-80 characters",
-      "invalidEmail": "Invalid email",
-      "invalidRating": "Rating must be 1-5",
-      "invalidContentLength": "Content must be 1-2000 characters",
-      "lookupFailed": "Lookup failed",
-      "notFound": "Not found",
-      "tooManySubmissions": "Too many submissions. Try again tomorrow.",
-      "reviewCapReached": "Not accepting more reviews on current plan.",
-      "saveFailed": "Could not save review",
-      "missingId": "Missing ID",
-      "approvedMustBeBoolean": "Approved must be boolean"
+      "unauthorized": "Не авторизован",
+      "missingSlug": "Отсутствует идентификатор",
+      "invalidNameLength": "Имя должно содержать от 1 до 80 символов",
+      "invalidEmail": "Недопустимый email",
+      "invalidRating": "Оценка должна быть от 1 до 5",
+      "invalidContentLength": "Содержимое должно быть от 1 до 2000 символов",
+      "lookupFailed": "Поиск не удался",
+      "notFound": "Не найдено",
+      "tooManySubmissions": "Слишком много отправок. Попробуйте снова завтра.",
+      "reviewCapReached": "Больше отзывов на текущем плане не принимается.",
+      "saveFailed": "Не удалось сохранить отзыв",
+      "missingId": "Отсутствует ID",
+      "approvedMustBeBoolean": "Одобрено должно быть булевым значением"
     }
+  },
+  "podcasters": {
+    "title": {
+      "fallback": "Ваш подкаст"
+    },
+    "episode": {
+      "fallback1": "Эпизод 1",
+      "fallback2": "Эпизод 2",
+      "fallback3": "Эпизод 3"
+    },
+    "badge": "Страница подкаста",
+    "subtitle": {
+      "fallback": "Эта страница станет публичным домом вашего подкаста."
+    },
+    "aboutShow": "О программе",
+    "description": {
+      "fallback": "Описание вашего подкаста, созданное в Launchpad, появится здесь."
+    },
+    "audience": "Аудитория",
+    "episodes": "Эпизоды",
+    "episodeLabel": "Эпизод {n}",
+    "host": "Ведущий",
+    "introScript": "Сценарий вступления",
+    "openStudio": "Открыть студию подкаста"
   }
 }

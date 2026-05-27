@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { useI18n } from "@/components/i18n/I18nProvider";
+import { t } from "@/lib/i18n/t";
 
 const PLAN_STYLES: Record<string, { label: string; bg: string; color: string }> = {
   free:     { label: "FREE",     bg: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)" },
@@ -10,6 +12,7 @@ const PLAN_STYLES: Record<string, { label: string; bg: string; color: string }> 
 };
 
 export default function Topbar() {
+  const { dict } = useI18n();
   const [name, setName] = useState<string | null>(null);
   const [plan, setPlan] = useState<string>("free");
   const [credits, setCredits] = useState<number>(0);
@@ -54,7 +57,7 @@ export default function Topbar() {
       }}
     >
       <span style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,195,0,0.95)", fontFamily: "monospace" }}>
-        ⚡ {credits} {credits === 1 ? "credit" : "credits"}
+        ⚡ {credits} {credits === 1 ? t(dict, "topbar.credit", "credit") : t(dict, "topbar.credits", "credits")}
       </span>
 
       <span
@@ -73,7 +76,7 @@ export default function Topbar() {
       </span>
 
       <span style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>
-        {name ?? "Account"}
+        {name ?? t(dict, "topbar.account", "Account")}
       </span>
     </header>
   );

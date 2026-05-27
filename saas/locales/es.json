@@ -5,6 +5,7 @@
   "podcasters": "Podcasters",
   "dashboard": "Panel",
   "pricing": "Precios",
+  "reset": "Empezar de nuevo",
   "docs": {
     "label": "Documentación",
     "searchPlaceholder": "Buscar en la documentación...",
@@ -180,18 +181,18 @@
         "desc": "Crea desde cero con ayuda de la IA"
       }
     },
-    "ai": {
-      "currentPage": "Site Builder",
-      "userPlan": "free",
-      "taskContext": "Building a {template} website called \"{businessName}\". Description: {businessDesc}. Languages: {languages}."
-    },
     "lang": {
       "en": "Inglés",
       "pt": "Portugués",
       "es": "Español",
       "pl": "Polaco",
       "ru": "Ruso"
-    }
+    },
+    "firstMessage": {
+      "single": "¡Genial{nameWithSpace}! Estoy creando tu sitio para \"{businessName}\".\n\nEsto es lo que estoy creando:\n\n✓ Página de inicio con la información de tu negocio\n✓ Sección \"Acerca de\"\n✓ Datos de contacto\n✓ Contenido en el idioma elegido\n\nCuéntame más sobre tu negocio — cuantos más detalles me des, mejor quedará tu sitio.",
+      "multilingual": "¡Genial{nameWithSpace}! Estoy creando tu sitio para \"{businessName}\" en {count} idiomas.\n\nEsto es lo que estoy creando:\n\n✓ Página de inicio con la información de tu negocio\n✓ Sección \"Acerca de\"\n✓ Datos de contacto\n✓ Contenido en varios idiomas\n\nCuéntame más sobre tu negocio — cuantos más detalles me des, mejor quedará tu sitio."
+    },
+    "languagesSelectedFull": "{count} idiomas seleccionados — requiere el plan Starter o superior"
   },
   "audio": {
     "pageTitle": "Audio",
@@ -299,7 +300,7 @@
     }
   },
   "dash": {
-    "askPlaceholder": "Pregúntale lo que sea a SignalBoost...",
+    "askPlaceholder": "Pregúntale lo que sea a SignalBoost…",
     "askButton": "Preguntar",
     "startHere": "Empieza aquí",
     "continueWhere": "Continúa donde lo dejaste",
@@ -312,9 +313,12 @@
     "lastEdited": "Editado",
     "open": "Abrir",
     "team": "Equipo",
-    "loadingTeam": "Cargando equipo...",
+    "loadingTeam": "Cargando equipo…",
     "feedback": "Comparte tu opinión — cada mensaje ayuda a mejorar SignalBoost",
     "connectionError": "Problema de conexión. Inténtalo de nuevo.",
+    "sketch": {
+      "headlineFallback": "Tu titular aquí"
+    },
     "actions": {
       "website": {
         "label": "Crear un sitio",
@@ -374,38 +378,35 @@
       "russian": "RUSO"
     },
     "preview": {
-      "label": "VISTA_EN_VIVO",
-      "close": "CERRAR",
-      "openInBuilder": "ABRIR_EN_CONSTRUCTOR →",
-      "quickActions": "ACCIONES_RÁPIDAS",
-      "yourProjects": "TUS_PROYECTOS",
-      "createProject": "+ CREAR_PROYECTO",
-      "openProject": "ABRIR_PROYECTO",
-      "updated": "ACTUALIZADO",
-      "execute": "ENVIAR",
-      "thinking": "PENSANDO...",
-      "thinkingMsg": "SignalBoost está pensando..."
+      "label": "Vista previa en vivo",
+      "close": "Cerrar",
+      "openInBuilder": "Abrir en el constructor →",
+      "quickActions": "Acciones rápidas",
+      "yourProjects": "Tus proyectos",
+      "createProject": "+ Crear proyecto",
+      "openProject": "Abrir proyecto",
+      "updated": "Actualizado",
+      "execute": "Enviar",
+      "thinking": "Pensando…",
+      "thinkingMsg": "SignalBoost está pensando…"
     },
     "concierge": {
       "title": "SignalBoost Concierge",
-      "loading": "Loading your workspace and checking what needs attention.",
-      "welcome": "Welcome. Start by creating your first project, or ask SignalBoost what to build first.",
+      "loading": "Cargando tu espacio de trabajo y revisando qué necesita atención.",
+      "welcome": "Bienvenido. Empieza creando tu primer proyecto, o pregúntale a SignalBoost qué construir primero.",
       "drafts": {
-        "one": "You have 1 draft project. Open one and publish when ready.",
-        "many": "You have {count} draft projects. Open one and publish when ready."
+        "one": "Tienes 1 proyecto en borrador. Ábrelo y publícalo cuando esté listo.",
+        "many": "Tienes {count} proyectos en borrador. Abre uno y publícalo cuando esté listo."
       },
       "live": {
-        "one": "You have 1 live project. Next step: promote, collect reviews, or create content.",
-        "many": "You have {count} live projects. Next step: promote, collect reviews, or create content."
+        "one": "Tienes 1 proyecto en vivo. Próximo paso: promover, recopilar reseñas o crear contenido.",
+        "many": "Tienes {count} proyectos en vivo. Próximo paso: promover, recopilar reseñas o crear contenido."
       },
-      "help": "Need help choosing the next move? Ask SignalBoost below.",
-      "askNext": "ASK_NEXT"
-    },
-    "ai": {
-      "currentPage": "Dashboard"
+      "help": "¿Necesitas ayuda para elegir el siguiente paso? Pregúntale a SignalBoost abajo.",
+      "askNext": "Siguiente paso"
     },
     "prompt": {
-      "nextAction": "What should I do next?"
+      "nextAction": "¿Qué debería hacer ahora?"
     }
   },
   "auth": {
@@ -637,20 +638,20 @@
         "desc": "Descarga tus episodios multilingües o publica directamente en tu sitio de podcast SignalBoost."
       },
       "step1": {
-        "title": "Upload your episode",
-        "desc": "Bring the finished audio or video."
+        "title": "Sube tu episodio",
+        "desc": "Trae el audio o video terminado."
       },
       "step2": {
-        "title": "Choose outputs",
-        "desc": "Clips, captions, languages, voiceover and show notes."
+        "title": "Elige salidas",
+        "desc": "Clips, subtítulos, idiomas, locución y notas del programa."
       },
       "step3": {
-        "title": "AI crew works",
-        "desc": "Transcript, clip, translation and distribution agents prepare assets."
+        "title": "El equipo de IA trabaja",
+        "desc": "Agentes de transcripción, clips, traducción y distribución preparan los activos."
       },
       "step4": {
-        "title": "Publish everywhere",
-        "desc": "Download or prepare content for every channel."
+        "title": "Publica en todas partes",
+        "desc": "Descarga o prepara contenido para cada canal."
       }
     },
     "deliver": {
@@ -729,28 +730,28 @@
     },
     "deliverables": {
       "voiceover": {
-        "title": "Native voiceover",
-        "desc": "Turn one episode into natural voice versions in multiple languages."
+        "title": "Locución nativa",
+        "desc": "Convierte un episodio en versiones de voz natural en varios idiomas."
       },
       "clips": {
-        "title": "Clip factory",
-        "desc": "Find the best moments and turn them into Shorts, Reels and TikToks."
+        "title": "Fábrica de clips",
+        "desc": "Encuentra los mejores momentos y conviértelos en Shorts, Reels y TikToks."
       },
       "captions": {
-        "title": "Captions",
-        "desc": "Generate subtitles, transcripts and social captions automatically."
+        "title": "Subtítulos",
+        "desc": "Genera subtítulos, transcripciones y captions sociales automáticamente."
       },
       "website": {
-        "title": "Podcast website",
-        "desc": "A branded home for episodes, show notes, reviews and languages."
+        "title": "Sitio de podcast",
+        "desc": "Un hogar con tu marca para episodios, notas, reseñas e idiomas."
       },
       "distribution": {
-        "title": "Distribution",
-        "desc": "Prepare content for YouTube, TikTok, Instagram, email and more."
+        "title": "Distribución",
+        "desc": "Prepara contenido para YouTube, TikTok, Instagram, email y más."
       },
       "growth": {
-        "title": "Listener growth",
-        "desc": "Collect reviews, testimonials and audience signals."
+        "title": "Crecimiento de oyentes",
+        "desc": "Recopila reseñas, testimonios y señales de audiencia."
       }
     }
   },
@@ -794,107 +795,150 @@
     }
   },
   "errors": {
-    "generationFailed": "Generation failed",
-    "networkError": "Network error",
-    "unauthorized": "Unauthorized"
+    "generationFailed": "Generación fallida",
+    "networkError": "Error de red",
+    "unauthorized": "No autorizado"
   },
   "api": {
-    "invalidJson": "Invalid JSON",
-    "promptRequired": "Prompt is required"
+    "invalidJson": "JSON inválido",
+    "promptRequired": "El prompt es obligatorio"
   },
   "projects": {
-    "limitReached": "Project limit reached for your plan."
+    "limitReached": "Límite de proyectos alcanzado para tu plan."
   },
   "actionRouter": {
-    "openWebsiteBuilder": "Open Website Builder",
-    "openReviewCollector": "Open Review Collector",
-    "openAudioStudio": "Open Audio Studio",
-    "openVideoStudio": "Open Video Studio",
-    "openSalesAgent": "Open Sales Agent",
-    "openSalesPipeline": "Open Sales Pipeline",
-    "answerInChat": "Answer in chat"
+    "openWebsiteBuilder": "Abrir constructor de sitios",
+    "openReviewCollector": "Abrir recolector de reseñas",
+    "openAudioStudio": "Abrir estudio de audio",
+    "openVideoStudio": "Abrir estudio de video",
+    "openSalesAgent": "Abrir agente de ventas",
+    "openSalesPipeline": "Abrir pipeline de ventas",
+    "answerInChat": "Responder en el chat"
   },
   "videoSearch": {
     "timeout": {
-      "generic": "Request timed out.",
-      "aiService": "AI service timed out.",
-      "intent": "Intent processing timed out.",
-      "script": "Script generation timed out.",
-      "search": "Video search timed out.",
-      "searchDetailed": "Video search timed out. Try a shorter request."
+      "generic": "Tiempo de solicitud agotado.",
+      "aiService": "Tiempo del servicio de IA agotado.",
+      "intent": "Tiempo de procesamiento de intención agotado.",
+      "script": "Tiempo de generación de guion agotado.",
+      "search": "Tiempo de búsqueda de video agotado.",
+      "searchDetailed": "Tiempo de búsqueda de video agotado. Intenta una solicitud más corta."
     },
     "status": {
-      "searching": "Searching for videos...",
-      "searchingPromptMatch": "Searching for videos matching your prompt..."
+      "searching": "Buscando videos...",
+      "searchingPromptMatch": "Buscando videos que coincidan con tu prompt..."
     },
     "errors": {
-      "generateScriptFailed": "Failed to generate script",
-      "searchFailed": "Search failed"
+      "generateScriptFailed": "Fallo al generar el guion",
+      "searchFailed": "Búsqueda fallida"
     },
     "rights": {
-      "restricted": "All results are rights-restricted for this query.",
-      "embeddableOnly": "Only embeddable results were found."
+      "restricted": "Todos los resultados tienen restricciones de derechos para esta consulta.",
+      "embeddableOnly": "Solo se encontraron resultados incorporables."
     }
   },
   "videoGenerate": {
     "errors": {
-      "authRequired": "You must be signed in.",
-      "promptRequired": "Please enter a prompt.",
-      "imageRequired": "Please attach an image.",
-      "noCredits": "No video credits left this month.",
-      "creditCheckFailed": "Could not check your credits."
+      "authRequired": "Debes iniciar sesión.",
+      "promptRequired": "Por favor, introduce un prompt.",
+      "imageRequired": "Por favor, adjunta una imagen.",
+      "noCredits": "No quedan créditos de video este mes.",
+      "creditCheckFailed": "No se pudieron comprobar tus créditos."
     },
     "defaults": {
-      "imagePrompt": "Add natural, subtle motion to this image."
+      "imagePrompt": "Añade movimiento natural y sutil a esta imagen."
     }
   },
   "operator": {
-    "commitPrefix": "Website Operator update:",
+    "commitPrefix": "Actualización del Operador:",
     "errors": {
-      "requestRequired": "Please describe what you want to change.",
-      "planCreateFailed": "Could not create the plan right now.",
-      "planIdRequired": "Plan ID is required.",
-      "planNotFound": "Plan not found.",
-      "approvalRequired": "Approval required before applying changes.",
-      "applyFailed": "Could not apply approved update.",
-      "jobIdRequired": "Job ID is required.",
-      "jobNotFound": "Job not found.",
-      "rollbackUnavailable": "Rollback is not available for this update.",
-      "rollbackFailed": "Could not complete rollback.",
-      "statusNotFound": "Status not found."
+      "requestRequired": "Por favor, describe qué quieres cambiar.",
+      "planCreateFailed": "No se pudo crear el plan ahora.",
+      "plan": "No se pudo generar el sitio.",
+      "publish": "No se pudo publicar el sitio.",
+      "connect": "No se pudo conectar. Inténtalo de nuevo.",
+      "planIdRequired": "Se requiere ID del plan.",
+      "planNotFound": "Plan no encontrado.",
+      "approvalRequired": "Se requiere aprobación antes de aplicar cambios.",
+      "applyFailed": "No se pudo aplicar la actualización aprobada.",
+      "jobIdRequired": "Se requiere ID del trabajo.",
+      "jobNotFound": "Trabajo no encontrado.",
+      "rollbackUnavailable": "La reversión no está disponible para esta actualización.",
+      "rollbackFailed": "No se pudo completar la reversión.",
+      "statusNotFound": "Estado no encontrado."
     },
     "success": {
-      "published": "Changes published. Rollback is available.",
-      "approvedAndPublished": "Update approved and published with rollback point.",
-      "rollbackComplete": "Rollback complete. Previous version restored."
+      "published": "Tu sitio está en vivo.",
+      "approvedAndPublished": "Actualización aprobada y publicada con punto de reversión.",
+      "rollbackComplete": "Reversión completa. Versión anterior restaurada."
+    },
+    "title": {
+      "kicker": "Operador de Sitios con IA",
+      "main": "Describe tu sitio",
+      "subtitle": "Cuéntame sobre tu negocio. Diseñaré un sitio completo — y podrás publicarlo en vivo con un clic."
     },
     "input": {
-      "defaultRequest": "A high-end rooftop cocktail bar in Rio with bottle service and DJ nights"
+      "placeholder": "ej. Un restaurante italiano acogedor en Madrid con menú, nuestra historia y botón de reservas"
     },
+    "cta": {
+      "design": "Diseñar mi sitio",
+      "designing": "Diseñando…",
+      "regenerate": "Regenerar"
+    },
+    "publish": {
+      "hint": "¿Te gusta? Publícalo en una dirección web en vivo.",
+      "cta": "Publicar sitio",
+      "loading": "Publicando…"
+    },
+    "live": "Tu sitio está en vivo",
     "preview": {
-      "liveLabel": "Live preview",
-      "dark": "dark",
-      "light": "light",
-      "sections": "sections",
-      "empty": "Your designed website will appear here.",
-      "loading": "Designing your website…"
+      "liveLabel": "Vista previa en vivo",
+      "dark": "oscuro",
+      "light": "claro",
+      "sections": "secciones",
+      "empty": "Tu sitio diseñado aparecerá aquí.",
+      "loading": "Diseñando tu sitio…"
     }
   },
   "reviews": {
     "errors": {
-      "unauthorized": "Unauthorized",
-      "missingSlug": "Missing slug",
-      "invalidNameLength": "Name must be 1-80 characters",
-      "invalidEmail": "Invalid email",
-      "invalidRating": "Rating must be 1-5",
-      "invalidContentLength": "Content must be 1-2000 characters",
-      "lookupFailed": "Lookup failed",
-      "notFound": "Not found",
-      "tooManySubmissions": "Too many submissions. Try again tomorrow.",
-      "reviewCapReached": "Not accepting more reviews on current plan.",
-      "saveFailed": "Could not save review",
-      "missingId": "Missing ID",
-      "approvedMustBeBoolean": "Approved must be boolean"
+      "unauthorized": "No autorizado",
+      "missingSlug": "Falta el identificador",
+      "invalidNameLength": "El nombre debe tener de 1 a 80 caracteres",
+      "invalidEmail": "Email inválido",
+      "invalidRating": "La puntuación debe ser de 1 a 5",
+      "invalidContentLength": "El contenido debe tener de 1 a 2000 caracteres",
+      "lookupFailed": "Búsqueda fallida",
+      "notFound": "No encontrado",
+      "tooManySubmissions": "Demasiados envíos. Inténtalo de nuevo mañana.",
+      "reviewCapReached": "No se aceptan más reseñas en el plan actual.",
+      "saveFailed": "No se pudo guardar la reseña",
+      "missingId": "Falta el ID",
+      "approvedMustBeBoolean": "Aprobado debe ser booleano"
     }
+  },
+  "podcasters": {
+    "title": {
+      "fallback": "Tu podcast"
+    },
+    "episode": {
+      "fallback1": "Episodio 1",
+      "fallback2": "Episodio 2",
+      "fallback3": "Episodio 3"
+    },
+    "badge": "Página del podcast",
+    "subtitle": {
+      "fallback": "Esta página será el hogar público de tu podcast."
+    },
+    "aboutShow": "Sobre el programa",
+    "description": {
+      "fallback": "La descripción de tu podcast generada en Launchpad aparecerá aquí."
+    },
+    "audience": "Audiencia",
+    "episodes": "Episodios",
+    "episodeLabel": "Episodio {n}",
+    "host": "Anfitrión",
+    "introScript": "Guion de introducción",
+    "openStudio": "Abrir estudio de podcast"
   }
 }

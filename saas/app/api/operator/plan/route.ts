@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Please describe what you want to change.' }, { status: 400 })
     }
 
-    const plan = buildPlan(request)
+    const plan = await buildPlan(request)
     operatorStore.plans.set(plan.id, plan)
 
     return NextResponse.json({ plan })

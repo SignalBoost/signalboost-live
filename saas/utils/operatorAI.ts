@@ -8,6 +8,6 @@ export function parseIntent(request: string) {
   return 'content'
 }
 
-export function generateOperatorPlan(request: string) {
+export async function generateOperatorPlan(request: string) {
   return buildPlan(request)
 }

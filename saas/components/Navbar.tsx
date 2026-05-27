@@ -131,6 +131,9 @@ export default function Navbar() {
     },
   ]
 
+  // Builder retired — "Build a website" now points to /dashboard/operator
+  // (the real working AI website creator). The standalone "AI Operator" tile
+  // is gone since it's redundant with this one.
   const toolLinks = [
     {
       icon: '📣',
@@ -141,7 +144,7 @@ export default function Navbar() {
     {
       icon: '🌐',
       label: t(dict, 'buildWebsite', 'Build a website'),
-      href: '/dashboard/builder',
+      href: '/dashboard/operator',
       featured: false,
     },
     {
@@ -166,12 +169,6 @@ export default function Navbar() {
       icon: '🧪',
       label: typeof dict?.lab === 'string' ? dict.lab : 'Lab',
       href: '/dashboard/lab',
-      featured: false,
-    },
-    {
-      icon: '🤖',
-      label: t(dict, 'navbar.aiOperator', 'AI Operator'),
-      href: '/dashboard/operator',
       featured: false,
     },
     {

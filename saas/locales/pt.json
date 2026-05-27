@@ -2,7 +2,30 @@
   "hello": "Olá",
   "welcome": "Bem-vindo",
   "home": "Início",
-  "podcasters": "Podcasters",
+  "podcasters": {
+    "title": {
+      "fallback": "Seu podcast"
+    },
+    "episode": {
+      "fallback1": "Episódio 1",
+      "fallback2": "Episódio 2",
+      "fallback3": "Episódio 3"
+    },
+    "badge": "Página do podcast",
+    "subtitle": {
+      "fallback": "Esta página será a casa pública do seu podcast."
+    },
+    "aboutShow": "Sobre o programa",
+    "description": {
+      "fallback": "A descrição do seu podcast gerada no Launchpad aparecerá aqui."
+    },
+    "audience": "Audiência",
+    "episodes": "Episódios",
+    "episodeLabel": "Episódio {n}",
+    "host": "Apresentador",
+    "introScript": "Roteiro de abertura",
+    "openStudio": "Abrir estúdio de podcast"
+  },
   "dashboard": "Painel",
   "pricing": "Preços",
   "reset": "Recomeçar",
@@ -60,7 +83,7 @@
     "pricing": {
       "title": "Planos, preços e armazenamento",
       "q1": "Quais são os limites dos planos?",
-      "a1": "Grátis: 1 projeto, 1 idioma, apenas prévia com marca d'água, créditos de IA limitados. Starter ($15/mês): 1 site publicado, 2 idiomas, ~50 gerações de áudio/mês. Pro ($39/mês): 5 sites, todos os 5 idiomas, ~200 gerações de áudio/mês, ferramentas de vídeo. Business ($99/mês): sites ilimitados, todos os idiomas mais personalizados, marca branca. Planos de podcast são separados — veja a página de Podcasters para detalhes.",
+      "a1": "Website: $19 / $49 / $149 · Podcast: $29 / $79 / $299 · Network starting at $299/mo",
       "q2": "Parceiros de negócio ganham um teste grátis?",
       "a2": "Sim — parceiros de negócio ganham 30 dias grátis apenas no plano Starter. Isso dá acesso a 2 idiomas, coletor de avaliações e áudio nativo para experimentar a plataforma. Se você precisar de recursos Pro ou Business, esses planos exigem pagamento desde o primeiro dia.",
       "q3": "Por que existem limites de projeto e armazenamento?",
@@ -967,30 +990,6 @@
       "missingId": "ID ausente",
       "approvedMustBeBoolean": "Aprovado deve ser booleano"
     }
-  },
-  "podcasters": {
-    "title": {
-      "fallback": "Seu podcast"
-    },
-    "episode": {
-      "fallback1": "Episódio 1",
-      "fallback2": "Episódio 2",
-      "fallback3": "Episódio 3"
-    },
-    "badge": "Página do podcast",
-    "subtitle": {
-      "fallback": "Esta página será a casa pública do seu podcast."
-    },
-    "aboutShow": "Sobre o programa",
-    "description": {
-      "fallback": "A descrição do seu podcast gerada no Launchpad aparecerá aqui."
-    },
-    "audience": "Audiência",
-    "episodes": "Episódios",
-    "episodeLabel": "Episódio {n}",
-    "host": "Apresentador",
-    "introScript": "Roteiro de abertura",
-    "openStudio": "Abrir estúdio de podcast"
   },
   "singleLanguageContent": "Conteúdo em {language}"
 }

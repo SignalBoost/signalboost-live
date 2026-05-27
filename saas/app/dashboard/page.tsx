@@ -105,7 +105,7 @@ export default function DashboardOverviewPage() {
       title: t(dict, 'dash.concierge.title', 'SignalBoost Concierge'),
       message: t(dict, 'dash.concierge.help', 'Need help choosing the next move? Ask SignalBoost below.')
     }
-  }, [projects, projectsLoaded])
+  }, [dict, projects, projectsLoaded])
 
   const promptRef = useRef<HTMLDivElement>(null)
 

@@ -20,32 +20,80 @@ function guessFileTargets(request: string): string[] {
   return Array.from(new Set(files))
 }
 
+const SUPPORTED_LANGS = ['en', 'pt', 'es', 'pl', 'ru'] as const
+type SupportedLang = typeof SUPPORTED_LANGS[number]
+
+function normalizeLanguage(language?: string): SupportedLang {
+  const lower = (language || '').trim().toLowerCase()
+  if (lower.startsWith('pt')) return 'pt'
+  if (lower.startsWith('es')) return 'es'
+  if (lower.startsWith('pl')) return 'pl'
+  if (lower.startsWith('ru')) return 'ru'
+  return 'en'
+}
+
+const TEMPLATE_COPY: Record<SupportedLang, {
+  clarification: string
+  summaryVisual: string
+  summaryDefault: string
+  steps: string[]
+  preview: string[]
+}> = {
+  en: {
+    clarification: 'Could you share the page you want me to update first (for example: homepage, podcasters, or builder)?',
+    summaryVisual: 'I will first prepare a visual concept update, then apply focused content and layout updates using SignalBoost tools.',
+    summaryDefault: 'I will apply a focused product update in small, safe steps with approval before publish.',
+    steps: ['Understand your goal in plain language.', 'Inspect the most relevant page files and translation files.', 'Prepare a visual-first update plan (for website requests) or a focused feature plan.', 'Show you exactly what will change and ask for approval.', 'Apply the approved update, publish it, and keep rollback ready.'],
+    preview: ['Friendly UI update aligned with your requested style and goals.', 'Content/button/layout updates in the relevant page.', 'Language updates for translated versions when requested.'],
+  },
+  pt: {
+    clarification: 'Você pode me dizer qual página quer atualizar primeiro (por exemplo: homepage, podcasters ou builder)?',
+    summaryVisual: 'Vou preparar primeiro uma proposta visual e depois aplicar ajustes focados de conteúdo e layout com as ferramentas da SignalBoost.',
+    summaryDefault: 'Vou aplicar uma atualização focada do produto em etapas pequenas e seguras, com aprovação antes da publicação.',
+    steps: ['Entender seu objetivo em linguagem simples.', 'Inspecionar os arquivos de página e de tradução mais relevantes.', 'Montar um plano visual (para pedidos de site) ou um plano de funcionalidade focado.', 'Mostrar exatamente o que vai mudar e pedir sua aprovação.', 'Aplicar a atualização aprovada, publicar e manter rollback pronto.'],
+    preview: ['Atualização de interface alinhada ao estilo e objetivo que você pediu.', 'Ajustes de conteúdo/botões/layout na página relevante.', 'Atualizações de idioma para versões traduzidas quando solicitado.'],
+  },
+  es: {
+    clarification: '¿Puedes decirme qué página quieres que actualice primero (por ejemplo: homepage, podcasters o builder)?',
+    summaryVisual: 'Primero prepararé una propuesta visual y luego aplicaré ajustes enfocados de contenido y diseño con las herramientas de SignalBoost.',
+    summaryDefault: 'Aplicaré una actualización enfocada del producto en pasos pequeños y seguros, con aprobación antes de publicar.',
+    steps: ['Entender tu objetivo en lenguaje simple.', 'Revisar los archivos de página y traducción más relevantes.', 'Preparar un plan visual (para solicitudes de sitio web) o un plan de funcionalidad enfocado.', 'Mostrarte exactamente qué cambiará y pedir tu aprobación.', 'Aplicar la actualización aprobada, publicarla y mantener rollback listo.'],
+    preview: ['Actualización de UI alineada con el estilo y objetivo solicitado.', 'Ajustes de contenido/botones/diseño en la página relevante.', 'Actualizaciones de idioma para versiones traducidas cuando se solicite.'],
+  },
+  pl: {
+    clarification: 'Czy możesz podać, którą stronę mam najpierw zaktualizować (np. homepage, podcasters albo builder)?',
+    summaryVisual: 'Najpierw przygotuję koncepcję wizualną, a potem wdrożę precyzyjne zmiany treści i układu narzędziami SignalBoost.',
+    summaryDefault: 'Wprowadzę ukierunkowaną aktualizację produktu małymi, bezpiecznymi krokami z akceptacją przed publikacją.',
+    steps: ['Zrozumieć Twój cel prostym językiem.', 'Sprawdzić najważniejsze pliki strony i tłumaczeń.', 'Przygotować plan wizualny (dla próśb o stronę) albo plan funkcjonalny.', 'Pokazać dokładnie, co się zmieni, i poprosić o akceptację.', 'Wdrożyć zaakceptowaną zmianę, opublikować i utrzymać gotowy rollback.'],
+    preview: ['Przyjazna aktualizacja UI zgodna z Twoim stylem i celem.', 'Zmiany treści/przycisków/układu na właściwej stronie.', 'Aktualizacje językowe dla tłumaczonych wersji, gdy są wymagane.'],
+  },
+  ru: {
+    clarification: 'Подскажите, какую страницу нужно обновить первой (например: homepage, podcasters или builder)?',
+    summaryVisual: 'Сначала подготовлю визуальную концепцию, затем внесу точечные изменения контента и структуры с помощью инструментов SignalBoost.',
+    summaryDefault: 'Я выполню целевое обновление продукта небольшими и безопасными шагами с согласованием перед публикацией.',
+    steps: ['Понять вашу цель простым языком.', 'Проверить наиболее важные файлы страниц и переводов.', 'Подготовить визуальный план (для запросов по сайту) или сфокусированный план по функции.', 'Показать вам, что именно изменится, и запросить одобрение.', 'Применить одобренные изменения, опубликовать и сохранить возможность отката.'],
+    preview: ['Понятное обновление интерфейса в вашем стиле и под вашу цель.', 'Изменения контента/кнопок/макета на нужной странице.', 'Языковые обновления для переводов, если они нужны.'],
+  },
+}
+
 // ── Safe fallback: the original template, used if the AI call fails ──
 function templatePlan(request: string, language?: string): OperatorPlan {
   const lower = request.toLowerCase()
   const visualFirst = lower.includes('website') || lower.includes('homepage') || lower.includes('restaurant') || lower.includes('real estate')
+  const selectedLang = normalizeLanguage(language)
+  const copy = TEMPLATE_COPY[selectedLang]
   return {
     id: newId('plan'),
     request,
     clarificationQuestion: isUnclearRequest(request)
-      ? 'Could you share the page you want me to update first (for example: homepage, podcasters, or builder)?'
+      ? copy.clarification
       : undefined,
     summary: visualFirst
-      ? 'I will first prepare a visual concept update, then apply focused content and layout updates using SignalBoost tools.'
-      : 'I will apply a focused product update in small, safe steps with approval before publish.',
-    steps: [
-      'Understand your goal in plain language.',
-      'Inspect the most relevant page files and translation files.',
-      'Prepare a visual-first update plan (for website requests) or a focused feature plan.',
-      'Show you exactly what will change and ask for approval.',
-      'Apply the approved update, publish it, and keep rollback ready.',
-    ],
+      ? copy.summaryVisual
+      : copy.summaryDefault,
+    steps: copy.steps,
     fileTargets: guessFileTargets(request),
-    preview: [
-      'Friendly UI update aligned with your requested style and goals.',
-      'Content/button/layout updates in the relevant page.',
-      'Language updates for translated versions when requested.',
-    ],
+    preview: copy.preview,
     requiresApproval: true,
     createdAt: new Date().toISOString(),
   }

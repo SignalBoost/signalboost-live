@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import SitePreview, { type SitePreviewContent } from '@/components/operator/SitePreview'
+import ResetButton from '@/components/ResetButton'
 
 export default function OperatorPage() {
   const [request, setRequest] = useState('A high-end rooftop cocktail bar in Rio with bottle service and DJ nights')
@@ -64,7 +65,7 @@ export default function OperatorPage() {
   }
 
   function reset() {
-    setContent(null); setLiveUrl(null); setMessage(''); setRequest('')
+    setContent(null); setLiveUrl(null); setMessage(''); setRequest(''); setLoading(false); setPublishing(false); setJobId(null); setPlanId(null)
   }
 
   const fullUrl = liveUrl ? `${typeof window !== 'undefined' ? window.location.origin : ''}${liveUrl}` : null
@@ -92,9 +93,7 @@ export default function OperatorPage() {
               {loading ? '✨ Designing…' : content ? '↻ Regenerate' : '✨ Design my website'}
             </button>
             {(content || liveUrl || request) && (
-              <button className="sb-button-ghost" onClick={reset} disabled={loading || publishing}>
-                Start over
-              </button>
+              <ResetButton onReset={reset} className="sb-button-ghost" />
             )}
           </div>
 

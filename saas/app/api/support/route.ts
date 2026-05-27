@@ -11,6 +11,7 @@ const LANGUAGE_LABELS: Record<string, string> = {
   'pt-br': 'Portuguese (Brazil)',
   es: 'Spanish',
   pl: 'Polish',
+  ru: 'Russian',
 }
 
 export async function POST(req: NextRequest) {
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'AI backend is not configured.' }, { status: 500 })
     }
 
-    const response = await openai.chat.completions.create({
+    const completionPromise = openai.chat.completions.create({
       model: 'gpt-4o-mini',
       temperature: 0.4,
       messages: [
@@ -44,6 +45,10 @@ export async function POST(req: NextRequest) {
         ...sanitized,
       ],
     })
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('AI request timeout')), 25000)
+    )
+    const response = (await Promise.race([completionPromise, timeoutPromise])) as Awaited<typeof completionPromise>
 
     const reply = response.choices[0]?.message?.content?.trim()
     if (!reply) {

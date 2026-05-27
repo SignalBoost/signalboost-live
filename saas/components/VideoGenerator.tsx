@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import ResetButton from "@/components/ResetButton";
 
 export default function VideoGenerator() {
+  const { t } = useTranslation();
   const [prompt, setPrompt] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -50,12 +53,19 @@ export default function VideoGenerator() {
     }
   }
 
+  function reset() {
+    setPrompt("");
+    setVideoUrl("");
+    setLoading(false);
+    setError("");
+  }
+
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
       <textarea
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
-        placeholder="Describe your video..."
+        placeholder={t("video.promptPlaceholder", "Describe your video...")}
         className="w-full min-h-[160px] rounded-xl border border-gray-700 bg-black p-4 text-white"
       />
 
@@ -64,8 +74,9 @@ export default function VideoGenerator() {
         disabled={loading || !prompt}
         className="rounded-xl bg-yellow-400 px-6 py-3 font-bold text-black disabled:opacity-50"
       >
-        {loading ? "Generating Video..." : "Generate Video"}
+        {loading ? t("video.generating", "Generating Video...") : t("video.generate", "Generate Video")}
       </button>
+      {(videoUrl || error) && <ResetButton onReset={reset} />}
 
       {error && (
         <div className="rounded-xl bg-red-500/20 p-4 text-red-400">

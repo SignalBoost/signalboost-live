@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useTranslation } from '@/components/i18n/useTranslation'
+import ResetButton from '@/components/ResetButton'
 
 const GOLD = '#ffc300'
 
@@ -15,11 +17,13 @@ type Sketch = {
 }
 
 export default function PodcastLaunchpad() {
+  const { t } = useTranslation()
   const [experience, setExperience] = useState('guided')
   const [topic, setTopic] = useState('')
   const [format, setFormat] = useState('solo')
   const [loading, setLoading] = useState(false)
   const [sketch, setSketch] = useState<Sketch | null>(null)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -31,6 +35,7 @@ export default function PodcastLaunchpad() {
 
     try {
       setLoading(true)
+      setError('')
 
       const response = await fetch('/api/launchpad/podcast', {
         method: 'POST',
@@ -46,6 +51,10 @@ export default function PodcastLaunchpad() {
 
       const data = await response.json()
 
+      if (!response.ok) {
+        throw new Error(data?.error || t('podcast.launchpad.error', 'Could not generate podcast sketch.'))
+      }
+
       if (data.sketch) {
         setSketch(data.sketch)
         localStorage.setItem(
@@ -53,11 +62,20 @@ export default function PodcastLaunchpad() {
           JSON.stringify(data.sketch)
         )
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
+      setError(error?.message || t('podcast.launchpad.error', 'Could not generate podcast sketch.'))
     } finally {
       setLoading(false)
     }
+  }
+
+  function reset() {
+    setTopic('')
+    setSketch(null)
+    setLoading(false)
+    setError('')
+    window.scrollTo({ top: 0, behavior: 'auto' })
   }
 
   return (
@@ -163,6 +181,7 @@ export default function PodcastLaunchpad() {
             >
               {loading ? 'Generating...' : 'Generate Podcast Sketch'}
             </button>
+            {(sketch || error) && <ResetButton onReset={reset} />}
 
             {sketch && (
               <>
@@ -202,6 +221,7 @@ export default function PodcastLaunchpad() {
               </>
             )}
           </div>
+          {error && <p style={{ color: '#fca5a5', marginTop: 12 }}>{error}</p>}
         </div>
 
         {sketch && (

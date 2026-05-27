@@ -116,10 +116,18 @@ export default function BuilderPage() {
         ? t('languages', 'languages')
         : t('language', 'language')
 
+    const singleLanguageName =
+      LANGS.find((item) => item.code === languages[0])?.nameKey
+        ? t(
+            LANGS.find((item) => item.code === languages[0])!.nameKey,
+            LANGS.find((item) => item.code === languages[0])!.fallback
+          )
+        : t('builder.lang.en', 'English')
+
     const contentBlock =
       languages.length > 1
         ? t('multilingualContent', 'Content in multiple languages')
-        : t('englishContent', 'English content')
+        : t('singleLanguageContent', '{language} content').replace('{language}', singleLanguageName)
 
     setMessages([
       {

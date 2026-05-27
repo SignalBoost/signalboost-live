@@ -896,5 +896,6 @@
       "missingId": "Missing ID",
       "approvedMustBeBoolean": "Approved must be boolean"
     }
-  }
+  },
+  "singleLanguageContent": "Conteúdo em {language}"
 }

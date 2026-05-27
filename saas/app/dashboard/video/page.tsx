@@ -404,7 +404,7 @@ export default function VideoPage() {
       formData.append('formats', selectedFormats.join(','))
 
       setUploadProgress(20)
-      setStatusMsg(t(dict, 'video_page.status.transcribing', 'Transcribing... this may take a minute'))
+      setStatusMsg(t(dict, 'video_page.status.transcribing', 'Transcribing… this may take a minute'))
 
       const res = await fetch('/api/video', {
         method: 'POST',

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Business - SignalBoost Live</title>
+
+<style>
+:root{
+  --bg:#202533;
+  --bg-soft:#272d3d;
+  --text:#e9edf5;
+  --muted:#aeb7c9;
+  --line:rgba(255,255,255,0.08);
+  --accent:#4da3ff;
+  --radius:18px;
+}
+
+body{
+  margin:0;
+  font-family:Arial, Helvetica, sans-serif;
+  background:linear-gradient(180deg,#1b2130 0%, var(--bg) 100%);
+  color:var(--text);
+}
+
+.container{
+  width:90%;
+  max-width:1100px;
+  margin:auto;
+}
+
+.nav{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:18px 0;
+}
+
+.brand{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  font-weight:bold;
+}
+
+.brand-wave{
+  color:var(--accent);
+}
+
+.back{
+  background:var(--accent);
+  color:white;
+  padding:10px 16px;
+  border-radius:999px;
+  text-decoration:none;
+}
+
+.section{
+  margin-top:30px;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:16px;
+}
+
+.card{
+  background:var(--bg-soft);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  overflow:hidden;
+}
+
+.card-content{
+  padding:12px;
+}
+
+iframe{
+  width:100%;
+  height:200px;
+  border:none;
+}
+
+.loading{
+  color:var(--muted);
+}
+
+.source-icons{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:10px;
+}
+
+.source-badge{
+  padding:5px 9px;
+  border-radius:999px;
+  background:rgba(255,255,255,0.05);
+  border:1px solid var(--line);
+  font-size:.74rem;
+  color:#dbe6ff;
+  white-space:nowrap;
+}
+
+.wide-card{
+  background:var(--bg-soft);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:18px;
+  margin-top:10px;
+}
+
+.wide-card p{
+  margin:0 0 10px;
+  color:var(--muted);
+  line-height:1.55;
+}
+
+@media(max-width:900px){
+  .grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+
+<body>
+
+<div class="container nav">
+  <div class="brand">
+    <div class="brand-wave">~~~~~</div>
+    <div>SignalBoost Live</div>
+  </div>
+  <a href="index.html" class="back">Back</a>
+</div>
+
+<div class="container">
+  <h1>Business & Economy</h1>
+  <p>Markets, companies, and global economic trends shaping the world.</p>
+
+  <div class="section">
+    <h2>Featured Video</h2>
+    <div id="featured" class="loading">Loading...</div>
+  </div>
+
+  <div class="section">
+    <h2>Top Videos</h2>
+    <div id="videos" class="grid"></div>
+  </div>
+
+  <div class="section">
+    <h2>What People Are Saying</h2>
+    <div class="grid">
+
+      <div class="card">
+        <div class="card-content">
+          <p>"The economy is more resilient than expected."</p>
+          <div class="source-icons">
+            <span class="source-badge">𝕏 X</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-content">
+          <p>"Markets are reacting to policy changes."</p>
+          <div class="source-icons">
+            <span class="source-badge">T Truth Social</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-content">
+          <p>"Companies must adapt to new economic realities."</p>
+          <div class="source-icons">
+            <span class="source-badge">in LinkedIn</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Quick Summary</h2>
+    <div class="wide-card">
+      <p>The business and economy topic trends because it impacts jobs, markets, and global stability. Discussions are driven by financial media, corporate leaders, and public reactions.</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Instant Context</h2>
+    <div class="wide-card">
+      <p><strong>Inflation</strong>: increase in prices over time.</p>
+      <p><strong>Interest rates</strong>: cost of borrowing money set by central banks.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_KEY = "AIzaSyBWSnsfSNZxY_kYG_ACxm-GQYMsCOEuIuc";
+const QUERY = "business economy inflation markets layoffs finance";
+
+async function loadVideos(){
+  try{
+    const res = await fetch(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=4&q=${encodeURIComponent(QUERY)}&key=${API_KEY}`
+    );
+
+    const data = await res.json();
+
+    if(!data.items){
+      document.getElementById("featured").innerText = "Error loading videos";
+      return;
+    }
+
+    const first = data.items[0];
+
+    document.getElementById("featured").innerHTML = `
+      <div class="card">
+        <iframe src="https://www.youtube.com/embed/${first.id.videoId}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+        <div class="card-content">
+          <h3>${first.snippet.title}</h3>
+          <p>${first.snippet.description ? first.snippet.description.substring(0, 140) + "..." : "Featured business video."}</p>
+          <div class="source-icons">
+            <span class="source-badge">▶ YouTube</span>
+            <span class="source-badge">💼 Finance</span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const rest = data.items.slice(1);
+
+    document.getElementById("videos").innerHTML = rest.map(v => `
+      <div class="card">
+        <iframe src="https://www.youtube.com/embed/${v.id.videoId}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+        <div class="card-content">
+          <h3>${v.snippet.title}</h3>
+          <p>${v.snippet.description ? v.snippet.description.substring(0, 120) + "..." : "Real YouTube result."}</p>
+          <div class="source-icons">
+            <span class="source-badge">▶ YouTube</span>
+            <span class="source-badge">💼 Finance</span>
+          </div>
+        </div>
+      </div>
+    `).join("");
+
+  }catch(e){
+    document.getElementById("featured").innerText = "Failed to load videos";
+    console.error(e);
+  }
+}
+
+loadVideos();
+</script>
+
+</body>
+</html>

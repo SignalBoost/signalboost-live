@@ -572,20 +572,20 @@
         "desc": "Baixe seus episódios multilíngues ou publique direto no seu site de podcast SignalBoost."
       },
       "step1": {
-        "title": "Upload your episode",
-        "desc": "Bring the finished audio or video."
+        "title": "Envie seu episódio",
+        "desc": "Traga o áudio ou vídeo finalizado."
       },
       "step2": {
-        "title": "Choose outputs",
-        "desc": "Clips, captions, languages, voiceover and show notes."
+        "title": "Escolha as entregas",
+        "desc": "Clipes, legendas, idiomas, locução e notas do episódio."
       },
       "step3": {
-        "title": "AI crew works",
-        "desc": "Transcript, clip, translation and distribution agents prepare assets."
+        "title": "Equipe de IA em ação",
+        "desc": "Agentes de transcrição, clipes, tradução e distribuição preparam tudo."
       },
       "step4": {
-        "title": "Publish everywhere",
-        "desc": "Download or prepare content for every channel."
+        "title": "Publique em todos os canais",
+        "desc": "Baixe ou prepare conteúdo para cada canal."
       }
     },
     "deliver": {
@@ -664,29 +664,42 @@
     },
     "deliverables": {
       "voiceover": {
-        "title": "Native voiceover",
-        "desc": "Turn one episode into natural voice versions in multiple languages."
+        "title": "Locução nativa",
+        "desc": "Transforme um episódio em versões de voz natural em vários idiomas."
       },
       "clips": {
-        "title": "Clip factory",
-        "desc": "Find the best moments and turn them into Shorts, Reels and TikToks."
+        "title": "Fábrica de clipes",
+        "desc": "Encontre os melhores momentos e transforme em Shorts, Reels e TikToks."
       },
       "captions": {
-        "title": "Captions",
-        "desc": "Generate subtitles, transcripts and social captions automatically."
+        "title": "Legendas",
+        "desc": "Gere automaticamente legendas, transcrições e textos para redes sociais."
       },
       "website": {
-        "title": "Podcast website",
-        "desc": "A branded home for episodes, show notes, reviews and languages."
+        "title": "Site do podcast",
+        "desc": "Uma base com sua marca para episódios, notas, avaliações e idiomas."
       },
       "distribution": {
-        "title": "Distribution",
-        "desc": "Prepare content for YouTube, TikTok, Instagram, email and more."
+        "title": "Distribuição",
+        "desc": "Prepare conteúdo para YouTube, TikTok, Instagram, email e mais."
       },
       "growth": {
-        "title": "Listener growth",
-        "desc": "Collect reviews, testimonials and audience signals."
+        "title": "Crescimento de audiência",
+        "desc": "Colete avaliações, depoimentos e sinais de audiência."
       }
+    },
+    "hero": {
+      "line1": "Seu podcast.",
+      "line2": "Seu estúdio.",
+      "line3": "Seu público global.",
+      "subtitle": "Envie um episódio e deixe a SignalBoost ajudar a criar transcrições, clipes, legendas, áudio multilíngue, notas do episódio e materiais de distribuição em um único estúdio.",
+      "openStudio": "Abrir estúdio",
+      "howItWorks": "Como funciona",
+      "liveBadge": "PODCAST_STUDIO // AO VIVO"
+    },
+    "studio": {
+      "generateClips": "Gerar clipes",
+      "uploadEpisode": "Enviar episódio"
     }
   },
   "podcastSection": {

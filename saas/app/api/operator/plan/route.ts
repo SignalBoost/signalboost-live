@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'operator.errors.requestRequired' }, { status: 400 })
     }
 
-    const plan = await buildPlan(request)
+    const plan = await buildPlan(request, body?.language)
     operatorStore.plans.set(plan.id, plan)
 
     return NextResponse.json({ plan })

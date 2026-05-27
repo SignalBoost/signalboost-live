@@ -42,7 +42,7 @@ export default function BuilderPage() {
   const [template, setTemplate] = useState('')
   const [businessName, setBusinessName] = useState('')
   const [businessDesc, setBusinessDesc] = useState('')
-  const [languages, setLanguages] = useState<string[]>(['en'])
+  const [languages, setLanguages] = useState<string[]>([lang || 'en'])
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<{ role: string; content: string }[]>([])
   const [loading, setLoading] = useState(false)

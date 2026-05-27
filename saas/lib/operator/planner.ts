@@ -108,8 +108,13 @@ RULES:
 - Keep each string concise.
 - clarificationQuestion must be a string (use "" if none).`
 
-export async function buildPlan(request: string): Promise<OperatorPlan> {
-  const raw = await callClaude(SYSTEM_PROMPT, request)
+export async function buildPlan(request: string, preferredLanguage?: string): Promise<OperatorPlan> {
+  const preferred = typeof preferredLanguage === 'string' ? preferredLanguage.trim().toLowerCase() : ''
+  const languageHint = preferred
+    ? `\n\nPREFERRED LANGUAGE FROM UI: ${preferred}\n- If valid, prioritize this language for the response even if the request is short or mixed-language.`
+    : ''
+
+  const raw = await callClaude(SYSTEM_PROMPT + languageHint, request)
 
   // If the AI is unavailable, fall back to the safe template so the page never breaks.
   if (!raw) return templatePlan(request)

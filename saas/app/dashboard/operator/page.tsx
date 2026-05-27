@@ -1,13 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import SitePreview, { type SitePreviewContent } from '@/components/operator/SitePreview'
 import ResetButton from '@/components/ResetButton'
 
 export default function OperatorPage() {
   const { t, lang } = useTranslation()
-  const [request, setRequest] = useState(t('operator.input.defaultRequest', 'A high-end rooftop cocktail bar in Rio with bottle service and DJ nights'))
+  const defaultRequest = t('operator.input.defaultRequest', 'A high-end rooftop cocktail bar in Rio with bottle service and DJ nights')
+  const [request, setRequest] = useState(defaultRequest)
   const [content, setContent] = useState<SitePreviewContent | null>(null)
   const [liveUrl, setLiveUrl] = useState<string | null>(null)
   const [planId, setPlanId] = useState<string | null>(null)
@@ -15,6 +16,11 @@ export default function OperatorPage() {
   const [loading, setLoading] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [message, setMessage] = useState('')
+  const [requestEdited, setRequestEdited] = useState(false)
+
+  useEffect(() => {
+    if (!requestEdited) setRequest(defaultRequest)
+  }, [defaultRequest, requestEdited])
 
   async function generate() {
     setLoading(true); setMessage(''); setLiveUrl(null); setContent(null); setJobId(null)
@@ -67,7 +73,7 @@ export default function OperatorPage() {
   }
 
   function reset() {
-    setContent(null); setLiveUrl(null); setMessage(''); setRequest(''); setLoading(false); setPublishing(false); setJobId(null); setPlanId(null)
+    setContent(null); setLiveUrl(null); setMessage(''); setRequest(defaultRequest); setLoading(false); setPublishing(false); setJobId(null); setPlanId(null); setRequestEdited(false)
   }
 
   const fullUrl = liveUrl ? `${typeof window !== 'undefined' ? window.location.origin : ''}${liveUrl}` : null
@@ -84,7 +90,7 @@ export default function OperatorPage() {
 
           <textarea
             value={request}
-            onChange={(e) => setRequest(e.target.value)}
+            onChange={(e) => { setRequestEdited(true); setRequest(e.target.value) }}
             rows={5}
             placeholder={t('operator.input.placeholder', 'e.g. A cozy Italian restaurant in São Paulo with a menu, our story, and a reservation button')}
             style={{ width: '100%', marginTop: 14, borderRadius: 14, border: '1px solid var(--border-soft)', background: 'rgba(255,255,255,.02)', color: '#fff', padding: 12, fontSize: 14, lineHeight: 1.5, resize: 'vertical' }}

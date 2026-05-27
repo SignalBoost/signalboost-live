@@ -4,16 +4,17 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from 'react'
 
-import { detectLanguage } from '@/lib/i18n/detectLanguage'
 import { loadLanguage, type Dict } from '@/lib/i18n/loadLanguage'
 
 type I18nContextType = {
   lang: string
   dict: Dict
-  setLang: (lang: string) => void
+  isReady: boolean
+  setLang: (lang: string) => Promise<void>
 }
 
 const I18nContext =
@@ -74,25 +75,33 @@ export function I18nProvider({
   children: React.ReactNode
 }) {
   const [lang, setLangState] =
-    useState('en')
+    useState(() => getInitialLanguage())
 
   const [dict, setDict] =
     useState<Dict>({})
+  const [isReady, setIsReady] =
+    useState(false)
 
   useEffect(() => {
+    let cancelled = false
+
     async function init() {
-      const initialLang =
-        getInitialLanguage()
+      setIsReady(false)
 
       const loaded =
-        await loadLanguage(initialLang)
+        await loadLanguage(lang)
 
-      setLangState(initialLang)
+      if (cancelled) return
+
       setDict(loaded)
+      setIsReady(true)
     }
 
     init()
-  }, [])
+    return () => {
+      cancelled = true
+    }
+  }, [lang])
 
   const setLang = async (
     newLang: string
@@ -110,20 +119,24 @@ export function I18nProvider({
       safeLang
     )
 
-    const loaded =
-      await loadLanguage(safeLang)
-
     setLangState(safeLang)
-    setDict(loaded)
   }
+
+  const value = useMemo(
+    () => ({
+      lang,
+      dict,
+      isReady,
+      setLang,
+    }),
+    [lang, dict, isReady]
+  )
+
+  if (!isReady) return null
 
   return (
     <I18nContext.Provider
-      value={{
-        lang,
-        dict,
-        setLang,
-      }}
+      value={value}
     >
       {children}
     </I18nContext.Provider>

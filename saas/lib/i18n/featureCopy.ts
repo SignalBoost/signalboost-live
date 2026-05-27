@@ -2,7 +2,7 @@ export type SupportedLang = 'en' | 'pt' | 'es' | 'pl' | 'ru'
 
 type FeatureCopy = Record<string, string>
 
-const COPY: Record<SupportedLang, FeatureCopy> = {
+export const COPY: Record<SupportedLang, FeatureCopy> = {
   en: {
     'builder.subline': 'Tell me about your business and I will build your multilingual website automatically.',
     'builder.siteTypeQuestion': 'What kind of site do you need?',

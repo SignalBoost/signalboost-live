@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import ResetButton from '@/components/ResetButton'
 
 type Lang = 'en' | 'pt' | 'es' | 'pl' | 'ru'
 type Message = { role: 'user' | 'assistant'; content: string }
@@ -145,7 +146,7 @@ export default function Concierge() {
     setLoading(true)
 
     try {
-      const res = await fetch('/api/support', {
+      const res = await fetch('/api/concierge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -184,9 +185,7 @@ export default function Concierge() {
               <strong style={{ fontSize: 18 }}>{copy.title}</strong>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button type="button" onClick={resetVisibleChat} style={{ background: 'rgba(255,255,255,.06)', border: '1px solid var(--border-soft)', color: 'white', borderRadius: 999, padding: '7px 10px', fontSize: 12 }}>
-                {copy.reset}
-              </button>
+              <ResetButton onReset={resetVisibleChat} className="sb-button-ghost" />
               <button onClick={() => setOpen(false)} aria-label={copy.close} style={{ background: 'transparent', border: '1px solid var(--border-soft)', color: 'white', width: 34, height: 34, borderRadius: 999, fontSize: 20 }}>
                 ×
               </button>

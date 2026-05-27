@@ -1,31 +1,25 @@
-
 {
   "dashboard.title": "Panel",
   "dashboard.subtitle": "Administra tus proyectos y automatizaciones",
-
   "nav.dashboard": "Panel",
   "nav.projects": "Proyectos",
   "nav.automations": "Automatizaciones",
   "nav.courses": "Cursos",
   "nav.billing": "Facturación",
   "nav.settings": "Configuración",
-
   "projects.title": "Proyectos",
   "projects.create": "Crear Proyecto",
   "projects.empty": "Aún no hay proyectos.",
-
   "editor.save": "Guardar",
   "editor.generating": "Generando...",
   "editor.preview": "Vista previa",
-
   "billing.title": "Facturación y Planes",
   "billing.upgrade": "Actualizar",
   "billing.current": "Plan Actual",
-
   "mobile.install": "Instalar App",
-
   "common.loading": "Cargando...",
   "common.cancel": "Cancelar",
   "common.delete": "Eliminar",
-  "common.edit": "Editar"
+  "common.edit": "Editar",
+  "reset": "Reiniciar"
 }

@@ -1,10 +1,12 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslation } from '@/components/i18n/useTranslation'
 import SitePreview, { type SitePreviewContent } from '@/components/operator/SitePreview'
 import ResetButton from '@/components/ResetButton'
 
 export default function OperatorPage() {
+  const { t } = useTranslation()
   const [request, setRequest] = useState('A high-end rooftop cocktail bar in Rio with bottle service and DJ nights')
   const [content, setContent] = useState<SitePreviewContent | null>(null)
   const [liveUrl, setLiveUrl] = useState<string | null>(null)
@@ -15,7 +17,7 @@ export default function OperatorPage() {
   const [message, setMessage] = useState('')
 
   async function generate() {
-    setLoading(true); setMessage(''); setLiveUrl(null); setContent(null)
+    setLoading(true); setMessage(''); setLiveUrl(null); setContent(null); setJobId(null)
     try {
       const res = await fetch('/api/operator/plan', {
         method: 'POST',
@@ -23,12 +25,12 @@ export default function OperatorPage() {
         body: JSON.stringify({ request }),
       })
       const data = await res.json()
-      if (!res.ok) setMessage(data.error || 'Could not generate the plan.')
+      if (!res.ok) setMessage(data.error || t('operator.errors.plan', 'Could not generate the plan.'))
       else { setPlanId(data.plan?.id || null); setContent({
-        businessName: 'Operator Plan',
-        headline: data.plan?.summary || 'Planned update',
+        businessName: t('operator.preview.businessName', 'Operator Plan'),
+        headline: data.plan?.summary || t('operator.preview.headlineFallback', 'Planned update'),
         subheadline: data.plan?.steps?.map((s: any) => `• ${s.title}`).join('\n') || '',
-        ctaText: 'Approve update',
+        ctaText: t('operator.preview.cta', 'Approve update'),
         sections: (data.plan?.steps || []).map((step: any, i: number) => ({
           id: String(i),
           type: 'features',
@@ -39,7 +41,7 @@ export default function OperatorPage() {
         theme: 'dark',
       } as any) }
     } catch {
-      setMessage('Could not connect. Please try again.')
+      setMessage(t('operator.errors.connect', 'Could not connect. Please try again.'))
     } finally {
       setLoading(false)
     }
@@ -55,10 +57,10 @@ export default function OperatorPage() {
         body: JSON.stringify({ planId, approved: true }),
       })
       const data = await res.json()
-      if (!res.ok) setMessage(data.error || 'Could not publish the website.')
-      else { setJobId(data.job?.id || null); setLiveUrl('/dashboard/operator'); setMessage(data.userMessage || 'Update published.') }
+      if (!res.ok) setMessage(data.error || t('operator.errors.publish', 'Could not publish the website.'))
+      else { setJobId(data.job?.id || null); setLiveUrl('/dashboard/operator'); setMessage(data.userMessage || t('operator.success.published', 'Update published.')) }
     } catch {
-      setMessage('Could not connect. Please try again.')
+      setMessage(t('operator.errors.connect', 'Could not connect. Please try again.'))
     } finally {
       setPublishing(false)
     }
@@ -76,21 +78,21 @@ export default function OperatorPage() {
 
         {/* ── Left: input ── */}
         <section className="hero-panel" style={{ padding: 24, position: 'sticky', top: 16 }}>
-          <div className="sb-kicker">🤖 AI Website Operator</div>
-          <h1 className="sb-title" style={{ marginBottom: 8, fontSize: 28 }}>Describe your website</h1>
-          <p className="sb-subtitle" style={{ marginTop: 0 }}>Tell me about your business. I will design a complete website — and you can publish it live in one click.</p>
+          <div className="sb-kicker">🤖 {t('operator.title.kicker', 'AI Website Operator')}</div>
+          <h1 className="sb-title" style={{ marginBottom: 8, fontSize: 28 }}>{t('operator.title.main', 'Describe your website')}</h1>
+          <p className="sb-subtitle" style={{ marginTop: 0 }}>{t('operator.title.subtitle', 'Tell me about your business. I will design a complete website — and you can publish it live in one click.')}</p>
 
           <textarea
             value={request}
             onChange={(e) => setRequest(e.target.value)}
             rows={5}
-            placeholder="e.g. A cozy Italian restaurant in São Paulo with a menu, our story, and a reservation button"
+            placeholder={t('operator.input.placeholder', 'e.g. A cozy Italian restaurant in São Paulo with a menu, our story, and a reservation button')}
             style={{ width: '100%', marginTop: 14, borderRadius: 14, border: '1px solid var(--border-soft)', background: 'rgba(255,255,255,.02)', color: '#fff', padding: 12, fontSize: 14, lineHeight: 1.5, resize: 'vertical' }}
           />
 
           <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <button className="sb-button-primary" onClick={generate} disabled={loading || !request.trim()}>
-              {loading ? '✨ Designing…' : content ? '↻ Regenerate' : '✨ Design my website'}
+              {loading ? t('operator.cta.designing', '✨ Designing…') : content ? t('operator.cta.regenerate', '↻ Regenerate') : t('operator.cta.design', '✨ Design my website')}
             </button>
             {(content || liveUrl || request) && (
               <ResetButton onReset={reset} className="sb-button-ghost" />
@@ -99,16 +101,16 @@ export default function OperatorPage() {
 
           {content && !liveUrl && (
             <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px solid var(--border-soft)' }}>
-              <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 0 }}>Happy with it? Publish it to a live web address.</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 0 }}>{t('operator.publish.hint', 'Happy with it? Publish it to a live web address.')}</p>
               <button className="sb-button-primary" onClick={publish} disabled={publishing} style={{ width: '100%' }}>
-                {publishing ? '🚀 Publishing…' : '🚀 Publish website'}
+                {publishing ? t('operator.publish.loading', '🚀 Publishing…') : t('operator.publish.cta', '🚀 Publish website')}
               </button>
             </div>
           )}
 
           {liveUrl && fullUrl && (
             <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px solid var(--border-gold)' }}>
-              <div style={{ color: '#fff', fontWeight: 800, marginBottom: 6 }}>🎉 Your website is live</div>
+              <div style={{ color: '#fff', fontWeight: 800, marginBottom: 6 }}>{t('operator.live', '🎉 Your website is live')}</div>
               <a href={liveUrl} target="_blank" rel="noopener noreferrer" className="sb-button-primary" style={{ display: 'inline-block', wordBreak: 'break-all', width: '100%', textAlign: 'center' }}>
                 {fullUrl} ↗
               </a>

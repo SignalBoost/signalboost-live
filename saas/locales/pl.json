@@ -555,6 +555,63 @@
     "readyTitle": "Gotowy, by działać globalnie?",
     "readyDesc": "Ty nagrywasz. My zajmujemy się resztą — lektor, napisy, klipy, strona i opinie w 5 językach.",
     "readyCta": "Zobacz plany podcastowe",
+    "hero": {
+      "liveBadge": "PODCAST_STUDIO // NA ŻYWO",
+      "line1": "Twój podcast.",
+      "line2": "Twoje studio.",
+      "line3": "Twoja globalna publiczność.",
+      "subtitle": "Prześlij jeden odcinek i pozwól SignalBoost pomóc utworzyć transkrypcje, klipy, napisy, wielojęzyczne audio, notatki programu i materiały dystrybucyjne z jednego studia.",
+      "openStudio": "Otwórz studio",
+      "howItWorks": "Jak to działa"
+    },
+    "panel": {
+      "foundry": "SIGNALBOOST AUDIO FOUNDRY",
+      "episodeFile": "Odcinek_034.wav",
+      "onAir": "NA ŻYWO"
+    },
+    "metrics": {
+      "transcript": "Transkrypcja",
+      "ready": "Gotowe",
+      "clipsFound": "Znaleziono klipów",
+      "languages": "Języki",
+      "publishPack": "Pakiet publikacji"
+    },
+    "agents": {
+      "transcript": "Agent Transkrypcji",
+      "clip": "Agent Wirusowych Klipów",
+      "translation": "Agent Tłumaczeń",
+      "voice": "Agent Głosowy",
+      "distribution": "Agent Dystrybucji"
+    },
+    "status": {
+      "active": "AKTYWNY",
+      "scanning": "SKANOWANIE",
+      "lang5": "5 JĘZYKÓW",
+      "ready": "GOTOWY",
+      "standby": "OCZEKIWANIE"
+    },
+    "actions": {
+      "generateClips": "Generuj klipy",
+      "uploadEpisode": "Prześlij odcinek"
+    },
+    "episodes": {
+      "e34": "Odcinek 34",
+      "e34Clips": "8 klipów",
+      "e34Langs": "5 języków",
+      "e33": "Odcinek 33",
+      "e33Clips": "6 klipów",
+      "e33Langs": "3 języki",
+      "e32": "Odcinek 32",
+      "e32Clips": "4 klipy",
+      "e32Langs": "2 języki",
+      "published": "Opublikowany",
+      "scheduled": "Zaplanowany",
+      "draft": "Szkic"
+    },
+    "section": {
+      "fullStudioTitle": "Pełne studio produkcyjne po nagraniu",
+      "fullStudioSubtitle": "Ty skupiasz się na rozmowie. SignalBoost pomaga przekształcić ten odcinek w klipy, napisy, przetłumaczoną treść, lektora, strony i materiały promocyjne."
+    },
     "stats": {
       "languages": "Języki",
       "turnaround": "Czas realizacji",
@@ -632,10 +689,9 @@
         "f3": "2 języki",
         "f4": "Natywny lektor AI",
         "f5": "Napisy w 2 językach",
-        "f6": "Podstawowe generowanie klipów (5 klipów na odcinek)",
+        "f6": "Podstawowe generowanie klipów",
         "f7": "Strona podcastu",
-        "f8": "Opinie słuchaczy",
-        "f9": "Wsparcie email"
+        "f8": "Opinie słuchaczy"
       },
       "pro": {
         "name": "Pro",
@@ -644,13 +700,11 @@
         "f1": "3 programy",
         "f2": "Nieograniczone odcinki",
         "f3": "Wszystkie 5 języków",
-        "f4": "Natywny lektor AI (priorytet)",
+        "f4": "Natywny lektor AI",
         "f5": "Napisy we wszystkich 5 językach",
-        "f6": "Fabryka klipów (nieograniczone klipy)",
+        "f6": "Fabryka klipów",
         "f7": "Wielojęzyczna strona podcastu",
-        "f8": "Opinie i analityka słuchaczy",
-        "f9": "Transkrypcja we wszystkich językach",
-        "f10": "Priorytetowe wsparcie"
+        "f8": "Analityka"
       },
       "network": {
         "name": "Network",
@@ -658,15 +712,12 @@
         "cta": "Skontaktuj się",
         "f1": "Nieograniczone programy",
         "f2": "Nieograniczone odcinki",
-        "f3": "Wszystkie 5 języków plus niestandardowe",
-        "f4": "Natywny lektor AI (dedykowany)",
-        "f5": "Niestandardowe formaty napisów (SRT, VTT, ASS)",
-        "f6": "Fabryka klipów (nieograniczona)",
-        "f7": "Strona z marką własną",
-        "f8": "Pełny pakiet analityczny",
-        "f9": "Dostęp do API",
-        "f10": "Dedykowany opiekun konta",
-        "f11": "Gwarancja SLA"
+        "f3": "Wszystkie języki plus niestandardowe",
+        "f4": "Dedykowane przetwarzanie",
+        "f5": "Niestandardowe formaty napisów",
+        "f6": "Strona z marką własną",
+        "f7": "Dostęp do API",
+        "f8": "Dedykowany opiekun konta"
       },
       "networkEmailSubject": "SignalBoost Network Plan"
     },

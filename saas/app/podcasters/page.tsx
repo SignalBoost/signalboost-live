@@ -24,6 +24,7 @@ const SYMBOLS: Record<string, string> = {
 export default function PodcastersPage() {
   const { dict } = useI18n()
   const P = (key: string, fallback: string) => t(dict, `podcasters_page.${key}`, fallback)
+  const supportEmail = CONTACT_EMAIL
   const [currency, setCurrency] = useState('USD')
 
   const PLANS = [
@@ -761,7 +762,7 @@ export default function PodcastersPage() {
                 onClick={() => {
                   window.location.href =
                     plan.key === 'network'
-                      ? `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(P('plans.networkEmailSubject', 'SignalBoost Network Plan'))}`
+                      ? `mailto:${supportEmail}?subject=${encodeURIComponent(P('plans.networkEmailSubject', 'SignalBoost Network Plan'))}`
                       : '/pricing'
                 }}
                 style={{

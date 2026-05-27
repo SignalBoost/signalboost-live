@@ -7,7 +7,7 @@ import ResetButton from '@/components/ResetButton'
 
 export default function OperatorPage() {
   const { t, lang } = useTranslation()
-  const defaultRequest = t('operator.input.defaultRequest', 'A high-end rooftop cocktail bar in Rio with bottle service and DJ nights')
+  const defaultRequest = t('operator.input.defaultRequest', 'A rooftop cocktail bar in Rio with bottle service and DJ nights')
   const [request, setRequest] = useState(defaultRequest)
   const [content, setContent] = useState<SitePreviewContent | null>(null)
   const [liveUrl, setLiveUrl] = useState<string | null>(null)

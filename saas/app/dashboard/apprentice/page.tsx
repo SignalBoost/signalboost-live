@@ -48,7 +48,7 @@ const COPY: Record<Lang, {
     badge: 'Apprentice Workshop',
     title: 'Learn while building.',
     subtitle: 'No technical experience needed. Choose what you want to create and SignalBoost will guide you one simple step at a time.',
-    promise: 'Start from zero. Leave with something real.',
+    promise: 'Start from zero. Leave with real output.',
     workshopTitle: 'SignalBoost Apprentice Workshop',
     workshopTagline: 'Learn while building.',
     goalTitle: 'Goal',

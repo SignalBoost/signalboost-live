@@ -315,5 +315,6 @@
     "plans": {
       "networkEmailSubject": "SignalBoost Network Plan"
     }
-  }
+  },
+  "singleLanguageContent": "{language} content"
 }

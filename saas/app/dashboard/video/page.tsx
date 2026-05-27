@@ -8,6 +8,7 @@ const BLUE = '#3b82f6'
 const GOLD = '#ffc300'
 const GREEN = '#4ade80'
 
+
 const LANGS = [
   { code: 'en', flag: '🇺🇸', name: 'English' },
   { code: 'pt', flag: '🇧🇷', name: 'Português' },
@@ -17,9 +18,9 @@ const LANGS = [
 ]
 
 const CAPTION_FORMATS = [
-  { id: 'srt', name: 'SRT', desc: 'Standard subtitle format. Works on most platforms.' },
-  { id: 'vtt', name: 'VTT', desc: 'Web Video Text Tracks. Best for web players.' },
-  { id: 'ass', name: 'ASS', desc: 'Advanced styling. Best for burned-in captions.' },
+  { id: 'srt', name: 'SRT', descKey: 'video_page.formats.srt' },
+  { id: 'vtt', name: 'VTT', descKey: 'video_page.formats.vtt' },
+  { id: 'ass', name: 'ASS', descKey: 'video_page.formats.ass' },
 ]
 
 const CLIP_FORMATS = [
@@ -614,7 +615,7 @@ export default function VideoPage() {
                     <span style={{ fontSize: 13, fontWeight: 700 }}>{fmt.name}</span>
                     {selectedFormats.includes(fmt.id) && <span style={{ color: BLUE }}>✓</span>}
                   </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{fmt.desc}</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{t(dict, fmt.descKey, '')}</div>
                 </div>
               ))}
             </div>

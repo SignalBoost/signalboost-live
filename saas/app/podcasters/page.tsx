@@ -22,13 +22,13 @@ const SYMBOLS: Record<string, string> = {
 }
 
 export default function PodcastersPage() {
-  const { dict } = useI18n()
-  const P = (key: string, fallback: string) => t(dict, `podcasters_page.${key}`, fallback)
+  const { dict, lang } = useI18n()
+  const P = (key: string) => t(dict, `podcasters_page.${key}`, '')
   const [currency, setCurrency] = useState('USD')
 
   const PLANS = [
     {
-      name: t(dict, 'podcasters_page.plans.indie.name', 'Indie'),
+      name: t(dict, 'podcasters_page.plans.indie.name', ''),
       key: 'indie',
       price: { USD: 29, BRL: 149, PLN: 120, MXN: 540, EUR: 27 },
       description: t(
@@ -37,20 +37,20 @@ export default function PodcastersPage() {
         'Perfect for independent podcasters getting started globally.'
       ),
       features: [
-        t(dict, 'podcasters_page.plans.indie.f1', '1 show'),
-        t(dict, 'podcasters_page.plans.indie.f2', '4 episodes per month'),
-        t(dict, 'podcasters_page.plans.indie.f3', '2 languages'),
-        t(dict, 'podcasters_page.plans.indie.f4', 'Native AI voiceover'),
-        t(dict, 'podcasters_page.plans.indie.f5', 'Captions in 2 languages'),
-        t(dict, 'podcasters_page.plans.indie.f6', 'Basic clip generation'),
-        t(dict, 'podcasters_page.plans.indie.f7', 'Podcast website'),
-        t(dict, 'podcasters_page.plans.indie.f8', 'Listener reviews'),
+        t(dict, 'podcasters_page.plans.indie.f1', ''),
+        t(dict, 'podcasters_page.plans.indie.f2', ''),
+        t(dict, 'podcasters_page.plans.indie.f3', ''),
+        t(dict, 'podcasters_page.plans.indie.f4', ''),
+        t(dict, 'podcasters_page.plans.indie.f5', ''),
+        t(dict, 'podcasters_page.plans.indie.f6', ''),
+        t(dict, 'podcasters_page.plans.indie.f7', ''),
+        t(dict, 'podcasters_page.plans.indie.f8', ''),
       ],
-      cta: t(dict, 'podcasters_page.plans.indie.cta', 'Get started'),
+      cta: t(dict, 'podcasters_page.plans.indie.cta', ''),
       highlight: false,
     },
     {
-      name: t(dict, 'podcasters_page.plans.pro.name', 'Pro'),
+      name: t(dict, 'podcasters_page.plans.pro.name', ''),
       key: 'pro',
       price: { USD: 79, BRL: 399, PLN: 320, MXN: 1450, EUR: 74 },
       description: t(
@@ -59,20 +59,20 @@ export default function PodcastersPage() {
         'For serious podcasters who want global reach.'
       ),
       features: [
-        t(dict, 'podcasters_page.plans.pro.f1', '3 shows'),
-        t(dict, 'podcasters_page.plans.pro.f2', 'Unlimited episodes'),
-        t(dict, 'podcasters_page.plans.pro.f3', 'All 5 languages'),
-        t(dict, 'podcasters_page.plans.pro.f4', 'Native AI voiceover'),
-        t(dict, 'podcasters_page.plans.pro.f5', 'Captions in all 5 languages'),
-        t(dict, 'podcasters_page.plans.pro.f6', 'Clip factory'),
-        t(dict, 'podcasters_page.plans.pro.f7', 'Multi-language podcast website'),
-        t(dict, 'podcasters_page.plans.pro.f8', 'Analytics'),
+        t(dict, 'podcasters_page.plans.pro.f1', ''),
+        t(dict, 'podcasters_page.plans.pro.f2', ''),
+        t(dict, 'podcasters_page.plans.pro.f3', ''),
+        t(dict, 'podcasters_page.plans.pro.f4', ''),
+        t(dict, 'podcasters_page.plans.pro.f5', ''),
+        t(dict, 'podcasters_page.plans.pro.f6', ''),
+        t(dict, 'podcasters_page.plans.pro.f7', ''),
+        t(dict, 'podcasters_page.plans.pro.f8', ''),
       ],
-      cta: t(dict, 'podcasters_page.plans.pro.cta', 'Get started'),
+      cta: t(dict, 'podcasters_page.plans.pro.cta', ''),
       highlight: true,
     },
     {
-      name: t(dict, 'podcasters_page.plans.network.name', 'Network'),
+      name: t(dict, 'podcasters_page.plans.network.name', ''),
       key: 'network',
       price: { USD: 299, BRL: 1490, PLN: 1200, MXN: 5400, EUR: 279 },
       description: t(
@@ -81,41 +81,41 @@ export default function PodcastersPage() {
         'For podcast networks managing multiple shows.'
       ),
       features: [
-        t(dict, 'podcasters_page.plans.network.f1', 'Unlimited shows'),
-        t(dict, 'podcasters_page.plans.network.f2', 'Unlimited episodes'),
-        t(dict, 'podcasters_page.plans.network.f3', 'All languages plus custom'),
-        t(dict, 'podcasters_page.plans.network.f4', 'Dedicated processing'),
-        t(dict, 'podcasters_page.plans.network.f5', 'Custom caption formats'),
-        t(dict, 'podcasters_page.plans.network.f6', 'White label website'),
-        t(dict, 'podcasters_page.plans.network.f7', 'API access'),
-        t(dict, 'podcasters_page.plans.network.f8', 'Dedicated account manager'),
+        t(dict, 'podcasters_page.plans.network.f1', ''),
+        t(dict, 'podcasters_page.plans.network.f2', ''),
+        t(dict, 'podcasters_page.plans.network.f3', ''),
+        t(dict, 'podcasters_page.plans.network.f4', ''),
+        t(dict, 'podcasters_page.plans.network.f5', ''),
+        t(dict, 'podcasters_page.plans.network.f6', ''),
+        t(dict, 'podcasters_page.plans.network.f7', ''),
+        t(dict, 'podcasters_page.plans.network.f8', ''),
       ],
-      cta: t(dict, 'podcasters_page.plans.network.cta', 'Contact us'),
+      cta: t(dict, 'podcasters_page.plans.network.cta', ''),
       highlight: false,
     },
   ]
 
   const studioAgents = [
-    { icon: '📝', name: P('agents.transcript','Transcript Agent'), status: P('status.active','ACTIVE'), color: GREEN },
-    { icon: '✂️', name: P('agents.clip','Viral Clip Agent'), status: P('status.scanning','SCANNING'), color: GOLD },
-    { icon: '🌍', name: P('agents.translation','Translation Agent'), status: P('status.lang5','5 LANG'), color: BLUE },
-    { icon: '🎙️', name: P('agents.voice','Voice Agent'), status: P('status.ready','READY'), color: PURPLE },
-    { icon: '📣', name: P('agents.distribution','Distribution Agent'), status: P('status.standby','STANDBY'), color: '#fb7185' },
+    { icon: '📝', name: P('agents.transcript'), status: P('status.active'), color: GREEN },
+    { icon: '✂️', name: P('agents.clip'), status: P('status.scanning'), color: GOLD },
+    { icon: '🌍', name: P('agents.translation'), status: P('status.lang5'), color: BLUE },
+    { icon: '🎙️', name: P('agents.voice'), status: P('status.ready'), color: PURPLE },
+    { icon: '📣', name: P('agents.distribution'), status: P('status.standby'), color: '#fb7185' },
   ]
 
   const productions = [
-    { title: P('episodes.e34','Episode 34'), clips: P('episodes.e34Clips','8 clips'), langs: P('episodes.e34Langs','5 languages'), status: P('episodes.published','Published') },
-    { title: P('episodes.e33','Episode 33'), clips: P('episodes.e33Clips','6 clips'), langs: P('episodes.e33Langs','3 languages'), status: P('episodes.scheduled','Scheduled') },
-    { title: P('episodes.e32','Episode 32'), clips: P('episodes.e32Clips','4 clips'), langs: P('episodes.e32Langs','2 languages'), status: P('episodes.draft','Draft') },
+    { title: P('episodes.e34'), clips: P('episodes.e34Clips'), langs: P('episodes.e34Langs'), status: P('episodes.published') },
+    { title: P('episodes.e33'), clips: P('episodes.e33Clips'), langs: P('episodes.e33Langs'), status: P('episodes.scheduled') },
+    { title: P('episodes.e32'), clips: P('episodes.e32Clips'), langs: P('episodes.e32Langs'), status: P('episodes.draft') },
   ]
 
   const deliverables = [
-    { icon: '🎙️', title: P('deliverables.voiceover.title', 'Native voiceover'), desc: P('deliverables.voiceover.desc', 'Turn one episode into natural voice versions in multiple languages.') },
-    { icon: '✂️', title: P('deliverables.clips.title', 'Clip factory'), desc: P('deliverables.clips.desc', 'Find the best moments and turn them into Shorts, Reels and TikToks.') },
-    { icon: '💬', title: P('deliverables.captions.title', 'Captions'), desc: P('deliverables.captions.desc', 'Generate subtitles, transcripts and social captions automatically.') },
-    { icon: '🌐', title: P('deliverables.website.title', 'Podcast website'), desc: P('deliverables.website.desc', 'A branded home for episodes, show notes, reviews and languages.') },
-    { icon: '📣', title: P('deliverables.distribution.title', 'Distribution'), desc: P('deliverables.distribution.desc', 'Prepare content for YouTube, TikTok, Instagram, email and more.') },
-    { icon: '⭐', title: P('deliverables.growth.title', 'Listener growth'), desc: P('deliverables.growth.desc', 'Collect reviews, testimonials and audience signals.') },
+    { icon: '🎙️', title: P('deliverables.voiceover.title'), desc: P('deliverables.voiceover.desc') },
+    { icon: '✂️', title: P('deliverables.clips.title'), desc: P('deliverables.clips.desc') },
+    { icon: '💬', title: P('deliverables.captions.title'), desc: P('deliverables.captions.desc') },
+    { icon: '🌐', title: P('deliverables.website.title'), desc: P('deliverables.website.desc') },
+    { icon: '📣', title: P('deliverables.distribution.title'), desc: P('deliverables.distribution.desc') },
+    { icon: '⭐', title: P('deliverables.growth.title'), desc: P('deliverables.growth.desc') },
   ]
 
   return (
@@ -191,7 +191,7 @@ export default function PodcastersPage() {
             }}
           >
             <span style={{ color: '#ef4444' }}>●</span>
-            {P('hero.liveBadge', 'PODCAST_STUDIO // LIVE')}
+            {P('hero.liveBadge')}
           </div>
 
           <h1
@@ -203,11 +203,11 @@ export default function PodcastersPage() {
               fontWeight: 950,
             }}
           >
-            {P('hero.line1','Your podcast.')}
+            {P('hero.line1')}
             <br />
-            {P('hero.line2','Your studio.')}
+            {P('hero.line2')}
             <br />
-            <span style={{ color: GOLD }}>{P('hero.line3','Your global audience.')}</span>
+            <span style={{ color: GOLD }}>{P('hero.line3')}</span>
           </h1>
 
           <p
@@ -219,7 +219,7 @@ export default function PodcastersPage() {
               maxWidth: 620,
             }}
           >
-            {P('hero.subtitle','Upload one episode and let SignalBoost help create transcripts, clips, captions, multilingual audio, show notes and distribution assets from a single studio workspace.')}
+            {P('hero.subtitle')}
           </p>
 
           <div
@@ -241,7 +241,7 @@ export default function PodcastersPage() {
                 textDecoration: 'none',
               }}
             >
-              {P('hero.openStudio','Open Studio')}
+              {P('hero.openStudio')}
             </Link>
 
             <Link
@@ -256,7 +256,7 @@ export default function PodcastersPage() {
                 textDecoration: 'none',
               }}
             >
-              {P('hero.howItWorks','How it works')} →
+              {P('hero.howItWorks')} →
             </Link>
           </div>
         </div>
@@ -304,10 +304,10 @@ export default function PodcastersPage() {
                     fontWeight: 900,
                   }}
                 >
-                  {P('panel.foundry','SIGNALBOOST AUDIO FOUNDRY')}
+                  {P('panel.foundry')}
                 </div>
                 <div style={{ fontSize: 22, fontWeight: 900, marginTop: 4 }}>
-                  {P('panel.episodeFile','Episode_034.wav')}
+                  {P('panel.episodeFile')}
                 </div>
               </div>
 
@@ -325,7 +325,7 @@ export default function PodcastersPage() {
                   fontWeight: 900,
                 }}
               >
-                🔴 {P('panel.onAir','ON AIR')}
+                🔴 {P('panel.onAir')}
               </div>
             </div>
 
@@ -376,10 +376,10 @@ export default function PodcastersPage() {
                   gap: 10,
                 }}
               >
-                <StudioMetric label={P('metrics.transcript','Transcript')} value={P('metrics.ready','Ready')} />
-                <StudioMetric label={P('metrics.clipsFound','Clips found')} value="08" />
-                <StudioMetric label={P('metrics.languages','Languages')} value="5" />
-                <StudioMetric label={P('metrics.publishPack','Publish pack')} value="86%" />
+                <StudioMetric label={P('metrics.transcript')} value={P('metrics.ready')} />
+                <StudioMetric label={P('metrics.clipsFound')} value="08" />
+                <StudioMetric label={P('metrics.languages')} value="5" />
+                <StudioMetric label={P('metrics.publishPack')} value="86%" />
               </div>
             </div>
 
@@ -440,7 +440,7 @@ export default function PodcastersPage() {
                   cursor: 'pointer',
                 }}
               >
-                {P('actions.generateClips','Generate clips')}
+                {P('actions.generateClips')}
               </Link>
 
               <Link href="/dashboard/video"
@@ -454,7 +454,7 @@ export default function PodcastersPage() {
                   cursor: 'pointer',
                 }}
               >
-                {P('actions.uploadEpisode','Upload episode')}
+                {P('actions.uploadEpisode')}
               </Link>
             </div>
           </div>
@@ -524,7 +524,7 @@ export default function PodcastersPage() {
             textAlign: 'center',
           }}
         >
-          {P('section.fullStudioTitle','A full production studio after you record')}
+          {P('section.fullStudioTitle')}
         </h2>
 
         <p
@@ -536,7 +536,7 @@ export default function PodcastersPage() {
             lineHeight: 1.7,
           }}
         >
-          {P('section.fullStudioSubtitle','You focus on the conversation. SignalBoost helps turn that episode into clips, captions, translated content, voiceovers, pages and promotional assets.')}
+          {P('section.fullStudioSubtitle')}
         </p>
 
         <div
@@ -583,7 +583,7 @@ export default function PodcastersPage() {
         }}
       >
         <h2 style={{ textAlign: 'center', fontSize: 38, marginBottom: 36 }}>
-          {t(dict, 'podcasters_page.howTitle', 'How it works')}
+          {t(dict, 'podcasters_page.howTitle', '')}
         </h2>
 
         <div
@@ -595,10 +595,10 @@ export default function PodcastersPage() {
           }}
         >
           {[
-            ['01', P('how.step1.title', 'Upload your episode'), P('how.step1.desc', 'Bring the finished audio or video.')],
-            ['02', P('how.step2.title', 'Choose outputs'), P('how.step2.desc', 'Clips, captions, languages, voiceover and show notes.')],
-            ['03', P('how.step3.title', 'AI crew works'), P('how.step3.desc', 'Transcript, clip, translation and distribution agents prepare assets.')],
-            ['04', P('how.step4.title', 'Publish everywhere'), P('how.step4.desc', 'Download or prepare content for every channel.')],
+            ['01', P('how.step1.title'), P('how.step1.desc')],
+            ['02', P('how.step2.title'), P('how.step2.desc')],
+            ['03', P('how.step3.title'), P('how.step3.desc')],
+            ['04', P('how.step4.title'), P('how.step4.desc')],
           ].map(step => (
             <div
               key={step[0]}
@@ -644,7 +644,7 @@ export default function PodcastersPage() {
         }}
       >
         <h2 style={{ fontSize: 38, fontWeight: 900, textAlign: 'center', marginBottom: 12 }}>
-          {t(dict, 'podcasters_page.plansTitle', 'Podcast plans')}
+          {t(dict, 'podcasters_page.plansTitle', '')}
         </h2>
 
         <p
@@ -717,7 +717,7 @@ export default function PodcastersPage() {
                     borderRadius: 999,
                   }}
                 >
-                  {t(dict, 'podcasters_page.mostPopular', 'Most popular')}
+                  {t(dict, 'podcasters_page.mostPopular', '')}
                 </div>
               )}
 
@@ -742,7 +742,7 @@ export default function PodcastersPage() {
                   {(plan.price as any)[currency]}
                 </span>
                 <span style={{ color: 'rgba(255,255,255,.35)', fontSize: 13 }}>
-                  {t(dict, 'podcasters_page.perMonth', '/mo')}
+                  {t(dict, 'podcasters_page.perMonth', '')}
                 </span>
               </div>
 
@@ -761,7 +761,7 @@ export default function PodcastersPage() {
                 onClick={() => {
                   window.location.href =
                     plan.key === 'network'
-                      ? `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(P('plans.networkEmailSubject', 'SignalBoost Network Plan'))}`
+                      ? `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(P('plans.networkEmailSubject'))}`
                       : '/pricing'
                 }}
                 style={{

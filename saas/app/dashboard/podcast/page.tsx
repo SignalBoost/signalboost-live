@@ -1,6 +1,13 @@
 'use client'
 
+// saas/app/dashboard/podcasters/page.tsx
+//
+// Fully i18n'd. Every visible string uses t(dict, key, fallback) so the
+// page renders in the user's selected language across en / pt / es / pl / ru.
+
 import { useEffect, useState } from 'react'
+import { useI18n } from '@/components/i18n/I18nProvider'
+import { t } from '@/lib/i18n/t'
 
 const GOLD = '#ffc300'
 
@@ -15,11 +22,13 @@ type Sketch = {
 }
 
 export default function PodcastPage() {
+  const { dict } = useI18n()
+  const tr = (key: string, fallback: string) => t(dict, key, fallback)
+
   const [sketch, setSketch] = useState<Sketch | null>(null)
 
   useEffect(() => {
     const saved = localStorage.getItem('podcastSketch')
-
     if (saved) {
       try {
         setSketch(JSON.parse(saved))
@@ -29,12 +38,17 @@ export default function PodcastPage() {
     }
   }, [])
 
-  const title = sketch?.showNames?.[0] || 'Your Podcast'
-  const episodes = sketch?.firstEpisodes || [
-    'Episode 1',
-    'Episode 2',
-    'Episode 3',
-  ]
+  const title = sketch?.showNames?.[0] || tr('podcasters.title.fallback', 'Your Podcast')
+
+  // Episode labels: only fall back to translated "Episode N" placeholders if there's no real episode data.
+  const episodes =
+    sketch?.firstEpisodes && sketch.firstEpisodes.length > 0
+      ? sketch.firstEpisodes
+      : [
+          tr('podcasters.episode.fallback1', 'Episode 1'),
+          tr('podcasters.episode.fallback2', 'Episode 2'),
+          tr('podcasters.episode.fallback3', 'Episode 3'),
+        ]
 
   return (
     <main
@@ -61,7 +75,7 @@ export default function PodcastPage() {
               marginBottom: 20,
             }}
           >
-            🎙️ PODCAST_PAGE
+            🎙️ {tr('podcasters.badge', 'Podcast page')}
           </div>
 
           <h1
@@ -84,7 +98,7 @@ export default function PodcastPage() {
             }}
           >
             {sketch?.showDescription ||
-              'This page will become the public home of your podcast.'}
+              tr('podcasters.subtitle.fallback', 'This page will become the public home of your podcast.')}
           </p>
         </div>
 
@@ -103,7 +117,7 @@ export default function PodcastPage() {
               border: '1px solid rgba(255,255,255,.08)',
             }}
           >
-            <h2>About the show</h2>
+            <h2>{tr('podcasters.aboutShow', 'About the show')}</h2>
 
             <p
               style={{
@@ -112,12 +126,12 @@ export default function PodcastPage() {
               }}
             >
               {sketch?.showDescription ||
-                'Your podcast description generated from Launchpad will appear here.'}
+                tr('podcasters.description.fallback', 'Your podcast description generated from Launchpad will appear here.')}
             </p>
 
             {sketch?.targetAudience && (
               <>
-                <h2 style={{ marginTop: 30 }}>Audience</h2>
+                <h2 style={{ marginTop: 30 }}>{tr('podcasters.audience', 'Audience')}</h2>
                 <p
                   style={{
                     color: 'rgba(255,255,255,.7)',
@@ -129,11 +143,11 @@ export default function PodcastPage() {
               </>
             )}
 
-            <h2 style={{ marginTop: 30 }}>Episodes</h2>
+            <h2 style={{ marginTop: 30 }}>{tr('podcasters.episodes', 'Episodes')}</h2>
 
             {episodes.map((episode, index) => (
               <div
-                key={episode}
+                key={`${index}-${episode}`}
                 style={{
                   padding: 16,
                   marginTop: 12,
@@ -142,7 +156,7 @@ export default function PodcastPage() {
                   border: '1px solid rgba(255,255,255,.08)',
                 }}
               >
-                <strong>🎧 Episode {index + 1}</strong>
+                <strong>🎧 {tr('podcasters.episodeLabel', 'Episode {n}').replace('{n}', String(index + 1))}</strong>
                 <div
                   style={{
                     marginTop: 6,
@@ -164,7 +178,7 @@ export default function PodcastPage() {
               border: '1px solid rgba(255,255,255,.08)',
             }}
           >
-            <h2>Host</h2>
+            <h2>{tr('podcasters.host', 'Host')}</h2>
 
             <div
               style={{
@@ -184,12 +198,12 @@ export default function PodcastPage() {
                 lineHeight: 1.6,
               }}
             >
-              Host information will appear here.
+              {tr('podcasters.host.fallback', 'Host information will appear here.')}
             </p>
 
             {sketch?.introScript && (
               <>
-                <h2 style={{ marginTop: 30 }}>Intro Script</h2>
+                <h2 style={{ marginTop: 30 }}>{tr('podcasters.introScript', 'Intro script')}</h2>
                 <p
                   style={{
                     color: 'rgba(255,255,255,.7)',
@@ -217,7 +231,7 @@ export default function PodcastPage() {
                 cursor: 'pointer',
               }}
             >
-              Open Podcast Studio
+              {tr('podcasters.openStudio', 'Open Podcast Studio')}
             </button>
           </aside>
         </div>

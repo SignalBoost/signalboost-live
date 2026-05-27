@@ -436,7 +436,7 @@ a{
           class="audio-frame"
           src="https://www.youtube.com/embed/jfKfPfyJRdk"
           title="Live audio stream"
-          allowfullscreen>
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen>
         </iframe>
         <p class="notice">Optional background listening while browsing.</p>
       </div>
@@ -525,7 +525,7 @@ async function loadVideos(){
     const top = sorted[0];
 
     document.getElementById("featured").innerHTML = `
-      <iframe class="featured-frame" src="https://www.youtube.com/embed/${top.id}" allowfullscreen></iframe>
+      <iframe class="featured-frame" src="https://www.youtube.com/embed/${top.id}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
       <div class="card-content">
         <h3>${top.snippet.title}</h3>
         <p>${top.snippet.description ? top.snippet.description.substring(0, 180) + "..." : "Featured AI discussion."}</p>
@@ -546,7 +546,7 @@ async function loadVideos(){
 
     document.getElementById("videos").innerHTML = rest.map(v => `
       <div class="card video-card">
-        <iframe class="video-frame" src="https://www.youtube.com/embed/${v.id}" allowfullscreen></iframe>
+        <iframe class="video-frame" src="https://www.youtube.com/embed/${v.id}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
         <div class="card-content">
           <h3>${v.snippet.title}</h3>
           <p>${v.snippet.description ? v.snippet.description.substring(0, 120) + "..." : "AI video result."}</p>

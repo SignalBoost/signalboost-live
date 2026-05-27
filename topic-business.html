@@ -218,7 +218,7 @@ async function loadVideos(){
 
     document.getElementById("featured").innerHTML = `
       <div class="card">
-        <iframe src="https://www.youtube.com/embed/${first.id.videoId}" allowfullscreen></iframe>
+        <iframe src="https://www.youtube.com/embed/${first.id.videoId}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
         <div class="card-content">
           <h3>${first.snippet.title}</h3>
           <p>${first.snippet.description ? first.snippet.description.substring(0, 140) + "..." : "Featured business video."}</p>
@@ -234,7 +234,7 @@ async function loadVideos(){
 
     document.getElementById("videos").innerHTML = rest.map(v => `
       <div class="card">
-        <iframe src="https://www.youtube.com/embed/${v.id.videoId}" allowfullscreen></iframe>
+        <iframe src="https://www.youtube.com/embed/${v.id.videoId}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
         <div class="card-content">
           <h3>${v.snippet.title}</h3>
           <p>${v.snippet.description ? v.snippet.description.substring(0, 120) + "..." : "Real YouTube result."}</p>

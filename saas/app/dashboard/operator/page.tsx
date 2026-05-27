@@ -4,66 +4,101 @@ import { useState } from 'react'
 import OperatorInput from '@/components/operator/OperatorInput'
 import OperatorPlan, { type OperatorPlanView } from '@/components/operator/OperatorPlan'
 import OperatorApproval from '@/components/operator/OperatorApproval'
-import OperatorStatus, { type OperatorJobView } from '@/components/operator/OperatorStatus'
-import OperatorRollback from '@/components/operator/OperatorRollback'
-
-type Plan = OperatorPlanView & { request: string; fileTargets: string[]; requiresApproval: boolean }
-type Job = OperatorJobView & { id: string; rollbackAvailable: boolean }
 
 export default function OperatorPage() {
-  const [request, setRequest] = useState('Make my restaurant website look more elegant and add a reservation button')
-  const [plan, setPlan] = useState<Plan | null>(null)
-  const [job, setJob] = useState<Job | null>(null)
+  const [request, setRequest] = useState('A cozy Italian restaurant in São Paulo with a menu, our story, and a reservation button')
+  const [content, setContent] = useState<OperatorPlanView | null>(null)
+  const [liveUrl, setLiveUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [publishing, setPublishing] = useState(false)
   const [message, setMessage] = useState('')
 
-  async function createPlan() {
+  // Step 1: generate the real website content
+  async function generate() {
     setLoading(true)
     setMessage('')
-    const res = await fetch('/api/operator/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ request }) })
-    const data = await res.json()
-    setLoading(false)
-    if (!res.ok) return setMessage(data.error || 'Could not create plan.')
-    setPlan(data.plan)
+    setLiveUrl(null)
+    setContent(null)
+    try {
+      const res = await fetch('/api/sites/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: request }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setMessage(data.error || 'Could not generate the website.')
+      } else {
+        setContent(data.content)
+      }
+    } catch {
+      setMessage('Could not connect. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  async function approveAndPublish() {
-    if (!plan) return
-    setLoading(true)
-    const res = await fetch('/api/operator/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ planId: plan.id, approved: true }) })
-    const data = await res.json()
-    setLoading(false)
-    if (!res.ok) return setMessage(data.error || 'Could not apply.')
-    setJob(data.job)
-    setMessage(data.userMessage || '')
+  // Step 2: publish the generated content live
+  async function publish() {
+    if (!content) return
+    setPublishing(true)
+    setMessage('')
+    try {
+      const res = await fetch('/api/sites/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setMessage(data.error || 'Could not publish the website.')
+      } else {
+        setLiveUrl(data.url || null)
+        setMessage(data.userMessage || 'Your website is live.')
+      }
+    } catch {
+      setMessage('Could not connect. Please try again.')
+    } finally {
+      setPublishing(false)
+    }
   }
 
-  async function rollback() {
-    if (!job) return
-    setLoading(true)
-    const res = await fetch('/api/operator/rollback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jobId: job.id }) })
-    const data = await res.json()
-    setLoading(false)
-    if (!res.ok) return setMessage(data.error || 'Could not rollback.')
-    setJob(data.job)
-    setMessage(data.userMessage || '')
-  }
+  const fullUrl = liveUrl
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}${liveUrl}`
+    : null
 
   return (
     <main className="sb-page" style={{ maxWidth: 980 }}>
-      <OperatorInput value={request} onChange={setRequest} onPlan={createPlan} loading={loading} />
+      <OperatorInput value={request} onChange={setRequest} onPlan={generate} loading={loading} />
 
-      {plan && (
+      {content && (
         <>
-          <div style={{ marginTop: 12 }}>
-            <OperatorApproval loading={loading} onApprove={approveAndPublish} />
-            {job?.rollbackAvailable && <OperatorRollback loading={loading} onRollback={rollback} />}
-          </div>
-          <OperatorPlan plan={plan} />
+          <OperatorPlan plan={content} />
+
+          {!liveUrl && (
+            <div style={{ marginTop: 12 }}>
+              <OperatorApproval loading={publishing} onApprove={publish} />
+            </div>
+          )}
         </>
       )}
 
-      {job && <OperatorStatus job={job} />}
+      {liveUrl && fullUrl && (
+        <section className="hero-panel" style={{ marginTop: 16, padding: 22 }}>
+          <h3 style={{ color: '#fff', marginTop: 0 }}>🎉 Your website is live</h3>
+          <p style={{ color: 'var(--text-secondary)' }}>Anyone can now visit it here:</p>
+          <a
+            href={liveUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="sb-button-primary"
+            style={{ display: 'inline-block', marginTop: 6, wordBreak: 'break-all' }}
+          >
+            {fullUrl} ↗
+          </a>
+        </section>
+      )}
+
       {message && <p style={{ marginTop: 12, color: 'var(--text-secondary)' }}>{message}</p>}
     </main>
   )

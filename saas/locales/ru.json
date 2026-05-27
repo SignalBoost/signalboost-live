@@ -990,5 +990,6 @@
       "missingId": "Отсутствует ID",
       "approvedMustBeBoolean": "Одобрено должно быть булевым значением"
     }
-  }
+  },
+  "singleLanguageContent": "Контент на одном языке"
 }

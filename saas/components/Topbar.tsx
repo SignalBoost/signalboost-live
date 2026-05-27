@@ -4,11 +4,11 @@ import { supabase } from "../lib/supabaseClient";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { t } from "@/lib/i18n/t";
 
-const PLAN_STYLES: Record<string, { label: string; bg: string; color: string }> = {
-  free:     { label: "FREE",     bg: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)" },
-  starter:  { label: "STARTER",  bg: "rgba(59,130,246,0.18)",  color: "#7ab8ff" },
-  pro:      { label: "PRO",      bg: "rgba(255,195,0,0.18)",   color: "#ffc300" },
-  business: { label: "BUSINESS", bg: "rgba(74,222,128,0.18)",  color: "#4ade80" },
+const PLAN_STYLES: Record<string, { labelKey: string; fallback: string; bg: string; color: string }> = {
+  free:     { labelKey: "plan.free", fallback: "Free", bg: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)" },
+  starter:  { labelKey: "plan.starter", fallback: "Starter", bg: "rgba(59,130,246,0.18)",  color: "#7ab8ff" },
+  pro:      { labelKey: "plan.pro", fallback: "Pro", bg: "rgba(255,195,0,0.18)",   color: "#ffc300" },
+  business: { labelKey: "plan.business", fallback: "Business", bg: "rgba(74,222,128,0.18)",  color: "#4ade80" },
 };
 
 export default function Topbar() {
@@ -72,7 +72,7 @@ export default function Topbar() {
           fontFamily: "monospace",
         }}
       >
-        {planStyle.label}
+        {t(dict, planStyle.labelKey, planStyle.fallback)}
       </span>
 
       <span style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import ResetButton from '@/components/ResetButton'
 
 type Lang = 'en' | 'pt' | 'es' | 'pl' | 'ru'
 
@@ -268,12 +269,17 @@ export default function ApprenticeWorkshopPage() {
     { label: copy.nav.lab, href: '/dashboard/lab' },
   ]
 
+  function resetWorkshop() {
+    setLevel('beginner')
+    setSelected(MODULES[0].id)
+  }
+
   return (
     <main className="sb-page" style={{ background: 'radial-gradient(circle at 12% 10%, rgba(255,195,0,.09), transparent 25%), radial-gradient(circle at 90% 0%, rgba(59,130,246,.10), transparent 28%), linear-gradient(180deg, #07080f 0%, #0a0b14 48%, #090b12 100%)' }}>
       <section style={{ marginBottom: 18, border: '1px solid var(--border-soft)', borderRadius: 18, background: 'rgba(7,10,18,.72)', backdropFilter: 'blur(8px)', padding: '14px 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          <div style={{ color: '#fff', fontWeight: 900, letterSpacing: '.03em' }}>✨ SignalBoost Apprentice Workshop</div>
-          <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Workshop environment · guided tracks · real tools</div>
+          <div style={{ color: '#fff', fontWeight: 900, letterSpacing: '.03em' }}>✨ {copy.workshopTitle}</div>
+          <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>{copy.workshopTagline}</div>
         </div>
         <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {workshopNav.map(item => (
@@ -318,7 +324,7 @@ export default function ApprenticeWorkshopPage() {
 
 
       <section className="hero-panel" style={{ marginTop: 28, padding: 24 }}>
-        <div style={{ color: 'var(--gold)', fontWeight: 950, letterSpacing: '.04em', textTransform: 'uppercase', fontSize: 12 }}>New Core Feature</div>
+        <div style={{ color: 'var(--gold)', fontWeight: 950, letterSpacing: '.04em', textTransform: 'uppercase', fontSize: 12 }}>{copy.badge}</div>
         <h2 style={{ color: '#fff', fontSize: 32, margin: '8px 0 6px' }}>✨ {copy.workshopTitle}</h2>
         <p style={{ color: 'var(--text-secondary)', marginTop: 0, fontWeight: 700 }}>{copy.workshopTagline}</p>
 
@@ -370,6 +376,9 @@ export default function ApprenticeWorkshopPage() {
           </div>
         </div>
         <div style={{ alignSelf: 'end' }}>
+          <div style={{ marginBottom: 10 }}>
+            <ResetButton onReset={resetWorkshop} className="sb-button-ghost" />
+          </div>
           <Link href={activeModule.href} className="sb-button-primary" style={{ width: '100%' }}>
             {copy.start}
           </Link>

@@ -64,16 +64,16 @@ export default function DashboardOverviewPage() {
     if (!projectsLoaded) {
       return {
         icon: '🛰️',
-        title: 'SignalBoost Concierge',
-        message: 'Loading your workspace and checking what needs attention.'
+        title: t(dict, 'dash.concierge.title', 'SignalBoost Concierge'),
+        message: t(dict, 'dash.concierge.loading', 'Loading your workspace and checking what needs attention.')
       }
     }
 
     if (projects.length === 0) {
       return {
         icon: '👋',
-        title: 'SignalBoost Concierge',
-        message: 'Welcome. Start by creating your first project, or ask SignalBoost what to build first.'
+        title: t(dict, 'dash.concierge.title', 'SignalBoost Concierge'),
+        message: t(dict, 'dash.concierge.welcome', 'Welcome. Start by creating your first project, or ask SignalBoost what to build first.')
       }
     }
 
@@ -83,23 +83,27 @@ export default function DashboardOverviewPage() {
     if (draftProjects.length > 0) {
       return {
         icon: '🧭',
-        title: 'SignalBoost Concierge',
-        message: `You have ${draftProjects.length} draft project${draftProjects.length > 1 ? 's' : ''}. Open one and publish when ready.`
+        title: t(dict, 'dash.concierge.title', 'SignalBoost Concierge'),
+        message: draftProjects.length > 1
+          ? t(dict, 'dash.concierge.drafts.many', 'You have {count} draft projects. Open one and publish when ready.').replace('{count}', String(draftProjects.length))
+          : t(dict, 'dash.concierge.drafts.one', 'You have 1 draft project. Open one and publish when ready.')
       }
     }
 
     if (liveProjects.length > 0) {
       return {
         icon: '🚀',
-        title: 'SignalBoost Concierge',
-        message: `You have ${liveProjects.length} live project${liveProjects.length > 1 ? 's' : ''}. Next step: promote, collect reviews, or create content.`
+        title: t(dict, 'dash.concierge.title', 'SignalBoost Concierge'),
+        message: liveProjects.length > 1
+          ? t(dict, 'dash.concierge.live.many', 'You have {count} live projects. Next step: promote, collect reviews, or create content.').replace('{count}', String(liveProjects.length))
+          : t(dict, 'dash.concierge.live.one', 'You have 1 live project. Next step: promote, collect reviews, or create content.')
       }
     }
 
     return {
       icon: '💡',
-      title: 'SignalBoost Concierge',
-      message: 'Need help choosing the next move? Ask SignalBoost below.'
+      title: t(dict, 'dash.concierge.title', 'SignalBoost Concierge'),
+      message: t(dict, 'dash.concierge.help', 'Need help choosing the next move? Ask SignalBoost below.')
     }
   }, [projects, projectsLoaded])
 
@@ -184,7 +188,7 @@ export default function DashboardOverviewPage() {
           messages: newMessages,
           context: {
             userName: firstName,
-            currentPage: 'Dashboard',
+            currentPage: t(dict, 'dash.ai.currentPage', 'Dashboard'),
             userPlan: plan,
             language: lang,
           },
@@ -382,7 +386,7 @@ export default function DashboardOverviewPage() {
             <button
               onClick={() => {
                 setPromptOpen(true)
-                setPromptInput('What should I do next?')
+                setPromptInput(t(dict, 'dash.prompt.nextAction', 'What should I do next?'))
               }}
               className="terminal-text"
               style={{
@@ -397,7 +401,7 @@ export default function DashboardOverviewPage() {
                 whiteSpace: 'nowrap',
               }}
             >
-              ASK_NEXT
+              {t(dict, 'dash.concierge.askNext', 'ASK_NEXT')}
             </button>
           </div>
 

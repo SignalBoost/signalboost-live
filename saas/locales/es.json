@@ -179,6 +179,11 @@
         "name": "Empezar desde cero",
         "desc": "Crea desde cero con ayuda de la IA"
       }
+    },
+    "ai": {
+      "currentPage": "Site Builder",
+      "userPlan": "free",
+      "taskContext": "Building a {template} website called \"{businessName}\". Description: {businessDesc}. Languages: {languages}."
     }
   },
   "audio": {
@@ -373,6 +378,27 @@
       "execute": "ENVIAR",
       "thinking": "PENSANDO...",
       "thinkingMsg": "SignalBoost está pensando..."
+    },
+    "concierge": {
+      "title": "SignalBoost Concierge",
+      "loading": "Loading your workspace and checking what needs attention.",
+      "welcome": "Welcome. Start by creating your first project, or ask SignalBoost what to build first.",
+      "drafts": {
+        "one": "You have 1 draft project. Open one and publish when ready.",
+        "many": "You have {count} draft projects. Open one and publish when ready."
+      },
+      "live": {
+        "one": "You have 1 live project. Next step: promote, collect reviews, or create content.",
+        "many": "You have {count} live projects. Next step: promote, collect reviews, or create content."
+      },
+      "help": "Need help choosing the next move? Ask SignalBoost below.",
+      "askNext": "ASK_NEXT"
+    },
+    "ai": {
+      "currentPage": "Dashboard"
+    },
+    "prompt": {
+      "nextAction": "What should I do next?"
     }
   },
   "auth": {
@@ -602,6 +628,22 @@
       "s4": {
         "title": "Publica en todas partes",
         "desc": "Descarga tus episodios multilingües o publica directamente en tu sitio de podcast SignalBoost."
+      },
+      "step1": {
+        "title": "Upload your episode",
+        "desc": "Bring the finished audio or video."
+      },
+      "step2": {
+        "title": "Choose outputs",
+        "desc": "Clips, captions, languages, voiceover and show notes."
+      },
+      "step3": {
+        "title": "AI crew works",
+        "desc": "Transcript, clip, translation and distribution agents prepare assets."
+      },
+      "step4": {
+        "title": "Publish everywhere",
+        "desc": "Download or prepare content for every channel."
       }
     },
     "deliver": {
@@ -675,6 +717,33 @@
         "f9": "Acceso a API",
         "f10": "Gerente de cuenta dedicado",
         "f11": "Garantía de SLA"
+      },
+      "networkEmailSubject": "SignalBoost Network Plan"
+    },
+    "deliverables": {
+      "voiceover": {
+        "title": "Native voiceover",
+        "desc": "Turn one episode into natural voice versions in multiple languages."
+      },
+      "clips": {
+        "title": "Clip factory",
+        "desc": "Find the best moments and turn them into Shorts, Reels and TikToks."
+      },
+      "captions": {
+        "title": "Captions",
+        "desc": "Generate subtitles, transcripts and social captions automatically."
+      },
+      "website": {
+        "title": "Podcast website",
+        "desc": "A branded home for episodes, show notes, reviews and languages."
+      },
+      "distribution": {
+        "title": "Distribution",
+        "desc": "Prepare content for YouTube, TikTok, Instagram, email and more."
+      },
+      "growth": {
+        "title": "Listener growth",
+        "desc": "Collect reviews, testimonials and audience signals."
       }
     }
   },
@@ -791,6 +860,17 @@
       "published": "Changes published. Rollback is available.",
       "approvedAndPublished": "Update approved and published with rollback point.",
       "rollbackComplete": "Rollback complete. Previous version restored."
+    },
+    "input": {
+      "defaultRequest": "A high-end rooftop cocktail bar in Rio with bottle service and DJ nights"
+    },
+    "preview": {
+      "liveLabel": "Live preview",
+      "dark": "dark",
+      "light": "light",
+      "sections": "sections",
+      "empty": "Your designed website will appear here.",
+      "loading": "Designing your website…"
     }
   },
   "reviews": {

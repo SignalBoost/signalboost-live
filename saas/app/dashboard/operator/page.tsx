@@ -6,8 +6,8 @@ import SitePreview, { type SitePreviewContent } from '@/components/operator/Site
 import ResetButton from '@/components/ResetButton'
 
 export default function OperatorPage() {
-  const { t } = useTranslation()
-  const [request, setRequest] = useState('A high-end rooftop cocktail bar in Rio with bottle service and DJ nights')
+  const { t, lang } = useTranslation()
+  const [request, setRequest] = useState(t('operator.input.defaultRequest', 'A high-end rooftop cocktail bar in Rio with bottle service and DJ nights'))
   const [content, setContent] = useState<SitePreviewContent | null>(null)
   const [liveUrl, setLiveUrl] = useState<string | null>(null)
   const [planId, setPlanId] = useState<string | null>(null)
@@ -22,7 +22,7 @@ export default function OperatorPage() {
       const res = await fetch('/api/operator/plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ request }),
+        body: JSON.stringify({ request, language: lang }),
       })
       const data = await res.json()
       if (!res.ok) setMessage(data.error || t('operator.errors.plan', 'Could not generate the plan.'))
@@ -123,22 +123,22 @@ export default function OperatorPage() {
         {/* ── Right: live-style preview ── */}
         <section className="hero-panel" style={{ padding: 18, minHeight: 360 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ color: 'var(--text-faint)', fontSize: 12, fontWeight: 900, letterSpacing: '.08em', textTransform: 'uppercase' }}>Live preview</div>
-            {content && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{content.theme === 'dark' ? '🌙 dark' : '☀️ light'} · {content.sections?.length || 0} sections</div>}
+            <div style={{ color: 'var(--text-faint)', fontSize: 12, fontWeight: 900, letterSpacing: '.08em', textTransform: 'uppercase' }}>{t('operator.preview.liveLabel', 'Live preview')}</div>
+            {content && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{content.theme === 'dark' ? `🌙 ${t('operator.preview.dark', 'dark')}` : `☀️ ${t('operator.preview.light', 'light')}`} · {content.sections?.length || 0} {t('operator.preview.sections', 'sections')}</div>}
           </div>
 
           {!content && !loading && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 320, color: 'var(--text-faint)', textAlign: 'center', border: '1px dashed var(--border-soft)', borderRadius: 16, padding: 24 }}>
               <div>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>🎨</div>
-                <div style={{ fontSize: 14 }}>Your designed website will appear here.</div>
+                <div style={{ fontSize: 14 }}>{t('operator.preview.empty', 'Your designed website will appear here.')}</div>
               </div>
             </div>
           )}
 
           {loading && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 320, color: 'var(--text-muted)' }}>
-              ✨ Designing your website…
+              ✨ {t('operator.preview.loading', 'Designing your website…')}
             </div>
           )}
 

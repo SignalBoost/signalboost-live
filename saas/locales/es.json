@@ -990,5 +990,6 @@
       "missingId": "Falta el ID",
       "approvedMustBeBoolean": "Aprobado debe ser booleano"
     }
-  }
+  },
+  "singleLanguageContent": "Contenido en un solo idioma"
 }

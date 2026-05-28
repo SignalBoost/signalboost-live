@@ -20,19 +20,23 @@ export type OperatorJob = {
   createdAt: string
   updatedAt: string
   error?: string
+  // Hero video generation (kicked off at publish time, rendered async)
+  videoRequestId?: string
+  videoModel?: string
+  videoUrl?: string
+  videoStatus?: 'rendering' | 'done' | 'failed'
 }
 
 type OperatorStore = {
   plans: Map<string, OperatorPlan>
-  jobs: Map<string, OperatorJob>
+  jobs:  Map<string, OperatorJob>
 }
 
 const g = globalThis as unknown as { __sbOperatorStore?: OperatorStore }
-
 if (!g.__sbOperatorStore) {
   g.__sbOperatorStore = {
     plans: new Map(),
-    jobs: new Map(),
+    jobs:  new Map(),
   }
 }
 

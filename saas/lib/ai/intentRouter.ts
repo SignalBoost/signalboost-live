@@ -37,7 +37,7 @@ const LOCAL_KEYWORDS = [
   // Portuguese
   'bairro', 'zona norte', 'zona sul', 'zona leste', 'zona oeste', 'zn', 'zs', 'zl', 'zo',
   'várzea', 'varzea', 'futebol amador', 'time de', 'equipe de', 'clube de',
-  'restaurante', 'barbearia', 'padaria', 'academia', 'quadra', 'campo', 'igreja local',
+  'restaurante', 'barbearia', 'padaria', 'academia', 'quadra', 'campo', 'igreja',
   'negócio local', 'empresa local', 'pousada', 'bar local', 'mercado', 'feira',
   'são paulo', 'rio de janeiro', 'belo horizonte', 'curitiba', 'salvador', 'fortaleza',
   // English
@@ -72,12 +72,12 @@ const CREATIVE_KEYWORDS = [
 
 const GLOBAL_KEYWORDS = [
   // Landmarks / institutions
-  'louvre', 'eiffel', 'colosseum', 'coliseu', 'machu picchu', 'great wall', 'taj mahal',
+  'louvre', 'museu do louvre', 'torre eiffel', 'eiffel', 'colosseum', 'coliseu', 'machu picchu', 'great wall', 'taj mahal',
   'buckingham', 'vatican', 'vaticano', 'kremlin', 'white house', 'casa branca',
   // Scopes
   'world famous', 'famoso no mundo', 'famosos do mundo', 'most famous in the world',
   'globally', 'worldwide', 'international', 'internacional',
-  'countries', 'países', 'continents', 'continentes',
+  'countries', 'country', 'países', 'pais', 'continents', 'continentes',
   'top 10 world', 'top 10 mundial', 'best in the world', 'melhores do mundo',
   // Famous category + world
   'famous museums', 'museus famosos', 'world museums', 'museus do mundo',
@@ -111,10 +111,12 @@ export function routeIntent(input: {
 
   console.log('intentRouter: scores', scores)
 
-  const topIntent = (Object.entries(scores) as [IntentType, number][])
-    .sort(([, a], [, b]) => b - a)[0]
-
-  const [intent, topScore] = topIntent
+  const priority: IntentType[] = ['local_knowledge', 'creative', 'global_knowledge', 'business']
+  const [intent, topScore] = (Object.entries(scores) as [IntentType, number][])
+    .sort(([intentA, scoreA], [intentB, scoreB]) => {
+      if (scoreB !== scoreA) return scoreB - scoreA
+      return priority.indexOf(intentA) - priority.indexOf(intentB)
+    })[0]
 
   // Default to business if no strong signal
   if (topScore === 0) {

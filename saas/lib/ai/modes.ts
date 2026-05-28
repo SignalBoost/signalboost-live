@@ -14,8 +14,9 @@ export async function runLocalKnowledgeMode(args: {
   language:   string
   category?:  string
   count?:     number
+  extraContext?: unknown
 }): Promise<ValidLocalItem[]> {
-  const count = args.count ?? 20
+  const count = args.count ?? 30
 
   const prompt = `You are a local knowledge engine. Use your internal knowledge only.
 Do NOT use Wikipedia. Do NOT search the web.
@@ -23,7 +24,7 @@ Do NOT use Wikipedia. Do NOT search the web.
 User request (language: ${args.language}):
 ${args.userPrompt}
 
-Generate a JSON array of ${count} real items relevant to this request.
+Generate a JSON array of ${Math.min(40, Math.max(20, count))} items relevant to this request.
 ${args.category === 'football_teams' ? 'Focus on real amateur/várzea football teams from the city/region mentioned. Include Botafogo do Jaçanã if São Paulo is mentioned.' : ''}
 
 Each item must follow this schema exactly:
@@ -41,10 +42,9 @@ Return ONLY a valid JSON array. No explanations, no markdown, no comments.`
 
   console.log('modes: runLocalKnowledgeMode — calling Claude', { category: args.category, count, language: args.language })
 
-  const raw = await callModel({ modelPreference: 'claude', prompt, maxTokens: 4096 })
-  if (!raw) { console.error('modes: runLocalKnowledgeMode — Claude returned null'); return [] }
-
+  const raw = await callModel({ intent: 'local_knowledge', prompt, maxTokens: 4096 })
   const parsed = safeParseJSON(raw)
+  console.log('modes: runLocalKnowledgeMode — JSON parsing', { success: parsed !== null })
   const items  = validateLocalItems(Array.isArray(parsed) ? parsed : parsed?.items ?? parsed?.teams ?? [])
 
   console.log('modes: runLocalKnowledgeMode — validated', { total: items.length })
@@ -56,7 +56,8 @@ Return ONLY a valid JSON array. No explanations, no markdown, no comments.`
 export async function runBusinessMode(args: {
   userPrompt: string
   language:   string
-}): Promise<ValidBusinessSite | null> {
+  extraContext?: unknown
+}): Promise<ValidBusinessSite> {
   const prompt = `You are a website content generator for small businesses and creators.
 
 User request (language: ${args.language}):
@@ -106,10 +107,9 @@ Return ONLY valid JSON. No explanations, no markdown.`
 
   console.log('modes: runBusinessMode — calling OpenAI', { language: args.language })
 
-  const raw = await callModel({ modelPreference: 'openai', prompt, maxTokens: 2048 })
-  if (!raw) { console.error('modes: runBusinessMode — model returned null'); return null }
-
+  const raw = await callModel({ intent: 'business', prompt, maxTokens: 2048 })
   const parsed = safeParseJSON(raw)
+  console.log('modes: runBusinessMode — JSON parsing', { success: parsed !== null })
   return validateBusinessSite(parsed)
 }
 
@@ -118,7 +118,8 @@ Return ONLY valid JSON. No explanations, no markdown.`
 export async function runCreativeMode(args: {
   userPrompt: string
   language:   string
-}): Promise<ValidCreativeWorld | null> {
+  extraContext?: unknown
+}): Promise<ValidCreativeWorld> {
   const prompt = `You are a creative world builder.
 
 User request (language: ${args.language}):
@@ -154,10 +155,9 @@ Return ONLY valid JSON.`
 
   console.log('modes: runCreativeMode — calling Claude', { language: args.language })
 
-  const raw = await callModel({ modelPreference: 'claude', prompt, maxTokens: 2048 })
-  if (!raw) { console.error('modes: runCreativeMode — model returned null'); return null }
-
+  const raw = await callModel({ intent: 'creative', prompt, maxTokens: 2048 })
   const parsed = safeParseJSON(raw)
+  console.log('modes: runCreativeMode — JSON parsing', { success: parsed !== null })
   return validateCreativeWorld(parsed)
 }
 
@@ -166,7 +166,8 @@ Return ONLY valid JSON.`
 export async function runGlobalKnowledgeMode(args: {
   userPrompt: string
   language:   string
-}): Promise<ValidGlobalKnowledge | null> {
+  extraContext?: unknown
+}): Promise<ValidGlobalKnowledge> {
   const prompt = `You are a global knowledge explainer.
 
 User request (language: ${args.language}):
@@ -185,9 +186,8 @@ Return ONLY valid JSON.`
 
   console.log('modes: runGlobalKnowledgeMode — calling OpenAI', { language: args.language })
 
-  const raw = await callModel({ modelPreference: 'openai', prompt, maxTokens: 1024 })
-  if (!raw) { console.error('modes: runGlobalKnowledgeMode — model returned null'); return null }
-
+  const raw = await callModel({ intent: 'global_knowledge', prompt, maxTokens: 1024 })
   const parsed = safeParseJSON(raw)
+  console.log('modes: runGlobalKnowledgeMode — JSON parsing', { success: parsed !== null })
   return validateGlobalKnowledge(parsed)
 }

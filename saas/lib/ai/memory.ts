@@ -25,7 +25,7 @@ export async function saveLocalItems(
       neighborhood: item.neighborhood,
       zone:         item.zone,
       founded:      item.founded,
-      colors:       JSON.stringify(item.colors),
+      colors:       item.colors,
       description:  item.description,
       language:     context.language,
       user_prompt:  context.userPrompt.slice(0, 500),

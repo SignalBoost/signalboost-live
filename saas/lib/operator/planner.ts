@@ -1,3 +1,5 @@
+import { routeIntent } from '@/lib/ai/intentRouter'
+import { runGlobalKnowledgeMode, runLocalKnowledgeMode } from '@/lib/ai/modes'
 import { OperatorPlan, WikiContentItem, newId } from './store'
 
 const WEBSITE_HINTS = ['website', 'homepage', 'landing', 'restaurant', 'real estate', 'colors', 'button', 'reservation', 'polish', 'portuguese']
@@ -132,53 +134,6 @@ function extractSearchQuery(request: string): string {
   return stripped.length > 5 ? stripped.trim() : request.trim()
 }
 
-// ── Wikipedia fetch (server-side, no CORS origin param) ──────────────────────
-const WIKI_API   = 'https://en.wikipedia.org/w/api.php'
-const USER_AGENT = 'SignalBoostApp/1.0 (https://saas.signalboostapp.com; support@signalboostapp.com)'
-
-async function fetchWikipediaEnrichment(query: string): Promise<WikiContentItem[]> {
-  try {
-    // Step 1: search
-    const searchParams = new URLSearchParams({
-      action: 'query', list: 'search', srsearch: query,
-      srlimit: '8', format: 'json',
-    })
-    const searchRes = await fetch(`${WIKI_API}?${searchParams}`, {
-      headers: { 'User-Agent': USER_AGENT },
-    })
-    if (!searchRes.ok) return []
-    const searchData = await searchRes.json()
-    const pageIds: number[] = (searchData?.query?.search ?? []).map((r: { pageid: number }) => r.pageid)
-    if (pageIds.length === 0) return []
-
-    // Step 2: fetch page details
-    const detailParams = new URLSearchParams({
-      action: 'query', pageids: pageIds.join('|'),
-      prop: 'extracts|pageimages|info',
-      exintro: 'true', explaintext: 'true', exsentences: '2',
-      piprop: 'original', inprop: 'url', format: 'json',
-    })
-    const detailRes = await fetch(`${WIKI_API}?${detailParams}`, {
-      headers: { 'User-Agent': USER_AGENT },
-    })
-    if (!detailRes.ok) return []
-    const detailData = await detailRes.json()
-    const pages = Object.values(detailData?.query?.pages ?? {}) as any[]
-
-    return pages
-      .filter((p: any) => p.title && p.extract)
-      .map((p: any) => ({
-        title:       p.title,
-        description: p.extract?.trim() ?? null,
-        image_url:   p.original?.source ?? null,
-        wiki_url:    p.fullurl ?? `https://en.wikipedia.org/?curid=${p.pageid}`,
-      }))
-  } catch (err) {
-    console.error('Operator Wikipedia enrichment error:', err)
-    return []
-  }
-}
-
 // ── Safe fallback ─────────────────────────────────────────────────────────────
 function templatePlan(request: string, language?: string): OperatorPlan {
   const lower = request.toLowerCase()
@@ -260,18 +215,36 @@ RULES:
 export async function buildPlan(request: string, language?: string): Promise<OperatorPlan> {
   const requestedLanguage = (language || '').trim().toLowerCase()
 
-  // ── Step 1: Detect if this request needs real-world data ──────────────────
+  // ── Step 1: Detect if this request needs orchestrated AI data ─────────────
   let contentData: WikiContentItem[] | undefined
   let contentQuery: string | undefined
+  const routedIntent = routeIntent({ userPrompt: request, language })
 
-  if (detectsRealWorldContent(request)) {
-    contentQuery = extractSearchQuery(request)
-    console.log('Operator: real-world content detected, fetching Wikipedia for:', contentQuery)
-    const fetched = await fetchWikipediaEnrichment(contentQuery)
-    if (fetched.length > 0) {
-      contentData = fetched
-      console.log(`Operator: enriched plan with ${fetched.length} Wikipedia items`)
+  if (routedIntent.intent === 'local_knowledge') {
+    contentQuery = request
+    console.log('Operator: local content detected, using AI orchestration:', contentQuery)
+    const items = await runLocalKnowledgeMode({ userPrompt: request, language: routedIntent.language, count: 20 })
+    if (items.length > 0) {
+      contentData = items.slice(0, 10).map(item => ({
+        title: item.name,
+        description: [item.neighborhood, item.zone, item.description].filter(Boolean).join(' — '),
+        image_url: null,
+        wiki_url: `local-knowledge://${encodeURIComponent(item.name)}`,
+      }))
+      console.log(`Operator: enriched plan with ${contentData.length} local AI items`)
     }
+  } else if (routedIntent.intent === 'global_knowledge' || detectsRealWorldContent(request)) {
+    contentQuery = extractSearchQuery(request)
+    console.log('Operator: global content detected, using AI orchestration:', contentQuery)
+    const knowledge = await runGlobalKnowledgeMode({ userPrompt: contentQuery, language: routedIntent.language })
+    const entities = knowledge.related_entities.length > 0 ? knowledge.related_entities : [knowledge.topic]
+    contentData = entities.slice(0, 10).map((entity, index) => ({
+      title: entity,
+      description: index === 0 ? knowledge.summary : knowledge.key_points[index - 1] || knowledge.summary,
+      image_url: null,
+      wiki_url: `global-knowledge://${encodeURIComponent(entity)}`,
+    }))
+    console.log(`Operator: enriched plan with ${contentData.length} global AI entities`)
   }
 
   // ── Step 2: Build the Claude prompt, injecting real data if available ─────
@@ -280,10 +253,10 @@ export async function buildPlan(request: string, language?: string): Promise<Ope
     : ''
 
   const dataDirective = contentData && contentData.length > 0
-    ? `\n\nREAL_WORLD_DATA (fetched automatically from Wikipedia for this request):\n${contentData
+    ? `\n\nAI_ORCHESTRATION_DATA (generated by the intent router for this request):\n${contentData
         .slice(0, 6)
         .map((item, i) => `${i + 1}. ${item.title}${item.description ? ': ' + item.description.slice(0, 120) : ''}`)
-        .join('\n')}\n\nIMPORTANT: The site will be populated with these real items. Reference them by name in your preview strings so the user knows their site will feature actual real-world content, not placeholders.`
+        .join('\n')}\n\nIMPORTANT: The site will be populated with these real items. Reference them by name in your preview strings so the user knows their site will feature orchestrated AI content, not placeholders.`
     : ''
 
   const raw = await callClaude(

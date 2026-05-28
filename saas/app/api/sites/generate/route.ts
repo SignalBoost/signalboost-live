@@ -13,11 +13,10 @@ import { createClient } from '@supabase/supabase-js'
 import {
   buildFallbackItems,
   promptPreprocessor,
-  validateItems,
   type ValidatedItem,
 } from '@/lib/ai/promptPreprocessor'
-import { routeDataRequest } from '@/lib/ai/localKnowledge'
-import { runLocalKnowledgeMode, type ValidLocalItem } from '@/lib/ai/modes'
+import { routeIntent } from '@/lib/ai/intentRouter'
+import { runBusinessMode, runGlobalKnowledgeMode, runLocalKnowledgeMode, type ValidLocalItem } from '@/lib/ai/modes'
 import {
   getCachedLocalItems,
   getSiteDesignCache,
@@ -26,11 +25,6 @@ import {
 } from '@/lib/ai/memory'
 
 export const dynamic = 'force-dynamic'
-
-const WIKI_API   = 'https://en.wikipedia.org/w/api.php'
-const USER_AGENT = 'SignalBoostApp/1.0 (https://saas.signalboostapp.com; support@signalboostapp.com)'
-
-type WikiItem = { title: string; description: string; image_url: string | null; wiki_url: string }
 
 function supabaseAdmin() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
@@ -46,48 +40,8 @@ async function saveValidatedItems(items: ValidatedItem[]): Promise<number> {
   } catch (err) { console.error('Sites generate: DB save exception:', err); return 0 }
 }
 
-async function saveWikipediaItems(query: string, wikiItems: WikiItem[]): Promise<number> {
-  const { items, skippedRows } = validateItems(
-    wikiItems.map(item => ({
-      name:        item.title,
-      description: item.description,
-      image_url:   item.image_url,
-      source_url:  item.wiki_url,
-      metadata:    { source: 'wikipedia', query, license: 'CC-BY-SA' },
-    })),
-    query,
-  )
-  skippedRows.forEach(row => console.warn('Sites generate: skipped Wikipedia row', row))
-  return saveValidatedItems(items)
-}
-
 async function seedFallbackItems(query: string | null): Promise<number> {
   return saveValidatedItems(buildFallbackItems(query, 30))
-}
-
-async function fetchWikipediaItems(query: string): Promise<WikiItem[]> {
-  try {
-    const searchParams = new URLSearchParams({ action: 'query', list: 'search', srsearch: query, srlimit: '12', format: 'json' })
-    const searchRes = await fetch(`${WIKI_API}?${searchParams}`, { headers: { 'User-Agent': USER_AGENT } })
-    if (!searchRes.ok) return []
-    const searchData = await searchRes.json()
-    const pageIds: number[] = (searchData?.query?.search ?? []).map((r: any) => r.pageid)
-    if (pageIds.length === 0) return []
-    const detailParams = new URLSearchParams({
-      action: 'query', pageids: pageIds.join('|'), prop: 'extracts|pageimages|info',
-      exintro: 'true', explaintext: 'true', exsentences: '2', piprop: 'original', inprop: 'url', format: 'json',
-    })
-    const detailRes = await fetch(`${WIKI_API}?${detailParams}`, { headers: { 'User-Agent': USER_AGENT } })
-    if (!detailRes.ok) return []
-    const detailData = await detailRes.json()
-    const pages = Object.values(detailData?.query?.pages ?? {}) as any[]
-    return pages.filter((p: any) => p.title && p.extract).map((p: any) => ({
-      title:       p.title,
-      description: (p.extract || '').trim().slice(0, 200),
-      image_url:   p.original?.source ?? null,
-      wiki_url:    p.fullurl ?? `https://en.wikipedia.org/?curid=${p.pageid}`,
-    }))
-  } catch (err) { console.error('Sites generate: Wikipedia fetch error', err); return [] }
 }
 
 async function callHaiku(systemPrompt: string, userContent: string): Promise<string | null> {
@@ -121,7 +75,9 @@ LANGUAGE (CRITICAL): Detect the user's language and write EVERY visible text val
 
 LOCAL_KNOWLEDGE_DATA (CRITICAL when provided): These are REAL items. You MUST use them ALL. Include a gallery or feature-grid section listing every item by name with neighborhood and description. Do NOT replace with fictional items.
 
-REAL_WORLD_DATA (CRITICAL when provided): Real items from Wikipedia. Use them exactly in gallery/feature-grid sections.
+GLOBAL_KNOWLEDGE_DATA (CRITICAL when provided): Use the supplied summary, key points, and related entities to ground the page.
+
+BUSINESS_SITE_CONTENT (CRITICAL when provided): Use the supplied structured business copy for hero, services, FAQ, and contact sections.
 
 DESIGN LIKE A SENIOR DESIGNER:
 - Bold, cohesive aesthetic. Dark theme for dramatic/tech/premium; light for friendly/food/services.
@@ -150,7 +106,7 @@ function buildRecoveryContent(description: string, items: ValidatedItem[]) {
     sections: [
       { type: 'hero', eyebrow: 'AI-ready prompt', heading: 'Your request is ready to launch', subheading: description, cta: 'Explore the data', ctaSecondary: 'Contact us' },
       { type: 'feature-grid', eyebrow: 'Fallback data', heading: 'Curated starter items', subheading: 'Demo records keep the page useful while live data recovers.', items: cards },
-      { type: 'cta', heading: 'Ready for real data', subheading: 'Connect Wikipedia, CSV, scraper, or API sources when available.', cta: 'Generate again' },
+      { type: 'cta', heading: 'Ready for real data', subheading: 'Use AI orchestration, CSV, scraper, or API sources when available.', cta: 'Generate again' },
       { type: 'contact', eyebrow: 'SignalBoost', heading: 'Keep building', body: 'We recovered gracefully and seeded safe demo content.', email: 'support@signalboostapp.com', phone: '', address: '' },
     ],
   }
@@ -174,7 +130,8 @@ export async function POST(req: NextRequest) {
 
   const trimmed      = description.trim()
   const language     = (body?.language || 'en').toString()
-  const routing      = routeDataRequest(trimmed)
+  const routedIntent = routeIntent({ userPrompt: trimmed, language })
+  const routing      = { mode: routedIntent.intent, category: 'general', confidence: routedIntent.confidence, localQuery: trimmed, wikiQuery: trimmed }
   const preprocessed = promptPreprocessor(trimmed)
 
   const stream = new TransformStream()
@@ -182,8 +139,9 @@ export async function POST(req: NextRequest) {
 
   ;(async () => {
     try {
-      let wikiItems:   WikiItem[]       = []
       let localItems:  ValidLocalItem[] = []
+      let businessContent: Awaited<ReturnType<typeof runBusinessMode>> | null = null
+      let globalKnowledge: Awaited<ReturnType<typeof runGlobalKnowledgeMode>> | null = null
       let fallbackSeeded                = false
       let promptDataBlock               = ''
       let localCacheHit                 = false
@@ -211,9 +169,11 @@ export async function POST(req: NextRequest) {
         type: 'status', step: 'routing',
         message: routing.mode === 'local_knowledge'
           ? `🔍 Checking local knowledge cache for ${routing.category.replace('_', ' ')}…`
-          : routing.mode === 'wikipedia'
-            ? `🌐 Searching Wikipedia for "${routing.wikiQuery}"…`
-            : '🔍 Analyzing your request…',
+          : routing.mode === 'global_knowledge'
+            ? '🌐 Building global knowledge context with AI…'
+            : routing.mode === 'business'
+              ? '🏢 Generating business site content with AI…'
+              : '🔍 Analyzing your request…',
       }))
 
       if (routing.mode === 'local_knowledge') {
@@ -250,27 +210,38 @@ export async function POST(req: NextRequest) {
           promptDataBlock = `\n\nLOCAL_KNOWLEDGE_DATA (real items — use ALL of these in the site):\n${itemList}\n\nIMPORTANT: Include a gallery or feature-grid section listing EVERY item above by name.`
         }
 
-      } else if (routing.mode === 'wikipedia' && routing.wikiQuery) {
-        wikiItems = await fetchWikipediaItems(routing.wikiQuery)
-        if (wikiItems.length > 0) {
-          saveWikipediaItems(routing.wikiQuery, wikiItems).catch(() => {})
-          await writer.write(encode({
-            type: 'status', step: 'data_ready',
-            message: `✅ Found ${wikiItems.length} Wikipedia articles — designing with Haiku…`,
-            items: wikiItems.slice(0, 5).map(i => i.title),
-          }))
-          const itemList = wikiItems.slice(0, 12).map((item, i) =>
-            `${i + 1}. ${item.title}${item.description ? ' — ' + item.description : ''}`,
-          ).join('\n')
-          promptDataBlock = `\n\nREAL_WORLD_DATA (from Wikipedia):\n${itemList}\n\nIMPORTANT: Include a gallery or feature-grid section with these real items by name.`
-        }
+      } else if (routing.mode === 'global_knowledge') {
+        globalKnowledge = await runGlobalKnowledgeMode({ userPrompt: trimmed, language })
+        await writer.write(encode({ type: 'status', step: 'data_ready', message: '✅ Global knowledge context ready — designing with Haiku…' }))
+        promptDataBlock = `
+
+GLOBAL_KNOWLEDGE_DATA:
+Topic: ${globalKnowledge.topic}
+Summary: ${globalKnowledge.summary}
+Key points:
+${globalKnowledge.key_points.map((point, i) => `${i + 1}. ${point}`).join('\n')}
+Related entities: ${globalKnowledge.related_entities.join(', ')}
+
+IMPORTANT: Ground the site in this structured global knowledge.`
+      } else if (routing.mode === 'business') {
+        businessContent = await runBusinessMode({ userPrompt: trimmed, language })
+        await writer.write(encode({ type: 'status', step: 'data_ready', message: '✅ Business copy ready — designing with Haiku…' }))
+        promptDataBlock = `
+
+BUSINESS_SITE_CONTENT:
+${JSON.stringify(businessContent, null, 2)}
+
+IMPORTANT: Use this structured copy to render hero, services, testimonials, FAQ, and contact sections.`
       }
 
-      if (localItems.length === 0 && wikiItems.length === 0 && routing.mode !== 'none') {
+      if (localItems.length === 0 && !businessContent && !globalKnowledge) {
         seedFallbackItems(routing.localQuery || routing.wikiQuery).catch(() => {})
         const fallbackItems = buildFallbackItems(routing.localQuery || routing.wikiQuery, 8)
         fallbackSeeded = true
-        promptDataBlock = `\n\nFALLBACK_DEMO_DATA:\n${fallbackItems.map((item, i) => `${i + 1}. ${item.name} — ${item.description}`).join('\n')}`
+        promptDataBlock = `
+
+FALLBACK_DEMO_DATA:
+${fallbackItems.map((item, i) => `${i + 1}. ${item.name} — ${item.description}`).join('\n')}`
       }
 
       // ── Layer 3: Haiku site design ────────────────────────────────────────
@@ -310,12 +281,12 @@ export async function POST(req: NextRequest) {
         type:        'result',
         content:     parsed,
         localItems:  localItems.length > 0 ? localItems : undefined,
-        wikiItems:   wikiItems.length > 0  ? wikiItems  : undefined,
-        attribution: wikiItems.length > 0  ? 'Data from Wikipedia, licensed under CC-BY-SA 4.0.' : undefined,
+        businessContent: businessContent || undefined,
+        globalKnowledge: globalKnowledge || undefined,
         preprocessor: {
           mode: routing.mode, category: routing.category, confidence: routing.confidence,
           siteDesignCacheHit, localCacheHit, fallbackUsed: fallbackSeeded,
-          localCount: localItems.length, wikiCount: wikiItems.length,
+          localCount: localItems.length, businessContent: Boolean(businessContent), globalKnowledge: Boolean(globalKnowledge),
         },
       }))
 

@@ -117,10 +117,10 @@ export function validateLocalItems(raw: any): ValidLocalItem[] {
   return valid
 }
 
-export function validateBusinessSite(raw: any): ValidBusinessSite | null {
+export function validateBusinessSite(raw: any): ValidBusinessSite {
   if (!raw || typeof raw !== 'object') {
-    console.warn('validation: validateBusinessSite — invalid input')
-    return null
+    console.warn('validation: validateBusinessSite — invalid input; returning fallback')
+    raw = {}
   }
 
   // Safe fallback defaults
@@ -165,10 +165,10 @@ export function validateBusinessSite(raw: any): ValidBusinessSite | null {
   return site
 }
 
-export function validateCreativeWorld(raw: any): ValidCreativeWorld | null {
+export function validateCreativeWorld(raw: any): ValidCreativeWorld {
   if (!raw || typeof raw !== 'object') {
-    console.warn('validation: validateCreativeWorld — invalid input')
-    return null
+    console.warn('validation: validateCreativeWorld — invalid input; returning fallback')
+    raw = {}
   }
 
   return {
@@ -196,10 +196,10 @@ export function validateCreativeWorld(raw: any): ValidCreativeWorld | null {
   }
 }
 
-export function validateGlobalKnowledge(raw: any): ValidGlobalKnowledge | null {
+export function validateGlobalKnowledge(raw: any): ValidGlobalKnowledge {
   if (!raw || typeof raw !== 'object') {
-    console.warn('validation: validateGlobalKnowledge — invalid input')
-    return null
+    console.warn('validation: validateGlobalKnowledge — invalid input; returning fallback')
+    raw = {}
   }
 
   return {

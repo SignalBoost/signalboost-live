@@ -1,45 +1,47 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { newId, operatorStore, type OperatorJob } from '@/lib/operator/store'
+export type OperatorPlan = {
+  id: string
+  request: string
+  clarificationQuestion?: string
+  summary: string
+  steps: string[]
+  fileTargets: string[]
+  preview: string[]
+  requiresApproval: boolean
+  createdAt: string
+}
 
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json()
-    const planId = body?.planId
-    const approved = body?.approved
+export type OperatorJob = {
+  id: string
+  planId: string
+  state: 'queued' | 'applying' | 'committed' | 'deploying' | 'published' | 'failed' | 'rolled_back'
+  commitMessage: string
+  publishMessage: string
+  rollbackAvailable: boolean
+  createdAt: string
+  updatedAt: string
+  error?: string
+  // Hero video generation (kicked off at publish time, rendered async)
+  videoRequestId?: string
+  videoModel?: string
+  videoUrl?: string
+  videoStatus?: 'rendering' | 'done' | 'failed'
+}
 
-    if (!planId || typeof planId !== 'string') {
-      return NextResponse.json({ error: 'operator.errors.planIdRequired' }, { status: 400 })
-    }
+type OperatorStore = {
+  plans: Map<string, OperatorPlan>
+  jobs:  Map<string, OperatorJob>
+}
 
-    const plan = operatorStore.plans.get(planId)
-    if (!plan) {
-      return NextResponse.json({ error: 'operator.errors.planNotFound' }, { status: 404 })
-    }
-
-    if (!approved) {
-      return NextResponse.json({ error: 'operator.errors.approvalRequired' }, { status: 400 })
-    }
-
-    const now = new Date().toISOString()
-    const job: OperatorJob = {
-      id: newId('job'),
-      planId,
-      state: 'published',
-      commitMessage: `operator.commitPrefix ${plan.request.slice(0, 72)}`,
-      publishMessage: 'operator.success.published',
-      rollbackAvailable: true,
-      createdAt: now,
-      updatedAt: now,
-    }
-
-    operatorStore.jobs.set(job.id, job)
-
-    return NextResponse.json({
-      job,
-      userMessage: 'operator.success.approvedAndPublished',
-    })
-  } catch (error) {
-    console.error('Operator apply error', error)
-    return NextResponse.json({ error: 'operator.errors.applyFailed' }, { status: 500 })
+const g = globalThis as unknown as { __sbOperatorStore?: OperatorStore }
+if (!g.__sbOperatorStore) {
+  g.__sbOperatorStore = {
+    plans: new Map(),
+    jobs:  new Map(),
   }
+}
+
+export const operatorStore = g.__sbOperatorStore
+
+export function newId(prefix: string) {
+  return `${prefix}_${Math.random().toString(36).slice(2, 10)}`
 }

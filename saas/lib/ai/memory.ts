@@ -15,7 +15,7 @@ function supabaseAdmin() {
 
 export async function saveLocalItems(
   items:   ValidLocalItem[],
-  context: { userPrompt: string; language: string },
+  context: { userPrompt: string; language: string; category?: string },
 ): Promise<void> {
   if (items.length === 0) return
   try {
@@ -58,6 +58,109 @@ export async function saveBusinessSite(
   }
 }
 
+// ── Cache lookup — find previously generated items for similar requests ────────
+//
+// Strategy: extract key location/topic words from the current prompt and check
+// if the ai_local_items table has rows whose user_prompt contains those words.
+// If we find >= minItems rows, return them — skip Claude entirely.
+
+function extractCacheKeywords(userPrompt: string): string[] {
+  const lower = userPrompt.toLowerCase()
+
+  // Known cities / zones
+  const cities = [
+    'são paulo', 'sao paulo', 'sp',
+    'rio de janeiro', 'rj',
+    'belo horizonte', 'bh',
+    'curitiba', 'salvador', 'fortaleza', 'recife', 'manaus',
+    'zona norte', 'zona sul', 'zona leste', 'zona oeste',
+    'jaçanã', 'tucuruvi', 'santana', 'penha', 'tatuapé',
+    'ipiranga', 'vila prudente', 'pirituba', 'brasilândia',
+  ]
+
+  // Known categories
+  const categories = [
+    'várzea', 'varzea', 'futebol', 'football', 'soccer',
+    'restaurante', 'restaurant', 'padaria', 'bakery',
+    'academia', 'gym', 'barbearia', 'barbershop',
+    'museu', 'museum', 'igreja', 'church', 'praia', 'beach',
+  ]
+
+  const found: string[] = []
+  for (const kw of [...cities, ...categories]) {
+    if (lower.includes(kw)) found.push(kw)
+  }
+
+  return found
+}
+
+export async function getCachedLocalItems(context: {
+  userPrompt: string
+  language:   string
+  minItems?:  number
+  maxAge?:    number // hours, default 48
+}): Promise<ValidLocalItem[] | null> {
+  const minItems = context.minItems ?? 10
+  const maxAge   = context.maxAge   ?? 48
+
+  try {
+    const keywords = extractCacheKeywords(context.userPrompt)
+    if (keywords.length === 0) {
+      console.log('memory: getCachedLocalItems — no cache keywords found')
+      return null
+    }
+
+    const db = supabaseAdmin()
+
+    // Look for rows saved in the last maxAge hours whose user_prompt
+    // contains at least one of our keywords
+    const since = new Date(Date.now() - maxAge * 60 * 60 * 1000).toISOString()
+
+    // Build OR filter: user_prompt ilike any keyword
+    const orFilter = keywords
+      .slice(0, 5) // limit to 5 keywords to keep query simple
+      .map(kw => `user_prompt.ilike.%${kw}%`)
+      .join(',')
+
+    const { data, error } = await db
+      .from('ai_local_items')
+      .select('name, neighborhood, zone, founded, colors, description')
+      .eq('language', context.language)
+      .gte('created_at', since)
+      .or(orFilter)
+      .order('created_at', { ascending: false })
+      .limit(40)
+
+    if (error) {
+      console.error('memory: getCachedLocalItems error', error.message)
+      return null
+    }
+
+    if (!data || data.length < minItems) {
+      console.log(`memory: getCachedLocalItems — cache miss (${data?.length ?? 0} rows, need ${minItems})`)
+      return null
+    }
+
+    console.log(`memory: getCachedLocalItems — cache HIT (${data.length} rows, keywords: ${keywords.join(', ')})`)
+
+    return data.map(row => ({
+      name:         row.name,
+      neighborhood: row.neighborhood,
+      zone:         row.zone,
+      founded:      row.founded,
+      colors:       Array.isArray(row.colors)
+        ? row.colors
+        : typeof row.colors === 'string'
+          ? (() => { try { return JSON.parse(row.colors) } catch { return [] } })()
+          : [],
+      description:  row.description,
+    }))
+  } catch (err) {
+    console.error('memory: getCachedLocalItems exception', err)
+    return null
+  }
+}
+
 // ── Retrieve recent local items ───────────────────────────────────────────────
 
 export async function getRecentLocalItems(context: {
@@ -81,7 +184,11 @@ export async function getRecentLocalItems(context: {
       neighborhood: row.neighborhood,
       zone:         row.zone,
       founded:      row.founded,
-      colors:       Array.isArray(row.colors) ? row.colors : (typeof row.colors === 'string' ? JSON.parse(row.colors) : []),
+      colors:       Array.isArray(row.colors)
+        ? row.colors
+        : typeof row.colors === 'string'
+          ? (() => { try { return JSON.parse(row.colors) } catch { return [] } })()
+          : [],
       description:  row.description,
     }))
   } catch (err) {

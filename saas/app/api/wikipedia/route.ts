@@ -11,8 +11,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const WIKI_API = 'https://en.wikipedia.org/w/api.php'
-const RESULTS  = 10
+const WIKI_API   = 'https://en.wikipedia.org/w/api.php'
+const RESULTS    = 10
+const USER_AGENT = 'SignalBoostApp/1.0 (https://saas.signalboostapp.com; support@signalboostapp.com)'
 
 function supabase() {
   return createClient(
@@ -21,25 +22,24 @@ function supabase() {
   )
 }
 
-// ── Wikipedia helpers ─────────────────────────────────────────────────────────
-
 async function searchPageIds(query: string): Promise<number[]> {
   const params = new URLSearchParams({
-    action:  'query',
-    list:    'search',
+    action:   'query',
+    list:     'search',
     srsearch: query,
     srlimit:  String(RESULTS),
-    format:  'json',
-    origin:  '*',
+    format:   'json',
   })
-  const res  = await fetch(`${WIKI_API}?${params}`)
+  const res = await fetch(`${WIKI_API}?${params}`, {
+    headers: { 'User-Agent': USER_AGENT },
+  })
+  if (!res.ok) throw new Error(`Wikipedia search failed: ${res.status}`)
   const data = await res.json()
   return (data?.query?.search ?? []).map((r: { pageid: number }) => r.pageid)
 }
 
 async function fetchPageDetails(pageIds: number[]): Promise<WikiItem[]> {
   if (pageIds.length === 0) return []
-
   const params = new URLSearchParams({
     action:      'query',
     pageids:     pageIds.join('|'),
@@ -50,13 +50,13 @@ async function fetchPageDetails(pageIds: number[]): Promise<WikiItem[]> {
     piprop:      'original',
     inprop:      'url',
     format:      'json',
-    origin:      '*',
   })
-
-  const res  = await fetch(`${WIKI_API}?${params}`)
-  const data = await res.json()
+  const res = await fetch(`${WIKI_API}?${params}`, {
+    headers: { 'User-Agent': USER_AGENT },
+  })
+  if (!res.ok) throw new Error(`Wikipedia page fetch failed: ${res.status}`)
+  const data  = await res.json()
   const pages = Object.values(data?.query?.pages ?? {}) as WikiPage[]
-
   return pages.map(page => ({
     title:       page.title ?? '',
     description: page.extract?.trim() ?? null,
@@ -66,11 +66,11 @@ async function fetchPageDetails(pageIds: number[]): Promise<WikiItem[]> {
 }
 
 type WikiPage = {
-  pageid:   number
-  title?:   string
-  extract?: string
+  pageid:    number
+  title?:    string
+  extract?:  string
   original?: { source?: string }
-  fullurl?: string
+  fullurl?:  string
 }
 
 type WikiItem = {
@@ -80,18 +80,13 @@ type WikiItem = {
   wiki_url:    string
 }
 
-// ── Route handler ─────────────────────────────────────────────────────────────
-
 export async function POST(req: NextRequest) {
   try {
     const body  = await req.json()
     const query = (body?.query ?? '').trim()
-
     if (!query) {
       return NextResponse.json({ error: 'query is required' }, { status: 400 })
     }
-
-    // 1. Search Wikipedia
     const pageIds = await searchPageIds(query)
     if (pageIds.length === 0) {
       return NextResponse.json({
@@ -100,12 +95,8 @@ export async function POST(req: NextRequest) {
         message:     'No Wikipedia results found for that query.',
       })
     }
-
-    // 2. Fetch full details for each page
     const wikiItems = await fetchPageDetails(pageIds)
-
-    // 3. Save to Supabase (upsert on wiki_url to avoid duplicates)
-    const db = supabase()
+    const db   = supabase()
     const rows = wikiItems.map(item => ({
       query,
       title:       item.title,
@@ -114,29 +105,23 @@ export async function POST(req: NextRequest) {
       wiki_url:    item.wiki_url,
       fetched_at:  new Date().toISOString(),
     }))
-
     const { data: saved, error: dbError } = await db
       .from('items')
       .upsert(rows, { onConflict: 'wiki_url' })
       .select()
-
     if (dbError) {
       console.error('Wikipedia route: DB upsert error', dbError)
-      // Still return the results even if save failed
       return NextResponse.json({
         items:       wikiItems,
         attribution: wikipediaAttribution(),
         warning:     'Results returned but could not be saved to database.',
       })
     }
-
     console.log(`Wikipedia route: saved ${saved?.length ?? 0} items for query "${query}"`)
-
     return NextResponse.json({
       items:       saved ?? wikiItems,
       attribution: wikipediaAttribution(),
     })
-
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('Wikipedia route error:', message)
@@ -146,9 +131,9 @@ export async function POST(req: NextRequest) {
 
 function wikipediaAttribution() {
   return {
-    source:  'Wikipedia',
-    license: 'CC BY-SA 4.0',
+    source:      'Wikipedia',
+    license:     'CC BY-SA 4.0',
     license_url: 'https://creativecommons.org/licenses/by-sa/4.0/',
-    notice:  'Content retrieved from Wikipedia. Wikipedia® is a registered trademark of the Wikimedia Foundation. Content is available under the Creative Commons Attribution-ShareAlike 4.0 International License.',
+    notice:      'Content retrieved from Wikipedia. Wikipedia® is a registered trademark of the Wikimedia Foundation. Content is available under the Creative Commons Attribution-ShareAlike 4.0 International License.',
   }
 }

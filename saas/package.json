@@ -6,7 +6,8 @@
   "scripts": {
     "build": "next build",
     "start": "next start",
-    "dev": "next dev"
+    "dev": "next dev",
+    "test": "node --test tests/promptPreprocessor.node.test.ts"
   },
   "dependencies": {
     "next": "16.2.6",

@@ -37,8 +37,6 @@ export async function POST(req: NextRequest) {
     operatorStore.jobs.set(job.id, job)
 
     // ── Fire-and-forget hero video generation ────────────────────────────────
-    // Dynamic import keeps fal-ai out of the top-level module graph so it
-    // never interferes with Next.js route type-checking at build time.
     const jobId = job.id
     ;(async () => {
       try {
@@ -56,7 +54,7 @@ export async function POST(req: NextRequest) {
         } else {
           j.videoStatus = 'failed'
           j.updatedAt   = new Date().toISOString()
-          console.error('Operator video start failed', result.error)
+          console.error('Operator video start failed', result.ok === false ? result.error : 'unknown')
         }
       } catch (err) {
         const j = operatorStore.jobs.get(jobId)

@@ -1,9 +1,9 @@
 // saas/app/api/sites/generate/route.ts
 //
 // Routing logic:
-//   LOCAL  → /api/items/generate (Claude internal knowledge — local teams, restaurants, etc.)
-//   GLOBAL → Wikipedia (famous museums, world churches, etc.)
-//   NONE   → plain business/creative site, no data enrichment
+//   LOCAL  → runLocalKnowledgeMode() directly (no HTTP round-trip)
+//   GLOBAL → Wikipedia
+//   NONE   → plain business/creative site
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/utils/supabase/server'
@@ -12,10 +12,10 @@ import {
   buildFallbackItems,
   promptPreprocessor,
   validateItems,
-  PROMPT_PREPROCESSOR_CONFIDENCE_THRESHOLD,
   type ValidatedItem,
 } from '@/lib/ai/promptPreprocessor'
-import { routeDataRequest, type GeneratedItem } from '@/lib/ai/localKnowledge'
+import { routeDataRequest } from '@/lib/ai/localKnowledge'
+import { runLocalKnowledgeMode, type ValidLocalItem } from '@/lib/ai/modes'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,6 +54,21 @@ async function saveWikipediaItems(query: string, wikiItems: WikiItem[]): Promise
   return saveValidatedItems(items)
 }
 
+async function saveLocalItems(items: ValidLocalItem[], query: string): Promise<void> {
+  if (items.length === 0) return
+  try {
+    const db = supabaseAdmin()
+    const rows = items.map(item => ({
+      name:        item.name,
+      description: item.description,
+      source_url:  `local-knowledge://${encodeURIComponent(item.name)}`,
+      metadata:    { source: 'local-knowledge', query },
+    }))
+    const { error } = await db.from('items').upsert(rows, { onConflict: 'source_url' })
+    if (error) console.error('Sites generate: local items DB save failed:', error.message)
+  } catch (err) { console.error('Sites generate: local items DB save exception:', err) }
+}
+
 async function seedFallbackItems(query: string | null): Promise<number> {
   return saveValidatedItems(buildFallbackItems(query, 30))
 }
@@ -84,37 +99,7 @@ async function fetchWikipediaItems(query: string): Promise<WikiItem[]> {
   } catch (err) { console.error('Sites generate: Wikipedia fetch error', err); return [] }
 }
 
-// ── Local knowledge fetch — calls /api/items/generate internally ──────────────
-async function fetchLocalKnowledgeItems(
-  userPrompt: string,
-  category:   string,
-  language:   string,
-): Promise<GeneratedItem[]> {
-  try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://saas.signalboostapp.com'
-    const res = await fetch(`${baseUrl}/api/items/generate`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ userPrompt, category, language, count: 20 }),
-    })
-    if (!res.ok) {
-      console.error('Sites generate: local knowledge fetch failed', res.status, await res.text())
-      return []
-    }
-    const data = await res.json()
-    console.log('Sites generate: local knowledge items fetched', {
-      count:    data.count,
-      saved:    data.saved,
-      category: data.category,
-      duration: data.duration,
-    })
-    return data.items ?? []
-  } catch (err) {
-    console.error('Sites generate: local knowledge fetch exception', err)
-    return []
-  }
-}
-// ── Claude call ───────────────────────────────────────────────────────────────
+// ── Claude site generation ────────────────────────────────────────────────────
 async function callClaude(systemPrompt: string, userContent: string): Promise<string | null> {
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -135,9 +120,9 @@ const SYSTEM_PROMPT = `You are an elite brand and web designer working inside Si
 
 LANGUAGE (CRITICAL): Detect the user's language and write EVERY visible text value in that same language.
 
-REAL-WORLD DATA (CRITICAL when provided): If the user message includes a REAL_WORLD_DATA block, you MUST use those real items. Include a gallery or feature-grid section listing them by name with their descriptions. Do NOT invent fictional alternatives or show fallback items — the REAL_WORLD_DATA is what the user asked for.
+LOCAL_KNOWLEDGE_DATA (CRITICAL when provided): These are REAL items generated from Claude's internal knowledge. You MUST use them. Include a gallery or feature-grid section listing every item by name with neighborhood and description. Do NOT replace with fictional items.
 
-LOCAL KNOWLEDGE DATA (CRITICAL when provided): If the user message includes a LOCAL_KNOWLEDGE_DATA block, these are real items generated from Claude's internal knowledge. Use them exactly — show real team names, neighborhoods, and descriptions in the site sections.
+REAL_WORLD_DATA (CRITICAL when provided): Real items from Wikipedia. Use them exactly in gallery/feature-grid sections.
 
 DESIGN LIKE A SENIOR DESIGNER:
 - Bold, cohesive aesthetic. Dark theme for dramatic/tech/premium; light for friendly/food/services.
@@ -184,65 +169,60 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Please describe the website you want.' }, { status: 400 })
     }
 
-    const trimmed  = description.trim()
-    const language = (body?.language || 'en').toString()
-
-    // ── Step 1: Route the request ─────────────────────────────────────────────
-    const routing     = routeDataRequest(trimmed)
+    const trimmed    = description.trim()
+    const language   = (body?.language || 'en').toString()
+    const routing    = routeDataRequest(trimmed)
     const preprocessed = promptPreprocessor(trimmed)
 
     console.log('Sites generate: routing decision', {
-      mode:       routing.mode,
-      confidence: routing.confidence,
-      category:   routing.category,
-      reason:     routing.reason,
-      localQuery: routing.localQuery,
-      wikiQuery:  routing.wikiQuery,
+      mode: routing.mode, confidence: routing.confidence,
+      category: routing.category, reason: routing.reason,
     })
 
-    let wikiItems:          WikiItem[]      = []
-    let localItems:         GeneratedItem[] = []
-    let fallbackSeeded                      = false
-    let promptDataBlock                     = ''
-    let dataMode                            = routing.mode
+    let wikiItems:    WikiItem[]      = []
+    let localItems:   ValidLocalItem[] = []
+    let fallbackSeeded                 = false
+    let promptDataBlock                = ''
 
-    // ── Step 2: Fetch data based on routing decision ──────────────────────────
+    // ── Step 2: Fetch data ────────────────────────────────────────────────────
 
-    if (routing.mode === 'local_knowledge' && routing.localQuery) {
-      // LOCAL MODE — use Claude's internal knowledge
-      console.log('Sites generate: LOCAL mode — calling /api/items/generate for', routing.localQuery)
-      localItems = await fetchLocalKnowledgeItems(trimmed, routing.category, language)
+    if (routing.mode === 'local_knowledge') {
+      // Direct function call — no HTTP round-trip, no timeout risk
+      console.log('Sites generate: LOCAL mode — calling runLocalKnowledgeMode directly')
+      localItems = await runLocalKnowledgeMode({
+        userPrompt: trimmed,
+        language,
+        category:   routing.category,
+        count:      20,
+      })
       console.log(`Sites generate: local knowledge returned ${localItems.length} items`)
 
+      // Save to DB non-blocking
       if (localItems.length > 0) {
-        const itemList = localItems.slice(0, 20)
-          .map((item, i) =>
-            `${i + 1}. ${item.name}${item.neighborhood ? ` (${item.neighborhood}${item.zone ? ', ' + item.zone : ''})` : ''}${item.description ? ' — ' + item.description : ''}`,
-          )
-          .join('\n')
+        saveLocalItems(localItems, routing.localQuery ?? trimmed).catch(() => {})
+
+        const itemList = localItems.slice(0, 20).map((item, i) =>
+          `${i + 1}. ${item.name}${item.neighborhood ? ` (${item.neighborhood}${item.zone ? ', ' + item.zone : ''})` : ''}${item.description ? ' — ' + item.description : ''}`,
+        ).join('\n')
 
         promptDataBlock = `
 
-LOCAL_KNOWLEDGE_DATA (generated from Claude's internal knowledge — use ALL of these real items in the site):
+LOCAL_KNOWLEDGE_DATA (real items from Claude's knowledge — use ALL of these in the site):
 ${itemList}
 
-IMPORTANT:
-- Include a gallery or feature-grid section that lists EVERY item above by name.
-- These are REAL items from your knowledge — not placeholders. Use them exactly.
-- Do not replace them with fictional or generic items.`
+IMPORTANT: Include a gallery or feature-grid section listing EVERY item above by name. These are REAL — not placeholders.`
       }
+
     } else if (routing.mode === 'wikipedia' && routing.wikiQuery) {
-      // WIKIPEDIA MODE — fetch from Wikipedia
       console.log('Sites generate: WIKIPEDIA mode — fetching for', routing.wikiQuery)
       wikiItems = await fetchWikipediaItems(routing.wikiQuery)
       console.log(`Sites generate: Wikipedia returned ${wikiItems.length} items`)
 
-      // Save to DB non-blocking
       if (wikiItems.length > 0) {
         saveWikipediaItems(routing.wikiQuery, wikiItems).catch(() => {})
-        const itemList = wikiItems.slice(0, 12)
-          .map((item, i) => `${i + 1}. ${item.title}${item.description ? ' — ' + item.description : ''} Source: ${item.wiki_url}`)
-          .join('\n')
+        const itemList = wikiItems.slice(0, 12).map((item, i) =>
+          `${i + 1}. ${item.title}${item.description ? ' — ' + item.description : ''}`,
+        ).join('\n')
         promptDataBlock = `
 
 REAL_WORLD_DATA (from Wikipedia — use these real items in the site):
@@ -253,24 +233,18 @@ IMPORTANT: Include a gallery or feature-grid section with these real items by na
     }
 
     // ── Step 3: Fallback if no data found ────────────────────────────────────
-    if (localItems.length === 0 && wikiItems.length === 0 && routing.mode !== 'none' && routing.mode !== 'business') {
-      console.log('Sites generate: no items found, seeding fallback demo data')
+    if (localItems.length === 0 && wikiItems.length === 0 && routing.mode !== 'none') {
       seedFallbackItems(routing.localQuery || routing.wikiQuery).catch(() => {})
       const fallbackItems = buildFallbackItems(routing.localQuery || routing.wikiQuery, 8)
       fallbackSeeded = true
       promptDataBlock = `
 
-FALLBACK_DEMO_DATA (safe demo rows — use if real data is unavailable):
-${fallbackItems.map((item, i) => `${i + 1}. ${item.name} — ${item.description} Source: ${item.source_url}`).join('\n')}`
+FALLBACK_DEMO_DATA:
+${fallbackItems.map((item, i) => `${i + 1}. ${item.name} — ${item.description}`).join('\n')}`
     }
 
-    // ── Step 4: Build the full prompt ─────────────────────────────────────────
-    const userMessage = `${preprocessed.optimizedPrompt}
-
-RAW_USER_INPUT:
-${trimmed}${promptDataBlock}`
-
-    // ── Step 5: Generate the site with Claude Sonnet ──────────────────────────
+    // ── Step 4: Generate the site ─────────────────────────────────────────────
+    const userMessage = `${preprocessed.optimizedPrompt}\n\nRAW_USER_INPUT:\n${trimmed}${promptDataBlock}`
     const raw = await callClaude(SYSTEM_PROMPT, userMessage)
 
     if (!raw) {
@@ -279,7 +253,6 @@ ${trimmed}${promptDataBlock}`
       return NextResponse.json({
         content: buildRecoveryContent(trimmed, fallbackItems),
         message: 'The live AI model is unavailable. A fallback page was generated.',
-        preprocessor: { mode: dataMode, intent: routing.mode, confidence: routing.confidence, fallbackUsed: true },
       })
     }
 
@@ -289,36 +262,26 @@ ${trimmed}${promptDataBlock}`
       if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
         parsed = JSON.parse(raw.slice(firstBrace, lastBrace + 1))
       }
-    } catch (parseError) {
-      console.error('Sites generate: JSON parse failed; using fallback', parseError)
+    } catch {
       parsed = buildRecoveryContent(trimmed, buildFallbackItems(routing.localQuery, 8))
       fallbackSeeded = true
-      seedFallbackItems(routing.localQuery).catch(() => {})
     }
 
     if (!isValidContent(parsed)) {
-      console.warn('Sites generate: invalid AI content; using fallback')
       parsed = buildRecoveryContent(trimmed, buildFallbackItems(routing.localQuery, 8))
       fallbackSeeded = true
-      seedFallbackItems(routing.localQuery).catch(() => {})
     }
 
     if (parsed.theme !== 'dark' && parsed.theme !== 'light') parsed.theme = 'light'
 
-    // ── Step 6: Return result ─────────────────────────────────────────────────
     return NextResponse.json({
       content:     parsed,
-      // Surface local items for the preview
       localItems:  localItems.length > 0 ? localItems : undefined,
-      wikiItems:   wikiItems.length > 0 ? wikiItems : undefined,
-      attribution: wikiItems.length > 0 ? 'Data from Wikipedia, licensed under CC-BY-SA 4.0.' : undefined,
-      transparencyMessage: preprocessed.transparencyMessage,
+      wikiItems:   wikiItems.length > 0  ? wikiItems  : undefined,
+      attribution: wikiItems.length > 0  ? 'Data from Wikipedia, licensed under CC-BY-SA 4.0.' : undefined,
       preprocessor: {
-        mode:         dataMode,
-        intent:       routing.mode,
+        mode:         routing.mode,
         category:     routing.category,
-        localQuery:   routing.localQuery,
-        wikiQuery:    routing.wikiQuery,
         confidence:   routing.confidence,
         reason:       routing.reason,
         fallbackUsed: fallbackSeeded,
@@ -333,7 +296,6 @@ ${trimmed}${promptDataBlock}`
     return NextResponse.json({
       content: buildRecoveryContent('We recovered from an unexpected generation error.', fallbackItems),
       message: 'Something went wrong. A fallback page was generated instead.',
-      preprocessor: { mode: 'none', intent: 'error', confidence: 0, fallbackUsed: true },
     })
   }
 }

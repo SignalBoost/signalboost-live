@@ -21,9 +21,11 @@ export default function OperatorPage() {
   const [loading, setLoading] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [message, setMessage] = useState('')
+  const [aiUnderstanding, setAiUnderstanding] = useState<any | null>(null)
+  const [sourceHistory, setSourceHistory] = useState<any[]>([])
 
   async function generate() {
-    setLoading(true); setMessage(''); setLiveUrl(null); setContent(null)
+    setLoading(true); setMessage(''); setLiveUrl(null); setContent(null); setAiUnderstanding(null); setSourceHistory([])
     try {
       const res = await fetch('/api/sites/generate', {
         method: 'POST',
@@ -32,7 +34,11 @@ export default function OperatorPage() {
       })
       const data = await res.json()
       if (!res.ok) setMessage(data.error || tr('operator.errors.plan', 'Could not generate the website.'))
-      else setContent(data.content)
+      else {
+        setContent(data.content)
+        setAiUnderstanding(data.aiUnderstanding || null)
+        setSourceHistory(Array.isArray(data.sourceHistory) ? data.sourceHistory : [])
+      }
     } catch {
       setMessage(tr('operator.errors.connect', 'Could not connect. Please try again.'))
     } finally {
@@ -60,7 +66,7 @@ export default function OperatorPage() {
   }
 
   function reset() {
-    setContent(null); setLiveUrl(null); setMessage(''); setRequest(''); setLoading(false); setPublishing(false)
+    setContent(null); setLiveUrl(null); setMessage(''); setRequest(''); setLoading(false); setPublishing(false); setAiUnderstanding(null); setSourceHistory([])
   }
 
   const fullUrl = liveUrl ? `${typeof window !== 'undefined' ? window.location.origin : ''}${liveUrl}` : null
@@ -119,7 +125,29 @@ export default function OperatorPage() {
             </div>
           )}
 
-          {message && !liveUrl && <p style={{ marginTop: 14, color: 'var(--text-secondary)', fontSize: 13 }}>{message}</p>}
+
+
+          {aiUnderstanding && (
+            <div style={{ marginTop: 14, padding: 12, borderRadius: 12, border: '1px solid var(--border-soft)', background: 'rgba(255,255,255,.02)', fontSize: 12, color: 'var(--text-secondary)' }}>
+              <div><strong>🧠 AI understanding:</strong> {aiUnderstanding.message}</div>
+              <div style={{ marginTop: 6 }}>Intent: <strong>{aiUnderstanding.intent}</strong> · Confidence: <strong>{Math.round((aiUnderstanding.confidence || 0) * 100)}%</strong></div>
+              <div style={{ marginTop: 6 }}>Query: <code>{aiUnderstanding.query}</code></div>
+              {Array.isArray(aiUnderstanding.keywords) && aiUnderstanding.keywords.length > 0 && (
+                <div style={{ marginTop: 6 }}>Keywords: {aiUnderstanding.keywords.join(', ')}</div>
+              )}
+            </div>
+          )}
+
+          {sourceHistory.length > 0 && (
+            <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>Source history</div>
+              {sourceHistory.map((row, idx) => (
+                <div key={idx}>• {row.source} · {row.query} · {row.importedCount} items</div>
+              ))}
+            </div>
+          )}
+
+                    {message && !liveUrl && <p style={{ marginTop: 14, color: 'var(--text-secondary)', fontSize: 13 }}>{message}</p>}
         </section>
 
         {/* ── Right: live-style preview ── */}

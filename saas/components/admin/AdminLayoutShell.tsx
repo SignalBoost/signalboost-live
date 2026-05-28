@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/utils/supabase/client'
 
 const nav = [
-  ['Overview', '/admin'],['SignalBoost', '/admin/signalboost'],['SaaSSignal', '/admin/saas'],['Sales / Outreach', '/admin/sales'],['Revenue', '/admin/revenue'],['AI Operations', '/admin/ai'],['Email / Marketing', '/admin/email'],['Partners', '/admin/partners'],['System Health', '/admin/system'],['Settings', '/admin/settings'],
+  ['Overview', '/admin'],['ADM Console', '/admin/adm'],['SignalBoost', '/admin/signalboost'],['SaaSSignal', '/admin/saas'],['Sales / Outreach', '/admin/sales'],['Revenue', '/admin/revenue'],['AI Operations', '/admin/ai'],['Email / Marketing', '/admin/email'],['Partners', '/admin/partners'],['System Health', '/admin/system'],['Settings', '/admin/settings'],
 ]
 
 export default function AdminLayoutShell({ children }: { children: React.ReactNode }) {

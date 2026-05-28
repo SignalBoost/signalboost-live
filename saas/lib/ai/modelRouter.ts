@@ -1,6 +1,8 @@
 // saas/lib/ai/modelRouter.ts
 // Routes model calls to Claude or OpenAI with automatic fallback.
 
+import { getAdminSupabase } from '@/utils/supabase/server'
+
 export interface ModelCallArgs {
   modelPreference?: 'claude' | 'openai'
   prompt:           string
@@ -90,18 +92,51 @@ async function callOpenAI(args: ModelCallArgs): Promise<string | null> {
   }
 }
 
+async function logAiTask(args: {
+  taskType: string
+  provider: string
+  status: 'success' | 'error' | 'fallback'
+  durationMs: number
+  fallbackUsed?: boolean
+  errorMessage?: string
+  metadata?: Record<string, unknown>
+}) {
+  try {
+    const admin = getAdminSupabase()
+    await admin.from('ai_task_log').insert({
+      task_type: args.taskType,
+      provider: args.provider,
+      model: args.provider === 'openai' ? 'gpt-4o-mini' : 'claude-sonnet-4-6',
+      status: args.status,
+      duration_ms: args.durationMs,
+      fallback_used: !!args.fallbackUsed,
+      error_message: args.errorMessage || null,
+      metadata: args.metadata || {},
+    })
+  } catch {
+    // Observability must never break model execution.
+  }
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export async function callModel(args: ModelCallArgs): Promise<string | null> {
   const preference = args.modelPreference ?? 'claude'
+  const startedAt = Date.now()
 
   console.log('modelRouter: calling', preference, {
     maxTokens: args.maxTokens ?? 2048,
     promptLength: args.prompt.length,
   })
 
-  if (preference === 'openai') {
-    return callOpenAI(args)
-  }
-  return callClaude(args)
+  const result = preference === 'openai' ? await callOpenAI(args) : await callClaude(args)
+  await logAiTask({
+    taskType: args.systemPrompt ? 'system_prompt_call' : 'model_call',
+    provider: preference,
+    status: result ? 'success' : 'error',
+    durationMs: Date.now() - startedAt,
+    metadata: { maxTokens: args.maxTokens ?? 2048, promptLength: args.prompt.length },
+  })
+
+  return result
 }

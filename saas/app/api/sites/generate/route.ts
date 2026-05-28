@@ -1,11 +1,15 @@
 // saas/app/api/sites/generate/route.ts
 //
-// Routing logic:
+// Streaming version — sends NDJSON chunks so the client shows live progress:
+//   {"type":"status","message":"..."}   ← progress updates
+//   {"type":"result","content":{...}}   ← final site JSON
+//
+// Routing:
 //   LOCAL  → runLocalKnowledgeMode() directly (no HTTP round-trip)
 //   GLOBAL → Wikipedia
 //   NONE   → plain business/creative site
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { getCurrentUser } from '@/utils/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import {
@@ -157,145 +161,219 @@ function buildRecoveryContent(description: string, items: ValidatedItem[]) {
   }
 }
 
-// ── Route handler ─────────────────────────────────────────────────────────────
+// ── NDJSON stream helpers ─────────────────────────────────────────────────────
+
+function encode(obj: object): Uint8Array {
+  return new TextEncoder().encode(JSON.stringify(obj) + '\n')
+}
+
+// ── Route handler — streaming ─────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
-  try {
-    const user = await getCurrentUser()
-    if (!user) return NextResponse.json({ error: 'Please sign in to generate a website.' }, { status: 401 })
+  const user = await getCurrentUser()
+  if (!user) {
+    return new Response(JSON.stringify({ error: 'Please sign in to generate a website.' }), { status: 401 })
+  }
 
-    const body = await req.json()
-    const description = body?.description
-    if (!description || typeof description !== 'string' || description.trim().length < 4) {
-      return NextResponse.json({ error: 'Please describe the website you want.' }, { status: 400 })
-    }
+  const body = await req.json()
+  const description = body?.description
+  if (!description || typeof description !== 'string' || description.trim().length < 4) {
+    return new Response(JSON.stringify({ error: 'Please describe the website you want.' }), { status: 400 })
+  }
 
-    const trimmed    = description.trim()
-    const language   = (body?.language || 'en').toString()
-    const routing    = routeDataRequest(trimmed)
-    const preprocessed = promptPreprocessor(trimmed)
+  const trimmed    = description.trim()
+  const language   = (body?.language || 'en').toString()
+  const routing    = routeDataRequest(trimmed)
+  const preprocessed = promptPreprocessor(trimmed)
 
-    console.log('Sites generate: routing decision', {
-      mode: routing.mode, confidence: routing.confidence,
-      category: routing.category, reason: routing.reason,
-    })
+  // ── Create a streaming response ───────────────────────────────────────────
+  const stream = new TransformStream()
+  const writer = stream.writable.getWriter()
 
-    let wikiItems:    WikiItem[]      = []
-    let localItems:   ValidLocalItem[] = []
-    let fallbackSeeded                 = false
-    let promptDataBlock                = ''
+  // Run the generation pipeline async — don't await, let the stream flow
+  ;(async () => {
+    try {
+      let wikiItems:   WikiItem[]      = []
+      let localItems:  ValidLocalItem[] = []
+      let fallbackSeeded               = false
+      let promptDataBlock              = ''
 
-    // ── Step 2: Fetch data ────────────────────────────────────────────────────
+      // ── Status: analyzing ──────────────────────────────────────────────────
+      await writer.write(encode({
+        type:    'status',
+        step:    'routing',
+        message: routing.mode === 'local_knowledge'
+          ? `🔍 Analyzing request — local knowledge mode (${routing.category})`
+          : routing.mode === 'wikipedia'
+            ? `🔍 Analyzing request — searching Wikipedia for "${routing.wikiQuery}"`
+            : '🔍 Analyzing your request…',
+      }))
 
-    if (routing.mode === 'local_knowledge') {
-      // Direct function call — no HTTP round-trip, no timeout risk
-      console.log('Sites generate: LOCAL mode — calling runLocalKnowledgeMode directly')
-      localItems = await runLocalKnowledgeMode({
-        userPrompt: trimmed,
-        language,
-        category:   routing.category,
-        count:      20,
-      })
-      console.log(`Sites generate: local knowledge returned ${localItems.length} items`)
+      // ── Step 1: Fetch data ─────────────────────────────────────────────────
+      if (routing.mode === 'local_knowledge') {
+        await writer.write(encode({
+          type:    'status',
+          step:    'data',
+          message: `🧠 Generating real ${routing.category.replace('_', ' ')} from internal knowledge…`,
+        }))
 
-      // Save to DB non-blocking
-      if (localItems.length > 0) {
-        saveLocalItems(localItems, routing.localQuery ?? trimmed).catch(() => {})
+        localItems = await runLocalKnowledgeMode({
+          userPrompt: trimmed,
+          language,
+          category:   routing.category,
+          count:      20,
+        })
 
-        const itemList = localItems.slice(0, 20).map((item, i) =>
-          `${i + 1}. ${item.name}${item.neighborhood ? ` (${item.neighborhood}${item.zone ? ', ' + item.zone : ''})` : ''}${item.description ? ' — ' + item.description : ''}`,
-        ).join('\n')
+        console.log(`Sites generate: local knowledge returned ${localItems.length} items`)
 
-        promptDataBlock = `
+        if (localItems.length > 0) {
+          // Save to DB non-blocking
+          saveLocalItems(localItems, routing.localQuery ?? trimmed).catch(() => {})
+
+          await writer.write(encode({
+            type:    'status',
+            step:    'data_ready',
+            message: `✅ Found ${localItems.length} real items — now designing your site…`,
+            items:   localItems.slice(0, 5).map(i => i.name), // preview first 5 names
+          }))
+
+          const itemList = localItems.slice(0, 20).map((item, i) =>
+            `${i + 1}. ${item.name}${item.neighborhood ? ` (${item.neighborhood}${item.zone ? ', ' + item.zone : ''})` : ''}${item.description ? ' — ' + item.description : ''}`,
+          ).join('\n')
+
+          promptDataBlock = `
 
 LOCAL_KNOWLEDGE_DATA (real items from Claude's knowledge — use ALL of these in the site):
 ${itemList}
 
 IMPORTANT: Include a gallery or feature-grid section listing EVERY item above by name. These are REAL — not placeholders.`
-      }
+        }
 
-    } else if (routing.mode === 'wikipedia' && routing.wikiQuery) {
-      console.log('Sites generate: WIKIPEDIA mode — fetching for', routing.wikiQuery)
-      wikiItems = await fetchWikipediaItems(routing.wikiQuery)
-      console.log(`Sites generate: Wikipedia returned ${wikiItems.length} items`)
+      } else if (routing.mode === 'wikipedia' && routing.wikiQuery) {
+        await writer.write(encode({
+          type:    'status',
+          step:    'data',
+          message: `🌐 Searching Wikipedia for "${routing.wikiQuery}"…`,
+        }))
 
-      if (wikiItems.length > 0) {
-        saveWikipediaItems(routing.wikiQuery, wikiItems).catch(() => {})
-        const itemList = wikiItems.slice(0, 12).map((item, i) =>
-          `${i + 1}. ${item.title}${item.description ? ' — ' + item.description : ''}`,
-        ).join('\n')
-        promptDataBlock = `
+        wikiItems = await fetchWikipediaItems(routing.wikiQuery)
+        console.log(`Sites generate: Wikipedia returned ${wikiItems.length} items`)
+
+        if (wikiItems.length > 0) {
+          saveWikipediaItems(routing.wikiQuery, wikiItems).catch(() => {})
+
+          await writer.write(encode({
+            type:    'status',
+            step:    'data_ready',
+            message: `✅ Found ${wikiItems.length} Wikipedia articles — now designing your site…`,
+            items:   wikiItems.slice(0, 5).map(i => i.title),
+          }))
+
+          const itemList = wikiItems.slice(0, 12).map((item, i) =>
+            `${i + 1}. ${item.title}${item.description ? ' — ' + item.description : ''}`,
+          ).join('\n')
+
+          promptDataBlock = `
 
 REAL_WORLD_DATA (from Wikipedia — use these real items in the site):
 ${itemList}
 
 IMPORTANT: Include a gallery or feature-grid section with these real items by name.`
+        }
       }
-    }
 
-    // ── Step 3: Fallback if no data found ────────────────────────────────────
-    if (localItems.length === 0 && wikiItems.length === 0 && routing.mode !== 'none') {
-      seedFallbackItems(routing.localQuery || routing.wikiQuery).catch(() => {})
-      const fallbackItems = buildFallbackItems(routing.localQuery || routing.wikiQuery, 8)
-      fallbackSeeded = true
-      promptDataBlock = `
+      // ── Fallback if no data ────────────────────────────────────────────────
+      if (localItems.length === 0 && wikiItems.length === 0 && routing.mode !== 'none') {
+        seedFallbackItems(routing.localQuery || routing.wikiQuery).catch(() => {})
+        const fallbackItems = buildFallbackItems(routing.localQuery || routing.wikiQuery, 8)
+        fallbackSeeded = true
+        promptDataBlock = `
 
 FALLBACK_DEMO_DATA:
 ${fallbackItems.map((item, i) => `${i + 1}. ${item.name} — ${item.description}`).join('\n')}`
-    }
-
-    // ── Step 4: Generate the site ─────────────────────────────────────────────
-    const userMessage = `${preprocessed.optimizedPrompt}\n\nRAW_USER_INPUT:\n${trimmed}${promptDataBlock}`
-    const raw = await callClaude(SYSTEM_PROMPT, userMessage)
-
-    if (!raw) {
-      const fallbackItems = buildFallbackItems(routing.localQuery, 8)
-      seedFallbackItems(routing.localQuery).catch(() => {})
-      return NextResponse.json({
-        content: buildRecoveryContent(trimmed, fallbackItems),
-        message: 'The live AI model is unavailable. A fallback page was generated.',
-      })
-    }
-
-    let parsed: any = null
-    try {
-      const firstBrace = raw.indexOf('{'), lastBrace = raw.lastIndexOf('}')
-      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-        parsed = JSON.parse(raw.slice(firstBrace, lastBrace + 1))
       }
-    } catch {
-      parsed = buildRecoveryContent(trimmed, buildFallbackItems(routing.localQuery, 8))
-      fallbackSeeded = true
+
+      // ── Status: designing ──────────────────────────────────────────────────
+      await writer.write(encode({
+        type:    'status',
+        step:    'designing',
+        message: '🎨 Designing your website…',
+      }))
+
+      // ── Generate the site ──────────────────────────────────────────────────
+      const userMessage = `${preprocessed.optimizedPrompt}\n\nRAW_USER_INPUT:\n${trimmed}${promptDataBlock}`
+      const raw = await callClaude(SYSTEM_PROMPT, userMessage)
+
+      if (!raw) {
+        const fallbackItems = buildFallbackItems(routing.localQuery, 8)
+        seedFallbackItems(routing.localQuery).catch(() => {})
+        await writer.write(encode({
+          type:    'result',
+          content: buildRecoveryContent(trimmed, fallbackItems),
+          error:   'AI model unavailable. A fallback page was generated.',
+          preprocessor: { mode: routing.mode, fallbackUsed: true },
+        }))
+        await writer.close()
+        return
+      }
+
+      let parsed: any = null
+      try {
+        const firstBrace = raw.indexOf('{'), lastBrace = raw.lastIndexOf('}')
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          parsed = JSON.parse(raw.slice(firstBrace, lastBrace + 1))
+        }
+      } catch {
+        parsed = buildRecoveryContent(trimmed, buildFallbackItems(routing.localQuery, 8))
+        fallbackSeeded = true
+      }
+
+      if (!isValidContent(parsed)) {
+        parsed = buildRecoveryContent(trimmed, buildFallbackItems(routing.localQuery, 8))
+        fallbackSeeded = true
+      }
+
+      if (parsed.theme !== 'dark' && parsed.theme !== 'light') parsed.theme = 'light'
+
+      // ── Final result ───────────────────────────────────────────────────────
+      await writer.write(encode({
+        type:        'result',
+        content:     parsed,
+        localItems:  localItems.length > 0 ? localItems : undefined,
+        wikiItems:   wikiItems.length > 0  ? wikiItems  : undefined,
+        attribution: wikiItems.length > 0  ? 'Data from Wikipedia, licensed under CC-BY-SA 4.0.' : undefined,
+        preprocessor: {
+          mode:         routing.mode,
+          category:     routing.category,
+          confidence:   routing.confidence,
+          reason:       routing.reason,
+          fallbackUsed: fallbackSeeded,
+          localCount:   localItems.length,
+          wikiCount:    wikiItems.length,
+        },
+      }))
+
+      await writer.close()
+
+    } catch (error) {
+      console.error('Sites generate streaming error', error)
+      try {
+        const fallbackItems = buildFallbackItems(null, 8)
+        await writer.write(encode({
+          type:    'result',
+          content: buildRecoveryContent('We recovered from an unexpected generation error.', fallbackItems),
+          error:   'Something went wrong. A fallback page was generated.',
+          preprocessor: { mode: 'none', fallbackUsed: true },
+        }))
+        await writer.close()
+      } catch { /* writer already closed */ }
     }
+  })()
 
-    if (!isValidContent(parsed)) {
-      parsed = buildRecoveryContent(trimmed, buildFallbackItems(routing.localQuery, 8))
-      fallbackSeeded = true
-    }
-
-    if (parsed.theme !== 'dark' && parsed.theme !== 'light') parsed.theme = 'light'
-
-    return NextResponse.json({
-      content:     parsed,
-      localItems:  localItems.length > 0 ? localItems : undefined,
-      wikiItems:   wikiItems.length > 0  ? wikiItems  : undefined,
-      attribution: wikiItems.length > 0  ? 'Data from Wikipedia, licensed under CC-BY-SA 4.0.' : undefined,
-      preprocessor: {
-        mode:         routing.mode,
-        category:     routing.category,
-        confidence:   routing.confidence,
-        reason:       routing.reason,
-        fallbackUsed: fallbackSeeded,
-        localCount:   localItems.length,
-        wikiCount:    wikiItems.length,
-      },
-    })
-  } catch (error) {
-    console.error('Sites generate error', error)
-    const fallbackItems = buildFallbackItems(null, 8)
-    seedFallbackItems(null).catch(() => {})
-    return NextResponse.json({
-      content: buildRecoveryContent('We recovered from an unexpected generation error.', fallbackItems),
-      message: 'Something went wrong. A fallback page was generated instead.',
-    })
-  }
+  return new Response(stream.readable, {
+    headers: {
+      'Content-Type':  'application/x-ndjson',
+      'Cache-Control': 'no-cache',
+      'X-Accel-Buffering': 'no', // disable Nginx buffering on Vercel
+    },
+  })
 }

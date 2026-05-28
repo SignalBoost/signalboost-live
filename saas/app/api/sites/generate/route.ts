@@ -1,14 +1,13 @@
 // saas/app/api/sites/generate/route.ts
 //
 // Streaming + two-layer cache:
-//   Layer 1 — Site design cache: exact prompt match → return cached site (~3 sec)
-//   Layer 2 — Local items cache: same category/city → skip team generation (~15 sec)
-//   Layer 3 — Full generation: Haiku for site design + Sonnet for local knowledge
+//   Layer 1 — Site design cache (~3 sec on repeat)
+//   Layer 2 — Local items cache (~15 sec on repeat)
+//   Layer 3 — Haiku site design + Sonnet local knowledge (~18 sec first time)
 //
-// KEY FIX: saveSiteDesign is now awaited BEFORE writer.close()
-// so the Vercel function doesn't terminate before the cache write completes.
+// Uses Next.js after() to save site cache AFTER response is sent — no blocking.
 
-import { NextRequest } from 'next/server'
+import { NextRequest, after } from 'next/server'
 import { getCurrentUser } from '@/utils/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import {
@@ -231,7 +230,6 @@ export async function POST(req: NextRequest) {
           }))
         } else {
           await writer.write(encode({ type: 'status', step: 'data', message: `🧠 Generating real ${routing.category.replace('_', ' ')} with Claude Sonnet…` }))
-
           localItems = await runLocalKnowledgeMode({ userPrompt: trimmed, language, category: routing.category, count: 20 })
           console.log(`Sites generate: LOCAL ITEMS CACHE MISS — Sonnet generated ${localItems.length} items`)
 
@@ -275,7 +273,7 @@ export async function POST(req: NextRequest) {
         promptDataBlock = `\n\nFALLBACK_DEMO_DATA:\n${fallbackItems.map((item, i) => `${i + 1}. ${item.name} — ${item.description}`).join('\n')}`
       }
 
-      // ── Layer 3: Site design with Haiku ───────────────────────────────────
+      // ── Layer 3: Haiku site design ────────────────────────────────────────
       await writer.write(encode({ type: 'status', step: 'designing', message: '🎨 Designing your website with Haiku…' }))
 
       const userMessage = `${preprocessed.optimizedPrompt}\n\nRAW_USER_INPUT:\n${trimmed}${promptDataBlock}`
@@ -307,7 +305,7 @@ export async function POST(req: NextRequest) {
 
       if (parsed.theme !== 'dark' && parsed.theme !== 'light') parsed.theme = 'light'
 
-      // ── Write result to stream FIRST ──────────────────────────────────────
+      // ── Send result immediately ───────────────────────────────────────────
       await writer.write(encode({
         type:        'result',
         content:     parsed,
@@ -321,18 +319,20 @@ export async function POST(req: NextRequest) {
         },
       }))
 
-      // ── Save to site cache AFTER writing result, BEFORE closing ───────────
-      // Awaiting here keeps the Vercel function alive long enough to complete the DB write.
-      if (!fallbackSeeded) {
-        try {
-          await saveSiteDesign(parsed, { userPrompt: trimmed, language })
-          console.log('Sites generate: site design saved to cache')
-        } catch (err) {
-          console.error('Sites generate: saveSiteDesign failed', err)
-        }
-      }
-
       await writer.close()
+
+      // ── Save to cache AFTER stream closes using after() ───────────────────
+      // after() runs after the response is sent — zero impact on user wait time.
+      if (!fallbackSeeded) {
+        after(async () => {
+          try {
+            await saveSiteDesign(parsed, { userPrompt: trimmed, language })
+            console.log('Sites generate: site design cached via after()')
+          } catch (err) {
+            console.error('Sites generate: after() saveSiteDesign failed', err)
+          }
+        })
+      }
 
     } catch (error) {
       console.error('Sites generate streaming error', error)

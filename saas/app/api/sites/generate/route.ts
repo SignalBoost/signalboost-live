@@ -3,163 +3,62 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/utils/supabase/server'
 import { createClient } from '@supabase/supabase-js'
+import {
+  buildFallbackItems,
+  promptPreprocessor,
+  validateItems,
+  PROMPT_PREPROCESSOR_CONFIDENCE_THRESHOLD,
+  type ValidatedItem,
+} from '@/lib/ai/promptPreprocessor'
 
 export const dynamic = 'force-dynamic'
 
 const WIKI_API = 'https://en.wikipedia.org/w/api.php'
 const USER_AGENT = 'SignalBoostApp/1.0 (https://saas.signalboostapp.com; support@signalboostapp.com)'
 
-const TYPO_MAP: Record<string, string> = {
-  restuarants: 'restaurants', musuem: 'museum', musuems: 'museums',
-  univeristy: 'university', footbal: 'football', futebool: 'futebol', eqipes: 'equipes',
-}
-
-type Intent = 'site_design' | 'data_seeding' | 'data_fetching'
-type ExtractedQuery = { query: string | null; confidence: number; intent: Intent; keywords: string[]; normalizedText: string }
 type WikiItem = { title: string; description: string; image_url: string | null; wiki_url: string }
-
-function normalizeInput(description: string): string {
-  const cleaned = description
-    .normalize('NFD').replace(/\p{Diacritic}/gu, '')
-    .replace(/[^\p{L}\p{N}\s]/gu, ' ').toLowerCase().replace(/\s+/g, ' ').trim()
-  return cleaned.split(' ').map((token) => TYPO_MAP[token] ?? token).join(' ')
-}
-
-function extractKeywords(normalizedText: string): string[] {
-  const buckets = [
-    'team','teams','equipe','equipes','club','clubs','football','futebol','soccer','amateur','varzea',
-    'museum','museums','museu','museus','restaurant','restaurants','restaurante','restaurantes',
-    'university','universities','universidade','universidades',
-    'church','churches','igreja','igrejas','beach','beaches','praia','praias',
-    'sao paulo','rio de janeiro','brazil','brasil','world','mundo',
-  ]
-  return [...new Set(buckets.filter((k) => normalizedText.includes(k)))]
-}
-
-function classifyIntent(normalizedText: string): Intent {
-  if (/\b(seed|demo|fake|populate|preencher|dados fake|dados demo)\b/.test(normalizedText)) return 'data_seeding'
-  if (/\b(list|top|best|famous|show|fetch|get|wikipedia|listar|melhores|mais famosos|pegue|buscar)\b/.test(normalizedText)) return 'data_fetching'
-  return 'site_design'
-}
-
-function buildDeterministicQuery(normalizedText: string, keywords: string[]): string | null {
-  const hasMuseum  = keywords.some((k) => ['museum','museums','museu','museus'].includes(k))
-  const hasTeam    = keywords.some((k) => ['team','teams','equipe','equipes','club','clubs'].includes(k))
-  const hasFootball = keywords.some((k) => ['football','futebol','soccer'].includes(k))
-  const hasChurch  = keywords.some((k) => ['church','churches','igreja','igrejas'].includes(k))
-  const hasBeach   = keywords.some((k) => ['beach','beaches','praia','praias'].includes(k))
-  const hasSaoPaulo = normalizedText.includes('sao paulo')
-  const hasWorld   = /\b(world|mundo)\b/.test(normalizedText)
-
-  if (hasMuseum && hasWorld) return 'famous museums world'
-  if (hasTeam && hasFootball && hasSaoPaulo) return 'São Paulo amateur football teams'
-  if (hasChurch && hasWorld) return 'famous churches world'
-  if (hasBeach) return hasSaoPaulo ? 'beaches São Paulo Brazil' : 'best beaches world'
-  if (hasMuseum) return 'famous museums world'
-  if (keywords.some((k) => ['restaurant','restaurants','restaurante','restaurantes'].includes(k))) return 'best restaurants world'
-  if (keywords.some((k) => ['university','universities','universidade','universidades'].includes(k))) return 'top universities world'
-  return null
-}
-
-async function extractWikipediaQuery(description: string): Promise<ExtractedQuery> {
-  const normalizedText = normalizeInput(description)
-  const keywords = extractKeywords(normalizedText)
-  const intent = classifyIntent(normalizedText)
-  const deterministicQuery = buildDeterministicQuery(normalizedText, keywords)
-
-  let query = deterministicQuery
-  let confidence = deterministicQuery ? 0.82 : 0.35
-
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001', max_tokens: 60,
-        system: `Extract a Wikipedia search query from the user's website description.
-Reply with JSON: {"query": "2-5 word English Wikipedia query" | "NONE", "confidence": 0.0-1.0}
-Return NONE if the request is for a plain business website with no real-world list of places/things.
-Examples: "most famous museums world" → {"query":"famous museums world","confidence":0.9}
-"beautiful churches world" → {"query":"famous churches world","confidence":0.9}
-"São Paulo várzea football teams" → {"query":"Sao Paulo amateur football teams","confidence":0.85}
-"my restaurant website" → {"query":"NONE","confidence":0.95}`,
-        messages: [{ role: 'user', content: description }],
-      }),
-    })
-    if (response.ok) {
-      const data = await response.json()
-      const text = (data.content?.[0]?.text || '').trim()
-      const firstBrace = text.indexOf('{'), lastBrace = text.lastIndexOf('}')
-      if (firstBrace !== -1 && lastBrace > firstBrace) {
-        const parsed = JSON.parse(text.slice(firstBrace, lastBrace + 1)) as { query?: string; confidence?: number }
-        if (parsed.query && parsed.query.toUpperCase() !== 'NONE') query = parsed.query.trim()
-        if (typeof parsed.confidence === 'number') confidence = Math.min(1, Math.max(0, parsed.confidence))
-      }
-    }
-  } catch { /* keep deterministic fallback */ }
-
-  if (!query && intent === 'data_fetching' && keywords.length > 0) {
-    query = keywords.slice(0, 3).join(' ')
-    confidence = Math.max(confidence, 0.55)
-  }
-
-  return { query, confidence, intent, keywords, normalizedText }
-}
 
 function supabaseAdmin() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 }
 
 // ── DB save is NON-BLOCKING — never throws, never kills site generation ───────
-async function saveWikipediaItems(query: string, wikiItems: WikiItem[]): Promise<number> {
-  if (wikiItems.length === 0) return 0
+async function saveValidatedItems(items: ValidatedItem[]): Promise<number> {
+  if (items.length === 0) return 0
   try {
     const db = supabaseAdmin()
-    const rows = wikiItems.map((item) => ({
-      name:        item.title,
-      description: item.description,
-      image_url:   item.image_url,
-      source_url:  item.wiki_url,
-      metadata:    { source: 'wikipedia', query, license: 'CC-BY-SA' },
-    }))
-    const { data, error } = await db.from('items').upsert(rows, { onConflict: 'source_url' }).select('id')
+    const { data, error } = await db.from('items').upsert(items, { onConflict: 'source_url' }).select('id')
     if (error) {
       console.error('Sites generate: DB save failed (non-blocking):', error.message)
       return 0
     }
-    return data?.length ?? rows.length
+    return data?.length ?? items.length
   } catch (err) {
     console.error('Sites generate: DB save exception (non-blocking):', err)
     return 0
   }
 }
 
-async function seedFallbackItems(): Promise<number> {
-  try {
-    const db = supabaseAdmin()
-    const makeRows = (count: number, prefix: string, category: string, city: string) =>
-      Array.from({ length: count }, (_, i) => ({
-        name:        `${prefix} ${i + 1}`,
-        description: `Demo ${category} entry ${i + 1} for ${city}.`,
-        image_url:   null,
-        source_url:  `https://example.com/demo/${category}/${i + 1}`,
-        metadata:    { seeded: true, source: 'fallback-demo', category },
-      }))
-    const rows = [
-      ...makeRows(10, 'Equipe de Várzea', 'teams', 'São Paulo'),
-      ...makeRows(10, 'Museu', 'museums', 'World'),
-      ...makeRows(10, 'Restaurante', 'restaurants', 'World'),
-    ]
-    const { error } = await db.from('items').upsert(rows, { onConflict: 'source_url' })
-    if (error) {
-      console.error('Sites generate: fallback seed failed (non-blocking):', error.message)
-      return 0
-    }
-    return rows.length
-  } catch (err) {
-    console.error('Sites generate: fallback seed exception (non-blocking):', err)
-    return 0
-  }
+// ── DB save is NON-BLOCKING — never throws, never kills site generation ───────
+async function saveWikipediaItems(query: string, wikiItems: WikiItem[]): Promise<number> {
+  const { items, skippedRows } = validateItems(
+    wikiItems.map((item) => ({
+      name:        item.title,
+      description: item.description,
+      image_url:   item.image_url,
+      source_url:  item.wiki_url,
+      metadata:    { source: 'wikipedia', query, license: 'CC-BY-SA' },
+    })),
+    query,
+  )
+
+  skippedRows.forEach((row) => console.warn('Sites generate: skipped Wikipedia row', row))
+  return saveValidatedItems(items)
+}
+
+async function seedFallbackItems(query: string | null): Promise<number> {
+  const fallbackRows = buildFallbackItems(query, 30)
+  return saveValidatedItems(fallbackRows)
 }
 
 async function fetchWikipediaItems(query: string): Promise<WikiItem[]> {
@@ -209,7 +108,6 @@ async function callClaude(systemPrompt: string, userContent: string): Promise<st
 
 const DISPLAY_FONTS = ['Fraunces','Playfair Display','Bricolage Grotesque','Space Grotesk','Syne','Sora','DM Serif Display','Archivo','Unbounded']
 const BODY_FONTS    = ['DM Sans','Manrope','Work Sans','Outfit','Spline Sans','Newsreader','IBM Plex Sans']
-const CONFIDENCE_THRESHOLD = 0.6
 
 const SYSTEM_PROMPT = `You are an elite brand and web designer working inside SignalBoost. From a short description, you design a COMPLETE, visually striking one-page website and return it as structured JSON.
 
@@ -234,6 +132,22 @@ function isValidContent(p: any): boolean {
   return p && typeof p.businessName === 'string' && Array.isArray(p.sections) && p.sections.length > 0
 }
 
+function buildRecoveryContent(description: string, items: ValidatedItem[]) {
+  const cards = items.slice(0, 6).map((item) => ({ title: item.name, body: item.description }))
+  return {
+    businessName: 'SignalBoost Demo Site',
+    theme: 'light',
+    fonts: { display: 'Space Grotesk', body: 'DM Sans' },
+    palette: { primary: '#2563eb', accent: '#f97316', background: '#f8fafc', surface: '#ffffff', text: '#0f172a', muted: '#64748b' },
+    sections: [
+      { type: 'hero', eyebrow: 'AI-ready prompt', heading: 'Your request is ready to launch', subheading: description, cta: 'Explore the data', ctaSecondary: 'Contact us' },
+      { type: 'feature-grid', eyebrow: 'Fallback data', heading: 'Curated starter items', subheading: 'Demo records keep the page useful while live data recovers.', items: cards },
+      { type: 'cta', heading: 'Ready for real data', subheading: 'Connect Wikipedia, CSV, scraper, or API sources when available.', cta: 'Generate again' },
+      { type: 'contact', eyebrow: 'SignalBoost', heading: 'Keep building', body: 'We recovered gracefully and seeded safe demo content.', email: 'support@signalboostapp.com', phone: '', address: '' },
+    ],
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser()
@@ -246,54 +160,118 @@ export async function POST(req: NextRequest) {
     }
 
     const trimmed = description.trim()
-    let userMessage = trimmed
+    const preprocessed = promptPreprocessor(trimmed)
+    const wikiQuery = preprocessed.query
+    const shouldFetch = Boolean(wikiQuery && !preprocessed.shouldUseFallback && preprocessed.confidence >= PROMPT_PREPROCESSOR_CONFIDENCE_THRESHOLD)
     let wikiItems: WikiItem[] = []
+    let fallbackSeeded = false
 
-    const extraction = await extractWikipediaQuery(trimmed)
-    const wikiQuery = extraction.query
-    const shouldFetch = wikiQuery && extraction.confidence >= CONFIDENCE_THRESHOLD
-
-    console.log('Sites generate NLP:', { query: wikiQuery, confidence: extraction.confidence, intent: extraction.intent })
+    console.log('Sites generate preprocessor:', {
+      intent: preprocessed.intent,
+      query: wikiQuery,
+      confidence: preprocessed.confidence,
+      fallback: preprocessed.shouldUseFallback,
+      keywords: preprocessed.keywords,
+      skippedRows: preprocessed.validation.skippedRows,
+    })
 
     if (shouldFetch && wikiQuery) {
       wikiItems = await fetchWikipediaItems(wikiQuery)
       console.log(`Sites generate: fetched ${wikiItems.length} Wikipedia items for "${wikiQuery}"`)
 
-      // Save to DB — non-blocking, never throws
-      saveWikipediaItems(wikiQuery, wikiItems).catch(() => {})
-
-      if (wikiItems.length > 0) {
-        const itemList = wikiItems.slice(0, 12)
-          .map((item, i) => `${i + 1}. ${item.title}${item.description ? ' — ' + item.description : ''}`)
-          .join('\n')
-        userMessage = `${trimmed}\n\nREAL_WORLD_DATA (from Wikipedia — use these real items in the site):\n${itemList}\n\nIMPORTANT: Include a gallery or feature-grid section with these real items by name.`
-      }
+      const saved = await saveWikipediaItems(wikiQuery, wikiItems)
+      console.log('Sites generate: saved Wikipedia rows', { saved, skipped: Math.max(0, wikiItems.length - saved) })
     }
 
-    // Fallback seeding — non-blocking, never throws
-    if (!shouldFetch || wikiItems.length === 0) {
-      seedFallbackItems().catch(() => {})
+    let promptDataBlock = ''
+    if (wikiItems.length > 0) {
+      const itemList = wikiItems.slice(0, 12)
+        .map((item, i) => `${i + 1}. ${item.title}${item.description ? ' — ' + item.description : ''} Source: ${item.wiki_url}`)
+        .join('\n')
+      promptDataBlock = `
+
+REAL_WORLD_DATA (from Wikipedia — use these real items in the site):
+${itemList}
+
+IMPORTANT: Include a gallery or feature-grid section with these real items by name.`
+    } else {
+      const seeded = await seedFallbackItems(wikiQuery)
+      fallbackSeeded = true
+      console.log('Sites generate: fallback demo seed used', { seeded, query: wikiQuery })
+      const fallbackItems = buildFallbackItems(wikiQuery, 8)
+      promptDataBlock = `
+
+FALLBACK_DEMO_DATA (safe demo rows — use if real data is unavailable):
+${fallbackItems
+        .map((item, i) => `${i + 1}. ${item.name} — ${item.description} Source: ${item.source_url}`)
+        .join('\n')}`
     }
+
+    const userMessage = `${preprocessed.optimizedPrompt}
+
+RAW_USER_INPUT:
+${trimmed}${promptDataBlock}`
 
     const raw = await callClaude(SYSTEM_PROMPT, userMessage)
-    if (!raw) return NextResponse.json({ error: 'I could not generate the website right now. Please try again.' }, { status: 502 })
+    if (!raw) {
+      const fallbackItems = buildFallbackItems(wikiQuery, 8)
+      await seedFallbackItems(wikiQuery)
+      return NextResponse.json({
+        content: buildRecoveryContent(preprocessed.cleanedPrompt, fallbackItems),
+        message: 'The live AI model is unavailable, so I interpreted your request and generated a safe demo page instead.',
+        transparencyMessage: preprocessed.transparencyMessage,
+        preprocessor: {
+          intent: preprocessed.intent,
+          query: wikiQuery,
+          confidence: preprocessed.confidence,
+          fallbackUsed: true,
+        },
+      })
+    }
 
     let parsed: any = null
     try {
       const firstBrace = raw.indexOf('{'), lastBrace = raw.lastIndexOf('}')
       if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) parsed = JSON.parse(raw.slice(firstBrace, lastBrace + 1))
-    } catch { parsed = null }
+    } catch (parseError) {
+      console.error('Sites generate: JSON parse failed; using fallback content', parseError)
+      parsed = buildRecoveryContent(preprocessed.cleanedPrompt, buildFallbackItems(wikiQuery, 8))
+      fallbackSeeded = true
+      await seedFallbackItems(wikiQuery)
+    }
 
-    if (!isValidContent(parsed)) return NextResponse.json({ error: 'The generated design was not valid. Please try again.' }, { status: 502 })
+    if (!isValidContent(parsed)) {
+      console.warn('Sites generate: invalid AI content; using fallback content')
+      parsed = buildRecoveryContent(preprocessed.cleanedPrompt, buildFallbackItems(wikiQuery, 8))
+      fallbackSeeded = true
+      await seedFallbackItems(wikiQuery)
+    }
     if (parsed.theme !== 'dark' && parsed.theme !== 'light') parsed.theme = 'light'
 
     return NextResponse.json({
       content:     parsed,
       wikiItems:   wikiItems.length > 0 ? wikiItems : undefined,
       attribution: wikiItems.length > 0 ? 'Data from Wikipedia, licensed under CC-BY-SA 4.0.' : undefined,
+      transparencyMessage: preprocessed.transparencyMessage,
+      preprocessor: {
+        intent: preprocessed.intent,
+        query: wikiQuery,
+        confidence: preprocessed.confidence,
+        confidenceLabel: preprocessed.confidenceLabel,
+        fallbackUsed: fallbackSeeded || wikiItems.length === 0,
+        optimizedPrompt: preprocessed.optimizedPrompt,
+        validation: preprocessed.validation,
+      },
     })
   } catch (error) {
     console.error('Sites generate error', error)
-    return NextResponse.json({ error: 'Something went wrong generating the website.' }, { status: 500 })
+    const fallbackItems = buildFallbackItems(null, 8)
+    await seedFallbackItems(null)
+    return NextResponse.json({
+      content: buildRecoveryContent('We recovered from an unexpected generation error.', fallbackItems),
+      message: 'Something went wrong, so I seeded safe demo data and generated a fallback page instead.',
+      transparencyMessage: 'I interpreted your request as: a recoverable website generation request using fallback demo data.',
+      preprocessor: { intent: 'site_generation', query: null, confidence: 0, fallbackUsed: true },
+    })
   }
 }

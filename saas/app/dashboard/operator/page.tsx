@@ -1,43 +1,92 @@
 'use client'
 
-// saas/app/dashboard/operator/page.tsx
-//
-// The REAL Website Operator. Calls /api/sites/generate (the AI design brain)
-// and /api/sites/publish (the publish chain). Uses the project-wide useI18n
-// pattern (NOT useTranslation, which is inconsistent with the rest of the app).
+// saas/app/dashboard/operator/page.tsx — streaming version
+// Reads NDJSON chunks from /api/sites/generate and shows live progress updates
+// while the site is being built, then renders the preview the moment it arrives.
 
 import { useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 import SitePreview, { type SitePreviewContent } from '@/components/operator/SitePreview'
 
+type StatusStep = {
+  step:    string
+  message: string
+  items?:  string[]
+}
+
 export default function OperatorPage() {
   const { dict, lang } = useI18n()
   const tr = (key: string, fallback: string) => t(dict, key, fallback)
 
-  const [request, setRequest] = useState('')
-  const [content, setContent] = useState<SitePreviewContent | null>(null)
-  const [liveUrl, setLiveUrl] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [request, setRequest]       = useState('')
+  const [content, setContent]       = useState<SitePreviewContent | null>(null)
+  const [liveUrl, setLiveUrl]       = useState<string | null>(null)
+  const [loading, setLoading]       = useState(false)
   const [publishing, setPublishing] = useState(false)
-  const [message, setMessage] = useState('')
-  const [aiUnderstanding, setAiUnderstanding] = useState<any | null>(null)
-  const [sourceHistory, setSourceHistory] = useState<any[]>([])
+  const [message, setMessage]       = useState('')
+  const [steps, setSteps]           = useState<StatusStep[]>([])
+  const [preprocessor, setPreprocessor] = useState<any | null>(null)
 
+  // ── Streaming generate ────────────────────────────────────────────────────
   async function generate() {
-    setLoading(true); setMessage(''); setLiveUrl(null); setContent(null); setAiUnderstanding(null); setSourceHistory([])
+    setLoading(true)
+    setMessage('')
+    setLiveUrl(null)
+    setContent(null)
+    setSteps([])
+    setPreprocessor(null)
+
     try {
       const res = await fetch('/api/sites/generate', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description: request, language: lang }),
+        body:    JSON.stringify({ description: request, language: lang }),
       })
-      const data = await res.json()
-      if (!res.ok) setMessage(data.error || tr('operator.errors.plan', 'Could not generate the website.'))
-      else {
-        setContent(data.content)
-        setAiUnderstanding(data.aiUnderstanding || null)
-        setSourceHistory(Array.isArray(data.sourceHistory) ? data.sourceHistory : [])
+
+      if (!res.ok || !res.body) {
+        const err = await res.json().catch(() => ({}))
+        setMessage(err.error || tr('operator.errors.plan', 'Could not generate the website.'))
+        setLoading(false)
+        return
+      }
+
+      // Read the NDJSON stream
+      const reader  = res.body.getReader()
+      const decoder = new TextDecoder()
+      let   buffer  = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+
+        // Process all complete lines in the buffer
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? '' // keep incomplete last line
+
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed) continue
+
+          let chunk: any
+          try { chunk = JSON.parse(trimmed) } catch { continue }
+
+          if (chunk.type === 'status') {
+            setSteps(prev => [...prev, { step: chunk.step, message: chunk.message, items: chunk.items }])
+          } else if (chunk.type === 'result') {
+            if (chunk.content) {
+              setContent(chunk.content)
+            }
+            if (chunk.preprocessor) {
+              setPreprocessor(chunk.preprocessor)
+            }
+            if (chunk.error && !chunk.content) {
+              setMessage(chunk.error)
+            }
+          }
+        }
       }
     } catch {
       setMessage(tr('operator.errors.connect', 'Could not connect. Please try again.'))
@@ -51,9 +100,9 @@ export default function OperatorPage() {
     setPublishing(true); setMessage('')
     try {
       const res = await fetch('/api/sites/publish', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, language: lang }),
+        body:    JSON.stringify({ content, language: lang }),
       })
       const data = await res.json()
       if (!res.ok) setMessage(data.error || tr('operator.errors.publish', 'Could not publish the website.'))
@@ -66,21 +115,29 @@ export default function OperatorPage() {
   }
 
   function reset() {
-    setContent(null); setLiveUrl(null); setMessage(''); setRequest(''); setLoading(false); setPublishing(false); setAiUnderstanding(null); setSourceHistory([])
+    setContent(null); setLiveUrl(null); setMessage('')
+    setRequest(''); setLoading(false); setPublishing(false)
+    setSteps([]); setPreprocessor(null)
   }
 
-  const fullUrl = liveUrl ? `${typeof window !== 'undefined' ? window.location.origin : ''}${liveUrl}` : null
+  const fullUrl     = liveUrl ? `${typeof window !== 'undefined' ? window.location.origin : ''}${liveUrl}` : null
   const placeholder = tr('operator.input.placeholder', 'e.g. A cozy Italian restaurant in São Paulo with a menu, our story, and a reservation button')
 
   return (
     <main className="sb-page" style={{ maxWidth: 1240 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 440px) 1fr', gap: 24, alignItems: 'start' }} className="sb-operator-grid">
-
+      <div
+        style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 440px) 1fr', gap: 24, alignItems: 'start' }}
+        className="sb-operator-grid"
+      >
         {/* ── Left: input ── */}
         <section className="hero-panel" style={{ padding: 24, position: 'sticky', top: 16 }}>
           <div className="sb-kicker">🤖 {tr('operator.title.kicker', 'AI Website Operator')}</div>
-          <h1 className="sb-title" style={{ marginBottom: 8, fontSize: 28 }}>{tr('operator.title.main', 'Describe your website')}</h1>
-          <p className="sb-subtitle" style={{ marginTop: 0 }}>{tr('operator.title.subtitle', 'Tell me about your business. I will design a complete website — and you can publish it live in one click.')}</p>
+          <h1 className="sb-title" style={{ marginBottom: 8, fontSize: 28 }}>
+            {tr('operator.title.main', 'Describe your website')}
+          </h1>
+          <p className="sb-subtitle" style={{ marginTop: 0 }}>
+            {tr('operator.title.subtitle', 'Tell me about your business. I will design a complete website — and you can publish it live in one click.')}
+          </p>
 
           <textarea
             value={request}
@@ -105,9 +162,49 @@ export default function OperatorPage() {
             )}
           </div>
 
+          {/* ── Live status stream ── */}
+          {loading && steps.length > 0 && (
+            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {steps.map((step, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display:    'flex',
+                    flexDirection: 'column',
+                    gap:        4,
+                    padding:    '10px 12px',
+                    borderRadius: 10,
+                    background: i === steps.length - 1
+                      ? 'rgba(255,195,0,0.08)'
+                      : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${i === steps.length - 1 ? 'rgba(255,195,0,0.2)' : 'var(--border-soft)'}`,
+                    fontSize:   13,
+                    color:      i === steps.length - 1 ? '#fff' : 'var(--text-muted)',
+                    transition: 'all 0.3s ease',
+                  }}
+                >
+                  <span>{step.message}</span>
+                  {step.items && step.items.length > 0 && (
+                    <span style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>
+                      {step.items.join(' · ')}
+                      {step.items.length < 20 ? '' : ' · …'}
+                    </span>
+                  )}
+                </div>
+              ))}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', fontSize: 13, color: 'var(--text-faint)' }}>
+                <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span>
+                Working…
+              </div>
+            </div>
+          )}
+
+          {/* ── Publish button ── */}
           {content && !liveUrl && (
             <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px solid var(--border-soft)' }}>
-              <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 0 }}>{tr('operator.publish.hint', 'Happy with it? Publish it to a live web address.')}</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 0 }}>
+                {tr('operator.publish.hint', 'Happy with it? Publish it to a live web address.')}
+              </p>
               <button className="sb-button-primary" onClick={publish} disabled={publishing} style={{ width: '100%' }}>
                 {publishing
                   ? `🚀 ${tr('operator.publish.loading', 'Publishing…')}`
@@ -116,44 +213,41 @@ export default function OperatorPage() {
             </div>
           )}
 
+          {/* ── Live URL ── */}
           {liveUrl && fullUrl && (
             <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px solid var(--border-gold)' }}>
-              <div style={{ color: '#fff', fontWeight: 800, marginBottom: 6 }}>🎉 {tr('operator.live', 'Your website is live')}</div>
-              <a href={liveUrl} target="_blank" rel="noopener noreferrer" className="sb-button-primary" style={{ display: 'inline-block', wordBreak: 'break-all', width: '100%', textAlign: 'center' }}>
+              <div style={{ color: '#fff', fontWeight: 800, marginBottom: 6 }}>
+                🎉 {tr('operator.live', 'Your website is live')}
+              </div>
+              <a href={liveUrl} target="_blank" rel="noopener noreferrer" className="sb-button-primary"
+                style={{ display: 'inline-block', wordBreak: 'break-all', width: '100%', textAlign: 'center' }}>
                 {fullUrl} ↗
               </a>
             </div>
           )}
 
-
-
-          {aiUnderstanding && (
-            <div style={{ marginTop: 14, padding: 12, borderRadius: 12, border: '1px solid var(--border-soft)', background: 'rgba(255,255,255,.02)', fontSize: 12, color: 'var(--text-secondary)' }}>
-              <div><strong>🧠 AI understanding:</strong> {aiUnderstanding.message}</div>
-              <div style={{ marginTop: 6 }}>Intent: <strong>{aiUnderstanding.intent}</strong> · Confidence: <strong>{Math.round((aiUnderstanding.confidence || 0) * 100)}%</strong></div>
-              <div style={{ marginTop: 6 }}>Query: <code>{aiUnderstanding.query}</code></div>
-              {Array.isArray(aiUnderstanding.keywords) && aiUnderstanding.keywords.length > 0 && (
-                <div style={{ marginTop: 6 }}>Keywords: {aiUnderstanding.keywords.join(', ')}</div>
-              )}
+          {/* ── Preprocessor debug (collapsed) ── */}
+          {preprocessor && !loading && (
+            <div style={{ marginTop: 14, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border-soft)', background: 'rgba(255,255,255,.02)', fontSize: 11, color: 'var(--text-faint)' }}>
+              Mode: <strong>{preprocessor.mode}</strong>
+              {preprocessor.category ? ` · ${preprocessor.category}` : ''}
+              {preprocessor.localCount ? ` · ${preprocessor.localCount} local items` : ''}
+              {preprocessor.wikiCount  ? ` · ${preprocessor.wikiCount} wiki items`  : ''}
+              {preprocessor.fallbackUsed ? ' · fallback' : ''}
             </div>
           )}
 
-          {sourceHistory.length > 0 && (
-            <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
-              <div style={{ fontWeight: 700, marginBottom: 4 }}>Source history</div>
-              {sourceHistory.map((row, idx) => (
-                <div key={idx}>• {row.source} · {row.query} · {row.importedCount} items</div>
-              ))}
-            </div>
+          {message && !liveUrl && (
+            <p style={{ marginTop: 14, color: 'var(--text-secondary)', fontSize: 13 }}>{message}</p>
           )}
-
-                    {message && !liveUrl && <p style={{ marginTop: 14, color: 'var(--text-secondary)', fontSize: 13 }}>{message}</p>}
         </section>
 
-        {/* ── Right: live-style preview ── */}
+        {/* ── Right: live preview ── */}
         <section className="hero-panel" style={{ padding: 18, minHeight: 360 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ color: 'var(--text-faint)', fontSize: 12, fontWeight: 900, letterSpacing: '.08em', textTransform: 'uppercase' }}>{tr('operator.preview.liveLabel', 'Live preview')}</div>
+            <div style={{ color: 'var(--text-faint)', fontSize: 12, fontWeight: 900, letterSpacing: '.08em', textTransform: 'uppercase' }}>
+              {tr('operator.preview.liveLabel', 'Live preview')}
+            </div>
             {content && (
               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                 {content.theme === 'dark' ? `🌙 ${tr('operator.preview.dark', 'dark')}` : `☀️ ${tr('operator.preview.light', 'light')}`}
@@ -172,9 +266,14 @@ export default function OperatorPage() {
             </div>
           )}
 
-          {loading && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 320, color: 'var(--text-muted)' }}>
-              ✨ {tr('operator.preview.loading', 'Designing your website…')}
+          {loading && !content && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 320, gap: 16, color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: 40, animation: 'pulse 2s ease-in-out infinite' }}>✨</div>
+              <div style={{ fontSize: 14, textAlign: 'center' }}>
+                {steps.length > 0
+                  ? steps[steps.length - 1].message
+                  : tr('operator.preview.loading', 'Designing your website…')}
+              </div>
             </div>
           )}
 
@@ -186,6 +285,14 @@ export default function OperatorPage() {
         @media (max-width: 860px) {
           .sb-operator-grid { grid-template-columns: 1fr !important; }
           .sb-operator-grid > section:first-child { position: static !important; }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 0.5; transform: scale(1); }
+          50%       { opacity: 1;   transform: scale(1.1); }
         }
       `}</style>
     </main>

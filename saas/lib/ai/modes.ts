@@ -1,271 +1,193 @@
-// saas/lib/ai/memory.ts
-// Supabase memory layer — save and reuse generated AI content.
+// saas/lib/ai/modes.ts
+// Four AI modes — each builds a structured prompt and returns typed JSON.
 
-import { createClient } from '@supabase/supabase-js'
-import type { ValidLocalItem, ValidBusinessSite } from './validation'
+import { callModel } from './modelRouter'
+import { safeParseJSON, validateLocalItems, validateBusinessSite, validateCreativeWorld, validateGlobalKnowledge } from './validation'
+import type { ValidLocalItem, ValidBusinessSite, ValidCreativeWorld, ValidGlobalKnowledge } from './validation'
 
-function supabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  )
-}
+export type { ValidLocalItem, ValidBusinessSite, ValidCreativeWorld, ValidGlobalKnowledge }
 
-// ── Save local items ──────────────────────────────────────────────────────────
+// ── 2.1 Local Knowledge Mode ──────────────────────────────────────────────────
 
-export async function saveLocalItems(
-  items:   ValidLocalItem[],
-  context: { userPrompt: string; language: string; category?: string },
-): Promise<void> {
-  if (items.length === 0) return
-  try {
-    const db   = supabaseAdmin()
-    const rows = items.map(item => ({
-      name:         item.name,
-      neighborhood: item.neighborhood,
-      zone:         item.zone,
-      founded:      item.founded,
-      colors:       JSON.stringify(item.colors),
-      description:  item.description,
-      language:     context.language,
-      user_prompt:  context.userPrompt.slice(0, 500),
-    }))
-    const { error } = await db.from('ai_local_items').insert(rows)
-    if (error) console.error('memory: saveLocalItems error', error.message)
-    else console.log('memory: saveLocalItems — saved', rows.length, 'items')
-  } catch (err) {
-    console.error('memory: saveLocalItems exception (non-blocking)', err)
-  }
-}
-
-// ── Save business site ────────────────────────────────────────────────────────
-
-export async function saveBusinessSite(
-  site:    ValidBusinessSite,
-  context: { userPrompt: string; language: string },
-): Promise<void> {
-  try {
-    const db = supabaseAdmin()
-    const { error } = await db.from('ai_business_sites').insert({
-      site_json:   site,
-      language:    context.language,
-      user_prompt: context.userPrompt.slice(0, 500),
-    })
-    if (error) console.error('memory: saveBusinessSite error', error.message)
-    else console.log('memory: saveBusinessSite — saved')
-  } catch (err) {
-    console.error('memory: saveBusinessSite exception (non-blocking)', err)
-  }
-}
-
-// ── Save site design (full SitePreviewContent JSON) ───────────────────────────
-
-export async function saveSiteDesign(
-  content:  object,
-  context:  { userPrompt: string; language: string },
-): Promise<void> {
-  try {
-    const db = supabaseAdmin()
-    const { error } = await db.from('ai_business_sites').insert({
-      site_json:   content,
-      language:    context.language,
-      user_prompt: context.userPrompt.slice(0, 500),
-    })
-    if (error) console.error('memory: saveSiteDesign error', error.message)
-    else console.log('memory: saveSiteDesign — saved')
-  } catch (err) {
-    console.error('memory: saveSiteDesign exception (non-blocking)', err)
-  }
-}
-
-// ── Get cached site design ────────────────────────────────────────────────────
-// Looks for a previously generated site for the same prompt + language.
-// Returns null on miss so the caller falls through to Claude.
-
-export async function getSiteDesignCache(context: {
+export async function runLocalKnowledgeMode(args: {
   userPrompt: string
   language:   string
-  maxAge?:    number // hours, default 24
-}): Promise<object | null> {
-  const maxAge = context.maxAge ?? 24
-  try {
-    const db    = supabaseAdmin()
-    const since = new Date(Date.now() - maxAge * 60 * 60 * 1000).toISOString()
-
-    const { data, error } = await db
-      .from('ai_business_sites')
-      .select('site_json')
-      .eq('language', context.language)
-      .eq('user_prompt', context.userPrompt.slice(0, 500))
-      .gte('created_at', since)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (error) {
-      console.error('memory: getSiteDesignCache error', error.message)
-      return null
-    }
-
-    if (!data?.site_json) {
-      console.log('memory: getSiteDesignCache — miss')
-      return null
-    }
-
-    console.log('memory: getSiteDesignCache — HIT')
-    return data.site_json as object
-  } catch (err) {
-    console.error('memory: getSiteDesignCache exception', err)
-    return null
-  }
-}
-
-// ── Cache lookup for local items ──────────────────────────────────────────────
-
-function extractCacheKeywords(userPrompt: string): string[] {
-  const lower = userPrompt.toLowerCase()
-  const cities = [
-    'são paulo', 'sao paulo', 'sp',
-    'rio de janeiro', 'rj',
-    'belo horizonte', 'bh',
-    'curitiba', 'salvador', 'fortaleza', 'recife', 'manaus',
-    'zona norte', 'zona sul', 'zona leste', 'zona oeste',
-    'jaçanã', 'tucuruvi', 'santana', 'penha', 'tatuapé',
-    'ipiranga', 'vila prudente', 'pirituba', 'brasilândia',
-  ]
-  const categories = [
-    'várzea', 'varzea', 'futebol', 'football', 'soccer',
-    'restaurante', 'restaurant', 'padaria', 'bakery',
-    'academia', 'gym', 'barbearia', 'barbershop',
-    'museu', 'museum', 'igreja', 'church', 'praia', 'beach',
-  ]
-  const found: string[] = []
-  for (const kw of [...cities, ...categories]) {
-    if (lower.includes(kw)) found.push(kw)
-  }
-  return found
-}
-
-export async function getCachedLocalItems(context: {
-  userPrompt: string
-  language:   string
-  minItems?:  number
-  maxAge?:    number
-}): Promise<ValidLocalItem[] | null> {
-  const minItems = context.minItems ?? 10
-  const maxAge   = context.maxAge   ?? 48
-
-  try {
-    const keywords = extractCacheKeywords(context.userPrompt)
-    if (keywords.length === 0) {
-      console.log('memory: getCachedLocalItems — no cache keywords found')
-      return null
-    }
-
-    const db    = supabaseAdmin()
-    const since = new Date(Date.now() - maxAge * 60 * 60 * 1000).toISOString()
-
-    const orFilter = keywords
-      .slice(0, 5)
-      .map(kw => `user_prompt.ilike.%${kw}%`)
-      .join(',')
-
-    const { data, error } = await db
-      .from('ai_local_items')
-      .select('name, neighborhood, zone, founded, colors, description')
-      .eq('language', context.language)
-      .gte('created_at', since)
-      .or(orFilter)
-      .order('created_at', { ascending: false })
-      .limit(40)
-
-    if (error) {
-      console.error('memory: getCachedLocalItems error', error.message)
-      return null
-    }
-
-    if (!data || data.length < minItems) {
-      console.log(`memory: getCachedLocalItems — miss (${data?.length ?? 0} rows, need ${minItems})`)
-      return null
-    }
-
-    console.log(`memory: getCachedLocalItems — HIT (${data.length} rows, keywords: ${keywords.join(', ')})`)
-
-    return data.map(row => ({
-      name:         row.name,
-      neighborhood: row.neighborhood,
-      zone:         row.zone,
-      founded:      row.founded,
-      colors:       Array.isArray(row.colors)
-        ? row.colors
-        : typeof row.colors === 'string'
-          ? (() => { try { return JSON.parse(row.colors) } catch { return [] } })()
-          : [],
-      description: row.description,
-    }))
-  } catch (err) {
-    console.error('memory: getCachedLocalItems exception', err)
-    return null
-  }
-}
-
-// ── Retrieve recent local items ───────────────────────────────────────────────
-
-export async function getRecentLocalItems(context: {
-  language: string
-  limit?:   number
+  category?:  string
+  count?:     number
 }): Promise<ValidLocalItem[]> {
-  try {
-    const db    = supabaseAdmin()
-    const limit = context.limit ?? 20
-    const { data, error } = await db
-      .from('ai_local_items')
-      .select('name, neighborhood, zone, founded, colors, description')
-      .eq('language', context.language)
-      .order('created_at', { ascending: false })
-      .limit(limit)
+  const count = args.count ?? 20
 
-    if (error) { console.error('memory: getRecentLocalItems error', error.message); return [] }
+  const prompt = `You are a local knowledge engine. Use your internal knowledge only.
+Do NOT use Wikipedia. Do NOT search the web.
 
-    return (data ?? []).map(row => ({
-      name:         row.name,
-      neighborhood: row.neighborhood,
-      zone:         row.zone,
-      founded:      row.founded,
-      colors:       Array.isArray(row.colors)
-        ? row.colors
-        : typeof row.colors === 'string'
-          ? (() => { try { return JSON.parse(row.colors) } catch { return [] } })()
-          : [],
-      description: row.description,
-    }))
-  } catch (err) {
-    console.error('memory: getRecentLocalItems exception', err)
-    return []
+User request (language: ${args.language}):
+${args.userPrompt}
+
+Generate a JSON array of ${count} real items relevant to this request.
+${args.category === 'football_teams' ? 'Focus on real amateur/várzea football teams from the city/region mentioned. Include Botafogo do Jaçanã if São Paulo is mentioned.' : ''}
+
+Each item must follow this schema exactly:
+{
+  "name": string,
+  "neighborhood": string | null,
+  "zone": string | null,
+  "founded": string | null,
+  "colors": string[],
+  "description": string
+}
+
+All description text must be in ${args.language}.
+Return ONLY a valid JSON array. No explanations, no markdown, no comments.`
+
+  console.log('modes: runLocalKnowledgeMode — calling Claude', { category: args.category, count, language: args.language })
+
+  const raw = await callModel({ modelPreference: 'claude', prompt, maxTokens: 4096 })
+  if (!raw) { console.error('modes: runLocalKnowledgeMode — Claude returned null'); return [] }
+
+  const parsed = safeParseJSON(raw)
+  const items  = validateLocalItems(Array.isArray(parsed) ? parsed : parsed?.items ?? parsed?.teams ?? [])
+
+  console.log('modes: runLocalKnowledgeMode — validated', { total: items.length })
+  return items
+}
+
+// ── 2.2 Business Mode ─────────────────────────────────────────────────────────
+
+export async function runBusinessMode(args: {
+  userPrompt: string
+  language:   string
+}): Promise<ValidBusinessSite | null> {
+  const prompt = `You are a website content generator for small businesses and creators.
+
+User request (language: ${args.language}):
+${args.userPrompt}
+
+Generate structured JSON for a one-page website with the following sections:
+{
+  "hero": {
+    "headline": string,
+    "subheadline": string,
+    "primary_cta": string,
+    "secondary_cta": string | null
+  },
+  "about": {
+    "title": string,
+    "body": string
+  },
+  "services": [
+    {
+      "name": string,
+      "description": string,
+      "price_hint": string | null
+    }
+  ],
+  "testimonials": [
+    {
+      "name": string,
+      "role": string | null,
+      "quote": string
+    }
+  ],
+  "faq": [
+    {
+      "question": string,
+      "answer": string
+    }
+  ],
+  "contact": {
+    "headline": string,
+    "body": string,
+    "cta": string
   }
 }
 
-// ── Retrieve recent business sites ────────────────────────────────────────────
+All text must be in ${args.language}.
+Return ONLY valid JSON. No explanations, no markdown.`
 
-export async function getRecentBusinessSites(context: {
-  language: string
-  limit?:   number
-}): Promise<ValidBusinessSite[]> {
-  try {
-    const db    = supabaseAdmin()
-    const limit = context.limit ?? 5
-    const { data, error } = await db
-      .from('ai_business_sites')
-      .select('site_json')
-      .eq('language', context.language)
-      .order('created_at', { ascending: false })
-      .limit(limit)
+  console.log('modes: runBusinessMode — calling OpenAI', { language: args.language })
 
-    if (error) { console.error('memory: getRecentBusinessSites error', error.message); return [] }
+  const raw = await callModel({ modelPreference: 'openai', prompt, maxTokens: 2048 })
+  if (!raw) { console.error('modes: runBusinessMode — model returned null'); return null }
 
-    return (data ?? []).map(row => row.site_json as ValidBusinessSite)
-  } catch (err) {
-    console.error('memory: getRecentBusinessSites exception', err)
-    return []
-  }
+  const parsed = safeParseJSON(raw)
+  return validateBusinessSite(parsed)
+}
+
+// ── 2.3 Creative Mode ─────────────────────────────────────────────────────────
+
+export async function runCreativeMode(args: {
+  userPrompt: string
+  language:   string
+}): Promise<ValidCreativeWorld | null> {
+  const prompt = `You are a creative world builder.
+
+User request (language: ${args.language}):
+${args.userPrompt}
+
+Generate a JSON object with:
+{
+  "world_summary": string,
+  "main_characters": [
+    {
+      "name": string,
+      "role": string,
+      "description": string
+    }
+  ],
+  "locations": [
+    {
+      "name": string,
+      "type": string,
+      "description": string
+    }
+  ],
+  "conflicts": [
+    {
+      "title": string,
+      "description": string
+    }
+  ]
+}
+
+All text must be in ${args.language}.
+Return ONLY valid JSON.`
+
+  console.log('modes: runCreativeMode — calling Claude', { language: args.language })
+
+  const raw = await callModel({ modelPreference: 'claude', prompt, maxTokens: 2048 })
+  if (!raw) { console.error('modes: runCreativeMode — model returned null'); return null }
+
+  const parsed = safeParseJSON(raw)
+  return validateCreativeWorld(parsed)
+}
+
+// ── 2.4 Global Knowledge Mode ─────────────────────────────────────────────────
+
+export async function runGlobalKnowledgeMode(args: {
+  userPrompt: string
+  language:   string
+}): Promise<ValidGlobalKnowledge | null> {
+  const prompt = `You are a global knowledge explainer.
+
+User request (language: ${args.language}):
+${args.userPrompt}
+
+Generate a JSON object with:
+{
+  "topic": string,
+  "summary": string,
+  "key_points": string[],
+  "related_entities": string[]
+}
+
+All text must be in ${args.language}.
+Return ONLY valid JSON.`
+
+  console.log('modes: runGlobalKnowledgeMode — calling OpenAI', { language: args.language })
+
+  const raw = await callModel({ modelPreference: 'openai', prompt, maxTokens: 1024 })
+  if (!raw) { console.error('modes: runGlobalKnowledgeMode — model returned null'); return null }
+
+  const parsed = safeParseJSON(raw)
+  return validateGlobalKnowledge(parsed)
 }

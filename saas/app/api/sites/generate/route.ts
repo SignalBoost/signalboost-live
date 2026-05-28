@@ -22,7 +22,7 @@ const TYPO_MAP: Record<string, string> = {
 type Intent = 'site_design' | 'data_seeding' | 'data_fetching'
 type ExtractedQuery = { query: string | null, confidence: number, intent: Intent, keywords: string[], normalizedText: string }
 
-type WikiItem = { title: string, description: string, image_url: string | null, wiki_url: string }
+type WikiItem = { title: string | null, description: string, image_url: string | null, wiki_url: string | null }
 
 type ImportHistoryRow = {
   source: 'wikipedia' | 'fallback-demo'
@@ -139,14 +139,24 @@ function supabaseAdmin() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 }
 
-async function seedFallbackItems() {
+type SaveItemsResult = { savedCount: number, hadIncompleteRows: boolean }
+
+const DEMO_FALLBACK = {
+  title: 'Unknown Item',
+  query: 'demo',
+  source_url: 'demo://fallback',
+} as const
+
+async function seedFallbackItems(reasonQuery = 'demo') {
   const db = supabaseAdmin()
   const makeRows = (count: number, prefix: string, category: string, city: string) =>
     Array.from({ length: count }, (_, i) => ({
-      name: `${prefix} ${i + 1}`,
+      title: `${prefix} ${i + 1}`,
       description: `Demo ${category} entry ${i + 1} for ${city}.`,
       image_url: null,
       source_url: `https://example.com/demo/${category}/${i + 1}`,
+      query: reasonQuery,
+      category,
       metadata: { seeded: true, source: 'fallback-demo', category },
     }))
 
@@ -157,24 +167,55 @@ async function seedFallbackItems() {
     ...makeRows(20, 'Universidade', 'universities', 'São Paulo'),
   ]
 
-  const { error } = await db.from('items').upsert(rows, { onConflict: 'source_url' })
+  const { error } = await db.from('items').upsert(rows, { onConflict: 'title,source_url' })
   if (error) throw error
   return rows.length
 }
 
-async function saveWikipediaItems(query: string, wikiItems: WikiItem[]) {
-  if (wikiItems.length === 0) return 0
+async function saveWikipediaItems(query: string, wikiItems: WikiItem[]): Promise<SaveItemsResult> {
+  if (wikiItems.length === 0) return { savedCount: 0, hadIncompleteRows: false }
   const db = supabaseAdmin()
-  const rows = wikiItems.map((item) => ({
-    name: item.title,
-    description: item.description,
-    image_url: item.image_url,
-    source_url: item.wiki_url,
-    metadata: { source: 'wikipedia', query, license: 'CC-BY-SA' },
-  }))
-  const { data, error } = await db.from('items').upsert(rows, { onConflict: 'source_url' }).select('id')
+  const skipped: string[] = []
+  let hadIncompleteRows = false
+  const rows = wikiItems.map((item, idx) => {
+    const safeTitle = item.title?.trim() || DEMO_FALLBACK.title
+    const safeQuery = query?.trim() || DEMO_FALLBACK.query
+    const safeSourceUrl = item.wiki_url?.trim() || `${DEMO_FALLBACK.source_url}/${idx + 1}`
+
+    if (!item.title?.trim()) {
+      skipped.push(`row ${idx + 1}: missing title`)
+      hadIncompleteRows = true
+    }
+    if (!query?.trim()) {
+      skipped.push(`row ${idx + 1}: missing query`)
+      hadIncompleteRows = true
+    }
+    if (!item.wiki_url?.trim()) {
+      skipped.push(`row ${idx + 1}: missing source_url`)
+      hadIncompleteRows = true
+    }
+
+    return {
+      title: safeTitle,
+      description: item.description,
+      image_url: item.image_url,
+      source_url: safeSourceUrl,
+      query: safeQuery,
+      category: 'wikipedia',
+      metadata: { source: 'wikipedia', query: safeQuery, license: 'CC-BY-SA', hadFallback: hadIncompleteRows },
+    }
+  })
+
+  for (const reason of skipped) {
+    console.warn('Sites generate: skipped/incomplete Wikipedia row ->', reason)
+  }
+
+  const { data, error } = await db
+    .from('items')
+    .upsert(rows, { onConflict: 'title,source_url' })
+    .select('id')
   if (error) throw error
-  return data?.length ?? rows.length
+  return { savedCount: data?.length ?? rows.length, hadIncompleteRows }
 }
 
 async function fetchWikipediaItems(query: string): Promise<WikiItem[]> {
@@ -198,10 +239,10 @@ async function fetchWikipediaItems(query: string): Promise<WikiItem[]> {
     return pages
       .filter((p: any) => p.title && p.extract)
       .map((p: any) => ({
-        title: p.title,
+        title: p.title ?? null,
         description: (p.extract || '').trim().slice(0, 200),
         image_url: p.original?.source ?? null,
-        wiki_url: p.fullurl ?? `https://en.wikipedia.org/?curid=${p.pageid}`,
+        wiki_url: p.fullurl ?? null,
       }))
   } catch (err) {
     console.error('Sites generate: Wikipedia fetch error', err)
@@ -260,6 +301,7 @@ export async function POST(req: NextRequest) {
     let userMessage = trimmed
     let wikiItems: WikiItem[] = []
     const importHistory: ImportHistoryRow[] = []
+    let replacementNotice: string | undefined
 
     const extraction = await extractWikipediaQuery(trimmed)
     const wikiQuery = extraction.query
@@ -270,7 +312,8 @@ export async function POST(req: NextRequest) {
     if (shouldFetch) {
       wikiItems = await fetchWikipediaItems(wikiQuery)
       const saved = await saveWikipediaItems(wikiQuery, wikiItems)
-      importHistory.push({ source: 'wikipedia', query: wikiQuery, importedCount: saved, confidence: extraction.confidence, timestamp: new Date().toISOString() })
+      importHistory.push({ source: 'wikipedia', query: wikiQuery, importedCount: saved.savedCount, confidence: extraction.confidence, timestamp: new Date().toISOString() })
+      if (saved.hadIncompleteRows) replacementNotice = 'Some items were incomplete and replaced with demo data.'
 
       if (wikiItems.length > 0) {
         const itemList = wikiItems.slice(0, 20).map((item, i) => `${i + 1}. ${item.title}${item.description ? ' — ' + item.description : ''}`).join('\n')
@@ -279,7 +322,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (!shouldFetch || wikiItems.length === 0) {
-      const seededCount = await seedFallbackItems()
+      const seededCount = await seedFallbackItems(wikiQuery ?? 'demo')
+      replacementNotice = 'Some items were incomplete and replaced with demo data.'
       importHistory.push({ source: 'fallback-demo', query: wikiQuery ?? 'NONE', importedCount: seededCount, confidence: extraction.confidence, timestamp: new Date().toISOString() })
     }
 
@@ -314,6 +358,7 @@ export async function POST(req: NextRequest) {
           : `I interpreted your request as: ${wikiQuery ?? extraction.normalizedText}`,
       },
       sourceHistory: importHistory,
+      warning: replacementNotice,
     })
   } catch (error) {
     console.error('Sites generate error', error)

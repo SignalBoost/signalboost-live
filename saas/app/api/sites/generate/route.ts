@@ -1,9 +1,9 @@
 // saas/app/api/sites/generate/route.ts
 //
-// Streaming + two-layer cache:
+// Streaming + AI orchestration + two-layer cache:
 //   Layer 1 — Site design cache: exact prompt match → return cached site (~3 sec)
-//   Layer 2 — Local items cache: same category/city → skip team generation (~15 sec)
-//   Layer 3 — Full generation: Haiku for site design + Sonnet for local knowledge
+//   Layer 2 — Local items cache: same category/city → skip local generation (~15 sec)
+//   Layer 3 — AI mode output + Haiku site design
 
 import { NextRequest } from 'next/server'
 import { getCurrentUser } from '@/utils/supabase/server'
@@ -11,11 +11,17 @@ import { createClient } from '@supabase/supabase-js'
 import {
   buildFallbackItems,
   promptPreprocessor,
-  validateItems,
   type ValidatedItem,
 } from '@/lib/ai/promptPreprocessor'
-import { routeDataRequest } from '@/lib/ai/localKnowledge'
-import { runLocalKnowledgeMode, type ValidLocalItem } from '@/lib/ai/modes'
+import { routeIntent, type IntentType } from '@/lib/ai/intentRouter'
+import {
+  runBusinessMode,
+  runGlobalKnowledgeMode,
+  runLocalKnowledgeMode,
+  type ValidBusinessSite,
+  type ValidGlobalKnowledge,
+  type ValidLocalItem,
+} from '@/lib/ai/modes'
 import {
   getCachedLocalItems,
   getSiteDesignCache,
@@ -25,10 +31,16 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-const WIKI_API   = 'https://en.wikipedia.org/w/api.php'
-const USER_AGENT = 'SignalBoostApp/1.0 (https://saas.signalboostapp.com; support@signalboostapp.com)'
+type SiteGenerationMode = Exclude<IntentType, 'creative'>
 
-type WikiItem = { title: string; description: string; image_url: string | null; wiki_url: string }
+type OrchestrationResult = {
+  mode: SiteGenerationMode
+  data: ValidLocalItem[] | ValidBusinessSite | ValidGlobalKnowledge | null
+  localItems: ValidLocalItem[]
+  localCacheHit: boolean
+  fallbackSeeded: boolean
+  promptDataBlock: string
+}
 
 function supabaseAdmin() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
@@ -45,49 +57,8 @@ async function saveValidatedItems(items: ValidatedItem[]): Promise<number> {
   } catch (err) { console.error('Sites generate: DB save exception:', err); return 0 }
 }
 
-async function saveWikipediaItems(query: string, wikiItems: WikiItem[]): Promise<number> {
-  const { items, skippedRows } = validateItems(
-    wikiItems.map(item => ({
-      name:        item.title,
-      description: item.description,
-      image_url:   item.image_url,
-      source_url:  item.wiki_url,
-      metadata:    { source: 'wikipedia', query, license: 'CC-BY-SA' },
-    })),
-    query,
-  )
-  skippedRows.forEach(row => console.warn('Sites generate: skipped Wikipedia row', row))
-  return saveValidatedItems(items)
-}
-
 async function seedFallbackItems(query: string | null): Promise<number> {
   return saveValidatedItems(buildFallbackItems(query, 30))
-}
-
-// ── Wikipedia fetch ───────────────────────────────────────────────────────────
-async function fetchWikipediaItems(query: string): Promise<WikiItem[]> {
-  try {
-    const searchParams = new URLSearchParams({ action: 'query', list: 'search', srsearch: query, srlimit: '12', format: 'json' })
-    const searchRes = await fetch(`${WIKI_API}?${searchParams}`, { headers: { 'User-Agent': USER_AGENT } })
-    if (!searchRes.ok) return []
-    const searchData = await searchRes.json()
-    const pageIds: number[] = (searchData?.query?.search ?? []).map((r: any) => r.pageid)
-    if (pageIds.length === 0) return []
-    const detailParams = new URLSearchParams({
-      action: 'query', pageids: pageIds.join('|'), prop: 'extracts|pageimages|info',
-      exintro: 'true', explaintext: 'true', exsentences: '2', piprop: 'original', inprop: 'url', format: 'json',
-    })
-    const detailRes = await fetch(`${WIKI_API}?${detailParams}`, { headers: { 'User-Agent': USER_AGENT } })
-    if (!detailRes.ok) return []
-    const detailData = await detailRes.json()
-    const pages = Object.values(detailData?.query?.pages ?? {}) as any[]
-    return pages.filter((p: any) => p.title && p.extract).map((p: any) => ({
-      title:       p.title,
-      description: (p.extract || '').trim().slice(0, 200),
-      image_url:   p.original?.source ?? null,
-      wiki_url:    p.fullurl ?? `https://en.wikipedia.org/?curid=${p.pageid}`,
-    }))
-  } catch (err) { console.error('Sites generate: Wikipedia fetch error', err); return [] }
 }
 
 // ── Site design via Claude Haiku (fast) ───────────────────────────────────────
@@ -122,18 +93,16 @@ async function callHaiku(systemPrompt: string, userContent: string): Promise<str
 const DISPLAY_FONTS = ['Fraunces','Playfair Display','Bricolage Grotesque','Space Grotesk','Syne','Sora','DM Serif Display','Archivo','Unbounded']
 const BODY_FONTS    = ['DM Sans','Manrope','Work Sans','Outfit','Spline Sans','Newsreader','IBM Plex Sans']
 
-const SYSTEM_PROMPT = `You are an elite brand and web designer working inside SignalBoost. From a short description, you design a COMPLETE, visually striking one-page website and return it as structured JSON.
+const SYSTEM_PROMPT = `You are an elite brand and web designer working inside SignalBoost. From a short description and optional AI orchestration data, you design a COMPLETE, visually striking one-page website and return it as structured JSON.
 
-LANGUAGE (CRITICAL): Detect the user's language and write EVERY visible text value in that same language.
+LANGUAGE (CRITICAL): Detect the user's language and write EVERY visible string in that language.
 
-LOCAL_KNOWLEDGE_DATA (CRITICAL when provided): These are REAL items. You MUST use them ALL. Include a gallery or feature-grid section listing every item by name with neighborhood and description. Do NOT replace with fictional items.
+AI_ORCHESTRATION_DATA (CRITICAL when provided): Use the supplied local, business, or global knowledge payload as the factual backbone of the page. Do not invent conflicting facts. If a list of real local items is supplied, include every item by name.
 
-REAL_WORLD_DATA (CRITICAL when provided): Real items from Wikipedia. Use them exactly in gallery/feature-grid sections.
-
-DESIGN LIKE A SENIOR DESIGNER:
-- Bold, cohesive aesthetic. Dark theme for dramatic/tech/premium; light for friendly/food/services.
-- Distinctive font pairing. Display: ${DISPLAY_FONTS.join(', ')}. Body: ${BODY_FONTS.join(', ')}.
-- Cohesive palette with dominant color and sharp accent (hex values).
+VISUAL DIRECTION:
+- Premium editorial style, not generic SaaS template.
+- Choose fonts only from: display=${DISPLAY_FONTS.join(', ')}; body=${BODY_FONTS.join(', ')}.
+- Strong palette with dominant color and sharp accent (hex values).
 - Rich, varied page: strong hero, deliberate sequence of 5-8 sections.
 
 SECTION TYPES: hero (eyebrow,heading,subheading,cta,ctaSecondary), hero-split (+body), feature-grid (eyebrow,heading,subheading,items[]{icon,title,body}), stats (heading,stats[]{value,label}), gallery (heading,items[]{title,body}), video (eyebrow,heading,subheading,videoUrl=""), testimonials (heading,testimonials[]{quote,author,role}), cta (heading,subheading,cta), contact (eyebrow,heading,body,email,phone,address), about/text (eyebrow,heading,body).
@@ -157,7 +126,7 @@ function buildRecoveryContent(description: string, items: ValidatedItem[]) {
     sections: [
       { type: 'hero', eyebrow: 'AI-ready prompt', heading: 'Your request is ready to launch', subheading: description, cta: 'Explore the data', ctaSecondary: 'Contact us' },
       { type: 'feature-grid', eyebrow: 'Fallback data', heading: 'Curated starter items', subheading: 'Demo records keep the page useful while live data recovers.', items: cards },
-      { type: 'cta', heading: 'Ready for real data', subheading: 'Connect Wikipedia, CSV, scraper, or API sources when available.', cta: 'Generate again' },
+      { type: 'cta', heading: 'Ready for real data', subheading: 'Connect AI, CSV, scraper, or API sources when available.', cta: 'Generate again' },
       { type: 'contact', eyebrow: 'SignalBoost', heading: 'Keep building', body: 'We recovered gracefully and seeded safe demo content.', email: 'support@signalboostapp.com', phone: '', address: '' },
     ],
   }
@@ -165,6 +134,186 @@ function buildRecoveryContent(description: string, items: ValidatedItem[]) {
 
 function encode(obj: object): Uint8Array {
   return new TextEncoder().encode(JSON.stringify(obj) + '\n')
+}
+
+function normalizeSiteMode(intent: IntentType): SiteGenerationMode {
+  return intent === 'creative' ? 'business' : intent
+}
+
+function inferLocalCategory(userPrompt: string): string | undefined {
+  const lower = userPrompt.toLowerCase()
+  if (lower.includes('várzea') || lower.includes('varzea') || lower.includes('football') || lower.includes('soccer') || lower.includes('futebol')) return 'football_teams'
+  if (lower.includes('restaurant') || lower.includes('restaurante')) return 'restaurants'
+  if (lower.includes('bakery') || lower.includes('padaria')) return 'bakeries'
+  if (lower.includes('gym') || lower.includes('academia')) return 'gyms'
+  if (lower.includes('barber') || lower.includes('barbearia')) return 'barbershops'
+  if (lower.includes('museum') || lower.includes('museu')) return 'museums'
+  if (lower.includes('church') || lower.includes('igreja')) return 'churches'
+  if (lower.includes('beach') || lower.includes('praia')) return 'beaches'
+  return undefined
+}
+
+function buildLocalItemsBlock(localItems: ValidLocalItem[]): string {
+  if (localItems.length === 0) return ''
+
+  const itemList = localItems.slice(0, 20).map((item, i) =>
+    `${i + 1}. ${item.name}${item.neighborhood ? ` (${item.neighborhood}${item.zone ? ', ' + item.zone : ''})` : ''}${item.description ? ' — ' + item.description : ''}`,
+  ).join('\n')
+
+  return `
+
+AI_ORCHESTRATION_DATA — LOCAL_KNOWLEDGE (real items — use ALL of these in the site):
+${itemList}
+
+IMPORTANT: Include a gallery or feature-grid section listing EVERY item above by name.`
+}
+
+function buildBusinessBlock(site: ValidBusinessSite): string {
+  return `
+
+AI_ORCHESTRATION_DATA — BUSINESS:
+${JSON.stringify(site, null, 2)}
+
+IMPORTANT: Convert this business content into a polished one-page website using the required section schema.`
+}
+
+function buildGlobalKnowledgeBlock(knowledge: ValidGlobalKnowledge): string {
+  const keyPoints = knowledge.key_points.map((point, i) => `${i + 1}. ${point}`).join('\n')
+  const related = knowledge.related_entities.length > 0 ? knowledge.related_entities.join(', ') : 'None supplied'
+
+  return `
+
+AI_ORCHESTRATION_DATA — GLOBAL_KNOWLEDGE:
+Topic: ${knowledge.topic}
+Summary: ${knowledge.summary}
+Key points:
+${keyPoints || 'No key points supplied'}
+Related entities: ${related}
+
+IMPORTANT: Present this knowledge as a credible, visually rich informational website.`
+}
+
+async function runOrchestration(args: {
+  mode: SiteGenerationMode
+  userPrompt: string
+  language: string
+  writer: WritableStreamDefaultWriter<Uint8Array>
+}): Promise<OrchestrationResult> {
+  const { mode, userPrompt, language, writer } = args
+  let data: OrchestrationResult['data'] = null
+  let localItems: ValidLocalItem[] = []
+  let localCacheHit = false
+  let fallbackSeeded = false
+  let promptDataBlock = ''
+
+  if (mode === 'local_knowledge') {
+    const category = inferLocalCategory(userPrompt)
+
+    await writer.write(encode({
+      type:    'status',
+      step:    'routing',
+      message: category
+        ? `🔍 Checking local knowledge cache for ${category.replace('_', ' ')}…`
+        : '🔍 Checking local knowledge cache…',
+    }))
+
+    const cached = await getCachedLocalItems({ userPrompt, language, minItems: 10, maxAge: 48 })
+
+    if (cached && cached.length >= 10) {
+      localCacheHit = true
+      localItems    = cached
+      data          = cached
+      console.log(`Sites generate: LOCAL ITEMS CACHE HIT — ${cached.length} items`)
+
+      await writer.write(encode({
+        type:    'status',
+        step:    'data_ready',
+        message: `⚡ Found ${localItems.length} cached items — designing with Haiku…`,
+        items:   localItems.slice(0, 5).map(i => i.name),
+        cached:  true,
+      }))
+    } else {
+      await writer.write(encode({
+        type:    'status',
+        step:    'data',
+        message: category
+          ? `🧠 Generating real ${category.replace('_', ' ')} with AI orchestration…`
+          : '🧠 Generating real local knowledge with AI orchestration…',
+      }))
+
+      localItems = await runLocalKnowledgeMode({
+        userPrompt,
+        language,
+        category,
+        count: 20,
+      })
+      data = localItems
+
+      console.log(`Sites generate: LOCAL ITEMS CACHE MISS — generated ${localItems.length} items`)
+
+      if (localItems.length > 0) {
+        saveLocalItems(localItems, { userPrompt, language, category }).catch(() => {})
+
+        await writer.write(encode({
+          type:    'status',
+          step:    'data_ready',
+          message: `✅ Generated ${localItems.length} real items — designing with Haiku…`,
+          items:   localItems.slice(0, 5).map(i => i.name),
+          cached:  false,
+        }))
+      }
+    }
+
+    promptDataBlock = buildLocalItemsBlock(localItems)
+  } else if (mode === 'business') {
+    await writer.write(encode({
+      type:    'status',
+      step:    'data',
+      message: '🧠 Generating business content with AI orchestration…',
+    }))
+
+    const site = await runBusinessMode({ userPrompt, language })
+    data = site
+
+    if (site) {
+      promptDataBlock = buildBusinessBlock(site)
+      await writer.write(encode({
+        type:    'status',
+        step:    'data_ready',
+        message: '✅ Business content generated — designing with Haiku…',
+      }))
+    }
+  } else if (mode === 'global_knowledge') {
+    await writer.write(encode({
+      type:    'status',
+      step:    'data',
+      message: '🧠 Generating global knowledge with AI orchestration…',
+    }))
+
+    const knowledge = await runGlobalKnowledgeMode({ userPrompt, language })
+    data = knowledge
+
+    if (knowledge) {
+      promptDataBlock = buildGlobalKnowledgeBlock(knowledge)
+      await writer.write(encode({
+        type:    'status',
+        step:    'data_ready',
+        message: '✅ Knowledge content generated — designing with Haiku…',
+      }))
+    }
+  }
+
+  if (!data || (Array.isArray(data) && data.length === 0)) {
+    seedFallbackItems(userPrompt).catch(() => {})
+    const fallbackItems = buildFallbackItems(userPrompt, 8)
+    fallbackSeeded = true
+    promptDataBlock = `
+
+FALLBACK_DEMO_DATA:
+${fallbackItems.map((item, i) => `${i + 1}. ${item.name} — ${item.description}`).join('\n')}`
+  }
+
+  return { mode, data, localItems, localCacheHit, fallbackSeeded, promptDataBlock }
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────
@@ -181,8 +330,9 @@ export async function POST(req: NextRequest) {
   }
 
   const trimmed      = description.trim()
-  const language     = (body?.language || 'en').toString()
-  const routing      = routeDataRequest(trimmed)
+  const routed       = routeIntent({ userPrompt: trimmed, language: body?.language?.toString() })
+  const language     = routed.language
+  const mode         = normalizeSiteMode(routed.intent)
   const preprocessed = promptPreprocessor(trimmed)
 
   const stream = new TransformStream()
@@ -190,12 +340,7 @@ export async function POST(req: NextRequest) {
 
   ;(async () => {
     try {
-      let wikiItems:    WikiItem[]       = []
-      let localItems:   ValidLocalItem[] = []
-      let fallbackSeeded                 = false
-      let promptDataBlock                = ''
-      let localCacheHit                  = false
-      let siteDesignCacheHit             = false
+      let siteDesignCacheHit = false
 
       // ── Layer 1: Site design cache check (fastest path — ~3 sec) ───────────
       await writer.write(encode({
@@ -220,11 +365,13 @@ export async function POST(req: NextRequest) {
           type:       'result',
           content:    cachedSite,
           preprocessor: {
-            mode:             routing.mode,
-            category:         routing.category,
-            siteDesignCacheHit: true,
-            localCacheHit:    false,
-            fallbackUsed:     false,
+            mode,
+            routedIntent: routed.intent,
+            confidence: routed.confidence,
+            reason: routed.reason,
+            siteDesignCacheHit,
+            localCacheHit: false,
+            fallbackUsed: false,
           },
         }))
 
@@ -232,112 +379,8 @@ export async function POST(req: NextRequest) {
         return
       }
 
-      // ── Layer 2: Data fetch (local items or Wikipedia) ─────────────────────
-      await writer.write(encode({
-        type:    'status',
-        step:    'routing',
-        message: routing.mode === 'local_knowledge'
-          ? `🔍 Checking local knowledge cache for ${routing.category.replace('_', ' ')}…`
-          : routing.mode === 'wikipedia'
-            ? `🌐 Searching Wikipedia for "${routing.wikiQuery}"…`
-            : '🔍 Analyzing your request…',
-      }))
-
-      if (routing.mode === 'local_knowledge') {
-        // Layer 2a: local items cache
-        const cached = await getCachedLocalItems({ userPrompt: trimmed, language, minItems: 10, maxAge: 48 })
-
-        if (cached && cached.length >= 10) {
-          localCacheHit = true
-          localItems    = cached
-          console.log(`Sites generate: LOCAL ITEMS CACHE HIT — ${cached.length} items`)
-
-          await writer.write(encode({
-            type:    'status',
-            step:    'data_ready',
-            message: `⚡ Found ${localItems.length} cached items — designing with Haiku…`,
-            items:   localItems.slice(0, 5).map(i => i.name),
-            cached:  true,
-          }))
-        } else {
-          // Cache miss — generate with Sonnet
-          await writer.write(encode({
-            type:    'status',
-            step:    'data',
-            message: `🧠 Generating real ${routing.category.replace('_', ' ')} with Claude Sonnet…`,
-          }))
-
-          localItems = await runLocalKnowledgeMode({
-            userPrompt: trimmed,
-            language,
-            category:   routing.category,
-            count:      20,
-          })
-
-          console.log(`Sites generate: LOCAL ITEMS CACHE MISS — Sonnet generated ${localItems.length} items`)
-
-          if (localItems.length > 0) {
-            saveLocalItems(localItems, { userPrompt: trimmed, language, category: routing.category }).catch(() => {})
-
-            await writer.write(encode({
-              type:    'status',
-              step:    'data_ready',
-              message: `✅ Generated ${localItems.length} real items — designing with Haiku…`,
-              items:   localItems.slice(0, 5).map(i => i.name),
-              cached:  false,
-            }))
-          }
-        }
-
-        if (localItems.length > 0) {
-          const itemList = localItems.slice(0, 20).map((item, i) =>
-            `${i + 1}. ${item.name}${item.neighborhood ? ` (${item.neighborhood}${item.zone ? ', ' + item.zone : ''})` : ''}${item.description ? ' — ' + item.description : ''}`,
-          ).join('\n')
-
-          promptDataBlock = `
-
-LOCAL_KNOWLEDGE_DATA (real items — use ALL of these in the site):
-${itemList}
-
-IMPORTANT: Include a gallery or feature-grid section listing EVERY item above by name.`
-        }
-
-      } else if (routing.mode === 'wikipedia' && routing.wikiQuery) {
-        wikiItems = await fetchWikipediaItems(routing.wikiQuery)
-
-        if (wikiItems.length > 0) {
-          saveWikipediaItems(routing.wikiQuery, wikiItems).catch(() => {})
-
-          await writer.write(encode({
-            type:    'status',
-            step:    'data_ready',
-            message: `✅ Found ${wikiItems.length} Wikipedia articles — designing with Haiku…`,
-            items:   wikiItems.slice(0, 5).map(i => i.title),
-          }))
-
-          const itemList = wikiItems.slice(0, 12).map((item, i) =>
-            `${i + 1}. ${item.title}${item.description ? ' — ' + item.description : ''}`,
-          ).join('\n')
-
-          promptDataBlock = `
-
-REAL_WORLD_DATA (from Wikipedia):
-${itemList}
-
-IMPORTANT: Include a gallery or feature-grid section with these real items by name.`
-        }
-      }
-
-      // Fallback if no data
-      if (localItems.length === 0 && wikiItems.length === 0 && routing.mode !== 'none') {
-        seedFallbackItems(routing.localQuery || routing.wikiQuery).catch(() => {})
-        const fallbackItems = buildFallbackItems(routing.localQuery || routing.wikiQuery, 8)
-        fallbackSeeded = true
-        promptDataBlock = `
-
-FALLBACK_DEMO_DATA:
-${fallbackItems.map((item, i) => `${i + 1}. ${item.name} — ${item.description}`).join('\n')}`
-      }
+      // ── Layer 2: AI orchestration ───────────────────────────────────────────
+      const orchestration = await runOrchestration({ mode, userPrompt: trimmed, language, writer })
 
       // ── Layer 3: Site design with Haiku (fast) ─────────────────────────────
       await writer.write(encode({
@@ -346,12 +389,12 @@ ${fallbackItems.map((item, i) => `${i + 1}. ${item.name} — ${item.description}
         message: '🎨 Designing your website with Haiku…',
       }))
 
-      const userMessage = `${preprocessed.optimizedPrompt}\n\nRAW_USER_INPUT:\n${trimmed}${promptDataBlock}`
+      const userMessage = `${preprocessed.optimizedPrompt}\n\nRAW_USER_INPUT:\n${trimmed}${orchestration.promptDataBlock}`
       const raw = await callHaiku(SYSTEM_PROMPT, userMessage)
 
       if (!raw) {
-        const fallbackItems = buildFallbackItems(routing.localQuery, 8)
-        seedFallbackItems(routing.localQuery).catch(() => {})
+        const fallbackItems = buildFallbackItems(trimmed, 8)
+        seedFallbackItems(trimmed).catch(() => {})
         await writer.write(encode({
           type:    'result',
           content: buildRecoveryContent(trimmed, fallbackItems),
@@ -362,18 +405,19 @@ ${fallbackItems.map((item, i) => `${i + 1}. ${item.name} — ${item.description}
       }
 
       let parsed: any = null
+      let fallbackSeeded = orchestration.fallbackSeeded
       try {
         const firstBrace = raw.indexOf('{'), lastBrace = raw.lastIndexOf('}')
         if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
           parsed = JSON.parse(raw.slice(firstBrace, lastBrace + 1))
         }
       } catch {
-        parsed = buildRecoveryContent(trimmed, buildFallbackItems(routing.localQuery, 8))
+        parsed = buildRecoveryContent(trimmed, buildFallbackItems(trimmed, 8))
         fallbackSeeded = true
       }
 
       if (!isValidContent(parsed)) {
-        parsed = buildRecoveryContent(trimmed, buildFallbackItems(routing.localQuery, 8))
+        parsed = buildRecoveryContent(trimmed, buildFallbackItems(trimmed, 8))
         fallbackSeeded = true
       }
 
@@ -385,20 +429,22 @@ ${fallbackItems.map((item, i) => `${i + 1}. ${item.name} — ${item.description}
       }
 
       await writer.write(encode({
-        type:        'result',
-        content:     parsed,
-        localItems:  localItems.length > 0 ? localItems : undefined,
-        wikiItems:   wikiItems.length > 0  ? wikiItems  : undefined,
-        attribution: wikiItems.length > 0  ? 'Data from Wikipedia, licensed under CC-BY-SA 4.0.' : undefined,
+        type:       'result',
+        content:    parsed,
+        localItems: orchestration.localItems.length > 0 ? orchestration.localItems : undefined,
+        orchestration: {
+          mode: orchestration.mode,
+          data: orchestration.data,
+        },
         preprocessor: {
-          mode:               routing.mode,
-          category:           routing.category,
-          confidence:         routing.confidence,
+          mode,
+          routedIntent: routed.intent,
+          confidence: routed.confidence,
+          reason: routed.reason,
           siteDesignCacheHit,
-          localCacheHit,
-          fallbackUsed:       fallbackSeeded,
-          localCount:         localItems.length,
-          wikiCount:          wikiItems.length,
+          localCacheHit: orchestration.localCacheHit,
+          fallbackUsed: fallbackSeeded,
+          localCount: orchestration.localItems.length,
         },
       }))
 

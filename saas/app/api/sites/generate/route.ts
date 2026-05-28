@@ -1,7 +1,4 @@
 // saas/app/api/sites/generate/route.ts
-// Generates a REAL, fully-designed website from a user's description using Claude.
-// Automatically fetches real-world content from Wikipedia when the request is
-// about real-world topics and injects it so Claude populates sections with actual data.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/utils/supabase/server'
@@ -13,8 +10,6 @@ export const dynamic = 'force-dynamic'
 const WIKI_API   = 'https://en.wikipedia.org/w/api.php'
 const USER_AGENT = 'SignalBoostApp/1.0 (https://saas.signalboostapp.com; support@signalboostapp.com)'
 
-// Use Claude to extract a clean 2-5 word Wikipedia search query from the description.
-// Returns null if the description is not about real-world listable content.
 async function extractWikipediaQuery(description: string): Promise<string | null> {
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -26,17 +21,31 @@ async function extractWikipediaQuery(description: string): Promise<string | null
       },
       body: JSON.stringify({
         model:      'claude-haiku-4-5-20251001',
-        max_tokens: 50,
-        system: `You extract Wikipedia search queries from website descriptions.
-If the description asks for a site about real-world listable things (museums, churches, restaurants, sports teams, beaches, landmarks, cities, etc.), reply with ONLY a short 2-5 word English search query suitable for Wikipedia (e.g. "famous churches world", "best museums Paris", "Sao Paulo varzea football teams").
-If the description is about a business, product, or service (not a list of real-world things), reply with exactly: NONE`,
+        max_tokens: 30,
+        system: `You decide if a website description needs real-world data from Wikipedia.
+
+Reply with a short 2-5 word English Wikipedia search query IF the description mentions wanting a list of real-world things like:
+- famous/best/top museums, churches, restaurants, hotels, beaches, landmarks, monuments, cities, teams, parks, castles, etc.
+- specific real places or entities to feature on the site
+- "populate with", "list of", "show the top", "add teams/items from"
+
+Examples:
+"build a site about the most famous museums in the world" → famous museums world
+"site about beautiful churches" → beautiful churches world
+"site listing top beaches in Brazil" → top beaches Brazil
+"várzea football teams São Paulo" → varzea football teams Sao Paulo
+"cozy Italian restaurant in São Paulo" → NONE
+"my bakery needs a website" → NONE
+"portfolio for a photographer" → NONE
+
+Reply with ONLY the search query or NONE. No explanation.`,
         messages: [{ role: 'user', content: description }],
       }),
     })
     if (!response.ok) return null
     const data = await response.json()
     const text = (data.content?.[0]?.text || '').trim()
-    if (!text || text === 'NONE' || text.startsWith('NONE')) return null
+    if (!text || text.toUpperCase() === 'NONE') return null
     return text
   } catch {
     return null
@@ -186,9 +195,9 @@ export async function POST(req: NextRequest) {
 
     const trimmed = description.trim()
 
-    // ── Step 1: Ask Claude (Haiku, fast+cheap) if Wikipedia data would help ──
-    let userMessage  = trimmed
-    let wikiItems:   WikiItem[] = []
+    // ── Step 1: Extract Wikipedia query via Haiku ─────────────────────────
+    let userMessage = trimmed
+    let wikiItems:  WikiItem[] = []
 
     const wikiQuery = await extractWikipediaQuery(trimmed)
     console.log('Sites generate: Wikipedia query extracted:', wikiQuery ?? 'NONE')
@@ -212,7 +221,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── Step 2: Generate the site with Claude Sonnet ─────────────────────────
+    // ── Step 2: Generate site with Claude Sonnet ──────────────────────────
     const raw = await callClaude(SYSTEM_PROMPT, userMessage)
     if (!raw) {
       return NextResponse.json(

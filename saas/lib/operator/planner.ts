@@ -1,4 +1,4 @@
-import { OperatorPlan, newId } from './store'
+import { OperatorPlan, WikiContentItem, newId } from './store'
 
 const WEBSITE_HINTS = ['website', 'homepage', 'landing', 'restaurant', 'real estate', 'colors', 'button', 'reservation', 'polish', 'portuguese']
 
@@ -8,7 +8,7 @@ export function isUnclearRequest(input: string) {
   return !WEBSITE_HINTS.some(word => trimmed.includes(word))
 }
 
-// Pick likely file targets from the request (kept from the original, used by both AI and fallback)
+// Pick likely file targets from the request
 function guessFileTargets(request: string): string[] {
   const lower = request.toLowerCase()
   const files = ['saas/app/dashboard/builder/page.tsx', 'saas/public/i18n/en.json']
@@ -76,7 +76,110 @@ const TEMPLATE_COPY: Record<SupportedLang, {
   },
 }
 
-// ── Safe fallback: the original template, used if the AI call fails ──
+// ── Real-world content detection ──────────────────────────────────────────────
+// Keywords that signal the user wants a site populated with real-world entities
+const REAL_WORLD_KEYWORDS = [
+  'churches', 'church', 'museums', 'museum', 'restaurants', 'restaurant',
+  'hotels', 'hotel', 'beaches', 'beach', 'landmarks', 'landmark',
+  'monuments', 'monument', 'cities', 'city', 'countries', 'country',
+  'teams', 'team', 'players', 'player', 'artists', 'artist',
+  'scientists', 'scientist', 'inventors', 'inventor', 'parks', 'park',
+  'universities', 'university', 'hospitals', 'hospital', 'mountains',
+  'waterfalls', 'lakes', 'rivers', 'buildings', 'skyscrapers',
+  'igrejas', 'museus', 'praias', 'times', 'cidades', // Portuguese
+  'iglesias', 'playas', 'equipos', 'ciudades', // Spanish
+  'kościoły', 'muzea', 'plaże', 'drużyny', // Polish
+  'церкви', 'музеи', 'пляжи', 'команды', // Russian
+]
+
+const CONTENT_INTENT_KEYWORDS = [
+  'best', 'top', 'most', 'famous', 'beautiful', 'greatest', 'list',
+  'world', 'global', 'all', 'popular', 'known', 'historic', 'ancient',
+  'melhores', 'mais', 'famosas', 'mundiais', // Portuguese
+  'mejores', 'más', 'famosas', 'mundiales', // Spanish
+  'najlepsze', 'słynne', 'światowe', // Polish
+  'лучшие', 'известные', 'мировые', // Russian
+]
+
+function detectsRealWorldContent(request: string): boolean {
+  const lower = request.toLowerCase()
+  const hasRealWorldTopic = REAL_WORLD_KEYWORDS.some(kw => lower.includes(kw))
+  const hasContentIntent = CONTENT_INTENT_KEYWORDS.some(kw => lower.includes(kw))
+  return hasRealWorldTopic && hasContentIntent
+}
+
+// Extract a clean English search query from the user's request
+function extractSearchQuery(request: string): string {
+  const lower = request.toLowerCase()
+
+  // Strip common site-building prefixes and extract the topic
+  const stripped = lower
+    .replace(/build\s+(me\s+)?a\s+site\s+(about|on|for|with|showing|listing|featuring)?/gi, '')
+    .replace(/create\s+(me\s+)?a\s+(website|site|page)\s+(about|on|for|with|showing|listing|featuring)?/gi, '')
+    .replace(/make\s+(me\s+)?a\s+(website|site|page)\s+(about|on|for|with|showing|listing|featuring)?/gi, '')
+    .replace(/i\s+want\s+a\s+(website|site|page)\s+(about|on|for|with)?/gi, '')
+    .replace(/quero\s+(um\s+)?site\s+(sobre|com|de)?/gi, '')
+    .replace(/criar?\s+(um\s+)?site\s+(sobre|com|de)?/gi, '')
+    .replace(/crea[r]?\s+(un\s+)?sitio\s+(sobre|con|de)?/gi, '')
+    .replace(/stwórz\s+(mi\s+)?stronę\s+(o|na|dla)?/gi, '')
+    .replace(/создай\s+(мне\s+)?сайт\s+(о|про|для)?/gi, '')
+    .replace(/and\s+(put|add|save|store|insert)\s+(it|them|the\s+data)?\s+(in|into|to)\s+(the\s+)?(database|db|supabase).*/gi, '')
+    .replace(/coloque\s+(no|na)\s+banco\s+de\s+dados.*/gi, '')
+    .replace(/coloca[r]?\s+(en|al)\s+(la\s+)?base\s+de\s+datos.*/gi, '')
+    .trim()
+
+  // Return the cleaned query, falling back to the original if stripping removed too much
+  return stripped.length > 5 ? stripped.trim() : request.trim()
+}
+
+// ── Wikipedia fetch (server-side, no CORS origin param) ──────────────────────
+const WIKI_API   = 'https://en.wikipedia.org/w/api.php'
+const USER_AGENT = 'SignalBoostApp/1.0 (https://saas.signalboostapp.com; support@signalboostapp.com)'
+
+async function fetchWikipediaEnrichment(query: string): Promise<WikiContentItem[]> {
+  try {
+    // Step 1: search
+    const searchParams = new URLSearchParams({
+      action: 'query', list: 'search', srsearch: query,
+      srlimit: '8', format: 'json',
+    })
+    const searchRes = await fetch(`${WIKI_API}?${searchParams}`, {
+      headers: { 'User-Agent': USER_AGENT },
+    })
+    if (!searchRes.ok) return []
+    const searchData = await searchRes.json()
+    const pageIds: number[] = (searchData?.query?.search ?? []).map((r: { pageid: number }) => r.pageid)
+    if (pageIds.length === 0) return []
+
+    // Step 2: fetch page details
+    const detailParams = new URLSearchParams({
+      action: 'query', pageids: pageIds.join('|'),
+      prop: 'extracts|pageimages|info',
+      exintro: 'true', explaintext: 'true', exsentences: '2',
+      piprop: 'original', inprop: 'url', format: 'json',
+    })
+    const detailRes = await fetch(`${WIKI_API}?${detailParams}`, {
+      headers: { 'User-Agent': USER_AGENT },
+    })
+    if (!detailRes.ok) return []
+    const detailData = await detailRes.json()
+    const pages = Object.values(detailData?.query?.pages ?? {}) as any[]
+
+    return pages
+      .filter((p: any) => p.title && p.extract)
+      .map((p: any) => ({
+        title:       p.title,
+        description: p.extract?.trim() ?? null,
+        image_url:   p.original?.source ?? null,
+        wiki_url:    p.fullurl ?? `https://en.wikipedia.org/?curid=${p.pageid}`,
+      }))
+  } catch (err) {
+    console.error('Operator Wikipedia enrichment error:', err)
+    return []
+  }
+}
+
+// ── Safe fallback ─────────────────────────────────────────────────────────────
 function templatePlan(request: string, language?: string): OperatorPlan {
   const lower = request.toLowerCase()
   const visualFirst = lower.includes('website') || lower.includes('homepage') || lower.includes('restaurant') || lower.includes('real estate')
@@ -85,12 +188,8 @@ function templatePlan(request: string, language?: string): OperatorPlan {
   return {
     id: newId('plan'),
     request,
-    clarificationQuestion: isUnclearRequest(request)
-      ? copy.clarification
-      : undefined,
-    summary: visualFirst
-      ? copy.summaryVisual
-      : copy.summaryDefault,
+    clarificationQuestion: isUnclearRequest(request) ? copy.clarification : undefined,
+    summary: visualFirst ? copy.summaryVisual : copy.summaryDefault,
     steps: copy.steps,
     fileTargets: guessFileTargets(request),
     preview: copy.preview,
@@ -99,7 +198,7 @@ function templatePlan(request: string, language?: string): OperatorPlan {
   }
 }
 
-// ── Call Claude (same pattern as the support route) ──
+// ── Call Claude ───────────────────────────────────────────────────────────────
 async function callClaude(systemPrompt: string, userContent: string): Promise<string | null> {
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -140,6 +239,7 @@ LANGUAGE (MOST IMPORTANT RULE):
 WHAT TO PRODUCE:
 - A real plan tailored to the user's actual idea — not a generic template. Reference what they actually described.
 - Be concrete and encouraging, like a senior consultant who understands their business goal.
+- If REAL_WORLD_DATA is provided below, reference the actual items by name in the preview — tell the user their site will feature those specific real places/things.
 
 OUTPUT FORMAT (STRICT):
 Respond with ONLY a valid JSON object, no markdown, no backticks, no text before or after. Exactly this shape:
@@ -156,21 +256,48 @@ RULES:
 - Keep each string concise.
 - clarificationQuestion must be a string (use "" if none).`
 
+// ── Main export ───────────────────────────────────────────────────────────────
 export async function buildPlan(request: string, language?: string): Promise<OperatorPlan> {
   const requestedLanguage = (language || '').trim().toLowerCase()
+
+  // ── Step 1: Detect if this request needs real-world data ──────────────────
+  let contentData: WikiContentItem[] | undefined
+  let contentQuery: string | undefined
+
+  if (detectsRealWorldContent(request)) {
+    contentQuery = extractSearchQuery(request)
+    console.log('Operator: real-world content detected, fetching Wikipedia for:', contentQuery)
+    const fetched = await fetchWikipediaEnrichment(contentQuery)
+    if (fetched.length > 0) {
+      contentData = fetched
+      console.log(`Operator: enriched plan with ${fetched.length} Wikipedia items`)
+    }
+  }
+
+  // ── Step 2: Build the Claude prompt, injecting real data if available ─────
   const languageDirective = requestedLanguage
     ? `\n\nSELECTED LANGUAGE OVERRIDE:\n- The app-selected language is "${requestedLanguage}".\n- You MUST respond entirely in this selected language, even if the user's request text is in a different language.`
     : ''
-  const raw = await callClaude(`${SYSTEM_PROMPT}${languageDirective}`, request)
 
-  // If the AI is unavailable, fall back to the safe template so the page never breaks.
-  if (!raw) return templatePlan(request, language)
+  const dataDirective = contentData && contentData.length > 0
+    ? `\n\nREAL_WORLD_DATA (fetched automatically from Wikipedia for this request):\n${contentData
+        .slice(0, 6)
+        .map((item, i) => `${i + 1}. ${item.title}${item.description ? ': ' + item.description.slice(0, 120) : ''}`)
+        .join('\n')}\n\nIMPORTANT: The site will be populated with these real items. Reference them by name in your preview strings so the user knows their site will feature actual real-world content, not placeholders.`
+    : ''
 
-  // Parse the AI's JSON. Tolerate stray text/backticks around the object.
+  const raw = await callClaude(
+    `${SYSTEM_PROMPT}${languageDirective}${dataDirective}`,
+    request,
+  )
+
+  if (!raw) return { ...templatePlan(request, language), contentData, contentQuery }
+
+  // ── Step 3: Parse Claude's response ──────────────────────────────────────
   let parsed: any = null
   try {
     const firstBrace = raw.indexOf('{')
-    const lastBrace = raw.lastIndexOf('}')
+    const lastBrace  = raw.lastIndexOf('}')
     if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
       parsed = JSON.parse(raw.slice(firstBrace, lastBrace + 1))
     }
@@ -179,24 +306,31 @@ export async function buildPlan(request: string, language?: string): Promise<Ope
   }
 
   if (!parsed || typeof parsed.summary !== 'string' || !Array.isArray(parsed.steps)) {
-    return templatePlan(request, language)
+    return { ...templatePlan(request, language), contentData, contentQuery }
   }
 
-  const steps = parsed.steps.filter((s: any) => typeof s === 'string' && s.trim().length > 0)
+  const steps   = parsed.steps.filter((s: any) => typeof s === 'string' && s.trim().length > 0)
   const preview = Array.isArray(parsed.preview)
     ? parsed.preview.filter((s: any) => typeof s === 'string' && s.trim().length > 0)
     : []
-  const clarification = typeof parsed.clarificationQuestion === 'string' ? parsed.clarificationQuestion.trim() : ''
+  const clarification = typeof parsed.clarificationQuestion === 'string'
+    ? parsed.clarificationQuestion.trim()
+    : ''
+
+  const fallback = templatePlan(request, language)
 
   return {
     id: newId('plan'),
     request,
     clarificationQuestion: clarification.length > 0 ? clarification : undefined,
     summary: parsed.summary.trim(),
-    steps: steps.length > 0 ? steps : templatePlan(request, language).steps,
+    steps:   steps.length > 0   ? steps   : fallback.steps,
     fileTargets: guessFileTargets(request),
-    preview: preview.length > 0 ? preview : templatePlan(request, language).preview,
+    preview: preview.length > 0 ? preview : fallback.preview,
     requiresApproval: true,
     createdAt: new Date().toISOString(),
+    // Real-world content attached to the plan for the apply/render step
+    contentData,
+    contentQuery,
   }
 }

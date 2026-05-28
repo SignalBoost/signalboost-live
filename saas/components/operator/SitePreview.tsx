@@ -1,18 +1,17 @@
 'use client'
 
 // Rich preview that mirrors the published renderer (saas/app/s/[handle]/page.tsx).
-// Shows the REAL design (theme, fonts, palette, hero/section styles) so the
-// preview matches what will publish. Scaled down to fit a dashboard card.
 
 import { useEffect } from 'react'
 
 type Palette = { primary?: string; accent?: string; background?: string; surface?: string; text?: string; muted?: string }
 type FeatureItem = { title?: string; body?: string; icon?: string }
+type GalleryItem = { title?: string; body?: string; image_url?: string; wiki_url?: string }
 type StatItem = { value?: string; label?: string }
 type Testimonial = { quote?: string; author?: string; role?: string }
 type Section = {
   type: string; eyebrow?: string; heading?: string; subheading?: string; body?: string
-  cta?: string; ctaSecondary?: string; items?: FeatureItem[]; stats?: StatItem[]
+  cta?: string; ctaSecondary?: string; items?: (FeatureItem | GalleryItem)[]; stats?: StatItem[]
   testimonials?: Testimonial[]; videoUrl?: string; email?: string; phone?: string; address?: string
 }
 export type SitePreviewContent = {
@@ -75,22 +74,30 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
   useFonts(content)
   const dark = content.theme === 'dark'
   const p = content.palette || {}
-  const primary = p.primary || (dark ? '#7c5cff' : '#1d4ed8')
-  const accent = p.accent || (dark ? '#22d3ee' : '#f59e0b')
+  const primary    = p.primary    || (dark ? '#7c5cff' : '#1d4ed8')
+  const accent     = p.accent     || (dark ? '#22d3ee' : '#f59e0b')
   const background = p.background || (dark ? '#0a0a12' : '#ffffff')
-  const surface = p.surface || (dark ? 'rgba(255,255,255,0.04)' : '#f6f7fb')
-  const text = p.text || (dark ? '#f3f4f8' : '#15161c')
-  const muted = p.muted || (dark ? 'rgba(243,244,248,0.65)' : 'rgba(21,22,28,0.62)')
-  const display = content.fonts?.display ? `'${content.fonts.display}', Georgia, serif` : 'Georgia, serif'
-  const bodyFont = content.fonts?.body ? `'${content.fonts.body}', -apple-system, sans-serif` : '-apple-system, sans-serif'
-  const sections = Array.isArray(content.sections) ? content.sections : []
+  const surface    = p.surface    || (dark ? 'rgba(255,255,255,0.04)' : '#f6f7fb')
+  const text       = p.text       || (dark ? '#f3f4f8' : '#15161c')
+  const muted      = p.muted      || (dark ? 'rgba(243,244,248,0.65)' : 'rgba(21,22,28,0.62)')
+  const display    = content.fonts?.display ? `'${content.fonts.display}', Georgia, serif` : 'Georgia, serif'
+  const bodyFont   = content.fonts?.body    ? `'${content.fonts.body}', -apple-system, sans-serif` : '-apple-system, sans-serif'
+  const sections   = Array.isArray(content.sections) ? content.sections : []
 
   return (
     <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', background, color: text, fontFamily: bodyFont, maxHeight: '70vh', overflowY: 'auto' }}>
       {sections.map((s, i) => {
-        const h = s.heading?.trim(); const sub = s.subheading?.trim(); const body = s.body?.trim(); const eb = s.eyebrow?.trim()
-        const eyebrow = eb ? <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: accent, marginBottom: 8 }}>{eb}</div> : null
+        const h    = s.heading?.trim()
+        const sub  = s.subheading?.trim()
+        const body = s.body?.trim()
+        const eb   = s.eyebrow?.trim()
+        const eyebrow = eb ? (
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: accent, marginBottom: 8 }}>
+            {eb}
+          </div>
+        ) : null
 
+        // ── Hero ──────────────────────────────────────────────────────────
         if (s.type === 'hero' || s.type === 'hero-split') {
           const heroBg = dark
             ? `radial-gradient(500px 260px at 15% -10%, ${withAlpha(primary, 0.45)}, transparent 60%), radial-gradient(400px 220px at 100% 0%, ${withAlpha(accent, 0.3)}, transparent 55%), ${background}`
@@ -109,22 +116,89 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
             </div>
           )
         }
+
+        // ── Feature grid ──────────────────────────────────────────────────
         if (s.type === 'feature-grid' && Array.isArray(s.items) && s.items.length > 0) {
           return (
             <div key={i} style={{ padding: '32px 24px' }}>
+              {eyebrow}
               {h && <div style={{ fontFamily: display, fontWeight: 800, fontSize: 20, textAlign: 'center', marginBottom: 18 }}>{h}</div>}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
-                {s.items.map((it, j) => (
+                {(s.items as FeatureItem[]).map((it, j) => (
                   <div key={j} style={{ background: surface, border: `1px solid ${withAlpha(text, 0.08)}`, borderRadius: 12, padding: 16 }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 9, background: `linear-gradient(135deg, ${primary}, ${accent})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, marginBottom: 10 }}>{it.icon || '◆'}</div>
+                    <div style={{ width: 34, height: 34, borderRadius: 9, background: `linear-gradient(135deg, ${primary}, ${accent})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, marginBottom: 10 }}>
+                      {it.icon || '◆'}
+                    </div>
                     {it.title && <div style={{ fontFamily: display, fontWeight: 800, fontSize: 14 }}>{it.title}</div>}
-                    {it.body && <div style={{ color: muted, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>{it.body}</div>}
+                    {it.body  && <div style={{ color: muted, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>{it.body}</div>}
                   </div>
                 ))}
               </div>
             </div>
           )
         }
+
+        // ── Gallery — rich cards with image, title, description ───────────
+        if (s.type === 'gallery' && Array.isArray(s.items) && s.items.length > 0) {
+          return (
+            <div key={i} style={{ padding: '32px 24px' }}>
+              {eyebrow}
+              {h && <div style={{ fontFamily: display, fontWeight: 800, fontSize: 20, textAlign: 'center', marginBottom: 18 }}>{h}</div>}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14 }}>
+                {(s.items as GalleryItem[]).map((it, j) => (
+                  <div
+                    key={j}
+                    style={{
+                      background: surface,
+                      border: `1px solid ${withAlpha(text, 0.08)}`,
+                      borderRadius: 14,
+                      overflow: 'hidden',
+                      display: 'flex',
+                      flexDirection: 'column',
+                    }}
+                  >
+                    {/* Image — show if available, otherwise a colored placeholder */}
+                    {it.image_url ? (
+                      <img
+                        src={it.image_url}
+                        alt={it.title || ''}
+                        style={{ width: '100%', height: 100, objectFit: 'cover', display: 'block' }}
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: '100%', height: 100,
+                        background: `linear-gradient(135deg, ${withAlpha(primary, 0.3)}, ${withAlpha(accent, 0.3)})`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 28,
+                      }}>
+                        🏛️
+                      </div>
+                    )}
+                    <div style={{ padding: '10px 12px', flex: 1 }}>
+                      {it.title && (
+                        <div style={{ fontFamily: display, fontWeight: 700, fontSize: 13, lineHeight: 1.3, marginBottom: 4 }}>
+                          {it.title}
+                        </div>
+                      )}
+                      {it.body && (
+                        <div style={{ color: muted, fontSize: 11, lineHeight: 1.5 }}>
+                          {it.body.slice(0, 100)}{it.body.length > 100 ? '…' : ''}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* CC-BY-SA attribution if this is Wikipedia content */}
+              <div style={{ marginTop: 12, fontSize: 10, color: muted, textAlign: 'center' }}>
+                Content from Wikipedia · CC BY-SA 4.0
+              </div>
+            </div>
+          )
+        }
+
+        // ── Stats ─────────────────────────────────────────────────────────
         if (s.type === 'stats' && Array.isArray(s.stats) && s.stats.length > 0) {
           return (
             <div key={i} style={{ background: `linear-gradient(135deg, ${primary}, ${accent})`, color: '#fff', padding: '28px 24px', display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(90px, 1fr))`, gap: 14, textAlign: 'center' }}>
@@ -137,31 +211,57 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
             </div>
           )
         }
+
+        // ── Video ─────────────────────────────────────────────────────────
         if (s.type === 'video') {
           return (
             <div key={i} style={{ padding: '32px 24px', textAlign: 'center', background: dark ? background : surface }}>
+              {eyebrow}
               {h && <div style={{ fontFamily: display, fontWeight: 800, fontSize: 18, marginBottom: 12 }}>{h}</div>}
-              <div style={{ position: 'relative', paddingTop: '56.25%', borderRadius: 12, overflow: 'hidden', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ position: 'absolute', color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>🎬 Video</span>
+              <div style={{ position: 'relative', paddingTop: '56.25%', borderRadius: 12, overflow: 'hidden', background: '#000' }}>
+                <span style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>🎬 Video</span>
               </div>
             </div>
           )
         }
+
+        // ── Testimonials ──────────────────────────────────────────────────
+        if (s.type === 'testimonials' && Array.isArray(s.testimonials) && s.testimonials.length > 0) {
+          return (
+            <div key={i} style={{ padding: '32px 24px', background: dark ? surface : '#f6f7fb' }}>
+              {h && <div style={{ fontFamily: display, fontWeight: 800, fontSize: 18, textAlign: 'center', marginBottom: 16 }}>{h}</div>}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+                {s.testimonials.map((tm, j) => (
+                  <div key={j} style={{ background, border: `1px solid ${withAlpha(text, 0.08)}`, borderRadius: 12, padding: 16 }}>
+                    {tm.quote && <div style={{ color: muted, fontSize: 13, lineHeight: 1.6, fontStyle: 'italic', marginBottom: 10 }}>"{tm.quote}"</div>}
+                    {tm.author && <div style={{ fontWeight: 700, fontSize: 12 }}>{tm.author}</div>}
+                    {tm.role   && <div style={{ color: accent, fontSize: 11 }}>{tm.role}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        }
+
+        // ── CTA ───────────────────────────────────────────────────────────
         if (s.type === 'cta') {
           return (
             <div key={i} style={{ padding: '24px' }}>
               <div style={{ borderRadius: 16, padding: '28px 22px', textAlign: 'center', background: `linear-gradient(135deg, ${primary}, ${accent})`, color: '#fff' }}>
-                {h && <div style={{ fontFamily: display, fontWeight: 800, fontSize: 20 }}>{h}</div>}
+                {h   && <div style={{ fontFamily: display, fontWeight: 800, fontSize: 20 }}>{h}</div>}
                 {sub && <div style={{ fontSize: 13, opacity: 0.95, marginTop: 6 }}>{sub}</div>}
                 {s.cta && <div style={{ marginTop: 14 }}><span style={{ background: '#fff', color: primary, fontWeight: 800, fontSize: 13, padding: '10px 22px', borderRadius: 10 }}>{s.cta}</span></div>}
               </div>
             </div>
           )
         }
+
+        // ── Contact ───────────────────────────────────────────────────────
         if (s.type === 'contact') {
           return (
             <div key={i} style={{ padding: '32px 24px', textAlign: 'center', background: dark ? surface : '#f6f7fb' }}>
-              {h && <div style={{ fontFamily: display, fontWeight: 800, fontSize: 20 }}>{h}</div>}
+              {eyebrow}
+              {h    && <div style={{ fontFamily: display, fontWeight: 800, fontSize: 20 }}>{h}</div>}
               {body && <div style={{ color: muted, fontSize: 13, margin: '10px 0 14px', lineHeight: 1.5 }}>{body}</div>}
               <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', fontSize: 13, fontWeight: 700, color: primary }}>
                 {s.email && <span>✉ {s.email}</span>}
@@ -170,11 +270,12 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
             </div>
           )
         }
-        // about / text / fallback
+
+        // ── About / text / fallback ───────────────────────────────────────
         return (
           <div key={i} style={{ padding: '28px 24px', textAlign: 'center' }}>
             {eyebrow}
-            {h && <div style={{ fontFamily: display, fontWeight: 800, fontSize: 18, marginBottom: 8 }}>{h}</div>}
+            {h    && <div style={{ fontFamily: display, fontWeight: 800, fontSize: 18, marginBottom: 8 }}>{h}</div>}
             {body && <div style={{ color: muted, fontSize: 13, lineHeight: 1.6 }}>{body}</div>}
           </div>
         )

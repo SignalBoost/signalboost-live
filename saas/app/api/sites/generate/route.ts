@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/utils/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,6 +51,74 @@ Reply with ONLY the search query or NONE. No explanation.`,
   } catch {
     return null
   }
+}
+
+function normalizeWikipediaQuery(description: string): string | null {
+  const raw = description
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .toLowerCase()
+
+  const topicHints = [
+    { pattern: /\b(team|teams|equipes?|clubes?)\b/, query: 'teams' },
+    { pattern: /\b(football|futebol|soccer)\b/, query: 'football' },
+    { pattern: /\b(amateur|varzea|várzea)\b/, query: 'amateur' },
+    { pattern: /\b(museum|museums|museu|museus)\b/, query: 'museums' },
+    { pattern: /\b(restaurant|restaurants|restaurante|restaurantes)\b/, query: 'restaurants' },
+  ]
+
+  const locationHints = ['sao paulo', 'são paulo', 'brazil', 'brasil', 'rio de janeiro', 'lisbon', 'new york', 'london']
+  const topicParts = topicHints.filter(h => h.pattern.test(raw)).map(h => h.query)
+  const location = locationHints.find(loc => raw.includes(loc))
+
+  if (topicParts.length === 0) return null
+  const queryParts = [location, ...new Set(topicParts), 'Wikipedia'].filter(Boolean)
+  return queryParts.join(' ')
+}
+
+function supabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
+
+async function seedFallbackItems() {
+  const db = supabaseAdmin()
+  const makeRows = (count: number, prefix: string, category: string, city: string) =>
+    Array.from({ length: count }, (_, i) => ({
+      name: `${prefix} ${i + 1}`,
+      description: `Demo ${category} entry ${i + 1} for ${city}.`,
+      image_url: null,
+      source_url: `https://example.com/demo/${category}/${i + 1}`,
+      metadata: { seeded: true, source: 'fallback-demo' },
+    }))
+
+  const rows = [
+    ...makeRows(40, 'Equipe de Várzea', 'teams', 'São Paulo'),
+    ...makeRows(20, 'Museu', 'museums', 'São Paulo'),
+    ...makeRows(20, 'Restaurante', 'restaurants', 'São Paulo'),
+  ]
+
+  const { error } = await db.from('items').upsert(rows, { onConflict: 'source_url' })
+  if (error) throw error
+  return rows.length
+}
+
+async function saveWikipediaItems(query: string, wikiItems: WikiItem[]) {
+  if (wikiItems.length === 0) return 0
+  const db = supabaseAdmin()
+  const rows = wikiItems.map((item) => ({
+    name: item.title,
+    description: item.description,
+    image_url: item.image_url,
+    source_url: item.wiki_url,
+    metadata: { source: 'wikipedia', query, license: 'CC-BY-SA' },
+  }))
+  const { data, error } = await db.from('items').upsert(rows, { onConflict: 'source_url' }).select('id')
+  if (error) throw error
+  return data?.length ?? rows.length
 }
 
 type WikiItem = {
@@ -199,12 +268,15 @@ export async function POST(req: NextRequest) {
     let userMessage = trimmed
     let wikiItems:  WikiItem[] = []
 
-    const wikiQuery = await extractWikipediaQuery(trimmed)
+    const extractedQuery = await extractWikipediaQuery(trimmed)
+    const wikiQuery = extractedQuery ?? normalizeWikipediaQuery(trimmed)
     console.log('Sites generate: Wikipedia query extracted:', wikiQuery ?? 'NONE')
 
     if (wikiQuery) {
       wikiItems = await fetchWikipediaItems(wikiQuery)
       console.log(`Sites generate: fetched ${wikiItems.length} Wikipedia items for "${wikiQuery}"`)
+      const saved = await saveWikipediaItems(wikiQuery, wikiItems)
+      console.log(`Sites generate: saved ${saved} Wikipedia items to Items table`)
 
       if (wikiItems.length > 0) {
         const itemList = wikiItems
@@ -219,6 +291,9 @@ export async function POST(req: NextRequest) {
           `IMPORTANT: Include a gallery or feature-grid section listing these real items by name. ` +
           `Use their actual descriptions. Do not invent fictional alternatives.`
       }
+    } else {
+      const seededCount = await seedFallbackItems()
+      console.log(`Sites generate: query=NONE, seeded ${seededCount} demo items`)
     }
 
     // ── Step 2: Generate site with Claude Sonnet ──────────────────────────
@@ -253,6 +328,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       content:   parsed,
       wikiItems: wikiItems.length > 0 ? wikiItems : undefined,
+      attribution: wikiItems.length > 0 ? 'Data from Wikipedia, licensed under CC-BY-SA.' : undefined,
     })
   } catch (error) {
     console.error('Sites generate error', error)

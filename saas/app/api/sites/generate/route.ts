@@ -1,10 +1,9 @@
 // saas/app/api/sites/generate/route.ts
 //
-// Streaming + Cache version:
-//   LOCAL  → check ai_local_items cache first → if hit, skip Claude (~2 sec)
-//             if miss, call runLocalKnowledgeMode() and save to cache (~60 sec)
-//   GLOBAL → Wikipedia
-//   NONE   → plain business/creative site
+// Streaming + two-layer cache:
+//   Layer 1 — Site design cache: exact prompt match → return cached site (~3 sec)
+//   Layer 2 — Local items cache: same category/city → skip team generation (~15 sec)
+//   Layer 3 — Full generation: Haiku for site design + Sonnet for local knowledge
 
 import { NextRequest } from 'next/server'
 import { getCurrentUser } from '@/utils/supabase/server'
@@ -17,7 +16,12 @@ import {
 } from '@/lib/ai/promptPreprocessor'
 import { routeDataRequest } from '@/lib/ai/localKnowledge'
 import { runLocalKnowledgeMode, type ValidLocalItem } from '@/lib/ai/modes'
-import { getCachedLocalItems, saveLocalItems } from '@/lib/ai/memory'
+import {
+  getCachedLocalItems,
+  getSiteDesignCache,
+  saveLocalItems,
+  saveSiteDesign,
+} from '@/lib/ai/memory'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,18 +90,33 @@ async function fetchWikipediaItems(query: string): Promise<WikiItem[]> {
   } catch (err) { console.error('Sites generate: Wikipedia fetch error', err); return [] }
 }
 
-// ── Claude site generation ────────────────────────────────────────────────────
-async function callClaude(systemPrompt: string, userContent: string): Promise<string | null> {
+// ── Site design via Claude Haiku (fast) ───────────────────────────────────────
+async function callHaiku(systemPrompt: string, userContent: string): Promise<string | null> {
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01' },
-      body:    JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 4096, system: systemPrompt, messages: [{ role: 'user', content: userContent }] }),
+      headers: {
+        'Content-Type':      'application/json',
+        'x-api-key':         process.env.ANTHROPIC_API_KEY!,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model:      'claude-haiku-4-5-20251001', // Fast model for site design
+        max_tokens: 4096,
+        system:     systemPrompt,
+        messages:   [{ role: 'user', content: userContent }],
+      }),
     })
-    if (!response.ok) { console.error('Sites generate Anthropic:', response.status, await response.text()); return null }
+    if (!response.ok) {
+      console.error('Sites generate Haiku error:', response.status, await response.text())
+      return null
+    }
     const data = await response.json()
     return data.content?.[0]?.text || ''
-  } catch (err) { console.error('Sites generate Claude error', err); return null }
+  } catch (err) {
+    console.error('Sites generate Haiku exception', err)
+    return null
+  }
 }
 
 const DISPLAY_FONTS = ['Fraunces','Playfair Display','Bricolage Grotesque','Space Grotesk','Syne','Sora','DM Serif Display','Archivo','Unbounded']
@@ -107,7 +126,7 @@ const SYSTEM_PROMPT = `You are an elite brand and web designer working inside Si
 
 LANGUAGE (CRITICAL): Detect the user's language and write EVERY visible text value in that same language.
 
-LOCAL_KNOWLEDGE_DATA (CRITICAL when provided): These are REAL items generated from Claude's internal knowledge. You MUST use them. Include a gallery or feature-grid section listing every item by name with neighborhood and description. Do NOT replace with fictional items.
+LOCAL_KNOWLEDGE_DATA (CRITICAL when provided): These are REAL items. You MUST use them ALL. Include a gallery or feature-grid section listing every item by name with neighborhood and description. Do NOT replace with fictional items.
 
 REAL_WORLD_DATA (CRITICAL when provided): Real items from Wikipedia. Use them exactly in gallery/feature-grid sections.
 
@@ -144,12 +163,11 @@ function buildRecoveryContent(description: string, items: ValidatedItem[]) {
   }
 }
 
-// ── NDJSON stream helpers ─────────────────────────────────────────────────────
 function encode(obj: object): Uint8Array {
   return new TextEncoder().encode(JSON.stringify(obj) + '\n')
 }
 
-// ── Route handler — streaming + cache ─────────────────────────────────────────
+// ── Route handler ─────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser()
   if (!user) {
@@ -176,51 +194,77 @@ export async function POST(req: NextRequest) {
       let localItems:   ValidLocalItem[] = []
       let fallbackSeeded                 = false
       let promptDataBlock                = ''
-      let cacheHit                       = false
+      let localCacheHit                  = false
+      let siteDesignCacheHit             = false
 
-      // ── Status: analyzing ────────────────────────────────────────────────
+      // ── Layer 1: Site design cache check (fastest path — ~3 sec) ───────────
+      await writer.write(encode({
+        type:    'status',
+        step:    'cache_check',
+        message: '⚡ Checking cache…',
+      }))
+
+      const cachedSite = await getSiteDesignCache({ userPrompt: trimmed, language, maxAge: 24 })
+
+      if (cachedSite && isValidContent(cachedSite)) {
+        siteDesignCacheHit = true
+        console.log('Sites generate: SITE CACHE HIT — returning instantly')
+
+        await writer.write(encode({
+          type:    'status',
+          step:    'site_cache_hit',
+          message: '⚡ Loaded from cache instantly',
+        }))
+
+        await writer.write(encode({
+          type:       'result',
+          content:    cachedSite,
+          preprocessor: {
+            mode:             routing.mode,
+            category:         routing.category,
+            siteDesignCacheHit: true,
+            localCacheHit:    false,
+            fallbackUsed:     false,
+          },
+        }))
+
+        await writer.close()
+        return
+      }
+
+      // ── Layer 2: Data fetch (local items or Wikipedia) ─────────────────────
       await writer.write(encode({
         type:    'status',
         step:    'routing',
         message: routing.mode === 'local_knowledge'
-          ? `🔍 Checking cache for ${routing.category.replace('_', ' ')}…`
+          ? `🔍 Checking local knowledge cache for ${routing.category.replace('_', ' ')}…`
           : routing.mode === 'wikipedia'
-            ? `🔍 Searching Wikipedia for "${routing.wikiQuery}"…`
+            ? `🌐 Searching Wikipedia for "${routing.wikiQuery}"…`
             : '🔍 Analyzing your request…',
       }))
 
-      // ── Step 1: Fetch data ───────────────────────────────────────────────
       if (routing.mode === 'local_knowledge') {
-
-        // ── CACHE CHECK — fastest path ──────────────────────────────────────
-        const cached = await getCachedLocalItems({
-          userPrompt: trimmed,
-          language,
-          minItems:   10,
-          maxAge:     48,
-        })
+        // Layer 2a: local items cache
+        const cached = await getCachedLocalItems({ userPrompt: trimmed, language, minItems: 10, maxAge: 48 })
 
         if (cached && cached.length >= 10) {
-          // Cache hit — skip Claude entirely
-          cacheHit   = true
-          localItems = cached
-
-          console.log(`Sites generate: CACHE HIT — ${cached.length} items, skipping Claude`)
+          localCacheHit = true
+          localItems    = cached
+          console.log(`Sites generate: LOCAL ITEMS CACHE HIT — ${cached.length} items`)
 
           await writer.write(encode({
             type:    'status',
             step:    'data_ready',
-            message: `⚡ Found ${localItems.length} cached items — designing your site…`,
+            message: `⚡ Found ${localItems.length} cached items — designing with Haiku…`,
             items:   localItems.slice(0, 5).map(i => i.name),
             cached:  true,
           }))
-
         } else {
-          // Cache miss — generate with Claude
+          // Cache miss — generate with Sonnet
           await writer.write(encode({
             type:    'status',
             step:    'data',
-            message: `🧠 Generating real ${routing.category.replace('_', ' ')} from internal knowledge…`,
+            message: `🧠 Generating real ${routing.category.replace('_', ' ')} with Claude Sonnet…`,
           }))
 
           localItems = await runLocalKnowledgeMode({
@@ -230,20 +274,15 @@ export async function POST(req: NextRequest) {
             count:      20,
           })
 
-          console.log(`Sites generate: CACHE MISS — Claude generated ${localItems.length} items`)
+          console.log(`Sites generate: LOCAL ITEMS CACHE MISS — Sonnet generated ${localItems.length} items`)
 
           if (localItems.length > 0) {
-            // Save to cache for next time — non-blocking
-            saveLocalItems(localItems, {
-              userPrompt: trimmed,
-              language,
-              category:   routing.category,
-            }).catch(() => {})
+            saveLocalItems(localItems, { userPrompt: trimmed, language, category: routing.category }).catch(() => {})
 
             await writer.write(encode({
               type:    'status',
               step:    'data_ready',
-              message: `✅ Generated ${localItems.length} real items — designing your site…`,
+              message: `✅ Generated ${localItems.length} real items — designing with Haiku…`,
               items:   localItems.slice(0, 5).map(i => i.name),
               cached:  false,
             }))
@@ -264,12 +303,6 @@ IMPORTANT: Include a gallery or feature-grid section listing EVERY item above by
         }
 
       } else if (routing.mode === 'wikipedia' && routing.wikiQuery) {
-        await writer.write(encode({
-          type:    'status',
-          step:    'data',
-          message: `🌐 Fetching from Wikipedia…`,
-        }))
-
         wikiItems = await fetchWikipediaItems(routing.wikiQuery)
 
         if (wikiItems.length > 0) {
@@ -278,7 +311,7 @@ IMPORTANT: Include a gallery or feature-grid section listing EVERY item above by
           await writer.write(encode({
             type:    'status',
             step:    'data_ready',
-            message: `✅ Found ${wikiItems.length} Wikipedia articles — designing your site…`,
+            message: `✅ Found ${wikiItems.length} Wikipedia articles — designing with Haiku…`,
             items:   wikiItems.slice(0, 5).map(i => i.title),
           }))
 
@@ -288,14 +321,14 @@ IMPORTANT: Include a gallery or feature-grid section listing EVERY item above by
 
           promptDataBlock = `
 
-REAL_WORLD_DATA (from Wikipedia — use these real items in the site):
+REAL_WORLD_DATA (from Wikipedia):
 ${itemList}
 
 IMPORTANT: Include a gallery or feature-grid section with these real items by name.`
         }
       }
 
-      // ── Fallback if no data ──────────────────────────────────────────────
+      // Fallback if no data
       if (localItems.length === 0 && wikiItems.length === 0 && routing.mode !== 'none') {
         seedFallbackItems(routing.localQuery || routing.wikiQuery).catch(() => {})
         const fallbackItems = buildFallbackItems(routing.localQuery || routing.wikiQuery, 8)
@@ -306,16 +339,15 @@ FALLBACK_DEMO_DATA:
 ${fallbackItems.map((item, i) => `${i + 1}. ${item.name} — ${item.description}`).join('\n')}`
       }
 
-      // ── Status: designing ────────────────────────────────────────────────
+      // ── Layer 3: Site design with Haiku (fast) ─────────────────────────────
       await writer.write(encode({
         type:    'status',
         step:    'designing',
-        message: '🎨 Designing your website…',
+        message: '🎨 Designing your website with Haiku…',
       }))
 
-      // ── Generate site ────────────────────────────────────────────────────
       const userMessage = `${preprocessed.optimizedPrompt}\n\nRAW_USER_INPUT:\n${trimmed}${promptDataBlock}`
-      const raw = await callClaude(SYSTEM_PROMPT, userMessage)
+      const raw = await callHaiku(SYSTEM_PROMPT, userMessage)
 
       if (!raw) {
         const fallbackItems = buildFallbackItems(routing.localQuery, 8)
@@ -347,6 +379,11 @@ ${fallbackItems.map((item, i) => `${i + 1}. ${item.name} — ${item.description}
 
       if (parsed.theme !== 'dark' && parsed.theme !== 'light') parsed.theme = 'light'
 
+      // Save site design to cache for next time — non-blocking
+      if (!fallbackSeeded) {
+        saveSiteDesign(parsed, { userPrompt: trimmed, language }).catch(() => {})
+      }
+
       await writer.write(encode({
         type:        'result',
         content:     parsed,
@@ -354,14 +391,14 @@ ${fallbackItems.map((item, i) => `${i + 1}. ${item.name} — ${item.description}
         wikiItems:   wikiItems.length > 0  ? wikiItems  : undefined,
         attribution: wikiItems.length > 0  ? 'Data from Wikipedia, licensed under CC-BY-SA 4.0.' : undefined,
         preprocessor: {
-          mode:         routing.mode,
-          category:     routing.category,
-          confidence:   routing.confidence,
-          reason:       routing.reason,
-          fallbackUsed: fallbackSeeded,
-          cacheHit,
-          localCount:   localItems.length,
-          wikiCount:    wikiItems.length,
+          mode:               routing.mode,
+          category:           routing.category,
+          confidence:         routing.confidence,
+          siteDesignCacheHit,
+          localCacheHit,
+          fallbackUsed:       fallbackSeeded,
+          localCount:         localItems.length,
+          wikiCount:          wikiItems.length,
         },
       }))
 

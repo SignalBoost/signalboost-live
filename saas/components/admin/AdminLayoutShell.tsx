@@ -6,7 +6,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/utils/supabase/client'
 
 const nav = [
-  ['Overview', '/admin'],['ADM Console', '/admin/adm'],['SignalBoost', '/admin/signalboost'],['SaaSSignal', '/admin/saas'],['Onboarding', '/admin/onboarding'],['Sales / Outreach', '/admin/sales'],['Revenue', '/admin/revenue'],['AI Operations', '/admin/ai'],['Email / Marketing', '/admin/email'],['Partners', '/admin/partners'],['System Health', '/admin/system'],['Settings', '/admin/settings'],
+  ['Dashboards', '/admin'],
+  ['ADM Console', '/admin/adm'],
+  ['Security Logs', '/admin/system'],
+  ['Outreach Control', '/admin/sales'],
+  ['Predictive Insights', '/admin/ai'],
+  ['Partners', '/admin/partners'],
+  ['Revenue', '/admin/revenue'],
+  ['Settings', '/admin/settings'],
 ]
 
 export default function AdminLayoutShell({ children }: { children: React.ReactNode }) {
@@ -50,17 +57,32 @@ export default function AdminLayoutShell({ children }: { children: React.ReactNo
     check()
   }, [adminEmails, router])
 
-  if (loading) return <div className="min-h-screen bg-slate-950 text-slate-100 p-10">Checking owner/admin access...</div>
+  if (loading) return <div className="min-h-screen bg-slate-950 p-10 text-slate-100">Checking owner/admin access...</div>
   if (!authorized) return null
 
-  return <div className="min-h-screen bg-slate-950 text-slate-100 flex">
-    <aside className="w-72 border-r border-slate-800 p-5">
-      <h1 className="text-lg font-semibold mb-1">Owner Console</h1>
-      <p className="text-xs text-slate-400 mb-5">SignalBoost + SaaSSignal</p>
-      <nav className="space-y-1">
-        {nav.map(([label, href]) => <Link key={href} href={href} className={`block rounded px-3 py-2 text-sm ${pathname===href?'bg-blue-600 text-white':'text-slate-300 hover:bg-slate-800'}`}>{label}</Link>)}
-      </nav>
-    </aside>
-    <main className="flex-1 p-6">{children}</main>
-  </div>
+  return (
+    <div className="sb-dashboard-shell">
+      <aside className="sb-sidebar">
+        <div className="sb-sidebar__header">
+          <span className="sb-eyebrow">Owner Console</span>
+          <h2>Control room</h2>
+          <p>Dashboards, security logs, outreach control, and predictive insights stay in one scan path.</p>
+        </div>
+        <nav className="sb-sidebar__nav">
+          <section className="sb-sidebar__group">
+            <p>Admin flow</p>
+            {nav.map(([label, href]) => (
+              <Link key={href} href={href} className="sb-sidebar__link" style={pathname === href ? { background: 'rgba(255,195,0,.12)', color: '#fff', borderColor: 'rgba(255,195,0,.3)' } : undefined}>{label}</Link>
+            ))}
+          </section>
+        </nav>
+      </aside>
+      <main className="sb-dashboard-main">{children}</main>
+      <aside className="sb-live-preview">
+        <span className="sb-eyebrow">ADM preview</span>
+        <h3>AI safety note</h3>
+        <p>Review security logs and approval queues before sending external outreach.</p>
+      </aside>
+    </div>
+  )
 }

@@ -11,6 +11,7 @@ import { supabase } from '@/utils/supabase/client'
 import AuthModal from './AuthModal'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
+import { SERVICES } from '@/lib/services/catalog'
 
 const GOLD = '#ffc300'
 
@@ -109,15 +110,12 @@ export default function Navbar() {
     { label: t(dict, 'docs', 'Docs'),            href: '/docs' },
   ]
 
-  const toolLinks = [
-    { icon: '📣', label: t(dict, 'promoteBusiness', 'Promote business'), href: '/dashboard/promote',    featured: true },
-    { icon: '🌐', label: t(dict, 'buildWebsite', 'Build a website'),      href: '/dashboard/builder',   featured: false },
-    { icon: '⭐', label: t(dict, 'collectReviews', 'Collect reviews'),    href: '/dashboard/reviews',    featured: false },
-    { icon: '🎙️', label: t(dict, 'generateAudio', 'Generate audio'),     href: '/dashboard/audio',      featured: false },
-    { icon: '🎬', label: t(dict, 'createVideos', 'Create videos'),        href: '/dashboard/video',      featured: false },
-    { icon: '🧪', label: typeof dict?.lab === 'string' ? dict.lab : 'Lab', href: '/dashboard/lab',      featured: false },
-    { icon: '🛠️', label: t(dict, 'navbar.workshopApprentice', 'Workshop Apprentice'), href: '/dashboard/apprentice', featured: false },
-  ]
+  const toolLinks = SERVICES.map((service) => ({
+    icon: service.icon,
+    label: t(dict, `services.${service.key}.title`, service.titleFallback),
+    href: service.dashboardHref,
+    featured: service.key === 'promote',
+  }))
 
   const planStyle = PLAN_STYLES[plan] || PLAN_STYLES.free
   const planLabel = t(dict, `plan.${plan}`, plan.charAt(0).toUpperCase() + plan.slice(1))

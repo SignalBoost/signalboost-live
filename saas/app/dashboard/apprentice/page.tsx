@@ -61,6 +61,8 @@ export default function ApprenticeWorkshopPage() {
     { href: '/dashboard/outreach/discovery', key: 'outreach', depth: level === 'advanced' ? 'Pipeline rules and data diagnostics' : 'Audience discovery walkthrough' },
     { href: '/dashboard/reviews', key: 'reviews', depth: level === 'intermediate' ? 'Review automations and response tuning' : 'Trust-building review collection' },
     { href: '/dashboard/video', key: 'video', depth: level === 'advanced' ? 'Generation settings and render status' : 'Social video starter flow' },
+    { href: '/dashboard/improve', key: 'improve', depth: level === 'advanced' ? 'SEO, accessibility, conversion, and speed audit' : 'Website improvement walkthrough' },
+    { href: '/dashboard/podcast/studio', key: 'podcastStudio', depth: level === 'beginner' ? 'Upload, transcript, clips, titles, and publishing checklist' : 'Studio optimization, metadata, and multilingual distribution' },
   ], [level])
 
   return (
@@ -84,6 +86,28 @@ export default function ApprenticeWorkshopPage() {
             </Link>
           ))}
         </div>
+
+        <section style={{ marginTop: 28, display: 'grid', gap: 16 }}>
+          <h2 style={{ fontSize: 'clamp(1.6rem, 4vw, 2.6rem)', marginBottom: 0 }}>{t(dict, 'apprentice.tutorials.title', 'New service tutorials')}</h2>
+          {['improve', 'podcastStudio'].map((key) => (
+            <article key={key} style={{ border: '1px solid rgba(255,195,0,.18)', borderRadius: 24, padding: 20, background: 'rgba(255,195,0,.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                <div>
+                  <strong>{t(dict, `apprentice.modules.${key}`, key === 'improve' ? 'Improve Website' : 'Optimize Podcast Studio')}</strong>
+                  <ol style={{ color: 'rgba(255,255,255,.72)', lineHeight: 1.8 }}>
+                    <li>{t(dict, `apprentice.tutorials.${key}.step1`, key === 'improve' ? 'Paste the website URL and identify the primary conversion goal.' : 'Upload or link an episode and confirm the show goal.')}</li>
+                    <li>{t(dict, `apprentice.tutorials.${key}.step2`, key === 'improve' ? 'Review visual examples for hero, CTA, SEO, accessibility, and speed fixes.' : 'Review visual examples for transcript cleanup, short clips, titles, and metadata.')}</li>
+                    <li>{t(dict, `apprentice.tutorials.${key}.step3`, key === 'improve' ? 'Apply the prioritized checklist and open the optimization module.' : 'Approve the distribution checklist and open the podcast studio optimizer.')}</li>
+                  </ol>
+                </div>
+                <Link className="sb-button-primary" href={key === 'improve' ? '/dashboard/improve' : '/dashboard/podcast/studio'}>{t(dict, 'apprentice.tutorials.cta', 'Start tutorial')}</Link>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(80px, 1fr))', gap: 10, marginTop: 10 }} aria-label={t(dict, 'apprentice.tutorials.visualExamples', 'Visual examples')}>
+                {['01', '02', '03'].map((label) => <div key={label} style={{ minHeight: 70, borderRadius: 16, border: '1px solid rgba(255,255,255,.12)', background: 'linear-gradient(135deg, rgba(56,189,248,.18), rgba(255,255,255,.04))', display: 'grid', placeItems: 'center', color: '#fde68a', fontWeight: 900 }}>{label}</div>)}
+              </div>
+            </article>
+          ))}
+        </section>
       </section>
     </main>
   )

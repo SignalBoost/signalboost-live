@@ -7,6 +7,7 @@ import { generatePromoPlan } from '@/lib/ai/promoPlan'
 import { generateOutreachMessage } from '@/lib/ai/outreachMessage'
 import { runBusinessMode } from '@/lib/ai/modes'
 import type { OutreachAssets } from '@/lib/outreach/types'
+import { PARTNER_INTENT_GROUPS } from '@/lib/outreach/serviceIntents'
 
 export async function generateOutreachAssets(args: {
   sourceUrl: string
@@ -34,6 +35,9 @@ export async function generateOutreachAssets(args: {
   const review_strategy = await generateReviewStrategy({ analysis: analyzer_summary, language: args.language })
   const social_plan = await generateSocialPlan({ analysis: analyzer_summary, language: args.language })
   const promo_plan = await generatePromoPlan({ analysis: analyzer_summary, predictiveNeeds: predictive_needs, language: args.language })
+  const partnerIntentContext = PARTNER_INTENT_GROUPS
+    .map((group) => `${group.label}: ${group.signals.join(', ')}`)
+    .join(' | ')
   const messageAssets = {
     analyzer_summary,
     business_model_profile,
@@ -43,7 +47,16 @@ export async function generateOutreachAssets(args: {
     social_plan,
     promo_plan,
   }
-  const outreach_message = await generateOutreachMessage({ assets: messageAssets, language: args.language })
+  const outreach_message = await generateOutreachMessage({
+    assets: {
+      ...messageAssets,
+      promo_plan: {
+        ...promo_plan,
+        hmi_summary: `${promo_plan.hmi_summary} Partner intent groups: ${partnerIntentContext}`,
+      },
+    },
+    language: args.language,
+  })
 
   return { ...messageAssets, outreach_message }
 }

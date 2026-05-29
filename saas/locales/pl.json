@@ -1,7 +1,36 @@
 {
   "hello": "Cześć",
   "welcome": "Witaj",
-  "home": "Strona główna",
+  "home": {
+    "featuresLabel": "Features",
+    "featuresKicker": "Features",
+    "featuresTitle": "Everything arranged around momentum.",
+    "workflowCta": "Show me the workflow",
+    "servicesLabel": "Services",
+    "servicesKicker": "All services",
+    "servicesTitle": "Nine connected services for launch, content, optimization, and learning.",
+    "openWorkspace": "Open workspace",
+    "ctaLabel": "Call to action",
+    "readyKicker": "Ready when you are",
+    "readyTitle": "Let SignalBoost organize your growth room.",
+    "readyText": "Start with one campaign or optimization. The AI will suggest an audience, tone, proof point, approval step, and launch-ready result before you publish.",
+    "startBuilding": "Start building",
+    "comparePlans": "Compare plans",
+    "features": {
+      "1": {
+        "title": "AI proposes the next move",
+        "text": "Guided suggestions appear before a user types, reducing blank-page friction."
+      },
+      "2": {
+        "title": "One brand, every channel",
+        "text": "Websites, reviews, audio, video, optimization, lab, and outreach share the same visual rhythm."
+      },
+      "3": {
+        "title": "Built for action",
+        "text": "Each service highlights one primary CTA so teams know exactly what to do next."
+      }
+    }
+  },
   "podcasters": {
     "title": {
       "fallback": "Twój podcast"
@@ -502,8 +531,8 @@
     "badge": "Proste ceny",
     "headline": "Zacznij za darmo. Publikuj, gdy będziesz gotowy.",
     "subhead": "SignalBoost pomaga firmom rosnąć dzięki stronom, opiniom, audio i narzędziom treści opartym na AI.",
-    "mostPopular": "NAJPOPULARNIEJSZY",
-    "perMonth": "/mies",
+    "mostPopular": "Najpopularniejsze",
+    "perMonth": "/miesiąc",
     "priceFree": "Darmowy",
     "seats1": "1 miejsce",
     "seats3": "3 miejsca",
@@ -560,7 +589,14 @@
       "f6": "Zaawansowane raporty",
       "f7": "API i integracje",
       "video": "Generowanie wideo dla firm"
-    }
+    },
+    "included": "W pakiecie",
+    "perMonthShort": "/mc",
+    "kicker": "Jasne ceny",
+    "title": "Zacznij za darmo. Opublikuj, gdy będzie gotowe.",
+    "subtitle": "Proste plany według celu: test, start, skalowanie lub większy system wzrostu.",
+    "servicePricingKicker": "Ceny usług",
+    "servicePricingTitle": "Każda usługa ma bezpośredni CTA do workspace."
   },
   "podcasters_page": {
     "badge": "Dla podcasterów",
@@ -1218,6 +1254,214 @@
       "replied": "Odpowiedziano",
       "client": "Klient",
       "draft_failed": "Szkic nieudany"
+    }
+  },
+  "services": {
+    "kicker": "SignalBoost service",
+    "comparePricing": "Compare pricing",
+    "workflow": "Guided workflow",
+    "inputs": "Inputs",
+    "urlInput": "URL input",
+    "uploadInput": "Upload input",
+    "briefInput": "Brief",
+    "briefPlaceholder": "Describe the goal, audience, offer, and preferred tone.",
+    "aiSuggestions": "AI suggestions",
+    "resultsPanel": "Results panel",
+    "resultsTitle": "What SignalBoost prepares",
+    "generateResults": "Generate results",
+    "viewLanding": "View landing page",
+    "promote": {
+      "title": "Promuj firmę",
+      "desc": "Launch localized campaigns, ad copy, outreach, and offers from one business brief.",
+      "cta": "Open marketing tools",
+      "workflow": {
+        "1": "Add a product, offer, flyer, or URL.",
+        "2": "Review audience, tone, channel, and AI copy suggestions.",
+        "3": "Approve ads, social posts, email, and outreach messages."
+      },
+      "suggestions": {
+        "1": "Lead with one timely offer.",
+        "2": "Match the tone to the local audience.",
+        "3": "Reuse proof points across every channel."
+      },
+      "results": {
+        "1": "Campaign checklist",
+        "2": "Localized ad and social copy",
+        "3": "Outreach-ready CTA bundle"
+      }
+    },
+    "builder": {
+      "title": "Zbuduj stronę",
+      "desc": "Generate a responsive multilingual site with structure, sections, and publish-ready calls to action.",
+      "cta": "Open website builder",
+      "workflow": {
+        "1": "Describe the business and target visitors.",
+        "2": "Review the AI sitemap, sections, and visual direction.",
+        "3": "Publish or hand off the generated site plan."
+      },
+      "suggestions": {
+        "1": "Start with a clear hero promise.",
+        "2": "Add trust proof near every CTA.",
+        "3": "Keep mobile sections short."
+      },
+      "results": {
+        "1": "Site outline",
+        "2": "Homepage content blocks",
+        "3": "Publishing checklist"
+      }
+    },
+    "reviews": {
+      "title": "Zbieraj opinie",
+      "desc": "Create review links, follow-ups, and testimonial assets that turn trust into growth.",
+      "cta": "Open review collection",
+      "workflow": {
+        "1": "Add the business URL or review destination.",
+        "2": "Choose request timing and tone.",
+        "3": "Launch review links and testimonial follow-ups."
+      },
+      "suggestions": {
+        "1": "Ask right after a positive moment.",
+        "2": "Offer simple prompts to reduce friction.",
+        "3": "Turn five-star feedback into homepage proof."
+      },
+      "results": {
+        "1": "Review request templates",
+        "2": "Follow-up cadence",
+        "3": "Testimonial ideas"
+      }
+    },
+    "audio": {
+      "title": "Generuj audio",
+      "desc": "Turn scripts into natural voice content for promos, podcasts, explainers, and social clips.",
+      "cta": "Open audio studio",
+      "workflow": {
+        "1": "Upload or paste a script.",
+        "2": "Pick voice, language, and delivery style.",
+        "3": "Generate, review, and export audio."
+      },
+      "suggestions": {
+        "1": "Use shorter sentences for natural delivery.",
+        "2": "Localize idioms before voice generation.",
+        "3": "Create a 15-second cutdown first."
+      },
+      "results": {
+        "1": "Voice-ready script",
+        "2": "Language variants",
+        "3": "Audio export checklist"
+      }
+    },
+    "video": {
+      "title": "Twórz filmy",
+      "desc": "Plan, script, generate, and package short-form videos with AI-guided production steps.",
+      "cta": "Open video creator",
+      "workflow": {
+        "1": "Add footage, URL, or a video idea.",
+        "2": "Review hooks, scenes, captions, and format suggestions.",
+        "3": "Generate clips and approve publish-ready assets."
+      },
+      "suggestions": {
+        "1": "Open with the outcome in the first three seconds.",
+        "2": "Use captions for silent viewing.",
+        "3": "Match format to the destination channel."
+      },
+      "results": {
+        "1": "Video script",
+        "2": "Scene and caption plan",
+        "3": "Publish-ready CTA"
+      }
+    },
+    "improve": {
+      "title": "Ulepsz stronę",
+      "desc": "Audit any URL for clarity, SEO, conversion, accessibility, and speed improvement opportunities.",
+      "cta": "Open website optimization",
+      "workflow": {
+        "1": "Paste the URL and identify the page goal.",
+        "2": "Review AI suggestions for copy, SEO, accessibility, speed, and CTAs.",
+        "3": "Apply the prioritized fixes and measure the next conversion step."
+      },
+      "suggestions": {
+        "1": "Clarify the hero promise before adding new sections.",
+        "2": "Make the primary CTA visible without scrolling.",
+        "3": "Check accessibility and performance before publishing."
+      },
+      "results": {
+        "1": "Website optimization scorecard",
+        "2": "Prioritized fix list",
+        "3": "Conversion-ready copy recommendations"
+      }
+    },
+    "podcastStudio": {
+      "title": "Optymalizuj studio podcastowe",
+      "desc": "Improve episode workflow, transcript quality, clips, titles, metadata, and multilingual distribution.",
+      "cta": "Open podcast optimization",
+      "workflow": {
+        "1": "Upload an episode or paste a show URL.",
+        "2": "Review transcript, clip, title, and metadata suggestions.",
+        "3": "Export clips, show notes, and multilingual promotion assets."
+      },
+      "suggestions": {
+        "1": "Turn one strong quote into a short clip.",
+        "2": "Write titles for search and human curiosity.",
+        "3": "Repurpose show notes into social and email copy."
+      },
+      "results": {
+        "1": "Episode optimization checklist",
+        "2": "Clip and transcript recommendations",
+        "3": "Distribution-ready metadata"
+      }
+    },
+    "lab": {
+      "title": "Laboratorium",
+      "desc": "Experiment with search, motion prompts, captions, and emerging AI workflows before they graduate.",
+      "cta": "Open lab",
+      "workflow": {
+        "1": "Upload or search for experimental source material.",
+        "2": "Test AI prompts, captions, dubs, or generation settings.",
+        "3": "Save the useful outputs for production workflows."
+      },
+      "suggestions": {
+        "1": "Test one variable at a time.",
+        "2": "Document the winning prompt.",
+        "3": "Move proven workflows into the workspace."
+      },
+      "results": {
+        "1": "Experiment notes",
+        "2": "Prototype assets",
+        "3": "Production handoff"
+      }
+    },
+    "apprentice": {
+      "title": "Uczeń warsztatu",
+      "desc": "Follow guided tutorials and visual examples for every SignalBoost service.",
+      "cta": "Start tutorial",
+      "workflow": {
+        "1": "Choose a service tutorial.",
+        "2": "Follow step-by-step guidance with visual examples.",
+        "3": "Open the matching module and complete the task."
+      },
+      "suggestions": {
+        "1": "Start with beginner mode when learning a new tool.",
+        "2": "Use the visual examples before changing advanced settings.",
+        "3": "Return after launch to learn the optimization path."
+      },
+      "results": {
+        "1": "Tutorial checklist",
+        "2": "Visual example path",
+        "3": "Module launch CTA"
+      }
+    }
+  },
+  "pricing_page_extra": {},
+  "apprentice_extra": {},
+  "apprentice": {
+    "tutorials": {
+      "title": "Samouczki nowych usług",
+      "cta": "Rozpocznij samouczek",
+      "visualExamples": "Przykłady wizualne"
+    },
+    "modules": {
+      "improve": "Ulepsz stronę",
+      "podcastStudio": "Optymalizuj studio podcastowe"
     }
   }
 }

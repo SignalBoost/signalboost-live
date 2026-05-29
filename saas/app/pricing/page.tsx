@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
-import { SERVICES } from '@/lib/services/catalog'
 
 const CONTACT_EMAIL = 'support@signalboostapp.com'
 
@@ -19,16 +18,14 @@ export default function PricingPage() {
     { name: t(dict, 'pricing_page.business.name', 'Business'), plan: 'business', price: '$149', seats: t(dict, 'pricing_page.business.seats', '10+ seats'), description: t(dict, 'pricing_page.business.description', 'For agencies and multi-location brands.'), cta: t(dict, 'pricing_page.business.cta', 'Get Business'), highlight: false, features: [1,2,3,4].map((i) => t(dict, `pricing_page.business.feature${i}`, ['Unlimited websites', 'White label', 'Dedicated onboarding', 'API & integrations'][i - 1])) },
   ]
 
-  const serviceTiers = SERVICES.map((service) => ({
-    key: service.key,
-    icon: service.icon,
-    href: service.dashboardHref,
-    name: t(dict, `services.${service.key}.title`, service.titleFallback),
-    description: t(dict, `services.${service.key}.desc`, service.descFallback),
-    price: service.key === 'improve' ? '$29' : service.key === 'podcastStudio' ? '$19' : t(dict, 'pricing_page.included', 'Included'),
-    suffix: service.key === 'improve' || service.key === 'podcastStudio' ? t(dict, 'pricing_page.perMonth', '/month') : '',
-    cta: t(dict, `services.${service.key}.cta`, service.ctaFallback),
-  }))
+  const moduleTiers = [
+    { key: 'promote', icon: '📣', href: '/dashboard/promote', price: t(dict, 'pricing_page.included', 'Included'), name: t(dict, 'wireframes.modules.promote.title', 'Promote Business'), description: t(dict, 'wireframes.modules.promote.description', 'Build launches with multilingual campaign blocks, live telemetry, and AI concierge next steps.') },
+    { key: 'reviews', icon: '⭐', href: '/dashboard/reviews', price: t(dict, 'pricing_page.included', 'Included'), name: t(dict, 'wireframes.modules.reviews.title', 'Reviews'), description: t(dict, 'wireframes.modules.reviews.description', 'Capture localized reviews, monitor sentiment, and route moderation work without leaving the console.') },
+    { key: 'calendar', icon: '📅', href: '/dashboard/calendar', price: '$9', name: t(dict, 'wireframes.modules.calendar.title', 'Calendar'), description: t(dict, 'wireframes.modules.calendar.description', 'Plan monthly operations with event creation overlays and mission-style reminder timelines.') },
+    { key: 'spreadsheets', icon: '▦', href: '/dashboard/spreadsheets', price: '$12', name: t(dict, 'wireframes.modules.spreadsheets.title', 'Spreadsheets'), description: t(dict, 'wireframes.modules.spreadsheets.description', 'Coordinate shared utility tables with permissions, comments, and real-time activity signals.') },
+    { key: 'outreach', icon: '📡', href: '/dashboard/outreach', price: '$19', name: t(dict, 'wireframes.modules.outreach.title', 'Outreach'), description: t(dict, 'wireframes.modules.outreach.description', 'Launch email, social, and partner pushes while the concierge recommends the next channel.') },
+    { key: 'assistant', icon: '🛰️', href: '/dashboard/assistant', price: '$15', name: t(dict, 'wireframes.modules.assistant.title', 'Personal Assistant'), description: t(dict, 'wireframes.modules.assistant.description', 'Turn work into prioritized tasks, reminders, and productivity telemetry for the day.') },
+  ]
 
   async function handleCheckout(plan: string) {
     if (plan === 'free') {
@@ -57,7 +54,7 @@ export default function PricingPage() {
   }
 
   return (
-    <main className="sb-page-shell sb-section">
+    <main className="sb-page-shell sb-section sb-pricing-cockpit">
       <section style={{ textAlign: 'center', marginBottom: 32 }}>
         <span className="sb-eyebrow">{t(dict, 'pricing_page.kicker', 'Docs-clear pricing')}</span>
         <h1 className="sb-h1" style={{ marginTop: 12 }}>{t(dict, 'pricing_page.title', 'Start free. Publish when ready.')}</h1>
@@ -66,7 +63,7 @@ export default function PricingPage() {
 
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
         {plans.map(plan => (
-          <article key={plan.plan} className="sb-card" style={{ padding: 24, borderColor: plan.highlight ? 'rgba(255,195,0,.42)' : undefined }}>
+          <article key={plan.plan} className="sb-card sb-pricing-panel" style={{ padding: 24, borderColor: plan.highlight ? 'rgba(255,195,0,.42)' : undefined }}>
             {plan.highlight && <span className="sb-eyebrow">{t(dict, 'pricing_page.mostPopular', 'Most popular')}</span>}
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline', marginTop: plan.highlight ? 12 : 0 }}>
               <h2 className="sb-h3">{plan.name}</h2>
@@ -84,20 +81,29 @@ export default function PricingPage() {
         ))}
       </section>
 
-      <section style={{ marginTop: 34 }}>
-        <span className="sb-eyebrow">{t(dict, 'pricing_page.servicePricingKicker', 'Service pricing')}</span>
-        <h2 className="sb-h2" style={{ marginTop: 10 }}>{t(dict, 'pricing_page.servicePricingTitle', 'Every service has a direct workspace CTA.')}</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 16, marginTop: 18 }}>
-          {serviceTiers.map((tier) => (
-            <article key={tier.key} className="sb-card" style={{ padding: 20 }}>
-              <div style={{ fontSize: 28 }}>{tier.icon}</div>
+      <section style={{ marginTop: 34 }} id="saas-modules">
+        <span className="sb-eyebrow">{t(dict, 'pricing_page.servicePricingKicker', 'SaaS module pricing')}</span>
+        <h2 className="sb-h2" style={{ marginTop: 10 }}>{t(dict, 'pricing_page.servicePricingTitle', 'Every cockpit panel opens a live SaaS dashboard.')}</h2>
+        <div className="sb-pricing-module-grid">
+          {moduleTiers.map((tier) => (
+            <article key={tier.key} className="sb-card sb-pricing-panel" style={{ padding: 20 }}>
+              <div className="sb-pricing-panel__icon">{tier.icon}</div>
               <h3 className="sb-h3">{tier.name}</h3>
-              <div style={{ fontSize: 32, fontWeight: 950 }}>{tier.price}<span className="sb-caption">{tier.suffix}</span></div>
+              <div style={{ fontSize: 32, fontWeight: 950 }}>{tier.price}<span className="sb-caption">{tier.price.startsWith('$') ? t(dict, 'pricing_page.perMonthShort', '/mo') : ''}</span></div>
               <p className="sb-body" style={{ fontSize: 13 }}>{tier.description}</p>
-              <Link className="sb-button-secondary" href={tier.href}>{tier.cta}</Link>
+              <Link className="sb-button-secondary" href={tier.href}>{t(dict, 'wireframes.openDashboard', 'Open dashboard')}</Link>
             </article>
           ))}
         </div>
+      </section>
+
+      <section className="sb-pricing-wireframe-cta" aria-labelledby="pricing-wireframe-cta-title">
+        <div>
+          <span className="sb-eyebrow">{t(dict, 'wireframes.kicker', 'NASA-style SaaS HMI wireframes')}</span>
+          <h2 id="pricing-wireframe-cta-title" className="sb-h2">{t(dict, 'wireframes.pricing.title', 'Tiered SaaS cockpit panels')}</h2>
+          <p className="sb-body">{t(dict, 'wireframes.pricing.description', 'Pricing cards use the same console styling and route CTAs directly into each SaaS dashboard module.')}</p>
+        </div>
+        <Link className="sb-button-primary" href="/dashboard/wireframes">{t(dict, 'wireframes.viewPricing', 'View cockpit pricing')}</Link>
       </section>
     </main>
   )

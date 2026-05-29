@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760">
+<defs><radialGradient id="g" cx="18%" cy="8%"><stop stop-color="#1af0ff" stop-opacity=".32"/><stop offset="1" stop-color="#030712" stop-opacity="0"/></radialGradient><filter id="glow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<rect width="1200" height="760" fill="#030712"/><rect width="1200" height="760" fill="url(#g)"/><circle cx="1020" cy="80" r="230" fill="#ff4fd8" opacity=".12"/>
+<rect x="28" y="28" width="1144" height="704" rx="38" fill="rgba(255,255,255,.055)" stroke="#ffffff" stroke-opacity=".14"/>
+<rect x="44" y="52" width="250" height="650" rx="30" fill="rgba(2,6,23,.78)" stroke="#1af0ff" stroke-opacity=".28"/>
+<text x="64" y="102" fill="#ffc300" font-size="32" font-weight="900" filter="url(#glow)">SignalBoost</text><rect x="46" y="154" width="234" height="44" rx="14" fill="#0b1830" stroke="#1af0ff" stroke-opacity=".25"/><text x="68" y="182" fill="#dbeafe" font-size="17">Promote</text><rect x="46" y="218" width="234" height="44" rx="14" fill="#0b1830" stroke="#1af0ff" stroke-opacity=".25"/><text x="68" y="246" fill="#dbeafe" font-size="17">Reviews</text><rect x="46" y="282" width="234" height="44" rx="14" fill="#0b1830" stroke="#1af0ff" stroke-opacity=".25"/><text x="68" y="310" fill="#dbeafe" font-size="17">Calendar</text><rect x="46" y="346" width="234" height="44" rx="14" fill="#0b1830" stroke="#1af0ff" stroke-opacity=".25"/><text x="68" y="374" fill="#dbeafe" font-size="17">Sheets</text><rect x="46" y="410" width="234" height="44" rx="14" fill="#0b1830" stroke="#1af0ff" stroke-opacity=".25"/><text x="68" y="438" fill="#dbeafe" font-size="17">Outreach</text><rect x="46" y="474" width="234" height="44" rx="14" fill="#0b1830" stroke="#1af0ff" stroke-opacity=".25"/><text x="68" y="502" fill="#dbeafe" font-size="17">Assistant</text>
+<text x="330" y="94" fill="#9ff7ff" font-size="16" font-weight="900" letter-spacing="3">NASA-STYLE HMI WIREFRAME</text>
+<text x="330" y="142" fill="#ffffff" font-size="46" font-weight="900">Unified SaaS Dashboard</text>
+<text x="332" y="166" fill="#cbd5e1" font-size="20">Sidebar console + telemetry grid</text>
+<rect x="330" y="180" width="240" height="135" rx="24" fill="rgba(5,13,28,.78)" stroke="#ffc300" stroke-opacity=".42"/>
+<text x="354" y="222" fill="#dffcff" font-size="24" font-weight="800">Promote Business</text>
+<rect x="354" y="252" width="192" height="16" rx="8" fill="#ffc300" opacity=".28"/>
+<rect x="354" y="284" width="130.56" height="16" rx="8" fill="#fff" opacity=".12"/>
+<rect x="354" y="316" width="88.32000000000001" height="16" rx="8" fill="#fff" opacity=".08"/><rect x="600" y="180" width="240" height="135" rx="24" fill="rgba(5,13,28,.78)" stroke="#1af0ff" stroke-opacity=".42"/>
+<text x="624" y="222" fill="#dffcff" font-size="24" font-weight="800">Reviews</text>
+<rect x="624" y="252" width="192" height="16" rx="8" fill="#1af0ff" opacity=".28"/>
+<rect x="624" y="284" width="130.56" height="16" rx="8" fill="#fff" opacity=".12"/>
+<rect x="624" y="316" width="88.32000000000001" height="16" rx="8" fill="#fff" opacity=".08"/><rect x="870" y="180" width="240" height="135" rx="24" fill="rgba(5,13,28,.78)" stroke="#1af0ff" stroke-opacity=".42"/>
+<text x="894" y="222" fill="#dffcff" font-size="24" font-weight="800">Calendar</text>
+<rect x="894" y="252" width="192" height="16" rx="8" fill="#1af0ff" opacity=".28"/>
+<rect x="894" y="284" width="130.56" height="16" rx="8" fill="#fff" opacity=".12"/>
+<rect x="894" y="316" width="88.32000000000001" height="16" rx="8" fill="#fff" opacity=".08"/><rect x="330" y="360" width="240" height="135" rx="24" fill="rgba(5,13,28,.78)" stroke="#1af0ff" stroke-opacity=".42"/>
+<text x="354" y="402" fill="#dffcff" font-size="24" font-weight="800">Spreadsheets</text>
+<rect x="354" y="432" width="192" height="16" rx="8" fill="#1af0ff" opacity=".28"/>
+<rect x="354" y="464" width="130.56" height="16" rx="8" fill="#fff" opacity=".12"/>
+<rect x="354" y="496" width="88.32000000000001" height="16" rx="8" fill="#fff" opacity=".08"/><rect x="600" y="360" width="240" height="135" rx="24" fill="rgba(5,13,28,.78)" stroke="#1af0ff" stroke-opacity=".42"/>
+<text x="624" y="402" fill="#dffcff" font-size="24" font-weight="800">Outreach</text>
+<rect x="624" y="432" width="192" height="16" rx="8" fill="#1af0ff" opacity=".28"/>
+<rect x="624" y="464" width="130.56" height="16" rx="8" fill="#fff" opacity=".12"/>
+<rect x="624" y="496" width="88.32000000000001" height="16" rx="8" fill="#fff" opacity=".08"/><rect x="870" y="360" width="240" height="135" rx="24" fill="rgba(5,13,28,.78)" stroke="#1af0ff" stroke-opacity=".42"/>
+<text x="894" y="402" fill="#dffcff" font-size="24" font-weight="800">Personal Assistant</text>
+<rect x="894" y="432" width="192" height="16" rx="8" fill="#1af0ff" opacity=".28"/>
+<rect x="894" y="464" width="130.56" height="16" rx="8" fill="#fff" opacity=".12"/>
+<rect x="894" y="496" width="88.32000000000001" height="16" rx="8" fill="#fff" opacity=".08"/>
+<text x="64" y="676" fill="#86efac" font-size="15">● i18n: EN · ES · PT · PL · RU</text>
+</svg>

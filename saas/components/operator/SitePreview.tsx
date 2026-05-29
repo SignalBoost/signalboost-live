@@ -50,6 +50,23 @@ function withAlpha(color: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
+
+function toEmbedUrl(url?: string): string | null {
+  if (!url || typeof url !== 'string') return null
+
+  const u = url.trim()
+  const yt = u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]{6,})/)
+  if (yt) return `https://www.youtube.com/embed/${yt[1]}`
+
+  const vm = u.match(/vimeo\.com\/(?:video\/)?(\d+)/)
+  if (vm) return `https://player.vimeo.com/video/${vm[1]}`
+
+  if (/\.(mp4|webm|ogg)(\?.*)?$/i.test(u)) return u
+  if (/\/embed\//.test(u) || /player\./.test(u)) return u
+
+  return null
+}
+
 function useFonts(content: SitePreviewContent) {
   useEffect(() => {
     const fams: string[] = []
@@ -214,12 +231,26 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
 
         // ── Video ─────────────────────────────────────────────────────────
         if (s.type === 'video') {
+          const embed = toEmbedUrl(s.videoUrl)
           return (
             <div key={i} style={{ padding: '32px 24px', textAlign: 'center', background: dark ? background : surface }}>
               {eyebrow}
-              {h && <div style={{ fontFamily: display, fontWeight: 800, fontSize: 18, marginBottom: 12 }}>{h}</div>}
-              <div style={{ position: 'relative', paddingTop: '56.25%', borderRadius: 12, overflow: 'hidden', background: '#000' }}>
-                <span style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>🎬 Video</span>
+              {h && <div style={{ fontFamily: display, fontWeight: 800, fontSize: 18, marginBottom: sub || body ? 8 : 12 }}>{h}</div>}
+              {sub && <div style={{ color: muted, fontSize: 12, lineHeight: 1.5, marginBottom: 12 }}>{sub}</div>}
+              <div style={{ position: 'relative', paddingTop: '56.25%', borderRadius: 12, overflow: 'hidden', background: `linear-gradient(135deg, ${withAlpha(primary, 0.9)}, ${withAlpha(accent, 0.9)})` }}>
+                {embed ? (
+                  /\.(mp4|webm|ogg)(\?.*)?$/i.test(embed) ? (
+                    <video src={embed} controls style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <iframe src={embed} title={h || 'SignalBoost video preview'} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }} />
+                  )
+                ) : (
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#fff', padding: 20 }}>
+                    <span style={{ fontSize: 28, lineHeight: 1 }}>🎬</span>
+                    <span style={{ fontFamily: display, fontWeight: 800, fontSize: 15 }}>{h || 'Brand story video'}</span>
+                    {body && <span style={{ maxWidth: 320, fontSize: 11, lineHeight: 1.5, opacity: 0.85 }}>{body}</span>}
+                  </div>
+                )}
               </div>
             </div>
           )

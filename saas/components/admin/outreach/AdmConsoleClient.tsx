@@ -13,10 +13,6 @@ type OutreachRow = {
   business_model_profile?: any
   predictive_needs?: any
   outreach_message?: string
-  website_json?: any
-  review_strategy?: any
-  social_plan?: any
-  promo_plan?: any
 }
 
 type AdmData = {
@@ -27,12 +23,7 @@ type AdmData = {
   hmi: { summary: string; nextActions: string[] }
 }
 
-const statusColors: Record<string, string> = {
-  pending: 'border-amber-500/40 bg-amber-500/10 text-amber-200',
-  approved: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200',
-  sent: 'border-blue-500/40 bg-blue-500/10 text-blue-200',
-  rejected: 'border-red-500/40 bg-red-500/10 text-red-200',
-}
+const workflow = ['Dashboards', 'Security Logs', 'Outreach Control', 'Predictive Insights']
 
 export default function AdmConsoleClient() {
   const [data, setData] = useState<AdmData | null>(null)
@@ -137,121 +128,87 @@ export default function AdmConsoleClient() {
     await load()
   }
 
-  if (loading) return <div className="text-slate-300">Loading ADM Console...</div>
+  if (loading) return <div className="sb-glass" style={{ padding: 24 }}>Loading ADM Console...</div>
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-blue-300">Admin Command Center</p>
-          <h2 className="mt-2 text-3xl font-semibold text-white">ADM Console</h2>
-          <p className="mt-2 max-w-3xl text-sm text-slate-400">{data?.hmi.summary}</p>
+    <div className="sb-stack">
+      <section className="sb-glass sb-grid-2" style={{ padding: 28, alignItems: 'end' }}>
+        <div className="sb-stack">
+          <p className="sb-eyebrow">Admin command center</p>
+          <h2 className="sb-h2">ADM Console</h2>
+          <p className="sb-body">{data?.hmi.summary}</p>
+          <div className="sb-row">{workflow.map(step => <span className="sb-chip" key={step}>{step}</span>)}</div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button disabled={busy} onClick={syncDigits} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">Sync Digits</button>
-          <button disabled={busy} onClick={() => togglePanic(!data?.metrics.panicSwitch)} className={`rounded-lg px-4 py-2 text-sm font-medium ${data?.metrics.panicSwitch ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'} disabled:opacity-50`}>
+        <div className="sb-row" style={{ justifyContent: 'flex-end' }}>
+          <button disabled={busy} onClick={syncDigits} className="sb-button sb-button-secondary">Sync Digits</button>
+          <button disabled={busy} onClick={() => togglePanic(!data?.metrics.panicSwitch)} className="sb-button sb-button-primary">
             {data?.metrics.panicSwitch ? 'Disable Panic Switch' : 'Enable Panic Switch'}
           </button>
         </div>
-      </div>
+      </section>
 
-      {message && <div className="rounded-xl border border-slate-700 bg-slate-900 p-3 text-sm text-slate-200">{message}</div>}
+      {message && <div className="sb-ai-prompt">{message}</div>}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <section className="sb-grid-4">
         {[
           ['Pending', data?.metrics.pending],
           ['Approved', data?.metrics.approved],
           ['Sent', data?.metrics.sent],
-          ['24h Sends', `${data?.metrics.sendLimit?.count || 0}/${data?.metrics.sendLimit?.limit || 50}`],
-          ['Security Events', data?.metrics.security24h],
+          ['Security Logs', data?.recentSecurityEvents?.length || 0],
+          ['AI Tasks', data?.recentAiTasks?.length || 0],
+          ['Daily Limit', data?.metrics.dailyLimit],
+          ['Panic Switch', data?.metrics.panicSwitch ? 'On' : 'Off'],
+          ['Predicted Needs', Object.keys(predictedNeeds).length],
         ].map(([label, value]) => (
-          <div key={String(label)} className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-            <p className="text-xs uppercase tracking-wider text-slate-500">{label}</p>
-            <p className="mt-2 text-2xl font-semibold text-white">{value ?? 0}</p>
+          <div key={label} className="sb-glass-soft" style={{ padding: 18 }}>
+            <p className="sb-caption" style={{ textTransform: 'uppercase', letterSpacing: '0.12em' }}>{label}</p>
+            <p className="sb-h3" style={{ marginTop: 8 }}>{value ?? '—'}</p>
           </div>
         ))}
-      </div>
+      </section>
 
-      <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-            <h3 className="font-semibold text-white">Analyze Business</h3>
-            <div className="mt-4 space-y-3">
-              <input value={businessName} onChange={e => setBusinessName(e.target.value)} placeholder="Business name" className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
-              <input value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} placeholder="Public website or social URL" className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
-              <button disabled={busy || !sourceUrl} onClick={runManualAnalysis} className="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">Generate Assets + Queue</button>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-            <h3 className="font-semibold text-white">Outreach Queue</h3>
-            <div className="mt-4 max-h-[640px] space-y-2 overflow-auto pr-1">
-              {data?.recentOutreach.map(row => (
-                <button key={row.id} onClick={() => setSelected(row)} className={`w-full rounded-xl border p-3 text-left transition ${selected?.id === row.id ? 'border-blue-500 bg-blue-500/10' : 'border-slate-800 bg-slate-950 hover:border-slate-600'}`}>
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-medium text-white">{row.business_name}</p>
-                    <span className={`rounded-full border px-2 py-0.5 text-[11px] ${statusColors[row.status] || 'border-slate-600 text-slate-300'}`}>{row.status}</span>
-                  </div>
-                  <p className="mt-1 truncate text-xs text-slate-500">{row.source_platform} • {row.business_url}</p>
-                </button>
-              ))}
-            </div>
-          </div>
+      <section className="sb-grid-2">
+        <div className="sb-glass-soft sb-stack" style={{ padding: 24 }}>
+          <p className="sb-eyebrow">Outreach Control</p>
+          <input className="sb-input" style={{ borderRadius: 14, padding: 12 }} placeholder="Business name" value={businessName} onChange={e => setBusinessName(e.target.value)} />
+          <input className="sb-input" style={{ borderRadius: 14, padding: 12 }} placeholder="Business URL" value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} />
+          <button disabled={busy || !sourceUrl} onClick={runManualAnalysis} className="sb-button sb-button-primary">Analyze and queue</button>
+          <p className="sb-ai-prompt">“I’ll analyze, profile, predict, generate assets, then wait for approval.”</p>
         </div>
 
-        <div className="space-y-4">
-          {selected ? (
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-              <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-                <div>
-                  <h3 className="text-xl font-semibold text-white">{selected.business_name}</h3>
-                  <p className="mt-1 text-sm text-slate-400">{selected.business_url}</p>
-                  <p className="mt-3 text-sm text-slate-300">{selected.analyzer_summary?.hmi_summary}</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button disabled={busy || selected.status === 'approved'} onClick={() => patchOutreach(selected.id, 'approved')} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white disabled:opacity-50">Approve</button>
-                  <button disabled={busy || selected.status === 'rejected'} onClick={() => patchOutreach(selected.id, 'rejected')} className="rounded-lg bg-red-600 px-3 py-2 text-sm text-white disabled:opacity-50">Reject</button>
-                </div>
-              </div>
-
-              <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                <InfoCard title="Business Intelligence" data={selected.analyzer_summary} />
-                <InfoCard title="Business Model Profiler" data={selected.business_model_profile} />
-                <InfoCard title="Predictive Needs" data={selected.predictive_needs} />
-                <InfoCard title="Review Strategy" data={selected.review_strategy} />
-                <InfoCard title="Social Plan" data={selected.social_plan} />
-                <InfoCard title="Promo Campaign" data={selected.promo_plan} />
-              </div>
-
-              <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4">
-                <h4 className="font-medium text-white">Outreach Message</h4>
-                <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-300">{selected.outreach_message}</p>
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                  <input value={sendEmail} onChange={e => setSendEmail(e.target.value)} placeholder="Optional email recipient" className="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white" />
-                  <button disabled={busy || selected.status !== 'approved'} onClick={sendSelected} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">Send Now</button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-slate-400">No outreach records yet.</div>
-          )}
-
-          <div className="grid gap-4 lg:grid-cols-3">
-            <InfoCard title="Predicted Needs Mix" data={predictedNeeds} />
-            <InfoCard title="AI Behavior Monitor" data={data?.recentAiTasks.slice(0, 5)} />
-            <InfoCard title="Security & Privacy" data={{ panicSwitch: data?.metrics.panicSwitch, rateLimit24h: data?.metrics.rateLimit24h, recentSecurityEvents: data?.recentSecurityEvents.slice(0, 5) }} />
-          </div>
+        <div className="sb-glass-soft sb-stack" style={{ padding: 24 }}>
+          <p className="sb-eyebrow">Predictive Insights</p>
+          {Object.entries(predictedNeeds).length === 0 ? <p className="sb-body">No prediction cluster yet.</p> : Object.entries(predictedNeeds).map(([need, count]) => (
+            <div className="sb-row" key={need} style={{ justifyContent: 'space-between' }}><span>{need}</span><span className="sb-chip">{String(count)}</span></div>
+          ))}
         </div>
-      </div>
-    </div>
-  )
-}
+      </section>
 
-function InfoCard({ title, data }: { title: string; data: any }) {
-  return (
-    <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
-      <h4 className="font-medium text-white">{title}</h4>
-      <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap text-xs leading-5 text-slate-400">{JSON.stringify(data || {}, null, 2)}</pre>
+      <section className="sb-grid-2">
+        <div className="sb-glass-soft sb-stack" style={{ padding: 20 }}>
+          <p className="sb-eyebrow">Approval Queue</p>
+          {data?.recentOutreach?.map(row => (
+            <button key={row.id} onClick={() => setSelected(row)} className="sb-glass-soft" style={{ padding: 14, textAlign: 'left', color: '#fff', borderColor: selected?.id === row.id ? 'rgba(255,195,0,0.45)' : 'rgba(255,255,255,0.10)' }}>
+              <strong>{row.business_name || row.business_url}</strong>
+              <p className="sb-caption">{row.status} • {row.source_platform}</p>
+            </button>
+          )) || <p className="sb-body">No outreach queued.</p>}
+        </div>
+
+        <div className="sb-glass sb-stack" style={{ padding: 24 }}>
+          <p className="sb-eyebrow">Generated Assets</p>
+          <h3 className="sb-h3">{selected?.business_name || 'Select an outreach item'}</h3>
+          <p className="sb-body" style={{ whiteSpace: 'pre-wrap', fontSize: 14 }}>{selected?.outreach_message || 'Generated email, campaign notes, and approval controls appear here.'}</p>
+          <div className="sb-tone-selector"><span>Friendly</span><span>Professional</span><span>Playful</span></div>
+          <input className="sb-input" style={{ borderRadius: 14, padding: 12 }} placeholder="Optional send-to email" value={sendEmail} onChange={e => setSendEmail(e.target.value)} />
+          <div className="sb-row">
+            <button disabled={busy || !selected} onClick={() => selected && patchOutreach(selected.id, 'approved')} className="sb-button sb-button-secondary">Approve</button>
+            <button disabled={busy || !selected} onClick={sendSelected} className="sb-button sb-button-primary">Send / record</button>
+            <button disabled={busy || !selected} onClick={() => selected && patchOutreach(selected.id, 'rejected')} className="sb-button sb-button-ghost">Reject</button>
+          </div>
+          <p className="sb-ai-prompt">This campaign looks strong for urgency, but you could add a testimonial.</p>
+        </div>
+      </section>
     </div>
   )
 }

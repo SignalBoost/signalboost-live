@@ -1,34 +1,61 @@
 import { AdminSectionConfig } from '@/lib/admin/sections'
 
-export default function AdminSectionView({ section }: { section: AdminSectionConfig }) {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold text-white">{section.title}</h2>
-        <p className="text-slate-400 mt-1">{section.description}</p>
-      </div>
+const partnerGroups = [
+  ['Flights', 'High-intent travel searches, routes, baggage, and timing friction.'],
+  ['Hotels', 'Stay recommendations, location fit, comfort, and booking confidence.'],
+  ['SIM Cards', 'Connectivity before arrival, roaming avoidance, and local data needs.'],
+  ['Insurance', 'Trip protection, medical confidence, and cancellation concerns.'],
+  ['Activities', 'Tours, events, local experiences, and last-mile conversion moments.'],
+]
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+export default function AdminSectionView({ section }: { section: AdminSectionConfig }) {
+  const isPartners = section.title === 'Partners'
+
+  return (
+    <div className="sb-stack">
+      <section className="sb-glass sb-stack" style={{ padding: 28 }}>
+        <p className="sb-eyebrow">{isPartners ? 'Human intent map' : 'Admin dashboard'}</p>
+        <h2 className="sb-h2">{section.title}</h2>
+        <p className="sb-body">{section.description}</p>
+        {isPartners && <p className="sb-ai-prompt">“Group partner decisions by what the traveler is trying to solve, not by internal vendor lists.”</p>}
+      </section>
+
+      {isPartners && (
+        <section className="sb-grid-3" aria-label="Partner categories by intent">
+          {partnerGroups.map(([title, body]) => (
+            <article key={title} className="sb-glass-soft sb-stack" style={{ padding: 20 }}>
+              <h3 className="sb-h3">{title}</h3>
+              <p className="sb-body" style={{ fontSize: 14 }}>{body}</p>
+            </article>
+          ))}
+        </section>
+      )}
+
+      <section className="sb-grid-4">
         {section.metrics.map(metric => (
-          <div key={metric.key} className="rounded-xl border border-slate-800 bg-slate-900 p-4">
-            <p className="text-xs uppercase tracking-wider text-slate-400">{metric.label}</p>
-            <p className="text-xl font-semibold text-white mt-2">{metric.value ?? 'Not tracked yet'}</p>
+          <div key={metric.key} className="sb-glass-soft" style={{ padding: 18 }}>
+            <p className="sb-caption" style={{ textTransform: 'uppercase', letterSpacing: '0.12em' }}>{metric.label}</p>
+            <p className="sb-h3" style={{ marginTop: 8 }}>{metric.value ?? 'Not tracked yet'}</p>
           </div>
         ))}
-      </div>
+      </section>
 
-      <div className="rounded-xl border border-slate-800 bg-slate-900 overflow-hidden">
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-          <h3 className="font-medium">{section.tableTitle}</h3>
-          <div className="text-xs text-slate-400">Filters: date range • product • country • plan</div>
+      <section className="sb-glass-soft" style={{ overflow: 'hidden' }}>
+        <div className="sb-row" style={{ justifyContent: 'space-between', padding: 18, borderBottom: '1px solid var(--border-soft)' }}>
+          <h3 className="sb-h3">{section.tableTitle}</h3>
+          <span className="sb-caption">Filters: date range • product • country • plan</span>
         </div>
-        <table className="w-full text-sm">
-          <thead className="bg-slate-800/60 text-slate-300"><tr>{section.tableColumns.map(c => <th key={c} className="text-left px-4 py-3">{c}</th>)}</tr></thead>
-          <tbody>
-            <tr className="border-t border-slate-800"><td colSpan={section.tableColumns.length} className="px-4 py-8 text-slate-400">Not tracked yet. Connect this panel to analytics tables/events when available.</td></tr>
-          </tbody>
-        </table>
-      </div>
+        <div className="sb-table-wrap">
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+            <thead style={{ background: 'rgba(34,211,238,0.08)', color: 'var(--text-secondary)' }}>
+              <tr>{section.tableColumns.map(c => <th key={c} style={{ textAlign: 'left', padding: 14 }}>{c}</th>)}</tr>
+            </thead>
+            <tbody>
+              <tr><td colSpan={section.tableColumns.length} style={{ padding: 28, color: 'var(--text-muted)' }}>Not tracked yet. Connect this panel to analytics tables/events when available.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   )
 }

@@ -6,7 +6,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/utils/supabase/client'
 
 const nav = [
-  ['Overview', '/admin'],['ADM Console', '/admin/adm'],['SignalBoost', '/admin/signalboost'],['SaaSSignal', '/admin/saas'],['Sales / Outreach', '/admin/sales'],['Revenue', '/admin/revenue'],['AI Operations', '/admin/ai'],['Email / Marketing', '/admin/email'],['Partners', '/admin/partners'],['System Health', '/admin/system'],['Settings', '/admin/settings'],
+  ['📊', 'Dashboards', '/admin'],
+  ['🛡️', 'Security Logs', '/admin/system'],
+  ['📣', 'Outreach Control', '/admin/adm'],
+  ['🔮', 'Predictive Insights', '/admin/ai'],
+  ['🤝', 'Partners', '/admin/partners'],
+  ['💸', 'Revenue', '/admin/revenue'],
+  ['✉️', 'Email / Marketing', '/admin/email'],
+  ['⚙️', 'Settings', '/admin/settings'],
 ]
 
 export default function AdminLayoutShell({ children }: { children: React.ReactNode }) {
@@ -50,17 +57,23 @@ export default function AdminLayoutShell({ children }: { children: React.ReactNo
     check()
   }, [adminEmails, router])
 
-  if (loading) return <div className="min-h-screen bg-slate-950 text-slate-100 p-10">Checking owner/admin access...</div>
+  if (loading) return <div className="sb-page"><div className="sb-glass" style={{ padding: 24 }}>Checking owner/admin access...</div></div>
   if (!authorized) return null
 
-  return <div className="min-h-screen bg-slate-950 text-slate-100 flex">
-    <aside className="w-72 border-r border-slate-800 p-5">
-      <h1 className="text-lg font-semibold mb-1">Owner Console</h1>
-      <p className="text-xs text-slate-400 mb-5">SignalBoost + SaaSSignal</p>
-      <nav className="space-y-1">
-        {nav.map(([label, href]) => <Link key={href} href={href} className={`block rounded px-3 py-2 text-sm ${pathname===href?'bg-blue-600 text-white':'text-slate-300 hover:bg-slate-800'}`}>{label}</Link>)}
-      </nav>
-    </aside>
-    <main className="flex-1 p-6">{children}</main>
-  </div>
+  return (
+    <div className="sb-admin-shell">
+      <aside className="sb-glass-soft" style={{ padding: 18, alignSelf: 'start', position: 'sticky', top: 104 }}>
+        <p className="sb-eyebrow">ADM Console</p>
+        <h1 className="sb-h3">Owner Command Center</h1>
+        <p className="sb-caption" style={{ marginTop: 8 }}>Dashboards → Security Logs → Outreach Control → Predictive Insights.</p>
+        <nav className="sb-stack" style={{ gap: 6, marginTop: 20 }}>
+          {nav.map(([icon, label, href]) => {
+            const active = pathname === href || (href !== '/admin' && pathname?.startsWith(href))
+            return <Link key={href} href={href} className={`sb-side-link ${active ? 'sb-side-link-active' : ''}`}><span>{icon}</span><span>{label}</span></Link>
+          })}
+        </nav>
+      </aside>
+      <main className="sb-stack" style={{ minWidth: 0 }}>{children}</main>
+    </div>
+  )
 }

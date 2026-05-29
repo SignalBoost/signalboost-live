@@ -1,94 +1,20 @@
 'use client'
+
 import { useState } from 'react'
+import Link from 'next/link'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 
-const CONTACT_EMAIL = 'support@signalboostapp.com'
+const plans = [
+  ['free', 'Free', 'Preview your first idea', 'Free', ['1 website preview', '1 language', 'Limited AI credits', 'Community support']],
+  ['starter', 'Starter', 'Launch a focused business presence', '$19', ['Publish 1 website', '2 languages', 'Review collection', 'Email support']],
+  ['pro', 'Pro', 'Scale campaigns and content', '$49', ['5 websites', 'All core languages', 'Video and audio tools', 'Team collaboration']],
+  ['business', 'Business', 'Multi-location and agency growth', '$149', ['Unlimited websites', 'White label', 'Priority processing', 'Advanced reporting']],
+]
 
 export default function PricingPage() {
   const { dict } = useI18n()
   const [loading, setLoading] = useState<string | null>(null)
-
-  const INDIVIDUAL_PLANS = [
-    {
-      name: t(dict, 'pricing_page.free.name', 'Free'),
-      plan: 'free',
-      description: t(dict, 'pricing_page.free.description', 'Build and preview your idea before publishing.'),
-      features: [
-        t(dict, 'pricing_page.free.f1', '1 website preview'),
-        t(dict, 'pricing_page.free.f2', '1 language'),
-        t(dict, 'pricing_page.free.f3', 'Limited AI credits'),
-        t(dict, 'pricing_page.free.f4', 'Review collector (up to 3 reviews)'),
-        t(dict, 'pricing_page.free.video', '2 AI video credits (watermarked, for testing)'),
-        t(dict, 'pricing_page.free.f5', 'SignalBoost watermark'),
-        t(dict, 'pricing_page.free.f6', 'Community support'),
-      ],
-      cta: t(dict, 'pricing_page.free.cta', 'Start building'),
-      highlight: false,
-      seats: t(dict, 'pricing_page.seats1', '1 seat'),
-      price: t(dict, 'pricing_page.priceFree', 'Free'),
-    },
-
-    {
-      name: t(dict, 'pricing_page.starter.name', 'Starter'),
-      plan: 'starter',
-      description: t(dict, 'pricing_page.starter.description', 'For solo businesses ready to launch.'),
-      features: [
-        t(dict, 'pricing_page.starter.f1', 'Publish 1 website'),
-        t(dict, 'pricing_page.starter.f2', '2 languages'),
-        t(dict, 'pricing_page.starter.f3', 'Review collection'),
-        t(dict, 'pricing_page.starter.f4', '~40 audio generations/month'),
-        t(dict, 'pricing_page.starter.f5', 'Captions in 2 languages'),
-        t(dict, 'pricing_page.starter.video', '10 AI video credits/month'),
-        t(dict, 'pricing_page.starter.f6', 'No watermark'),
-        t(dict, 'pricing_page.starter.f7', 'Email support'),
-      ],
-      cta: t(dict, 'pricing_page.starter.cta', 'Launch my business'),
-      highlight: false,
-      seats: t(dict, 'pricing_page.seats1', '1 seat'),
-      price: '$19',
-    },
-
-    {
-      name: t(dict, 'pricing_page.pro.name', 'Pro'),
-      plan: 'pro',
-      description: t(dict, 'pricing_page.pro.description', 'For growing businesses expanding reach.'),
-      features: [
-        t(dict, 'pricing_page.pro.f1', '5 websites'),
-        t(dict, 'pricing_page.pro.f2', 'All 5 languages'),
-        t(dict, 'pricing_page.pro.f3', 'Review suite + video'),
-        t(dict, 'pricing_page.pro.f4', '~150 audio generations/month'),
-        t(dict, 'pricing_page.pro.f5', 'Video creation tools'),
-        t(dict, 'pricing_page.pro.video', '40 AI video credits/month'),
-        t(dict, 'pricing_page.pro.f6', 'Priority support'),
-        t(dict, 'pricing_page.pro.f7', 'Team collaboration'),
-      ],
-      cta: t(dict, 'pricing_page.pro.cta', 'Scale faster'),
-      highlight: true,
-      seats: t(dict, 'pricing_page.seats3', '3 seats'),
-      price: '$49',
-    },
-
-    {
-      name: t(dict, 'pricing_page.business.name', 'Business'),
-      plan: 'business',
-      description: t(dict, 'pricing_page.business.description', 'For agencies and multi-location brands.'),
-      features: [
-        t(dict, 'pricing_page.business.f1', 'Unlimited websites'),
-        t(dict, 'pricing_page.business.f2', 'All languages + custom'),
-        t(dict, 'pricing_page.business.f3', 'White label'),
-        t(dict, 'pricing_page.business.f4', 'Dedicated onboarding'),
-        t(dict, 'pricing_page.business.f5', 'Priority processing'),
-        t(dict, 'pricing_page.business.video', '120 AI video credits/month'),
-        t(dict, 'pricing_page.business.f6', 'Advanced reporting'),
-        t(dict, 'pricing_page.business.f7', 'API & integrations'),
-      ],
-      cta: t(dict, 'pricing_page.business.cta', 'Get Business'),
-      highlight: false,
-      seats: t(dict, 'pricing_page.seats10', '10+ seats'),
-      price: '$149',
-    },
-  ]
 
   async function handleCheckout(plan: string) {
     if (plan === 'free') {
@@ -98,38 +24,17 @@ export default function PricingPage() {
 
     try {
       setLoading(plan)
-
-      const { createClient } =
-        await import('@supabase/supabase-js')
-
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      const token = session?.access_token || ''
-
+      const { createClient } = await import('@supabase/supabase-js')
+      const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/api/checkout', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
         body: JSON.stringify({ plan }),
       })
-
       const data = await res.json()
-
-      if (data.url) {
-        window.location.href = data.url
-      } else {
-        alert(t(dict, 'pricing_page.errorGeneric', 'Something went wrong.'))
-      }
-
+      if (data.url) window.location.href = data.url
+      else alert(t(dict, 'pricing_page.errorGeneric', 'Something went wrong.'))
     } catch {
       alert(t(dict, 'pricing_page.errorGeneric', 'Something went wrong.'))
     } finally {
@@ -137,224 +42,45 @@ export default function PricingPage() {
     }
   }
 
-  const freePriceLabel = t(dict, 'pricing_page.priceFree', 'Free')
-return (
-    <main
-      style={{
-        minHeight: '100vh',
-        background: 'var(--bg-base)',
-        color: 'var(--text-primary)',
-        fontFamily: 'system-ui',
-      }}
-    >
-      <section
-        style={{
-          maxWidth: 1100,
-          margin: '0 auto',
-          padding: '28px 24px 80px',
-        }}
-      >
-        <div
-          style={{
-            textAlign: 'center',
-            marginBottom: 40,
-          }}
-        >
-          <div
-            style={{
-              display: 'inline-flex',
-              padding: '6px 14px',
-              borderRadius: 999,
-              marginBottom: 16,
-              background: 'rgba(255,195,0,.08)',
-              border: '1px solid rgba(255,195,0,.2)',
-              color: '#ffc300',
-              fontWeight: 700,
-              fontSize: 11,
-              letterSpacing: '.08em',
-              textTransform: 'uppercase',
-            }}
-          >
-            {t(dict, 'pricing_page.badge', 'Simple pricing')}
-          </div>
+  return (
+    <main className="sb-page">
+      <section className="sb-glass sb-stack" style={{ padding: 32, textAlign: 'center', alignItems: 'center' }}>
+        <p className="sb-eyebrow">Pricing</p>
+        <h1 className="sb-h1">Choose the room you need to grow.</h1>
+        <p className="sb-body">Simple plans organized by launch stage. Every plan keeps the same dark neon workspace, guided suggestions, and consistent approval flow.</p>
+        <div className="sb-ai-prompt" style={{ maxWidth: 720 }}>“If you are unsure, start Free. Upgrade when you need publishing, more languages, or more campaign volume.”</div>
+      </section>
 
-          <h1
-            style={{
-              fontSize:'clamp(32px,5vw,54px)',
-              fontWeight:900,
-              letterSpacing:'-.04em',
-              margin:'0 0 14px'
-            }}
-          >
-            {t(dict, 'pricing_page.headline', 'Start free. Publish when ready.')}
-          </h1>
-
-          <p
-            style={{
-              maxWidth:550,
-              margin:'0 auto',
-              color:'var(--text-muted)',
-              lineHeight:1.7
-            }}
-          >
-            {t(dict, 'pricing_page.subhead', 'SignalBoost helps businesses grow with AI-powered websites, reviews, audio and content tools.')}
-          </p>
-        </div>
-
-        <div
-          style={{
-            display:'grid',
-            gridTemplateColumns:'repeat(4,1fr)',
-            gap:18
-          }}
-        >
-          {INDIVIDUAL_PLANS.map(plan=>(
-            <div
-              key={plan.name}
-              style={{
-                background:plan.highlight
-                ?'rgba(255,195,0,.05)'
-                :'var(--surface-1)',
-
-                border:`1px solid ${
-                  plan.highlight
-                  ?'rgba(255,195,0,.35)'
-                  :'var(--border-medium)'
-                }`,
-
-                borderRadius:20,
-                padding:24,
-                display:'flex',
-                flexDirection:'column',
-                gap:18,
-                position:'relative'
-              }}
-            >
-              {plan.highlight && (
-                <div
-                  style={{
-                    position:'absolute',
-                    top:-12,
-                    left:'50%',
-                    transform:'translateX(-50%)',
-                    background:'#ffc300',
-                    color:'#000',
-                    padding:'4px 12px',
-                    borderRadius:999,
-                    fontSize:10,
-                    fontWeight:800
-                  }}
-                >
-                  {t(dict, 'pricing_page.mostPopular', 'MOST POPULAR')}
-                </div>
-              )}
-
-              <div>
-                <div
-                  style={{
-                    display:'flex',
-                    justifyContent:'space-between',
-                    marginBottom:10
-                  }}
-                >
-                  <div
-                    style={{
-                      fontWeight:800
-                    }}
-                  >
-                    {plan.name}
-                  </div>
-
-                  <div
-                    style={{
-                      fontSize:11,
-                      color:'var(--text-muted)'
-                    }}
-                  >
-                    {plan.seats}
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    fontSize:42,
-                    fontWeight:900
-                  }}
-                >
-                  {plan.price}
-                  {plan.price !== freePriceLabel && (
-                    <span
-                      style={{
-                        fontSize:12,
-                        color:'var(--text-faint)'
-                      }}
-                    >
-                      {t(dict, 'pricing_page.perMonth', '/mo')}
-                    </span>
-                  )}
-                </div>
-
-                <p
-                  style={{
-                    color:'var(--text-muted)',
-                    fontSize:13,
-                    lineHeight:1.6
-                  }}
-                >
-                  {plan.description}
-                </p>
-              </div>
-
-              <button
-                onClick={()=>handleCheckout(plan.plan)}
-                disabled={loading===plan.plan}
-                style={{
-                  width:'100%',
-                  padding:'12px',
-                  borderRadius:999,
-                  border:'none',
-                  cursor:'pointer',
-                  fontWeight:800,
-                  background:plan.highlight
-                  ?'#ffc300'
-                  :'var(--surface-3)',
-                  color:plan.highlight
-                  ?'#000'
-                  :'#fff'
-                }}
-              >
-                {loading===plan.plan
-                  ? t(dict, 'pricing_page.loading', 'Loading...')
-                  : plan.cta}
+      <section className="sb-grid-4 sb-section">
+        {plans.map(([id, name, description, price, features]) => {
+          const highlighted = id === 'pro'
+          return (
+            <article key={id as string} className="sb-glass-soft sb-stack" style={{ padding: 24, borderColor: highlighted ? 'rgba(255,195,0,0.42)' : undefined }}>
+              {highlighted && <span className="sb-chip" style={{ color: 'var(--accent-yellow)' }}>Recommended</span>}
+              <h2 className="sb-h3">{name as string}</h2>
+              <p className="sb-body" style={{ fontSize: 14 }}>{description as string}</p>
+              <p className="sb-h2">{price as string}<span className="sb-caption"> / month</span></p>
+              <ul className="sb-stack" style={{ paddingLeft: 18, margin: 0, gap: 10 }}>
+                {(features as string[]).map(feature => <li className="sb-body" style={{ fontSize: 14 }} key={feature}>{feature}</li>)}
+              </ul>
+              <button onClick={() => handleCheckout(id as string)} disabled={loading === id} className={`sb-button ${highlighted ? 'sb-button-primary' : 'sb-button-secondary'}`}>
+                {loading === id ? 'Opening checkout…' : id === 'free' ? 'Start building' : 'Choose plan'}
               </button>
+            </article>
+          )
+        })}
+      </section>
 
-              <div
-                style={{
-                  display:'flex',
-                  flexDirection:'column',
-                  gap:10
-                }}
-              >
-                {plan.features.map(feature=>(
-                  <div
-                    key={feature}
-                    style={{
-                      display:'flex',
-                      gap:8,
-                      color:'var(--text-secondary)',
-                      fontSize:13
-                    }}
-                  >
-                    <span style={{color:'#ffc300'}}>
-                      ✓
-                    </span>
-                    {feature}
-                  </div>
-                ))}
-              </div>
-
-            </div>
-          ))}
+      <section className="sb-section sb-grid-2">
+        <div className="sb-glass-soft sb-stack" style={{ padding: 24 }}>
+          <p className="sb-eyebrow">Easy scan</p>
+          <h2 className="sb-h2">What changes as you upgrade?</h2>
+          <p className="sb-body">More published assets, languages, automation volume, team seats, support priority, and reporting depth.</p>
+        </div>
+        <div className="sb-glass-soft sb-stack" style={{ padding: 24 }}>
+          <p className="sb-eyebrow">Need help?</p>
+          <p className="sb-body">Tell the AI what you are trying to launch and it will suggest the lowest plan that fits.</p>
+          <Link className="sb-button sb-button-ghost" href="/docs">Read docs</Link>
         </div>
       </section>
     </main>

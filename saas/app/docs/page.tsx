@@ -1,208 +1,53 @@
 'use client'
-import Link from 'next/link'
+
 import { useState } from 'react'
-import { useI18n } from '@/components/i18n/I18nProvider'
-import { t } from '@/lib/i18n/t'
+import Link from 'next/link'
 
-const BLUE = '#3b82f6'
-const GOLD = '#ffc300'
-
-const CONTACT_EMAIL = 'support@signalboostapp.com'
-
-const SECTION_DEFS = [
-  {
-    id: 'how-it-works',
-    icon: '⚡',
-    titleKey: 'docs.howItWorks.title',
-    titleFallback: 'How SignalBoost works',
-    items: [
-      { qKey: 'docs.howItWorks.q1', qFallback: 'What is SignalBoost?', aKey: 'docs.howItWorks.a1', aFallback: 'SignalBoost is a multilingual content platform. We help businesses build websites, collect customer reviews, produce native audio and video content, and reach global audiences in 5 languages: English, Portuguese, Spanish, Polish and Russian. We are not a translation service — we create native content that sounds and reads like it was made by a local.' },
-      { qKey: 'docs.howItWorks.q2', qFallback: 'Who is SignalBoost for?', aKey: 'docs.howItWorks.a2', aFallback: 'Anyone who wants to reach an international audience. From a bakery in Lisbon that wants a website in Portuguese and English, to a podcast network that wants to reach listeners in Brazil, Poland and Russia. We serve both complete beginners and technical developers — the experience adapts to your level.' },
-      { qKey: 'docs.howItWorks.q3', qFallback: 'What does SignalBoost NOT do?', aKey: 'docs.howItWorks.a3', aFallback: 'We do not do hardware or recording equipment. We do not edit raw audio (removing background noise, cutting mistakes). We do not host podcast RSS feeds or submit to Spotify/Apple Podcasts. We do not produce music or intros. We are honest about our limits.' },
-      { qKey: 'docs.howItWorks.q4', qFallback: 'How does the AI work?', aKey: 'docs.howItWorks.a4', aFallback: 'SignalBoost uses AI to generate native voiceover, captions, social clips, show notes, website content and more. Our AI support agent monitors your activity and proactively helps when it detects you are stuck — without you having to ask. If the AI cannot solve something, it brings in additional AI support silently, then escalates to Luis (our founder) if still unresolved.' },
-    ]
-  },
-  {
-    id: 'partners',
-    icon: '🤝',
-    titleKey: 'docs.partners.title',
-    titleFallback: 'Our partners — full transparency',
-    items: [
-      { qKey: 'docs.partners.q1', qFallback: 'Why does SignalBoost recommend certain providers?', aKey: 'docs.partners.a1', aFallback: 'We recommend providers based on quality, reliability and value. We have tested all of them. Some of our recommendations include affiliate links — meaning SignalBoost earns a commission if you sign up through our link, at no extra cost to you. We always disclose this clearly.' },
-      { qKey: 'docs.partners.q2', qFallback: 'Which providers do you recommend and why?', aKey: 'docs.partners.a2', aFallback: 'Domain names: Namecheap (best value, easy DNS), Cloudflare (at-cost pricing, free SSL). Hosting: Vercel (best performance, free tier), Netlify (great for static sites). Audio AI: ElevenLabs (most natural voices available). We do not recommend providers we have not tested ourselves.' },
-      { qKey: 'docs.partners.q3', qFallback: 'Do partner commissions affect your recommendations?', aKey: 'docs.partners.a3', aFallback: 'No. We list Cloudflare as a domain option even though they do not pay commissions, because they are genuinely good. If a provider becomes worse than their competitors we will say so and remove them from our recommendations, regardless of commission. Our users trust matters more than commission income.' },
-      { qKey: 'docs.partners.q4', qFallback: 'Can SignalBoost get a partnership deal that benefits me?', aKey: 'docs.partners.a4', aFallback: 'Yes — we actively seek partnerships that give SignalBoost users discounts or extended trials. If we secure a deal, we pass the benefit to you. Check our pricing page for current partner benefits.' },
-    ]
-  },
-  {
-    id: 'your-data',
-    icon: '🔒',
-    titleKey: 'docs.yourData.title',
-    titleFallback: 'Your data and privacy',
-    items: [
-      { qKey: 'docs.yourData.q1', qFallback: 'Where is my data stored?', aKey: 'docs.yourData.a1', aFallback: 'Your account data and project metadata are stored in Supabase — a secure, open-source database platform hosted on AWS. Your audio and video files are stored in Supabase Storage. Your site files are deployed via Vercel. We do not store your API keys in plain text — they are encrypted at rest.' },
-      { qKey: 'docs.yourData.q2', qFallback: 'Who can see my data?', aKey: 'docs.yourData.a2', aFallback: 'Only you can see your projects and files. Luis (founder) has admin access for support purposes only and does not access user data unless you request help. We do not sell your data to anyone. We do not share it with third parties except the infrastructure providers listed above.' },
-      { qKey: 'docs.yourData.q3', qFallback: 'What happens if I cancel?', aKey: 'docs.yourData.a3', aFallback: 'You keep access until the end of your billing period. After that your data is kept for 30 days in case you want to return. After 30 days it is permanently deleted. You can request immediate deletion at any time by opening a support ticket from this page.' },
-      { qKey: 'docs.yourData.q4', qFallback: 'How do I delete my account?', aKey: 'docs.yourData.a4', aFallback: 'Open a support ticket from this page with the subject "Delete my account" sent from your registered email address. We will delete everything within 48 hours and confirm when done. No questions asked.' },
-    ]
-  },
-  {
-    id: 'ai-support',
-    icon: '🤖',
-    titleKey: 'docs.aiSupport.title',
-    titleFallback: 'AI support — how it works',
-    items: [
-      { qKey: 'docs.aiSupport.q1', qFallback: 'How does the AI support system work?', aKey: 'docs.aiSupport.a1', aFallback: 'SignalBoost monitors your activity in real time. If you spend more than 3 minutes on the same page, click repeatedly without progress, or encounter an error — the AI proactively opens and offers help. It already knows your account, your plan, your current page, and what went wrong. You never have to explain your situation from scratch.' },
-      { qKey: 'docs.aiSupport.q2', qFallback: 'What happens when the AI cannot solve my problem?', aKey: 'docs.aiSupport.a2', aFallback: 'The AI escalates seamlessly. First it brings in additional AI reasoning to analyze the problem from a different angle. The two AIs work together silently and present you with a combined solution. If still unresolved, Luis is notified automatically with the full conversation context and will respond personally.' },
-      { qKey: 'docs.aiSupport.q3', qFallback: 'What can the AI NOT do?', aKey: 'docs.aiSupport.a3', aFallback: 'The AI cannot make purchasing decisions for you, access your bank or credit card, submit things on your behalf to third-party services, or guarantee resolution of issues caused by third-party providers (like Vercel outages or Namecheap DNS delays). In these cases it will explain clearly what is happening and what you need to do.' },
-      { qKey: 'docs.aiSupport.q4', qFallback: 'Is my support conversation private?', aKey: 'docs.aiSupport.a4', aFallback: 'Yes. Your support conversations are private and only visible to you and SignalBoost support (Luis). They are not used to train AI models. Conversations are kept for 90 days for quality purposes then deleted.' },
-    ]
-  },
-  {
-    id: 'pricing',
-    icon: '💳',
-    titleKey: 'docs.pricing.title',
-    titleFallback: 'Plans, pricing and storage',
-    items: [
-      { qKey: 'docs.pricing.q1', qFallback: 'What are the plan limits?', aKey: 'docs.pricing.a1', aFallback: 'Free: 1 project, 1 language, preview only with watermark, limited AI credits. Starter ($19/mo): 1 published website, 2 languages, ~40 audio generations/month. Pro ($49/mo): 5 websites, all 5 languages, ~150 audio generations/month, video tools. Business ($149/mo): unlimited websites, all languages plus custom, white label. Podcast plans are separate — see the Podcasters page for details.' },
-      { qKey: 'docs.pricing.q2', qFallback: 'Do business partners get a free trial?', aKey: 'docs.pricing.a2', aFallback: 'Yes — business partners get 30 days free on the Starter plan only. This gives you access to 2 languages, review collector, and native audio to try the platform. If you need Pro or Business features, those plans require payment from day one.' },
-      { qKey: 'docs.pricing.q3', qFallback: 'Why are there project and storage limits?', aKey: 'docs.pricing.a3', aFallback: 'Storage costs money. Audio and video files can be large — a 10-minute podcast episode can be 50-100MB. Without limits a small number of heavy users would make the platform unaffordable for everyone else. The limits are designed so the free plan covers most people getting started, and paid plans cover professional use.' },
-      { qKey: 'docs.pricing.q4', qFallback: 'What happens when I reach my limit?', aKey: 'docs.pricing.a4', aFallback: 'You will see a clear warning before you hit the limit. When you reach it, you cannot create new projects until you either delete an existing one or upgrade. We never delete your data or lock you out — we just pause new creation until resolved.' },
-      { qKey: 'docs.pricing.q5', qFallback: 'How do I cancel?', aKey: 'docs.pricing.a5', aFallback: 'Cancel anytime from your dashboard under Settings, or open a support ticket from this page. No cancellation fees. You keep access until the end of your billing period. We do not make cancellation difficult on purpose — if you want to leave, we make it easy.' },
-    ]
-  },
-  {
-    id: 'getting-started',
-    icon: '🚀',
-    titleKey: 'docs.gettingStarted.title',
-    titleFallback: 'Getting started guides',
-    items: [
-      { qKey: 'docs.gettingStarted.q1', qFallback: 'How do I build my first website?', aKey: 'docs.gettingStarted.a1', aFallback: 'Go to Dashboard and click Site builder. If you are a beginner, the AI will guide you through the process conversationally — just tell it about your business. If you are technical, you can use the full builder directly. Either way, the AI is there to help at every step.' },
-      { qKey: 'docs.gettingStarted.q2', qFallback: 'How do I set up a podcast?', aKey: 'docs.gettingStarted.a2', aFallback: 'Go to the Podcasters page and pick a plan. Once subscribed, go to Dashboard, then Native audio, then upload your episode. We support MP3, MP4, WAV and more. Important: bring us your finished, edited episode. We do not do raw audio editing. We generate voiceover, captions, clips and show notes from your final file.' },
-      { qKey: 'docs.gettingStarted.q3', qFallback: 'How do I collect reviews?', aKey: 'docs.gettingStarted.a3', aFallback: 'Go to Dashboard then Review collector. You will get a review link to share with your customers. Reviews appear in your chosen languages automatically. You can embed the review widget on your SignalBoost site or any external site.' },
-      { qKey: 'docs.gettingStarted.q4', qFallback: 'How do I connect my own domain?', aKey: 'docs.gettingStarted.a4', aFallback: 'Go through the onboarding wizard or go to Dashboard, then Settings, then Domain. You will need to update your DNS records at your domain provider to point to SignalBoost. The AI will give you the exact records to copy. DNS changes take 15 minutes to 48 hours to propagate worldwide.' },
-    ]
-  },
+const sections = [
+  ['Start here', ['Create an account', 'Open the dashboard', 'Let AI suggest your first action']],
+  ['Build', ['Generate a website', 'Choose a tone', 'Preview before publishing']],
+  ['Grow', ['Collect reviews', 'Create audio and video', 'Run outreach through approvals']],
+  ['Operate', ['Track metrics', 'Manage credits', 'Use admin controls safely']],
 ]
 
 export default function DocsPage() {
-  const { dict } = useI18n()
-  const [search, setSearch] = useState('')
-  const [openSection, setOpenSection] = useState<string | null>(null)
-  const [openQ, setOpenQ] = useState<string | null>(null)
-
-  const SECTIONS = SECTION_DEFS.map(s => ({
-    id: s.id,
-    icon: s.icon,
-    title: t(dict, s.titleKey, s.titleFallback),
-    content: s.items.map(item => ({
-      q: t(dict, item.qKey, item.qFallback),
-      a: t(dict, item.aKey, item.aFallback),
-    })),
-  }))
-
-  const filtered = SECTIONS.map(s => ({
-    ...s,
-    content: s.content.filter(c =>
-      c.q.toLowerCase().includes(search.toLowerCase()) ||
-      c.a.toLowerCase().includes(search.toLowerCase())
-    )
-  })).filter(s => s.content.length > 0)
-
-  const docsLabel = t(dict, 'docs.label', 'Documentation')
-  const searchPlaceholder = t(dict, 'docs.searchPlaceholder', 'Search docs...')
-  const noResults = t(dict, 'docs.noResults', 'No results for')
-  const stillTitle = t(dict, 'docs.stillTitle', 'Still have a question?')
-  const stillBody = t(dict, 'docs.stillBody', 'Open a support ticket. Every question that is not answered in the docs gets added here so the next person does not have to ask.')
-  const stillCta = t(dict, 'docs.stillCta', 'Open a support ticket')
+  const [query, setQuery] = useState('')
+  const filtered = sections.map(([title, items]) => [title, (items as string[]).filter(item => item.toLowerCase().includes(query.toLowerCase()) || (title as string).toLowerCase().includes(query.toLowerCase()))] as const).filter(([, items]) => items.length || !query)
 
   return (
-    <main style={{ minHeight: '100vh', background: '#1e1e2e', color: '#fff', fontFamily: 'system-ui' }}>
-
-      <section style={{ maxWidth: 760, margin: '0 auto', padding: '60px 24px 32px', textAlign: 'center' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 999, padding: '4px 16px', marginBottom: 24, fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: GOLD }}>
-          {docsLabel}
-        </div>
-        <div style={{ position: 'relative', maxWidth: 480, margin: '0 auto' }}>
-          <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 16, pointerEvents: 'none' }}>🔍</span>
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder={searchPlaceholder}
-            style={{ width: '100%', padding: '13px 16px 13px 44px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 15, color: '#fff', outline: 'none', boxSizing: 'border-box' }}
-            onFocus={e => (e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)')}
-            onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)')} />
-        </div>
+    <main className="sb-page">
+      <section className="sb-glass sb-stack" style={{ padding: 32 }}>
+        <p className="sb-eyebrow">Docs</p>
+        <h1 className="sb-h1">Find the next step fast.</h1>
+        <p className="sb-body">Docs are grouped by human intent: start, build, grow, and operate. Scan the structure, then jump directly into the workspace.</p>
+        <input className="sb-input" style={{ borderRadius: 999, padding: '14px 18px', maxWidth: 640 }} placeholder="Ask: how do I launch my first campaign?" value={query} onChange={e => setQuery(e.target.value)} />
       </section>
 
-      {!search && (
-        <section style={{ maxWidth: 760, margin: '0 auto', padding: '0 24px 40px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-            {SECTIONS.map(s => (
-              <a key={s.id} href={`#${s.id}`}
-                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, textDecoration: 'none', color: '#fff', transition: 'border-color 0.15s' }}
-                onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(255,195,0,0.3)')}
-                onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)')}>
-                <span style={{ fontSize: 20 }}>{s.icon}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>{s.title}</span>
-              </a>
-            ))}
-          </div>
-        </section>
-      )}
+      <section className="sb-grid-4 sb-section-tight" aria-label="Docs quick navigation">
+        {sections.map(([title]) => <a key={title as string} href={`#${String(title).toLowerCase().replaceAll(' ', '-')}`} className="sb-chip" style={{ textDecoration: 'none', justifyContent: 'center' }}>{title as string}</a>)}
+      </section>
 
-      <section style={{ maxWidth: 760, margin: '0 auto', padding: '0 24px 80px' }}>
-        {filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '48px 0', color: 'rgba(255,255,255,0.3)', fontSize: 15 }}>
-            {noResults} "{search}"
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-            {filtered.map(section => (
-              <div key={section.id} id={section.id}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, cursor: 'pointer' }}
-                  onClick={() => setOpenSection(openSection === section.id ? null : section.id)}>
-                  <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
-                    {section.icon}
-                  </div>
-                  <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, flex: 1 }}>{section.title}</h2>
-                  <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 18 }}>{openSection === section.id ? '−' : '+'}</span>
-                </div>
-                {(openSection === section.id || search) && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 52 }}>
-                    {section.content.map(item => (
-                      <div key={item.q} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, overflow: 'hidden' }}>
-                        <div onClick={() => setOpenQ(openQ === item.q ? null : item.q)}
-                          style={{ padding: '14px 18px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{item.q}</span>
-                          <span style={{ color: BLUE, fontSize: 16, flexShrink: 0 }}>{openQ === item.q ? '−' : '+'}</span>
-                        </div>
-                        {(openQ === item.q || search) && (
-                          <div style={{ padding: '0 18px 16px', fontSize: 13, color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                            <div style={{ paddingTop: 12 }}>{item.a}</div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+      <section className="sb-grid-2 sb-section">
+        {filtered.map(([title, items]) => (
+          <article id={String(title).toLowerCase().replaceAll(' ', '-')} key={title as string} className="sb-glass-soft sb-stack" style={{ padding: 24 }}>
+            <p className="sb-eyebrow">{title as string}</p>
+            {(items.length ? items : (sections.find(([sourceTitle]) => sourceTitle === title)?.[1] as string[])).map(item => (
+              <div className="sb-glass-soft" style={{ padding: 16 }} key={item}>
+                <h2 className="sb-h3">{item}</h2>
+                <p className="sb-body" style={{ fontSize: 14, marginTop: 8 }}>SignalBoost will guide this step with suggestions, tone presets, and a preview before you commit.</p>
               </div>
             ))}
-          </div>
-        )}
+          </article>
+        ))}
       </section>
 
-      <section style={{ maxWidth: 600, margin: '0 auto', padding: '0 24px 80px', textAlign: 'center' }}>
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: '40px 32px' }}>
-          <div style={{ fontSize: 32, marginBottom: 16 }}>💬</div>
-          <h2 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 10px' }}>{stillTitle}</h2>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, margin: '0 0 24px', lineHeight: 1.6 }}>
-            {stillBody}
-          </p>
-          <a href={`mailto:${CONTACT_EMAIL}?subject=SignalBoost%20Question`}
-            style={{ background: GOLD, color: '#000', fontWeight: 800, fontSize: 14, padding: '12px 32px', borderRadius: 999, textDecoration: 'none', display: 'inline-block' }}>
-            {stillCta}
-          </a>
+      <section className="sb-section sb-glass sb-grid-2" style={{ padding: 28, alignItems: 'center' }}>
+        <p className="sb-ai-prompt">“Start with a clear homepage, add proof, then approve one outreach campaign.”</p>
+        <div className="sb-row" style={{ justifyContent: 'flex-end' }}>
+          <Link className="sb-button sb-button-primary" href="/dashboard">Open dashboard</Link>
+          <Link className="sb-button sb-button-secondary" href="/pricing">Compare plans</Link>
         </div>
       </section>
-
     </main>
   )
 }

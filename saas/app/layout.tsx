@@ -110,7 +110,7 @@ export default function RootLayout({
         >
           <I18nProvider>
             <Navbar />
-            <main className="hero-layout">{children}</main>
+            <main style={{ flex: 1 }}>{children}</main>
             <Footer />
             <LanguageSuggestion />
             <Concierge />

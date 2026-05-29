@@ -991,5 +991,160 @@
       "approvedMustBeBoolean": "Aprobado debe ser booleano"
     }
   },
-  "singleLanguageContent": "Contenido en un solo idioma"
+  "singleLanguageContent": "Contenido en un solo idioma",
+  "support": {
+    "help": "Ayuda",
+    "faq": "Preguntas frecuentes",
+    "contact": "Contactar soporte",
+    "documentation": "Documentación",
+    "kicker": "Flujo de soporte",
+    "title": "¿Cómo podemos ayudarte?",
+    "subtitle": "Empieza con preguntas frecuentes o documentación y luego envía una solicitud con el contexto necesario.",
+    "defaultSubject": "Solicitud de soporte de SignalBoost",
+    "faqDesc": "Busca respuestas primero.",
+    "docsDesc": "Lee las guías del producto.",
+    "email": "Enviar correo a soporte",
+    "topic": "Tema",
+    "topicPlaceholder": "Facturación, publicación web, reseñas, audio...",
+    "details": "Detalles",
+    "detailsPlaceholder": "Cuéntanos qué pasó, qué esperabas y en qué página estabas trabajando.",
+    "send": "Abrir solicitud por correo"
+  },
+  "concierge": {
+    "title": "Conserje de IA",
+    "button": "Conserje",
+    "greeting": "Hola, soy el Conserje de SignalBoost. Pregúntame sobre tu espacio de trabajo o abre FAQ, soporte y documentación abajo.",
+    "placeholder": "Pregunta cualquier cosa...",
+    "send": "Enviar",
+    "thinking": "Pensando...",
+    "fallback": "No pude crear una respuesta.",
+    "connectionError": "Problema de conexión. Inténtalo de nuevo.",
+    "close": "Cerrar conserje",
+    "quick": {
+      "video": {
+        "label": "🎥 Video",
+        "prompt": "¿Cómo creo videos en SignalBoost?"
+      },
+      "credits": {
+        "label": "⚡ Créditos",
+        "prompt": "Explica cómo funcionan los créditos en SignalBoost."
+      },
+      "growth": {
+        "label": "📈 Crecimiento",
+        "prompt": "Dame ideas de crecimiento usando SignalBoost."
+      },
+      "support": {
+        "label": "💬 Soporte",
+        "prompt": "Necesito ayuda para usar SignalBoost."
+      }
+    }
+  },
+  "plan": {
+    "free": "Gratis",
+    "starter": "Inicial",
+    "pro": "Pro",
+    "business": "Empresa"
+  },
+  "dashboard_modules": {
+    "kicker": "Módulos del espacio",
+    "title": "Elige qué construir ahora",
+    "promote": {
+      "title": "Promocionar negocio",
+      "desc": "Crea campañas, anuncios, textos sociales y alcance local desde un brief de marca.",
+      "cta": "Abrir herramientas de marketing",
+      "task1": "Generador de campaña",
+      "task2": "Anuncios localizados",
+      "task3": "Cola de alcance"
+    },
+    "builder": {
+      "title": "Crear un sitio web",
+      "desc": "Describe tu negocio y publica un sitio multilingüe responsive.",
+      "cta": "Abrir constructor web",
+      "task1": "Esquema del sitio con IA",
+      "task2": "Vista previa en vivo",
+      "task3": "Publicación en un clic"
+    },
+    "reviews": {
+      "title": "Recopilar reseñas",
+      "desc": "Crea enlaces de reseñas y convierte feedback en testimonios.",
+      "cta": "Abrir recolección de reseñas",
+      "task1": "Página pública de reseñas",
+      "task2": "Captura de valoración",
+      "task3": "Biblioteca de testimonios"
+    },
+    "audio": {
+      "title": "Generar audio",
+      "desc": "Convierte guiones en voz natural para cada idioma compatible.",
+      "cta": "Abrir estudio de audio",
+      "task1": "Selección de voz",
+      "task2": "Localización del guion",
+      "task3": "Exportación de audio"
+    },
+    "video": {
+      "title": "Crear videos",
+      "desc": "Genera conceptos, recursos creativos y clips listos para publicar.",
+      "cta": "Abrir creador de video",
+      "task1": "Prompts de video",
+      "task2": "Previews creativos",
+      "task3": "Flujo de clips"
+    },
+    "lab": {
+      "title": "Lab",
+      "desc": "Experimenta con búsqueda, video y flujos de IA emergentes.",
+      "cta": "Abrir lab",
+      "task1": "Búsqueda de video",
+      "task2": "Prompts de movimiento",
+      "task3": "Prototipos"
+    },
+    "apprentice": {
+      "title": "Aprendiz de taller",
+      "desc": "Sigue tutoriales guiados para avanzar rápido en cada herramienta.",
+      "cta": "Iniciar tutorial",
+      "task1": "Ruta para principiantes",
+      "task2": "Guías de herramientas",
+      "task3": "Checklist de lanzamiento"
+    }
+  },
+  "faq": {
+    "kicker": "Centro de ayuda",
+    "title": "Preguntas frecuentes",
+    "subtitle": "Busca respuestas localizadas, explora categorías o contacta soporte.",
+    "search": "Buscar preguntas...",
+    "empty": "No hay respuestas para tu búsqueda.",
+    "categories": {
+      "all": "Todo",
+      "gettingStarted": "Primeros pasos",
+      "billing": "Facturación",
+      "websites": "Sitios web",
+      "reviews": "Reseñas",
+      "audioVideo": "Audio y video",
+      "support": "Soporte"
+    },
+    "questions": {
+      "start": {
+        "q": "¿Cómo empiezo con SignalBoost?",
+        "a": "Abre Dashboard, elige un módulo y sigue la guía. Puedes crear un sitio, recopilar reseñas, generar audio, crear video o pedir ayuda al Conserje."
+      },
+      "credits": {
+        "q": "¿Cómo funcionan los créditos y Pro?",
+        "a": "Tus créditos y etiqueta de plan se cargan desde tu cuenta mediante la API de créditos. Al mejorar el plan aumentan los límites."
+      },
+      "website": {
+        "q": "¿SignalBoost puede crear mi sitio web?",
+        "a": "Sí. Usa Crear un sitio web para describir tu negocio, ver la vista previa y publicar cuando esté listo."
+      },
+      "reviews": {
+        "q": "¿Cómo recopilo reseñas?",
+        "a": "Abre Recopilar reseñas, crea tu enlace público, compártelo y reutiliza testimonios aprobados."
+      },
+      "audio": {
+        "q": "¿Qué herramientas de audio y video incluye?",
+        "a": "Genera audio desde guiones, localiza contenido y crea prompts o recursos de video desde Dashboard y Lab."
+      },
+      "support": {
+        "q": "¿Cómo contacto soporte?",
+        "a": "Usa el botón Conserje, abre Contactar soporte o escribe a support@signalboostapp.com con tu email y página."
+      }
+    }
+  }
 }

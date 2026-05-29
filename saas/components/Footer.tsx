@@ -66,6 +66,7 @@ export default function Footer() {
                 { label: t(dict, 'pricing', 'Pricing'), href: '/pricing' },
                 { label: t(dict, 'dashboard', 'Dashboard'), href: '/dashboard' },
                 { label: t(dict, 'footer.documentation', 'Documentation'), href: '/docs' },
+                { label: t(dict, 'support.faq', 'FAQ'), href: '/faq' },
                 { label: t(dict, 'podcasters', 'Podcasters'), href: '/podcasters' },
               ].map(item => (
                 <Link
@@ -189,7 +190,7 @@ export default function Footer() {
                 },
                 {
                   label: t(dict, 'footer.contact', 'Contact'),
-                  href: `mailto:${CONTACT_EMAIL}`,
+                  href: '/support',
                 },
               ].map(item => (
                 <Link

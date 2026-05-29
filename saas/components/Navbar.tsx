@@ -104,14 +104,14 @@ export default function Navbar() {
   const navLinks = [
     { label: t(dict, 'home', 'Home'),           href: '/' },
     { label: t(dict, 'podcasters', 'Podcasters'), href: '/podcasters' },
-    ...(!user ? [{ label: t(dict, 'dashboard', 'Dashboard'), href: '/dashboard' }] : []),
+    { label: t(dict, 'dashboard', 'Dashboard'), href: '/dashboard' },
     { label: t(dict, 'pricing', 'Pricing'),     href: '/pricing' },
     { label: t(dict, 'docs', 'Docs'),            href: '/docs' },
   ]
 
   const toolLinks = [
     { icon: '📣', label: t(dict, 'promoteBusiness', 'Promote business'), href: '/dashboard/promote',    featured: true },
-    { icon: '🌐', label: t(dict, 'buildWebsite', 'Build a website'),      href: '/dashboard/operator',   featured: false },
+    { icon: '🌐', label: t(dict, 'buildWebsite', 'Build a website'),      href: '/dashboard/builder',   featured: false },
     { icon: '⭐', label: t(dict, 'collectReviews', 'Collect reviews'),    href: '/dashboard/reviews',    featured: false },
     { icon: '🎙️', label: t(dict, 'generateAudio', 'Generate audio'),     href: '/dashboard/audio',      featured: false },
     { icon: '🎬', label: t(dict, 'createVideos', 'Create videos'),        href: '/dashboard/video',      featured: false },
@@ -120,6 +120,7 @@ export default function Navbar() {
   ]
 
   const planStyle = PLAN_STYLES[plan] || PLAN_STYLES.free
+  const planLabel = t(dict, `plan.${plan}`, plan.charAt(0).toUpperCase() + plan.slice(1))
 
   return (
     <>
@@ -163,6 +164,17 @@ export default function Navbar() {
           }}>
             {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
           </select>
+
+          <details style={{ position: 'relative' }}>
+            <summary style={{ listStyle: 'none', cursor: 'pointer', color: 'var(--text-muted)', border: '1px solid var(--border-soft)', borderRadius: 999, padding: '8px 12px', fontSize: 12, fontWeight: 700 }}>
+              {t(dict, 'support.help', 'Help')} ▾
+            </summary>
+            <div style={{ position: 'absolute', right: 0, top: 42, minWidth: 210, padding: 10, borderRadius: 14, background: 'rgba(10,10,15,.98)', border: '1px solid var(--border-soft)', boxShadow: '0 18px 50px rgba(0,0,0,.35)', display: 'grid', gap: 6 }}>
+              <Link href="/faq" style={{ color: '#fff', textDecoration: 'none', padding: '8px 10px', borderRadius: 10 }}>❓ {t(dict, 'support.faq', 'FAQ')}</Link>
+              <Link href="/support" style={{ color: '#fff', textDecoration: 'none', padding: '8px 10px', borderRadius: 10 }}>✉️ {t(dict, 'support.contact', 'Contact Support')}</Link>
+              <Link href="/docs" style={{ color: '#fff', textDecoration: 'none', padding: '8px 10px', borderRadius: 10 }}>📖 {t(dict, 'support.documentation', 'Documentation')}</Link>
+            </div>
+          </details>
 
           {user ? (
             <button onClick={handleLogout} style={{
@@ -229,7 +241,7 @@ export default function Navbar() {
               padding: '3px 10px', borderRadius: 999,
               background: planStyle.bg, color: planStyle.color, fontFamily: 'monospace',
             }}>
-              {plan.charAt(0).toUpperCase() + plan.slice(1)}
+              {planLabel}
             </span>
             <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>
               {userName ?? t(dict, 'topbar.account', 'Account')}

@@ -991,5 +991,160 @@
       "approvedMustBeBoolean": "Zatwierdzone musi być wartością boolean"
     }
   },
-  "singleLanguageContent": "Treść w jednym języku"
+  "singleLanguageContent": "Treść w jednym języku",
+  "support": {
+    "help": "Pomoc",
+    "faq": "FAQ",
+    "contact": "Kontakt z pomocą",
+    "documentation": "Dokumentacja",
+    "kicker": "Proces pomocy",
+    "title": "Jak możemy pomóc?",
+    "subtitle": "Zacznij od FAQ lub dokumentacji, a potem wyślij zgłoszenie z potrzebnym kontekstem.",
+    "defaultSubject": "Zgłoszenie do pomocy SignalBoost",
+    "faqDesc": "Najpierw wyszukaj odpowiedzi.",
+    "docsDesc": "Przeczytaj przewodniki produktu.",
+    "email": "Napisz do pomocy",
+    "topic": "Temat",
+    "topicPlaceholder": "Płatności, publikacja strony, opinie, audio...",
+    "details": "Szczegóły",
+    "detailsPlaceholder": "Opisz, co się stało, czego oczekiwano i na której stronie pracowano.",
+    "send": "Otwórz zgłoszenie e-mail"
+  },
+  "concierge": {
+    "title": "Konsjerż AI",
+    "button": "Konsjerż",
+    "greeting": "Cześć, jestem Konsjerżem SignalBoost. Zapytaj o workspace albo otwórz FAQ, pomoc i dokumentację poniżej.",
+    "placeholder": "Zapytaj o cokolwiek...",
+    "send": "Wyślij",
+    "thinking": "Myślę...",
+    "fallback": "Nie udało się utworzyć odpowiedzi.",
+    "connectionError": "Problem z połączeniem. Spróbuj ponownie.",
+    "close": "Zamknij konsjerża",
+    "quick": {
+      "video": {
+        "label": "🎥 Wideo",
+        "prompt": "Jak tworzyć wideo w SignalBoost?"
+      },
+      "credits": {
+        "label": "⚡ Kredyty",
+        "prompt": "Wyjaśnij, jak działają kredyty w SignalBoost."
+      },
+      "growth": {
+        "label": "📈 Wzrost",
+        "prompt": "Podaj pomysły na wzrost z użyciem SignalBoost."
+      },
+      "support": {
+        "label": "💬 Pomoc",
+        "prompt": "Potrzebuję pomocy w korzystaniu z SignalBoost."
+      }
+    }
+  },
+  "plan": {
+    "free": "Darmowy",
+    "starter": "Start",
+    "pro": "Pro",
+    "business": "Biznes"
+  },
+  "dashboard_modules": {
+    "kicker": "Moduły workspace",
+    "title": "Wybierz, co zbudować dalej",
+    "promote": {
+      "title": "Promote business",
+      "desc": "Build campaigns, ads, social copy, and local outreach from one brand brief.",
+      "cta": "Open marketing tools",
+      "task1": "Campaign brief generator",
+      "task2": "Localized ad copy",
+      "task3": "Outreach queue"
+    },
+    "builder": {
+      "title": "Build a website",
+      "desc": "Describe your business and publish a responsive multilingual website.",
+      "cta": "Open website builder",
+      "task1": "AI site outline",
+      "task2": "Live preview",
+      "task3": "One-click publishing"
+    },
+    "reviews": {
+      "title": "Collect reviews",
+      "desc": "Create shareable review links and convert feedback into testimonials.",
+      "cta": "Open review collection",
+      "task1": "Public review page",
+      "task2": "Rating capture",
+      "task3": "Testimonial library"
+    },
+    "audio": {
+      "title": "Generate audio",
+      "desc": "Turn scripts into natural voice content for every supported language.",
+      "cta": "Open audio studio",
+      "task1": "Voice selection",
+      "task2": "Script localization",
+      "task3": "Audio export"
+    },
+    "video": {
+      "title": "Create videos",
+      "desc": "Generate video concepts, creative assets, and publish-ready clips.",
+      "cta": "Open video creator",
+      "task1": "Video prompts",
+      "task2": "Creative previews",
+      "task3": "Clip workflow"
+    },
+    "lab": {
+      "title": "Lab",
+      "desc": "Experiment with search, video, and emerging AI workflows before they graduate.",
+      "cta": "Open lab",
+      "task1": "Video search",
+      "task2": "Motion prompts",
+      "task3": "Prototype workflows"
+    },
+    "apprentice": {
+      "title": "Workshop Apprentice",
+      "desc": "Follow guided tutorials that teach the fastest path through each SignalBoost tool.",
+      "cta": "Start tutorial",
+      "task1": "Beginner path",
+      "task2": "Tool walkthroughs",
+      "task3": "Launch checklist"
+    }
+  },
+  "faq": {
+    "kicker": "Centrum pomocy",
+    "title": "Najczęstsze pytania",
+    "subtitle": "Szukaj odpowiedzi, przeglądaj kategorie albo skontaktuj się z pomocą.",
+    "search": "Szukaj pytań...",
+    "empty": "Brak wyników dla wyszukiwania.",
+    "categories": {
+      "all": "Wszystko",
+      "gettingStarted": "Pierwsze kroki",
+      "billing": "Płatności",
+      "websites": "Strony",
+      "reviews": "Opinie",
+      "audioVideo": "Audio i wideo",
+      "support": "Pomoc"
+    },
+    "questions": {
+      "start": {
+        "q": "How do I start with SignalBoost?",
+        "a": "Open Dashboard, choose a module, and follow the guided prompt. You can build a website, collect reviews, create audio, make video, or ask Concierge for help."
+      },
+      "credits": {
+        "q": "How do credits and Pro work?",
+        "a": "Your credits and plan label are loaded from your account through the credits API. Upgrading increases limits for publishing, generation, and team workflows."
+      },
+      "website": {
+        "q": "Can SignalBoost build my website?",
+        "a": "Yes. Use Build a website to describe your business, preview the generated site, and publish when ready."
+      },
+      "reviews": {
+        "q": "How do I collect customer reviews?",
+        "a": "Open Collect reviews, create your public review handle, share the link, and reuse approved testimonials in marketing."
+      },
+      "audio": {
+        "q": "What audio and video tools are included?",
+        "a": "Generate audio from scripts, localize content, and create video prompts or assets from the dashboard video and lab modules."
+      },
+      "support": {
+        "q": "How do I contact support?",
+        "a": "Use the Concierge button, open Contact Support, or email support@signalboostapp.com. Include your account email and the page where you need help."
+      }
+    }
+  }
 }

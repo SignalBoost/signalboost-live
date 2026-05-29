@@ -1,24 +1,23 @@
 const testimonials = [
-  { name: 'Sarah K.', role: 'Shopify Store Owner', text: 'SignalBoost turned our 5-star reviews into ads overnight. Our ROAS doubled in the first week.' },
-  { name: 'Marcus T.', role: 'Local Business Owner', text: 'I had no idea how powerful my reviews were until I saw them as voice ads. Incredible tool.' },
-  { name: 'Priya N.', role: 'Marketing Manager', text: 'Fast, professional, easy from start to finish. This is now a core part of our content workflow.' },
+  { name: 'Sarah K.', role: 'Shopify Store Owner', text: 'SignalBoost turned our reviews into a clear ad workflow overnight.' },
+  { name: 'Marcus T.', role: 'Local Business Owner', text: 'The AI suggestions made outreach feel like a guided conversation, not another blank form.' },
+  { name: 'Priya N.', role: 'Marketing Manager', text: 'The dashboard finally shows our next action, preview, and approval path in one place.' },
 ]
 
 export default function Testimonials() {
   return (
-    <section className="bg-[#0f0f0f] px-6 py-20">
-      <div className="max-w-6xl mx-auto">
-        <h2 className="text-3xl font-bold text-white mb-12">What our customers say</h2>
-        <div className="grid md:grid-cols-3 gap-6">
-          {testimonials.map((t) => (
-            <div key={t.name} className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <div className="text-yellow-400 text-lg mb-3">★★★★★</div>
-              <p className="text-white/70 text-sm mb-4">"{t.text}"</p>
-              <div className="text-white font-semibold text-sm">{t.name}</div>
-              <div className="text-white/40 text-xs">{t.role}</div>
-            </div>
-          ))}
-        </div>
+    <section className="sb-page-shell sb-section" aria-label="Testimonials">
+      <span className="sb-eyebrow">Testimonials</span>
+      <h2 className="sb-h2" style={{ marginTop: 10, marginBottom: 24 }}>Customers feel less clutter and more control.</h2>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+        {testimonials.map(t => (
+          <article key={t.name} className="sb-card" style={{ padding: 24 }}>
+            <div style={{ color: 'var(--gold)', letterSpacing: 2, marginBottom: 12 }}>★★★★★</div>
+            <p className="sb-body" style={{ fontSize: 15 }}>“{t.text}”</p>
+            <div style={{ color: '#fff', fontWeight: 800 }}>{t.name}</div>
+            <div className="sb-caption">{t.role}</div>
+          </article>
+        ))}
       </div>
     </section>
   )

@@ -343,3 +343,74 @@ html, body {
 
 @media (prefers-reduced-motion: reduce) { .sb-neon-panel, .sb-glass-panel, .sb-service-rail a { transition: none !important; } }
 @media (max-width: 720px) { .sb-orbit-table { overflow-x: auto; } .sb-cockpit-grid, .sb-mission-grid { grid-template-columns: 1fr; } }
+
+/* NASA-style HMI cockpit redesign */
+.sb-cockpit-home { display: grid; gap: 28px; }
+.sb-nasa-hero { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr); gap: 22px; align-items: stretch; }
+.sb-nasa-hero__copy,
+.sb-concierge-dock,
+.sb-module-hero,
+.sb-pricing-hero,
+.sb-pricing-card,
+.sb-cockpit-panel,
+.sb-module-tile {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(2, 10, 24, .86), rgba(14, 23, 42, .62));
+  border: 1px solid rgba(26, 240, 255, .18);
+  box-shadow: 0 28px 90px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.08);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+.sb-nasa-hero__copy { padding: clamp(28px, 5vw, 58px); border-radius: 32px; }
+.sb-nasa-hero__copy::before,
+.sb-pricing-card::before,
+.sb-module-hero::before { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, rgba(26,240,255,.06) 1px, transparent 1px), linear-gradient(180deg, rgba(26,240,255,.045) 1px, transparent 1px); background-size: 44px 44px; mask-image: linear-gradient(to bottom, #000, transparent 72%); }
+.sb-ai-search { margin-top: 28px; display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid rgba(255,195,0,.36); border-radius: 999px; background: rgba(255,255,255,.07); box-shadow: 0 0 42px rgba(255,195,0,.12); }
+.sb-ai-search input { min-width: 0; background: transparent; border: 0; color: white; outline: 0; font: inherit; }
+.sb-ai-search a { text-decoration: none; color: #050507; background: var(--gold); border-radius: 999px; padding: 8px 12px; font-weight: 900; }
+.sb-telemetry-strip { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.sb-telemetry-strip span { border: 1px solid rgba(26,240,255,.22); color: #9ff7ff; border-radius: 999px; padding: 7px 10px; font-size: 12px; }
+.sb-concierge-dock { border-radius: 32px; padding: 28px; display: flex; flex-direction: column; justify-content: flex-end; min-height: 360px; }
+.sb-concierge-dock h2 { margin: 0 0 10px; font-size: 24px; }
+.sb-orbit-ring { position: absolute; inset: 24px; border: 1px solid rgba(26,240,255,.2); border-radius: 999px; animation: cockpitPulse 8s linear infinite; }
+.sb-orbit-ring span { position: absolute; width: 10px; height: 10px; border-radius: 99px; background: var(--gold); box-shadow: 0 0 18px var(--gold); }
+.sb-orbit-ring span:nth-child(1) { top: 12%; left: 22%; }
+.sb-orbit-ring span:nth-child(2) { right: 14%; top: 42%; background: #1af0ff; box-shadow: 0 0 18px #1af0ff; }
+.sb-orbit-ring span:nth-child(3) { left: 46%; bottom: 9%; background: #ff4fd8; box-shadow: 0 0 18px #ff4fd8; }
+.sb-cockpit-panel-grid,
+.sb-module-rail__grid,
+.sb-pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.sb-cockpit-panel,
+.sb-module-tile { border-radius: 22px; padding: 22px; color: white; text-decoration: none; transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+.sb-cockpit-panel:hover,
+.sb-module-tile:hover,
+.sb-pricing-card:hover { transform: translateY(-4px); border-color: rgba(255,195,0,.54); box-shadow: 0 0 46px rgba(26,240,255,.12), 0 28px 90px rgba(0,0,0,.34); }
+.sb-cockpit-panel__icon,
+.sb-module-tile span { display: block; font-size: 32px; margin-bottom: 14px; }
+.sb-cockpit-panel strong,
+.sb-module-tile strong { display: block; font-size: 19px; }
+.sb-cockpit-panel small,
+.sb-cockpit-panel em,
+.sb-module-tile small { display: block; color: rgba(226,232,240,.72); line-height: 1.5; margin-top: 8px; }
+.sb-cockpit-panel em { color: #9ff7ff; font-style: normal; }
+.sb-module-rail { display: grid; gap: 20px; }
+.sb-module-hero { --module-accent: #1af0ff; border-color: color-mix(in srgb, var(--module-accent), transparent 42%); border-radius: 32px; padding: clamp(28px, 5vw, 56px); display: grid; grid-template-columns: minmax(0,1fr) minmax(240px, .36fr); gap: 24px; align-items: center; }
+.sb-module-telemetry { border: 1px solid color-mix(in srgb, var(--module-accent), transparent 52%); border-radius: 24px; padding: 22px; background: rgba(255,255,255,.055); }
+.sb-module-telemetry span,
+.sb-module-telemetry small { display: block; color: rgba(226,232,240,.72); }
+.sb-module-telemetry strong { display: block; margin: 8px 0; color: white; font-size: 22px; }
+.sb-module-command { margin-top: 22px; padding: 28px; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 18px; align-items: center; }
+.sb-pricing-hero { text-align: center; border-radius: 32px; padding: clamp(28px, 5vw, 56px); margin-bottom: 24px; }
+.sb-pricing-hero .sb-body { margin-left: auto; margin-right: auto; }
+.sb-pricing-card { border-radius: 28px; padding: 24px; }
+.sb-pricing-card--hot { border-color: rgba(255,195,0,.54); box-shadow: 0 0 54px rgba(255,195,0,.14), 0 28px 90px rgba(0,0,0,.34); }
+.sb-pricing-card h2 { font-size: 28px; margin: 8px 0 10px; }
+.sb-pricing-card__price { font-size: 42px; font-weight: 950; margin-bottom: 18px; }
+.sb-pricing-card__price span { font-size: 13px; color: rgba(226,232,240,.72); margin-left: 4px; }
+.sb-pricing-card__modules { display: grid; gap: 10px; margin-bottom: 18px; }
+.sb-pricing-card__modules a { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 8px 10px; color: white; text-decoration: none; border: 1px solid rgba(255,255,255,.12); border-radius: 16px; padding: 12px; background: rgba(255,255,255,.045); }
+.sb-pricing-card__modules small { grid-column: 2; color: #9ff7ff; }
+@keyframes cockpitPulse { from { transform: rotate(0deg) scale(.92); opacity: .72; } to { transform: rotate(360deg) scale(.92); opacity: .72; } }
+@media (max-width: 860px) { .sb-nasa-hero, .sb-module-hero, .sb-module-command { grid-template-columns: 1fr; } .sb-concierge-dock { min-height: 280px; } }
+@media (prefers-reduced-motion: reduce) { .sb-orbit-ring, .sb-cockpit-panel, .sb-module-tile, .sb-pricing-card { animation: none !important; transition: none !important; } }

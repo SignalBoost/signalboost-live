@@ -1,103 +1,53 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { t } from '@/lib/i18n/t'
-import { SERVICES } from '@/lib/services/catalog'
+import { COCKPIT_COPY, LOCALE_META, MODULES, PRICING_TIERS, formatMissionCurrency, normalizeCockpitLocale } from '@/lib/cockpit/missionControl'
 
-const CONTACT_EMAIL = 'support@signalboostapp.com'
+const tierNames = {
+  ignite: { en: 'Ignite', es: 'Ignición', pt: 'Ignição', pl: 'Start', ru: 'Запуск' },
+  orbit: { en: 'Orbit', es: 'Órbita', pt: 'Órbita', pl: 'Orbita', ru: 'Орбита' },
+  mission: { en: 'Mission Control', es: 'Control de misión', pt: 'Controle de missão', pl: 'Kontrola misji', ru: 'Центр миссии' },
+} as const
 
 export default function PricingPage() {
-  const { dict } = useI18n()
-  const [loading, setLoading] = useState<string | null>(null)
-
-  const plans = [
-    { name: t(dict, 'pricing_page.free.name', 'Free'), plan: 'free', price: t(dict, 'pricing_page.priceFree', 'Free'), seats: t(dict, 'pricing_page.free.seats', '1 seat'), description: t(dict, 'pricing_page.free.description', 'Preview the workspace and build your first idea.'), cta: t(dict, 'pricing_page.free.cta', 'Start building'), highlight: false, features: [1,2,3,4].map((i) => t(dict, `pricing_page.free.feature${i}`, ['1 website preview', '1 language', 'Limited AI credits', 'Community support'][i - 1])) },
-    { name: t(dict, 'pricing_page.starter.name', 'Starter'), plan: 'starter', price: '$19', seats: t(dict, 'pricing_page.starter.seats', '1 seat'), description: t(dict, 'pricing_page.starter.description', 'For solo businesses ready to publish and promote.'), cta: t(dict, 'pricing_page.starter.cta', 'Launch my business'), highlight: false, features: [1,2,3,4].map((i) => t(dict, `pricing_page.starter.feature${i}`, ['Publish 1 website', '2 languages', 'Review collection', '10 AI video credits/month'][i - 1])) },
-    { name: t(dict, 'pricing_page.pro.name', 'Pro'), plan: 'pro', price: '$49', seats: t(dict, 'pricing_page.pro.seats', '3 seats'), description: t(dict, 'pricing_page.pro.description', 'For growing teams that need more campaigns and channels.'), cta: t(dict, 'pricing_page.pro.cta', 'Scale faster'), highlight: true, features: [1,2,3,4].map((i) => t(dict, `pricing_page.pro.feature${i}`, ['5 websites', 'All core languages', 'Review suite + video', 'Team collaboration'][i - 1])) },
-    { name: t(dict, 'pricing_page.business.name', 'Business'), plan: 'business', price: '$149', seats: t(dict, 'pricing_page.business.seats', '10+ seats'), description: t(dict, 'pricing_page.business.description', 'For agencies and multi-location brands.'), cta: t(dict, 'pricing_page.business.cta', 'Get Business'), highlight: false, features: [1,2,3,4].map((i) => t(dict, `pricing_page.business.feature${i}`, ['Unlimited websites', 'White label', 'Dedicated onboarding', 'API & integrations'][i - 1])) },
-  ]
-
-  const serviceTiers = SERVICES.map((service) => ({
-    key: service.key,
-    icon: service.icon,
-    href: service.dashboardHref,
-    name: t(dict, `services.${service.key}.title`, service.titleFallback),
-    description: t(dict, `services.${service.key}.desc`, service.descFallback),
-    price: service.key === 'improve' ? '$29' : service.key === 'podcastStudio' ? '$19' : t(dict, 'pricing_page.included', 'Included'),
-    suffix: service.key === 'improve' || service.key === 'podcastStudio' ? t(dict, 'pricing_page.perMonth', '/month') : '',
-    cta: t(dict, `services.${service.key}.cta`, service.ctaFallback),
-  }))
-
-  async function handleCheckout(plan: string) {
-    if (plan === 'free') {
-      window.location.href = '/dashboard'
-      return
-    }
-
-    try {
-      setLoading(plan)
-      const { createClient } = await import('@supabase/supabase-js')
-      const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
-      const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
-        body: JSON.stringify({ plan }),
-      })
-      const data = await res.json()
-      if (data.url) window.location.href = data.url
-      else alert(t(dict, 'pricing_page.errorGeneric', 'Something went wrong.'))
-    } catch {
-      alert(t(dict, 'pricing_page.errorNetwork', `Unable to start checkout. Please contact ${CONTACT_EMAIL}`))
-    } finally {
-      setLoading(null)
-    }
-  }
+  const { lang } = useI18n()
+  const locale = normalizeCockpitLocale(lang)
+  const copy = COCKPIT_COPY[locale]
 
   return (
-    <main className="sb-page-shell sb-section">
-      <section style={{ textAlign: 'center', marginBottom: 32 }}>
-        <span className="sb-eyebrow">{t(dict, 'pricing_page.kicker', 'Docs-clear pricing')}</span>
-        <h1 className="sb-h1" style={{ marginTop: 12 }}>{t(dict, 'pricing_page.title', 'Start free. Publish when ready.')}</h1>
-        <p className="sb-body" style={{ maxWidth: 680, margin: '18px auto 0' }}>{t(dict, 'pricing_page.subtitle', 'Simple plan tiers arranged by human intent: test, launch, scale, or operate a larger growth system.')}</p>
+    <main className="sb-page-shell sb-section" dir={LOCALE_META[locale].dir}>
+      <section className="sb-pricing-hero" aria-label="Unified SaaS pricing">
+        <span className="sb-eyebrow">SignalBoost SaaS · {LOCALE_META[locale].label}</span>
+        <h1 className="sb-h1">{copy.pricingTitle}</h1>
+        <p className="sb-body">{copy.pricingSubtitle}</p>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
-        {plans.map(plan => (
-          <article key={plan.plan} className="sb-card" style={{ padding: 24, borderColor: plan.highlight ? 'rgba(255,195,0,.42)' : undefined }}>
-            {plan.highlight && <span className="sb-eyebrow">{t(dict, 'pricing_page.mostPopular', 'Most popular')}</span>}
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline', marginTop: plan.highlight ? 12 : 0 }}>
-              <h2 className="sb-h3">{plan.name}</h2>
-              <span className="sb-caption">{plan.seats}</span>
+      <section className="sb-pricing-grid" aria-label="Pricing tiers">
+        {PRICING_TIERS.map((tier) => (
+          <article key={tier.key} className={`sb-pricing-card ${tier.highlighted ? 'sb-pricing-card--hot' : ''}`}>
+            {tier.highlighted && <span className="sb-eyebrow">Recommended orbit</span>}
+            <h2>{tierNames[tier.key][locale]}</h2>
+            <div className="sb-pricing-card__price">
+              {formatMissionCurrency(locale, tier.monthly)}<span>{copy.perMonth}</span>
             </div>
-            <div style={{ fontSize: 44, fontWeight: 950, marginTop: 16 }}>{plan.price}<span className="sb-caption">{plan.price.startsWith('$') ? t(dict, 'pricing_page.perMonthShort', '/mo') : ''}</span></div>
-            <p className="sb-body" style={{ fontSize: 14 }}>{plan.description}</p>
-            <button className={plan.highlight ? 'sb-button-primary' : 'sb-button-secondary'} style={{ width: '100%', border: plan.highlight ? 'none' : undefined, cursor: 'pointer' }} onClick={() => handleCheckout(plan.plan)} disabled={loading === plan.plan}>
-              {loading === plan.plan ? t(dict, 'common.loading', 'Loading…') : plan.cta}
-            </button>
-            <ul style={{ listStyle: 'none', padding: 0, margin: '20px 0 0', display: 'grid', gap: 10 }}>
-              {plan.features.map(feature => <li key={feature} className="sb-caption">✦ {feature}</li>)}
-            </ul>
+            <div className="sb-pricing-card__modules">
+              {tier.modules.map((slug) => {
+                const module = MODULES[slug]
+                return (
+                  <Link href={module.href} key={slug} style={{ borderColor: `${module.accent}55` }}>
+                    <span>{module.icon}</span>
+                    <strong>{module.title[locale]}</strong>
+                    <small>{copy.moduleCta} →</small>
+                  </Link>
+                )
+              })}
+            </div>
+            <Link className={tier.highlighted ? 'sb-button-primary' : 'sb-button-secondary'} href={MODULES[tier.modules[0]].href}>
+              {copy.moduleCta}
+            </Link>
           </article>
         ))}
-      </section>
-
-      <section style={{ marginTop: 34 }}>
-        <span className="sb-eyebrow">{t(dict, 'pricing_page.servicePricingKicker', 'Service pricing')}</span>
-        <h2 className="sb-h2" style={{ marginTop: 10 }}>{t(dict, 'pricing_page.servicePricingTitle', 'Every service has a direct workspace CTA.')}</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 16, marginTop: 18 }}>
-          {serviceTiers.map((tier) => (
-            <article key={tier.key} className="sb-card" style={{ padding: 20 }}>
-              <div style={{ fontSize: 28 }}>{tier.icon}</div>
-              <h3 className="sb-h3">{tier.name}</h3>
-              <div style={{ fontSize: 32, fontWeight: 950 }}>{tier.price}<span className="sb-caption">{tier.suffix}</span></div>
-              <p className="sb-body" style={{ fontSize: 13 }}>{tier.description}</p>
-              <Link className="sb-button-secondary" href={tier.href}>{tier.cta}</Link>
-            </article>
-          ))}
-        </div>
       </section>
     </main>
   )

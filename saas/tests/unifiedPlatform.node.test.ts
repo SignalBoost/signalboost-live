@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { ADMIN_SIDEBAR, COCKPIT_PANELS, CRM_STAGES, DESIGN_TOKENS, FINANCIAL_LEDGER, FORECASTS, KPI_DASHBOARD, SUPPORTED_LOCALES, UNIFIED_NAV, getConciergeAnswer, inferAudienceRole } from '../lib/platform/unifiedPlatform.ts'
+import { COCKPIT_COPY, COCKPIT_LOCALES, MARKETPLACE_CATEGORIES, MODULES, MODULE_SLUGS, PRICING_TIERS, formatMissionCurrency, formatMissionDate } from '../lib/cockpit/missionControl.ts'
 
 test('design tokens cover typography, spacing, colors, shadows, and glassmorphism', () => {
   assert.ok(DESIGN_TOKENS.typography.display)
@@ -47,4 +48,21 @@ test('intent inference remains under a 2s performance budget', () => {
   const start = performance.now()
   for (let i = 0; i < 1000; i += 1) inferAudienceRole('executive forecast kpi outreach marketplace booking')
   assert.ok(performance.now() - start < 2000)
+})
+
+test('NASA cockpit marketplace and SaaS modules cover HMI requirements', () => {
+  assert.deepEqual(MARKETPLACE_CATEGORIES.map(category => category.key), ['Flights', 'Hotels', 'eSIM', 'Tours', 'Cars', 'Marketplace'])
+  assert.deepEqual(MODULE_SLUGS, ['promote-business', 'reviews', 'calendar', 'spreadsheets', 'outreach', 'personal-assistant'])
+  assert.ok(MODULES.reviews.telemetry.includes('Sentiment delta'))
+  assert.ok(MODULES.calendar.subtitle.en.includes('Localized scheduling'))
+  assert.ok(MODULES.spreadsheets.subtitle.en.includes('Collaborative'))
+})
+
+test('cockpit pricing and Concierge copy are localized with date and currency formatting', () => {
+  for (const locale of COCKPIT_LOCALES) {
+    assert.ok(COCKPIT_COPY[locale].conciergeReply.length > 50)
+    assert.ok(formatMissionCurrency(locale, 49).length > 1)
+    assert.ok(formatMissionDate(locale).length > 8)
+  }
+  assert.equal(PRICING_TIERS.at(-1)?.modules.length, MODULE_SLUGS.length)
 })

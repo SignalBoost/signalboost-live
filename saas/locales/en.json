@@ -408,7 +408,7 @@
       "f2": "1 language",
       "f3": "Limited AI credits",
       "f4": "Review collector (up to 3 reviews)",
-      "video": "2 AI video credits (watermarked, for testing)",
+      "video": "Video tools included",
       "f5": "SignalBoost watermark",
       "f6": "Community support"
     },
@@ -421,7 +421,7 @@
       "f3": "Review collection",
       "f4": "~40 audio generations/month",
       "f5": "Captions in 2 languages",
-      "video": "10 AI video credits/month",
+      "video": "Starter video generation",
       "f6": "No watermark",
       "f7": "Email support"
     },
@@ -434,7 +434,7 @@
       "f3": "Review suite + video",
       "f4": "~150 audio generations/month",
       "f5": "Video creation tools",
-      "video": "40 AI video credits/month",
+      "video": "Pro video generation",
       "f6": "Priority support",
       "f7": "Team collaboration"
     },
@@ -447,7 +447,7 @@
       "f3": "White label",
       "f4": "Dedicated onboarding",
       "f5": "Priority processing",
-      "video": "120 AI video credits/month",
+      "video": "Business video generation",
       "f6": "Advanced reporting",
       "f7": "API & integrations"
     }
@@ -1149,6 +1149,75 @@
         "q": "How do I contact support?",
         "a": "Use the Concierge button, open Contact Support, or email support@signalboostapp.com. Include your account email and the page where you need help."
       }
+    }
+  },
+  "settings": {
+    "title": "System Settings",
+    "subtitle": "Configure account options, data sync webhooks, and routing rules.",
+    "workspace": "General Workspace Settings",
+    "platformLabel": "Platform Instance Label",
+    "ingestion": "Data Ingestion Channels",
+    "webhookTarget": "Affiliate Ingest Webhook Target",
+    "webhookHelp": "Direct destination address for processing traffic hooks from third-party travel and marketplace systems.",
+    "automation": "Automation & Triggers",
+    "emailSummaries": "Email Generation Summaries",
+    "emailSummariesHelp": "Receive automated activity logs whenever video assets complete processing.",
+    "autoTopup": "Automatic Compute Top-up",
+    "autoTopupHelp": "Automatically reload system balance credits when balance falls below 50 units.",
+    "saving": "Updating Rules...",
+    "save": "Save Configuration",
+    "saved": "System configurations saved successfully!"
+  },
+  "data": {
+    "title": "Universal Data Connector",
+    "wikipediaReminder": "Wikipedia reminder: Content is CC-BY-SA licensed and attribution is required.",
+    "uploadCsv": "Upload CSV",
+    "addApi": "Add API Connector",
+    "runApi": "Run API Import",
+    "addScraper": "Add Scraper Connector",
+    "runScraper": "Run Scraper Import",
+    "importedItems": "Imported Items by Category",
+    "sourceHistory": "Source History",
+    "importing": "Importing...",
+    "done": "Done: {count} inserted",
+    "error": "Error: {error}"
+  },
+  "sales": {
+    "title": "🧠 AI Sales Agent",
+    "subtitle": "Give the AI a prospect. It drafts a professional sales email for you to review and send.",
+    "prospect": "Prospect",
+    "company": "Company name",
+    "contact": "Contact name",
+    "email": "Email",
+    "website": "Website",
+    "industry": "Industry",
+    "notes": "Notes about this prospect",
+    "drafting": "Drafting...",
+    "generate": "Generate Sales Email",
+    "aiDraft": "AI Draft",
+    "emptyDraft": "The sales email will appear here.",
+    "subject": "Subject",
+    "openEmail": "Open in Email",
+    "pipeline": {
+      "title": "Sales Pipeline",
+      "subtitle": "Track prospects from discovery to client.",
+      "loading": "Loading pipeline...",
+      "noLeads": "No leads",
+      "unnamed": "Unnamed company",
+      "noIndustry": "No industry",
+      "noCountry": "No country",
+      "noEmail": "No email",
+      "draft": "Draft:"
+    },
+    "status": {
+      "discovered": "Discovered",
+      "approved": "Approved",
+      "draft_ready": "Draft Ready",
+      "sketch_ready": "Sketch Ready",
+      "sent": "Sent",
+      "replied": "Replied",
+      "client": "Client",
+      "draft_failed": "Draft Failed"
     }
   }
 }

@@ -519,7 +519,8 @@
       "f3": "Ograniczone kredyty AI",
       "f4": "Kolektor opinii (do 3 opinii)",
       "f5": "Znak wodny SignalBoost",
-      "f6": "Wsparcie społeczności"
+      "f6": "Wsparcie społeczności",
+      "video": "Narzędzia wideo w zestawie"
     },
     "starter": {
       "name": "Starter",
@@ -531,7 +532,8 @@
       "f4": "~50 generacji audio/mies",
       "f5": "Napisy w 2 językach",
       "f6": "Bez znaku wodnego",
-      "f7": "Wsparcie email"
+      "f7": "Wsparcie email",
+      "video": "Podstawowe generowanie wideo"
     },
     "pro": {
       "name": "Pro",
@@ -543,7 +545,8 @@
       "f4": "~200 generacji audio/mies",
       "f5": "Narzędzia tworzenia wideo",
       "f6": "Priorytetowe wsparcie",
-      "f7": "Współpraca zespołowa"
+      "f7": "Współpraca zespołowa",
+      "video": "Generowanie wideo Pro"
     },
     "business": {
       "name": "Business",
@@ -555,7 +558,8 @@
       "f4": "Dedykowany onboarding",
       "f5": "Priorytetowe przetwarzanie",
       "f6": "Zaawansowane raporty",
-      "f7": "API i integracje"
+      "f7": "API i integracje",
+      "video": "Generowanie wideo dla firm"
     }
   },
   "podcasters_page": {
@@ -1145,6 +1149,75 @@
         "q": "How do I contact support?",
         "a": "Use the Concierge button, open Contact Support, or email support@signalboostapp.com. Include your account email and the page where you need help."
       }
+    }
+  },
+  "settings": {
+    "title": "Ustawienia systemu",
+    "subtitle": "Skonfiguruj opcje konta, webhooki synchronizacji danych i reguły routingu.",
+    "workspace": "Ogólne ustawienia obszaru roboczego",
+    "platformLabel": "Etykieta instancji platformy",
+    "ingestion": "Kanały pozyskiwania danych",
+    "webhookTarget": "Docelowy webhook pozyskiwania afiliacyjnego",
+    "webhookHelp": "Bezpośredni adres docelowy do przetwarzania hooków ruchu z zewnętrznych systemów turystycznych i marketplace.",
+    "automation": "Automatyzacja i wyzwalacze",
+    "emailSummaries": "Podsumowania generowania emaili",
+    "emailSummariesHelp": "Otrzymuj automatyczne dzienniki aktywności po zakończeniu przetwarzania zasobów wideo.",
+    "autoTopup": "Automatyczne doładowanie mocy obliczeniowej",
+    "autoTopupHelp": "Automatycznie doładuj kredyty salda systemu, gdy spadnie poniżej 50 jednostek.",
+    "saving": "Aktualizowanie reguł...",
+    "save": "Zapisz konfigurację",
+    "saved": "Konfiguracja systemu została zapisana pomyślnie!"
+  },
+  "data": {
+    "title": "Uniwersalny konektor danych",
+    "wikipediaReminder": "Przypomnienie z Wikipedii: treści są na licencji CC-BY-SA i wymagają atrybucji.",
+    "uploadCsv": "Prześlij CSV",
+    "addApi": "Dodaj konektor API",
+    "runApi": "Uruchom import API",
+    "addScraper": "Dodaj konektor scrapera",
+    "runScraper": "Uruchom import scrapera",
+    "importedItems": "Zaimportowane elementy według kategorii",
+    "sourceHistory": "Historia źródeł",
+    "importing": "Importowanie...",
+    "done": "Gotowe: wstawiono {count}",
+    "error": "Błąd: {error}"
+  },
+  "sales": {
+    "title": "🧠 Agent sprzedaży AI",
+    "subtitle": "Podaj AI prospekta. Przygotuje profesjonalny email sprzedażowy do sprawdzenia i wysłania.",
+    "prospect": "Prospekt",
+    "company": "Nazwa firmy",
+    "contact": "Imię kontaktu",
+    "email": "Email",
+    "website": "Strona internetowa",
+    "industry": "Branża",
+    "notes": "Notatki o tym prospekcie",
+    "drafting": "Tworzenie szkicu...",
+    "generate": "Wygeneruj email sprzedażowy",
+    "aiDraft": "Szkic AI",
+    "emptyDraft": "Email sprzedażowy pojawi się tutaj.",
+    "subject": "Temat",
+    "openEmail": "Otwórz w emailu",
+    "pipeline": {
+      "title": "Pipeline sprzedaży",
+      "subtitle": "Śledź prospektów od odkrycia do klienta.",
+      "loading": "Ładowanie pipeline...",
+      "noLeads": "Brak leadów",
+      "unnamed": "Firma bez nazwy",
+      "noIndustry": "Brak branży",
+      "noCountry": "Brak kraju",
+      "noEmail": "Brak emaila",
+      "draft": "Szkic:"
+    },
+    "status": {
+      "discovered": "Odkryte",
+      "approved": "Zatwierdzone",
+      "draft_ready": "Szkic gotowy",
+      "sketch_ready": "Szkic strony gotowy",
+      "sent": "Wysłane",
+      "replied": "Odpowiedziano",
+      "client": "Klient",
+      "draft_failed": "Szkic nieudany"
     }
   }
 }

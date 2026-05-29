@@ -2,8 +2,10 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTranslation } from '@/components/i18n/useTranslation';
 
 export default function SettingsPage() {
+  const { t } = useTranslation();
   const [platformName, setPlatformName] = useState('SignalBoost Live System');
   const [webhookUrl, setWebhookUrl] = useState('https://api.signalboost.live/v1/webhook/ingest');
   const [emailAlerts, setEmailAlerts] = useState(true);
@@ -16,7 +18,7 @@ export default function SettingsPage() {
     
     setTimeout(() => {
       setIsSaving(false);
-      alert('System configurations saved successfully!');
+      alert(t('settings.saved', 'System configurations saved successfully!'));
     }, 800);
   };
 
@@ -24,8 +26,8 @@ export default function SettingsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="border-b border-slate-200 pb-5">
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">System Settings</h1>
-        <p className="text-sm text-slate-500 mt-1">Configure account options, data sync webhooks, and routing rules.</p>
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{t('settings.title', 'System Settings')}</h1>
+        <p className="text-sm text-slate-500 mt-1">{t('settings.subtitle', 'Configure account options, data sync webhooks, and routing rules.')}</p>
       </div>
 
       <div className="max-w-2xl bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -33,9 +35,9 @@ export default function SettingsPage() {
           
           {/* Section 1: Project Metadata */}
           <div className="p-6 space-y-4">
-            <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">General Workspace Settings</h2>
+            <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">{t('settings.workspace', 'General Workspace Settings')}</h2>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Platform Instance Label</label>
+              <label className="block text-xs font-medium text-slate-700 mb-1">{t('settings.platformLabel', 'Platform Instance Label')}</label>
               <input
                 type="text"
                 value={platformName}
@@ -48,9 +50,9 @@ export default function SettingsPage() {
 
           {/* Section 2: Webhooks & Endpoints */}
           <div className="p-6 space-y-4">
-            <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Data Ingestion Channels</h2>
+            <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">{t('settings.ingestion', 'Data Ingestion Channels')}</h2>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Affiliate Ingest Webhook Target</label>
+              <label className="block text-xs font-medium text-slate-700 mb-1">{t('settings.webhookTarget', 'Affiliate Ingest Webhook Target')}</label>
               <input
                 type="text"
                 value={webhookUrl}
@@ -58,18 +60,18 @@ export default function SettingsPage() {
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 required
               />
-              <p className="text-xs text-slate-400 mt-1">Direct destination address for processing traffic hooks from third-party travel and marketplace systems.</p>
+              <p className="text-xs text-slate-400 mt-1">{t('settings.webhookHelp', 'Direct destination address for processing traffic hooks from third-party travel and marketplace systems.')}</p>
             </div>
           </div>
 
           {/* Section 3: Notification Toggles */}
           <div className="p-6 space-y-4">
-            <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Automation & Triggers</h2>
+            <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">{t('settings.automation', 'Automation & Triggers')}</h2>
             
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium text-slate-900 block">Email Generation Summaries</label>
-                <span className="text-xs text-slate-500">Receive automated activity logs whenever video assets complete processing.</span>
+                <label className="text-sm font-medium text-slate-900 block">{t('settings.emailSummaries', 'Email Generation Summaries')}</label>
+                <span className="text-xs text-slate-500">{t('settings.emailSummariesHelp', 'Receive automated activity logs whenever video assets complete processing.')}</span>
               </div>
               <input
                 type="checkbox"
@@ -81,8 +83,8 @@ export default function SettingsPage() {
 
             <div className="flex items-center justify-between pt-4">
               <div>
-                <label className="text-sm font-medium text-slate-900 block">Automatic Compute Top-up</label>
-                <span className="text-xs text-slate-500">Automatically reload system balance credits when balance falls below 50 units.</span>
+                <label className="text-sm font-medium text-slate-900 block">{t('settings.autoTopup', 'Automatic Compute Top-up')}</label>
+                <span className="text-xs text-slate-500">{t('settings.autoTopupHelp', 'Automatically reload system balance credits when balance falls below 50 units.')}</span>
               </div>
               <input
                 type="checkbox"
@@ -100,7 +102,7 @@ export default function SettingsPage() {
               disabled={isSaving}
               className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 shadow-sm"
             >
-              {isSaving ? 'Updating Rules...' : 'Save Configuration'}
+              {isSaving ? t('settings.saving', 'Updating Rules...') : t('settings.save', 'Save Configuration')}
             </button>
           </div>
 

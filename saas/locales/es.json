@@ -577,7 +577,8 @@
       "f3": "Créditos de IA limitados",
       "f4": "Recolector de reseñas (hasta 3 reseñas)",
       "f5": "Marca de agua de SignalBoost",
-      "f6": "Soporte de la comunidad"
+      "f6": "Soporte de la comunidad",
+      "video": "Herramientas de video incluidas"
     },
     "starter": {
       "name": "Starter",
@@ -589,7 +590,8 @@
       "f4": "~50 generaciones de audio/mes",
       "f5": "Subtítulos en 2 idiomas",
       "f6": "Sin marca de agua",
-      "f7": "Soporte por email"
+      "f7": "Soporte por email",
+      "video": "Generación de video inicial"
     },
     "pro": {
       "name": "Pro",
@@ -601,7 +603,8 @@
       "f4": "~200 generaciones de audio/mes",
       "f5": "Herramientas de creación de video",
       "f6": "Soporte prioritario",
-      "f7": "Colaboración en equipo"
+      "f7": "Colaboración en equipo",
+      "video": "Generación de video Pro"
     },
     "business": {
       "name": "Business",
@@ -613,7 +616,8 @@
       "f4": "Onboarding dedicado",
       "f5": "Procesamiento prioritario",
       "f6": "Informes avanzados",
-      "f7": "API e integraciones"
+      "f7": "API e integraciones",
+      "video": "Generación de video para empresas"
     }
   },
   "podcasters_page": {
@@ -1145,6 +1149,75 @@
         "q": "¿Cómo contacto soporte?",
         "a": "Usa el botón Conserje, abre Contactar soporte o escribe a support@signalboostapp.com con tu email y página."
       }
+    }
+  },
+  "settings": {
+    "title": "Configuración del sistema",
+    "subtitle": "Configura opciones de cuenta, webhooks de sincronización de datos y reglas de enrutamiento.",
+    "workspace": "Configuración general del espacio de trabajo",
+    "platformLabel": "Etiqueta de instancia de la plataforma",
+    "ingestion": "Canales de ingesta de datos",
+    "webhookTarget": "Destino del webhook de ingesta de afiliados",
+    "webhookHelp": "Dirección de destino directa para procesar hooks de tráfico de sistemas externos de viajes y marketplaces.",
+    "automation": "Automatización y activadores",
+    "emailSummaries": "Resúmenes de generación por email",
+    "emailSummariesHelp": "Recibe registros automáticos de actividad cuando los recursos de video terminen de procesarse.",
+    "autoTopup": "Recarga automática de cómputo",
+    "autoTopupHelp": "Recarga automáticamente créditos del saldo del sistema cuando baje de 50 unidades.",
+    "saving": "Actualizando reglas...",
+    "save": "Guardar configuración",
+    "saved": "¡La configuración del sistema se guardó correctamente!"
+  },
+  "data": {
+    "title": "Conector universal de datos",
+    "wikipediaReminder": "Recordatorio de Wikipedia: el contenido tiene licencia CC-BY-SA y requiere atribución.",
+    "uploadCsv": "Subir CSV",
+    "addApi": "Agregar conector API",
+    "runApi": "Ejecutar importación API",
+    "addScraper": "Agregar conector de scraping",
+    "runScraper": "Ejecutar importación de scraper",
+    "importedItems": "Elementos importados por categoría",
+    "sourceHistory": "Historial de fuentes",
+    "importing": "Importando...",
+    "done": "Listo: {count} insertados",
+    "error": "Error: {error}"
+  },
+  "sales": {
+    "title": "🧠 Agente de ventas con IA",
+    "subtitle": "Dale un prospecto a la IA. Redactará un email de ventas profesional para que lo revises y envíes.",
+    "prospect": "Prospecto",
+    "company": "Nombre de la empresa",
+    "contact": "Nombre del contacto",
+    "email": "Email",
+    "website": "Sitio web",
+    "industry": "Industria",
+    "notes": "Notas sobre este prospecto",
+    "drafting": "Redactando...",
+    "generate": "Generar email de ventas",
+    "aiDraft": "Borrador de IA",
+    "emptyDraft": "El email de ventas aparecerá aquí.",
+    "subject": "Asunto",
+    "openEmail": "Abrir en email",
+    "pipeline": {
+      "title": "Pipeline de ventas",
+      "subtitle": "Sigue prospectos desde el descubrimiento hasta el cliente.",
+      "loading": "Cargando pipeline...",
+      "noLeads": "Sin leads",
+      "unnamed": "Empresa sin nombre",
+      "noIndustry": "Sin industria",
+      "noCountry": "Sin país",
+      "noEmail": "Sin email",
+      "draft": "Borrador:"
+    },
+    "status": {
+      "discovered": "Descubierto",
+      "approved": "Aprobado",
+      "draft_ready": "Borrador listo",
+      "sketch_ready": "Boceto listo",
+      "sent": "Enviado",
+      "replied": "Respondido",
+      "client": "Cliente",
+      "draft_failed": "Falló el borrador"
     }
   }
 }

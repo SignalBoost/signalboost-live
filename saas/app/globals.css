@@ -412,3 +412,472 @@ html, body {
   .sb-review-link-builder > div, .sb-review-link-copy { display: grid; }
   .sb-review-control-row select, .sb-review-tabs button, .sb-review-actions button { width: 100%; }
 }
+
+/* SaaS dashboard wireframes — NASA-style HMI cockpit previews */
+.sb-hmi-shell {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(26, 240, 255, .18), transparent 30rem),
+    radial-gradient(circle at 88% 18%, rgba(255, 79, 216, .14), transparent 28rem),
+    linear-gradient(180deg, #030712 0%, #07111f 46%, #030712 100%);
+  color: #fff;
+  min-height: 100vh;
+  padding: clamp(12px, 2.4vw, 28px);
+}
+
+.sb-hmi-dashboard {
+  display: grid;
+  gap: clamp(16px, 2vw, 24px);
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  margin: 0 auto;
+  max-width: 1500px;
+}
+
+.sb-hmi-sidebar,
+.sb-hmi-hero,
+.sb-hmi-module,
+.sb-hmi-pricing-preview,
+.sb-hmi-telemetry-card,
+.sb-hmi-panel,
+.sb-hmi-price-card {
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  border: 1px solid rgba(255, 255, 255, .14);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, .34), inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+
+.sb-hmi-sidebar {
+  align-self: start;
+  background: linear-gradient(180deg, rgba(5, 13, 28, .92), rgba(2, 6, 23, .76));
+  border-color: rgba(26, 240, 255, .22);
+  border-radius: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-height: calc(100vh - 56px);
+  padding: 20px;
+  position: sticky;
+  top: 20px;
+}
+
+.sb-hmi-brand {
+  color: #ffc300;
+  font-size: 24px;
+  font-weight: 950;
+  letter-spacing: -.04em;
+  text-decoration: none;
+  text-shadow: 0 0 24px rgba(255, 195, 0, .36);
+}
+
+.sb-hmi-sidebar nav {
+  display: grid;
+  gap: 10px;
+}
+
+.sb-hmi-nav-item {
+  align-items: center;
+  background: rgba(255, 255, 255, .045);
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 16px;
+  color: rgba(226, 232, 240, .84);
+  display: flex;
+  gap: 12px;
+  min-height: 48px;
+  padding: 10px 12px;
+  text-decoration: none;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+.sb-hmi-nav-item:hover,
+.sb-hmi-nav-item:focus-visible {
+  background: rgba(26, 240, 255, .08);
+  border-color: rgba(26, 240, 255, .38);
+  box-shadow: 0 0 34px rgba(26, 240, 255, .15);
+  outline: 2px solid rgba(26, 240, 255, .32);
+  outline-offset: 3px;
+  transform: translateX(3px);
+}
+
+.sb-hmi-nav-icon,
+.sb-hmi-icon {
+  align-items: center;
+  background: rgba(2, 6, 23, .58);
+  border: 1px solid rgba(26, 240, 255, .24);
+  border-radius: 14px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 34px;
+  justify-content: center;
+  text-shadow: 0 0 18px currentColor;
+  width: 34px;
+}
+
+.sb-hmi-status {
+  color: rgba(226, 232, 240, .62);
+  font-family: var(--sb-font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  margin-top: auto;
+}
+
+.sb-hmi-status span {
+  background: #4ade80;
+  border-radius: 999px;
+  box-shadow: 0 0 18px rgba(74, 222, 128, .8);
+  display: inline-block;
+  height: 9px;
+  margin-right: 8px;
+  width: 9px;
+}
+
+.sb-hmi-main,
+.sb-hmi-modules {
+  display: grid;
+  gap: clamp(16px, 2vw, 24px);
+}
+
+.sb-hmi-hero,
+.sb-hmi-module,
+.sb-hmi-pricing-preview {
+  background:
+    radial-gradient(circle at top left, rgba(26, 240, 255, .14), transparent 24rem),
+    linear-gradient(135deg, rgba(255, 255, 255, .1), rgba(255, 255, 255, .035));
+  border-radius: 32px;
+  padding: clamp(20px, 4vw, 36px);
+}
+
+.sb-hmi-hero h1,
+.sb-hmi-pricing-preview h2 {
+  font-size: clamp(2.35rem, 5.4vw, 5.5rem);
+  letter-spacing: -.07em;
+  line-height: .92;
+  margin: 8px 0 16px;
+  max-width: 980px;
+}
+
+.sb-hmi-hero p,
+.sb-hmi-pricing-preview p,
+.sb-hmi-muted {
+  color: rgba(226, 232, 240, .72);
+  line-height: 1.7;
+  max-width: 880px;
+}
+
+.sb-hmi-kicker {
+  color: #9ff7ff;
+  font-family: var(--sb-font-mono);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .16em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.sb-hmi-cta-row,
+.sb-hmi-module__top {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.sb-hmi-telemetry {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
+}
+
+.sb-hmi-telemetry-card {
+  background: linear-gradient(145deg, rgba(5, 13, 28, .86), rgba(15, 23, 42, .62));
+  border-color: color-mix(in srgb, var(--module-accent) 52%, rgba(255,255,255,.12));
+  border-radius: 22px;
+  color: #fff;
+  min-height: 120px;
+  padding: 16px;
+  text-decoration: none;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.sb-hmi-telemetry-card:hover,
+.sb-hmi-telemetry-card:focus-visible {
+  box-shadow: 0 24px 80px color-mix(in srgb, var(--module-accent) 24%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--module-accent) 60%, transparent);
+  outline-offset: 3px;
+  transform: translateY(-3px);
+}
+
+.sb-hmi-telemetry-card span,
+.sb-hmi-telemetry-card strong,
+.sb-hmi-telemetry-card small {
+  display: block;
+}
+
+.sb-hmi-telemetry-card span { font-size: 24px; }
+.sb-hmi-telemetry-card strong { font-size: 34px; margin-top: 12px; }
+.sb-hmi-telemetry-card small { color: rgba(226, 232, 240, .62); }
+
+.sb-hmi-module:focus-visible {
+  border-color: rgba(255, 195, 0, .5);
+  outline: 2px solid rgba(255, 195, 0, .35);
+  outline-offset: 4px;
+}
+
+.sb-hmi-module__top {
+  justify-content: space-between;
+}
+
+.sb-hmi-module__top h2 {
+  font-size: clamp(1.7rem, 3vw, 2.7rem);
+  letter-spacing: -.05em;
+  margin: 4px 0 0;
+}
+
+.sb-hmi-module__top strong {
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  letter-spacing: -.06em;
+}
+
+.sb-hmi-module__grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(240px, 1.3fr) repeat(2, minmax(200px, 1fr));
+  margin-top: 20px;
+}
+
+.sb-hmi-panel {
+  background: rgba(2, 6, 23, .54);
+  border-color: rgba(26, 240, 255, .16);
+  border-radius: 22px;
+  min-height: 176px;
+  padding: 16px;
+}
+
+.sb-hmi-panel--primary { min-height: 220px; }
+.sb-hmi-panel span,
+.sb-hmi-price-card strong {
+  color: #fff;
+  display: block;
+  font-weight: 900;
+}
+
+.sb-hmi-form-lines,
+.sb-hmi-feed {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.sb-hmi-form-lines i,
+.sb-hmi-feed i {
+  background: linear-gradient(90deg, rgba(26, 240, 255, .28), rgba(255, 255, 255, .06));
+  border: 1px solid rgba(255, 255, 255, .09);
+  border-radius: 999px;
+  display: block;
+  height: 18px;
+}
+
+.sb-hmi-form-lines i:nth-child(2) { width: 76%; }
+.sb-hmi-form-lines i:nth-child(3) { width: 58%; }
+.sb-hmi-feed i { height: 34px; }
+
+.sb-hmi-chart {
+  align-items: end;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(6, 1fr);
+  height: 118px;
+  margin-top: 20px;
+}
+
+.sb-hmi-chart span {
+  border-radius: 999px 999px 8px 8px;
+  box-shadow: 0 0 18px currentColor;
+  min-height: 22px;
+}
+
+.sb-hmi-link {
+  color: #9ff7ff;
+  display: inline-flex;
+  font-weight: 900;
+  margin-top: 18px;
+  text-decoration: none;
+}
+
+.sb-hmi-link:hover,
+.sb-hmi-link:focus-visible {
+  outline: 2px solid rgba(26, 240, 255, .32);
+  outline-offset: 4px;
+  text-decoration: underline;
+}
+
+.sb-hmi-pricing-preview {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(260px, .8fr) minmax(0, 1.2fr);
+}
+
+.sb-hmi-price-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sb-hmi-price-card {
+  background: linear-gradient(145deg, rgba(5, 13, 28, .92), rgba(15, 23, 42, .68));
+  border-color: rgba(255, 195, 0, .24);
+  border-radius: 24px;
+  color: #fff;
+  min-height: 190px;
+  padding: 18px;
+  text-decoration: none;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.sb-hmi-price-card:hover,
+.sb-hmi-price-card:focus-visible {
+  border-color: rgba(255, 195, 0, .55);
+  box-shadow: 0 0 42px rgba(255, 195, 0, .18);
+  outline: 2px solid rgba(255, 195, 0, .34);
+  outline-offset: 3px;
+  transform: translateY(-3px);
+}
+
+.sb-hmi-price-card span {
+  color: #ffc300;
+  display: block;
+  font-size: 34px;
+  font-weight: 950;
+}
+
+.sb-hmi-price-card strong { font-size: 20px; margin-top: 16px; }
+.sb-hmi-price-card small { color: rgba(226, 232, 240, .62); display: block; margin-top: 28px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sb-hmi-nav-item,
+  .sb-hmi-telemetry-card,
+  .sb-hmi-price-card { transition: none !important; }
+}
+
+@media (max-width: 1120px) {
+  .sb-hmi-dashboard,
+  .sb-hmi-pricing-preview { grid-template-columns: 1fr; }
+  .sb-hmi-sidebar { min-height: auto; position: static; }
+  .sb-hmi-sidebar nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sb-hmi-telemetry { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sb-hmi-module__grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 720px) {
+  .sb-hmi-sidebar nav,
+  .sb-hmi-telemetry,
+  .sb-hmi-price-grid { grid-template-columns: 1fr; }
+  .sb-hmi-shell { padding: 8px; }
+  .sb-hmi-hero h1,
+  .sb-hmi-pricing-preview h2 { font-size: clamp(2rem, 14vw, 3.35rem); }
+}
+
+/* Cockpit pricing cards routed into SaaS dashboards */
+.sb-pricing-cockpit .sb-pricing-panel {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(26, 240, 255, .13), transparent 16rem),
+    linear-gradient(145deg, rgba(5, 13, 28, .86), rgba(15, 23, 42, .64));
+  border-color: rgba(26, 240, 255, .16);
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.sb-pricing-cockpit .sb-pricing-panel:hover,
+.sb-pricing-cockpit .sb-pricing-panel:focus-within {
+  border-color: rgba(26, 240, 255, .42);
+  box-shadow: 0 30px 90px rgba(0,0,0,.34), 0 0 38px rgba(26,240,255,.14);
+  transform: translateY(-3px);
+}
+
+.sb-pricing-module-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  margin-top: 18px;
+}
+
+.sb-pricing-panel__icon {
+  align-items: center;
+  background: rgba(2, 6, 23, .58);
+  border: 1px solid rgba(26, 240, 255, .22);
+  border-radius: 16px;
+  display: inline-flex;
+  font-size: 28px;
+  height: 46px;
+  justify-content: center;
+  margin-bottom: 14px;
+  width: 46px;
+}
+
+.sb-pricing-wireframe-cta {
+  align-items: center;
+  background: radial-gradient(circle at top left, rgba(255,195,0,.15), transparent 24rem), var(--sb-glass-surface);
+  border: 1px solid rgba(255,195,0,.22);
+  border-radius: 28px;
+  box-shadow: var(--sb-shadow-panel);
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  margin-top: 34px;
+  padding: clamp(18px, 4vw, 30px);
+}
+
+@media (max-width: 760px) {
+  .sb-pricing-wireframe-cta { align-items: flex-start; flex-direction: column; }
+}
+
+.sb-hmi-preview-gallery {
+  background: rgba(2, 6, 23, .48);
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 28px;
+  padding: clamp(18px, 3vw, 28px);
+}
+
+.sb-hmi-preview-gallery h2 {
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  letter-spacing: -.05em;
+  margin: 8px 0 18px;
+}
+
+.sb-hmi-preview-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.sb-hmi-preview-card {
+  background: linear-gradient(145deg, rgba(5,13,28,.86), rgba(15,23,42,.64));
+  border: 1px solid rgba(26,240,255,.18);
+  border-radius: 20px;
+  color: rgba(226,232,240,.78);
+  overflow: hidden;
+  text-decoration: none;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.sb-hmi-preview-card:hover,
+.sb-hmi-preview-card:focus-visible {
+  border-color: rgba(26,240,255,.48);
+  box-shadow: 0 0 34px rgba(26,240,255,.16);
+  outline: 2px solid rgba(26,240,255,.34);
+  outline-offset: 3px;
+  transform: translateY(-3px);
+}
+
+.sb-hmi-preview-card img {
+  aspect-ratio: 16 / 10;
+  display: block;
+  object-fit: cover;
+  width: 100%;
+}
+
+.sb-hmi-preview-card span {
+  display: block;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: .05em;
+  padding: 12px 14px;
+  text-transform: uppercase;
+}

@@ -596,7 +596,9 @@
     "title": "Zacznij za darmo. Opublikuj, gdy będzie gotowe.",
     "subtitle": "Proste plany według celu: test, start, skalowanie lub większy system wzrostu.",
     "servicePricingKicker": "Ceny usług",
-    "servicePricingTitle": "Każda usługa ma bezpośredni CTA do workspace."
+    "servicePricingTitle": "Każda usługa ma bezpośredni CTA do workspace.",
+    "websiteOptimizationName": "Optymalizacja strony",
+    "podcastOptimizationName": "Optymalizacja studia podcastowego"
   },
   "podcasters_page": {
     "badge": "Dla podcasterów",
@@ -927,7 +929,12 @@
     "openVideoStudio": "Otwórz studio wideo",
     "openSalesAgent": "Otwórz agenta sprzedaży",
     "openSalesPipeline": "Otwórz pipeline sprzedaży",
-    "answerInChat": "Odpowiedz w czacie"
+    "answerInChat": "Odpowiedz w czacie",
+    "openPromoteBusiness": "Otwórz Promuj firmę",
+    "openWebsiteOptimization": "Otwórz optymalizację strony",
+    "openLab": "Otwórz laboratorium",
+    "openWorkshopApprentice": "Otwórz ucznia warsztatu",
+    "openPodcastOptimization": "Otwórz optymalizację podcastu"
   },
   "videoSearch": {
     "timeout": {
@@ -1463,5 +1470,24 @@
       "improve": "Ulepsz stronę",
       "podcastStudio": "Optymalizuj studio podcastowe"
     }
+  },
+  "common": {
+    "enabled": "Włączone",
+    "ready": "Gotowe",
+    "loading": "Ładowanie…"
+  },
+  "orchestration": {
+    "kicker": "Orkiestracja AI",
+    "title": "Automatycznie skieruj następną akcję",
+    "subtitle": "Router intencji, wybór trybu AI, silnik przepływu, pamięć, awaryjny operator, zunifikowane API i telemetria są połączone w każdym obszarze roboczym.",
+    "openRoute": "Otwórz skierowany moduł",
+    "inputLabel": "Opisz wynik",
+    "placeholder": "Przykład: popraw SEO mojej strony i utwórz materiały kampanii follow-up",
+    "run": "Uruchom orkiestrację",
+    "intentRouter": "Router intencji",
+    "confidence": "Pewność",
+    "memory": "Warstwa pamięci",
+    "operatorFallback": "Awaryjny operator",
+    "telemetry": "Telemetria"
   }
 }

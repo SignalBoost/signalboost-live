@@ -7,6 +7,7 @@ import Testimonials from '@/components/Testimonials'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 import { SERVICES } from '@/lib/services/catalog'
+import OrchestrationPanel from '@/components/orchestration/OrchestrationPanel'
 
 export default function Home() {
   const { dict } = useI18n()
@@ -58,6 +59,10 @@ export default function Home() {
             </Link>
           ))}
         </div>
+      </section>
+
+      <section className="sb-page-shell sb-section" aria-label={t(dict, 'orchestration.kicker', 'AI orchestration')}>
+        <OrchestrationPanel module="homepage" />
       </section>
 
       <FeaturesFlow />

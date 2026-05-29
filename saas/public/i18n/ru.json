@@ -293,5 +293,6 @@
       "networkEmailSubject": "SignalBoost Network Plan"
     }
   },
-  "singleLanguageContent": "Контент на одном языке"
+  "singleLanguageContent": "Контент на одном языке",
+  "orchestration.kicker": "AI-оркестрация"
 }

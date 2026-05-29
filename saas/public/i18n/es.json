@@ -293,5 +293,6 @@
       "draft_failed": "Falló el borrador"
     }
   },
-  "singleLanguageContent": "Contenido en un solo idioma"
+  "singleLanguageContent": "Contenido en un solo idioma",
+  "orchestration.kicker": "Orquestación de IA"
 }

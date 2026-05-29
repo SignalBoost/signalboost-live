@@ -7,6 +7,10 @@ export type ActionIntent =
   | 'video'
   | 'sales'
   | 'pipeline'
+  | 'promote'
+  | 'improve'
+  | 'lab'
+  | 'apprentice'
   | 'general'
 
 export type ActionRoute = {
@@ -19,6 +23,68 @@ export type ActionRoute = {
 
 export function routeUserAction(input: string): ActionRoute {
   const q = (input || '').toLowerCase()
+
+
+  if (
+    q.includes('promote') ||
+    q.includes('campaign') ||
+    q.includes('marketing') ||
+    q.includes('offer')
+  ) {
+    return {
+      intent: 'promote',
+      href: '/dashboard/promote',
+      label: 'actionRouter.openPromoteBusiness',
+      confidence: 0.9,
+      reason: 'promotion_request',
+    }
+  }
+
+  if (
+    q.includes('improve website') ||
+    q.includes('optimize website') ||
+    q.includes('seo') ||
+    q.includes('accessibility') ||
+    q.includes('conversion') ||
+    q.includes('speed audit')
+  ) {
+    return {
+      intent: 'improve',
+      href: '/dashboard/improve',
+      label: 'actionRouter.openWebsiteOptimization',
+      confidence: 0.92,
+      reason: 'website_optimization_request',
+    }
+  }
+
+  if (
+    q.includes('lab') ||
+    q.includes('experiment') ||
+    q.includes('prototype')
+  ) {
+    return {
+      intent: 'lab',
+      href: '/dashboard/lab',
+      label: 'actionRouter.openLab',
+      confidence: 0.84,
+      reason: 'lab_request',
+    }
+  }
+
+  if (
+    q.includes('apprentice') ||
+    q.includes('tutorial') ||
+    q.includes('learn') ||
+    q.includes('walkthrough')
+  ) {
+    return {
+      intent: 'apprentice',
+      href: '/dashboard/apprentice',
+      label: 'actionRouter.openWorkshopApprentice',
+      confidence: 0.86,
+      reason: 'guided_learning_request',
+    }
+  }
 
   if (
     q.includes('website') ||
@@ -61,8 +127,8 @@ export function routeUserAction(input: string): ActionRoute {
   ) {
     return {
       intent: 'podcast',
-      href: '/dashboard/audio',
-      label: 'actionRouter.openAudioStudio',
+      href: q.includes('podcast') || q.includes('episode') ? '/dashboard/podcast/studio' : '/dashboard/audio',
+      label: q.includes('podcast') || q.includes('episode') ? 'actionRouter.openPodcastOptimization' : 'actionRouter.openAudioStudio',
       confidence: 0.9,
       reason: 'audio_or_podcast_request',
     }

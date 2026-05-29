@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react'
 
+import englishCopy from '@/locales/en.json'
 import { loadLanguage, type Dict } from '@/lib/i18n/loadLanguage'
 
 type I18nContextType = {
@@ -26,20 +27,17 @@ const SUPPORTED_LANGS = [
   'es',
   'pl',
   'ru',
-]
+] as const
 
 function normalizeLang(value: string | null) {
   if (!value) return 'en'
 
   const lower = value.toLowerCase()
+  const match = SUPPORTED_LANGS.find((supportedLang) =>
+    lower.startsWith(supportedLang)
+  )
 
-  if (lower.startsWith('pt')) return 'pt'
-  if (lower.startsWith('es')) return 'es'
-  if (lower.startsWith('pl')) return 'pl'
-  if (lower.startsWith('ru')) return 'ru'
-  if (lower.startsWith('en')) return 'en'
-
-  return 'en'
+  return match ?? 'en'
 }
 
 function getInitialLanguage() {
@@ -60,10 +58,7 @@ function getInitialLanguage() {
     navigator.language ||
     null
 
-  const browserLang =
-    normalizeLang(browser)
-
-  return browserLang
+  return normalizeLang(browser)
 }
 
 export function I18nProvider({
@@ -72,18 +67,29 @@ export function I18nProvider({
   children: React.ReactNode
 }) {
   const [lang, setLangState] =
-    useState(() => getInitialLanguage())
+    useState('en')
 
   const [dict, setDict] =
-    useState<Dict>({})
+    useState<Dict>(englishCopy as Dict)
   const [isReady, setIsReady] =
     useState(false)
+
+  useEffect(() => {
+    const initialLang = getInitialLanguage()
+
+    if (initialLang !== lang) {
+      setLangState(initialLang)
+    }
+    // Run once after hydration so server and first client render both use English.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     let cancelled = false
 
     async function init() {
       setIsReady(false)
+      setDict(englishCopy as Dict)
 
       const loaded =
         await loadLanguage(lang)
@@ -128,8 +134,6 @@ export function I18nProvider({
     }),
     [lang, dict, isReady]
   )
-
-  if (!isReady) return null
 
   return (
     <I18nContext.Provider

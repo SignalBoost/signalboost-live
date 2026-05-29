@@ -8,7 +8,7 @@ const OPERATOR_PATH = '/dashboard/operator'
 // Add more here later, or replace with a role/plan check when opening to users.
 const OWNER_EMAILS = ['cadomos@gmail.com']
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   // Only guard the operator path; everything else passes through untouched.
   if (!req.nextUrl.pathname.startsWith(OPERATOR_PATH)) {
     return NextResponse.next()

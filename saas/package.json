@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "dev": "next dev",
-    "test": "node --test tests/promptPreprocessor.node.test.ts"
+    "test": "node --test tests/promptPreprocessor.node.test.ts tests/orchestration.static.test.js"
   },
   "dependencies": {
     "next": "16.2.6",

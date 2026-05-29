@@ -41,7 +41,11 @@
     "openVideoStudio": "Open Video Studio",
     "openSalesAgent": "Open Sales Agent",
     "openSalesPipeline": "Open Sales Pipeline",
-    "answerInChat": "Answer in chat"
+    "answerInChat": "Answer in chat",
+    "openImproveWebsite": "Abrir auditoria do site",
+    "openPodcastStudio": "Abrir estúdio podcast",
+    "openLab": "Abrir laboratório",
+    "openApprentice": "Abrir aprendiz"
   },
   "videoSearch": {
     "timeout": {
@@ -292,6 +296,53 @@
       "replied": "Respondido",
       "client": "Cliente",
       "draft_failed": "Falha no rascunho"
+    }
+  },
+  "orchestration": {
+    "kicker": "Orquestração de IA",
+    "title": "Um roteador para cada fluxo do SignalBoost",
+    "subtitle": "Roteamento de intenção, seleção de modo de IA, validação, memória, telemetria e fallback humano são aplicados antes do trabalho chegar ao módulo.",
+    "promptLabel": "Objetivo do fluxo",
+    "run": "Executar orquestração",
+    "selected": "Módulo selecionado",
+    "mode": "Modo",
+    "openModule": "Abrir módulo recomendado",
+    "status": {
+      "routing": "Roteando solicitação...",
+      "operator": "Fallback humano preparado",
+      "ready": "Fluxo pronto",
+      "idle": "Descreva um objetivo e o SignalBoost roteará"
+    },
+    "runLoading": "Roteando..."
+  },
+  "dashboard_modules": {
+    "improve": {
+      "title": "Melhorar site",
+      "desc": "Audite SEO, velocidade, acessibilidade e conversão com próximos passos validados.",
+      "cta": "Abrir auditoria do site",
+      "task1": "Pontuação SEO",
+      "task2": "Checklist de conversão",
+      "task3": "Validação do plano"
+    },
+    "podcastStudio": {
+      "title": "Otimizar Podcast Studio",
+      "desc": "Transforme episódios em notas multilíngues, clipes e checklists de publicação.",
+      "cta": "Abrir estúdio podcast",
+      "task1": "Diagnóstico do episódio",
+      "task2": "Oportunidades de clipes",
+      "task3": "Pacote de publicação"
+    }
+  },
+  "services": {
+    "improveWebsite": {
+      "kicker": "Melhorar site",
+      "title": "Auditoria IA e plano de correção",
+      "subtitle": "O SignalBoost roteia melhorias por auditoria, SEO, validação, telemetria e fallback humano antes de recomendar mudanças."
+    },
+    "podcastStudio": {
+      "kicker": "Otimizar Podcast Studio",
+      "title": "Orquestração de otimização de episódios",
+      "subtitle": "Otimize episódios com melhoria de áudio, clipes, notas, i18n, validação e fallback humano claro."
     }
   }
 }

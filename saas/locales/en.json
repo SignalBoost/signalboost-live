@@ -891,7 +891,11 @@
     "openVideoStudio": "Open Video Studio",
     "openSalesAgent": "Open Sales Agent",
     "openSalesPipeline": "Open Sales Pipeline",
-    "answerInChat": "Answer in chat"
+    "answerInChat": "Answer in chat",
+    "openImproveWebsite": "Open website audit",
+    "openPodcastStudio": "Open podcast studio",
+    "openLab": "Open lab",
+    "openApprentice": "Open apprentice"
   },
   "videoSearch": {
     "timeout": {
@@ -1107,6 +1111,22 @@
       "task1": "Beginner path",
       "task2": "Tool walkthroughs",
       "task3": "Launch checklist"
+    },
+    "improve": {
+      "title": "Improve website",
+      "desc": "Audit SEO, speed, accessibility, and conversion gaps with validated next steps.",
+      "cta": "Open website audit",
+      "task1": "SEO scoring",
+      "task2": "Conversion checklist",
+      "task3": "Fix plan validation"
+    },
+    "podcastStudio": {
+      "title": "Optimize Podcast Studio",
+      "desc": "Turn episodes into multilingual show notes, clips, and publishing checklists.",
+      "cta": "Open podcast studio",
+      "task1": "Episode diagnostics",
+      "task2": "Clip opportunities",
+      "task3": "Publishing package"
     }
   },
   "faq": {
@@ -1218,6 +1238,35 @@
       "replied": "Replied",
       "client": "Client",
       "draft_failed": "Draft Failed"
+    }
+  },
+  "orchestration": {
+    "kicker": "AI orchestration",
+    "title": "One router for every SignalBoost workflow",
+    "subtitle": "Intent routing, AI mode selection, validation, memory, telemetry, and operator fallback are applied before work reaches a module.",
+    "promptLabel": "Workflow goal",
+    "run": "Run orchestration",
+    "selected": "Selected module",
+    "mode": "Mode",
+    "openModule": "Open recommended module",
+    "status": {
+      "routing": "Routing request...",
+      "operator": "Operator fallback prepared",
+      "ready": "Workflow ready",
+      "idle": "Describe a goal and SignalBoost will route it"
+    },
+    "runLoading": "Routing..."
+  },
+  "services": {
+    "improveWebsite": {
+      "kicker": "Improve Website",
+      "title": "AI website audit and fix plan",
+      "subtitle": "SignalBoost routes website improvement requests through website audit, SEO scoring, validation, telemetry, and operator fallback before recommending changes."
+    },
+    "podcastStudio": {
+      "kicker": "Optimize Podcast Studio",
+      "title": "Episode optimization orchestration",
+      "subtitle": "Optimize podcast episodes with AI-guided audio enhancement, clip planning, show notes, i18n support, validation, and clear operator fallback."
     }
   }
 }

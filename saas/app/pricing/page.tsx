@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
+import OrchestrationGuide from '@/components/orchestration/OrchestrationGuide'
 
 const CONTACT_EMAIL = 'support@signalboostapp.com'
 
@@ -50,6 +51,8 @@ export default function PricingPage() {
         <h1 className="sb-h1" style={{ marginTop: 12 }}>Start free. Publish when ready.</h1>
         <p className="sb-body" style={{ maxWidth: 680, margin: '18px auto 0' }}>Simple plan tiers arranged by human intent: test, launch, scale, or operate a larger growth system.</p>
       </section>
+
+      <OrchestrationGuide compact />
 
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
         {plans.map(plan => (

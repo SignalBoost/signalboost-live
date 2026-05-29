@@ -2,6 +2,7 @@ import Link from 'next/link'
 import SignalHero from '@/components/SignalHero'
 import FeaturesFlow from '@/components/FeaturesFlow'
 import Testimonials from '@/components/Testimonials'
+import OrchestrationGuide from '@/components/orchestration/OrchestrationGuide'
 
 const featureCards = [
   ['🧠', 'AI proposes the next move', 'Guided suggestions appear before a user types, reducing blank-page friction.'],
@@ -32,6 +33,10 @@ export default function Home() {
             </article>
           ))}
         </div>
+      </section>
+
+      <section className="sb-page-shell sb-section" aria-label="AI orchestration">
+        <OrchestrationGuide />
       </section>
 
       <FeaturesFlow />

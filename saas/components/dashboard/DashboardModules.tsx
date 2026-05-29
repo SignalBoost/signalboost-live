@@ -14,6 +14,8 @@ type ModuleKey =
   | 'reviews'
   | 'audio'
   | 'video'
+  | 'improve'
+  | 'podcastStudio'
   | 'lab'
   | 'apprentice'
 
@@ -86,6 +88,32 @@ export default function DashboardModules() {
           t(dict, 'dashboard_modules.video.task1', 'Video prompts'),
           t(dict, 'dashboard_modules.video.task2', 'Creative previews'),
           t(dict, 'dashboard_modules.video.task3', 'Clip workflow'),
+        ],
+      },
+      {
+        key: 'improve' as const,
+        icon: '🧭',
+        href: '/dashboard/improve-website',
+        title: t(dict, 'dashboard_modules.improve.title', 'Improve website'),
+        desc: t(dict, 'dashboard_modules.improve.desc', 'Audit SEO, speed, accessibility, and conversion gaps with validated next steps.'),
+        cta: t(dict, 'dashboard_modules.improve.cta', 'Open website audit'),
+        tasks: [
+          t(dict, 'dashboard_modules.improve.task1', 'SEO scoring'),
+          t(dict, 'dashboard_modules.improve.task2', 'Conversion checklist'),
+          t(dict, 'dashboard_modules.improve.task3', 'Fix plan validation'),
+        ],
+      },
+      {
+        key: 'podcastStudio' as const,
+        icon: '🎚️',
+        href: '/dashboard/podcast-studio',
+        title: t(dict, 'dashboard_modules.podcastStudio.title', 'Optimize Podcast Studio'),
+        desc: t(dict, 'dashboard_modules.podcastStudio.desc', 'Turn episodes into multilingual show notes, clips, and publishing checklists.'),
+        cta: t(dict, 'dashboard_modules.podcastStudio.cta', 'Open podcast studio'),
+        tasks: [
+          t(dict, 'dashboard_modules.podcastStudio.task1', 'Episode diagnostics'),
+          t(dict, 'dashboard_modules.podcastStudio.task2', 'Clip opportunities'),
+          t(dict, 'dashboard_modules.podcastStudio.task3', 'Publishing package'),
         ],
       },
       {

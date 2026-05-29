@@ -7,6 +7,10 @@ export type ActionIntent =
   | 'video'
   | 'sales'
   | 'pipeline'
+  | 'improve_website'
+  | 'podcast_studio'
+  | 'lab'
+  | 'apprentice'
   | 'general'
 
 export type ActionRoute = {
@@ -84,6 +88,47 @@ export function routeUserAction(input: string): ActionRoute {
       label: 'actionRouter.openVideoStudio',
       confidence: 0.9,
       reason: 'video_request',
+    }
+  }
+
+
+  if (q.includes('improve website') || q.includes('audit') || q.includes('conversion') || q.includes('accessibility') || q.includes('site speed')) {
+    return {
+      intent: 'improve_website',
+      href: '/dashboard/improve-website',
+      label: 'actionRouter.openImproveWebsite',
+      confidence: 0.9,
+      reason: 'website_improvement_request',
+    }
+  }
+
+  if (q.includes('podcast studio') || q.includes('optimize podcast') || q.includes('show notes') || q.includes('transcript')) {
+    return {
+      intent: 'podcast_studio',
+      href: '/dashboard/podcast-studio',
+      label: 'actionRouter.openPodcastStudio',
+      confidence: 0.9,
+      reason: 'podcast_optimization_request',
+    }
+  }
+
+  if (q.includes('lab') || q.includes('experiment') || q.includes('prototype')) {
+    return {
+      intent: 'lab',
+      href: '/dashboard/lab',
+      label: 'actionRouter.openLab',
+      confidence: 0.86,
+      reason: 'lab_request',
+    }
+  }
+
+  if (q.includes('apprentice') || q.includes('tutorial') || q.includes('teach me') || q.includes('guide me')) {
+    return {
+      intent: 'apprentice',
+      href: '/dashboard/apprentice',
+      label: 'actionRouter.openApprentice',
+      confidence: 0.86,
+      reason: 'guided_learning_request',
     }
   }
 

@@ -41,7 +41,11 @@
     "openVideoStudio": "Open Video Studio",
     "openSalesAgent": "Open Sales Agent",
     "openSalesPipeline": "Open Sales Pipeline",
-    "answerInChat": "Answer in chat"
+    "answerInChat": "Answer in chat",
+    "openImproveWebsite": "Abrir auditoría web",
+    "openPodcastStudio": "Abrir estudio podcast",
+    "openLab": "Abrir laboratorio",
+    "openApprentice": "Abrir aprendiz"
   },
   "videoSearch": {
     "timeout": {
@@ -293,5 +297,52 @@
       "draft_failed": "Falló el borrador"
     }
   },
-  "singleLanguageContent": "Contenido en un solo idioma"
+  "singleLanguageContent": "Contenido en un solo idioma",
+  "orchestration": {
+    "kicker": "Orquestación de IA",
+    "title": "Un router para cada flujo de SignalBoost",
+    "subtitle": "El enrutamiento de intención, selección de modo IA, validación, memoria, telemetría y respaldo humano se aplican antes de que el trabajo llegue a un módulo.",
+    "promptLabel": "Objetivo del flujo",
+    "run": "Ejecutar orquestación",
+    "selected": "Módulo seleccionado",
+    "mode": "Modo",
+    "openModule": "Abrir módulo recomendado",
+    "status": {
+      "routing": "Enrutando solicitud...",
+      "operator": "Respaldo humano preparado",
+      "ready": "Flujo listo",
+      "idle": "Describe un objetivo y SignalBoost lo enrutará"
+    },
+    "runLoading": "Enrutando..."
+  },
+  "dashboard_modules": {
+    "improve": {
+      "title": "Mejorar sitio web",
+      "desc": "Audita SEO, velocidad, accesibilidad y brechas de conversión con próximos pasos validados.",
+      "cta": "Abrir auditoría web",
+      "task1": "Puntuación SEO",
+      "task2": "Lista de conversión",
+      "task3": "Validación del plan"
+    },
+    "podcastStudio": {
+      "title": "Optimizar Podcast Studio",
+      "desc": "Convierte episodios en notas multilingües, clips y listas de publicación.",
+      "cta": "Abrir estudio podcast",
+      "task1": "Diagnóstico del episodio",
+      "task2": "Oportunidades de clips",
+      "task3": "Paquete de publicación"
+    }
+  },
+  "services": {
+    "improveWebsite": {
+      "kicker": "Mejorar sitio web",
+      "title": "Auditoría IA y plan de mejoras",
+      "subtitle": "SignalBoost enruta solicitudes de mejora web por auditoría, SEO, validación, telemetría y respaldo humano antes de recomendar cambios."
+    },
+    "podcastStudio": {
+      "kicker": "Optimizar Podcast Studio",
+      "title": "Orquestación de optimización de episodios",
+      "subtitle": "Optimiza episodios con mejora de audio, planificación de clips, notas, i18n, validación y respaldo humano claro."
+    }
+  }
 }

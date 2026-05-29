@@ -41,7 +41,11 @@
     "openVideoStudio": "Open Video Studio",
     "openSalesAgent": "Open Sales Agent",
     "openSalesPipeline": "Open Sales Pipeline",
-    "answerInChat": "Answer in chat"
+    "answerInChat": "Answer in chat",
+    "openImproveWebsite": "Otwórz audyt strony",
+    "openPodcastStudio": "Otwórz studio podcastu",
+    "openLab": "Otwórz laboratorium",
+    "openApprentice": "Otwórz praktykanta"
   },
   "videoSearch": {
     "timeout": {
@@ -293,5 +297,52 @@
       "draft_failed": "Szkic nieudany"
     }
   },
-  "singleLanguageContent": "Treść w jednym języku"
+  "singleLanguageContent": "Treść w jednym języku",
+  "orchestration": {
+    "kicker": "Orkiestracja AI",
+    "title": "Jeden router dla każdego procesu SignalBoost",
+    "subtitle": "Routing intencji, wybór trybu AI, walidacja, pamięć, telemetria i przekazanie operatorowi działają zanim zadanie trafi do modułu.",
+    "promptLabel": "Cel procesu",
+    "run": "Uruchom orkiestrację",
+    "selected": "Wybrany moduł",
+    "mode": "Tryb",
+    "openModule": "Otwórz rekomendowany moduł",
+    "status": {
+      "routing": "Kierowanie żądania...",
+      "operator": "Przygotowano przekazanie operatorowi",
+      "ready": "Proces gotowy",
+      "idle": "Opisz cel, a SignalBoost wybierze trasę"
+    },
+    "runLoading": "Kierowanie..."
+  },
+  "dashboard_modules": {
+    "improve": {
+      "title": "Ulepsz stronę",
+      "desc": "Audyt SEO, szybkości, dostępności i konwersji z zatwierdzonymi krokami.",
+      "cta": "Otwórz audyt strony",
+      "task1": "Ocena SEO",
+      "task2": "Lista konwersji",
+      "task3": "Walidacja planu"
+    },
+    "podcastStudio": {
+      "title": "Optymalizuj Podcast Studio",
+      "desc": "Zmieniaj odcinki w wielojęzyczne notatki, klipy i listy publikacji.",
+      "cta": "Otwórz studio podcastu",
+      "task1": "Diagnostyka odcinka",
+      "task2": "Możliwości klipów",
+      "task3": "Pakiet publikacji"
+    }
+  },
+  "services": {
+    "improveWebsite": {
+      "kicker": "Ulepsz stronę",
+      "title": "Audyt AI i plan napraw",
+      "subtitle": "SignalBoost kieruje ulepszenia przez audyt, SEO, walidację, telemetrię i operatora przed rekomendacją zmian."
+    },
+    "podcastStudio": {
+      "kicker": "Optymalizuj Podcast Studio",
+      "title": "Orkiestracja optymalizacji odcinków",
+      "subtitle": "Optymalizuj odcinki przez poprawę audio, klipy, notatki, i18n, walidację i jasny fallback operatora."
+    }
+  }
 }

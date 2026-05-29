@@ -41,7 +41,11 @@
     "openVideoStudio": "Open Video Studio",
     "openSalesAgent": "Open Sales Agent",
     "openSalesPipeline": "Open Sales Pipeline",
-    "answerInChat": "Answer in chat"
+    "answerInChat": "Answer in chat",
+    "openImproveWebsite": "Открыть аудит сайта",
+    "openPodcastStudio": "Открыть подкаст-студию",
+    "openLab": "Открыть лабораторию",
+    "openApprentice": "Открыть практикум"
   },
   "videoSearch": {
     "timeout": {
@@ -293,5 +297,52 @@
       "networkEmailSubject": "SignalBoost Network Plan"
     }
   },
-  "singleLanguageContent": "Контент на одном языке"
+  "singleLanguageContent": "Контент на одном языке",
+  "orchestration": {
+    "kicker": "AI-оркестрация",
+    "title": "Один маршрутизатор для каждого процесса SignalBoost",
+    "subtitle": "Определение намерения, выбор режима AI, проверка, память, телеметрия и передача оператору применяются до попадания задачи в модуль.",
+    "promptLabel": "Цель процесса",
+    "run": "Запустить оркестрацию",
+    "selected": "Выбранный модуль",
+    "mode": "Режим",
+    "openModule": "Открыть рекомендуемый модуль",
+    "status": {
+      "routing": "Маршрутизация запроса...",
+      "operator": "Подготовлена передача оператору",
+      "ready": "Процесс готов",
+      "idle": "Опишите цель, и SignalBoost выберет маршрут"
+    },
+    "runLoading": "Маршрутизация..."
+  },
+  "dashboard_modules": {
+    "improve": {
+      "title": "Улучшить сайт",
+      "desc": "Аудит SEO, скорости, доступности и конверсии с проверенными следующими шагами.",
+      "cta": "Открыть аудит сайта",
+      "task1": "SEO-оценка",
+      "task2": "Чеклист конверсии",
+      "task3": "Проверка плана"
+    },
+    "podcastStudio": {
+      "title": "Оптимизировать Podcast Studio",
+      "desc": "Превращайте эпизоды в многоязычные заметки, клипы и чеклисты публикации.",
+      "cta": "Открыть подкаст-студию",
+      "task1": "Диагностика эпизода",
+      "task2": "Возможности клипов",
+      "task3": "Пакет публикации"
+    }
+  },
+  "services": {
+    "improveWebsite": {
+      "kicker": "Улучшить сайт",
+      "title": "AI-аудит сайта и план исправлений",
+      "subtitle": "SignalBoost направляет улучшения через аудит, SEO, проверку, телеметрию и оператора перед рекомендацией изменений."
+    },
+    "podcastStudio": {
+      "kicker": "Оптимизировать Podcast Studio",
+      "title": "Оркестрация оптимизации эпизодов",
+      "subtitle": "Оптимизируйте эпизоды с улучшением аудио, клипами, заметками, i18n, проверкой и понятной передачей оператору."
+    }
+  }
 }

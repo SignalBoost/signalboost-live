@@ -210,5 +210,88 @@
     "pricing": {
       "a1": "Website: $19 / $49 / $149 · Podcast: $29 / $79 / $299 · Network starting at $299/mo"
     }
+  },
+  "pricing_page": {
+    "free": {
+      "video": "Ferramentas de vídeo incluídas"
+    },
+    "starter": {
+      "video": "Geração de vídeo inicial"
+    },
+    "pro": {
+      "video": "Geração de vídeo Pro"
+    },
+    "business": {
+      "video": "Geração de vídeo para empresas"
+    }
+  },
+  "settings": {
+    "title": "Configurações do sistema",
+    "subtitle": "Configure opções da conta, webhooks de sincronização de dados e regras de roteamento.",
+    "workspace": "Configurações gerais do espaço de trabalho",
+    "platformLabel": "Rótulo da instância da plataforma",
+    "ingestion": "Canais de ingestão de dados",
+    "webhookTarget": "Destino do webhook de ingestão de afiliados",
+    "webhookHelp": "Endereço de destino direto para processar hooks de tráfego de sistemas externos de viagens e marketplaces.",
+    "automation": "Automação e gatilhos",
+    "emailSummaries": "Resumos de geração por email",
+    "emailSummariesHelp": "Receba logs automáticos de atividade sempre que os recursos de vídeo concluírem o processamento.",
+    "autoTopup": "Recarga automática de computação",
+    "autoTopupHelp": "Recarregue automaticamente créditos do saldo do sistema quando ficar abaixo de 50 unidades.",
+    "saving": "Atualizando regras...",
+    "save": "Salvar configuração",
+    "saved": "Configurações do sistema salvas com sucesso!"
+  },
+  "data": {
+    "title": "Conector universal de dados",
+    "wikipediaReminder": "Lembrete da Wikipedia: o conteúdo tem licença CC-BY-SA e exige atribuição.",
+    "uploadCsv": "Enviar CSV",
+    "addApi": "Adicionar conector de API",
+    "runApi": "Executar importação de API",
+    "addScraper": "Adicionar conector de scraper",
+    "runScraper": "Executar importação do scraper",
+    "importedItems": "Itens importados por categoria",
+    "sourceHistory": "Histórico de fontes",
+    "importing": "Importando...",
+    "done": "Concluído: {count} inseridos",
+    "error": "Erro: {error}"
+  },
+  "sales": {
+    "title": "🧠 Agente de vendas com IA",
+    "subtitle": "Dê um prospecto à IA. Ela redige um email de vendas profissional para você revisar e enviar.",
+    "prospect": "Prospecto",
+    "company": "Nome da empresa",
+    "contact": "Nome do contato",
+    "email": "Email",
+    "website": "Site",
+    "industry": "Setor",
+    "notes": "Notas sobre este prospecto",
+    "drafting": "Redigindo...",
+    "generate": "Gerar email de vendas",
+    "aiDraft": "Rascunho da IA",
+    "emptyDraft": "O email de vendas aparecerá aqui.",
+    "subject": "Assunto",
+    "openEmail": "Abrir no email",
+    "pipeline": {
+      "title": "Pipeline de vendas",
+      "subtitle": "Acompanhe prospectos da descoberta ao cliente.",
+      "loading": "Carregando pipeline...",
+      "noLeads": "Sem leads",
+      "unnamed": "Empresa sem nome",
+      "noIndustry": "Sem setor",
+      "noCountry": "Sem país",
+      "noEmail": "Sem email",
+      "draft": "Rascunho:"
+    },
+    "status": {
+      "discovered": "Descoberto",
+      "approved": "Aprovado",
+      "draft_ready": "Rascunho pronto",
+      "sketch_ready": "Esboço pronto",
+      "sent": "Enviado",
+      "replied": "Respondido",
+      "client": "Cliente",
+      "draft_failed": "Falha no rascunho"
+    }
   }
 }

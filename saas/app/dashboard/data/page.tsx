@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useTranslation } from '@/components/i18n/useTranslation'
 
 type HistoryPayload = {
   groupedItems: Record<string, Array<{ id: string; name: string; description?: string; source_url?: string }>>
@@ -8,6 +9,7 @@ type HistoryPayload = {
 }
 
 export default function DataConnectorsPage() {
+  const { t } = useTranslation()
   const [csvText, setCsvText] = useState('name,category,description,image_url,source_url\nFC Barcelona,Football Teams,Spanish football club,https://example.com/barca.jpg,https://www.fcbarcelona.com')
   const [apiEndpoint, setApiEndpoint] = useState('https://example.com/api/items')
   const [apiMapping, setApiMapping] = useState('{"name":"name","category":"category","description":"description","image_url":"image","source_url":"url"}')
@@ -24,45 +26,49 @@ export default function DataConnectorsPage() {
   useEffect(() => { refresh() }, [])
 
   async function submit(payload: Record<string, unknown>) {
-    setStatus('Importing...')
+    setStatus(t('data.importing', 'Importing...'))
     const res = await fetch('/api/data-connectors/import', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
     })
     const data = await res.json()
-    setStatus(res.ok ? `Done: ${data.inserted ?? 0} inserted` : `Error: ${data.error}`)
+    setStatus(
+      res.ok
+        ? t('data.done', 'Done: {count} inserted').replace('{count}', String(data.inserted ?? 0))
+        : t('data.error', 'Error: {error}').replace('{error}', String(data.error))
+    )
     if (res.ok) refresh()
   }
 
   return (
     <main style={{ padding: 24, color: '#fff' }}>
-      <h1 style={{ fontSize: 28, marginBottom: 16 }}>Universal Data Connector</h1>
-      <p style={{ marginBottom: 12, color: '#eab308' }}>Wikipedia reminder: Content is CC-BY-SA licensed and attribution is required.</p>
+      <h1 style={{ fontSize: 28, marginBottom: 16 }}>{t('data.title', 'Universal Data Connector')}</h1>
+      <p style={{ marginBottom: 12, color: '#eab308' }}>{t('data.wikipediaReminder', 'Wikipedia reminder: Content is CC-BY-SA licensed and attribution is required.')}</p>
 
       <section style={{ marginBottom: 20 }}>
-        <h2>Upload CSV</h2>
+        <h2>{t('data.uploadCsv', 'Upload CSV')}</h2>
         <textarea value={csvText} onChange={(e) => setCsvText(e.target.value)} style={{ width: '100%', minHeight: 100, color: '#111' }} />
-        <button onClick={() => submit({ mode: 'csv', csvText, fileName: 'manual.csv' })}>Upload CSV</button>
+        <button onClick={() => submit({ mode: 'csv', csvText, fileName: 'manual.csv' })}>{t('data.uploadCsv', 'Upload CSV')}</button>
       </section>
 
       <section style={{ marginBottom: 20 }}>
-        <h2>Add API Connector</h2>
+        <h2>{t('data.addApi', 'Add API Connector')}</h2>
         <input value={apiEndpoint} onChange={(e) => setApiEndpoint(e.target.value)} style={{ width: '100%', color: '#111' }} />
         <textarea value={apiMapping} onChange={(e) => setApiMapping(e.target.value)} style={{ width: '100%', minHeight: 100, color: '#111' }} />
-        <button onClick={() => submit({ mode: 'api', endpoint: apiEndpoint, mapping: JSON.parse(apiMapping), config: { label: 'Restaurants API' } })}>Run API Import</button>
+        <button onClick={() => submit({ mode: 'api', endpoint: apiEndpoint, mapping: JSON.parse(apiMapping), config: { label: 'Restaurants API' } })}>{t('data.runApi', 'Run API Import')}</button>
       </section>
 
       <section style={{ marginBottom: 20 }}>
-        <h2>Add Scraper Connector</h2>
+        <h2>{t('data.addScraper', 'Add Scraper Connector')}</h2>
         <textarea value={scraperJson} onChange={(e) => setScraperJson(e.target.value)} style={{ width: '100%', minHeight: 100, color: '#111' }} />
-        <button onClick={() => submit({ mode: 'scraper', json: JSON.parse(scraperJson), config: { script: 'custom scraper output' } })}>Run Scraper Import</button>
+        <button onClick={() => submit({ mode: 'scraper', json: JSON.parse(scraperJson), config: { script: 'custom scraper output' } })}>{t('data.runScraper', 'Run Scraper Import')}</button>
       </section>
 
       <p>{status}</p>
 
       <section style={{ marginTop: 24 }}>
-        <h2>Imported Items by Category</h2>
+        <h2>{t('data.importedItems', 'Imported Items by Category')}</h2>
         {Object.entries(history.groupedItems).map(([category, items]) => (
           <div key={category} style={{ marginBottom: 12 }}>
             <h3>{category}</h3>
@@ -74,7 +80,7 @@ export default function DataConnectorsPage() {
       </section>
 
       <section style={{ marginTop: 24 }}>
-        <h2>Source History</h2>
+        <h2>{t('data.sourceHistory', 'Source History')}</h2>
         <ul>
           {history.sources.map((source) => (
             <li key={source.id}>{source.type} — {new Date(source.created_at).toLocaleString()} — {JSON.stringify(source.config)}</li>

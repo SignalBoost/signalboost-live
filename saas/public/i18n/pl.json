@@ -209,5 +209,89 @@
     "pricing": {
       "a1": "Website: $19 / $49 / $149 · Podcast: $29 / $79 / $299 · Network starting at $299/mo"
     }
-  }
+  },
+  "pricing_page": {
+    "free": {
+      "video": "Narzędzia wideo w zestawie"
+    },
+    "starter": {
+      "video": "Podstawowe generowanie wideo"
+    },
+    "pro": {
+      "video": "Generowanie wideo Pro"
+    },
+    "business": {
+      "video": "Generowanie wideo dla firm"
+    }
+  },
+  "settings": {
+    "title": "Ustawienia systemu",
+    "subtitle": "Skonfiguruj opcje konta, webhooki synchronizacji danych i reguły routingu.",
+    "workspace": "Ogólne ustawienia obszaru roboczego",
+    "platformLabel": "Etykieta instancji platformy",
+    "ingestion": "Kanały pozyskiwania danych",
+    "webhookTarget": "Docelowy webhook pozyskiwania afiliacyjnego",
+    "webhookHelp": "Bezpośredni adres docelowy do przetwarzania hooków ruchu z zewnętrznych systemów turystycznych i marketplace.",
+    "automation": "Automatyzacja i wyzwalacze",
+    "emailSummaries": "Podsumowania generowania emaili",
+    "emailSummariesHelp": "Otrzymuj automatyczne dzienniki aktywności po zakończeniu przetwarzania zasobów wideo.",
+    "autoTopup": "Automatyczne doładowanie mocy obliczeniowej",
+    "autoTopupHelp": "Automatycznie doładuj kredyty salda systemu, gdy spadnie poniżej 50 jednostek.",
+    "saving": "Aktualizowanie reguł...",
+    "save": "Zapisz konfigurację",
+    "saved": "Konfiguracja systemu została zapisana pomyślnie!"
+  },
+  "data": {
+    "title": "Uniwersalny konektor danych",
+    "wikipediaReminder": "Przypomnienie z Wikipedii: treści są na licencji CC-BY-SA i wymagają atrybucji.",
+    "uploadCsv": "Prześlij CSV",
+    "addApi": "Dodaj konektor API",
+    "runApi": "Uruchom import API",
+    "addScraper": "Dodaj konektor scrapera",
+    "runScraper": "Uruchom import scrapera",
+    "importedItems": "Zaimportowane elementy według kategorii",
+    "sourceHistory": "Historia źródeł",
+    "importing": "Importowanie...",
+    "done": "Gotowe: wstawiono {count}",
+    "error": "Błąd: {error}"
+  },
+  "sales": {
+    "title": "🧠 Agent sprzedaży AI",
+    "subtitle": "Podaj AI prospekta. Przygotuje profesjonalny email sprzedażowy do sprawdzenia i wysłania.",
+    "prospect": "Prospekt",
+    "company": "Nazwa firmy",
+    "contact": "Imię kontaktu",
+    "email": "Email",
+    "website": "Strona internetowa",
+    "industry": "Branża",
+    "notes": "Notatki o tym prospekcie",
+    "drafting": "Tworzenie szkicu...",
+    "generate": "Wygeneruj email sprzedażowy",
+    "aiDraft": "Szkic AI",
+    "emptyDraft": "Email sprzedażowy pojawi się tutaj.",
+    "subject": "Temat",
+    "openEmail": "Otwórz w emailu",
+    "pipeline": {
+      "title": "Pipeline sprzedaży",
+      "subtitle": "Śledź prospektów od odkrycia do klienta.",
+      "loading": "Ładowanie pipeline...",
+      "noLeads": "Brak leadów",
+      "unnamed": "Firma bez nazwy",
+      "noIndustry": "Brak branży",
+      "noCountry": "Brak kraju",
+      "noEmail": "Brak emaila",
+      "draft": "Szkic:"
+    },
+    "status": {
+      "discovered": "Odkryte",
+      "approved": "Zatwierdzone",
+      "draft_ready": "Szkic gotowy",
+      "sketch_ready": "Szkic strony gotowy",
+      "sent": "Wysłane",
+      "replied": "Odpowiedziano",
+      "client": "Klient",
+      "draft_failed": "Szkic nieudany"
+    }
+  },
+  "singleLanguageContent": "Treść w jednym języku"
 }

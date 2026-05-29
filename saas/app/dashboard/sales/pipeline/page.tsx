@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useTranslation } from '@/components/i18n/useTranslation'
 
 type Lead = {
   id: string
@@ -28,6 +29,7 @@ const STATUSES = [
 ]
 
 export default function SalesPipelinePage() {
+  const { t } = useTranslation()
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -66,15 +68,15 @@ export default function SalesPipelinePage() {
     >
       <div style={{ maxWidth: 1400, margin: '0 auto' }}>
         <h1 style={{ fontSize: 42, marginBottom: 8 }}>
-          Sales Pipeline
+          {t('sales.pipeline.title', 'Sales Pipeline')}
         </h1>
 
         <p style={{ color: 'rgba(255,255,255,.6)', marginBottom: 28 }}>
-          Track prospects from discovery to client.
+          {t('sales.pipeline.subtitle', 'Track prospects from discovery to client.')}
         </p>
 
         {loading ? (
-          <div style={emptyStyle}>Loading pipeline...</div>
+          <div style={emptyStyle}>{t('sales.pipeline.loading', 'Loading pipeline...')}</div>
         ) : (
           <div
             style={{
@@ -104,11 +106,11 @@ export default function SalesPipelinePage() {
                     marginBottom: 14,
                   }}
                 >
-                  {label(group.status)} ({group.leads.length})
+                  {t(`sales.status.${group.status}`, label(group.status))} ({group.leads.length})
                 </h2>
 
                 {group.leads.length === 0 && (
-                  <div style={emptyStyle}>No leads</div>
+                  <div style={emptyStyle}>{t('sales.pipeline.noLeads', 'No leads')}</div>
                 )}
 
                 {group.leads.map(lead => (
@@ -122,14 +124,14 @@ export default function SalesPipelinePage() {
                       marginBottom: 12,
                     }}
                   >
-                    <strong>{lead.company || 'Unnamed company'}</strong>
+                    <strong>{lead.company || t('sales.pipeline.unnamed', 'Unnamed company')}</strong>
 
                     <div style={metaStyle}>
-                      {lead.industry || 'No industry'} · {lead.country || 'No country'}
+                      {lead.industry || t('sales.pipeline.noIndustry', 'No industry')} · {lead.country || t('sales.pipeline.noCountry', 'No country')}
                     </div>
 
                     <div style={metaStyle}>
-                      {lead.email || 'No email'}
+                      {lead.email || t('sales.pipeline.noEmail', 'No email')}
                     </div>
 
                     {lead.draft_subject && (
@@ -143,7 +145,7 @@ export default function SalesPipelinePage() {
                           fontSize: 12,
                         }}
                       >
-                        <strong>Draft:</strong> {lead.draft_subject}
+                        <strong>{t('sales.pipeline.draft', 'Draft:')}</strong> {lead.draft_subject}
                       </div>
                     )}
 

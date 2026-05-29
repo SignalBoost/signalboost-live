@@ -1,63 +1,35 @@
-"use client";
+'use client'
 
-import LanguageSwitcher from "@/components/i18n/LanguageSwitcher";
-import { useI18n } from "@/components/i18n/I18nProvider";
-import { useTranslation } from "@/lib/i18n/useTranslation";
+import Link from 'next/link'
+import LanguageSwitcher from '@/components/i18n/LanguageSwitcher'
+import { useI18n } from '@/components/i18n/I18nProvider'
+import { useTranslation } from '@/lib/i18n/useTranslation'
+
+const nav = [
+  ['nav.home', '/'], ['nav.podcasters', '/podcasters'], ['nav.pricing', '/pricing'], ['nav.docs', '/docs'], ['nav.dashboard', '/dashboard'],
+]
 
 export default function HomePage() {
-  const { lang, setLang } = useI18n();
-  const { t } = useTranslation();
-
+  const { lang, setLang } = useI18n()
+  const { t } = useTranslation()
   return (
     <main className="min-h-screen bg-black text-white p-8">
-      <header className="flex items-center justify-between mb-12">
-        <h1 className="text-2xl font-bold text-[#FFD700]">
-          SignalBoost
-        </h1>
-
+      <header className="flex flex-wrap items-center justify-between gap-4 mb-16">
+        <Link href="/" className="text-2xl font-bold text-[#FFD700] no-underline">SignalBoost</Link>
+        <nav className="flex flex-wrap gap-4 text-sm">
+          {nav.map(([key, href]) => <Link key={href} href={href} className="text-white/70 hover:text-white no-underline">{t(key)}</Link>)}
+        </nav>
         <LanguageSwitcher current={lang} onChange={setLang} />
       </header>
-
-      <section className="max-w-3xl">
-        <p className="text-sm text-[#FFD700] mb-3">
-          Current language: {lang.toUpperCase()}
-        </p>
-
-        <h2 className="text-4xl font-bold mb-4">
-          {t("dashboard.title")}
-        </h2>
-
-        <p className="text-neutral-400 text-lg mb-8">
-          {t("dashboard.subtitle")}
-        </p>
-
-        <div className="flex gap-4">
-          <button className="px-5 py-3 rounded-lg bg-[#FFD700] text-black font-semibold">
-            {t("projects.create")}
-          </button>
-
-          <button className="px-5 py-3 rounded-lg border border-neutral-700 text-white">
-            {t("editor.preview")}
-          </button>
-        </div>
-      </section>
-
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-12">
-        <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-5">
-          <h3 className="font-semibold mb-2">{t("projects.title")}</h3>
-          <p className="text-sm text-neutral-400">{t("projects.empty")}</p>
-        </div>
-
-        <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-5">
-          <h3 className="font-semibold mb-2">{t("billing.title")}</h3>
-          <p className="text-sm text-neutral-400">{t("billing.current")}</p>
-        </div>
-
-        <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-5">
-          <h3 className="font-semibold mb-2">{t("nav.automations")}</h3>
-          <p className="text-sm text-neutral-400">{t("common.loading")}</p>
+      <section className="max-w-4xl">
+        <p className="text-sm text-[#FFD700] mb-3">{t('landing.kicker')}</p>
+        <h1 className="text-5xl font-bold mb-5">{t('landing.title')}</h1>
+        <p className="text-neutral-400 text-xl mb-8">{t('landing.subtitle')}</p>
+        <div className="flex flex-wrap gap-4">
+          <Link href="/dashboard" className="px-5 py-3 rounded-lg bg-[#FFD700] text-black font-semibold no-underline">{t('landing.cta')}</Link>
+          <Link href="/pricing" className="px-5 py-3 rounded-lg border border-neutral-700 text-white no-underline">{t('landing.secondary')}</Link>
         </div>
       </section>
     </main>
-  );
+  )
 }

@@ -991,5 +991,160 @@
       "approvedMustBeBoolean": "Aprovado deve ser booleano"
     }
   },
-  "singleLanguageContent": "Conteúdo em {language}"
+  "singleLanguageContent": "Conteúdo em {language}",
+  "support": {
+    "help": "Ajuda",
+    "faq": "FAQ",
+    "contact": "Contato com suporte",
+    "documentation": "Documentação",
+    "kicker": "Fluxo de suporte",
+    "title": "Como podemos ajudar?",
+    "subtitle": "Comece pelo FAQ ou pela documentação e depois envie uma solicitação localizada com o contexto necessário.",
+    "defaultSubject": "Solicitação de suporte SignalBoost",
+    "faqDesc": "Procure respostas primeiro.",
+    "docsDesc": "Leia os guias do produto.",
+    "email": "Enviar e-mail ao suporte",
+    "topic": "Assunto",
+    "topicPlaceholder": "Cobrança, publicação do site, avaliações, áudio...",
+    "details": "Detalhes",
+    "detailsPlaceholder": "Conte o que aconteceu, o que você esperava e a página em que estava trabalhando.",
+    "send": "Abrir solicitação por e-mail"
+  },
+  "concierge": {
+    "title": "Concierge de IA",
+    "button": "Concierge",
+    "greeting": "Olá, sou o Concierge SignalBoost. Pergunte sobre seu workspace ou abra FAQ, suporte e documentação abaixo.",
+    "placeholder": "Pergunte qualquer coisa...",
+    "send": "Enviar",
+    "thinking": "Pensando...",
+    "fallback": "Não consegui criar uma resposta.",
+    "connectionError": "Problema de conexão. Tente novamente.",
+    "close": "Fechar concierge",
+    "quick": {
+      "video": {
+        "label": "🎥 Vídeo",
+        "prompt": "Como criar vídeos no SignalBoost?"
+      },
+      "credits": {
+        "label": "⚡ Créditos",
+        "prompt": "Explique como funcionam os créditos no SignalBoost."
+      },
+      "growth": {
+        "label": "📈 Crescimento",
+        "prompt": "Dê ideias de crescimento usando o SignalBoost."
+      },
+      "support": {
+        "label": "💬 Suporte",
+        "prompt": "Preciso de ajuda para usar o SignalBoost."
+      }
+    }
+  },
+  "plan": {
+    "free": "Grátis",
+    "starter": "Inicial",
+    "pro": "Pro",
+    "business": "Empresa"
+  },
+  "dashboard_modules": {
+    "kicker": "Módulos do workspace",
+    "title": "Escolha o que criar agora",
+    "promote": {
+      "title": "Promote business",
+      "desc": "Build campaigns, ads, social copy, and local outreach from one brand brief.",
+      "cta": "Open marketing tools",
+      "task1": "Campaign brief generator",
+      "task2": "Localized ad copy",
+      "task3": "Outreach queue"
+    },
+    "builder": {
+      "title": "Build a website",
+      "desc": "Describe your business and publish a responsive multilingual website.",
+      "cta": "Open website builder",
+      "task1": "AI site outline",
+      "task2": "Live preview",
+      "task3": "One-click publishing"
+    },
+    "reviews": {
+      "title": "Collect reviews",
+      "desc": "Create shareable review links and convert feedback into testimonials.",
+      "cta": "Open review collection",
+      "task1": "Public review page",
+      "task2": "Rating capture",
+      "task3": "Testimonial library"
+    },
+    "audio": {
+      "title": "Generate audio",
+      "desc": "Turn scripts into natural voice content for every supported language.",
+      "cta": "Open audio studio",
+      "task1": "Voice selection",
+      "task2": "Script localization",
+      "task3": "Audio export"
+    },
+    "video": {
+      "title": "Create videos",
+      "desc": "Generate video concepts, creative assets, and publish-ready clips.",
+      "cta": "Open video creator",
+      "task1": "Video prompts",
+      "task2": "Creative previews",
+      "task3": "Clip workflow"
+    },
+    "lab": {
+      "title": "Lab",
+      "desc": "Experiment with search, video, and emerging AI workflows before they graduate.",
+      "cta": "Open lab",
+      "task1": "Video search",
+      "task2": "Motion prompts",
+      "task3": "Prototype workflows"
+    },
+    "apprentice": {
+      "title": "Workshop Apprentice",
+      "desc": "Follow guided tutorials that teach the fastest path through each SignalBoost tool.",
+      "cta": "Start tutorial",
+      "task1": "Beginner path",
+      "task2": "Tool walkthroughs",
+      "task3": "Launch checklist"
+    }
+  },
+  "faq": {
+    "kicker": "Central de ajuda",
+    "title": "Perguntas frequentes",
+    "subtitle": "Pesquise respostas localizadas, navegue por categorias ou fale com o suporte.",
+    "search": "Buscar perguntas...",
+    "empty": "Nenhuma resposta corresponde à busca.",
+    "categories": {
+      "all": "Tudo",
+      "gettingStarted": "Primeiros passos",
+      "billing": "Cobrança",
+      "websites": "Sites",
+      "reviews": "Avaliações",
+      "audioVideo": "Áudio e vídeo",
+      "support": "Suporte"
+    },
+    "questions": {
+      "start": {
+        "q": "How do I start with SignalBoost?",
+        "a": "Open Dashboard, choose a module, and follow the guided prompt. You can build a website, collect reviews, create audio, make video, or ask Concierge for help."
+      },
+      "credits": {
+        "q": "How do credits and Pro work?",
+        "a": "Your credits and plan label are loaded from your account through the credits API. Upgrading increases limits for publishing, generation, and team workflows."
+      },
+      "website": {
+        "q": "Can SignalBoost build my website?",
+        "a": "Yes. Use Build a website to describe your business, preview the generated site, and publish when ready."
+      },
+      "reviews": {
+        "q": "How do I collect customer reviews?",
+        "a": "Open Collect reviews, create your public review handle, share the link, and reuse approved testimonials in marketing."
+      },
+      "audio": {
+        "q": "What audio and video tools are included?",
+        "a": "Generate audio from scripts, localize content, and create video prompts or assets from the dashboard video and lab modules."
+      },
+      "support": {
+        "q": "How do I contact support?",
+        "a": "Use the Concierge button, open Contact Support, or email support@signalboostapp.com. Include your account email and the page where you need help."
+      }
+    }
+  }
 }

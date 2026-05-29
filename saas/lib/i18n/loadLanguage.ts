@@ -14,7 +14,33 @@ const dictionaries: Record<string, () => Promise<Dict>> = {
     import('@/locales/ru.json').then(m => m.default as Dict),
 }
 
+function isDict(value: DictValue | undefined): value is Dict {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function mergeWithEnglishFallback(english: Dict, localized: Dict): Dict {
+  const merged: Dict = { ...english }
+
+  for (const [key, value] of Object.entries(localized)) {
+    const englishValue = english[key]
+    if (isDict(englishValue) && isDict(value)) {
+      merged[key] = mergeWithEnglishFallback(englishValue, value)
+    } else {
+      merged[key] = value
+    }
+  }
+
+  return merged
+}
+
 export async function loadLanguage(lang: string): Promise<Dict> {
-  const loader = dictionaries[lang] || dictionaries['en']
-  return loader()
+  const english = await dictionaries.en()
+  if (lang === 'en' || !dictionaries[lang]) return english
+
+  try {
+    const localized = await dictionaries[lang]()
+    return mergeWithEnglishFallback(english, localized)
+  } catch {
+    return english
+  }
 }

@@ -1,7 +1,5 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 // Verified sender identities, aligned to the Signal ecosystem.
 export const SENDERS = {
   signalSupport: 'SignalBoost Team <signalsupport@signalboostapp.com>',
@@ -14,6 +12,12 @@ export const SENDERS = {
 
 type SenderKey = keyof typeof SENDERS
 
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) return null
+  return new Resend(apiKey)
+}
+
 export async function sendEmail(opts: {
   from: SenderKey
   to: string
@@ -22,6 +26,9 @@ export async function sendEmail(opts: {
   replyTo?: string
 }) {
   try {
+    const resend = getResendClient()
+    if (!resend) return { ok: false, error: 'RESEND_API_KEY is not configured' }
+
     const { data, error } = await resend.emails.send({
       from: SENDERS[opts.from],
       to: opts.to,

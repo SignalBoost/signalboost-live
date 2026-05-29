@@ -16,12 +16,12 @@ export default function ApprenticeWorkshopPage() {
 
   return (
     <main style={{ padding: 24, color: '#fff', background: '#0b1020', minHeight: '100vh' }}>
-      <h1>{t(dict, 'apprentice.title', '')}</h1>
-      <p>{t(dict, 'apprentice.subtitle', '')}</p>
+      <h1>{t(dict, 'apprentice.title', 'Workshop Apprentice')}</h1>
+      <p>{t(dict, 'apprentice.subtitle', 'Guided tutorials for every SignalBoost workflow.')}</p>
       <ul>
         {items.map((item) => (
           <li key={item.key}>
-            <Link href={item.href}>{t(dict, `apprentice.modules.${item.key}`, '')}</Link>
+            <Link href={item.href}>{t(dict, `apprentice.modules.${item.key}`, item.key)}</Link>
           </li>
         ))}
       </ul>

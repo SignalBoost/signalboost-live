@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import TeamManager from '@/components/TeamManager'
+import DashboardModules from '@/components/dashboard/DashboardModules'
 import AuthModal from '@/components/AuthModal'
 import { supabase } from '@/utils/supabase/client'
 import { useI18n } from '@/components/i18n/I18nProvider'
@@ -338,6 +339,8 @@ export default function DashboardOverviewPage() {
       `}</style>
 
       {showLoginGate && <AuthModal onClose={() => {}} />}
+
+      <DashboardModules />
 
       <div style={{ opacity: showLoginGate ? 0.2 : 1, pointerEvents: showLoginGate ? 'none' : 'auto', filter: showLoginGate ? 'blur(2px)' : 'none', transition: 'all 0.3s' }}>
 

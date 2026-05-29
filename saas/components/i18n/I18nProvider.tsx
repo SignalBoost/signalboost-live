@@ -51,11 +51,8 @@ function getInitialLanguage() {
     localStorage.getItem('signalboost_language') ||
     localStorage.getItem('site-language')
 
-  if (
-    saved &&
-    SUPPORTED_LANGS.includes(saved)
-  ) {
-    return saved
+  if (saved) {
+    return normalizeLang(saved)
   }
 
   const browser =

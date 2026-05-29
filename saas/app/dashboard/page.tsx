@@ -497,7 +497,7 @@ export default function DashboardOverviewPage() {
                 ))}
               </div>
 
-              <Link href="/dashboard/builder" className="terminal-text" style={{ display: 'block', textAlign: 'center', marginTop: 14, background: GOLD, color: '#000', padding: 12, borderRadius: 6, textDecoration: 'none', fontWeight: 800, fontSize: 12 }}>
+              <Link href="/dashboard/operator" className="terminal-text" style={{ display: 'block', textAlign: 'center', marginTop: 14, background: GOLD, color: '#000', padding: 12, borderRadius: 6, textDecoration: 'none', fontWeight: 800, fontSize: 12 }}>
                 {termCase(L.openInBuilder, lang)}
               </Link>
             </div>
@@ -560,7 +560,7 @@ export default function DashboardOverviewPage() {
                 {L.upgrade}
               </Link>
             ) : (
-              <Link href="/dashboard/builder" className="terminal-text" style={{ background: GOLD, color: '#000', padding: '10px 20px', border: 'none', borderRadius: 6, fontWeight: 800, fontSize: 11, textDecoration: 'none' }}>
+              <Link href="/dashboard/operator" className="terminal-text" style={{ background: GOLD, color: '#000', padding: '10px 20px', border: 'none', borderRadius: 6, fontWeight: 800, fontSize: 11, textDecoration: 'none' }}>
                 {termCase(L.createProject, lang)}
               </Link>
             )}

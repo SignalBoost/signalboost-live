@@ -13,7 +13,7 @@ export type AdminSectionConfig = {
   tableColumns: string[]
 }
 
-const unknown = 'Not tracked yet'
+const unknown = 'Awaiting data'
 
 export const ADMIN_SECTIONS: Record<string, AdminSectionConfig> = {
   overview: {

@@ -35,7 +35,7 @@ export default function AdminSectionView({ section }: { section: AdminSectionCon
         {section.metrics.map(metric => (
           <div key={metric.key} className="sb-glass-soft" style={{ padding: 18 }}>
             <p className="sb-caption" style={{ textTransform: 'uppercase', letterSpacing: '0.12em' }}>{metric.label}</p>
-            <p className="sb-h3" style={{ marginTop: 8 }}>{metric.value ?? 'Not tracked yet'}</p>
+            <p className="sb-h3" style={{ marginTop: 8 }}>{metric.value ?? 'Awaiting data'}</p>
           </div>
         ))}
       </section>
@@ -51,7 +51,7 @@ export default function AdminSectionView({ section }: { section: AdminSectionCon
               <tr>{section.tableColumns.map(c => <th key={c} style={{ textAlign: 'left', padding: 14 }}>{c}</th>)}</tr>
             </thead>
             <tbody>
-              <tr><td colSpan={section.tableColumns.length} style={{ padding: 28, color: 'var(--text-muted)' }}>Not tracked yet. Connect this panel to analytics tables/events when available.</td></tr>
+              <tr><td colSpan={section.tableColumns.length} style={{ padding: 28, color: 'var(--text-muted)' }}>Live analytics will appear here as soon as the connected events begin reporting.</td></tr>
             </tbody>
           </table>
         </div>

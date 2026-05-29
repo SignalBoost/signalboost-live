@@ -246,7 +246,11 @@ function SectionView({ section, theme, displayFont, idx }: { section: Section; t
                 <iframe src={embed} title={heading || 'Video'} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }} />
               )
             ) : (
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.5)', fontSize: 15 }}>Video coming soon</div>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: '#fff', padding: 28, background: `linear-gradient(135deg, ${withAlpha(primary, 0.95)}, ${withAlpha(accent, 0.95)})` }}>
+                <span style={{ fontSize: 44, lineHeight: 1 }} aria-hidden="true">🎬</span>
+                <strong style={{ fontFamily: displayFont, fontSize: 'clamp(20px, 3vw, 30px)' }}>{heading || 'Brand story video'}</strong>
+                {(sub || section.body) && <span style={{ maxWidth: 560, color: 'rgba(255,255,255,0.86)', fontSize: 15, lineHeight: 1.6 }}>{sub || section.body}</span>}
+              </div>
             )}
           </div>
         </div>

@@ -3,7 +3,7 @@ import PodcastSection from '@/components/PodcastSection'
 
 export default function Home() {
   return (
-    <main
+    <div
       style={{
         minHeight: '100vh',
         background: 'var(--bg-base)',
@@ -18,6 +18,6 @@ export default function Home() {
       >
         <PodcastSection />
       </div>
-    </main>
+    </div>
   )
 }

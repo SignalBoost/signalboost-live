@@ -23,6 +23,14 @@ type OutreachRow = {
 
 type SendLimit = { ok: boolean; count: number; limit: number }
 
+const socialPlatforms = [
+  { key: 'facebook_pages', label: 'Facebook Pages' },
+  { key: 'instagram_business', label: 'Instagram Business' },
+  { key: 'linkedin_company', label: 'LinkedIn Company' },
+  { key: 'twitter_x', label: 'Twitter/X' },
+  { key: 'youtube_channels', label: 'YouTube Channels' },
+]
+
 const tabs: Array<{ status: OutreachStatus; label: string }> = [
   { status: 'pending', label: 'Pending Approval' },
   { status: 'approved', label: 'Approved (waiting to send)' },
@@ -48,6 +56,10 @@ export default function OutreachDashboardClient() {
   const [messageDraft, setMessageDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
+  const [socialPlatform, setSocialPlatform] = useState('facebook_pages')
+  const [socialText, setSocialText] = useState('')
+  const [socialImageUrl, setSocialImageUrl] = useState('')
+  const [socialVideoUrl, setSocialVideoUrl] = useState('')
 
   const selected = useMemo(() => rows.find(row => row.id === selectedId) || rows[0] || null, [rows, selectedId])
   const counts = useMemo(() => rows.reduce((acc, row) => {
@@ -72,6 +84,7 @@ export default function OutreachDashboardClient() {
 
   useEffect(() => {
     setMessageDraft(selected?.outreach_message || '')
+    setSocialText(selected?.social_plan?.seven_day_calendar?.[0]?.caption || selected?.outreach_message || '')
   }, [selected?.id, selected?.outreach_message])
 
   async function generatePackage() {
@@ -137,6 +150,27 @@ export default function OutreachDashboardClient() {
     setBusy(false)
     setNotice(res.ok ? 'Message saved for human approval.' : json.error || 'Message save failed.')
     await load(activeTab)
+  }
+
+  async function connectSocial(platform = socialPlatform) {
+    const res = await fetch(`/api/outreach/social/oauth?platform=${platform}`, { cache: 'no-store' })
+    const json = await res.json()
+    setNotice(res.ok ? `OAuth ready for ${json.connector?.label}. Open provider URL from the logged response when credentials are configured.` : json.error || 'OAuth start failed.')
+  }
+
+  async function sendSocialNow() {
+    if (!selected) return
+    setBusy(true)
+    const res = await fetch('/api/outreach/social/post', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ outreach_id: selected.id, platform: socialPlatform, text: socialText, image_url: socialImageUrl || undefined, video_url: socialVideoUrl || undefined }),
+    })
+    const json = await res.json()
+    setBusy(false)
+    setNotice(res.ok ? `Social post queued/sent through ${socialPlatform}; engagement tracking started.` : json.error || 'Social post failed.')
+    if (res.ok) setActiveTab('sent')
+    await load(res.ok ? 'sent' : activeTab)
   }
 
   async function sendNow() {
@@ -246,6 +280,37 @@ export default function OutreachDashboardClient() {
                   <button disabled={sendBlocked} onClick={sendNow} className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Send Now</button>
                 </div>
                 <p className="mt-2 text-xs text-slate-500">Send Now is only enabled for approved messages while the 50-per-24-hours limit has capacity.</p>
+              </div>
+
+              <div className="rounded-2xl border border-cyan-400/20 bg-slate-950 p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="font-semibold text-white">Social Outreach</h3>
+                    <p className="mt-1 text-xs text-slate-500">OAuth connectors support text, image, and video posts with likes, shares, and comments logged back to Admin Console.</p>
+                  </div>
+                  <span className="rounded-full border border-amber-400/30 px-3 py-1 text-xs font-semibold text-amber-200">{sendLimit.count}/{sendLimit.limit} posts today</span>
+                </div>
+                <div className="mt-4 grid gap-3 lg:grid-cols-[220px_1fr]">
+                  <div className="space-y-2">
+                    {socialPlatforms.map(platform => (
+                      <button key={platform.key} onClick={() => { setSocialPlatform(platform.key); connectSocial(platform.key) }} className={`w-full rounded-xl border px-3 py-2 text-left text-sm ${socialPlatform === platform.key ? 'border-cyan-300 bg-cyan-300/10 text-white' : 'border-slate-800 bg-slate-900 text-slate-300'}`}>
+                        {platform.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="space-y-3">
+                    <textarea value={socialText} onChange={event => setSocialText(event.target.value)} className="min-h-36 w-full rounded-xl border border-slate-700 bg-slate-900 p-3 text-sm leading-6 text-slate-100 outline-none focus:border-cyan-300" placeholder="Generated caption or post text" />
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <input value={socialImageUrl} onChange={event => setSocialImageUrl(event.target.value)} placeholder="Image URL (optional)" className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-300" />
+                      <input value={socialVideoUrl} onChange={event => setSocialVideoUrl(event.target.value)} placeholder="Video URL (optional)" className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-300" />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button disabled={busy} onClick={() => connectSocial()} className="rounded-xl border border-cyan-400/30 px-4 py-2 text-sm font-semibold text-cyan-100 disabled:opacity-50">Authenticate OAuth</button>
+                      <button disabled={sendBlocked} onClick={sendSocialNow} className="rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-50">Approve & Send Social</button>
+                    </div>
+                    <p className="text-xs text-slate-500">Compliance: requires approved queue status, enforces 50 posts/day, and centralizes provider rate-limit policy checks before publishing.</p>
+                  </div>
+                </div>
               </div>
             </section>
           ) : (

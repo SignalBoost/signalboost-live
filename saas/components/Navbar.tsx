@@ -40,21 +40,34 @@ export default function Navbar() {
   const [credits, setCredits]     = useState<number>(0)
   const [plan, setPlan]           = useState<string>('free')
   const [userName, setUserName]   = useState<string | null>(null)
+  const [isAdmin, setIsAdmin]     = useState(false)
 
   // Auth + credits
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       const u = data?.user ?? null
       setUser(u)
-      if (u) fetchCredits()
+      if (u) { fetchCredits(); checkAdminRole(u) } else setIsAdmin(false)
     })
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       const u = session?.user ?? null
       setUser(u)
-      if (u) fetchCredits()
+      if (u) { fetchCredits(); checkAdminRole(u) } else setIsAdmin(false)
     })
     return () => { listener.subscription.unsubscribe() }
   }, [])
+
+  async function checkAdminRole(u: any) {
+    const metadataRole = u?.user_metadata?.role
+    if (metadataRole === 'owner' || metadataRole === 'admin') { setIsAdmin(true); return }
+    try {
+      const { data } = await supabase
+        .from('team_members')
+        .select('role,status,owner_id,member_id')
+        .or(`member_id.eq.${u.id},owner_id.eq.${u.id}`)
+      setIsAdmin(!!data?.some((m: any) => (m.status === 'active' || m.owner_id === u.id) && (m.role === 'owner' || m.role === 'admin' || m.owner_id === u.id)))
+    } catch { setIsAdmin(false) }
+  }
 
   async function fetchCredits() {
     try {
@@ -103,19 +116,20 @@ export default function Navbar() {
   }
 
   const navLinks = [
-    { label: t(dict, 'home', 'Home'),           href: '/' },
-    { label: t(dict, 'podcasters', 'Podcasters'), href: '/podcasters' },
-    { label: t(dict, 'dashboard', 'Dashboard'), href: '/dashboard' },
-    { label: t(dict, 'pricing', 'Pricing'),     href: '/pricing' },
-    { label: t(dict, 'docs', 'Docs'),            href: '/docs' },
+    { label: t(dict, 'aiNav.home', 'Home'), href: '/', icon: '⌂' },
   ]
 
-  const toolLinks = SERVICES.map((service) => ({
+  const serviceNavLinks = SERVICES.map((service) => ({
     icon: service.icon,
     label: t(dict, `services.${service.key}.title`, service.titleFallback),
     href: service.dashboardHref,
     featured: service.key === 'promote',
   }))
+
+  const toolLinks = [
+    ...serviceNavLinks,
+    ...(isAdmin ? [{ icon: '🛡️', label: t(dict, 'aiNav.admin', 'Admin'), href: '/admin', featured: false }] : []),
+  ]
 
   const planStyle = PLAN_STYLES[plan] || PLAN_STYLES.free
   const planLabel = t(dict, `plan.${plan}`, plan.charAt(0).toUpperCase() + plan.slice(1))
@@ -126,8 +140,9 @@ export default function Navbar() {
       <nav style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '16px 32px',
-        background: 'rgba(10,10,15,.88)',
-        borderBottom: user ? 'none' : '1px solid var(--border-soft)',
+        background: 'linear-gradient(135deg, rgba(8,10,20,.82), rgba(15,23,42,.58))',
+        borderBottom: '1px solid rgba(26,240,255,.16)',
+        boxShadow: '0 18px 60px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.08)',
         position: 'sticky', top: 0, zIndex: 100,
         backdropFilter: 'blur(12px)',
       }}>
@@ -148,7 +163,7 @@ export default function Navbar() {
                 fontWeight: isActive ? 700 : 500,
                 transition: 'all 0.15s',
               }}>
-                {item.label}
+                <span style={{ marginRight: 6 }}>{item.icon}</span>{item.label}
               </Link>
             )
           })}

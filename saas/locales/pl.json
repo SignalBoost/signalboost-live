@@ -1489,5 +1489,9 @@
     "memory": "Warstwa pamięci",
     "operatorFallback": "Awaryjny operator",
     "telemetry": "Telemetria"
+  },
+  "aiNav": {
+    "home": "Strona główna",
+    "admin": "Admin"
   }
 }

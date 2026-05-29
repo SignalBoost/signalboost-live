@@ -7,8 +7,10 @@
     "build": "next build",
     "start": "next start",
     "dev": "next dev",
-    "test": "node --test tests/promptPreprocessor.node.test.ts",
-    "validate:conflicts": "node scripts/validate-conflict-cleanup.mjs"
+    "test": "node --test tests/promptPreprocessor.node.test.ts tests/unifiedPlatform.node.test.ts",
+    "validate:conflicts": "node scripts/validate-conflict-cleanup.mjs",
+    "test:jest": "jest tests/unifiedPlatform.jest.test.ts",
+    "test:playwright": "playwright test tests/unifiedPlatform.playwright.spec.ts"
   },
   "dependencies": {
     "next": "16.2.6",

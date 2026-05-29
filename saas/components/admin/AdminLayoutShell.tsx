@@ -4,17 +4,9 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/utils/supabase/client'
+import { ADMIN_SIDEBAR } from '@/lib/platform/unifiedPlatform'
 
-const nav = [
-  ['Dashboards', '/admin'],
-  ['ADM Console', '/admin/adm'],
-  ['Security Logs', '/admin/system'],
-  ['Outreach Control', '/admin/sales'],
-  ['Predictive Insights', '/admin/ai'],
-  ['Partners', '/admin/partners'],
-  ['Revenue', '/admin/revenue'],
-  ['Settings', '/admin/settings'],
-]
+const nav = ADMIN_SIDEBAR
 
 export default function AdminLayoutShell({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
@@ -66,22 +58,24 @@ export default function AdminLayoutShell({ children }: { children: React.ReactNo
         <div className="sb-sidebar__header">
           <span className="sb-eyebrow">Owner Console</span>
           <h2>Control room</h2>
-          <p>Dashboards, security logs, outreach control, and predictive insights stay in one scan path.</p>
+          <p>Overview, Logs, Outreach, Insights, Role Management, Marketplace Monitor, SaaS Monitor, and Concierge Monitor stay in one scan path.</p>
         </div>
         <nav className="sb-sidebar__nav">
           <section className="sb-sidebar__group">
             <p>Admin flow</p>
-            {nav.map(([label, href]) => (
-              <Link key={href} href={href} className="sb-sidebar__link" style={pathname === href ? { background: 'rgba(255,195,0,.12)', color: '#fff', borderColor: 'rgba(255,195,0,.3)' } : undefined}>{label}</Link>
+            {nav.map(({ icon, label, href }) => (
+              <Link key={href} href={href} className="sb-sidebar__link" style={pathname === href ? { background: 'rgba(26,240,255,.14)', color: '#fff', borderColor: 'rgba(26,240,255,.42)', boxShadow: '0 0 24px rgba(26,240,255,.14)' } : undefined}>
+                <span aria-hidden="true">{icon}</span><span>{label}</span>
+              </Link>
             ))}
           </section>
         </nav>
       </aside>
       <main className="sb-dashboard-main">{children}</main>
       <aside className="sb-live-preview">
-        <span className="sb-eyebrow">ADM preview</span>
-        <h3>AI safety note</h3>
-        <p>Review security logs and approval queues before sending external outreach.</p>
+        <span className="sb-eyebrow">Executive preview</span>
+        <h3>Owner/admin restricted</h3>
+        <p>Financial, KPI, CRM, Outreach, Forecasting, and Concierge recommendations are restricted to owner/admin roles.</p>
       </aside>
     </div>
   )

@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+saas/node_modules/
+
+# Next.js build output
+.next/
+saas/.next/
+next-env.d.ts
+saas/next-env.d.ts
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local environment files
+.env*.local
+.env.local

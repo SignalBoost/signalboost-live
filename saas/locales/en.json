@@ -1505,5 +1505,84 @@
     "calendar": "Calendar",
     "spreadsheets": "Spreadsheets",
     "outreach": "Outreach"
+  },
+  "marketplaceHome": {
+    "pageLabel": "SignalBoost Marketplace cockpit homepage",
+    "kicker": "NASA-style marketplace HMI",
+    "title": "Plan trips, bookings, connectivity, and campaigns from one cockpit.",
+    "subtitle": "SignalBoost Concierge guides travelers and operators through partner choices with telemetry, multilingual prompts, and booking-ready actions.",
+    "searchLabel": "AI-guided marketplace search",
+    "searchPlaceholder": "Search: flights to Lima next month.",
+    "searchButton": "Scan",
+    "suggestionsLabel": "Contextual search suggestions",
+    "conciergeLabel": "Concierge AI hero widget",
+    "conciergeKicker": "Concierge AI",
+    "conciergeTitle": "Ask me to optimize the route.",
+    "conciergeText": "I can compare partners, translate search intent, and recommend the next booking or campaign action.",
+    "conciergeMetricsLabel": "Concierge telemetry",
+    "conciergeMetricOne": "Intent lock: 94%",
+    "conciergeMetricTwo": "Latency: 0.8s",
+    "conciergeMetricThree": "Locale aware",
+    "executiveLabel": "Executive marketplace telemetry",
+    "connectedLabel": "Connected with",
+    "connectedValue": "130+ trusted partners.",
+    "activeCampaigns": "Active campaigns: 24",
+    "bookingsToday": "Bookings today: 318",
+    "signalHealth": "Signal health: nominal",
+    "languageLabel": "Language selector",
+    "categoriesKicker": "Category panels",
+    "categoriesTitle": "Select a mission panel and reveal live stats.",
+    "quickStat": "Quick stat",
+    "signal": "Signal",
+    "partnerKicker": "Partner vitrina",
+    "partnerTitle": "Trusted partner carousel with neon framing.",
+    "partnerCarouselLabel": "Trusted partner logos",
+    "partnerTooltip": "Ask me about these partners.",
+    "footerLabel": "Homepage cockpit footer",
+    "footerKicker": "Support console",
+    "footerTitle": "Mission support is standing by.",
+    "footerText": "Contact support for partner onboarding, booking flow diagnostics, and SaaS module setup.",
+    "quickLinksLabel": "Quick links",
+    "supportChannel": "Contact + support",
+    "categories": {
+      "flights": {
+        "title": "Flights",
+        "description": "Predict routes, windows, fares, and partner handoff timing."
+      },
+      "hotels": {
+        "title": "Hotels",
+        "description": "Rank stays by location fit, trust signal, and campaign demand."
+      },
+      "esim": {
+        "title": "eSIM & Internet",
+        "description": "Match data packs to destination, device readiness, and trip length."
+      },
+      "tours": {
+        "title": "Tours & Activities",
+        "description": "Surface bookable experiences with demand and availability telemetry."
+      },
+      "cars": {
+        "title": "Car Rentals",
+        "description": "Compare fleet coverage, pickup flow, and conversion quality."
+      },
+      "marketplace": {
+        "title": "Marketplace",
+        "description": "Coordinate partner offers, SaaS modules, and Concierge recommendations."
+      }
+    },
+    "partners": {
+      "booking": "Booking.com",
+      "amazon": "Amazon",
+      "drimsim": "Drimsim",
+      "viator": "Viator",
+      "rentalcars": "Rentalcars",
+      "getyourguide": "GetYourGuide"
+    },
+    "quickLinks": {
+      "admin": "Admin",
+      "dashboard": "Dashboard",
+      "saasModules": "SaaS Modules",
+      "pricing": "Pricing"
+    }
   }
 }

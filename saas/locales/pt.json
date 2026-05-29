@@ -1505,5 +1505,84 @@
     "calendar": "Calendário",
     "spreadsheets": "Planilhas",
     "outreach": "Outreach"
+  },
+  "marketplaceHome": {
+    "kicker": "HMI de marketplace estilo NASA",
+    "title": "Planeje viagens, reservas, conectividade e campanhas em um cockpit.",
+    "subtitle": "O SignalBoost Concierge orienta viajantes e operadores com telemetria, prompts multilíngues e ações prontas para reserva.",
+    "searchPlaceholder": "Buscar: voos para Lima no próximo mês.",
+    "searchButton": "Escanear",
+    "conciergeTitle": "Peça para eu otimizar a rota.",
+    "conciergeText": "Posso comparar parceiros, traduzir intenção e recomendar a próxima reserva ou campanha.",
+    "connectedLabel": "Conectado com",
+    "connectedValue": "130+ parceiros confiáveis.",
+    "activeCampaigns": "Campanhas ativas: 24",
+    "bookingsToday": "Reservas hoje: 318",
+    "languageLabel": "Seletor de idioma",
+    "categoriesTitle": "Selecione um painel de missão e veja estatísticas ao vivo.",
+    "partnerTitle": "Carrossel de parceiros confiáveis com moldura neon.",
+    "partnerTooltip": "Pergunte-me sobre estes parceiros.",
+    "footerTitle": "Suporte de missão pronto.",
+    "footerText": "Contate o suporte para onboarding de parceiros, diagnósticos de reserva e módulos SaaS.",
+    "categories": {
+      "flights": {
+        "title": "Voos",
+        "description": "Preveja rotas, datas, tarifas e handoff ao parceiro."
+      },
+      "hotels": {
+        "title": "Hotéis",
+        "description": "Classifique estadias por localização, confiança e demanda."
+      },
+      "esim": {
+        "title": "eSIM e Internet",
+        "description": "Combine pacotes de dados com destino, dispositivo e duração."
+      },
+      "tours": {
+        "title": "Tours e atividades",
+        "description": "Mostre experiências reserváveis com telemetria de demanda."
+      },
+      "cars": {
+        "title": "Aluguel de carros",
+        "description": "Compare cobertura, retirada e qualidade de conversão."
+      },
+      "marketplace": {
+        "title": "Marketplace",
+        "description": "Coordene ofertas, módulos SaaS e recomendações Concierge."
+      }
+    },
+    "quickLinks": {
+      "admin": "Admin",
+      "dashboard": "Dashboard",
+      "saasModules": "Módulos SaaS",
+      "pricing": "Preços"
+    },
+    "pageLabel": "SignalBoost Marketplace cockpit homepage",
+    "searchLabel": "AI-guided marketplace search",
+    "suggestionsLabel": "Contextual search suggestions",
+    "conciergeLabel": "Concierge AI hero widget",
+    "conciergeKicker": "Concierge AI",
+    "conciergeMetricsLabel": "Concierge telemetry",
+    "conciergeMetricOne": "Intent lock: 94%",
+    "conciergeMetricTwo": "Latency: 0.8s",
+    "conciergeMetricThree": "Locale aware",
+    "executiveLabel": "Executive marketplace telemetry",
+    "signalHealth": "Signal health: nominal",
+    "categoriesKicker": "Category panels",
+    "quickStat": "Quick stat",
+    "signal": "Signal",
+    "partnerKicker": "Partner vitrina",
+    "partnerCarouselLabel": "Trusted partner logos",
+    "footerLabel": "Homepage cockpit footer",
+    "footerKicker": "Support console",
+    "quickLinksLabel": "Quick links",
+    "supportChannel": "Contact + support",
+    "partners": {
+      "booking": "Booking.com",
+      "amazon": "Amazon",
+      "drimsim": "Drimsim",
+      "viator": "Viator",
+      "rentalcars": "Rentalcars",
+      "getyourguide": "GetYourGuide"
+    }
   }
 }

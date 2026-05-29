@@ -1505,5 +1505,84 @@
     "calendar": "Kalendarz",
     "spreadsheets": "Arkusze",
     "outreach": "Outreach"
+  },
+  "marketplaceHome": {
+    "kicker": "Marketplace HMI w stylu NASA",
+    "title": "Planuj podróże, rezerwacje, łączność i kampanie z jednego kokpitu.",
+    "subtitle": "SignalBoost Concierge prowadzi podróżnych i operatorów przez partnerów, telemetrię, wielojęzyczne podpowiedzi i gotowe akcje.",
+    "searchPlaceholder": "Szukaj: loty do Limy w przyszłym miesiącu.",
+    "searchButton": "Skanuj",
+    "conciergeTitle": "Poproś mnie o optymalizację trasy.",
+    "conciergeText": "Porównam partnerów, przetłumaczę intencję i polecę kolejną rezerwację lub kampanię.",
+    "connectedLabel": "Połączono z",
+    "connectedValue": "130+ zaufanymi partnerami.",
+    "activeCampaigns": "Aktywne kampanie: 24",
+    "bookingsToday": "Dzisiejsze rezerwacje: 318",
+    "languageLabel": "Wybór języka",
+    "categoriesTitle": "Wybierz panel misji i pokaż statystyki na żywo.",
+    "partnerTitle": "Karuzela zaufanych partnerów w neonowej ramie.",
+    "partnerTooltip": "Zapytaj mnie o tych partnerów.",
+    "footerTitle": "Wsparcie misji jest gotowe.",
+    "footerText": "Skontaktuj się ze wsparciem w sprawie partnerów, rezerwacji i modułów SaaS.",
+    "categories": {
+      "flights": {
+        "title": "Loty",
+        "description": "Prognozuj trasy, terminy, ceny i przekazanie do partnera."
+      },
+      "hotels": {
+        "title": "Hotele",
+        "description": "Oceniaj pobyty według lokalizacji, zaufania i popytu."
+      },
+      "esim": {
+        "title": "eSIM i Internet",
+        "description": "Dopasuj pakiety danych do celu, urządzenia i długości wyjazdu."
+      },
+      "tours": {
+        "title": "Wycieczki i atrakcje",
+        "description": "Pokazuj rezerwowalne atrakcje z telemetrią popytu."
+      },
+      "cars": {
+        "title": "Wynajem aut",
+        "description": "Porównuj flotę, odbiór i jakość konwersji."
+      },
+      "marketplace": {
+        "title": "Marketplace",
+        "description": "Koordynuj oferty, moduły SaaS i rekomendacje Concierge."
+      }
+    },
+    "quickLinks": {
+      "admin": "Admin",
+      "dashboard": "Dashboard",
+      "saasModules": "Moduły SaaS",
+      "pricing": "Cennik"
+    },
+    "pageLabel": "SignalBoost Marketplace cockpit homepage",
+    "searchLabel": "AI-guided marketplace search",
+    "suggestionsLabel": "Contextual search suggestions",
+    "conciergeLabel": "Concierge AI hero widget",
+    "conciergeKicker": "Concierge AI",
+    "conciergeMetricsLabel": "Concierge telemetry",
+    "conciergeMetricOne": "Intent lock: 94%",
+    "conciergeMetricTwo": "Latency: 0.8s",
+    "conciergeMetricThree": "Locale aware",
+    "executiveLabel": "Executive marketplace telemetry",
+    "signalHealth": "Signal health: nominal",
+    "categoriesKicker": "Category panels",
+    "quickStat": "Quick stat",
+    "signal": "Signal",
+    "partnerKicker": "Partner vitrina",
+    "partnerCarouselLabel": "Trusted partner logos",
+    "footerLabel": "Homepage cockpit footer",
+    "footerKicker": "Support console",
+    "quickLinksLabel": "Quick links",
+    "supportChannel": "Contact + support",
+    "partners": {
+      "booking": "Booking.com",
+      "amazon": "Amazon",
+      "drimsim": "Drimsim",
+      "viator": "Viator",
+      "rentalcars": "Rentalcars",
+      "getyourguide": "GetYourGuide"
+    }
   }
 }

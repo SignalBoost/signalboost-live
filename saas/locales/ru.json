@@ -1505,5 +1505,84 @@
     "calendar": "Календарь",
     "spreadsheets": "Таблицы",
     "outreach": "Outreach"
+  },
+  "marketplaceHome": {
+    "kicker": "HMI маркетплейса в стиле NASA",
+    "title": "Планируйте поездки, бронирования, связь и кампании из одного кокпита.",
+    "subtitle": "SignalBoost Concierge ведет путешественников и операторов через партнеров, телеметрию, многоязычные подсказки и готовые действия.",
+    "searchPlaceholder": "Поиск: рейсы в Лиму в следующем месяце.",
+    "searchButton": "Сканировать",
+    "conciergeTitle": "Попросите меня оптимизировать маршрут.",
+    "conciergeText": "Я сравню партнеров, переведу намерение и предложу следующее бронирование или кампанию.",
+    "connectedLabel": "Подключено к",
+    "connectedValue": "130+ надежным партнерам.",
+    "activeCampaigns": "Активные кампании: 24",
+    "bookingsToday": "Бронирований сегодня: 318",
+    "languageLabel": "Выбор языка",
+    "categoriesTitle": "Выберите панель миссии и откройте живую статистику.",
+    "partnerTitle": "Карусель надежных партнеров в неоновой рамке.",
+    "partnerTooltip": "Спросите меня об этих партнерах.",
+    "footerTitle": "Поддержка миссии готова.",
+    "footerText": "Свяжитесь с поддержкой по партнерам, диагностике бронирований и SaaS-модулям.",
+    "categories": {
+      "flights": {
+        "title": "Авиабилеты",
+        "description": "Прогнозируйте маршруты, даты, цены и передачу партнеру."
+      },
+      "hotels": {
+        "title": "Отели",
+        "description": "Ранжируйте варианты по локации, доверию и спросу."
+      },
+      "esim": {
+        "title": "eSIM и Интернет",
+        "description": "Подберите пакеты данных под страну, устройство и срок."
+      },
+      "tours": {
+        "title": "Туры и активности",
+        "description": "Показывайте доступные активности с телеметрией спроса."
+      },
+      "cars": {
+        "title": "Аренда авто",
+        "description": "Сравнивайте парк, выдачу и качество конверсии."
+      },
+      "marketplace": {
+        "title": "Marketplace",
+        "description": "Координируйте офферы, SaaS-модули и рекомендации Concierge."
+      }
+    },
+    "quickLinks": {
+      "admin": "Admin",
+      "dashboard": "Dashboard",
+      "saasModules": "SaaS-модули",
+      "pricing": "Цены"
+    },
+    "pageLabel": "SignalBoost Marketplace cockpit homepage",
+    "searchLabel": "AI-guided marketplace search",
+    "suggestionsLabel": "Contextual search suggestions",
+    "conciergeLabel": "Concierge AI hero widget",
+    "conciergeKicker": "Concierge AI",
+    "conciergeMetricsLabel": "Concierge telemetry",
+    "conciergeMetricOne": "Intent lock: 94%",
+    "conciergeMetricTwo": "Latency: 0.8s",
+    "conciergeMetricThree": "Locale aware",
+    "executiveLabel": "Executive marketplace telemetry",
+    "signalHealth": "Signal health: nominal",
+    "categoriesKicker": "Category panels",
+    "quickStat": "Quick stat",
+    "signal": "Signal",
+    "partnerKicker": "Partner vitrina",
+    "partnerCarouselLabel": "Trusted partner logos",
+    "footerLabel": "Homepage cockpit footer",
+    "footerKicker": "Support console",
+    "quickLinksLabel": "Quick links",
+    "supportChannel": "Contact + support",
+    "partners": {
+      "booking": "Booking.com",
+      "amazon": "Amazon",
+      "drimsim": "Drimsim",
+      "viator": "Viator",
+      "rentalcars": "Rentalcars",
+      "getyourguide": "GetYourGuide"
+    }
   }
 }

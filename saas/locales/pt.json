@@ -596,7 +596,9 @@
     "title": "Comece grátis. Publique quando estiver pronto.",
     "subtitle": "Planos simples por intenção: testar, lançar, escalar ou operar um sistema maior de crescimento.",
     "servicePricingKicker": "Preços por serviço",
-    "servicePricingTitle": "Cada serviço tem um CTA direto para o workspace."
+    "servicePricingTitle": "Cada serviço tem um CTA direto para o workspace.",
+    "websiteOptimizationName": "Otimização de site",
+    "podcastOptimizationName": "Otimização de estúdio de podcast"
   },
   "podcasters_page": {
     "badge": "Para podcasters",
@@ -927,7 +929,12 @@
     "openVideoStudio": "Abrir estúdio de vídeo",
     "openSalesAgent": "Abrir agente de vendas",
     "openSalesPipeline": "Abrir pipeline de vendas",
-    "answerInChat": "Responder no chat"
+    "answerInChat": "Responder no chat",
+    "openPromoteBusiness": "Abrir Promover negócio",
+    "openWebsiteOptimization": "Abrir otimização de site",
+    "openLab": "Abrir laboratório",
+    "openWorkshopApprentice": "Abrir aprendiz de oficina",
+    "openPodcastOptimization": "Abrir otimização de podcast"
   },
   "videoSearch": {
     "timeout": {
@@ -1463,5 +1470,24 @@
       "improve": "Melhorar site",
       "podcastStudio": "Otimizar estúdio de podcast"
     }
+  },
+  "common": {
+    "enabled": "Ativado",
+    "ready": "Pronto",
+    "loading": "Carregando…"
+  },
+  "orchestration": {
+    "kicker": "Orquestração de IA",
+    "title": "Encaminhe a próxima ação automaticamente",
+    "subtitle": "Roteador de intenção, seletor de modo de IA, motor de fluxo, memória, fallback de operador, API unificada e telemetria ficam conectados em todos os espaços.",
+    "openRoute": "Abrir módulo roteado",
+    "inputLabel": "Descreva o resultado",
+    "placeholder": "Exemplo: melhore o SEO do meu site e crie materiais de campanha de acompanhamento",
+    "run": "Executar orquestração",
+    "intentRouter": "Roteador de intenção",
+    "confidence": "Confiança",
+    "memory": "Camada de memória",
+    "operatorFallback": "Fallback de operador",
+    "telemetry": "Telemetria"
   }
 }

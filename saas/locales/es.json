@@ -654,7 +654,9 @@
     "title": "Empieza gratis. Publica cuando esté listo.",
     "subtitle": "Planes simples organizados por intención: probar, lanzar, escalar u operar un sistema de crecimiento mayor.",
     "servicePricingKicker": "Precios por servicio",
-    "servicePricingTitle": "Cada servicio tiene un CTA directo al espacio de trabajo."
+    "servicePricingTitle": "Cada servicio tiene un CTA directo al espacio de trabajo.",
+    "websiteOptimizationName": "Optimización de sitio web",
+    "podcastOptimizationName": "Optimización de estudio de podcast"
   },
   "podcasters_page": {
     "badge": "Para podcasters",
@@ -927,7 +929,12 @@
     "openVideoStudio": "Abrir estudio de video",
     "openSalesAgent": "Abrir agente de ventas",
     "openSalesPipeline": "Abrir pipeline de ventas",
-    "answerInChat": "Responder en el chat"
+    "answerInChat": "Responder en el chat",
+    "openPromoteBusiness": "Abrir Promocionar negocio",
+    "openWebsiteOptimization": "Abrir Optimización web",
+    "openLab": "Abrir laboratorio",
+    "openWorkshopApprentice": "Abrir aprendiz del taller",
+    "openPodcastOptimization": "Abrir optimización de podcast"
   },
   "videoSearch": {
     "timeout": {
@@ -1463,5 +1470,24 @@
       "improve": "Mejorar sitio web",
       "podcastStudio": "Optimizar estudio de podcast"
     }
+  },
+  "common": {
+    "enabled": "Activado",
+    "ready": "Listo",
+    "loading": "Cargando…"
+  },
+  "orchestration": {
+    "kicker": "Orquestación de IA",
+    "title": "Dirige la siguiente acción automáticamente",
+    "subtitle": "El enrutador de intención, selector de modo de IA, motor de flujo, memoria, respaldo de operador, API unificada y telemetría se mantienen conectados en cada espacio de trabajo.",
+    "openRoute": "Abrir módulo dirigido",
+    "inputLabel": "Describe el resultado",
+    "placeholder": "Ejemplo: mejora el SEO de mi sitio web y crea recursos de campaña de seguimiento",
+    "run": "Ejecutar orquestación",
+    "intentRouter": "Enrutador de intención",
+    "confidence": "Confianza",
+    "memory": "Capa de memoria",
+    "operatorFallback": "Respaldo de operador",
+    "telemetry": "Telemetría"
   }
 }

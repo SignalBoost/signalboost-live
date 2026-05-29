@@ -41,7 +41,29 @@
   --gold: #ffc300;
   --green: #4ade80;
   --red: #ef4444;
+
+  /* 4px spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Unified typography tokens */
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --type-xs: 12px;
+  --type-sm: 14px;
+  --type-base: 16px;
+  --type-lg: 20px;
+  --type-xl: 24px;
+  --type-2xl: 32px;
+  --type-3xl: 44px;
 }
+
 
 .sb-input {
   background: var(--surface-3);
@@ -196,4 +218,25 @@ html, body {
   .sb-sidebar__nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sb-live-preview { margin-top: 16px; }
   .sb-section { padding: 44px 0; }
+}
+
+
+.sb-service-rail {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding: var(--space-3) var(--space-8);
+  background: rgba(10, 10, 15, .72);
+  border-bottom: 1px solid var(--border-soft);
+  backdrop-filter: blur(14px);
+}
+
+.sb-service-rail a {
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .sb-desktop-nav { display: none !important; }
+  .sb-service-rail { padding: var(--space-3) var(--space-4); }
+  .sb-card, .sb-glass { border-radius: 18px; }
 }

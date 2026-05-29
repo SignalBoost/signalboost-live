@@ -486,7 +486,9 @@
     "title": "Start free. Publish when ready.",
     "subtitle": "Simple plan tiers arranged by human intent: test, launch, scale, or operate a larger growth system.",
     "servicePricingKicker": "Service pricing",
-    "servicePricingTitle": "Every service has a direct workspace CTA."
+    "servicePricingTitle": "Every service has a direct workspace CTA.",
+    "websiteOptimizationName": "Website Optimization",
+    "podcastOptimizationName": "Podcast Studio Optimization"
   },
   "dash": {
     "projectsTitle": "Your projects",
@@ -927,7 +929,12 @@
     "openVideoStudio": "Open Video Studio",
     "openSalesAgent": "Open Sales Agent",
     "openSalesPipeline": "Open Sales Pipeline",
-    "answerInChat": "Answer in chat"
+    "answerInChat": "Answer in chat",
+    "openPromoteBusiness": "Open Promote Business",
+    "openWebsiteOptimization": "Open Website Optimization",
+    "openLab": "Open Lab",
+    "openWorkshopApprentice": "Open Workshop Apprentice",
+    "openPodcastOptimization": "Open Podcast Studio Optimization"
   },
   "videoSearch": {
     "timeout": {
@@ -1463,5 +1470,24 @@
       "improve": "Improve Website",
       "podcastStudio": "Optimize Podcast Studio"
     }
+  },
+  "common": {
+    "enabled": "Enabled",
+    "ready": "Ready",
+    "loading": "Loading…"
+  },
+  "orchestration": {
+    "kicker": "AI orchestration",
+    "title": "Route the next action automatically",
+    "subtitle": "Intent Router, AI Mode Selector, Workflow Engine, Memory Layer, Operator Fallback, Unified API, and telemetry stay connected across every workspace.",
+    "openRoute": "Open routed module",
+    "inputLabel": "Describe the outcome",
+    "placeholder": "Example: improve my website SEO and create follow-up campaign assets",
+    "run": "Run orchestration",
+    "intentRouter": "Intent Router",
+    "confidence": "Confidence",
+    "memory": "Memory Layer",
+    "operatorFallback": "Operator Fallback",
+    "telemetry": "Telemetry"
   }
 }

@@ -138,7 +138,7 @@ export default function Navbar() {
           </span>
         </Link>
 
-        <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+        <div className="sb-desktop-nav" style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
           {navLinks.map(item => {
             const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))
             return (
@@ -193,44 +193,33 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* ── Tool pills + account info (replaces separate Topbar) ── */}
-      {user && (
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '6px 24px', flexWrap: 'wrap', gap: 8,
-          background: 'rgba(10,10,15,.88)',
-          borderBottom: '1px solid var(--border-soft)',
-          position: 'sticky', top: 73, zIndex: 99,
-          backdropFilter: 'blur(12px)',
-        }}>
-          {/* Tool pills */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-            {toolLinks.map(tool => {
-              const isActive = pathname === tool.href || pathname?.startsWith(tool.href + '/')
-              return (
-                <Link key={tool.href} href={tool.href} style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: tool.featured ? '7px 16px' : '6px 14px',
-                  borderRadius: 999, textDecoration: 'none',
-                  fontSize: 12, fontWeight: 800,
-                  background: tool.featured
-                    ? isActive ? 'rgba(255,195,0,.18)' : 'rgba(255,195,0,.10)'
-                    : isActive ? 'rgba(59,130,246,.15)' : 'var(--surface-1)',
-                  border: `1px solid ${tool.featured
-                    ? 'rgba(255,195,0,.36)'
-                    : isActive ? 'rgba(59,130,246,.4)' : 'var(--border-soft)'}`,
-                  color: tool.featured ? GOLD : isActive ? '#fff' : 'var(--text-muted)',
-                  boxShadow: tool.featured ? '0 10px 24px rgba(255,195,0,.10)' : 'none',
-                }}>
-                  <span>{tool.icon}</span>
-                  <span>{tool.label}</span>
-                </Link>
-              )
-            })}
-          </div>
+      {/* ── Service rail: all nine services stay globally available ── */}
+      <div className="sb-service-rail" style={{ position: 'sticky', top: 73, zIndex: 99 }}>
+        {toolLinks.map(tool => {
+          const isActive = pathname === tool.href || pathname?.startsWith(tool.href + '/')
+          return (
+            <Link key={tool.href} href={tool.href} style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: tool.featured ? '7px 16px' : '6px 14px',
+              borderRadius: 999, textDecoration: 'none',
+              fontSize: 12, fontWeight: 800,
+              background: tool.featured
+                ? isActive ? 'rgba(255,195,0,.18)' : 'rgba(255,195,0,.10)'
+                : isActive ? 'rgba(59,130,246,.15)' : 'var(--surface-1)',
+              border: `1px solid ${tool.featured
+                ? 'rgba(255,195,0,.36)'
+                : isActive ? 'rgba(59,130,246,.4)' : 'var(--border-soft)'}`,
+              color: tool.featured ? GOLD : isActive ? '#fff' : 'var(--text-muted)',
+              boxShadow: tool.featured ? '0 10px 24px rgba(255,195,0,.10)' : 'none',
+            }}>
+              <span>{tool.icon}</span>
+              <span>{tool.label}</span>
+            </Link>
+          )
+        })}
 
-          {/* Account info — right side of pills bar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        {user && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, marginLeft: 'auto' }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,195,0,0.95)', fontFamily: 'monospace' }}>
               ⚡ {credits} {credits === 1 ? t(dict, 'topbar.credit', 'credit') : t(dict, 'topbar.credits', 'credits')}
             </span>
@@ -245,8 +234,8 @@ export default function Navbar() {
               {userName ?? t(dict, 'topbar.account', 'Account')}
             </span>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
     </>

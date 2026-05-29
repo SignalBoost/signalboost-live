@@ -293,5 +293,6 @@
       "client": "Client",
       "draft_failed": "Draft Failed"
     }
-  }
+  },
+  "orchestration.kicker": "AI orchestration"
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import OrchestrationPanel from '@/components/orchestration/OrchestrationPanel'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 import { supabase } from '@/utils/supabase/client'
@@ -71,6 +72,8 @@ export default function ApprenticeWorkshopPage() {
         <span style={{ display: 'inline-flex', padding: '0.4rem 0.75rem', borderRadius: 999, background: 'rgba(255,195,0,.12)', color: '#fde68a', fontWeight: 800 }}>{guidance.badge}</span>
         <h1 style={{ fontSize: 'clamp(2rem, 6vw, 4rem)', letterSpacing: '-0.06em', marginBottom: '.5rem' }}>{t(dict, 'apprentice.title', 'Workshop Apprentice')}</h1>
         <p style={{ color: 'rgba(255,255,255,.68)', maxWidth: 720 }}>{guidance.subtitle} Current tone: <strong>{profile.tone_preference || 'friendly'}</strong>. Current role: <strong>{profile.role || 'not set'}</strong>.</p>
+
+        <OrchestrationPanel module="apprentice" compact />
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, margin: '1.5rem 0' }}>
           {guidance.tasks.map((task) => (

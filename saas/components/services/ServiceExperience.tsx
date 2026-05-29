@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 import type { ServiceCatalogItem } from '@/lib/services/catalog'
+import OrchestrationPanel from '@/components/orchestration/OrchestrationPanel'
 
 const panelStyle = {
   border: '1px solid rgba(255,255,255,.1)',
@@ -61,7 +62,9 @@ export default function ServiceExperience({ service, mode = 'dashboard' }: Servi
         </div>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+      <OrchestrationPanel module={service.key} compact />
+
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginTop: 16 }}>
         <article style={panelStyle}>
           <span className="sb-eyebrow">{t(dict, 'services.workflow', 'Guided workflow')}</span>
           <ol className="sb-body" style={{ paddingLeft: 20, display: 'grid', gap: 10 }}>

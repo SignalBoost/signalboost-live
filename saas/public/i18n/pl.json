@@ -293,5 +293,6 @@
       "draft_failed": "Szkic nieudany"
     }
   },
-  "singleLanguageContent": "Treść w jednym języku"
+  "singleLanguageContent": "Treść w jednym języku",
+  "orchestration.kicker": "Orkiestracja AI"
 }

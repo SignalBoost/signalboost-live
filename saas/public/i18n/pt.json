@@ -293,5 +293,6 @@
       "client": "Cliente",
       "draft_failed": "Falha no rascunho"
     }
-  }
+  },
+  "orchestration.kicker": "Orquestração de IA"
 }

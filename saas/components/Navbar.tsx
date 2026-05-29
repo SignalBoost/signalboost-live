@@ -12,6 +12,7 @@ import AuthModal from './AuthModal'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 import { SERVICES } from '@/lib/services/catalog'
+import { UNIFIED_NAV } from '@/lib/platform/unifiedPlatform'
 
 const GOLD = '#ffc300'
 
@@ -115,9 +116,7 @@ export default function Navbar() {
     window.location.href = '/'
   }
 
-  const navLinks = [
-    { label: t(dict, 'aiNav.home', 'Home'), href: '/', icon: '⌂' },
-  ]
+  const navLinks = UNIFIED_NAV.map(item => ({ ...item, label: t(dict, `aiNav.${item.label.toLowerCase().replace(/\s+/g, '')}`, item.label) }))
 
   const serviceNavLinks = SERVICES.map((service) => ({
     icon: service.icon,
@@ -227,7 +226,7 @@ export default function Navbar() {
               color: tool.featured ? GOLD : isActive ? '#fff' : 'var(--text-muted)',
               boxShadow: tool.featured ? '0 10px 24px rgba(255,195,0,.10)' : 'none',
             }}>
-              <span>{tool.icon}</span>
+              <span aria-hidden="true">{tool.icon}</span>
               <span>{tool.label}</span>
             </Link>
           )

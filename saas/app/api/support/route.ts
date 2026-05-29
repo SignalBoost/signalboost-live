@@ -1,5 +1,6 @@
 import OpenAI from 'openai'
 import { NextRequest, NextResponse } from 'next/server'
+import { getConciergeAnswer } from '@/lib/platform/unifiedPlatform'
 
 type SupportMessage = { role?: 'user' | 'assistant' | 'system'; content?: string }
 
@@ -24,6 +25,7 @@ export async function POST(req: NextRequest) {
     const messages = (Array.isArray(body?.messages) ? body.messages : []) as SupportMessage[]
     const languageCode = String(body?.context?.language || 'en').toLowerCase()
     const language = LANGUAGE_LABELS[languageCode] || 'English'
+    const currentPage = String(body?.context?.currentPage || '/')
 
     const sanitized = messages
       .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
@@ -31,11 +33,15 @@ export async function POST(req: NextRequest) {
       .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content as string }))
 
     if (!sanitized.length) {
-      return NextResponse.json({ reply: language.startsWith('Portuguese') ? 'Como posso ajudar você hoje?' : 'How can I help you today?' })
+      const local = getConciergeAnswer('', languageCode, currentPage)
+      return NextResponse.json({ reply: local.reply, telemetry: local })
     }
 
+    const latestUserMessage = [...sanitized].reverse().find(m => m.role === 'user')?.content || ''
+    const local = getConciergeAnswer(latestUserMessage, languageCode, currentPage)
+
     if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json({ error: 'AI backend is not configured.' }, { status: 500 })
+      return NextResponse.json({ reply: local.reply, telemetry: local, source: 'deterministic-concierge' })
     }
 
     const openai = getOpenAIClient()
@@ -49,7 +55,7 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: 'system',
-          content: `You are SignalBoost Concierge. Reply strictly in ${language}. Be practical and brief. If user asks about features, provide actionable steps in SignalBoost dashboard.`
+          content: `You are SignalBoost Concierge for the unified SignalBoost Marketplace + SaaS platform. Reply strictly in ${language}. Be practical, concise, accessible, and HMI-style with steps. Cover Marketplace partners/categories/bookings and SaaS modules Promote Business, Reviews, Calendar, Spreadsheets, Outreach, Admin telemetry, CRM pipeline, forecasts, financial/KPI dashboards, and owner/admin restrictions when relevant. Always mention telemetry logging for Concierge actions.`
         },
         ...sanitized,
       ],
@@ -64,7 +70,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'AI returned an empty response.' }, { status: 502 })
     }
 
-    return NextResponse.json({ reply })
+    return NextResponse.json({ reply, telemetry: local, source: 'openai-concierge' })
   } catch (error) {
     console.error('Support API error', error)
     return NextResponse.json({ error: 'Could not process your request right now.' }, { status: 500 })

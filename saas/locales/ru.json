@@ -1084,7 +1084,13 @@
         "label": "💬 Поддержка",
         "prompt": "Мне нужна помощь с SignalBoost."
       }
-    }
+    },
+    "quick.marketplace.label": "Marketplace",
+    "quick.marketplace.prompt": "Guide me through marketplace partners, categories, and bookings.",
+    "quick.saas.label": "SaaS cockpit",
+    "quick.saas.prompt": "Guide me through Promote Business, Reviews, Calendar, Spreadsheets, and Outreach.",
+    "quick.executive.label": "Executive insights",
+    "quick.executive.prompt": "Show financial, KPI, CRM, outreach, and forecasting recommendations."
   },
   "plan": {
     "free": "Бесплатный",
@@ -1492,6 +1498,12 @@
   },
   "aiNav": {
     "home": "Главная",
-    "admin": "Админ"
+    "admin": "Админ",
+    "marketplace": "Marketplace",
+    "promote": "Продвижение",
+    "reviews": "Отзывы",
+    "calendar": "Календарь",
+    "spreadsheets": "Таблицы",
+    "outreach": "Outreach"
   }
 }

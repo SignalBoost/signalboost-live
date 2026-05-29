@@ -10,10 +10,10 @@ import { t } from '@/lib/i18n/t'
 type Message = { role: 'user' | 'assistant'; content: string }
 
 const QUICK_KEYS = [
-  { label: 'concierge.quick.video.label', prompt: 'concierge.quick.video.prompt', fallbackLabel: '🎥 Video', fallbackPrompt: 'How do I create videos in SignalBoost?' },
-  { label: 'concierge.quick.credits.label', prompt: 'concierge.quick.credits.prompt', fallbackLabel: '⚡ Credits', fallbackPrompt: 'Explain how credits work in SignalBoost.' },
-  { label: 'concierge.quick.growth.label', prompt: 'concierge.quick.growth.prompt', fallbackLabel: '📈 Growth', fallbackPrompt: 'Give me growth ideas using SignalBoost.' },
-  { label: 'concierge.quick.support.label', prompt: 'concierge.quick.support.prompt', fallbackLabel: '💬 Support', fallbackPrompt: 'I need help using SignalBoost.' },
+  { label: 'concierge.quick.marketplace.label', prompt: 'concierge.quick.marketplace.prompt', fallbackLabel: '🛰️ Marketplace', fallbackPrompt: 'Guide me through marketplace partners, categories, and bookings.' },
+  { label: 'concierge.quick.saas.label', prompt: 'concierge.quick.saas.prompt', fallbackLabel: '🚀 SaaS cockpit', fallbackPrompt: 'Guide me through Promote Business, Reviews, Calendar, Spreadsheets, and Outreach.' },
+  { label: 'concierge.quick.executive.label', prompt: 'concierge.quick.executive.prompt', fallbackLabel: '📊 Executive insights', fallbackPrompt: 'Show financial, KPI, CRM, outreach, and forecasting recommendations.' },
+  { label: 'concierge.quick.support.label', prompt: 'concierge.quick.support.prompt', fallbackLabel: '💬 HMI support', fallbackPrompt: 'I need step-by-step help using SignalBoost.' },
 ]
 
 export default function Concierge() {
@@ -72,13 +72,13 @@ export default function Concierge() {
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(value => !value)} style={{ position: 'fixed', right: 24, bottom: 24, zIndex: 999999, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderRadius: 999, background: 'linear-gradient(135deg,#ffc300,#ff9500)', color: '#111', fontWeight: 900, boxShadow: '0 20px 50px rgba(255,149,0,.35)' }}>
+      <button type="button" aria-expanded={open} aria-controls="signalboost-concierge-panel" onClick={() => setOpen(value => !value)} style={{ position: 'fixed', right: 24, bottom: 24, zIndex: 999999, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderRadius: 999, background: 'linear-gradient(135deg,#ffc300,#ff9500)', color: '#111', fontWeight: 900, boxShadow: '0 20px 50px rgba(255,149,0,.35)' }}>
         <span style={{ fontSize: 24 }}>✨</span>
         {t(dict, 'concierge.button', 'Concierge')}
       </button>
 
       {open && (
-        <div className="hero-panel" style={{ position: 'fixed', right: 24, bottom: 100, zIndex: 999999, width: 420, maxWidth: 'calc(100vw - 30px)', padding: 20, color: 'white', borderRadius: 24 }}>
+        <div id="signalboost-concierge-panel" role="dialog" aria-label={t(dict, 'concierge.title', 'AI Concierge')} className="hero-panel" style={{ position: 'fixed', right: 24, bottom: 100, zIndex: 999999, width: 420, maxWidth: 'calc(100vw - 30px)', padding: 20, color: 'white', borderRadius: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div>
               <div style={{ color: 'var(--text-faint)', fontSize: 12 }}>SignalBoost</div>
@@ -98,7 +98,7 @@ export default function Concierge() {
             <Link href="/docs" className="sb-button-ghost" style={{ textDecoration: 'none', fontSize: 12, padding: '8px 10px' }}>📖 {t(dict, 'support.documentation', 'Documentation')}</Link>
           </div>
 
-          <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+          <div role="log" aria-live="polite" style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
             {visibleMessages.map((message, index) => (
               <div key={`${message.role}-${index}`} style={{ alignSelf: message.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '86%', padding: '10px 12px', borderRadius: 14, background: message.role === 'user' ? 'rgba(59,130,246,.18)' : 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.08)', lineHeight: 1.55, fontSize: 13, whiteSpace: 'pre-wrap' }}>
                 {message.content}
@@ -116,7 +116,7 @@ export default function Concierge() {
           </div>
 
           <div style={{ display: 'flex', gap: 8 }}>
-            <input value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') ask(input) }} className="sb-input" style={{ flex: 1, padding: 12, minWidth: 0 }} placeholder={t(dict, 'concierge.placeholder', 'Ask anything...')} />
+            <input aria-label={t(dict, 'concierge.placeholder', 'Ask anything...')} value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') ask(input) }} className="sb-input" style={{ flex: 1, padding: 12, minWidth: 0 }} placeholder={t(dict, 'concierge.placeholder', 'Ask anything...')} />
             <button type="button" className="sb-button-primary" onClick={() => ask(input)} disabled={loading || !input.trim()}>
               {t(dict, 'concierge.send', 'Send')}
             </button>

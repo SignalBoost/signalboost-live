@@ -1489,5 +1489,9 @@
     "memory": "Camada de memória",
     "operatorFallback": "Fallback de operador",
     "telemetry": "Telemetria"
+  },
+  "aiNav": {
+    "home": "Início",
+    "admin": "Admin"
   }
 }

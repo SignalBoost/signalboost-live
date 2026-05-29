@@ -1489,5 +1489,9 @@
     "memory": "Capa de memoria",
     "operatorFallback": "Respaldo de operador",
     "telemetry": "Telemetría"
+  },
+  "aiNav": {
+    "home": "Inicio",
+    "admin": "Admin"
   }
 }

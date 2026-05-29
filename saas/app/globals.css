@@ -343,3 +343,72 @@ html, body {
 
 @media (prefers-reduced-motion: reduce) { .sb-neon-panel, .sb-glass-panel, .sb-service-rail a { transition: none !important; } }
 @media (max-width: 720px) { .sb-orbit-table { overflow-x: auto; } .sb-cockpit-grid, .sb-mission-grid { grid-template-columns: 1fr; } }
+
+/* Reviews SaaS module — dark neon glassmorphism */
+.sb-reviews-page { display: grid; gap: 22px; margin: 0 auto; max-width: 1180px; padding: clamp(18px, 4vw, 42px) 0 80px; width: min(100% - 28px, 1180px); }
+.sb-reviews-hero { align-items: stretch; background: radial-gradient(circle at 20% 10%, rgba(26,240,255,.24), transparent 28rem), radial-gradient(circle at 80% 20%, rgba(168,85,247,.22), transparent 24rem), linear-gradient(135deg, rgba(255,255,255,.1), rgba(255,255,255,.03)); border: 1px solid rgba(26,240,255,.2); border-radius: 34px; box-shadow: 0 32px 120px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.1); display: grid; gap: 24px; grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); overflow: hidden; padding: clamp(22px, 5vw, 42px); position: relative; }
+.sb-reviews-hero h1 { font-size: clamp(38px, 7vw, 78px); letter-spacing: -.07em; line-height: .9; margin: 8px 0 14px; }
+.sb-reviews-hero p:not(.sb-eyebrow) { color: var(--text-secondary); font-size: clamp(15px, 2vw, 18px); line-height: 1.7; max-width: 720px; }
+.sb-review-hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.sb-review-wireframe { align-content: center; background: rgba(2,6,23,.52); border: 1px solid rgba(255,255,255,.14); border-radius: 26px; display: grid; gap: 10px; grid-template-columns: 1fr auto 1fr; padding: 18px; }
+.sb-review-wireframe span { border: 1px solid rgba(26,240,255,.2); border-radius: 16px; color: #dffcff; font-size: 12px; font-weight: 900; padding: 13px 12px; text-align: center; text-transform: uppercase; }
+.sb-review-wireframe span:nth-child(even) { border: 0; color: var(--gold); padding: 13px 0; }
+.sb-review-alert { background: rgba(255,195,0,.08); border: 1px solid rgba(255,195,0,.25); border-radius: 18px; color: #ffe08a; padding: 14px 16px; }
+.sb-review-grid, .sb-admin-review-grid { display: grid; gap: 18px; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .65fr); }
+.sb-review-panel, .sb-review-card, .sb-review-controls, .sb-admin-review-console { background: linear-gradient(145deg, rgba(15,23,42,.78), rgba(3,7,18,.68)); border: 1px solid rgba(255,255,255,.12); border-radius: 26px; box-shadow: 0 24px 80px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.08); padding: clamp(16px, 3vw, 24px); backdrop-filter: blur(18px); }
+.sb-review-panel--wide { min-width: 0; }
+.sb-review-panel-header { align-items: flex-start; display: flex; gap: 16px; justify-content: space-between; margin-bottom: 12px; }
+.sb-review-panel h2, .sb-review-panel h3, .sb-review-controls h2, .sb-admin-review-console h2 { letter-spacing: -.03em; margin: 0; }
+.sb-review-pill { border: 1px solid rgba(26,240,255,.26); border-radius: 999px; color: #9ff7ff; flex-shrink: 0; font-size: 11px; font-weight: 900; letter-spacing: .08em; padding: 8px 10px; text-transform: uppercase; }
+.sb-review-link-builder p, .sb-review-panel p, .sb-review-controls p, .sb-review-card small { color: var(--text-muted); line-height: 1.6; }
+.sb-review-link-builder > div, .sb-review-link-copy { align-items: stretch; background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.12); border-radius: 16px; display: flex; flex-wrap: wrap; gap: 0; margin-top: 12px; overflow: hidden; }
+.sb-review-link-builder span, .sb-review-link-copy code { align-items: center; color: var(--text-muted); display: flex; flex: 1; min-width: 220px; padding: 13px 14px; }
+.sb-review-link-builder input { background: transparent; border: 0; color: #fff; flex: 1; min-width: 180px; outline: 0; padding: 13px 14px; }
+.sb-review-link-builder button, .sb-review-link-copy button, .sb-review-actions button { background: linear-gradient(135deg, #1af0ff, #3b82f6); border: 0; color: #04111f; cursor: pointer; font-weight: 900; padding: 12px 16px; transition: transform .18s ease, filter .18s ease; }
+.sb-review-link-builder button:hover, .sb-review-link-copy button:hover, .sb-review-actions button:hover { filter: brightness(1.12); transform: translateY(-1px); }
+.sb-review-link-builder small { color: var(--red); display: block; margin-top: 8px; }
+.sb-review-link-copy a { align-items: center; color: #9ff7ff; display: flex; font-weight: 800; padding: 12px 16px; text-decoration: none; }
+.sb-review-submission-preview, .sb-review-ai-card { background: rgba(26,240,255,.07); border: 1px solid rgba(26,240,255,.18); border-radius: 20px; margin-top: 18px; padding: 16px; }
+.sb-stars { color: var(--gold); font-size: 20px; letter-spacing: .05em; text-shadow: 0 0 20px rgba(255,195,0,.26); }
+.sb-stars span { color: rgba(255,255,255,.18); }
+.sb-review-submission-preview label { color: var(--text-secondary); display: grid; gap: 8px; margin-top: 12px; }
+.sb-review-submission-preview input { border: 1px dashed rgba(255,255,255,.18); border-radius: 14px; color: var(--text-muted); padding: 12px; }
+.sb-review-controls { display: grid; gap: 16px; }
+.sb-review-control-row, .sb-review-tabs, .sb-review-actions, .sb-review-card-meta { display: flex; flex-wrap: wrap; gap: 8px; }
+.sb-review-control-row select { background: rgba(2,6,23,.74); border: 1px solid rgba(255,255,255,.14); border-radius: 999px; color: #fff; padding: 10px 12px; }
+.sb-review-tabs button { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 999px; color: var(--text-secondary); cursor: pointer; font-weight: 800; padding: 9px 13px; }
+.sb-review-tabs button.is-active { background: rgba(26,240,255,.16); border-color: rgba(26,240,255,.42); color: #dffcff; box-shadow: 0 0 28px rgba(26,240,255,.14); }
+.sb-review-feed { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sb-review-card { transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.sb-review-card:hover { border-color: rgba(26,240,255,.34); box-shadow: 0 28px 90px rgba(26,240,255,.12); transform: translateY(-3px); }
+.sb-review-card-top { align-items: flex-start; display: flex; gap: 14px; justify-content: space-between; }
+.sb-review-card h3 { margin: 0 0 4px; }
+.sb-review-card-top span, .sb-review-card-meta span { color: var(--text-faint); font-size: 12px; }
+.sb-review-card p { color: var(--text-secondary); line-height: 1.7; }
+.sb-review-card blockquote { border-left: 3px solid var(--gold); color: #fff2ba; margin: 12px 0; padding-left: 12px; }
+.sb-review-card-meta span { border: 1px solid rgba(255,255,255,.14); border-radius: 999px; font-weight: 900; padding: 6px 9px; text-transform: uppercase; }
+.sb-review-card-meta .verified { border-color: rgba(74,222,128,.32); color: #86efac; }
+.sb-review-card-meta .flagged { border-color: rgba(248,113,113,.34); color: #fca5a5; }
+.sb-review-actions button { border-radius: 999px; color: #06111f; font-size: 12px; padding: 9px 12px; }
+.sb-review-actions button:nth-child(2) { background: rgba(255,195,0,.92); }
+.sb-review-actions button:nth-child(3) { background: rgba(168,85,247,.95); color: #fff; }
+.sb-review-actions button:nth-child(4) { background: rgba(248,113,113,.95); color: #fff; }
+.sb-admin-review-console { display: grid; gap: 18px; }
+.sb-admin-review-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sb-bar { align-items: center; display: grid; gap: 10px; grid-template-columns: 92px minmax(0, 1fr) 32px; margin: 12px 0; }
+.sb-bar span, .sb-bar strong { color: var(--text-secondary); font-size: 12px; }
+.sb-bar i { border-radius: 999px; box-shadow: 0 0 18px currentColor; display: block; height: 10px; min-width: 8px; }
+.sb-review-empty { color: var(--text-muted); padding: 18px; }
+
+@media (max-width: 900px) {
+  .sb-reviews-hero, .sb-review-grid, .sb-admin-review-grid, .sb-review-feed { grid-template-columns: 1fr; }
+  .sb-review-wireframe { grid-template-columns: 1fr; }
+  .sb-review-wireframe span:nth-child(even) { transform: rotate(90deg); }
+  .sb-review-panel-header, .sb-review-card-top { display: grid; }
+}
+
+@media (max-width: 560px) {
+  .sb-reviews-page { width: min(100% - 18px, 1180px); }
+  .sb-review-link-builder > div, .sb-review-link-copy { display: grid; }
+  .sb-review-control-row select, .sb-review-tabs button, .sb-review-actions button { width: 100%; }
+}

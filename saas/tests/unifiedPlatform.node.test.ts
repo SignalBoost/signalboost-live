@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { ADMIN_SIDEBAR, COCKPIT_PANELS, CRM_STAGES, DESIGN_TOKENS, FINANCIAL_LEDGER, FORECASTS, KPI_DASHBOARD, SUPPORTED_LOCALES, UNIFIED_NAV, getConciergeAnswer, inferAudienceRole } from '../lib/platform/unifiedPlatform.ts'
+import { ADMIN_SIDEBAR, COCKPIT_PANELS, CRM_STAGES, DESIGN_TOKENS, FINANCIAL_LEDGER, FORECASTS, KPI_DASHBOARD, REVIEW_ADMIN_TELEMETRY, SUPPORTED_LOCALES, UNIFIED_NAV, getConciergeAnswer, inferAudienceRole } from '../lib/platform/unifiedPlatform.ts'
 
 test('design tokens cover typography, spacing, colors, shadows, and glassmorphism', () => {
   assert.ok(DESIGN_TOKENS.typography.display)
@@ -33,6 +33,14 @@ test('outreach engine, CRM, forecasting, financial, and KPI datasets are telemet
   assert.equal(FINANCIAL_LEDGER.unifiedRevenue, '$96.7K')
   assert.equal(KPI_DASHBOARD.unifiedEngagementIndex, '87/100')
   assert.equal(COCKPIT_PANELS.length, 6)
+  assert.deepEqual(REVIEW_ADMIN_TELEMETRY.localeVolume, ['en', 'es', 'pt', 'pl', 'ru'])
+  assert.equal(REVIEW_ADMIN_TELEMETRY.outreachTrigger.includes('CRM'), true)
+})
+
+test('concierge answers reviews sentiment and moderation queries with outreach context', () => {
+  const answer = getConciergeAnswer('Translate review sentiment and suggest moderation for testimonial campaign', 'pl', '/dashboard/reviews')
+  assert.equal(answer.language, 'pl')
+  assert.match(answer.reply, /Reviews|sentiment|testimonial|CRM/)
 })
 
 test('i18n locales are supported for concierge fallback responses', () => {

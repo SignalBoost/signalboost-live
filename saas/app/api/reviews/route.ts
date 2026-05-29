@@ -4,7 +4,7 @@
 //
 //   GET    /api/reviews              → owner lists their reviews (auth required)
 //   POST   /api/reviews              → public submission via slug (no auth)
-//   PATCH  /api/reviews?id=...       → owner toggles approved (auth required)
+//   PATCH  /api/reviews?id=...       → owner updates approval / moderation metadata (auth required)
 //   DELETE /api/reviews?id=...       → owner deletes a review (auth required)
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -49,6 +49,22 @@ function isValidEmail(s: string): boolean {
 }
 
 
+function analyzeSentiment(content: string, rating: number): 'positive' | 'neutral' | 'negative' {
+  const text = content.toLowerCase()
+  const positive = ['amazing', 'excellent', 'great', 'love', 'happy', 'fast', 'ótimo', 'excelente', 'clara', 'świetny', 'хорош', 'отлич'].filter(word => text.includes(word)).length
+  const negative = ['bad', 'slow', 'terrible', 'spam', 'fraud', 'lento', 'ruim', 'malo', 'wolno', 'медленно', 'плохо'].filter(word => text.includes(word)).length
+  const score = positive - negative + (rating >= 4 ? 1 : rating <= 2 ? -1 : 0)
+  if (score > 0) return 'positive'
+  if (score < 0) return 'negative'
+  return 'neutral'
+}
+
+function containsModerationFlag(content: string): boolean {
+  const text = content.toLowerCase()
+  return ['spam', 'fraud', 'hate', 'abuse', 'inappropriate', 'scam', 'violent'].some(word => text.includes(word))
+}
+
+
 // GET — owner reads their own reviews.
 export async function GET() {
   const user = await getAuthedUser()
@@ -57,7 +73,7 @@ export async function GET() {
   const a = admin()
   const { data, error } = await a
     .from('reviews')
-    .select('id, author_name, author_email, rating, content, language, approved, created_at')
+    .select('id, author_name, author_email, rating, content, language, approved, created_at, sentiment, verified_partner, partner_name, product_name, service_name, media_urls, flagged, moderation_status')
     .eq('owner_id', user.id)
     .order('created_at', { ascending: false })
 
@@ -77,6 +93,13 @@ export async function POST(req: NextRequest) {
   const rating       = Number(body?.rating)
   const content      = String(body?.content ?? '').trim()
   const language     = String(body?.language ?? 'en').trim().toLowerCase().slice(0, 8)
+  const media_urls   = Array.isArray(body?.media_urls)
+    ? body.media_urls.map((url: unknown) => String(url).trim()).filter((url: string) => /^https:\/\//.test(url)).slice(0, 4)
+    : []
+  const partner_name = body?.partner_name ? String(body.partner_name).trim().slice(0, 120) : null
+  const product_name = body?.product_name ? String(body.product_name).trim().slice(0, 120) : null
+  const service_name = body?.service_name ? String(body.service_name).trim().slice(0, 120) : null
+  const verified_partner = Boolean(body?.verified_partner)
 
   if (!slug)                                              return NextResponse.json({ error: 'reviews.errors.missingSlug' }, { status: 400 })
   if (author_name.length < 1 || author_name.length > 80)  return NextResponse.json({ error: 'reviews.errors.invalidNameLength' }, { status: 400 })
@@ -140,6 +163,14 @@ export async function POST(req: NextRequest) {
     language,
     approved: false,
     submitter_ip: ip,
+    media_urls,
+    partner_name,
+    product_name,
+    service_name,
+    verified_partner,
+    sentiment: analyzeSentiment(content, rating),
+    flagged: containsModerationFlag(content),
+    moderation_status: containsModerationFlag(content) ? 'flagged' : 'pending',
   })
 
   if (insertErr) return NextResponse.json({ error: 'reviews.errors.saveFailed' }, { status: 500 })
@@ -148,7 +179,7 @@ export async function POST(req: NextRequest) {
 }
 
 
-// PATCH — owner toggles approved.
+// PATCH — owner updates approval and moderation metadata.
 export async function PATCH(req: NextRequest) {
   const user = await getAuthedUser()
   if (!user) return NextResponse.json({ error: 'reviews.errors.unauthorized' }, { status: 401 })
@@ -158,12 +189,21 @@ export async function PATCH(req: NextRequest) {
 
   let body: any
   try { body = await req.json() } catch { return NextResponse.json({ error: 'api.invalidJson' }, { status: 400 }) }
-  if (typeof body?.approved !== 'boolean') return NextResponse.json({ error: 'reviews.errors.approvedMustBeBoolean' }, { status: 400 })
+
+  const patch: Record<string, unknown> = {}
+  if (typeof body?.approved === 'boolean') patch.approved = body.approved
+  if (typeof body?.flagged === 'boolean') patch.flagged = body.flagged
+  if (['pending', 'approved', 'rejected', 'flagged'].includes(body?.moderation_status)) patch.moderation_status = body.moderation_status
+  if (['positive', 'neutral', 'negative'].includes(body?.sentiment)) patch.sentiment = body.sentiment
+
+  if (Object.keys(patch).length === 0) {
+    return NextResponse.json({ error: 'reviews.errors.emptyPatch' }, { status: 400 })
+  }
 
   const a = admin()
   const { error } = await a
     .from('reviews')
-    .update({ approved: body.approved })
+    .update(patch)
     .eq('id', id)
     .eq('owner_id', user.id)
 

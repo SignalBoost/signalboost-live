@@ -41,6 +41,13 @@ export const COCKPIT_PANELS = [
   { title: 'Concierge telemetry', value: '612 guided sessions', status: 'Queries, language, audience role, recommended flow, and outcome.' },
 ]
 
+export const REVIEW_ADMIN_TELEMETRY = {
+  localeVolume: ['en', 'es', 'pt', 'pl', 'ru'],
+  sentimentTrend: ['positive', 'neutral', 'negative'],
+  moderationWorkflow: ['flagged', 'pending', 'approved', 'rejected'],
+  outreachTrigger: 'Positive approved reviews create testimonial campaign opportunities in CRM',
+}
+
 export const CRM_STAGES = [
   { stage: 'Leads', probability: 0.22, automation: 'Concierge captures marketplace/SaaS intent and suggests first campaign.' },
   { stage: 'Opportunities', probability: 0.48, automation: 'Outreach Engine drafts social posts, emails, promotions, and partner notifications.' },
@@ -88,6 +95,10 @@ export function getConciergeAnswer(input: string, locale?: string, currentPage =
     steps.push(`Open Executive cockpit: ${FINANCIAL_LEDGER.unifiedRevenue} unified revenue and engagement index ${KPI_DASHBOARD.unifiedEngagementIndex}.`)
     steps.push(`Review forecasts: ${FORECASTS.map(f => `${f.horizon} ${f.revenue}`).join(' • ')}.`)
     steps.push(`Recommendation: ${EXECUTIVE_RECOMMENDATIONS[0]}`)
+  } else if (/review.*sentiment|sentiment.*review|testimonial|moderation|translate.*review/.test(text)) {
+    steps.push('Open Reviews to filter by language, partner, product/service, date, rating, or AI relevance.')
+    steps.push(`Use Admin Console review telemetry: locales ${REVIEW_ADMIN_TELEMETRY.localeVolume.join(', ')} and sentiment ${REVIEW_ADMIN_TELEMETRY.sentimentTrend.join(' / ')}.`)
+    steps.push('For positive approved reviews, trigger an Outreach testimonial campaign and attach it to the CRM pipeline.')
   } else if (/outreach|campaign|crm|lead|opportunit|conversion|promotion|social|email/.test(text)) {
     steps.push('Choose a campaign type in Outreach: social post, email, partner notification, or promotion; connect it to Promote Business, Reviews, Calendar, and Spreadsheets when relevant.')
     steps.push(`Move CRM records through ${CRM_STAGES.map(s => s.stage).join(' → ')}.`)

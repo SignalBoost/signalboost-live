@@ -20,3 +20,6 @@ pnpm-debug.log*
 
 tsbuildinfo
 *.tsbuildinfo
+
+# Generated QA reports
+qa/*.md

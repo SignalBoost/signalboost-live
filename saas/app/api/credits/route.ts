@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
 import { cookies } from 'next/headers'
 import { getCreditState } from '@/lib/credits'
 
@@ -10,6 +11,7 @@ export async function GET() {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
+        cookieOptions: saasSupabaseCookieOptions,
         cookies: {
           getAll() {
             return cookieStore.getAll()

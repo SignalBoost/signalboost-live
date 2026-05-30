@@ -33,7 +33,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
         password,
         options: {
           data: { full_name: name.trim() },
-          emailRedirectTo: `${window.location.origin}/onboarding`,
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
         }
       })
       if (error) setError(error.message)
@@ -64,7 +64,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
     clearGreetingFlag()
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/onboarding` }
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=/onboarding` }
     })
   }
 
@@ -72,7 +72,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
     clearGreetingFlag()
     await supabase.auth.signInWithOAuth({
       provider: 'github',
-      options: { redirectTo: `${window.location.origin}/onboarding` }
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=/onboarding` }
     })
   }
 

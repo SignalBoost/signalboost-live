@@ -1,5 +1,6 @@
 // saas/utils/supabase/client.ts
 // Real browser Supabase client using @supabase/ssr when public credentials exist.
+import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
 // During static prerendering or preview builds without env vars, expose a safe
 // anonymous stub so layout components can compile without starting auth flows.
 
@@ -31,7 +32,8 @@ function createSafeBrowserClient() {
 
   return createBrowserClient(
     supabaseUrl,
-    supabaseAnonKey
+    supabaseAnonKey,
+    { cookieOptions: saasSupabaseCookieOptions }
   )
 }
 

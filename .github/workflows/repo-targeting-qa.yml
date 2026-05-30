@@ -1,0 +1,60 @@
+name: Repo Targeting QA
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, edited, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  verify-repo-targeting:
+    name: Verify repo targeting and consistency
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify repository targeting
+        run: >-
+          node scripts/verify-repo-targeting.mjs
+          --base origin/${{ github.base_ref }}
+          --head HEAD
+          --report qa/repo-targeting-report.md
+
+      - name: Upload QA report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repo-targeting-qa-report
+          path: qa/repo-targeting-report.md
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install root dependencies
+        run: npm install --no-package-lock
+
+      - name: Typecheck root app
+        run: npm run typecheck
+
+      - name: Build root app
+        run: npm run build
+
+      - name: Install SaaS dependencies
+        working-directory: saas
+        run: npm install --no-package-lock
+
+      - name: Validate SaaS conflict cleanup
+        working-directory: saas
+        run: npm run validate:conflicts
+
+      - name: Run SaaS node tests
+        working-directory: saas
+        run: npm test

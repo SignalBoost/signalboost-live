@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "dev": "next dev",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "qa:repo": "node scripts/verify-repo-targeting.mjs"
   },
   "dependencies": {
     "next": "16.2.6",

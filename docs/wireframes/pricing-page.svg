@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="920" viewBox="0 0 1440 920" role="img" aria-labelledby="title desc">
+  <title id="title">Unified SaaS pricing wireframe</title>
+  <desc id="desc">Dark neon cockpit pricing page with four tier cards and multilingual locale strip.</desc>
+  <defs><style>.bg{fill:#060913}.panel{fill:#0b1a30;stroke:#1af0ff;stroke-opacity:.5;stroke-width:2}.gold{stroke:#ffc300}.txt{font-family:Inter,Arial,sans-serif;fill:#fff}.muted{fill:#9fb4c7}.cyan{fill:#9ff7ff}.h1{font-size:54px;font-weight:900}.h2{font-size:32px;font-weight:800}.price{font-size:48px;font-weight:900}.sm{font-size:19px}</style></defs>
+  <rect width="1440" height="920" class="bg"/>
+  <rect x="95" y="70" width="1250" height="190" rx="34" class="panel"/>
+  <text x="190" y="135" class="txt cyan sm">UNIFIED SAAS PRICING</text>
+  <text x="190" y="205" class="txt h1">Cockpit tiers linking into dashboards</text>
+  <g transform="translate(95 315)">
+    <g><rect width="292" height="390" rx="28" class="panel"/><text x="28" y="58" class="txt h2">Free</text><text x="28" y="130" class="txt price">$0</text><text x="28" y="182" class="txt sm muted">Mission rehearsal</text><text x="28" y="245" class="txt sm cyan">Open SaaS dashboard</text></g>
+    <g transform="translate(320 0)"><rect width="292" height="390" rx="28" class="panel"/><text x="28" y="58" class="txt h2">Starter</text><text x="28" y="130" class="txt price">$19</text><text x="28" y="182" class="txt sm muted">Solo operator</text><text x="28" y="245" class="txt sm cyan">Open SaaS dashboard</text></g>
+    <g transform="translate(640 0)"><rect width="292" height="390" rx="28" class="panel gold"/><text x="28" y="58" class="txt h2">Pro</text><text x="28" y="130" class="txt price">$49</text><text x="28" y="182" class="txt sm muted">Growth crew</text><text x="28" y="245" class="txt sm cyan">Open SaaS dashboard</text></g>
+    <g transform="translate(960 0)"><rect width="292" height="390" rx="28" class="panel"/><text x="28" y="58" class="txt h2">Business</text><text x="28" y="130" class="txt price">$149</text><text x="28" y="182" class="txt sm muted">Command fleet</text><text x="28" y="245" class="txt sm cyan">Open SaaS dashboard</text></g>
+  </g>
+  <rect x="95" y="760" width="1250" height="86" rx="28" class="panel gold"/>
+  <text x="155" y="815" class="txt h2">English • Español • Português • Polski • Русский</text>
+</svg>

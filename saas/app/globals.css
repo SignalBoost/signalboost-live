@@ -412,3 +412,460 @@ html, body {
   .sb-review-link-builder > div, .sb-review-link-copy { display: grid; }
   .sb-review-control-row select, .sb-review-tabs button, .sb-review-actions button { width: 100%; }
 }
+
+/* NASA-style unified Marketplace + SaaS wireframes */
+.sb-cockpit,
+.sb-saas-cockpit,
+.sb-pricing-cockpit {
+  width: min(1240px, calc(100vw - 32px));
+  margin: 0 auto;
+}
+
+.sb-cockpit-hero,
+.sb-saas-header,
+.sb-pricing-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, .6fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+.sb-cockpit-copy,
+.sb-concierge-widget,
+.sb-info-strip,
+.sb-cockpit-panel,
+.sb-partner-carousel article,
+.sb-cockpit-footer,
+.sb-saas-sidebar,
+.sb-saas-header,
+.sb-module-panel,
+.sb-price-panel,
+.sb-locale-strip {
+  background: linear-gradient(135deg, rgba(9, 17, 36, .78), rgba(11, 24, 44, .48));
+  border: 1px solid rgba(26, 240, 255, .18);
+  border-radius: 28px;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, .34), inset 0 1px 0 rgba(255, 255, 255, .08);
+  backdrop-filter: blur(18px);
+}
+
+.sb-cockpit-copy,
+.sb-saas-header,
+.sb-pricing-hero {
+  padding: clamp(24px, 5vw, 54px);
+  position: relative;
+  overflow: hidden;
+}
+
+.sb-cockpit-copy::after,
+.sb-saas-header::after,
+.sb-pricing-hero::after {
+  content: '';
+  position: absolute;
+  inset: auto -10% -35% 35%;
+  height: 240px;
+  background: radial-gradient(circle, rgba(26, 240, 255, .22), transparent 68%);
+  pointer-events: none;
+}
+
+.sb-search-console {
+  margin-top: 28px;
+  display: grid;
+  gap: 12px;
+}
+
+.sb-search-console label {
+  color: #9ff7ff;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.sb-search-console > div {
+  display: flex;
+  gap: 10px;
+  background: rgba(0, 0, 0, .34);
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 999px;
+  padding: 8px;
+}
+
+.sb-search-console input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  color: #fff;
+  outline: 0;
+  padding: 12px 14px;
+}
+
+.sb-search-console button,
+.sb-cockpit-footer a,
+.sb-module-panel a,
+.sb-price-panel a {
+  border-radius: 999px;
+  font-weight: 950;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.sb-search-console > div button,
+.sb-price-panel a {
+  background: linear-gradient(135deg, #ffc300, #1af0ff);
+  color: #06111f;
+  padding: 12px 18px;
+}
+
+.sb-search-console ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sb-search-console li button {
+  background: rgba(26, 240, 255, .09);
+  border: 1px solid rgba(26, 240, 255, .18);
+  color: #c9fbff;
+  padding: 9px 12px;
+}
+
+.sb-concierge-widget {
+  min-height: 360px;
+  padding: 26px;
+  position: relative;
+  overflow: hidden;
+}
+
+.sb-concierge-widget > span,
+.sb-panel-index {
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: .16em;
+}
+
+.sb-concierge-widget strong {
+  display: block;
+  font-size: clamp(28px, 4vw, 44px);
+  line-height: .95;
+  margin: 16px 0;
+}
+
+.sb-concierge-widget p,
+.sb-price-panel p {
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.sb-orbit {
+  position: absolute;
+  inset: auto 24px 24px auto;
+  width: 170px;
+  height: 170px;
+  border: 1px dashed rgba(26, 240, 255, .32);
+  border-radius: 999px;
+  animation: sbOrbit 16s linear infinite;
+}
+
+.sb-orbit i {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #1af0ff;
+  box-shadow: 0 0 24px #1af0ff;
+}
+
+.sb-orbit i:nth-child(1) { top: -7px; left: 78px; }
+.sb-orbit i:nth-child(2) { bottom: 20px; left: 12px; background: var(--gold); box-shadow: 0 0 24px var(--gold); }
+.sb-orbit i:nth-child(3) { right: 18px; bottom: 34px; background: #4ade80; box-shadow: 0 0 24px #4ade80; }
+
+@keyframes sbOrbit { to { transform: rotate(360deg); } }
+
+.sb-info-strip,
+.sb-cockpit-footer,
+.sb-locale-strip {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  margin: 24px 0;
+  padding: 18px 22px;
+}
+
+.sb-info-strip div,
+.sb-cockpit-footer nav,
+.sb-locale-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sb-info-strip span,
+.sb-locale-strip span,
+.sb-status-stack span,
+.sb-wireframe-stack span {
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 999px;
+  color: #dffcff;
+  font-size: 12px;
+  font-weight: 850;
+  padding: 8px 11px;
+}
+
+.sb-section-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: end;
+  margin: 40px 0 18px;
+}
+
+.sb-cockpit-grid,
+.sb-module-grid,
+.sb-pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.sb-cockpit-panel,
+.sb-module-panel,
+.sb-price-panel {
+  color: #fff;
+  padding: 22px;
+  text-decoration: none;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.sb-cockpit-panel:hover,
+.sb-cockpit-panel:focus-visible,
+.sb-module-panel:hover,
+.sb-module-panel:focus-visible,
+.sb-price-panel:hover,
+.sb-price-panel:focus-visible,
+.sb-partner-carousel article:hover,
+.sb-partner-carousel article:focus-visible {
+  border-color: rgba(26, 240, 255, .52);
+  box-shadow: 0 30px 90px rgba(26, 240, 255, .14), inset 0 0 30px rgba(26, 240, 255, .05);
+  outline: none;
+  transform: translateY(-4px);
+}
+
+.sb-cockpit-panel > span,
+.sb-module-panel__top > span {
+  font-size: 32px;
+}
+
+.sb-cockpit-panel h3,
+.sb-module-panel h2,
+.sb-price-panel h2 {
+  margin: 14px 0 8px;
+}
+
+.sb-cockpit-panel p {
+  color: var(--text-secondary);
+  min-height: 50px;
+}
+
+.sb-cockpit-panel div,
+.sb-mini-chart {
+  align-items: end;
+  background: rgba(0, 0, 0, .28);
+  border-radius: 14px;
+  display: flex;
+  gap: 6px;
+  height: 58px;
+  margin-top: 18px;
+  overflow: hidden;
+  padding: 10px;
+}
+
+.sb-cockpit-panel div i,
+.sb-mini-chart i {
+  background: linear-gradient(180deg, #1af0ff, #3b82f6);
+  border-radius: 999px 999px 3px 3px;
+  box-shadow: 0 0 18px rgba(26, 240, 255, .36);
+  display: block;
+  height: 12px;
+}
+
+.sb-partner-carousel > div {
+  display: grid;
+  grid-auto-columns: minmax(190px, 1fr);
+  grid-auto-flow: column;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.sb-partner-carousel article {
+  min-height: 128px;
+  padding: 20px;
+}
+
+.sb-partner-carousel strong,
+.sb-partner-carousel small,
+.sb-cockpit-footer span {
+  display: block;
+}
+
+.sb-partner-carousel strong {
+  font-size: 22px;
+  margin: 18px 0 8px;
+}
+
+.sb-partner-carousel small {
+  color: #9ff7ff;
+}
+
+.sb-cockpit-footer a,
+.sb-module-panel a {
+  border: 1px solid rgba(26, 240, 255, .24);
+  color: #9ff7ff;
+  padding: 9px 12px;
+}
+
+.sb-saas-cockpit {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 22px;
+}
+
+.sb-saas-sidebar {
+  padding: 22px;
+  position: sticky;
+  top: 120px;
+}
+
+.sb-saas-sidebar nav {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.sb-saas-sidebar a {
+  align-items: center;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .10);
+  border-radius: 16px;
+  color: #fff;
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+}
+
+.sb-saas-sidebar a:hover,
+.sb-saas-sidebar a:focus-visible,
+.sb-search-console button:hover,
+.sb-search-console button:focus-visible,
+.sb-cockpit-footer a:hover,
+.sb-cockpit-footer a:focus-visible,
+.sb-module-panel a:hover,
+.sb-module-panel a:focus-visible,
+.sb-price-panel a:hover,
+.sb-price-panel a:focus-visible {
+  box-shadow: 0 0 28px rgba(26, 240, 255, .16);
+  outline: none;
+  transform: translateY(-2px);
+}
+
+.sb-saas-header {
+  grid-template-columns: minmax(0, 1fr) 220px;
+  margin-bottom: 18px;
+}
+
+.sb-status-stack,
+.sb-wireframe-stack {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.sb-module-panel__top {
+  display: flex;
+  gap: 14px;
+}
+
+.sb-wireframe-stack {
+  margin-top: 18px;
+}
+
+.sb-wireframe-stack span {
+  border-radius: 14px;
+}
+
+.sb-mini-chart i { flex: 1; }
+
+.sb-pricing-hero {
+  display: block;
+  text-align: center;
+}
+
+.sb-pricing-hero p {
+  margin: 18px auto 0;
+  max-width: 760px;
+}
+
+.sb-price-panel strong {
+  display: block;
+  font-size: 42px;
+  margin: 12px 0;
+}
+
+.sb-price-panel ul {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 20px 0;
+  padding: 0;
+}
+
+.sb-price-panel li::before {
+  color: #1af0ff;
+  content: '◈ ';
+}
+
+.sb-price-panel a {
+  display: inline-flex;
+  justify-content: center;
+  margin-top: 8px;
+  text-decoration: none;
+  width: 100%;
+}
+
+@media (max-width: 960px) {
+  .sb-cockpit-hero,
+  .sb-saas-cockpit,
+  .sb-saas-header {
+    grid-template-columns: 1fr;
+  }
+
+  .sb-saas-sidebar {
+    position: static;
+  }
+
+  .sb-cockpit-grid,
+  .sb-module-grid,
+  .sb-pricing-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .sb-info-strip,
+  .sb-cockpit-footer,
+  .sb-search-console > div {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sb-cockpit-grid,
+  .sb-module-grid,
+  .sb-pricing-grid {
+    grid-template-columns: 1fr;
+  }
+}

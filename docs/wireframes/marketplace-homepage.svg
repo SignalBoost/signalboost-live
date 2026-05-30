@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1100" viewBox="0 0 1440 1100" role="img" aria-labelledby="title desc">
+  <title id="title">Marketplace homepage cockpit wireframe</title>
+  <desc id="desc">NASA-style dark neon marketplace homepage with hero search, concierge, telemetry panels, partner carousel and footer console.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#05070f"/><stop offset="1" stop-color="#0b1b34"/></linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <style>.panel{fill:rgba(12,26,48,.82);stroke:#1af0ff;stroke-opacity:.55;stroke-width:2}.gold{stroke:#ffc300}.txt{font-family:Inter,Arial,sans-serif;fill:#fff}.muted{fill:#9fb4c7}.cyan{fill:#9ff7ff}.small{font-size:22px}.label{font-size:18px;letter-spacing:3px}.h1{font-size:54px;font-weight:900}.h2{font-size:32px;font-weight:800}</style>
+  </defs>
+  <rect width="1440" height="1100" fill="url(#bg)"/>
+  <circle cx="1180" cy="120" r="260" fill="#1af0ff" opacity=".09" filter="url(#glow)"/>
+  <circle cx="240" cy="420" r="220" fill="#ffc300" opacity=".08" filter="url(#glow)"/>
+  <rect x="70" y="70" width="850" height="360" rx="34" class="panel"/>
+  <text x="110" y="125" class="txt label cyan">MARKETPLACE MISSION CONTROL</text>
+  <text x="110" y="200" class="txt h1">AI-guided marketplace</text>
+  <text x="110" y="252" class="txt h1">search cockpit</text>
+  <text x="110" y="304" class="txt small muted">Contextual suggestions route Flights, Hotels, eSIM, Tours, Cars, Marketplace.</text>
+  <rect x="110" y="335" width="720" height="62" rx="31" fill="#050914" stroke="#ffffff" stroke-opacity=".2"/>
+  <text x="140" y="374" class="txt small muted">Try “Lisbon flights + hotel + eSIM + tours”</text>
+  <rect x="680" y="345" width="135" height="42" rx="21" fill="#ffc300"/>
+  <text x="707" y="373" fill="#06111f" font-family="Inter,Arial" font-size="20" font-weight="800">AI route</text>
+  <rect x="960" y="70" width="410" height="360" rx="34" class="panel gold"/>
+  <text x="1000" y="130" class="txt label">CONCIERGE AI</text>
+  <text x="1000" y="194" class="txt h2">Integrated widget</text>
+  <text x="1000" y="242" class="txt small muted">Compares options, localizes offers, and assembles safe itineraries.</text>
+  <circle cx="1170" cy="335" r="78" fill="none" stroke="#1af0ff" stroke-dasharray="10 12" filter="url(#glow)"/>
+  <circle cx="1170" cy="257" r="10" fill="#1af0ff"/>
+  <circle cx="1105" cy="374" r="10" fill="#ffc300"/>
+  <rect x="70" y="465" width="1300" height="78" rx="24" class="panel"/>
+  <text x="105" y="515" class="txt h2">Connected with 130+ trusted partners</text>
+  <text x="735" y="512" class="txt small cyan">API 99.99%   Fare scan 12k/min   Review trust 4.8/5</text>
+  <g transform="translate(70 590)">
+    <text x="0" y="0" class="txt label cyan">CATEGORY COCKPIT PANELS</text>
+    <g transform="translate(0 35)">
+      <rect width="405" height="155" rx="24" class="panel"/><text x="28" y="58" class="txt h2">Flights</text><line x1="28" y1="118" x2="280" y2="118" stroke="#1af0ff" stroke-width="10" stroke-linecap="round"/>
+      <rect x="448" width="405" height="155" rx="24" class="panel"/><text x="476" y="58" class="txt h2">Hotels</text><line x1="476" y1="118" x2="760" y2="118" stroke="#ffc300" stroke-width="10" stroke-linecap="round"/>
+      <rect x="895" width="405" height="155" rx="24" class="panel"/><text x="923" y="58" class="txt h2">eSIM &amp; Internet</text><line x1="923" y1="118" x2="1210" y2="118" stroke="#4ade80" stroke-width="10" stroke-linecap="round"/>
+      <rect y="185" width="405" height="155" rx="24" class="panel"/><text x="28" y="243" class="txt h2">Tours &amp; Activities</text><line x1="28" y1="303" x2="330" y2="303" stroke="#1af0ff" stroke-width="10" stroke-linecap="round"/>
+      <rect x="448" y="185" width="405" height="155" rx="24" class="panel"/><text x="476" y="243" class="txt h2">Car Rentals</text><line x1="476" y1="303" x2="720" y2="303" stroke="#ffc300" stroke-width="10" stroke-linecap="round"/>
+      <rect x="895" y="185" width="405" height="155" rx="24" class="panel"/><text x="923" y="243" class="txt h2">Marketplace</text><line x1="923" y1="303" x2="1260" y2="303" stroke="#4ade80" stroke-width="10" stroke-linecap="round"/>
+    </g>
+  </g>
+  <rect x="70" y="965" width="1300" height="82" rx="24" class="panel gold"/>
+  <text x="105" y="1017" class="txt h2">Footer cockpit console: Admin • Dashboard • SaaS • Pricing</text>
+</svg>

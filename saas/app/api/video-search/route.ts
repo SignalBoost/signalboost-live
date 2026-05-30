@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
 import { cookies } from 'next/headers'
 import { searchVideos } from '@/lib/video/search'
 
@@ -76,6 +77,7 @@ async function getUser(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: saasSupabaseCookieOptions,
       cookies: {
         get: (name) => cookieStore.get(name)?.value,
         set: () => {},

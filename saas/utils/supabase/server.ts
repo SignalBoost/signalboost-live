@@ -10,6 +10,7 @@
 //                           sent to the browser.
 //
 // Matches the existing browser client in ./client.ts which uses @supabase/ssr
+import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
 // with cookie-based sessions.
 
 import { cookies } from 'next/headers'
@@ -24,6 +25,7 @@ export async function getServerSupabase() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: saasSupabaseCookieOptions,
       cookies: {
         getAll() {
           return cookieStore.getAll()

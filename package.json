@@ -11,13 +11,15 @@
     "qa:repo": "node scripts/verify-repo-targeting.mjs"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.106.2",
+    "autoprefixer": "^10.4.16",
     "next": "16.2.6",
+    "openai": "^4.24.1",
+    "postcss": "^8.4.31",
     "react": "19.2.6",
     "react-dom": "19.2.6",
-    "openai": "^4.24.1",
-    "tailwindcss": "^3.4.1",
-    "postcss": "^8.4.31",
-    "autoprefixer": "^10.4.16"
+    "tailwindcss": "^3.4.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

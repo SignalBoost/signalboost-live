@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
@@ -21,6 +22,7 @@ const SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])?$/;
 async function getAuthedUser() {
   const cookieStore = await cookies();
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    cookieOptions: saasSupabaseCookieOptions,
     cookies: {
       get: (name: string) => cookieStore.get(name)?.value,
       set: () => {},

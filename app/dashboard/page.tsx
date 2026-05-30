@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { cockpitWireframe, signalBoostModules } from '@/lib/platform/unifiedPlatform'
-import { adminTelemetrySummary } from '@/lib/admin/saasTelemetry'
+import { adminTelemetrySummary, executiveTelemetry } from '@/lib/admin/saasTelemetry'
 
 export default function DashboardPage() {
   return (
@@ -20,6 +20,32 @@ export default function DashboardPage() {
             <p className="mt-5 text-xs uppercase tracking-[0.2em] text-[#FFD700]">{module.telemetryEvent}</p>
           </Link>
         ))}
+      </section>
+
+
+      <section aria-label="Executive cockpit" className="mt-8 rounded-[2rem] border border-[#FFD700]/20 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,.12),transparent_30%),rgba(255,215,0,.08)] p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.35em] text-[#FFD700]">Owner/admin executive dashboard</p>
+            <h2 className="mt-3 text-3xl font-black">Financials, KPIs, CRM, Forecasting, and Outreach telemetry</h2>
+          </div>
+          <Link href="/admin" className="rounded-full border border-[#FFD700]/40 px-5 py-3 text-sm font-bold text-[#FFD700] no-underline hover:bg-[#FFD700]/10">Open restricted console</Link>
+        </div>
+        <div className="mt-6 grid gap-4 lg:grid-cols-5">
+          {[
+            ['Financials', executiveTelemetry.financials[0].value, executiveTelemetry.financials[0].trend],
+            ['KPIs', executiveTelemetry.kpis[0].value, executiveTelemetry.kpis[0].trend],
+            ['CRM pipeline', executiveTelemetry.crmPipeline[0].value, executiveTelemetry.crmPipeline[0].trend],
+            ['Forecasting', executiveTelemetry.forecasts[0].confidence, executiveTelemetry.forecasts[0].prediction],
+            ['Outreach', executiveTelemetry.outreach[0].value, executiveTelemetry.outreach[0].trend],
+          ].map(([label, value, trend]) => (
+            <article key={label} className="rounded-2xl border border-white/10 bg-black/30 p-4">
+              <p className="text-sm text-white/50">{label}</p>
+              <p className="mt-2 text-2xl font-black text-[#FFD700]">{value}</p>
+              <p className="mt-2 text-xs leading-5 text-white/60">{trend}</p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="mt-8 grid gap-6 lg:grid-cols-[1fr_.8fr]">

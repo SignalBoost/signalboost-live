@@ -53,8 +53,18 @@
   --space-10: 40px;
   --space-12: 48px;
 
-  /* Unified typography tokens */
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* NASA-style HMI design tokens: typography, colors, spacing, shadows, and cockpit effects */
+  --font-sans: var(--sb-font-body);
+  --sb-font-heading: Orbitron, Exo, "Space Grotesk", Inter, ui-sans-serif, system-ui, sans-serif;
+  --sb-font-body: Inter, Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --sb-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --sb-font-weight-light: 300;
+  --sb-font-weight-medium: 500;
+  --sb-font-weight-bold: 700;
+  --sb-line-height-tight: 1;
+  --sb-line-height-heading: 1.12;
+  --sb-line-height-body: 1.65;
+  --sb-line-height-caption: 1.45;
   --type-xs: 12px;
   --type-sm: 14px;
   --type-base: 16px;
@@ -62,6 +72,31 @@
   --type-xl: 24px;
   --type-2xl: 32px;
   --type-3xl: 44px;
+
+  --sb-bg-black: #000000;
+  --sb-bg-navy: #07111f;
+  --sb-bg-gradient: radial-gradient(circle at 18% 8%, rgba(0,255,255,.13), transparent 30rem), radial-gradient(circle at 86% 12%, rgba(255,0,255,.12), transparent 28rem), linear-gradient(180deg, #000000 0%, #030712 42%, #07111f 100%);
+  --sb-color-primary-neon: #FFD700;
+  --sb-color-secondary-neon: #00FFFF;
+  --sb-color-accent-neon: #FF00FF;
+  --sb-color-text: #FFFFFF;
+  --sb-color-text-muted: #AAAAAA;
+
+  --sb-space-xs: 4px;
+  --sb-space-sm: 8px;
+  --sb-space-md: 16px;
+  --sb-space-lg: 24px;
+  --sb-space-xl: 32px;
+
+  --sb-shadow-neon: 0 0 12px currentColor;
+  --sb-shadow-panel-token: 0 4px 12px rgba(0,0,0,0.5);
+  --sb-shadow-hover-gold: 0 0 20px rgba(255,215,0,.72);
+  --sb-shadow-hover-cyan: 0 0 20px rgba(0,255,255,.72);
+  --sb-shadow-hover-magenta: 0 0 20px rgba(255,0,255,.72);
+
+  --sb-glass-background: rgba(255,255,255,0.1);
+  --sb-glass-blur: blur(12px);
+  --sb-transition-hover: 200ms ease-in-out;
 }
 
 
@@ -97,8 +132,8 @@
 html, body {
   margin: 0;
   padding: 0;
-  font-family: system-ui, sans-serif;
-  background: linear-gradient(180deg, #07080f 0%, #0a0b14 48%, #090b12 100%);
+  font-family: var(--sb-font-body);
+  background: var(--sb-bg-gradient);
   color: #fff;
 }
 
@@ -274,19 +309,18 @@ html, body {
 
 /* Unified state-of-the-art SignalBoost design tokens + NASA cockpit surfaces */
 :root {
-  --sb-font-display: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --sb-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  --sb-void: #030712;
-  --sb-cockpit: #07111f;
-  --sb-cyan: #1af0ff;
-  --sb-gold: #ffc300;
-  --sb-magenta: #ff4fd8;
+  --sb-font-display: var(--sb-font-heading);
+  --sb-void: var(--sb-bg-black);
+  --sb-cockpit: var(--sb-bg-navy);
+  --sb-cyan: var(--sb-color-secondary-neon);
+  --sb-gold: var(--sb-color-primary-neon);
+  --sb-magenta: var(--sb-color-accent-neon);
   --sb-green: #4ade80;
   --sb-radius-panel: 28px;
-  --sb-glass-surface: linear-gradient(135deg, rgba(255,255,255,.11), rgba(255,255,255,.035));
+  --sb-glass-surface: linear-gradient(135deg, var(--sb-glass-background), rgba(255,255,255,.035));
   --sb-glass-border: rgba(255,255,255,.14);
-  --sb-shadow-panel: 0 30px 90px rgba(0,0,0,.36);
-  --sb-shadow-cyan: 0 0 42px rgba(26,240,255,.22);
+  --sb-shadow-panel: var(--sb-shadow-panel-token), 0 30px 90px rgba(0,0,0,.36);
+  --sb-shadow-cyan: var(--sb-shadow-hover-cyan);
 }
 
 .sb-cockpit-stack { display: grid; gap: clamp(18px, 3vw, 30px); }
@@ -411,4 +445,105 @@ html, body {
   .sb-reviews-page { width: min(100% - 18px, 1180px); }
   .sb-review-link-builder > div, .sb-review-link-copy { display: grid; }
   .sb-review-control-row select, .sb-review-tabs button, .sb-review-actions button { width: 100%; }
+}
+
+
+/* Unified NASA-style HMI utilities for Marketplace, SaaS dashboards, and Pricing */
+.sb-marketplace,
+.sb-pricing,
+.sb-dashboard-main,
+.sb-dashboard-shell {
+  font-family: var(--sb-font-body);
+}
+
+.sb-h1,
+.sb-h2,
+.sb-h3,
+.sb-eyebrow,
+.sb-marketplace h1,
+.sb-marketplace h2,
+.sb-marketplace h3,
+.sb-pricing h1,
+.sb-pricing h2,
+.sb-pricing h3 {
+  font-family: var(--sb-font-heading);
+  font-weight: var(--sb-font-weight-bold);
+}
+
+.sb-h1 { line-height: var(--sb-line-height-tight); }
+.sb-h2, .sb-h3 { line-height: var(--sb-line-height-heading); }
+.sb-body { line-height: var(--sb-line-height-body); font-weight: var(--sb-font-weight-light); }
+.sb-caption { color: var(--sb-color-text-muted); line-height: var(--sb-line-height-caption); }
+
+.sb-cockpit-panel,
+.sb-marketplace-panel,
+.sb-pricing-card,
+.sb-telemetry-card {
+  background: var(--sb-glass-background);
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 24px;
+  box-shadow: var(--sb-shadow-panel-token);
+  backdrop-filter: var(--sb-glass-blur);
+  -webkit-backdrop-filter: var(--sb-glass-blur);
+  transition: transform var(--sb-transition-hover), border-color var(--sb-transition-hover), box-shadow var(--sb-transition-hover);
+}
+
+.sb-cockpit-panel:hover,
+.sb-marketplace-panel:hover,
+.sb-pricing-card:hover,
+.sb-telemetry-card:hover {
+  border-color: color-mix(in srgb, var(--sb-color-accent-neon) 55%, white 0%);
+  box-shadow: var(--sb-shadow-panel-token), var(--sb-shadow-hover-magenta);
+  transform: translateY(-3px);
+}
+
+.sb-neon-text-gold { color: var(--sb-color-primary-neon); text-shadow: var(--sb-shadow-neon); }
+.sb-neon-text-cyan { color: var(--sb-color-secondary-neon); text-shadow: var(--sb-shadow-neon); }
+.sb-neon-text-magenta { color: var(--sb-color-accent-neon); text-shadow: var(--sb-shadow-neon); }
+
+.sb-responsive-grid {
+  display: grid;
+  gap: var(--sb-space-md);
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.sb-telemetry-strip {
+  display: grid;
+  gap: var(--sb-space-sm);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sb-telemetry-bar {
+  background: linear-gradient(90deg, var(--sb-color-secondary-neon), var(--sb-color-accent-neon));
+  border-radius: 999px;
+  box-shadow: var(--sb-shadow-neon);
+  height: var(--sb-space-xs);
+}
+
+.sb-hero-search {
+  align-items: center;
+  background: rgba(0,0,0,.42);
+  border: 1px solid rgba(0,255,255,.28);
+  border-radius: 999px;
+  box-shadow: inset 0 0 20px rgba(0,255,255,.08), var(--sb-shadow-panel-token);
+  display: grid;
+  gap: var(--sb-space-sm);
+  grid-template-columns: 1fr auto;
+  padding: var(--sb-space-sm);
+}
+
+.sb-hero-search input {
+  background: transparent;
+  border: 0;
+  color: var(--sb-color-text);
+  font: inherit;
+  min-width: 0;
+  outline: 0;
+  padding: var(--sb-space-md);
+}
+
+.sb-hero-search input::placeholder { color: var(--sb-color-text-muted); }
+
+@media (max-width: 720px) {
+  .sb-hero-search, .sb-telemetry-strip { grid-template-columns: 1fr; }
 }

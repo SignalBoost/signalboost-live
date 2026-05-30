@@ -19,9 +19,6 @@ import {
 } from '@/lib/projects'
 import { getGreeting, SupportedLocale } from '@/lib/cultural-calendar'
 
-const BLUE = '#3b82f6'
-const BLUE_BORDER = 'rgba(59,130,246,0.3)'
-const GOLD = '#ffc300'
 
 type Message = {
   role: 'user' | 'assistant'
@@ -311,20 +308,21 @@ export default function DashboardOverviewPage() {
   }
 
   return (
-    <div style={{ color: '#fff', fontFamily: 'system-ui, -apple-system, sans-serif', maxWidth: 1200, margin: '0 auto', padding: '0 20px' }}>
+    <div className="sb-dashboard-main" style={{ color: '#fff', fontFamily: 'var(--sb-font-body)', maxWidth: 1200, margin: '0 auto', padding: '0 var(--sb-space-lg)' }}>
       <style>{`
         body {
-          background-color: #060913 !important;
+          background: var(--sb-bg-gradient) !important;
           background-image:
             radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.12) 0px, transparent 50%),
             radial-gradient(at 100% 100%, rgba(255, 195, 0, 0.05) 0px, transparent 50%) !important;
           background-attachment: fixed;
         }
         .fathom-glass {
-          background: rgba(6, 9, 19, 0.61);
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
-          border: 1px solid rgba(255, 255, 255, 0.06);
+          background: var(--sb-glass-background);
+          backdrop-filter: var(--sb-glass-blur);
+          -webkit-backdrop-filter: var(--sb-glass-blur);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          box-shadow: var(--sb-shadow-panel-token);
         }
         .terminal-text {
           font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
@@ -350,7 +348,7 @@ export default function DashboardOverviewPage() {
         <div style={{ display: 'flex', gap: 16, marginBottom: 28, alignItems: 'flex-start', flexWrap: 'wrap' }}>
 
           <div
-            className="fathom-glass"
+            className="fathom-glass sb-cockpit-panel"
             style={{
               width: '100%',
               borderRadius: 16,
@@ -378,7 +376,7 @@ export default function DashboardOverviewPage() {
             <div style={{ minWidth: 0, flex: 1 }}>
               <div
                 className="terminal-text"
-                style={{ fontSize: 11, fontWeight: 900, color: BLUE, letterSpacing: '.08em', textTransform: lang === 'en' ? 'uppercase' : 'none' }}
+                style={{ fontSize: 11, fontWeight: 900, color: 'var(--sb-color-secondary-neon)' , letterSpacing: '.08em', textTransform: lang === 'en' ? 'uppercase' : 'none' }}
               >
                 {conciergeMessage.title}
               </div>
@@ -391,13 +389,13 @@ export default function DashboardOverviewPage() {
             <button
               onClick={() => { setPromptOpen(true); setPromptInput(t(dict, 'dash.prompt.nextAction', 'What should I do next?')) }}
               className="terminal-text"
-              style={{ border: '1px solid rgba(255,195,0,.25)', background: 'rgba(255,195,0,.08)', color: GOLD, borderRadius: 999, padding: '9px 12px', fontSize: 10, fontWeight: 900, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              style={{ border: '1px solid rgba(255,195,0,.25)', background: 'rgba(255,195,0,.08)', color: 'var(--sb-color-primary-neon)' , borderRadius: 999, padding: '9px 12px', fontSize: 10, fontWeight: 900, cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
               {termCase(t(dict, 'dash.concierge.askNext', 'Ask next'), lang)}
             </button>
           </div>
 
-          <div className="fathom-glass" style={{ flex: sketch ? '1 1 380px' : '1 1 100%', minWidth: 320, borderRadius: 16, padding: 24 }}>
+          <div className="fathom-glass sb-cockpit-panel" style={{ flex: sketch ? '1 1 380px' : '1 1 100%', minWidth: 320, borderRadius: 16, padding: 'var(--sb-space-lg)' }}>
             <div style={{ overflow: 'hidden', maxHeight: greetingHidden ? 0 : 200, opacity: greetingHidden ? 0 : 1, marginBottom: greetingHidden ? 0 : 20, transition: 'all .4s ease' }}>
               <h1 className="terminal-text" style={{ fontSize: 24, fontWeight: 900, margin: '0 0 6px', background: 'linear-gradient(90deg,#3b82f6,#ffc300,#4ade80,#3b82f6)', backgroundSize: '300% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'shimmer 3s linear infinite', display: 'inline-block', textTransform: lang === 'en' ? 'uppercase' : 'none' }}>
                 {greetingData.headline} {greetingData.emoji}
@@ -408,7 +406,7 @@ export default function DashboardOverviewPage() {
             </div>
 
             <div style={{ display: 'flex', gap: 10, marginBottom: promptOpen ? 16 : 0 }}>
-              <span className="terminal-text" style={{ color: BLUE, display: 'flex', alignItems: 'center', fontWeight: 700 }}>$</span>
+              <span className="terminal-text" style={{ color: 'var(--sb-color-secondary-neon)' , display: 'flex', alignItems: 'center', fontWeight: 700 }}>$</span>
               <input
                 value={promptInput}
                 onChange={(e) => { setPromptInput(e.target.value); if (e.target.value.length > 0 && !hasTyped) setHasTyped(true) }}
@@ -421,7 +419,7 @@ export default function DashboardOverviewPage() {
                 onClick={() => sendPrompt()}
                 disabled={promptLoading}
                 className="terminal-text"
-                style={{ padding: '0 20px', borderRadius: 8, border: 'none', background: BLUE, color: '#fff', fontWeight: 700, fontSize: 12, cursor: promptLoading ? 'wait' : 'pointer', opacity: promptLoading ? 0.7 : 1 }}
+                style={{ padding: '0 20px', borderRadius: 8, border: 'none', background: 'var(--sb-color-secondary-neon)' , color: '#fff', fontWeight: 700, fontSize: 12, cursor: promptLoading ? 'wait' : 'pointer', opacity: promptLoading ? 0.7 : 1 }}
               >
                 {termCase(promptLoading ? L.thinking : L.execute, lang)}
               </button>
@@ -503,7 +501,7 @@ export default function DashboardOverviewPage() {
                 ))}
               </div>
 
-              <Link href="/dashboard/builder" className="terminal-text" style={{ display: 'block', textAlign: 'center', marginTop: 14, background: GOLD, color: '#000', padding: 12, borderRadius: 6, textDecoration: 'none', fontWeight: 800, fontSize: 12 }}>
+              <Link href="/dashboard/builder" className="terminal-text" style={{ display: 'block', textAlign: 'center', marginTop: 14, background: 'var(--sb-color-primary-neon)' , color: '#000', padding: 12, borderRadius: 6, textDecoration: 'none', fontWeight: 800, fontSize: 12 }}>
                 {termCase(L.openInBuilder, lang)}
               </Link>
             </div>
@@ -515,15 +513,15 @@ export default function DashboardOverviewPage() {
             // {termCase(L.quickActions, lang)}
           </h2>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
+          <div className="sb-responsive-grid">
             {QUICK_ACTIONS.map(item => (
               <Link
                 key={item.type}
                 href={item.href}
                 onMouseEnter={() => setHoveredAction(item.type)}
                 onMouseLeave={() => setHoveredAction(null)}
-                className="fathom-glass"
-                style={{ borderRadius: 12, padding: 20, textDecoration: 'none', transition: 'all .2s', borderColor: hoveredAction === item.type ? BLUE_BORDER : 'rgba(255,255,255,0.06)', background: hoveredAction === item.type ? 'rgba(59,130,246,0.04)' : 'rgba(6, 9, 19, 0.4)' }}
+                className="fathom-glass sb-cockpit-panel"
+                style={{ borderRadius: 12, padding: 'var(--sb-space-lg)', textDecoration: 'none', transition: 'all var(--sb-transition-hover)' , borderColor: hoveredAction === item.type ? 'rgba(0,255,255,.5)' : 'rgba(255,255,255,0.12)', background: hoveredAction === item.type ? 'rgba(0,255,255,0.08)' : 'rgba(6, 9, 19, 0.4)' }}
               >
                 <div style={{ fontSize: 24 }}>{item.icon}</div>
                 <div className="terminal-text" style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginTop: 10 }}>
@@ -537,18 +535,18 @@ export default function DashboardOverviewPage() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 28 }}>
+        <div className="sb-responsive-grid" style={{ marginBottom: 'var(--sb-space-xl)' }}>
           {[
             { label: t(dict, 'dash.stats.activeSites', 'Active sites'), value: projects.filter(p => p.status === 'live').length },
             { label: t(dict, 'dash.stats.projects', 'Projects'), value: `${projects.length}/${projectLimit === 999 ? '∞' : projectLimit}` },
             { label: t(dict, 'dash.stats.audioGenerated', 'Audio generated'), value: `0 ${t(dict, 'dash.stats.min', 'min')}` },
             { label: t(dict, 'dash.stats.videosCreated', 'Videos created'), value: '0' },
           ].map(stat => (
-            <div key={stat.label} className="fathom-glass" style={{ borderRadius: 12, padding: 16, background: 'rgba(6, 9, 19, 0.3)' }}>
+            <div key={stat.label} className="fathom-glass sb-telemetry-card" style={{ borderRadius: 12, padding: 'var(--sb-space-md)', background: 'rgba(6, 9, 19, 0.3)' }}>
               <div className="terminal-text" style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 8 }}>
                 [{termCase(stat.label, lang)}]
               </div>
-              <div className="terminal-text" style={{ fontSize: 22, fontWeight: 900, color: BLUE }}>
+              <div className="terminal-text" style={{ fontSize: 22, fontWeight: 900, color: 'var(--sb-color-secondary-neon)'  }}>
                 {stat.value}
               </div>
             </div>
@@ -562,27 +560,27 @@ export default function DashboardOverviewPage() {
             </h2>
 
             {atLimit ? (
-              <Link href="/pricing" style={{ background: GOLD, color: '#000', padding: '10px 20px', borderRadius: 6, textDecoration: 'none', fontWeight: 800, fontSize: 12, fontFamily: 'monospace', textTransform: lang === 'en' ? 'uppercase' : 'none' }}>
+              <Link href="/pricing" style={{ background: 'var(--sb-color-primary-neon)' , color: '#000', padding: '10px 20px', borderRadius: 6, textDecoration: 'none', fontWeight: 800, fontSize: 12, fontFamily: 'monospace', textTransform: lang === 'en' ? 'uppercase' : 'none' }}>
                 {L.upgrade}
               </Link>
             ) : (
-              <Link href="/dashboard/builder" className="terminal-text" style={{ background: GOLD, color: '#000', padding: '10px 20px', border: 'none', borderRadius: 6, fontWeight: 800, fontSize: 11, textDecoration: 'none' }}>
+              <Link href="/dashboard/builder" className="terminal-text" style={{ background: 'var(--sb-color-primary-neon)' , color: '#000', padding: '10px 20px', border: 'none', borderRadius: 6, fontWeight: 800, fontSize: 11, textDecoration: 'none' }}>
                 {termCase(L.createProject, lang)}
               </Link>
             )}
           </div>
 
           {projects.length === 0 ? (
-            <div className="fathom-glass" style={{ borderStyle: 'dashed', borderRadius: 16, padding: 50, textAlign: 'center' }}>
+            <div className="fathom-glass sb-cockpit-panel" style={{ borderStyle: 'dashed', borderRadius: 16, padding: 50, textAlign: 'center' }}>
               <div style={{ fontSize: 32, opacity: 0.3 }}>📁</div>
               <div className="terminal-text" style={{ marginTop: 10, fontWeight: 700, fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>
                 {L.noProjects}. {L.noProjectsSub}
               </div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
+            <div className="sb-responsive-grid">
               {projects.map((p, i) => (
-                <div key={p.id} className="fathom-glass" style={{ borderRadius: 12, padding: 20, animation: `cardIn .3s ease ${i * .04}s both`, background: 'rgba(6, 9, 19, 0.4)' }}>
+                <div key={p.id} className="fathom-glass sb-cockpit-panel" style={{ borderRadius: 12, padding: 'var(--sb-space-lg)', animation: `cardIn .3s ease ${i * .04}s both`, background: 'rgba(6, 9, 19, 0.4)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', gap: 10, minWidth: 0 }}>
                       <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(59,130,246,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.05)' }}>
@@ -620,7 +618,7 @@ export default function DashboardOverviewPage() {
           )}
         </div>
 
-        <div className="fathom-glass" style={{ borderRadius: 14, padding: 20, marginBottom: 24 }}>
+        <div className="fathom-glass sb-cockpit-panel" style={{ borderRadius: 14, padding: 'var(--sb-space-lg)', marginBottom: 'var(--sb-space-lg)' }}>
           <h2 className="terminal-text" style={{ fontSize: 11, letterSpacing: '.08em', color: 'rgba(255,255,255,0.3)', marginBottom: 20 }}>
             // {termCase(L.team, lang)}
           </h2>

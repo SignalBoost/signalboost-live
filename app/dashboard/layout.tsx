@@ -1,60 +1,36 @@
-// saas/app/dashboard/layout.tsx
-
-import Link from "next/link";
-import "../globals.css";
+import Link from 'next/link'
+import { signalBoostModules } from '@/lib/platform/unifiedPlatform'
+import '../globals.css'
 
 export const metadata = {
-  title: "SignalBoost Dashboard",
-};
+  title: 'SignalBoost Unified Cockpit',
+}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen bg-gray-100">
-      {/* Sidebar */}
-      <aside className="w-64 bg-black text-white flex flex-col p-6 space-y-6">
-        <h2 className="text-2xl font-bold">SignalBoost</h2>
+    <div className="min-h-screen bg-[#05070b] text-white lg:flex">
+      <aside className="border-b border-white/10 bg-black/70 p-5 backdrop-blur lg:sticky lg:top-0 lg:h-screen lg:w-72 lg:border-b-0 lg:border-r">
+        <Link href="/" className="block text-2xl font-black text-[#FFD700] no-underline">SignalBoost</Link>
+        <p className="mt-2 text-xs uppercase tracking-[0.25em] text-white/40">Marketplace + SaaS</p>
 
-        <nav className="flex flex-col space-y-3">
-          <Link
-            href="/dashboard"
-            className="hover:bg-gray-800 px-3 py-2 rounded-md transition"
-          >
-            Dashboard
+        <nav className="mt-8 grid gap-2">
+          <Link href="/dashboard" className="rounded-2xl px-4 py-3 text-white/75 no-underline transition hover:bg-white/10 hover:text-white">
+            Cockpit Overview
           </Link>
-
-          <Link
-            href="/dashboard/generate"
-            className="hover:bg-gray-800 px-3 py-2 rounded-md transition"
-          >
-            Generate
-          </Link>
-
-          <Link
-            href="/dashboard/history"
-            className="hover:bg-gray-800 px-3 py-2 rounded-md transition"
-          >
-            History
-          </Link>
-
-          {/* ⭐ NEW: Brand Settings link */}
-          <Link
-            href="/dashboard/brand"
-            className="hover:bg-gray-800 px-3 py-2 rounded-md transition"
-          >
-            Brand Settings
-          </Link>
-
-          <Link
-            href="/dashboard/settings"
-            className="hover:bg-gray-800 px-3 py-2 rounded-md transition"
-          >
-            Account Settings
-          </Link>
+          {signalBoostModules.map((module) => (
+            <Link key={module.key} href={module.href} className="rounded-2xl px-4 py-3 text-white/75 no-underline transition hover:bg-[#FFD700]/10 hover:text-[#FFD700]">
+              <span className="mr-3">{module.icon}</span>{module.label}
+            </Link>
+          ))}
         </nav>
+
+        <div className="mt-8 rounded-3xl border border-[#FFD700]/20 bg-[#FFD700]/10 p-4 text-sm text-white/70">
+          <p className="font-bold text-[#FFD700]">Telemetry active</p>
+          <p className="mt-2">Module usage, Concierge intents, and Marketplace context are logged in SignalBoost Admin Console.</p>
+        </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 p-8">{children}</main>
+      <main className="flex-1 p-5 md:p-8">{children}</main>
     </div>
-  );
+  )
 }

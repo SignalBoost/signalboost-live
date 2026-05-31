@@ -1,0 +1,1758 @@
+{
+  "checked_at": "2026-05-31T21:18:57.044Z",
+  "count": 125,
+  "failures": [
+    {
+      "partner": "aviasales",
+      "region": "default",
+      "url": "https://www.aviasales.com/",
+      "ok": false,
+      "error": "fetch failed"
+    },
+    {
+      "partner": "aviasales",
+      "region": "global",
+      "url": "https://www.aviasales.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "aviasales",
+      "region": "us",
+      "url": "https://www.aviasales.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "aviasales",
+      "region": "eu",
+      "url": "https://www.aviasales.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "aviasales",
+      "region": "latam",
+      "url": "https://www.aviasales.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "booking",
+      "region": "default",
+      "url": "https://www.booking.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "booking",
+      "region": "global",
+      "url": "https://www.booking.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "booking",
+      "region": "us",
+      "url": "https://www.booking.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "booking",
+      "region": "eu",
+      "url": "https://www.booking.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "booking",
+      "region": "latam",
+      "url": "https://www.booking.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "airalo",
+      "region": "default",
+      "url": "https://www.airalo.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "airalo",
+      "region": "global",
+      "url": "https://www.airalo.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "airalo",
+      "region": "us",
+      "url": "https://www.airalo.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "airalo",
+      "region": "eu",
+      "url": "https://www.airalo.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "airalo",
+      "region": "latam",
+      "url": "https://www.airalo.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "safetywing",
+      "region": "default",
+      "url": "https://www.safetywing.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "safetywing",
+      "region": "global",
+      "url": "https://www.safetywing.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "safetywing",
+      "region": "us",
+      "url": "https://www.safetywing.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "safetywing",
+      "region": "eu",
+      "url": "https://www.safetywing.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "safetywing",
+      "region": "latam",
+      "url": "https://www.safetywing.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "wise",
+      "region": "default",
+      "url": "https://www.wise.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "wise",
+      "region": "global",
+      "url": "https://www.wise.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "wise",
+      "region": "us",
+      "url": "https://www.wise.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "wise",
+      "region": "eu",
+      "url": "https://www.wise.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "wise",
+      "region": "latam",
+      "url": "https://www.wise.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "shopify",
+      "region": "default",
+      "url": "https://www.shopify.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "shopify",
+      "region": "global",
+      "url": "https://www.shopify.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "shopify",
+      "region": "us",
+      "url": "https://www.shopify.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "shopify",
+      "region": "eu",
+      "url": "https://www.shopify.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "shopify",
+      "region": "latam",
+      "url": "https://www.shopify.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "stripe",
+      "region": "default",
+      "url": "https://www.stripe.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "stripe",
+      "region": "global",
+      "url": "https://www.stripe.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "stripe",
+      "region": "us",
+      "url": "https://www.stripe.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "stripe",
+      "region": "eu",
+      "url": "https://www.stripe.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "stripe",
+      "region": "latam",
+      "url": "https://www.stripe.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "canva",
+      "region": "default",
+      "url": "https://www.canva.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "canva",
+      "region": "global",
+      "url": "https://www.canva.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "canva",
+      "region": "us",
+      "url": "https://www.canva.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "canva",
+      "region": "eu",
+      "url": "https://www.canva.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "canva",
+      "region": "latam",
+      "url": "https://www.canva.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "hubspot",
+      "region": "default",
+      "url": "https://www.hubspot.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "hubspot",
+      "region": "global",
+      "url": "https://www.hubspot.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "hubspot",
+      "region": "us",
+      "url": "https://www.hubspot.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "hubspot",
+      "region": "eu",
+      "url": "https://www.hubspot.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "hubspot",
+      "region": "latam",
+      "url": "https://www.hubspot.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "mailchimp",
+      "region": "default",
+      "url": "https://www.mailchimp.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "mailchimp",
+      "region": "global",
+      "url": "https://www.mailchimp.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "mailchimp",
+      "region": "us",
+      "url": "https://www.mailchimp.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "mailchimp",
+      "region": "eu",
+      "url": "https://www.mailchimp.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "mailchimp",
+      "region": "latam",
+      "url": "https://www.mailchimp.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "getyourguide",
+      "region": "default",
+      "url": "https://www.getyourguide.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "getyourguide",
+      "region": "global",
+      "url": "https://www.getyourguide.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "getyourguide",
+      "region": "us",
+      "url": "https://www.getyourguide.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "getyourguide",
+      "region": "eu",
+      "url": "https://www.getyourguide.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "getyourguide",
+      "region": "latam",
+      "url": "https://www.getyourguide.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "viator",
+      "region": "default",
+      "url": "https://www.viator.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "viator",
+      "region": "global",
+      "url": "https://www.viator.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "viator",
+      "region": "us",
+      "url": "https://www.viator.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "viator",
+      "region": "eu",
+      "url": "https://www.viator.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "viator",
+      "region": "latam",
+      "url": "https://www.viator.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "expedia",
+      "region": "default",
+      "url": "https://www.expedia.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "expedia",
+      "region": "global",
+      "url": "https://www.expedia.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "expedia",
+      "region": "us",
+      "url": "https://www.expedia.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "expedia",
+      "region": "eu",
+      "url": "https://www.expedia.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "expedia",
+      "region": "latam",
+      "url": "https://www.expedia.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "kayak",
+      "region": "default",
+      "url": "https://www.kayak.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "kayak",
+      "region": "global",
+      "url": "https://www.kayak.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "kayak",
+      "region": "us",
+      "url": "https://www.kayak.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "kayak",
+      "region": "eu",
+      "url": "https://www.kayak.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "kayak",
+      "region": "latam",
+      "url": "https://www.kayak.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "skyscanner",
+      "region": "default",
+      "url": "https://www.skyscanner.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "skyscanner",
+      "region": "global",
+      "url": "https://www.skyscanner.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "skyscanner",
+      "region": "us",
+      "url": "https://www.skyscanner.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "skyscanner",
+      "region": "eu",
+      "url": "https://www.skyscanner.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "skyscanner",
+      "region": "latam",
+      "url": "https://www.skyscanner.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "tripadvisor",
+      "region": "default",
+      "url": "https://www.tripadvisor.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "tripadvisor",
+      "region": "global",
+      "url": "https://www.tripadvisor.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "tripadvisor",
+      "region": "us",
+      "url": "https://www.tripadvisor.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "tripadvisor",
+      "region": "eu",
+      "url": "https://www.tripadvisor.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "tripadvisor",
+      "region": "latam",
+      "url": "https://www.tripadvisor.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "agoda",
+      "region": "default",
+      "url": "https://www.agoda.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "agoda",
+      "region": "global",
+      "url": "https://www.agoda.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "agoda",
+      "region": "us",
+      "url": "https://www.agoda.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "agoda",
+      "region": "eu",
+      "url": "https://www.agoda.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "agoda",
+      "region": "latam",
+      "url": "https://www.agoda.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "hostelworld",
+      "region": "default",
+      "url": "https://www.hostelworld.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "hostelworld",
+      "region": "global",
+      "url": "https://www.hostelworld.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "hostelworld",
+      "region": "us",
+      "url": "https://www.hostelworld.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "hostelworld",
+      "region": "eu",
+      "url": "https://www.hostelworld.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "hostelworld",
+      "region": "latam",
+      "url": "https://www.hostelworld.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "uber",
+      "region": "default",
+      "url": "https://www.uber.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "uber",
+      "region": "global",
+      "url": "https://www.uber.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "uber",
+      "region": "us",
+      "url": "https://www.uber.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "uber",
+      "region": "eu",
+      "url": "https://www.uber.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "uber",
+      "region": "latam",
+      "url": "https://www.uber.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "bolt",
+      "region": "default",
+      "url": "https://bolt.eu/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "bolt",
+      "region": "global",
+      "url": "https://bolt.eu/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "bolt",
+      "region": "us",
+      "url": "https://bolt.eu/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "bolt",
+      "region": "eu",
+      "url": "https://bolt.eu/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "bolt",
+      "region": "latam",
+      "url": "https://bolt.eu/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "nordvpn",
+      "region": "default",
+      "url": "https://www.nordvpn.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "nordvpn",
+      "region": "global",
+      "url": "https://www.nordvpn.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "nordvpn",
+      "region": "us",
+      "url": "https://www.nordvpn.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "nordvpn",
+      "region": "eu",
+      "url": "https://www.nordvpn.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "nordvpn",
+      "region": "latam",
+      "url": "https://www.nordvpn.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "notion",
+      "region": "default",
+      "url": "https://notion.so/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "notion",
+      "region": "global",
+      "url": "https://notion.so/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "notion",
+      "region": "us",
+      "url": "https://notion.so/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "notion",
+      "region": "eu",
+      "url": "https://notion.so/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "notion",
+      "region": "latam",
+      "url": "https://notion.so/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "zapier",
+      "region": "default",
+      "url": "https://www.zapier.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "zapier",
+      "region": "global",
+      "url": "https://www.zapier.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "zapier",
+      "region": "us",
+      "url": "https://www.zapier.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "zapier",
+      "region": "eu",
+      "url": "https://www.zapier.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "zapier",
+      "region": "latam",
+      "url": "https://www.zapier.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "calendly",
+      "region": "default",
+      "url": "https://www.calendly.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "calendly",
+      "region": "global",
+      "url": "https://www.calendly.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "calendly",
+      "region": "us",
+      "url": "https://www.calendly.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "calendly",
+      "region": "eu",
+      "url": "https://www.calendly.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "calendly",
+      "region": "latam",
+      "url": "https://www.calendly.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "typeform",
+      "region": "default",
+      "url": "https://www.typeform.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "typeform",
+      "region": "global",
+      "url": "https://www.typeform.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "typeform",
+      "region": "us",
+      "url": "https://www.typeform.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "typeform",
+      "region": "eu",
+      "url": "https://www.typeform.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "typeform",
+      "region": "latam",
+      "url": "https://www.typeform.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    }
+  ],
+  "results": [
+    {
+      "partner": "aviasales",
+      "region": "default",
+      "url": "https://www.aviasales.com/",
+      "ok": false,
+      "error": "fetch failed"
+    },
+    {
+      "partner": "aviasales",
+      "region": "global",
+      "url": "https://www.aviasales.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "aviasales",
+      "region": "us",
+      "url": "https://www.aviasales.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "aviasales",
+      "region": "eu",
+      "url": "https://www.aviasales.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "aviasales",
+      "region": "latam",
+      "url": "https://www.aviasales.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "booking",
+      "region": "default",
+      "url": "https://www.booking.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "booking",
+      "region": "global",
+      "url": "https://www.booking.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "booking",
+      "region": "us",
+      "url": "https://www.booking.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "booking",
+      "region": "eu",
+      "url": "https://www.booking.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "booking",
+      "region": "latam",
+      "url": "https://www.booking.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "airalo",
+      "region": "default",
+      "url": "https://www.airalo.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "airalo",
+      "region": "global",
+      "url": "https://www.airalo.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "airalo",
+      "region": "us",
+      "url": "https://www.airalo.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "airalo",
+      "region": "eu",
+      "url": "https://www.airalo.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "airalo",
+      "region": "latam",
+      "url": "https://www.airalo.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "safetywing",
+      "region": "default",
+      "url": "https://www.safetywing.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "safetywing",
+      "region": "global",
+      "url": "https://www.safetywing.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "safetywing",
+      "region": "us",
+      "url": "https://www.safetywing.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "safetywing",
+      "region": "eu",
+      "url": "https://www.safetywing.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "safetywing",
+      "region": "latam",
+      "url": "https://www.safetywing.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "wise",
+      "region": "default",
+      "url": "https://www.wise.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "wise",
+      "region": "global",
+      "url": "https://www.wise.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "wise",
+      "region": "us",
+      "url": "https://www.wise.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "wise",
+      "region": "eu",
+      "url": "https://www.wise.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "wise",
+      "region": "latam",
+      "url": "https://www.wise.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "shopify",
+      "region": "default",
+      "url": "https://www.shopify.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "shopify",
+      "region": "global",
+      "url": "https://www.shopify.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "shopify",
+      "region": "us",
+      "url": "https://www.shopify.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "shopify",
+      "region": "eu",
+      "url": "https://www.shopify.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "shopify",
+      "region": "latam",
+      "url": "https://www.shopify.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "stripe",
+      "region": "default",
+      "url": "https://www.stripe.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "stripe",
+      "region": "global",
+      "url": "https://www.stripe.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "stripe",
+      "region": "us",
+      "url": "https://www.stripe.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "stripe",
+      "region": "eu",
+      "url": "https://www.stripe.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "stripe",
+      "region": "latam",
+      "url": "https://www.stripe.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "canva",
+      "region": "default",
+      "url": "https://www.canva.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "canva",
+      "region": "global",
+      "url": "https://www.canva.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "canva",
+      "region": "us",
+      "url": "https://www.canva.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "canva",
+      "region": "eu",
+      "url": "https://www.canva.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "canva",
+      "region": "latam",
+      "url": "https://www.canva.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "hubspot",
+      "region": "default",
+      "url": "https://www.hubspot.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "hubspot",
+      "region": "global",
+      "url": "https://www.hubspot.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "hubspot",
+      "region": "us",
+      "url": "https://www.hubspot.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "hubspot",
+      "region": "eu",
+      "url": "https://www.hubspot.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "hubspot",
+      "region": "latam",
+      "url": "https://www.hubspot.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "mailchimp",
+      "region": "default",
+      "url": "https://www.mailchimp.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "mailchimp",
+      "region": "global",
+      "url": "https://www.mailchimp.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "mailchimp",
+      "region": "us",
+      "url": "https://www.mailchimp.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "mailchimp",
+      "region": "eu",
+      "url": "https://www.mailchimp.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "mailchimp",
+      "region": "latam",
+      "url": "https://www.mailchimp.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "getyourguide",
+      "region": "default",
+      "url": "https://www.getyourguide.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "getyourguide",
+      "region": "global",
+      "url": "https://www.getyourguide.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "getyourguide",
+      "region": "us",
+      "url": "https://www.getyourguide.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "getyourguide",
+      "region": "eu",
+      "url": "https://www.getyourguide.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "getyourguide",
+      "region": "latam",
+      "url": "https://www.getyourguide.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "viator",
+      "region": "default",
+      "url": "https://www.viator.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "viator",
+      "region": "global",
+      "url": "https://www.viator.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "viator",
+      "region": "us",
+      "url": "https://www.viator.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "viator",
+      "region": "eu",
+      "url": "https://www.viator.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "viator",
+      "region": "latam",
+      "url": "https://www.viator.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "expedia",
+      "region": "default",
+      "url": "https://www.expedia.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "expedia",
+      "region": "global",
+      "url": "https://www.expedia.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "expedia",
+      "region": "us",
+      "url": "https://www.expedia.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "expedia",
+      "region": "eu",
+      "url": "https://www.expedia.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "expedia",
+      "region": "latam",
+      "url": "https://www.expedia.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "kayak",
+      "region": "default",
+      "url": "https://www.kayak.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "kayak",
+      "region": "global",
+      "url": "https://www.kayak.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "kayak",
+      "region": "us",
+      "url": "https://www.kayak.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "kayak",
+      "region": "eu",
+      "url": "https://www.kayak.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "kayak",
+      "region": "latam",
+      "url": "https://www.kayak.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "skyscanner",
+      "region": "default",
+      "url": "https://www.skyscanner.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "skyscanner",
+      "region": "global",
+      "url": "https://www.skyscanner.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "skyscanner",
+      "region": "us",
+      "url": "https://www.skyscanner.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "skyscanner",
+      "region": "eu",
+      "url": "https://www.skyscanner.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "skyscanner",
+      "region": "latam",
+      "url": "https://www.skyscanner.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "tripadvisor",
+      "region": "default",
+      "url": "https://www.tripadvisor.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "tripadvisor",
+      "region": "global",
+      "url": "https://www.tripadvisor.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "tripadvisor",
+      "region": "us",
+      "url": "https://www.tripadvisor.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "tripadvisor",
+      "region": "eu",
+      "url": "https://www.tripadvisor.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "tripadvisor",
+      "region": "latam",
+      "url": "https://www.tripadvisor.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "agoda",
+      "region": "default",
+      "url": "https://www.agoda.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "agoda",
+      "region": "global",
+      "url": "https://www.agoda.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "agoda",
+      "region": "us",
+      "url": "https://www.agoda.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "agoda",
+      "region": "eu",
+      "url": "https://www.agoda.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "agoda",
+      "region": "latam",
+      "url": "https://www.agoda.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "hostelworld",
+      "region": "default",
+      "url": "https://www.hostelworld.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "hostelworld",
+      "region": "global",
+      "url": "https://www.hostelworld.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "hostelworld",
+      "region": "us",
+      "url": "https://www.hostelworld.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "hostelworld",
+      "region": "eu",
+      "url": "https://www.hostelworld.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "hostelworld",
+      "region": "latam",
+      "url": "https://www.hostelworld.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "uber",
+      "region": "default",
+      "url": "https://www.uber.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "uber",
+      "region": "global",
+      "url": "https://www.uber.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "uber",
+      "region": "us",
+      "url": "https://www.uber.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "uber",
+      "region": "eu",
+      "url": "https://www.uber.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "uber",
+      "region": "latam",
+      "url": "https://www.uber.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "bolt",
+      "region": "default",
+      "url": "https://bolt.eu/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "bolt",
+      "region": "global",
+      "url": "https://bolt.eu/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "bolt",
+      "region": "us",
+      "url": "https://bolt.eu/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "bolt",
+      "region": "eu",
+      "url": "https://bolt.eu/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "bolt",
+      "region": "latam",
+      "url": "https://bolt.eu/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "nordvpn",
+      "region": "default",
+      "url": "https://www.nordvpn.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "nordvpn",
+      "region": "global",
+      "url": "https://www.nordvpn.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "nordvpn",
+      "region": "us",
+      "url": "https://www.nordvpn.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "nordvpn",
+      "region": "eu",
+      "url": "https://www.nordvpn.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "nordvpn",
+      "region": "latam",
+      "url": "https://www.nordvpn.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "notion",
+      "region": "default",
+      "url": "https://notion.so/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "notion",
+      "region": "global",
+      "url": "https://notion.so/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "notion",
+      "region": "us",
+      "url": "https://notion.so/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "notion",
+      "region": "eu",
+      "url": "https://notion.so/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "notion",
+      "region": "latam",
+      "url": "https://notion.so/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "zapier",
+      "region": "default",
+      "url": "https://www.zapier.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "zapier",
+      "region": "global",
+      "url": "https://www.zapier.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "zapier",
+      "region": "us",
+      "url": "https://www.zapier.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "zapier",
+      "region": "eu",
+      "url": "https://www.zapier.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "zapier",
+      "region": "latam",
+      "url": "https://www.zapier.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "calendly",
+      "region": "default",
+      "url": "https://www.calendly.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "calendly",
+      "region": "global",
+      "url": "https://www.calendly.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "calendly",
+      "region": "us",
+      "url": "https://www.calendly.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "calendly",
+      "region": "eu",
+      "url": "https://www.calendly.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "calendly",
+      "region": "latam",
+      "url": "https://www.calendly.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "typeform",
+      "region": "default",
+      "url": "https://www.typeform.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "typeform",
+      "region": "global",
+      "url": "https://www.typeform.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "typeform",
+      "region": "us",
+      "url": "https://www.typeform.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "typeform",
+      "region": "eu",
+      "url": "https://www.typeform.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    },
+    {
+      "partner": "typeform",
+      "region": "latam",
+      "url": "https://www.typeform.com/",
+      "ok": false,
+      "error": "This operation was aborted"
+    }
+  ]
+}

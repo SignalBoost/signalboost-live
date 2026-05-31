@@ -41,7 +41,7 @@ export default function PricingPage() {
         <div className="mt-5 grid gap-3 md:grid-cols-3">
           {signalBoostModules.map((module) => (
             <Link key={module.key} href={module.href} className="rounded-2xl border border-white/10 bg-black/30 p-4 text-white no-underline transition hover:border-[#FFD700]">
-              <span className="mr-2">{module.icon}</span>{module.label}
+              <span className="mr-2">{module.icon}</span>{t(module.labelKey, module.label)}
             </Link>
           ))}
         </div>

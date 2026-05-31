@@ -6,9 +6,9 @@ import { useI18n } from '@/components/i18n/I18nProvider'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 
 const nav = [
-  ['Promote', '/dashboard/promote'],
-  ['Personal Assistant', '/dashboard/assistant'],
-  ['Pricing', '/pricing'],
+  ['nav.marketplace', '/marketplace'],
+  ['nav.pricing', '/pricing'],
+  ['nav.dashboard', '/dashboard'],
   ['Executive', '/executive'],
 ]
 
@@ -20,7 +20,7 @@ export default function HomePage() {
       <header className="flex flex-wrap items-center justify-between gap-4 mb-16">
         <Link href="/" className="text-2xl font-bold text-[#FFD700] no-underline">SignalBoost</Link>
         <nav className="flex flex-wrap gap-4 text-sm">
-          {nav.map(([label, href]) => <Link key={href} href={href} className="text-white/70 hover:text-white no-underline">{label}</Link>)}
+          {nav.map(([label, href]) => <Link key={href} href={href} className="text-white/70 hover:text-white no-underline">{label.startsWith('nav.') ? t(label) : label}</Link>)}
         </nav>
         <Link href="/login" className="rounded-full border border-[#FFD700]/40 px-4 py-2 text-sm font-bold text-[#FFD700] no-underline hover:bg-[#FFD700] hover:text-black">Login</Link>
         <LanguageSwitcher current={lang} onChange={setLang} />

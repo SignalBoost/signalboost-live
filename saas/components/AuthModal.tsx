@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { supabase } from '@/utils/supabase/client'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
+import { getSaasAuthCallbackUrl } from '@/lib/auth/redirects'
 
 type Mode = 'login' | 'signup'
 
@@ -33,7 +34,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
         password,
         options: {
           data: { full_name: name.trim() },
-          emailRedirectTo: `${window.location.origin}/onboarding`,
+          emailRedirectTo: getSaasAuthCallbackUrl('/onboarding', window.location.origin),
         }
       })
       if (error) setError(error.message)
@@ -64,7 +65,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
     clearGreetingFlag()
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/onboarding` }
+      options: { redirectTo: getSaasAuthCallbackUrl('/onboarding', window.location.origin) }
     })
   }
 
@@ -72,7 +73,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
     clearGreetingFlag()
     await supabase.auth.signInWithOAuth({
       provider: 'github',
-      options: { redirectTo: `${window.location.origin}/onboarding` }
+      options: { redirectTo: getSaasAuthCallbackUrl('/onboarding', window.location.origin) }
     })
   }
 

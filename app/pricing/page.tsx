@@ -30,7 +30,7 @@ export default function PricingPage() {
             <ul className="mt-5 space-y-3 text-white/70">
               {tier.modules.map((module) => <li key={module}>✓ {module}</li>)}
             </ul>
-            <Link href="/dashboard" className="mt-6 inline-block rounded-full bg-[#FFD700] px-5 py-3 font-bold text-black no-underline">{t('landing.cta')}</Link>
+            <Link href="/dashboard/promote" className="mt-6 inline-block rounded-full bg-[#FFD700] px-5 py-3 font-bold text-black no-underline">{t('landing.cta')}</Link>
           </article>
         ))}
       </section>

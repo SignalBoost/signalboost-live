@@ -17,7 +17,9 @@
     "openai": "^4.24.1",
     "tailwindcss": "^3.4.1",
     "postcss": "^8.4.31",
-    "autoprefixer": "^10.4.16"
+    "autoprefixer": "^10.4.16",
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.49.4"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

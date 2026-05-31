@@ -194,14 +194,14 @@ export default function Navbar() {
               border: '1px solid var(--border-soft)', borderRadius: 999,
               padding: '8px 14px', cursor: 'pointer',
             }}>
-              {t(dict, 'logout', 'Log out')}
+              {t(dict, 'auth.logout', 'Logout')}
             </button>
           ) : (
             <button onClick={() => setShowAuth(true)} style={{
               background: GOLD, color: '#000', border: 'none', borderRadius: 999,
               padding: '9px 22px', fontWeight: 800, cursor: 'pointer',
             }}>
-              {t(dict, 'getStarted', 'Get started')}
+              {t(dict, 'auth.logIn', 'Login')}
             </button>
           )}
         </div>

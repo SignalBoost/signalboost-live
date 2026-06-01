@@ -12,8 +12,12 @@ import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
 import { cookies } from 'next/headers'
+import { Resend } from 'resend'
 
 const FREE_TIER_REVIEW_CAP = 3
+const REVIEW_MEDIA_BUCKET = 'review-media'
+
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
 function admin() {
   return createClient(
@@ -66,6 +70,51 @@ function containsModerationFlag(content: string): boolean {
   return ['spam', 'fraud', 'hate', 'abuse', 'inappropriate', 'scam', 'violent'].some(word => text.includes(word))
 }
 
+function parseDataUrl(dataUrl: string): { mime: string; buffer: Buffer } | null {
+  const match = dataUrl.match(/^data:(image\/[^;]+|video\/[^;]+);base64,(.+)$/)
+  if (!match) return null
+  return { mime: match[1], buffer: Buffer.from(match[2], 'base64') }
+}
+
+async function uploadReviewMedia(a: ReturnType<typeof admin>, ownerId: string, mediaDataUrls: unknown): Promise<string[]> {
+  if (!Array.isArray(mediaDataUrls)) return []
+  const uploaded: string[] = []
+  for (const [index, raw] of mediaDataUrls.slice(0, 4).entries()) {
+    const parsed = typeof raw === 'string' ? parseDataUrl(raw) : null
+    if (!parsed || parsed.buffer.byteLength > 8 * 1024 * 1024) continue
+    const ext = parsed.mime.split('/')[1]?.replace(/[^a-z0-9]/gi, '') || 'bin'
+    const path = `${ownerId}/${Date.now()}-${index}.${ext}`
+    const { error } = await a.storage.from(REVIEW_MEDIA_BUCKET).upload(path, parsed.buffer, { contentType: parsed.mime, upsert: false })
+    if (!error) {
+      const { data } = a.storage.from(REVIEW_MEDIA_BUCKET).getPublicUrl(path)
+      if (data.publicUrl) uploaded.push(data.publicUrl)
+    }
+  }
+  return uploaded
+}
+
+async function notifyOwner(ownerId: string, review: { author_name: string; rating: number; sentiment: string; content: string }) {
+  if (!resend) return
+  const { data } = await admin().from('profiles').select('email').eq('id', ownerId).maybeSingle()
+  const to = data?.email || process.env.REVIEW_NOTIFICATION_EMAIL
+  if (!to) return
+  await resend.emails.send({
+    from: process.env.RESEND_FROM_EMAIL || 'SignalBoost Reviews <reviews@signalboostapp.com>',
+    to,
+    subject: `New ${review.sentiment} ${review.rating}-star review from ${review.author_name}`,
+    text: `${review.author_name} left a ${review.rating}-star review. Routing: ${review.sentiment === 'positive' ? 'public approval queue' : 'private follow-up queue'}.\n\n${review.content}`,
+  })
+}
+
+async function notifySmsWebhook(ownerId: string, review: { author_name: string; rating: number; sentiment: string }) {
+  if (!process.env.REVIEW_SMS_WEBHOOK_URL) return
+  await fetch(process.env.REVIEW_SMS_WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ownerId, type: 'review.created', review }),
+  }).catch(() => undefined)
+}
+
 
 // GET — owner reads their own reviews.
 export async function GET() {
@@ -95,7 +144,7 @@ export async function POST(req: NextRequest) {
   const rating       = Number(body?.rating)
   const content      = String(body?.content ?? '').trim()
   const language     = String(body?.language ?? 'en').trim().toLowerCase().slice(0, 8)
-  const media_urls   = Array.isArray(body?.media_urls)
+  const provided_media_urls = Array.isArray(body?.media_urls)
     ? body.media_urls.map((url: unknown) => String(url).trim()).filter((url: string) => /^https:\/\//.test(url)).slice(0, 4)
     : []
   const partner_name = body?.partner_name ? String(body.partner_name).trim().slice(0, 120) : null
@@ -156,6 +205,13 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const sentiment = analyzeSentiment(content, rating)
+  const flagged = containsModerationFlag(content)
+  const uploadedMediaUrls = await uploadReviewMedia(a, owner_id, body?.media_data_urls)
+  const media_urls = [...provided_media_urls, ...uploadedMediaUrls].slice(0, 4)
+  const approved = sentiment === 'positive' && !flagged
+  const moderation_status = flagged ? 'flagged' : approved ? 'approved' : 'pending'
+
   const { error: insertErr } = await a.from('reviews').insert({
     owner_id,
     author_name,
@@ -163,21 +219,27 @@ export async function POST(req: NextRequest) {
     rating,
     content,
     language,
-    approved: false,
+    approved,
     submitter_ip: ip,
     media_urls,
     partner_name,
     product_name,
     service_name,
     verified_partner,
-    sentiment: analyzeSentiment(content, rating),
-    flagged: containsModerationFlag(content),
-    moderation_status: containsModerationFlag(content) ? 'flagged' : 'pending',
+    sentiment,
+    flagged,
+    moderation_status,
+    public_destination: approved ? 'public' : 'private',
   })
 
   if (insertErr) return NextResponse.json({ error: 'reviews.errors.saveFailed' }, { status: 500 })
 
-  return NextResponse.json({ ok: true })
+  await Promise.all([
+    notifyOwner(owner_id, { author_name, rating, sentiment, content }),
+    notifySmsWebhook(owner_id, { author_name, rating, sentiment }),
+  ]).catch(() => undefined)
+
+  return NextResponse.json({ ok: true, routing: approved ? 'public' : 'private', sentiment })
 }
 
 

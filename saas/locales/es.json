@@ -1494,7 +1494,8 @@
         "2": "Visual example path",
         "3": "Module launch CTA"
       }
-    }
+    },
+    "openAnotherWorkspace": "Abrir otro workspace"
   },
   "pricing_page_extra": {},
   "apprentice_extra": {},
@@ -1526,7 +1527,10 @@
     "confidence": "Confianza",
     "memory": "Capa de memoria",
     "operatorFallback": "Respaldo de operador",
-    "telemetry": "Telemetría"
+    "telemetry": "Telemetría",
+    "manualOperator": "Operador manual",
+    "customFeedback": "Feedback personalizado",
+    "operatorMode": "Modo operador"
   },
   "aiNav": {
     "home": "Inicio",
@@ -1590,5 +1594,33 @@
   "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
   "wireframes.modules.assistant.panel1": "Task list panel",
   "wireframes.modules.assistant.panel2": "Reminder timeline",
-  "wireframes.modules.assistant.panel3": "Productivity insights chart"
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "nav": {
+    "marketplace": "Marketplace",
+    "openMenu": "Abrir menú",
+    "language": "Idioma"
+  },
+  "navGroups": {
+    "cowork": "Cowork",
+    "aiStudio": "AI Studio",
+    "reviews": "Reseñas",
+    "calendar": "Calendario",
+    "spreadsheets": "Hojas de cálculo",
+    "outreach": "Outreach",
+    "audio": "Generar audio",
+    "video": "Crear videos",
+    "improve": "Mejorar sitio web",
+    "podcastStudio": "Optimizar podcast",
+    "lab": "Laboratorio",
+    "apprentice": "Aprendiz de taller"
+  },
+  "outreach": {
+    "pipeline": {
+      "kicker": "Pipeline de outreach",
+      "title": "Convierte un lead en una campaña aprobada",
+      "subtitle": "Analyzer, Profiler e Inteligencia Predictiva trabajan juntos para convertir cada lead en una ruta de campaña completa y aprobada.",
+      "openEngine": "Abrir motor de outreach",
+      "completePath": "Ruta completa de aprobación"
+    }
+  }
 }

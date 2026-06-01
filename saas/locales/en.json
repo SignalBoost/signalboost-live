@@ -1494,7 +1494,8 @@
         "2": "Visual example path",
         "3": "Module launch CTA"
       }
-    }
+    },
+    "openAnotherWorkspace": "Open another workspace"
   },
   "pricing_page_extra": {},
   "apprentice_extra": {},
@@ -1526,7 +1527,10 @@
     "confidence": "Confidence",
     "memory": "Memory Layer",
     "operatorFallback": "Operator Fallback",
-    "telemetry": "Telemetry"
+    "telemetry": "Telemetry",
+    "manualOperator": "Manual operator",
+    "customFeedback": "Custom feedback",
+    "operatorMode": "Operator mode"
   },
   "aiNav": {
     "home": "Home",
@@ -1590,5 +1594,33 @@
   "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
   "wireframes.modules.assistant.panel1": "Task list panel",
   "wireframes.modules.assistant.panel2": "Reminder timeline",
-  "wireframes.modules.assistant.panel3": "Productivity insights chart"
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "nav": {
+    "marketplace": "Marketplace",
+    "openMenu": "Open menu",
+    "language": "Language"
+  },
+  "navGroups": {
+    "cowork": "Cowork",
+    "aiStudio": "AI Studio",
+    "reviews": "Reviews",
+    "calendar": "Calendar",
+    "spreadsheets": "Spreadsheets",
+    "outreach": "Outreach",
+    "audio": "Generate Audio",
+    "video": "Create Videos",
+    "improve": "Improve Website",
+    "podcastStudio": "Optimize Podcast Studio",
+    "lab": "Lab",
+    "apprentice": "Workshop Apprentice"
+  },
+  "outreach": {
+    "pipeline": {
+      "kicker": "Outreach pipeline",
+      "title": "Turn a lead into an approved campaign",
+      "subtitle": "Analyzer, Profiler, and Predictive Intelligence work together so every lead becomes a complete, human-approved campaign path.",
+      "openEngine": "Open outreach engine",
+      "completePath": "Complete approval path"
+    }
+  }
 }

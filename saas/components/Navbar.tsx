@@ -1,9 +1,5 @@
 'use client'
 
-// saas/components/Navbar.tsx
-// Topbar (credits/plan/name) merged into the tool pills bar.
-// The separate Topbar component is no longer needed in dashboard layout.
-
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
@@ -11,39 +7,52 @@ import { supabase } from '@/utils/supabase/client'
 import AuthModal from './AuthModal'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
-import { SERVICES } from '@/lib/services/catalog'
-import { UNIFIED_NAV } from '@/lib/platform/unifiedPlatform'
 
 const GOLD = '#ffc300'
 
 const LANGUAGES = [
   { code: 'en', label: 'English' },
-  { code: 'pt', label: 'Português' },
   { code: 'es', label: 'Español' },
+  { code: 'pt', label: 'Português' },
   { code: 'pl', label: 'Polski' },
   { code: 'ru', label: 'Русский' },
 ]
 
 const PLAN_STYLES: Record<string, { bg: string; color: string }> = {
-  free:     { bg: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)' },
-  starter:  { bg: 'rgba(59,130,246,0.18)',  color: '#7ab8ff' },
-  pro:      { bg: 'rgba(255,195,0,0.18)',   color: '#ffc300' },
-  business: { bg: 'rgba(74,222,128,0.18)',  color: '#4ade80' },
+  free: { bg: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)' },
+  starter: { bg: 'rgba(59,130,246,0.18)', color: '#7ab8ff' },
+  pro: { bg: 'rgba(255,195,0,0.18)', color: '#ffc300' },
+  business: { bg: 'rgba(74,222,128,0.18)', color: '#4ade80' },
 }
+
+const COWORK_LINKS = [
+  { icon: '⭐', key: 'reviews', href: '/dashboard/reviews', fallback: 'Reviews', desc: 'Collect, route, and moderate customer trust signals.' },
+  { icon: '📅', key: 'calendar', href: '/dashboard/calendar', fallback: 'Calendar', desc: 'Plan launches, reminders, and customer follow-ups.' },
+  { icon: '📊', key: 'spreadsheets', href: '/dashboard/spreadsheets', fallback: 'Spreadsheets', desc: 'Import lists and coordinate CRM-ready rows.' },
+  { icon: '📡', key: 'outreach', href: '/dashboard/outreach/outreach', fallback: 'Outreach', desc: 'Turn leads into approved multilingual campaigns.' },
+]
+
+const AI_STUDIO_LINKS = [
+  { icon: '🎙', key: 'audio', href: '/dashboard/audio', fallback: 'Generate Audio', desc: 'Create voice assets from scripts and briefs.' },
+  { icon: '🎥', key: 'video', href: '/dashboard/video', fallback: 'Create Videos', desc: 'Generate social-ready video concepts and clips.' },
+  { icon: '🖥', key: 'improve', href: '/dashboard/improve', fallback: 'Improve Website', desc: 'Audit SEO, clarity, accessibility, and conversion.' },
+  { icon: '🎧', key: 'podcastStudio', href: '/dashboard/podcast/studio', fallback: 'Optimize Podcast Studio', desc: 'Improve episodes, transcripts, clips, and metadata.' },
+  { icon: '🧪', key: 'lab', href: '/dashboard/lab', fallback: 'Lab', desc: 'Experiment with emerging AI production workflows.' },
+  { icon: '👨‍🎓', key: 'apprentice', href: '/dashboard/apprentice', fallback: 'Workshop Apprentice', desc: 'Learn each workspace with guided tutorials.' },
+]
 
 export default function Navbar() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const pathname  = usePathname()
+  const pathname = usePathname()
   const { lang, setLang, dict } = useI18n()
+  const [showAuth, setShowAuth] = useState(false)
+  const [user, setUser] = useState<any>(null)
+  const [credits, setCredits] = useState<number>(0)
+  const [plan, setPlan] = useState<string>('free')
+  const [userName, setUserName] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
 
-  const [showAuth, setShowAuth]   = useState(false)
-  const [user, setUser]           = useState<any>(null)
-  const [credits, setCredits]     = useState<number>(0)
-  const [plan, setPlan]           = useState<string>('free')
-  const [userName, setUserName]   = useState<string | null>(null)
-  const [isAdmin, setIsAdmin]     = useState(false)
-
-  // Auth + credits
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       const u = data?.user ?? null
@@ -62,25 +71,21 @@ export default function Navbar() {
     const metadataRole = u?.user_metadata?.role
     if (metadataRole === 'owner' || metadataRole === 'admin') { setIsAdmin(true); return }
     try {
-      const { data } = await supabase
-        .from('team_members')
-        .select('role,status,owner_id,member_id')
-        .or(`member_id.eq.${u.id},owner_id.eq.${u.id}`)
+      const { data } = await supabase.from('team_members').select('role,status,owner_id,member_id').or(`member_id.eq.${u.id},owner_id.eq.${u.id}`)
       setIsAdmin(!!data?.some((m: any) => (m.status === 'active' || m.owner_id === u.id) && (m.role === 'owner' || m.role === 'admin' || m.owner_id === u.id)))
     } catch { setIsAdmin(false) }
   }
 
   async function fetchCredits() {
     try {
-      const res  = await fetch('/api/credits')
+      const res = await fetch('/api/credits')
       const data = await res.json()
       if (typeof data.credits === 'number') setCredits(data.credits)
-      if (data.plan)  setPlan(data.plan)
-      if (data.name)  setUserName(data.name)
-    } catch { /* silent */ }
+      if (data.plan) setPlan(data.plan)
+      if (data.name) setUserName(data.name)
+    } catch {}
   }
 
-  // Signal animation
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -90,7 +95,6 @@ export default function Navbar() {
     const cx = W / 2, cy = H - 8
     let rings: { r: number; alpha: number }[] = []
     let last = 0, raf: number
-
     function draw(ts: number) {
       ctx.clearRect(0, 0, W, H)
       if (!last || ts - last > 2000) { rings.push({ r: 0, alpha: 1 }); last = ts }
@@ -116,141 +120,72 @@ export default function Navbar() {
     window.location.href = '/'
   }
 
-  const navLinks = UNIFIED_NAV.map(item => ({ ...item, label: t(dict, `aiNav.${item.label.toLowerCase().replace(/\s+/g, '')}`, item.label) }))
-
-  const serviceNavLinks = SERVICES.map((service) => ({
-    icon: service.icon,
-    label: t(dict, `services.${service.key}.title`, service.titleFallback),
-    href: service.dashboardHref,
-    featured: service.key === 'promote',
-  }))
-
-  const toolLinks = [
-    ...serviceNavLinks,
-    ...(isAdmin ? [{ icon: '🛡️', label: t(dict, 'aiNav.admin', 'Admin'), href: '/admin', featured: false }] : []),
-  ]
-
   const planStyle = PLAN_STYLES[plan] || PLAN_STYLES.free
   const planLabel = t(dict, `plan.${plan}`, plan.charAt(0).toUpperCase() + plan.slice(1))
+  const cockpitMode = pathname?.startsWith('/dashboard') || pathname?.startsWith('/admin')
+
+  function navLink(href: string, label: string, icon?: string) {
+    const active = pathname === href || (href !== '/' && pathname?.startsWith(href))
+    return <Link className={active ? 'sb-nav-link sb-nav-link--active' : 'sb-nav-link'} href={href} onClick={() => setMobileOpen(false)}>{icon && <span>{icon}</span>}{label}</Link>
+  }
+
+  function dropdown(label: string, items: typeof COWORK_LINKS, icon: string) {
+    return (
+      <div className="sb-nav-dropdown">
+        <button type="button" className="sb-nav-link sb-nav-trigger">{icon} {label} <span aria-hidden="true">▾</span></button>
+        <div className="sb-nav-menu">
+          {items.map(item => (
+            <Link key={item.href} href={item.href} className="sb-nav-menu-item" onClick={() => setMobileOpen(false)}>
+              <span className="sb-nav-menu-icon">{item.icon}</span>
+              <span><strong>{t(dict, `navGroups.${item.key}`, item.fallback)}</strong><small>{item.desc}</small></span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
-      {/* ── Main nav bar ── */}
-      <nav style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '16px 32px',
-        background: 'linear-gradient(135deg, rgba(8,10,20,.82), rgba(15,23,42,.58))',
-        borderBottom: '1px solid rgba(26,240,255,.16)',
-        boxShadow: '0 18px 60px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.08)',
-        position: 'sticky', top: 0, zIndex: 100,
-        backdropFilter: 'blur(12px)',
-      }}>
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-          <canvas ref={canvasRef} style={{ width: 40, height: 40 }} />
-          <span style={{ color: '#fff', fontWeight: 800, fontSize: 17 }}>
-            signal<span style={{ color: GOLD }}>boost</span>
-          </span>
+      <nav className="sb-fathom-nav">
+        <Link href="/" className="sb-nav-brand" onClick={() => setMobileOpen(false)}>
+          <canvas ref={canvasRef} />
+          <span>signal<b>boost</b></span>
         </Link>
 
-        <div className="sb-desktop-nav" style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
-          {navLinks.map(item => {
-            const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))
-            return (
-              <Link key={item.href} href={item.href} style={{
-                textDecoration: 'none',
-                color: isActive ? '#fff' : 'var(--text-muted)',
-                fontWeight: isActive ? 700 : 500,
-                transition: 'all 0.15s',
-              }}>
-                <span style={{ marginRight: 6 }}>{item.icon}</span>{item.label}
-              </Link>
-            )
-          })}
-        </div>
+        <button className="sb-mobile-toggle" type="button" onClick={() => setMobileOpen(open => !open)} aria-expanded={mobileOpen} aria-label={t(dict, 'nav.openMenu', 'Open menu')}>☰</button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <select value={lang} onChange={e => setLang(e.target.value)} style={{
-            background: 'var(--surface-2)', color: 'var(--text-secondary)',
-            border: '1px solid var(--border-medium)', borderRadius: 999,
-            padding: '8px 12px', fontSize: 12, cursor: 'pointer',
-          }}>
-            {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
-          </select>
+        <div className={mobileOpen ? 'sb-nav-content sb-nav-content--open' : 'sb-nav-content'}>
+          <div className="sb-nav-primary">
+            {dropdown(t(dict, 'navGroups.cowork', 'Cowork'), COWORK_LINKS, '✦')}
+            {dropdown(t(dict, 'navGroups.aiStudio', 'AI Studio'), AI_STUDIO_LINKS, '◈')}
+            {navLink('/', t(dict, 'nav.marketplace', 'Marketplace'), '🛰️')}
+            {navLink('/pricing', t(dict, 'pricing', 'Pricing'), '💳')}
+            {navLink('/support', t(dict, 'support.help', 'Help'), '❔')}
+            {cockpitMode && isAdmin && navLink('/admin', t(dict, 'aiNav.admin', 'Admin'), '🛡️')}
+          </div>
 
-          <details style={{ position: 'relative' }}>
-            <summary style={{ listStyle: 'none', cursor: 'pointer', color: 'var(--text-muted)', border: '1px solid var(--border-soft)', borderRadius: 999, padding: '8px 12px', fontSize: 12, fontWeight: 700 }}>
-              {t(dict, 'support.help', 'Help')} ▾
-            </summary>
-            <div style={{ position: 'absolute', right: 0, top: 42, minWidth: 210, padding: 10, borderRadius: 14, background: 'rgba(10,10,15,.98)', border: '1px solid var(--border-soft)', boxShadow: '0 18px 50px rgba(0,0,0,.35)', display: 'grid', gap: 6 }}>
-              <Link href="/faq" style={{ color: '#fff', textDecoration: 'none', padding: '8px 10px', borderRadius: 10 }}>❓ {t(dict, 'support.faq', 'FAQ')}</Link>
-              <Link href="/support" style={{ color: '#fff', textDecoration: 'none', padding: '8px 10px', borderRadius: 10 }}>✉️ {t(dict, 'support.contact', 'Contact Support')}</Link>
-              <Link href="/docs" style={{ color: '#fff', textDecoration: 'none', padding: '8px 10px', borderRadius: 10 }}>📖 {t(dict, 'support.documentation', 'Documentation')}</Link>
-            </div>
-          </details>
+          <div className="sb-nav-actions">
+            <select value={lang} onChange={e => setLang(e.target.value)} className="sb-language-select" aria-label={t(dict, 'nav.language', 'Language')}>
+              {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+            </select>
 
-          {user ? (
-            <button onClick={handleLogout} style={{
-              background: 'transparent', color: 'var(--text-muted)',
-              border: '1px solid var(--border-soft)', borderRadius: 999,
-              padding: '8px 14px', cursor: 'pointer',
-            }}>
-              {t(dict, 'logout', 'Log out')}
-            </button>
-          ) : (
-            <button onClick={() => setShowAuth(true)} style={{
-              background: GOLD, color: '#000', border: 'none', borderRadius: 999,
-              padding: '9px 22px', fontWeight: 800, cursor: 'pointer',
-            }}>
-              {t(dict, 'getStarted', 'Get started')}
-            </button>
-          )}
+            {user && (
+              <div className="sb-account-chip" aria-label={t(dict, 'topbar.account', 'Account')}>
+                <span>⚡ {credits}</span>
+                <b style={{ background: planStyle.bg, color: planStyle.color }}>{planLabel}</b>
+                <small>{userName ?? t(dict, 'topbar.account', 'Account')}</small>
+              </div>
+            )}
+
+            {user ? (
+              <button onClick={handleLogout} className="sb-logout-button">{t(dict, 'logout', 'Log out')}</button>
+            ) : (
+              <button onClick={() => setShowAuth(true)} className="sb-get-started-button">{t(dict, 'getStarted', 'Get started')}</button>
+            )}
+          </div>
         </div>
       </nav>
-
-      {/* ── Service rail: all nine services stay globally available ── */}
-      <div className="sb-service-rail" style={{ position: 'sticky', top: 73, zIndex: 99 }}>
-        {toolLinks.map(tool => {
-          const isActive = pathname === tool.href || pathname?.startsWith(tool.href + '/')
-          return (
-            <Link key={tool.href} href={tool.href} style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: tool.featured ? '7px 16px' : '6px 14px',
-              borderRadius: 999, textDecoration: 'none',
-              fontSize: 12, fontWeight: 800,
-              background: tool.featured
-                ? isActive ? 'rgba(255,195,0,.18)' : 'rgba(255,195,0,.10)'
-                : isActive ? 'rgba(59,130,246,.15)' : 'var(--surface-1)',
-              border: `1px solid ${tool.featured
-                ? 'rgba(255,195,0,.36)'
-                : isActive ? 'rgba(59,130,246,.4)' : 'var(--border-soft)'}`,
-              color: tool.featured ? GOLD : isActive ? '#fff' : 'var(--text-muted)',
-              boxShadow: tool.featured ? '0 10px 24px rgba(255,195,0,.10)' : 'none',
-            }}>
-              <span aria-hidden="true">{tool.icon}</span>
-              <span>{tool.label}</span>
-            </Link>
-          )
-        })}
-
-        {user && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, marginLeft: 'auto' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,195,0,0.95)', fontFamily: 'monospace' }}>
-              ⚡ {credits} {credits === 1 ? t(dict, 'topbar.credit', 'credit') : t(dict, 'topbar.credits', 'credits')}
-            </span>
-            <span style={{
-              fontSize: 11, fontWeight: 800, letterSpacing: '0.06em',
-              padding: '3px 10px', borderRadius: 999,
-              background: planStyle.bg, color: planStyle.color, fontFamily: 'monospace',
-            }}>
-              {planLabel}
-            </span>
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>
-              {userName ?? t(dict, 'topbar.account', 'Account')}
-            </span>
-          </div>
-        )}
-      </div>
-
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
     </>
   )

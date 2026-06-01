@@ -1,0 +1,2002 @@
+[
+  {
+    "id": "booking-com",
+    "name": "Booking",
+    "category": "travel",
+    "url": "https://booking.com",
+    "logoUrl": "https://booking.com/favicon.ico",
+    "affiliate": {
+      "default": "https://booking.com",
+      "regions": {
+        "US": "https://booking.com",
+        "EU": "https://booking.com",
+        "BR": "https://booking.com",
+        "PL": "https://booking.com"
+      }
+    }
+  },
+  {
+    "id": "expedia-com",
+    "name": "Expedia",
+    "category": "travel",
+    "url": "https://expedia.com",
+    "logoUrl": "https://expedia.com/favicon.ico",
+    "affiliate": {
+      "default": "https://expedia.com",
+      "regions": {
+        "US": "https://expedia.com",
+        "EU": "https://expedia.com",
+        "BR": "https://expedia.com",
+        "PL": "https://expedia.com"
+      }
+    }
+  },
+  {
+    "id": "hotels-com",
+    "name": "Hotels",
+    "category": "travel",
+    "url": "https://hotels.com",
+    "logoUrl": "https://hotels.com/favicon.ico",
+    "affiliate": {
+      "default": "https://hotels.com",
+      "regions": {
+        "US": "https://hotels.com",
+        "EU": "https://hotels.com",
+        "BR": "https://hotels.com",
+        "PL": "https://hotels.com"
+      }
+    }
+  },
+  {
+    "id": "airbnb-com",
+    "name": "Airbnb",
+    "category": "travel",
+    "url": "https://airbnb.com",
+    "logoUrl": "https://airbnb.com/favicon.ico",
+    "affiliate": {
+      "default": "https://airbnb.com",
+      "regions": {
+        "US": "https://airbnb.com",
+        "EU": "https://airbnb.com",
+        "BR": "https://airbnb.com",
+        "PL": "https://airbnb.com"
+      }
+    }
+  },
+  {
+    "id": "tripadvisor-com",
+    "name": "Tripadvisor",
+    "category": "travel",
+    "url": "https://tripadvisor.com",
+    "logoUrl": "https://tripadvisor.com/favicon.ico",
+    "affiliate": {
+      "default": "https://tripadvisor.com",
+      "regions": {
+        "US": "https://tripadvisor.com",
+        "EU": "https://tripadvisor.com",
+        "BR": "https://tripadvisor.com",
+        "PL": "https://tripadvisor.com"
+      }
+    }
+  },
+  {
+    "id": "agoda-com",
+    "name": "Agoda",
+    "category": "travel",
+    "url": "https://agoda.com",
+    "logoUrl": "https://agoda.com/favicon.ico",
+    "affiliate": {
+      "default": "https://agoda.com",
+      "regions": {
+        "US": "https://agoda.com",
+        "EU": "https://agoda.com",
+        "BR": "https://agoda.com",
+        "PL": "https://agoda.com"
+      }
+    }
+  },
+  {
+    "id": "kayak-com",
+    "name": "Kayak",
+    "category": "travel",
+    "url": "https://kayak.com",
+    "logoUrl": "https://kayak.com/favicon.ico",
+    "affiliate": {
+      "default": "https://kayak.com",
+      "regions": {
+        "US": "https://kayak.com",
+        "EU": "https://kayak.com",
+        "BR": "https://kayak.com",
+        "PL": "https://kayak.com"
+      }
+    }
+  },
+  {
+    "id": "priceline-com",
+    "name": "Priceline",
+    "category": "travel",
+    "url": "https://priceline.com",
+    "logoUrl": "https://priceline.com/favicon.ico",
+    "affiliate": {
+      "default": "https://priceline.com",
+      "regions": {
+        "US": "https://priceline.com",
+        "EU": "https://priceline.com",
+        "BR": "https://priceline.com",
+        "PL": "https://priceline.com"
+      }
+    }
+  },
+  {
+    "id": "vrbo-com",
+    "name": "Vrbo",
+    "category": "travel",
+    "url": "https://vrbo.com",
+    "logoUrl": "https://vrbo.com/favicon.ico",
+    "affiliate": {
+      "default": "https://vrbo.com",
+      "regions": {
+        "US": "https://vrbo.com",
+        "EU": "https://vrbo.com",
+        "BR": "https://vrbo.com",
+        "PL": "https://vrbo.com"
+      }
+    }
+  },
+  {
+    "id": "hostelworld-com",
+    "name": "Hostelworld",
+    "category": "travel",
+    "url": "https://hostelworld.com",
+    "logoUrl": "https://hostelworld.com/favicon.ico",
+    "affiliate": {
+      "default": "https://hostelworld.com",
+      "regions": {
+        "US": "https://hostelworld.com",
+        "EU": "https://hostelworld.com",
+        "BR": "https://hostelworld.com",
+        "PL": "https://hostelworld.com"
+      }
+    }
+  },
+  {
+    "id": "marriott-com",
+    "name": "Marriott",
+    "category": "travel",
+    "url": "https://marriott.com",
+    "logoUrl": "https://marriott.com/favicon.ico",
+    "affiliate": {
+      "default": "https://marriott.com",
+      "regions": {
+        "US": "https://marriott.com",
+        "EU": "https://marriott.com",
+        "BR": "https://marriott.com",
+        "PL": "https://marriott.com"
+      }
+    }
+  },
+  {
+    "id": "hilton-com",
+    "name": "Hilton",
+    "category": "travel",
+    "url": "https://hilton.com",
+    "logoUrl": "https://hilton.com/favicon.ico",
+    "affiliate": {
+      "default": "https://hilton.com",
+      "regions": {
+        "US": "https://hilton.com",
+        "EU": "https://hilton.com",
+        "BR": "https://hilton.com",
+        "PL": "https://hilton.com"
+      }
+    }
+  },
+  {
+    "id": "hyatt-com",
+    "name": "Hyatt",
+    "category": "travel",
+    "url": "https://hyatt.com",
+    "logoUrl": "https://hyatt.com/favicon.ico",
+    "affiliate": {
+      "default": "https://hyatt.com",
+      "regions": {
+        "US": "https://hyatt.com",
+        "EU": "https://hyatt.com",
+        "BR": "https://hyatt.com",
+        "PL": "https://hyatt.com"
+      }
+    }
+  },
+  {
+    "id": "ihg-com",
+    "name": "Ihg",
+    "category": "travel",
+    "url": "https://ihg.com",
+    "logoUrl": "https://ihg.com/favicon.ico",
+    "affiliate": {
+      "default": "https://ihg.com",
+      "regions": {
+        "US": "https://ihg.com",
+        "EU": "https://ihg.com",
+        "BR": "https://ihg.com",
+        "PL": "https://ihg.com"
+      }
+    }
+  },
+  {
+    "id": "accor-com",
+    "name": "Accor",
+    "category": "travel",
+    "url": "https://accor.com",
+    "logoUrl": "https://accor.com/favicon.ico",
+    "affiliate": {
+      "default": "https://accor.com",
+      "regions": {
+        "US": "https://accor.com",
+        "EU": "https://accor.com",
+        "BR": "https://accor.com",
+        "PL": "https://accor.com"
+      }
+    }
+  },
+  {
+    "id": "wyndhamhotels-com",
+    "name": "Wyndhamhotels",
+    "category": "travel",
+    "url": "https://wyndhamhotels.com",
+    "logoUrl": "https://wyndhamhotels.com/favicon.ico",
+    "affiliate": {
+      "default": "https://wyndhamhotels.com",
+      "regions": {
+        "US": "https://wyndhamhotels.com",
+        "EU": "https://wyndhamhotels.com",
+        "BR": "https://wyndhamhotels.com",
+        "PL": "https://wyndhamhotels.com"
+      }
+    }
+  },
+  {
+    "id": "choicehotels-com",
+    "name": "Choicehotels",
+    "category": "travel",
+    "url": "https://choicehotels.com",
+    "logoUrl": "https://choicehotels.com/favicon.ico",
+    "affiliate": {
+      "default": "https://choicehotels.com",
+      "regions": {
+        "US": "https://choicehotels.com",
+        "EU": "https://choicehotels.com",
+        "BR": "https://choicehotels.com",
+        "PL": "https://choicehotels.com"
+      }
+    }
+  },
+  {
+    "id": "bestwestern-com",
+    "name": "Bestwestern",
+    "category": "travel",
+    "url": "https://bestwestern.com",
+    "logoUrl": "https://bestwestern.com/favicon.ico",
+    "affiliate": {
+      "default": "https://bestwestern.com",
+      "regions": {
+        "US": "https://bestwestern.com",
+        "EU": "https://bestwestern.com",
+        "BR": "https://bestwestern.com",
+        "PL": "https://bestwestern.com"
+      }
+    }
+  },
+  {
+    "id": "radissonhotels-com",
+    "name": "Radissonhotels",
+    "category": "travel",
+    "url": "https://radissonhotels.com",
+    "logoUrl": "https://radissonhotels.com/favicon.ico",
+    "affiliate": {
+      "default": "https://radissonhotels.com",
+      "regions": {
+        "US": "https://radissonhotels.com",
+        "EU": "https://radissonhotels.com",
+        "BR": "https://radissonhotels.com",
+        "PL": "https://radissonhotels.com"
+      }
+    }
+  },
+  {
+    "id": "kempinski-com",
+    "name": "Kempinski",
+    "category": "travel",
+    "url": "https://kempinski.com",
+    "logoUrl": "https://kempinski.com/favicon.ico",
+    "affiliate": {
+      "default": "https://kempinski.com",
+      "regions": {
+        "US": "https://kempinski.com",
+        "EU": "https://kempinski.com",
+        "BR": "https://kempinski.com",
+        "PL": "https://kempinski.com"
+      }
+    }
+  },
+  {
+    "id": "skyscanner-com",
+    "name": "Skyscanner",
+    "category": "travel",
+    "url": "https://skyscanner.com",
+    "logoUrl": "https://skyscanner.com/favicon.ico",
+    "affiliate": {
+      "default": "https://skyscanner.com",
+      "regions": {
+        "US": "https://skyscanner.com",
+        "EU": "https://skyscanner.com",
+        "BR": "https://skyscanner.com",
+        "PL": "https://skyscanner.com"
+      }
+    }
+  },
+  {
+    "id": "kiwi-com",
+    "name": "Kiwi",
+    "category": "travel",
+    "url": "https://kiwi.com",
+    "logoUrl": "https://kiwi.com/favicon.ico",
+    "affiliate": {
+      "default": "https://kiwi.com",
+      "regions": {
+        "US": "https://kiwi.com",
+        "EU": "https://kiwi.com",
+        "BR": "https://kiwi.com",
+        "PL": "https://kiwi.com"
+      }
+    }
+  },
+  {
+    "id": "momondo-com",
+    "name": "Momondo",
+    "category": "travel",
+    "url": "https://momondo.com",
+    "logoUrl": "https://momondo.com/favicon.ico",
+    "affiliate": {
+      "default": "https://momondo.com",
+      "regions": {
+        "US": "https://momondo.com",
+        "EU": "https://momondo.com",
+        "BR": "https://momondo.com",
+        "PL": "https://momondo.com"
+      }
+    }
+  },
+  {
+    "id": "cheapoair-com",
+    "name": "Cheapoair",
+    "category": "travel",
+    "url": "https://cheapoair.com",
+    "logoUrl": "https://cheapoair.com/favicon.ico",
+    "affiliate": {
+      "default": "https://cheapoair.com",
+      "regions": {
+        "US": "https://cheapoair.com",
+        "EU": "https://cheapoair.com",
+        "BR": "https://cheapoair.com",
+        "PL": "https://cheapoair.com"
+      }
+    }
+  },
+  {
+    "id": "flights-google-com",
+    "name": "Flights",
+    "category": "travel",
+    "url": "https://flights.google.com",
+    "logoUrl": "https://flights.google.com/favicon.ico",
+    "affiliate": {
+      "default": "https://flights.google.com",
+      "regions": {
+        "US": "https://flights.google.com",
+        "EU": "https://flights.google.com",
+        "BR": "https://flights.google.com",
+        "PL": "https://flights.google.com"
+      }
+    }
+  },
+  {
+    "id": "united-com",
+    "name": "United",
+    "category": "travel",
+    "url": "https://united.com",
+    "logoUrl": "https://united.com/favicon.ico",
+    "affiliate": {
+      "default": "https://united.com",
+      "regions": {
+        "US": "https://united.com",
+        "EU": "https://united.com",
+        "BR": "https://united.com",
+        "PL": "https://united.com"
+      }
+    }
+  },
+  {
+    "id": "delta-com",
+    "name": "Delta",
+    "category": "travel",
+    "url": "https://delta.com",
+    "logoUrl": "https://delta.com/favicon.ico",
+    "affiliate": {
+      "default": "https://delta.com",
+      "regions": {
+        "US": "https://delta.com",
+        "EU": "https://delta.com",
+        "BR": "https://delta.com",
+        "PL": "https://delta.com"
+      }
+    }
+  },
+  {
+    "id": "aa-com",
+    "name": "Aa",
+    "category": "travel",
+    "url": "https://aa.com",
+    "logoUrl": "https://aa.com/favicon.ico",
+    "affiliate": {
+      "default": "https://aa.com",
+      "regions": {
+        "US": "https://aa.com",
+        "EU": "https://aa.com",
+        "BR": "https://aa.com",
+        "PL": "https://aa.com"
+      }
+    }
+  },
+  {
+    "id": "southwest-com",
+    "name": "Southwest",
+    "category": "travel",
+    "url": "https://southwest.com",
+    "logoUrl": "https://southwest.com/favicon.ico",
+    "affiliate": {
+      "default": "https://southwest.com",
+      "regions": {
+        "US": "https://southwest.com",
+        "EU": "https://southwest.com",
+        "BR": "https://southwest.com",
+        "PL": "https://southwest.com"
+      }
+    }
+  },
+  {
+    "id": "jetblue-com",
+    "name": "Jetblue",
+    "category": "travel",
+    "url": "https://jetblue.com",
+    "logoUrl": "https://jetblue.com/favicon.ico",
+    "affiliate": {
+      "default": "https://jetblue.com",
+      "regions": {
+        "US": "https://jetblue.com",
+        "EU": "https://jetblue.com",
+        "BR": "https://jetblue.com",
+        "PL": "https://jetblue.com"
+      }
+    }
+  },
+  {
+    "id": "lufthansa-com",
+    "name": "Lufthansa",
+    "category": "travel",
+    "url": "https://lufthansa.com",
+    "logoUrl": "https://lufthansa.com/favicon.ico",
+    "affiliate": {
+      "default": "https://lufthansa.com",
+      "regions": {
+        "US": "https://lufthansa.com",
+        "EU": "https://lufthansa.com",
+        "BR": "https://lufthansa.com",
+        "PL": "https://lufthansa.com"
+      }
+    }
+  },
+  {
+    "id": "airfrance-com",
+    "name": "Airfrance",
+    "category": "travel",
+    "url": "https://airfrance.com",
+    "logoUrl": "https://airfrance.com/favicon.ico",
+    "affiliate": {
+      "default": "https://airfrance.com",
+      "regions": {
+        "US": "https://airfrance.com",
+        "EU": "https://airfrance.com",
+        "BR": "https://airfrance.com",
+        "PL": "https://airfrance.com"
+      }
+    }
+  },
+  {
+    "id": "klm-com",
+    "name": "Klm",
+    "category": "travel",
+    "url": "https://klm.com",
+    "logoUrl": "https://klm.com/favicon.ico",
+    "affiliate": {
+      "default": "https://klm.com",
+      "regions": {
+        "US": "https://klm.com",
+        "EU": "https://klm.com",
+        "BR": "https://klm.com",
+        "PL": "https://klm.com"
+      }
+    }
+  },
+  {
+    "id": "britishairways-com",
+    "name": "Britishairways",
+    "category": "travel",
+    "url": "https://britishairways.com",
+    "logoUrl": "https://britishairways.com/favicon.ico",
+    "affiliate": {
+      "default": "https://britishairways.com",
+      "regions": {
+        "US": "https://britishairways.com",
+        "EU": "https://britishairways.com",
+        "BR": "https://britishairways.com",
+        "PL": "https://britishairways.com"
+      }
+    }
+  },
+  {
+    "id": "emirates-com",
+    "name": "Emirates",
+    "category": "travel",
+    "url": "https://emirates.com",
+    "logoUrl": "https://emirates.com/favicon.ico",
+    "affiliate": {
+      "default": "https://emirates.com",
+      "regions": {
+        "US": "https://emirates.com",
+        "EU": "https://emirates.com",
+        "BR": "https://emirates.com",
+        "PL": "https://emirates.com"
+      }
+    }
+  },
+  {
+    "id": "qatarairways-com",
+    "name": "Qatarairways",
+    "category": "travel",
+    "url": "https://qatarairways.com",
+    "logoUrl": "https://qatarairways.com/favicon.ico",
+    "affiliate": {
+      "default": "https://qatarairways.com",
+      "regions": {
+        "US": "https://qatarairways.com",
+        "EU": "https://qatarairways.com",
+        "BR": "https://qatarairways.com",
+        "PL": "https://qatarairways.com"
+      }
+    }
+  },
+  {
+    "id": "turkishairlines-com",
+    "name": "Turkishairlines",
+    "category": "travel",
+    "url": "https://turkishairlines.com",
+    "logoUrl": "https://turkishairlines.com/favicon.ico",
+    "affiliate": {
+      "default": "https://turkishairlines.com",
+      "regions": {
+        "US": "https://turkishairlines.com",
+        "EU": "https://turkishairlines.com",
+        "BR": "https://turkishairlines.com",
+        "PL": "https://turkishairlines.com"
+      }
+    }
+  },
+  {
+    "id": "ryanair-com",
+    "name": "Ryanair",
+    "category": "travel",
+    "url": "https://ryanair.com",
+    "logoUrl": "https://ryanair.com/favicon.ico",
+    "affiliate": {
+      "default": "https://ryanair.com",
+      "regions": {
+        "US": "https://ryanair.com",
+        "EU": "https://ryanair.com",
+        "BR": "https://ryanair.com",
+        "PL": "https://ryanair.com"
+      }
+    }
+  },
+  {
+    "id": "easyjet-com",
+    "name": "Easyjet",
+    "category": "travel",
+    "url": "https://easyjet.com",
+    "logoUrl": "https://easyjet.com/favicon.ico",
+    "affiliate": {
+      "default": "https://easyjet.com",
+      "regions": {
+        "US": "https://easyjet.com",
+        "EU": "https://easyjet.com",
+        "BR": "https://easyjet.com",
+        "PL": "https://easyjet.com"
+      }
+    }
+  },
+  {
+    "id": "wizzair-com",
+    "name": "Wizzair",
+    "category": "travel",
+    "url": "https://wizzair.com",
+    "logoUrl": "https://wizzair.com/favicon.ico",
+    "affiliate": {
+      "default": "https://wizzair.com",
+      "regions": {
+        "US": "https://wizzair.com",
+        "EU": "https://wizzair.com",
+        "BR": "https://wizzair.com",
+        "PL": "https://wizzair.com"
+      }
+    }
+  },
+  {
+    "id": "uber-com",
+    "name": "Uber",
+    "category": "local experiences",
+    "url": "https://uber.com",
+    "logoUrl": "https://uber.com/favicon.ico",
+    "affiliate": {
+      "default": "https://uber.com",
+      "regions": {
+        "US": "https://uber.com",
+        "EU": "https://uber.com",
+        "BR": "https://uber.com",
+        "PL": "https://uber.com"
+      }
+    }
+  },
+  {
+    "id": "lyft-com",
+    "name": "Lyft",
+    "category": "local experiences",
+    "url": "https://lyft.com",
+    "logoUrl": "https://lyft.com/favicon.ico",
+    "affiliate": {
+      "default": "https://lyft.com",
+      "regions": {
+        "US": "https://lyft.com",
+        "EU": "https://lyft.com",
+        "BR": "https://lyft.com",
+        "PL": "https://lyft.com"
+      }
+    }
+  },
+  {
+    "id": "bolt-eu",
+    "name": "Bolt",
+    "category": "local experiences",
+    "url": "https://bolt.eu",
+    "logoUrl": "https://bolt.eu/favicon.ico",
+    "affiliate": {
+      "default": "https://bolt.eu",
+      "regions": {
+        "US": "https://bolt.eu",
+        "EU": "https://bolt.eu",
+        "BR": "https://bolt.eu",
+        "PL": "https://bolt.eu"
+      }
+    }
+  },
+  {
+    "id": "grab-com",
+    "name": "Grab",
+    "category": "local experiences",
+    "url": "https://grab.com",
+    "logoUrl": "https://grab.com/favicon.ico",
+    "affiliate": {
+      "default": "https://grab.com",
+      "regions": {
+        "US": "https://grab.com",
+        "EU": "https://grab.com",
+        "BR": "https://grab.com",
+        "PL": "https://grab.com"
+      }
+    }
+  },
+  {
+    "id": "getaround-com",
+    "name": "Getaround",
+    "category": "local experiences",
+    "url": "https://getaround.com",
+    "logoUrl": "https://getaround.com/favicon.ico",
+    "affiliate": {
+      "default": "https://getaround.com",
+      "regions": {
+        "US": "https://getaround.com",
+        "EU": "https://getaround.com",
+        "BR": "https://getaround.com",
+        "PL": "https://getaround.com"
+      }
+    }
+  },
+  {
+    "id": "turo-com",
+    "name": "Turo",
+    "category": "local experiences",
+    "url": "https://turo.com",
+    "logoUrl": "https://turo.com/favicon.ico",
+    "affiliate": {
+      "default": "https://turo.com",
+      "regions": {
+        "US": "https://turo.com",
+        "EU": "https://turo.com",
+        "BR": "https://turo.com",
+        "PL": "https://turo.com"
+      }
+    }
+  },
+  {
+    "id": "hertz-com",
+    "name": "Hertz",
+    "category": "local experiences",
+    "url": "https://hertz.com",
+    "logoUrl": "https://hertz.com/favicon.ico",
+    "affiliate": {
+      "default": "https://hertz.com",
+      "regions": {
+        "US": "https://hertz.com",
+        "EU": "https://hertz.com",
+        "BR": "https://hertz.com",
+        "PL": "https://hertz.com"
+      }
+    }
+  },
+  {
+    "id": "avis-com",
+    "name": "Avis",
+    "category": "local experiences",
+    "url": "https://avis.com",
+    "logoUrl": "https://avis.com/favicon.ico",
+    "affiliate": {
+      "default": "https://avis.com",
+      "regions": {
+        "US": "https://avis.com",
+        "EU": "https://avis.com",
+        "BR": "https://avis.com",
+        "PL": "https://avis.com"
+      }
+    }
+  },
+  {
+    "id": "enterprise-com",
+    "name": "Enterprise",
+    "category": "local experiences",
+    "url": "https://enterprise.com",
+    "logoUrl": "https://enterprise.com/favicon.ico",
+    "affiliate": {
+      "default": "https://enterprise.com",
+      "regions": {
+        "US": "https://enterprise.com",
+        "EU": "https://enterprise.com",
+        "BR": "https://enterprise.com",
+        "PL": "https://enterprise.com"
+      }
+    }
+  },
+  {
+    "id": "budget-com",
+    "name": "Budget",
+    "category": "local experiences",
+    "url": "https://budget.com",
+    "logoUrl": "https://budget.com/favicon.ico",
+    "affiliate": {
+      "default": "https://budget.com",
+      "regions": {
+        "US": "https://budget.com",
+        "EU": "https://budget.com",
+        "BR": "https://budget.com",
+        "PL": "https://budget.com"
+      }
+    }
+  },
+  {
+    "id": "sixt-com",
+    "name": "Sixt",
+    "category": "local experiences",
+    "url": "https://sixt.com",
+    "logoUrl": "https://sixt.com/favicon.ico",
+    "affiliate": {
+      "default": "https://sixt.com",
+      "regions": {
+        "US": "https://sixt.com",
+        "EU": "https://sixt.com",
+        "BR": "https://sixt.com",
+        "PL": "https://sixt.com"
+      }
+    }
+  },
+  {
+    "id": "europcar-com",
+    "name": "Europcar",
+    "category": "local experiences",
+    "url": "https://europcar.com",
+    "logoUrl": "https://europcar.com/favicon.ico",
+    "affiliate": {
+      "default": "https://europcar.com",
+      "regions": {
+        "US": "https://europcar.com",
+        "EU": "https://europcar.com",
+        "BR": "https://europcar.com",
+        "PL": "https://europcar.com"
+      }
+    }
+  },
+  {
+    "id": "rome2rio-com",
+    "name": "Rome2rio",
+    "category": "local experiences",
+    "url": "https://rome2rio.com",
+    "logoUrl": "https://rome2rio.com/favicon.ico",
+    "affiliate": {
+      "default": "https://rome2rio.com",
+      "regions": {
+        "US": "https://rome2rio.com",
+        "EU": "https://rome2rio.com",
+        "BR": "https://rome2rio.com",
+        "PL": "https://rome2rio.com"
+      }
+    }
+  },
+  {
+    "id": "trainline-com",
+    "name": "Trainline",
+    "category": "local experiences",
+    "url": "https://trainline.com",
+    "logoUrl": "https://trainline.com/favicon.ico",
+    "affiliate": {
+      "default": "https://trainline.com",
+      "regions": {
+        "US": "https://trainline.com",
+        "EU": "https://trainline.com",
+        "BR": "https://trainline.com",
+        "PL": "https://trainline.com"
+      }
+    }
+  },
+  {
+    "id": "raileurope-com",
+    "name": "Raileurope",
+    "category": "local experiences",
+    "url": "https://raileurope.com",
+    "logoUrl": "https://raileurope.com/favicon.ico",
+    "affiliate": {
+      "default": "https://raileurope.com",
+      "regions": {
+        "US": "https://raileurope.com",
+        "EU": "https://raileurope.com",
+        "BR": "https://raileurope.com",
+        "PL": "https://raileurope.com"
+      }
+    }
+  },
+  {
+    "id": "flixbus-com",
+    "name": "Flixbus",
+    "category": "local experiences",
+    "url": "https://flixbus.com",
+    "logoUrl": "https://flixbus.com/favicon.ico",
+    "affiliate": {
+      "default": "https://flixbus.com",
+      "regions": {
+        "US": "https://flixbus.com",
+        "EU": "https://flixbus.com",
+        "BR": "https://flixbus.com",
+        "PL": "https://flixbus.com"
+      }
+    }
+  },
+  {
+    "id": "greyhound-com",
+    "name": "Greyhound",
+    "category": "local experiences",
+    "url": "https://greyhound.com",
+    "logoUrl": "https://greyhound.com/favicon.ico",
+    "affiliate": {
+      "default": "https://greyhound.com",
+      "regions": {
+        "US": "https://greyhound.com",
+        "EU": "https://greyhound.com",
+        "BR": "https://greyhound.com",
+        "PL": "https://greyhound.com"
+      }
+    }
+  },
+  {
+    "id": "omio-com",
+    "name": "Omio",
+    "category": "local experiences",
+    "url": "https://omio.com",
+    "logoUrl": "https://omio.com/favicon.ico",
+    "affiliate": {
+      "default": "https://omio.com",
+      "regions": {
+        "US": "https://omio.com",
+        "EU": "https://omio.com",
+        "BR": "https://omio.com",
+        "PL": "https://omio.com"
+      }
+    }
+  },
+  {
+    "id": "viator-com",
+    "name": "Viator",
+    "category": "local experiences",
+    "url": "https://viator.com",
+    "logoUrl": "https://viator.com/favicon.ico",
+    "affiliate": {
+      "default": "https://viator.com",
+      "regions": {
+        "US": "https://viator.com",
+        "EU": "https://viator.com",
+        "BR": "https://viator.com",
+        "PL": "https://viator.com"
+      }
+    }
+  },
+  {
+    "id": "getyourguide-com",
+    "name": "Getyourguide",
+    "category": "local experiences",
+    "url": "https://getyourguide.com",
+    "logoUrl": "https://getyourguide.com/favicon.ico",
+    "affiliate": {
+      "default": "https://getyourguide.com",
+      "regions": {
+        "US": "https://getyourguide.com",
+        "EU": "https://getyourguide.com",
+        "BR": "https://getyourguide.com",
+        "PL": "https://getyourguide.com"
+      }
+    }
+  },
+  {
+    "id": "klook-com",
+    "name": "Klook",
+    "category": "local experiences",
+    "url": "https://klook.com",
+    "logoUrl": "https://klook.com/favicon.ico",
+    "affiliate": {
+      "default": "https://klook.com",
+      "regions": {
+        "US": "https://klook.com",
+        "EU": "https://klook.com",
+        "BR": "https://klook.com",
+        "PL": "https://klook.com"
+      }
+    }
+  },
+  {
+    "id": "tiqets-com",
+    "name": "Tiqets",
+    "category": "local experiences",
+    "url": "https://tiqets.com",
+    "logoUrl": "https://tiqets.com/favicon.ico",
+    "affiliate": {
+      "default": "https://tiqets.com",
+      "regions": {
+        "US": "https://tiqets.com",
+        "EU": "https://tiqets.com",
+        "BR": "https://tiqets.com",
+        "PL": "https://tiqets.com"
+      }
+    }
+  },
+  {
+    "id": "headout-com",
+    "name": "Headout",
+    "category": "local experiences",
+    "url": "https://headout.com",
+    "logoUrl": "https://headout.com/favicon.ico",
+    "affiliate": {
+      "default": "https://headout.com",
+      "regions": {
+        "US": "https://headout.com",
+        "EU": "https://headout.com",
+        "BR": "https://headout.com",
+        "PL": "https://headout.com"
+      }
+    }
+  },
+  {
+    "id": "citypass-com",
+    "name": "Citypass",
+    "category": "local experiences",
+    "url": "https://citypass.com",
+    "logoUrl": "https://citypass.com/favicon.ico",
+    "affiliate": {
+      "default": "https://citypass.com",
+      "regions": {
+        "US": "https://citypass.com",
+        "EU": "https://citypass.com",
+        "BR": "https://citypass.com",
+        "PL": "https://citypass.com"
+      }
+    }
+  },
+  {
+    "id": "lonelyplanet-com",
+    "name": "Lonelyplanet",
+    "category": "local experiences",
+    "url": "https://lonelyplanet.com",
+    "logoUrl": "https://lonelyplanet.com/favicon.ico",
+    "affiliate": {
+      "default": "https://lonelyplanet.com",
+      "regions": {
+        "US": "https://lonelyplanet.com",
+        "EU": "https://lonelyplanet.com",
+        "BR": "https://lonelyplanet.com",
+        "PL": "https://lonelyplanet.com"
+      }
+    }
+  },
+  {
+    "id": "withlocals-com",
+    "name": "Withlocals",
+    "category": "local experiences",
+    "url": "https://withlocals.com",
+    "logoUrl": "https://withlocals.com/favicon.ico",
+    "affiliate": {
+      "default": "https://withlocals.com",
+      "regions": {
+        "US": "https://withlocals.com",
+        "EU": "https://withlocals.com",
+        "BR": "https://withlocals.com",
+        "PL": "https://withlocals.com"
+      }
+    }
+  },
+  {
+    "id": "eatwith-com",
+    "name": "Eatwith",
+    "category": "local experiences",
+    "url": "https://eatwith.com",
+    "logoUrl": "https://eatwith.com/favicon.ico",
+    "affiliate": {
+      "default": "https://eatwith.com",
+      "regions": {
+        "US": "https://eatwith.com",
+        "EU": "https://eatwith.com",
+        "BR": "https://eatwith.com",
+        "PL": "https://eatwith.com"
+      }
+    }
+  },
+  {
+    "id": "opentable-com",
+    "name": "Opentable",
+    "category": "local experiences",
+    "url": "https://opentable.com",
+    "logoUrl": "https://opentable.com/favicon.ico",
+    "affiliate": {
+      "default": "https://opentable.com",
+      "regions": {
+        "US": "https://opentable.com",
+        "EU": "https://opentable.com",
+        "BR": "https://opentable.com",
+        "PL": "https://opentable.com"
+      }
+    }
+  },
+  {
+    "id": "resy-com",
+    "name": "Resy",
+    "category": "local experiences",
+    "url": "https://resy.com",
+    "logoUrl": "https://resy.com/favicon.ico",
+    "affiliate": {
+      "default": "https://resy.com",
+      "regions": {
+        "US": "https://resy.com",
+        "EU": "https://resy.com",
+        "BR": "https://resy.com",
+        "PL": "https://resy.com"
+      }
+    }
+  },
+  {
+    "id": "thefork-com",
+    "name": "Thefork",
+    "category": "local experiences",
+    "url": "https://thefork.com",
+    "logoUrl": "https://thefork.com/favicon.ico",
+    "affiliate": {
+      "default": "https://thefork.com",
+      "regions": {
+        "US": "https://thefork.com",
+        "EU": "https://thefork.com",
+        "BR": "https://thefork.com",
+        "PL": "https://thefork.com"
+      }
+    }
+  },
+  {
+    "id": "yelp-com",
+    "name": "Yelp",
+    "category": "local experiences",
+    "url": "https://yelp.com",
+    "logoUrl": "https://yelp.com/favicon.ico",
+    "affiliate": {
+      "default": "https://yelp.com",
+      "regions": {
+        "US": "https://yelp.com",
+        "EU": "https://yelp.com",
+        "BR": "https://yelp.com",
+        "PL": "https://yelp.com"
+      }
+    }
+  },
+  {
+    "id": "foursquare-com",
+    "name": "Foursquare",
+    "category": "local experiences",
+    "url": "https://foursquare.com",
+    "logoUrl": "https://foursquare.com/favicon.ico",
+    "affiliate": {
+      "default": "https://foursquare.com",
+      "regions": {
+        "US": "https://foursquare.com",
+        "EU": "https://foursquare.com",
+        "BR": "https://foursquare.com",
+        "PL": "https://foursquare.com"
+      }
+    }
+  },
+  {
+    "id": "doordash-com",
+    "name": "Doordash",
+    "category": "payments connectivity insurance",
+    "url": "https://doordash.com",
+    "logoUrl": "https://doordash.com/favicon.ico",
+    "affiliate": {
+      "default": "https://doordash.com",
+      "regions": {
+        "US": "https://doordash.com",
+        "EU": "https://doordash.com",
+        "BR": "https://doordash.com",
+        "PL": "https://doordash.com"
+      }
+    }
+  },
+  {
+    "id": "ubereats-com",
+    "name": "Ubereats",
+    "category": "payments connectivity insurance",
+    "url": "https://ubereats.com",
+    "logoUrl": "https://ubereats.com/favicon.ico",
+    "affiliate": {
+      "default": "https://ubereats.com",
+      "regions": {
+        "US": "https://ubereats.com",
+        "EU": "https://ubereats.com",
+        "BR": "https://ubereats.com",
+        "PL": "https://ubereats.com"
+      }
+    }
+  },
+  {
+    "id": "grubhub-com",
+    "name": "Grubhub",
+    "category": "payments connectivity insurance",
+    "url": "https://grubhub.com",
+    "logoUrl": "https://grubhub.com/favicon.ico",
+    "affiliate": {
+      "default": "https://grubhub.com",
+      "regions": {
+        "US": "https://grubhub.com",
+        "EU": "https://grubhub.com",
+        "BR": "https://grubhub.com",
+        "PL": "https://grubhub.com"
+      }
+    }
+  },
+  {
+    "id": "wise-com",
+    "name": "Wise",
+    "category": "payments connectivity insurance",
+    "url": "https://wise.com",
+    "logoUrl": "https://wise.com/favicon.ico",
+    "affiliate": {
+      "default": "https://wise.com",
+      "regions": {
+        "US": "https://wise.com",
+        "EU": "https://wise.com",
+        "BR": "https://wise.com",
+        "PL": "https://wise.com"
+      }
+    }
+  },
+  {
+    "id": "revolut-com",
+    "name": "Revolut",
+    "category": "payments connectivity insurance",
+    "url": "https://revolut.com",
+    "logoUrl": "https://revolut.com/favicon.ico",
+    "affiliate": {
+      "default": "https://revolut.com",
+      "regions": {
+        "US": "https://revolut.com",
+        "EU": "https://revolut.com",
+        "BR": "https://revolut.com",
+        "PL": "https://revolut.com"
+      }
+    }
+  },
+  {
+    "id": "paypal-com",
+    "name": "Paypal",
+    "category": "payments connectivity insurance",
+    "url": "https://paypal.com",
+    "logoUrl": "https://paypal.com/favicon.ico",
+    "affiliate": {
+      "default": "https://paypal.com",
+      "regions": {
+        "US": "https://paypal.com",
+        "EU": "https://paypal.com",
+        "BR": "https://paypal.com",
+        "PL": "https://paypal.com"
+      }
+    }
+  },
+  {
+    "id": "stripe-com",
+    "name": "Stripe",
+    "category": "payments connectivity insurance",
+    "url": "https://stripe.com",
+    "logoUrl": "https://stripe.com/favicon.ico",
+    "affiliate": {
+      "default": "https://stripe.com",
+      "regions": {
+        "US": "https://stripe.com",
+        "EU": "https://stripe.com",
+        "BR": "https://stripe.com",
+        "PL": "https://stripe.com"
+      }
+    }
+  },
+  {
+    "id": "westernunion-com",
+    "name": "Westernunion",
+    "category": "payments connectivity insurance",
+    "url": "https://westernunion.com",
+    "logoUrl": "https://westernunion.com/favicon.ico",
+    "affiliate": {
+      "default": "https://westernunion.com",
+      "regions": {
+        "US": "https://westernunion.com",
+        "EU": "https://westernunion.com",
+        "BR": "https://westernunion.com",
+        "PL": "https://westernunion.com"
+      }
+    }
+  },
+  {
+    "id": "remitly-com",
+    "name": "Remitly",
+    "category": "payments connectivity insurance",
+    "url": "https://remitly.com",
+    "logoUrl": "https://remitly.com/favicon.ico",
+    "affiliate": {
+      "default": "https://remitly.com",
+      "regions": {
+        "US": "https://remitly.com",
+        "EU": "https://remitly.com",
+        "BR": "https://remitly.com",
+        "PL": "https://remitly.com"
+      }
+    }
+  },
+  {
+    "id": "xe-com",
+    "name": "Xe",
+    "category": "payments connectivity insurance",
+    "url": "https://xe.com",
+    "logoUrl": "https://xe.com/favicon.ico",
+    "affiliate": {
+      "default": "https://xe.com",
+      "regions": {
+        "US": "https://xe.com",
+        "EU": "https://xe.com",
+        "BR": "https://xe.com",
+        "PL": "https://xe.com"
+      }
+    }
+  },
+  {
+    "id": "airalo-com",
+    "name": "Airalo",
+    "category": "payments connectivity insurance",
+    "url": "https://airalo.com",
+    "logoUrl": "https://airalo.com/favicon.ico",
+    "affiliate": {
+      "default": "https://airalo.com",
+      "regions": {
+        "US": "https://airalo.com",
+        "EU": "https://airalo.com",
+        "BR": "https://airalo.com",
+        "PL": "https://airalo.com"
+      }
+    }
+  },
+  {
+    "id": "holafly-com",
+    "name": "Holafly",
+    "category": "payments connectivity insurance",
+    "url": "https://holafly.com",
+    "logoUrl": "https://holafly.com/favicon.ico",
+    "affiliate": {
+      "default": "https://holafly.com",
+      "regions": {
+        "US": "https://holafly.com",
+        "EU": "https://holafly.com",
+        "BR": "https://holafly.com",
+        "PL": "https://holafly.com"
+      }
+    }
+  },
+  {
+    "id": "nomadesim-com",
+    "name": "NomadeSIM",
+    "category": "payments connectivity insurance",
+    "url": "https://nomadeSIM.com",
+    "logoUrl": "https://nomadesim.com/favicon.ico",
+    "affiliate": {
+      "default": "https://nomadeSIM.com",
+      "regions": {
+        "US": "https://nomadeSIM.com",
+        "EU": "https://nomadeSIM.com",
+        "BR": "https://nomadeSIM.com",
+        "PL": "https://nomadeSIM.com"
+      }
+    }
+  },
+  {
+    "id": "gigsky-com",
+    "name": "Gigsky",
+    "category": "payments connectivity insurance",
+    "url": "https://gigsky.com",
+    "logoUrl": "https://gigsky.com/favicon.ico",
+    "affiliate": {
+      "default": "https://gigsky.com",
+      "regions": {
+        "US": "https://gigsky.com",
+        "EU": "https://gigsky.com",
+        "BR": "https://gigsky.com",
+        "PL": "https://gigsky.com"
+      }
+    }
+  },
+  {
+    "id": "truphone-com",
+    "name": "Truphone",
+    "category": "payments connectivity insurance",
+    "url": "https://truphone.com",
+    "logoUrl": "https://truphone.com/favicon.ico",
+    "affiliate": {
+      "default": "https://truphone.com",
+      "regions": {
+        "US": "https://truphone.com",
+        "EU": "https://truphone.com",
+        "BR": "https://truphone.com",
+        "PL": "https://truphone.com"
+      }
+    }
+  },
+  {
+    "id": "surfroam-com",
+    "name": "Surfroam",
+    "category": "payments connectivity insurance",
+    "url": "https://surfroam.com",
+    "logoUrl": "https://surfroam.com/favicon.ico",
+    "affiliate": {
+      "default": "https://surfroam.com",
+      "regions": {
+        "US": "https://surfroam.com",
+        "EU": "https://surfroam.com",
+        "BR": "https://surfroam.com",
+        "PL": "https://surfroam.com"
+      }
+    }
+  },
+  {
+    "id": "nordvpn-com",
+    "name": "Nordvpn",
+    "category": "payments connectivity insurance",
+    "url": "https://nordvpn.com",
+    "logoUrl": "https://nordvpn.com/favicon.ico",
+    "affiliate": {
+      "default": "https://nordvpn.com",
+      "regions": {
+        "US": "https://nordvpn.com",
+        "EU": "https://nordvpn.com",
+        "BR": "https://nordvpn.com",
+        "PL": "https://nordvpn.com"
+      }
+    }
+  },
+  {
+    "id": "expressvpn-com",
+    "name": "Expressvpn",
+    "category": "payments connectivity insurance",
+    "url": "https://expressvpn.com",
+    "logoUrl": "https://expressvpn.com/favicon.ico",
+    "affiliate": {
+      "default": "https://expressvpn.com",
+      "regions": {
+        "US": "https://expressvpn.com",
+        "EU": "https://expressvpn.com",
+        "BR": "https://expressvpn.com",
+        "PL": "https://expressvpn.com"
+      }
+    }
+  },
+  {
+    "id": "surfshark-com",
+    "name": "Surfshark",
+    "category": "payments connectivity insurance",
+    "url": "https://surfshark.com",
+    "logoUrl": "https://surfshark.com/favicon.ico",
+    "affiliate": {
+      "default": "https://surfshark.com",
+      "regions": {
+        "US": "https://surfshark.com",
+        "EU": "https://surfshark.com",
+        "BR": "https://surfshark.com",
+        "PL": "https://surfshark.com"
+      }
+    }
+  },
+  {
+    "id": "allianztravelinsurance-com",
+    "name": "Allianztravelinsurance",
+    "category": "payments connectivity insurance",
+    "url": "https://allianztravelinsurance.com",
+    "logoUrl": "https://allianztravelinsurance.com/favicon.ico",
+    "affiliate": {
+      "default": "https://allianztravelinsurance.com",
+      "regions": {
+        "US": "https://allianztravelinsurance.com",
+        "EU": "https://allianztravelinsurance.com",
+        "BR": "https://allianztravelinsurance.com",
+        "PL": "https://allianztravelinsurance.com"
+      }
+    }
+  },
+  {
+    "id": "worldnomads-com",
+    "name": "Worldnomads",
+    "category": "creative web commerce",
+    "url": "https://worldnomads.com",
+    "logoUrl": "https://worldnomads.com/favicon.ico",
+    "affiliate": {
+      "default": "https://worldnomads.com",
+      "regions": {
+        "US": "https://worldnomads.com",
+        "EU": "https://worldnomads.com",
+        "BR": "https://worldnomads.com",
+        "PL": "https://worldnomads.com"
+      }
+    }
+  },
+  {
+    "id": "safetywing-com",
+    "name": "Safetywing",
+    "category": "creative web commerce",
+    "url": "https://safetywing.com",
+    "logoUrl": "https://safetywing.com/favicon.ico",
+    "affiliate": {
+      "default": "https://safetywing.com",
+      "regions": {
+        "US": "https://safetywing.com",
+        "EU": "https://safetywing.com",
+        "BR": "https://safetywing.com",
+        "PL": "https://safetywing.com"
+      }
+    }
+  },
+  {
+    "id": "imglobal-com",
+    "name": "Imglobal",
+    "category": "creative web commerce",
+    "url": "https://imglobal.com",
+    "logoUrl": "https://imglobal.com/favicon.ico",
+    "affiliate": {
+      "default": "https://imglobal.com",
+      "regions": {
+        "US": "https://imglobal.com",
+        "EU": "https://imglobal.com",
+        "BR": "https://imglobal.com",
+        "PL": "https://imglobal.com"
+      }
+    }
+  },
+  {
+    "id": "visaguide-world",
+    "name": "Visaguide",
+    "category": "creative web commerce",
+    "url": "https://visaguide.world",
+    "logoUrl": "https://visaguide.world/favicon.ico",
+    "affiliate": {
+      "default": "https://visaguide.world",
+      "regions": {
+        "US": "https://visaguide.world",
+        "EU": "https://visaguide.world",
+        "BR": "https://visaguide.world",
+        "PL": "https://visaguide.world"
+      }
+    }
+  },
+  {
+    "id": "ivisa-com",
+    "name": "iVisa",
+    "category": "creative web commerce",
+    "url": "https://ivisa.com",
+    "logoUrl": "https://ivisa.com/favicon.ico",
+    "affiliate": {
+      "default": "https://ivisa.com",
+      "regions": {
+        "US": "https://ivisa.com",
+        "EU": "https://ivisa.com",
+        "BR": "https://ivisa.com",
+        "PL": "https://ivisa.com"
+      }
+    }
+  },
+  {
+    "id": "passportindex-org",
+    "name": "Passportindex",
+    "category": "creative web commerce",
+    "url": "https://passportindex.org",
+    "logoUrl": "https://passportindex.org/favicon.ico",
+    "affiliate": {
+      "default": "https://passportindex.org",
+      "regions": {
+        "US": "https://passportindex.org",
+        "EU": "https://passportindex.org",
+        "BR": "https://passportindex.org",
+        "PL": "https://passportindex.org"
+      }
+    }
+  },
+  {
+    "id": "duolingo-com",
+    "name": "Duolingo",
+    "category": "creative web commerce",
+    "url": "https://duolingo.com",
+    "logoUrl": "https://duolingo.com/favicon.ico",
+    "affiliate": {
+      "default": "https://duolingo.com",
+      "regions": {
+        "US": "https://duolingo.com",
+        "EU": "https://duolingo.com",
+        "BR": "https://duolingo.com",
+        "PL": "https://duolingo.com"
+      }
+    }
+  },
+  {
+    "id": "babbel-com",
+    "name": "Babbel",
+    "category": "creative web commerce",
+    "url": "https://babbel.com",
+    "logoUrl": "https://babbel.com/favicon.ico",
+    "affiliate": {
+      "default": "https://babbel.com",
+      "regions": {
+        "US": "https://babbel.com",
+        "EU": "https://babbel.com",
+        "BR": "https://babbel.com",
+        "PL": "https://babbel.com"
+      }
+    }
+  },
+  {
+    "id": "deepl-com",
+    "name": "Deepl",
+    "category": "creative web commerce",
+    "url": "https://deepl.com",
+    "logoUrl": "https://deepl.com/favicon.ico",
+    "affiliate": {
+      "default": "https://deepl.com",
+      "regions": {
+        "US": "https://deepl.com",
+        "EU": "https://deepl.com",
+        "BR": "https://deepl.com",
+        "PL": "https://deepl.com"
+      }
+    }
+  },
+  {
+    "id": "translate-google-com",
+    "name": "Translate",
+    "category": "creative web commerce",
+    "url": "https://translate.google.com",
+    "logoUrl": "https://translate.google.com/favicon.ico",
+    "affiliate": {
+      "default": "https://translate.google.com",
+      "regions": {
+        "US": "https://translate.google.com",
+        "EU": "https://translate.google.com",
+        "BR": "https://translate.google.com",
+        "PL": "https://translate.google.com"
+      }
+    }
+  },
+  {
+    "id": "canva-com",
+    "name": "Canva",
+    "category": "creative web commerce",
+    "url": "https://canva.com",
+    "logoUrl": "https://canva.com/favicon.ico",
+    "affiliate": {
+      "default": "https://canva.com",
+      "regions": {
+        "US": "https://canva.com",
+        "EU": "https://canva.com",
+        "BR": "https://canva.com",
+        "PL": "https://canva.com"
+      }
+    }
+  },
+  {
+    "id": "adobe-com",
+    "name": "Adobe",
+    "category": "creative web commerce",
+    "url": "https://adobe.com",
+    "logoUrl": "https://adobe.com/favicon.ico",
+    "affiliate": {
+      "default": "https://adobe.com",
+      "regions": {
+        "US": "https://adobe.com",
+        "EU": "https://adobe.com",
+        "BR": "https://adobe.com",
+        "PL": "https://adobe.com"
+      }
+    }
+  },
+  {
+    "id": "figma-com",
+    "name": "Figma",
+    "category": "creative web commerce",
+    "url": "https://figma.com",
+    "logoUrl": "https://figma.com/favicon.ico",
+    "affiliate": {
+      "default": "https://figma.com",
+      "regions": {
+        "US": "https://figma.com",
+        "EU": "https://figma.com",
+        "BR": "https://figma.com",
+        "PL": "https://figma.com"
+      }
+    }
+  },
+  {
+    "id": "webflow-com",
+    "name": "Webflow",
+    "category": "creative web commerce",
+    "url": "https://webflow.com",
+    "logoUrl": "https://webflow.com/favicon.ico",
+    "affiliate": {
+      "default": "https://webflow.com",
+      "regions": {
+        "US": "https://webflow.com",
+        "EU": "https://webflow.com",
+        "BR": "https://webflow.com",
+        "PL": "https://webflow.com"
+      }
+    }
+  },
+  {
+    "id": "wix-com",
+    "name": "Wix",
+    "category": "creative web commerce",
+    "url": "https://wix.com",
+    "logoUrl": "https://wix.com/favicon.ico",
+    "affiliate": {
+      "default": "https://wix.com",
+      "regions": {
+        "US": "https://wix.com",
+        "EU": "https://wix.com",
+        "BR": "https://wix.com",
+        "PL": "https://wix.com"
+      }
+    }
+  },
+  {
+    "id": "squarespace-com",
+    "name": "Squarespace",
+    "category": "creative web commerce",
+    "url": "https://squarespace.com",
+    "logoUrl": "https://squarespace.com/favicon.ico",
+    "affiliate": {
+      "default": "https://squarespace.com",
+      "regions": {
+        "US": "https://squarespace.com",
+        "EU": "https://squarespace.com",
+        "BR": "https://squarespace.com",
+        "PL": "https://squarespace.com"
+      }
+    }
+  },
+  {
+    "id": "wordpress-com",
+    "name": "Wordpress",
+    "category": "growth operations",
+    "url": "https://wordpress.com",
+    "logoUrl": "https://wordpress.com/favicon.ico",
+    "affiliate": {
+      "default": "https://wordpress.com",
+      "regions": {
+        "US": "https://wordpress.com",
+        "EU": "https://wordpress.com",
+        "BR": "https://wordpress.com",
+        "PL": "https://wordpress.com"
+      }
+    }
+  },
+  {
+    "id": "shopify-com",
+    "name": "Shopify",
+    "category": "growth operations",
+    "url": "https://shopify.com",
+    "logoUrl": "https://shopify.com/favicon.ico",
+    "affiliate": {
+      "default": "https://shopify.com",
+      "regions": {
+        "US": "https://shopify.com",
+        "EU": "https://shopify.com",
+        "BR": "https://shopify.com",
+        "PL": "https://shopify.com"
+      }
+    }
+  },
+  {
+    "id": "squareup-com",
+    "name": "Squareup",
+    "category": "growth operations",
+    "url": "https://squareup.com",
+    "logoUrl": "https://squareup.com/favicon.ico",
+    "affiliate": {
+      "default": "https://squareup.com",
+      "regions": {
+        "US": "https://squareup.com",
+        "EU": "https://squareup.com",
+        "BR": "https://squareup.com",
+        "PL": "https://squareup.com"
+      }
+    }
+  },
+  {
+    "id": "toasttab-com",
+    "name": "Toasttab",
+    "category": "growth operations",
+    "url": "https://toasttab.com",
+    "logoUrl": "https://toasttab.com/favicon.ico",
+    "affiliate": {
+      "default": "https://toasttab.com",
+      "regions": {
+        "US": "https://toasttab.com",
+        "EU": "https://toasttab.com",
+        "BR": "https://toasttab.com",
+        "PL": "https://toasttab.com"
+      }
+    }
+  },
+  {
+    "id": "mailchimp-com",
+    "name": "Mailchimp",
+    "category": "growth operations",
+    "url": "https://mailchimp.com",
+    "logoUrl": "https://mailchimp.com/favicon.ico",
+    "affiliate": {
+      "default": "https://mailchimp.com",
+      "regions": {
+        "US": "https://mailchimp.com",
+        "EU": "https://mailchimp.com",
+        "BR": "https://mailchimp.com",
+        "PL": "https://mailchimp.com"
+      }
+    }
+  },
+  {
+    "id": "hubspot-com",
+    "name": "Hubspot",
+    "category": "growth operations",
+    "url": "https://hubspot.com",
+    "logoUrl": "https://hubspot.com/favicon.ico",
+    "affiliate": {
+      "default": "https://hubspot.com",
+      "regions": {
+        "US": "https://hubspot.com",
+        "EU": "https://hubspot.com",
+        "BR": "https://hubspot.com",
+        "PL": "https://hubspot.com"
+      }
+    }
+  },
+  {
+    "id": "salesforce-com",
+    "name": "Salesforce",
+    "category": "growth operations",
+    "url": "https://salesforce.com",
+    "logoUrl": "https://salesforce.com/favicon.ico",
+    "affiliate": {
+      "default": "https://salesforce.com",
+      "regions": {
+        "US": "https://salesforce.com",
+        "EU": "https://salesforce.com",
+        "BR": "https://salesforce.com",
+        "PL": "https://salesforce.com"
+      }
+    }
+  },
+  {
+    "id": "zapier-com",
+    "name": "Zapier",
+    "category": "growth operations",
+    "url": "https://zapier.com",
+    "logoUrl": "https://zapier.com/favicon.ico",
+    "affiliate": {
+      "default": "https://zapier.com",
+      "regions": {
+        "US": "https://zapier.com",
+        "EU": "https://zapier.com",
+        "BR": "https://zapier.com",
+        "PL": "https://zapier.com"
+      }
+    }
+  },
+  {
+    "id": "notion-so",
+    "name": "Notion",
+    "category": "growth operations",
+    "url": "https://notion.so",
+    "logoUrl": "https://notion.so/favicon.ico",
+    "affiliate": {
+      "default": "https://notion.so",
+      "regions": {
+        "US": "https://notion.so",
+        "EU": "https://notion.so",
+        "BR": "https://notion.so",
+        "PL": "https://notion.so"
+      }
+    }
+  },
+  {
+    "id": "airtable-com",
+    "name": "Airtable",
+    "category": "growth operations",
+    "url": "https://airtable.com",
+    "logoUrl": "https://airtable.com/favicon.ico",
+    "affiliate": {
+      "default": "https://airtable.com",
+      "regions": {
+        "US": "https://airtable.com",
+        "EU": "https://airtable.com",
+        "BR": "https://airtable.com",
+        "PL": "https://airtable.com"
+      }
+    }
+  },
+  {
+    "id": "slack-com",
+    "name": "Slack",
+    "category": "growth operations",
+    "url": "https://slack.com",
+    "logoUrl": "https://slack.com/favicon.ico",
+    "affiliate": {
+      "default": "https://slack.com",
+      "regions": {
+        "US": "https://slack.com",
+        "EU": "https://slack.com",
+        "BR": "https://slack.com",
+        "PL": "https://slack.com"
+      }
+    }
+  },
+  {
+    "id": "zoom-us",
+    "name": "Zoom",
+    "category": "growth operations",
+    "url": "https://zoom.us",
+    "logoUrl": "https://zoom.us/favicon.ico",
+    "affiliate": {
+      "default": "https://zoom.us",
+      "regions": {
+        "US": "https://zoom.us",
+        "EU": "https://zoom.us",
+        "BR": "https://zoom.us",
+        "PL": "https://zoom.us"
+      }
+    }
+  },
+  {
+    "id": "calendly-com",
+    "name": "Calendly",
+    "category": "growth operations",
+    "url": "https://calendly.com",
+    "logoUrl": "https://calendly.com/favicon.ico",
+    "affiliate": {
+      "default": "https://calendly.com",
+      "regions": {
+        "US": "https://calendly.com",
+        "EU": "https://calendly.com",
+        "BR": "https://calendly.com",
+        "PL": "https://calendly.com"
+      }
+    }
+  },
+  {
+    "id": "typeform-com",
+    "name": "Typeform",
+    "category": "growth operations",
+    "url": "https://typeform.com",
+    "logoUrl": "https://typeform.com/favicon.ico",
+    "affiliate": {
+      "default": "https://typeform.com",
+      "regions": {
+        "US": "https://typeform.com",
+        "EU": "https://typeform.com",
+        "BR": "https://typeform.com",
+        "PL": "https://typeform.com"
+      }
+    }
+  },
+  {
+    "id": "surveymonkey-com",
+    "name": "Surveymonkey",
+    "category": "growth operations",
+    "url": "https://surveymonkey.com",
+    "logoUrl": "https://surveymonkey.com/favicon.ico",
+    "affiliate": {
+      "default": "https://surveymonkey.com",
+      "regions": {
+        "US": "https://surveymonkey.com",
+        "EU": "https://surveymonkey.com",
+        "BR": "https://surveymonkey.com",
+        "PL": "https://surveymonkey.com"
+      }
+    }
+  },
+  {
+    "id": "trustpilot-com",
+    "name": "Trustpilot",
+    "category": "growth operations",
+    "url": "https://trustpilot.com",
+    "logoUrl": "https://trustpilot.com/favicon.ico",
+    "affiliate": {
+      "default": "https://trustpilot.com",
+      "regions": {
+        "US": "https://trustpilot.com",
+        "EU": "https://trustpilot.com",
+        "BR": "https://trustpilot.com",
+        "PL": "https://trustpilot.com"
+      }
+    }
+  },
+  {
+    "id": "google-com",
+    "name": "Google",
+    "category": "growth operations",
+    "url": "https://google.com",
+    "logoUrl": "https://google.com/favicon.ico",
+    "affiliate": {
+      "default": "https://google.com",
+      "regions": {
+        "US": "https://google.com",
+        "EU": "https://google.com",
+        "BR": "https://google.com",
+        "PL": "https://google.com"
+      }
+    }
+  }
+]

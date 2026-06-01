@@ -1,227 +1,1235 @@
 {
-  "dashboard.title": "Panel główny",
-  "dashboard.subtitle": "Zarządzaj swoimi projektami i automatyzacjami",
-  "nav.dashboard": "Panel",
-  "nav.projects": "Projekty",
-  "nav.automations": "Automatyzacje",
-  "nav.courses": "Kursy",
-  "nav.billing": "Płatności",
-  "nav.settings": "Ustawienia",
-  "projects.title": "Projekty",
-  "projects.create": "Utwórz projekt",
-  "projects.empty": "Brak projektów.",
-  "editor.save": "Zapisz",
-  "editor.generating": "Generowanie...",
-  "editor.preview": "Podgląd",
-  "billing.title": "Płatności i plany",
-  "billing.upgrade": "Ulepsz plan",
-  "billing.current": "Aktualny plan",
-  "mobile.install": "Zainstaluj aplikację",
-  "common.loading": "Ładowanie...",
-  "common.cancel": "Anuluj",
-  "common.delete": "Usuń",
-  "common.edit": "Edytuj",
-  "reset": "Resetuj",
+  "hello": "Cześć",
+  "welcome": "Witaj",
+  "home": {
+    "featuresLabel": "Features",
+    "featuresKicker": "Features",
+    "featuresTitle": "Everything arranged around momentum.",
+    "workflowCta": "Show me the workflow",
+    "servicesLabel": "Services",
+    "servicesKicker": "All services",
+    "servicesTitle": "Nine connected services for launch, content, optimization, and learning.",
+    "openWorkspace": "Open workspace",
+    "ctaLabel": "Call to action",
+    "readyKicker": "Ready when you are",
+    "readyTitle": "Let SignalBoost organize your growth room.",
+    "readyText": "Start with one campaign or optimization. The AI will suggest an audience, tone, proof point, approval step, and launch-ready result before you publish.",
+    "startBuilding": "Start building",
+    "comparePlans": "Compare plans",
+    "features": {
+      "1": {
+        "title": "AI proposes the next move",
+        "text": "Guided suggestions appear before a user types, reducing blank-page friction."
+      },
+      "2": {
+        "title": "One brand, every channel",
+        "text": "Websites, reviews, audio, video, optimization, lab, and outreach share the same visual rhythm."
+      },
+      "3": {
+        "title": "Built for action",
+        "text": "Each service highlights one primary CTA so teams know exactly what to do next."
+      }
+    }
+  },
+  "podcasters": {
+    "title": {
+      "fallback": "Twój podcast"
+    },
+    "episode": {
+      "fallback1": "Odcinek 1",
+      "fallback2": "Odcinek 2",
+      "fallback3": "Odcinek 3"
+    },
+    "badge": "Strona podcastu",
+    "subtitle": {
+      "fallback": "Ta strona stanie się publicznym domem Twojego podcastu."
+    },
+    "aboutShow": "O programie",
+    "description": {
+      "fallback": "Opis Twojego podcastu wygenerowany w Launchpad pojawi się tutaj."
+    },
+    "audience": "Publiczność",
+    "episodes": "Odcinki",
+    "episodeLabel": "Odcinek {n}",
+    "host": "Prowadzący",
+    "introScript": "Scenariusz wstępu",
+    "openStudio": "Otwórz studio podcastu"
+  },
+  "dashboard": "Panel",
+  "pricing": "Cennik",
+  "reset": "Zacznij od nowa",
+  "docs": {
+    "label": "Dokumentacja",
+    "searchPlaceholder": "Szukaj w dokumentacji...",
+    "noResults": "Brak wyników dla",
+    "stillTitle": "Masz jeszcze pytanie?",
+    "stillBody": "Otwórz zgłoszenie do wsparcia. Każde pytanie, na które nie ma odpowiedzi w dokumentacji, jest tu dodawane, aby następna osoba nie musiała pytać.",
+    "stillCta": "Otwórz zgłoszenie do wsparcia",
+    "howItWorks": {
+      "title": "Jak działa SignalBoost",
+      "q1": "Czym jest SignalBoost?",
+      "a1": "SignalBoost to wielojęzyczna platforma treści. Pomagamy firmom tworzyć strony, zbierać opinie klientów, produkować natywne audio i wideo oraz docierać do globalnej publiczności w 5 językach: Angielskim, Portugalskim, Hiszpańskim, Polskim i Rosyjskim. Nie jesteśmy usługą tłumaczeniową — tworzymy natywne treści, które brzmią i czytają się tak, jakby zrobił je miejscowy.",
+      "q2": "Dla kogo jest SignalBoost?",
+      "a2": "Dla każdego, kto chce dotrzeć do międzynarodowej publiczności. Od piekarni w Lizbonie, która chce stronę po Portugalsku i Angielsku, po sieć podcastów chcącą dotrzeć do słuchaczy w Brazylii, Polsce i Rosji. Obsługujemy zarówno kompletnych początkujących, jak i technicznych deweloperów — doświadczenie dostosowuje się do Twojego poziomu.",
+      "q3": "Czego SignalBoost NIE robi?",
+      "a3": "Nie zajmujemy się sprzętem ani urządzeniami do nagrywania. Nie edytujemy surowego audio (usuwanie szumów, wycinanie błędów). Nie hostujemy kanałów RSS podcastów ani nie przesyłamy do Spotify/Apple Podcasts. Nie produkujemy muzyki ani intro. Jesteśmy szczerzy co do naszych ograniczeń.",
+      "q4": "Jak działa AI?",
+      "a4": "SignalBoost używa AI do generowania natywnego lektora, napisów, klipów społecznościowych, notatek, treści stron i więcej. Nasz agent wsparcia AI monitoruje Twoją aktywność i proaktywnie pomaga, gdy wykryje, że utknąłeś — bez konieczności pytania. Jeśli AI nie może czegoś rozwiązać, po cichu sprowadza dodatkowe wsparcie AI, a potem eskaluje do Luisa (naszego założyciela), jeśli nadal nie rozwiązano."
+    },
+    "partners": {
+      "title": "Nasi partnerzy — pełna przejrzystość",
+      "q1": "Dlaczego SignalBoost poleca określonych dostawców?",
+      "a1": "Polecamy dostawców na podstawie jakości, niezawodności i wartości. Przetestowaliśmy ich wszystkich. Niektóre z naszych rekomendacji zawierają linki afiliacyjne — oznacza to, że SignalBoost zarabia prowizję, jeśli zarejestrujesz się przez nasz link, bez dodatkowych kosztów dla Ciebie. Zawsze jasno to ujawniamy.",
+      "q2": "Których dostawców polecacie i dlaczego?",
+      "a2": "Domeny: Namecheap (najlepsza wartość, łatwy DNS), Cloudflare (ceny po kosztach, darmowy SSL). Hosting: Vercel (najlepsza wydajność, darmowy plan), Netlify (świetny dla stron statycznych). AI audio: ElevenLabs (najbardziej naturalne dostępne głosy). Nie polecamy dostawców, których sami nie przetestowaliśmy.",
+      "q3": "Czy prowizje partnerów wpływają na wasze rekomendacje?",
+      "a3": "Nie. Wymieniamy Cloudflare jako opcję domeny, mimo że nie płacą prowizji, bo są naprawdę dobrzy. Jeśli dostawca stanie się gorszy od konkurencji, powiemy to i usuniemy go z rekomendacji, niezależnie od prowizji. Zaufanie naszych użytkowników liczy się bardziej niż dochód z prowizji.",
+      "q4": "Czy SignalBoost może uzyskać umowę partnerską, która mi pomoże?",
+      "a4": "Tak — aktywnie szukamy partnerstw, które dają użytkownikom SignalBoost zniżki lub wydłużone okresy próbne. Jeśli zawrzemy umowę, przekazujemy korzyść Tobie. Sprawdź naszą stronę z cenami, aby zobaczyć aktualne korzyści partnerskie."
+    },
+    "yourData": {
+      "title": "Twoje dane i prywatność",
+      "q1": "Gdzie przechowywane są moje dane?",
+      "a1": "Dane Twojego konta i metadane projektów są przechowywane w Supabase — bezpiecznej, otwartoźródłowej platformie bazodanowej hostowanej na AWS. Twoje pliki audio i wideo są przechowywane w Supabase Storage. Twoje pliki stron są wdrażane przez Vercel. Nie przechowujemy Twoich kluczy API jako zwykłego tekstu — są szyfrowane.",
+      "q2": "Kto może zobaczyć moje dane?",
+      "a2": "Tylko Ty możesz zobaczyć swoje projekty i pliki. Luis (założyciel) ma dostęp administratora wyłącznie do celów wsparcia i nie uzyskuje dostępu do danych użytkowników, chyba że poprosisz o pomoc. Nie sprzedajemy Twoich danych nikomu. Nie udostępniamy ich stronom trzecim poza dostawcami infrastruktury wymienionymi powyżej.",
+      "q3": "Co się stanie, jeśli anuluję?",
+      "a3": "Zachowujesz dostęp do końca okresu rozliczeniowego. Potem Twoje dane są przechowywane przez 30 dni, na wypadek gdybyś chciał wrócić. Po 30 dniach są trwale usuwane. Możesz poprosić o natychmiastowe usunięcie w dowolnym momencie, otwierając zgłoszenie do wsparcia na tej stronie.",
+      "q4": "Jak usunąć moje konto?",
+      "a4": "Otwórz zgłoszenie do wsparcia na tej stronie z tematem \"Usuń moje konto\" wysłane z zarejestrowanego adresu email. Usuniemy wszystko w ciągu 48 godzin i potwierdzimy po zakończeniu. Bez pytań."
+    },
+    "aiSupport": {
+      "title": "Wsparcie AI — jak działa",
+      "q1": "Jak działa system wsparcia AI?",
+      "a1": "SignalBoost monitoruje Twoją aktywność w czasie rzeczywistym. Jeśli spędzisz ponad 3 minuty na tej samej stronie, klikasz wielokrotnie bez postępu lub napotkasz błąd — AI proaktywnie otwiera się i oferuje pomoc. Już zna Twoje konto, plan, bieżącą stronę i to, co poszło nie tak. Nigdy nie musisz wyjaśniać swojej sytuacji od zera.",
+      "q2": "Co się dzieje, gdy AI nie może rozwiązać mojego problemu?",
+      "a2": "AI eskaluje płynnie. Najpierw sprowadza dodatkowe rozumowanie AI, aby przeanalizować problem z innej strony. Dwie AI pracują razem po cichu i przedstawiają połączone rozwiązanie. Jeśli nadal nie rozwiązano, Luis jest automatycznie powiadamiany z pełnym kontekstem rozmowy i odpowie osobiście.",
+      "q3": "Czego AI NIE może zrobić?",
+      "a3": "AI nie może podejmować za Ciebie decyzji zakupowych, uzyskiwać dostępu do Twojego banku lub karty kredytowej, przesyłać rzeczy w Twoim imieniu do usług stron trzecich ani gwarantować rozwiązania problemów spowodowanych przez dostawców zewnętrznych (jak awarie Vercel czy opóźnienia DNS Namecheap). W takich przypadkach jasno wyjaśni, co się dzieje i co musisz zrobić.",
+      "q4": "Czy moja rozmowa z wsparciem jest prywatna?",
+      "a4": "Tak. Twoje rozmowy z wsparciem są prywatne i widoczne tylko dla Ciebie i wsparcia SignalBoost (Luis). Nie są używane do trenowania modeli AI. Rozmowy są przechowywane przez 90 dni w celach jakościowych, a potem usuwane."
+    },
+    "pricing": {
+      "title": "Plany, ceny i przechowywanie",
+      "q1": "Jakie są limity planów?",
+      "a1": "SignalBoost ma dwie linie produktów, wyceniane osobno. Plany stron internetowych (strony, opinie, audio, narzędzia wideo): Darmowy — 1 podgląd strony, 1 język, ograniczone kredyty AI, kolektor opinii do 3 opinii, 2 kredyty wideo AI ze znakiem wodnym, znak wodny SignalBoost, wsparcie społeczności. Starter ($19/mies) — publikuj 1 stronę, 2 języki, zbieranie opinii, ~40 generacji audio/mies, napisy w 2 językach, bez znaku wodnego, wsparcie email. Pro ($49/mies) — 5 stron, wszystkie 5 języków, pakiet opinii + wideo, ~150 generacji audio/mies, narzędzia tworzenia wideo, priorytetowe wsparcie, współpraca zespołowa. Business ($149/mies) — nieograniczone strony, wszystkie języki + niestandardowe, marka własna, dedykowany onboarding, priorytetowe przetwarzanie, zaawansowane raporty, API i integracje. Plany podcastowe (natywny lektor, wielojęzyczne napisy, fabryka klipów, strona podcastu): Indie ($29/mies) — 1 program, 4 odcinki/mies, 2 języki, natywny lektor AI, podstawowe generowanie klipów, strona podcastu, opinie słuchaczy. Pro ($79/mies) — 3 programy, nieograniczone odcinki, wszystkie 5 języków, fabryka klipów, wielojęzyczna strona podcastu, analityka. Network (od $299/mies, skontaktuj się z nami w sprawie cen niestandardowych) — nieograniczone programy, wszystkie języki plus niestandardowe, dedykowane przetwarzanie, niestandardowe formaty napisów, marka własna, dostęp do API, dedykowany opiekun konta. Plany można łączyć — większość podcasterów używa też narzędzi stron do landing page swojego programu.",
+      "q2": "Czy partnerzy biznesowi dostają darmowy okres próbny?",
+      "a2": "Tak — partnerzy biznesowi dostają 30 dni za darmo tylko na planie Starter. Daje to dostęp do 2 języków, kolektora opinii i natywnego audio do wypróbowania platformy. Jeśli potrzebujesz funkcji Pro lub Business, te plany wymagają płatności od pierwszego dnia.",
+      "q3": "Dlaczego istnieją limity projektów i przechowywania?",
+      "a3": "Przechowywanie kosztuje. Pliki audio i wideo mogą być duże — 10-minutowy odcinek podcastu może mieć 50-100MB. Bez limitów mała liczba intensywnych użytkowników uczyniłaby platformę nieopłacalną dla wszystkich innych. Limity są zaprojektowane tak, by darmowy plan obejmował większość zaczynających, a płatne plany obejmowały użytek profesjonalny.",
+      "q4": "Co się dzieje, gdy osiągnę limit?",
+      "a4": "Zobaczysz jasne ostrzeżenie, zanim osiągniesz limit. Gdy go osiągniesz, nie będziesz mógł tworzyć nowych projektów, dopóki nie usuniesz istniejącego lub nie ulepszysz planu. Nigdy nie usuwamy Twoich danych ani nie blokujemy dostępu — po prostu wstrzymujemy tworzenie nowych do rozwiązania.",
+      "q5": "Jak anulować?",
+      "a5": "Anuluj w dowolnym momencie z panelu w Ustawieniach lub otwórz zgłoszenie do wsparcia na tej stronie. Bez opłat za anulowanie. Zachowujesz dostęp do końca okresu rozliczeniowego. Nie utrudniamy anulowania celowo — jeśli chcesz odejść, ułatwiamy to."
+    },
+    "gettingStarted": {
+      "title": "Przewodniki na start",
+      "q1": "Jak zbudować moją pierwszą stronę?",
+      "a1": "Przejdź do Panelu i kliknij Kreator stron. Jeśli jesteś początkujący, AI poprowadzi Cię przez proces konwersacyjnie — po prostu opowiedz o swojej firmie. Jeśli jesteś techniczny, możesz użyć pełnego kreatora bezpośrednio. Tak czy inaczej, AI jest tam, by pomóc na każdym kroku.",
+      "q2": "Jak skonfigurować podcast?",
+      "a2": "Przejdź na stronę Podcasterów i wybierz plan. Po subskrypcji przejdź do Panelu, potem Natywne audio, potem prześlij swój odcinek. Obsługujemy MP3, MP4, WAV i więcej. Ważne: przynieś gotowy, zmontowany odcinek. Nie zajmujemy się surową edycją audio. Generujemy lektora, napisy, klipy i notatki z Twojego finalnego pliku.",
+      "q3": "Jak zbierać opinie?",
+      "a3": "Przejdź do Panelu, potem Kolektor opinii. Otrzymasz link do opinii do udostępnienia klientom. Opinie pojawiają się w wybranych językach automatycznie. Możesz osadzić widżet opinii na swojej stronie SignalBoost lub dowolnej stronie zewnętrznej.",
+      "q4": "Jak podłączyć własną domenę?",
+      "a4": "Przejdź przez kreator onboardingu lub przejdź do Panelu, potem Ustawienia, potem Domena. Musisz zaktualizować rekordy DNS u swojego dostawcy domeny, aby wskazywały na SignalBoost. AI poda dokładne rekordy do skopiowania. Zmiany DNS propagują się od 15 minut do 48 godzin na całym świecie."
+    }
+  },
+  "logout": "Wyloguj",
+  "getStarted": "Zacznij",
+  "buildWebsite": "Stwórz stronę",
+  "collectReviews": "Zbieraj opinie",
+  "generateAudio": "Generuj audio",
+  "createVideos": "Twórz wideo",
+  "promoteBusiness": "Promuj firmę",
+  "lab": {
+    "title": "RDZEŃ_SILNIKA // Laboratorium",
+    "subtitle": "Synteza parametrów: parsowanie materiału, streaming awatara generatywnego, orkiestracja dubbingu audio.",
+    "placeholder": "Zapytanie... np. \"stwórz reklamę 30s po hiszpańsku\"",
+    "attach": "ZAŁĄCZ",
+    "abort": "PRZERWIJ",
+    "runPrompt": "URUCHOM",
+    "compiling": "KOMPILOWANIE...",
+    "status": "STATUS",
+    "online": "ONLINE",
+    "systemLoad": "OBCIĄŻENIE",
+    "compute": "OBLICZENIA",
+    "active": "AKTYWNY",
+    "mode": {
+      "auto": "Auto",
+      "search": "Znajdź materiał",
+      "generate": "Generuj wideo",
+      "caption": "Dodaj napisy",
+      "dub": "Dubbinguj audio"
+    },
+    "agentReasoning": "ROZUMOWANIE_AGENTA",
+    "warnConstraints": "OSTRZEŻENIA",
+    "evaluating": "Ocenianie...",
+    "searchFailed": "Wyszukiwanie nie powiodło się",
+    "somethingWrong": "Coś poszło nie tak",
+    "generatedMatrix": "WYNIKI",
+    "nodesDetected": "WYKRYTE_WĘZŁY",
+    "restrictedNode": "OGRANICZONE",
+    "pipeline": "PIPELINE",
+    "inject": "URUCHOM",
+    "synthesisCore": "CENTRUM_SYNTEZY",
+    "awaitingDirectives": "Czekam na instrukcje.",
+    "coreScope": "ZAKRES",
+    "targetProjectId": "ID_PROJEKTU",
+    "defaultProject": "Mój projekt",
+    "recipeTemplates": "SZABLONY",
+    "suggestion1": "Ostatni gol Pelé",
+    "suggestion2": "Lądowanie na Księżycu 1969",
+    "suggestion3": "Przemówienie Churchilla WWII",
+    "suggestion4": "Stwórz reklamę podcastu po hiszpańsku",
+    "suggestion5": "Upadek Muru Berlińskiego 1989",
+    "suggestion6": "Stwórz promo TikTok",
+    "pipelineStaging": "PRZYGOTOWANIE",
+    "purgeAll": "WYCZYŚĆ",
+    "run": "URUCHOM",
+    "license": {
+      "public": "Domena publiczna",
+      "embeddable": "Można osadzić",
+      "restricted": "Ograniczone prawami"
+    },
+    "captionInfo": {
+      "title": "Automatyzacja napisów",
+      "description": "AI transkrybuje audio, tłumaczy tekst i generuje pliki SRT, VTT oraz ASS."
+    },
+    "generateSubtitles": "Generuj napisy w 5 językach",
+    "openOriginal": "Otwórz oryginał na",
+    "videoSynthesis": "Synteza wideo",
+    "inputScript": "Skrypt",
+    "avatarNode": "Awatar",
+    "aspectRatio": "Proporcje",
+    "heygenWarning": "HEYGEN_API_KEY nie jest skonfigurowany.",
+    "heygenNotConfigured": "Dodaj HEYGEN_API_KEY w Vercel, aby włączyć generowanie wideo.",
+    "renderComplete": "Renderowanie zakończone",
+    "initializeSynthesis": "Rozpocznij syntezę"
+  },
+  "builder": {
+    "tpl": {
+      "restaurant": {
+        "name": "Restauracja",
+        "desc": "Menu, godziny, rezerwacje, lokalizacja"
+      },
+      "retail": {
+        "name": "Sklep detaliczny",
+        "desc": "Produkty, ceny, kontakt, o nas"
+      },
+      "services": {
+        "name": "Usługi",
+        "desc": "Co oferujesz, ceny, rezerwacje"
+      },
+      "podcast": {
+        "name": "Podcast",
+        "desc": "Odcinki, o nas, linki do subskrypcji"
+      },
+      "portfolio": {
+        "name": "Portfolio",
+        "desc": "Prezentacja prac, bio, kontakt"
+      },
+      "blank": {
+        "name": "Zacznij od zera",
+        "desc": "Twórz od podstaw z pomocą AI"
+      }
+    },
+    "lang": {
+      "en": "Angielski",
+      "pt": "Portugalski",
+      "es": "Hiszpański",
+      "pl": "Polski",
+      "ru": "Rosyjski"
+    },
+    "firstMessage": {
+      "single": "Świetnie{nameWithSpace}! Tworzę Twoją stronę dla \"{businessName}\".\n\nOto co tworzę:\n\n✓ Strona główna z informacjami o Twojej firmie\n✓ Sekcja \"O nas\"\n✓ Dane kontaktowe\n✓ Treść w wybranym języku\n\nOpowiedz mi więcej o swojej firmie — im więcej szczegółów mi podasz, tym lepsza będzie Twoja strona.",
+      "multilingual": "Świetnie{nameWithSpace}! Tworzę Twoją stronę dla \"{businessName}\" w {count} językach.\n\nOto co tworzę:\n\n✓ Strona główna z informacjami o Twojej firmie\n✓ Sekcja \"O nas\"\n✓ Dane kontaktowe\n✓ Treść w wielu językach\n\nOpowiedz mi więcej o swojej firmie — im więcej szczegółów mi podasz, tym lepsza będzie Twoja strona."
+    },
+    "languagesSelectedFull": "Wybrano {count} języków — wymaga planu Starter lub wyższego"
+  },
+  "audio": {
+    "pageTitle": "Audio",
+    "pageSubtitle": "Zamień swój tekst na naturalnie brzmiące audio. Wybierz język, wybierz głos, generuj.",
+    "title": "Audio",
+    "subtitle": "Zamień dowolny tekst na natywnie brzmiące audio.",
+    "pickVoice": "Wybierz głos",
+    "voicesAvailable": "dostępne",
+    "noVoices": "Brak dostępnych głosów dla tego języka.",
+    "yourText": "Twój tekst",
+    "clear": "Wyczyść",
+    "textPlaceholder": "Wpisz lub wklej to, co chcesz powiedzieć...",
+    "characters": "znaki",
+    "overLimit": "Powyżej limitu znaków",
+    "servedFromCache": "Z pamięci podręcznej",
+    "justGenerated": "Właśnie wygenerowano",
+    "download": "Pobierz",
+    "error": "Generowanie nie powiodło się",
+    "generating": "Generowanie...",
+    "generateAgain": "Generuj ponownie",
+    "generate": "Generuj audio"
+  },
+  "reviews_page": {
+    "title": "Kolektor opinii",
+    "subtitle": "Udostępnij jeden link. Klienci zostawiają opinie we własnym języku. Ty zatwierdzasz, co pojawia się publicznie.",
+    "sendLinkTitle": "Wyślij ten link swoim klientom",
+    "sendLinkDesc": "Klikają go, zostawiają opinię we własnym języku, a ona pojawia się poniżej jako Oczekująca, aż ją zatwierdzisz.",
+    "loading": "Ładowanie…",
+    "pickHandleDesc": "Wybierz identyfikator dla swojego linku do opinii. Może to być Twoje imię, firma, cokolwiek — od 3 do 30 małych liter, cyfr i myślników.",
+    "handlePlaceholder": "twoj-identyfikator",
+    "saving": "Zapisywanie…",
+    "claim": "Zarezerwuj",
+    "copied": "Skopiowano",
+    "copyLink": "Kopiuj link",
+    "openNewTab": "Otwórz w nowej karcie",
+    "handleLabel": "Identyfikator:",
+    "yourReviews": "Twoje opinie",
+    "summaryEmpty": "Jeszcze nic. Udostępnij link powyżej, aby zacząć.",
+    "total": "łącznie",
+    "pending": "oczekujące",
+    "approved": "zatwierdzone",
+    "avg": "średnia",
+    "filterAll": "Wszystkie",
+    "filterPending": "Oczekujące",
+    "filterApproved": "Zatwierdzone",
+    "noReviewsYet": "Jeszcze brak opinii",
+    "noReviewsHaveLink": "Wyślij swój link powyżej klientowi, aby otrzymać pierwszą opinię.",
+    "noReviewsNoLink": "Zarezerwuj identyfikator powyżej, aby otrzymać link do opinii.",
+    "nonePending": "Brak oczekujących opinii.",
+    "noneApproved": "Brak zatwierdzonych opinii.",
+    "statusPending": "Oczekująca",
+    "statusApproved": "Zatwierdzona",
+    "unpublish": "Cofnij publikację",
+    "approve": "Zatwierdź",
+    "delete": "Usuń",
+    "deleteTitle": "Usuń opinię",
+    "confirmDelete": "Usunąć tę opinię? Tego nie można cofnąć.",
+    "errSignIn": "Zaloguj się, aby zobaczyć swoje opinie.",
+    "errLoad": "Nie udało się załadować opinii.",
+    "errPickHandle": "Wybierz identyfikator, aby kontynuować.",
+    "errSaveHandle": "Nie udało się zapisać identyfikatora.",
+    "kicker": "Centrum opinii",
+    "flagged": "oflagowane",
+    "shareCta": "Udostępnij link",
+    "adminCta": "Zobacz telemetrię",
+    "submissionTitle": "Lokalne przesyłanie opinii",
+    "mediaLabel": "Opcjonalne obrazy",
+    "previewText": "Customer text keeps its original language. Dates and currency render per locale:",
+    "conciergeTitle": "Concierge AI",
+    "conciergeHeadline": "Review-aware recommendations",
+    "conciergeBody": "Concierge answers review questions in the selected language, suggests moderation actions, and proposes campaigns when sentiment is positive.",
+    "noCampaigns": "Positive reviews will trigger testimonial campaign ideas here.",
+    "sortRelevance": "Sort: relevance",
+    "sortDate": "Sort: newest",
+    "sortRating": "Sort: rating",
+    "allLanguages": "All languages",
+    "allPartners": "All partners",
+    "allProducts": "All products/services",
+    "filterFlagged": "Oflagowane",
+    "generalService": "General service",
+    "verifiedPartner": "Zweryfikowany partner",
+    "media": "media",
+    "unflag": "Clear flag",
+    "flag": "Flag",
+    "translate": "Tłumacz AI",
+    "adminConsole": "Konsola Admin",
+    "telemetryTitle": "Telemetria, sentyment i moderacja",
+    "logsEnabled": "Submissions · AI sentiment · moderation logged",
+    "localeVolume": "Liczba opinii wg języka",
+    "sentimentTrend": "Trend sentymentu",
+    "moderationQueue": "Kolejka moderacji",
+    "outreachHooks": "Outreach + CRM",
+    "crmRegression": "Regression guard: approved positive reviews can attach to Leads → Opportunities → Conversions."
+  },
+  "team": {
+    "teamSeats": "Miejsca w zespole",
+    "used": "użyte",
+    "planSuffix": "plan",
+    "seatLimitReached": "Osiągnięto limit miejsc. Ulepsz plan, aby dodać więcej członków zespołu.",
+    "upgrade": "Ulepsz",
+    "emailPlaceholder": "kolega@email.com",
+    "sending": "Wysyłanie...",
+    "invite": "Zaproś",
+    "inviteSent": "Zaproszenie wysłane!",
+    "noMembers": "Jeszcze brak członków zespołu. Zaproś kogoś powyżej.",
+    "remove": "Usuń"
+  },
+  "video_page": {
+    "title": "Edytor wideo",
+    "subtitle": "Generuj wielojęzyczne napisy i klipy na media społecznościowe ze swoich filmów.",
+    "tabCaptions": "Napisy",
+    "tabClips": "Klipy społecznościowe",
+    "tabFiles": "Moje pliki",
+    "generateCaptions": "Generuj napisy",
+    "generateClips": "Generuj klipy społecznościowe",
+    "generateClipsBtn": "Generuj klipy",
+    "languages": "Języki",
+    "langsForCaptions": "Języki napisów",
+    "captionFormat": "Format napisów",
+    "exportFor": "Eksportuj dla",
+    "processing": "Przetwarzanie...",
+    "processingShort": "Przetwarzanie",
+    "ready": "Gotowe",
+    "download": "Pobierz",
+    "myFiles": "Moje pliki wideo",
+    "noFiles": "Jeszcze brak plików",
+    "noFilesSub": "Wygeneruj napisy lub klipy, aby je tu zobaczyć",
+    "langCount": "języki",
+    "dropVideo": "Upuść tu swój film lub kliknij, aby przeglądać",
+    "supports": "Obsługuje MP4, MOV, AVI, MKV, WebM",
+    "captionFmt": {
+      "srt": "Standardowy format napisów. Działa na większości platform.",
+      "vtt": "Web Video Text Tracks. Najlepszy dla odtwarzaczy webowych.",
+      "ass": "Zaawansowana stylizacja. Najlepszy dla napisów wtopionych.",
+      "burnedName": "Wtopione",
+      "burned": "Napisy zintegrowane bezpośrednio w pliku wideo."
+    }
+  },
+  "dash": {
+    "askPlaceholder": "Zapytaj SignalBoost o cokolwiek…",
+    "askButton": "Zapytaj",
+    "startHere": "Zacznij tutaj",
+    "continueWhere": "Kontynuuj tam, gdzie skończyłeś",
+    "projectsTitle": "Twoje projekty",
+    "projectsTitleNamed": "Projekty użytkownika {name}",
+    "upgrade": "Ulepsz",
+    "newProject": "+ Nowy projekt",
+    "noProjects": "Jeszcze brak projektów",
+    "noProjectsSub": "Utwórz swój pierwszy projekt powyżej",
+    "lastEdited": "Edytowano",
+    "open": "Otwórz",
+    "team": "Zespół",
+    "loadingTeam": "Ładowanie zespołu…",
+    "feedback": "Podziel się opinią — każda wiadomość pomaga ulepszać SignalBoost",
+    "connectionError": "Problem z połączeniem. Spróbuj ponownie.",
+    "sketch": {
+      "headlineFallback": "Twój nagłówek tutaj"
+    },
+    "actions": {
+      "website": {
+        "label": "Stwórz stronę",
+        "subline": "Utwórz lub edytuj swoją obecność online"
+      },
+      "review": {
+        "label": "Zbieraj opinie",
+        "subline": "Otrzymuj opinie i referencje"
+      },
+      "podcast": {
+        "label": "Generuj natywne audio",
+        "subline": "Twórz treści głosowe w wielu językach"
+      },
+      "video": {
+        "label": "Twórz wideo",
+        "subline": "Zamień treści w materiały wizualne"
+      }
+    },
+    "prompts": {
+      "new": {
+        "p1": "Który plan jest dla mnie odpowiedni?",
+        "p2": "Jak zbudować moją pierwszą stronę?",
+        "p3": "Jakie języki obsługujecie?",
+        "p4": "Jak działa darmowy plan?"
+      },
+      "returning": {
+        "p1": "Jak dodać nowy język?",
+        "p2": "Jak przesłać odcinek podcastu?",
+        "p3": "Jak zbierać opinie?",
+        "p4": "Jak ulepszyć mój plan?"
+      }
+    },
+    "stats": {
+      "activeSites": "Aktywne strony",
+      "projects": "Projekty",
+      "audioGenerated": "Wygenerowane audio",
+      "videosCreated": "Utworzone wideo",
+      "min": "min"
+    },
+    "time": {
+      "daysShort": "d",
+      "hoursShort": "godz",
+      "minsShort": "min",
+      "ago": "temu",
+      "justNow": "Przed chwilą"
+    },
+    "status": {
+      "draft": "SZKIC",
+      "live": "NA ŻYWO",
+      "paused": "WSTRZYMANY"
+    },
+    "lang": {
+      "english": "ANGIELSKI",
+      "portuguese": "PORTUGALSKI",
+      "spanish": "HISZPAŃSKI",
+      "polish": "POLSKI",
+      "russian": "ROSYJSKI"
+    },
+    "preview": {
+      "label": "Podgląd na żywo",
+      "close": "Zamknij",
+      "openInBuilder": "Otwórz w kreatorze →",
+      "quickActions": "Szybkie akcje",
+      "yourProjects": "Twoje projekty",
+      "createProject": "+ Utwórz projekt",
+      "openProject": "Otwórz projekt",
+      "updated": "Zaktualizowano",
+      "execute": "Wyślij",
+      "thinking": "Myślę…",
+      "thinkingMsg": "SignalBoost myśli…"
+    },
+    "concierge": {
+      "title": "SignalBoost Concierge",
+      "loading": "Ładowanie Twojego obszaru roboczego i sprawdzanie, co wymaga uwagi.",
+      "welcome": "Witaj. Zacznij od utworzenia pierwszego projektu lub zapytaj SignalBoost, co zbudować najpierw.",
+      "drafts": {
+        "one": "Masz 1 projekt w szkicu. Otwórz go i opublikuj, gdy będzie gotowy.",
+        "many": "Masz {count} projektów w szkicu. Otwórz jeden i opublikuj, gdy będzie gotowy."
+      },
+      "live": {
+        "one": "Masz 1 projekt na żywo. Następny krok: promuj, zbieraj opinie lub twórz treści.",
+        "many": "Masz {count} projektów na żywo. Następny krok: promuj, zbieraj opinie lub twórz treści."
+      },
+      "help": "Potrzebujesz pomocy w wyborze następnego kroku? Zapytaj SignalBoost poniżej.",
+      "askNext": "Następny krok"
+    },
+    "prompt": {
+      "nextAction": "Co powinienem teraz zrobić?"
+    }
+  },
+  "auth": {
+    "welcomeBack": "Witaj ponownie",
+    "createAccount": "Utwórz darmowe konto",
+    "continueGoogle": "Kontynuuj z Google",
+    "continueGitHub": "Kontynuuj z GitHub",
+    "or": "lub",
+    "namePlaceholder": "Twoje imię i nazwisko",
+    "emailPlaceholder": "Adres email",
+    "passwordPlaceholder": "Hasło",
+    "freePlanNote": "Zaczniesz od planu Darmowego — naszkicuj jedną stronę w jednym języku ze znakiem wodnym. Ulepsz w dowolnym momencie, aby publikować naprawdę.",
+    "errorNoName": "Wpisz swoje imię.",
+    "checkEmail": "Sprawdź email, aby potwierdzić konto!",
+    "pleaseWait": "Proszę czekać...",
+    "logIn": "Zaloguj się",
+    "createFreeAccount": "Utwórz darmowe konto",
+    "noAccount": "Nie masz konta?",
+    "signUpFree": "Zarejestruj się za darmo",
+    "haveAccount": "Masz już konto?",
+    "logInLink": "Zaloguj się"
+  },
+  "hero": {
+    "badge": "Twórz · Oceniaj · Nadawaj",
+    "headlines": [
+      "Twórz swoją markę po Polsku",
+      "Build your brand in English",
+      "Construa sua marca em Português",
+      "Construye tu marca en Español",
+      "Создайте свой бренд на Русском"
+    ],
+    "subhead": "Stwórz swoją stronę, zbieraj opinie klientów i twórz natywne audio i wideo — w swoim języku, nie w tłumaczeniu.",
+    "ctaPrimary": "Zacznij",
+    "ctaSecondary": "Zobacz demo",
+    "features": {
+      "site": "Kreator stron",
+      "reviews": "Kolektor opinii",
+      "audio": "Natywne audio",
+      "video": "Edytor wideo"
+    },
+    "tagHint": "Kliknij sygnał języka, aby dodać go do projektu",
+    "ticker": [
+      "Nowa opinia · São Paulo",
+      "Strona opublikowana · Madryt",
+      "Audio wygenerowane · pl-PL",
+      "Wideo wyrenderowane · ru-RU",
+      "Opinia zebrana · Lizbona",
+      "Strona na żywo · Meksyk",
+      "Transmisja wysłana · 5 języków"
+    ],
+    "scroll": "Przewiń"
+  },
+  "footer": {
+    "tagline": "SignalBoost pomaga firmom rosnąć dzięki natywnym stronom, opiniom klientów, audio, wideo i treściom opartym na AI — stworzonym dla tego, jak ludzie naprawdę mówią.",
+    "learnHow": "Dowiedz się, jak działa SignalBoost",
+    "readDocs": "przeczytaj dokumentację",
+    "product": "Produkt",
+    "build": "Twórz",
+    "company": "Firma",
+    "documentation": "Dokumentacja",
+    "generateNativeAudio": "Generuj natywne audio",
+    "about": "O nas",
+    "partners": "Partnerzy",
+    "privacy": "Prywatność",
+    "contact": "Kontakt",
+    "nativeExperiences": "Natywne doświadczenia dostępne w",
+    "poweredBy": "Obsługiwane przez"
+  },
+  "pricing_page": {
+    "badge": "Proste ceny",
+    "headline": "Zacznij za darmo. Publikuj, gdy będziesz gotowy.",
+    "subhead": "SignalBoost pomaga firmom rosnąć dzięki stronom, opiniom, audio i narzędziom treści opartym na AI.",
+    "mostPopular": "Najpopularniejsze",
+    "perMonth": "/miesiąc",
+    "priceFree": "Darmowy",
+    "seats1": "1 miejsce",
+    "seats3": "3 miejsca",
+    "seats10": "10+ miejsc",
+    "loading": "Ładowanie...",
+    "errorGeneric": "Coś poszło nie tak.",
+    "free": {
+      "name": "Darmowy",
+      "description": "Twórz i podglądaj swój pomysł przed publikacją.",
+      "cta": "Zacznij tworzyć",
+      "f1": "1 podgląd strony",
+      "f2": "1 język",
+      "f3": "Ograniczone kredyty AI",
+      "f4": "Kolektor opinii (do 3 opinii)",
+      "f5": "Znak wodny SignalBoost",
+      "f6": "Wsparcie społeczności",
+      "video": "Narzędzia wideo w zestawie"
+    },
+    "starter": {
+      "name": "Starter",
+      "description": "Dla jednoosobowych firm gotowych do startu.",
+      "cta": "Uruchom moją firmę",
+      "f1": "Publikuj 1 stronę",
+      "f2": "2 języki",
+      "f3": "Zbieranie opinii",
+      "f4": "~50 generacji audio/mies",
+      "f5": "Napisy w 2 językach",
+      "f6": "Bez znaku wodnego",
+      "f7": "Wsparcie email",
+      "video": "Podstawowe generowanie wideo"
+    },
+    "pro": {
+      "name": "Pro",
+      "description": "Dla rosnących firm rozszerzających zasięg.",
+      "cta": "Rośnij szybciej",
+      "f1": "5 stron",
+      "f2": "Wszystkie 5 języków",
+      "f3": "Pakiet opinii + wideo",
+      "f4": "~200 generacji audio/mies",
+      "f5": "Narzędzia tworzenia wideo",
+      "f6": "Priorytetowe wsparcie",
+      "f7": "Współpraca zespołowa",
+      "video": "Generowanie wideo Pro"
+    },
+    "business": {
+      "name": "Business",
+      "description": "Dla agencji i marek z wieloma lokalizacjami.",
+      "cta": "Skontaktuj się",
+      "f1": "Nieograniczone strony",
+      "f2": "Wszystkie języki + niestandardowe",
+      "f3": "Marka własna",
+      "f4": "Dedykowany onboarding",
+      "f5": "Priorytetowe przetwarzanie",
+      "f6": "Zaawansowane raporty",
+      "f7": "API i integracje",
+      "video": "Generowanie wideo dla firm"
+    },
+    "included": "W pakiecie",
+    "perMonthShort": "/mc",
+    "kicker": "Jasne ceny",
+    "title": "Zacznij za darmo. Opublikuj, gdy będzie gotowe.",
+    "subtitle": "Proste plany według celu: test, start, skalowanie lub większy system wzrostu.",
+    "servicePricingKicker": "Ceny usług",
+    "servicePricingTitle": "Każda usługa ma bezpośredni CTA do workspace.",
+    "websiteOptimizationName": "Optymalizacja strony",
+    "podcastOptimizationName": "Optymalizacja studia podcastowego"
+  },
+  "podcasters_page": {
+    "badge": "Dla podcasterów",
+    "heroLine1": "Ty nagrywasz.",
+    "heroLine2Pre": "My zabieramy to",
+    "heroLine2Highlight": "w świat.",
+    "heroSubhead": "Natywny lektor AI, wielojęzyczne napisy, generowanie klipów i strona podcastu z Twoją marką — wszystko w jednej platformie.",
+    "heroNote": "Nie zajmujemy się sprzętem ani surową edycją audio. Przynieś nam gotowy odcinek, a my zajmiemy się wszystkim dalej.",
+    "ctaSeePlans": "Zobacz plany",
+    "ctaHow": "Jak to działa",
+    "howTitle": "Jak to działa",
+    "deliverTitle": "Co dostarczamy",
+    "deliverSubtitle": "Wszystko po nagraniu. Ty skupiasz się na treści, a my zajmujemy się globalną dystrybucją.",
+    "plansTitle": "Plany podcastowe",
+    "plansSubtitle": "Naszkicuj swój pomysł za darmo w wersji podglądowej, potem wybierz plan podcastowy, gdy będziesz gotowy do publikacji.",
+    "mostPopular": "Najpopularniejszy",
+    "perMonth": "/mies",
+    "noCommitment": "Bez zobowiązań, anuluj w dowolnym momencie",
+    "readyTitle": "Gotowy, by działać globalnie?",
+    "readyDesc": "Ty nagrywasz. My zajmujemy się resztą — lektor, napisy, klipy, strona i opinie w 5 językach.",
+    "readyCta": "Zobacz plany podcastowe",
+    "hero": {
+      "liveBadge": "PODCAST_STUDIO // NA ŻYWO",
+      "line1": "Twój podcast.",
+      "line2": "Twoje studio.",
+      "line3": "Twoja globalna publiczność.",
+      "subtitle": "Prześlij jeden odcinek i pozwól SignalBoost pomóc utworzyć transkrypcje, klipy, napisy, wielojęzyczne audio, notatki programu i materiały dystrybucyjne z jednego studia.",
+      "openStudio": "Otwórz studio",
+      "howItWorks": "Jak to działa"
+    },
+    "panel": {
+      "foundry": "SIGNALBOOST AUDIO FOUNDRY",
+      "episodeFile": "Odcinek_034.wav",
+      "onAir": "NA ŻYWO"
+    },
+    "metrics": {
+      "transcript": "Transkrypcja",
+      "ready": "Gotowe",
+      "clipsFound": "Znaleziono klipów",
+      "languages": "Języki",
+      "publishPack": "Pakiet publikacji"
+    },
+    "agents": {
+      "transcript": "Agent Transkrypcji",
+      "clip": "Agent Wirusowych Klipów",
+      "translation": "Agent Tłumaczeń",
+      "voice": "Agent Głosowy",
+      "distribution": "Agent Dystrybucji"
+    },
+    "status": {
+      "active": "AKTYWNY",
+      "scanning": "SKANOWANIE",
+      "lang5": "5 JĘZYKÓW",
+      "ready": "GOTOWY",
+      "standby": "OCZEKIWANIE"
+    },
+    "actions": {
+      "generateClips": "Generuj klipy",
+      "uploadEpisode": "Prześlij odcinek"
+    },
+    "episodes": {
+      "e34": "Odcinek 34",
+      "e34Clips": "8 klipów",
+      "e34Langs": "5 języków",
+      "e33": "Odcinek 33",
+      "e33Clips": "6 klipów",
+      "e33Langs": "3 języki",
+      "e32": "Odcinek 32",
+      "e32Clips": "4 klipy",
+      "e32Langs": "2 języki",
+      "published": "Opublikowany",
+      "scheduled": "Zaplanowany",
+      "draft": "Szkic"
+    },
+    "section": {
+      "fullStudioTitle": "Pełne studio produkcyjne po nagraniu",
+      "fullStudioSubtitle": "Ty skupiasz się na rozmowie. SignalBoost pomaga przekształcić ten odcinek w klipy, napisy, przetłumaczoną treść, lektora, strony i materiały promocyjne."
+    },
+    "stats": {
+      "languages": "Języki",
+      "turnaround": "Czas realizacji",
+      "captionFormats": "Formaty napisów",
+      "freeSketch": "Darmowy szkic",
+      "noCommitment": "Bez zobowiązań"
+    },
+    "how": {
+      "s1": {
+        "title": "Prześlij swój odcinek",
+        "desc": "Wgraj gotowy plik audio lub wideo. Obsługujemy MP3, MP4, WAV i więcej. Bez surowej edycji."
+      },
+      "s2": {
+        "title": "Wybierz języki",
+        "desc": "Wybierz języki, które chcesz. Do wyboru Angielski, Portugalski, Hiszpański, Polski i Rosyjski."
+      },
+      "s3": {
+        "title": "Generujemy wszystko",
+        "desc": "Natywny lektor AI, napisy, krótkie klipy, przetłumaczone notatki — wszystko automatycznie."
+      },
+      "s4": {
+        "title": "Publikuj wszędzie",
+        "desc": "Pobierz swoje wielojęzyczne odcinki lub opublikuj bezpośrednio na stronie podcastu SignalBoost."
+      },
+      "step1": {
+        "title": "Prześlij swój odcinek",
+        "desc": "Przynieś gotowy plik audio lub wideo."
+      },
+      "step2": {
+        "title": "Wybierz wyjścia",
+        "desc": "Klipy, napisy, języki, lektor i notatki programu."
+      },
+      "step3": {
+        "title": "Zespół AI pracuje",
+        "desc": "Agenci transkrypcji, klipów, tłumaczenia i dystrybucji przygotowują materiały."
+      },
+      "step4": {
+        "title": "Publikuj wszędzie",
+        "desc": "Pobierz lub przygotuj treści dla każdego kanału."
+      }
+    },
+    "deliver": {
+      "d1": {
+        "title": "Natywny lektor AI",
+        "desc": "Twój odcinek z dubbingiem po Portugalsku, Hiszpańsku, Polsku i Rosyjsku z naturalnie brzmiącymi głosami AI."
+      },
+      "d2": {
+        "title": "Wielojęzyczne napisy",
+        "desc": "Automatycznie generowane napisy we wszystkich Twoich językach. Pobierz jako SRT, VTT lub wtop je w wideo."
+      },
+      "d3": {
+        "title": "Klipy społecznościowe",
+        "desc": "Krótkie klipy na TikTok, Instagram Reels i YouTube Shorts — w każdym języku."
+      },
+      "d4": {
+        "title": "Przetłumaczone notatki",
+        "desc": "Streszczenia odcinków pisane natywnie w każdym języku — nie tłumaczone maszynowo."
+      },
+      "d5": {
+        "title": "Strona podcastu",
+        "desc": "Strona z Twoją marką, odtwarzaczem odcinków, notatkami i przełącznikiem języków."
+      },
+      "d6": {
+        "title": "Opinie słuchaczy",
+        "desc": "Zbieraj i wyświetlaj referencje słuchaczy w ich natywnym języku."
+      }
+    },
+    "plans": {
+      "indie": {
+        "name": "Indie",
+        "description": "Idealny dla niezależnych podcasterów zaczynających globalnie.",
+        "cta": "Zacznij",
+        "f1": "1 program",
+        "f2": "4 odcinki miesięcznie",
+        "f3": "2 języki",
+        "f4": "Natywny lektor AI",
+        "f5": "Napisy w 2 językach",
+        "f6": "Podstawowe generowanie klipów",
+        "f7": "Strona podcastu",
+        "f8": "Opinie słuchaczy"
+      },
+      "pro": {
+        "name": "Pro",
+        "description": "Dla poważnych podcasterów chcących globalnego zasięgu.",
+        "cta": "Zacznij",
+        "f1": "3 programy",
+        "f2": "Nieograniczone odcinki",
+        "f3": "Wszystkie 5 języków",
+        "f4": "Natywny lektor AI",
+        "f5": "Napisy we wszystkich 5 językach",
+        "f6": "Fabryka klipów",
+        "f7": "Wielojęzyczna strona podcastu",
+        "f8": "Analityka"
+      },
+      "network": {
+        "name": "Network",
+        "description": "Dla sieci podcastowych zarządzających wieloma programami.",
+        "cta": "Skontaktuj się",
+        "f1": "Nieograniczone programy",
+        "f2": "Nieograniczone odcinki",
+        "f3": "Wszystkie języki plus niestandardowe",
+        "f4": "Dedykowane przetwarzanie",
+        "f5": "Niestandardowe formaty napisów",
+        "f6": "Strona z marką własną",
+        "f7": "Dostęp do API",
+        "f8": "Dedykowany opiekun konta"
+      },
+      "networkEmailSubject": "SignalBoost Network Plan"
+    },
+    "deliverables": {
+      "voiceover": {
+        "title": "Natywny lektor",
+        "desc": "Zamień jeden odcinek w naturalne wersje głosowe w wielu językach."
+      },
+      "clips": {
+        "title": "Fabryka klipów",
+        "desc": "Znajdź najlepsze momenty i zamień je w Shorts, Reels i TikToki."
+      },
+      "captions": {
+        "title": "Napisy",
+        "desc": "Generuj napisy, transkrypcje i podpisy do mediów społecznościowych automatycznie."
+      },
+      "website": {
+        "title": "Strona podcastu",
+        "desc": "Markowy dom dla odcinków, notatek, opinii i języków."
+      },
+      "distribution": {
+        "title": "Dystrybucja",
+        "desc": "Przygotuj treści dla YouTube, TikTok, Instagram, email i więcej."
+      },
+      "growth": {
+        "title": "Wzrost słuchaczy",
+        "desc": "Zbieraj opinie, referencje i sygnały od publiczności."
+      }
+    }
+  },
+  "podcastSection": {
+    "badge": "Dla podcasterów",
+    "headlineLine1": "Ty nagrywasz.",
+    "headlineLine2Pre": "My zabieramy to",
+    "headlineLine2Highlight": "w świat.",
+    "intro": "Gdy Twój odcinek jest nagrany, SignalBoost zajmuje się resztą — natywny lektor w 5 językach, napisy, klipy społecznościowe, strona programu i opinie słuchaczy.",
+    "note": "Nie zajmujemy się sprzętem ani surową edycją audio — po prostu przynieś nam gotowy odcinek.",
+    "ctaPlans": "Zobacz plany podcastowe",
+    "ctaHow": "Jak to działa",
+    "f1": {
+      "title": "Brzmij jak miejscowy",
+      "desc": "Przekształcamy Twój odcinek w natywnie brzmiące audio po Portugalsku, Hiszpańsku, Polsku i Rosyjsku. To nie napisy — to prawdziwe głosy."
+    },
+    "f2": {
+      "title": "Stań się wiralem w 5 językach",
+      "desc": "Automatycznie generuj krótkie klipy na TikTok, Reels i YouTube Shorts z każdego odcinka — we wszystkich językach."
+    },
+    "f3": {
+      "title": "Napisy w każdym języku",
+      "desc": "Automatycznie generuj napisy do swoich filmów — wtopione lub jako osobne pliki. Idealne dla oglądających bez dźwięku."
+    },
+    "f4": {
+      "title": "Twój program, Twoja strona",
+      "desc": "Strona podcastu z Twoją marką, odtwarzaczem odcinków, wielojęzycznymi notatkami i opiniami słuchaczy."
+    },
+    "f5": {
+      "title": "Buduj swoją społeczność",
+      "desc": "Zbieraj opinie i referencje słuchaczy w ich natywnym języku. Pokaż światu, że Twoja publiczność Cię kocha."
+    },
+    "podcaster1": {
+      "reach": "190M słuchaczy"
+    },
+    "podcaster2": {
+      "reach": "#1 w Brazylii"
+    },
+    "podcaster3": {
+      "reach": "Top LATAM"
+    }
+  },
+  "promote_page": {
+    "badge": "Promuj moją firmę",
+    "title": "Stwórz jedną promocję. Zamień ją w pełną kampanię.",
+    "subtitle": "Powiedz SignalBoost, co chcesz promować. Pomożemy stworzyć tekst na stronę, posty społecznościowe, email, pomysły wideo i wersje językowe.",
+    "businessName": "Nazwa firmy",
+    "businessPlaceholder": "Przykład: Luna Travel",
+    "audience": "Odbiorcy",
+    "audiencePlaceholder": "Przykład: rodziny, podróżnicy, lokalni klienci",
+    "offer": "Co chcesz promować?",
+    "offerPlaceholder": "Przykład: 20% zniżki na weekendowe pakiety do Cancún.",
+    "tone": "Ton",
+    "tones": {
+      "friendly": "Przyjazny",
+      "premium": "Premium",
+      "urgent": "Pilny",
+      "local": "Lokalny"
+    },
+    "generate": "Generuj kampanię",
+    "generatedNote": "Szkic kampanii utworzony. Następny krok: podłącz generator AI.",
+    "preview": {
+      "title": "Podgląd kampanii",
+      "sampleHeadline": "Weekendowa oferta specjalna",
+      "sampleBusiness": "Twoja firma",
+      "copyPrefix": "Kampania gotowa do adaptacji dla",
+      "forAudience": "dla",
+      "item1": "Banner strony",
+      "item2": "Posty społecznościowe",
+      "item3": "Tekst emaila",
+      "item4": "Pomysł na krótkie wideo",
+      "item5": "Wersje językowe"
+    },
+    "channels": {
+      "website": {
+        "title": "Aktualizacja strony",
+        "description": "Zamień ofertę w banner lub sekcję strony."
+      },
+      "social": {
+        "title": "Posty społecznościowe",
+        "description": "Twórz teksty na Facebook, Instagram, TikTok i więcej."
+      },
+      "email": {
+        "title": "Kampania email",
+        "description": "Wygeneruj krótki email dla klientów."
+      },
+      "video": {
+        "title": "Pomysł na wideo",
+        "description": "Stwórz krótki scenariusz do reels, shorts lub reklam."
+      },
+      "languages": {
+        "title": "Języki natywne",
+        "description": "Dostosuj wiadomość naturalnie do każdego języka."
+      },
+      "reviews": {
+        "title": "Opinie klientów",
+        "description": "Poproś zadowolonych klientów o opinię po promocji."
+      }
+    }
+  },
   "errors": {
-    "generationFailed": "Generation failed",
-    "networkError": "Network error",
-    "unauthorized": "Unauthorized"
+    "generationFailed": "Generowanie nie powiodło się",
+    "networkError": "Błąd sieci",
+    "unauthorized": "Nieautoryzowany"
   },
   "api": {
-    "invalidJson": "Invalid JSON",
-    "promptRequired": "Prompt is required"
+    "invalidJson": "Nieprawidłowy JSON",
+    "promptRequired": "Prompt jest wymagany"
   },
   "projects": {
-    "limitReached": "Project limit reached for your plan."
+    "limitReached": "Osiągnięto limit projektów dla Twojego planu."
   },
   "actionRouter": {
-    "openWebsiteBuilder": "Open Website Builder",
-    "openReviewCollector": "Open Review Collector",
-    "openAudioStudio": "Open Audio Studio",
-    "openVideoStudio": "Open Video Studio",
-    "openSalesAgent": "Open Sales Agent",
-    "openSalesPipeline": "Open Sales Pipeline",
-    "answerInChat": "Answer in chat"
+    "openWebsiteBuilder": "Otwórz kreator stron",
+    "openReviewCollector": "Otwórz kolektor opinii",
+    "openAudioStudio": "Otwórz studio audio",
+    "openVideoStudio": "Otwórz studio wideo",
+    "openSalesAgent": "Otwórz agenta sprzedaży",
+    "openSalesPipeline": "Otwórz pipeline sprzedaży",
+    "answerInChat": "Odpowiedz w czacie",
+    "openPromoteBusiness": "Otwórz Promuj firmę",
+    "openWebsiteOptimization": "Otwórz optymalizację strony",
+    "openLab": "Otwórz laboratorium",
+    "openWorkshopApprentice": "Otwórz ucznia warsztatu",
+    "openPodcastOptimization": "Otwórz optymalizację podcastu"
   },
   "videoSearch": {
     "timeout": {
-      "generic": "Request timed out.",
-      "aiService": "AI service timed out.",
-      "intent": "Intent processing timed out.",
-      "script": "Script generation timed out.",
-      "search": "Video search timed out.",
-      "searchDetailed": "Video search timed out. Try a shorter request."
+      "generic": "Upłynął limit czasu żądania.",
+      "aiService": "Upłynął limit czasu usługi AI.",
+      "intent": "Upłynął limit czasu przetwarzania intencji.",
+      "script": "Upłynął limit czasu generowania skryptu.",
+      "search": "Upłynął limit czasu wyszukiwania wideo.",
+      "searchDetailed": "Upłynął limit czasu wyszukiwania wideo. Spróbuj krótszego żądania."
     },
     "status": {
-      "searching": "Searching for videos...",
-      "searchingPromptMatch": "Searching for videos matching your prompt..."
+      "searching": "Wyszukiwanie filmów...",
+      "searchingPromptMatch": "Wyszukiwanie filmów pasujących do Twojego promptu..."
     },
     "errors": {
-      "generateScriptFailed": "Failed to generate script",
-      "searchFailed": "Search failed"
+      "generateScriptFailed": "Nie udało się wygenerować skryptu",
+      "searchFailed": "Wyszukiwanie nie powiodło się"
     },
     "rights": {
-      "restricted": "All results are rights-restricted for this query.",
-      "embeddableOnly": "Only embeddable results were found."
+      "restricted": "Wszystkie wyniki są ograniczone prawami dla tego zapytania.",
+      "embeddableOnly": "Znaleziono tylko wyniki możliwe do osadzenia."
     }
   },
   "videoGenerate": {
     "errors": {
-      "authRequired": "You must be signed in.",
-      "promptRequired": "Please enter a prompt.",
-      "imageRequired": "Please attach an image.",
-      "noCredits": "No video credits left this month.",
-      "creditCheckFailed": "Could not check your credits."
+      "authRequired": "Musisz być zalogowany.",
+      "promptRequired": "Wprowadź prompt.",
+      "imageRequired": "Załącz obraz.",
+      "noCredits": "Brak pozostałych kredytów wideo w tym miesiącu.",
+      "creditCheckFailed": "Nie można sprawdzić Twoich kredytów."
     },
     "defaults": {
-      "imagePrompt": "Add natural, subtle motion to this image."
+      "imagePrompt": "Dodaj naturalny, subtelny ruch do tego obrazu."
     }
   },
   "operator": {
-    "commitPrefix": "Website Operator update:",
+    "commitPrefix": "Aktualizacja Operatora:",
     "errors": {
-      "requestRequired": "Please describe what you want to change.",
-      "planCreateFailed": "Could not create the plan right now.",
-      "planIdRequired": "Plan ID is required.",
-      "planNotFound": "Plan not found.",
-      "approvalRequired": "Approval required before applying changes.",
-      "applyFailed": "Could not apply approved update.",
-      "jobIdRequired": "Job ID is required.",
-      "jobNotFound": "Job not found.",
-      "rollbackUnavailable": "Rollback is not available for this update.",
-      "rollbackFailed": "Could not complete rollback.",
-      "statusNotFound": "Status not found."
+      "requestRequired": "Opisz, co chcesz zmienić.",
+      "planCreateFailed": "Nie można teraz utworzyć planu.",
+      "plan": "Nie można wygenerować strony.",
+      "publish": "Nie można opublikować strony.",
+      "connect": "Nie można połączyć. Spróbuj ponownie.",
+      "planIdRequired": "ID planu jest wymagane.",
+      "planNotFound": "Plan nie znaleziony.",
+      "approvalRequired": "Wymagane zatwierdzenie przed zastosowaniem zmian.",
+      "applyFailed": "Nie można zastosować zatwierdzonej aktualizacji.",
+      "jobIdRequired": "ID zadania jest wymagane.",
+      "jobNotFound": "Zadanie nie znalezione.",
+      "rollbackUnavailable": "Cofnięcie nie jest dostępne dla tej aktualizacji.",
+      "rollbackFailed": "Nie można ukończyć cofnięcia.",
+      "statusNotFound": "Status nie znaleziony."
     },
     "success": {
-      "published": "Changes published. Rollback is available.",
-      "approvedAndPublished": "Update approved and published with rollback point.",
-      "rollbackComplete": "Rollback complete. Previous version restored."
+      "published": "Twoja strona jest na żywo.",
+      "approvedAndPublished": "Aktualizacja zatwierdzona i opublikowana z punktem cofnięcia.",
+      "rollbackComplete": "Cofnięcie ukończone. Przywrócono poprzednią wersję."
+    },
+    "title": {
+      "kicker": "Operator stron z AI",
+      "main": "Opisz swoją stronę",
+      "subtitle": "Opowiedz mi o swojej firmie. Zaprojektuję kompletną stronę — i możesz opublikować ją na żywo jednym kliknięciem."
     },
     "input": {
-      "defaultRequest": "A high-end rooftop cocktail bar in Rio with bottle service and DJ nights"
+      "placeholder": "np. Przytulna włoska restauracja w Warszawie z menu, naszą historią i przyciskiem rezerwacji"
     },
+    "cta": {
+      "design": "Zaprojektuj moją stronę",
+      "designing": "Projektowanie…",
+      "regenerate": "Generuj ponownie"
+    },
+    "publish": {
+      "hint": "Podoba Ci się? Opublikuj pod adresem internetowym na żywo.",
+      "cta": "Opublikuj stronę",
+      "loading": "Publikowanie…"
+    },
+    "live": "Twoja strona jest na żywo",
     "preview": {
-      "liveLabel": "Live preview",
-      "dark": "dark",
-      "light": "light",
-      "sections": "sections",
-      "empty": "Your designed website will appear here.",
-      "loading": "Designing your website…"
+      "liveLabel": "Podgląd na żywo",
+      "dark": "ciemny",
+      "light": "jasny",
+      "sections": "sekcje",
+      "empty": "Twoja zaprojektowana strona pojawi się tutaj.",
+      "loading": "Projektowanie Twojej strony…"
     }
   },
   "reviews": {
     "errors": {
-      "unauthorized": "Unauthorized",
-      "missingSlug": "Missing slug",
-      "invalidNameLength": "Name must be 1-80 characters",
-      "invalidEmail": "Invalid email",
-      "invalidRating": "Rating must be 1-5",
-      "invalidContentLength": "Content must be 1-2000 characters",
-      "lookupFailed": "Lookup failed",
-      "notFound": "Not found",
-      "tooManySubmissions": "Too many submissions. Try again tomorrow.",
-      "reviewCapReached": "Not accepting more reviews on current plan.",
-      "saveFailed": "Could not save review",
-      "missingId": "Missing ID",
-      "approvedMustBeBoolean": "Approved must be boolean"
+      "unauthorized": "Nieautoryzowany",
+      "missingSlug": "Brak identyfikatora",
+      "invalidNameLength": "Nazwa musi mieć od 1 do 80 znaków",
+      "invalidEmail": "Nieprawidłowy email",
+      "invalidRating": "Ocena musi być od 1 do 5",
+      "invalidContentLength": "Treść musi mieć od 1 do 2000 znaków",
+      "lookupFailed": "Wyszukiwanie nie powiodło się",
+      "notFound": "Nie znaleziono",
+      "tooManySubmissions": "Zbyt wiele zgłoszeń. Spróbuj ponownie jutro.",
+      "reviewCapReached": "Brak akceptacji większej liczby opinii w obecnym planie.",
+      "saveFailed": "Nie można zapisać opinii",
+      "missingId": "Brak ID",
+      "approvedMustBeBoolean": "Zatwierdzone musi być wartością boolean"
     }
   },
-  "dash": {
-    "concierge": {
-      "title": "SignalBoost Concierge",
-      "loading": "Loading your workspace and checking what needs attention.",
-      "welcome": "Welcome. Start by creating your first project, or ask SignalBoost what to build first.",
-      "drafts": {
-        "one": "You have 1 draft project. Open one and publish when ready.",
-        "many": "You have {count} draft projects. Open one and publish when ready."
-      },
-      "live": {
-        "one": "You have 1 live project. Next step: promote, collect reviews, or create content.",
-        "many": "You have {count} live projects. Next step: promote, collect reviews, or create content."
-      },
-      "help": "Need help choosing the next move? Ask SignalBoost below.",
-      "askNext": "ASK_NEXT"
-    },
-    "ai": {
-      "currentPage": "Dashboard"
-    },
-    "prompt": {
-      "nextAction": "What should I do next?"
-    }
+  "singleLanguageContent": "Treść w jednym języku",
+  "support": {
+    "help": "Pomoc",
+    "faq": "FAQ",
+    "contact": "Kontakt z pomocą",
+    "documentation": "Dokumentacja",
+    "kicker": "Proces pomocy",
+    "title": "Jak możemy pomóc?",
+    "subtitle": "Zacznij od FAQ lub dokumentacji, a potem wyślij zgłoszenie z potrzebnym kontekstem.",
+    "defaultSubject": "Zgłoszenie do pomocy SignalBoost",
+    "faqDesc": "Najpierw wyszukaj odpowiedzi.",
+    "docsDesc": "Przeczytaj przewodniki produktu.",
+    "email": "Napisz do pomocy",
+    "topic": "Temat",
+    "topicPlaceholder": "Płatności, publikacja strony, opinie, audio...",
+    "details": "Szczegóły",
+    "detailsPlaceholder": "Opisz, co się stało, czego oczekiwano i na której stronie pracowano.",
+    "send": "Otwórz zgłoszenie e-mail"
   },
-  "builder": {
-    "ai": {
-      "currentPage": "Site Builder",
-      "userPlan": "free",
-      "taskContext": "Building a {template} website called \"{businessName}\". Description: {businessDesc}. Languages: {languages}."
-    }
-  },
-  "podcasters_page": {
-    "deliverables": {
-      "voiceover": {
-        "title": "Native voiceover",
-        "desc": "Turn one episode into natural voice versions in multiple languages."
+  "concierge": {
+    "title": "Konsjerż AI",
+    "button": "Konsjerż",
+    "greeting": "Cześć, jestem Konsjerżem SignalBoost. Zapytaj o workspace albo otwórz FAQ, pomoc i dokumentację poniżej.",
+    "placeholder": "Zapytaj o cokolwiek...",
+    "send": "Wyślij",
+    "thinking": "Myślę...",
+    "fallback": "Nie udało się utworzyć odpowiedzi.",
+    "connectionError": "Problem z połączeniem. Spróbuj ponownie.",
+    "close": "Zamknij konsjerża",
+    "quick": {
+      "video": {
+        "label": "🎥 Wideo",
+        "prompt": "Jak tworzyć wideo w SignalBoost?"
       },
-      "clips": {
-        "title": "Clip factory",
-        "desc": "Find the best moments and turn them into Shorts, Reels and TikToks."
-      },
-      "captions": {
-        "title": "Captions",
-        "desc": "Generate subtitles, transcripts and social captions automatically."
-      },
-      "website": {
-        "title": "Podcast website",
-        "desc": "A branded home for episodes, show notes, reviews and languages."
-      },
-      "distribution": {
-        "title": "Distribution",
-        "desc": "Prepare content for YouTube, TikTok, Instagram, email and more."
+      "credits": {
+        "label": "⚡ Kredyty",
+        "prompt": "Wyjaśnij, jak działają kredyty w SignalBoost."
       },
       "growth": {
-        "title": "Listener growth",
-        "desc": "Collect reviews, testimonials and audience signals."
+        "label": "📈 Wzrost",
+        "prompt": "Podaj pomysły na wzrost z użyciem SignalBoost."
+      },
+      "support": {
+        "label": "💬 Pomoc",
+        "prompt": "Potrzebuję pomocy w korzystaniu z SignalBoost."
       }
     },
-    "how": {
-      "step1": {
-        "title": "Upload your episode",
-        "desc": "Bring the finished audio or video."
+    "quick.marketplace.label": "Marketplace",
+    "quick.marketplace.prompt": "Guide me through marketplace partners, categories, and bookings.",
+    "quick.saas.label": "SaaS cockpit",
+    "quick.saas.prompt": "Guide me through Promote Business, Reviews, Calendar, Spreadsheets, and Outreach.",
+    "quick.executive.label": "Executive insights",
+    "quick.executive.prompt": "Show financial, KPI, CRM, outreach, and forecasting recommendations."
+  },
+  "plan": {
+    "free": "Darmowy",
+    "starter": "Start",
+    "pro": "Pro",
+    "business": "Biznes"
+  },
+  "dashboard_modules": {
+    "kicker": "Moduły workspace",
+    "title": "Wybierz, co zbudować dalej",
+    "promote": {
+      "title": "Promote business",
+      "desc": "Build campaigns, ads, social copy, and local outreach from one brand brief.",
+      "cta": "Open marketing tools",
+      "task1": "Campaign brief generator",
+      "task2": "Localized ad copy",
+      "task3": "Outreach queue"
+    },
+    "builder": {
+      "title": "Build a website",
+      "desc": "Describe your business and publish a responsive multilingual website.",
+      "cta": "Open website builder",
+      "task1": "AI site outline",
+      "task2": "Live preview",
+      "task3": "One-click publishing"
+    },
+    "reviews": {
+      "title": "Collect reviews",
+      "desc": "Create shareable review links and convert feedback into testimonials.",
+      "cta": "Open review collection",
+      "task1": "Public review page",
+      "task2": "Rating capture",
+      "task3": "Testimonial library"
+    },
+    "audio": {
+      "title": "Generate audio",
+      "desc": "Turn scripts into natural voice content for every supported language.",
+      "cta": "Open audio studio",
+      "task1": "Voice selection",
+      "task2": "Script localization",
+      "task3": "Audio export"
+    },
+    "video": {
+      "title": "Create videos",
+      "desc": "Generate video concepts, creative assets, and publish-ready clips.",
+      "cta": "Open video creator",
+      "task1": "Video prompts",
+      "task2": "Creative previews",
+      "task3": "Clip workflow"
+    },
+    "lab": {
+      "title": "Lab",
+      "desc": "Experiment with search, video, and emerging AI workflows before they graduate.",
+      "cta": "Open lab",
+      "task1": "Video search",
+      "task2": "Motion prompts",
+      "task3": "Prototype workflows"
+    },
+    "apprentice": {
+      "title": "Workshop Apprentice",
+      "desc": "Follow guided tutorials that teach the fastest path through each SignalBoost tool.",
+      "cta": "Start tutorial",
+      "task1": "Beginner path",
+      "task2": "Tool walkthroughs",
+      "task3": "Launch checklist"
+    }
+  },
+  "faq": {
+    "kicker": "Centrum pomocy",
+    "title": "Najczęstsze pytania",
+    "subtitle": "Szukaj odpowiedzi, przeglądaj kategorie albo skontaktuj się z pomocą.",
+    "search": "Szukaj pytań...",
+    "empty": "Brak wyników dla wyszukiwania.",
+    "categories": {
+      "all": "Wszystko",
+      "gettingStarted": "Pierwsze kroki",
+      "billing": "Płatności",
+      "websites": "Strony",
+      "reviews": "Opinie",
+      "audioVideo": "Audio i wideo",
+      "support": "Pomoc"
+    },
+    "questions": {
+      "start": {
+        "q": "How do I start with SignalBoost?",
+        "a": "Open Dashboard, choose a module, and follow the guided prompt. You can build a website, collect reviews, create audio, make video, or ask Concierge for help."
       },
-      "step2": {
-        "title": "Choose outputs",
-        "desc": "Clips, captions, languages, voiceover and show notes."
+      "credits": {
+        "q": "How do credits and Pro work?",
+        "a": "Your credits and plan label are loaded from your account through the credits API. Upgrading increases limits for publishing, generation, and team workflows."
       },
-      "step3": {
-        "title": "AI crew works",
-        "desc": "Transcript, clip, translation and distribution agents prepare assets."
+      "website": {
+        "q": "Can SignalBoost build my website?",
+        "a": "Yes. Use Build a website to describe your business, preview the generated site, and publish when ready."
       },
-      "step4": {
-        "title": "Publish everywhere",
-        "desc": "Download or prepare content for every channel."
+      "reviews": {
+        "q": "How do I collect customer reviews?",
+        "a": "Open Collect reviews, create your public review handle, share the link, and reuse approved testimonials in marketing."
+      },
+      "audio": {
+        "q": "What audio and video tools are included?",
+        "a": "Generate audio from scripts, localize content, and create video prompts or assets from the dashboard video and lab modules."
+      },
+      "support": {
+        "q": "How do I contact support?",
+        "a": "Use the Concierge button, open Contact Support, or email support@signalboostapp.com. Include your account email and the page where you need help."
       }
-    },
-    "plans": {
-      "networkEmailSubject": "SignalBoost Network Plan"
-    }
-  },
-  "docs": {
-    "pricing": {
-      "a1": "Website: $19 / $49 / $149 · Podcast: $29 / $79 / $299 · Network starting at $299/mo"
-    }
-  },
-  "pricing_page": {
-    "free": {
-      "video": "Narzędzia wideo w zestawie"
-    },
-    "starter": {
-      "video": "Podstawowe generowanie wideo"
-    },
-    "pro": {
-      "video": "Generowanie wideo Pro"
-    },
-    "business": {
-      "video": "Generowanie wideo dla firm"
     }
   },
   "settings": {
@@ -293,6 +1301,326 @@
       "draft_failed": "Szkic nieudany"
     }
   },
-  "singleLanguageContent": "Treść w jednym języku",
-  "orchestration.kicker": "Orkiestracja AI"
+  "services": {
+    "kicker": "SignalBoost service",
+    "comparePricing": "Compare pricing",
+    "workflow": "Guided workflow",
+    "inputs": "Inputs",
+    "urlInput": "URL input",
+    "uploadInput": "Upload input",
+    "briefInput": "Brief",
+    "briefPlaceholder": "Describe the goal, audience, offer, and preferred tone.",
+    "aiSuggestions": "AI suggestions",
+    "resultsPanel": "Results panel",
+    "resultsTitle": "What SignalBoost prepares",
+    "generateResults": "Generate results",
+    "viewLanding": "View landing page",
+    "promote": {
+      "title": "Promuj firmę",
+      "desc": "Launch localized campaigns, ad copy, outreach, and offers from one business brief.",
+      "cta": "Open marketing tools",
+      "workflow": {
+        "1": "Add a product, offer, flyer, or URL.",
+        "2": "Review audience, tone, channel, and AI copy suggestions.",
+        "3": "Approve ads, social posts, email, and outreach messages."
+      },
+      "suggestions": {
+        "1": "Lead with one timely offer.",
+        "2": "Match the tone to the local audience.",
+        "3": "Reuse proof points across every channel."
+      },
+      "results": {
+        "1": "Campaign checklist",
+        "2": "Localized ad and social copy",
+        "3": "Outreach-ready CTA bundle"
+      }
+    },
+    "builder": {
+      "title": "Zbuduj stronę",
+      "desc": "Generate a responsive multilingual site with structure, sections, and publish-ready calls to action.",
+      "cta": "Open website builder",
+      "workflow": {
+        "1": "Describe the business and target visitors.",
+        "2": "Review the AI sitemap, sections, and visual direction.",
+        "3": "Publish or hand off the generated site plan."
+      },
+      "suggestions": {
+        "1": "Start with a clear hero promise.",
+        "2": "Add trust proof near every CTA.",
+        "3": "Keep mobile sections short."
+      },
+      "results": {
+        "1": "Site outline",
+        "2": "Homepage content blocks",
+        "3": "Publishing checklist"
+      }
+    },
+    "reviews": {
+      "title": "Zbieraj opinie",
+      "desc": "Create review links, follow-ups, and testimonial assets that turn trust into growth.",
+      "cta": "Open review collection",
+      "workflow": {
+        "1": "Add the business URL or review destination.",
+        "2": "Choose request timing and tone.",
+        "3": "Launch review links and testimonial follow-ups."
+      },
+      "suggestions": {
+        "1": "Ask right after a positive moment.",
+        "2": "Offer simple prompts to reduce friction.",
+        "3": "Turn five-star feedback into homepage proof."
+      },
+      "results": {
+        "1": "Review request templates",
+        "2": "Follow-up cadence",
+        "3": "Testimonial ideas"
+      }
+    },
+    "audio": {
+      "title": "Generuj audio",
+      "desc": "Turn scripts into natural voice content for promos, podcasts, explainers, and social clips.",
+      "cta": "Open audio studio",
+      "workflow": {
+        "1": "Upload or paste a script.",
+        "2": "Pick voice, language, and delivery style.",
+        "3": "Generate, review, and export audio."
+      },
+      "suggestions": {
+        "1": "Use shorter sentences for natural delivery.",
+        "2": "Localize idioms before voice generation.",
+        "3": "Create a 15-second cutdown first."
+      },
+      "results": {
+        "1": "Voice-ready script",
+        "2": "Language variants",
+        "3": "Audio export checklist"
+      }
+    },
+    "video": {
+      "title": "Twórz filmy",
+      "desc": "Plan, script, generate, and package short-form videos with AI-guided production steps.",
+      "cta": "Open video creator",
+      "workflow": {
+        "1": "Add footage, URL, or a video idea.",
+        "2": "Review hooks, scenes, captions, and format suggestions.",
+        "3": "Generate clips and approve publish-ready assets."
+      },
+      "suggestions": {
+        "1": "Open with the outcome in the first three seconds.",
+        "2": "Use captions for silent viewing.",
+        "3": "Match format to the destination channel."
+      },
+      "results": {
+        "1": "Video script",
+        "2": "Scene and caption plan",
+        "3": "Publish-ready CTA"
+      }
+    },
+    "improve": {
+      "title": "Ulepsz stronę",
+      "desc": "Audit any URL for clarity, SEO, conversion, accessibility, and speed improvement opportunities.",
+      "cta": "Open website optimization",
+      "workflow": {
+        "1": "Paste the URL and identify the page goal.",
+        "2": "Review AI suggestions for copy, SEO, accessibility, speed, and CTAs.",
+        "3": "Apply the prioritized fixes and measure the next conversion step."
+      },
+      "suggestions": {
+        "1": "Clarify the hero promise before adding new sections.",
+        "2": "Make the primary CTA visible without scrolling.",
+        "3": "Check accessibility and performance before publishing."
+      },
+      "results": {
+        "1": "Website optimization scorecard",
+        "2": "Prioritized fix list",
+        "3": "Conversion-ready copy recommendations"
+      }
+    },
+    "podcastStudio": {
+      "title": "Optymalizuj studio podcastowe",
+      "desc": "Improve episode workflow, transcript quality, clips, titles, metadata, and multilingual distribution.",
+      "cta": "Open podcast optimization",
+      "workflow": {
+        "1": "Upload an episode or paste a show URL.",
+        "2": "Review transcript, clip, title, and metadata suggestions.",
+        "3": "Export clips, show notes, and multilingual promotion assets."
+      },
+      "suggestions": {
+        "1": "Turn one strong quote into a short clip.",
+        "2": "Write titles for search and human curiosity.",
+        "3": "Repurpose show notes into social and email copy."
+      },
+      "results": {
+        "1": "Episode optimization checklist",
+        "2": "Clip and transcript recommendations",
+        "3": "Distribution-ready metadata"
+      }
+    },
+    "lab": {
+      "title": "Laboratorium",
+      "desc": "Experiment with search, motion prompts, captions, and emerging AI workflows before they graduate.",
+      "cta": "Open lab",
+      "workflow": {
+        "1": "Upload or search for experimental source material.",
+        "2": "Test AI prompts, captions, dubs, or generation settings.",
+        "3": "Save the useful outputs for production workflows."
+      },
+      "suggestions": {
+        "1": "Test one variable at a time.",
+        "2": "Document the winning prompt.",
+        "3": "Move proven workflows into the workspace."
+      },
+      "results": {
+        "1": "Experiment notes",
+        "2": "Prototype assets",
+        "3": "Production handoff"
+      }
+    },
+    "apprentice": {
+      "title": "Uczeń warsztatu",
+      "desc": "Follow guided tutorials and visual examples for every SignalBoost service.",
+      "cta": "Start tutorial",
+      "workflow": {
+        "1": "Choose a service tutorial.",
+        "2": "Follow step-by-step guidance with visual examples.",
+        "3": "Open the matching module and complete the task."
+      },
+      "suggestions": {
+        "1": "Start with beginner mode when learning a new tool.",
+        "2": "Use the visual examples before changing advanced settings.",
+        "3": "Return after launch to learn the optimization path."
+      },
+      "results": {
+        "1": "Tutorial checklist",
+        "2": "Visual example path",
+        "3": "Module launch CTA"
+      }
+    },
+    "openAnotherWorkspace": "Otwórz inny workspace"
+  },
+  "pricing_page_extra": {},
+  "apprentice_extra": {},
+  "apprentice": {
+    "tutorials": {
+      "title": "Samouczki nowych usług",
+      "cta": "Rozpocznij samouczek",
+      "visualExamples": "Przykłady wizualne"
+    },
+    "modules": {
+      "improve": "Ulepsz stronę",
+      "podcastStudio": "Optymalizuj studio podcastowe"
+    }
+  },
+  "common": {
+    "enabled": "Włączone",
+    "ready": "Gotowe",
+    "loading": "Ładowanie…"
+  },
+  "orchestration": {
+    "kicker": "Orkiestracja AI",
+    "title": "Automatycznie skieruj następną akcję",
+    "subtitle": "Router intencji, wybór trybu AI, silnik przepływu, pamięć, awaryjny operator, zunifikowane API i telemetria są połączone w każdym obszarze roboczym.",
+    "openRoute": "Otwórz skierowany moduł",
+    "inputLabel": "Opisz wynik",
+    "placeholder": "Przykład: popraw SEO mojej strony i utwórz materiały kampanii follow-up",
+    "run": "Uruchom orkiestrację",
+    "intentRouter": "Router intencji",
+    "confidence": "Pewność",
+    "memory": "Warstwa pamięci",
+    "operatorFallback": "Awaryjny operator",
+    "telemetry": "Telemetria",
+    "manualOperator": "Operator ręczny",
+    "customFeedback": "Własna informacja",
+    "operatorMode": "Tryb operatora"
+  },
+  "aiNav": {
+    "home": "Strona główna",
+    "admin": "Admin",
+    "marketplace": "Marketplace",
+    "promote": "Promocja",
+    "reviews": "Opinie",
+    "calendar": "Kalendarz",
+    "spreadsheets": "Arkusze",
+    "outreach": "Outreach"
+  },
+  "wireframes.openDashboard": "Otwórz dashboard",
+  "wireframes.unifiedAria": "Podgląd wireframe ujednoliconego dashboardu SaaS",
+  "wireframes.sidebarAria": "Nawigacja modułów SaaS",
+  "wireframes.i18nStatus": "i18n online: EN · ES · PT · PL · RU",
+  "wireframes.kicker": "Wireframe HMI SaaS w stylu NASA",
+  "wireframes.title": "Konsola kokpitu dla narzędzi biurowych + asystenta osobistego",
+  "wireframes.subtitle": "Responsywny system dark neon z kartami telemetrycznymi, nawigacją klawiaturą, szklanymi panelami i podglądami modułów gotowymi do akceptacji przed kodowaniem produkcyjnym.",
+  "wireframes.viewPricing": "Zobacz ceny kokpitu",
+  "wireframes.jumpPricing": "Przejdź do wireframe cennika",
+  "wireframes.telemetryAria": "Ujednolicone karty telemetryczne",
+  "wireframes.modulesAria": "Podglądy wireframe modułów",
+  "wireframes.pricing.kicker": "Integracja cen",
+  "wireframes.pricing.title": "Warstwowe panele SaaS kokpitu",
+  "wireframes.pricing.description": "Karty cenowe używają tego samego stylu konsoli i kierują CTA bezpośrednio do modułów SaaS.",
+  "wireframes.pricing.plan1": "Starter",
+  "wireframes.pricing.plan2": "Kontrola misji",
+  "wireframes.pricing.plan3": "Orbita enterprise",
+  "wireframes.modules.promote.title": "Promuj firmę",
+  "wireframes.modules.promote.metricLabel": "Wzrost konwersji",
+  "wireframes.modules.promote.description": "Build launches with multilingual campaign blocks, live telemetry, and AI concierge next steps.",
+  "wireframes.modules.promote.panel1": "Campaign builder panel",
+  "wireframes.modules.promote.panel2": "Analytics chart (reach, conversions)",
+  "wireframes.modules.promote.panel3": "Concierge suggestion box",
+  "wireframes.modules.reviews.title": "Opinie",
+  "wireframes.modules.reviews.metricLabel": "Wynik zaufania",
+  "wireframes.modules.reviews.description": "Capture localized reviews, monitor sentiment, and route moderation work without leaving the console.",
+  "wireframes.modules.reviews.panel1": "Review submission card",
+  "wireframes.modules.reviews.panel2": "Sentiment trend chart",
+  "wireframes.modules.reviews.panel3": "Moderation queue list",
+  "wireframes.modules.calendar.title": "Kalendarz",
+  "wireframes.modules.calendar.metricLabel": "Wydarzenia w kolejce",
+  "wireframes.modules.calendar.description": "Plan monthly operations with event creation overlays and mission-style reminder timelines.",
+  "wireframes.modules.calendar.panel1": "Monthly view grid",
+  "wireframes.modules.calendar.panel2": "Event creation modal",
+  "wireframes.modules.calendar.panel3": "Reminder timeline strip",
+  "wireframes.modules.spreadsheets.title": "Arkusze",
+  "wireframes.modules.spreadsheets.metricLabel": "Udostępnione arkusze",
+  "wireframes.modules.spreadsheets.description": "Coordinate shared utility tables with permissions, comments, and real-time activity signals.",
+  "wireframes.modules.spreadsheets.panel1": "Collaborative table grid",
+  "wireframes.modules.spreadsheets.panel2": "Sharing panel",
+  "wireframes.modules.spreadsheets.panel3": "Activity feed",
+  "wireframes.modules.outreach.title": "Outreach",
+  "wireframes.modules.outreach.metricLabel": "Skuteczność",
+  "wireframes.modules.outreach.description": "Launch email, social, and partner pushes while the concierge recommends the next channel.",
+  "wireframes.modules.outreach.panel1": "Campaign launch card",
+  "wireframes.modules.outreach.panel2": "Success rate chart",
+  "wireframes.modules.outreach.panel3": "Concierge recommendation panel",
+  "wireframes.modules.assistant.title": "Asystent osobisty",
+  "wireframes.modules.assistant.metricLabel": "Dzisiejsze zadania",
+  "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
+  "wireframes.modules.assistant.panel1": "Task list panel",
+  "wireframes.modules.assistant.panel2": "Reminder timeline",
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "nav": {
+    "marketplace": "Marketplace",
+    "openMenu": "Otwórz menu",
+    "language": "Język"
+  },
+  "navGroups": {
+    "cowork": "Cowork",
+    "aiStudio": "AI Studio",
+    "reviews": "Opinie",
+    "calendar": "Kalendarz",
+    "spreadsheets": "Arkusze",
+    "outreach": "Outreach",
+    "audio": "Generuj audio",
+    "video": "Twórz wideo",
+    "improve": "Ulepsz stronę",
+    "podcastStudio": "Optymalizuj podcast",
+    "lab": "Lab",
+    "apprentice": "Uczeń warsztatu"
+  },
+  "outreach": {
+    "pipeline": {
+      "kicker": "Pipeline outreach",
+      "title": "Zmień lead w zatwierdzoną kampanię",
+      "subtitle": "Analyzer, Profiler i Predictive Intelligence tworzą kompletną ścieżkę kampanii do zatwierdzenia.",
+      "openEngine": "Otwórz silnik outreach",
+      "completePath": "Pełna ścieżka zatwierdzania"
+    }
+  }
 }

@@ -1494,7 +1494,8 @@
         "2": "Visual example path",
         "3": "Module launch CTA"
       }
-    }
+    },
+    "openAnotherWorkspace": "Otwórz inny workspace"
   },
   "pricing_page_extra": {},
   "apprentice_extra": {},
@@ -1526,7 +1527,10 @@
     "confidence": "Pewność",
     "memory": "Warstwa pamięci",
     "operatorFallback": "Awaryjny operator",
-    "telemetry": "Telemetria"
+    "telemetry": "Telemetria",
+    "manualOperator": "Operator ręczny",
+    "customFeedback": "Własna informacja",
+    "operatorMode": "Tryb operatora"
   },
   "aiNav": {
     "home": "Strona główna",
@@ -1590,5 +1594,33 @@
   "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
   "wireframes.modules.assistant.panel1": "Task list panel",
   "wireframes.modules.assistant.panel2": "Reminder timeline",
-  "wireframes.modules.assistant.panel3": "Productivity insights chart"
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "nav": {
+    "marketplace": "Marketplace",
+    "openMenu": "Otwórz menu",
+    "language": "Język"
+  },
+  "navGroups": {
+    "cowork": "Cowork",
+    "aiStudio": "AI Studio",
+    "reviews": "Opinie",
+    "calendar": "Kalendarz",
+    "spreadsheets": "Arkusze",
+    "outreach": "Outreach",
+    "audio": "Generuj audio",
+    "video": "Twórz wideo",
+    "improve": "Ulepsz stronę",
+    "podcastStudio": "Optymalizuj podcast",
+    "lab": "Lab",
+    "apprentice": "Uczeń warsztatu"
+  },
+  "outreach": {
+    "pipeline": {
+      "kicker": "Pipeline outreach",
+      "title": "Zmień lead w zatwierdzoną kampanię",
+      "subtitle": "Analyzer, Profiler i Predictive Intelligence tworzą kompletną ścieżkę kampanii do zatwierdzenia.",
+      "openEngine": "Otwórz silnik outreach",
+      "completePath": "Pełna ścieżka zatwierdzania"
+    }
+  }
 }

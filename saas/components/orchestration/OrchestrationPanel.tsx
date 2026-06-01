@@ -15,6 +15,7 @@ export default function OrchestrationPanel({ module = 'global', compact = false 
   const { dict, lang } = useI18n()
   const [input, setInput] = useState('')
   const [remotePlan, setRemotePlan] = useState<OrchestrationPlan | null>(null)
+  const [operatorMode, setOperatorMode] = useState<'auto' | 'manual' | 'custom'>('auto')
   const localPlan = useMemo(() => orchestrate(input || module, { locale: lang, module }), [input, lang, module])
   const plan = remotePlan || localPlan
 
@@ -28,9 +29,22 @@ export default function OrchestrationPanel({ module = 'global', compact = false 
       })
       const data = await res.json()
       if (data.plan) setRemotePlan(data.plan)
+      setOperatorMode('auto')
     } catch {
       setRemotePlan(localPlan)
     }
+  }
+
+  function useManualOperator() {
+    setOperatorMode('manual')
+    setRemotePlan({ ...localPlan, operatorFallback: { ...localPlan.operatorFallback, enabled: true, message: 'Manual operator selected. Keep context attached and wait for human approval before launch.' } })
+  }
+
+  function addCustomFeedback() {
+    const feedback = input.trim() || 'Custom feedback requested'
+    setOperatorMode('custom')
+    setInput(feedback)
+    setRemotePlan({ ...localPlan, memory: [...localPlan.memory, { key: 'custom_feedback', value: feedback.slice(0, 240), scope: 'workflow' }], operatorFallback: { ...localPlan.operatorFallback, enabled: true, message: 'Custom feedback captured. Regenerate or hand off with this instruction preserved.' } })
   }
 
   return (
@@ -59,9 +73,18 @@ export default function OrchestrationPanel({ module = 'global', compact = false 
               style={{ borderRadius: 16, padding: 12, resize: 'vertical' }}
             />
           </label>
-          <button type="button" className="sb-button-secondary" onClick={runOrchestration} style={{ cursor: 'pointer' }}>
-            {t(dict, 'orchestration.run', 'Run orchestration')}
-          </button>
+          <div className="sb-cta-row" style={{ alignItems: 'stretch' }}>
+            <button type="button" className="sb-button-secondary" onClick={runOrchestration} style={{ cursor: 'pointer' }}>
+              {t(dict, 'orchestration.run', 'Run orchestration')}
+            </button>
+            <button type="button" className="sb-button-secondary" onClick={useManualOperator} style={{ cursor: 'pointer' }}>
+              {t(dict, 'orchestration.manualOperator', 'Manual operator')}
+            </button>
+            <button type="button" className="sb-button-secondary" onClick={addCustomFeedback} style={{ cursor: 'pointer' }}>
+              {t(dict, 'orchestration.customFeedback', 'Custom feedback')}
+            </button>
+          </div>
+          <span className="sb-caption">{t(dict, 'orchestration.operatorMode', 'Operator mode')}: {operatorMode}</span>
         </div>
 
         <div style={{ display: 'grid', gap: 12 }}>

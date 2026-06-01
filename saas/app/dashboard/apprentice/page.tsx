@@ -74,6 +74,7 @@ export default function ApprenticeWorkshopPage() {
         <p style={{ color: 'rgba(255,255,255,.68)', maxWidth: 720 }}>{guidance.subtitle} Current tone: <strong>{profile.tone_preference || 'friendly'}</strong>. Current role: <strong>{profile.role || 'not set'}</strong>.</p>
 
         <OrchestrationPanel module="apprentice" compact />
+        <div className="sb-cta-row" style={{ marginTop: 14 }}><Link className="sb-button-secondary" href="/dashboard">{t(dict, 'services.openAnotherWorkspace', 'Open another workspace')}</Link></div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, margin: '1.5rem 0' }}>
           {guidance.tasks.map((task) => (

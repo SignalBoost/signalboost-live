@@ -1,0 +1,1007 @@
+{
+  "checkedAt": "2026-06-01T07:25:15.293Z",
+  "total": 125,
+  "failures": 125,
+  "results": [
+    {
+      "id": "booking-com",
+      "name": "Booking",
+      "url": "https://booking.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "expedia-com",
+      "name": "Expedia",
+      "url": "https://expedia.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "hotels-com",
+      "name": "Hotels",
+      "url": "https://hotels.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "airbnb-com",
+      "name": "Airbnb",
+      "url": "https://airbnb.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "tripadvisor-com",
+      "name": "Tripadvisor",
+      "url": "https://tripadvisor.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "agoda-com",
+      "name": "Agoda",
+      "url": "https://agoda.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "kayak-com",
+      "name": "Kayak",
+      "url": "https://kayak.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "priceline-com",
+      "name": "Priceline",
+      "url": "https://priceline.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "vrbo-com",
+      "name": "Vrbo",
+      "url": "https://vrbo.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "hostelworld-com",
+      "name": "Hostelworld",
+      "url": "https://hostelworld.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "marriott-com",
+      "name": "Marriott",
+      "url": "https://marriott.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "hilton-com",
+      "name": "Hilton",
+      "url": "https://hilton.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "hyatt-com",
+      "name": "Hyatt",
+      "url": "https://hyatt.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "ihg-com",
+      "name": "Ihg",
+      "url": "https://ihg.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "accor-com",
+      "name": "Accor",
+      "url": "https://accor.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "wyndhamhotels-com",
+      "name": "Wyndhamhotels",
+      "url": "https://wyndhamhotels.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "choicehotels-com",
+      "name": "Choicehotels",
+      "url": "https://choicehotels.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "bestwestern-com",
+      "name": "Bestwestern",
+      "url": "https://bestwestern.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "radissonhotels-com",
+      "name": "Radissonhotels",
+      "url": "https://radissonhotels.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "kempinski-com",
+      "name": "Kempinski",
+      "url": "https://kempinski.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "skyscanner-com",
+      "name": "Skyscanner",
+      "url": "https://skyscanner.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "kiwi-com",
+      "name": "Kiwi",
+      "url": "https://kiwi.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "momondo-com",
+      "name": "Momondo",
+      "url": "https://momondo.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "cheapoair-com",
+      "name": "Cheapoair",
+      "url": "https://cheapoair.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "flights-google-com",
+      "name": "Flights",
+      "url": "https://flights.google.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "united-com",
+      "name": "United",
+      "url": "https://united.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "delta-com",
+      "name": "Delta",
+      "url": "https://delta.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "aa-com",
+      "name": "Aa",
+      "url": "https://aa.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "southwest-com",
+      "name": "Southwest",
+      "url": "https://southwest.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "jetblue-com",
+      "name": "Jetblue",
+      "url": "https://jetblue.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "lufthansa-com",
+      "name": "Lufthansa",
+      "url": "https://lufthansa.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "airfrance-com",
+      "name": "Airfrance",
+      "url": "https://airfrance.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "klm-com",
+      "name": "Klm",
+      "url": "https://klm.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "britishairways-com",
+      "name": "Britishairways",
+      "url": "https://britishairways.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "emirates-com",
+      "name": "Emirates",
+      "url": "https://emirates.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "qatarairways-com",
+      "name": "Qatarairways",
+      "url": "https://qatarairways.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "turkishairlines-com",
+      "name": "Turkishairlines",
+      "url": "https://turkishairlines.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "ryanair-com",
+      "name": "Ryanair",
+      "url": "https://ryanair.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "easyjet-com",
+      "name": "Easyjet",
+      "url": "https://easyjet.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "wizzair-com",
+      "name": "Wizzair",
+      "url": "https://wizzair.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "uber-com",
+      "name": "Uber",
+      "url": "https://uber.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "lyft-com",
+      "name": "Lyft",
+      "url": "https://lyft.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "bolt-eu",
+      "name": "Bolt",
+      "url": "https://bolt.eu",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "grab-com",
+      "name": "Grab",
+      "url": "https://grab.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "getaround-com",
+      "name": "Getaround",
+      "url": "https://getaround.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "turo-com",
+      "name": "Turo",
+      "url": "https://turo.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "hertz-com",
+      "name": "Hertz",
+      "url": "https://hertz.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "avis-com",
+      "name": "Avis",
+      "url": "https://avis.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "enterprise-com",
+      "name": "Enterprise",
+      "url": "https://enterprise.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "budget-com",
+      "name": "Budget",
+      "url": "https://budget.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "sixt-com",
+      "name": "Sixt",
+      "url": "https://sixt.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "europcar-com",
+      "name": "Europcar",
+      "url": "https://europcar.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "rome2rio-com",
+      "name": "Rome2rio",
+      "url": "https://rome2rio.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "trainline-com",
+      "name": "Trainline",
+      "url": "https://trainline.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "raileurope-com",
+      "name": "Raileurope",
+      "url": "https://raileurope.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "flixbus-com",
+      "name": "Flixbus",
+      "url": "https://flixbus.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "greyhound-com",
+      "name": "Greyhound",
+      "url": "https://greyhound.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "omio-com",
+      "name": "Omio",
+      "url": "https://omio.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "viator-com",
+      "name": "Viator",
+      "url": "https://viator.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "getyourguide-com",
+      "name": "Getyourguide",
+      "url": "https://getyourguide.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "klook-com",
+      "name": "Klook",
+      "url": "https://klook.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "tiqets-com",
+      "name": "Tiqets",
+      "url": "https://tiqets.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "headout-com",
+      "name": "Headout",
+      "url": "https://headout.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "citypass-com",
+      "name": "Citypass",
+      "url": "https://citypass.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "lonelyplanet-com",
+      "name": "Lonelyplanet",
+      "url": "https://lonelyplanet.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "withlocals-com",
+      "name": "Withlocals",
+      "url": "https://withlocals.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "eatwith-com",
+      "name": "Eatwith",
+      "url": "https://eatwith.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "opentable-com",
+      "name": "Opentable",
+      "url": "https://opentable.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "resy-com",
+      "name": "Resy",
+      "url": "https://resy.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "thefork-com",
+      "name": "Thefork",
+      "url": "https://thefork.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "yelp-com",
+      "name": "Yelp",
+      "url": "https://yelp.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "foursquare-com",
+      "name": "Foursquare",
+      "url": "https://foursquare.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "doordash-com",
+      "name": "Doordash",
+      "url": "https://doordash.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "ubereats-com",
+      "name": "Ubereats",
+      "url": "https://ubereats.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "grubhub-com",
+      "name": "Grubhub",
+      "url": "https://grubhub.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "wise-com",
+      "name": "Wise",
+      "url": "https://wise.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "revolut-com",
+      "name": "Revolut",
+      "url": "https://revolut.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "paypal-com",
+      "name": "Paypal",
+      "url": "https://paypal.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "stripe-com",
+      "name": "Stripe",
+      "url": "https://stripe.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "westernunion-com",
+      "name": "Westernunion",
+      "url": "https://westernunion.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "remitly-com",
+      "name": "Remitly",
+      "url": "https://remitly.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "xe-com",
+      "name": "Xe",
+      "url": "https://xe.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "airalo-com",
+      "name": "Airalo",
+      "url": "https://airalo.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "holafly-com",
+      "name": "Holafly",
+      "url": "https://holafly.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "nomadesim-com",
+      "name": "NomadeSIM",
+      "url": "https://nomadeSIM.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "gigsky-com",
+      "name": "Gigsky",
+      "url": "https://gigsky.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "truphone-com",
+      "name": "Truphone",
+      "url": "https://truphone.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "surfroam-com",
+      "name": "Surfroam",
+      "url": "https://surfroam.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "nordvpn-com",
+      "name": "Nordvpn",
+      "url": "https://nordvpn.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "expressvpn-com",
+      "name": "Expressvpn",
+      "url": "https://expressvpn.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "surfshark-com",
+      "name": "Surfshark",
+      "url": "https://surfshark.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "allianztravelinsurance-com",
+      "name": "Allianztravelinsurance",
+      "url": "https://allianztravelinsurance.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "worldnomads-com",
+      "name": "Worldnomads",
+      "url": "https://worldnomads.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "safetywing-com",
+      "name": "Safetywing",
+      "url": "https://safetywing.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "imglobal-com",
+      "name": "Imglobal",
+      "url": "https://imglobal.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "visaguide-world",
+      "name": "Visaguide",
+      "url": "https://visaguide.world",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "ivisa-com",
+      "name": "iVisa",
+      "url": "https://ivisa.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "passportindex-org",
+      "name": "Passportindex",
+      "url": "https://passportindex.org",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "duolingo-com",
+      "name": "Duolingo",
+      "url": "https://duolingo.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "babbel-com",
+      "name": "Babbel",
+      "url": "https://babbel.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "deepl-com",
+      "name": "Deepl",
+      "url": "https://deepl.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "translate-google-com",
+      "name": "Translate",
+      "url": "https://translate.google.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "canva-com",
+      "name": "Canva",
+      "url": "https://canva.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "adobe-com",
+      "name": "Adobe",
+      "url": "https://adobe.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "figma-com",
+      "name": "Figma",
+      "url": "https://figma.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "webflow-com",
+      "name": "Webflow",
+      "url": "https://webflow.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "wix-com",
+      "name": "Wix",
+      "url": "https://wix.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "squarespace-com",
+      "name": "Squarespace",
+      "url": "https://squarespace.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "wordpress-com",
+      "name": "Wordpress",
+      "url": "https://wordpress.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "shopify-com",
+      "name": "Shopify",
+      "url": "https://shopify.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "squareup-com",
+      "name": "Squareup",
+      "url": "https://squareup.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "toasttab-com",
+      "name": "Toasttab",
+      "url": "https://toasttab.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "mailchimp-com",
+      "name": "Mailchimp",
+      "url": "https://mailchimp.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "hubspot-com",
+      "name": "Hubspot",
+      "url": "https://hubspot.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "salesforce-com",
+      "name": "Salesforce",
+      "url": "https://salesforce.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "zapier-com",
+      "name": "Zapier",
+      "url": "https://zapier.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "notion-so",
+      "name": "Notion",
+      "url": "https://notion.so",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "airtable-com",
+      "name": "Airtable",
+      "url": "https://airtable.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "slack-com",
+      "name": "Slack",
+      "url": "https://slack.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "zoom-us",
+      "name": "Zoom",
+      "url": "https://zoom.us",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "calendly-com",
+      "name": "Calendly",
+      "url": "https://calendly.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "typeform-com",
+      "name": "Typeform",
+      "url": "https://typeform.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "surveymonkey-com",
+      "name": "Surveymonkey",
+      "url": "https://surveymonkey.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "trustpilot-com",
+      "name": "Trustpilot",
+      "url": "https://trustpilot.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    },
+    {
+      "id": "google-com",
+      "name": "Google",
+      "url": "https://google.com",
+      "ok": false,
+      "status": 0,
+      "error": "This operation was aborted"
+    }
+  ]
+}

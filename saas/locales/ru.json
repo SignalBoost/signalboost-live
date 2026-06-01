@@ -1494,7 +1494,8 @@
         "2": "Visual example path",
         "3": "Module launch CTA"
       }
-    }
+    },
+    "openAnotherWorkspace": "Открыть другой workspace"
   },
   "pricing_page_extra": {},
   "apprentice_extra": {},
@@ -1526,7 +1527,10 @@
     "confidence": "Уверенность",
     "memory": "Слой памяти",
     "operatorFallback": "Резервный оператор",
-    "telemetry": "Телеметрия"
+    "telemetry": "Телеметрия",
+    "manualOperator": "Ручной оператор",
+    "customFeedback": "Своя обратная связь",
+    "operatorMode": "Режим оператора"
   },
   "aiNav": {
     "home": "Главная",
@@ -1590,5 +1594,33 @@
   "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
   "wireframes.modules.assistant.panel1": "Task list panel",
   "wireframes.modules.assistant.panel2": "Reminder timeline",
-  "wireframes.modules.assistant.panel3": "Productivity insights chart"
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "nav": {
+    "marketplace": "Маркетплейс",
+    "openMenu": "Открыть меню",
+    "language": "Язык"
+  },
+  "navGroups": {
+    "cowork": "Cowork",
+    "aiStudio": "AI Studio",
+    "reviews": "Отзывы",
+    "calendar": "Календарь",
+    "spreadsheets": "Таблицы",
+    "outreach": "Outreach",
+    "audio": "Создать аудио",
+    "video": "Создать видео",
+    "improve": "Улучшить сайт",
+    "podcastStudio": "Оптимизировать подкаст",
+    "lab": "Лаборатория",
+    "apprentice": "Ученик мастерской"
+  },
+  "outreach": {
+    "pipeline": {
+      "kicker": "Outreach pipeline",
+      "title": "Превратить лид в утверждённую кампанию",
+      "subtitle": "Analyzer, Profiler и Predictive Intelligence вместе строят полный путь кампании с утверждением.",
+      "openEngine": "Открыть outreach engine",
+      "completePath": "Полный путь утверждения"
+    }
+  }
 }

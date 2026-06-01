@@ -57,7 +57,7 @@ export default function ServiceExperience({ service, mode = 'dashboard' }: Servi
           </div>
           <div className="sb-cta-row">
             <Link className="sb-button-primary" href={service.dashboardHref}>{cta}</Link>
-            <Link className="sb-button-secondary" href="/pricing">{t(dict, 'services.comparePricing', 'Compare pricing')}</Link>
+            <Link className="sb-button-secondary" href="/pricing#saas-modules">{t(dict, 'services.comparePricing', 'Compare pricing')}</Link>
           </div>
         </div>
       </section>
@@ -111,7 +111,7 @@ export default function ServiceExperience({ service, mode = 'dashboard' }: Servi
           </div>
           <div className="sb-cta-row">
             <Link className="sb-button-primary" href={service.dashboardHref}>{mode === 'landing' ? cta : t(dict, 'services.generateResults', 'Generate results')}</Link>
-            <Link className="sb-button-secondary" href={service.landingHref}>{t(dict, 'services.viewLanding', 'View landing page')}</Link>
+            <Link className="sb-button-secondary" href={mode === 'dashboard' ? '/dashboard' : service.landingHref}>{t(dict, 'services.openAnotherWorkspace', 'Open another workspace')}</Link>
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12, marginTop: 16 }}>

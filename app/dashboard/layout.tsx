@@ -1,12 +1,15 @@
 import Link from 'next/link'
 import { signalBoostModules } from '@/lib/platform/unifiedPlatform'
+import { getCurrentAdminSession } from '@/lib/admin/adminAccess'
 import '../globals.css'
 
 export const metadata = {
   title: 'SignalBoost Unified Cockpit',
 }
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const adminSession = await getCurrentAdminSession()
+  const isAdmin = adminSession.role === 'admin'
   return (
     <div className="min-h-screen bg-[#05070b] text-white lg:flex">
       <aside className="border-b border-white/10 bg-black/70 p-5 backdrop-blur lg:sticky lg:top-0 lg:h-screen lg:w-72 lg:border-b-0 lg:border-r">
@@ -22,6 +25,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span className="mr-3">{module.icon}</span>{module.label}
             </Link>
           ))}
+        {isAdmin ? (
+            <Link href="/admin" className="rounded-2xl border border-[#FFD700]/30 bg-[#FFD700]/10 px-4 py-3 font-bold text-[#FFD700] no-underline transition hover:bg-[#FFD700] hover:text-black">
+              🛡️ Admin
+            </Link>
+          ) : null}
         </nav>
 
         <div className="mt-8 rounded-3xl border border-[#FFD700]/20 bg-[#FFD700]/10 p-4 text-sm text-white/70">

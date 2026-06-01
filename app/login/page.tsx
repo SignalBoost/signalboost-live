@@ -13,10 +13,11 @@ export default function LoginPage() {
     setError('')
     setLoadingProvider(provider)
     const origin = window.location.origin
+    const next = new URLSearchParams(window.location.search).get('next') || '/dashboard'
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${origin}/auth/callback?next=/dashboard`,
+        redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
       },
     })
 

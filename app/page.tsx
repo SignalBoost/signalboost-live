@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import LanguageSwitcher from '@/components/i18n/LanguageSwitcher'
+import AdminNavLink from '@/components/auth/AdminNavLink'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 
@@ -22,6 +23,7 @@ export default function HomePage() {
         <nav className="flex flex-wrap gap-4 text-sm">
           {nav.map(([label, href]) => <Link key={href} href={href} className="text-white/70 hover:text-white no-underline">{label}</Link>)}
         </nav>
+        <AdminNavLink className="rounded-full border border-emerald-300/40 px-4 py-2 text-sm font-bold text-emerald-200 no-underline hover:bg-emerald-300 hover:text-black">Admin</AdminNavLink>
         <Link href="/login" className="rounded-full border border-[#FFD700]/40 px-4 py-2 text-sm font-bold text-[#FFD700] no-underline hover:bg-[#FFD700] hover:text-black">Login</Link>
         <LanguageSwitcher current={lang} onChange={setLang} />
       </header>

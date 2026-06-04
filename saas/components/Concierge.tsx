@@ -14,6 +14,7 @@ const QUICK_KEYS = [
   { label: 'concierge.quick.saas.label', prompt: 'concierge.quick.saas.prompt', fallbackLabel: '🚀 SaaS cockpit', fallbackPrompt: 'Guide me through Promote Business, Reviews, Calendar, Spreadsheets, and Outreach.' },
   { label: 'concierge.quick.executive.label', prompt: 'concierge.quick.executive.prompt', fallbackLabel: '📊 Executive insights', fallbackPrompt: 'Show financial, KPI, CRM, outreach, and forecasting recommendations.' },
   { label: 'concierge.quick.support.label', prompt: 'concierge.quick.support.prompt', fallbackLabel: '💬 HMI support', fallbackPrompt: 'I need step-by-step help using SignalBoost.' },
+  { label: 'concierge.quick.websites.label', prompt: 'concierge.quick.websites.prompt', fallbackLabel: '🌐 Websites', fallbackPrompt: 'Analyze https://signalboostapp.com and recommend website optimizations.' },
 ]
 
 export default function Concierge() {
@@ -59,9 +60,16 @@ export default function Concierge() {
       })
 
       const data = await res.json()
+      const websiteSummary = data.action === 'show_website_analyzer' && data.audit
+        ? `${data.reply}\nPerformance ${data.audit.performance}/100 · SEO ${data.audit.seo}/100 · Mobile ${data.audit.mobile}/100 · Conversion ${data.audit.conversion}/100\n${(data.audit.recommendations || []).slice(0, 3).map((item: { recommendation: string }) => `• ${item.recommendation}`).join('\n')}`
+        : data.action === 'show_website_optimizer' && data.optimized
+          ? `${data.reply}\n${data.optimized.headline}\nCTA: ${data.optimized.cta}`
+          : data.action === 'show_rebuild_engine' && data.rebuild
+            ? `${data.reply}\n${data.rebuild.reason}\nPages: ${(data.rebuild.structure?.pages || []).map((page: { title: string }) => page.title).join(', ')}`
+            : ''
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', content: data.reply || data.error || t(dict, 'concierge.fallback', 'I could not create a response.') },
+        { role: 'assistant', content: websiteSummary || data.reply || data.error || t(dict, 'concierge.fallback', 'I could not create a response.') },
       ])
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: t(dict, 'concierge.connectionError', 'Connection problem. Please try again.') }])
@@ -116,7 +124,7 @@ export default function Concierge() {
           </div>
 
           <div style={{ display: 'flex', gap: 8 }}>
-            <input aria-label={t(dict, 'concierge.placeholder', 'Ask anything...')} value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') ask(input) }} className="sb-input" style={{ flex: 1, padding: 12, minWidth: 0 }} placeholder={t(dict, 'concierge.placeholder', 'Ask anything...')} />
+            <input aria-label={t(dict, 'concierge.input.placeholder', 'Ask anything...')} value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') ask(input) }} className="sb-input" style={{ flex: 1, padding: 12, minWidth: 0 }} placeholder={t(dict, 'concierge.input.placeholder', 'Ask anything...')} />
             <button type="button" className="sb-button-primary" onClick={() => ask(input)} disabled={loading || !input.trim()}>
               {t(dict, 'concierge.send', 'Send')}
             </button>

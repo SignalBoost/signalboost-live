@@ -1590,5 +1590,11 @@
   "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
   "wireframes.modules.assistant.panel1": "Task list panel",
   "wireframes.modules.assistant.panel2": "Reminder timeline",
-  "wireframes.modules.assistant.panel3": "Productivity insights chart"
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "nav.websites": "Сайты",
+  "websites.analyzer.title": "Анализатор сайтов",
+  "websites.optimizer.title": "Оптимизатор сайта",
+  "websites.rebuild.title": "Модуль перестройки",
+  "websites.optimizer.applyChanges": "Применить изменения",
+  "concierge.input.placeholder": "Спросите Concierge об аудитах, оптимизации, перестройке, ценах или модулях…"
 }

@@ -1,5 +1,5 @@
 export type SignalBoostModule = {
-  key: 'promote' | 'reviews' | 'calendar' | 'spreadsheets' | 'outreach' | 'assistant'
+  key: 'promote' | 'reviews' | 'calendar' | 'spreadsheets' | 'websites' | 'outreach' | 'assistant'
   label: string
   href: string
   icon: string
@@ -50,6 +50,17 @@ export const signalBoostModules: SignalBoostModule[] = [
     cockpitRole: 'Data operations grid',
     signals: ['CSV readiness', 'Column mapping', 'Lead status', 'KPI rollups'],
   },
+
+  {
+    key: 'websites',
+    label: 'Websites',
+    href: '/saas-station/websites',
+    icon: '🌐',
+    description: 'Analyze, optimize, and rebuild websites with multilingual SEO, accessibility, conversion, and security guidance.',
+    telemetryEvent: 'saas.websites.viewed',
+    cockpitRole: 'Website optimization station',
+    signals: ['Website audit score', 'Optimizer draft', 'Rebuild recommendation', 'SEO readiness'],
+  },
   {
     key: 'outreach',
     label: 'Outreach',
@@ -81,7 +92,7 @@ export const marketplaceSignals = [
 ]
 
 export const cockpitWireframe = [
-  'LEFT RAIL: Promote Business | Reviews | Calendar | Spreadsheets | Outreach | Personal Assistant',
+  'LEFT RAIL: Promote Business | Reviews | Calendar | Spreadsheets | Websites | Outreach | Personal Assistant',
   'CENTER DECK: selected module workspace with NASA-style mission cards and checklists',
   'RIGHT RAIL: Concierge AI answers across Marketplace + SaaS and writes telemetry events',
   'ADMIN CONSOLE: SaaS usage stream rolls up module views, Concierge intents, and Marketplace context',

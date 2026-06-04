@@ -294,5 +294,11 @@
       "draft_failed": "Draft Failed"
     }
   },
-  "orchestration.kicker": "AI orchestration"
+  "orchestration.kicker": "AI orchestration",
+  "nav.websites": "Websites",
+  "websites.analyzer.title": "Website Analyzer",
+  "websites.optimizer.title": "Website Optimizer",
+  "websites.rebuild.title": "Rebuild Engine",
+  "websites.optimizer.applyChanges": "Apply changes",
+  "concierge.input.placeholder": "Ask Concierge about audits, optimization, rebuilds, pricing, or modules…"
 }

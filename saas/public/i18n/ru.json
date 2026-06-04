@@ -294,5 +294,11 @@
     }
   },
   "singleLanguageContent": "Контент на одном языке",
-  "orchestration.kicker": "AI-оркестрация"
+  "orchestration.kicker": "AI-оркестрация",
+  "nav.websites": "Сайты",
+  "websites.analyzer.title": "Анализатор сайтов",
+  "websites.optimizer.title": "Оптимизатор сайта",
+  "websites.rebuild.title": "Модуль перестройки",
+  "websites.optimizer.applyChanges": "Применить изменения",
+  "concierge.input.placeholder": "Спросите Concierge об аудитах, оптимизации, перестройке, ценах или модулях…"
 }

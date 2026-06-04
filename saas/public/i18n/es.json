@@ -294,5 +294,11 @@
     }
   },
   "singleLanguageContent": "Contenido en un solo idioma",
-  "orchestration.kicker": "Orquestación de IA"
+  "orchestration.kicker": "Orquestación de IA",
+  "nav.websites": "Sitios web",
+  "websites.analyzer.title": "Analizador web",
+  "websites.optimizer.title": "Optimizador web",
+  "websites.rebuild.title": "Motor de reconstrucción",
+  "websites.optimizer.applyChanges": "Aplicar cambios",
+  "concierge.input.placeholder": "Pregunta al Concierge sobre auditorías, optimización, reconstrucciones, precios o módulos…"
 }

@@ -1590,5 +1590,11 @@
   "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
   "wireframes.modules.assistant.panel1": "Task list panel",
   "wireframes.modules.assistant.panel2": "Reminder timeline",
-  "wireframes.modules.assistant.panel3": "Productivity insights chart"
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "nav.websites": "Sites",
+  "websites.analyzer.title": "Analisador de sites",
+  "websites.optimizer.title": "Otimizador de sites",
+  "websites.rebuild.title": "Motor de reconstrução",
+  "websites.optimizer.applyChanges": "Aplicar mudanças",
+  "concierge.input.placeholder": "Pergunte ao Concierge sobre auditorias, otimização, reconstruções, preços ou módulos…"
 }

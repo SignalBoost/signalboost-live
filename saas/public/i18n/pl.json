@@ -294,5 +294,11 @@
     }
   },
   "singleLanguageContent": "Treść w jednym języku",
-  "orchestration.kicker": "Orkiestracja AI"
+  "orchestration.kicker": "Orkiestracja AI",
+  "nav.websites": "Strony",
+  "websites.analyzer.title": "Analizator stron",
+  "websites.optimizer.title": "Optymalizator stron",
+  "websites.rebuild.title": "Silnik przebudowy",
+  "websites.optimizer.applyChanges": "Zastosuj zmiany",
+  "concierge.input.placeholder": "Zapytaj Concierge o audyty, optymalizację, przebudowę, ceny lub moduły…"
 }

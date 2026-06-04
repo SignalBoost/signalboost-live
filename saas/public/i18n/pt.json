@@ -294,5 +294,11 @@
       "draft_failed": "Falha no rascunho"
     }
   },
-  "orchestration.kicker": "Orquestração de IA"
+  "orchestration.kicker": "Orquestração de IA",
+  "nav.websites": "Sites",
+  "websites.analyzer.title": "Analisador de sites",
+  "websites.optimizer.title": "Otimizador de sites",
+  "websites.rebuild.title": "Motor de reconstrução",
+  "websites.optimizer.applyChanges": "Aplicar mudanças",
+  "concierge.input.placeholder": "Pergunte ao Concierge sobre auditorias, otimização, reconstruções, preços ou módulos…"
 }

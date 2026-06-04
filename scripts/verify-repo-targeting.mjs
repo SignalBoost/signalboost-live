@@ -18,6 +18,8 @@ for (let index = 2; index < process.argv.length; index += 1) {
   }
 }
 
+const productionTarget = { repo: 'SignalBoost', branch: 'main' }
+
 const productionModules = [
   { label: 'Promote Business', files: ['app/dashboard/promote/page.tsx'] },
   { label: 'Reviews', files: ['app/dashboard/reviews/page.tsx'] },
@@ -48,16 +50,20 @@ function runGit(args, fallback = '') {
   }
 }
 
+function parseRepoName(value = '') {
+  const trimmed = String(value).trim()
+  if (!trimmed) return ''
+  const cleaned = trimmed.replace(/\.git$/, '').replace(/\/$/, '')
+  return cleaned.split(/[/:]/).pop() ?? ''
+}
+
 function getRepoName() {
   if (process.env.QA_REPO_NAME) return process.env.QA_REPO_NAME
-  if (process.env.GITHUB_REPOSITORY) return process.env.GITHUB_REPOSITORY.split('/').pop()
+  if (process.env.GITHUB_REPOSITORY) return parseRepoName(process.env.GITHUB_REPOSITORY)
 
   const remote = runGit(['config', '--get', 'remote.origin.url'])
-  if (remote) {
-    const cleaned = remote.replace(/\.git$/, '').replace(/\/$/, '')
-    const remoteName = cleaned.split(/[/:]/).pop()
-    if (remoteName) return remoteName
-  }
+  const remoteName = parseRepoName(remote)
+  if (remoteName) return remoteName
 
   return basename(repoRoot)
 }
@@ -76,6 +82,29 @@ function readGitHubEvent() {
   } catch {
     return {}
   }
+}
+
+function getPullRequestTarget(event) {
+  const explicitTarget = process.env.QA_TARGET_REPOSITORY || args.get('target-repository')
+  const explicitBaseBranch = process.env.QA_BASE_BRANCH || args.get('base-branch')
+
+  const targetRepository = parseRepoName(explicitTarget)
+    || parseRepoName(event.pull_request?.base?.repo?.full_name)
+    || parseRepoName(event.pull_request?.base?.repo?.name)
+    || parseRepoName(event.repository?.full_name)
+    || getRepoName()
+
+  const baseBranch = explicitBaseBranch
+    || event.pull_request?.base?.ref
+    || process.env.GITHUB_BASE_REF
+    || runGit(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'], '').split('/').pop()
+    || runGit(['branch', '--show-current'], '')
+
+  return { targetRepository, baseBranch }
+}
+
+function isProductionTarget(target) {
+  return getRepoKind(target.targetRepository) === 'production' && target.baseBranch === productionTarget.branch
 }
 
 function hasExplicitStagingApproval() {
@@ -161,42 +190,170 @@ function scanConflictMarkers() {
   return filesWithMarkers
 }
 
+
+function getTrackedTextFiles() {
+  return runGit(['ls-files', '-z'])
+    .split('\0')
+    .filter(Boolean)
+    .filter((file) => !ignoredPathPattern.test(file))
+    .filter((file) => /\.(?:[cm]?[jt]sx?|json|css|md|html|mjs)$/.test(file))
+}
+
+function readTextFile(file) {
+  const absolutePath = resolve(repoRoot, file)
+  try {
+    const buffer = readFileSync(absolutePath)
+    if (buffer.includes(0)) return ''
+    return buffer.toString('utf8')
+  } catch {
+    return ''
+  }
+}
+
+function scanDuplicateComponentDefinitions() {
+  const duplicates = []
+  const declarationPattern = /(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+([A-Z][A-Za-z0-9_]*)\s*\(|(?:export\s+)?const\s+([A-Z][A-Za-z0-9_]*)\s*=|(?:export\s+)?class\s+([A-Z][A-Za-z0-9_]*)\s+/g
+  const candidateFiles = getTrackedTextFiles().filter((file) => /\.(?:[jt]sx?)$/.test(file))
+
+  for (const file of candidateFiles) {
+    const content = readTextFile(file)
+    if (!content) continue
+
+    const seen = new Map()
+    for (const match of content.matchAll(declarationPattern)) {
+      const name = match[1] || match[2] || match[3]
+      const beforeMatch = content.slice(0, match.index)
+      const line = beforeMatch.split('\n').length
+      const existing = seen.get(name)
+      if (existing) {
+        duplicates.push(`${file}: ${name} declared on lines ${existing} and ${line}`)
+      } else {
+        seen.set(name, line)
+      }
+    }
+  }
+
+  return duplicates
+}
+
+function normalizeRoutePath(file) {
+  const withoutApp = file.replace(/^app\//, '').replace(/\/(page|route)\.(?:[jt]sx?)$/, '')
+  const segments = withoutApp
+    .split('/')
+    .filter(Boolean)
+    .filter((segment) => !/^\(.+\)$/.test(segment))
+    .filter((segment) => !segment.startsWith('@'))
+    .map((segment) => segment.replace(/^\[\.\.\.(.+)\]$/, ':$1*').replace(/^\[(.+)\]$/, ':$1'))
+
+  return `/${segments.join('/')}`.replace(/\/$/, '') || '/'
+}
+
+function scanConflictingRoutes() {
+  const filesByRoute = new Map()
+  const routeFiles = runGit(['ls-files', 'app/**/page.tsx', 'app/**/page.ts', 'app/**/route.ts', 'app/**/route.tsx'])
+    .split('\n')
+    .filter(Boolean)
+
+  for (const file of routeFiles) {
+    const kind = file.includes('/route.') ? 'api' : 'page'
+    const route = `${kind}:${normalizeRoutePath(file)}`
+    const existing = filesByRoute.get(route) ?? []
+    existing.push(file)
+    filesByRoute.set(route, existing)
+  }
+
+  return [...filesByRoute.entries()]
+    .filter(([, files]) => files.length > 1)
+    .map(([route, files]) => `${route} -> ${files.join(', ')}`)
+}
+
+function scanDuplicateApiMethods() {
+  const duplicates = []
+  const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
+  const routeFiles = runGit(['ls-files', 'app/**/route.ts', 'app/**/route.tsx'])
+    .split('\n')
+    .filter(Boolean)
+
+  for (const file of routeFiles) {
+    const content = readTextFile(file)
+    if (!content) continue
+
+    for (const method of methods) {
+      const methodPattern = new RegExp(`export\\s+(?:async\\s+)?function\\s+${method}\\s*\\(|export\\s+const\\s+${method}\\s*=`, 'g')
+      const matches = [...content.matchAll(methodPattern)]
+      if (matches.length > 1) duplicates.push(`${file}: ${method} handler exported ${matches.length} times`)
+    }
+  }
+
+  return duplicates
+}
+
 function statusIcon(ok) {
   return ok ? '✅' : '❌'
 }
 
+const event = readGitHubEvent()
 const repoName = getRepoName()
 const repoKind = getRepoKind(repoName)
+const pullRequestTarget = getPullRequestTarget(event)
+const targetKind = getRepoKind(pullRequestTarget.targetRepository)
 const changedFiles = getChangedFiles()
 const explicitStagingApproval = hasExplicitStagingApproval()
 const deployedProductionAreas = productionAreas.filter(areaExists)
 const deployedModules = productionModules.filter(areaExists)
 const changedProductionAreas = findChangedProductionAreas(changedFiles)
 const filesWithConflictMarkers = scanConflictMarkers()
+const duplicateComponentDefinitions = scanDuplicateComponentDefinitions()
+const conflictingRoutes = scanConflictingRoutes()
+const duplicateApiMethods = scanDuplicateApiMethods()
 const failures = []
+
+const targetIsProductionMain = isProductionTarget(pullRequestTarget)
 
 if (repoKind === 'production') {
   const missingRequiredAreas = productionAreas.filter((area) => !areaExists(area))
   if (missingRequiredAreas.length > 0) {
     failures.push(`Production repo is missing required areas: ${missingRequiredAreas.map((area) => area.label).join(', ')}`)
   }
-} else if (repoKind === 'staging') {
-  if (changedProductionAreas.length > 0 && !explicitStagingApproval) {
-    failures.push(`Production-scope files changed in signalboost-live without explicit staging approval: ${changedProductionAreas.map((area) => area.label).join(', ')}`)
-  }
-} else {
+} else if (repoKind !== 'staging') {
   failures.push(`Unknown repository target "${repoName}". Expected SignalBoost or signalboost-live.`)
+}
+
+if (changedProductionAreas.length > 0 && !targetIsProductionMain) {
+  if (repoKind === 'staging' && explicitStagingApproval) {
+    // Explicitly approved staging-only experiments are allowed to remain in signalboost-live.
+  } else {
+    failures.push(`Production-scope files changed, so the PR base must be ${productionTarget.repo}/${productionTarget.branch}; detected ${pullRequestTarget.targetRepository}:${pullRequestTarget.baseBranch || 'unknown'}.`)
+  }
+}
+
+if (targetKind === 'production' && pullRequestTarget.baseBranch !== productionTarget.branch) {
+  failures.push(`Production PRs must target ${productionTarget.repo}/${productionTarget.branch}; detected ${pullRequestTarget.targetRepository}:${pullRequestTarget.baseBranch || 'unknown'}.`)
 }
 
 if (filesWithConflictMarkers.length > 0) {
   failures.push(`Conflict markers remain in: ${filesWithConflictMarkers.join(', ')}`)
 }
 
+if (duplicateComponentDefinitions.length > 0) {
+  failures.push(`Duplicate component definitions found: ${duplicateComponentDefinitions.join('; ')}`)
+}
+
+if (conflictingRoutes.length > 0) {
+  failures.push(`Conflicting Next.js route names found: ${conflictingRoutes.join('; ')}`)
+}
+
+if (duplicateApiMethods.length > 0) {
+  failures.push(`Conflicting API handler names found: ${duplicateApiMethods.join('; ')}`)
+}
+
 const reportLines = [
   '# SignalBoost Repo Targeting QA Report',
   '',
   `- **Repository:** ${repoName}`,
-  `- **Detected target:** ${repoKind}`,
+  `- **Detected source repository:** ${repoName} (${repoKind})`,
+  `- **PR base target:** ${pullRequestTarget.targetRepository}:${pullRequestTarget.baseBranch || 'unknown'} (${targetKind})`,
+  `- **Required production target:** ${productionTarget.repo}/${productionTarget.branch}`,
   `- **Explicit staging approval:** ${explicitStagingApproval ? 'yes' : 'no'}`,
   `- **Changed files scanned:** ${changedFiles.length}`,
   `- **Result:** ${failures.length === 0 ? 'PASS' : 'FAIL'}`,
@@ -205,11 +362,17 @@ const reportLines = [
   '',
 ]
 
+if (targetIsProductionMain) {
+  reportLines.push('✅ Production-scope PR target is SignalBoost/main.')
+} else {
+  reportLines.push('❌ Production-scope PR target is not SignalBoost/main.')
+}
+
 if (repoKind === 'production') {
   reportLines.push(`${statusIcon(failures.length === 0)} Production areas were verified in the SignalBoost repo.`)
 } else if (repoKind === 'staging') {
-  const noMisdeployments = changedProductionAreas.length === 0 || explicitStagingApproval
-  reportLines.push(`${statusIcon(noMisdeployments)} signalboost-live is treated as staging-only; production-scope changes require explicit approval.`)
+  const noMisdeployments = changedProductionAreas.length === 0 || explicitStagingApproval || targetIsProductionMain
+  reportLines.push(`${statusIcon(noMisdeployments)} signalboost-live is treated as staging-only; production-scope changes require a SignalBoost/main PR base unless explicitly approved for staging.`)
   if (changedProductionAreas.length > 0) {
     reportLines.push(`- Production-scope areas touched by this PR: ${changedProductionAreas.map((area) => area.label).join(', ')}`)
   } else {
@@ -238,6 +401,27 @@ if (filesWithConflictMarkers.length === 0) {
 } else {
   reportLines.push('❌ Merge conflict markers remain:')
   for (const file of filesWithConflictMarkers) reportLines.push(`- ${file}`)
+}
+
+if (duplicateComponentDefinitions.length === 0) {
+  reportLines.push('✅ No duplicate component definitions were found within tracked TypeScript modules.')
+} else {
+  reportLines.push('❌ Duplicate component definitions remain:')
+  for (const duplicate of duplicateComponentDefinitions) reportLines.push(`- ${duplicate}`)
+}
+
+if (conflictingRoutes.length === 0) {
+  reportLines.push('✅ No conflicting Next.js page or API route names were found.')
+} else {
+  reportLines.push('❌ Conflicting Next.js routes remain:')
+  for (const route of conflictingRoutes) reportLines.push(`- ${route}`)
+}
+
+if (duplicateApiMethods.length === 0) {
+  reportLines.push('✅ No duplicate API method exports were found in route handlers.')
+} else {
+  reportLines.push('❌ Duplicate API method exports remain:')
+  for (const method of duplicateApiMethods) reportLines.push(`- ${method}`)
 }
 
 reportLines.push('', '## Compilation validation', '')

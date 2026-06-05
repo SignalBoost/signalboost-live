@@ -42,7 +42,7 @@ export default function MetricsAnalyticsPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const next: Data = { ...EMPTY }
+    const next: Data = { ...EMPTY, leads: [], errors: [] }
     const year = new Date().getFullYear()
 
     const [credits, queue, calendar, dataConn] = await Promise.allSettled([
@@ -69,8 +69,11 @@ export default function MetricsAnalyticsPage() {
     } else next.errors.push('calendar')
 
     if (dataConn.status === 'fulfilled') {
-      const grouped = dataConn.value.groupedItems || {}
-      next.dataItems = Object.values(grouped).reduce((a: number, arr: any) => a + (Array.isArray(arr) ? arr.length : 0), 0)
+      const grouped = (dataConn.value.groupedItems || {}) as Record<string, unknown[]>
+      next.dataItems = Object.values(grouped).reduce<number>(
+        (a, arr) => a + (Array.isArray(arr) ? arr.length : 0),
+        0,
+      )
       next.dataSources = Array.isArray(dataConn.value.sources) ? dataConn.value.sources.length : 0
     } else next.errors.push('data')
 

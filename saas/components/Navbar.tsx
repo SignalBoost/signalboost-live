@@ -248,7 +248,7 @@ export default function Navbar() {
 
         {/* Desktop nav */}
         <div className="sbnav-desktop">
-          <Group id="services" label="Services" active={false as any}>
+          <Group id="services" label="Services">
             <div style={{ padding: 16, width: 580, maxWidth: '90vw' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                 {services.map(s => (
@@ -260,7 +260,7 @@ export default function Navbar() {
                     }}>{s.icon}</span>
                     <span style={{ minWidth: 0 }}>
                       <span style={{ display: 'block', color: '#fff', fontWeight: 700, fontSize: 13 }}>{s.title}</span>
-                      <span style={{ display: 'block', color: 'var(--text-muted)', fontSize: 11, lineHeight: 1.4, marginTop: 2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as any }}>{s.desc}</span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: 11, lineHeight: 1.4, marginTop: 2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as any }}>{s.desc}</span>
                     </span>
                   </Link>
                 ))}

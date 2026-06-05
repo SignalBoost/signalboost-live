@@ -2,7 +2,7 @@
 
 // saas/components/Navbar.tsx
 // Unified single-bar navigation. Every real page has a home here.
-// Curated menus (not auto-generated) so links are correct and nothing is orphaned.
+// Curated, domain-grouped menus (Website / Podcast / Content / Launchpad / Grow / Workspace).
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -32,15 +32,24 @@ const PLAN_STYLES: Record<string, { bg: string; color: string }> = {
 
 type Item = { icon: string; label: string; href: string; desc?: string }
 
-const BUILD: Item[] = [
-  { icon: '🌐', label: 'Website Builder', href: '/dashboard/builder', desc: 'Create and publish your site.' },
+const WEBSITE: Item[] = [
+  { icon: '🌐', label: 'Build a Website', href: '/dashboard/builder', desc: 'Generate a full site from a prompt.' },
+  { icon: '🧭', label: 'Optimize Website', href: '/dashboard/improve', desc: 'Analyze → optimize → rebuild an improved site.' },
   { icon: '⭐', label: 'Reviews', href: '/dashboard/reviews', desc: 'Collect and showcase customer reviews.' },
-  { icon: '🎙️', label: 'Audio Studio', href: '/dashboard/audio', desc: 'Native voice and audio content.' },
-  { icon: '🎬', label: 'Video Studio', href: '/dashboard/video', desc: 'Generate and edit videos.' },
-  { icon: '✨', label: 'Improve', href: '/dashboard/improve', desc: 'Polish and optimize your content.' },
+  { icon: '✨', label: 'Improve Content', href: '/dashboard/improve', desc: 'Polish pages for SEO and conversion.' },
+]
+
+const PODCAST: Item[] = [
+  { icon: '🎙️', label: 'Build a Podcast', href: '/dashboard/launchpad/podcast', desc: 'Start a podcast from scratch.' },
+  { icon: '🎚️', label: 'Optimize Podcast Studio', href: '/dashboard/podcast/studio', desc: 'Audit your feed for Apple/Spotify & growth.' },
+  { icon: '📻', label: 'Podcast Hub', href: '/dashboard/podcast', desc: 'Your podcast page and tools.' },
+]
+
+const CONTENT: Item[] = [
+  { icon: '🎧', label: 'Audio Studio', href: '/dashboard/audio', desc: 'Native voice and audio content.' },
+  { icon: '🎬', label: 'Video Studio', href: '/dashboard/video', desc: 'Generate videos, clips, and captions.' },
   { icon: '🧪', label: 'Lab', href: '/dashboard/lab', desc: 'Experimental tools and features.' },
   { icon: '🛠️', label: 'Workshop Apprentice', href: '/dashboard/apprentice', desc: 'Guided, level-aware help.' },
-  { icon: '🎚️', label: 'Optimize Podcast Studio', href: '/dashboard/podcast/studio', desc: 'Improve an existing podcast.' },
 ]
 
 const LAUNCHPAD: Item[] = [
@@ -48,8 +57,7 @@ const LAUNCHPAD: Item[] = [
   { icon: '🏢', label: 'Build a Business', href: '/dashboard/launchpad/business', desc: 'Launch a business from scratch.' },
   { icon: '🎬', label: 'Creator', href: '/dashboard/launchpad/creator', desc: 'Build your creator brand.' },
   { icon: '🛒', label: 'Online Store', href: '/dashboard/launchpad/store', desc: 'Launch a store from scratch.' },
-  { icon: '🎙️', label: 'Build a Podcast', href: '/dashboard/launchpad/podcast', desc: 'Start a podcast from scratch.' },
-  { icon: '📻', label: 'Podcast Hub', href: '/dashboard/podcast', desc: 'All your podcast tools.' },
+  { icon: '🎙️', label: 'Podcast', href: '/dashboard/launchpad/podcast', desc: 'Start a podcast from scratch.' },
 ]
 
 const GROW: Item[] = [
@@ -239,7 +247,7 @@ export default function Navbar() {
             <span style={accentLine} aria-hidden="true" />
             <div style={{ padding: 12, width, maxWidth: '92vw', display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 2 }}>
               {items.map(item => (
-                <Link key={item.href} href={item.href} className="sbnav-row" style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 12, textDecoration: 'none' }}>
+                <Link key={item.href + item.label} href={item.href} className="sbnav-row" style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 12, textDecoration: 'none' }}>
                   <span style={{ fontSize: 18, flexShrink: 0 }}>{item.icon}</span>
                   <span style={{ minWidth: 0 }}>
                     <span style={{ display: 'block', color: '#fff', fontWeight: 700, fontSize: 13 }}>{item.label}</span>
@@ -256,12 +264,12 @@ export default function Navbar() {
 return (
     <>
       <style>{`
-        .sbnav-desktop { display: flex; align-items: center; gap: 20px; }
+        .sbnav-desktop { display: flex; align-items: center; gap: 18px; }
         .sbnav-right { display: flex; align-items: center; gap: 10px; }
         .sbnav-burger { display: none; }
         .sbnav-row { transition: background .15s ease; border-radius: 12px; }
         .sbnav-row:hover { background: var(--surface-1-hover); }
-        @media (max-width: 1100px) {
+        @media (max-width: 1200px) {
           .sbnav-desktop, .sbnav-right { display: none !important; }
           .sbnav-burger { display: inline-flex !important; }
         }
@@ -287,7 +295,9 @@ return (
         {/* Desktop nav */}
         <div className="sbnav-desktop">
           <Link href="/" style={{ ...trigger(pathname === '/'), display: 'inline-flex' }}>Home</Link>
-          <Group id="build" label="Build" items={BUILD} cols={2} width={560} />
+          <Group id="website" label="Website" items={WEBSITE} width={340} />
+          <Group id="podcast" label="Podcast" items={PODCAST} width={320} />
+          <Group id="content" label="Content" items={CONTENT} width={320} />
           <Group id="launchpad" label="Launchpad" items={LAUNCHPAD} width={320} />
           <Group id="grow" label="Grow" items={GROW} width={320} />
           <Group id="workspace" label="Workspace" items={WORKSPACE} width={320} />
@@ -311,7 +321,7 @@ return (
               <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,195,0,0.95)', fontFamily: 'monospace' }}>⚡ {credits}</span>
               <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', padding: '3px 10px', borderRadius: 999, background: planStyle.bg, color: planStyle.color, fontFamily: 'monospace' }}>{planLabel}</span>
               {displayName && (
-                <span title={displayName} style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</span>
+                <span title={displayName} style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</span>
               )}
             </span>
           )}
@@ -349,7 +359,9 @@ return (
           </div>
 
           {[
-            { title: 'Build', items: BUILD },
+            { title: 'Website', items: WEBSITE },
+            { title: 'Podcast', items: PODCAST },
+            { title: 'Content', items: CONTENT },
             { title: 'Launchpad', items: LAUNCHPAD },
             { title: 'Grow', items: GROW },
             { title: 'Workspace', items: WORKSPACE },
@@ -358,7 +370,7 @@ return (
             <div key={section.title} style={{ display: 'grid', gap: 4, marginBottom: 14 }}>
               <span style={{ color: 'var(--text-faint)', fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>{section.title}</span>
               {section.items.map(item => (
-                <Link key={item.href} href={item.href} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 600, fontSize: 14 }}>
+                <Link key={item.href + item.label} href={item.href} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 600, fontSize: 14 }}>
                   <span>{item.icon}</span>{item.label}
                 </Link>
               ))}
@@ -369,7 +381,7 @@ return (
             <span style={{ color: 'var(--text-faint)', fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>More</span>
             <Link href="/pricing" style={{ padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 600, fontSize: 14 }}>Pricing</Link>
             {HELP.map(item => (
-              <Link key={item.href} href={item.href} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 600, fontSize: 14 }}>
+              <Link key={item.href + item.label} href={item.href} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 600, fontSize: 14 }}>
                 <span>{item.icon}</span>{item.label}
               </Link>
             ))}

@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr'
 import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
 import { cookies } from 'next/headers'
 import { getCreditState } from '@/lib/credits'
+import { getAccess } from '@/lib/auth/access'
 
 export async function GET() {
   try {
@@ -35,7 +36,7 @@ export async function GET() {
 
     if (!user?.id) {
       return NextResponse.json(
-        { credits: 0, plan: 'free', name: null },
+        { credits: 0, plan: 'free', name: null, role: 'guest', isAdmin: false, isOwner: false },
         { status: 401 }
       )
     }
@@ -48,14 +49,20 @@ export async function GET() {
       meta.name ||
       (user.email ? user.email.split('@')[0] : null)
 
+    // Single source of truth for role/permissions.
+    const access = await getAccess()
+
     return NextResponse.json({
       credits: state.credits,
       plan: state.plan,
       name,
+      role: access.role,
+      isAdmin: access.isAdmin,
+      isOwner: access.isOwner,
     })
   } catch {
     return NextResponse.json(
-      { credits: 0, plan: 'free', name: null },
+      { credits: 0, plan: 'free', name: null, role: 'member', isAdmin: false, isOwner: false },
       { status: 500 }
     )
   }

@@ -1,8 +1,7 @@
 'use client'
 
 // saas/components/Navbar.tsx
-// Unified single-bar navigation. Every real page has a home here.
-// Curated, domain-grouped menus (Website / Podcast / Content / Launchpad / Grow / Workspace).
+// Unified single-bar navigation, domain-grouped (Website / Podcast / Content / Launchpad / Grow / Workspace).
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -65,7 +64,8 @@ const GROW: Item[] = [
   { icon: '🔎', label: 'Discovery', href: '/dashboard/outreach/discovery', desc: 'Find and analyze new leads.' },
   { icon: '📇', label: 'Contacts', href: '/dashboard/outreach/contacts', desc: 'Review and approve leads.' },
   { icon: '📊', label: 'Pipeline', href: '/dashboard/outreach/pipeline', desc: 'Track prospects by stage.' },
-  { icon: '📣', label: 'Promote', href: '/dashboard/promote', desc: 'Run promotion campaigns.' },
+  { icon: '📣', label: 'Campaigns', href: '/dashboard/campaigns', desc: 'Plan campaigns, A/B tests, and funnel tracking.' },
+  { icon: '📢', label: 'Promote', href: '/dashboard/promote', desc: 'Run promotion campaigns.' },
   { icon: '💼', label: 'Sales', href: '/dashboard/sales', desc: 'Sales overview.' },
   { icon: '📈', label: 'Sales Pipeline', href: '/dashboard/sales/pipeline', desc: 'Deals in progress.' },
 ]
@@ -106,6 +106,8 @@ const HELP: Item[] = [
 
 export default function Navbar() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const navRef = useRef<HTMLDivElement>(null)
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pathname  = usePathname()
   const { lang, setLang, dict } = useI18n()
 
@@ -154,7 +156,34 @@ export default function Navbar() {
     } catch { /* silent */ }
   }
 
+  // Close any open menu on route change
   useEffect(() => { setOpenMenu(null); setMobileOpen(false) }, [pathname])
+
+  // Close the dropdown when clicking anywhere outside the navbar, or pressing Escape
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) setOpenMenu(null)
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpenMenu(null)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [])
+
+  // Hover helpers with a small close delay so moving button→panel doesn't flicker shut
+  function openNow(id: string) {
+    if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null }
+    setOpenMenu(id)
+  }
+  function closeSoon() {
+    if (closeTimer.current) clearTimeout(closeTimer.current)
+    closeTimer.current = setTimeout(() => setOpenMenu(null), 140)
+  }
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -235,19 +264,25 @@ export default function Navbar() {
     return (
       <div
         style={{ position: 'relative' }}
-        onMouseEnter={() => setOpenMenu(id)}
-        onMouseLeave={() => setOpenMenu(prev => (prev === id ? null : prev))}
+        onMouseEnter={() => openNow(id)}
+        onMouseLeave={closeSoon}
       >
-        <button type="button" aria-haspopup="true" aria-expanded={open} onClick={() => setOpenMenu(open ? null : id)} style={trigger(open || groupActive(items))}>
+        <button
+          type="button"
+          aria-haspopup="true"
+          aria-expanded={open}
+          onClick={() => setOpenMenu(open ? null : id)}
+          style={trigger(open || groupActive(items))}
+        >
           {label}
           <span style={{ fontSize: 10, opacity: 0.7, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .18s' }}>▾</span>
         </button>
-        <div style={panelWrap(open, align)}>
+        <div style={panelWrap(open, align)} onMouseEnter={() => openNow(id)} onMouseLeave={closeSoon}>
           <div style={panelCard}>
             <span style={accentLine} aria-hidden="true" />
             <div style={{ padding: 12, width, maxWidth: '92vw', display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 2 }}>
               {items.map(item => (
-                <Link key={item.href + item.label} href={item.href} className="sbnav-row" style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 12, textDecoration: 'none' }}>
+                <Link key={item.href + item.label} href={item.href} onClick={() => setOpenMenu(null)} className="sbnav-row" style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 12, textDecoration: 'none' }}>
                   <span style={{ fontSize: 18, flexShrink: 0 }}>{item.icon}</span>
                   <span style={{ minWidth: 0 }}>
                     <span style={{ display: 'block', color: '#fff', fontWeight: 700, fontSize: 13 }}>{item.label}</span>
@@ -275,7 +310,7 @@ return (
         }
       `}</style>
 
-      <nav style={{
+      <nav ref={navRef} style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '12px 24px',
         background: 'linear-gradient(135deg, rgba(8,10,20,.86), rgba(15,23,42,.62))',

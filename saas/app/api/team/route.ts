@@ -6,7 +6,7 @@ import { requireOwner } from '@/lib/auth/access'
 
 export const dynamic = 'force-dynamic'
 
-const VALID_ROLES = ['admin', 'member'] // owner is not assignable via the UI; there is exactly one owner
+const VALID_ROLES = ['admin', 'member']
 
 async function getClient() {
   const cookieStore = await cookies()
@@ -25,28 +25,24 @@ async function getClient() {
   )
 }
 
-// List your team
 export async function GET() {
   const guard = await requireOwner()
   if (!guard.ok) return NextResponse.json({ members: [], error: guard.error }, { status: guard.status })
-  const { ctx } = guard
 
   const supabase = await getClient()
   const { data, error } = await supabase
     .from('team_members')
     .select('id, member_email, member_id, role, status, created_at')
-    .eq('owner_id', ctx.userId)
+    .eq('owner_id', guard.ctx.userId)
     .order('created_at', { ascending: true })
 
   if (error) return NextResponse.json({ members: [], error: error.message }, { status: 500 })
   return NextResponse.json({ members: data || [] })
 }
 
-// Invite / add a member by email with a role
 export async function POST(req: NextRequest) {
   const guard = await requireOwner()
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
-  const { ctx } = guard
 
   let body: any
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
@@ -57,7 +53,7 @@ export async function POST(req: NextRequest) {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 })
   }
-  if (email === (ctx.email || '')) {
+  if (email === (guard.ctx.email || '')) {
     return NextResponse.json({ error: 'You are the owner — you are already on the team.' }, { status: 400 })
   }
 
@@ -65,7 +61,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase
     .from('team_members')
     .upsert(
-      { owner_id: ctx.userId, member_email: email, role, status: 'pending' },
+      { owner_id: guard.ctx.userId, member_email: email, role, status: 'pending' },
       { onConflict: 'owner_id,member_email' },
     )
     .select('id, member_email, member_id, role, status, created_at')
@@ -75,11 +71,9 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ member: data })
 }
 
-// Change a member's role
 export async function PATCH(req: NextRequest) {
   const guard = await requireOwner()
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
-  const { ctx } = guard
 
   let body: any
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
@@ -93,8 +87,8 @@ export async function PATCH(req: NextRequest) {
     .from('team_members')
     .update({ role: body.role })
     .eq('id', id)
-    .eq('owner_id', ctx.userId)
-    .neq('role', 'owner') // never let the owner row be downgraded here
+    .eq('owner_id', guard.ctx.userId)
+    .neq('role', 'owner')
     .select('id, member_email, member_id, role, status, created_at')
     .single()
 
@@ -102,11 +96,9 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({ member: data })
 }
 
-// Remove a member
 export async function DELETE(req: NextRequest) {
   const guard = await requireOwner()
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
-  const { ctx } = guard
 
   const id = req.nextUrl.searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
@@ -116,8 +108,8 @@ export async function DELETE(req: NextRequest) {
     .from('team_members')
     .delete()
     .eq('id', id)
-    .eq('owner_id', ctx.userId)
-    .neq('role', 'owner') // can't delete the owner row
+    .eq('owner_id', guard.ctx.userId)
+    .neq('role', 'owner')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })

@@ -56,43 +56,36 @@ function runChecks(html: string, finalUrl: string, ms: number, bytes: number): C
   const checks: Check[] = []
   const lower = html.toLowerCase()
 
-  // Security
   checks.push(finalUrl.startsWith('https://')
     ? { id: 'https', label: 'HTTPS secure connection', category: 'Security', status: 'pass', detail: 'The page is served over HTTPS.', recommendation: '' }
     : { id: 'https', label: 'HTTPS secure connection', category: 'Security', status: 'fail', detail: 'The page is not served over HTTPS.', recommendation: 'Serve the site over HTTPS with a valid TLS certificate.' })
 
-  // Title
   const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
   const title = titleMatch ? titleMatch[1].replace(/\s+/g, ' ').trim() : ''
   if (!title) checks.push({ id: 'title', label: 'Page title', category: 'SEO', status: 'fail', detail: 'No <title> tag found.', recommendation: 'Add a descriptive 30–60 character <title>.' })
   else if (title.length < 20 || title.length > 65) checks.push({ id: 'title', label: 'Page title', category: 'SEO', status: 'warn', detail: `Title is ${title.length} characters: “${title.slice(0, 70)}”.`, recommendation: 'Aim for a 30–60 character title with your main keyword.' })
   else checks.push({ id: 'title', label: 'Page title', category: 'SEO', status: 'pass', detail: `“${title}”`, recommendation: '' })
 
-  // Meta description
   const desc = findMeta(html, 'name', 'description')
   if (desc === null) checks.push({ id: 'desc', label: 'Meta description', category: 'SEO', status: 'fail', detail: 'No meta description found.', recommendation: 'Add a 50–160 character meta description summarizing the page.' })
   else if (desc.length < 50 || desc.length > 165) checks.push({ id: 'desc', label: 'Meta description', category: 'SEO', status: 'warn', detail: `Description is ${desc.length} characters.`, recommendation: 'Aim for 50–160 characters that invite the click.' })
   else checks.push({ id: 'desc', label: 'Meta description', category: 'SEO', status: 'pass', detail: 'Present and well-sized.', recommendation: '' })
 
-  // H1
   const h1s = (html.match(/<h1[\s>]/gi) || []).length
   if (h1s === 0) checks.push({ id: 'h1', label: 'Main heading (H1)', category: 'SEO', status: 'fail', detail: 'No <h1> found.', recommendation: 'Add exactly one clear <h1> describing the page.' })
   else if (h1s > 1) checks.push({ id: 'h1', label: 'Main heading (H1)', category: 'SEO', status: 'warn', detail: `${h1s} <h1> tags found.`, recommendation: 'Use a single <h1> per page; demote the rest to <h2>.' })
   else checks.push({ id: 'h1', label: 'Main heading (H1)', category: 'SEO', status: 'pass', detail: 'Exactly one <h1>.', recommendation: '' })
 
-  // Viewport (mobile)
   const viewport = findMeta(html, 'name', 'viewport')
   checks.push(viewport
     ? { id: 'viewport', label: 'Mobile viewport', category: 'Performance', status: 'pass', detail: 'Viewport meta tag present.', recommendation: '' }
     : { id: 'viewport', label: 'Mobile viewport', category: 'Performance', status: 'fail', detail: 'No viewport meta tag.', recommendation: 'Add <meta name="viewport" content="width=device-width, initial-scale=1"> for mobile.' })
 
-  // html lang
   const htmlLang = /<html[^>]+lang\s*=/i.test(html)
   checks.push(htmlLang
     ? { id: 'lang', label: 'Language attribute', category: 'Accessibility', status: 'pass', detail: '<html lang> is set.', recommendation: '' }
     : { id: 'lang', label: 'Language attribute', category: 'Accessibility', status: 'warn', detail: 'No lang attribute on <html>.', recommendation: 'Add lang to <html> (e.g. lang="en") for screen readers and SEO.' })
 
-  // Image alt coverage
   const imgs = html.match(/<img\b[^>]*>/gi) || []
   const withAlt = imgs.filter(t => { const a = attr(t, 'alt'); return a !== null && a.length > 0 }).length
   if (imgs.length === 0) checks.push({ id: 'alt', label: 'Image alt text', category: 'Accessibility', status: 'pass', detail: 'No images to check.', recommendation: '' })
@@ -103,34 +96,28 @@ function runChecks(html: string, finalUrl: string, ms: number, bytes: number): C
     else checks.push({ id: 'alt', label: 'Image alt text', category: 'Accessibility', status: 'fail', detail: `Only ${pct}% of images have alt text.`, recommendation: 'Add descriptive alt text to images for accessibility and SEO.' })
   }
 
-  // Open Graph (social)
   const ogTitle = findMeta(html, 'property', 'og:title')
   const ogImage = findMeta(html, 'property', 'og:image')
   if (ogTitle && ogImage) checks.push({ id: 'og', label: 'Social sharing (Open Graph)', category: 'Social', status: 'pass', detail: 'og:title and og:image present.', recommendation: '' })
   else checks.push({ id: 'og', label: 'Social sharing (Open Graph)', category: 'Social', status: 'warn', detail: 'Missing og:title and/or og:image.', recommendation: 'Add Open Graph tags so links preview nicely on social and chat.' })
 
-  // Canonical
   checks.push(/<link[^>]+rel\s*=\s*["\']canonical["\']/i.test(html)
     ? { id: 'canonical', label: 'Canonical URL', category: 'SEO', status: 'pass', detail: 'Canonical link present.', recommendation: '' }
     : { id: 'canonical', label: 'Canonical URL', category: 'SEO', status: 'warn', detail: 'No canonical link.', recommendation: 'Add <link rel="canonical"> to avoid duplicate-content issues.' })
 
-  // Structured data
   checks.push(lower.includes('application/ld+json')
     ? { id: 'jsonld', label: 'Structured data', category: 'SEO', status: 'pass', detail: 'JSON-LD structured data found.', recommendation: '' }
     : { id: 'jsonld', label: 'Structured data', category: 'SEO', status: 'warn', detail: 'No JSON-LD structured data.', recommendation: 'Add schema.org JSON-LD to enable rich results.' })
 
-  // Content depth
   const words = stripTags(html).split(' ').filter(Boolean).length
   if (words >= 300) checks.push({ id: 'content', label: 'Content depth', category: 'SEO', status: 'pass', detail: `~${words} words of visible text.`, recommendation: '' })
   else checks.push({ id: 'content', label: 'Content depth', category: 'SEO', status: 'warn', detail: `Only ~${words} words of visible text.`, recommendation: 'Thin pages rank poorly; add useful, original content.' })
 
-  // Page weight (rough, HTML only)
   const kb = Math.round(bytes / 1024)
   if (kb <= 150) checks.push({ id: 'weight', label: 'HTML page weight', category: 'Performance', status: 'pass', detail: `HTML is ~${kb} KB.`, recommendation: '' })
   else if (kb <= 400) checks.push({ id: 'weight', label: 'HTML page weight', category: 'Performance', status: 'warn', detail: `HTML is ~${kb} KB.`, recommendation: 'Trim inline scripts/markup; large HTML slows first paint.' })
   else checks.push({ id: 'weight', label: 'HTML page weight', category: 'Performance', status: 'fail', detail: `HTML is ~${kb} KB.`, recommendation: 'Heavy HTML hurts load time; reduce inline content and defer scripts.' })
 
-  // Server response time (best-effort)
   if (ms <= 800) checks.push({ id: 'speed', label: 'Server response time', category: 'Performance', status: 'pass', detail: `Responded in ${ms} ms.`, recommendation: '' })
   else if (ms <= 2500) checks.push({ id: 'speed', label: 'Server response time', category: 'Performance', status: 'warn', detail: `Responded in ${ms} ms.`, recommendation: 'Consider caching/CDN to speed up the initial response.' })
   else checks.push({ id: 'speed', label: 'Server response time', category: 'Performance', status: 'fail', detail: `Responded in ${ms} ms.`, recommendation: 'Slow first byte; use a CDN, caching, and a faster host.' })

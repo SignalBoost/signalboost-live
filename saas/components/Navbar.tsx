@@ -249,6 +249,8 @@ export default function Navbar() {
 
         {/* Desktop nav */}
         <div className="sbnav-desktop">
+          <Link href="/" style={{ ...trigger(pathname === '/'), display: 'inline-flex' }}>Home</Link>
+
           <Group id="services" label="Services">
             <div style={{ padding: 16, width: 580, maxWidth: '90vw' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
@@ -368,6 +370,9 @@ export default function Navbar() {
               {displayName && <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>{displayName}</span>}
             </div>
           )}
+          <div style={{ display: 'grid', gap: 6, marginBottom: 14 }}>
+            <Link href="/" style={{ padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 700, fontSize: 14 }}>🏠 Home</Link>
+          </div>
           <div style={{ display: 'grid', gap: 6, marginBottom: 14 }}>
             <span style={{ color: 'var(--text-faint)', fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>Services</span>
             {services.map(s => (

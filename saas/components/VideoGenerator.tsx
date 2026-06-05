@@ -29,8 +29,6 @@ export default function VideoGenerator() {
 
       const data = await response.json();
 
-      console.log("VIDEO RESPONSE:", data);
-
       if (!response.ok) {
         throw new Error(data.error || "Failed to generate video");
       }

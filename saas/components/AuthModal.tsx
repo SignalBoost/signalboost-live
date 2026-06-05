@@ -28,7 +28,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
     setLoading(true)
     if (mode === 'signup') {
       if (!name.trim()) { setError(t(dict, 'auth.errorNoName', 'Please enter your name.')); setLoading(false); return }
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -36,8 +36,18 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
           emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
         }
       })
-      if (error) setError(error.message)
-      else setSuccess(t(dict, 'auth.checkEmail', 'Check your email to confirm your account!'))
+      if (error) {
+        // Supabase returns an explicit duplicate error when email confirmation is off.
+        const msg = /already|registered|exists/i.test(error.message)
+          ? t(dict, 'auth.errorEmailExists', 'An account with this email already exists. Please log in instead.')
+          : error.message
+        setError(msg)
+      } else if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        // Email confirmation is on: Supabase obfuscates duplicates with an empty identities array.
+        setError(t(dict, 'auth.errorEmailExists', 'An account with this email already exists. Please log in instead.'))
+      } else {
+        setSuccess(t(dict, 'auth.checkEmail', 'Check your email to confirm your account!'))
+      }
     } else {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) {

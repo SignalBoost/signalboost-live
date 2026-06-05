@@ -1,7 +1,8 @@
 'use client'
 
 // saas/components/Navbar.tsx
-// Unified single-bar navigation with Fathom-style hover dropdowns.
+// Unified single-bar navigation. Every real page has a home here.
+// Curated menus (not auto-generated) so links are correct and nothing is orphaned.
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -10,8 +11,6 @@ import { supabase } from '@/utils/supabase/client'
 import AuthModal from './AuthModal'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
-import { SERVICES } from '@/lib/services/catalog'
-import { UNIFIED_NAV } from '@/lib/platform/unifiedPlatform'
 
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
@@ -31,6 +30,72 @@ const PLAN_STYLES: Record<string, { bg: string; color: string }> = {
   business: { bg: 'rgba(74,222,128,0.18)',  color: '#4ade80' },
 }
 
+type Item = { icon: string; label: string; href: string; desc?: string }
+
+const BUILD: Item[] = [
+  { icon: '🌐', label: 'Website Builder', href: '/dashboard/builder', desc: 'Create and publish your site.' },
+  { icon: '⭐', label: 'Reviews', href: '/dashboard/reviews', desc: 'Collect and showcase customer reviews.' },
+  { icon: '🎙️', label: 'Audio Studio', href: '/dashboard/audio', desc: 'Native voice and audio content.' },
+  { icon: '🎬', label: 'Video Studio', href: '/dashboard/video', desc: 'Generate and edit videos.' },
+  { icon: '✨', label: 'Improve', href: '/dashboard/improve', desc: 'Polish and optimize your content.' },
+  { icon: '🧪', label: 'Lab', href: '/dashboard/lab', desc: 'Experimental tools and features.' },
+  { icon: '🛠️', label: 'Workshop Apprentice', href: '/dashboard/apprentice', desc: 'Guided, level-aware help.' },
+  { icon: '🎚️', label: 'Optimize Podcast Studio', href: '/dashboard/podcast/studio', desc: 'Improve an existing podcast.' },
+]
+
+const LAUNCHPAD: Item[] = [
+  { icon: '🚀', label: 'Launchpad Home', href: '/dashboard/launchpad', desc: 'Choose a guided launch path.' },
+  { icon: '🏢', label: 'Build a Business', href: '/dashboard/launchpad/business', desc: 'Launch a business from scratch.' },
+  { icon: '🎬', label: 'Creator', href: '/dashboard/launchpad/creator', desc: 'Build your creator brand.' },
+  { icon: '🛒', label: 'Online Store', href: '/dashboard/launchpad/store', desc: 'Launch a store from scratch.' },
+  { icon: '🎙️', label: 'Build a Podcast', href: '/dashboard/launchpad/podcast', desc: 'Start a podcast from scratch.' },
+  { icon: '📻', label: 'Podcast Hub', href: '/dashboard/podcast', desc: 'All your podcast tools.' },
+]
+
+const GROW: Item[] = [
+  { icon: '📡', label: 'Outreach Hub', href: '/dashboard/outreach', desc: 'Your outreach command center.' },
+  { icon: '🔎', label: 'Discovery', href: '/dashboard/outreach/discovery', desc: 'Find and analyze new leads.' },
+  { icon: '📇', label: 'Contacts', href: '/dashboard/outreach/contacts', desc: 'Review and approve leads.' },
+  { icon: '📊', label: 'Pipeline', href: '/dashboard/outreach/pipeline', desc: 'Track prospects by stage.' },
+  { icon: '📣', label: 'Promote', href: '/dashboard/promote', desc: 'Run promotion campaigns.' },
+  { icon: '💼', label: 'Sales', href: '/dashboard/sales', desc: 'Sales overview.' },
+  { icon: '📈', label: 'Sales Pipeline', href: '/dashboard/sales/pipeline', desc: 'Deals in progress.' },
+]
+
+const WORKSPACE: Item[] = [
+  { icon: '🏠', label: 'Dashboard', href: '/dashboard', desc: 'Your home base.' },
+  { icon: '🤖', label: 'Assistant', href: '/dashboard/assistant', desc: 'Ask the concierge anything.' },
+  { icon: '📅', label: 'Calendar', href: '/dashboard/calendar', desc: 'Events and cultural dates.' },
+  { icon: '📑', label: 'Spreadsheets', href: '/dashboard/spreadsheets', desc: 'Your imported data, in a grid.' },
+  { icon: '🔌', label: 'Data Connectors', href: '/dashboard/data', desc: 'Import data from sources.' },
+  { icon: '⚡', label: 'Metrics & Credits', href: '/dashboard/metrics', desc: 'Usage and credit control.' },
+  { icon: '🎛️', label: 'Console', href: '/dashboard/wireframes', desc: 'Office utilities console.' },
+  { icon: '💬', label: 'Feedback', href: '/dashboard/feedback', desc: 'Send us your feedback.' },
+  { icon: '⚙️', label: 'Settings', href: '/dashboard/settings', desc: 'Account and preferences.' },
+]
+
+const ADMIN: Item[] = [
+  { icon: '🛡️', label: 'Admin Home', href: '/admin' },
+  { icon: '🖥️', label: 'System', href: '/admin/system' },
+  { icon: '🧠', label: 'AI', href: '/admin/ai' },
+  { icon: '💼', label: 'Sales', href: '/admin/sales' },
+  { icon: '💰', label: 'Revenue', href: '/admin/revenue' },
+  { icon: '☁️', label: 'SaaS', href: '/admin/saas' },
+  { icon: '🤝', label: 'Partners', href: '/admin/partners' },
+  { icon: '🚪', label: 'Onboarding', href: '/admin/onboarding' },
+  { icon: '✉️', label: 'Email', href: '/admin/email' },
+  { icon: '📶', label: 'SignalBoost', href: '/admin/signalboost' },
+  { icon: '⚙️', label: 'Settings', href: '/admin/settings' },
+  { icon: '👥', label: 'Roles', href: '/admin/settings/roles' },
+  { icon: '🗂️', label: 'Console', href: '/admin/adm' },
+]
+
+const HELP: Item[] = [
+  { icon: '❓', label: 'FAQ', href: '/faq' },
+  { icon: '✉️', label: 'Contact Support', href: '/support' },
+  { icon: '📖', label: 'Documentation', href: '/docs' },
+]
+
 export default function Navbar() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const pathname  = usePathname()
@@ -45,7 +110,6 @@ export default function Navbar() {
   const [openMenu, setOpenMenu]   = useState<string | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  // Auth + credits
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       const u = data?.user ?? null
@@ -82,10 +146,8 @@ export default function Navbar() {
     } catch { /* silent */ }
   }
 
-  // Close menus on route change
   useEffect(() => { setOpenMenu(null); setMobileOpen(false) }, [pathname])
 
-  // Signal animation
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -95,7 +157,6 @@ export default function Navbar() {
     const cx = W / 2, cy = H - 8
     let rings: { r: number; alpha: number }[] = []
     let last = 0, raf: number
-
     function draw(ts: number) {
       ctx.clearRect(0, 0, W, H)
       if (!last || ts - last > 2000) { rings.push({ r: 0, alpha: 1 }); last = ts }
@@ -121,50 +182,23 @@ export default function Navbar() {
     window.location.href = '/'
   }
 
-  // ── Data for dropdowns ──
-  const services = SERVICES.map(s => ({
-    key: s.key,
-    icon: s.icon,
-    accent: s.accent,
-    href: s.dashboardHref,
-    title: t(dict, `services.${s.key}.title`, s.titleFallback),
-    desc: t(dict, `services.${s.key}.desc`, s.descFallback),
-  }))
-
-  const workspace = UNIFIED_NAV
-    .filter(item => item.label !== 'Admin' || isAdmin)
-    .map(item => ({
-      icon: item.icon,
-      href: item.href,
-      description: item.description,
-      label: t(dict, `aiNav.${item.label.toLowerCase().replace(/\s+/g, '')}`, item.label),
-    }))
-
-  const help = [
-    { icon: '❓', label: t(dict, 'support.faq', 'FAQ'), href: '/faq' },
-    { icon: '✉️', label: t(dict, 'support.contact', 'Contact Support'), href: '/support' },
-    { icon: '📖', label: t(dict, 'support.documentation', 'Documentation'), href: '/docs' },
-  ]
-
   const planStyle = PLAN_STYLES[plan] || PLAN_STYLES.free
   const planLabel = t(dict, `plan.${plan}`, plan.charAt(0).toUpperCase() + plan.slice(1))
   const displayName = userName || user?.email || ''
 
-  const groupActive = (hrefs: string[]) =>
-    hrefs.some(h => h !== '/' && (pathname === h || pathname?.startsWith(h + '/')))
+  const groupActive = (items: Item[]) =>
+    items.some(i => i.href !== '/' && (pathname === i.href || pathname?.startsWith(i.href + '/')))
 
-  // ── Reusable styles ──
   const trigger = (active: boolean): React.CSSProperties => ({
     display: 'inline-flex', alignItems: 'center', gap: 6,
     background: 'transparent', border: 'none', cursor: 'pointer',
     color: active ? '#fff' : 'var(--text-secondary)',
     fontWeight: active ? 700 : 600, fontSize: 14, fontFamily: 'inherit',
-    padding: '8px 4px',
+    padding: '8px 4px', whiteSpace: 'nowrap',
   })
 
   const panelWrap = (open: boolean, align: 'left' | 'right'): React.CSSProperties => ({
-    position: 'absolute', top: '100%', [align]: 0,
-    paddingTop: 12,
+    position: 'absolute', top: '100%', [align]: 0, paddingTop: 12,
     opacity: open ? 1 : 0,
     transform: open ? 'translateY(0)' : 'translateY(8px)',
     visibility: open ? 'visible' : 'hidden',
@@ -188,7 +222,7 @@ export default function Navbar() {
     background: `linear-gradient(90deg, ${GOLD}, ${CYAN})`,
   }
 
-  function Group({ id, label, align = 'left', children }: { id: string; label: React.ReactNode; align?: 'left' | 'right'; children: React.ReactNode }) {
+  function Group({ id, label, items, align = 'left', cols = 1, width = 300 }: { id: string; label: string; items: Item[]; align?: 'left' | 'right'; cols?: number; width?: number }) {
     const open = openMenu === id
     return (
       <div
@@ -196,35 +230,38 @@ export default function Navbar() {
         onMouseEnter={() => setOpenMenu(id)}
         onMouseLeave={() => setOpenMenu(prev => (prev === id ? null : prev))}
       >
-        <button
-          type="button"
-          aria-haspopup="true"
-          aria-expanded={open}
-          onClick={() => setOpenMenu(open ? null : id)}
-          style={trigger(open)}
-        >
+        <button type="button" aria-haspopup="true" aria-expanded={open} onClick={() => setOpenMenu(open ? null : id)} style={trigger(open || groupActive(items))}>
           {label}
           <span style={{ fontSize: 10, opacity: 0.7, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .18s' }}>▾</span>
         </button>
         <div style={panelWrap(open, align)}>
           <div style={panelCard}>
             <span style={accentLine} aria-hidden="true" />
-            {children}
+            <div style={{ padding: 12, width, maxWidth: '92vw', display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 2 }}>
+              {items.map(item => (
+                <Link key={item.href} href={item.href} className="sbnav-row" style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 12, textDecoration: 'none' }}>
+                  <span style={{ fontSize: 18, flexShrink: 0 }}>{item.icon}</span>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'block', color: '#fff', fontWeight: 700, fontSize: 13 }}>{item.label}</span>
+                    {item.desc && <span style={{ display: 'block', color: 'var(--text-muted)', fontSize: 11, marginTop: 1, lineHeight: 1.35 }}>{item.desc}</span>}
+                  </span>
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       </div>
     )
   }
-
-  return (
+return (
     <>
       <style>{`
-        .sbnav-desktop { display: flex; align-items: center; gap: 28px; }
+        .sbnav-desktop { display: flex; align-items: center; gap: 20px; }
         .sbnav-right { display: flex; align-items: center; gap: 10px; }
         .sbnav-burger { display: none; }
         .sbnav-row { transition: background .15s ease; border-radius: 12px; }
         .sbnav-row:hover { background: var(--surface-1-hover); }
-        @media (max-width: 980px) {
+        @media (max-width: 1100px) {
           .sbnav-desktop, .sbnav-right { display: none !important; }
           .sbnav-burger { display: inline-flex !important; }
         }
@@ -232,7 +269,7 @@ export default function Navbar() {
 
       <nav style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 28px',
+        padding: '12px 24px',
         background: 'linear-gradient(135deg, rgba(8,10,20,.86), rgba(15,23,42,.62))',
         borderBottom: '1px solid rgba(26,240,255,.16)',
         boxShadow: '0 18px 60px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.08)',
@@ -250,55 +287,13 @@ export default function Navbar() {
         {/* Desktop nav */}
         <div className="sbnav-desktop">
           <Link href="/" style={{ ...trigger(pathname === '/'), display: 'inline-flex' }}>Home</Link>
-
-          <Group id="services" label="Services">
-            <div style={{ padding: 16, width: 580, maxWidth: '90vw' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                {services.map(s => (
-                  <Link key={s.key} href={s.href} className="sbnav-row" style={{ display: 'flex', gap: 12, padding: 12, textDecoration: 'none' }}>
-                    <span style={{
-                      flexShrink: 0, width: 38, height: 38, borderRadius: 11,
-                      display: 'grid', placeItems: 'center', fontSize: 18,
-                      background: `${s.accent}1f`, border: `1px solid ${s.accent}55`,
-                    }}>{s.icon}</span>
-                    <span style={{ minWidth: 0 }}>
-                      <span style={{ display: 'block', color: '#fff', fontWeight: 700, fontSize: 13 }}>{s.title}</span>
-                      <span style={{ color: 'var(--text-muted)', fontSize: 11, lineHeight: 1.4, marginTop: 2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as any }}>{s.desc}</span>
-                    </span>
-                  </Link>
-                ))}
-              </div>
-              <Link href="/dashboard" className="sbnav-row" style={{ display: 'block', marginTop: 8, padding: '10px 12px', textAlign: 'center', color: GOLD, fontWeight: 800, fontSize: 12, textDecoration: 'none', border: '1px solid var(--border-soft)' }}>
-                Open workspace →
-              </Link>
-            </div>
-          </Group>
-
-          <Group id="workspace" label="Workspace">
-            <div style={{ padding: 12, width: 320, maxWidth: '90vw', display: 'grid', gap: 2 }}>
-              {workspace.map(item => (
-                <Link key={item.href} href={item.href} className="sbnav-row" style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 12, textDecoration: 'none' }}>
-                  <span style={{ fontSize: 18, flexShrink: 0 }}>{item.icon}</span>
-                  <span style={{ minWidth: 0 }}>
-                    <span style={{ display: 'block', color: '#fff', fontWeight: 700, fontSize: 13 }}>{item.label}</span>
-                    <span style={{ display: 'block', color: 'var(--text-muted)', fontSize: 11, marginTop: 1 }}>{item.description}</span>
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </Group>
-
-          <Link href="/pricing" style={{ ...trigger(groupActive(['/pricing'])), display: 'inline-flex' }}>Pricing</Link>
-
-          <Group id="help" label="Help" align="right">
-            <div style={{ padding: 10, width: 220, display: 'grid', gap: 2 }}>
-              {help.map(item => (
-                <Link key={item.href} href={item.href} className="sbnav-row" style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 12px', textDecoration: 'none', color: '#fff', fontSize: 13, fontWeight: 600 }}>
-                  <span>{item.icon}</span>{item.label}
-                </Link>
-              ))}
-            </div>
-          </Group>
+          <Group id="build" label="Build" items={BUILD} cols={2} width={560} />
+          <Group id="launchpad" label="Launchpad" items={LAUNCHPAD} width={320} />
+          <Group id="grow" label="Grow" items={GROW} width={320} />
+          <Group id="workspace" label="Workspace" items={WORKSPACE} width={320} />
+          {isAdmin && <Group id="admin" label="Admin" items={ADMIN} cols={2} width={420} />}
+          <Link href="/pricing" style={{ ...trigger(pathname === '/pricing'), display: 'inline-flex' }}>Pricing</Link>
+          <Group id="help" label="Help" items={HELP} align="right" width={220} />
         </div>
 
         {/* Desktop right cluster */}
@@ -313,56 +308,34 @@ export default function Navbar() {
 
           {user && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,195,0,0.95)', fontFamily: 'monospace' }}>
-                ⚡ {credits}
-              </span>
-              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', padding: '3px 10px', borderRadius: 999, background: planStyle.bg, color: planStyle.color, fontFamily: 'monospace' }}>
-                {planLabel}
-              </span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,195,0,0.95)', fontFamily: 'monospace' }}>⚡ {credits}</span>
+              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', padding: '3px 10px', borderRadius: 999, background: planStyle.bg, color: planStyle.color, fontFamily: 'monospace' }}>{planLabel}</span>
               {displayName && (
-                <span title={displayName} style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {displayName}
-                </span>
+                <span title={displayName} style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</span>
               )}
             </span>
           )}
 
           {user ? (
-            <button onClick={handleLogout} style={{
-              background: 'transparent', color: 'var(--text-muted)',
-              border: '1px solid var(--border-soft)', borderRadius: 999,
-              padding: '8px 14px', cursor: 'pointer',
-            }}>
+            <button onClick={handleLogout} style={{ background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-soft)', borderRadius: 999, padding: '8px 14px', cursor: 'pointer' }}>
               {t(dict, 'logout', 'Log out')}
             </button>
           ) : (
-            <button onClick={() => setShowAuth(true)} style={{
-              background: GOLD, color: '#000', border: 'none', borderRadius: 999,
-              padding: '9px 22px', fontWeight: 800, cursor: 'pointer',
-            }}>
+            <button onClick={() => setShowAuth(true)} style={{ background: GOLD, color: '#000', border: 'none', borderRadius: 999, padding: '9px 22px', fontWeight: 800, cursor: 'pointer' }}>
               {t(dict, 'getStarted', 'Get started')}
             </button>
           )}
         </div>
 
         {/* Mobile burger */}
-        <button
-          className="sbnav-burger"
-          aria-label="Menu"
-          onClick={() => setMobileOpen(o => !o)}
-          style={{ background: 'transparent', border: '1px solid var(--border-soft)', borderRadius: 10, color: '#fff', padding: '8px 12px', cursor: 'pointer', fontSize: 18 }}
-        >
+        <button className="sbnav-burger" aria-label="Menu" onClick={() => setMobileOpen(o => !o)} style={{ background: 'transparent', border: '1px solid var(--border-soft)', borderRadius: 10, color: '#fff', padding: '8px 12px', cursor: 'pointer', fontSize: 18 }}>
           {mobileOpen ? '✕' : '☰'}
         </button>
       </nav>
 
       {/* Mobile panel */}
       {mobileOpen && (
-        <div style={{
-          position: 'sticky', top: 65, zIndex: 99,
-          background: 'rgba(8,10,20,.98)', borderBottom: '1px solid var(--border-medium)',
-          padding: 16, maxHeight: '80vh', overflowY: 'auto', backdropFilter: 'blur(12px)',
-        }}>
+        <div style={{ position: 'sticky', top: 65, zIndex: 99, background: 'rgba(8,10,20,.98)', borderBottom: '1px solid var(--border-medium)', padding: 16, maxHeight: '80vh', overflowY: 'auto', backdropFilter: 'blur(12px)' }}>
           {user && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,195,0,0.95)', fontFamily: 'monospace' }}>⚡ {credits}</span>
@@ -370,33 +343,38 @@ export default function Navbar() {
               {displayName && <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>{displayName}</span>}
             </div>
           )}
-          <div style={{ display: 'grid', gap: 6, marginBottom: 14 }}>
+
+          <div style={{ display: 'grid', gap: 4, marginBottom: 14 }}>
             <Link href="/" style={{ padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 700, fontSize: 14 }}>🏠 Home</Link>
           </div>
-          <div style={{ display: 'grid', gap: 6, marginBottom: 14 }}>
-            <span style={{ color: 'var(--text-faint)', fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>Services</span>
-            {services.map(s => (
-              <Link key={s.key} href={s.href} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 600, fontSize: 14 }}>
-                <span>{s.icon}</span>{s.title}
-              </Link>
-            ))}
-          </div>
-          <div style={{ display: 'grid', gap: 6, marginBottom: 14 }}>
-            <span style={{ color: 'var(--text-faint)', fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>Workspace</span>
-            {workspace.map(item => (
-              <Link key={item.href} href={item.href} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 600, fontSize: 14 }}>
-                <span>{item.icon}</span>{item.label}
-              </Link>
-            ))}
-          </div>
-          <div style={{ display: 'grid', gap: 6, marginBottom: 14 }}>
+
+          {[
+            { title: 'Build', items: BUILD },
+            { title: 'Launchpad', items: LAUNCHPAD },
+            { title: 'Grow', items: GROW },
+            { title: 'Workspace', items: WORKSPACE },
+            ...(isAdmin ? [{ title: 'Admin', items: ADMIN }] : []),
+          ].map(section => (
+            <div key={section.title} style={{ display: 'grid', gap: 4, marginBottom: 14 }}>
+              <span style={{ color: 'var(--text-faint)', fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>{section.title}</span>
+              {section.items.map(item => (
+                <Link key={item.href} href={item.href} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 600, fontSize: 14 }}>
+                  <span>{item.icon}</span>{item.label}
+                </Link>
+              ))}
+            </div>
+          ))}
+
+          <div style={{ display: 'grid', gap: 4, marginBottom: 14 }}>
+            <span style={{ color: 'var(--text-faint)', fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>More</span>
             <Link href="/pricing" style={{ padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 600, fontSize: 14 }}>Pricing</Link>
-            {help.map(item => (
+            {HELP.map(item => (
               <Link key={item.href} href={item.href} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 600, fontSize: 14 }}>
                 <span>{item.icon}</span>{item.label}
               </Link>
             ))}
           </div>
+
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <select value={lang} onChange={e => setLang(e.target.value)} style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--border-medium)', borderRadius: 999, padding: '8px 12px', fontSize: 12 }}>
               {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}

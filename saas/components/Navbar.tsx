@@ -74,7 +74,7 @@ export default function Navbar() {
 
   async function fetchCredits() {
     try {
-      const res  = await fetch('/api/credits')
+      const res  = await fetch('/api/credits', { cache: 'no-store' })
       const data = await res.json()
       if (typeof data.credits === 'number') setCredits(data.credits)
       if (data.plan)  setPlan(data.plan)
@@ -148,6 +148,7 @@ export default function Navbar() {
 
   const planStyle = PLAN_STYLES[plan] || PLAN_STYLES.free
   const planLabel = t(dict, `plan.${plan}`, plan.charAt(0).toUpperCase() + plan.slice(1))
+  const displayName = userName || user?.email || ''
 
   const groupActive = (hrefs: string[]) =>
     hrefs.some(h => h !== '/' && (pathname === h || pathname?.startsWith(h + '/')))
@@ -316,6 +317,11 @@ export default function Navbar() {
               <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', padding: '3px 10px', borderRadius: 999, background: planStyle.bg, color: planStyle.color, fontFamily: 'monospace' }}>
                 {planLabel}
               </span>
+              {displayName && (
+                <span title={displayName} style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {displayName}
+                </span>
+              )}
             </span>
           )}
 
@@ -355,6 +361,13 @@ export default function Navbar() {
           background: 'rgba(8,10,20,.98)', borderBottom: '1px solid var(--border-medium)',
           padding: 16, maxHeight: '80vh', overflowY: 'auto', backdropFilter: 'blur(12px)',
         }}>
+          {user && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,195,0,0.95)', fontFamily: 'monospace' }}>⚡ {credits}</span>
+              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', padding: '3px 10px', borderRadius: 999, background: planStyle.bg, color: planStyle.color, fontFamily: 'monospace' }}>{planLabel}</span>
+              {displayName && <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>{displayName}</span>}
+            </div>
+          )}
           <div style={{ display: 'grid', gap: 6, marginBottom: 14 }}>
             <span style={{ color: 'var(--text-faint)', fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>Services</span>
             {services.map(s => (

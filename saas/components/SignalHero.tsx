@@ -148,6 +148,17 @@ export default function SignalHero() {
     )
   }
 
+  // ---- CTA actions ----
+  const handlePrimary = () => {
+    window.location.href = '/dashboard'
+  }
+
+  const handleSecondary = () => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: Math.round(window.innerHeight * 0.9), behavior: 'smooth' })
+    }
+  }
+
   return (
     <section
       style={{
@@ -276,6 +287,7 @@ export default function SignalHero() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <button
+            onClick={handlePrimary}
             style={{
               background: '#ffc300',
               color: '#000',
@@ -291,6 +303,7 @@ export default function SignalHero() {
           </button>
 
           <button
+            onClick={handleSecondary}
             style={{
               color: 'rgba(255,255,255,0.5)',
               fontSize: 15,

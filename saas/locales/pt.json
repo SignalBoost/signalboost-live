@@ -1590,5 +1590,53 @@
   "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
   "wireframes.modules.assistant.panel1": "Task list panel",
   "wireframes.modules.assistant.panel2": "Reminder timeline",
-  "wireframes.modules.assistant.panel3": "Productivity insights chart"
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "podcasts": {
+    "eyebrow": "Estação SaaS SignalBoost",
+    "title": "Sistema de otimização de podcasts",
+    "subtitle": "Analise feeds, otimize metadados e transcrições, reconstrua RSS moderno e roteie consultas de podcast pelo Concierge.",
+    "analyzer": {
+      "title": "Analisador de podcasts",
+      "loading": "Analisando…",
+      "button": "Botão Analisar"
+    },
+    "feed": {
+      "label": "Campo de URL do feed",
+      "placeholder": "URL RSS ou link do Apple Podcasts"
+    },
+    "error": {
+      "generic": "Não foi possível processar o feed."
+    },
+    "score": {
+      "audio": "Áudio",
+      "metadata": "Metadados",
+      "distribution": "Distribuição",
+      "seo": "SEO",
+      "accessibility": "Acessibilidade"
+    },
+    "audit": {
+      "result": "Visualização do resultado da auditoria",
+      "episodes": "episódios"
+    },
+    "optimizer": {
+      "title": "Otimizador de podcasts",
+      "selector": "Seletor de episódio",
+      "loading": "Otimizando…",
+      "button": "Otimizar metadados",
+      "current": "Metadados atuais",
+      "ai": "Metadados otimizados por IA",
+      "noDescription": "Sem descrição no feed.",
+      "apply": "Aplicar alterações",
+      "empty": "Execute o otimizador para gerar metadados e transcrições."
+    },
+    "rebuild": {
+      "title": "Motor de reconstrução de podcasts",
+      "banner": "Recomendação: gere um RSS pronto para Podcasting 2.0 com metadados normalizados e transcrições.",
+      "loading": "Gerando…",
+      "button": "Gerar reconstrução",
+      "preview": "Prévia da reconstrução",
+      "export": "Opções de exportação"
+    },
+    "footer": "Rodapé: status saudável, sincronização ativa, saídas JSON seguras."
+  }
 }

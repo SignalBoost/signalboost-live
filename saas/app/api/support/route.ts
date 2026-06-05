@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 import { NextRequest, NextResponse } from 'next/server'
 import { getConciergeAnswer } from '@/lib/platform/unifiedPlatform'
+import { runPodcastConciergePipeline } from '@/lib/podcast/conciergePipeline'
 
 type SupportMessage = { role?: 'user' | 'assistant' | 'system'; content?: string }
 
@@ -39,9 +40,14 @@ export async function POST(req: NextRequest) {
 
     const latestUserMessage = [...sanitized].reverse().find(m => m.role === 'user')?.content || ''
     const local = getConciergeAnswer(latestUserMessage, languageCode, currentPage)
+    const podcastPipeline = runPodcastConciergePipeline(latestUserMessage, languageCode)
+    const isPodcastIntent = podcastPipeline.intent !== 'general'
 
     if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json({ reply: local.reply, telemetry: local, source: 'deterministic-concierge' })
+      const podcastReply = isPodcastIntent
+        ? `${podcastPipeline.replyPrefix} Open /saas-station/podcasts, paste the feed URL, then choose Analyzer, Optimizer, or Rebuild. Telemetry will record the Concierge action.`
+        : local.reply
+      return NextResponse.json({ reply: podcastReply, telemetry: { ...local, podcastPipeline }, source: isPodcastIntent ? 'deterministic-podcast-concierge' : 'deterministic-concierge' })
     }
 
     const openai = getOpenAIClient()
@@ -55,7 +61,7 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: 'system',
-          content: `You are SignalBoost Concierge for the unified SignalBoost Marketplace + SaaS platform. Reply strictly in ${language}. Be practical, concise, accessible, and HMI-style with steps. Cover Marketplace partners/categories/bookings and SaaS modules Promote Business, Reviews, Calendar, Spreadsheets, Outreach, Admin telemetry, CRM pipeline, forecasts, financial/KPI dashboards, and owner/admin restrictions when relevant. Always mention telemetry logging for Concierge actions.`
+          content: `You are SignalBoost Concierge for the unified SignalBoost Marketplace + SaaS platform. Reply strictly in ${language}. Be practical, concise, accessible, and HMI-style with steps. Cover Marketplace partners/categories/bookings and SaaS modules Promote Business, Reviews, Calendar, Spreadsheets, Outreach, Admin telemetry, CRM pipeline, forecasts, financial/KPI dashboards, podcast analyzer, podcast optimizer, podcast rebuild engine, and owner/admin restrictions when relevant. Always mention telemetry logging for Concierge actions. Podcast ConciergePipeline context: ${JSON.stringify(podcastPipeline)}. If podcastPipeline.intent is not general, answer with JSON-safe guidance that matches the schema and cite the /saas-station/podcasts workflow.`
         },
         ...sanitized,
       ],
@@ -70,7 +76,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'AI returned an empty response.' }, { status: 502 })
     }
 
-    return NextResponse.json({ reply, telemetry: local, source: 'openai-concierge' })
+    return NextResponse.json({ reply, telemetry: { ...local, podcastPipeline }, source: isPodcastIntent ? 'openai-podcast-concierge' : 'openai-concierge' })
   } catch (error) {
     console.error('Support API error', error)
     return NextResponse.json({ error: 'Could not process your request right now.' }, { status: 500 })

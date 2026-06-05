@@ -1590,5 +1590,53 @@
   "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
   "wireframes.modules.assistant.panel1": "Task list panel",
   "wireframes.modules.assistant.panel2": "Reminder timeline",
-  "wireframes.modules.assistant.panel3": "Productivity insights chart"
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "podcasts": {
+    "eyebrow": "SaaS-станция SignalBoost",
+    "title": "Система оптимизации подкастов",
+    "subtitle": "Анализируйте фиды, оптимизируйте метаданные и транскрипты, перестраивайте современный RSS и направляйте запросы через Concierge.",
+    "analyzer": {
+      "title": "Анализатор подкастов",
+      "loading": "Анализ…",
+      "button": "Кнопка анализа"
+    },
+    "feed": {
+      "label": "Поле URL фида",
+      "placeholder": "RSS URL или ссылка Apple Podcasts"
+    },
+    "error": {
+      "generic": "Не удалось обработать фид."
+    },
+    "score": {
+      "audio": "Аудио",
+      "metadata": "Метаданные",
+      "distribution": "Дистрибуция",
+      "seo": "SEO",
+      "accessibility": "Доступность"
+    },
+    "audit": {
+      "result": "Вид результата аудита",
+      "episodes": "эпизодов"
+    },
+    "optimizer": {
+      "title": "Оптимизатор подкастов",
+      "selector": "Выбор эпизода",
+      "loading": "Оптимизация…",
+      "button": "Оптимизировать метаданные",
+      "current": "Текущие метаданные",
+      "ai": "Метаданные от ИИ",
+      "noDescription": "В фиде нет описания.",
+      "apply": "Применить изменения",
+      "empty": "Запустите оптимизатор для создания метаданных и транскриптов."
+    },
+    "rebuild": {
+      "title": "Движок перестройки подкаста",
+      "banner": "Рекомендация: создайте RSS для Podcasting 2.0 с нормализованными метаданными и транскриптами.",
+      "loading": "Генерация…",
+      "button": "Сгенерировать перестройку",
+      "preview": "Предпросмотр перестройки",
+      "export": "Параметры экспорта"
+    },
+    "footer": "Футер: статус в норме, синхронизация активна, JSON-безопасные выходы."
+  }
 }

@@ -1590,5 +1590,53 @@
   "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
   "wireframes.modules.assistant.panel1": "Task list panel",
   "wireframes.modules.assistant.panel2": "Reminder timeline",
-  "wireframes.modules.assistant.panel3": "Productivity insights chart"
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "podcasts": {
+    "eyebrow": "Stacja SaaS SignalBoost",
+    "title": "System optymalizacji podcastów",
+    "subtitle": "Analizuj kanały, optymalizuj metadane i transkrypcje, przebudowuj nowoczesny RSS i kieruj pytania podcastowe przez Concierge.",
+    "analyzer": {
+      "title": "Analizator podcastów",
+      "loading": "Analizowanie…",
+      "button": "Przycisk analizuj"
+    },
+    "feed": {
+      "label": "Pole adresu kanału",
+      "placeholder": "Adres RSS lub link Apple Podcasts"
+    },
+    "error": {
+      "generic": "Nie można przetworzyć kanału."
+    },
+    "score": {
+      "audio": "Audio",
+      "metadata": "Metadane",
+      "distribution": "Dystrybucja",
+      "seo": "SEO",
+      "accessibility": "Dostępność"
+    },
+    "audit": {
+      "result": "Widok wyniku audytu",
+      "episodes": "odcinki"
+    },
+    "optimizer": {
+      "title": "Optymalizator podcastów",
+      "selector": "Wybór odcinka",
+      "loading": "Optymalizacja…",
+      "button": "Optymalizuj metadane",
+      "current": "Aktualne metadane",
+      "ai": "Metadane zoptymalizowane przez AI",
+      "noDescription": "Brak opisu w kanale.",
+      "apply": "Zastosuj zmiany",
+      "empty": "Uruchom optymalizator, aby wygenerować metadane i transkrypcje."
+    },
+    "rebuild": {
+      "title": "Silnik przebudowy podcastu",
+      "banner": "Rekomendacja: wygeneruj RSS gotowy na Podcasting 2.0 ze znormalizowanymi metadanymi i transkrypcjami.",
+      "loading": "Generowanie…",
+      "button": "Generuj przebudowę",
+      "preview": "Podgląd przebudowy",
+      "export": "Opcje eksportu"
+    },
+    "footer": "Stopka: status dobry, synchronizacja aktywna, bezpieczne wyjścia JSON."
+  }
 }

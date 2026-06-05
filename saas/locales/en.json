@@ -1590,5 +1590,53 @@
   "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
   "wireframes.modules.assistant.panel1": "Task list panel",
   "wireframes.modules.assistant.panel2": "Reminder timeline",
-  "wireframes.modules.assistant.panel3": "Productivity insights chart"
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "podcasts": {
+    "eyebrow": "SignalBoost SaaS Station",
+    "title": "Podcast Optimization System",
+    "subtitle": "Analyze podcast feeds, optimize episode metadata and transcripts, rebuild modern RSS outputs, and route podcast requests through Concierge.",
+    "analyzer": {
+      "title": "Podcast Analyzer",
+      "loading": "Analyzing…",
+      "button": "AnalyzeButton"
+    },
+    "feed": {
+      "label": "FeedInputField",
+      "placeholder": "RSS feed URL or Apple Podcasts link"
+    },
+    "error": {
+      "generic": "Could not process the feed."
+    },
+    "score": {
+      "audio": "Audio",
+      "metadata": "Metadata",
+      "distribution": "Distribution",
+      "seo": "SEO",
+      "accessibility": "Accessibility"
+    },
+    "audit": {
+      "result": "AuditResultView",
+      "episodes": "episodes"
+    },
+    "optimizer": {
+      "title": "Podcast Optimizer",
+      "selector": "EpisodeSelector",
+      "loading": "Optimizing…",
+      "button": "Optimize metadata",
+      "current": "CurrentMetadataView",
+      "ai": "AIOptimizedMetadataView",
+      "noDescription": "No description in feed.",
+      "apply": "ApplyChangesButton",
+      "empty": "Run the optimizer to generate metadata and transcripts."
+    },
+    "rebuild": {
+      "title": "Podcast Rebuild Engine",
+      "banner": "RebuildRecommendationBanner: Generate a Podcasting 2.0-ready RSS feed with normalized metadata and transcript payloads.",
+      "loading": "Generating…",
+      "button": "GenerateRebuildButton",
+      "preview": "RebuildPreview",
+      "export": "ExportOptions"
+    },
+    "footer": "Footer: status healthy, sync health live, JSON-safe outputs enabled."
+  }
 }

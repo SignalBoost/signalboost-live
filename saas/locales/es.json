@@ -1590,5 +1590,53 @@
   "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
   "wireframes.modules.assistant.panel1": "Task list panel",
   "wireframes.modules.assistant.panel2": "Reminder timeline",
-  "wireframes.modules.assistant.panel3": "Productivity insights chart"
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "podcasts": {
+    "eyebrow": "Estación SaaS de SignalBoost",
+    "title": "Sistema de optimización de podcasts",
+    "subtitle": "Analiza feeds, optimiza metadatos y transcripciones, reconstruye RSS moderno y enruta consultas de podcast por Concierge.",
+    "analyzer": {
+      "title": "Analizador de podcasts",
+      "loading": "Analizando…",
+      "button": "Botón Analizar"
+    },
+    "feed": {
+      "label": "Campo de URL del feed",
+      "placeholder": "URL RSS o enlace de Apple Podcasts"
+    },
+    "error": {
+      "generic": "No se pudo procesar el feed."
+    },
+    "score": {
+      "audio": "Audio",
+      "metadata": "Metadatos",
+      "distribution": "Distribución",
+      "seo": "SEO",
+      "accessibility": "Accesibilidad"
+    },
+    "audit": {
+      "result": "Vista del resultado de auditoría",
+      "episodes": "episodios"
+    },
+    "optimizer": {
+      "title": "Optimizador de podcasts",
+      "selector": "Selector de episodio",
+      "loading": "Optimizando…",
+      "button": "Optimizar metadatos",
+      "current": "Metadatos actuales",
+      "ai": "Metadatos optimizados por IA",
+      "noDescription": "Sin descripción en el feed.",
+      "apply": "Aplicar cambios",
+      "empty": "Ejecuta el optimizador para generar metadatos y transcripciones."
+    },
+    "rebuild": {
+      "title": "Motor de reconstrucción de podcasts",
+      "banner": "Recomendación: genera un RSS listo para Podcasting 2.0 con metadatos normalizados y transcripciones.",
+      "loading": "Generando…",
+      "button": "Generar reconstrucción",
+      "preview": "Vista previa de reconstrucción",
+      "export": "Opciones de exportación"
+    },
+    "footer": "Pie: estado saludable, sincronización activa, salidas JSON seguras."
+  }
 }

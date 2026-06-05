@@ -1,12 +1,5 @@
 // saas/lib/auth/access.ts
-// Single source of truth for authorization. Every protected page/route/menu asks this
-// "who is this user and what role do they have", instead of each one checking differently.
-//
-// Resolution order for a user's role:
-//   1. OWNER_EMAILS env  -> 'owner'   (hard backstop so you can never lock yourself out)
-//   2. team_members row  -> that role (the real, manageable source of truth)
-//   3. ADMIN_EMAILS env  -> 'admin'   (legacy backstop)
-//   4. otherwise         -> 'member'  (least privilege)
+// Single source of truth for authorization.
 
 import { createServerClient } from '@supabase/ssr'
 import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
@@ -19,8 +12,16 @@ export type AccessContext = {
   email: string | null
   role: Role
   isOwner: boolean
-  isAdmin: boolean   // true for owner OR admin (i.e. can see IT/admin pages)
-  isMember: boolean  // true for any signed-in team member (owner/admin/member)
+  isAdmin: boolean
+  isMember: boolean
+}
+
+// A guard result that never requires type-narrowing: all fields always present.
+export type GuardResult = {
+  ok: boolean
+  status: number     // 200 when ok, 401/403 otherwise
+  error: string      // '' when ok
+  ctx: AccessContext
 }
 
 function envList(name: string): string[] {
@@ -66,10 +67,6 @@ function buildContext(userId: string | null, email: string | null, role: Role): 
   }
 }
 
-/**
- * Resolve the current user's access context from their session.
- * Safe to call from any server route or server component.
- */
 export async function getAccess(): Promise<AccessContext> {
   const supabase = await getServerSupabase()
   const { data: { user } } = await supabase.auth.getUser()
@@ -78,18 +75,15 @@ export async function getAccess(): Promise<AccessContext> {
 
   const email = (user.email || '').toLowerCase()
 
-  // 1. Owner backstop — you can never lock yourself out via env.
   if (email && envList('OWNER_EMAILS').includes(email)) {
     return buildContext(user.id, email, 'owner')
   }
 
-  // 2. team_members is the real source of truth.
   try {
     const { data } = await supabase
       .from('team_members')
       .select('role, status')
       .or(`member_id.eq.${user.id},member_email.eq.${email}`)
-      .order('role', { ascending: true }) // 'admin' < 'member' < 'owner' alphabetically; we pick best below
     if (Array.isArray(data) && data.length > 0) {
       const active = data.filter(r => r.status === 'active' || r.status === 'pending')
       const rank: Record<string, number> = { owner: 3, admin: 2, member: 1 }
@@ -103,31 +97,26 @@ export async function getAccess(): Promise<AccessContext> {
       if (best === 'member') return buildContext(user.id, email, 'member')
     }
   } catch {
-    // table/query problem — fall through to env backstops, never crash auth
+    // never crash auth
   }
 
-  // 3. Legacy admin backstop.
   if (email && envList('ADMIN_EMAILS').includes(email)) {
     return buildContext(user.id, email, 'admin')
   }
 
-  // 4. Signed in but not on any team -> treat as member-level (least privilege),
-  //    so a logged-in person isn't locked out of their own basic dashboard,
-  //    but has no admin/IT access.
   return buildContext(user.id, email, 'member')
 }
 
-/** Convenience guards for API routes. Throw-style helpers return the context or a reason. */
-export async function requireAdmin(): Promise<{ ok: true; ctx: AccessContext } | { ok: false; status: number; error: string }> {
+export async function requireAdmin(): Promise<GuardResult> {
   const ctx = await getAccess()
-  if (ctx.role === 'guest') return { ok: false, status: 401, error: 'Not signed in.' }
-  if (!ctx.isAdmin) return { ok: false, status: 403, error: 'Admin access required.' }
-  return { ok: true, ctx }
+  if (ctx.role === 'guest') return { ok: false, status: 401, error: 'Not signed in.', ctx }
+  if (!ctx.isAdmin) return { ok: false, status: 403, error: 'Admin access required.', ctx }
+  return { ok: true, status: 200, error: '', ctx }
 }
 
-export async function requireOwner(): Promise<{ ok: true; ctx: AccessContext } | { ok: false; status: number; error: string }> {
+export async function requireOwner(): Promise<GuardResult> {
   const ctx = await getAccess()
-  if (ctx.role === 'guest') return { ok: false, status: 401, error: 'Not signed in.' }
-  if (!ctx.isOwner) return { ok: false, status: 403, error: 'Owner access required.' }
-  return { ok: true, ctx }
+  if (ctx.role === 'guest') return { ok: false, status: 401, error: 'Not signed in.', ctx }
+  if (!ctx.isOwner) return { ok: false, status: 403, error: 'Owner access required.', ctx }
+  return { ok: true, status: 200, error: '', ctx }
 }

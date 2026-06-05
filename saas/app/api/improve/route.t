@@ -41,7 +41,7 @@ async function fetchPage(url: string) {
   const start = Date.now()
   try {
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'SignalBoostBot/1.0 (+website audit)', Accept: 'text/html' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SignalBoostBot/1.0; +website audit)', Accept: 'text/html,application/xhtml+xml' },
       signal: controller.signal,
       redirect: 'follow',
     })
@@ -159,44 +159,49 @@ async function aiSummary(checks: Check[], score: number, url: string, language: 
 }
 
 export async function POST(req: NextRequest) {
-  let body: any
-  try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
-
-  let raw = String(body?.url || '').trim()
-  if (!raw) return NextResponse.json({ error: 'Please enter a URL.' }, { status: 400 })
-  if (!/^https?:\/\//i.test(raw)) raw = 'https://' + raw
-
-  let parsed: URL
-  try { parsed = new URL(raw) } catch { return NextResponse.json({ error: 'That does not look like a valid URL.' }, { status: 400 }) }
-  if (!/^https?:$/.test(parsed.protocol)) return NextResponse.json({ error: 'Only http and https URLs are supported.' }, { status: 400 })
-  if (isPrivateHost(parsed.hostname)) return NextResponse.json({ error: 'That host is not allowed.' }, { status: 400 })
-
-  const language = String(body?.language || 'en')
-
-  let page
   try {
-    page = await fetchPage(parsed.toString())
+    let body: any
+    try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+
+    let raw = String(body?.url || '').trim()
+    if (!raw) return NextResponse.json({ error: 'Please enter a URL.' }, { status: 400 })
+    if (!/^https?:\/\//i.test(raw)) raw = 'https://' + raw
+
+    let parsed: URL
+    try { parsed = new URL(raw) } catch { return NextResponse.json({ error: 'That does not look like a valid URL.' }, { status: 400 }) }
+    if (!/^https?:$/.test(parsed.protocol)) return NextResponse.json({ error: 'Only http and https URLs are supported.' }, { status: 400 })
+    if (isPrivateHost(parsed.hostname)) return NextResponse.json({ error: 'That host is not allowed.' }, { status: 400 })
+
+    const language = String(body?.language || 'en')
+
+    let page
+    try {
+      page = await fetchPage(parsed.toString())
+    } catch (e: any) {
+      const msg = e?.name === 'AbortError' ? 'The site took too long to respond.' : `Could not reach that URL (${e?.message || 'network error'}).`
+      return NextResponse.json({ error: msg }, { status: 502 })
+    }
+
+    if (page.status >= 400) {
+      return NextResponse.json({ error: `The site returned HTTP ${page.status}.`, fetchedStatus: page.status }, { status: 502 })
+    }
+
+    const checks = runChecks(page.html, page.finalUrl, page.ms, page.bytes)
+    const score = scoreOf(checks)
+    const ai = await aiSummary(checks, score, page.finalUrl, language)
+    const summary = ai || deterministicSummary(checks, score)
+
+    return NextResponse.json({
+      url: raw,
+      finalUrl: page.finalUrl,
+      fetchedStatus: page.status,
+      score,
+      checks,
+      summary,
+      source: ai ? 'openai' : 'deterministic',
+    })
   } catch (e: any) {
-    const msg = e?.name === 'AbortError' ? 'The site took too long to respond.' : 'Could not reach that URL.'
-    return NextResponse.json({ error: msg }, { status: 502 })
+    // Last-resort guard: always return JSON so the client shows a real message, never a crash page.
+    return NextResponse.json({ error: `Audit failed: ${e?.message || 'unexpected error'}` }, { status: 500 })
   }
-
-  if (page.status >= 400) {
-    return NextResponse.json({ error: `The site returned HTTP ${page.status}.`, fetchedStatus: page.status }, { status: 502 })
-  }
-
-  const checks = runChecks(page.html, page.finalUrl, page.ms, page.bytes)
-  const score = scoreOf(checks)
-  const ai = await aiSummary(checks, score, page.finalUrl, language)
-  const summary = ai || deterministicSummary(checks, score)
-
-  return NextResponse.json({
-    url: raw,
-    finalUrl: page.finalUrl,
-    fetchedStatus: page.status,
-    score,
-    checks,
-    summary,
-    source: ai ? 'openai' : 'deterministic',
-  })
 }

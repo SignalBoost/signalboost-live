@@ -4,9 +4,13 @@ import { createServerClient } from '@supabase/ssr'
 
 const OPERATOR_PATH = '/dashboard/operator'
 
-// Only these emails may access the AI Website Operator while it is owner-only.
-// Add more here later, or replace with a role/plan check when opening to users.
-const OWNER_EMAILS = ['cadomos@gmail.com']
+// Owner-only access to the AI Website Operator.
+// Set OPERATOR_OWNER_EMAILS in the environment (comma-separated) to control who has access,
+// without changing code. Falls back to the original owner email if the var is unset.
+const OWNER_EMAILS = (process.env.OPERATOR_OWNER_EMAILS || 'cadomos@gmail.com')
+  .split(',')
+  .map(e => e.trim().toLowerCase())
+  .filter(Boolean)
 
 export async function proxy(req: NextRequest) {
   // Only guard the operator path; everything else passes through untouched.

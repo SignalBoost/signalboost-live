@@ -35,12 +35,17 @@ function mergeWithEnglishFallback(english: Dict, localized: Dict): Dict {
 
 export async function loadLanguage(lang: string): Promise<Dict> {
   const english = await dictionaries.en()
-  if (lang === 'en' || !dictionaries[lang]) return english
+  if (lang === 'en' || !dictionaries[lang]) {
+    // Stamp the active language so suite copy (lib/i18n/suiteCopy.ts) can resolve correctly.
+    return { ...english, __lang: 'en' }
+  }
 
   try {
     const localized = await dictionaries[lang]()
-    return mergeWithEnglishFallback(english, localized)
+    const merged = mergeWithEnglishFallback(english, localized)
+    merged.__lang = lang
+    return merged
   } catch {
-    return english
+    return { ...english, __lang: 'en' }
   }
 }

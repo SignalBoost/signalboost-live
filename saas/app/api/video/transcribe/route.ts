@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
 import { refundVideoCredit, spendVideoCredit } from '@/lib/credits'
@@ -26,19 +27,38 @@ type JsonSafeVideoResponse<T> = {
   }
 }
 
+type StoredVideoPayload = {
+  bucket?: string
+  path?: string
+  locale?: SupportedVideoLocale
+  durationSec?: number
+}
+
 const supportedLocales: SupportedVideoLocale[] = ['en', 'es', 'pt', 'pl', 'ru']
-const maxDirectUploadMb = 25
+const storageCaptionMaxMb = 24
+const directCaptionMaxMb = 4
 
 function json<T>(body: JsonSafeVideoResponse<T>, status = 200) {
   return NextResponse.json(body, { status })
 }
 
-function locale(value: FormDataEntryValue | null): SupportedVideoLocale {
+function locale(value: unknown): SupportedVideoLocale {
   const requested = String(value || 'en')
 
   return supportedLocales.includes(requested as SupportedVideoLocale)
     ? requested as SupportedVideoLocale
     : 'en'
+}
+
+function adminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!url || !key) return null
+
+  return createClient(url, key, {
+    auth: { persistSession: false },
+  })
 }
 
 async function getUser() {
@@ -119,33 +139,92 @@ function fallbackCues(text: string, durationSec: number): CaptionCue[] {
   }))
 }
 
-export async function POST(request: Request) {
+function filenameFromPath(path: string) {
+  return path.split('/').pop() || 'video.mp4'
+}
+
+async function getVideoFromRequest(request: Request): Promise<{
+  file: File
+  lang: SupportedVideoLocale
+  durationSec: number
+}> {
+  const contentType = request.headers.get('content-type') || ''
+
+  if (contentType.includes('application/json')) {
+    const body = await request.json() as StoredVideoPayload
+    const lang = locale(body.locale)
+    const bucket = String(body.bucket || '')
+    const path = String(body.path || '')
+    const durationSec = Number(body.durationSec || 0)
+
+    if (!bucket || !path) {
+      throw new Error('Stored video bucket and path are required.')
+    }
+
+    const supabase = adminClient()
+
+    if (!supabase) {
+      throw new Error('Storage is not configured. Add SUPABASE_SERVICE_ROLE_KEY in Vercel.')
+    }
+
+    const { data, error } = await supabase.storage.from(bucket).download(path)
+
+    if (error || !data) {
+      throw new Error(error?.message || 'Could not download uploaded video from storage.')
+    }
+
+    if (data.size > storageCaptionMaxMb * 1024 * 1024) {
+      throw new Error(
+        `This video is too large for immediate captions (${storageCaptionMaxMb} MB max). Background caption processing is required for larger videos.`,
+      )
+    }
+
+    const file = new File(
+      [data],
+      filenameFromPath(path),
+      { type: data.type || 'video/mp4' },
+    )
+
+    return { file, lang, durationSec }
+  }
+
   const form = await request.formData()
   const lang = locale(form.get('locale'))
   const video = form.get('video')
   const durationSec = Number(form.get('durationSec') || 0)
 
   if (!(video instanceof File)) {
-    return json(
-      {
-        ok: false,
-        data: null,
-        error: 'A video file is required for AI caption generation.',
-        meta: { locale: lang, generatedAt: new Date().toISOString() },
-      },
-      400,
+    throw new Error('A video file is required for AI caption generation.')
+  }
+
+  if (video.size > directCaptionMaxMb * 1024 * 1024) {
+    throw new Error(
+      `Direct browser captioning supports files up to ${directCaptionMaxMb} MB. Upload the video to storage first, then generate captions.`,
     )
   }
 
-  if (video.size > maxDirectUploadMb * 1024 * 1024) {
+  return { file: video, lang, durationSec }
+}
+
+export async function POST(request: Request) {
+  let videoFile: File
+  let lang: SupportedVideoLocale
+  let durationSec = 0
+
+  try {
+    const video = await getVideoFromRequest(request)
+    videoFile = video.file
+    lang = video.lang
+    durationSec = video.durationSec
+  } catch (error) {
     return json(
       {
         ok: false,
         data: null,
-        error: `This direct captioning flow supports files up to ${maxDirectUploadMb} MB. Use background caption processing for longer videos.`,
-        meta: { locale: lang, generatedAt: new Date().toISOString() },
+        error: error instanceof Error ? error.message : 'Invalid caption request.',
+        meta: { locale: 'en', generatedAt: new Date().toISOString() },
       },
-      413,
+      400,
     )
   }
 
@@ -190,7 +269,7 @@ export async function POST(request: Request) {
   }
 
   const upstreamForm = new FormData()
-  upstreamForm.set('file', video)
+  upstreamForm.set('file', videoFile)
   upstreamForm.set('model', process.env.OPENAI_TRANSCRIPTION_MODEL || 'whisper-1')
   upstreamForm.set('language', lang)
   upstreamForm.set('response_format', 'verbose_json')

@@ -1,459 +1,186 @@
-// saas/app/dashboard/video-page.tsx
-// Real captions Studio with DIRECT-TO-STORAGE upload (no Vercel 4.5MB limit).
-// Flow: ask server for a signed upload URL -> upload file straight to Supabase
-// Storage -> tell /api/video the path -> show/download real captions.
-
 'use client'
 
-import { useState, useRef, useMemo } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 
-type CaptionResult = {
-  lang: string
-  langName: string
-  srtUrl?: string
-  vttUrl?: string
-  assUrl?: string
-}
-
-type Chapter = {
-  headline?: string
-  gist?: string
-  summary?: string
-  start?: number
-  end?: number
-}
-
-type VideoResult = {
-  jobId: string
-  status: string
-  fileName: string
-  duration: number
-  captions: CaptionResult[]
-  chapters?: Chapter[] | null
-  transcriptExcerpt?: string
-  langs: string[]
-  formats: string[]
-}
-
+type CaptionResult = { lang: string; langName: string; srtUrl?: string; vttUrl?: string; assUrl?: string }
+type CaptionCue = { id: string; index: number; start: number; end: number; text: string; x: number; y: number; width: number }
+type CaptionStyle = { fontFamily: string; fontSize: number; color: string; backgroundColor: string; animation: 'none' | 'fade' | 'pop' | 'slide' }
+type VideoResult = { jobId: string; status: string; fileName: string; sourcePath: string; sourceSizeMb: number; duration: number; captions: CaptionResult[]; transcriptExcerpt?: string; langs: string[]; formats: string[] }
+type ExportJob = { jobId: string; status: 'queued' | 'processing' | 'completed' | 'failed'; resultUrl?: string | null; error?: string | null }
 type Phase = null | 'preparing' | 'uploading' | 'processing'
 
 const LANGS = [
-  { code: 'en', label: 'English' },
-  { code: 'pt', label: 'Português' },
-  { code: 'es', label: 'Español' },
-  { code: 'pl', label: 'Polski' },
-  { code: 'ru', label: 'Русский' },
+  { code: 'en', label: 'English' }, { code: 'pt', label: 'Português' }, { code: 'es', label: 'Español' }, { code: 'pl', label: 'Polski' }, { code: 'ru', label: 'Русский' },
 ]
-
-const FORMATS = [
-  { code: 'srt', label: 'SRT', hint: 'Most editors / YouTube' },
-  { code: 'vtt', label: 'WebVTT', hint: 'Web players / HTML5' },
-  { code: 'ass', label: 'ASS', hint: 'Styled / Aegisub' },
-]
-
-const ACCEPT = '.mp4,.mov,.avi,.mkv,.webm,.mp3,.wav,.m4a,video/*,audio/*'
-
-function fmtBytes(bytes: number): string {
-  if (!bytes) return '0 B'
-  const u = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${u[i]}`
-}
+const FORMATS = [{ code: 'srt', label: 'SRT' }, { code: 'vtt', label: 'WebVTT' }, { code: 'ass', label: 'ASS' }]
+const ACCEPT = '.mp4,.mov,.avi,.mkv,.webm,video/*'
+const DEFAULT_STYLE: CaptionStyle = { fontFamily: 'Arial', fontSize: 44, color: '#ffffff', backgroundColor: '#000000', animation: 'fade' }
 
 function fmtDuration(secs: number): string {
-  if (!secs || secs < 0) return '—'
-  const h = Math.floor(secs / 3600)
-  const m = Math.floor((secs % 3600) / 60)
-  const s = Math.floor(secs % 60)
+  if (!secs || secs < 0) return '0:00'
+  const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = Math.floor(secs % 60)
   const pad = (n: number) => String(n).padStart(2, '0')
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`
 }
-
-function baseName(name: string): string {
-  return name.replace(/\.[^./\\]+$/, '') || 'captions'
+function fmtBytes(bytes: number): string {
+  if (!bytes) return '0 B'; const u = ['B', 'KB', 'MB', 'GB']; const i = Math.min(u.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)))
+  return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${u[i]}`
+}
+async function safeJson(res: Response): Promise<any> { try { return await res.json() } catch { return { error: `Unexpected server response (${res.status}).` } } }
+function secondsFromStamp(stamp: string): number {
+  const match = stamp.trim().match(/(?:(\d+):)?(\d{2}):(\d{2})[,.](\d{1,3})/)
+  if (!match) return 0
+  const [, hh = '0', mm, ss, ms] = match
+  return Number(hh) * 3600 + Number(mm) * 60 + Number(ss) + Number(ms.padEnd(3, '0')) / 1000
+}
+function parseCaptionText(text: string): CaptionCue[] {
+  return text.replace(/^WEBVTT[\s\S]*?\n\n/, '').split(/\n\s*\n/).map((block, blockIndex) => {
+    const lines = block.split('\n').map(l => l.trim()).filter(Boolean)
+    const timingIndex = lines.findIndex(l => /-->/.test(l))
+    if (timingIndex < 0) return null
+    const [startRaw, endRaw] = lines[timingIndex].split('-->').map(part => part.trim().split(/\s+/)[0])
+    return { id: `cue-${blockIndex}`, index: Number(lines[0]) || blockIndex + 1, start: secondsFromStamp(startRaw), end: secondsFromStamp(endRaw), text: lines.slice(timingIndex + 1).join(' '), x: 12, y: 72, width: 76 }
+  }).filter(Boolean) as CaptionCue[]
 }
 
-async function safeJson(res: Response): Promise<any> {
-  try {
-    return await res.json()
-  } catch {
-    return { error: `Unexpected server response (${res.status}).` }
-  }
+function QuotaStatusBar({ entitlement, tr }: { entitlement: any; tr: (k: string, f: string) => string }) {
+  if (!entitlement) return null
+  const minPct = Math.min(100, (Number(entitlement.projectedMinutes || entitlement.usedMinutes || 0) / Math.max(1, Number(entitlement.quotaMinutes || 1))) * 100)
+  const gbPct = Math.min(100, (Number(entitlement.projectedStorageGb || entitlement.usedStorageGb || 0) / Math.max(0.1, Number(entitlement.quotaStorageGb || 0.1))) * 100)
+  return <div className="sb-card" style={{ padding: 16, display: 'grid', gap: 10 }}>
+    <strong>{tr('video.quota.title', 'Quota status')}</strong>
+    <div className="sb-caption">{entitlement.message}</div>
+    {[{ label: tr('video.quota.minutes', 'Minutes'), pct: minPct }, { label: tr('video.quota.storage', 'Storage'), pct: gbPct }].map(item => <div key={item.label}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}><span>{item.label}</span><span>{Math.round(item.pct)}%</span></div>
+      <div style={{ height: 7, borderRadius: 99, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}><div style={{ width: `${item.pct}%`, height: '100%', background: item.pct >= 100 ? '#f97316' : 'var(--cyan,#1af0ff)' }} /></div>
+    </div>)}
+  </div>
 }
 
-export default function VideoPage() {
-  const i18n: any = useI18n()
-  const dict = i18n?.dict ?? i18n ?? {}
-  const tr = (key: string, fallback: string) => t(dict, key, fallback)
+function BillingBanner({ entitlement, tr }: { entitlement: any; tr: (k: string, f: string) => string }) {
+  if (!entitlement?.overQuota && !entitlement?.demoOnly) return null
+  return <div style={{ padding: 14, borderRadius: 16, border: '1px solid rgba(249,115,22,.45)', background: 'rgba(249,115,22,.12)', color: '#fed7aa' }}>
+    <strong>{entitlement.demoOnly ? tr('video.billing.demo', 'Demo playback only') : tr('video.billing.over', 'Overage billing applies')}</strong>
+    <div style={{ marginTop: 4 }}>{entitlement.demoOnly ? tr('video.billing.upgrade', 'Free/demo users can preview short clips. Upgrade for full editing and export.') : `${tr('video.billing.estimate', 'Estimated overage')}: $${entitlement.estimatedOverageUsd} (${(entitlement.billingProviders || []).join(' / ') || 'Stripe/PayPal'})`}</div>
+  </div>
+}
 
-  // Browser Supabase client (storage only — public anon key, fine client-side)
-  const supabase = useMemo(
-    () =>
-      createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      ),
-    [],
-  )
+function CanvasEditor({ videoUrl, cues, setCues, style, setStyle, demoLimitSec, tr }: { videoUrl: string; cues: CaptionCue[]; setCues: (c: CaptionCue[]) => void; style: CaptionStyle; setStyle: (s: CaptionStyle) => void; demoLimitSec: number; tr: (k: string, f: string) => string }) {
+  const videoRef = useRef<HTMLVideoElement>(null), canvasRef = useRef<HTMLCanvasElement>(null)
+  const [time, setTime] = useState(0), [duration, setDuration] = useState(0), [dragId, setDragId] = useState<string | null>(null)
+  const activeCue = cues.find(c => time >= c.start && time <= c.end) || null
 
-  const [file, setFile] = useState<File | null>(null)
-  const [langs, setLangs] = useState<string[]>(['en'])
-  const [formats, setFormats] = useState<string[]>(['srt'])
-  const [phase, setPhase] = useState<Phase>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<VideoResult | null>(null)
-  const [dragOver, setDragOver] = useState(false)
-  const [downloading, setDownloading] = useState<string | null>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  const busy = phase !== null
-
-  function pickFiles(list: FileList | null) {
-    if (!list || !list.length) return
-    setError(null)
-    setResult(null)
-    setFile(list[0])
-  }
-
-  function onDrop(e: React.DragEvent) {
-    e.preventDefault()
-    setDragOver(false)
-    pickFiles(e.dataTransfer?.files ?? null)
-  }
-
-  function toggleLang(code: string) {
-    setLangs((prev) =>
-      prev.includes(code)
-        ? prev.length > 1 ? prev.filter((l) => l !== code) : prev
-        : [...prev, code],
-    )
-  }
-
-  function toggleFormat(code: string) {
-    setFormats((prev) =>
-      prev.includes(code)
-        ? prev.length > 1 ? prev.filter((f) => f !== code) : prev
-        : [...prev, code],
-    )
-  }
-
-  async function generate() {
-    if (!file || busy) return
-    setError(null)
-    setResult(null)
-
-    try {
-      // 1. Ask server for a one-time signed upload URL
-      setPhase('preparing')
-      const prep = await fetch('/api/video/upload-url', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ fileName: file.name, fileSize: file.size, langs, formats }),
-      })
-      const prepData = await safeJson(prep)
-      if (!prep.ok) {
-        setError(prepData?.error || tr('video.err.prep', `Could not start upload (${prep.status}).`))
-        return
+  useEffect(() => {
+    let raf = 0
+    const draw = () => {
+      const video = videoRef.current, canvas = canvasRef.current, ctx = canvas?.getContext('2d')
+      if (video && canvas && ctx) {
+        const w = canvas.width, h = canvas.height
+        ctx.fillStyle = '#050816'; ctx.fillRect(0, 0, w, h)
+        if (video.readyState >= 2) ctx.drawImage(video, 0, 0, w, h)
+        const cue = cues.find(c => video.currentTime >= c.start && video.currentTime <= c.end)
+        if (cue) drawCaption(ctx, cue, style, w, h, video.currentTime)
+        setTime(video.currentTime); setDuration(video.duration || 0)
+        if (demoLimitSec > 0 && video.currentTime > demoLimitSec) video.pause()
       }
-      const { jobId, path, token } = prepData
-
-      // 2. Upload the video DIRECTLY to Supabase Storage
-      setPhase('uploading')
-      const { error: upErr } = await supabase.storage
-        .from('video-jobs')
-        .uploadToSignedUrl(path, token, file)
-      if (upErr) {
-        setError(
-          tr('video.err.upload', 'Upload to storage failed: ') +
-            (upErr.message || 'unknown') +
-            tr('video.err.upload2', ' — if the file is large, your storage plan may cap file size.'),
-        )
-        return
-      }
-
-      // 3. Tell the server to transcribe + generate captions
-      setPhase('processing')
-      const res = await fetch('/api/video', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jobId, path, langs, formats }),
-      })
-      const data = await safeJson(res)
-      if (!res.ok) {
-        setError(data?.error || tr('video.err.failed', `Processing failed (${res.status}).`))
-        return
-      }
-      setResult(data as VideoResult)
-    } catch (e) {
-      setError(
-        tr('video.err.network', 'Unexpected error: ') +
-          (e instanceof Error ? e.message : String(e)),
-      )
-    } finally {
-      setPhase(null)
+      raf = requestAnimationFrame(draw)
     }
+    raf = requestAnimationFrame(draw); return () => cancelAnimationFrame(raf)
+  }, [cues, style, demoLimitSec])
+
+  function updateCue(id: string, patch: Partial<CaptionCue>) { setCues(cues.map(c => c.id === id ? { ...c, ...patch } : c)) }
+  function onPointer(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (!activeCue) return
+    const rect = e.currentTarget.getBoundingClientRect(); const x = ((e.clientX - rect.left) / rect.width) * 100; const y = ((e.clientY - rect.top) / rect.height) * 100
+    if (e.type === 'pointerdown') { setDragId(activeCue.id); e.currentTarget.setPointerCapture(e.pointerId) }
+    if (e.type === 'pointermove' && dragId) updateCue(dragId, { x: Math.max(0, Math.min(90, x - activeCue.width / 2)), y: Math.max(0, Math.min(90, y)) })
+    if (e.type === 'pointerup') setDragId(null)
   }
 
-  async function download(url: string, fname: string, tag: string) {
-    setDownloading(tag)
-    try {
-      const r = await fetch(url)
-      if (!r.ok) throw new Error('fetch failed')
-      const blob = await r.blob()
-      const href = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = href
-      a.download = fname
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(href)
-    } catch {
-      window.open(url, '_blank', 'noopener,noreferrer')
-    } finally {
-      setDownloading(null)
-    }
-  }
-
-  function reset() {
-    setFile(null)
-    setResult(null)
-    setError(null)
-    if (inputRef.current) inputRef.current.value = ''
-  }
-
-  const canGenerate = !!file && !busy && langs.length > 0 && formats.length > 0
-
-  const phaseText =
-    phase === 'preparing'
-      ? tr('video.phase.prep', 'Preparing upload…')
-      : phase === 'uploading'
-      ? tr('video.phase.upload', 'Uploading your file…')
-      : tr(
-          'video.phase.process',
-          'Transcribing and generating captions. Longer files can take several minutes — keep this tab open.',
-        )
-
-  return (
-    <div style={{ maxWidth: 920, margin: '0 auto', padding: '32px 20px 80px' }}>
-      <style>{`
-        @keyframes sbSweep { 0% { transform: translateX(-100%);} 100% { transform: translateX(220%);} }
-        .sb-chip { display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:999px; cursor:pointer; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.03); color:#c9cdd6; font-size:14px; user-select:none; transition:all .15s ease; }
-        .sb-chip:hover { border-color:rgba(255,255,255,0.28); }
-        .sb-chip[data-on="true"] { border-color:var(--gold,#ffc300); background:rgba(255,195,0,0.12); color:#fff; }
-        .sb-fmt { display:flex; flex-direction:column; gap:2px; padding:12px 16px; border-radius:12px; cursor:pointer; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.03); transition:all .15s ease; min-width:150px; }
-        .sb-fmt:hover { border-color:rgba(255,255,255,0.28); }
-        .sb-fmt[data-on="true"] { border-color:var(--cyan,#1af0ff); background:rgba(26,240,255,0.10); }
-      `}</style>
-
-      <p className="sb-eyebrow">{tr('video.eyebrow', 'Video Studio')}</p>
-      <h2 className="sb-h2">{tr('video.title', 'Auto Captions')}</h2>
-      <p className="sb-body" style={{ maxWidth: 620, marginTop: 8 }}>
-        {tr(
-          'video.subtitle',
-          'Upload a video or audio file and get accurate, downloadable captions (SRT, WebVTT, ASS) — translated into the languages you choose.',
-        )}
-      </p>
-
-      <div className="sb-card" style={{ marginTop: 24, padding: 0, overflow: 'hidden' }}>
-        <div
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={onDrop}
-          onClick={() => !busy && inputRef.current?.click()}
-          style={{
-            cursor: busy ? 'default' : 'pointer',
-            padding: '36px 24px',
-            textAlign: 'center',
-            border: `1.5px dashed ${dragOver ? 'var(--gold, #ffc300)' : 'rgba(255,255,255,0.18)'}`,
-            background: dragOver ? 'rgba(255,195,0,0.06)' : 'transparent',
-            transition: 'all .15s ease',
-            margin: 16,
-            borderRadius: 14,
-            opacity: busy ? 0.6 : 1,
-          }}
-        >
-          <input
-            ref={inputRef}
-            type="file"
-            accept={ACCEPT}
-            style={{ display: 'none' }}
-            onChange={(e) => pickFiles(e.target.files)}
-          />
-          {file ? (
-            <div>
-              <div className="sb-h3" style={{ marginBottom: 4 }}>{file.name}</div>
-              <div className="sb-caption">{fmtBytes(file.size)}</div>
-              {!busy && (
-                <button
-                  className="sb-button-secondary"
-                  style={{ marginTop: 14 }}
-                  onClick={(e) => { e.stopPropagation(); reset() }}
-                >
-                  {tr('video.change', 'Choose a different file')}
-                </button>
-              )}
-            </div>
-          ) : (
-            <div>
-              <div className="sb-h3" style={{ marginBottom: 6 }}>
-                {tr('video.drop', 'Drop a file here or click to browse')}
-              </div>
-              <div className="sb-caption">
-                {tr('video.types', 'MP4, MOV, MKV, WEBM, MP3, WAV, M4A')}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div style={{ marginTop: 28 }}>
-        <h3 className="sb-h3" style={{ marginBottom: 4 }}>
-          {tr('video.langs.title', 'Caption languages')}
-        </h3>
-        <p className="sb-caption" style={{ marginBottom: 12 }}>
-          {tr('video.langs.hint', 'English is transcribed directly; other languages are translated from the transcript.')}
-        </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-          {LANGS.map((l) => (
-            <div key={l.code} className="sb-chip" data-on={langs.includes(l.code)} onClick={() => !busy && toggleLang(l.code)}>
-              {l.label}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ marginTop: 28 }}>
-        <h3 className="sb-h3" style={{ marginBottom: 12 }}>
-          {tr('video.formats.title', 'Output formats')}
-        </h3>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-          {FORMATS.map((f) => (
-            <div key={f.code} className="sb-fmt" data-on={formats.includes(f.code)} onClick={() => !busy && toggleFormat(f.code)}>
-              <span style={{ color: '#fff', fontWeight: 600 }}>{f.label}</span>
-              <span className="sb-caption">{f.hint}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ marginTop: 32 }}>
-        <button
-          className="sb-button-primary"
-          disabled={!canGenerate}
-          onClick={generate}
-          style={{ opacity: canGenerate ? 1 : 0.5, cursor: canGenerate ? 'pointer' : 'not-allowed' }}
-        >
-          {busy ? tr('video.working', 'Working…') : tr('video.generate', 'Generate captions')}
-        </button>
-        {!file && (
-          <p className="sb-caption" style={{ marginTop: 10 }}>
-            {tr('video.needfile', 'Add a file above to get started.')}
-          </p>
-        )}
-      </div>
-
-      {busy && (
-        <div className="sb-card" style={{ marginTop: 24, padding: 20 }}>
-          <div style={{ position: 'relative', height: 6, borderRadius: 999, overflow: 'hidden', background: 'rgba(255,255,255,0.08)' }}>
-            <div style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: '40%', borderRadius: 999, background: 'linear-gradient(90deg, transparent, var(--gold, #ffc300), transparent)', animation: 'sbSweep 1.3s ease-in-out infinite' }} />
-          </div>
-          <p className="sb-body" style={{ marginTop: 14 }}>{phaseText}</p>
-        </div>
-      )}
-
-      {error && !busy && (
-        <div style={{ marginTop: 24, padding: '14px 18px', borderRadius: 12, border: '1px solid rgba(255,90,90,0.45)', background: 'rgba(255,90,90,0.12)', color: '#ffb4b4' }}>
-          {error}
-        </div>
-      )}
-
-      {result && !busy && (
-        <div style={{ marginTop: 32 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-            <h3 className="sb-h3">{tr('video.results.title', 'Your captions')}</h3>
-            <span className="sb-caption">
-              {tr('video.results.duration', 'Duration')}: {fmtDuration(result.duration)}
-            </span>
-          </div>
-
-          <div style={{ display: 'grid', gap: 14 }}>
-            {result.captions?.map((c) => {
-              const items = [
-                { fmt: 'srt', url: c.srtUrl, ext: 'srt' },
-                { fmt: 'vtt', url: c.vttUrl, ext: 'vtt' },
-                { fmt: 'ass', url: c.assUrl, ext: 'ass' },
-              ].filter((i) => !!i.url)
-
-              return (
-                <div className="sb-card" key={c.lang} style={{ padding: 18 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                    <span style={{ color: '#fff', fontWeight: 600 }}>{c.langName || c.lang}</span>
-                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                      {items.length === 0 && (
-                        <span className="sb-caption" style={{ color: '#ffb4b4' }}>
-                          {tr('video.results.nofile', 'No file generated for this language.')}
-                        </span>
-                      )}
-                      {items.map((i) => {
-                        const tag = `${c.lang}.${i.ext}`
-                        const fname = `${baseName(result.fileName)}-${c.lang}.${i.ext}`
-                        return (
-                          <button
-                            key={i.ext}
-                            className="sb-button-secondary"
-                            disabled={downloading === tag}
-                            onClick={() => download(i.url as string, fname, tag)}
-                          >
-                            {downloading === tag
-                              ? tr('video.results.downloading', 'Downloading…')
-                              : `${tr('video.results.download', 'Download')} .${i.ext}`}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {Array.isArray(result.chapters) && result.chapters.length > 0 && (
-            <div className="sb-card" style={{ marginTop: 16, padding: 18 }}>
-              <h3 className="sb-h3" style={{ marginBottom: 10 }}>{tr('video.chapters', 'Chapters')}</h3>
-              <div style={{ display: 'grid', gap: 8 }}>
-                {result.chapters.map((ch, idx) => (
-                  <div key={idx} style={{ display: 'flex', gap: 12 }}>
-                    <span className="sb-caption" style={{ minWidth: 56, color: 'var(--cyan, #1af0ff)' }}>
-                      {fmtDuration((ch.start ?? 0) / 1000)}
-                    </span>
-                    <span className="sb-body">{ch.headline || ch.gist || '—'}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {result.transcriptExcerpt && (
-            <div className="sb-card" style={{ marginTop: 16, padding: 18 }}>
-              <h3 className="sb-h3" style={{ marginBottom: 8 }}>{tr('video.transcript', 'Transcript preview')}</h3>
-              <p className="sb-body" style={{ opacity: 0.85 }}>
-                {result.transcriptExcerpt}
-                {result.transcriptExcerpt.length >= 500 ? '…' : ''}
-              </p>
-            </div>
-          )}
-
-          <div style={{ marginTop: 24 }}>
-            <button className="sb-button-secondary" onClick={reset}>
-              {tr('video.again', 'Caption another file')}
-            </button>
-          </div>
-        </div>
-      )}
+  return <div className="sb-card" style={{ padding: 18 }}>
+    <video ref={videoRef} src={videoUrl} playsInline style={{ display: 'none' }} onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)} />
+    <canvas ref={canvasRef} width={1280} height={720} onPointerDown={onPointer} onPointerMove={onPointer} onPointerUp={onPointer} style={{ width: '100%', borderRadius: 18, border: '1px solid rgba(255,255,255,.12)', cursor: activeCue ? 'grab' : 'default', background: '#050816' }} />
+    <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
+      <button className="sb-button-primary" onClick={() => videoRef.current?.paused ? videoRef.current.play() : videoRef.current?.pause()}>{tr('video.editor.playPause', 'Play / pause')}</button>
+      <input aria-label={tr('video.editor.scrub', 'Scrub timeline')} type="range" min={0} max={duration || 1} step={0.05} value={time} onChange={e => { if (videoRef.current) videoRef.current.currentTime = Number(e.target.value) }} style={{ flex: 1 }} />
+      <span className="sb-caption">{fmtDuration(time)} / {fmtDuration(demoLimitSec > 0 ? Math.min(duration, demoLimitSec) : duration)}</span>
     </div>
-  )
+    <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12 }}>
+      <label className="sb-caption">{tr('video.style.font', 'Font')}<select value={style.fontFamily} onChange={e => setStyle({ ...style, fontFamily: e.target.value })} className="sb-input"><option>Arial</option><option>Inter</option><option>Georgia</option><option>Impact</option></select></label>
+      <label className="sb-caption">{tr('video.style.size', 'Size')}<input className="sb-input" type="number" min={18} max={96} value={style.fontSize} onChange={e => setStyle({ ...style, fontSize: Number(e.target.value) })} /></label>
+      <label className="sb-caption">{tr('video.style.color', 'Color')}<input className="sb-input" type="color" value={style.color} onChange={e => setStyle({ ...style, color: e.target.value })} /></label>
+      <label className="sb-caption">{tr('video.style.background', 'Background')}<input className="sb-input" type="color" value={style.backgroundColor} onChange={e => setStyle({ ...style, backgroundColor: e.target.value })} /></label>
+      <label className="sb-caption">{tr('video.style.animation', 'Animation')}<select className="sb-input" value={style.animation} onChange={e => setStyle({ ...style, animation: e.target.value as CaptionStyle['animation'] })}><option value="none">{tr('video.anim.none', 'None')}</option><option value="fade">{tr('video.anim.fade', 'Fade')}</option><option value="pop">{tr('video.anim.pop', 'Pop')}</option><option value="slide">{tr('video.anim.slide', 'Slide')}</option></select></label>
+    </div>
+  </div>
+}
+
+function drawCaption(ctx: CanvasRenderingContext2D, cue: CaptionCue, style: CaptionStyle, w: number, h: number, time: number) {
+  ctx.save(); const alpha = style.animation === 'fade' ? Math.min(1, Math.max(0.2, (time - cue.start) / 0.4)) : 1; ctx.globalAlpha = alpha
+  const x = (cue.x / 100) * w, y = (cue.y / 100) * h, maxWidth = (cue.width / 100) * w
+  ctx.font = `700 ${style.fontSize}px ${style.fontFamily}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  const lines = wrapText(ctx, cue.text, maxWidth - 40); const lineHeight = style.fontSize * 1.22; const boxH = lines.length * lineHeight + 28; const cx = x + maxWidth / 2
+  ctx.fillStyle = `${style.backgroundColor}cc`; roundRect(ctx, x, y - boxH / 2, maxWidth, boxH, 18); ctx.fill()
+  ctx.fillStyle = style.color; lines.forEach((line, i) => ctx.fillText(line, cx, y + (i - (lines.length - 1) / 2) * lineHeight, maxWidth - 28)); ctx.restore()
+}
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) { const words = text.split(/\s+/); const lines: string[] = []; let line = ''; for (const word of words) { const test = `${line} ${word}`.trim(); if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = word } else line = test } if (line) lines.push(line); return lines }
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r) }
+
+function CaptionTimeline({ cues, activeTime, tr }: { cues: CaptionCue[]; activeTime: number; tr: (k: string, f: string) => string }) {
+  return <div className="sb-card" style={{ padding: 18, maxHeight: 420, overflow: 'auto' }}><h3>{tr('video.timeline.title', 'Caption timeline')}</h3>{cues.map(c => <div key={c.id} style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,.08)', color: activeTime >= c.start && activeTime <= c.end ? 'var(--gold,#ffc300)' : undefined }}><div className="sb-caption">{fmtDuration(c.start)} → {fmtDuration(c.end)}</div><div>{c.text}</div></div>)}</div>
+}
+
+function ExportPanel({ result, cues, style, entitlement, tr }: { result: VideoResult | null; cues: CaptionCue[]; style: CaptionStyle; entitlement: any; tr: (k: string, f: string) => string }) {
+  const [job, setJob] = useState<ExportJob | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null)
+  useEffect(() => {
+    if (!job || job.status === 'completed' || job.status === 'failed') return
+    const timer = setInterval(async () => { const res = await fetch(`/api/video/jobs/${job.jobId}`); const data = await safeJson(res); if (res.ok) setJob(data) }, 3500)
+    return () => clearInterval(timer)
+  }, [job])
+  async function exportVideo() {
+    if (!result) return; setBusy(true); setError(null)
+    const caption = result.captions?.find(c => c.vttUrl || c.srtUrl) || result.captions?.[0]
+    const res = await fetch('/api/video/export', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sourceJobId: result.jobId, sourcePath: result.sourcePath, sourceSizeMb: result.sourceSizeMb, durationSec: result.duration, captionUrl: caption?.vttUrl || caption?.srtUrl, captionLang: caption?.lang || 'en', style: { ...style, x: cues[0]?.x ?? 12, y: cues[0]?.y ?? 72, width: cues[0]?.width ?? 76 }, overlays: cues }) })
+    const data = await safeJson(res); setBusy(false); if (!res.ok) { setError(data.error || 'Export failed'); return } setJob(data)
+  }
+  return <div className="sb-card" style={{ padding: 18 }}><h3>{tr('video.export.title', 'Export MP4')}</h3><p className="sb-caption">{tr('video.export.help', 'Exports are queued for a dedicated FFmpeg worker so heavy caption burns do not run inside serverless functions.')}</p><button className="sb-button-primary" disabled={!result || busy || entitlement?.demoOnly} onClick={exportVideo}>{busy ? tr('video.export.queueing', 'Queueing…') : tr('video.export.button', 'Burn captions and export')}</button>{job && <p className="sb-body" style={{ marginTop: 12 }}>{tr('video.export.status', 'Job status')}: {job.status}</p>}{job?.resultUrl && <a className="sb-button-secondary" href={job.resultUrl} style={{ display: 'inline-flex', marginTop: 10 }}>{tr('video.export.download', 'Download final .mp4')}</a>}{error && <p style={{ color: '#fca5a5' }}>{error}</p>}</div>
+}
+
+export default function VideoEditorPage() {
+  const i18n: any = useI18n(); const dict = i18n?.dict ?? i18n ?? {}; const tr = (key: string, fallback: string) => t(dict, key, fallback)
+  const [file, setFile] = useState<File | null>(null), [videoUrl, setVideoUrl] = useState(''), [langs, setLangs] = useState(['en']), [formats, setFormats] = useState(['srt', 'vtt'])
+  const [phase, setPhase] = useState<Phase>(null), [error, setError] = useState<string | null>(null), [result, setResult] = useState<VideoResult | null>(null), [cues, setCues] = useState<CaptionCue[]>([]), [style, setStyle] = useState(DEFAULT_STYLE), [entitlement, setEntitlement] = useState<any>(null), [activeTime] = useState(0)
+  const inputRef = useRef<HTMLInputElement>(null); const busy = phase !== null
+  useEffect(() => () => { if (videoUrl) URL.revokeObjectURL(videoUrl) }, [videoUrl])
+  function pickFiles(list: FileList | null) { const next = list?.[0]; if (!next) return; if (videoUrl) URL.revokeObjectURL(videoUrl); setFile(next); setVideoUrl(URL.createObjectURL(next)); setResult(null); setCues([]); setError(null) }
+  function toggle(arr: string[], set: (v: string[]) => void, code: string) { set(arr.includes(code) ? (arr.length > 1 ? arr.filter(x => x !== code) : arr) : [...arr, code]) }
+  async function generate() {
+    if (!file || busy) return; setPhase('preparing'); setError(null)
+    try {
+      const prep = await fetch('/api/video/upload-url', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fileName: file.name, fileSize: file.size, langs, formats }) }); const prepData = await safeJson(prep); setEntitlement(prepData.entitlement)
+      if (!prep.ok) throw new Error(prepData.error || 'Could not prepare upload')
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      if (!supabaseUrl || !supabaseAnon) throw new Error('Supabase browser client is not configured.')
+      const supabase = createBrowserClient(supabaseUrl, supabaseAnon)
+      setPhase('uploading'); const { error: upErr } = await supabase.storage.from('video-jobs').uploadToSignedUrl(prepData.path, prepData.token, file); if (upErr) throw new Error(upErr.message)
+      setPhase('processing'); const res = await fetch('/api/video', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jobId: prepData.jobId, path: prepData.path, langs, formats }) }); const data = await safeJson(res); if (!res.ok) throw new Error(data.error || 'Caption generation failed')
+      setResult(data); const first = data.captions?.find((c: CaptionResult) => c.vttUrl || c.srtUrl); if (first) { const cap = await fetch(first.vttUrl || first.srtUrl); setCues(parseCaptionText(await cap.text())) }
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) } finally { setPhase(null) }
+  }
+  const demoLimit = entitlement?.demoOnly ? Number(entitlement.maxDemoSeconds || 30) : 0
+  return <div style={{ maxWidth: 1220, margin: '0 auto', padding: '32px 20px 80px' }}>
+    <p className="sb-eyebrow">{tr('video.editor.eyebrow', 'Video Studio')}</p><h2 className="sb-h2">{tr('video.editor.title', 'Canvas Caption Editor')}</h2><p className="sb-body">{tr('video.editor.subtitle', 'Upload a source video, generate timed captions, drag styled overlays on the canvas, and queue an FFmpeg burn-in export.')}</p>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(280px,.6fr)', gap: 18, marginTop: 20 }}>
+      <div style={{ display: 'grid', gap: 18 }}>
+        <div className="sb-card" style={{ padding: 18 }}><input ref={inputRef} type="file" accept={ACCEPT} onChange={e => pickFiles(e.target.files)} /><div className="sb-caption" style={{ marginTop: 8 }}>{file ? `${file.name} · ${fmtBytes(file.size)}` : tr('video.upload.help', 'Choose MP4, MOV, MKV, AVI, or WEBM.')}</div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>{LANGS.map(l => <button key={l.code} className="sb-button-secondary" data-on={langs.includes(l.code)} onClick={() => toggle(langs, setLangs, l.code)}>{l.label}</button>)}{FORMATS.map(f => <button key={f.code} className="sb-button-secondary" onClick={() => toggle(formats, setFormats, f.code)}>{f.label}</button>)}</div><button className="sb-button-primary" disabled={!file || busy} style={{ marginTop: 14 }} onClick={generate}>{busy ? tr('video.working', 'Working…') : tr('video.generate', 'Generate captions')}</button>{phase && <p className="sb-caption">{phase === 'preparing' ? tr('video.phase.prep', 'Preparing upload…') : phase === 'uploading' ? tr('video.phase.upload', 'Uploading your file…') : tr('video.phase.process', 'Transcribing and syncing captions…')}</p>}{error && <p style={{ color: '#fca5a5' }}>{error}</p>}</div>
+        {videoUrl && <CanvasEditor videoUrl={videoUrl} cues={cues} setCues={setCues} style={style} setStyle={setStyle} demoLimitSec={demoLimit} tr={tr} />}
+        <ExportPanel result={result} cues={cues} style={style} entitlement={entitlement} tr={tr} />
+      </div>
+      <div style={{ display: 'grid', gap: 18, alignContent: 'start' }}><QuotaStatusBar entitlement={entitlement} tr={tr} /><BillingBanner entitlement={entitlement} tr={tr} /><CaptionTimeline cues={cues} activeTime={activeTime} tr={tr} /><footer className="sb-caption">{tr('video.footer.sync', 'Status: captions stay synced to playback time; exports are processed by the video worker queue.')}</footer></div>
+    </div>
+  </div>
 }

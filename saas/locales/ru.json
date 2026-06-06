@@ -1590,5 +1590,62 @@
   "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
   "wireframes.modules.assistant.panel1": "Task list panel",
   "wireframes.modules.assistant.panel2": "Reminder timeline",
-  "wireframes.modules.assistant.panel3": "Productivity insights chart"
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "video": {
+    "editor": {
+      "eyebrow": "Видеостудия",
+      "title": "Canvas-редактор субтитров",
+      "subtitle": "Загрузите видео, создайте таймированные субтитры, перетаскивайте стилизованные слои на canvas и ставьте FFmpeg-экспорт в очередь.",
+      "playPause": "Воспроизвести / пауза",
+      "scrub": "Перемотка таймлайна"
+    },
+    "upload": {
+      "help": "Выберите MP4, MOV, MKV, AVI или WEBM."
+    },
+    "working": "Обработка…",
+    "generate": "Создать субтитры",
+    "phase": {
+      "prep": "Подготовка загрузки…",
+      "upload": "Загрузка файла…",
+      "process": "Транскрибация и синхронизация субтитров…"
+    },
+    "quota": {
+      "title": "Статус квоты",
+      "minutes": "Минуты",
+      "storage": "Хранилище"
+    },
+    "billing": {
+      "demo": "Только демо-воспроизведение",
+      "upgrade": "Бесплатные/демо пользователи могут смотреть короткие превью. Обновите план для полного редактирования и экспорта.",
+      "over": "Применяется оплата превышения",
+      "estimate": "Оценка превышения"
+    },
+    "style": {
+      "font": "Шрифт",
+      "size": "Размер",
+      "color": "Цвет",
+      "background": "Фон",
+      "animation": "Анимация"
+    },
+    "anim": {
+      "none": "Нет",
+      "fade": "Появление",
+      "pop": "Поп",
+      "slide": "Сдвиг"
+    },
+    "timeline": {
+      "title": "Таймлайн субтитров"
+    },
+    "export": {
+      "title": "Экспорт MP4",
+      "help": "Экспорты идут в очередь выделенного FFmpeg worker, чтобы тяжелые задачи не выполнялись в serverless.",
+      "queueing": "Добавление в очередь…",
+      "button": "Вшить субтитры и экспортировать",
+      "status": "Статус задания",
+      "download": "Скачать финальный .mp4"
+    },
+    "footer": {
+      "sync": "Статус: субтитры синхронизированы с воспроизведением; экспорты обрабатывает видео-очередь."
+    }
+  }
 }

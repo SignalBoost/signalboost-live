@@ -8,6 +8,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
 import { cookies } from 'next/headers'
+import { getVideoEntitlement, resolveAccountId } from '@/lib/video/pipeline'
 
 const VIDEO_BUCKET = 'video-jobs'
 
@@ -99,13 +100,14 @@ export async function POST(req: NextRequest) {
     { auth: { persistSession: false } },
   )
 
-  // ── Plan / size check (done here, before upload) ───────────────────────────
+  // ── Plan / quota check (done here, before upload) ──────────────────────────
   const plan = await getUserPlan(supabaseAdmin, user.id)
-  const maxMinutes = PLAN_VIDEO_LIMITS[plan] ?? 5
   const fileSizeMB = fileSize / (1024 * 1024)
+  const entitlement = await getVideoEntitlement(supabaseAdmin, user.id, 0, fileSizeMB)
+  const maxMinutes = PLAN_VIDEO_LIMITS[plan] ?? 5
   if (fileSizeMB > maxMinutes * 100) {
     return NextResponse.json(
-      { error: `File too large for your ${plan} plan. Max ~${maxMinutes} minutes.` },
+      { error: `File too large for your ${plan} plan. Max ~${maxMinutes} minutes.`, entitlement },
       { status: 413 },
     )
   }
@@ -113,16 +115,21 @@ export async function POST(req: NextRequest) {
   // ── Create job + signed upload URL ─────────────────────────────────────────
   const jobId = crypto.randomUUID()
   const path = `${user.id}/${jobId}/source.${ext}`
+  const accountId = await resolveAccountId(supabaseAdmin, user.id)
 
   const { error: insertError } = await supabaseAdmin.from('video_jobs').insert({
     id: jobId,
+    account_id: accountId,
     user_id: user.id,
+    source_video: path,
     file_name: fileName,
     file_size: fileSize,
     langs,
     formats,
-    status: 'awaiting_upload',
+    status: 'queued',
+    job_type: 'transcode',
     plan,
+    updated_at: new Date().toISOString(),
   })
   if (insertError) {
     return NextResponse.json(
@@ -153,6 +160,7 @@ export async function POST(req: NextRequest) {
     bucket: VIDEO_BUCKET,
     langs,
     formats,
+    entitlement,
   })
 }
 

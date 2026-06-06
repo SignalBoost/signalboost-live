@@ -1,5 +1,6 @@
 export type SupportedLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 export type AudienceRole = 'partner' | 'business_owner' | 'customer' | 'admin' | 'owner'
+export type ConciergeIntent = 'marketplace' | 'saas' | 'video_edit' | 'caption_overlay' | 'video_export' | 'support'
 
 export const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'es', 'pt', 'pl', 'ru']
 
@@ -86,12 +87,31 @@ export function inferAudienceRole(input: string): AudienceRole {
   return 'customer'
 }
 
+export function classifyConciergeIntent(input: string, currentPage = '/'): ConciergeIntent {
+  const text = `${input} ${currentPage}`.toLowerCase()
+  if (/export|render|download.*mp4|burn.*caption|ffmpeg|transcod/.test(text)) return 'video_export'
+  if (/caption|subtitle|srt|vtt|overlay|drag.*text/.test(text)) return 'caption_overlay'
+  if (/video|clip|canvas editor|timeline/.test(text)) return 'video_edit'
+  if (/marketplace|partner|category|booking/.test(text)) return 'marketplace'
+  if (/review|calendar|spreadsheet|promote|saas|business|outreach/.test(text)) return 'saas'
+  return 'support'
+}
+
 export function getConciergeAnswer(input: string, locale?: string, currentPage = '/') {
   const lang = normalizeLocale(locale)
   const role = inferAudienceRole(`${input} ${currentPage}`)
+  const intent = classifyConciergeIntent(input, currentPage)
   const text = input.toLowerCase()
   const steps: string[] = []
-  if (/forecast|financial|revenue|kpi|executive/.test(text)) {
+  if (intent === 'video_export') {
+    steps.push('Open Video Studio, confirm your subscription status, and queue the caption burn export from the Export MP4 panel.')
+    steps.push('The JobQueueController sends heavy FFmpeg work to the video worker, while StorageController saves source videos and final renders.')
+    steps.push('SubscriptionChecker blocks free/demo exports; BillingHandler records Stripe/PayPal metered overage events when usage exceeds quota.')
+  } else if (intent === 'caption_overlay' || intent === 'video_edit') {
+    steps.push('Open Video Studio to upload the source video, generate SRT/VTT captions, and load them into the canvas timeline.')
+    steps.push('Drag the active caption overlay on the canvas, then adjust font, color, size, background, and animation controls.')
+    steps.push('OutputValidator keeps caption/export payloads JSON-safe before JobQueueController enqueues transcoder work.')
+  } else if (/forecast|financial|revenue|kpi|executive/.test(text)) {
     steps.push(`Open Executive cockpit: ${FINANCIAL_LEDGER.unifiedRevenue} unified revenue and engagement index ${KPI_DASHBOARD.unifiedEngagementIndex}.`)
     steps.push(`Review forecasts: ${FORECASTS.map(f => `${f.horizon} ${f.revenue}`).join(' • ')}.`)
     steps.push(`Recommendation: ${EXECUTIVE_RECOMMENDATIONS[0]}`)
@@ -115,5 +135,5 @@ export function getConciergeAnswer(input: string, locale?: string, currentPage =
     steps.push(localizedFallbacks[lang])
     steps.push('HMI onboarding path: choose role → choose Marketplace or SaaS → approve next action → review telemetry.')
   }
-  return { role, language: lang, reply: steps.map((step, index) => `${index + 1}. ${step}`).join('\n') }
+  return { role, language: lang, intent, pipeline: ['IntentClassifier','SubscriptionChecker','JobQueueController','StorageController','BillingHandler','ModelCaller','OutputValidator','Translator'], reply: steps.map((step, index) => `${index + 1}. ${step}`).join('\n') }
 }

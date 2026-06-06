@@ -1590,5 +1590,62 @@
   "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
   "wireframes.modules.assistant.panel1": "Task list panel",
   "wireframes.modules.assistant.panel2": "Reminder timeline",
-  "wireframes.modules.assistant.panel3": "Productivity insights chart"
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "video": {
+    "editor": {
+      "eyebrow": "Estudio de video",
+      "title": "Editor de subtítulos en canvas",
+      "subtitle": "Sube un video, genera subtítulos sincronizados, arrastra capas con estilo en el canvas y envía una exportación FFmpeg.",
+      "playPause": "Reproducir / pausar",
+      "scrub": "Mover línea de tiempo"
+    },
+    "upload": {
+      "help": "Elige MP4, MOV, MKV, AVI o WEBM."
+    },
+    "working": "Procesando…",
+    "generate": "Generar subtítulos",
+    "phase": {
+      "prep": "Preparando carga…",
+      "upload": "Subiendo tu archivo…",
+      "process": "Transcribiendo y sincronizando subtítulos…"
+    },
+    "quota": {
+      "title": "Estado de cuota",
+      "minutes": "Minutos",
+      "storage": "Almacenamiento"
+    },
+    "billing": {
+      "demo": "Solo reproducción demo",
+      "upgrade": "Los usuarios gratis/demo pueden previsualizar clips cortos. Mejora tu plan para edición y exportación completas.",
+      "over": "Se aplica facturación por excedente",
+      "estimate": "Excedente estimado"
+    },
+    "style": {
+      "font": "Fuente",
+      "size": "Tamaño",
+      "color": "Color",
+      "background": "Fondo",
+      "animation": "Animación"
+    },
+    "anim": {
+      "none": "Ninguna",
+      "fade": "Desvanecer",
+      "pop": "Pop",
+      "slide": "Deslizar"
+    },
+    "timeline": {
+      "title": "Línea de subtítulos"
+    },
+    "export": {
+      "title": "Exportar MP4",
+      "help": "Las exportaciones se envían a un worker FFmpeg dedicado para no ejecutar trabajos pesados en serverless.",
+      "queueing": "Encolando…",
+      "button": "Quemar subtítulos y exportar",
+      "status": "Estado del trabajo",
+      "download": "Descargar .mp4 final"
+    },
+    "footer": {
+      "sync": "Estado: los subtítulos permanecen sincronizados con la reproducción; las exportaciones las procesa la cola de video."
+    }
+  }
 }

@@ -1,5 +1,6 @@
 'use client'
 
+import { createClient } from '@supabase/supabase-js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 type SupportedVideoLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
@@ -59,6 +60,8 @@ type CaptionPreset = {
   style: CaptionStyle
   aspectRatio?: AspectRatio
 }
+
+const DIRECT_CAPTION_MAX_MB = 4
 
 const defaultCaptionStyle: CaptionStyle = {
   fontFamily: 'Inter, Arial, sans-serif',
@@ -204,6 +207,39 @@ function formatTime(seconds: number) {
   const tenths = Math.floor((safe - Math.floor(safe)) * 10)
 
   return `${mins}:${String(secs).padStart(2, '0')}.${tenths}`
+}
+
+function formatFileSize(bytes: number) {
+  const mb = bytes / 1024 / 1024
+  return `${mb.toFixed(mb >= 10 ? 0 : 1)} MB`
+}
+
+async function readJsonResponse<T>(response: Response): Promise<T> {
+  const text = await response.text()
+
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    const clean = text.replace(/\s+/g, ' ').trim()
+    throw new Error(clean || `Request failed with status ${response.status}`)
+  }
+}
+
+function getBrowserSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!url || !key) {
+    throw new Error(
+      'Supabase browser keys are missing. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel.',
+    )
+  }
+
+  return createClient(url, key)
+}
+
+function directCaptioningAllowed(file: File) {
+  return file.size <= DIRECT_CAPTION_MAX_MB * 1024 * 1024
 }
 
 function wrapCaption(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
@@ -667,7 +703,6 @@ function CanvasEditor({
             src={videoUrl}
             className="hidden"
             playsInline
-            crossOrigin="anonymous"
             onLoadedMetadata={(event) => onDuration(Number((event.currentTarget.duration || 0).toFixed(2)))}
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
@@ -823,7 +858,8 @@ export default function VideoEditor() {
   const [tier, setTier] = useState<SubscriptionTier>('free')
   const [usedMinutes, setUsedMinutes] = useState(0)
   const [durationSec, setDurationSec] = useState(0)
-  const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [sourceUrl, setSourceUrl] = useState<string | null>(null)
   const [videoFile, setVideoFile] = useState<File | null>(null)
   const [filename, setFilename] = useState('source-video.mp4')
   const [cues, setCues] = useState<CaptionCue[]>([])
@@ -833,10 +869,13 @@ export default function VideoEditor() {
   const [selectedCueId, setSelectedCueId] = useState<string | null>(null)
   const [currentTime, setCurrentTime] = useState(0)
   const [job, setJob] = useState<JobState | null>(null)
+  const localPreviewRef = useRef<string | null>(null)
+
   const [uploadState, setUploadState] = useState<UploadState>({
     status: 'idle',
     message: 'Upload a source video to begin.',
   })
+
   const [captionState, setCaptionState] = useState<CaptionGenerationState>({
     status: 'idle',
     message: 'Generate AI captions after uploading a video, or upload an SRT/VTT file.',
@@ -847,34 +886,90 @@ export default function VideoEditor() {
     return calculateVideoQuota(tier, projectedMinutes)
   }, [tier, usedMinutes, durationSec])
 
+  useEffect(() => {
+    return () => {
+      if (localPreviewRef.current) {
+        URL.revokeObjectURL(localPreviewRef.current)
+      }
+    }
+  }, [])
+
   async function uploadVideo(file: File) {
-    setUploadState({ status: 'uploading', message: `Uploading ${file.name}…` })
-    setCaptionState({ status: 'idle', message: 'Video uploaded. Generate AI captions next.' })
+    setUploadState({ status: 'uploading', message: `Preparing ${file.name} (${formatFileSize(file.size)})…` })
+    setCaptionState({ status: 'idle', message: 'Video selected. Generate AI captions next.' })
     setVideoFile(file)
+    setFilename(file.name)
     setCues([])
     setSelectedCueId(null)
     setCurrentTime(0)
+    setSourceUrl(null)
+    setJob(null)
 
-    const form = new FormData()
-    form.set('video', file)
-    form.set('tier', tier)
-    form.set('durationSec', String(durationSec))
-    form.set('usedMinutes', String(usedMinutes))
-    form.set('locale', locale)
+    if (localPreviewRef.current) {
+      URL.revokeObjectURL(localPreviewRef.current)
+    }
+
+    const nextPreviewUrl = URL.createObjectURL(file)
+    localPreviewRef.current = nextPreviewUrl
+    setPreviewUrl(nextPreviewUrl)
 
     try {
-      const res = await fetch('/api/video/upload', { method: 'POST', body: form })
-      const payload = await res.json()
+      const uploadUrlResponse = await fetch('/api/video/upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name }),
+      })
 
-      if (payload.ok) {
-        setVideoUrl(payload.data.publicUrl)
-        setFilename(payload.data.filename || file.name)
-        setUploadState({
-          status: 'ready',
-          message: `${payload.data.filename || file.name} is stored and ready for AI captions.`,
+      const uploadUrlPayload = await readJsonResponse<{
+        ok: boolean
+        data?: { bucket: string; path: string; token: string }
+        error?: string
+      }>(uploadUrlResponse)
+
+      if (!uploadUrlPayload.ok || !uploadUrlPayload.data) {
+        throw new Error(uploadUrlPayload.error || 'Could not create direct upload URL.')
+      }
+
+      const supabase = getBrowserSupabase()
+      const { bucket, path, token } = uploadUrlPayload.data
+
+      const { error: uploadError } = await supabase.storage
+        .from(bucket)
+        .uploadToSignedUrl(path, token, file)
+
+      if (uploadError) {
+        throw new Error(uploadError.message)
+      }
+
+      const completeResponse = await fetch('/api/video/upload-complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bucket, path }),
+      })
+
+      const completePayload = await readJsonResponse<{
+        ok: boolean
+        data?: { signedUrl: string; bucket: string; path: string }
+        error?: string
+      }>(completeResponse)
+
+      if (!completePayload.ok || !completePayload.data?.signedUrl) {
+        throw new Error(completePayload.error || 'Could not finalize video upload.')
+      }
+
+      setSourceUrl(completePayload.data.signedUrl)
+
+      setUploadState({
+        status: 'ready',
+        message: `${file.name} uploaded directly to storage.`,
+      })
+
+      if (!directCaptioningAllowed(file)) {
+        setCaptionState({
+          status: 'failed',
+          message:
+            `This video is ${formatFileSize(file.size)}. Direct AI captions currently support clips under ${DIRECT_CAPTION_MAX_MB} MB. Full background captioning is the next worker step.`,
         })
-      } else {
-        setUploadState({ status: 'failed', message: payload.error || 'Upload failed.' })
       }
     } catch (error) {
       setUploadState({
@@ -890,6 +985,15 @@ export default function VideoEditor() {
       return
     }
 
+    if (!directCaptioningAllowed(videoFile)) {
+      setCaptionState({
+        status: 'failed',
+        message:
+          `This video is ${formatFileSize(videoFile.size)}. Direct AI captioning currently supports clips under ${DIRECT_CAPTION_MAX_MB} MB. The production fix is background audio extraction with FFmpeg.`,
+      })
+      return
+    }
+
     setCaptionState({ status: 'generating', message: 'Generating AI captions…' })
 
     const form = new FormData()
@@ -900,10 +1004,15 @@ export default function VideoEditor() {
 
     try {
       const res = await fetch('/api/video/transcribe', { method: 'POST', body: form })
-      const payload = await res.json()
+
+      const payload = await readJsonResponse<{
+        ok: boolean
+        data?: { cues?: CaptionCue[] }
+        error?: string
+      }>(res)
 
       if (payload.ok) {
-        const nextCues = Array.isArray(payload.data.cues) ? payload.data.cues : []
+        const nextCues = Array.isArray(payload.data?.cues) ? payload.data.cues : []
 
         setCues(nextCues)
         setSelectedCueId(nextCues[0]?.id || null)
@@ -934,10 +1043,15 @@ export default function VideoEditor() {
 
     try {
       const res = await fetch(`/api/video/captions?locale=${locale}`, { method: 'POST', body: form })
-      const payload = await res.json()
+
+      const payload = await readJsonResponse<{
+        ok: boolean
+        data?: { cues?: CaptionCue[] }
+        error?: string
+      }>(res)
 
       if (payload.ok) {
-        const nextCues = Array.isArray(payload.data.cues) ? payload.data.cues : []
+        const nextCues = Array.isArray(payload.data?.cues) ? payload.data.cues : []
 
         setCues(nextCues)
         setSelectedCueId(nextCues[0]?.id || null)
@@ -961,14 +1075,14 @@ export default function VideoEditor() {
   }
 
   async function exportVideo() {
-    if (!videoUrl) return
+    if (!sourceUrl && !previewUrl) return
 
     try {
       const res = await fetch('/api/video/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sourceUrl: videoUrl,
+          sourceUrl: sourceUrl || previewUrl,
           filename,
           durationSec: Math.max(1, durationSec),
           captions: cues,
@@ -980,12 +1094,16 @@ export default function VideoEditor() {
         }),
       })
 
-      const payload = await res.json()
+      const payload = await readJsonResponse<{
+        ok: boolean
+        data?: { jobId: string; status: string }
+        error?: string
+      }>(res)
 
-      if (payload.ok) {
+      if (payload.ok && payload.data) {
         setJob({ jobId: payload.data.jobId, status: payload.data.status })
       } else {
-        setJob({ jobId: 'blocked', status: 'failed', error: payload.error })
+        setJob({ jobId: 'blocked', status: 'failed', error: payload.error || 'Export failed.' })
       }
     } catch (error) {
       setJob({
@@ -999,15 +1117,28 @@ export default function VideoEditor() {
   async function refreshJob() {
     if (!job || job.jobId === 'blocked') return
 
-    const res = await fetch(`/api/video/jobs/${job.jobId}`)
-    const payload = await res.json()
+    try {
+      const res = await fetch(`/api/video/jobs/${job.jobId}`)
 
-    if (payload.ok) {
+      const payload = await readJsonResponse<{
+        ok: boolean
+        data?: { status: string; result_url?: string | null; error?: string | null }
+        error?: string
+      }>(res)
+
+      if (payload.ok && payload.data) {
+        setJob({
+          jobId: job.jobId,
+          status: payload.data.status,
+          result_url: payload.data.result_url,
+          error: payload.data.error,
+        })
+      }
+    } catch (error) {
       setJob({
         jobId: job.jobId,
-        status: payload.data.status,
-        result_url: payload.data.result_url,
-        error: payload.data.error,
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'Could not refresh job.',
       })
     }
   }
@@ -1123,7 +1254,9 @@ export default function VideoEditor() {
 
         <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
-            <p className="text-xs text-white/55">Storage: {uploadState.message}</p>
+            <p className={`text-xs ${uploadState.status === 'failed' ? 'text-red-300' : 'text-white/55'}`}>
+              Storage: {uploadState.message}
+            </p>
             <p className={`mt-1 text-xs ${captionState.status === 'failed' ? 'text-red-300' : 'text-white/55'}`}>
               Captions: {captionState.message}
             </p>
@@ -1132,7 +1265,7 @@ export default function VideoEditor() {
           <button
             type="button"
             onClick={generateCaptions}
-            disabled={!videoFile || captionState.status === 'generating'}
+            disabled={!videoFile || captionState.status === 'generating' || !directCaptioningAllowed(videoFile)}
             className="rounded-full bg-[#FFD700] px-6 py-3 font-bold text-black disabled:opacity-50"
           >
             {captionState.status === 'generating' ? 'Generating…' : 'Generate Captions'}
@@ -1143,7 +1276,7 @@ export default function VideoEditor() {
       <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_.42fr]">
         <div className="space-y-6">
           <CanvasEditor
-            videoUrl={videoUrl}
+            videoUrl={previewUrl}
             cues={cues}
             style={style}
             aspectRatio={aspectRatio}
@@ -1183,7 +1316,7 @@ export default function VideoEditor() {
 
           <ExportPanel
             canExport={quota.exportEnabled}
-            hasSource={Boolean(videoUrl)}
+            hasSource={Boolean(sourceUrl || previewUrl)}
             job={job}
             onExport={exportVideo}
             onRefresh={refreshJob}
@@ -1193,7 +1326,7 @@ export default function VideoEditor() {
 
       <footer className="mt-8 rounded-2xl border border-white/10 bg-white/[.03] p-4 text-sm text-white/60">
         Sync health: canvas time {currentTime.toFixed(2)}s · duration {durationSec || 0}s · {cues.length} captions ·
-        queue-backed exports require <code>npm run worker:video</code>.
+        direct upload enabled · queue-backed exports require <code>npm run worker:video</code>.
       </footer>
     </main>
   )

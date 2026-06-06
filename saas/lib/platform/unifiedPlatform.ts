@@ -1,5 +1,5 @@
 export type SupportedLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
-export type AudienceRole = 'partner' | 'business_owner' | 'customer' | 'admin' | 'owner'
+export type AudienceRole = 'partner' | 'business_owner' | 'customer' | 'admin' | 'owner' | 'video_operator'
 
 export const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'es', 'pt', 'pl', 'ru']
 
@@ -18,6 +18,7 @@ export const UNIFIED_NAV = [
   { icon: '📅', label: 'Calendar', href: '/dashboard/outreach/outreach', description: 'scheduled launches' },
   { icon: '📊', label: 'Spreadsheets', href: '/dashboard/data', description: 'imports and CRM lists' },
   { icon: '📡', label: 'Outreach', href: '/dashboard/outreach/pipeline', description: 'pipeline and campaigns' },
+  { icon: '🎬', label: 'Video', href: '/dashboard/video', description: 'transcoding and universal playback' },
   { icon: '🧭', label: 'Admin', href: '/admin', description: 'owner cockpit' },
 ]
 
@@ -79,6 +80,7 @@ export function normalizeLocale(locale?: string): SupportedLocale {
 
 export function inferAudienceRole(input: string): AudienceRole {
   const text = input.toLowerCase()
+  if (/video|upload|playback|transcod|hls|dash|mp4|avi|mkv|flv|mov|webm|quota|overage/.test(text)) return 'video_operator'
   if (/owner|admin|executive|finance|forecast|kpi/.test(text)) return 'owner'
   if (/partner|booking|marketplace|category/.test(text)) return 'partner'
   if (/customer|review|appointment|book/.test(text)) return 'customer'
@@ -91,7 +93,11 @@ export function getConciergeAnswer(input: string, locale?: string, currentPage =
   const role = inferAudienceRole(`${input} ${currentPage}`)
   const text = input.toLowerCase()
   const steps: string[] = []
-  if (/forecast|financial|revenue|kpi|executive/.test(text)) {
+  if (/video|upload|playback|transcod|hls|dash|mp4|avi|mkv|flv|mov|webm|quota|overage/.test(text)) {
+    steps.push('IntentClassifier detected video_upload or video_playback; open Video Studio and upload any source extension for normalization.')
+    steps.push('SubscriptionChecker enforces tier logic: free users receive an automatic demo trim, paid users receive full MP4/HLS playback within quota, and over-quota accounts trigger Stripe/PayPal billing.')
+    steps.push('TranscodeController runs FFmpeg to archive the original, emit H.264/AAC MP4, package HLS chunks, and PlaybackController serves HLS with MP4 fallback in the selected language.')
+  } else if (/forecast|financial|revenue|kpi|executive/.test(text)) {
     steps.push(`Open Executive cockpit: ${FINANCIAL_LEDGER.unifiedRevenue} unified revenue and engagement index ${KPI_DASHBOARD.unifiedEngagementIndex}.`)
     steps.push(`Review forecasts: ${FORECASTS.map(f => `${f.horizon} ${f.revenue}`).join(' • ')}.`)
     steps.push(`Recommendation: ${EXECUTIVE_RECOMMENDATIONS[0]}`)

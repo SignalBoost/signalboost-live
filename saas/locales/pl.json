@@ -1590,5 +1590,54 @@
   "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
   "wireframes.modules.assistant.panel1": "Task list panel",
   "wireframes.modules.assistant.panel2": "Reminder timeline",
-  "wireframes.modules.assistant.panel3": "Productivity insights chart"
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "video_engine": {
+    "eyebrow": "Uniwersalne odtwarzanie",
+    "title": "Silnik transkodowania wideo i uniwersalnego odtwarzania",
+    "subtitle": "Prześlij AVI, MKV, FLV, MOV, WEBM, MP4 lub inne pliki wideo. SignalBoost archiwizuje oryginał i serwuje zgodne MP4 z adaptacyjnym HLS.",
+    "footer": {
+      "processing": "Silnik transkodowania: przetwarzanie normalizacji FFmpeg i pakietów HLS.",
+      "ready": "Silnik transkodowania: gotowy i zsynchronizowany.",
+      "idle": "Silnik transkodowania: bezczynny i sprawny.",
+      "formats": "Serwujemy standardowe MP4/HLS; oryginały są zachowane w archiwum."
+    },
+    "subscription": {
+      "label": "Poziom subskrypcji",
+      "free": "Darmowy/demo",
+      "pro": "Pro",
+      "enterprise": "Enterprise"
+    },
+    "upload": {
+      "choose": "Wybierz dowolny plik wideo",
+      "none": "Nie wybrano jeszcze wideo.",
+      "accepts": "Obsługiwane: MP4, AVI, MKV, FLV, MOV, WEBM, WMV, MPEG, 3GP, OGV i przesyłanie video/*.",
+      "processing": "Transkodowanie do MP4/HLS…",
+      "cta": "Prześlij i znormalizuj wideo"
+    },
+    "errors": {
+      "failed": "Transkodowanie wideo nie powiodło się.",
+      "network": "Błąd sieci podczas przesyłania wideo."
+    },
+    "playback": {
+      "title": "PlaybackView",
+      "demo": "Konto darmowe/demo: plik został automatycznie skrócony do krótkiego klipu.",
+      "overage": "Konto ponad limit: pełne odtwarzanie jest dostępne z rozliczeniem nadwyżki.",
+      "full": "Konto płatne: pełne odtwarzanie w ramach limitu.",
+      "hls": "Adaptacyjny strumień HLS",
+      "mp4": "Zapasowy strumień MP4",
+      "asset": "Znormalizowany zasób"
+    },
+    "quota": {
+      "title": "QuotaStatusBar",
+      "over": "Pamięć przekracza limit i naliczy opłaty licznikowe.",
+      "ok": "Pamięć jest w limicie."
+    },
+    "billing": {
+      "title": "BillingBanner",
+      "copy": "To konto przekroczyło limit wideo. Dodatkowa pamięć/odtwarzanie jest rozliczane za GB/minutę zgodnie z ustawieniami.",
+      "amount": "Szacowana opłata",
+      "stripe": "Zapłać Stripe",
+      "paypal": "Zapłać PayPal"
+    }
+  }
 }

@@ -1590,5 +1590,54 @@
   "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
   "wireframes.modules.assistant.panel1": "Task list panel",
   "wireframes.modules.assistant.panel2": "Reminder timeline",
-  "wireframes.modules.assistant.panel3": "Productivity insights chart"
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "video_engine": {
+    "eyebrow": "Reprodução universal",
+    "title": "Motor de transcodificação de vídeo e reprodução universal",
+    "subtitle": "Envie AVI, MKV, FLV, MOV, WEBM, MP4 ou outros vídeos. O SignalBoost arquiva o original e serve MP4 compatível com HLS adaptativo.",
+    "footer": {
+      "processing": "Motor de transcodificação: processando com normalização FFmpeg e empacotamento HLS.",
+      "ready": "Motor de transcodificação: pronto e sincronizado.",
+      "idle": "Motor de transcodificação: ocioso e saudável.",
+      "formats": "Servindo MP4/HLS padronizado; originais retidos no arquivo."
+    },
+    "subscription": {
+      "label": "Plano de assinatura",
+      "free": "Grátis/demo",
+      "pro": "Pro",
+      "enterprise": "Enterprise"
+    },
+    "upload": {
+      "choose": "Escolher qualquer vídeo",
+      "none": "Nenhum vídeo selecionado ainda.",
+      "accepts": "Aceito: MP4, AVI, MKV, FLV, MOV, WEBM, WMV, MPEG, 3GP, OGV e envios video/*.",
+      "processing": "Transcodificando para MP4/HLS…",
+      "cta": "Enviar e normalizar vídeo"
+    },
+    "errors": {
+      "failed": "Falha na transcodificação do vídeo.",
+      "network": "Erro de rede ao enviar o vídeo."
+    },
+    "playback": {
+      "title": "PlaybackView",
+      "demo": "Conta grátis/demo: este arquivo foi cortado automaticamente para um clipe curto.",
+      "overage": "Conta acima da cota: reprodução completa disponível com cobrança de excedente.",
+      "full": "Conta paga: reprodução completa dentro da cota.",
+      "hls": "Stream HLS adaptativo",
+      "mp4": "Stream MP4 alternativo",
+      "asset": "Ativo padronizado"
+    },
+    "quota": {
+      "title": "QuotaStatusBar",
+      "over": "O armazenamento passou da cota e gerará cobranças medidas.",
+      "ok": "O armazenamento está dentro da cota."
+    },
+    "billing": {
+      "title": "BillingBanner",
+      "copy": "Esta conta excedeu a cota de vídeo. Armazenamento/reprodução extra é cobrado por GB/minuto conforme as configurações.",
+      "amount": "Cobrança estimada",
+      "stripe": "Pagar com Stripe",
+      "paypal": "Pagar com PayPal"
+    }
+  }
 }

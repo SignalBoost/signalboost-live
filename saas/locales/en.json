@@ -1590,5 +1590,54 @@
   "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
   "wireframes.modules.assistant.panel1": "Task list panel",
   "wireframes.modules.assistant.panel2": "Reminder timeline",
-  "wireframes.modules.assistant.panel3": "Productivity insights chart"
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "video_engine": {
+    "eyebrow": "Universal Playback",
+    "title": "Video Transcoding + Universal Playback Engine",
+    "subtitle": "Upload AVI, MKV, FLV, MOV, WEBM, MP4, or other video files. SignalBoost archives the original and serves browser-safe MP4 with HLS adaptive streaming.",
+    "footer": {
+      "processing": "Transcoding engine: processing with FFmpeg normalization and HLS packaging.",
+      "ready": "Transcoding engine: ready and synchronized.",
+      "idle": "Transcoding engine: idle and healthy.",
+      "formats": "Serving standardized MP4/HLS; originals retained for archive."
+    },
+    "subscription": {
+      "label": "Subscription tier",
+      "free": "Free/demo",
+      "pro": "Pro",
+      "enterprise": "Enterprise"
+    },
+    "upload": {
+      "choose": "Choose any video file",
+      "none": "No video selected yet.",
+      "accepts": "Accepted: MP4, AVI, MKV, FLV, MOV, WEBM, WMV, MPEG, 3GP, OGV, and video/* MIME uploads.",
+      "processing": "Transcoding to MP4/HLS…",
+      "cta": "Upload and normalize video"
+    },
+    "errors": {
+      "failed": "Video transcoding failed.",
+      "network": "Network error while uploading the video."
+    },
+    "playback": {
+      "title": "PlaybackView",
+      "demo": "Free/demo account: this file was automatically trimmed to a short demo clip.",
+      "overage": "Over-quota account: full playback is available with overage billing reconciliation.",
+      "full": "Paid account: full video playback within quota.",
+      "hls": "Adaptive HLS stream",
+      "mp4": "MP4 fallback stream",
+      "asset": "Standardized asset"
+    },
+    "quota": {
+      "title": "QuotaStatusBar",
+      "over": "Storage is over quota and will accrue metered charges.",
+      "ok": "Storage is within quota."
+    },
+    "billing": {
+      "title": "BillingBanner",
+      "copy": "This account exceeded its video quota. Extra storage/playback is charged per GB/minute according to your billing settings.",
+      "amount": "Estimated charge",
+      "stripe": "Pay with Stripe",
+      "paypal": "Pay with PayPal"
+    }
+  }
 }

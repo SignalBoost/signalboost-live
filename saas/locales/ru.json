@@ -1590,5 +1590,54 @@
   "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
   "wireframes.modules.assistant.panel1": "Task list panel",
   "wireframes.modules.assistant.panel2": "Reminder timeline",
-  "wireframes.modules.assistant.panel3": "Productivity insights chart"
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "video_engine": {
+    "eyebrow": "Универсальное воспроизведение",
+    "title": "Движок транскодирования видео и универсального воспроизведения",
+    "subtitle": "Загружайте AVI, MKV, FLV, MOV, WEBM, MP4 и другие видео. SignalBoost архивирует оригинал и отдает браузерный MP4 с адаптивным HLS.",
+    "footer": {
+      "processing": "Движок транскодирования: обработка FFmpeg и упаковка HLS.",
+      "ready": "Движок транскодирования: готов и синхронизирован.",
+      "idle": "Движок транскодирования: простаивает и исправен.",
+      "formats": "Отдаются стандартизированные MP4/HLS; оригиналы сохранены в архиве."
+    },
+    "subscription": {
+      "label": "Уровень подписки",
+      "free": "Бесплатно/демо",
+      "pro": "Pro",
+      "enterprise": "Enterprise"
+    },
+    "upload": {
+      "choose": "Выбрать любой видеофайл",
+      "none": "Видео еще не выбрано.",
+      "accepts": "Принимается: MP4, AVI, MKV, FLV, MOV, WEBM, WMV, MPEG, 3GP, OGV и загрузки video/*.",
+      "processing": "Транскодирование в MP4/HLS…",
+      "cta": "Загрузить и нормализовать видео"
+    },
+    "errors": {
+      "failed": "Не удалось транскодировать видео.",
+      "network": "Ошибка сети при загрузке видео."
+    },
+    "playback": {
+      "title": "PlaybackView",
+      "demo": "Бесплатный/демо аккаунт: файл автоматически обрезан до короткого демо-клипа.",
+      "overage": "Аккаунт сверх лимита: полное воспроизведение доступно с оплатой перерасхода.",
+      "full": "Платный аккаунт: полное воспроизведение в пределах квоты.",
+      "hls": "Адаптивный HLS-поток",
+      "mp4": "Резервный MP4-поток",
+      "asset": "Стандартизированный ресурс"
+    },
+    "quota": {
+      "title": "QuotaStatusBar",
+      "over": "Хранилище сверх квоты, будут начисляться измеряемые платежи.",
+      "ok": "Хранилище в пределах квоты."
+    },
+    "billing": {
+      "title": "BillingBanner",
+      "copy": "Этот аккаунт превысил квоту видео. Дополнительное хранение/воспроизведение оплачивается за GB/минуту согласно настройкам.",
+      "amount": "Оценочный платеж",
+      "stripe": "Оплатить Stripe",
+      "paypal": "Оплатить PayPal"
+    }
+  }
 }

@@ -1590,5 +1590,54 @@
   "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
   "wireframes.modules.assistant.panel1": "Task list panel",
   "wireframes.modules.assistant.panel2": "Reminder timeline",
-  "wireframes.modules.assistant.panel3": "Productivity insights chart"
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "video_engine": {
+    "eyebrow": "Reproducción universal",
+    "title": "Motor de transcodificación de video y reproducción universal",
+    "subtitle": "Sube AVI, MKV, FLV, MOV, WEBM, MP4 u otros videos. SignalBoost archiva el original y sirve MP4 compatible con HLS adaptativo.",
+    "footer": {
+      "processing": "Motor de transcodificación: procesando con normalización FFmpeg y empaquetado HLS.",
+      "ready": "Motor de transcodificación: listo y sincronizado.",
+      "idle": "Motor de transcodificación: inactivo y saludable.",
+      "formats": "Sirviendo MP4/HLS estandarizado; originales retenidos en archivo."
+    },
+    "subscription": {
+      "label": "Nivel de suscripción",
+      "free": "Gratis/demo",
+      "pro": "Pro",
+      "enterprise": "Empresa"
+    },
+    "upload": {
+      "choose": "Elegir cualquier video",
+      "none": "Aún no hay video seleccionado.",
+      "accepts": "Aceptado: MP4, AVI, MKV, FLV, MOV, WEBM, WMV, MPEG, 3GP, OGV y cargas video/*.",
+      "processing": "Transcodificando a MP4/HLS…",
+      "cta": "Subir y normalizar video"
+    },
+    "errors": {
+      "failed": "Falló la transcodificación de video.",
+      "network": "Error de red al subir el video."
+    },
+    "playback": {
+      "title": "PlaybackView",
+      "demo": "Cuenta gratis/demo: este archivo se recortó automáticamente a un clip corto.",
+      "overage": "Cuenta sobre cuota: la reproducción completa está disponible con facturación de excedente.",
+      "full": "Cuenta paga: reproducción completa dentro de la cuota.",
+      "hls": "Stream HLS adaptativo",
+      "mp4": "Stream MP4 de respaldo",
+      "asset": "Activo estandarizado"
+    },
+    "quota": {
+      "title": "QuotaStatusBar",
+      "over": "El almacenamiento superó la cuota y acumulará cargos medidos.",
+      "ok": "El almacenamiento está dentro de la cuota."
+    },
+    "billing": {
+      "title": "BillingBanner",
+      "copy": "Esta cuenta superó su cuota de video. El almacenamiento/reproducción extra se cobra por GB/minuto según tu configuración de facturación.",
+      "amount": "Cargo estimado",
+      "stripe": "Pagar con Stripe",
+      "paypal": "Pagar con PayPal"
+    }
+  }
 }

@@ -13,14 +13,15 @@ function admin() {
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
-async function ensureBucket(supabase: ReturnType<typeof createClient>) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function ensureBucket(supabase: any) {
   const { data } = await supabase.storage.getBucket(BUCKET)
   if (!data) {
     await supabase.storage.createBucket(BUCKET, { public: false })
   }
 }
 
-export async function POST(req: Request) {   
+export async function POST(req: Request) {
   const supabase = admin()
   if (!supabase) {
     return NextResponse.json(

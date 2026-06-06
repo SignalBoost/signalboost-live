@@ -50,6 +50,10 @@ type JsonSafeVideoResponse<T> = {
   }
 }
 
+type AccountRow = {
+  id?: string | null
+}
+
 const supportedLocales: SupportedVideoLocale[] = ['en', 'es', 'pt', 'pl', 'ru']
 
 function json<T>(body: JsonSafeVideoResponse<T>, status = 200) {
@@ -107,8 +111,11 @@ async function getUser() {
   return user
 }
 
-async function resolveAccountId(supabase: ReturnType<typeof createClient>, userId: string) {
-  const { data } = await supabase
+async function resolveAccountId(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<string | null> {
+  const result = await supabase
     .from('accounts')
     .select('id')
     .or(`user_id.eq.${userId},owner_id.eq.${userId}`)
@@ -116,7 +123,13 @@ async function resolveAccountId(supabase: ReturnType<typeof createClient>, userI
     .limit(1)
     .maybeSingle()
 
-  return data?.id ?? null
+  const row = result.data as AccountRow | null
+
+  if (!row || typeof row.id !== 'string') {
+    return null
+  }
+
+  return row.id
 }
 
 export async function POST(request: Request) {
@@ -223,19 +236,24 @@ export async function POST(request: Request) {
       plan: credit.plan,
     })
 
-    if (error) throw new Error(error.message)
+    if (error) {
+      throw new Error(error.message)
+    }
 
-    return json({
-      ok: true,
-      data: {
-        jobId,
-        status: 'queued' as const,
-        creditsRemaining: credit.remaining,
-        plan: credit.plan,
+    return json(
+      {
+        ok: true,
+        data: {
+          jobId,
+          status: 'queued' as const,
+          creditsRemaining: credit.remaining,
+          plan: credit.plan,
+        },
+        error: null,
+        meta: { locale: lang, generatedAt: new Date().toISOString() },
       },
-      error: null,
-      meta: { locale: lang, generatedAt: new Date().toISOString() },
-    }, 202)
+      202,
+    )
   } catch (error) {
     await refundVideoCredit(user.id)
 

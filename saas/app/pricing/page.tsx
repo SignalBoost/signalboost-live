@@ -37,109 +37,109 @@ export default function PricingPage() {
   const plans: Plan[] = [
     {
       key: 'free',
-      name: t(dict, 'pricing_page.free.name', 'Free'),
-      audience: t(dict, 'pricing_page.free.audience', 'Explore the platform'),
-      price: t(dict, 'pricing_page.priceFree', 'Free'),
+      name: t(dict, 'pricing_v2.free.name', 'Free Demo'),
+      audience: t(dict, 'pricing_v2.free.audience', 'Evaluate SignalBoost before subscribing'),
+      price: t(dict, 'pricing_v2.priceFree', 'Free'),
       description: t(
         dict,
-        'pricing_page.free.description',
-        'Test the multilingual workspace, preview the editor, and understand what SignalBoost can do before upgrading.',
+        'pricing_v2.free.description',
+        'A limited evaluation pass so you can test the multilingual workspace, preview the editor, and understand the platform before choosing a paid plan.',
       ),
-      cta: t(dict, 'pricing_page.free.cta', 'Start free'),
-      credits: t(dict, 'pricing_page.free.credits', '2 video credits / month'),
-      seats: t(dict, 'pricing_page.free.seats', '1 user'),
+      cta: t(dict, 'pricing_v2.free.cta', 'Start demo'),
+      credits: t(dict, 'pricing_v2.free.credits', '2 one-time video credits'),
+      seats: t(dict, 'pricing_v2.free.seats', '1 user'),
       features: [
-        t(dict, 'pricing_page.free.feature1', '5-language workspace preview'),
-        t(dict, 'pricing_page.free.feature2', 'Website, podcast, video, reviews, and outreach preview'),
-        t(dict, 'pricing_page.free.feature3', 'Canvas Video Studio preview and manual caption editing'),
-        t(dict, 'pricing_page.free.feature4', 'Basic assistant and dashboard access'),
+        t(dict, 'pricing_v2.free.feature1', '5-language workspace preview'),
+        t(dict, 'pricing_v2.free.feature2', 'Website, podcast, video, reviews, outreach, and workspace preview'),
+        t(dict, 'pricing_v2.free.feature3', 'Canvas Video Studio preview and manual caption editing'),
+        t(dict, 'pricing_v2.free.feature4', 'Basic assistant and dashboard access'),
       ],
       limits: [
-        t(dict, 'pricing_page.free.limit1', 'Limited credits for AI captions and exports'),
-        t(dict, 'pricing_page.free.limit2', 'No production-scale video processing'),
-        t(dict, 'pricing_page.free.limit3', 'No team workspace or brand kit'),
+        t(dict, 'pricing_v2.free.limit1', 'Evaluation access only — not a monthly free operating plan'),
+        t(dict, 'pricing_v2.free.limit2', '2 one-time credits for AI captions or MP4 export testing'),
+        t(dict, 'pricing_v2.free.limit3', 'Paid plan required for ongoing business use'),
       ],
     },
     {
       key: 'starter',
-      name: t(dict, 'pricing_page.launch.name', 'Launch'),
-      audience: t(dict, 'pricing_page.launch.audience', 'For solo operators and small businesses'),
+      name: t(dict, 'pricing_v2.launch.name', 'Launch'),
+      audience: t(dict, 'pricing_v2.launch.audience', 'For solo operators and small businesses'),
       price: '$29',
-      period: t(dict, 'pricing_page.perMonthShort', '/mo'),
+      period: t(dict, 'pricing_v2.perMonthShort', '/mo'),
       description: t(
         dict,
-        'pricing_page.launch.description',
-        'Launch a multilingual business presence with website tools, AI captions, reviews, podcast/web optimization, and a focused operating workspace.',
+        'pricing_v2.launch.description',
+        'Launch a multilingual business presence with website tools, AI captions, video exports, reviews, podcast/web optimization, and a focused operating workspace.',
       ),
-      cta: t(dict, 'pricing_page.launch.cta', 'Launch with SignalBoost'),
-      badge: t(dict, 'pricing_page.launch.badge', 'Best starting point'),
-      credits: t(dict, 'pricing_page.launch.credits', '25 video credits / month'),
-      seats: t(dict, 'pricing_page.launch.seats', '1 user'),
+      cta: t(dict, 'pricing_v2.launch.cta', 'Launch with SignalBoost'),
+      badge: t(dict, 'pricing_v2.launch.badge', 'Best starting point'),
+      credits: t(dict, 'pricing_v2.launch.credits', '25 video credits / month'),
+      seats: t(dict, 'pricing_v2.launch.seats', '1 user'),
       features: [
-        t(dict, 'pricing_page.launch.feature1', '5-language platform: English, Portuguese, Spanish, Polish, and Russian'),
-        t(dict, 'pricing_page.launch.feature2', '1 published website plus website optimization tools'),
-        t(dict, 'pricing_page.launch.feature3', 'Canvas Video Studio with AI captions and MP4 exports'),
-        t(dict, 'pricing_page.launch.feature4', 'Podcast launch and optimization workspace'),
-        t(dict, 'pricing_page.launch.feature5', 'Reviews, calendar, basic outreach, and assistant tools'),
+        t(dict, 'pricing_v2.launch.feature1', '5-language platform: English, Portuguese, Spanish, Polish, and Russian'),
+        t(dict, 'pricing_v2.launch.feature2', '1 published website plus website optimization tools'),
+        t(dict, 'pricing_v2.launch.feature3', 'Canvas Video Studio with AI captions and MP4 exports'),
+        t(dict, 'pricing_v2.launch.feature4', 'Podcast launch and optimization workspace'),
+        t(dict, 'pricing_v2.launch.feature5', 'Reviews, calendar, basic outreach, and assistant tools'),
       ],
       limits: [
-        t(dict, 'pricing_page.launch.limit1', 'Designed for one brand or business'),
-        t(dict, 'pricing_page.launch.limit2', 'Advanced team workflows start on Growth'),
+        t(dict, 'pricing_v2.launch.limit1', 'Designed for one brand or business'),
+        t(dict, 'pricing_v2.launch.limit2', 'Advanced team workflows start on Growth'),
       ],
     },
     {
       key: 'pro',
-      name: t(dict, 'pricing_page.growth.name', 'Growth'),
-      audience: t(dict, 'pricing_page.growth.audience', 'For growing businesses and small teams'),
+      name: t(dict, 'pricing_v2.growth.name', 'Growth'),
+      audience: t(dict, 'pricing_v2.growth.audience', 'For growing businesses and small teams'),
       price: '$99',
-      period: t(dict, 'pricing_page.perMonthShort', '/mo'),
+      period: t(dict, 'pricing_v2.perMonthShort', '/mo'),
       description: t(
         dict,
-        'pricing_page.growth.description',
+        'pricing_v2.growth.description',
         'Scale content, campaigns, reviews, websites, podcasts, and video production across a multilingual team workspace.',
       ),
-      cta: t(dict, 'pricing_page.growth.cta', 'Grow faster'),
+      cta: t(dict, 'pricing_v2.growth.cta', 'Grow faster'),
       highlight: true,
-      badge: t(dict, 'pricing_page.mostPopular', 'Most popular'),
-      credits: t(dict, 'pricing_page.growth.credits', '100 video credits / month'),
-      seats: t(dict, 'pricing_page.growth.seats', '3 users'),
+      badge: t(dict, 'pricing_v2.mostPopular', 'Most popular'),
+      credits: t(dict, 'pricing_v2.growth.credits', '100 video credits / month'),
+      seats: t(dict, 'pricing_v2.growth.seats', '3 users'),
       features: [
-        t(dict, 'pricing_page.growth.feature1', 'Everything in Launch'),
-        t(dict, 'pricing_page.growth.feature2', 'Up to 5 websites/projects and deeper website optimization'),
-        t(dict, 'pricing_page.growth.feature3', 'Canvas Video Studio templates, brand styling, and higher video usage'),
-        t(dict, 'pricing_page.growth.feature4', 'CoWork workspace, spreadsheets, calendar, reviews suite, and outreach tools'),
-        t(dict, 'pricing_page.growth.feature5', 'Podcast optimization, content planning, campaigns, and assistant workflows'),
+        t(dict, 'pricing_v2.growth.feature1', 'Everything in Launch'),
+        t(dict, 'pricing_v2.growth.feature2', 'Up to 5 websites/projects and deeper website optimization'),
+        t(dict, 'pricing_v2.growth.feature3', 'Canvas Video Studio templates, brand styling, and higher video usage'),
+        t(dict, 'pricing_v2.growth.feature4', 'CoWork workspace, spreadsheets, calendar, reviews suite, and outreach tools'),
+        t(dict, 'pricing_v2.growth.feature5', 'Podcast optimization, content planning, campaigns, and assistant workflows'),
       ],
       limits: [
-        t(dict, 'pricing_page.growth.limit1', 'Best for active content and growth operations'),
-        t(dict, 'pricing_page.growth.limit2', 'White label and advanced agency controls start on Command'),
+        t(dict, 'pricing_v2.growth.limit1', 'Best for active content and growth operations'),
+        t(dict, 'pricing_v2.growth.limit2', 'White label and advanced agency controls start on Command'),
       ],
     },
     {
       key: 'business',
-      name: t(dict, 'pricing_page.command.name', 'Command'),
-      audience: t(dict, 'pricing_page.command.audience', 'For agencies, teams, and serious operators'),
+      name: t(dict, 'pricing_v2.command.name', 'Command'),
+      audience: t(dict, 'pricing_v2.command.audience', 'For agencies, teams, and serious operators'),
       price: '$249',
-      period: t(dict, 'pricing_page.perMonthShort', '/mo'),
+      period: t(dict, 'pricing_v2.perMonthShort', '/mo'),
       description: t(
         dict,
-        'pricing_page.command.description',
+        'pricing_v2.command.description',
         'Run a multilingual growth command center with expanded websites, advanced video, podcast optimization, outreach, teams, and priority workflows.',
       ),
-      cta: t(dict, 'pricing_page.command.cta', 'Get Command'),
-      badge: t(dict, 'pricing_page.command.badge', 'Full platform'),
-      credits: t(dict, 'pricing_page.command.credits', '300 video credits / month'),
-      seats: t(dict, 'pricing_page.command.seats', '10+ users'),
+      cta: t(dict, 'pricing_v2.command.cta', 'Get Command'),
+      badge: t(dict, 'pricing_v2.command.badge', 'Full platform'),
+      credits: t(dict, 'pricing_v2.command.credits', '300 video credits / month'),
+      seats: t(dict, 'pricing_v2.command.seats', '10+ users'),
       features: [
-        t(dict, 'pricing_page.command.feature1', 'Everything in Growth'),
-        t(dict, 'pricing_page.command.feature2', 'Unlimited or expanded websites and advanced optimization workflows'),
-        t(dict, 'pricing_page.command.feature3', 'Advanced video workflows, larger usage pool, and priority rendering path'),
-        t(dict, 'pricing_page.command.feature4', 'Team workspace, brand kit, white label, reviews, outreach, and sales pipeline'),
-        t(dict, 'pricing_page.command.feature5', 'Data connectors, API/integrations path, dedicated onboarding, and priority support'),
+        t(dict, 'pricing_v2.command.feature1', 'Everything in Growth'),
+        t(dict, 'pricing_v2.command.feature2', 'Unlimited or expanded websites and advanced optimization workflows'),
+        t(dict, 'pricing_v2.command.feature3', 'Advanced video workflows, larger usage pool, and priority rendering path'),
+        t(dict, 'pricing_v2.command.feature4', 'Team workspace, brand kit, white label, reviews, outreach, and sales pipeline'),
+        t(dict, 'pricing_v2.command.feature5', 'Data connectors, API/integrations path, dedicated onboarding, and priority support'),
       ],
       limits: [
-        t(dict, 'pricing_page.command.limit1', 'Built for multi-location businesses, agencies, and operators'),
-        t(dict, 'pricing_page.command.limit2', 'Custom usage and enterprise terms available by request'),
+        t(dict, 'pricing_v2.command.limit1', 'Built for multi-location businesses, agencies, and operators'),
+        t(dict, 'pricing_v2.command.limit2', 'Custom usage and enterprise terms available by request'),
       ],
     },
   ]
@@ -147,104 +147,105 @@ export default function PricingPage() {
   const platformModules: PlatformModule[] = [
     {
       icon: '🌐',
-      name: t(dict, 'pricing_page.modules.website.name', 'Website Builder + Web Optimization'),
-      availability: t(dict, 'pricing_page.modules.website.availability', 'Launch+'),
+      name: t(dict, 'pricing_v2.modules.website.name', 'Website Builder + Web Optimization'),
+      availability: t(dict, 'pricing_v2.modules.website.availability', 'Launch+'),
       description: t(
         dict,
-        'pricing_page.modules.website.description',
+        'pricing_v2.modules.website.description',
         'Create websites, improve existing pages, optimize content, and prepare multilingual pages for search and conversion.',
       ),
     },
     {
       icon: '🎙️',
-      name: t(dict, 'pricing_page.modules.podcast.name', 'Podcast Builder + Podcast Optimization'),
-      availability: t(dict, 'pricing_page.modules.podcast.availability', 'Launch+ / Add-on for advanced podcast network'),
+      name: t(dict, 'pricing_v2.modules.podcast.name', 'Podcast Builder + Podcast Optimization'),
+      availability: t(dict, 'pricing_v2.modules.podcast.availability', 'Launch+ / advanced podcast add-on path'),
       description: t(
         dict,
-        'pricing_page.modules.podcast.description',
+        'pricing_v2.modules.podcast.description',
         'Plan, launch, audit, and optimize podcast presence across the same 5-language operating workspace.',
       ),
     },
     {
       icon: '🎬',
-      name: t(dict, 'pricing_page.modules.video.name', 'Canvas Video Studio'),
-      availability: t(dict, 'pricing_page.modules.video.availability', 'All plans, credits apply'),
+      name: t(dict, 'pricing_v2.modules.video.name', 'Canvas Video Studio'),
+      availability: t(dict, 'pricing_v2.modules.video.availability', 'All plans, credits apply'),
       description: t(
         dict,
-        'pricing_page.modules.video.description',
+        'pricing_v2.modules.video.description',
         'Upload video, generate AI captions, style overlays, preview edits, and export MP4s using video credits.',
       ),
     },
     {
       icon: '🎧',
-      name: t(dict, 'pricing_page.modules.audio.name', 'Audio Studio'),
-      availability: t(dict, 'pricing_page.modules.audio.availability', 'Growth+'),
+      name: t(dict, 'pricing_v2.modules.audio.name', 'Audio Studio'),
+      availability: t(dict, 'pricing_v2.modules.audio.availability', 'Growth+'),
       description: t(
         dict,
-        'pricing_page.modules.audio.description',
+        'pricing_v2.modules.audio.description',
         'Create and manage voice/audio content as part of your multilingual publishing workflow.',
       ),
     },
     {
       icon: '⭐',
-      name: t(dict, 'pricing_page.modules.reviews.name', 'Reviews + Reputation'),
-      availability: t(dict, 'pricing_page.modules.reviews.availability', 'Launch+'),
+      name: t(dict, 'pricing_v2.modules.reviews.name', 'Reviews + Reputation'),
+      availability: t(dict, 'pricing_v2.modules.reviews.availability', 'Launch+'),
       description: t(
         dict,
-        'pricing_page.modules.reviews.description',
+        'pricing_v2.modules.reviews.description',
         'Collect, manage, and showcase reviews while supporting reputation workflows across languages.',
       ),
     },
     {
       icon: '📡',
-      name: t(dict, 'pricing_page.modules.outreach.name', 'Outreach + Campaigns'),
-      availability: t(dict, 'pricing_page.modules.outreach.availability', 'Growth+'),
+      name: t(dict, 'pricing_v2.modules.outreach.name', 'Outreach + Campaigns'),
+      availability: t(dict, 'pricing_v2.modules.outreach.availability', 'Growth+'),
       description: t(
         dict,
-        'pricing_page.modules.outreach.description',
+        'pricing_v2.modules.outreach.description',
         'Coordinate discovery, contacts, pipeline, promotion, campaigns, and sales follow-up from one workspace.',
       ),
     },
     {
       icon: '🤝',
-      name: t(dict, 'pricing_page.modules.cowork.name', 'CoWork Workspace'),
-      availability: t(dict, 'pricing_page.modules.cowork.availability', 'Growth+'),
+      name: t(dict, 'pricing_v2.modules.cowork.name', 'CoWork Workspace'),
+      availability: t(dict, 'pricing_v2.modules.cowork.availability', 'Growth+'),
       description: t(
         dict,
-        'pricing_page.modules.cowork.description',
+        'pricing_v2.modules.cowork.description',
         'Operate with shared dashboards, roles, tasks, planning, feedback, and team collaboration workflows.',
       ),
     },
     {
       icon: '🤖',
-      name: t(dict, 'pricing_page.modules.assistant.name', 'Assistant + Concierge'),
-      availability: t(dict, 'pricing_page.modules.assistant.availability', 'All plans, deeper workflows on Growth+'),
+      name: t(dict, 'pricing_v2.modules.assistant.name', 'Assistant + Concierge'),
+      availability: t(dict, 'pricing_v2.modules.assistant.availability', 'All plans, deeper workflows on Growth+'),
       description: t(
         dict,
-        'pricing_page.modules.assistant.description',
+        'pricing_v2.modules.assistant.description',
         'Use AI assistance for prioritization, content, launch guidance, optimization ideas, and daily operations.',
       ),
     },
     {
       icon: '📅',
-      name: t(dict, 'pricing_page.modules.operations.name', 'Calendar, Spreadsheets + Data Connectors'),
-      availability: t(dict, 'pricing_page.modules.operations.availability', 'Growth+'),
+      name: t(dict, 'pricing_v2.modules.operations.name', 'Calendar, Spreadsheets + Data Connectors'),
+      availability: t(dict, 'pricing_v2.modules.operations.availability', 'Growth+'),
       description: t(
         dict,
-        'pricing_page.modules.operations.description',
+        'pricing_v2.modules.operations.description',
         'Coordinate schedules, shared tables, data imports, metrics, and credit control from the operations console.',
       ),
     },
   ]
 
   const comparisonRows = [
+    ['Platform access', 'Limited demo', 'Ongoing use', 'Ongoing use', 'Ongoing use'],
     ['5-language platform', 'Preview', 'Included', 'Included', 'Included'],
     ['Published websites/projects', 'Preview', '1', '5', 'Expanded / custom'],
     ['Website optimization', 'Preview', 'Included', 'Advanced', 'Advanced + priority'],
     ['Podcast optimization', 'Preview', 'Included', 'Advanced', 'Advanced + network path'],
     ['Canvas Video Studio', 'Preview', 'Included', 'Included + templates', 'Advanced workflows'],
-    ['Video credits', '2', '25', '100', '300'],
-    ['AI captions + MP4 exports', 'Limited', 'Included via credits', 'Included via credits', 'Included via credits'],
+    ['Video credits', '2 one-time', '25 / month', '100 / month', '300 / month'],
+    ['AI captions + MP4 exports', 'Limited demo', 'Included via credits', 'Included via credits', 'Included via credits'],
     ['Reviews workspace', 'Preview', 'Included', 'Advanced', 'Advanced'],
     ['Outreach + campaigns', 'Preview', 'Basic', 'Included', 'Advanced'],
     ['CoWork/team workspace', 'Preview', 'Basic', '3 users', '10+ users'],
@@ -261,11 +262,13 @@ export default function PricingPage() {
 
     try {
       setLoading(plan)
+
       const { createClient } = await import('@supabase/supabase-js')
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       )
+
       const {
         data: { session },
       } = await supabase.auth.getSession()
@@ -284,10 +287,10 @@ export default function PricingPage() {
       if (data.url) {
         window.location.href = data.url
       } else {
-        alert(data.error || t(dict, 'pricing_page.errorGeneric', 'Something went wrong.'))
+        alert(data.error || t(dict, 'pricing_v2.errorGeneric', 'Something went wrong.'))
       }
     } catch {
-      alert(t(dict, 'pricing_page.errorNetwork', `Unable to start checkout. Please contact ${CONTACT_EMAIL}`))
+      alert(t(dict, 'pricing_v2.errorNetwork', `Unable to start checkout. Please contact ${CONTACT_EMAIL}`))
     } finally {
       setLoading(null)
     }
@@ -297,17 +300,17 @@ export default function PricingPage() {
     <main className="sb-page-shell sb-section sb-pricing-cockpit">
       <section style={{ textAlign: 'center', marginBottom: 32 }}>
         <span className="sb-eyebrow">
-          {t(dict, 'pricing_page.kicker', 'Multilingual AI operations platform')}
+          {t(dict, 'pricing_v2.kicker', 'Multilingual AI operations platform')}
         </span>
 
         <h1 className="sb-h1" style={{ marginTop: 12 }}>
-          {t(dict, 'pricing_page.title', 'Build, publish, optimize, and grow in 5 languages.')}
+          {t(dict, 'pricing_v2.title', 'Build, publish, optimize, and grow in 5 languages.')}
         </h1>
 
-        <p className="sb-body" style={{ maxWidth: 820, margin: '18px auto 0' }}>
+        <p className="sb-body" style={{ maxWidth: 840, margin: '18px auto 0' }}>
           {t(
             dict,
-            'pricing_page.subtitle',
+            'pricing_v2.subtitle',
             'SignalBoost combines websites, web optimization, podcast optimization, Canvas video, AI captions, reviews, outreach, CoWork, and operations tools into one multilingual platform.',
           )}
         </p>
@@ -379,7 +382,9 @@ export default function PricingPage() {
                 {plan.credits}
               </strong>
               <span className="sb-caption">
-                {t(dict, 'pricing_page.creditExplainerShort', 'Credits are used for AI captions and MP4 exports. Preview/editing is free.')}
+                {plan.key === 'free'
+                  ? t(dict, 'pricing_v2.free.creditExplainerShort', 'One-time demo credits for AI captions or MP4 export testing.')
+                  : t(dict, 'pricing_v2.creditExplainerShort', 'Credits are used for AI captions and MP4 exports. Preview/editing is free.')}
               </span>
             </div>
 
@@ -409,17 +414,37 @@ export default function PricingPage() {
 
       <section style={{ marginTop: 38 }}>
         <span className="sb-eyebrow">
-          {t(dict, 'pricing_page.platformKicker', 'What is included')}
+          {t(dict, 'pricing_v2.demoKicker', 'Free Demo is not a monthly free plan')}
+        </span>
+
+        <div className="sb-card sb-pricing-panel" style={{ padding: 24, marginTop: 12 }}>
+          <h2 className="sb-h2">
+            {t(dict, 'pricing_v2.demoTitle', 'Try the platform. Upgrade to keep operating.')}
+          </h2>
+
+          <p className="sb-body" style={{ maxWidth: 860 }}>
+            {t(
+              dict,
+              'pricing_v2.demoDescription',
+              'Free Demo is designed for evaluation. It includes limited access and 2 one-time video credits so you can test the workflow. Ongoing business use requires Launch, Growth, or Command.',
+            )}
+          </p>
+        </div>
+      </section>
+
+      <section style={{ marginTop: 38 }}>
+        <span className="sb-eyebrow">
+          {t(dict, 'pricing_v2.platformKicker', 'What is included')}
         </span>
 
         <h2 className="sb-h2" style={{ marginTop: 10 }}>
-          {t(dict, 'pricing_page.platformTitle', 'One platform. Multiple business systems. Five languages.')}
+          {t(dict, 'pricing_v2.platformTitle', 'One platform. Multiple business systems. Five languages.')}
         </h2>
 
         <p className="sb-body" style={{ maxWidth: 760 }}>
           {t(
             dict,
-            'pricing_page.platformDescription',
+            'pricing_v2.platformDescription',
             'SignalBoost is designed to replace disconnected tools with one multilingual operating workspace for publishing, optimization, content, reputation, outreach, and growth.',
           )}
         </p>
@@ -440,29 +465,29 @@ export default function PricingPage() {
 
       <section style={{ marginTop: 38 }}>
         <span className="sb-eyebrow">
-          {t(dict, 'pricing_page.videoUsageKicker', 'Video usage')}
+          {t(dict, 'pricing_v2.videoUsageKicker', 'Video usage')}
         </span>
 
         <div className="sb-card sb-pricing-panel" style={{ padding: 24, marginTop: 12 }}>
           <h2 className="sb-h2">
-            {t(dict, 'pricing_page.videoUsageTitle', 'Video credits keep AI captions and exports fair.')}
+            {t(dict, 'pricing_v2.videoUsageTitle', 'Video credits keep AI captions and exports fair.')}
           </h2>
 
           <p className="sb-body" style={{ maxWidth: 820 }}>
             {t(
               dict,
-              'pricing_page.videoUsageDescription',
+              'pricing_v2.videoUsageDescription',
               'Previewing, editing, dragging captions, styling templates, and reviewing your video are free. Credits are used for expensive actions: AI caption generation and MP4 export/rendering.',
             )}
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 18 }}>
             {[
-              ['Free', '2 credits'],
-              ['Launch', '25 credits'],
-              ['Growth', '100 credits'],
-              ['Command', '300 credits'],
-            ].map(([name, credits]) => (
+              ['Free Demo', '2 one-time credits', 'no monthly reset'],
+              ['Launch', '25 credits', 'per month'],
+              ['Growth', '100 credits', 'per month'],
+              ['Command', '300 credits', 'per month'],
+            ].map(([name, credits, note]) => (
               <div
                 key={name}
                 style={{
@@ -473,8 +498,8 @@ export default function PricingPage() {
                 }}
               >
                 <span className="sb-caption">{name}</span>
-                <strong style={{ display: 'block', fontSize: 24, color: '#fff', marginTop: 4 }}>{credits}</strong>
-                <span className="sb-caption">per month</span>
+                <strong style={{ display: 'block', fontSize: 23, color: '#fff', marginTop: 4 }}>{credits}</strong>
+                <span className="sb-caption">{note}</span>
               </div>
             ))}
           </div>
@@ -482,7 +507,7 @@ export default function PricingPage() {
           <p className="sb-caption" style={{ marginTop: 16 }}>
             {t(
               dict,
-              'pricing_page.videoUsageNote',
+              'pricing_v2.videoUsageNote',
               'Larger videos use storage-first captioning now and will move to background FFmpeg audio extraction for production-scale processing.',
             )}
           </p>
@@ -491,11 +516,11 @@ export default function PricingPage() {
 
       <section style={{ marginTop: 38, overflowX: 'auto' }}>
         <span className="sb-eyebrow">
-          {t(dict, 'pricing_page.compareKicker', 'Plan comparison')}
+          {t(dict, 'pricing_v2.compareKicker', 'Plan comparison')}
         </span>
 
         <h2 className="sb-h2" style={{ marginTop: 10 }}>
-          {t(dict, 'pricing_page.compareTitle', 'Choose based on the operation you want to run.')}
+          {t(dict, 'pricing_v2.compareTitle', 'Choose based on the operation you want to run.')}
         </h2>
 
         <table
@@ -512,7 +537,7 @@ export default function PricingPage() {
         >
           <thead>
             <tr style={{ background: 'rgba(255,255,255,.06)' }}>
-              {['Capability', 'Free', 'Launch', 'Growth', 'Command'].map((heading) => (
+              {['Capability', 'Free Demo', 'Launch', 'Growth', 'Command'].map((heading) => (
                 <th
                   key={heading}
                   style={{
@@ -554,28 +579,28 @@ export default function PricingPage() {
       <section className="sb-pricing-wireframe-cta" aria-labelledby="pricing-wireframe-cta-title">
         <div>
           <span className="sb-eyebrow">
-            {t(dict, 'pricing_page.finalCtaKicker', 'Ready before marketing')}
+            {t(dict, 'pricing_v2.finalCtaKicker', 'Ready before marketing')}
           </span>
 
           <h2 id="pricing-wireframe-cta-title" className="sb-h2">
-            {t(dict, 'pricing_page.finalCtaTitle', 'Launch with a platform, not a single tool.')}
+            {t(dict, 'pricing_v2.finalCtaTitle', 'Launch with a platform, not a single tool.')}
           </h2>
 
           <p className="sb-body">
             {t(
               dict,
-              'pricing_page.finalCtaDescription',
-              'Start free, test the 5-language workspace, then upgrade when you are ready to publish, optimize, caption, export, and grow.',
+              'pricing_v2.finalCtaDescription',
+              'Start with a limited demo, test the 5-language workspace, then upgrade when you are ready to publish, optimize, caption, export, and grow.',
             )}
           </p>
         </div>
 
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <Link className="sb-button-secondary" href="/dashboard">
-            {t(dict, 'pricing_page.tryDashboard', 'Try dashboard')}
+            {t(dict, 'pricing_v2.tryDashboard', 'Try dashboard')}
           </Link>
           <Link className="sb-button-primary" href="/dashboard/video">
-            {t(dict, 'pricing_page.tryVideoStudio', 'Try Video Studio')}
+            {t(dict, 'pricing_v2.tryVideoStudio', 'Try Video Studio')}
           </Link>
         </div>
       </section>

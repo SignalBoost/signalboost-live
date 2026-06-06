@@ -83,20 +83,11 @@ const WORKSPACE: Item[] = [
 ]
 
 const ADMIN: Item[] = [
-  { icon: '🌌', label: 'Overview (live data)', href: '/admin/overview' },
-  { icon: '🛡️', label: 'Admin Home', href: '/admin' },
-  { icon: '🖥️', label: 'System', href: '/admin/system' },
-  { icon: '🧠', label: 'AI', href: '/admin/ai' },
-  { icon: '💼', label: 'Sales', href: '/admin/sales' },
-  { icon: '💰', label: 'Revenue', href: '/admin/revenue' },
-  { icon: '☁️', label: 'SaaS', href: '/admin/saas' },
-  { icon: '🤝', label: 'Partners', href: '/admin/partners' },
-  { icon: '🚪', label: 'Onboarding', href: '/admin/onboarding' },
-  { icon: '✉️', label: 'Email', href: '/admin/email' },
-  { icon: '📶', label: 'SignalBoost', href: '/admin/signalboost' },
-  { icon: '⚙️', label: 'Settings', href: '/admin/settings' },
-  { icon: '👥', label: 'Roles', href: '/admin/settings/roles' },
-  { icon: '🗂️', label: 'Console', href: '/admin/adm' },
+  { icon: '🌌', label: 'Overview (live data)', href: '/admin/overview', desc: 'Real counts from your live data.' },
+  { icon: '👥', label: 'Team & Roles', href: '/dashboard/team', desc: 'Add people and set their access.' },
+  { icon: '🛡️', label: 'Role Management', href: '/admin/settings/roles', desc: 'Manage roles and ownership.' },
+  { icon: '🚪', label: 'Onboarding', href: '/admin/onboarding', desc: 'Onboarding controls.' },
+  { icon: '⚙️', label: 'Admin Settings', href: '/admin/settings', desc: 'System settings.' },
 ]
 
 const HELP: Item[] = [
@@ -330,7 +321,7 @@ export default function Navbar() {
           <Group id="launchpad" label="Launchpad" items={LAUNCHPAD} width={320} />
           <Group id="grow" label="Grow" items={GROW} width={320} />
           <Group id="workspace" label="Workspace" items={workspaceItems} width={320} />
-          {isAdmin && <Group id="admin" label="Admin" items={ADMIN} cols={2} width={420} />}
+          {isAdmin && <Group id="admin" label="Admin" items={ADMIN} width={300} />}
           <Link href="/pricing" style={{ ...trigger(pathname === '/pricing'), display: 'inline-flex' }}>Pricing</Link>
           <Group id="help" label="Help" items={HELP} align="right" width={220} />
         </div>

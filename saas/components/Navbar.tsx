@@ -87,7 +87,7 @@ const ADMIN: Item[] = [
   { icon: '👥', label: 'Team & Roles', href: '/dashboard/team', desc: 'Add people and set their access.' },
   { icon: '🛡️', label: 'Role Management', href: '/admin/settings/roles', desc: 'Manage roles and ownership.' },
   { icon: '🚪', label: 'Onboarding', href: '/admin/onboarding', desc: 'Onboarding controls.' },
-  { icon: '⚙️', label: 'Admin Settings', href: '/admin/settings', desc: 'System settings.' },
+  { icon: '⚙️', label: 'Admin Settings', href: '/admin/settings', desc: 'System-wide switches.' },
 ]
 
 const HELP: Item[] = [

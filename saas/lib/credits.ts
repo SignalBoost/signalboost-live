@@ -1,15 +1,18 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Per-plan monthly video credit allowance.
+// Per-plan video credit allowance.
 // Public plan names:
+// - free    = Free Demo, one-time credits only
 // - starter = Launch
 // - pro     = Growth
 // - business = Command
 //
-// Aliases are included so future Stripe metadata can use either the old
-// internal keys or the new launch/growth/command names.
+// Important:
+// Free/demo credits DO NOT reset monthly.
+// Paid plan credits reset monthly.
 export const PLAN_VIDEO_CREDITS: Record<string, number> = {
   free: 2,
+  demo: 2,
 
   starter: 25,
   launch: 25,
@@ -21,8 +24,6 @@ export const PLAN_VIDEO_CREDITS: Record<string, number> = {
   command: 300,
 }
 
-// Server-side Supabase client using the service role key.
-// This NEVER runs in the browser — credits cannot be tampered with by users.
 function adminClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,7 +32,6 @@ function adminClient() {
   )
 }
 
-// Has it been at least a month since the last reset?
 function monthElapsed(resetAt: string | null): boolean {
   if (!resetAt) return true
 
@@ -45,10 +45,8 @@ function monthElapsed(resetAt: string | null): boolean {
   return now - last >= THIRTY_DAYS
 }
 
-type CreditState = {
-  plan: string
-  credits: number
-  allowance: number
+function isFreeDemoPlan(plan: string | null | undefined) {
+  return !plan || plan === 'free' || plan === 'demo'
 }
 
 function allowanceForPlan(plan: string | null | undefined) {
@@ -56,11 +54,22 @@ function allowanceForPlan(plan: string | null | undefined) {
   return PLAN_VIDEO_CREDITS[safePlan] ?? PLAN_VIDEO_CREDITS.free
 }
 
+type CreditState = {
+  plan: string
+  credits: number
+  allowance: number
+}
+
 /*
-  Reads the user's subscription, applies a monthly reset if due,
-  and returns the current credit state. Creates a row if none exists
-  (defaults to the free plan). Also grants the initial allowance to any
-  row that has never been initialized (credits_initialized = false).
+  Reads the user's subscription and returns current credit state.
+
+  Free/demo:
+  - Gets 2 one-time credits.
+  - Does NOT reset monthly.
+  - Designed for evaluation only.
+
+  Paid plans:
+  - Launch/Growth/Command credits reset monthly.
 */
 export async function getCreditState(userId: string): Promise<CreditState> {
   const supabase = adminClient()
@@ -71,7 +80,6 @@ export async function getCreditState(userId: string): Promise<CreditState> {
     .eq('user_id', userId)
     .maybeSingle()
 
-  // No subscription row yet — treat as free, create a row with free credits.
   if (error || !data) {
     const allowance = PLAN_VIDEO_CREDITS.free
 
@@ -88,10 +96,9 @@ export async function getCreditState(userId: string): Promise<CreditState> {
 
   const plan = data.plan || 'free'
   const allowance = allowanceForPlan(plan)
+  const currentCredits = data.video_credits ?? 0
 
-  // Never initialized (e.g. row created before credits existed) OR monthly reset due
-  // → grant the plan's allowance and mark initialized.
-  if (!data.credits_initialized || monthElapsed(data.credits_reset_at)) {
+  if (!data.credits_initialized) {
     await supabase
       .from('subscriptions')
       .update({
@@ -104,23 +111,35 @@ export async function getCreditState(userId: string): Promise<CreditState> {
     return { plan, credits: allowance, allowance }
   }
 
-  return { plan, credits: data.video_credits ?? 0, allowance }
+  // Free/demo credits are one-time evaluation credits.
+  // They should not reset every month.
+  if (isFreeDemoPlan(plan)) {
+    return { plan, credits: currentCredits, allowance }
+  }
+
+  // Paid plans reset monthly.
+  if (monthElapsed(data.credits_reset_at)) {
+    await supabase
+      .from('subscriptions')
+      .update({
+        video_credits: allowance,
+        credits_reset_at: new Date().toISOString(),
+        credits_initialized: true,
+      })
+      .eq('user_id', userId)
+
+    return { plan, credits: allowance, allowance }
+  }
+
+  return { plan, credits: currentCredits, allowance }
 }
 
-/*
-  Convenience helper: returns just the current credit number.
-  Used by server-side API routes (never call directly from the browser).
-*/
 export async function getCredits(userId: string): Promise<number> {
   const state = await getCreditState(userId)
 
   return state.credits
 }
 
-/*
-  Attempts to spend ONE video credit. Returns success + remaining balance.
-  Applies monthly reset first via getCreditState, so balances are always current.
-*/
 export async function spendVideoCredit(userId: string): Promise<{
   ok: boolean
   remaining: number
@@ -131,7 +150,12 @@ export async function spendVideoCredit(userId: string): Promise<{
   const state = await getCreditState(userId)
 
   if (state.credits <= 0) {
-    return { ok: false, remaining: 0, plan: state.plan, reason: 'no_credits' }
+    return {
+      ok: false,
+      remaining: 0,
+      plan: state.plan,
+      reason: 'no_credits',
+    }
   }
 
   const remaining = state.credits - 1
@@ -142,16 +166,21 @@ export async function spendVideoCredit(userId: string): Promise<{
     .eq('user_id', userId)
 
   if (error) {
-    return { ok: false, remaining: state.credits, plan: state.plan, reason: 'db_error' }
+    return {
+      ok: false,
+      remaining: state.credits,
+      plan: state.plan,
+      reason: 'db_error',
+    }
   }
 
-  return { ok: true, remaining, plan: state.plan }
+  return {
+    ok: true,
+    remaining,
+    plan: state.plan,
+  }
 }
 
-/*
-  Refunds ONE video credit (used when a generation fails after a credit was spent).
-  Never exceeds the plan's monthly allowance, so a refund can't inflate a balance.
-*/
 export async function refundVideoCredit(userId: string): Promise<void> {
   const supabase = adminClient()
 

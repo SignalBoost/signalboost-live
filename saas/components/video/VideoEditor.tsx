@@ -550,7 +550,6 @@ function CanvasEditor({
   const [time, setTime] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [dragging, setDragging] = useState(false)
-  const cue = activeCue(cues, time)
   const size = canvasSizes[aspectRatio]
 
   useEffect(() => {
@@ -572,50 +571,36 @@ function CanvasEditor({
 
         if (ctx) {
           ctx.clearRect(0, 0, canvas.width, canvas.height)
-          ctx.fillStyle = '#05070b'
-          ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-          if (video && video.readyState >= 2) {
-            const videoRatio = video.videoWidth && video.videoHeight
-              ? video.videoWidth / video.videoHeight
-              : 16 / 9
-
-            const canvasRatio = canvas.width / canvas.height
-
-            let drawWidth = canvas.width
-            let drawHeight = canvas.height
-            let x = 0
-            let y = 0
-
-            if (videoRatio > canvasRatio) {
-              drawHeight = canvas.height
-              drawWidth = drawHeight * videoRatio
-              x = (canvas.width - drawWidth) / 2
-            } else {
-              drawWidth = canvas.width
-              drawHeight = drawWidth / videoRatio
-              y = (canvas.height - drawHeight) / 2
-            }
-
-            ctx.drawImage(video, x, y, drawWidth, drawHeight)
-          } else {
+          if (!videoUrl) {
             ctx.fillStyle = 'rgba(255,255,255,.08)'
-            drawRoundRect(ctx, canvas.width * 0.12, canvas.height * 0.42, canvas.width * 0.76, canvas.height * 0.16, 28)
+            drawRoundRect(
+              ctx,
+              canvas.width * 0.12,
+              canvas.height * 0.42,
+              canvas.width * 0.76,
+              canvas.height * 0.16,
+              28,
+            )
             ctx.fill()
 
             ctx.fillStyle = 'rgba(255,255,255,.68)'
             ctx.font = `700 ${Math.max(22, canvas.width * 0.035)}px Inter, Arial, sans-serif`
             ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
             ctx.fillText('Upload a source video to start editing', canvas.width / 2, canvas.height / 2)
           }
 
+          const renderTime = video?.currentTime ?? time
+          const cue = activeCue(cues, renderTime)
+
           if (cue) {
             const animationOffset = style.animation === 'slide'
-              ? Math.max(0, 1 - ((time - cue.start) / 0.2)) * (canvas.height * 0.05)
+              ? Math.max(0, 1 - ((renderTime - cue.start) / 0.2)) * (canvas.height * 0.05)
               : 0
 
             const scale = style.animation === 'pop'
-              ? 1 + Math.max(0, 1 - ((time - cue.start) / 0.18)) * 0.08
+              ? 1 + Math.max(0, 1 - ((renderTime - cue.start) / 0.18)) * 0.08
               : 1
 
             const fontScale = aspectRatio === '9:16'
@@ -630,7 +615,7 @@ function CanvasEditor({
 
             ctx.save()
             ctx.globalAlpha = style.animation === 'fade'
-              ? clamp(Math.min(time - cue.start, cue.end - time) / 0.18, 0.25, 1)
+              ? clamp(Math.min(renderTime - cue.start, cue.end - renderTime) / 0.18, 0.25, 1)
               : 1
 
             ctx.font = `800 ${fontSize}px ${style.fontFamily}`
@@ -663,7 +648,7 @@ function CanvasEditor({
     frame = requestAnimationFrame(draw)
 
     return () => cancelAnimationFrame(frame)
-  }, [cue, style, time, aspectRatio])
+  }, [videoUrl, cues, style, aspectRatio, time])
 
   const setPosition = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect()
@@ -701,8 +686,9 @@ function CanvasEditor({
           <video
             ref={videoRef}
             src={videoUrl}
-            className="hidden"
+            className="absolute inset-0 h-full w-full object-cover"
             playsInline
+            preload="metadata"
             onLoadedMetadata={(event) => onDuration(Number((event.currentTarget.duration || 0).toFixed(2)))}
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
@@ -729,7 +715,7 @@ function CanvasEditor({
             event.currentTarget.releasePointerCapture(event.pointerId)
           }}
           onPointerCancel={() => setDragging(false)}
-          className="h-full w-full cursor-move touch-none"
+          className="relative z-10 h-full w-full cursor-move touch-none"
           aria-label="Video canvas with draggable caption overlay"
         />
       </div>
@@ -1075,14 +1061,21 @@ export default function VideoEditor() {
   }
 
   async function exportVideo() {
-    if (!sourceUrl && !previewUrl) return
+    if (!sourceUrl) {
+      setJob({
+        jobId: 'blocked',
+        status: 'failed',
+        error: 'Upload the video to storage before exporting.',
+      })
+      return
+    }
 
     try {
       const res = await fetch('/api/video/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sourceUrl: sourceUrl || previewUrl,
+          sourceUrl,
           filename,
           durationSec: Math.max(1, durationSec),
           captions: cues,
@@ -1316,7 +1309,7 @@ export default function VideoEditor() {
 
           <ExportPanel
             canExport={quota.exportEnabled}
-            hasSource={Boolean(sourceUrl || previewUrl)}
+            hasSource={Boolean(sourceUrl)}
             job={job}
             onExport={exportVideo}
             onRefresh={refreshJob}

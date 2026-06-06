@@ -248,3 +248,155 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
     </section>
   }
 )
+// ── Export Panel ───────────────────────────────────────────────────────────────
+function ExportPanel({ canExport, hasSource, exportState, onExport }: { canExport: boolean; hasSource: boolean; exportState: ExportState; onExport: () => void }) {
+  const isRecording = exportState.status === 'recording'
+  const isDone = exportState.status === 'ready'
+  return <section className="rounded-3xl border border-white/10 bg-black/40 p-5">
+    <h2 className="text-xl font-bold">Export panel</h2>
+    <p className="mt-2 text-sm text-white/55">Click export then let the video play all the way through. Your browser records the canvas with captions burned in and produces a downloadable .webm file. No server required.</p>
+    <button onClick={onExport} disabled={!canExport || !hasSource || isRecording} className="mt-4 w-full rounded-full bg-[#FFD700] px-5 py-3 font-bold text-black disabled:opacity-50">
+      {isRecording ? '● Recording — let video play through…' : 'Export captioned video'}
+    </button>
+    {exportState.message ? <p className={`mt-3 text-sm ${exportState.status === 'failed' ? 'text-red-300' : 'text-white/70'}`}>{exportState.message}</p> : null}
+    {isDone && exportState.url ? <a href={exportState.url} download="captioned-video.webm" className="mt-3 block rounded-full border border-[#FFD700] px-5 py-2 text-center font-bold text-[#FFD700]">↓ Download captioned video (.webm)</a> : null}
+    <p className="mt-3 text-xs text-white/40">.webm plays in Chrome, Edge, and Firefox. To convert to MP4, use HandBrake (free) or cloudconvert.com.</p>
+  </section>
+}
+
+// ── Main page ──────────────────────────────────────────────────────────────────
+export default function VideoEditor() {
+  const { t } = useTranslation()
+  const canvasEditorRef = useRef<CanvasEditorHandle>(null)
+
+  const [locale, setLocale] = useState<SupportedVideoLocale>('en')
+  const [tier, setTier] = useState('free')
+  const [durationSec, setDurationSec] = useState(0)
+  const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const [storagePath, setStoragePath] = useState<string | null>(null)
+  const [transcriptId, setTranscriptId] = useState<string | null>(null)
+  const [cues, setCues] = useState(starterCaptions)
+  const [style, setStyle] = useState(defaultCaptionStyle)
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('9:16')
+  const [activePreset, setActivePreset] = useState('signal')
+  const [selectedCueId, setSelectedCueId] = useState<string | null>(starterCaptions[0]?.id || null)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [uploadState, setUploadState] = useState<UploadState>({ status: 'idle', message: 'Upload a source video to begin.' })
+  const [captionState, setCaptionState] = useState<CaptionGenerationState>({ status: 'idle', message: 'Generate AI captions after uploading a video, or upload SRT/VTT manually.' })
+  const [exportState, setExportState] = useState<ExportState>({ status: 'idle', message: '' })
+
+  const quota = useMemo(() => calculateVideoQuota(tier, Math.ceil(Math.max(1, durationSec) / 60)), [tier, durationSec])
+
+  // ── Poll AssemblyAI until transcription is complete ────────────────────────
+  useEffect(() => {
+    if (!transcriptId) return
+    let cancelled = false
+    const poll = async () => {
+      if (cancelled) return
+      try {
+        const res = await fetch(`/api/video/transcribe?id=${encodeURIComponent(transcriptId)}`)
+        const json = await res.json()
+        if (!json.ok) {
+          setCaptionState({ status: 'failed', message: json.error || 'Transcription failed.' }); setTranscriptId(null); return
+        }
+        const { status, cues: newCues, cueCount } = json.data
+        if (status === 'completed' && newCues) {
+          setCues(newCues); setSelectedCueId(newCues[0]?.id || null); setCurrentTime(newCues[0]?.start || 0)
+          setCaptionState({ status: 'ready', message: `${cueCount} AI captions ready.` }); setTranscriptId(null)
+        }
+        // else still processing — keep polling
+      } catch { /* network hiccup — keep polling */ }
+    }
+    const timer = setInterval(poll, 3000)
+    return () => { cancelled = true; clearInterval(timer) }
+  }, [transcriptId])
+
+  // ── Upload: get signed URL → PUT file directly to Supabase Storage ─────────
+  async function uploadVideo(file: File) {
+    setVideoUrl(URL.createObjectURL(file)) // local preview immediately, no wait
+    setUploadState({ status: 'uploading', message: `Uploading ${file.name} to secure storage…` })
+    setCaptionState({ status: 'idle', message: 'Video selected. Click Generate Captions after upload completes.' })
+    try {
+      const urlRes = await fetch('/api/video/upload-url', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: file.name }) })
+      const urlJson = await urlRes.json()
+      if (!urlJson.ok) { setUploadState({ status: 'failed', message: urlJson.error || 'Could not get upload URL.' }); return }
+      const { path, token } = urlJson.data
+      // PUT directly to Supabase Storage — bypasses Vercel's 4.5 MB body limit entirely
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+      const putRes = await fetch(`${supabaseUrl}/storage/v1/object/upload/sign/video-uploads/${path}?token=${encodeURIComponent(token)}`, { method: 'PUT', body: file, headers: { 'Content-Type': file.type || 'video/mp4' } })
+      if (!putRes.ok) { setUploadState({ status: 'failed', message: `Storage upload failed (${putRes.status}). Check Supabase bucket permissions.` }); return }
+      setStoragePath(path)
+      setUploadState({ status: 'ready', message: `${file.name} stored — ready to generate captions.` })
+    } catch (e) {
+      setUploadState({ status: 'failed', message: e instanceof Error ? e.message : 'Upload failed.' })
+    }
+  }
+
+  // ── Submit video to AssemblyAI for transcription ───────────────────────────
+  async function generateCaptions() {
+    if (!storagePath) { setCaptionState({ status: 'failed', message: 'Wait for the video upload to finish before generating captions.' }); return }
+    setCaptionState({ status: 'generating', message: 'Submitting to AI transcription (30–90 seconds)…' })
+    try {
+      const res = await fetch('/api/video/transcribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: storagePath }) })
+      const json = await res.json()
+      if (!json.ok) { setCaptionState({ status: 'failed', message: json.error || 'Caption generation failed.' }); return }
+      setTranscriptId(json.data.transcriptId)
+      setCaptionState({ status: 'generating', message: 'Transcribing… checking every 3 seconds.' })
+    } catch (e) {
+      setCaptionState({ status: 'failed', message: e instanceof Error ? e.message : 'Caption generation failed.' })
+    }
+  }
+
+  // ── Import SRT / VTT captions entirely in-browser (no server call) ─────────
+  async function uploadCaptions(file: File) {
+    try {
+      const newCues = parseCaptionFile(await file.text())
+      if (!newCues.length) { setCaptionState({ status: 'failed', message: 'Could not parse captions — verify the file is valid SRT or VTT.' }); return }
+      setCues(newCues); setSelectedCueId(newCues[0]?.id || null); setCurrentTime(newCues[0]?.start || 0)
+      setCaptionState({ status: 'ready', message: `${newCues.length} captions imported from ${file.name}.` })
+    } catch { setCaptionState({ status: 'failed', message: 'Could not read captions file.' }) }
+  }
+
+  // ── Export: MediaRecorder records the live canvas → downloadable .webm ─────
+  async function exportVideo() {
+    if (!canvasEditorRef.current) return
+    setExportState({ status: 'recording', message: 'Recording — let the video play all the way through. Do not close this tab.' })
+    try {
+      const url = await canvasEditorRef.current.startExport()
+      setExportState({ status: 'ready', message: 'Done! Captions are burned in. Download your video below.', url })
+    } catch (e) {
+      setExportState({ status: 'failed', message: e instanceof Error ? e.message : 'Export failed.' })
+    }
+  }
+
+  const updateCueText = (id: string, text: string) => setCues((items) => items.map((c) => c.id === id ? { ...c, text } : c))
+
+  return <main className="min-h-screen bg-[#05070b] p-6 text-white">
+    <section className="rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,215,0,.20),transparent_35%),linear-gradient(135deg,#101827,#05070b)] p-8">
+      <p className="text-xs uppercase tracking-[0.35em] text-[#FFD700]">{t('video.kicker', 'Video Studio')}</p>
+      <h1 className="mt-4 text-4xl font-black">{t('video.title', 'AI caption video editor')}</h1>
+      <p className="mt-3 max-w-3xl text-white/70">{t('video.subtitle', 'Upload a video, generate synced AI captions, drag styled overlays on canvas, and export a captioned video file.')}</p>
+    </section>
+    <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_.35fr]"><QuotaStatusBar quota={quota} /><BillingBanner quota={quota} /></div>
+    <section className="mt-6 grid gap-4 rounded-3xl border border-white/10 bg-white/[.03] p-5 md:grid-cols-5">
+      <label className="text-sm">Video<input type="file" accept="video/*" onChange={(e) => e.target.files?.[0] && uploadVideo(e.target.files[0])} className="mt-2 w-full" /></label>
+      <div className="text-sm"><span>AI captions</span><button type="button" onClick={generateCaptions} disabled={!storagePath || captionState.status === 'generating'} className="mt-2 w-full rounded-xl bg-[#FFD700] px-4 py-2 font-bold text-black disabled:opacity-50">{captionState.status === 'generating' ? 'Transcribing…' : 'Generate Captions'}</button></div>
+      <label className="text-sm">Optional SRT/VTT<input type="file" accept=".srt,.vtt,text/vtt" onChange={(e) => e.target.files?.[0] && uploadCaptions(e.target.files[0])} className="mt-2 w-full" /></label>
+      <label className="text-sm">Tier<select className="mt-2 w-full rounded-xl bg-black p-2" value={tier} onChange={(e) => setTier(e.target.value)}><option value="free">Free/demo</option><option value="launch">Launch</option><option value="growth">Growth</option><option value="command">Command</option></select></label>
+      <label className="text-sm">Locale<select className="mt-2 w-full rounded-xl bg-black p-2" value={locale} onChange={(e) => setLocale(e.target.value as SupportedVideoLocale)}><option>en</option><option>es</option><option>pt</option><option>pl</option><option>ru</option></select></label>
+      <p className="text-xs text-white/55 md:col-span-5">Storage: {uploadState.message}<br />Captions: {captionState.message}</p>
+    </section>
+    <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_.42fr]">
+      <div className="space-y-6">
+        <CanvasEditor ref={canvasEditorRef} videoUrl={videoUrl} cues={cues} style={style} aspectRatio={aspectRatio} seekTime={currentTime} durationSec={durationSec} onStyleChange={setStyle} onTime={setCurrentTime} onDuration={setDurationSec} />
+        <StyleControls style={style} aspectRatio={aspectRatio} onChange={setStyle} onAspectRatio={setAspectRatio} />
+        <PresetPicker activePreset={activePreset} onPreset={(p) => { setActivePreset(p.id); setStyle(p.style) }} />
+      </div>
+      <div className="space-y-6">
+        <CaptionTimeline cues={cues} currentTime={currentTime} selectedCueId={selectedCueId} onSeek={setCurrentTime} onSelect={setSelectedCueId} onUpdateText={updateCueText} />
+        <ExportPanel canExport={quota.exportEnabled} hasSource={Boolean(videoUrl)} exportState={exportState} onExport={exportVideo} />
+      </div>
+    </div>
+    <footer className="mt-8 rounded-2xl border border-white/10 bg-white/[.03] p-4 text-sm text-white/60">Canvas time {currentTime.toFixed(2)}s · duration {durationSec || 0}s · {cues.length} captions · exports record from canvas in real time.</footer>
+  </main>
+}

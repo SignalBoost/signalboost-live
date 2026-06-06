@@ -15,7 +15,6 @@ type Plan = {
   period?: string
   description: string
   cta: string
-  highlight?: boolean
   badge?: string
   credits: string
   seats: string
@@ -99,8 +98,7 @@ export default function PricingPage() {
         'Scale content, campaigns, reviews, websites, podcasts, and video production across a multilingual team workspace.',
       ),
       cta: t(dict, 'pricing_v2.growth.cta', 'Grow faster'),
-      highlight: true,
-      badge: t(dict, 'pricing_v2.mostPopular', 'Most popular'),
+      badge: t(dict, 'pricing_v2.growth.badge', 'Best for teams'),
       credits: t(dict, 'pricing_v2.growth.credits', '100 video credits / month'),
       seats: t(dict, 'pricing_v2.growth.seats', '3 users'),
       features: [
@@ -341,8 +339,6 @@ export default function PricingPage() {
             className="sb-card sb-pricing-panel"
             style={{
               padding: 24,
-              borderColor: plan.highlight ? 'rgba(255,195,0,.5)' : undefined,
-              boxShadow: plan.highlight ? '0 24px 80px rgba(255,195,0,.12)' : undefined,
               position: 'relative',
             }}
           >
@@ -389,8 +385,13 @@ export default function PricingPage() {
             </div>
 
             <button
-              className={plan.highlight ? 'sb-button-primary' : 'sb-button-secondary'}
-              style={{ width: '100%', border: plan.highlight ? 'none' : undefined, cursor: 'pointer', marginTop: 18 }}
+              className={plan.key === 'free' ? 'sb-button-secondary' : 'sb-button-primary'}
+              style={{
+                width: '100%',
+                border: plan.key === 'free' ? undefined : 'none',
+                cursor: 'pointer',
+                marginTop: 18,
+              }}
               onClick={() => handleCheckout(plan.key)}
               disabled={loading === plan.key}
             >

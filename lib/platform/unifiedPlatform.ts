@@ -13,7 +13,7 @@ export const signalBoostModules: SignalBoostModule[] = [
   {
     key: 'promote',
     label: 'Promote Business',
-    href: '/dashboard/promote',
+    href: '/saas-station/promote',
     icon: '🚀',
     description: 'Plan multilingual campaigns, launch offers, and connect promotions to Marketplace demand signals.',
     telemetryEvent: 'saas.promote_business.viewed',
@@ -23,7 +23,7 @@ export const signalBoostModules: SignalBoostModule[] = [
   {
     key: 'reviews',
     label: 'Reviews',
-    href: '/dashboard/reviews',
+    href: '/saas-station/reviews',
     icon: '⭐',
     description: 'Collect, triage, translate, and reuse customer proof inside brand and Marketplace workflows.',
     telemetryEvent: 'saas.reviews.viewed',
@@ -33,7 +33,7 @@ export const signalBoostModules: SignalBoostModule[] = [
   {
     key: 'calendar',
     label: 'Calendar',
-    href: '/dashboard/calendar',
+    href: '/saas-station/calendar',
     icon: '📅',
     description: 'Schedule SaaS launches, outreach windows, local holidays, review asks, and Marketplace booking moments.',
     telemetryEvent: 'saas.calendar.viewed',
@@ -43,7 +43,7 @@ export const signalBoostModules: SignalBoostModule[] = [
   {
     key: 'spreadsheets',
     label: 'Spreadsheets',
-    href: '/dashboard/spreadsheets',
+    href: '/saas-station/spreadsheets',
     icon: '📊',
     description: 'Import CSV lists, normalize contacts, track KPIs, and route spreadsheet rows into Outreach.',
     telemetryEvent: 'saas.spreadsheets.viewed',
@@ -53,7 +53,7 @@ export const signalBoostModules: SignalBoostModule[] = [
   {
     key: 'outreach',
     label: 'Outreach',
-    href: '/dashboard/outreach',
+    href: '/saas-station/outreach',
     icon: '📡',
     description: 'Coordinate email, partner notifications, social prompts, and review follow-ups from one cockpit.',
     telemetryEvent: 'saas.outreach.viewed',
@@ -63,7 +63,7 @@ export const signalBoostModules: SignalBoostModule[] = [
   {
     key: 'assistant',
     label: 'Personal Assistant',
-    href: '/dashboard/assistant',
+    href: '/saas-station/assistant',
     icon: '🤖',
     description: 'Ask Concierge AI about Marketplace partners, bookings, pricing, SaaS modules, and next actions.',
     telemetryEvent: 'saas.personal_assistant.viewed',

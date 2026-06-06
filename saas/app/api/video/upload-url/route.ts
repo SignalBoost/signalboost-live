@@ -53,7 +53,6 @@ export async function POST(req: NextRequest) {
 
   // Fail fast on missing config — before the user uploads anything.
   const missingEnv: string[] = []
-  if (!process.env.ASSEMBLYAI_API_KEY) missingEnv.push('ASSEMBLYAI_API_KEY')
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missingEnv.push('SUPABASE_SERVICE_ROLE_KEY')
   if (missingEnv.length) {
     return NextResponse.json(
@@ -73,6 +72,7 @@ export async function POST(req: NextRequest) {
   const fileSize = Number(body?.fileSize ?? 0)
   const langsIn: unknown = body?.langs
   const formatsIn: unknown = body?.formats
+  const sourceOnly = body?.sourceOnly === true
 
   if (!fileName || !fileSize) {
     return NextResponse.json({ error: 'fileName and fileSize are required' }, { status: 400 })
@@ -114,14 +114,19 @@ export async function POST(req: NextRequest) {
   const jobId = crypto.randomUUID()
   const path = `${user.id}/${jobId}/source.${ext}`
 
-  const { error: insertError } = await supabaseAdmin.from('video_jobs').insert({
+  const { error: insertError } = sourceOnly
+    ? { error: null }
+    : await supabaseAdmin.from('video_jobs').insert({
     id: jobId,
     user_id: user.id,
     file_name: fileName,
     file_size: fileSize,
     langs,
     formats,
-    status: 'awaiting_upload',
+    status: 'queued',
+    job_type: 'caption_burn',
+    account_id: user.id,
+    source_video: path,
     plan,
   })
   if (insertError) {
@@ -147,7 +152,7 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({
-    jobId,
+    jobId: sourceOnly ? null : jobId,
     path: signed.path,
     token: signed.token,
     bucket: VIDEO_BUCKET,
@@ -164,7 +169,7 @@ async function getUserPlan(supabase: any, userId: string): Promise<string> {
     .eq('status', 'active')
     .maybeSingle()
 
-  if (!data?.plan) return 'trial'
+  if (!data?.plan) return 'free'
   const plan = String(data.plan).toLowerCase()
-  return ['trial', 'starter', 'pro', 'business'].includes(plan) ? plan : 'trial'
+  return ['free', 'trial', 'starter', 'pro', 'business'].includes(plan) ? plan : 'free'
 }

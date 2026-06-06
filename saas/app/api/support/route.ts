@@ -1,6 +1,11 @@
 import OpenAI from 'openai'
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
 import { getConciergeAnswer } from '@/lib/platform/unifiedPlatform'
+import { classifyVideoIntent, runConciergeVideoPipeline } from '@/lib/video/conciergePipeline'
 
 type SupportMessage = { role?: 'user' | 'assistant' | 'system'; content?: string }
 
@@ -17,6 +22,29 @@ const LANGUAGE_LABELS: Record<string, string> = {
   es: 'Spanish',
   pl: 'Polish',
   ru: 'Russian',
+}
+
+async function getAuthenticatedUser() {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookieOptions: saasSupabaseCookieOptions,
+      cookies: {
+        get: (name) => cookieStore.get(name)?.value,
+        set: () => {},
+        remove: () => {},
+      },
+    },
+  )
+  const { data: { user } } = await supabase.auth.getUser()
+  return user
+}
+
+function getAdminClient() {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return null
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } })
 }
 
 export async function POST(req: NextRequest) {
@@ -40,6 +68,28 @@ export async function POST(req: NextRequest) {
     const latestUserMessage = [...sanitized].reverse().find(m => m.role === 'user')?.content || ''
     const local = getConciergeAnswer(latestUserMessage, languageCode, currentPage)
 
+    if (classifyVideoIntent(latestUserMessage) !== 'general') {
+      const user = await getAuthenticatedUser()
+      const admin = getAdminClient()
+      if (user?.id && admin) {
+        const videoPipeline = await runConciergeVideoPipeline({
+          supabase: admin,
+          userId: user.id,
+          message: latestUserMessage,
+          language: languageCode,
+          sourceVideo: typeof body?.context?.sourceVideo === 'string' ? body.context.sourceVideo : undefined,
+          captionsPath: typeof body?.context?.captionsPath === 'string' ? body.context.captionsPath : undefined,
+        })
+        if (videoPipeline) {
+          return NextResponse.json({
+            reply: videoPipeline.reply,
+            telemetry: { ...local, conciergePipeline: videoPipeline.json },
+            source: 'concierge-video-pipeline',
+          })
+        }
+      }
+    }
+
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({ reply: local.reply, telemetry: local, source: 'deterministic-concierge' })
     }
@@ -55,7 +105,7 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: 'system',
-          content: `You are SignalBoost Concierge for the unified SignalBoost Marketplace + SaaS platform. Reply strictly in ${language}. Be practical, concise, accessible, and HMI-style with steps. Cover Marketplace partners/categories/bookings and SaaS modules Promote Business, Reviews, Calendar, Spreadsheets, Outreach, Admin telemetry, CRM pipeline, forecasts, financial/KPI dashboards, and owner/admin restrictions when relevant. Always mention telemetry logging for Concierge actions.`
+          content: `You are SignalBoost Concierge for the unified SignalBoost Marketplace + SaaS platform. Reply strictly in ${language}. Be practical, concise, accessible, and HMI-style with steps. Cover Marketplace partners/categories/bookings and SaaS modules Promote Business, Reviews, Calendar, Spreadsheets, Outreach, Admin telemetry, CRM pipeline, forecasts, financial/KPI dashboards, and owner/admin restrictions when relevant. Always mention telemetry logging for Concierge actions. For video_transcode or video_export intents, route through IntentClassifier, SubscriptionChecker, JobQueueController, StorageController, BillingHandler, and Translator; do not promise full export to free/demo users.`
         },
         ...sanitized,
       ],

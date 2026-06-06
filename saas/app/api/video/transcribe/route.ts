@@ -1,149 +1,197 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+export const maxDuration = 300
 
-const BUCKET = 'video-uploads'
-const AAI = 'https://api.assemblyai.com/v2'
+type SupportedVideoLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function admin(): any {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) return null
-  return createClient(url, key, { auth: { persistSession: false } })
+type CaptionCue = {
+  id: string
+  start: number
+  end: number
+  text: string
 }
 
-/**
- * POST /api/video/transcribe
- * Body: { path: string }  — the storage path returned by /api/video/upload-url
- * Returns: { ok: true, data: { transcriptId: string, status: string } }
- *
- * Submits the video to AssemblyAI and returns immediately with a transcriptId.
- * The client polls GET /api/video/transcribe?id=<transcriptId> until completed.
- */
-export async function POST(req: Request) {
-  const apiKey = process.env.ASSEMBLYAI_API_KEY
-  if (!apiKey) {
-    return NextResponse.json(
-      { ok: false, error: 'Captions unavailable: add ASSEMBLYAI_API_KEY in Vercel environment variables.' },
-      { status: 500 },
-    )
+type JsonSafeVideoResponse<T> = {
+  ok: boolean
+  data: T | null
+  error: string | null
+  meta: {
+    locale: SupportedVideoLocale
+    generatedAt: string
   }
-  const supabase = admin()
-  if (!supabase) {
-    return NextResponse.json(
-      { ok: false, error: 'Storage not configured: add SUPABASE_SERVICE_ROLE_KEY in Vercel environment variables.' },
-      { status: 500 },
-    )
-  }
-
-  let body: { path?: string } = {}
-  try { body = await req.json() } catch {}
-  const path = typeof body.path === 'string' ? body.path.trim() : ''
-  if (!path) {
-    return NextResponse.json({ ok: false, error: 'Missing storage path. Upload the video first.' }, { status: 400 })
-  }
-
-  // Create a short-lived signed URL so AssemblyAI can download the file
-  const { data: signed, error: signErr } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600)
-  if (signErr || !signed?.signedUrl) {
-    return NextResponse.json(
-      { ok: false, error: signErr?.message || 'Could not create a read URL for the uploaded file. Confirm the file uploaded successfully.' },
-      { status: 500 },
-    )
-  }
-
-  // Submit transcription job to AssemblyAI
-  const res = await fetch(`${AAI}/transcript`, {
-    method: 'POST',
-    headers: { authorization: apiKey, 'content-type': 'application/json' },
-    body: JSON.stringify({
-      audio_url: signed.signedUrl,
-      language_detection: true,
-      punctuate: true,
-      format_text: true,
-    }),
-  })
-  const json = await res.json()
-  if (!res.ok || !json?.id) {
-    return NextResponse.json(
-      { ok: false, error: json?.error || 'AssemblyAI rejected the request. Verify ASSEMBLYAI_API_KEY is valid.' },
-      { status: 502 },
-    )
-  }
-
-  return NextResponse.json({ ok: true, data: { transcriptId: json.id, status: json.status || 'queued' } })
 }
 
-/**
- * GET /api/video/transcribe?id=<transcriptId>
- * Poll an in-progress transcription job.
- * Returns { ok: true, data: { status: 'processing'|'completed'|'error', cues?, cueCount? } }
- * Client keeps polling every 3 seconds until status === 'completed'.
- */
-export async function GET(req: Request) {
-  const apiKey = process.env.ASSEMBLYAI_API_KEY
-  if (!apiKey) {
-    return NextResponse.json(
-      { ok: false, error: 'Captions unavailable: add ASSEMBLYAI_API_KEY in Vercel environment variables.' },
-      { status: 500 },
+const supportedLocales: SupportedVideoLocale[] = ['en', 'es', 'pt', 'pl', 'ru']
+const maxDirectUploadMb = 25
+const freeDemoMaxSeconds = 30
+
+function json<T>(body: JsonSafeVideoResponse<T>, status = 200) {
+  return NextResponse.json(body, { status })
+}
+
+function locale(value: FormDataEntryValue | null): SupportedVideoLocale {
+  const requested = String(value || 'en')
+
+  return supportedLocales.includes(requested as SupportedVideoLocale)
+    ? requested as SupportedVideoLocale
+    : 'en'
+}
+
+function cueFromSegment(segment: unknown, index: number): CaptionCue | null {
+  if (!segment || typeof segment !== 'object') return null
+
+  const record = segment as {
+    start?: unknown
+    end?: unknown
+    text?: unknown
+  }
+
+  const start = Number(record.start)
+  const end = Number(record.end)
+  const text = String(record.text || '').replace(/\s+/g, ' ').trim()
+
+  if (!Number.isFinite(start) || !Number.isFinite(end) || !text) return null
+
+  return {
+    id: `cue-${index + 1}`,
+    start,
+    end: Math.max(end, start + 0.5),
+    text,
+  }
+}
+
+function fallbackCues(text: string, durationSec: number): CaptionCue[] {
+  const words = text.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean)
+
+  if (!words.length) return []
+
+  const chunkSize = 9
+  const chunks: string[] = []
+
+  for (let index = 0; index < words.length; index += chunkSize) {
+    chunks.push(words.slice(index, index + chunkSize).join(' '))
+  }
+
+  const duration = Math.max(durationSec || chunks.length * 3, chunks.length * 1.5)
+  const step = duration / chunks.length
+
+  return chunks.map((chunk, index) => ({
+    id: `cue-${index + 1}`,
+    start: Number((index * step).toFixed(2)),
+    end: Number(Math.min(duration, (index + 1) * step).toFixed(2)),
+    text: chunk,
+  }))
+}
+
+export async function POST(request: Request) {
+  const form = await request.formData()
+  const lang = locale(form.get('locale'))
+  const video = form.get('video')
+  const tier = String(form.get('tier') || 'free').toLowerCase()
+  const durationSec = Number(form.get('durationSec') || 0)
+
+  if (!(video instanceof File)) {
+    return json(
+      {
+        ok: false,
+        data: null,
+        error: 'A video file is required for AI caption generation.',
+        meta: { locale: lang, generatedAt: new Date().toISOString() },
+      },
+      400,
     )
   }
 
-  const id = new URL(req.url).searchParams.get('id')
-  if (!id) return NextResponse.json({ ok: false, error: 'Missing transcript id.' }, { status: 400 })
-
-  const res = await fetch(`${AAI}/transcript/${id}`, { headers: { authorization: apiKey } })
-  const json = await res.json()
-  if (!res.ok) {
-    return NextResponse.json({ ok: false, error: json?.error || 'Could not read transcript status.' }, { status: 502 })
-  }
-  if (json.status === 'error') {
-    return NextResponse.json({ ok: false, error: json.error || 'Transcription failed on AssemblyAI.' }, { status: 502 })
-  }
-  if (json.status !== 'completed') {
-    return NextResponse.json({ ok: true, data: { status: json.status } })
+  if ((tier === 'free' || tier === 'demo') && durationSec > freeDemoMaxSeconds) {
+    return json(
+      {
+        ok: false,
+        data: null,
+        error: `Free/demo caption generation is limited to ${freeDemoMaxSeconds} seconds. Upgrade to caption the full video.`,
+        meta: { locale: lang, generatedAt: new Date().toISOString() },
+      },
+      402,
+    )
   }
 
-  // Build caption cues from sentence-level results (best granularity)
-  type Cue = { id: string; start: number; end: number; text: string }
-  let cues: Cue[] = []
+  if (video.size > maxDirectUploadMb * 1024 * 1024) {
+    return json(
+      {
+        ok: false,
+        data: null,
+        error: `This direct captioning flow supports files up to ${maxDirectUploadMb} MB. Compress the video or use the render worker audio-extraction flow for longer videos.`,
+        meta: { locale: lang, generatedAt: new Date().toISOString() },
+      },
+      413,
+    )
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    return json(
+      {
+        ok: false,
+        data: null,
+        error: 'OPENAI_API_KEY is not configured.',
+        meta: { locale: lang, generatedAt: new Date().toISOString() },
+      },
+      500,
+    )
+  }
+
+  const upstreamForm = new FormData()
+  upstreamForm.set('file', video)
+  upstreamForm.set('model', process.env.OPENAI_TRANSCRIPTION_MODEL || 'whisper-1')
+  upstreamForm.set('language', lang)
+  upstreamForm.set('response_format', 'verbose_json')
+  upstreamForm.append('timestamp_granularities[]', 'segment')
 
   try {
-    const sRes = await fetch(`${AAI}/transcript/${id}/sentences`, { headers: { authorization: apiKey } })
-    const sJson = await sRes.json()
-    if (Array.isArray(sJson?.sentences) && sJson.sentences.length) {
-      cues = sJson.sentences
-        .map((s: { text?: string; start?: number; end?: number }, i: number) => ({
-          id: `cue-${i + 1}`,
-          start: (s.start || 0) / 1000,
-          end: (s.end || 0) / 1000,
-          text: String(s.text || '').trim(),
-        }))
-        .filter((c: Cue) => c.text)
+    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: upstreamForm,
+    })
+
+    const payload = await response.json() as {
+      text?: string
+      segments?: unknown[]
+      error?: { message?: string }
     }
-  } catch {}
 
-  // Fallback: chunk word-level results into groups of 7 words
-  if (!cues.length && Array.isArray(json.words) && json.words.length) {
-    const chunk = 7
-    for (let i = 0; i < json.words.length; i += chunk) {
-      const grp = json.words.slice(i, i + chunk)
-      cues.push({
-        id: `cue-${cues.length + 1}`,
-        start: (grp[0].start || 0) / 1000,
-        end: (grp[grp.length - 1].end || 0) / 1000,
-        text: grp.map((w: { text: string }) => w.text).join(' '),
-      })
+    if (!response.ok) {
+      throw new Error(payload.error?.message || 'OpenAI transcription failed.')
     }
-  }
 
-  // Last resort: whole transcript as one cue
-  if (!cues.length && json.text) {
-    cues = [{ id: 'cue-1', start: 0, end: Math.max(2, Number(json.audio_duration) || 3), text: String(json.text) }]
-  }
+    const segmentCues = Array.isArray(payload.segments)
+      ? payload.segments.map(cueFromSegment).filter(Boolean) as CaptionCue[]
+      : []
 
-  return NextResponse.json({ ok: true, data: { status: 'completed', cues, cueCount: cues.length } })
+    const cues = segmentCues.length
+      ? segmentCues
+      : fallbackCues(String(payload.text || ''), durationSec)
+
+    return json({
+      ok: true,
+      data: {
+        cues,
+        cueCount: cues.length,
+        text: payload.text || '',
+      },
+      error: null,
+      meta: { locale: lang, generatedAt: new Date().toISOString() },
+    })
+  } catch (error) {
+    return json(
+      {
+        ok: false,
+        data: null,
+        error: error instanceof Error ? error.message : 'Caption generation failed.',
+        meta: { locale: lang, generatedAt: new Date().toISOString() },
+      },
+      500,
+    )
+  }
 }

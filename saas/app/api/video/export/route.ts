@@ -79,6 +79,8 @@ function adminClient() {
   })
 }
 
+type AdminClient = NonNullable<ReturnType<typeof adminClient>>
+
 async function getUser() {
   const cookieStore = await cookies()
 
@@ -112,7 +114,7 @@ async function getUser() {
 }
 
 async function resolveAccountId(
-  supabase: ReturnType<typeof createClient>,
+  supabase: AdminClient,
   userId: string,
 ): Promise<string | null> {
   const result = await supabase

@@ -18,7 +18,7 @@ for (let index = 2; index < process.argv.length; index += 1) {
   }
 }
 
-const productionTarget = { repo: 'SignalBoost', branch: 'main' }
+const productionTarget = { repo: 'signalboost-live', branch: 'main' }
 
 const productionModules = [
   { label: 'Promote Business', files: ['app/dashboard/promote/page.tsx'] },
@@ -37,6 +37,7 @@ const productionAreas = [
   { label: 'Executive Dashboard', type: 'Dashboard', files: ['app/dashboard/page.tsx', 'components/dashboard/CockpitModulePage.tsx'] },
   { label: 'i18n translations', type: 'Localization', files: ['components/i18n/I18nProvider.tsx', 'lib/i18n/useTranslation.ts', 'lib/i18n/loadLanguage.ts', 'lib/i18n/detectLanguage.ts', 'saas/public/i18n/en.json'] },
   { label: 'Concierge AI integration', type: 'Concierge', files: ['app/api/concierge/route.ts', 'lib/concierge/unifiedConcierge.ts', 'saas/components/Concierge.tsx'] },
+  { label: 'Video Studio', type: 'Video editing', files: ['app/dashboard/video/page.tsx', 'components/video/VideoEditor.tsx', 'app/api/video', 'lib/video', 'scripts/video-render-worker.mjs', 'saas/supabase/migrations/20260606_video_caption_editor_pipeline.sql'] },
 ]
 
 const conflictMarkerPattern = /^(<<<<<<<|=======|>>>>>>>)(?:\s|$)/m
@@ -70,8 +71,8 @@ function getRepoName() {
 
 function getRepoKind(repoName) {
   const normalized = repoName.toLowerCase()
-  if (normalized === 'signalboost') return 'production'
-  if (normalized === 'signalboost-live') return 'staging'
+  if (normalized === 'signalboost-live') return 'production'
+  if (normalized === 'signalboost') return 'protected-upstream'
   return 'unknown'
 }
 
@@ -118,8 +119,7 @@ function hasExplicitStagingApproval() {
   const labels = (event.pull_request?.labels ?? []).map((label) => String(label.name ?? '').toLowerCase())
 
   return text.includes('use signalboost-live')
-    || text.includes('staging deployment')
-    || labels.includes('staging-approved')
+    || text.includes('signalboost-live/main')
     || labels.includes('signalboost-live')
 }
 
@@ -316,7 +316,7 @@ if (repoKind === 'production') {
     failures.push(`Production repo is missing required areas: ${missingRequiredAreas.map((area) => area.label).join(', ')}`)
   }
 } else if (repoKind !== 'staging') {
-  failures.push(`Unknown repository target "${repoName}". Expected SignalBoost or signalboost-live.`)
+  failures.push(`Unknown repository target "${repoName}". Expected signalboost-live.`)
 }
 
 if (changedProductionAreas.length > 0 && !targetIsProductionMain) {
@@ -363,16 +363,16 @@ const reportLines = [
 ]
 
 if (targetIsProductionMain) {
-  reportLines.push('✅ Production-scope PR target is SignalBoost/main.')
+  reportLines.push('✅ Production-scope PR target is signalboost-live/main.')
 } else {
-  reportLines.push('❌ Production-scope PR target is not SignalBoost/main.')
+  reportLines.push('❌ Production-scope PR target is not signalboost-live/main.')
 }
 
 if (repoKind === 'production') {
-  reportLines.push(`${statusIcon(failures.length === 0)} Production areas were verified in the SignalBoost repo.`)
+  reportLines.push(`${statusIcon(failures.length === 0)} Production areas were verified in the signalboost-live repo.`)
 } else if (repoKind === 'staging') {
   const noMisdeployments = changedProductionAreas.length === 0 || explicitStagingApproval || targetIsProductionMain
-  reportLines.push(`${statusIcon(noMisdeployments)} signalboost-live is treated as staging-only; production-scope changes require a SignalBoost/main PR base unless explicitly approved for staging.`)
+  reportLines.push(`${statusIcon(noMisdeployments)} signalboost-live is the required production target; production-scope changes must target signalboost-live/main.`)
   if (changedProductionAreas.length > 0) {
     reportLines.push(`- Production-scope areas touched by this PR: ${changedProductionAreas.map((area) => area.label).join(', ')}`)
   } else {

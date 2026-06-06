@@ -6,7 +6,7 @@ export async function POST(req: Request) {
   const query = typeof body.query === 'string' ? body.query : ''
   const locale = typeof body.locale === 'string' ? body.locale : 'en'
 
-  return NextResponse.json(answerSignalBoostConcierge(query, locale))
+  return NextResponse.json(answerSignalBoostConcierge(query, locale, { tier: body.tier, usedMinutes: body.usedMinutes, billingProvider: body.billingProvider }))
 }
 
 export async function GET() {

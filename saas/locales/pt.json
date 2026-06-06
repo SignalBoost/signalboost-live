@@ -1590,5 +1590,62 @@
   "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
   "wireframes.modules.assistant.panel1": "Task list panel",
   "wireframes.modules.assistant.panel2": "Reminder timeline",
-  "wireframes.modules.assistant.panel3": "Productivity insights chart"
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "video": {
+    "editor": {
+      "eyebrow": "Estúdio de vídeo",
+      "title": "Editor de legendas em canvas",
+      "subtitle": "Envie um vídeo, gere legendas temporizadas, arraste sobreposições estilizadas no canvas e envie uma exportação FFmpeg.",
+      "playPause": "Reproduzir / pausar",
+      "scrub": "Navegar na linha do tempo"
+    },
+    "upload": {
+      "help": "Escolha MP4, MOV, MKV, AVI ou WEBM."
+    },
+    "working": "Processando…",
+    "generate": "Gerar legendas",
+    "phase": {
+      "prep": "Preparando envio…",
+      "upload": "Enviando seu arquivo…",
+      "process": "Transcrevendo e sincronizando legendas…"
+    },
+    "quota": {
+      "title": "Status da cota",
+      "minutes": "Minutos",
+      "storage": "Armazenamento"
+    },
+    "billing": {
+      "demo": "Apenas reprodução demo",
+      "upgrade": "Usuários grátis/demo podem pré-visualizar clipes curtos. Faça upgrade para edição e exportação completas.",
+      "over": "Cobrança por excedente aplicada",
+      "estimate": "Excedente estimado"
+    },
+    "style": {
+      "font": "Fonte",
+      "size": "Tamanho",
+      "color": "Cor",
+      "background": "Fundo",
+      "animation": "Animação"
+    },
+    "anim": {
+      "none": "Nenhuma",
+      "fade": "Fade",
+      "pop": "Pop",
+      "slide": "Deslizar"
+    },
+    "timeline": {
+      "title": "Linha do tempo das legendas"
+    },
+    "export": {
+      "title": "Exportar MP4",
+      "help": "As exportações entram em uma fila de worker FFmpeg dedicado para evitar jobs pesados em serverless.",
+      "queueing": "Enfileirando…",
+      "button": "Gravar legendas e exportar",
+      "status": "Status do job",
+      "download": "Baixar .mp4 final"
+    },
+    "footer": {
+      "sync": "Status: as legendas ficam sincronizadas com a reprodução; as exportações são processadas pela fila de vídeo."
+    }
+  }
 }

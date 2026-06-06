@@ -1590,5 +1590,62 @@
   "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
   "wireframes.modules.assistant.panel1": "Task list panel",
   "wireframes.modules.assistant.panel2": "Reminder timeline",
-  "wireframes.modules.assistant.panel3": "Productivity insights chart"
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "video": {
+    "editor": {
+      "eyebrow": "Video Studio",
+      "title": "Canvas Caption Editor",
+      "subtitle": "Upload a source video, generate timed captions, drag styled overlays on the canvas, and queue an FFmpeg burn-in export.",
+      "playPause": "Play / pause",
+      "scrub": "Scrub timeline"
+    },
+    "upload": {
+      "help": "Choose MP4, MOV, MKV, AVI, or WEBM."
+    },
+    "working": "Working…",
+    "generate": "Generate captions",
+    "phase": {
+      "prep": "Preparing upload…",
+      "upload": "Uploading your file…",
+      "process": "Transcribing and syncing captions…"
+    },
+    "quota": {
+      "title": "Quota status",
+      "minutes": "Minutes",
+      "storage": "Storage"
+    },
+    "billing": {
+      "demo": "Demo playback only",
+      "upgrade": "Free/demo users can preview short clips. Upgrade for full editing and export.",
+      "over": "Overage billing applies",
+      "estimate": "Estimated overage"
+    },
+    "style": {
+      "font": "Font",
+      "size": "Size",
+      "color": "Color",
+      "background": "Background",
+      "animation": "Animation"
+    },
+    "anim": {
+      "none": "None",
+      "fade": "Fade",
+      "pop": "Pop",
+      "slide": "Slide"
+    },
+    "timeline": {
+      "title": "Caption timeline"
+    },
+    "export": {
+      "title": "Export MP4",
+      "help": "Exports are queued for a dedicated FFmpeg worker so heavy caption burns do not run inside serverless functions.",
+      "queueing": "Queueing…",
+      "button": "Burn captions and export",
+      "status": "Job status",
+      "download": "Download final .mp4"
+    },
+    "footer": {
+      "sync": "Status: captions stay synced to playback time; exports are processed by the video worker queue."
+    }
+  }
 }

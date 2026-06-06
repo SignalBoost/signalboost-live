@@ -1590,5 +1590,62 @@
   "wireframes.modules.assistant.description": "Turn work into prioritized tasks, reminders, and productivity telemetry for the day.",
   "wireframes.modules.assistant.panel1": "Task list panel",
   "wireframes.modules.assistant.panel2": "Reminder timeline",
-  "wireframes.modules.assistant.panel3": "Productivity insights chart"
+  "wireframes.modules.assistant.panel3": "Productivity insights chart",
+  "video": {
+    "editor": {
+      "eyebrow": "Studio wideo",
+      "title": "Edytor napisów canvas",
+      "subtitle": "Prześlij wideo, wygeneruj napisy z czasem, przeciągaj stylizowane nakładki na canvasie i dodaj eksport FFmpeg do kolejki.",
+      "playPause": "Odtwórz / pauza",
+      "scrub": "Przewiń oś czasu"
+    },
+    "upload": {
+      "help": "Wybierz MP4, MOV, MKV, AVI lub WEBM."
+    },
+    "working": "Przetwarzanie…",
+    "generate": "Generuj napisy",
+    "phase": {
+      "prep": "Przygotowanie przesyłania…",
+      "upload": "Przesyłanie pliku…",
+      "process": "Transkrypcja i synchronizacja napisów…"
+    },
+    "quota": {
+      "title": "Status limitu",
+      "minutes": "Minuty",
+      "storage": "Pamięć"
+    },
+    "billing": {
+      "demo": "Tylko odtwarzanie demo",
+      "upgrade": "Użytkownicy darmowi/demo mogą oglądać krótkie podglądy. Zmień plan, aby edytować i eksportować w pełni.",
+      "over": "Obowiązuje opłata za nadwyżkę",
+      "estimate": "Szacowana nadwyżka"
+    },
+    "style": {
+      "font": "Font",
+      "size": "Rozmiar",
+      "color": "Kolor",
+      "background": "Tło",
+      "animation": "Animacja"
+    },
+    "anim": {
+      "none": "Brak",
+      "fade": "Zanikanie",
+      "pop": "Pop",
+      "slide": "Przesunięcie"
+    },
+    "timeline": {
+      "title": "Oś czasu napisów"
+    },
+    "export": {
+      "title": "Eksport MP4",
+      "help": "Eksporty trafiają do dedykowanego workera FFmpeg, aby ciężkie zadania nie działały w serverless.",
+      "queueing": "Dodawanie do kolejki…",
+      "button": "Wypal napisy i eksportuj",
+      "status": "Status zadania",
+      "download": "Pobierz finalny .mp4"
+    },
+    "footer": {
+      "sync": "Status: napisy pozostają zsynchronizowane z odtwarzaniem; eksporty przetwarza kolejka wideo."
+    }
+  }
 }

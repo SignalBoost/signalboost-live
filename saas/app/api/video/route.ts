@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
     .createSignedUrl(path, SIGNED_URL_TTL)
 
   if (dlError || !dl?.signedUrl) {
-    await supabaseAdmin.from('video_jobs').update({ status: 'error', error: dlError?.message ?? 'no signed url' }).eq('id', jobId)
+    await supabaseAdmin.from('video_jobs').update({ status: 'failed', error: dlError?.message ?? 'no signed url' }).eq('id', jobId)
     return NextResponse.json(
       { error: `Could not read the uploaded file from storage: ${dlError?.message ?? 'unknown'}` },
       { status: 500 },
@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
   // ── Transcribe (AssemblyAI fetches the signed URL directly) ────────────────
   let transcript: TranscriptResult
   try {
-    await supabaseAdmin.from('video_jobs').update({ status: 'transcribing' }).eq('id', jobId)
+    await supabaseAdmin.from('video_jobs').update({ status: 'processing' }).eq('id', jobId)
     const transcriptId = await startTranscription(dl.signedUrl, 'en')
     transcript = await pollTranscription(transcriptId)
 
@@ -149,12 +149,12 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const m = errMsg(err)
     console.error('AssemblyAI transcription error:', err)
-    await supabaseAdmin.from('video_jobs').update({ status: 'error', error: m }).eq('id', jobId)
+    await supabaseAdmin.from('video_jobs').update({ status: 'failed', error: m }).eq('id', jobId)
     return NextResponse.json({ error: `Transcription failed: ${m}` }, { status: 502 })
   }
 
   // ── Generate captions for each language ────────────────────────────────────
-  await supabaseAdmin.from('video_jobs').update({ status: 'generating' }).eq('id', jobId)
+  await supabaseAdmin.from('video_jobs').update({ status: 'processing' }).eq('id', jobId)
 
   const captionResults: Array<{
     lang: string
@@ -231,7 +231,7 @@ export async function POST(req: NextRequest) {
 
   const anyUrls = captionResults.some((r) => r.srtUrl || r.vttUrl || r.assUrl)
   if (!anyUrls && storageError) {
-    await supabaseAdmin.from('video_jobs').update({ status: 'error', error: storageError }).eq('id', jobId)
+    await supabaseAdmin.from('video_jobs').update({ status: 'failed', error: storageError }).eq('id', jobId)
     return NextResponse.json(
       { error: `Captions generated but could not be saved. Storage error (check the '${VIDEO_BUCKET}' bucket exists): ${storageError}` },
       { status: 500 },
@@ -244,18 +244,33 @@ export async function POST(req: NextRequest) {
     .from(VIDEO_BUCKET)
     .upload(transcriptKey, new Blob([JSON.stringify(transcript)], { type: 'application/json' }), { upsert: true })
 
+  await supabaseAdmin.from('video_storage').insert({
+    account_id: job.account_id || null,
+    user_id: user.id,
+    filename: job.file_name,
+    size_mb: Math.ceil(Number(job.file_size || 0) / (1024 * 1024)),
+    duration_sec: Math.round(transcript.audio_duration),
+    transcoded: false,
+    captions: captionResults,
+    source_path: path,
+    created_at: new Date().toISOString(),
+  })
+
   await supabaseAdmin.from('video_jobs').update({
-    status: 'done',
+    status: 'completed',
     duration_seconds: Math.round(transcript.audio_duration),
     captions: captionResults,
     chapters: transcript.chapters,
     transcript_text: transcript.text.slice(0, 5000),
     completed_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   }).eq('id', jobId)
 
   return NextResponse.json({
     jobId,
-    status: 'done',
+    status: 'completed',
+    sourcePath: path,
+    sourceSizeMb: Math.ceil(Number(job.file_size || 0) / (1024 * 1024)),
     fileName: job.file_name,
     duration: Math.round(transcript.audio_duration),
     captions: captionResults,

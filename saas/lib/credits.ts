@@ -1,11 +1,24 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Per-plan monthly video credit allowance (matches the pricing page + cost model)
+// Per-plan monthly video credit allowance.
+// Public plan names:
+// - starter = Launch
+// - pro     = Growth
+// - business = Command
+//
+// Aliases are included so future Stripe metadata can use either the old
+// internal keys or the new launch/growth/command names.
 export const PLAN_VIDEO_CREDITS: Record<string, number> = {
-  free:     2,
-  starter:  10,
-  pro:      40,
-  business: 120,
+  free: 2,
+
+  starter: 25,
+  launch: 25,
+
+  pro: 100,
+  growth: 100,
+
+  business: 300,
+  command: 300,
 }
 
 // Server-side Supabase client using the service role key.
@@ -14,17 +27,21 @@ function adminClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
+    { auth: { persistSession: false } },
   )
 }
 
 // Has it been at least a month since the last reset?
 function monthElapsed(resetAt: string | null): boolean {
   if (!resetAt) return true
+
   const last = new Date(resetAt).getTime()
+
   if (Number.isNaN(last)) return true
+
   const now = Date.now()
   const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000
+
   return now - last >= THIRTY_DAYS
 }
 
@@ -32,6 +49,11 @@ type CreditState = {
   plan: string
   credits: number
   allowance: number
+}
+
+function allowanceForPlan(plan: string | null | undefined) {
+  const safePlan = plan || 'free'
+  return PLAN_VIDEO_CREDITS[safePlan] ?? PLAN_VIDEO_CREDITS.free
 }
 
 /*
@@ -49,9 +71,10 @@ export async function getCreditState(userId: string): Promise<CreditState> {
     .eq('user_id', userId)
     .maybeSingle()
 
-  // No subscription row yet — treat as free, create a row with free credits
+  // No subscription row yet — treat as free, create a row with free credits.
   if (error || !data) {
-    const allowance = PLAN_VIDEO_CREDITS['free']
+    const allowance = PLAN_VIDEO_CREDITS.free
+
     await supabase.from('subscriptions').upsert({
       user_id: userId,
       plan: 'free',
@@ -59,11 +82,12 @@ export async function getCreditState(userId: string): Promise<CreditState> {
       credits_reset_at: new Date().toISOString(),
       credits_initialized: true,
     }, { onConflict: 'user_id' })
+
     return { plan: 'free', credits: allowance, allowance }
   }
 
   const plan = data.plan || 'free'
-  const allowance = PLAN_VIDEO_CREDITS[plan] ?? PLAN_VIDEO_CREDITS['free']
+  const allowance = allowanceForPlan(plan)
 
   // Never initialized (e.g. row created before credits existed) OR monthly reset due
   // → grant the plan's allowance and mark initialized.
@@ -76,6 +100,7 @@ export async function getCreditState(userId: string): Promise<CreditState> {
         credits_initialized: true,
       })
       .eq('user_id', userId)
+
     return { plan, credits: allowance, allowance }
   }
 
@@ -88,6 +113,7 @@ export async function getCreditState(userId: string): Promise<CreditState> {
 */
 export async function getCredits(userId: string): Promise<number> {
   const state = await getCreditState(userId)
+
   return state.credits
 }
 
@@ -109,6 +135,7 @@ export async function spendVideoCredit(userId: string): Promise<{
   }
 
   const remaining = state.credits - 1
+
   const { error } = await supabase
     .from('subscriptions')
     .update({ video_credits: remaining })
@@ -137,7 +164,7 @@ export async function refundVideoCredit(userId: string): Promise<void> {
   if (!data) return
 
   const plan = data.plan || 'free'
-  const allowance = PLAN_VIDEO_CREDITS[plan] ?? PLAN_VIDEO_CREDITS['free']
+  const allowance = allowanceForPlan(plan)
   const current = data.video_credits ?? 0
   const refunded = Math.min(current + 1, allowance)
 

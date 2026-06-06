@@ -1,136 +1,427 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+// saas/components/Navbar.tsx
+// Unified single-bar navigation, domain-grouped. Role/access comes from /api/credits (single source of truth).
+
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
+import { supabase } from '@/utils/supabase/client'
+import AuthModal from './AuthModal'
+import { useI18n } from '@/components/i18n/I18nProvider'
+import { t } from '@/lib/i18n/t'
 
 const GOLD = '#ffc300'
+const CYAN = '#1af0ff'
 
-type Breakdown = { line: string; plan: string; count: number; mrr: number }
-type Revenue = {
-  generatedAt: string
-  pricesResolved: boolean
-  totals: { mrr: number; arr: number; activeWebsite: number; activePodcast: number; activeTotal: number }
-  breakdown: Breakdown[]
+const LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'pt', label: 'Português' },
+  { code: 'es', label: 'Español' },
+  { code: 'pl', label: 'Polski' },
+  { code: 'ru', label: 'Русский' },
+]
+
+const PLAN_STYLES: Record<string, { bg: string; color: string }> = {
+  free:     { bg: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)' },
+  starter:  { bg: 'rgba(59,130,246,0.18)',  color: '#7ab8ff' },
+  pro:      { bg: 'rgba(255,195,0,0.18)',   color: '#ffc300' },
+  business: { bg: 'rgba(74,222,128,0.18)',  color: '#4ade80' },
 }
 
-function money(n: number) {
-  return '$' + n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-}
+type Item = { icon: string; label: string; href: string; desc?: string }
 
-export default function AdminRevenuePage() {
-  const [data, setData] = useState<Revenue | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [notAllowed, setNotAllowed] = useState(false)
+const WEBSITE: Item[] = [
+  { icon: '🌐', label: 'Build a Website', href: '/dashboard/builder', desc: 'Generate a full site from a prompt.' },
+  { icon: '🧭', label: 'Optimize Website', href: '/dashboard/improve', desc: 'Analyze → optimize → rebuild an improved site.' },
+  { icon: '⭐', label: 'Reviews', href: '/dashboard/reviews', desc: 'Collect and showcase customer reviews.' },
+  { icon: '✨', label: 'Improve Content', href: '/dashboard/improve', desc: 'Polish pages for SEO and conversion.' },
+]
 
-  const load = useCallback(async () => {
-    setLoading(true); setError('')
+const PODCAST: Item[] = [
+  { icon: '🎙️', label: 'Build a Podcast', href: '/dashboard/launchpad/podcast', desc: 'Start a podcast from scratch.' },
+  { icon: '🎚️', label: 'Optimize Podcast Studio', href: '/dashboard/podcast/studio', desc: 'Audit your feed for Apple/Spotify & growth.' },
+  { icon: '📻', label: 'Podcast Hub', href: '/dashboard/podcast', desc: 'Your podcast page and tools.' },
+]
+
+const CONTENT: Item[] = [
+  { icon: '🎧', label: 'Audio Studio', href: '/dashboard/audio', desc: 'Native voice and audio content.' },
+  { icon: '🎬', label: 'Video Studio', href: '/dashboard/video', desc: 'Generate videos, clips, and captions.' },
+  { icon: '🧪', label: 'Lab', href: '/dashboard/lab', desc: 'Experimental tools and features.' },
+  { icon: '🛠️', label: 'Workshop Apprentice', href: '/dashboard/apprentice', desc: 'Guided, level-aware help.' },
+]
+
+const LAUNCHPAD: Item[] = [
+  { icon: '🚀', label: 'Launchpad Home', href: '/dashboard/launchpad', desc: 'Choose a guided launch path.' },
+  { icon: '🏢', label: 'Build a Business', href: '/dashboard/launchpad/business', desc: 'Launch a business from scratch.' },
+  { icon: '🎬', label: 'Creator', href: '/dashboard/launchpad/creator', desc: 'Build your creator brand.' },
+  { icon: '🛒', label: 'Online Store', href: '/dashboard/launchpad/store', desc: 'Launch a store from scratch.' },
+  { icon: '🎙️', label: 'Podcast', href: '/dashboard/launchpad/podcast', desc: 'Start a podcast from scratch.' },
+]
+
+const GROW: Item[] = [
+  { icon: '📡', label: 'Outreach Hub', href: '/dashboard/outreach', desc: 'Your outreach command center.' },
+  { icon: '🔎', label: 'Discovery', href: '/dashboard/outreach/discovery', desc: 'Find and analyze new leads.' },
+  { icon: '📇', label: 'Contacts', href: '/dashboard/outreach/contacts', desc: 'Review and approve leads.' },
+  { icon: '📊', label: 'Pipeline', href: '/dashboard/outreach/pipeline', desc: 'Track prospects by stage.' },
+  { icon: '📣', label: 'Campaigns', href: '/dashboard/campaigns', desc: 'Plan campaigns, A/B tests, and funnel tracking.' },
+  { icon: '📢', label: 'Promote', href: '/dashboard/promote', desc: 'Run promotion campaigns.' },
+  { icon: '💼', label: 'Sales', href: '/dashboard/sales', desc: 'Sales overview.' },
+  { icon: '📈', label: 'Sales Pipeline', href: '/dashboard/sales/pipeline', desc: 'Deals in progress.' },
+]
+
+const WORKSPACE: Item[] = [
+  { icon: '🏠', label: 'Dashboard', href: '/dashboard', desc: 'Your home base.' },
+  { icon: '🤖', label: 'Assistant', href: '/dashboard/assistant', desc: 'Ask the concierge anything.' },
+  { icon: '📅', label: 'Calendar', href: '/dashboard/calendar', desc: 'Events and cultural dates.' },
+  { icon: '📑', label: 'Spreadsheets', href: '/dashboard/spreadsheets', desc: 'Your imported data, in a grid.' },
+  { icon: '🔌', label: 'Data Connectors', href: '/dashboard/data', desc: 'Import data from sources.' },
+  { icon: '⚡', label: 'Metrics & Credits', href: '/dashboard/metrics', desc: 'Usage and credit control.' },
+  { icon: '🎛️', label: 'Console', href: '/dashboard/wireframes', desc: 'Office utilities console.' },
+  { icon: '💬', label: 'Feedback', href: '/dashboard/feedback', desc: 'Send us your feedback.' },
+  { icon: '⚙️', label: 'Settings', href: '/dashboard/settings', desc: 'Account and preferences.' },
+]
+
+const ADMIN: Item[] = [
+  { icon: '🌌', label: 'Overview (live data)', href: '/admin/overview', desc: 'Real counts from your live data.' },
+  { icon: '💰', label: 'Revenue', href: '/admin/revenue', desc: 'Live MRR from active subscriptions.' },
+  { icon: '👥', label: 'Team & Roles', href: '/dashboard/team', desc: 'Add people and set their access.' },
+  { icon: '🛡️', label: 'Role Management', href: '/admin/settings/roles', desc: 'Manage roles and ownership.' },
+  { icon: '🚪', label: 'Onboarding', href: '/admin/onboarding', desc: 'Onboarding controls.' },
+  { icon: '⚙️', label: 'Admin Settings', href: '/admin/settings', desc: 'System-wide switches.' },
+]
+
+const HELP: Item[] = [
+  { icon: '❓', label: 'FAQ', href: '/faq' },
+  { icon: '✉️', label: 'Contact Support', href: '/support' },
+  { icon: '📖', label: 'Documentation', href: '/docs' },
+]
+
+const TEAM_ITEM: Item = { icon: '👥', label: 'Team & Roles', href: '/dashboard/team', desc: 'Add people and set their access.' }
+
+export default function Navbar() {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const navRef = useRef<HTMLDivElement>(null)
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pathname  = usePathname()
+  const { lang, setLang, dict } = useI18n()
+
+  const [showAuth, setShowAuth]   = useState(false)
+  const [user, setUser]           = useState<any>(null)
+  const [credits, setCredits]     = useState<number>(0)
+  const [plan, setPlan]           = useState<string>('free')
+  const [userName, setUserName]   = useState<string | null>(null)
+  const [isAdmin, setIsAdmin]     = useState(false)
+  const [isOwner, setIsOwner]     = useState(false)
+  const [openMenu, setOpenMenu]   = useState<string | null>(null)
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const u = data?.user ?? null
+      setUser(u)
+      if (u) { fetchCredits() } else { setIsAdmin(false); setIsOwner(false) }
+    })
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const u = session?.user ?? null
+      setUser(u)
+      if (u) { fetchCredits() } else { setIsAdmin(false); setIsOwner(false) }
+    })
+    return () => { listener.subscription.unsubscribe() }
+  }, [])
+
+  async function fetchCredits() {
     try {
-      const res = await fetch('/api/admin/revenue', { cache: 'no-store' })
-      if (res.status === 401 || res.status === 403) { setNotAllowed(true); setLoading(false); return }
-      const d = await res.json()
-      if (!res.ok) { setError(d?.error || 'Could not load revenue.'); setLoading(false); return }
-      setData(d)
-    } catch {
-      setError('Something went wrong loading revenue.')
-    } finally {
-      setLoading(false)
+      const res  = await fetch('/api/credits', { cache: 'no-store' })
+      const data = await res.json()
+      if (typeof data.credits === 'number') setCredits(data.credits)
+      if (data.plan)  setPlan(data.plan)
+      if (data.name)  setUserName(data.name)
+      setIsAdmin(!!data.isAdmin)
+      setIsOwner(!!data.isOwner)
+    } catch { /* silent */ }
+  }
+
+  useEffect(() => { setOpenMenu(null); setMobileOpen(false) }, [pathname])
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) setOpenMenu(null)
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpenMenu(null)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('keydown', onKey)
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  function openNow(id: string) {
+    if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null }
+    setOpenMenu(id)
+  }
+  function closeSoon() {
+    if (closeTimer.current) clearTimeout(closeTimer.current)
+    closeTimer.current = setTimeout(() => setOpenMenu(null), 140)
+  }
 
-  if (notAllowed) {
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')!
+    const W = 40, H = 40
+    canvas.width = W; canvas.height = H
+    const cx = W / 2, cy = H - 8
+    let rings: { r: number; alpha: number }[] = []
+    let last = 0, raf: number
+    function draw(ts: number) {
+      ctx.clearRect(0, 0, W, H)
+      if (!last || ts - last > 2000) { rings.push({ r: 0, alpha: 1 }); last = ts }
+      rings = rings.filter(r => r.alpha > 0.01)
+      for (const r of rings) {
+        r.r += 0.8; r.alpha -= 0.012
+        ctx.globalAlpha = Math.max(0, r.alpha)
+        ctx.strokeStyle = GOLD; ctx.lineWidth = 1
+        ctx.beginPath(); ctx.arc(cx, cy, r.r, Math.PI, 0); ctx.stroke()
+      }
+      ctx.globalAlpha = 1
+      ctx.fillStyle = GOLD
+      ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill()
+      raf = requestAnimationFrame(draw)
+    }
+    raf = requestAnimationFrame(draw)
+    return () => { cancelAnimationFrame(raf) }
+  }, [])
+
+  async function handleLogout() {
+    sessionStorage.removeItem('greetingDismissed')
+    await supabase.auth.signOut()
+    window.location.href = '/'
+  }
+
+  const planStyle = PLAN_STYLES[plan] || PLAN_STYLES.free
+  const planLabel = t(dict, `plan.${plan}`, plan.charAt(0).toUpperCase() + plan.slice(1))
+  const displayName = userName || user?.email || ''
+
+  const workspaceItems = isOwner ? [...WORKSPACE, TEAM_ITEM] : WORKSPACE
+
+  const groupActive = (items: Item[]) =>
+    items.some(i => i.href !== '/' && (pathname === i.href || pathname?.startsWith(i.href + '/')))
+
+  const trigger = (active: boolean): React.CSSProperties => ({
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    background: 'transparent', border: 'none', cursor: 'pointer',
+    color: active ? '#fff' : 'var(--text-secondary)',
+    fontWeight: active ? 700 : 600, fontSize: 14, fontFamily: 'inherit',
+    padding: '8px 4px', whiteSpace: 'nowrap',
+  })
+
+  const panelWrap = (open: boolean, align: 'left' | 'right'): React.CSSProperties => ({
+    position: 'absolute', top: '100%', [align]: 0, paddingTop: 12,
+    opacity: open ? 1 : 0,
+    transform: open ? 'translateY(0)' : 'translateY(8px)',
+    visibility: open ? 'visible' : 'hidden',
+    pointerEvents: open ? 'auto' : 'none',
+    transition: 'opacity .18s ease, transform .18s ease, visibility .18s',
+    zIndex: 200,
+  })
+
+  const panelCard: React.CSSProperties = {
+    position: 'relative',
+    background: 'linear-gradient(135deg, rgba(20,24,36,.98), rgba(15,23,42,.98))',
+    border: '1px solid var(--border-medium)',
+    borderRadius: 18,
+    boxShadow: '0 30px 80px rgba(0,0,0,.55)',
+    overflow: 'hidden',
+    backdropFilter: 'blur(14px)',
+  }
+
+  const accentLine: React.CSSProperties = {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 2,
+    background: `linear-gradient(90deg, ${GOLD}, ${CYAN})`,
+  }
+
+  function Group({ id, label, items, align = 'left', cols = 1, width = 300 }: { id: string; label: string; items: Item[]; align?: 'left' | 'right'; cols?: number; width?: number }) {
+    const open = openMenu === id
     return (
-      <main style={{ padding: 24, color: '#fff', maxWidth: 720, margin: '0 auto' }}>
-        <div className="sb-card" style={{ padding: 28, textAlign: 'center' }}>
-          <h1 className="sb-h3" style={{ marginTop: 0 }}>Revenue</h1>
-          <p className="sb-body" style={{ margin: 0 }}>Only the account owner can view revenue.</p>
+      <div
+        style={{ position: 'relative' }}
+        onMouseEnter={() => openNow(id)}
+        onMouseLeave={closeSoon}
+      >
+        <button
+          type="button"
+          aria-haspopup="true"
+          aria-expanded={open}
+          onClick={() => setOpenMenu(open ? null : id)}
+          style={trigger(open || groupActive(items))}
+        >
+          {label}
+          <span style={{ fontSize: 10, opacity: 0.7, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .18s' }}>▾</span>
+        </button>
+        <div style={panelWrap(open, align)} onMouseEnter={() => openNow(id)} onMouseLeave={closeSoon}>
+          <div style={panelCard}>
+            <span style={accentLine} aria-hidden="true" />
+            <div style={{ padding: 12, width, maxWidth: '92vw', display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 2 }}>
+              {items.map(item => (
+                <Link key={item.href + item.label} href={item.href} onClick={() => setOpenMenu(null)} className="sbnav-row" style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 12, textDecoration: 'none' }}>
+                  <span style={{ fontSize: 18, flexShrink: 0 }}>{item.icon}</span>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'block', color: '#fff', fontWeight: 700, fontSize: 13 }}>{item.label}</span>
+                    {item.desc && <span style={{ display: 'block', color: 'var(--text-muted)', fontSize: 11, marginTop: 1, lineHeight: 1.35 }}>{item.desc}</span>}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
         </div>
-      </main>
+      </div>
     )
   }
 
   return (
-    <main style={{ padding: 24, color: '#fff', maxWidth: 920, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
-        <div>
-          <span className="sb-eyebrow">Admin</span>
-          <h1 className="sb-h2" style={{ marginTop: 8, marginBottom: 2 }}>Revenue</h1>
-          <p className="sb-body" style={{ margin: 0 }}>Live MRR from active subscriptions, priced from Stripe.</p>
+    <>
+      <style>{`
+        .sbnav-desktop { display: flex; align-items: center; gap: 18px; }
+        .sbnav-right { display: flex; align-items: center; gap: 10px; }
+        .sbnav-burger { display: none; }
+        .sbnav-row { transition: background .15s ease; border-radius: 12px; }
+        .sbnav-row:hover { background: var(--surface-1-hover); }
+        @media (max-width: 1200px) {
+          .sbnav-desktop, .sbnav-right { display: none !important; }
+          .sbnav-burger { display: inline-flex !important; }
+        }
+      `}</style>
+
+      <nav ref={navRef} style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '12px 24px',
+        background: 'linear-gradient(135deg, rgba(8,10,20,.86), rgba(15,23,42,.62))',
+        borderBottom: '1px solid rgba(26,240,255,.16)',
+        boxShadow: '0 18px 60px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.08)',
+        position: 'sticky', top: 0, zIndex: 100,
+        backdropFilter: 'blur(12px)',
+      }}>
+        {/* Logo */}
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0 }}>
+          <canvas ref={canvasRef} style={{ width: 40, height: 40 }} />
+          <span style={{ color: '#fff', fontWeight: 800, fontSize: 17 }}>
+            signal<span style={{ color: GOLD }}>boost</span>
+          </span>
+        </Link>
+
+        {/* Desktop nav */}
+        <div className="sbnav-desktop">
+          <Link href="/" style={{ ...trigger(pathname === '/'), display: 'inline-flex' }}>Home</Link>
+          <Group id="website" label="Website" items={WEBSITE} width={340} />
+          <Group id="podcast" label="Podcast" items={PODCAST} width={320} />
+          <Group id="content" label="Content" items={CONTENT} width={320} />
+          <Group id="launchpad" label="Launchpad" items={LAUNCHPAD} width={320} />
+          <Group id="grow" label="Grow" items={GROW} width={320} />
+          <Group id="workspace" label="Workspace" items={workspaceItems} width={320} />
+          {isAdmin && <Group id="admin" label="Admin" items={ADMIN} width={320} />}
+          <Link href="/pricing" style={{ ...trigger(pathname === '/pricing'), display: 'inline-flex' }}>Pricing</Link>
+          <Group id="help" label="Help" items={HELP} align="right" width={220} />
         </div>
-        <button onClick={load} disabled={loading} className="sb-button-secondary" style={{ opacity: loading ? 0.6 : 1 }}>
-          {loading ? 'Refreshing…' : 'Refresh'}
+
+        {/* Desktop right cluster */}
+        <div className="sbnav-right">
+          <select value={lang} onChange={e => setLang(e.target.value)} style={{
+            background: 'var(--surface-2)', color: 'var(--text-secondary)',
+            border: '1px solid var(--border-medium)', borderRadius: 999,
+            padding: '8px 12px', fontSize: 12, cursor: 'pointer',
+          }}>
+            {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+          </select>
+
+          {user && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,195,0,0.95)', fontFamily: 'monospace' }}>⚡ {credits}</span>
+              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', padding: '3px 10px', borderRadius: 999, background: planStyle.bg, color: planStyle.color, fontFamily: 'monospace' }}>{planLabel}</span>
+              {displayName && (
+                <span title={displayName} style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</span>
+              )}
+            </span>
+          )}
+
+          {user ? (
+            <button onClick={handleLogout} style={{ background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-soft)', borderRadius: 999, padding: '8px 14px', cursor: 'pointer' }}>
+              {t(dict, 'logout', 'Log out')}
+            </button>
+          ) : (
+            <button onClick={() => setShowAuth(true)} style={{ background: GOLD, color: '#000', border: 'none', borderRadius: 999, padding: '9px 22px', fontWeight: 800, cursor: 'pointer' }}>
+              {t(dict, 'getStarted', 'Get started')}
+            </button>
+          )}
+        </div>
+
+        {/* Mobile burger */}
+        <button className="sbnav-burger" aria-label="Menu" onClick={() => setMobileOpen(o => !o)} style={{ background: 'transparent', border: '1px solid var(--border-soft)', borderRadius: 10, color: '#fff', padding: '8px 12px', cursor: 'pointer', fontSize: 18 }}>
+          {mobileOpen ? '✕' : '☰'}
         </button>
-      </div>
+      </nav>
 
-      {error && <p className="sb-caption" style={{ color: '#fca5a5', marginBottom: 12 }}>{error}</p>}
-      {loading && !data && <p className="sb-body">Loading…</p>}
-
-      {data && (
-        <>
-          {!data.pricesResolved && (
-            <div className="sb-card" style={{ padding: 14, marginBottom: 16, border: '1px solid rgba(252,165,165,.3)' }}>
-              <p className="sb-caption" style={{ margin: 0, color: '#fca5a5' }}>
-                Stripe prices couldn&apos;t be read, so MRR may show $0. Check that STRIPE_SECRET_KEY and the
-                STRIPE_PRICE_* variables are set correctly in your environment.
-              </p>
+      {/* Mobile panel */}
+      {mobileOpen && (
+        <div style={{ position: 'sticky', top: 65, zIndex: 99, background: 'rgba(8,10,20,.98)', borderBottom: '1px solid var(--border-medium)', padding: 16, maxHeight: '80vh', overflowY: 'auto', backdropFilter: 'blur(12px)' }}>
+          {user && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,195,0,0.95)', fontFamily: 'monospace' }}>⚡ {credits}</span>
+              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', padding: '3px 10px', borderRadius: 999, background: planStyle.bg, color: planStyle.color, fontFamily: 'monospace' }}>{planLabel}</span>
+              {displayName && <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>{displayName}</span>}
             </div>
           )}
 
-          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12, marginBottom: 26 }}>
-            <div className="sb-card" style={{ padding: 18 }}>
-              <div style={{ fontSize: 30, fontWeight: 900, color: GOLD }}>{money(data.totals.mrr)}</div>
-              <div className="sb-caption" style={{ marginTop: 2 }}>MRR (monthly recurring)</div>
-            </div>
-            <div className="sb-card" style={{ padding: 18 }}>
-              <div style={{ fontSize: 30, fontWeight: 900, color: '#fff' }}>{money(data.totals.arr)}</div>
-              <div className="sb-caption" style={{ marginTop: 2 }}>ARR (annual run-rate)</div>
-            </div>
-            <div className="sb-card" style={{ padding: 18 }}>
-              <div style={{ fontSize: 30, fontWeight: 900, color: '#86efac' }}>{data.totals.activeTotal}</div>
-              <div className="sb-caption" style={{ marginTop: 2 }}>Active subscriptions</div>
-            </div>
-          </section>
+          <div style={{ display: 'grid', gap: 4, marginBottom: 14 }}>
+            <Link href="/" style={{ padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 700, fontSize: 14 }}>🏠 Home</Link>
+          </div>
 
-          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12, marginBottom: 26 }}>
-            <div className="sb-card" style={{ padding: 16 }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#7dd3fc' }}>{data.totals.activeWebsite}</div>
-              <div className="sb-caption">Active website plans</div>
-            </div>
-            <div className="sb-card" style={{ padding: 16 }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#c4b5fd' }}>{data.totals.activePodcast}</div>
-              <div className="sb-caption">Active podcast plans</div>
-            </div>
-          </section>
-
-          <h2 className="sb-h3" style={{ marginBottom: 10 }}>By plan</h2>
-          {data.breakdown.length === 0 ? (
-            <div className="sb-card" style={{ padding: 24, textAlign: 'center' }}>
-              <p className="sb-body" style={{ margin: 0 }}>No active subscriptions yet.</p>
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gap: 10 }}>
-              {data.breakdown.map(b => (
-                <div key={`${b.line}:${b.plan}`} className="sb-card" style={{ padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                  <div>
-                    <strong style={{ color: '#fff', textTransform: 'capitalize' }}>{b.line} · {b.plan}</strong>
-                    <div className="sb-caption" style={{ marginTop: 2 }}>{b.count} active</div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: GOLD }}>{money(b.mrr)}</div>
-                    <div className="sb-caption">/mo</div>
-                  </div>
-                </div>
+          {[
+            { title: 'Website', items: WEBSITE },
+            { title: 'Podcast', items: PODCAST },
+            { title: 'Content', items: CONTENT },
+            { title: 'Launchpad', items: LAUNCHPAD },
+            { title: 'Grow', items: GROW },
+            { title: 'Workspace', items: workspaceItems },
+            ...(isAdmin ? [{ title: 'Admin', items: ADMIN }] : []),
+          ].map(section => (
+            <div key={section.title} style={{ display: 'grid', gap: 4, marginBottom: 14 }}>
+              <span style={{ color: 'var(--text-faint)', fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>{section.title}</span>
+              {section.items.map(item => (
+                <Link key={item.href + item.label} href={item.href} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 600, fontSize: 14 }}>
+                  <span>{item.icon}</span>{item.label}
+                </Link>
               ))}
             </div>
-          )}
+          ))}
 
-          <p className="sb-caption" style={{ marginTop: 18, opacity: 0.55 }}>
-            From active subscriptions in your database, priced live from Stripe. This is a dashboard estimate, not an
-            accounting ledger — reconcile against Stripe for official figures. Generated {new Date(data.generatedAt).toLocaleString()}.
-          </p>
-        </>
+          <div style={{ display: 'grid', gap: 4, marginBottom: 14 }}>
+            <span style={{ color: 'var(--text-faint)', fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>More</span>
+            <Link href="/pricing" style={{ padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 600, fontSize: 14 }}>Pricing</Link>
+            {HELP.map(item => (
+              <Link key={item.href + item.label} href={item.href} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 600, fontSize: 14 }}>
+                <span>{item.icon}</span>{item.label}
+              </Link>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <select value={lang} onChange={e => setLang(e.target.value)} style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--border-medium)', borderRadius: 999, padding: '8px 12px', fontSize: 12 }}>
+              {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+            </select>
+            {user ? (
+              <button onClick={handleLogout} style={{ background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-soft)', borderRadius: 999, padding: '9px 16px', cursor: 'pointer' }}>{t(dict, 'logout', 'Log out')}</button>
+            ) : (
+              <button onClick={() => { setMobileOpen(false); setShowAuth(true) }} style={{ background: GOLD, color: '#000', border: 'none', borderRadius: 999, padding: '9px 22px', fontWeight: 800, cursor: 'pointer' }}>{t(dict, 'getStarted', 'Get started')}</button>
+            )}
+          </div>
+        </div>
       )}
-    </main>
+
+      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+    </>
   )
 }

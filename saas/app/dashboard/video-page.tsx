@@ -1,257 +1,543 @@
+// saas/app/dashboard/video-page.tsx
+// Real captions Studio. Uploads the file to POST /api/video, shows an honest
+// indeterminate loader while the (synchronous) route transcribes + generates
+// captions, then renders real downloadable SRT/VTT/ASS from signed URLs.
+// No fake progress bar. No fake clips tab.
+
 'use client'
+
 import { useState, useRef } from 'react'
+import { useI18n } from '@/components/i18n/I18nProvider'
+import { t } from '@/lib/i18n/t'
 
-const BLUE = '#3b82f6'
-const GOLD = '#ffc300'
+// ── Types mirroring the /api/video response ────────────────────────────────
+type CaptionResult = {
+  lang: string
+  langName: string
+  srtUrl?: string
+  vttUrl?: string
+  assUrl?: string
+  srtKey?: string
+  vttKey?: string
+  assKey?: string
+}
 
-const CAPTION_FORMATS = [
-  { id: 'srt', name: 'SRT', desc: 'Standard subtitle format. Works on most platforms.' },
-  { id: 'vtt', name: 'VTT', desc: 'Web Video Text Tracks. Best for web players.' },
-  { id: 'ass', name: 'ASS', desc: 'Advanced styling. Best for burned-in captions.' },
-  { id: 'burned', name: 'Burned in', desc: 'Captions embedded directly into the video file.' },
-]
+type Chapter = {
+  headline?: string
+  gist?: string
+  summary?: string
+  start?: number
+  end?: number
+}
 
-const CLIP_FORMATS = [
-  { id: 'tiktok',   icon: '🎵', name: 'TikTok',          size: '9:16 · 60s max' },
-  { id: 'reels',    icon: '📱', name: 'Instagram Reels',  size: '9:16 · 90s max' },
-  { id: 'shorts',   icon: '▶️', name: 'YouTube Shorts',   size: '9:16 · 60s max' },
-  { id: 'twitter',  icon: '🐦', name: 'X / Twitter',      size: '16:9 · 2:20 max' },
-  { id: 'linkedin', icon: '💼', name: 'LinkedIn',         size: '1:1 · 10min max' },
-]
+type VideoResult = {
+  jobId: string
+  status: string
+  fileName: string
+  duration: number
+  captions: CaptionResult[]
+  chapters?: Chapter[] | null
+  transcriptExcerpt?: string
+  langs: string[]
+  formats: string[]
+}
 
+// ── Static options (must match SUPPORTED_LANGS / formats in the route) ──────
 const LANGS = [
-  { code: 'en', flag: '🇺🇸', name: 'English' },
-  { code: 'pt', flag: '🇧🇷', name: 'Português' },
-  { code: 'es', flag: '🇪🇸', name: 'Español' },
-  { code: 'pl', flag: '🇵🇱', name: 'Polski' },
-  { code: 'ru', flag: '🇷🇺', name: 'Русский' },
+  { code: 'en', label: 'English' },
+  { code: 'pt', label: 'Português' },
+  { code: 'es', label: 'Español' },
+  { code: 'pl', label: 'Polski' },
+  { code: 'ru', label: 'Русский' },
 ]
+
+const FORMATS = [
+  { code: 'srt', label: 'SRT', hint: 'Most editors / YouTube' },
+  { code: 'vtt', label: 'WebVTT', hint: 'Web players / HTML5' },
+  { code: 'ass', label: 'ASS', hint: 'Styled / Aegisub' },
+]
+
+const ACCEPT =
+  '.mp4,.mov,.avi,.mkv,.webm,.mp3,.wav,.m4a,video/*,audio/*'
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function fmtBytes(bytes: number): string {
+  if (!bytes) return '0 B'
+  const u = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(1024))
+  return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${u[i]}`
+}
+
+function fmtDuration(secs: number): string {
+  if (!secs || secs < 0) return '—'
+  const h = Math.floor(secs / 3600)
+  const m = Math.floor((secs % 3600) / 60)
+  const s = Math.floor(secs % 60)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`
+}
+
+function baseName(name: string): string {
+  return name.replace(/\.[^./\\]+$/, '') || 'captions'
+}
 
 export default function VideoPage() {
-  const [tab, setTab] = useState<'captions' | 'clips' | 'jobs'>('captions')
-  const [uploadedFile, setUploadedFile] = useState('')
-  const [selectedLangs, setSelectedLangs] = useState<string[]>(['en'])
-  const [selectedFormats, setSelectedFormats] = useState<string[]>(['srt'])
-  const [selectedClipFormats, setSelectedClipFormats] = useState<string[]>(['tiktok'])
-  const [processing, setProcessing] = useState(false)
-  const [jobs, setJobs] = useState<any[]>([])
-  const fileRef = useRef<HTMLInputElement>(null)
+  // useI18n shape isn't documented in the handoff — this accepts either
+  // { dict } or the dict object directly, and t() falls back to English,
+  // so missing keys degrade gracefully instead of breaking the build.
+  const i18n: any = useI18n()
+  const dict = i18n?.dict ?? i18n ?? {}
+  const tr = (key: string, fallback: string) => t(dict, key, fallback)
 
+  const [file, setFile] = useState<File | null>(null)
+  const [langs, setLangs] = useState<string[]>(['en'])
+  const [formats, setFormats] = useState<string[]>(['srt'])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<VideoResult | null>(null)
+  const [dragOver, setDragOver] = useState(false)
+  const [downloading, setDownloading] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // ── File handling ─────────────────────────────────────────────────────────
+  function pickFiles(list: FileList | null) {
+    if (!list || !list.length) return
+    setError(null)
+    setResult(null)
+    setFile(list[0])
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setDragOver(false)
+    pickFiles(e.dataTransfer?.files ?? null)
+  }
+
+  // ── Option toggles (always keep at least one selected) ─────────────────────
   function toggleLang(code: string) {
-    setSelectedLangs(prev =>
-      prev.includes(code) && prev.length > 1 ? prev.filter(l => l !== code) : prev.includes(code) ? prev : [...prev, code]
+    setLangs((prev) =>
+      prev.includes(code)
+        ? prev.length > 1
+          ? prev.filter((l) => l !== code)
+          : prev
+        : [...prev, code],
     )
   }
 
-  function toggleFormat(id: string) {
-    setSelectedFormats(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id])
+  function toggleFormat(code: string) {
+    setFormats((prev) =>
+      prev.includes(code)
+        ? prev.length > 1
+          ? prev.filter((f) => f !== code)
+          : prev
+        : [...prev, code],
+    )
   }
 
-  function toggleClipFormat(id: string) {
-    setSelectedClipFormats(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id])
-  }
+  // ── Submit → real /api/video call ──────────────────────────────────────────
+  async function generate() {
+    if (!file || busy) return
+    setBusy(true)
+    setError(null)
+    setResult(null)
 
-  async function process() {
-    if (!uploadedFile) return
-    setProcessing(true)
-    const newJob = {
-      id: Date.now().toString(),
-      file: uploadedFile,
-      type: tab,
-      langs: selectedLangs,
-      formats: tab === 'captions' ? selectedFormats : selectedClipFormats,
-      status: 'processing',
-      progress: 0,
-      created: new Date().toISOString().split('T')[0],
-    }
-    setJobs(prev => [newJob, ...prev])
-    setTab('jobs')
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('langs', langs.join(','))
+      fd.append('formats', formats.join(','))
 
-    let progress = 0
-    const interval = setInterval(() => {
-      progress += Math.random() * 15
-      if (progress >= 100) {
-        progress = 100
-        clearInterval(interval)
-        setJobs(prev => prev.map(j => j.id === newJob.id ? { ...j, status: 'done', progress: 100 } : j))
-        setProcessing(false)
+      const res = await fetch('/api/video', { method: 'POST', body: fd })
+
+      // Route returns JSON; a Vercel timeout/proxy error may not — handle both.
+      let data: any
+      try {
+        data = await res.json()
+      } catch {
+        data = {
+          error:
+            res.status === 504
+              ? tr(
+                  'video.err.timeout',
+                  'The server timed out. This usually means the file is long enough to exceed the processing limit — try a shorter clip.',
+                )
+              : tr('video.err.bad', `Unexpected server response (${res.status}).`),
+        }
       }
-      setJobs(prev => prev.map(j => j.id === newJob.id ? { ...j, progress: Math.min(progress, 99) } : j))
-    }, 600)
+
+      if (!res.ok) {
+        setError(data?.error || tr('video.err.failed', `Request failed (${res.status}).`))
+        return
+      }
+
+      setResult(data as VideoResult)
+    } catch {
+      setError(
+        tr(
+          'video.err.network',
+          'Network error — the upload was interrupted. Check your connection and try again.',
+        ),
+      )
+    } finally {
+      setBusy(false)
+    }
   }
 
-  const FileUpload = () => (
-    <div>
-      <input ref={fileRef} type="file" accept=".mp4,.mov,.avi,.mkv,.webm" style={{ display: 'none' }}
-        onChange={e => setUploadedFile(e.target.files?.[0]?.name || '')} />
-      <div onClick={() => fileRef.current?.click()}
-        style={{ border: `2px dashed ${uploadedFile ? 'rgba(74,222,128,0.4)' : 'rgba(255,255,255,0.15)'}`, borderRadius: 12, padding: '28px 24px', textAlign: 'center', cursor: 'pointer', marginBottom: 20, transition: 'border-color 0.15s' }}
-        onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)')}
-        onMouseLeave={e => (e.currentTarget.style.borderColor = uploadedFile ? 'rgba(74,222,128,0.4)' : 'rgba(255,255,255,0.15)')}>
-        <div style={{ fontSize: 32, marginBottom: 10 }}>{uploadedFile ? '✅' : '🎬'}</div>
-        {uploadedFile ? (
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#4ade80' }}>{uploadedFile}</div>
-        ) : (
-          <>
-            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Drop your video here or click to browse</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>Supports MP4, MOV, AVI, MKV, WebM</div>
-          </>
-        )}
-      </div>
-    </div>
-  )
+  // ── Download a caption file (blob for a clean filename; fallback to open) ───
+  async function download(url: string, fname: string, tag: string) {
+    setDownloading(tag)
+    try {
+      const r = await fetch(url)
+      if (!r.ok) throw new Error('fetch failed')
+      const blob = await r.blob()
+      const href = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = href
+      a.download = fname
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(href)
+    } catch {
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } finally {
+      setDownloading(null)
+    }
+  }
 
+  function reset() {
+    setFile(null)
+    setResult(null)
+    setError(null)
+    if (inputRef.current) inputRef.current.value = ''
+  }
+
+  const canGenerate = !!file && !busy && langs.length > 0 && formats.length > 0
+
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div style={{ color: '#fff', fontFamily: 'system-ui' }}>
+    <div style={{ maxWidth: 920, margin: '0 auto', padding: '32px 20px 80px' }}>
+      {/* Local keyframes for the honest indeterminate bar */}
+      <style>{`
+        @keyframes sbSweep {
+          0%   { transform: translateX(-100%); }
+          100% { transform: translateX(220%); }
+        }
+        .sb-chip {
+          display: inline-flex; align-items: center; gap: 8px;
+          padding: 8px 14px; border-radius: 999px; cursor: pointer;
+          border: 1px solid rgba(255,255,255,0.14);
+          background: rgba(255,255,255,0.03);
+          color: #c9cdd6; font-size: 14px; user-select: none;
+          transition: all .15s ease;
+        }
+        .sb-chip:hover { border-color: rgba(255,255,255,0.28); }
+        .sb-chip[data-on="true"] {
+          border-color: var(--gold, #ffc300);
+          background: rgba(255,195,0,0.12);
+          color: #fff;
+        }
+        .sb-fmt {
+          display: flex; flex-direction: column; gap: 2px;
+          padding: 12px 16px; border-radius: 12px; cursor: pointer;
+          border: 1px solid rgba(255,255,255,0.14);
+          background: rgba(255,255,255,0.03);
+          transition: all .15s ease; min-width: 150px;
+        }
+        .sb-fmt:hover { border-color: rgba(255,255,255,0.28); }
+        .sb-fmt[data-on="true"] {
+          border-color: var(--cyan, #1af0ff);
+          background: rgba(26,240,255,0.10);
+        }
+      `}</style>
 
-      <div style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', paddingBottom: 20, marginBottom: 28 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 900, margin: 0, letterSpacing: '-0.02em' }}>🎬 Video editor</h1>
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>
-          Generate multilingual captions and social media clips from your videos.
-        </p>
-      </div>
+      <p className="sb-eyebrow">{tr('video.eyebrow', 'Video Studio')}</p>
+      <h2 className="sb-h2">{tr('video.title', 'Auto Captions')}</h2>
+      <p className="sb-body" style={{ maxWidth: 620, marginTop: 8 }}>
+        {tr(
+          'video.subtitle',
+          'Upload a video or audio file and get accurate, downloadable captions (SRT, WebVTT, ASS) — translated into the languages you choose.',
+        )}
+      </p>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 24, background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: 4, width: 'fit-content' }}>
-        {[
-          { id: 'captions', label: '💬 Captions' },
-          { id: 'clips',    label: '✂️ Social clips' },
-          { id: 'jobs',     label: `📁 My files ${jobs.length > 0 ? `(${jobs.length})` : ''}` },
-        ].map(t => (
-          <button key={t.id} onClick={() => setTab(t.id as any)}
-            style={{ padding: '8px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer', background: tab === t.id ? BLUE : 'transparent', color: tab === t.id ? '#fff' : 'rgba(255,255,255,0.45)' }}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Captions */}
-      {tab === 'captions' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 20 }}>
-          <div>
-            <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Generate captions</h2>
-            <FileUpload />
-
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 10 }}>Languages</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {LANGS.map(lang => (
-                  <button key={lang.code} onClick={() => toggleLang(lang.code)}
-                    style={{ padding: '7px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', background: selectedLangs.includes(lang.code) ? BLUE : 'rgba(255,255,255,0.06)', color: selectedLangs.includes(lang.code) ? '#fff' : 'rgba(255,255,255,0.5)', transition: 'all 0.15s' }}>
-                    {lang.flag} {lang.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button onClick={process} disabled={!uploadedFile || processing}
-              style={{ background: uploadedFile && !processing ? GOLD : 'rgba(255,255,255,0.05)', color: uploadedFile && !processing ? '#000' : 'rgba(255,255,255,0.4)', fontWeight: 800, fontSize: 14, padding: '13px 32px', borderRadius: 12, border: 'none', cursor: uploadedFile && !processing ? 'pointer' : 'default', transition: 'all 0.15s' }}>
-              {processing ? 'Processing...' : '💬 Generate captions'}
-            </button>
-          </div>
-
-          <div>
-            <label style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 10 }}>Caption format</label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {CAPTION_FORMATS.map(fmt => (
-                <div key={fmt.id} onClick={() => toggleFormat(fmt.id)}
-                  style={{ padding: '12px 14px', borderRadius: 10, cursor: 'pointer', background: selectedFormats.includes(fmt.id) ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.02)', border: `1px solid ${selectedFormats.includes(fmt.id) ? BLUE : 'rgba(255,255,255,0.07)'}`, transition: 'all 0.15s' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700 }}>{fmt.name}</span>
-                    {selectedFormats.includes(fmt.id) && <span style={{ color: BLUE, fontSize: 14 }}>✓</span>}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{fmt.desc}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Clips */}
-      {tab === 'clips' && (
-        <div>
-          <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Generate social clips</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      {/* ── Upload zone ─────────────────────────────────────────────────── */}
+      <div className="sb-card" style={{ marginTop: 24, padding: 0, overflow: 'hidden' }}>
+        <div
+          onDragOver={(e) => {
+            e.preventDefault()
+            setDragOver(true)
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={onDrop}
+          onClick={() => inputRef.current?.click()}
+          style={{
+            cursor: 'pointer',
+            padding: '36px 24px',
+            textAlign: 'center',
+            border: `1.5px dashed ${dragOver ? 'var(--gold, #ffc300)' : 'rgba(255,255,255,0.18)'}`,
+            background: dragOver ? 'rgba(255,195,0,0.06)' : 'transparent',
+            transition: 'all .15s ease',
+            margin: 16,
+            borderRadius: 14,
+          }}
+        >
+          <input
+            ref={inputRef}
+            type="file"
+            accept={ACCEPT}
+            style={{ display: 'none' }}
+            onChange={(e) => pickFiles(e.target.files)}
+          />
+          {file ? (
             <div>
-              <FileUpload />
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 10 }}>Languages for captions</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {LANGS.map(lang => (
-                    <button key={lang.code} onClick={() => toggleLang(lang.code)}
-                      style={{ padding: '7px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', background: selectedLangs.includes(lang.code) ? BLUE : 'rgba(255,255,255,0.06)', color: selectedLangs.includes(lang.code) ? '#fff' : 'rgba(255,255,255,0.5)', transition: 'all 0.15s' }}>
-                      {lang.flag} {lang.name}
-                    </button>
-                  ))}
-                </div>
+              <div className="sb-h3" style={{ marginBottom: 4 }}>
+                {file.name}
               </div>
-              <button onClick={process} disabled={!uploadedFile || processing}
-                style={{ background: uploadedFile && !processing ? GOLD : 'rgba(255,255,255,0.05)', color: uploadedFile && !processing ? '#000' : 'rgba(255,255,255,0.4)', fontWeight: 800, fontSize: 14, padding: '13px 32px', borderRadius: 12, border: 'none', cursor: uploadedFile && !processing ? 'pointer' : 'default' }}>
-                {processing ? 'Processing...' : '✂️ Generate clips'}
+              <div className="sb-caption">{fmtBytes(file.size)}</div>
+              <button
+                className="sb-button-secondary"
+                style={{ marginTop: 14 }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  reset()
+                }}
+              >
+                {tr('video.change', 'Choose a different file')}
               </button>
             </div>
+          ) : (
             <div>
-              <label style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 10 }}>Export for</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {CLIP_FORMATS.map(fmt => (
-                  <div key={fmt.id} onClick={() => toggleClipFormat(fmt.id)}
-                    style={{ padding: '12px 14px', borderRadius: 10, cursor: 'pointer', background: selectedClipFormats.includes(fmt.id) ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.02)', border: `1px solid ${selectedClipFormats.includes(fmt.id) ? BLUE : 'rgba(255,255,255,0.07)'}`, display: 'flex', alignItems: 'center', gap: 12, transition: 'all 0.15s' }}>
-                    <span style={{ fontSize: 20 }}>{fmt.icon}</span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>{fmt.name}</div>
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{fmt.size}</div>
+              <div className="sb-h3" style={{ marginBottom: 6 }}>
+                {tr('video.drop', 'Drop a file here or click to browse')}
+              </div>
+              <div className="sb-caption">
+                {tr('video.types', 'MP4, MOV, MKV, WEBM, MP3, WAV, M4A')}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Languages ───────────────────────────────────────────────────── */}
+      <div style={{ marginTop: 28 }}>
+        <h3 className="sb-h3" style={{ marginBottom: 4 }}>
+          {tr('video.langs.title', 'Caption languages')}
+        </h3>
+        <p className="sb-caption" style={{ marginBottom: 12 }}>
+          {tr(
+            'video.langs.hint',
+            'English is transcribed directly; other languages are translated from the transcript.',
+          )}
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          {LANGS.map((l) => (
+            <div
+              key={l.code}
+              className="sb-chip"
+              data-on={langs.includes(l.code)}
+              onClick={() => toggleLang(l.code)}
+            >
+              {l.label}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Formats ─────────────────────────────────────────────────────── */}
+      <div style={{ marginTop: 28 }}>
+        <h3 className="sb-h3" style={{ marginBottom: 12 }}>
+          {tr('video.formats.title', 'Output formats')}
+        </h3>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+          {FORMATS.map((f) => (
+            <div
+              key={f.code}
+              className="sb-fmt"
+              data-on={formats.includes(f.code)}
+              onClick={() => toggleFormat(f.code)}
+            >
+              <span style={{ color: '#fff', fontWeight: 600 }}>{f.label}</span>
+              <span className="sb-caption">{f.hint}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Generate ────────────────────────────────────────────────────── */}
+      <div style={{ marginTop: 32 }}>
+        <button
+          className="sb-button-primary"
+          disabled={!canGenerate}
+          onClick={generate}
+          style={{ opacity: canGenerate ? 1 : 0.5, cursor: canGenerate ? 'pointer' : 'not-allowed' }}
+        >
+          {busy
+            ? tr('video.working', 'Generating captions…')
+            : tr('video.generate', 'Generate captions')}
+        </button>
+        {!file && (
+          <p className="sb-caption" style={{ marginTop: 10 }}>
+            {tr('video.needfile', 'Add a file above to get started.')}
+          </p>
+        )}
+      </div>
+
+      {/* ── Honest indeterminate progress (no fake %) ───────────────────── */}
+      {busy && (
+        <div className="sb-card" style={{ marginTop: 24, padding: 20 }}>
+          <div
+            style={{
+              position: 'relative',
+              height: 6,
+              borderRadius: 999,
+              overflow: 'hidden',
+              background: 'rgba(255,255,255,0.08)',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                height: '100%',
+                width: '40%',
+                borderRadius: 999,
+                background:
+                  'linear-gradient(90deg, transparent, var(--gold, #ffc300), transparent)',
+                animation: 'sbSweep 1.3s ease-in-out infinite',
+              }}
+            />
+          </div>
+          <p className="sb-body" style={{ marginTop: 14 }}>
+            {tr(
+              'video.progress',
+              'Uploading, transcribing and generating captions. Longer files can take several minutes — keep this tab open.',
+            )}
+          </p>
+        </div>
+      )}
+
+      {/* ── Error (clearly visible on dark bg) ──────────────────────────── */}
+      {error && !busy && (
+        <div
+          style={{
+            marginTop: 24,
+            padding: '14px 18px',
+            borderRadius: 12,
+            border: '1px solid rgba(255,90,90,0.45)',
+            background: 'rgba(255,90,90,0.12)',
+            color: '#ffb4b4',
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {/* ── Results ─────────────────────────────────────────────────────── */}
+      {result && !busy && (
+        <div style={{ marginTop: 32 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              justifyContent: 'space-between',
+              gap: 12,
+              flexWrap: 'wrap',
+              marginBottom: 16,
+            }}
+          >
+            <h3 className="sb-h3">{tr('video.results.title', 'Your captions')}</h3>
+            <span className="sb-caption">
+              {tr('video.results.duration', 'Duration')}: {fmtDuration(result.duration)}
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', gap: 14 }}>
+            {result.captions?.map((c) => {
+              const items = [
+                { fmt: 'srt', url: c.srtUrl, ext: 'srt' },
+                { fmt: 'vtt', url: c.vttUrl, ext: 'vtt' },
+                { fmt: 'ass', url: c.assUrl, ext: 'ass' },
+              ].filter((i) => !!i.url)
+
+              return (
+                <div className="sb-card" key={c.lang} style={{ padding: 18 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <span style={{ color: '#fff', fontWeight: 600 }}>{c.langName || c.lang}</span>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      {items.length === 0 && (
+                        <span className="sb-caption" style={{ color: '#ffb4b4' }}>
+                          {tr('video.results.nofile', 'No file generated for this language.')}
+                        </span>
+                      )}
+                      {items.map((i) => {
+                        const tag = `${c.lang}.${i.ext}`
+                        const fname = `${baseName(result.fileName)}-${c.lang}.${i.ext}`
+                        return (
+                          <button
+                            key={i.ext}
+                            className="sb-button-secondary"
+                            disabled={downloading === tag}
+                            onClick={() => download(i.url as string, fname, tag)}
+                          >
+                            {downloading === tag
+                              ? tr('video.results.downloading', 'Downloading…')
+                              : `${tr('video.results.download', 'Download')} .${i.ext}`}
+                          </button>
+                        )
+                      })}
                     </div>
-                    {selectedClipFormats.includes(fmt.id) && <span style={{ color: BLUE }}>✓</span>}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Chapters, if AssemblyAI returned any */}
+          {Array.isArray(result.chapters) && result.chapters.length > 0 && (
+            <div className="sb-card" style={{ marginTop: 16, padding: 18 }}>
+              <h3 className="sb-h3" style={{ marginBottom: 10 }}>
+                {tr('video.chapters', 'Chapters')}
+              </h3>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {result.chapters.map((ch, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: 12 }}>
+                    <span className="sb-caption" style={{ minWidth: 56, color: 'var(--cyan, #1af0ff)' }}>
+                      {fmtDuration((ch.start ?? 0) / 1000)}
+                    </span>
+                    <span className="sb-body">{ch.headline || ch.gist || '—'}</span>
                   </div>
                 ))}
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Jobs */}
-      {tab === 'jobs' && (
-        <div>
-          <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>My video files</h2>
-          {jobs.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '48px 0', color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 16 }}>
-              <div style={{ fontSize: 36, marginBottom: 12 }}>🎬</div>
-              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>No files yet</div>
-              <div style={{ fontSize: 13 }}>Generate captions or clips to see them here</div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {jobs.map(job => (
-                <div key={job.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '16px 20px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: job.status === 'processing' ? 10 : 0 }}>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{job.file}</div>
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
-                        {job.type === 'captions' ? 'Captions' : 'Social clips'} · {job.langs.length} language{job.langs.length > 1 ? 's' : ''} · {job.created}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: job.status === 'done' ? 'rgba(74,222,128,0.1)' : 'rgba(59,130,246,0.1)', color: job.status === 'done' ? '#4ade80' : BLUE }}>
-                        {job.status === 'done' ? '✓ Ready' : `Processing ${Math.round(job.progress)}%`}
-                      </span>
-                      {job.status === 'done' && (
-                        <button style={{ padding: '6px 14px', borderRadius: 8, background: BLUE, color: '#fff', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
-                          Download
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  {job.status === 'processing' && (
-                    <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 999 }}>
-                      <div style={{ height: '100%', background: BLUE, borderRadius: 999, width: `${job.progress}%`, transition: 'width 0.5s' }} />
-                    </div>
-                  )}
-                </div>
-              ))}
+          {/* Transcript preview */}
+          {result.transcriptExcerpt && (
+            <div className="sb-card" style={{ marginTop: 16, padding: 18 }}>
+              <h3 className="sb-h3" style={{ marginBottom: 8 }}>
+                {tr('video.transcript', 'Transcript preview')}
+              </h3>
+              <p className="sb-body" style={{ opacity: 0.85 }}>
+                {result.transcriptExcerpt}
+                {result.transcriptExcerpt.length >= 500 ? '…' : ''}
+              </p>
             </div>
           )}
+
+          <div style={{ marginTop: 24 }}>
+            <button className="sb-button-secondary" onClick={reset}>
+              {tr('video.again', 'Caption another file')}
+            </button>
+          </div>
         </div>
       )}
     </div>

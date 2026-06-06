@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminSupabase, getCurrentUser } from '@/utils/supabase/server'
+import { getAccess } from '@/lib/auth/access'
 
 export type AdminContext = {
   user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>
@@ -10,28 +11,14 @@ export async function requireAdmin(): Promise<AdminContext | NextResponse> {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const adminEmails = (process.env.ADMIN_EMAILS || process.env.NEXT_PUBLIC_ADMIN_EMAILS || '')
-    .split(',')
-    .map(email => email.trim().toLowerCase())
-    .filter(Boolean)
-
-  const emailAllowed = !!user.email && adminEmails.includes(user.email.toLowerCase())
-  const admin = getAdminSupabase()
-
-  let roleAllowed = false
-  const { data: memberships } = await admin
-    .from('team_members')
-    .select('role,status,owner_id,member_id')
-    .or(`member_id.eq.${user.id},owner_id.eq.${user.id}`)
-
-  if (memberships?.length) {
-    roleAllowed = memberships.some((m: any) =>
-      (m.status === 'active' || m.owner_id === user.id) &&
-      (m.role === 'owner' || m.role === 'admin' || m.owner_id === user.id)
-    )
+  // Single source of truth for the role decision (team_members + owner/admin env backstops).
+  const access = await getAccess()
+  if (!access.isAdmin) {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
-  if (!emailAllowed && !roleAllowed) return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+  // Keep returning the service-role client the outreach routes depend on.
+  const admin = getAdminSupabase()
   return { user, admin }
 }
 

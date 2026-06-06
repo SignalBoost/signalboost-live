@@ -1,4 +1,8 @@
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
+import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
+import { refundVideoCredit, spendVideoCredit } from '@/lib/credits'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -24,7 +28,6 @@ type JsonSafeVideoResponse<T> = {
 
 const supportedLocales: SupportedVideoLocale[] = ['en', 'es', 'pt', 'pl', 'ru']
 const maxDirectUploadMb = 25
-const freeDemoMaxSeconds = 30
 
 function json<T>(body: JsonSafeVideoResponse<T>, status = 200) {
   return NextResponse.json(body, { status })
@@ -36,6 +39,38 @@ function locale(value: FormDataEntryValue | null): SupportedVideoLocale {
   return supportedLocales.includes(requested as SupportedVideoLocale)
     ? requested as SupportedVideoLocale
     : 'en'
+}
+
+async function getUser() {
+  const cookieStore = await cookies()
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookieOptions: saasSupabaseCookieOptions,
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options)
+            })
+          } catch {
+            // Safe to ignore in server contexts where cookies cannot be set.
+          }
+        },
+      },
+    },
+  )
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  return user
 }
 
 function cueFromSegment(segment: unknown, index: number): CaptionCue | null {
@@ -88,7 +123,6 @@ export async function POST(request: Request) {
   const form = await request.formData()
   const lang = locale(form.get('locale'))
   const video = form.get('video')
-  const tier = String(form.get('tier') || 'free').toLowerCase()
   const durationSec = Number(form.get('durationSec') || 0)
 
   if (!(video instanceof File)) {
@@ -103,24 +137,12 @@ export async function POST(request: Request) {
     )
   }
 
-  if ((tier === 'free' || tier === 'demo') && durationSec > freeDemoMaxSeconds) {
-    return json(
-      {
-        ok: false,
-        data: null,
-        error: `Free/demo caption generation is limited to ${freeDemoMaxSeconds} seconds. Upgrade to caption the full video.`,
-        meta: { locale: lang, generatedAt: new Date().toISOString() },
-      },
-      402,
-    )
-  }
-
   if (video.size > maxDirectUploadMb * 1024 * 1024) {
     return json(
       {
         ok: false,
         data: null,
-        error: `This direct captioning flow supports files up to ${maxDirectUploadMb} MB. Compress the video or use the render worker audio-extraction flow for longer videos.`,
+        error: `This direct captioning flow supports files up to ${maxDirectUploadMb} MB. Use background caption processing for longer videos.`,
         meta: { locale: lang, generatedAt: new Date().toISOString() },
       },
       413,
@@ -136,6 +158,34 @@ export async function POST(request: Request) {
         meta: { locale: lang, generatedAt: new Date().toISOString() },
       },
       500,
+    )
+  }
+
+  const user = await getUser()
+
+  if (!user?.id) {
+    return json(
+      {
+        ok: false,
+        data: null,
+        error: 'You must be signed in to generate AI captions.',
+        meta: { locale: lang, generatedAt: new Date().toISOString() },
+      },
+      401,
+    )
+  }
+
+  const credit = await spendVideoCredit(user.id)
+
+  if (!credit.ok) {
+    return json(
+      {
+        ok: false,
+        data: null,
+        error: 'You do not have enough video credits to generate captions. Upgrade or wait for your monthly reset.',
+        meta: { locale: lang, generatedAt: new Date().toISOString() },
+      },
+      402,
     )
   }
 
@@ -179,11 +229,15 @@ export async function POST(request: Request) {
         cues,
         cueCount: cues.length,
         text: payload.text || '',
+        creditsRemaining: credit.remaining,
+        plan: credit.plan,
       },
       error: null,
       meta: { locale: lang, generatedAt: new Date().toISOString() },
     })
   } catch (error) {
+    await refundVideoCredit(user.id)
+
     return json(
       {
         ok: false,

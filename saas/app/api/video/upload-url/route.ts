@@ -1,178 +1,49 @@
-// saas/app/api/video/upload-url/route.ts
-// Step 1 of the upload flow: validate auth/plan/size, create the job row,
-// and return a one-time signed upload URL so the browser can upload the video
-// DIRECTLY to Supabase Storage (bypassing Vercel's ~4.5MB request body limit).
-
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { createServerClient } from '@supabase/ssr'
-import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
-import { cookies } from 'next/headers'
-import { getVideoEntitlement, resolveAccountId } from '@/lib/video/pipeline'
 
-const VIDEO_BUCKET = 'video-jobs'
+export const runtime = 'nodejs'
+export const maxDuration = 30
 
-const PLAN_VIDEO_LIMITS: Record<string, number> = {
-  trial: 5,
-  starter: 30,
-  pro: 120,
-  business: 999,
+const BUCKET = 'video-uploads'
+
+function admin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return null
+  return createClient(url, key, { auth: { persistSession: false } })
 }
 
-const SUPPORTED_LANGS = ['en', 'pt', 'es', 'pl', 'ru']
-
-function errMsg(err: unknown): string {
-  if (err instanceof Error) return err.message
-  try { return String(err) } catch { return 'unknown error' }
-}
-
-function extFromName(name: string): string {
-  const m = name.match(/\.([a-z0-9]+)$/i)
-  return m ? m[1].toLowerCase() : 'mp4'
-}
-
-export async function POST(req: NextRequest) {
-  // ── Auth ──────────────────────────────────────────────────────────────────
-  const cookieStore = await cookies()
-  const supabaseUser = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookieOptions: saasSupabaseCookieOptions,
-      cookies: {
-        get: (name) => cookieStore.get(name)?.value,
-        set: () => {},
-        remove: () => {},
-      },
-    },
-  )
-
-  const { data: { user }, error: authError } = await supabaseUser.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+async function ensureBucket(supabase: ReturnType<typeof createClient>) {
+  const { data } = await supabase.storage.getBucket(BUCKET)
+  if (!data) {
+    await supabase.storage.createBucket(BUCKET, { public: false })
   }
+}
 
-  // Fail fast on missing config — before the user uploads anything.
-  const missingEnv: string[] = []
-  if (!process.env.ASSEMBLYAI_API_KEY) missingEnv.push('ASSEMBLYAI_API_KEY')
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missingEnv.push('SUPABASE_SERVICE_ROLE_KEY')
-  if (missingEnv.length) {
+export async function POST(req: Request) {   
+  const supabase = admin()
+  if (!supabase) {
     return NextResponse.json(
-      { error: `Server config error: missing env var(s): ${missingEnv.join(', ')}` },
+      { ok: false, error: 'Storage is not configured. Add SUPABASE_SERVICE_ROLE_KEY in Vercel.' },
       { status: 500 },
     )
   }
 
-  let body: any
+  let body: { filename?: string } = {}
+  try { body = await req.json() } catch {}
+  const rawName = typeof body.filename === 'string' && body.filename ? body.filename : 'video.mp4'
+  const safeName = rawName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80) || 'video.mp4'
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`
+
   try {
-    body = await req.json()
-  } catch (err) {
-    return NextResponse.json({ error: `Invalid request body: ${errMsg(err)}` }, { status: 400 })
+    await ensureBucket(supabase)
+    const { data, error } = await supabase.storage.from(BUCKET).createSignedUploadUrl(path)
+    if (error || !data) {
+      return NextResponse.json({ ok: false, error: error?.message || 'Could not create upload URL.' }, { status: 500 })
+    }
+    return NextResponse.json({ ok: true, data: { bucket: BUCKET, path: data.path, token: data.token } })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Upload URL failed.'
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 })
   }
-
-  const fileName = String(body?.fileName ?? '').trim()
-  const fileSize = Number(body?.fileSize ?? 0)
-  const langsIn: unknown = body?.langs
-  const formatsIn: unknown = body?.formats
-
-  if (!fileName || !fileSize) {
-    return NextResponse.json({ error: 'fileName and fileSize are required' }, { status: 400 })
-  }
-
-  const ext = extFromName(fileName)
-  if (!/^(mp4|mov|avi|mkv|webm|mp3|wav|m4a)$/.test(ext)) {
-    return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 })
-  }
-
-  const langs = (Array.isArray(langsIn) ? langsIn : [])
-    .map((l) => String(l).trim())
-    .filter((l) => SUPPORTED_LANGS.includes(l))
-  if (!langs.length) langs.push('en')
-
-  const formats = (Array.isArray(formatsIn) ? formatsIn : [])
-    .map((f) => String(f).trim())
-    .filter((f) => ['srt', 'vtt', 'ass'].includes(f))
-  if (!formats.length) formats.push('srt')
-
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  )
-
-  // ── Plan / quota check (done here, before upload) ──────────────────────────
-  const plan = await getUserPlan(supabaseAdmin, user.id)
-  const fileSizeMB = fileSize / (1024 * 1024)
-  const entitlement = await getVideoEntitlement(supabaseAdmin, user.id, 0, fileSizeMB)
-  const maxMinutes = PLAN_VIDEO_LIMITS[plan] ?? 5
-  if (fileSizeMB > maxMinutes * 100) {
-    return NextResponse.json(
-      { error: `File too large for your ${plan} plan. Max ~${maxMinutes} minutes.`, entitlement },
-      { status: 413 },
-    )
-  }
-
-  // ── Create job + signed upload URL ─────────────────────────────────────────
-  const jobId = crypto.randomUUID()
-  const path = `${user.id}/${jobId}/source.${ext}`
-  const accountId = await resolveAccountId(supabaseAdmin, user.id)
-
-  const { error: insertError } = await supabaseAdmin.from('video_jobs').insert({
-    id: jobId,
-    account_id: accountId,
-    user_id: user.id,
-    source_video: path,
-    file_name: fileName,
-    file_size: fileSize,
-    langs,
-    formats,
-    status: 'queued',
-    job_type: 'transcode',
-    plan,
-    updated_at: new Date().toISOString(),
-  })
-  if (insertError) {
-    return NextResponse.json(
-      { error: `Database error creating job (video_jobs): ${insertError.message}` },
-      { status: 500 },
-    )
-  }
-
-  const { data: signed, error: signError } = await supabaseAdmin.storage
-    .from(VIDEO_BUCKET)
-    .createSignedUploadUrl(path)
-
-  if (signError || !signed) {
-    return NextResponse.json(
-      {
-        error: `Could not create upload URL (check the '${VIDEO_BUCKET}' bucket exists): ${
-          signError?.message ?? 'unknown'
-        }`,
-      },
-      { status: 500 },
-    )
-  }
-
-  return NextResponse.json({
-    jobId,
-    path: signed.path,
-    token: signed.token,
-    bucket: VIDEO_BUCKET,
-    langs,
-    formats,
-    entitlement,
-  })
-}
-
-async function getUserPlan(supabase: any, userId: string): Promise<string> {
-  const { data } = await supabase
-    .from('subscriptions')
-    .select('plan, status')
-    .eq('user_id', userId)
-    .eq('status', 'active')
-    .maybeSingle()
-
-  if (!data?.plan) return 'trial'
-  const plan = String(data.plan).toLowerCase()
-  return ['trial', 'starter', 'pro', 'business'].includes(plan) ? plan : 'trial'
 }

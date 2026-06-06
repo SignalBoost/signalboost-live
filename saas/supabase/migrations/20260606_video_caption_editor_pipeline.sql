@@ -42,7 +42,7 @@ alter table public.video_jobs alter column status set default 'queued';
 alter table public.video_jobs drop constraint if exists video_jobs_status_check;
 alter table public.video_jobs add constraint video_jobs_status_check check (status in ('queued','processing','completed','failed'));
 alter table public.video_jobs drop constraint if exists video_jobs_job_type_check;
-alter table public.video_jobs add constraint video_jobs_job_type_check check (job_type in ('transcode','caption_burn','export'));
+alter table public.video_jobs add constraint video_jobs_job_type_check check (job_type in ('transcode','export'));
 
 create table if not exists public.video_storage (
   id uuid primary key default gen_random_uuid(),

@@ -83,6 +83,7 @@ const WORKSPACE: Item[] = [
 ]
 
 const ADMIN: Item[] = [
+  { icon: '🌌', label: 'Overview (live data)', href: '/admin/overview' },
   { icon: '🛡️', label: 'Admin Home', href: '/admin' },
   { icon: '🖥️', label: 'System', href: '/admin/system' },
   { icon: '🧠', label: 'AI', href: '/admin/ai' },

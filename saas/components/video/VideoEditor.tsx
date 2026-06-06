@@ -61,7 +61,13 @@ type CaptionPreset = {
   aspectRatio?: AspectRatio
 }
 
-const DIRECT_CAPTION_MAX_MB = 4
+type StorageObject = {
+  bucket: string
+  path: string
+  signedUrl: string
+}
+
+const immediateCaptionMaxMb = 24
 
 const defaultCaptionStyle: CaptionStyle = {
   fontFamily: 'Inter, Arial, sans-serif',
@@ -238,10 +244,6 @@ function getBrowserSupabase() {
   return createClient(url, key)
 }
 
-function directCaptioningAllowed(file: File) {
-  return file.size <= DIRECT_CAPTION_MAX_MB * 1024 * 1024
-}
-
 function wrapCaption(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
   const words = text.split(/\s+/).filter(Boolean)
   const lines: string[] = []
@@ -305,12 +307,12 @@ function QuotaStatusBar({ quota }: { quota: VideoQuota }) {
       </div>
 
       <p className="mt-2 text-xs text-white/55">
-        AI captions and exports should be usage-gated so video costs stay under control.
+        AI captions and exports spend video credits. Preview/editing stays free.
       </p>
 
       {quota.demoOnly ? (
         <p className="mt-2 text-sm text-amber-200">
-          Free/demo users can preview the editor. Upgrade for full exports and longer AI caption generation.
+          Free/demo users can preview the editor. Use credits for captions and exports.
         </p>
       ) : null}
     </div>
@@ -846,6 +848,7 @@ export default function VideoEditor() {
   const [durationSec, setDurationSec] = useState(0)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [sourceUrl, setSourceUrl] = useState<string | null>(null)
+  const [storageObject, setStorageObject] = useState<StorageObject | null>(null)
   const [videoFile, setVideoFile] = useState<File | null>(null)
   const [filename, setFilename] = useState('source-video.mp4')
   const [cues, setCues] = useState<CaptionCue[]>([])
@@ -882,13 +885,14 @@ export default function VideoEditor() {
 
   async function uploadVideo(file: File) {
     setUploadState({ status: 'uploading', message: `Preparing ${file.name} (${formatFileSize(file.size)})…` })
-    setCaptionState({ status: 'idle', message: 'Video selected. Generate AI captions next.' })
+    setCaptionState({ status: 'idle', message: 'Video selected. Uploading before caption generation…' })
     setVideoFile(file)
     setFilename(file.name)
     setCues([])
     setSelectedCueId(null)
     setCurrentTime(0)
     setSourceUrl(null)
+    setStorageObject(null)
     setJob(null)
 
     if (localPreviewRef.current) {
@@ -944,17 +948,27 @@ export default function VideoEditor() {
       }
 
       setSourceUrl(completePayload.data.signedUrl)
+      setStorageObject({
+        bucket: completePayload.data.bucket,
+        path: completePayload.data.path,
+        signedUrl: completePayload.data.signedUrl,
+      })
 
       setUploadState({
         status: 'ready',
         message: `${file.name} uploaded directly to storage.`,
       })
 
-      if (!directCaptioningAllowed(file)) {
+      if (file.size > immediateCaptionMaxMb * 1024 * 1024) {
         setCaptionState({
           status: 'failed',
           message:
-            `This video is ${formatFileSize(file.size)}. Direct AI captions currently support clips under ${DIRECT_CAPTION_MAX_MB} MB. Full background captioning is the next worker step.`,
+            `This video is ${formatFileSize(file.size)}. Immediate captions currently support up to ${immediateCaptionMaxMb} MB. Larger videos need background caption processing.`,
+        })
+      } else {
+        setCaptionState({
+          status: 'idle',
+          message: `Ready for AI captions. This video is ${formatFileSize(file.size)}.`,
         })
       }
     } catch (error) {
@@ -971,29 +985,31 @@ export default function VideoEditor() {
       return
     }
 
-    if (!directCaptioningAllowed(videoFile)) {
+    if (!storageObject) {
       setCaptionState({
         status: 'failed',
-        message:
-          `This video is ${formatFileSize(videoFile.size)}. Direct AI captioning currently supports clips under ${DIRECT_CAPTION_MAX_MB} MB. The production fix is background audio extraction with FFmpeg.`,
+        message: 'Wait for the video upload to finish before generating captions.',
       })
       return
     }
 
-    setCaptionState({ status: 'generating', message: 'Generating AI captions…' })
-
-    const form = new FormData()
-    form.set('video', videoFile)
-    form.set('locale', locale)
-    form.set('tier', tier)
-    form.set('durationSec', String(durationSec))
+    setCaptionState({ status: 'generating', message: 'Generating AI captions from stored video…' })
 
     try {
-      const res = await fetch('/api/video/transcribe', { method: 'POST', body: form })
+      const res = await fetch('/api/video/transcribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bucket: storageObject.bucket,
+          path: storageObject.path,
+          locale,
+          durationSec,
+        }),
+      })
 
       const payload = await readJsonResponse<{
         ok: boolean
-        data?: { cues?: CaptionCue[] }
+        data?: { cues?: CaptionCue[]; creditsRemaining?: number }
         error?: string
       }>(res)
 
@@ -1005,7 +1021,7 @@ export default function VideoEditor() {
         setCurrentTime(nextCues[0]?.start || 0)
         setCaptionState({
           status: 'ready',
-          message: `Generated ${nextCues.length} caption cues.`,
+          message: `Generated ${nextCues.length} caption cues. Refresh to update credit count.`,
         })
       } else {
         setCaptionState({
@@ -1258,7 +1274,7 @@ export default function VideoEditor() {
           <button
             type="button"
             onClick={generateCaptions}
-            disabled={!videoFile || captionState.status === 'generating' || !directCaptioningAllowed(videoFile)}
+            disabled={!videoFile || captionState.status === 'generating' || uploadState.status === 'uploading'}
             className="rounded-full bg-[#FFD700] px-6 py-3 font-bold text-black disabled:opacity-50"
           >
             {captionState.status === 'generating' ? 'Generating…' : 'Generate Captions'}
@@ -1319,7 +1335,7 @@ export default function VideoEditor() {
 
       <footer className="mt-8 rounded-2xl border border-white/10 bg-white/[.03] p-4 text-sm text-white/60">
         Sync health: canvas time {currentTime.toFixed(2)}s · duration {durationSec || 0}s · {cues.length} captions ·
-        direct upload enabled · queue-backed exports require <code>npm run worker:video</code>.
+        storage-based captions enabled · queue-backed exports require <code>npm run worker:video</code>.
       </footer>
     </main>
   )

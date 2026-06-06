@@ -44,12 +44,15 @@ export type TranscriptResult = {
 // ── Step 1: Upload file buffer to AssemblyAI CDN ─────────────────────────────
 
 export async function uploadAudio(buffer: ArrayBuffer): Promise<string> {
+  // NOTE: Do NOT set a 'transfer-encoding' header here. Node's built-in fetch
+  // (undici, used on Vercel) throws UND_ERR_INVALID_ARG "invalid transfer-encoding
+  // header" if it's set manually. Passing the buffer as the body lets undici set
+  // Content-Length automatically, which is what AssemblyAI's /upload expects.
   const res = await fetch(`${ASSEMBLYAI_BASE}/upload`, {
     method: 'POST',
     headers: {
       authorization: process.env.ASSEMBLYAI_API_KEY!,
       'content-type': 'application/octet-stream',
-      'transfer-encoding': 'chunked',
     },
     body: buffer,
   })
@@ -72,13 +75,9 @@ export async function startTranscription(audioUrl: string, languageCode = 'en'):
     body: JSON.stringify({
       audio_url: audioUrl,
       language_code: languageCode,
-      word_boost: [],
       punctuate: true,
       format_text: true,
-      speaker_labels: true,
       auto_chapters: true,
-      // Word-level timestamps — essential for caption generation
-      words_per_caption_group: 8,
     }),
   })
 

@@ -1,5 +1,5 @@
 export type SignalBoostModule = {
-  key: 'promote' | 'reviews' | 'calendar' | 'spreadsheets' | 'outreach' | 'assistant'
+  key: 'promote' | 'reviews' | 'calendar' | 'spreadsheets' | 'outreach' | 'assistant' | 'video'
   label: string
   href: string
   icon: string
@@ -60,6 +60,17 @@ export const signalBoostModules: SignalBoostModule[] = [
     cockpitRole: 'Communications console',
     signals: ['Queue health', 'Approval status', 'Channel mix', 'Response trend'],
   },
+
+  {
+    key: 'video',
+    label: 'Video Studio',
+    href: '/dashboard/video',
+    icon: '🎬',
+    description: 'Edit multilingual videos with canvas captions, timing controls, queued FFmpeg exports, and billing-aware quotas.',
+    telemetryEvent: 'saas.video_studio.viewed',
+    cockpitRole: 'Caption render bay',
+    signals: ['Caption sync', 'Render queue', 'Storage usage', 'Billing overage'],
+  },
   {
     key: 'assistant',
     label: 'Personal Assistant',
@@ -81,9 +92,10 @@ export const marketplaceSignals = [
 ]
 
 export const cockpitWireframe = [
-  'LEFT RAIL: Promote Business | Reviews | Calendar | Spreadsheets | Outreach | Personal Assistant',
+  'LEFT RAIL: Promote Business | Reviews | Calendar | Spreadsheets | Outreach | Video Studio | Personal Assistant',
   'CENTER DECK: selected module workspace with NASA-style mission cards and checklists',
   'RIGHT RAIL: Concierge AI answers across Marketplace + SaaS and writes telemetry events',
+  'VIDEO BAY: canvas caption editor, storage queue, FFmpeg worker, and download-ready renders',
   'ADMIN CONSOLE: SaaS usage stream rolls up module views, Concierge intents, and Marketplace context',
 ]
 

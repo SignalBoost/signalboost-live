@@ -7,6 +7,17 @@ import type { JsonSafeVideoResponse, SupportedVideoLocale } from '@/lib/video/ty
 function json<T>(body: JsonSafeVideoResponse<T>, status = 200) { return NextResponse.json(body, { status }) }
 function locale(value: FormDataEntryValue | null): SupportedVideoLocale { return ['en','es','pt','pl','ru'].includes(String(value)) ? String(value) as SupportedVideoLocale : 'en' }
 
+async function resolveAccountId(supabase: Awaited<ReturnType<typeof createMarketingServerSupabase>>, userId: string) {
+  const { data } = await supabase
+    .from('accounts')
+    .select('id')
+    .or(`user_id.eq.${userId},owner_id.eq.${userId}`)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  return data?.id ?? null
+}
+
 export async function POST(request: Request) {
   const form = await request.formData()
   const lang = locale(form.get('locale'))
@@ -24,15 +35,19 @@ export async function POST(request: Request) {
   if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     const supabase = await createMarketingServerSupabase()
     const { data: { user } } = await supabase.auth.getUser()
-    if (user) await supabase.from('video_storage').insert({
-      user_id: user.id,
-      filename: persisted.filename,
-      source_path: persisted.publicUrl,
-      size_mb: persisted.sizeMb,
-      duration_sec: Math.round(durationSec),
-      captions: [],
-      transcoded: false,
-    })
+    if (user) {
+      const accountId = await resolveAccountId(supabase, user.id)
+      await supabase.from('video_storage').insert({
+        user_id: user.id,
+        account_id: accountId,
+        filename: persisted.filename,
+        source_path: persisted.publicUrl,
+        size_mb: persisted.sizeMb,
+        duration_sec: Math.round(durationSec),
+        captions: [],
+        transcoded: false,
+      })
+    }
   }
 
   return json({

@@ -1,6 +1,6 @@
 export type SupportedVideoLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 export type VideoJobStatus = 'queued' | 'processing' | 'completed' | 'failed'
-export type VideoJobType = 'transcode' | 'caption_burn' | 'export'
+export type VideoJobType = 'transcode' | 'export'
 export type SubscriptionTier = 'free' | 'demo' | 'launch' | 'growth' | 'command' | 'paid'
 
 export type CaptionCue = {

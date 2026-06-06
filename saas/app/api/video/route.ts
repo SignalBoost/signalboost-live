@@ -1,7 +1,9 @@
 // saas/app/api/video/route.ts
-// POST /api/video
-// Accepts multipart/form-data: { file: File, langs: string (comma-separated), formats: string (comma-separated) }
-// Returns: { jobId, status, captions: { lang, srt, vtt, ass }[], transcript, chapters, duration }
+// Step 3 of the upload flow. Receives JSON { jobId, path, langs, formats }.
+// The video is ALREADY in Supabase Storage (uploaded directly by the browser).
+// This route creates a signed download URL and hands it to AssemblyAI, which
+// fetches the file itself — so the video never passes through this function
+// and there is no request-body size limit.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -9,7 +11,6 @@ import { createServerClient } from '@supabase/ssr'
 import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
 import { cookies } from 'next/headers'
 import {
-  uploadAudio,
   startTranscription,
   pollTranscription,
   wordsToCaption,
@@ -22,14 +23,6 @@ import {
 const VIDEO_BUCKET = 'video-jobs'
 const SIGNED_URL_TTL = 60 * 60 * 6  // 6 hours
 
-// Plan limits: max video duration in minutes
-const PLAN_VIDEO_LIMITS: Record<string, number> = {
-  trial:    5,
-  starter:  30,
-  pro:      120,
-  business: 999,
-}
-
 const SUPPORTED_LANGS = ['en', 'pt', 'es', 'pl', 'ru']
 
 const LANG_NAMES: Record<string, string> = {
@@ -40,7 +33,6 @@ const LANG_NAMES: Record<string, string> = {
   ru: 'Русский',
 }
 
-// GPT translation prompt per language
 const TRANSLATE_PROMPTS: Record<string, string> = {
   pt: 'Translate the following English text to Brazilian Portuguese. Preserve all punctuation and line breaks. Return only the translated text.',
   es: 'Translate the following English text to Spanish (LATAM). Preserve all punctuation and line breaks. Return only the translated text.',
@@ -48,9 +40,8 @@ const TRANSLATE_PROMPTS: Record<string, string> = {
   ru: 'Translate the following English text to Russian. Preserve all punctuation and line breaks. Return only the translated text.',
 }
 
-export const maxDuration = 300  // 5 min Vercel function timeout (Pro plan needed for longer)
+export const maxDuration = 300  // 5 min Vercel function timeout
 
-// Pulls a readable message out of any thrown value.
 function errMsg(err: unknown): string {
   if (err instanceof Error) return err.message
   try { return String(err) } catch { return 'unknown error' }
@@ -77,7 +68,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Early env sanity check — surfaces the real cause instead of a vague 502 later.
   const missingEnv: string[] = []
   if (!process.env.ASSEMBLYAI_API_KEY) missingEnv.push('ASSEMBLYAI_API_KEY')
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missingEnv.push('SUPABASE_SERVICE_ROLE_KEY')
@@ -94,85 +84,63 @@ export async function POST(req: NextRequest) {
     { auth: { persistSession: false } },
   )
 
-  // ── Parse multipart form ──────────────────────────────────────────────────
-  let formData: FormData
+  // ── Parse body ──────────────────────────────────────────────────────────────
+  let body: any
   try {
-    formData = await req.formData()
+    body = await req.json()
   } catch (err) {
-    return NextResponse.json({ error: `Invalid form data: ${errMsg(err)}` }, { status: 400 })
+    return NextResponse.json({ error: `Invalid request body: ${errMsg(err)}` }, { status: 400 })
   }
 
-  const file = formData.get('file') as File | null
-  const langsRaw = (formData.get('langs') as string | null) ?? 'en'
-  const formatsRaw = (formData.get('formats') as string | null) ?? 'srt'
-
-  if (!file || file.size === 0) {
-    return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+  const jobId = String(body?.jobId ?? '').trim()
+  const path = String(body?.path ?? '').trim()
+  if (!jobId || !path) {
+    return NextResponse.json({ error: 'jobId and path are required' }, { status: 400 })
   }
 
-  // Validate file type
-  const allowedTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska', 'video/webm', 'audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/mp4']
-  if (!allowedTypes.includes(file.type) && !file.name.match(/\.(mp4|mov|avi|mkv|webm|mp3|wav|m4a)$/i)) {
-    return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 })
+  // ── Verify the job belongs to this user ────────────────────────────────────
+  const { data: job, error: jobError } = await supabaseAdmin
+    .from('video_jobs')
+    .select('*')
+    .eq('id', jobId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (jobError) {
+    return NextResponse.json({ error: `Database error reading job: ${jobError.message}` }, { status: 500 })
+  }
+  if (!job) {
+    return NextResponse.json({ error: 'Job not found' }, { status: 404 })
   }
 
-  const langs = langsRaw.split(',').map(l => l.trim()).filter(l => SUPPORTED_LANGS.includes(l))
+  const langs: string[] = Array.isArray(job.langs)
+    ? job.langs.filter((l: string) => SUPPORTED_LANGS.includes(l))
+    : ['en']
   if (!langs.length) langs.push('en')
 
-  const formats = formatsRaw.split(',').map(f => f.trim()).filter(f => ['srt', 'vtt', 'ass'].includes(f))
+  const formats: string[] = Array.isArray(job.formats)
+    ? job.formats.filter((f: string) => ['srt', 'vtt', 'ass'].includes(f))
+    : ['srt']
   if (!formats.length) formats.push('srt')
 
-  // ── Plan check ────────────────────────────────────────────────────────────
-  const plan = await getUserPlan(supabaseAdmin, user.id)
-  const maxMinutes = PLAN_VIDEO_LIMITS[plan] ?? 5
+  // ── Signed download URL for AssemblyAI to fetch ────────────────────────────
+  const { data: dl, error: dlError } = await supabaseAdmin.storage
+    .from(VIDEO_BUCKET)
+    .createSignedUrl(path, SIGNED_URL_TTL)
 
-  // File size proxy for duration check (rough: 1MB ≈ 1 min for compressed video)
-  const fileSizeMB = file.size / (1024 * 1024)
-  if (fileSizeMB > maxMinutes * 100) {
+  if (dlError || !dl?.signedUrl) {
+    await supabaseAdmin.from('video_jobs').update({ status: 'error', error: dlError?.message ?? 'no signed url' }).eq('id', jobId)
     return NextResponse.json(
-      { error: `File too large for your ${plan} plan. Max ~${maxMinutes} minutes.` },
-      { status: 413 },
-    )
-  }
-
-  // ── Create job record ─────────────────────────────────────────────────────
-  const jobId = crypto.randomUUID()
-  const { error: insertError } = await supabaseAdmin.from('video_jobs').insert({
-    id: jobId,
-    user_id: user.id,
-    file_name: file.name,
-    file_size: file.size,
-    langs,
-    formats,
-    status: 'uploading',
-    plan,
-  })
-  // If the video_jobs table is missing/misshaped, say so plainly.
-  if (insertError) {
-    return NextResponse.json(
-      { error: `Database error creating job (video_jobs): ${insertError.message}` },
+      { error: `Could not read the uploaded file from storage: ${dlError?.message ?? 'unknown'}` },
       { status: 500 },
     )
   }
 
-  // ── Upload to AssemblyAI ──────────────────────────────────────────────────
-  let uploadUrl: string
-  try {
-    await supabaseAdmin.from('video_jobs').update({ status: 'uploading' }).eq('id', jobId)
-    const buffer = await file.arrayBuffer()
-    uploadUrl = await uploadAudio(buffer)
-  } catch (err) {
-    const m = errMsg(err)
-    console.error('AssemblyAI upload error:', err)
-    await supabaseAdmin.from('video_jobs').update({ status: 'error', error: m }).eq('id', jobId)
-    return NextResponse.json({ error: `Upload to AssemblyAI failed: ${m}` }, { status: 502 })
-  }
-
-  // ── Transcribe ────────────────────────────────────────────────────────────
+  // ── Transcribe (AssemblyAI fetches the signed URL directly) ────────────────
   let transcript: TranscriptResult
   try {
     await supabaseAdmin.from('video_jobs').update({ status: 'transcribing' }).eq('id', jobId)
-    const transcriptId = await startTranscription(uploadUrl, 'en')
+    const transcriptId = await startTranscription(dl.signedUrl, 'en')
     transcript = await pollTranscription(transcriptId)
 
     if (transcript.status === 'error') {
@@ -185,7 +153,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Transcription failed: ${m}` }, { status: 502 })
   }
 
-  // ── Generate captions for each language ──────────────────────────────────
+  // ── Generate captions for each language ────────────────────────────────────
   await supabaseAdmin.from('video_jobs').update({ status: 'generating' }).eq('id', jobId)
 
   const captionResults: Array<{
@@ -199,21 +167,17 @@ export async function POST(req: NextRequest) {
     assUrl?: string
   }> = []
 
-  // Track storage problems so we can report them instead of silently returning no URLs.
   let storageError: string | null = null
 
   for (const lang of langs) {
     let words = transcript.words
 
-    // For non-English, translate the text and rebuild word list with original timestamps
     if (lang !== 'en') {
       try {
         const translatedText = await translateText(transcript.text, lang)
-        // Use translated text split back onto original timestamps (approximate)
         words = rebuildWordsFromTranslation(transcript.words, translatedText)
       } catch (err) {
         console.error(`Translation failed for ${lang}:`, err)
-        // Fall back to English captions for this language
       }
     }
 
@@ -247,7 +211,6 @@ export async function POST(req: NextRequest) {
         .upload(storageKey, new Blob([content], { type: mimeType }), { upsert: true })
 
       if (uploadError) {
-        // Most common cause: the 'video-jobs' storage bucket doesn't exist.
         storageError = uploadError.message
         console.error(`Storage upload failed for ${storageKey}:`, uploadError)
       } else {
@@ -266,8 +229,7 @@ export async function POST(req: NextRequest) {
     captionResults.push(result)
   }
 
-  // If nothing got a URL and we saw a storage error, fail loudly (no silent "done").
-  const anyUrls = captionResults.some(r => r.srtUrl || r.vttUrl || r.assUrl)
+  const anyUrls = captionResults.some((r) => r.srtUrl || r.vttUrl || r.assUrl)
   if (!anyUrls && storageError) {
     await supabaseAdmin.from('video_jobs').update({ status: 'error', error: storageError }).eq('id', jobId)
     return NextResponse.json(
@@ -276,26 +238,25 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // ── Store transcript ──────────────────────────────────────────────────────
+  // ── Store transcript + finalise ────────────────────────────────────────────
   const transcriptKey = `${user.id}/${jobId}/transcript.json`
   await supabaseAdmin.storage
     .from(VIDEO_BUCKET)
     .upload(transcriptKey, new Blob([JSON.stringify(transcript)], { type: 'application/json' }), { upsert: true })
 
-  // ── Finalise job ──────────────────────────────────────────────────────────
   await supabaseAdmin.from('video_jobs').update({
     status: 'done',
     duration_seconds: Math.round(transcript.audio_duration),
     captions: captionResults,
     chapters: transcript.chapters,
-    transcript_text: transcript.text.slice(0, 5000),  // store excerpt for display
+    transcript_text: transcript.text.slice(0, 5000),
     completed_at: new Date().toISOString(),
   }).eq('id', jobId)
 
   return NextResponse.json({
     jobId,
     status: 'done',
-    fileName: file.name,
+    fileName: job.file_name,
     duration: Math.round(transcript.audio_duration),
     captions: captionResults,
     chapters: transcript.chapters,
@@ -306,19 +267,6 @@ export async function POST(req: NextRequest) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-async function getUserPlan(supabase: any, userId: string): Promise<string> {
-  const { data } = await supabase
-    .from('subscriptions')
-    .select('plan, status')
-    .eq('user_id', userId)
-    .eq('status', 'active')
-    .maybeSingle()
-
-  if (!data?.plan) return 'trial'
-  const plan = String(data.plan).toLowerCase()
-  return ['trial', 'starter', 'pro', 'business'].includes(plan) ? plan : 'trial'
-}
 
 async function translateText(text: string, targetLang: string): Promise<string> {
   const prompt = TRANSLATE_PROMPTS[targetLang]
@@ -346,8 +294,6 @@ async function translateText(text: string, targetLang: string): Promise<string> 
   return data.choices?.[0]?.message?.content?.trim() ?? text
 }
 
-// Maps translated text back onto original word timestamps
-// Strategy: split translated text into tokens, distribute across original word count
 function rebuildWordsFromTranslation(
   originalWords: Array<{ text: string; start: number; end: number; confidence: number }>,
   translatedText: string,

@@ -50,6 +50,12 @@ const TRANSLATE_PROMPTS: Record<string, string> = {
 
 export const maxDuration = 300  // 5 min Vercel function timeout (Pro plan needed for longer)
 
+// Pulls a readable message out of any thrown value.
+function errMsg(err: unknown): string {
+  if (err instanceof Error) return err.message
+  try { return String(err) } catch { return 'unknown error' }
+}
+
 export async function POST(req: NextRequest) {
   // ── Auth ──────────────────────────────────────────────────────────────────
   const cookieStore = await cookies()
@@ -71,6 +77,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // Early env sanity check — surfaces the real cause instead of a vague 502 later.
+  const missingEnv: string[] = []
+  if (!process.env.ASSEMBLYAI_API_KEY) missingEnv.push('ASSEMBLYAI_API_KEY')
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missingEnv.push('SUPABASE_SERVICE_ROLE_KEY')
+  if (missingEnv.length) {
+    return NextResponse.json(
+      { error: `Server config error: missing env var(s): ${missingEnv.join(', ')}` },
+      { status: 500 },
+    )
+  }
+
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -81,8 +98,8 @@ export async function POST(req: NextRequest) {
   let formData: FormData
   try {
     formData = await req.formData()
-  } catch {
-    return NextResponse.json({ error: 'Invalid form data' }, { status: 400 })
+  } catch (err) {
+    return NextResponse.json({ error: `Invalid form data: ${errMsg(err)}` }, { status: 400 })
   }
 
   const file = formData.get('file') as File | null
@@ -120,7 +137,7 @@ export async function POST(req: NextRequest) {
 
   // ── Create job record ─────────────────────────────────────────────────────
   const jobId = crypto.randomUUID()
-  await supabaseAdmin.from('video_jobs').insert({
+  const { error: insertError } = await supabaseAdmin.from('video_jobs').insert({
     id: jobId,
     user_id: user.id,
     file_name: file.name,
@@ -130,6 +147,13 @@ export async function POST(req: NextRequest) {
     status: 'uploading',
     plan,
   })
+  // If the video_jobs table is missing/misshaped, say so plainly.
+  if (insertError) {
+    return NextResponse.json(
+      { error: `Database error creating job (video_jobs): ${insertError.message}` },
+      { status: 500 },
+    )
+  }
 
   // ── Upload to AssemblyAI ──────────────────────────────────────────────────
   let uploadUrl: string
@@ -138,9 +162,10 @@ export async function POST(req: NextRequest) {
     const buffer = await file.arrayBuffer()
     uploadUrl = await uploadAudio(buffer)
   } catch (err) {
+    const m = errMsg(err)
     console.error('AssemblyAI upload error:', err)
-    await supabaseAdmin.from('video_jobs').update({ status: 'error', error: 'Upload failed' }).eq('id', jobId)
-    return NextResponse.json({ error: 'Failed to upload file for transcription' }, { status: 502 })
+    await supabaseAdmin.from('video_jobs').update({ status: 'error', error: m }).eq('id', jobId)
+    return NextResponse.json({ error: `Upload to AssemblyAI failed: ${m}` }, { status: 502 })
   }
 
   // ── Transcribe ────────────────────────────────────────────────────────────
@@ -154,9 +179,10 @@ export async function POST(req: NextRequest) {
       throw new Error(transcript.error ?? 'Transcription failed')
     }
   } catch (err) {
+    const m = errMsg(err)
     console.error('AssemblyAI transcription error:', err)
-    await supabaseAdmin.from('video_jobs').update({ status: 'error', error: 'Transcription failed' }).eq('id', jobId)
-    return NextResponse.json({ error: 'Transcription failed' }, { status: 502 })
+    await supabaseAdmin.from('video_jobs').update({ status: 'error', error: m }).eq('id', jobId)
+    return NextResponse.json({ error: `Transcription failed: ${m}` }, { status: 502 })
   }
 
   // ── Generate captions for each language ──────────────────────────────────
@@ -172,6 +198,9 @@ export async function POST(req: NextRequest) {
     vttUrl?: string
     assUrl?: string
   }> = []
+
+  // Track storage problems so we can report them instead of silently returning no URLs.
+  let storageError: string | null = null
 
   for (const lang of langs) {
     let words = transcript.words
@@ -217,7 +246,11 @@ export async function POST(req: NextRequest) {
         .from(VIDEO_BUCKET)
         .upload(storageKey, new Blob([content], { type: mimeType }), { upsert: true })
 
-      if (!uploadError) {
+      if (uploadError) {
+        // Most common cause: the 'video-jobs' storage bucket doesn't exist.
+        storageError = uploadError.message
+        console.error(`Storage upload failed for ${storageKey}:`, uploadError)
+      } else {
         const { data: signed } = await supabaseAdmin.storage
           .from(VIDEO_BUCKET)
           .createSignedUrl(storageKey, SIGNED_URL_TTL)
@@ -231,6 +264,16 @@ export async function POST(req: NextRequest) {
     }
 
     captionResults.push(result)
+  }
+
+  // If nothing got a URL and we saw a storage error, fail loudly (no silent "done").
+  const anyUrls = captionResults.some(r => r.srtUrl || r.vttUrl || r.assUrl)
+  if (!anyUrls && storageError) {
+    await supabaseAdmin.from('video_jobs').update({ status: 'error', error: storageError }).eq('id', jobId)
+    return NextResponse.json(
+      { error: `Captions generated but could not be saved. Storage error (check the '${VIDEO_BUCKET}' bucket exists): ${storageError}` },
+      { status: 500 },
+    )
   }
 
   // ── Store transcript ──────────────────────────────────────────────────────

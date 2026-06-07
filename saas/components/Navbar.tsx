@@ -73,13 +73,6 @@ const WORKSPACE: Item[] = [
   { icon: '💬', label: 'Feedback', href: '/dashboard/feedback', desc: 'Send us your feedback.' },
 ]
 
-const TEAM_ITEM: Item = {
-  icon: '👥',
-  label: 'Team & Roles',
-  href: '/dashboard/team',
-  desc: 'Add people and set their access.',
-}
-
 const ADMIN: Item[] = [
   { icon: '🌌', label: 'Overview', href: '/admin/overview', desc: 'Real counts from live data.' },
   { icon: '💰', label: 'Revenue', href: '/admin/revenue', desc: 'Live MRR from active subscriptions.' },
@@ -303,7 +296,7 @@ export default function Navbar() {
     }, 140)
   }
 
-  const workspaceItems = isOwner ? [...WORKSPACE, TEAM_ITEM] : WORKSPACE
+  const workspaceItems = WORKSPACE
 
   const groupActive = (items: Item[]) =>
     items.some((item) => item.href !== '/' && (pathname === item.href || pathname?.startsWith(`${item.href}/`)))

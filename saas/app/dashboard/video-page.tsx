@@ -124,7 +124,7 @@ function StyleControls({ style, aspectRatio, onChange, onAspectRatio }: { style:
 }
 
 const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
-  function CanvasEditor({ videoUrl, cues, style, aspectRatio, seekTime, durationSec, onStyleChange, onTime, onDuration }, ref) {
+  ({ videoUrl, cues, style, aspectRatio, seekTime, durationSec, onStyleChange, onTime, onDuration }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null)
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const [time, setTime] = useState(0)
@@ -248,6 +248,9 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
     </section>
   }
 )
+
+CanvasEditor.displayName = 'CanvasEditor'
+
 // ── Export Panel ───────────────────────────────────────────────────────────────
 function ExportPanel({ canExport, hasSource, exportState, onExport }: { canExport: boolean; hasSource: boolean; exportState: ExportState; onExport: () => void }) {
   const isRecording = exportState.status === 'recording'

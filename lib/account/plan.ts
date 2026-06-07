@@ -1,6 +1,7 @@
 import type { User } from '@supabase/supabase-js'
 
 export type AccountPlanKey = 'free' | 'launch' | 'growth' | 'command' | 'paid'
+export type PlanAction = 'current' | 'included' | 'upgrade' | 'contact' | 'subscribe'
 
 export type AccountPlan = {
   key: AccountPlanKey
@@ -18,7 +19,10 @@ export type AccountSnapshot = {
   displayName: string
   avatarUrl: string | null
   plan: AccountPlan
+  effectivePlan: AccountPlan
   subscriptionStatus: string
+  subscriptionStatusLabel: string
+  workspaceStatus: 'guest' | 'active' | 'trialing' | 'attention' | 'inactive'
 }
 
 export const accountPlans: Record<AccountPlanKey, AccountPlan> = {
@@ -70,14 +74,20 @@ export const accountPlans: Record<AccountPlanKey, AccountPlan> = {
 }
 
 export function normalizeAccountPlan(value: string | null | undefined): AccountPlanKey {
-  const plan = String(value ?? 'free').toLowerCase()
-  if (plan === 'starter') return 'launch'
+  const plan = String(value ?? 'free').toLowerCase().trim()
+  if (plan === 'starter' || plan === 'start' || plan === 'launch_monthly') return 'launch'
+  if (plan === 'pro' || plan === 'scale' || plan === 'growth_monthly') return 'growth'
+  if (plan === 'enterprise' || plan === 'command_monthly') return 'command'
   if (plan === 'launch' || plan === 'growth' || plan === 'command' || plan === 'paid') return plan
   return 'free'
 }
 
 export function getAccountPlan(value: string | null | undefined): AccountPlan {
   return accountPlans[normalizeAccountPlan(value)]
+}
+
+export function getEffectiveAccountPlan(plan: AccountPlan): AccountPlan {
+  return plan.key === 'paid' ? accountPlans.growth : plan
 }
 
 function firstString(...values: unknown[]) {
@@ -101,22 +111,42 @@ export function getAvatarFromUser(user: User | null | undefined) {
   return firstString(userMetadata.avatar_url, userMetadata.picture)
 }
 
+export function formatSubscriptionStatus(status: string | null | undefined, plan: AccountPlan, isAuthenticated: boolean) {
+  const normalized = String(status || '').toLowerCase().trim()
+
+  if (!isAuthenticated) return { raw: 'guest', label: 'Guest workspace', workspaceStatus: 'guest' as const }
+  if (plan.key === 'free' && !normalized) return { raw: 'free', label: 'No active subscription', workspaceStatus: 'inactive' as const }
+  if (normalized === 'trialing') return { raw: normalized, label: 'Trial active', workspaceStatus: 'trialing' as const }
+  if (normalized === 'active') return { raw: normalized, label: 'Subscription active', workspaceStatus: 'active' as const }
+  if (normalized === 'past_due') return { raw: normalized, label: 'Payment needs attention', workspaceStatus: 'attention' as const }
+  if (normalized === 'canceled' || normalized === 'cancelled') return { raw: normalized, label: 'Subscription canceled', workspaceStatus: 'inactive' as const }
+  if (normalized) return { raw: normalized, label: normalized.replace(/_/g, ' '), workspaceStatus: 'attention' as const }
+
+  return { raw: plan.key === 'free' ? 'free' : 'active', label: plan.key === 'free' ? 'No active subscription' : 'Subscription active', workspaceStatus: plan.key === 'free' ? 'inactive' as const : 'active' as const }
+}
+
 export function buildAccountSnapshot(user: User | null | undefined, planOverride?: string | null, statusOverride?: string | null): AccountSnapshot {
   const plan = planOverride ? getAccountPlan(planOverride) : getPlanFromUser(user)
+  const status = formatSubscriptionStatus(statusOverride, plan, Boolean(user))
+
   return {
     isAuthenticated: Boolean(user),
     email: user?.email ?? null,
     displayName: getDisplayNameFromUser(user),
     avatarUrl: getAvatarFromUser(user),
     plan,
-    subscriptionStatus: statusOverride || (plan.key === 'free' ? 'Not subscribed' : 'Active'),
+    effectivePlan: getEffectiveAccountPlan(plan),
+    subscriptionStatus: status.raw,
+    subscriptionStatusLabel: status.label,
+    workspaceStatus: status.workspaceStatus,
   }
 }
 
-export function getPlanAction(currentPlan: AccountPlan, targetPlan: AccountPlan) {
-  if (currentPlan.key === targetPlan.key) return 'current'
-  if (currentPlan.rank > targetPlan.rank) return 'included'
-  if (currentPlan.key === 'launch' && targetPlan.key === 'growth') return 'upgrade'
+export function getPlanAction(currentPlan: AccountPlan, targetPlan: AccountPlan): PlanAction {
+  const effectiveCurrentPlan = getEffectiveAccountPlan(currentPlan)
+  if (effectiveCurrentPlan.key === targetPlan.key) return 'current'
+  if (effectiveCurrentPlan.rank > targetPlan.rank) return 'included'
+  if (effectiveCurrentPlan.key === 'launch' && targetPlan.key === 'growth') return 'upgrade'
   if (targetPlan.key === 'command') return 'contact'
   return 'subscribe'
 }

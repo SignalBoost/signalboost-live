@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslation } from '@/lib/i18n/useTranslation'
 
 type Prospect = {
   company: string
@@ -17,6 +18,7 @@ type Draft = {
 }
 
 export default function SalesPage() {
+  const { t } = useTranslation()
   const [prospect, setProspect] = useState<Prospect>({
     company: '',
     contactName: '',
@@ -63,11 +65,11 @@ export default function SalesPage() {
     >
       <div style={{ maxWidth: 1000, margin: '0 auto' }}>
         <h1 style={{ fontSize: 42, marginBottom: 10 }}>
-          🧠 AI Sales Agent
+          🧠 {t('sales.title')}
         </h1>
 
         <p style={{ color: 'rgba(255,255,255,.6)', marginBottom: 30 }}>
-          Give the AI a prospect. It drafts a professional sales email for you to review and send.
+          {t('sales.subtitle')}
         </p>
 
         <div
@@ -85,14 +87,14 @@ export default function SalesPage() {
               border: '1px solid rgba(255,255,255,.08)',
             }}
           >
-            <h2>Prospect</h2>
+            <h2>{t('sales.prospect')}</h2>
 
             {[
-              ['company', 'Company name'],
-              ['contactName', 'Contact name'],
-              ['email', 'Email'],
-              ['website', 'Website'],
-              ['industry', 'Industry'],
+              ['company', t('sales.company')],
+              ['contactName', t('sales.contactName')],
+              ['email', t('sales.email')],
+              ['website', t('sales.website')],
+              ['industry', t('sales.industry')],
             ].map(([key, label]) => (
               <input
                 key={key}
@@ -109,7 +111,7 @@ export default function SalesPage() {
             ))}
 
             <textarea
-              placeholder="Notes about this prospect"
+              placeholder={t('sales.notes')}
               value={prospect.notes}
               onChange={e =>
                 setProspect(prev => ({
@@ -129,7 +131,7 @@ export default function SalesPage() {
               disabled={loading || !prospect.company}
               style={buttonStyle}
             >
-              {loading ? 'Drafting...' : 'Generate Sales Email'}
+              {loading ? t('sales.drafting') : t('sales.generate')}
             </button>
           </section>
 
@@ -141,20 +143,20 @@ export default function SalesPage() {
               border: '1px solid rgba(255,255,255,.08)',
             }}
           >
-            <h2>AI Draft</h2>
+            <h2>{t('sales.draft')}</h2>
 
             {!draft && (
               <p style={{ color: 'rgba(255,255,255,.5)' }}>
-                The sales email will appear here.
+                {t('sales.empty')}
               </p>
             )}
 
             {draft && (
               <>
-                <h3>Subject</h3>
+                <h3>{t('sales.subject')}</h3>
                 <div style={boxStyle}>{draft.subject}</div>
 
-                <h3 style={{ marginTop: 24 }}>Email</h3>
+                <h3 style={{ marginTop: 24 }}>{t('sales.emailBody')}</h3>
                 <div style={boxStyle}>{draft.body}</div>
 
                 <a
@@ -166,7 +168,7 @@ export default function SalesPage() {
                     marginTop: 24,
                   }}
                 >
-                  Open in Email
+                  {t('sales.open')}
                 </a>
               </>
             )}

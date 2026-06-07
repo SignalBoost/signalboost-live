@@ -1,0 +1,7 @@
+{
+  "docs.title": "Documentation",
+  "docs.subtitle": "Operational docs for dashboard, outreach, reviews, calendar, admin telemetry, and localization.",
+  "docs.section.dashboard": "Dashboard modules",
+  "docs.section.admin": "Admin telemetry",
+  "docs.section.localization": "Localization workflow"
+}

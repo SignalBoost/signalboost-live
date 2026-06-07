@@ -18,7 +18,7 @@ export const stagingDeployment = {
 export function getStagingModules() {
   return signalBoostModules.map((module) => ({
     key: module.key,
-    label: module.label,
+    label: module.labelKey,
     href: module.href,
     telemetryEvent: module.telemetryEvent,
   }))

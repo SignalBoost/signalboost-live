@@ -1,103 +1,88 @@
 export type SignalBoostModule = {
   key: 'promote' | 'reviews' | 'calendar' | 'spreadsheets' | 'outreach' | 'assistant' | 'video'
-  label: string
+  labelKey: string
   href: string
   icon: string
-  description: string
+  descriptionKey: string
   telemetryEvent: string
-  cockpitRole: string
-  signals: string[]
+  cockpitRoleKey: string
+  signalsKey: string
 }
 
 export const signalBoostModules: SignalBoostModule[] = [
   {
     key: 'promote',
-    label: 'Promote Business',
+    labelKey: 'dashboard.module.promote.label',
     href: '/dashboard/promote',
     icon: '🚀',
-    description: 'Plan multilingual campaigns, launch offers, and connect promotions to Marketplace demand signals.',
+    descriptionKey: 'dashboard.module.promote.description',
     telemetryEvent: 'saas.promote_business.viewed',
-    cockpitRole: 'Growth launch control',
-    signals: ['Campaign objective', 'Audience language', 'Marketplace category', 'Launch readiness'],
+    cockpitRoleKey: 'dashboard.module.promote.role',
+    signalsKey: 'dashboard.module.promote.signals',
   },
   {
     key: 'reviews',
-    label: 'Reviews',
+    labelKey: 'dashboard.module.reviews.label',
     href: '/dashboard/reviews',
     icon: '⭐',
-    description: 'Collect, triage, translate, and reuse customer proof inside brand and Marketplace workflows.',
+    descriptionKey: 'dashboard.module.reviews.description',
     telemetryEvent: 'saas.reviews.viewed',
-    cockpitRole: 'Trust and reputation desk',
-    signals: ['Review velocity', 'Sentiment', 'Response status', 'Reusable proof'],
+    cockpitRoleKey: 'dashboard.module.reviews.role',
+    signalsKey: 'dashboard.module.reviews.signals',
   },
   {
     key: 'calendar',
-    label: 'Calendar',
+    labelKey: 'dashboard.module.calendar.label',
     href: '/dashboard/calendar',
     icon: '📅',
-    description: 'Schedule SaaS launches, outreach windows, local holidays, review asks, and Marketplace booking moments.',
+    descriptionKey: 'dashboard.module.calendar.description',
     telemetryEvent: 'saas.calendar.viewed',
-    cockpitRole: 'Mission timeline',
-    signals: ['7-day plan', 'Cultural timing', 'Booked moments', 'Follow-up windows'],
+    cockpitRoleKey: 'dashboard.module.calendar.role',
+    signalsKey: 'dashboard.module.calendar.signals',
   },
   {
     key: 'spreadsheets',
-    label: 'Spreadsheets',
+    labelKey: 'dashboard.module.spreadsheets.label',
     href: '/dashboard/spreadsheets',
     icon: '📊',
-    description: 'Import CSV lists, normalize contacts, track KPIs, and route spreadsheet rows into Outreach.',
+    descriptionKey: 'dashboard.module.spreadsheets.description',
     telemetryEvent: 'saas.spreadsheets.viewed',
-    cockpitRole: 'Data operations grid',
-    signals: ['CSV readiness', 'Column mapping', 'Lead status', 'KPI rollups'],
+    cockpitRoleKey: 'dashboard.module.spreadsheets.role',
+    signalsKey: 'dashboard.module.spreadsheets.signals',
   },
   {
     key: 'outreach',
-    label: 'Outreach',
+    labelKey: 'dashboard.module.outreach.label',
     href: '/dashboard/outreach',
     icon: '📡',
-    description: 'Coordinate email, partner notifications, social prompts, and review follow-ups from one cockpit.',
+    descriptionKey: 'dashboard.module.outreach.description',
     telemetryEvent: 'saas.outreach.viewed',
-    cockpitRole: 'Communications console',
-    signals: ['Queue health', 'Approval status', 'Channel mix', 'Response trend'],
+    cockpitRoleKey: 'dashboard.module.outreach.role',
+    signalsKey: 'dashboard.module.outreach.signals',
   },
-
   {
     key: 'video',
-    label: 'Video Studio',
+    labelKey: 'dashboard.module.video.label',
     href: '/dashboard/video',
     icon: '🎬',
-    description: 'Edit multilingual videos with canvas captions, timing controls, queued FFmpeg exports, and billing-aware quotas.',
+    descriptionKey: 'dashboard.module.video.description',
     telemetryEvent: 'saas.video_studio.viewed',
-    cockpitRole: 'Caption render bay',
-    signals: ['Caption sync', 'Render queue', 'Storage usage', 'Billing overage'],
+    cockpitRoleKey: 'dashboard.module.video.role',
+    signalsKey: 'dashboard.module.video.signals',
   },
   {
     key: 'assistant',
-    label: 'Personal Assistant',
+    labelKey: 'dashboard.module.assistant.label',
     href: '/dashboard/assistant',
     icon: '🤖',
-    description: 'Ask Concierge AI about Marketplace partners, bookings, pricing, SaaS modules, and next actions.',
+    descriptionKey: 'dashboard.module.assistant.description',
     telemetryEvent: 'saas.personal_assistant.viewed',
-    cockpitRole: 'Concierge guidance layer',
-    signals: ['User intent', 'Marketplace context', 'SaaS module match', 'Telemetry trail'],
+    cockpitRoleKey: 'dashboard.module.assistant.role',
+    signalsKey: 'dashboard.module.assistant.signals',
   },
 ]
 
-export const marketplaceSignals = [
-  'partner discovery',
-  'category selection',
-  'booking intent',
-  'customer proof',
-  'localized campaign demand',
-]
-
-export const cockpitWireframe = [
-  'LEFT RAIL: Promote Business | Reviews | Calendar | Spreadsheets | Outreach | Video Studio | Personal Assistant',
-  'CENTER DECK: selected module workspace with NASA-style mission cards and checklists',
-  'RIGHT RAIL: Concierge AI answers across Marketplace + SaaS and writes telemetry events',
-  'VIDEO BAY: canvas caption editor, storage queue, FFmpeg worker, and download-ready renders',
-  'ADMIN CONSOLE: SaaS usage stream rolls up module views, Concierge intents, and Marketplace context',
-]
+export const cockpitWireframeKeys = ['wireframe.0', 'wireframe.1', 'wireframe.2', 'wireframe.3', 'wireframe.4']
 
 export function getModuleByKey(key: SignalBoostModule['key']) {
   return signalBoostModules.find((module) => module.key === key)

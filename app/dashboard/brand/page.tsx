@@ -3,8 +3,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "@/lib/i18n/useTranslation";
 
 export default function BrandSettingsPage() {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -73,31 +75,31 @@ export default function BrandSettingsPage() {
     });
 
     setSaving(false);
-    alert("Brand profile saved!");
+    alert(t("brand.saved"));
   }
 
   if (loading) {
-    return <div className="p-8 text-gray-600">Loading brand profile…</div>;
+    return <div className="p-8 text-gray-600">{t("brand.loading")}</div>;
   }
 
   return (
     <div className="p-8 space-y-8 max-w-3xl">
-      <h1 className="text-3xl font-bold text-gray-800">Brand Settings</h1>
+      <h1 className="text-3xl font-bold text-gray-800">{t("brand.settings.title")}</h1>
 
       <div className="space-y-6">
         {Object.entries({
-          brand_name: "Brand Name",
-          brand_tagline: "Tagline",
-          brand_tone: "Tone (e.g. warm, premium, friendly)",
-          formality_level: "Formality (formal, neutral, casual)",
-          primary_audience: "Primary Audience",
-          brand_personality: "Brand Personality",
-          primary_language: "Primary Language (e.g. en, pt-BR)",
-          secondary_languages: "Secondary Languages (comma-separated)",
-          cultural_notes: "Cultural Notes",
-          preferred_colors: "Preferred Colors (comma-separated)",
-          layout_style: "Layout Style (clean, bold, minimal, etc.)",
-          visual_notes: "Visual Notes",
+          brand_name: t("brand.name"),
+          brand_tagline: t("brand.tagline"),
+          brand_tone: t("brand.tone"),
+          formality_level: t("brand.formality"),
+          primary_audience: t("brand.primaryAudience"),
+          brand_personality: t("brand.personality"),
+          primary_language: t("brand.primaryLanguage"),
+          secondary_languages: t("brand.secondaryLanguages"),
+          cultural_notes: t("brand.culturalNotes"),
+          preferred_colors: t("brand.preferredColors"),
+          layout_style: t("brand.layoutStyle"),
+          visual_notes: t("brand.visualNotes"),
         }).map(([key, label]) => (
           <div key={key}>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -120,7 +122,7 @@ export default function BrandSettingsPage() {
         disabled={saving}
         className="btn-primary px-6 py-3 rounded-md bg-yellow-400 text-black font-semibold hover:bg-yellow-500 transition"
       >
-        {saving ? "Saving…" : "Save Brand Profile"}
+        {saving ? t("brand.saving") : t("brand.save")}
       </button>
     </div>
   );

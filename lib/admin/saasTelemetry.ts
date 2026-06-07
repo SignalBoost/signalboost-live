@@ -2,32 +2,35 @@ import { signalBoostModules } from '@/lib/platform/unifiedPlatform'
 
 export type SaasTelemetryEvent = {
   id: string
-  module: string
+  moduleKey: string
   event: string
-  area: 'Marketplace' | 'SaaS' | 'Unified cockpit'
-  audience: string
-  detail: string
-  status: 'logged' | 'routing' | 'attention'
+  areaKey: string
+  audienceKey: string
+  detailKey: string
+  detailRoleKey: string
+  statusKey: string
 }
 
 export const saasTelemetryEvents: SaasTelemetryEvent[] = signalBoostModules.map((module, index) => ({
   id: `sb-telemetry-${module.key}`,
-  module: module.label,
+  moduleKey: module.labelKey,
   event: module.telemetryEvent,
-  area: index % 2 === 0 ? 'Unified cockpit' : 'SaaS',
-  audience: module.key === 'assistant' ? 'All roles' : 'Business owner',
-  detail: `${module.cockpitRole} usage is logged inside SignalBoost with Marketplace context.`,
-  status: module.key === 'spreadsheets' ? 'routing' : 'logged',
+  areaKey: index % 2 === 0 ? 'admin.area.unified' : 'admin.area.saas',
+  audienceKey: module.key === 'assistant' ? 'admin.audience.allRoles' : 'admin.audience.businessOwner',
+  detailKey: 'admin.detail.moduleUsage',
+  detailRoleKey: module.cockpitRoleKey,
+  statusKey: module.key === 'spreadsheets' ? 'admin.status.routing' : 'admin.status.logged',
 }))
 
+export const adminTelemetryMetricKeys = [
+  { labelKey: 'admin.metrics.modules', value: String(signalBoostModules.length) },
+  { labelKey: 'admin.metrics.marketplace', valueKey: 'admin.metrics.marketplaceValue' },
+  { labelKey: 'admin.metrics.concierge', valueKey: 'admin.metrics.conciergeValue' },
+  { labelKey: 'admin.metrics.telemetry', valueKey: 'admin.metrics.telemetryValue' },
+]
+
 export const adminTelemetrySummary = {
-  title: 'SignalBoost Admin Console telemetry',
-  description:
-    'SaaS usage is logged in the SignalBoost repo and correlated with Marketplace partner, category, booking, and Concierge activity.',
-  metrics: [
-    { label: 'SaaS modules monitored', value: String(signalBoostModules.length) },
-    { label: 'Marketplace context', value: 'Partners + bookings' },
-    { label: 'Concierge coverage', value: 'Marketplace + SaaS' },
-    { label: 'Telemetry stream', value: 'Unified cockpit' },
-  ],
+  titleKey: 'admin.summary.title',
+  descriptionKey: 'admin.summary.description',
+  metrics: adminTelemetryMetricKeys,
 }

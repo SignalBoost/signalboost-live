@@ -1,0 +1,8 @@
+{
+  "faq.title": "[pt] FAQ",
+  "faq.subtitle": "[pt] Answers for multilingual SignalBoost SaaS operations.",
+  "faq.question.0": "[pt] How does SignalBoost choose a language?",
+  "faq.answer.0": "[pt] SignalBoost uses the saved cookie, saved browser preference, browser locale, and English fallback.",
+  "faq.question.1": "[pt] Can teams switch locales?",
+  "faq.answer.1": "[pt] Yes. The dashboard language switcher persists the selected locale in a cookie."
+}

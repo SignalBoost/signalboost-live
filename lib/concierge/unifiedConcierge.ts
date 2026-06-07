@@ -1,11 +1,11 @@
-import { marketplaceSignals, signalBoostModules } from '@/lib/platform/unifiedPlatform'
+import { signalBoostModules } from '@/lib/platform/unifiedPlatform'
 import { assertCanExport, calculateVideoQuota } from '@/lib/video/subscription'
 import type { SupportedVideoLocale } from '@/lib/video/types'
 
 const supportedLocales = ['en', 'es', 'pt', 'pl', 'ru'] as const
 const moduleMatcher = signalBoostModules.map((module) => ({
   module,
-  tokens: [module.key, module.label.toLowerCase(), ...module.signals.map((signal) => signal.toLowerCase())],
+  tokens: [module.key, module.labelKey.toLowerCase(), module.signalsKey.toLowerCase()],
 }))
 const videoIntentTokens = {
   video_edit: ['video edit', 'editor', 'canvas', 'trim', 'timeline', 'studio'],
@@ -43,7 +43,8 @@ export function answerSignalBoostConcierge(query: string, locale = 'en', options
   const selected = videoRequested
     ? signalBoostModules.filter((module) => module.key === 'video')
     : matches.length > 0 ? matches : signalBoostModules
-  const modules = selected.slice(0, 3).map((module) => `${module.icon} ${module.label}`).join(', ')
+  const modules = selected.slice(0, 3).map((module) => `${module.icon} ${module.labelKey}`).join(', ')
+  const marketplaceSignals = ['partner discovery', 'category selection', 'booking intent', 'customer proof', 'localized campaign demand']
   const marketplace = marketplaceSignals.filter((signal) => normalized.includes(signal.split(' ')[0]))
   const quota = calculateVideoQuota(options.tier, Number(options.usedMinutes || 0), options.billingProvider || 'stripe')
   const exportGate = assertCanExport(quota)
@@ -67,6 +68,6 @@ export function answerSignalBoostConcierge(query: string, locale = 'en', options
       videoRequested
         ? `SignalBoost Video Studio is ready for ${intents.join(', ')}. Use the canvas editor for synced draggable captions, enqueue FFmpeg exports through /api/video/export, and ${quota.demoOnly ? 'upgrade from free/demo for full-length export.' : quota.requiresOverageCharge ? `approve the ${quota.overageProvider} overage charge before rendering.` : 'render the downloadable MP4 from the worker queue.'}`
         : `SignalBoost Concierge can help across Marketplace and SaaS. Start with ${modules}; then connect the work to Marketplace signals like ${marketplace.length ? marketplace.join(', ') : marketplaceSignals.slice(0, 3).join(', ')}. I will log the module intent, recommended next action, and Marketplace context in Admin Console telemetry.`,
-    nextActions: selected.slice(0, 4).map((module) => ({ label: module.label, href: module.href })),
+    nextActions: selected.slice(0, 4).map((module) => ({ label: module.labelKey, href: module.href })),
   }
 }

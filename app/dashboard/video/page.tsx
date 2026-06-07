@@ -1,9 +1,6 @@
-import CanvasEditor from './CanvasEditor'
+import CockpitModulePage from '@/components/dashboard/CockpitModulePage'
+import { getModuleByKey } from '@/lib/platform/unifiedPlatform'
 
-export default function VideoEditor() {
-  const captions = [
-    { text: 'Hello World', start: 0, end: 5, x: 50, y: 300, style: { fontSize: '24px', color: 'white', fontFamily: 'Arial' } }
-  ]
-
-  return <CanvasEditor videoSrc="/sample.mp4" captions={captions} />
+export default function VideoPage() {
+  return <CockpitModulePage module={getModuleByKey('video')!} primaryActionKey="video.primaryAction" checklistPrefix="video.checklist" previewPrefix="video.preview" />
 }

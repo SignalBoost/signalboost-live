@@ -2,32 +2,168 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { t } from '@/lib/i18n/t'
 import { getNamedaysForDate } from '@/lib/cultural-calendar/pl-namedays'
 import { getRussianNamedaysForDate } from '@/lib/cultural-calendar/ru-namedays'
 
 const GOLD = '#ffc300'
 
-type CalEvent = { id: string; title: string; event_date: string; event_type?: string; notes?: string }
+type CalEvent = {
+  id: string
+  title: string
+  event_date: string
+  event_type?: string
+  notes?: string
+}
 
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
-const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+type CalendarCopy = {
+  eyebrow: string
+  prev: string
+  today: string
+  next: string
+  loadError: string
+  genericLoadError: string
+  saveError: string
+  loading: string
+  nameDaysHelp: string
+  regularHelp: string
+  addEvent: string
+  eventTitlePlaceholder: string
+  notesPlaceholder: string
+  cancel: string
+  saving: string
+  addEventButton: string
+  clickToDelete: string
+  months: string[]
+  weekdays: string[]
+}
+
+const COPY: Record<string, CalendarCopy> = {
+  en: {
+    eyebrow: 'Calendar',
+    prev: '← Prev',
+    today: 'Today',
+    next: 'Next →',
+    loadError: 'Could not load your events.',
+    genericLoadError: 'Something went wrong loading your calendar.',
+    saveError: 'Could not save the event.',
+    loading: 'Loading calendar…',
+    nameDaysHelp: '🎉 = name days for this locale. Click any day to add an event; click an event to delete it.',
+    regularHelp: 'Click any day to add an event; click an event to delete it.',
+    addEvent: 'Add event',
+    eventTitlePlaceholder: 'Event title (e.g. Launch promo)',
+    notesPlaceholder: 'Notes (optional)',
+    cancel: 'Cancel',
+    saving: 'Saving…',
+    addEventButton: 'Add event',
+    clickToDelete: 'click to delete',
+    months: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+    weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+  },
+  pt: {
+    eyebrow: 'Calendário',
+    prev: '← Anterior',
+    today: 'Hoje',
+    next: 'Próximo →',
+    loadError: 'Não foi possível carregar seus eventos.',
+    genericLoadError: 'Algo deu errado ao carregar seu calendário.',
+    saveError: 'Não foi possível salvar o evento.',
+    loading: 'Carregando calendário…',
+    nameDaysHelp: '🎉 = dias de nomes para este idioma. Clique em qualquer dia para adicionar um evento; clique em um evento para excluí-lo.',
+    regularHelp: 'Clique em qualquer dia para adicionar um evento; clique em um evento para excluí-lo.',
+    addEvent: 'Adicionar evento',
+    eventTitlePlaceholder: 'Título do evento (ex.: Promoção de lançamento)',
+    notesPlaceholder: 'Notas (opcional)',
+    cancel: 'Cancelar',
+    saving: 'Salvando…',
+    addEventButton: 'Adicionar evento',
+    clickToDelete: 'clique para excluir',
+    months: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'],
+    weekdays: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
+  },
+  es: {
+    eyebrow: 'Calendario',
+    prev: '← Anterior',
+    today: 'Hoy',
+    next: 'Siguiente →',
+    loadError: 'No se pudieron cargar tus eventos.',
+    genericLoadError: 'Algo salió mal al cargar tu calendario.',
+    saveError: 'No se pudo guardar el evento.',
+    loading: 'Cargando calendario…',
+    nameDaysHelp: '🎉 = días onomásticos para este idioma. Haz clic en cualquier día para agregar un evento; haz clic en un evento para eliminarlo.',
+    regularHelp: 'Haz clic en cualquier día para agregar un evento; haz clic en un evento para eliminarlo.',
+    addEvent: 'Agregar evento',
+    eventTitlePlaceholder: 'Título del evento (ej.: Promoción de lanzamiento)',
+    notesPlaceholder: 'Notas (opcional)',
+    cancel: 'Cancelar',
+    saving: 'Guardando…',
+    addEventButton: 'Agregar evento',
+    clickToDelete: 'clic para eliminar',
+    months: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
+    weekdays: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
+  },
+  pl: {
+    eyebrow: 'Kalendarz',
+    prev: '← Poprzedni',
+    today: 'Dzisiaj',
+    next: 'Następny →',
+    loadError: 'Nie można załadować wydarzeń.',
+    genericLoadError: 'Coś poszło nie tak podczas ładowania kalendarza.',
+    saveError: 'Nie można zapisać wydarzenia.',
+    loading: 'Ładowanie kalendarza…',
+    nameDaysHelp: '🎉 = imieniny dla tego języka. Kliknij dowolny dzień, aby dodać wydarzenie; kliknij wydarzenie, aby je usunąć.',
+    regularHelp: 'Kliknij dowolny dzień, aby dodać wydarzenie; kliknij wydarzenie, aby je usunąć.',
+    addEvent: 'Dodaj wydarzenie',
+    eventTitlePlaceholder: 'Tytuł wydarzenia (np. promocja startowa)',
+    notesPlaceholder: 'Notatki (opcjonalnie)',
+    cancel: 'Anuluj',
+    saving: 'Zapisywanie…',
+    addEventButton: 'Dodaj wydarzenie',
+    clickToDelete: 'kliknij, aby usunąć',
+    months: ['Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec', 'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'],
+    weekdays: ['Nd', 'Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob'],
+  },
+  ru: {
+    eyebrow: 'Календарь',
+    prev: '← Назад',
+    today: 'Сегодня',
+    next: 'Далее →',
+    loadError: 'Не удалось загрузить ваши события.',
+    genericLoadError: 'Что-то пошло не так при загрузке календаря.',
+    saveError: 'Не удалось сохранить событие.',
+    loading: 'Загрузка календаря…',
+    nameDaysHelp: '🎉 = именины для этого языка. Нажмите на любой день, чтобы добавить событие; нажмите на событие, чтобы удалить его.',
+    regularHelp: 'Нажмите на любой день, чтобы добавить событие; нажмите на событие, чтобы удалить его.',
+    addEvent: 'Добавить событие',
+    eventTitlePlaceholder: 'Название события (например: промо запуска)',
+    notesPlaceholder: 'Заметки (необязательно)',
+    cancel: 'Отмена',
+    saving: 'Сохранение…',
+    addEventButton: 'Добавить событие',
+    clickToDelete: 'нажмите, чтобы удалить',
+    months: ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'],
+    weekdays: ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
+  },
+}
 
 function ymd(y: number, m: number, d: number) {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
 }
 
+function copyFor(lang: string): CalendarCopy {
+  return COPY[lang] || COPY.en
+}
+
 export default function CalendarPage() {
-  const { dict, lang } = useI18n()
+  const { lang } = useI18n()
+  const copy = copyFor(lang)
   const today = new Date()
 
   const [year, setYear] = useState(today.getFullYear())
-  const [month, setMonth] = useState(today.getMonth()) // 0-11
+  const [month, setMonth] = useState(today.getMonth())
   const [events, setEvents] = useState<CalEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  // add-event form
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [title, setTitle] = useState('')
   const [notes, setNotes] = useState('')
@@ -39,62 +175,92 @@ export default function CalendarPage() {
   async function load() {
     setLoading(true)
     setError('')
+
     const from = ymd(year, month, 1)
     const to = ymd(year, month, daysInMonth)
+
     try {
       const res = await fetch(`/api/calendar/events?from=${from}&to=${to}`, { cache: 'no-store' })
       const data = await res.json()
-      if (!res.ok) setError(data?.error || 'Could not load your events.')
+
+      if (!res.ok) {
+        setError(data?.error || copy.loadError)
+      }
+
       setEvents(Array.isArray(data.events) ? data.events : [])
     } catch {
-      setError('Something went wrong loading your calendar.')
+      setError(copy.genericLoadError)
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { load() /* eslint-disable-next-line */ }, [year, month])
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [year, month, lang])
 
   const eventsByDate = useMemo(() => {
     const map: Record<string, CalEvent[]> = {}
-    for (const e of events) {
-      (map[e.event_date] ||= []).push(e)
+
+    for (const event of events) {
+      ;(map[event.event_date] ||= []).push(event)
     }
+
     return map
   }, [events])
 
   function namedaysFor(day: number): string[] {
     const m = month + 1
+
     if (lang === 'pl') return getNamedaysForDate(m, day)
     if (lang === 'ru') return getRussianNamedaysForDate(m, day)
+
     return []
   }
 
   function prevMonth() {
-    if (month === 0) { setMonth(11); setYear(y => y - 1) } else setMonth(m => m - 1)
+    if (month === 0) {
+      setMonth(11)
+      setYear((value) => value - 1)
+    } else {
+      setMonth((value) => value - 1)
+    }
   }
+
   function nextMonth() {
-    if (month === 11) { setMonth(0); setYear(y => y + 1) } else setMonth(m => m + 1)
+    if (month === 11) {
+      setMonth(0)
+      setYear((value) => value + 1)
+    } else {
+      setMonth((value) => value + 1)
+    }
   }
 
   async function addEvent() {
     if (!selectedDate || !title.trim() || saving) return
+
     setSaving(true)
+
     try {
       const res = await fetch('/api/calendar/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: title.trim(), event_date: selectedDate, notes: notes.trim() || undefined }),
       })
+
       const data = await res.json()
+
       if (res.ok && data.event) {
-        setEvents(prev => [...prev, data.event])
-        setTitle(''); setNotes(''); setSelectedDate(null)
+        setEvents((previous) => [...previous, data.event])
+        setTitle('')
+        setNotes('')
+        setSelectedDate(null)
       } else {
-        setError(data?.error || 'Could not save the event.')
+        setError(data?.error || copy.saveError)
       }
     } catch {
-      setError('Could not save the event.')
+      setError(copy.saveError)
     } finally {
       setSaving(false)
     }
@@ -103,13 +269,18 @@ export default function CalendarPage() {
   async function deleteEvent(id: string) {
     try {
       const res = await fetch(`/api/calendar/events?id=${id}`, { method: 'DELETE' })
-      if (res.ok) setEvents(prev => prev.filter(e => e.id !== id))
-    } catch { /* ignore */ }
+
+      if (res.ok) {
+        setEvents((previous) => previous.filter((event) => event.id !== id))
+      }
+    } catch {
+      // Ignore delete failures so the calendar stays usable.
+    }
   }
 
   const cells: Array<number | null> = [
     ...Array(firstDow).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+    ...Array.from({ length: daysInMonth }, (_, index) => index + 1),
   ]
 
   const isToday = (day: number) =>
@@ -119,37 +290,53 @@ export default function CalendarPage() {
     <main style={{ padding: 24, color: '#fff', maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 18 }}>
         <div>
-          <span className="sb-eyebrow">Calendar</span>
-          <h1 className="sb-h2" style={{ marginTop: 8, marginBottom: 0 }}>{MONTHS[month]} {year}</h1>
+          <span className="sb-eyebrow">{copy.eyebrow}</span>
+          <h1 className="sb-h2" style={{ marginTop: 8, marginBottom: 0 }}>
+            {copy.months[month]} {year}
+          </h1>
         </div>
+
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={prevMonth} className="sb-button-secondary">← Prev</button>
-          <button onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth()) }} className="sb-button-secondary">Today</button>
-          <button onClick={nextMonth} className="sb-button-secondary">Next →</button>
+          <button onClick={prevMonth} className="sb-button-secondary">{copy.prev}</button>
+          <button
+            onClick={() => {
+              setYear(today.getFullYear())
+              setMonth(today.getMonth())
+            }}
+            className="sb-button-secondary"
+          >
+            {copy.today}
+          </button>
+          <button onClick={nextMonth} className="sb-button-secondary">{copy.next}</button>
         </div>
       </div>
 
-      {error && <p className="sb-caption" style={{ color: '#fca5a5', marginBottom: 12 }}>{error}</p>}
-      {loading && <p className="sb-body">Loading calendar…</p>}
+      {error ? <p className="sb-caption" style={{ color: '#fca5a5', marginBottom: 12 }}>{error}</p> : null}
+      {loading ? <p className="sb-body">{copy.loading}</p> : null}
 
-      {/* Weekday header */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 6, marginBottom: 6 }}>
-        {DOW.map(d => (
-          <div key={d} className="sb-caption" style={{ textAlign: 'center', textTransform: 'uppercase', letterSpacing: '.06em' }}>{d}</div>
+        {copy.weekdays.map((weekday) => (
+          <div key={weekday} className="sb-caption" style={{ textAlign: 'center', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+            {weekday}
+          </div>
         ))}
       </div>
 
-      {/* Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 6 }}>
-        {cells.map((day, i) => {
-          if (day === null) return <div key={`empty-${i}`} />
+        {cells.map((day, index) => {
+          if (day === null) return <div key={`empty-${index}`} />
+
           const dateStr = ymd(year, month, day)
           const dayEvents = eventsByDate[dateStr] || []
           const names = namedaysFor(day)
+
           return (
             <button
               key={dateStr}
-              onClick={() => { setSelectedDate(dateStr); setError('') }}
+              onClick={() => {
+                setSelectedDate(dateStr)
+                setError('')
+              }}
               style={{
                 textAlign: 'left',
                 minHeight: 104,
@@ -166,67 +353,97 @@ export default function CalendarPage() {
             >
               <span style={{ fontWeight: 800, fontSize: 13, color: isToday(day) ? GOLD : '#fff' }}>{day}</span>
 
-              {dayEvents.map(e => (
+              {dayEvents.map((event) => (
                 <span
-                  key={e.id}
-                  onClick={ev => { ev.stopPropagation(); deleteEvent(e.id) }}
-                  title={`${e.title}${e.notes ? ' — ' + e.notes : ''}\n(click to delete)`}
-                  style={{ fontSize: 11, fontWeight: 700, background: 'rgba(26,240,255,.15)', border: '1px solid rgba(26,240,255,.35)', color: '#bdf3ff', borderRadius: 6, padding: '2px 6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  key={event.id}
+                  onClick={(clickEvent) => {
+                    clickEvent.stopPropagation()
+                    deleteEvent(event.id)
+                  }}
+                  title={`${event.title}${event.notes ? ` — ${event.notes}` : ''}\n(${copy.clickToDelete})`}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    background: 'rgba(26,240,255,.15)',
+                    border: '1px solid rgba(26,240,255,.35)',
+                    color: '#bdf3ff',
+                    borderRadius: 6,
+                    padding: '2px 6px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
                 >
-                  {e.title}
+                  {event.title}
                 </span>
               ))}
 
-              {names.length > 0 && (
+              {names.length > 0 ? (
                 <span style={{ fontSize: 10, color: 'rgba(255,255,255,.45)', marginTop: 'auto' }}>
                   🎉 {names.slice(0, 2).join(', ')}
                 </span>
-              )}
+              ) : null}
             </button>
           )
         })}
       </div>
 
-      {(lang === 'pl' || lang === 'ru') && (
-        <p className="sb-caption" style={{ marginTop: 12 }}>🎉 = name days for this locale. Click any day to add an event; click an event to delete it.</p>
-      )}
-      {lang !== 'pl' && lang !== 'ru' && (
-        <p className="sb-caption" style={{ marginTop: 12 }}>Click any day to add an event; click an event to delete it.</p>
-      )}
+      <p className="sb-caption" style={{ marginTop: 12 }}>
+        {lang === 'pl' || lang === 'ru' ? copy.nameDaysHelp : copy.regularHelp}
+      </p>
 
-      {/* Add-event panel */}
-      {selectedDate && (
+      {selectedDate ? (
         <div
           onClick={() => setSelectedDate(null)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, zIndex: 1000 }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+            zIndex: 1000,
+          }}
         >
-          <div onClick={e => e.stopPropagation()} className="sb-card" style={{ padding: 24, width: '100%', maxWidth: 420 }}>
-            <h2 className="sb-h3" style={{ marginTop: 0 }}>Add event · {selectedDate}</h2>
+          <div onClick={(event) => event.stopPropagation()} className="sb-card" style={{ padding: 24, width: '100%', maxWidth: 420 }}>
+            <h2 className="sb-h3" style={{ marginTop: 0 }}>
+              {copy.addEvent} · {selectedDate}
+            </h2>
+
             <input
               className="sb-input"
               value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="Event title (e.g. Launch promo)"
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder={copy.eventTitlePlaceholder}
               style={{ padding: 12, width: '100%', boxSizing: 'border-box', marginBottom: 10 }}
-              onKeyDown={e => { if (e.key === 'Enter') addEvent() }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') addEvent()
+              }}
             />
+
             <textarea
               className="sb-input"
               value={notes}
-              onChange={e => setNotes(e.target.value)}
-              placeholder="Notes (optional)"
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder={copy.notesPlaceholder}
               rows={3}
               style={{ padding: 12, width: '100%', boxSizing: 'border-box', resize: 'vertical', marginBottom: 14 }}
             />
+
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button onClick={() => setSelectedDate(null)} className="sb-button-secondary">Cancel</button>
+              <button onClick={() => setSelectedDate(null)} className="sb-button-secondary">
+                {copy.cancel}
+              </button>
+
               <button onClick={addEvent} disabled={saving || !title.trim()} className="sb-button-primary" style={{ opacity: saving || !title.trim() ? 0.6 : 1 }}>
-                {saving ? 'Saving…' : 'Add event'}
+                {saving ? copy.saving : copy.addEventButton}
               </button>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </main>
   )
 }

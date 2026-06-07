@@ -1,59 +1,64 @@
-import Link from "next/link";
-import { signalBoostModules } from "@/lib/platform/unifiedPlatform";
-import { adminTelemetrySummary } from "@/lib/admin/saasTelemetry";
-import { formatSubscription } from "@/lib/account/plan";
+import { formatSubscription, type Subscription } from "@/lib/account/plan";
 
-const onboardingChecklist = [
-  { label: "Confirm business profile", detail: "Add brand name, service area, and primary customer segment.", href: "/dashboard/brand", done: true, owner: "Brand" },
-  { label: "Plan first promotion", detail: "Choose an offer, language, and launch window.", href: "/dashboard/promote", done: false, owner: "Growth" },
-  { label: "Import lead or customer list", detail: "Prepare CSV rows for Outreach and review requests.", href: "/dashboard/spreadsheets", done: false, owner: "Data" },
-  { label: "Schedule follow-up rhythm", detail: "Block review asks, partner check-ins, and campaign reporting.", href: "/dashboard/calendar", done: false, owner: "Ops" },
-];
+type DashboardUser = {
+  name: string;
+  subscription: Subscription;
+};
 
-export default function DashboardPage({ user }) {
+const demoUser: DashboardUser = {
+  name: "Luis",
+  subscription: {
+    plan: "starter",
+    status: "active",
+  },
+};
+
+export default function DashboardPage() {
+  const user = demoUser;
   const subscription = user.subscription;
-  const completedItems = onboardingChecklist.filter((item) => item.done).length;
-  const completion = Math.round((completedItems / onboardingChecklist.length) * 100);
-  const nextChecklistItem = onboardingChecklist.find((item) => !item.done);
 
   return (
-    <main className="min-h-screen text-white">
-      {/* Hero + subscription badge */}
-      <section className="rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,215,0,.2),transparent_35%),linear-gradient(135deg,#101827,#05070b)] p-5 shadow-2xl md:p-8">
-        <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-[#FFD700]">SignalBoost operations cockpit</p>
-            <h1 className="mt-4 max-w-4xl text-4xl font-black tracking-tight md:text-6xl">
-              Run promotions, reviews, outreach, and local growth from one workspace.
-            </h1>
-            <p className="mt-5 max-w-3xl text-lg text-white/70">
-              Start with a focused onboarding path, then move work through Calendar, Spreadsheets, Reviews, Outreach, Promote Business, and Concierge AI.
-            </p>
-          </div>
-          <div className="rounded-3xl border border-[#FFD700]/25 bg-black/35 p-5 xl:w-80">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm text-white/50">Onboarding progress</p>
-                <p className="mt-2 text-4xl font-black text-[#FFD700]">{completion}%</p>
-              </div>
-              <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs text-white/60">Foundation</span>
-            </div>
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
-              <div className="h-full rounded-full bg-[#FFD700]" style={{ width: `${completion}%` }} />
-            </div>
-            <p className="mt-3 text-sm text-white/60">{completedItems} of {onboardingChecklist.length} setup steps complete.</p>
-            {nextChecklistItem ? (
-              <Link href={nextChecklistItem.href} className="mt-4 block rounded-full bg-[#FFD700] px-4 py-2 text-center text-sm font-bold text-black no-underline">
-                Next: {nextChecklistItem.label}
-              </Link>
-            ) : null}
-            <p className="mt-4 text-sm text-white/70">{formatSubscription(subscription)}</p>
-          </div>
-        </div>
-      </section>
+    <div className="mx-auto max-w-5xl p-6">
+      <h1 className="text-2xl font-bold">Bem-vindo, {user.name}</h1>
 
-      {/* Other sections remain unchanged (metrics, quick actions, activity, modules, admin telemetry) */}
-      {/* ... keep your existing code from the uploaded document here ... */}
-    </main>
+      <p className="text-gray-600">
+        {formatSubscription(subscription)}
+      </p>
+
+      <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="rounded bg-white p-4 shadow">
+          <h2 className="font-semibold">Onboarding</h2>
+          <ul className="ml-4 list-disc text-sm">
+            <li>Cadastrar time</li>
+            <li>Procurar adversário</li>
+            <li>Explorar campeonatos</li>
+          </ul>
+        </div>
+
+        <div className="rounded bg-white p-4 shadow">
+          <h2 className="font-semibold">Atividade Recente</h2>
+          <p className="text-sm text-gray-500">
+            Nenhuma atividade ainda.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="rounded border border-green-200 bg-green-50 p-4">
+          <h3 className="font-semibold">Plano Atual</h3>
+          <p className="text-sm">{subscription.plan.toUpperCase()}</p>
+        </div>
+
+        <div className="rounded border border-blue-200 bg-blue-50 p-4">
+          <h3 className="font-semibold">Ferramentas Incluídas</h3>
+          <p className="text-sm">Dashboard, Times, Campeonatos</p>
+        </div>
+
+        <div className="rounded border border-yellow-200 bg-yellow-50 p-4">
+          <h3 className="font-semibold">Próxima Ação</h3>
+          <p className="text-sm">Complete seu perfil de time</p>
+        </div>
+      </div>
+    </div>
   );
 }

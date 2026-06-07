@@ -99,35 +99,144 @@ LANGUAGE (CRITICAL): Detect the user's language and write EVERY visible string i
 
 AI_ORCHESTRATION_DATA (CRITICAL when provided): Use the supplied local, business, or global knowledge payload as the factual backbone of the page. Do not invent conflicting facts. If a list of real local items is supplied, include every item by name.
 
-VISUAL DIRECTION:
-- Premium editorial style, not generic SaaS template.
-- Choose fonts only from: display=${DISPLAY_FONTS.join(', ')}; body=${BODY_FONTS.join(', ')}.
-- Strong palette with dominant color and sharp accent (hex values).
-- Rich, varied page: strong hero, deliberate sequence of 5-8 sections.
+QUALITY BAR (CRITICAL): Benchmark every design decision against ChatGPT, Copilot, Framer, Notion, Stripe, Linear, and Canva marketing pages. The page must feel like a professional web designer created it, not an AI template generator.
+
+ANTI-GENERIC RULES:
+- Do NOT generate generic AI-builder layouts, vague SaaS cards, filler claims, or repetitive equal-card grids.
+- Create a custom editorial concept tied to the request: one distinctive angle, concrete details, and section copy that could not fit any other business.
+- Use strong visual hierarchy: one memorable hero idea, concise supporting copy, and varied section rhythms.
+- Use controlled spacing: compact enough to avoid excessive empty space, but premium and breathable.
+- Use premium typography only from: display=${DISPLAY_FONTS.join(', ')}; body=${BODY_FONTS.join(', ')}.
+- Use a consistent design system: one dominant color, one sharp accent, calibrated neutral background/surface/text/muted colors.
+- Design mobile-first: short headings, scannable paragraphs, clear CTA labels, and content that stacks cleanly.
+
+REQUIRED SECTION STRUCTURE (6-8 sections, in this order unless the data strongly requires one extra detail section):
+1. hero or hero-split — custom hero with eyebrow, heading, subheading, cta, ctaSecondary.
+2. about/text — value proposition, not generic; explain the core promise in specific language.
+3. stats or testimonials — social proof. Use credible proxy proof if exact proof is unavailable; never invent named customers.
+4. feature-grid — 3-5 carefully differentiated features. Avoid repetitive card copy.
+5. gallery, video, or another about/text — concrete proof/details/process/items that make the site feel custom.
+6. cta — direct conversion section.
+7. contact — final conversion/contact section. The renderer adds the footer automatically.
 
 SECTION TYPES: hero (eyebrow,heading,subheading,cta,ctaSecondary), hero-split (+body), feature-grid (eyebrow,heading,subheading,items[]{icon,title,body}), stats (heading,stats[]{value,label}), gallery (heading,items[]{title,body}), video (eyebrow,heading,subheading,videoUrl=""), testimonials (heading,testimonials[]{quote,author,role}), cta (heading,subheading,cta), contact (eyebrow,heading,body,email,phone,address), about/text (eyebrow,heading,body).
 
 OUTPUT: valid JSON only — no markdown, no backticks.
 {"businessName":"...","theme":"light"|"dark","fonts":{"display":"...","body":"..."},"palette":{"primary":"#...","accent":"#...","background":"#...","surface":"#...","text":"#...","muted":"#..."},"sections":[...]}
 
-RULES: Valid JSON. Real specific copy. 5-8 sections. Start with hero, end with contact.`
+RULES: Valid JSON. Real specific copy. 6-8 sections. Start with hero or hero-split. Include value proposition, social proof, features, CTA, contact, and rely on the renderer footer.`
 
 function isValidContent(p: any): boolean {
   return p && typeof p.businessName === 'string' && Array.isArray(p.sections) && p.sections.length > 0
 }
 
+const SECTION_ORDER = ['hero', 'hero-split', 'about', 'text', 'stats', 'testimonials', 'feature-grid', 'gallery', 'video', 'cta', 'contact']
+
+function hasSection(content: any, predicate: (section: any) => boolean): boolean {
+  return Array.isArray(content?.sections) && content.sections.some(predicate)
+}
+
+function normalizeGeneratedSite(content: any, description: string) {
+  const normalized = { ...content }
+  normalized.sections = Array.isArray(content?.sections) ? [...content.sections] : []
+
+  const businessName = typeof normalized.businessName === 'string' && normalized.businessName.trim()
+    ? normalized.businessName.trim()
+    : 'SignalBoost Studio Site'
+  normalized.businessName = businessName
+
+  if (!normalized.fonts || typeof normalized.fonts !== 'object') {
+    normalized.fonts = { display: 'Space Grotesk', body: 'DM Sans' }
+  }
+
+  if (!normalized.palette || typeof normalized.palette !== 'object') {
+    normalized.palette = { primary: '#171717', accent: '#ff6b35', background: '#fbfaf7', surface: '#ffffff', text: '#171717', muted: '#6b665f' }
+  }
+
+  if (!hasSection(normalized, s => s.type === 'hero' || s.type === 'hero-split')) {
+    normalized.sections.unshift({
+      type: 'hero-split',
+      eyebrow: 'Designed with SignalBoost',
+      heading: businessName,
+      subheading: description,
+      cta: 'Start now',
+      ctaSecondary: 'See the approach',
+      body: 'A focused first impression with a clear offer, proof, and next step.',
+    })
+  }
+
+  if (!hasSection(normalized, s => s.type === 'about' || s.type === 'text')) {
+    normalized.sections.splice(1, 0, {
+      type: 'about',
+      eyebrow: 'Value proposition',
+      heading: 'Built around one clear promise',
+      body: `${businessName} turns the request into a focused experience with specific copy, deliberate pacing, and a visual system that feels custom from the first scroll.`,
+    })
+  }
+
+  if (!hasSection(normalized, s => s.type === 'stats' || s.type === 'testimonials')) {
+    normalized.sections.splice(2, 0, {
+      type: 'stats',
+      heading: 'Designed to earn trust quickly',
+      stats: [
+        { value: '01', label: 'Clear primary action' },
+        { value: '06+', label: 'Purposeful sections' },
+        { value: '100%', label: 'Mobile-first structure' },
+      ],
+    })
+  }
+
+  if (!hasSection(normalized, s => s.type === 'feature-grid')) {
+    normalized.sections.splice(3, 0, {
+      type: 'feature-grid',
+      eyebrow: 'Experience system',
+      heading: 'Every section has a job',
+      subheading: 'The page avoids filler by pairing specific messaging with a consistent visual language.',
+      items: [
+        { icon: '◆', title: 'Custom narrative', body: 'Copy and structure follow the user request rather than a reusable template.' },
+        { icon: '◐', title: 'Controlled rhythm', body: 'Compact sections, strong headings, and varied layouts keep attention moving.' },
+        { icon: '↗', title: 'Conversion clarity', body: 'CTAs, proof, and contact details work together toward one next step.' },
+      ],
+    })
+  }
+
+  if (!hasSection(normalized, s => s.type === 'cta')) {
+    const contactIndex = normalized.sections.findIndex((s: any) => s.type === 'contact')
+    const insertAt = contactIndex >= 0 ? contactIndex : normalized.sections.length
+    normalized.sections.splice(insertAt, 0, { type: 'cta', heading: 'Ready to move from idea to live page?', subheading: 'Use this focused page as the starting point for a polished web presence.', cta: 'Publish the site' })
+  }
+
+  if (!hasSection(normalized, s => s.type === 'contact')) {
+    normalized.sections.push({ type: 'contact', eyebrow: 'Contact', heading: 'Let’s make the next step simple', body: 'Share the context, offer, or launch goal and SignalBoost will keep the page moving toward a real outcome.', email: 'support@signalboostapp.com', phone: '', address: '' })
+  }
+
+  normalized.sections = normalized.sections
+    .filter((section: any) => section && typeof section.type === 'string' && SECTION_ORDER.includes(section.type))
+    .slice(0, 8)
+
+  const lastContactIndex = normalized.sections.findIndex((section: any) => section.type === 'contact')
+  if (lastContactIndex >= 0 && lastContactIndex !== normalized.sections.length - 1) {
+    const [contact] = normalized.sections.splice(lastContactIndex, 1)
+    normalized.sections.push(contact)
+  }
+
+  return normalized
+}
+
 function buildRecoveryContent(description: string, items: ValidatedItem[]) {
-  const cards = items.slice(0, 6).map(item => ({ title: item.name, body: item.description }))
+  const cards = items.slice(0, 5).map(item => ({ title: item.name, body: item.description }))
   return {
     businessName: 'SignalBoost Demo Site',
     theme: 'light',
     fonts: { display: 'Space Grotesk', body: 'DM Sans' },
-    palette: { primary: '#2563eb', accent: '#f97316', background: '#f8fafc', surface: '#ffffff', text: '#0f172a', muted: '#64748b' },
+    palette: { primary: '#111827', accent: '#f97316', background: '#fbfaf7', surface: '#ffffff', text: '#111827', muted: '#6b7280' },
     sections: [
-      { type: 'hero', eyebrow: 'AI-ready prompt', heading: 'Your request is ready to launch', subheading: description, cta: 'Explore the data', ctaSecondary: 'Contact us' },
-      { type: 'feature-grid', eyebrow: 'Fallback data', heading: 'Curated starter items', subheading: 'Demo records keep the page useful while live data recovers.', items: cards },
+      { type: 'hero-split', eyebrow: 'Recovered design brief', heading: 'A focused page is ready to refine', subheading: description, cta: 'Regenerate with live AI', ctaSecondary: 'Review structure', body: 'Hero, value proposition, proof, features, CTA, and contact are preserved so the page still feels intentionally designed.' },
+      { type: 'about', eyebrow: 'Value proposition', heading: 'Built from a professional page system', body: 'SignalBoost keeps the page useful during recovery by applying the same hierarchy, typography, spacing, and conversion structure required for generated websites.' },
+      { type: 'stats', heading: 'Quality guardrails stay active', stats: [{ value: '06', label: 'Required sections' }, { value: '01', label: 'Clear conversion path' }, { value: '0', label: 'Generic filler layouts' }] },
+      { type: 'feature-grid', eyebrow: 'Fallback data', heading: 'Curated starter details', subheading: 'Demo records keep the page concrete while live data recovers.', items: cards },
       { type: 'cta', heading: 'Ready for real data', subheading: 'Connect AI, CSV, scraper, or API sources when available.', cta: 'Generate again' },
-      { type: 'contact', eyebrow: 'SignalBoost', heading: 'Keep building', body: 'We recovered gracefully and seeded safe demo content.', email: 'support@signalboostapp.com', phone: '', address: '' },
+      { type: 'contact', eyebrow: 'SignalBoost', heading: 'Keep building', body: 'We recovered gracefully and kept a premium section structure in place.', email: 'support@signalboostapp.com', phone: '', address: '' },
     ],
   }
 }
@@ -363,7 +472,7 @@ export async function POST(req: NextRequest) {
 
         await writer.write(encode({
           type:       'result',
-          content:    cachedSite,
+          content:    normalizeGeneratedSite(cachedSite, trimmed),
           preprocessor: {
             mode,
             routedIntent: routed.intent,
@@ -422,6 +531,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (parsed.theme !== 'dark' && parsed.theme !== 'light') parsed.theme = 'light'
+      parsed = normalizeGeneratedSite(parsed, trimmed)
 
       // Save site design to cache for next time — non-blocking
       if (!fallbackSeeded) {

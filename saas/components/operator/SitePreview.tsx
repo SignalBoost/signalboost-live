@@ -103,6 +103,14 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
 
   return (
     <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', background, color: text, fontFamily: bodyFont, maxHeight: '70vh', overflowY: 'auto' }}>
+      <style>{`
+        .sb-preview-bento-card { grid-column: span 2; }
+        .sb-preview-bento-card--lead { grid-column: span 3; }
+        @media (max-width: 700px) {
+          .sb-preview-bento { grid-template-columns: 1fr !important; }
+          .sb-preview-bento-card, .sb-preview-bento-card--lead { grid-column: 1 / -1 !important; }
+        }
+      `}</style>
       {sections.map((s, i) => {
         const h    = s.heading?.trim()
         const sub  = s.subheading?.trim()
@@ -140,9 +148,9 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
             <div key={i} style={{ padding: '32px 24px' }}>
               {eyebrow}
               {h && <div style={{ fontFamily: display, fontWeight: 800, fontSize: 20, textAlign: 'center', marginBottom: 18 }}>{h}</div>}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+              <div className="sb-preview-bento" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 12 }}>
                 {(s.items as FeatureItem[]).map((it, j) => (
-                  <div key={j} style={{ background: surface, border: `1px solid ${withAlpha(text, 0.08)}`, borderRadius: 12, padding: 16 }}>
+                  <div key={j} className={j === 0 ? 'sb-preview-bento-card sb-preview-bento-card--lead' : 'sb-preview-bento-card'} style={{ background: surface, border: `1px solid ${withAlpha(text, 0.08)}`, borderRadius: 14, padding: j === 0 ? 18 : 16 }}>
                     <div style={{ width: 34, height: 34, borderRadius: 9, background: `linear-gradient(135deg, ${primary}, ${accent})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, marginBottom: 10 }}>
                       {it.icon || '◆'}
                     </div>

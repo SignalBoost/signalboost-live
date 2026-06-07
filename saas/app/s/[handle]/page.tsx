@@ -162,8 +162,8 @@ function SectionView({ section, theme, displayFont, idx }: { section: Section; t
       ? `radial-gradient(1200px 600px at 15% -10%, ${withAlpha(primary, 0.45)}, transparent 60%), radial-gradient(900px 500px at 100% 0%, ${withAlpha(accent, 0.30)}, transparent 55%), ${background}`
       : `radial-gradient(1100px 550px at 12% -10%, ${withAlpha(primary, 0.18)}, transparent 60%), radial-gradient(800px 460px at 100% 0%, ${withAlpha(accent, 0.16)}, transparent 55%), ${background}`
     return (
-      <section style={{ background: heroBg, color: text, padding: split ? '120px 28px' : '140px 28px', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ maxWidth: 1120, margin: '0 auto', display: split ? 'grid' : 'block', gridTemplateColumns: split ? '1.1fr 0.9fr' : undefined, gap: 48, alignItems: 'center', textAlign: split ? 'left' : 'center' }}>
+      <section className="sb-public-section sb-public-hero" style={{ background: heroBg, color: text, padding: split ? 'clamp(72px, 10vw, 120px) 28px' : 'clamp(84px, 11vw, 140px) 28px', position: 'relative', overflow: 'hidden' }}>
+        <div className={split ? 'sb-public-hero-inner sb-public-hero-inner--split' : 'sb-public-hero-inner'} style={{ maxWidth: 1120, margin: '0 auto', display: split ? 'grid' : 'block', gridTemplateColumns: split ? 'minmax(0, 1.08fr) minmax(280px, 0.92fr)' : undefined, gap: 48, alignItems: 'center', textAlign: split ? 'left' : 'center' }}>
           <div style={{ maxWidth: split ? 'none' : 860, margin: split ? '0' : '0 auto' }}>
             {eyebrowEl}
             {heading && <h1 style={{ ...headingStyle, fontSize: 'clamp(40px, 7vw, 78px)', fontWeight: 900, lineHeight: 1.02 }}>{heading}</h1>}
@@ -192,16 +192,16 @@ function SectionView({ section, theme, displayFont, idx }: { section: Section; t
   // ── FEATURE GRID ──
   if (t === 'feature-grid' && Array.isArray(section.items) && section.items.length > 0) {
     return (
-      <section style={{ background, color: text, padding: '96px 28px' }}>
+      <section className="sb-public-section" style={{ background, color: text, padding: 'clamp(64px, 8vw, 96px) 28px' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 56 }}>
             {eyebrowEl}
             {heading && <h2 style={{ ...headingStyle, fontSize: 'clamp(30px, 4.5vw, 46px)' }}>{heading}</h2>}
             {sub && <p style={{ color: muted, fontSize: 18, marginTop: 14, maxWidth: 620, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.55 }}>{sub}</p>}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 22 }}>
+          <div className="sb-public-bento" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 18 }}>
             {section.items.map((item, j) => (
-              <div key={j} style={{ background: surface, border: `1px solid ${withAlpha(text, dark ? 0.08 : 0.06)}`, borderRadius: 20, padding: 30, boxShadow: dark ? 'none' : `0 10px 30px ${withAlpha(text, 0.05)}` }}>
+              <div key={j} className={j === 0 ? 'sb-public-bento-card sb-public-bento-card--lead' : 'sb-public-bento-card'} style={{ background: surface, border: `1px solid ${withAlpha(text, dark ? 0.08 : 0.06)}`, borderRadius: 22, padding: j === 0 ? 34 : 26, boxShadow: dark ? 'none' : `0 14px 34px ${withAlpha(text, 0.06)}` }}>
                 <div style={{ width: 50, height: 50, borderRadius: 14, background: `linear-gradient(135deg, ${primary}, ${accent})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, marginBottom: 18 }}>{item.icon || '◆'}</div>
                 {item.title && <h3 style={{ fontFamily: displayFont, fontSize: 21, fontWeight: 800, margin: '0 0 10px' }}>{item.title}</h3>}
                 {item.body && <p style={{ color: muted, fontSize: 15, lineHeight: 1.6, margin: 0 }}>{item.body}</p>}
@@ -216,7 +216,7 @@ function SectionView({ section, theme, displayFont, idx }: { section: Section; t
   // ── STATS BAND ──
   if (t === 'stats' && Array.isArray(section.stats) && section.stats.length > 0) {
     return (
-      <section style={{ background: `linear-gradient(135deg, ${primary}, ${accent})`, color: '#fff', padding: '72px 28px' }}>
+      <section className="sb-public-section" style={{ background: `linear-gradient(135deg, ${primary}, ${accent})`, color: '#fff', padding: 'clamp(56px, 7vw, 72px) 28px' }}>
         <div style={{ maxWidth: 1000, margin: '0 auto', display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(160px, 1fr))`, gap: 28, textAlign: 'center' }}>
           {section.stats.map((s, j) => (
             <div key={j}>
@@ -233,7 +233,7 @@ function SectionView({ section, theme, displayFont, idx }: { section: Section; t
   if (t === 'video') {
     const embed = toEmbedUrl(section.videoUrl)
     return (
-      <section style={{ background: dark ? background : surface, color: text, padding: '96px 28px' }}>
+      <section className="sb-public-section" style={{ background: dark ? background : surface, color: text, padding: 'clamp(64px, 8vw, 96px) 28px' }}>
         <div style={{ maxWidth: 960, margin: '0 auto', textAlign: 'center' }}>
           {eyebrowEl}
           {heading && <h2 style={{ ...headingStyle, fontSize: 'clamp(28px, 4.5vw, 44px)', marginBottom: sub ? 12 : 32 }}>{heading}</h2>}
@@ -261,7 +261,7 @@ function SectionView({ section, theme, displayFont, idx }: { section: Section; t
   // ── GALLERY (color-block tiles; real images can be added later) ──
   if (t === 'gallery' && Array.isArray(section.items) && section.items.length > 0) {
     return (
-      <section style={{ background, color: text, padding: '96px 28px' }}>
+      <section className="sb-public-section" style={{ background, color: text, padding: 'clamp(64px, 8vw, 96px) 28px' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           {(heading || eyebrow) && (
             <div style={{ textAlign: 'center', marginBottom: 48 }}>
@@ -269,9 +269,9 @@ function SectionView({ section, theme, displayFont, idx }: { section: Section; t
               {heading && <h2 style={{ ...headingStyle, fontSize: 'clamp(28px, 4.5vw, 44px)' }}>{heading}</h2>}
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+          <div className="sb-public-gallery" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 16 }}>
             {section.items.map((item, j) => (
-              <div key={j} style={{ borderRadius: 18, aspectRatio: '4/3', background: `linear-gradient(${135 + j * 25}deg, ${withAlpha(primary, 0.85)}, ${withAlpha(accent, 0.85)})`, display: 'flex', alignItems: 'flex-end', padding: 18, color: '#fff', fontWeight: 800, fontFamily: displayFont, boxShadow: `0 14px 36px ${withAlpha(primary, 0.3)}` }}>
+              <div key={j} className={j % 5 === 0 ? 'sb-public-gallery-tile sb-public-gallery-tile--wide' : 'sb-public-gallery-tile'} style={{ borderRadius: 20, minHeight: j % 5 === 0 ? 250 : 210, background: `linear-gradient(${135 + j * 25}deg, ${withAlpha(primary, 0.85)}, ${withAlpha(accent, 0.85)})`, display: 'flex', alignItems: 'flex-end', padding: 20, color: '#fff', fontWeight: 800, fontFamily: displayFont, boxShadow: `0 14px 36px ${withAlpha(primary, 0.3)}` }}>
                 {item.title}
               </div>
             ))}
@@ -284,7 +284,7 @@ function SectionView({ section, theme, displayFont, idx }: { section: Section; t
   // ── TESTIMONIALS ──
   if (t === 'testimonials' && Array.isArray(section.testimonials) && section.testimonials.length > 0) {
     return (
-      <section style={{ background: dark ? surface : '#0a0a12', color: dark ? text : '#f3f4f8', padding: '96px 28px' }}>
+      <section className="sb-public-section" style={{ background: dark ? surface : '#0a0a12', color: dark ? text : '#f3f4f8', padding: 'clamp(64px, 8vw, 96px) 28px' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           {heading && <h2 style={{ ...headingStyle, fontSize: 'clamp(28px, 4.5vw, 44px)', textAlign: 'center', marginBottom: 48 }}>{heading}</h2>}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 22 }}>
@@ -305,7 +305,7 @@ function SectionView({ section, theme, displayFont, idx }: { section: Section; t
   // ── CTA BAND ──
   if (t === 'cta') {
     return (
-      <section style={{ background, color: text, padding: '40px 28px 96px' }}>
+      <section className="sb-public-section" style={{ background, color: text, padding: '40px 28px clamp(64px, 8vw, 96px)' }}>
         <div style={{ maxWidth: 960, margin: '0 auto', borderRadius: 28, padding: '64px 40px', textAlign: 'center', background: `linear-gradient(135deg, ${primary}, ${accent})`, color: '#fff', boxShadow: `0 30px 80px ${withAlpha(primary, 0.4)}` }}>
           {heading && <h2 style={{ ...headingStyle, fontSize: 'clamp(28px, 4.5vw, 46px)', color: '#fff' }}>{heading}</h2>}
           {sub && <p style={{ fontSize: 18, opacity: 0.95, margin: '14px 0 0', lineHeight: 1.5 }}>{sub}</p>}
@@ -318,7 +318,7 @@ function SectionView({ section, theme, displayFont, idx }: { section: Section; t
   // ── CONTACT ──
   if (t === 'contact') {
     return (
-      <section style={{ background: dark ? surface : '#f6f7fb', color: text, padding: '96px 28px' }}>
+      <section className="sb-public-section" style={{ background: dark ? surface : '#f6f7fb', color: text, padding: 'clamp(64px, 8vw, 96px) 28px' }}>
         <div style={{ maxWidth: 680, margin: '0 auto', textAlign: 'center' }}>
           {eyebrowEl}
           {heading && <h2 style={{ ...headingStyle, fontSize: 'clamp(28px, 4.5vw, 44px)' }}>{heading}</h2>}
@@ -335,7 +335,7 @@ function SectionView({ section, theme, displayFont, idx }: { section: Section; t
 
   // ── ABOUT / generic text (default) ──
   return (
-    <section style={{ background, color: text, padding: '88px 28px' }}>
+    <section className="sb-public-section" style={{ background, color: text, padding: 'clamp(60px, 8vw, 88px) 28px' }}>
       <div style={{ maxWidth: 760, margin: '0 auto', textAlign: 'center' }}>
         {eyebrowEl}
         {heading && <h2 style={{ ...headingStyle, fontSize: 'clamp(26px, 4vw, 40px)', marginBottom: 18 }}>{heading}</h2>}
@@ -365,6 +365,19 @@ export default async function PublicSitePage({ params }: { params: Promise<{ han
   return (
     <>
       {fontsHref && <link rel="stylesheet" href={fontsHref} />}
+      <style>{`
+        .sb-public-bento-card { grid-column: span 2; }
+        .sb-public-bento-card--lead { grid-column: span 3; grid-row: span 2; }
+        .sb-public-gallery-tile { grid-column: span 2; }
+        .sb-public-gallery-tile--wide { grid-column: span 3; }
+        @media (max-width: 820px) {
+          .sb-public-hero-inner--split { display: block !important; text-align: left !important; }
+          .sb-public-hero-inner--split > div + div { margin-top: 34px; min-height: 240px !important; }
+          .sb-public-bento, .sb-public-gallery { grid-template-columns: 1fr !important; }
+          .sb-public-bento-card, .sb-public-bento-card--lead, .sb-public-gallery-tile, .sb-public-gallery-tile--wide { grid-column: 1 / -1 !important; }
+          .sb-public-section { padding-left: 20px !important; padding-right: 20px !important; }
+        }
+      `}</style>
       <main style={{ background: theme.background, color: theme.text, minHeight: '100vh', fontFamily: bodyFont, margin: 0 }}>
         {sections.map((section, i) => (
           <SectionView key={i} section={section} theme={theme} displayFont={displayFont} idx={i} />

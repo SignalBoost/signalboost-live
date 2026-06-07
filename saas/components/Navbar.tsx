@@ -70,26 +70,7 @@ const WORKSPACE: Item[] = [
   { icon: '🤖', label: 'Assistant', href: '/dashboard/assistant', desc: 'Ask the concierge anything.' },
   { icon: '📅', label: 'Calendar', href: '/dashboard/calendar', desc: 'Events and cultural dates.' },
   { icon: '📑', label: 'Spreadsheets', href: '/dashboard/spreadsheets', desc: 'Your imported data, in a grid.' },
-  { icon: '🔌', label: 'Data Connectors', href: '/dashboard/data', desc: 'Import data from sources.' },
-  { icon: '⚡', label: 'Metrics & Credits', href: '/dashboard/metrics', desc: 'Usage and credit control.' },
-  { icon: '🎛️', label: 'Console', href: '/dashboard/wireframes', desc: 'Office utilities console.' },
   { icon: '💬', label: 'Feedback', href: '/dashboard/feedback', desc: 'Send us your feedback.' },
-  { icon: '⚙️', label: 'Settings', href: '/dashboard/settings', desc: 'Account and preferences.' },
-]
-
-const ADMIN: Item[] = [
-  { icon: '🌌', label: 'Overview', href: '/admin/overview', desc: 'Real counts from live data.' },
-  { icon: '💰', label: 'Revenue', href: '/admin/revenue', desc: 'Live MRR from active subscriptions.' },
-  { icon: '👥', label: 'Team & Roles', href: '/dashboard/team', desc: 'Add people and set access.' },
-  { icon: '🛡️', label: 'Role Management', href: '/admin/settings/roles', desc: 'Manage roles and ownership.' },
-  { icon: '🚪', label: 'Onboarding', href: '/admin/onboarding', desc: 'Onboarding controls.' },
-  { icon: '⚙️', label: 'Admin Settings', href: '/admin/settings', desc: 'System-wide switches.' },
-]
-
-const HELP: Item[] = [
-  { icon: '❓', label: 'FAQ', href: '/faq' },
-  { icon: '✉️', label: 'Contact Support', href: '/support' },
-  { icon: '📖', label: 'Documentation', href: '/docs' },
 ]
 
 const TEAM_ITEM: Item = {
@@ -98,6 +79,25 @@ const TEAM_ITEM: Item = {
   href: '/dashboard/team',
   desc: 'Add people and set their access.',
 }
+
+const ADMIN: Item[] = [
+  { icon: '🌌', label: 'Overview', href: '/admin/overview', desc: 'Real counts from live data.' },
+  { icon: '💰', label: 'Revenue', href: '/admin/revenue', desc: 'Live MRR from active subscriptions.' },
+  { icon: '🔌', label: 'Data Connectors', href: '/dashboard/data', desc: 'Import and manage connected data sources.' },
+  { icon: '⚡', label: 'Metrics & Credits', href: '/dashboard/metrics', desc: 'Usage, credits, and operating metrics.' },
+  { icon: '🎛️', label: 'Console', href: '/dashboard/wireframes', desc: 'Office utilities and internal console.' },
+  { icon: '👥', label: 'Team & Roles', href: '/dashboard/team', desc: 'Add people and set access.' },
+  { icon: '🛡️', label: 'Role Management', href: '/admin/settings/roles', desc: 'Manage roles and ownership.' },
+  { icon: '🚪', label: 'Onboarding', href: '/admin/onboarding', desc: 'Onboarding controls.' },
+  { icon: '⚙️', label: 'Admin Settings', href: '/admin/settings', desc: 'System-wide switches.' },
+  { icon: '🧰', label: 'Settings', href: '/dashboard/settings', desc: 'Operational settings and account preferences.' },
+]
+
+const HELP: Item[] = [
+  { icon: '❓', label: 'FAQ', href: '/faq' },
+  { icon: '✉️', label: 'Contact Support', href: '/support' },
+  { icon: '📖', label: 'Documentation', href: '/docs' },
+]
 
 const PUBLIC_PLAN_LABELS: Record<string, string> = {
   free: 'Free Demo',
@@ -194,7 +194,7 @@ export default function Navbar() {
       setIsAdmin(!!data.isAdmin)
       setIsOwner(!!data.isOwner)
     } catch {
-      // Silent by design. Navbar should not break the app if credits fail.
+      // Navbar should not break the app if credits fail.
     }
   }
 
@@ -504,7 +504,7 @@ export default function Navbar() {
           <Group id="grow" label="Grow" items={GROW} width={340} />
           <Group id="workspace" label="Workspace" items={workspaceItems} width={340} />
 
-          {isAdmin ? <Group id="admin" label="Admin" items={ADMIN} width={340} /> : null}
+          {isAdmin ? <Group id="admin" label="Admin" items={ADMIN} width={360} /> : null}
 
           <Link href="/pricing" style={{ ...trigger(pathname === '/pricing'), display: 'inline-flex' }}>
             Pricing

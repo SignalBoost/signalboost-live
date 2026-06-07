@@ -42,6 +42,8 @@ const productionAreas = [
 
 const conflictMarkerPattern = /^(<<<<<<<|=======|>>>>>>>)(?:\s|$)/m
 const ignoredPathPattern = /(^|\/)(\.git|\.next|node_modules|dist|build|coverage)(\/|$)/
+const translationLocaleFiles = ['saas/locales/en.json', 'saas/locales/es.json', 'saas/locales/pt.json', 'saas/locales/pl.json', 'saas/locales/ru.json']
+
 
 function runGit(args, fallback = '') {
   try {
@@ -270,7 +272,7 @@ function scanConflictingRoutes() {
 function scanDuplicateApiMethods() {
   const duplicates = []
   const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
-  const routeFiles = runGit(['ls-files', 'app/**/route.ts', 'app/**/route.tsx'])
+  const routeFiles = runGit(['ls-files', 'app/**/route.ts', 'app/**/route.tsx', 'saas/app/**/route.ts', 'saas/app/**/route.tsx'])
     .split('\n')
     .filter(Boolean)
 
@@ -286,6 +288,183 @@ function scanDuplicateApiMethods() {
   }
 
   return duplicates
+}
+
+function lineForIndex(content, index) {
+  return content.slice(0, index).split('\n').length
+}
+
+function parseJsonStringToken(content, start) {
+  let value = ''
+  let index = start + 1
+
+  while (index < content.length) {
+    const char = content[index]
+    if (char === '"') return { value, end: index + 1 }
+    if (char !== '\\') {
+      value += char
+      index += 1
+      continue
+    }
+
+    const escaped = content[index + 1]
+    if (escaped === 'u') {
+      value += content.slice(index, index + 6)
+      index += 6
+    } else {
+      value += escaped ?? ''
+      index += 2
+    }
+  }
+
+  return { value, end: index }
+}
+
+function skipJsonPrimitive(content, start) {
+  let index = start
+  while (index < content.length && !/[\s,}\]]/.test(content[index])) index += 1
+  return index
+}
+
+function scanDuplicateKeysInJson(content, file) {
+  const duplicates = []
+  const stack = []
+  let index = 0
+
+  const current = () => stack[stack.length - 1]
+  const currentPath = () => stack.map((context) => context.pathPart).filter(Boolean).join('.')
+  const completeValue = () => {
+    const parent = current()
+    if (!parent) return
+    if (parent.type === 'object') {
+      parent.pendingKey = null
+      parent.expecting = 'commaOrEnd'
+    } else {
+      parent.index += 1
+      parent.expecting = 'commaOrEnd'
+    }
+  }
+  const pathPartForNewValue = () => {
+    const parent = current()
+    if (!parent) return ''
+    if (parent.type === 'object') return parent.pendingKey ?? ''
+    const arrayPath = String(parent.index)
+    return arrayPath
+  }
+
+  while (index < content.length) {
+    const char = content[index]
+    if (/\s/.test(char)) {
+      index += 1
+      continue
+    }
+
+    const context = current()
+
+    if (char === '"') {
+      const token = parseJsonStringToken(content, index)
+      if (context?.type === 'object' && context.expecting === 'keyOrEnd') {
+        const existingLine = context.keys.get(token.value)
+        const line = lineForIndex(content, index)
+        if (existingLine) {
+          const objectPath = currentPath() || '<root>'
+          duplicates.push(`${file}: duplicate key "${token.value}" in ${objectPath} on lines ${existingLine} and ${line}`)
+        } else {
+          context.keys.set(token.value, line)
+        }
+        context.pendingKey = token.value
+        context.expecting = 'colon'
+      } else {
+        completeValue()
+      }
+      index = token.end
+      continue
+    }
+
+    if (char === '{' || char === '[') {
+      if (context?.type === 'object' && context.expecting !== 'value') {
+        index += 1
+        continue
+      }
+      if (context?.type === 'array' && !['value', 'valueOrEnd'].includes(context.expecting)) {
+        index += 1
+        continue
+      }
+
+      stack.push(char === '{'
+        ? { type: 'object', pathPart: pathPartForNewValue(), keys: new Map(), pendingKey: null, expecting: 'keyOrEnd' }
+        : { type: 'array', pathPart: pathPartForNewValue(), index: 0, expecting: 'valueOrEnd' })
+      index += 1
+      continue
+    }
+
+    if (char === '}' || char === ']') {
+      stack.pop()
+      completeValue()
+      index += 1
+      continue
+    }
+
+    if (char === ':') {
+      if (context?.type === 'object') context.expecting = 'value'
+      index += 1
+      continue
+    }
+
+    if (char === ',') {
+      if (context?.type === 'object') context.expecting = 'keyOrEnd'
+      if (context?.type === 'array') context.expecting = 'value'
+      index += 1
+      continue
+    }
+
+    index = skipJsonPrimitive(content, index)
+    completeValue()
+  }
+
+  return duplicates
+}
+
+function flattenTranslationKeys(value, prefix = '') {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return prefix ? [prefix] : []
+
+  return Object.entries(value).flatMap(([key, nested]) => flattenTranslationKeys(nested, prefix ? `${prefix}.${key}` : key))
+}
+
+function scanDuplicateTranslationKeys() {
+  const issues = []
+  const parsedLocales = new Map()
+
+  for (const file of translationLocaleFiles) {
+    const content = readTextFile(file)
+    if (!content) {
+      issues.push(`${file}: locale file is missing or empty`)
+      continue
+    }
+
+    issues.push(...scanDuplicateKeysInJson(content, file))
+
+    try {
+      parsedLocales.set(file, JSON.parse(content))
+    } catch (error) {
+      issues.push(`${file}: invalid JSON (${error instanceof Error ? error.message : 'parse failed'})`)
+    }
+  }
+
+  const english = parsedLocales.get('saas/locales/en.json')
+  if (english) {
+    const englishKeys = new Set(flattenTranslationKeys(english))
+    for (const [file, locale] of parsedLocales.entries()) {
+      if (file === 'saas/locales/en.json') continue
+      const localeKeys = new Set(flattenTranslationKeys(locale))
+      const missing = [...englishKeys].filter((key) => !localeKeys.has(key))
+      const extra = [...localeKeys].filter((key) => !englishKeys.has(key))
+      if (missing.length > 0) issues.push(`${file}: missing translation keys: ${missing.join(', ')}`)
+      if (extra.length > 0) issues.push(`${file}: extra translation keys: ${extra.join(', ')}`)
+    }
+  }
+
+  return issues
 }
 
 function statusIcon(ok) {
@@ -306,6 +485,7 @@ const filesWithConflictMarkers = scanConflictMarkers()
 const duplicateComponentDefinitions = scanDuplicateComponentDefinitions()
 const conflictingRoutes = scanConflictingRoutes()
 const duplicateApiMethods = scanDuplicateApiMethods()
+const duplicateTranslationKeys = scanDuplicateTranslationKeys()
 const failures = []
 
 const targetIsProductionMain = isProductionTarget(pullRequestTarget)
@@ -345,6 +525,10 @@ if (conflictingRoutes.length > 0) {
 
 if (duplicateApiMethods.length > 0) {
   failures.push(`Conflicting API handler names found: ${duplicateApiMethods.join('; ')}`)
+}
+
+if (duplicateTranslationKeys.length > 0) {
+  failures.push(`Translation key validation failed: ${duplicateTranslationKeys.join('; ')}`)
 }
 
 const reportLines = [
@@ -422,6 +606,13 @@ if (duplicateApiMethods.length === 0) {
 } else {
   reportLines.push('❌ Duplicate API method exports remain:')
   for (const method of duplicateApiMethods) reportLines.push(`- ${method}`)
+}
+
+if (duplicateTranslationKeys.length === 0) {
+  reportLines.push('✅ No duplicate translation keys were found and locale structures match English.')
+} else {
+  reportLines.push('❌ Translation key validation issues remain:')
+  for (const issue of duplicateTranslationKeys) reportLines.push(`- ${issue}`)
 }
 
 reportLines.push('', '## Compilation validation', '')

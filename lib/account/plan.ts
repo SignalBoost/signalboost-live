@@ -8,6 +8,55 @@ export interface Subscription {
   expiresAt?: Date | string | null;
 }
 
+type AccountUser = {
+  email?: string | null;
+  user_metadata?: {
+    avatar_url?: string | null;
+    full_name?: string | null;
+    name?: string | null;
+  } | null;
+};
+
+export type WorkspaceStatus = "active" | "trialing" | "attention" | "inactive";
+
+export type AccountPlanSnapshot = {
+  key: Plan;
+  name: string;
+  badge: string;
+  includedModules: string[];
+};
+
+export type AccountSnapshot = {
+  displayName: string;
+  email: string | null;
+  avatarUrl: string | null;
+  isAuthenticated: boolean;
+  workspaceStatus: WorkspaceStatus;
+  subscriptionStatusLabel: string;
+  effectivePlan: AccountPlanSnapshot;
+};
+
+const PLAN_SNAPSHOTS: Record<Plan, AccountPlanSnapshot> = {
+  starter: {
+    key: "starter",
+    name: "Starter",
+    badge: "Starter plan",
+    includedModules: ["promote", "reviews", "calendar"],
+  },
+  growth: {
+    key: "growth",
+    name: "Growth",
+    badge: "Growth plan",
+    includedModules: ["promote", "reviews", "calendar", "spreadsheets", "outreach", "assistant", "video"],
+  },
+  enterprise: {
+    key: "enterprise",
+    name: "Enterprise",
+    badge: "Enterprise plan",
+    includedModules: ["promote", "reviews", "calendar", "spreadsheets", "outreach", "assistant", "video"],
+  },
+};
+
 export function normalizePlan(plan?: string | null): Plan {
   switch ((plan || "").toLowerCase().trim()) {
     case "starter":
@@ -64,4 +113,44 @@ export function formatSubscription(subscription?: Subscription | null): string {
   }
 
   return `Plano ${planName} inativo`;
+}
+
+function normalizeWorkspaceStatus(status?: string | null): WorkspaceStatus {
+  const normalized = (status || "").toLowerCase().trim();
+
+  if (normalized === "active") return "active";
+  if (normalized === "trial" || normalized === "trialing") return "trialing";
+  if (normalized === "past_due" || normalized === "past due") return "attention";
+  return "inactive";
+}
+
+function subscriptionStatusLabel(status: WorkspaceStatus): string {
+  if (status === "active") return "Subscription active";
+  if (status === "trialing") return "Trial active";
+  if (status === "attention") return "Needs attention";
+  return "No active subscription";
+}
+
+function displayNameForUser(user?: AccountUser | null): string {
+  const metadata = user?.user_metadata;
+  const metadataName = metadata?.full_name || metadata?.name;
+
+  if (metadataName) return metadataName;
+  if (user?.email) return user.email.split("@")[0] || "SignalBoost user";
+  return "SignalBoost guest";
+}
+
+export function buildAccountSnapshot(user?: AccountUser | null, plan?: string | null, status?: string | null): AccountSnapshot {
+  const normalizedPlan = normalizePlan(plan);
+  const workspaceStatus = user ? normalizeWorkspaceStatus(status) : "inactive";
+
+  return {
+    displayName: displayNameForUser(user),
+    email: user?.email ?? null,
+    avatarUrl: user?.user_metadata?.avatar_url ?? null,
+    isAuthenticated: Boolean(user),
+    workspaceStatus,
+    subscriptionStatusLabel: subscriptionStatusLabel(workspaceStatus),
+    effectivePlan: PLAN_SNAPSHOTS[normalizedPlan],
+  };
 }

@@ -1,0 +1,12 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "installCommand": "npm ci",
+  "regions": ["iad1"],
+  "env": {
+    "NEXT_PUBLIC_API_BASE_URL": "@next_public_api_base_url"
+  },
+  "rewrites": [
+    { "source": "/api/express/:path*", "destination": "https://api.signalboost.live/api/:path*" }
+  ]
+}

@@ -27,5 +27,5 @@
     "**/*.ts",
     "**/*.tsx"
   ],
-  "exclude": ["node_modules", "saas", "saas/node_modules"]
+  "exclude": ["node_modules", "saas", "saas/node_modules", "server"]
 }

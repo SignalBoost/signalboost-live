@@ -82,6 +82,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
               <span className="mr-2">{module.icon}</span>{module.label}
             </Link>
           ))}
+          <Link href="/dashboard/league" className="rounded-2xl px-4 py-3 text-sm text-white/75 no-underline transition hover:bg-[#FFD700]/10 hover:text-[#FFD700]">
+            <span className="mr-2">🏟️</span>League CRUD
+          </Link>
           <Link href="/pricing" className="rounded-2xl px-4 py-3 text-sm text-white/75 no-underline transition hover:bg-[#FFD700]/10 hover:text-[#FFD700]">
             <span className="mr-2">💳</span>Plans & billing
           </Link>

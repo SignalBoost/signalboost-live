@@ -9,7 +9,10 @@
     "dev": "next dev",
     "typecheck": "tsc --noEmit",
     "qa:repo": "node scripts/verify-repo-targeting.mjs",
-    "worker:video": "node scripts/video-render-worker.mjs"
+    "worker:video": "node scripts/video-render-worker.mjs",
+    "api:dev": "npm --prefix server run dev",
+    "api:start": "npm --prefix server start",
+    "db:migrate": "for file in db/migrations/*.sql; do psql \"$DATABASE_URL\" -f \"$file\"; done"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

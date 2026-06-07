@@ -105,27 +105,35 @@ VISUAL DIRECTION:
 - Strong palette with dominant color and sharp accent (hex values).
 - Rich, varied page: strong hero, deliberate sequence of 5-8 sections.
 
-SECTION TYPES: hero (eyebrow,heading,subheading,cta,ctaSecondary), hero-split (+body), feature-grid (eyebrow,heading,subheading,items[]{icon,title,body}), stats (heading,stats[]{value,label}), gallery (heading,items[]{title,body}), video (eyebrow,heading,subheading,videoUrl=""), testimonials (heading,testimonials[]{quote,author,role}), cta (heading,subheading,cta), contact (eyebrow,heading,body,email,phone,address), about/text (eyebrow,heading,body).
+MEDIA + LAYOUT SCHEMA (CRITICAL): Generated JSON supports rich visual storytelling. Use these fields whenever they make the site more vivid:
+- Any section may include backgroundImage { url, alt, overlay? } or backgroundImageUrl/background_image_url for atmospheric full-bleed imagery.
+- Hero sections may include heroImage { url, alt, caption? } or heroImageUrl/hero_image_url. Use hero-split when pairing a story panel with media.
+- Gallery items may include image { url, alt }, imageUrl, or image_url. Prefer 3-8 image-led cards.
+- Feature/grid/team/sponsor items may include image { url, alt }, logo { url, alt }, imageUrl/image_url, or logoUrl/logo_url.
+- Variable-size content blocks: items may include size="sm"|"md"|"lg"|"wide"|"tall"|"featured" and sections may include layout="grid"|"mosaic"|"bento".
+
+SECTION TYPES: hero (eyebrow,heading,subheading,cta,ctaSecondary,heroImage,backgroundImage), hero-split (+body), feature-grid (eyebrow,heading,subheading,layout,items[]{icon,title,body,image,logo,size}), bento (eyebrow,heading,subheading,items[]{title,body,icon,image,logo,size}), stats (heading,stats[]{value,label}), gallery (heading,layout,items[]{title,body,image,size}), team (heading,items[]{title,body,role,image,logo}), sponsors/logo-cloud (heading,items[]{title,body,logo,image}), video (eyebrow,heading,subheading,videoUrl="",posterImage), testimonials (heading,testimonials[]{quote,author,role}), cta (heading,subheading,cta,backgroundImage), contact (eyebrow,heading,body,email,phone,address), about/text (eyebrow,heading,body,backgroundImage).
 
 OUTPUT: valid JSON only — no markdown, no backticks.
 {"businessName":"...","theme":"light"|"dark","fonts":{"display":"...","body":"..."},"palette":{"primary":"#...","accent":"#...","background":"#...","surface":"#...","text":"#...","muted":"#..."},"sections":[...]}
 
-RULES: Valid JSON. Real specific copy. 5-8 sections. Start with hero, end with contact.`
+RULES: Valid JSON. Real specific copy. 5-8 sections. Start with hero, include at least one rich media section (gallery, bento, team, or sponsors/logo-cloud), and end with contact. Only use image/logo URLs that are supplied by the user/orchestration data or are stable public URLs you are confident exist; otherwise include descriptive alt/caption text and let the renderer create branded visual placeholders.`
 
 function isValidContent(p: any): boolean {
   return p && typeof p.businessName === 'string' && Array.isArray(p.sections) && p.sections.length > 0
 }
 
 function buildRecoveryContent(description: string, items: ValidatedItem[]) {
-  const cards = items.slice(0, 6).map(item => ({ title: item.name, body: item.description }))
+  const cards = items.slice(0, 6).map((item, index) => ({ title: item.name, body: item.description, icon: ['✦','◆','●','▲','■','◇'][index % 6], size: index === 0 ? 'featured' : index === 3 ? 'wide' : 'md' }))
   return {
     businessName: 'SignalBoost Demo Site',
     theme: 'light',
     fonts: { display: 'Space Grotesk', body: 'DM Sans' },
     palette: { primary: '#2563eb', accent: '#f97316', background: '#f8fafc', surface: '#ffffff', text: '#0f172a', muted: '#64748b' },
     sections: [
-      { type: 'hero', eyebrow: 'AI-ready prompt', heading: 'Your request is ready to launch', subheading: description, cta: 'Explore the data', ctaSecondary: 'Contact us' },
-      { type: 'feature-grid', eyebrow: 'Fallback data', heading: 'Curated starter items', subheading: 'Demo records keep the page useful while live data recovers.', items: cards },
+      { type: 'hero-split', eyebrow: 'AI-ready prompt', heading: 'Your request is ready to launch', subheading: description, body: 'A visual launch board is ready for your story.', cta: 'Explore the data', ctaSecondary: 'Contact us', heroImage: { alt: 'Abstract launch board with colorful content tiles' } },
+      { type: 'bento', eyebrow: 'Fallback data', heading: 'Curated starter items', subheading: 'Demo records keep the page useful while live data recovers.', layout: 'bento', items: cards },
+      { type: 'sponsors', heading: 'Visual partners and proof points', items: cards.slice(0, 4).map(card => ({ ...card, logo: { alt: card.title } })) },
       { type: 'cta', heading: 'Ready for real data', subheading: 'Connect AI, CSV, scraper, or API sources when available.', cta: 'Generate again' },
       { type: 'contact', eyebrow: 'SignalBoost', heading: 'Keep building', body: 'We recovered gracefully and seeded safe demo content.', email: 'support@signalboostapp.com', phone: '', address: '' },
     ],

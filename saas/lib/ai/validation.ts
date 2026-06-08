@@ -63,25 +63,52 @@ export interface ValidGlobalKnowledge {
 export function safeParseJSON(raw: string): any | null {
   if (!raw || typeof raw !== 'string') return null
 
-  // Try direct parse
+  // 1) Strip markdown code fences (```json ... ``` or ``` ... ```) and trim.
+  let cleaned = raw.trim()
+  cleaned = cleaned
+    .replace(/^```(?:json)?\s*/i, '') // opening fence at start
+    .replace(/```\s*$/i, '')          // closing fence at end
+    .trim()
+
+  // 2) Try a direct parse of the cleaned string.
+  try { return JSON.parse(cleaned) } catch { /* continue */ }
+
+  // 3) Try the original raw, in case cleaning removed something valid.
   try { return JSON.parse(raw) } catch { /* continue */ }
 
-  // Try extracting JSON array
-  try {
-    const firstBracket = raw.indexOf('[')
-    const lastBracket  = raw.lastIndexOf(']')
-    if (firstBracket !== -1 && lastBracket > firstBracket) {
-      return JSON.parse(raw.slice(firstBracket, lastBracket + 1))
-    }
-  } catch { /* continue */ }
+  // 4) Decide whether the content looks like an object or an array by which
+  //    delimiter appears FIRST, then extract that balanced region.
+  const firstBrace = cleaned.indexOf('{')
+  const firstBracket = cleaned.indexOf('[')
 
-  // Try extracting JSON object
+  const preferObject =
+    firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)
+
+  const tryExtract = (open: string, close: string): any | null => {
+    const start = cleaned.indexOf(open)
+    const end = cleaned.lastIndexOf(close)
+    if (start === -1 || end <= start) return null
+    const slice = cleaned.slice(start, end + 1)
+    try { return JSON.parse(slice) } catch { return null }
+  }
+
+  // 5) Try the preferred shape first, then the other.
+  if (preferObject) {
+    const obj = tryExtract('{', '}')
+    if (obj !== null) return obj
+    const arr = tryExtract('[', ']')
+    if (arr !== null) return arr
+  } else {
+    const arr = tryExtract('[', ']')
+    if (arr !== null) return arr
+    const obj = tryExtract('{', '}')
+    if (obj !== null) return obj
+  }
+
+  // 6) Last resort: remove trailing commas before } or ] and retry.
   try {
-    const firstBrace = raw.indexOf('{')
-    const lastBrace  = raw.lastIndexOf('}')
-    if (firstBrace !== -1 && lastBrace > firstBrace) {
-      return JSON.parse(raw.slice(firstBrace, lastBrace + 1))
-    }
+    const deTrailed = cleaned.replace(/,\s*([}\]])/g, '$1')
+    return JSON.parse(deTrailed)
   } catch { /* continue */ }
 
   console.warn('validation: safeParseJSON failed on input length', raw.length)

@@ -54,6 +54,10 @@ function withAlpha(color: string, alpha: number): string {
 }
 
 
+function hideBrokenImage(e: React.SyntheticEvent<HTMLImageElement>) {
+  e.currentTarget.style.display = 'none'
+}
+
 function toEmbedUrl(url?: string): string | null {
   if (!url || typeof url !== 'string') return null
 
@@ -143,7 +147,7 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
             <div key={i} style={{ background: heroBg, padding: '40px 24px', textAlign: hasImage ? 'left' : 'center' }}>
               <div style={{ display: hasImage ? 'grid' : 'block', gridTemplateColumns: hasImage ? '1fr minmax(160px, 0.85fr)' : undefined, gap: 18, alignItems: 'center' }}>
                 <div>
-                  {content.logo_url && i === 0 && <img src={content.logo_url} alt={content.logoAlt || `${content.businessName || 'Site'} logo`} style={{ width: 42, height: 42, borderRadius: 12, marginBottom: 12, objectFit: 'cover' }} />}
+                  {content.logo_url && i === 0 && <img src={content.logo_url} alt={content.logoAlt || `${content.businessName || 'Site'} logo`} style={{ width: 42, height: 42, borderRadius: 12, marginBottom: 12, objectFit: 'cover' }} onError={hideBrokenImage} />}
                   {eyebrow}
                   {h && <div style={{ fontFamily: display, fontWeight: 900, fontSize: 30, lineHeight: 1.05, letterSpacing: '-0.02em' }}>{h}</div>}
                   {sub && <div style={{ color: muted, fontSize: 14, marginTop: 12, lineHeight: 1.5, maxWidth: 420, marginLeft: hasImage ? 0 : 'auto', marginRight: hasImage ? 0 : 'auto' }}>{sub}</div>}
@@ -156,7 +160,7 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
                 </div>
                 {hasImage && (
                   <div style={{ minHeight: 180, borderRadius: 18, overflow: 'hidden', background: `linear-gradient(135deg, ${withAlpha(primary, 0.32)}, ${withAlpha(accent, 0.32)})` }}>
-                    <img src={s.image_url} alt={s.imageAlt || h || ''} style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                    <img src={s.image_url} alt={s.imageAlt || h || ''} style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block' }} onError={hideBrokenImage} />
                   </div>
                 )}
               </div>
@@ -174,7 +178,7 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
                 {(s.items as FeatureItem[]).map((it, j) => (
                   <div key={j} style={{ background: surface, border: `1px solid ${withAlpha(text, 0.08)}`, borderRadius: 12, padding: it.image_url ? 0 : 16, overflow: 'hidden' }}>
                     {it.image_url ? (
-                      <img src={it.image_url} alt={it.imageAlt || it.title || ''} style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }} />
+                      <img src={it.image_url} alt={it.imageAlt || it.title || ''} style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }} onError={hideBrokenImage} />
                     ) : (
                       <div style={{ width: 34, height: 34, borderRadius: 9, background: `linear-gradient(135deg, ${primary}, ${accent})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, marginBottom: 10 }}>
                         {it.icon || '◆'}
@@ -216,7 +220,7 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
                           src={it.image_url}
                           alt={it.imageAlt || it.title || ''}
                           style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                          onError={hideBrokenImage}
                         />
                       ) : 'No image URL'}
                     </div>
@@ -253,7 +257,7 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
                   const url = it.logo_url || it.image_url
                   return (
                     <div key={j} style={{ background, border: `1px solid ${withAlpha(text, 0.08)}`, borderRadius: 12, overflow: 'hidden' }}>
-                      {url && <img src={url} alt={it.logoAlt || it.imageAlt || it.title || ''} style={{ width: '100%', height: 88, objectFit: 'cover', display: 'block' }} />}
+                      {url && <img src={url} alt={it.logoAlt || it.imageAlt || it.title || ''} style={{ width: '100%', height: 88, objectFit: 'cover', display: 'block' }} onError={hideBrokenImage} />}
                       {it.title && <div style={{ padding: 10, fontWeight: 800, fontSize: 12 }}>{it.title}</div>}
                     </div>
                   )

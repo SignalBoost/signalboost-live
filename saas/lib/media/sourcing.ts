@@ -23,78 +23,78 @@ type MediaCategory = 'football' | 'food' | 'business' | 'technology' | 'bakery' 
 type CuratedMedia = {
   category: MediaCategory
   label: string
-  keywordSets: string[][]
+  generatedAssets: string[]
 }
 
 const CURATED_MEDIA: Record<MediaCategory, CuratedMedia> = {
   football: {
     category: 'football',
     label: 'grassroots football field',
-    keywordSets: [
-      ['grassroots', 'football', 'field', 'community', 'matchday'],
-      ['soccer', 'team', 'training', 'local', 'sports'],
-      ['football', 'club', 'players', 'neighborhood', 'pitch'],
-      ['amateur', 'football', 'match', 'field', 'fans'],
+    generatedAssets: [
+      '/media/generated/football-matchday-01.webp',
+      '/media/generated/football-training-01.webp',
+      '/media/generated/football-community-01.webp',
+      '/media/generated/football-sponsor-01.webp',
     ],
   },
   food: {
     category: 'food',
     label: 'restaurant dining room',
-    keywordSets: [
-      ['restaurant', 'dining', 'interior', 'warm', 'hospitality'],
-      ['chef', 'kitchen', 'fresh', 'food', 'service'],
-      ['cafe', 'restaurant', 'table', 'aesthetic', 'menu'],
-      ['hospitality', 'dining', 'plates', 'ambient', 'interior'],
+    generatedAssets: [
+      '/media/generated/food-dining-room-01.webp',
+      '/media/generated/food-kitchen-01.webp',
+      '/media/generated/food-table-01.webp',
+      '/media/generated/food-hospitality-01.webp',
     ],
   },
   bakery: {
     category: 'bakery',
     label: 'artisan bakery interior',
-    keywordSets: [
-      ['croissant', 'bakery', 'interior', 'aesthetic'],
-      ['artisan', 'bread', 'bakery', 'warm', 'counter'],
-      ['pastry', 'coffee', 'bakery', 'luxury', 'interior'],
-      ['baker', 'fresh', 'bread', 'shop', 'morning'],
+    generatedAssets: [
+      '/media/generated/bakery-counter-01.webp',
+      '/media/generated/bakery-bread-01.webp',
+      '/media/generated/bakery-pastry-01.webp',
+      '/media/generated/bakery-morning-01.webp',
     ],
   },
   technology: {
     category: 'technology',
     label: 'software dashboard workspace',
-    keywordSets: [
-      ['software', 'dashboard', 'cyberpunk'],
-      ['technology', 'startup', 'dashboard', 'interface', 'office'],
-      ['saas', 'analytics', 'computer', 'team', 'workspace'],
-      ['digital', 'platform', 'data', 'screen', 'modern'],
+    generatedAssets: [
+      '/media/generated/technology-dashboard-01.webp',
+      '/media/generated/technology-workspace-01.webp',
+      '/media/generated/technology-analytics-01.webp',
+      '/media/generated/technology-platform-01.webp',
     ],
   },
   legal: {
     category: 'legal',
     label: 'professional law office',
-    keywordSets: [
-      ['office', 'architecture', 'professional'],
-      ['law', 'firm', 'office', 'professional', 'corporate'],
-      ['legal', 'consultation', 'business', 'documents', 'office'],
-      ['corporate', 'lawyer', 'workspace', 'architecture', 'trust'],
+    generatedAssets: [
+      '/media/generated/legal-office-01.webp',
+      '/media/generated/legal-consultation-01.webp',
+      '/media/generated/legal-documents-01.webp',
+      '/media/generated/legal-workspace-01.webp',
     ],
   },
   business: {
     category: 'business',
     label: 'local business workspace',
-    keywordSets: [
-      ['local', 'business', 'workspace', 'team', 'professional'],
-      ['storefront', 'small', 'business', 'owner', 'service'],
-      ['office', 'team', 'meeting', 'professional', 'brand'],
-      ['studio', 'agency', 'workspace', 'creative', 'modern'],
+    generatedAssets: [
+      '/media/generated/business-workspace-01.webp',
+      '/media/generated/business-storefront-01.webp',
+      '/media/generated/business-team-01.webp',
+      '/media/generated/business-studio-01.webp',
     ],
   },
   generic: {
     category: 'generic',
     label: 'editorial brand imagery',
-    keywordSets: [
-      ['editorial', 'brand', 'website', 'modern', 'aesthetic'],
-      ['creative', 'business', 'interior', 'professional', 'design'],
-      ['architecture', 'workspace', 'premium', 'minimal', 'brand'],
-      ['lifestyle', 'business', 'website', 'visual', 'modern'],
+    generatedAssets: [
+      '/media/generated/generic-brand-01.webp',
+      '/media/generated/generic-workspace-01.webp',
+      '/media/generated/generic-architecture-01.webp',
+      '/media/generated/generic-lifestyle-01.webp',
     ],
   },
 }
@@ -112,6 +112,8 @@ const TECHNOLOGY_TERMS = ['saas', 'software', 'dashboard', 'platform', 'technolo
 const LEGAL_TERMS = ['lawyer', 'law', 'legal', 'attorney', 'advogado', 'abogado', 'solicitor', 'law firm', 'juridico', 'jurídico']
 const BUSINESS_TERMS = ['business', 'empresa', 'storefront', 'store', 'shop', 'loja', 'team', 'workspace', 'office', 'coworking', 'studio', 'agency', 'consulting', 'service']
 const URL_RE = /https?:\/\/[^\s"'<>]+/i
+const IMAGE_PATH_RE = /(?:^|\/)[^\s"'<>]+\.(?:png|jpe?g|webp|gif|svg)(?:[?#][^\s"'<>]*)?$/i
+const GENERATED_MEDIA_RE = /^\/media\/generated\/[^\s"'<>]+\.(?:webp|png|jpe?g|gif|svg)$/i
 const IMAGE_URL_RE = /https?:\/\/[^\s"'<>]+(?:\.(?:png|jpe?g|webp|gif|svg)(?:[?#][^\s"'<>]*)?|[^\s"'<>]*(?:images\.unsplash\.com|images\.pexels\.com|cdn\.pixabay\.com|image|photo|logo)[^\s"'<>]*)/i
 
 function includesAny(text: string, terms: string[]): boolean {
@@ -132,7 +134,7 @@ function hasMediaUrl(value: unknown, key = ''): boolean {
   if (typeof value === 'string') {
     const lowerKey = key.toLowerCase()
     const mediaKey = lowerKey.includes('image') || lowerKey.includes('logo') || lowerKey.includes('photo') || lowerKey.includes('picture')
-    return value.startsWith('data:image/') || (mediaKey && URL_RE.test(value)) || IMAGE_URL_RE.test(value)
+    return value.startsWith('data:image/') || (mediaKey && (URL_RE.test(value) || IMAGE_PATH_RE.test(value))) || IMAGE_URL_RE.test(value)
   }
   if (Array.isArray(value)) return value.some(item => hasMediaUrl(item, key))
   if (typeof value === 'object') {
@@ -145,14 +147,15 @@ function hasExplicitInputImageUrl(prompt: string): boolean {
   return IMAGE_URL_RE.test(prompt)
 }
 
-function isUnsplashFeaturedUrl(value: string): boolean {
-  return value.startsWith('https://images.unsplash.com/featured/1600x900/?')
+function isGeneratedMediaPath(value: string): boolean {
+  return GENERATED_MEDIA_RE.test(value)
 }
 
 function shouldReplaceGeneratedAsset(value: unknown, promptHasImageUrl: boolean): boolean {
   if (typeof value !== 'string' || value.trim().length === 0) return true
   const trimmed = value.trim()
-  if (isUnsplashFeaturedUrl(trimmed)) return false
+  if (isGeneratedMediaPath(trimmed)) return false
+  if (trimmed.startsWith('https://images.unsplash.com/featured/1600x900/?')) return true
   if (promptHasImageUrl && URL_RE.test(trimmed) && !trimmed.includes('images.unsplash.com/photo-')) return false
   if (trimmed.startsWith('data:image/')) return true
   if (!URL_RE.test(trimmed)) return true
@@ -206,39 +209,10 @@ function inferCategory(text: string): MediaCategory {
   return 'generic'
 }
 
-function normalizeKeyword(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}
-
-function keywordCandidates(text: string): string[] {
-  const stopWords = new Set([
-    'a', 'an', 'and', 'as', 'build', 'create', 'for', 'from', 'in', 'make', 'of', 'on', 'site', 'the', 'to', 'web', 'website', 'with',
-    'crie', 'criar', 'para', 'com', 'site', 'uma', 'um', 'de', 'da', 'do', 'dos', 'das',
-    'crear', 'sitio', 'pagina', 'página', 'con', 'una', 'un', 'para',
-  ])
-
-  return text
-    .split(/[^\p{L}\p{N}]+/u)
-    .map(normalizeKeyword)
-    .filter(word => word.length > 2 && !stopWords.has(word))
-}
-
-function unsplashFeaturedUrl(keywords: string[]): string {
-  const cleaned = Array.from(new Set(keywords.map(normalizeKeyword).filter(Boolean))).slice(0, 6)
-  const finalKeywords = cleaned.length > 0 ? cleaned : CURATED_MEDIA.generic.keywordSets[0]
-  return `https://images.unsplash.com/featured/1600x900/?${finalKeywords.join(',')}`
-}
 
 function pickUrl(category: MediaCategory, seed: string, offset = 0): string {
-  const keywordSets = CURATED_MEDIA[category].keywordSets
-  const baseKeywords = keywordSets[(hash(seed) + offset) % keywordSets.length]
-  const contextualKeywords = keywordCandidates(seed).slice(0, 3)
-  return unsplashFeaturedUrl([...contextualKeywords, ...baseKeywords])
+  const assets = CURATED_MEDIA[category].generatedAssets
+  return assets[(hash(seed) + offset) % assets.length]
 }
 
 function isFootballCategory(content: SiteContent, prompt: string): boolean {

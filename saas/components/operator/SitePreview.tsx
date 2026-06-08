@@ -6,13 +6,14 @@ import { useEffect } from 'react'
 
 type Palette = { primary?: string; accent?: string; background?: string; surface?: string; text?: string; muted?: string }
 type FeatureItem = { title?: string; body?: string; icon?: string }
-type GalleryItem = { title?: string; body?: string; image_url?: string; wiki_url?: string }
+type GalleryItem = { title?: string; body?: string; image_url?: string; imageAlt?: string; wiki_url?: string }
 type StatItem = { value?: string; label?: string }
 type Testimonial = { quote?: string; author?: string; role?: string }
 type Section = {
   type: string; eyebrow?: string; heading?: string; subheading?: string; body?: string
   cta?: string; ctaSecondary?: string; items?: (FeatureItem | GalleryItem)[]; stats?: StatItem[]
   testimonials?: Testimonial[]; videoUrl?: string; email?: string; phone?: string; address?: string
+  image_url?: string; imageAlt?: string
 }
 export type SitePreviewContent = {
   businessName?: string
@@ -20,6 +21,8 @@ export type SitePreviewContent = {
   fonts?: { display?: string; body?: string }
   palette?: Palette
   sections?: Section[]
+  logo_url?: string
+  logoAlt?: string
 }
 
 const FONT_HREF: Record<string, string> = {
@@ -119,17 +122,28 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
           const heroBg = dark
             ? `radial-gradient(500px 260px at 15% -10%, ${withAlpha(primary, 0.45)}, transparent 60%), radial-gradient(400px 220px at 100% 0%, ${withAlpha(accent, 0.3)}, transparent 55%), ${background}`
             : `radial-gradient(500px 260px at 12% -10%, ${withAlpha(primary, 0.18)}, transparent 60%), ${background}`
+          const hasImage = Boolean(s.image_url)
           return (
-            <div key={i} style={{ background: heroBg, padding: '40px 24px', textAlign: 'center' }}>
-              {eyebrow}
-              {h && <div style={{ fontFamily: display, fontWeight: 900, fontSize: 30, lineHeight: 1.05, letterSpacing: '-0.02em' }}>{h}</div>}
-              {sub && <div style={{ color: muted, fontSize: 14, marginTop: 12, lineHeight: 1.5, maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' }}>{sub}</div>}
-              {(s.cta || s.ctaSecondary) && (
-                <div style={{ display: 'flex', gap: 8, marginTop: 18, justifyContent: 'center', flexWrap: 'wrap' }}>
-                  {s.cta && <span style={{ background: `linear-gradient(135deg, ${primary}, ${accent})`, color: '#fff', fontWeight: 800, fontSize: 13, padding: '10px 20px', borderRadius: 10 }}>{s.cta}</span>}
-                  {s.ctaSecondary && <span style={{ color: text, fontWeight: 700, fontSize: 13, padding: '10px 18px', borderRadius: 10, border: `1px solid ${withAlpha(text, 0.25)}` }}>{s.ctaSecondary}</span>}
+            <div key={i} style={{ background: heroBg, padding: '40px 24px', textAlign: hasImage ? 'left' : 'center' }}>
+              <div style={{ display: hasImage ? 'grid' : 'block', gridTemplateColumns: hasImage ? '1fr minmax(160px, 0.85fr)' : undefined, gap: 18, alignItems: 'center' }}>
+                <div>
+                  {content.logo_url && i === 0 && <img src={content.logo_url} alt={content.logoAlt || `${content.businessName || 'Site'} logo`} style={{ width: 42, height: 42, borderRadius: 12, marginBottom: 12, objectFit: 'cover' }} />}
+                  {eyebrow}
+                  {h && <div style={{ fontFamily: display, fontWeight: 900, fontSize: 30, lineHeight: 1.05, letterSpacing: '-0.02em' }}>{h}</div>}
+                  {sub && <div style={{ color: muted, fontSize: 14, marginTop: 12, lineHeight: 1.5, maxWidth: 420, marginLeft: hasImage ? 0 : 'auto', marginRight: hasImage ? 0 : 'auto' }}>{sub}</div>}
+                  {(s.cta || s.ctaSecondary) && (
+                    <div style={{ display: 'flex', gap: 8, marginTop: 18, justifyContent: hasImage ? 'flex-start' : 'center', flexWrap: 'wrap' }}>
+                      {s.cta && <span style={{ background: `linear-gradient(135deg, ${primary}, ${accent})`, color: '#fff', fontWeight: 800, fontSize: 13, padding: '10px 20px', borderRadius: 10 }}>{s.cta}</span>}
+                      {s.ctaSecondary && <span style={{ color: text, fontWeight: 700, fontSize: 13, padding: '10px 18px', borderRadius: 10, border: `1px solid ${withAlpha(text, 0.25)}` }}>{s.ctaSecondary}</span>}
+                    </div>
+                  )}
                 </div>
-              )}
+                {hasImage && (
+                  <div style={{ minHeight: 180, borderRadius: 18, overflow: 'hidden', background: `linear-gradient(135deg, ${withAlpha(primary, 0.32)}, ${withAlpha(accent, 0.32)})` }}>
+                    <img src={s.image_url} alt={s.imageAlt || h || ''} style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                  </div>
+                )}
+              </div>
             </div>
           )
         }
@@ -175,23 +189,16 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
                     }}
                   >
                     {/* Image — show if available, otherwise a colored placeholder */}
-                    {it.image_url ? (
-                      <img
-                        src={it.image_url}
-                        alt={it.title || ''}
-                        style={{ width: '100%', height: 100, objectFit: 'cover', display: 'block' }}
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                      />
-                    ) : (
-                      <div style={{
-                        width: '100%', height: 100,
-                        background: `linear-gradient(135deg, ${withAlpha(primary, 0.3)}, ${withAlpha(accent, 0.3)})`,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 28,
-                      }}>
-                        🏛️
-                      </div>
-                    )}
+                    <div style={{ width: '100%', height: 100, background: `linear-gradient(135deg, ${withAlpha(primary, 0.3)}, ${withAlpha(accent, 0.3)})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>
+                      {it.image_url ? (
+                        <img
+                          src={it.image_url}
+                          alt={it.imageAlt || it.title || ''}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                        />
+                      ) : '🏛️'}
+                    </div>
                     <div style={{ padding: '10px 12px', flex: 1 }}>
                       {it.title && (
                         <div style={{ fontFamily: display, fontWeight: 700, fontSize: 13, lineHeight: 1.3, marginBottom: 4 }}>

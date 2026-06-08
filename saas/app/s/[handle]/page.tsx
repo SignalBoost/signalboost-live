@@ -13,7 +13,7 @@ import { getAdminSupabase } from '@/utils/supabase/server'
 export const dynamic = 'force-dynamic'
 
 type Palette = { primary?: string; accent?: string; background?: string; surface?: string; text?: string; muted?: string }
-type FeatureItem = { title?: string; body?: string; icon?: string }
+type FeatureItem = { title?: string; body?: string; icon?: string; image_url?: string; imageAlt?: string }
 type StatItem = { value?: string; label?: string }
 type Testimonial = { quote?: string; author?: string; role?: string }
 type Section = {
@@ -32,6 +32,8 @@ type Section = {
   email?: string
   phone?: string
   address?: string
+  image_url?: string
+  imageAlt?: string
 }
 type FontPair = { display?: string; body?: string }
 type SiteContent = {
@@ -40,6 +42,8 @@ type SiteContent = {
   fonts?: FontPair
   palette?: Palette
   sections?: Section[]
+  logo_url?: string
+  logoAlt?: string
 }
 
 const FONT_SAFE: Record<string, string> = {
@@ -142,7 +146,7 @@ function toEmbedUrl(url?: string): string | null {
 
 type Theme = ReturnType<typeof resolveTheme>
 
-function SectionView({ section, theme, displayFont, idx }: { section: Section; theme: Theme; displayFont: string; idx: number }) {
+function SectionView({ section, theme, displayFont, idx, siteContent }: { section: Section; theme: Theme; displayFont: string; idx: number; siteContent: SiteContent }) {
   const { dark, primary, accent, surface, text, muted, background } = theme
   const heading = section.heading?.trim()
   const body = section.body?.trim()
@@ -157,7 +161,7 @@ function SectionView({ section, theme, displayFont, idx }: { section: Section; t
 
   // ── HERO (full-bleed, atmospheric) ──
   if (t === 'hero' || t === 'hero-split') {
-    const split = t === 'hero-split'
+    const split = t === 'hero-split' || Boolean(section.image_url)
     const heroBg = dark
       ? `radial-gradient(1200px 600px at 15% -10%, ${withAlpha(primary, 0.45)}, transparent 60%), radial-gradient(900px 500px at 100% 0%, ${withAlpha(accent, 0.30)}, transparent 55%), ${background}`
       : `radial-gradient(1100px 550px at 12% -10%, ${withAlpha(primary, 0.18)}, transparent 60%), radial-gradient(800px 460px at 100% 0%, ${withAlpha(accent, 0.16)}, transparent 55%), ${background}`
@@ -165,6 +169,7 @@ function SectionView({ section, theme, displayFont, idx }: { section: Section; t
       <section style={{ background: heroBg, color: text, padding: split ? '120px 28px' : '140px 28px', position: 'relative', overflow: 'hidden' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto', display: split ? 'grid' : 'block', gridTemplateColumns: split ? '1.1fr 0.9fr' : undefined, gap: 48, alignItems: 'center', textAlign: split ? 'left' : 'center' }}>
           <div style={{ maxWidth: split ? 'none' : 860, margin: split ? '0' : '0 auto' }}>
+            {siteContent.logo_url && idx === 0 && <img src={siteContent.logo_url} alt={siteContent.logoAlt || `${siteContent.businessName || 'Site'} logo`} style={{ width: 58, height: 58, borderRadius: 16, marginBottom: 20, objectFit: 'cover', boxShadow: `0 14px 34px ${withAlpha(primary, 0.24)}` }} />}
             {eyebrowEl}
             {heading && <h1 style={{ ...headingStyle, fontSize: 'clamp(40px, 7vw, 78px)', fontWeight: 900, lineHeight: 1.02 }}>{heading}</h1>}
             {sub && <p style={{ fontSize: 'clamp(17px, 2.4vw, 23px)', color: muted, lineHeight: 1.5, margin: '20px 0 0', maxWidth: 640, marginLeft: split ? 0 : 'auto', marginRight: split ? 0 : 'auto' }}>{sub}</p>}
@@ -180,8 +185,8 @@ function SectionView({ section, theme, displayFont, idx }: { section: Section; t
             )}
           </div>
           {split && (
-            <div style={{ borderRadius: 24, minHeight: 320, background: `linear-gradient(135deg, ${withAlpha(primary, 0.9)}, ${withAlpha(accent, 0.8)})`, boxShadow: `0 30px 80px ${withAlpha(primary, 0.4)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: displayFont, fontWeight: 900, fontSize: 28, padding: 28, textAlign: 'center' }}>
-              {section.body || heading}
+            <div style={{ borderRadius: 24, minHeight: 320, background: `linear-gradient(135deg, ${withAlpha(primary, 0.9)}, ${withAlpha(accent, 0.8)})`, boxShadow: `0 30px 80px ${withAlpha(primary, 0.4)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: displayFont, fontWeight: 900, fontSize: 28, padding: section.image_url ? 0 : 28, textAlign: 'center', overflow: 'hidden' }}>
+              {section.image_url ? <img src={section.image_url} alt={section.imageAlt || heading || ''} style={{ width: '100%', height: '100%', minHeight: 320, objectFit: 'cover', display: 'block' }} /> : (section.body || heading)}
             </div>
           )}
         </div>
@@ -195,6 +200,7 @@ function SectionView({ section, theme, displayFont, idx }: { section: Section; t
       <section style={{ background, color: text, padding: '96px 28px' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 56 }}>
+            {siteContent.logo_url && idx === 0 && <img src={siteContent.logo_url} alt={siteContent.logoAlt || `${siteContent.businessName || 'Site'} logo`} style={{ width: 58, height: 58, borderRadius: 16, marginBottom: 20, objectFit: 'cover', boxShadow: `0 14px 34px ${withAlpha(primary, 0.24)}` }} />}
             {eyebrowEl}
             {heading && <h2 style={{ ...headingStyle, fontSize: 'clamp(30px, 4.5vw, 46px)' }}>{heading}</h2>}
             {sub && <p style={{ color: muted, fontSize: 18, marginTop: 14, maxWidth: 620, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.55 }}>{sub}</p>}
@@ -271,8 +277,10 @@ function SectionView({ section, theme, displayFont, idx }: { section: Section; t
           )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
             {section.items.map((item, j) => (
-              <div key={j} style={{ borderRadius: 18, aspectRatio: '4/3', background: `linear-gradient(${135 + j * 25}deg, ${withAlpha(primary, 0.85)}, ${withAlpha(accent, 0.85)})`, display: 'flex', alignItems: 'flex-end', padding: 18, color: '#fff', fontWeight: 800, fontFamily: displayFont, boxShadow: `0 14px 36px ${withAlpha(primary, 0.3)}` }}>
-                {item.title}
+              <div key={j} style={{ borderRadius: 18, aspectRatio: '4/3', background: `linear-gradient(${135 + j * 25}deg, ${withAlpha(primary, 0.85)}, ${withAlpha(accent, 0.85)})`, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'flex-end', padding: 18, color: '#fff', fontWeight: 800, fontFamily: displayFont, boxShadow: `0 14px 36px ${withAlpha(primary, 0.3)}` }}>
+                {item.image_url && <img src={item.image_url} alt={item.imageAlt || item.title || ''} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+                <div style={{ position: 'absolute', inset: 0, background: item.image_url ? 'linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.68))' : 'transparent' }} />
+                <span style={{ position: 'relative', zIndex: 1 }}>{item.title}</span>
               </div>
             ))}
           </div>
@@ -367,7 +375,7 @@ export default async function PublicSitePage({ params }: { params: Promise<{ han
       {fontsHref && <link rel="stylesheet" href={fontsHref} />}
       <main style={{ background: theme.background, color: theme.text, minHeight: '100vh', fontFamily: bodyFont, margin: 0 }}>
         {sections.map((section, i) => (
-          <SectionView key={i} section={section} theme={theme} displayFont={displayFont} idx={i} />
+          <SectionView key={i} section={section} theme={theme} displayFont={displayFont} idx={i} siteContent={c} />
         ))}
         <footer style={{ padding: '36px 28px', textAlign: 'center', borderTop: `1px solid ${withAlpha(theme.text, 0.1)}`, fontSize: 13, color: theme.muted, background: theme.background }}>
           {c.businessName || site.name} · Powered by SignalBoost

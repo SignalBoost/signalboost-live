@@ -28,6 +28,7 @@ import {
   saveLocalItems,
   saveSiteDesign,
 } from '@/lib/ai/memory'
+import { enrichSiteMedia } from '@/lib/media/sourcing'
 
 export const dynamic = 'force-dynamic'
 
@@ -363,7 +364,7 @@ export async function POST(req: NextRequest) {
 
         await writer.write(encode({
           type:       'result',
-          content:    cachedSite,
+          content:    enrichSiteMedia(cachedSite, trimmed),
           preprocessor: {
             mode,
             routedIntent: routed.intent,
@@ -397,7 +398,7 @@ export async function POST(req: NextRequest) {
         seedFallbackItems(trimmed).catch(() => {})
         await writer.write(encode({
           type:    'result',
-          content: buildRecoveryContent(trimmed, fallbackItems),
+          content: enrichSiteMedia(buildRecoveryContent(trimmed, fallbackItems), trimmed),
           error:   'AI model unavailable. A fallback page was generated.',
         }))
         await writer.close()
@@ -422,6 +423,8 @@ export async function POST(req: NextRequest) {
       }
 
       if (parsed.theme !== 'dark' && parsed.theme !== 'light') parsed.theme = 'light'
+
+      parsed = enrichSiteMedia(parsed, trimmed)
 
       // Save site design to cache for next time — non-blocking
       if (!fallbackSeeded) {
@@ -456,7 +459,7 @@ export async function POST(req: NextRequest) {
         const fallbackItems = buildFallbackItems(null, 8)
         await writer.write(encode({
           type:    'result',
-          content: buildRecoveryContent('We recovered from an unexpected generation error.', fallbackItems),
+          content: enrichSiteMedia(buildRecoveryContent('We recovered from an unexpected generation error.', fallbackItems), trimmed),
           error:   'Something went wrong. A fallback page was generated.',
         }))
         await writer.close()

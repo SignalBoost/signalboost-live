@@ -17,7 +17,7 @@ test('maps football prompts to grassroots field images when no URLs are provided
   }, 'Build a football club website with images')
 
   assert.equal(site.sections?.[0]?.type, 'hero-split')
-  assert.match(String(site.sections?.[0]?.image_url), /images\.unsplash\.com/)
+  assert.match(String(site.sections?.[0]?.image_url), /^https:\/\/images\.unsplash\.com\/featured\/1600x900\/\?/)
   const gallery = site.sections?.find(section => section.type === 'gallery')
   assert.match(String(gallery?.items?.[0]?.imageAlt), /grassroots football field/)
 })
@@ -38,7 +38,7 @@ test('still sources imagery when the prompt contains a non-image business URL', 
     sections: [{ type: 'hero', heading: 'Example Bistro' }],
   }, 'Use https://example.com as reference and make a restaurant site with photos')
 
-  assert.match(String(site.sections?.[0]?.image_url), /images\.unsplash\.com/)
+  assert.match(String(site.sections?.[0]?.image_url), /^https:\/\/images\.unsplash\.com\/featured\/1600x900\/\?/)
 })
 
 
@@ -53,12 +53,28 @@ test('football prompts inject hero, gallery, and sponsor logo imagery without ex
   }, 'Crie um site para DNA da Várzea com times de futebol amador de São Paulo')
 
   const hero = site.sections?.find(section => section.type === 'hero-split')
-  assert.match(String(hero?.image_url), /images\.unsplash\.com/)
+  assert.match(String(hero?.image_url), /^https:\/\/images\.unsplash\.com\/featured\/1600x900\/\?/)
 
   const imageLed = site.sections?.find(section => section.type === 'feature-grid' || section.type === 'gallery')
   assert.equal(imageLed?.items?.filter(item => item.image_url).length, 3)
 
   const logos = site.sections?.find(section => section.type === 'logos')
   assert.ok(logos, 'football prompts should include a sponsor/logo section')
-  assert.ok((logos?.items || []).every(item => String(item.logo_url).includes('images.unsplash.com')))
+  assert.ok((logos?.items || []).every(item => String(item.logo_url).startsWith('https://images.unsplash.com/featured/1600x900/?')))
+})
+
+
+test('replaces generic generated image paths with descriptive Unsplash Source URLs', () => {
+  const site = enrichSiteMedia({
+    businessName: 'Luxury Bakery',
+    sections: [
+      { type: 'hero-split', heading: 'Luxury Bakery', image_url: 'hero.jpg' },
+      { type: 'gallery', items: [{ title: 'Croissant counter', image_url: '/images/croissant.png' }] },
+    ],
+    logo_url: 'logo.png',
+  }, 'Build a luxury bakery landing page')
+
+  assert.match(String(site.sections?.[0]?.image_url), /^https:\/\/images\.unsplash\.com\/featured\/1600x900\/\?luxury,bakery/)
+  assert.match(String(site.sections?.[1]?.items?.[0]?.image_url), /^https:\/\/images\.unsplash\.com\/featured\/1600x900\/\?luxury,bakery/)
+  assert.match(String(site.logo_url), /^https:\/\/images\.unsplash\.com\/featured\/1600x900\/\?luxury,bakery/)
 })

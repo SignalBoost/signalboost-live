@@ -106,12 +106,18 @@ VISUAL DIRECTION:
 - Strong palette with dominant color and sharp accent (hex values).
 - Rich, varied page: strong hero, deliberate sequence of 5-8 sections.
 
-SECTION TYPES: hero (eyebrow,heading,subheading,cta,ctaSecondary), hero-split (+body), feature-grid (eyebrow,heading,subheading,items[]{icon,title,body}), stats (heading,stats[]{value,label}), gallery (heading,items[]{title,body}), video (eyebrow,heading,subheading,videoUrl=""), testimonials (heading,testimonials[]{quote,author,role}), cta (heading,subheading,cta), contact (eyebrow,heading,body,email,phone,address), about/text (eyebrow,heading,body).
+COMPONENT & IMAGE RULES:
+- NEVER use generic file paths such as "hero.jpg", "logo.png", "/images/photo.jpg", or placeholder asset names.
+- Every image asset field you include (image_url, logo_url, or similar) MUST be a highly descriptive, context-specific Unsplash Source URL.
+- Generate relevant photos with exact Unsplash Source API syntax: "https://images.unsplash.com/featured/1600x900/?[comma,separated,keywords]".
+- Keywords must be exact, descriptive, comma-separated terms based on the user's business niche. For SaaS use "software,dashboard,cyberpunk"; for luxury bakery use "croissant,bakery,interior,aesthetic"; for corporate lawyer use "office,architecture,professional".
+
+SECTION TYPES: hero (eyebrow,heading,subheading,cta,ctaSecondary,image_url,imageAlt), hero-split (+body,image_url,imageAlt), feature-grid (eyebrow,heading,subheading,items[]{icon,title,body,image_url,imageAlt}), stats (heading,stats[]{value,label}), gallery (heading,items[]{title,body,image_url,imageAlt}), video (eyebrow,heading,subheading,videoUrl=""), testimonials (heading,testimonials[]{quote,author,role}), cta (heading,subheading,cta), contact (eyebrow,heading,body,email,phone,address), about/text (eyebrow,heading,body).
 
 OUTPUT: valid JSON only — no markdown, no backticks.
 {"businessName":"...","theme":"light"|"dark","fonts":{"display":"...","body":"..."},"palette":{"primary":"#...","accent":"#...","background":"#...","surface":"#...","text":"#...","muted":"#..."},"sections":[...]}
 
-RULES: Valid JSON. Real specific copy. 5-8 sections. Start with hero, end with contact.`
+RULES: Valid JSON. Real specific copy. 5-8 sections. Start with hero, end with contact. Return only the JSON object matching the requested layout sections.`
 
 function isValidContent(p: any): boolean {
   return p && typeof p.businessName === 'string' && Array.isArray(p.sections) && p.sections.length > 0

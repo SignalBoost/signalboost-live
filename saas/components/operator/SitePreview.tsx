@@ -103,25 +103,9 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
   const display    = content.fonts?.display ? `'${content.fonts.display}', Georgia, serif` : 'Georgia, serif'
   const bodyFont   = content.fonts?.body    ? `'${content.fonts.body}', -apple-system, sans-serif` : '-apple-system, sans-serif'
   const sections   = Array.isArray(content.sections) ? content.sections : []
-  const heroImageUrl = sections.find(section => (section.type === 'hero' || section.type === 'hero-split') && section.image_url)?.image_url || ''
-  const galleryImageUrls = sections.flatMap(section => (section.type === 'gallery' || section.type === 'bento' || section.type === 'team' || section.type === 'feature-grid') && Array.isArray(section.items) ? section.items.map(item => item.image_url).filter(Boolean) as string[] : [])
-  const logoImageUrls = [content.logo_url, ...sections.flatMap(section => /logo|sponsor|partner/i.test(section.type) && Array.isArray(section.items) ? section.items.map(item => item.logo_url || item.image_url).filter(Boolean) as string[] : [])].filter(Boolean) as string[]
-  const firstImageUrls = [heroImageUrl, ...galleryImageUrls, ...logoImageUrls].filter(Boolean).slice(0, 3)
-  const mediaDetected = Boolean(heroImageUrl || galleryImageUrls.length > 0 || logoImageUrls.length > 0)
 
   return (
     <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', background, color: text, fontFamily: bodyFont, maxHeight: '70vh', overflowY: 'auto' }}>
-      <div style={{ margin: 12, padding: 12, borderRadius: 12, border: `1px solid ${withAlpha(text, 0.14)}`, background: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.035)', color: text, fontSize: 11, lineHeight: 1.5 }}>
-        <div style={{ fontWeight: 800, marginBottom: 6 }}>Media debug</div>
-        <div>mediaDetected: {mediaDetected ? 'yes' : 'no'}</div>
-        <div>hero image URL: {heroImageUrl || 'none'}</div>
-        <div>gallery images: {galleryImageUrls.length}</div>
-        <div>logo images: {logoImageUrls.length}</div>
-        <div>first 3 image URLs:</div>
-        <ol style={{ margin: '4px 0 0 18px', padding: 0, wordBreak: 'break-all' }}>
-          {firstImageUrls.length > 0 ? firstImageUrls.map((url, index) => <li key={index}>{url}</li>) : <li>none</li>}
-        </ol>
-      </div>
       {sections.map((s, i) => {
         const h    = s.heading?.trim()
         const sub  = s.subheading?.trim()

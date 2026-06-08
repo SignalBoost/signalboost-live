@@ -1,30 +1,19 @@
 // saas/app/api/creative/generate-image/route.ts
 //
 // Creative Studio image generation via Gemini 2.5 Flash Image ("Nano Banana").
-// Flow: check image credit -> call Gemini -> upload to Supabase Storage ->
-// spend 1 image credit -> return public URL. Refunds on any failure.
+// Returns the generated image directly to the client (no server-side storage).
+// Flow: check image credit -> call Gemini -> spend 1 credit -> return image.
+// Refunds the credit if generation fails.
 //
-// Env required: GEMINI_API_KEY, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+// Env required: GEMINI_API_KEY
 
 import { NextRequest } from 'next/server'
 import { getCurrentUser } from '@/utils/supabase/server'
-import { createClient } from '@supabase/supabase-js'
 import { getCreditState, spendCredit, refundCredit } from '@/lib/credits'
 
 export const dynamic = 'force-dynamic'
 
 const GEMINI_MODEL = 'gemini-2.5-flash-image'
-const BUCKET = 'generated-images'
-
-function supabaseAdmin() {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
-}
-
-function extOf(mime: string): string {
-  if (mime.includes('jpeg') || mime.includes('jpg')) return 'jpg'
-  if (mime.includes('webp')) return 'webp'
-  return 'png'
-}
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser()
@@ -58,56 +47,60 @@ export async function POST(req: NextRequest) {
     }), { status: 403 })
   }
 
-  // ── Call Gemini ──────────────────────────────────────────────────────────────
-  let geminiData: any = null
-  try {
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': key,
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseModalities: ['IMAGE'],
-          imageConfig: { aspectRatio },
-        },
-      }),
-      cache: 'no-store',
-    })
+  // ── Call Gemini (with one automatic retry if it returns no image) ───────────────
+  async function callGemini(): Promise<{ base64: string; mime: string } | { error: string; status: number }> {
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key! },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio } },
+        }),
+        cache: 'no-store',
+      })
 
-    if (!res.ok) {
-      const detail = await res.text()
-      console.error('Gemini image error:', res.status, detail)
-      const msg = res.status === 429
-        ? 'Rate limit reached. Please wait a moment and try again.'
-        : 'The image service is temporarily unavailable. Please try again.'
-      return new Response(JSON.stringify({ error: msg }), { status: 502 })
+      if (!res.ok) {
+        const detail = await res.text()
+        console.error('Gemini image error:', res.status, detail)
+        const msg = res.status === 429
+          ? 'Rate limit reached. Please wait a moment and try again.'
+          : 'The image service is temporarily unavailable. Please try again.'
+        return { error: msg, status: 502 }
+      }
+
+      const data = await res.json()
+      const parts = data?.candidates?.[0]?.content?.parts
+      const imagePart = Array.isArray(parts) ? parts.find((p: any) => p?.inlineData?.data) : null
+      const base64 = imagePart?.inlineData?.data
+      const mime = imagePart?.inlineData?.mimeType || 'image/png'
+
+      if (!base64) return { error: 'no_image', status: 502 }
+      return { base64, mime }
+    } catch (err) {
+      console.error('Gemini image exception:', err)
+      return { error: 'Could not reach the image service.', status: 502 }
     }
-    geminiData = await res.json()
-  } catch (err) {
-    console.error('Gemini image exception:', err)
-    return new Response(JSON.stringify({ error: 'Could not reach the image service.' }), { status: 502 })
   }
 
-  // ── Extract the image bytes from the response ──────────────────────────────────
-  const parts = geminiData?.candidates?.[0]?.content?.parts
-  const imagePart = Array.isArray(parts) ? parts.find((p: any) => p?.inlineData?.data) : null
-  const base64 = imagePart?.inlineData?.data
-  const mime = imagePart?.inlineData?.mimeType || 'image/png'
+  // First attempt; if Gemini returns no image, retry once (this was the frequent
+  // first-try 502 — Gemini occasionally replies with no image part).
+  let result = await callGemini()
+  if ('error' in result && result.error === 'no_image') {
+    result = await callGemini()
+  }
 
-  if (!base64) {
-    console.error('Gemini returned no image part:', JSON.stringify(geminiData)?.slice(0, 500))
-    return new Response(JSON.stringify({ error: 'No image was generated. Try rephrasing your prompt.' }), { status: 502 })
+  if ('error' in result) {
+    const message = result.error === 'no_image'
+      ? 'No image was generated. Try rephrasing your prompt.'
+      : result.error
+    return new Response(JSON.stringify({ error: message }), { status: result.status })
   }
 
   // ── Spend 1 image credit (only now that we have a real image) ───────────────────
   const spend = await spendCredit(user.id, 'image')
   if (!spend.ok) {
-    // Cap was hit between the pre-check and now (rare race) — don't return an image
-    // the user didn't pay for.
     return new Response(JSON.stringify({
       error: 'cap_reached',
       meter: 'image',
@@ -117,40 +110,10 @@ export async function POST(req: NextRequest) {
     }), { status: 403 })
   }
 
-  // ── Upload to Supabase Storage ─────────────────────────────────────────────────
-  try {
-    const bytes = Buffer.from(base64, 'base64')
-    const filename = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extOf(mime)}`
-    const db = supabaseAdmin()
-
-    const { error: uploadError } = await db.storage.from(BUCKET).upload(filename, bytes, {
-      contentType: mime,
-      upsert: false,
-    })
-    if (uploadError) {
-      console.error('Supabase upload failed:', uploadError.message)
-      // We have the image but couldn't store it — still deliver it inline so the
-      // credit the user just spent isn't wasted.
-      return new Response(JSON.stringify({
-        imageUrl: `data:${mime};base64,${base64}`,
-        stored: false,
-        remaining: spend.remaining,
-      }), { status: 200 })
-    }
-
-    const { data: pub } = db.storage.from(BUCKET).getPublicUrl(filename)
-    return new Response(JSON.stringify({
-      imageUrl: pub.publicUrl,
-      stored: true,
-      remaining: spend.remaining,
-    }), { status: 200 })
-  } catch (err) {
-    console.error('Image storage exception:', err)
-    // Same as above: image exists, deliver inline, credit already spent fairly.
-    return new Response(JSON.stringify({
-      imageUrl: `data:${mime};base64,${base64}`,
-      stored: false,
-      remaining: spend.remaining,
-    }), { status: 200 })
-  }
+  // ── Return the image directly (no server-side storage) ──────────────────────────
+  return new Response(JSON.stringify({
+    imageUrl: `data:${result.mime};base64,${result.base64}`,
+    stored: false,
+    remaining: spend.remaining,
+  }), { status: 200 })
 }

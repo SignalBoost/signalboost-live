@@ -72,14 +72,11 @@ Each slide: 3-5 short bullet points. Keep each bullet under 90 characters.`
 }
 
 // ── Minimal PDF writer (no external library) ──────────────────────────────────
-// Escapes text for PDF string literals.
 function esc(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)')
 }
 
-// Keep only WinAnsi-safe characters; replace anything outside with '?'.
 function ascii(s: string): string {
-  // Replace common smart punctuation with ASCII, then strip non-Latin1.
   return s
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[\u201C\u201D]/g, '"')
@@ -104,57 +101,37 @@ function wrap(text: string, max: number): string[] {
   return lines
 }
 
-function buildPdf(slides: Slide[]): Buffer {
+function buildPdf(slides: Slide[]): Uint8Array {
   const W = 720
   const H = 540
 
-  // Build the content stream for one slide page.
   function pageStream(slide: Slide, index: number): string {
     const parts: string[] = []
-
-    // Background (dark ink)
     parts.push('0.06 0.09 0.16 rg')
     parts.push(`0 0 ${W} ${H} re f`)
-
-    // Top accent bar (gold)
     parts.push('1 0.764 0 rg')
     parts.push(`0 ${H - 8} ${W} 8 re f`)
-
-    // Wordmark
     parts.push('BT /F2 18 Tf 1 1 1 rg 48 ' + (H - 50) + ' Td (signalboost) Tj ET')
-    // Slide number
     parts.push('BT /F1 12 Tf 0.5 0.55 0.62 rg ' + (W - 90) + ' ' + (H - 48) + ' Td (' + esc((index + 1) + ' / 6') + ') Tj ET')
-
-    // Title (gold)
     parts.push('BT /F2 28 Tf 1 0.764 0 rg 48 ' + (H - 120) + ' Td (' + esc(ascii(slide.title)) + ') Tj ET')
 
-    // Bullets (white)
     let y = H - 175
     for (const bullet of slide.bullets) {
       const lines = wrap(bullet, 72)
-      // bullet dot
       parts.push('1 0.764 0 rg')
       parts.push(`56 ${y + 3} 3 3 re f`)
-      // text lines
       lines.forEach((ln, i) => {
         parts.push('BT /F1 14 Tf 1 1 1 rg 72 ' + (y - i * 20) + ' Td (' + esc(ln) + ') Tj ET')
       })
       y -= lines.length * 20 + 16
     }
 
-    // Footer
     parts.push('BT /F1 10 Tf 0.5 0.55 0.62 rg 48 30 Td (' + esc('signalboostapp.com  -  saas.signalboostapp.com') + ') Tj ET')
-
     return parts.join('\n')
   }
 
-  // Assemble PDF objects.
   const objects: string[] = []
   const N = slides.length
-
-  // Object numbering:
-  // 1 = Catalog, 2 = Pages, 3 = Font F1 (Helvetica), 4 = Font F2 (Helvetica-Bold)
-  // then for each page: a Page object and a Contents object.
   const pageObjStart = 5
   const pageObjNums: number[] = []
   const contentObjNums: number[] = []
@@ -163,18 +140,12 @@ function buildPdf(slides: Slide[]): Buffer {
     contentObjNums.push(pageObjStart + i * 2 + 1)
   }
 
-  // 1 Catalog
   objects[1] = '<< /Type /Catalog /Pages 2 0 R >>'
-
-  // 2 Pages
   const kids = pageObjNums.map((n) => `${n} 0 R`).join(' ')
   objects[2] = `<< /Type /Pages /Count ${N} /Kids [${kids}] >>`
-
-  // 3, 4 Fonts
   objects[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>'
   objects[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'
 
-  // Pages + contents
   for (let i = 0; i < N; i++) {
     const stream = pageStream(slides[i], i)
     const contentNum = contentObjNums[i]
@@ -183,7 +154,6 @@ function buildPdf(slides: Slide[]): Buffer {
     objects[contentNum] = `<< /Length ${Buffer.byteLength(stream, 'latin1')} >>\nstream\n${stream}\nendstream`
   }
 
-  // Serialize with xref.
   let pdf = '%PDF-1.4\n'
   const offsets: number[] = []
   const totalObjects = contentObjNums[N - 1]
@@ -201,7 +171,7 @@ function buildPdf(slides: Slide[]): Buffer {
   }
   pdf += `trailer\n<< /Size ${totalObjects + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`
 
-  return Buffer.from(pdf, 'latin1')
+  return new Uint8Array(Buffer.from(pdf, 'latin1'))
 }
 
 export async function POST(req: NextRequest) {

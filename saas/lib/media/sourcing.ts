@@ -24,6 +24,7 @@ type CuratedMedia = {
   category: MediaCategory
   label: string
   keywordSets: string[][]
+  imageUrls: readonly string[]
 }
 
 const CURATED_MEDIA: Record<MediaCategory, CuratedMedia> = {
@@ -36,6 +37,12 @@ const CURATED_MEDIA: Record<MediaCategory, CuratedMedia> = {
       ['football', 'club', 'players', 'neighborhood', 'pitch'],
       ['amateur', 'football', 'match', 'field', 'fans'],
     ],
+    imageUrls: [
+      'https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1551958219-acbc608c6377?auto=format&fit=crop&w=1600&q=80',
+    ],
   },
   food: {
     category: 'food',
@@ -45,6 +52,12 @@ const CURATED_MEDIA: Record<MediaCategory, CuratedMedia> = {
       ['chef', 'kitchen', 'fresh', 'food', 'service'],
       ['cafe', 'restaurant', 'table', 'aesthetic', 'menu'],
       ['hospitality', 'dining', 'plates', 'ambient', 'interior'],
+    ],
+    imageUrls: [
+      'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=1600&q=80',
     ],
   },
   bakery: {
@@ -56,6 +69,12 @@ const CURATED_MEDIA: Record<MediaCategory, CuratedMedia> = {
       ['pastry', 'coffee', 'bakery', 'luxury', 'interior'],
       ['baker', 'fresh', 'bread', 'shop', 'morning'],
     ],
+    imageUrls: [
+      'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1517433367423-c7e5b0f35086?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1568254183919-78a4f43a2877?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=1600&q=80',
+    ],
   },
   technology: {
     category: 'technology',
@@ -65,6 +84,12 @@ const CURATED_MEDIA: Record<MediaCategory, CuratedMedia> = {
       ['technology', 'startup', 'dashboard', 'interface', 'office'],
       ['saas', 'analytics', 'computer', 'team', 'workspace'],
       ['digital', 'platform', 'data', 'screen', 'modern'],
+    ],
+    imageUrls: [
+      'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1551434678-e076c223a692?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1600&q=80',
     ],
   },
   legal: {
@@ -76,6 +101,12 @@ const CURATED_MEDIA: Record<MediaCategory, CuratedMedia> = {
       ['legal', 'consultation', 'business', 'documents', 'office'],
       ['corporate', 'lawyer', 'workspace', 'architecture', 'trust'],
     ],
+    imageUrls: [
+      'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1505664194779-8beaceb93744?auto=format&fit=crop&w=1600&q=80',
+    ],
   },
   business: {
     category: 'business',
@@ -86,6 +117,12 @@ const CURATED_MEDIA: Record<MediaCategory, CuratedMedia> = {
       ['office', 'team', 'meeting', 'professional', 'brand'],
       ['studio', 'agency', 'workspace', 'creative', 'modern'],
     ],
+    imageUrls: [
+      'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=80',
+    ],
   },
   generic: {
     category: 'generic',
@@ -95,6 +132,12 @@ const CURATED_MEDIA: Record<MediaCategory, CuratedMedia> = {
       ['creative', 'business', 'interior', 'professional', 'design'],
       ['architecture', 'workspace', 'premium', 'minimal', 'brand'],
       ['lifestyle', 'business', 'website', 'visual', 'modern'],
+    ],
+    imageUrls: [
+      'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1600&q=80',
     ],
   },
 }
@@ -145,18 +188,22 @@ function hasExplicitInputImageUrl(prompt: string): boolean {
   return IMAGE_URL_RE.test(prompt)
 }
 
-function isUnsplashFeaturedUrl(value: string): boolean {
+function isCuratedMediaUrl(value: string): boolean {
+  return Object.values(CURATED_MEDIA).some(media => media.imageUrls.includes(value))
+}
+
+function isLegacyGeneratedUrl(value: string): boolean {
   return value.startsWith('https://images.unsplash.com/featured/1600x900/?')
 }
 
 function shouldReplaceGeneratedAsset(value: unknown, promptHasImageUrl: boolean): boolean {
   if (typeof value !== 'string' || value.trim().length === 0) return true
   const trimmed = value.trim()
-  if (isUnsplashFeaturedUrl(trimmed)) return false
+  if (isCuratedMediaUrl(trimmed)) return false
   if (promptHasImageUrl && URL_RE.test(trimmed) && !trimmed.includes('images.unsplash.com/photo-')) return false
   if (trimmed.startsWith('data:image/')) return true
   if (!URL_RE.test(trimmed)) return true
-  return /images\.unsplash\.com\/photo-/i.test(trimmed)
+  return isLegacyGeneratedUrl(trimmed) || (/images\.unsplash\.com\/photo-/i.test(trimmed) && !isCuratedMediaUrl(trimmed))
 }
 
 function normalizeMediaAssets(content: SiteContent, prompt: string, category: MediaCategory, promptHasImageUrl: boolean): SiteContent {
@@ -206,39 +253,9 @@ function inferCategory(text: string): MediaCategory {
   return 'generic'
 }
 
-function normalizeKeyword(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}
-
-function keywordCandidates(text: string): string[] {
-  const stopWords = new Set([
-    'a', 'an', 'and', 'as', 'build', 'create', 'for', 'from', 'in', 'make', 'of', 'on', 'site', 'the', 'to', 'web', 'website', 'with',
-    'crie', 'criar', 'para', 'com', 'site', 'uma', 'um', 'de', 'da', 'do', 'dos', 'das',
-    'crear', 'sitio', 'pagina', 'página', 'con', 'una', 'un', 'para',
-  ])
-
-  return text
-    .split(/[^\p{L}\p{N}]+/u)
-    .map(normalizeKeyword)
-    .filter(word => word.length > 2 && !stopWords.has(word))
-}
-
-function unsplashFeaturedUrl(keywords: string[]): string {
-  const cleaned = Array.from(new Set(keywords.map(normalizeKeyword).filter(Boolean))).slice(0, 6)
-  const finalKeywords = cleaned.length > 0 ? cleaned : CURATED_MEDIA.generic.keywordSets[0]
-  return `https://images.unsplash.com/featured/1600x900/?${finalKeywords.join(',')}`
-}
-
 function pickUrl(category: MediaCategory, seed: string, offset = 0): string {
-  const keywordSets = CURATED_MEDIA[category].keywordSets
-  const baseKeywords = keywordSets[(hash(seed) + offset) % keywordSets.length]
-  const contextualKeywords = keywordCandidates(seed).slice(0, 3)
-  return unsplashFeaturedUrl([...contextualKeywords, ...baseKeywords])
+  const urls = CURATED_MEDIA[category].imageUrls
+  return urls[(hash(seed) + offset) % urls.length]
 }
 
 function isFootballCategory(content: SiteContent, prompt: string): boolean {

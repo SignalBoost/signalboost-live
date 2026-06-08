@@ -101,7 +101,12 @@ function wrap(text: string, max: number): string[] {
   return lines
 }
 
-function buildPdf(slides: Slide[]): Uint8Array {
+function byteLen(s: string): number {
+  // Latin-1: one byte per char (all chars are <= 0xFF after ascii()).
+  return s.length
+}
+
+function buildPdf(slides: Slide[]): string {
   const W = 720
   const H = 540
 
@@ -151,7 +156,7 @@ function buildPdf(slides: Slide[]): Uint8Array {
     const contentNum = contentObjNums[i]
     const pageNum = pageObjNums[i]
     objects[pageNum] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentNum} 0 R >>`
-    objects[contentNum] = `<< /Length ${Buffer.byteLength(stream, 'latin1')} >>\nstream\n${stream}\nendstream`
+    objects[contentNum] = `<< /Length ${byteLen(stream)} >>\nstream\n${stream}\nendstream`
   }
 
   let pdf = '%PDF-1.4\n'
@@ -159,11 +164,11 @@ function buildPdf(slides: Slide[]): Uint8Array {
   const totalObjects = contentObjNums[N - 1]
 
   for (let n = 1; n <= totalObjects; n++) {
-    offsets[n] = Buffer.byteLength(pdf, 'latin1')
+    offsets[n] = byteLen(pdf)
     pdf += `${n} 0 obj\n${objects[n]}\nendobj\n`
   }
 
-  const xrefStart = Buffer.byteLength(pdf, 'latin1')
+  const xrefStart = byteLen(pdf)
   pdf += `xref\n0 ${totalObjects + 1}\n`
   pdf += '0000000000 65535 f \n'
   for (let n = 1; n <= totalObjects; n++) {
@@ -171,7 +176,7 @@ function buildPdf(slides: Slide[]): Uint8Array {
   }
   pdf += `trailer\n<< /Size ${totalObjects + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`
 
-  return new Uint8Array(Buffer.from(pdf, 'latin1'))
+  return pdf
 }
 
 export async function POST(req: NextRequest) {
@@ -198,13 +203,11 @@ export async function POST(req: NextRequest) {
 
   const businessName = business?.business_name || business?.analyzer_summary?.business_name || 'Partner'
   const slides = await buildSlides(business, category, language)
-  const pdf = buildPdf(slides)
+  const pdfString = buildPdf(slides)
 
   const safeName = businessName.replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 40) || 'partner'
 
-  const blob = new Blob([pdf], { type: 'application/pdf' })
-
-  return new NextResponse(blob, {
+  return new NextResponse(pdfString, {
     status: 200,
     headers: {
       'Content-Type': 'application/pdf',

@@ -5,8 +5,8 @@
 import { useEffect } from 'react'
 
 type Palette = { primary?: string; accent?: string; background?: string; surface?: string; text?: string; muted?: string }
-type FeatureItem = { title?: string; body?: string; icon?: string }
-type GalleryItem = { title?: string; body?: string; image_url?: string; imageAlt?: string; wiki_url?: string }
+type FeatureItem = { title?: string; body?: string; icon?: string; image_url?: string; logo_url?: string; imageAlt?: string; logoAlt?: string }
+type GalleryItem = { title?: string; body?: string; image_url?: string; logo_url?: string; imageAlt?: string; logoAlt?: string; wiki_url?: string }
 type StatItem = { value?: string; label?: string }
 type Testimonial = { quote?: string; author?: string; role?: string }
 type Section = {
@@ -103,9 +103,25 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
   const display    = content.fonts?.display ? `'${content.fonts.display}', Georgia, serif` : 'Georgia, serif'
   const bodyFont   = content.fonts?.body    ? `'${content.fonts.body}', -apple-system, sans-serif` : '-apple-system, sans-serif'
   const sections   = Array.isArray(content.sections) ? content.sections : []
+  const heroImageUrl = sections.find(section => (section.type === 'hero' || section.type === 'hero-split') && section.image_url)?.image_url || ''
+  const galleryImageUrls = sections.flatMap(section => (section.type === 'gallery' || section.type === 'bento' || section.type === 'team' || section.type === 'feature-grid') && Array.isArray(section.items) ? section.items.map(item => item.image_url).filter(Boolean) as string[] : [])
+  const logoImageUrls = [content.logo_url, ...sections.flatMap(section => /logo|sponsor|partner/i.test(section.type) && Array.isArray(section.items) ? section.items.map(item => item.logo_url || item.image_url).filter(Boolean) as string[] : [])].filter(Boolean) as string[]
+  const firstImageUrls = [heroImageUrl, ...galleryImageUrls, ...logoImageUrls].filter(Boolean).slice(0, 3)
+  const mediaDetected = Boolean(heroImageUrl || galleryImageUrls.length > 0 || logoImageUrls.length > 0)
 
   return (
     <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', background, color: text, fontFamily: bodyFont, maxHeight: '70vh', overflowY: 'auto' }}>
+      <div style={{ margin: 12, padding: 12, borderRadius: 12, border: `1px solid ${withAlpha(text, 0.14)}`, background: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.035)', color: text, fontSize: 11, lineHeight: 1.5 }}>
+        <div style={{ fontWeight: 800, marginBottom: 6 }}>Media debug</div>
+        <div>mediaDetected: {mediaDetected ? 'yes' : 'no'}</div>
+        <div>hero image URL: {heroImageUrl || 'none'}</div>
+        <div>gallery images: {galleryImageUrls.length}</div>
+        <div>logo images: {logoImageUrls.length}</div>
+        <div>first 3 image URLs:</div>
+        <ol style={{ margin: '4px 0 0 18px', padding: 0, wordBreak: 'break-all' }}>
+          {firstImageUrls.length > 0 ? firstImageUrls.map((url, index) => <li key={index}>{url}</li>) : <li>none</li>}
+        </ol>
+      </div>
       {sections.map((s, i) => {
         const h    = s.heading?.trim()
         const sub  = s.subheading?.trim()
@@ -156,12 +172,18 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
               {h && <div style={{ fontFamily: display, fontWeight: 800, fontSize: 20, textAlign: 'center', marginBottom: 18 }}>{h}</div>}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
                 {(s.items as FeatureItem[]).map((it, j) => (
-                  <div key={j} style={{ background: surface, border: `1px solid ${withAlpha(text, 0.08)}`, borderRadius: 12, padding: 16 }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 9, background: `linear-gradient(135deg, ${primary}, ${accent})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, marginBottom: 10 }}>
-                      {it.icon || '◆'}
+                  <div key={j} style={{ background: surface, border: `1px solid ${withAlpha(text, 0.08)}`, borderRadius: 12, padding: it.image_url ? 0 : 16, overflow: 'hidden' }}>
+                    {it.image_url ? (
+                      <img src={it.image_url} alt={it.imageAlt || it.title || ''} style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }} />
+                    ) : (
+                      <div style={{ width: 34, height: 34, borderRadius: 9, background: `linear-gradient(135deg, ${primary}, ${accent})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, marginBottom: 10 }}>
+                        {it.icon || '◆'}
+                      </div>
+                    )}
+                    <div style={{ padding: it.image_url ? 12 : 0 }}>
+                      {it.title && <div style={{ fontFamily: display, fontWeight: 800, fontSize: 14 }}>{it.title}</div>}
+                      {it.body  && <div style={{ color: muted, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>{it.body}</div>}
                     </div>
-                    {it.title && <div style={{ fontFamily: display, fontWeight: 800, fontSize: 14 }}>{it.title}</div>}
-                    {it.body  && <div style={{ color: muted, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>{it.body}</div>}
                   </div>
                 ))}
               </div>
@@ -188,8 +210,7 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
                       flexDirection: 'column',
                     }}
                   >
-                    {/* Image — show if available, otherwise a colored placeholder */}
-                    <div style={{ width: '100%', height: 100, background: `linear-gradient(135deg, ${withAlpha(primary, 0.3)}, ${withAlpha(accent, 0.3)})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>
+                    <div style={{ width: '100%', height: 100, background: surface, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: muted }}>
                       {it.image_url ? (
                         <img
                           src={it.image_url}
@@ -197,7 +218,7 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
                           style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                         />
-                      ) : '🏛️'}
+                      ) : 'No image URL'}
                     </div>
                     <div style={{ padding: '10px 12px', flex: 1 }}>
                       {it.title && (
@@ -217,6 +238,26 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
               {/* CC-BY-SA attribution if this is Wikipedia content */}
               <div style={{ marginTop: 12, fontSize: 10, color: muted, textAlign: 'center' }}>
                 Content from Wikipedia · CC BY-SA 4.0
+              </div>
+            </div>
+          )
+        }
+
+        // ── Logos / sponsors ──────────────────────────────────────────────
+        if ((s.type === 'logos' || s.type === 'sponsors') && Array.isArray(s.items) && s.items.length > 0) {
+          return (
+            <div key={i} style={{ padding: '28px 24px', background: dark ? surface : '#f6f7fb' }}>
+              {h && <div style={{ fontFamily: display, fontWeight: 800, fontSize: 18, textAlign: 'center', marginBottom: 16 }}>{h}</div>}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12 }}>
+                {(s.items as GalleryItem[]).map((it, j) => {
+                  const url = it.logo_url || it.image_url
+                  return (
+                    <div key={j} style={{ background, border: `1px solid ${withAlpha(text, 0.08)}`, borderRadius: 12, overflow: 'hidden' }}>
+                      {url && <img src={url} alt={it.logoAlt || it.imageAlt || it.title || ''} style={{ width: '100%', height: 88, objectFit: 'cover', display: 'block' }} />}
+                      {it.title && <div style={{ padding: 10, fontWeight: 800, fontSize: 12 }}>{it.title}</div>}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )

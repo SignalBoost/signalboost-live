@@ -209,3 +209,280 @@ const COPY: Record<string, DiscoveryCopy> = {
 function copyFor(lang: string): DiscoveryCopy {
   return COPY[lang] || COPY.en
 }
+export default function OutreachDiscoveryPage() {
+  const { lang } = useI18n()
+  const copy = copyFor(lang)
+
+  const [businessUrl, setBusinessUrl] = useState('')
+  const [businessName, setBusinessName] = useState('')
+  const [platform, setPlatform] = useState('manual')
+  const [category, setCategory] = useState('company')
+  const [publicText, setPublicText] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [result, setResult] = useState<any>(null)
+  const [deckLoading, setDeckLoading] = useState(false)
+  const [deckError, setDeckError] = useState('')
+
+  async function analyze() {
+    setError('')
+    setResult(null)
+    setDeckError('')
+
+    let url = businessUrl.trim()
+
+    if (!url) {
+      setError(copy.missingUrl)
+      return
+    }
+
+    // Normalize: add https:// if the user didn't type a scheme.
+    if (!/^https?:\/\//i.test(url)) {
+      url = `https://${url}`
+    }
+
+    setLoading(true)
+
+    try {
+      const res = await fetch('/api/outreach/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          business_url: url,
+          business_name: businessName.trim() || undefined,
+          source_platform: platform,
+          category,
+          language: lang,
+          public_text: publicText.trim() || undefined,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data?.error || copy.analyzeError)
+        return
+      }
+
+      setResult(data.outreach)
+    } catch {
+      setError(copy.genericError)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function generateDeck() {
+    if (!result?.id) return
+    setDeckError('')
+    setDeckLoading(true)
+
+    try {
+      const res = await fetch('/api/outreach/deck', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lead_id: result.id,
+          category,
+          language: lang,
+        }),
+      })
+
+      if (!res.ok) {
+        let msg = copy.deckError
+        try {
+          const data = await res.json()
+          msg = data?.error || msg
+        } catch { /* response wasn't JSON */ }
+        setDeckError(msg)
+        return
+      }
+
+      // The route returns a PDF; trigger a download.
+      const blob = await res.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const name = (result.business_name || result.analyzer_summary?.business_name || 'partner')
+        .replace(/[^a-z0-9]+/gi, '-')
+        .toLowerCase()
+        .slice(0, 40) || 'partner'
+
+      const a = document.createElement('a')
+      a.href = objectUrl
+      a.download = `signalboost-deck-${name}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(objectUrl)
+    } catch {
+      setDeckError(copy.deckError)
+    } finally {
+      setDeckLoading(false)
+    }
+  }
+
+  return (
+    <main className="sb-glass" style={{ padding: 24 }}>
+      <div style={{ marginBottom: 20 }}>
+        <span className="sb-eyebrow">{copy.eyebrow}</span>
+
+        <h1 className="sb-h2" style={{ marginTop: 10 }}>
+          {copy.title}
+        </h1>
+
+        <p className="sb-body" style={{ maxWidth: 680 }}>
+          {copy.subtitle}
+        </p>
+      </div>
+
+      <section className="sb-card" style={{ padding: 20, display: 'grid', gap: 14 }}>
+        <div style={{ display: 'grid', gap: 6 }}>
+          <label className="sb-eyebrow" htmlFor="biz-url">
+            {copy.urlLabel}
+          </label>
+
+          <input
+            id="biz-url"
+            className="sb-input"
+            value={businessUrl}
+            onChange={(event) => setBusinessUrl(event.target.value)}
+            placeholder={copy.urlPlaceholder}
+            style={{ padding: 12 }}
+          />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,220px)', gap: 12 }}>
+          <div style={{ display: 'grid', gap: 6 }}>
+            <label className="sb-eyebrow" htmlFor="biz-name">
+              {copy.nameLabel}
+            </label>
+
+            <input
+              id="biz-name"
+              className="sb-input"
+              value={businessName}
+              onChange={(event) => setBusinessName(event.target.value)}
+              placeholder={copy.namePlaceholder}
+              style={{ padding: 12 }}
+            />
+          </div>
+
+          <div style={{ display: 'grid', gap: 6 }}>
+            <label className="sb-eyebrow" htmlFor="biz-platform">
+              {copy.sourceLabel}
+            </label>
+
+            <select
+              id="biz-platform"
+              className="sb-input"
+              value={platform}
+              onChange={(event) => setPlatform(event.target.value)}
+              style={{ padding: 12 }}
+            >
+              {PLATFORMS.map((item) => (
+                <option key={item} value={item}>
+                  {copy.platforms[item] || item}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gap: 6 }}>
+          <label className="sb-eyebrow" htmlFor="biz-category">
+            {copy.categoryLabel}
+          </label>
+
+          <select
+            id="biz-category"
+            className="sb-input"
+            value={category}
+            onChange={(event) => setCategory(event.target.value)}
+            style={{ padding: 12 }}
+          >
+            {CATEGORIES.map((item) => (
+              <option key={item} value={item}>
+                {copy.categories[item] || item}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ display: 'grid', gap: 6 }}>
+          <label className="sb-eyebrow" htmlFor="biz-text">
+            {copy.notesLabel}
+          </label>
+
+          <textarea
+            id="biz-text"
+            className="sb-input"
+            value={publicText}
+            onChange={(event) => setPublicText(event.target.value)}
+            rows={4}
+            placeholder={copy.notesPlaceholder}
+            style={{ padding: 12, resize: 'vertical' }}
+          />
+        </div>
+
+        <div className="sb-cta-row">
+          <button className="sb-button-primary" type="button" onClick={analyze} disabled={loading}>
+            {loading ? copy.analyzing : copy.analyzeButton}
+          </button>
+
+          <Link className="sb-button-secondary" href="/dashboard/outreach/contacts">
+            {copy.viewContacts}
+          </Link>
+        </div>
+
+        {error ? (
+          <p className="sb-caption" style={{ color: '#fca5a5', margin: 0 }}>
+            {error}
+          </p>
+        ) : null}
+      </section>
+
+      {result ? (
+        <section className="sb-card" style={{ padding: 20, marginTop: 20 }}>
+          <span className="sb-eyebrow" style={{ color: '#86efac' }}>
+            {copy.leadQueued}
+          </span>
+
+          <h2 className="sb-h3" style={{ marginTop: 8 }}>
+            {result.business_name || result.analyzer_summary?.business_name || copy.newLead}
+          </h2>
+
+          {result.outreach_message ? (
+            <div className="sb-ai-feedback" style={{ marginTop: 12 }}>
+              <strong>{copy.draftFirstTouch}</strong>
+              <p style={{ whiteSpace: 'pre-wrap' }}>{result.outreach_message}</p>
+            </div>
+          ) : null}
+
+          <div className="sb-cta-row" style={{ marginTop: 14 }}>
+            <Link className="sb-button-primary" href="/dashboard/outreach/contacts">
+              {copy.reviewContacts}
+            </Link>
+
+            <button
+              className="sb-button-secondary"
+              type="button"
+              onClick={generateDeck}
+              disabled={deckLoading}
+            >
+              {deckLoading ? copy.generatingDeck : copy.generateDeck}
+            </button>
+
+            <Link className="sb-button-secondary" href="/dashboard/outreach/outreach">
+              {copy.openEngine}
+            </Link>
+          </div>
+
+          {deckError ? (
+            <p className="sb-caption" style={{ color: '#fca5a5', marginTop: 10 }}>
+              {deckError}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
+    </main>
+  )
+}

@@ -4,7 +4,7 @@ import { predictBusinessNeeds } from '@/lib/ai/predictiveIntelligence'
 import { generateReviewStrategy } from '@/lib/ai/reviewStrategy'
 import { generateSocialPlan } from '@/lib/ai/socialPlan'
 import { generatePromoPlan } from '@/lib/ai/promoPlan'
-import { generateOutreachMessage } from '@/lib/ai/outreachMessage'
+import { generateOutreachMessage, type OutreachCategory } from '@/lib/ai/outreachMessage'
 import { runBusinessMode } from '@/lib/ai/modes'
 import type { OutreachAssets } from '@/lib/outreach/types'
 import { PARTNER_INTENT_GROUPS } from '@/lib/outreach/serviceIntents'
@@ -15,6 +15,7 @@ export async function generateOutreachAssets(args: {
   sourcePlatform?: string
   language?: string
   publicText?: string
+  category?: OutreachCategory
 }): Promise<OutreachAssets> {
   const extracted = args.publicText
     ? { url: args.sourceUrl, text: args.publicText }
@@ -56,6 +57,7 @@ export async function generateOutreachAssets(args: {
       },
     },
     language: args.language,
+    category: args.category,
   })
 
   return { ...messageAssets, outreach_message }

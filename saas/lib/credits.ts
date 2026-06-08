@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Per-plan video credit allowance.
+// Per-plan credit allowances, by meter.
 // Public plan names:
 // - free    = Free Demo, one-time credits only
 // - starter = Launch
@@ -10,6 +10,10 @@ import { createClient } from '@supabase/supabase-js'
 // Important:
 // Free/demo credits DO NOT reset monthly.
 // Paid plan credits reset monthly.
+
+export type CreditType = 'video' | 'image' | 'ai'
+
+// Video kept for backwards compatibility (existing callers import this).
 export const PLAN_VIDEO_CREDITS: Record<string, number> = {
   free: 2,
   demo: 2,
@@ -22,6 +26,41 @@ export const PLAN_VIDEO_CREDITS: Record<string, number> = {
 
   business: 300,
   command: 300,
+}
+
+export const PLAN_IMAGE_CREDITS: Record<string, number> = {
+  free: 5,
+  demo: 5,
+
+  starter: 50,
+  launch: 50,
+
+  pro: 200,
+  growth: 200,
+
+  business: 600,
+  command: 600,
+}
+
+export const PLAN_AI_CREDITS: Record<string, number> = {
+  free: 20,
+  demo: 20,
+
+  starter: 500,
+  launch: 500,
+
+  pro: 2000,
+  growth: 2000,
+
+  business: 10000,
+  command: 10000,
+}
+
+// Maps a meter to its DB column and its per-plan allowance table.
+const METERS: Record<CreditType, { column: string; allowances: Record<string, number> }> = {
+  video: { column: 'video_credits', allowances: PLAN_VIDEO_CREDITS },
+  image: { column: 'image_credits', allowances: PLAN_IMAGE_CREDITS },
+  ai:    { column: 'ai_credits',    allowances: PLAN_AI_CREDITS },
 }
 
 function adminClient() {
@@ -49,94 +88,172 @@ function isFreeDemoPlan(plan: string | null | undefined) {
   return !plan || plan === 'free' || plan === 'demo'
 }
 
-function allowanceForPlan(plan: string | null | undefined) {
+function allowanceFor(meter: CreditType, plan: string | null | undefined) {
   const safePlan = plan || 'free'
-  return PLAN_VIDEO_CREDITS[safePlan] ?? PLAN_VIDEO_CREDITS.free
+  const table = METERS[meter].allowances
+  return table[safePlan] ?? table.free
+}
+
+// Back-compat alias for any code that referenced the old helper name.
+function allowanceForPlan(plan: string | null | undefined) {
+  return allowanceFor('video', plan)
 }
 
 type CreditState = {
   plan: string
-  credits: number
-  allowance: number
+  credits: number      // video — kept for backwards compatibility
+  allowance: number    // video allowance — kept for backwards compatibility
+  video: number
+  image: number
+  ai: number
+  allowances: { video: number; image: number; ai: number }
 }
 
 /*
-  Reads the user's subscription and returns current credit state.
+  Reads the user's subscription and returns current credit state for ALL meters.
 
   Free/demo:
-  - Gets 2 one-time credits.
-  - Does NOT reset monthly.
-  - Designed for evaluation only.
+  - One-time credits, do NOT reset monthly.
 
   Paid plans:
-  - Launch/Growth/Command credits reset monthly.
+  - Launch/Growth/Command credits reset monthly (all meters together).
 */
 export async function getCreditState(userId: string): Promise<CreditState> {
   const supabase = adminClient()
 
   const { data, error } = await supabase
     .from('subscriptions')
-    .select('plan, video_credits, credits_reset_at, credits_initialized')
+    .select('plan, video_credits, image_credits, ai_credits, credits_reset_at, credits_initialized')
     .eq('user_id', userId)
     .maybeSingle()
 
+  const buildState = (plan: string, video: number, image: number, ai: number): CreditState => ({
+    plan,
+    credits: video,
+    allowance: allowanceFor('video', plan),
+    video,
+    image,
+    ai,
+    allowances: {
+      video: allowanceFor('video', plan),
+      image: allowanceFor('image', plan),
+      ai: allowanceFor('ai', plan),
+    },
+  })
+
   if (error || !data) {
-    const allowance = PLAN_VIDEO_CREDITS.free
+    const plan = 'free'
+    const v = allowanceFor('video', plan)
+    const i = allowanceFor('image', plan)
+    const a = allowanceFor('ai', plan)
 
     await supabase.from('subscriptions').upsert({
       user_id: userId,
-      plan: 'free',
-      video_credits: allowance,
+      plan,
+      video_credits: v,
+      image_credits: i,
+      ai_credits: a,
       credits_reset_at: new Date().toISOString(),
       credits_initialized: true,
     }, { onConflict: 'user_id' })
 
-    return { plan: 'free', credits: allowance, allowance }
+    return buildState(plan, v, i, a)
   }
 
   const plan = data.plan || 'free'
-  const allowance = allowanceForPlan(plan)
-  const currentCredits = data.video_credits ?? 0
 
+  // Fresh allowances for this plan (used on init or monthly reset).
+  const freshV = allowanceFor('video', plan)
+  const freshI = allowanceFor('image', plan)
+  const freshA = allowanceFor('ai', plan)
+
+  // Current values; image/ai may be null on rows created before this feature —
+  // treat null as "not yet granted" and seed the allowance.
+  const curV = data.video_credits ?? 0
+  const curI = data.image_credits
+  const curA = data.ai_credits
+
+  // First-time initialization of the whole credit system.
   if (!data.credits_initialized) {
     await supabase
       .from('subscriptions')
       .update({
-        video_credits: allowance,
+        video_credits: freshV,
+        image_credits: freshI,
+        ai_credits: freshA,
         credits_reset_at: new Date().toISOString(),
         credits_initialized: true,
       })
       .eq('user_id', userId)
 
-    return { plan, credits: allowance, allowance }
+    return buildState(plan, freshV, freshI, freshA)
   }
 
-  // Free/demo credits are one-time evaluation credits.
-  // They should not reset every month.
+  // Backfill: existing initialized rows that predate the image/ai columns.
+  // Seed those two meters once without disturbing video or the reset clock.
+  if (curI === null || curA === null) {
+    const seededI = curI === null ? freshI : curI
+    const seededA = curA === null ? freshA : curA
+
+    await supabase
+      .from('subscriptions')
+      .update({
+        image_credits: seededI,
+        ai_credits: seededA,
+      })
+      .eq('user_id', userId)
+
+    // Free/demo: keep current video; paid: continue to reset check below by
+    // falling through with seeded values.
+    if (isFreeDemoPlan(plan)) {
+      return buildState(plan, curV, seededI, seededA)
+    }
+
+    if (monthElapsed(data.credits_reset_at)) {
+      await supabase
+        .from('subscriptions')
+        .update({
+          video_credits: freshV,
+          image_credits: freshI,
+          ai_credits: freshA,
+          credits_reset_at: new Date().toISOString(),
+        })
+        .eq('user_id', userId)
+
+      return buildState(plan, freshV, freshI, freshA)
+    }
+
+    return buildState(plan, curV, seededI, seededA)
+  }
+
+  // Free/demo credits are one-time evaluation credits — never reset.
   if (isFreeDemoPlan(plan)) {
-    return { plan, credits: currentCredits, allowance }
+    return buildState(plan, curV, curI, curA)
   }
 
-  // Paid plans reset monthly.
+  // Paid plans reset all meters monthly.
   if (monthElapsed(data.credits_reset_at)) {
     await supabase
       .from('subscriptions')
       .update({
-        video_credits: allowance,
+        video_credits: freshV,
+        image_credits: freshI,
+        ai_credits: freshA,
         credits_reset_at: new Date().toISOString(),
         credits_initialized: true,
       })
       .eq('user_id', userId)
 
-    return { plan, credits: allowance, allowance }
+    return buildState(plan, freshV, freshI, freshA)
   }
 
-  return { plan, credits: currentCredits, allowance }
+  return buildState(plan, curV, curI, curA)
 }
+
+// ── Video (backwards-compatible original API — unchanged behavior) ─────────────
 
 export async function getCredits(userId: string): Promise<number> {
   const state = await getCreditState(userId)
-
   return state.credits
 }
 
@@ -146,10 +263,26 @@ export async function spendVideoCredit(userId: string): Promise<{
   plan: string
   reason?: string
 }> {
+  return spendCredit(userId, 'video')
+}
+
+export async function refundVideoCredit(userId: string): Promise<void> {
+  return refundCredit(userId, 'video')
+}
+
+// ── Generic multi-meter API (video / image / ai) ───────────────────────────────
+
+export async function spendCredit(userId: string, type: CreditType): Promise<{
+  ok: boolean
+  remaining: number
+  plan: string
+  reason?: string
+}> {
   const supabase = adminClient()
   const state = await getCreditState(userId)
+  const current = state[type]
 
-  if (state.credits <= 0) {
+  if (current <= 0) {
     return {
       ok: false,
       remaining: 0,
@@ -158,17 +291,18 @@ export async function spendVideoCredit(userId: string): Promise<{
     }
   }
 
-  const remaining = state.credits - 1
+  const remaining = current - 1
+  const column = METERS[type].column
 
   const { error } = await supabase
     .from('subscriptions')
-    .update({ video_credits: remaining })
+    .update({ [column]: remaining })
     .eq('user_id', userId)
 
   if (error) {
     return {
       ok: false,
-      remaining: state.credits,
+      remaining: current,
       plan: state.plan,
       reason: 'db_error',
     }
@@ -181,24 +315,26 @@ export async function spendVideoCredit(userId: string): Promise<{
   }
 }
 
-export async function refundVideoCredit(userId: string): Promise<void> {
+export async function refundCredit(userId: string, type: CreditType): Promise<void> {
   const supabase = adminClient()
+
+  const column = METERS[type].column
 
   const { data } = await supabase
     .from('subscriptions')
-    .select('plan, video_credits')
+    .select(`plan, ${column}`)
     .eq('user_id', userId)
     .maybeSingle()
 
   if (!data) return
 
-  const plan = data.plan || 'free'
-  const allowance = allowanceForPlan(plan)
-  const current = data.video_credits ?? 0
+  const plan = (data as any).plan || 'free'
+  const allowance = allowanceFor(type, plan)
+  const current = (data as any)[column] ?? 0
   const refunded = Math.min(current + 1, allowance)
 
   await supabase
     .from('subscriptions')
-    .update({ video_credits: refunded })
+    .update({ [column]: refunded })
     .eq('user_id', userId)
 }

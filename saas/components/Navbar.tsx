@@ -42,6 +42,7 @@ const PODCAST: Item[] = [
 const CONTENT: Item[] = [
   { icon: '🎧', label: 'Audio Studio', href: '/dashboard/audio', desc: 'Native voice and audio content.' },
   { icon: '🎬', label: 'Video Studio', href: '/dashboard/video', desc: 'Generate videos, clips, captions, and exports.' },
+  { icon: '🎨', label: 'Creative Studio', href: '/dashboard/creative', desc: 'Generate promo banners and campaign visuals with AI.' },
   { icon: '🧪', label: 'Lab', href: '/dashboard/lab', desc: 'Experimental tools and features.' },
   { icon: '🛠️', label: 'Workshop Apprentice', href: '/dashboard/apprentice', desc: 'Guided, level-aware help.' },
 ]

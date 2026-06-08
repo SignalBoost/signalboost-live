@@ -34,7 +34,7 @@ type SiteContent = {
   [key: string]: unknown
 }
 
-type MediaCategory = 'football' | 'food' | 'business' | 'technology' | 'bakery' | 'legal' | 'generic'
+type MediaCategory = 'football' | 'food' | 'business' | 'technology' | 'bakery' | 'legal' | 'transport' | 'generic'
 
 type CuratedMedia = {
   category: MediaCategory
@@ -93,6 +93,16 @@ const CURATED_MEDIA: Record<MediaCategory, CuratedMedia> = {
       ['corporate', 'lawyer', 'workspace', 'architecture', 'trust'],
     ],
   },
+  transport: {
+    category: 'transport',
+    label: 'professional taxi and transport service',
+    keywordSets: [
+      ['taxi', 'cab', 'city', 'street', 'transport'],
+      ['car', 'driver', 'ride', 'urban', 'service'],
+      ['transport', 'vehicle', 'road', 'travel', 'city'],
+      ['airport', 'transfer', 'car', 'professional', 'travel'],
+    ],
+  },
   business: {
     category: 'business',
     label: 'local business workspace',
@@ -121,12 +131,17 @@ const IMAGE_REQUEST_TERMS = [
   'imagen', 'imagenes', 'imágenes', 'galería',
 ]
 const LOGO_REQUEST_TERMS = ['logo', 'logos', 'brand mark', 'logotipo', 'marca']
-const FOOTBALL_TERMS = ['football', 'soccer', 'futebol', 'várzea', 'varzea', 'sports', 'sport', 'esporte', 'esportes', 'team', 'club']
+
+// Football detection is now STRICT — only unambiguous football words.
+// Removed the broad terms ('team', 'sport', 'sports', 'club', 'esporte', 'esportes')
+// because they were wrongly classifying taxi/business/agency sites as football.
+const FOOTBALL_TERMS = ['football', 'soccer', 'futebol', 'várzea', 'varzea']
 const FOOD_TERMS = ['restaurant', 'restaurante', 'food', 'comida', 'cafe', 'café', 'bar', 'pizza', 'burger', 'menu', 'dining']
 const BAKERY_TERMS = ['bakery', 'padaria', 'baker', 'pastry', 'croissant', 'bread', 'cake', 'confeitaria', 'panadería']
-const TECHNOLOGY_TERMS = ['saas', 'software', 'dashboard', 'platform', 'technology', 'tech', 'app', 'application', 'cybersecurity', 'analytics', 'ai']
+const TECHNOLOGY_TERMS = ['saas', 'software', 'dashboard', 'platform', 'technology', 'tech', 'app', 'application', 'cybersecurity', 'analytics']
 const LEGAL_TERMS = ['lawyer', 'law', 'legal', 'attorney', 'advogado', 'abogado', 'solicitor', 'law firm', 'juridico', 'jurídico']
-const BUSINESS_TERMS = ['business', 'empresa', 'storefront', 'store', 'shop', 'loja', 'team', 'workspace', 'office', 'coworking', 'studio', 'agency', 'consulting', 'service']
+const TRANSPORT_TERMS = ['taxi', 'cab', 'driver', 'drivers', 'ride', 'rides', 'rideshare', 'airport pickup', 'pickup', 'pick up', 'transport', 'transportation', 'chauffeur', 'limo', 'limousine', 'fleet', 'motorista', 'corrida', 'transporte', 'uber']
+const BUSINESS_TERMS = ['business', 'empresa', 'storefront', 'store', 'shop', 'loja', 'workspace', 'office', 'coworking', 'studio', 'agency', 'consulting', 'service', 'services']
 const URL_RE = /https?:\/\/[^\s"'<>]+/i
 const IMAGE_URL_RE = /https?:\/\/[^\s"'<>]+(?:\.(?:png|jpe?g|webp|gif|svg)(?:[?#][^\s"'<>]*)?|[^\s"'<>]*(?:images\.unsplash\.com|images\.pexels\.com|cdn\.pixabay\.com|image|photo|logo)[^\s"'<>]*)/i
 
@@ -191,9 +206,11 @@ function hash(input: string): number {
 }
 
 function inferCategory(text: string): MediaCategory {
+  // Order matters: most specific / least ambiguous niches first.
   if (includesAny(text, FOOTBALL_TERMS)) return 'football'
   if (includesAny(text, BAKERY_TERMS)) return 'bakery'
   if (includesAny(text, FOOD_TERMS)) return 'food'
+  if (includesAny(text, TRANSPORT_TERMS)) return 'transport'
   if (includesAny(text, TECHNOLOGY_TERMS)) return 'technology'
   if (includesAny(text, LEGAL_TERMS)) return 'legal'
   if (includesAny(text, BUSINESS_TERMS)) return 'business'
@@ -306,6 +323,13 @@ function fallbackGalleryItems(content: SiteContent, category: MediaCategory): No
       { title: 'Service atmosphere', body: 'Hospitality photography for trust and appetite appeal.' },
     ]
   }
+  if (category === 'transport') {
+    return [
+      { title: 'On-demand rides', body: `Reliable transport visuals for ${name}.` },
+      { title: 'Airport transfers', body: 'Professional driver and vehicle imagery for trust.' },
+      { title: 'City coverage', body: 'Urban travel photography for booking and scheduling.' },
+    ]
+  }
   return [
     { title: 'Storefront presence', body: `Professional imagery for ${name}.` },
     { title: 'Team at work', body: 'Human business visuals that build trust.' },
@@ -317,9 +341,11 @@ function isFootballCategory(content: SiteContent, prompt: string): boolean {
   return inferCategory(textForDetection(content, prompt)) === 'football'
 }
 
-export function wantsGeneratedMedia(prompt: string): boolean {
-  const lower = prompt.toLowerCase()
-  return includesAny(lower, IMAGE_REQUEST_TERMS) || includesAny(lower, LOGO_REQUEST_TERMS) || includesAny(lower, FOOTBALL_TERMS)
+// Media is sourced for ANY site now — every generated site benefits from a real
+// hero/gallery image. Football no longer gets special privilege here (that was the
+// leftover hard-coding that forced football imagery onto unrelated sites).
+export function wantsGeneratedMedia(_prompt: string): boolean {
+  return true
 }
 
 // Cheap scan: does anything actually need sourcing? Lets cache hits whose assets
@@ -404,7 +430,7 @@ export async function enrichSiteMedia(content: any, prompt: string): Promise<Sit
   if (!imageSection && next.sections) {
     imageSection = {
       type: 'gallery',
-      heading: category === 'football' ? 'Field visuals' : category === 'food' ? 'Restaurant visuals' : 'Featured visuals',
+      heading: category === 'football' ? 'Field visuals' : category === 'food' ? 'Restaurant visuals' : category === 'transport' ? 'Ride visuals' : 'Featured visuals',
       items: fallbackGalleryItems(next, category),
     }
     next.sections.splice(Math.min(2, next.sections.length), 0, imageSection)

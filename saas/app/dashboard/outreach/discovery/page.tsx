@@ -4,7 +4,9 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 
-const PLATFORMS = ['manual', 'google', 'facebook', 'instagram', 'website', 'directory']
+const PLATFORMS = ['manual', 'google', 'facebook', 'instagram', 'linkedin', 'tiktok', 'youtube', 'telegram', 'wechat', 'reddit', 'website', 'directory']
+
+const CATEGORIES = ['company', 'affiliate', 'media']
 
 type DiscoveryCopy = {
   eyebrow: string
@@ -13,6 +15,7 @@ type DiscoveryCopy = {
   urlLabel: string
   nameLabel: string
   sourceLabel: string
+  categoryLabel: string
   notesLabel: string
   urlPlaceholder: string
   namePlaceholder: string
@@ -29,6 +32,7 @@ type DiscoveryCopy = {
   reviewContacts: string
   openEngine: string
   platforms: Record<string, string>
+  categories: Record<string, string>
 }
 
 const COPY: Record<string, DiscoveryCopy> = {
@@ -39,6 +43,7 @@ const COPY: Record<string, DiscoveryCopy> = {
     urlLabel: 'Business URL or profile *',
     nameLabel: 'Business name (optional)',
     sourceLabel: 'Source',
+    categoryLabel: 'Outreach type',
     notesLabel: 'Public text / notes (optional)',
     urlPlaceholder: 'https://example.com',
     namePlaceholder: 'e.g. Luna Travel',
@@ -55,13 +60,11 @@ const COPY: Record<string, DiscoveryCopy> = {
     reviewContacts: 'Review in contacts',
     openEngine: 'Open engine',
     platforms: {
-      manual: 'Manual',
-      google: 'Google',
-      facebook: 'Facebook',
-      instagram: 'Instagram',
-      website: 'Website',
-      directory: 'Directory',
+      manual: 'Manual', google: 'Google', facebook: 'Facebook', instagram: 'Instagram',
+      linkedin: 'LinkedIn', tiktok: 'TikTok', youtube: 'YouTube', telegram: 'Telegram',
+      wechat: 'WeChat', reddit: 'Reddit', website: 'Website', directory: 'Directory',
     },
+    categories: { company: 'Company', affiliate: 'Affiliate / Partner', media: 'Media Platform' },
   },
   pt: {
     eyebrow: 'Descoberta',
@@ -70,6 +73,7 @@ const COPY: Record<string, DiscoveryCopy> = {
     urlLabel: 'URL ou perfil do negócio *',
     nameLabel: 'Nome do negócio (opcional)',
     sourceLabel: 'Fonte',
+    categoryLabel: 'Tipo de prospecção',
     notesLabel: 'Texto público / notas (opcional)',
     urlPlaceholder: 'https://exemplo.com',
     namePlaceholder: 'ex.: Luna Travel',
@@ -86,13 +90,11 @@ const COPY: Record<string, DiscoveryCopy> = {
     reviewContacts: 'Revisar em contatos',
     openEngine: 'Abrir motor',
     platforms: {
-      manual: 'Manual',
-      google: 'Google',
-      facebook: 'Facebook',
-      instagram: 'Instagram',
-      website: 'Site',
-      directory: 'Diretório',
+      manual: 'Manual', google: 'Google', facebook: 'Facebook', instagram: 'Instagram',
+      linkedin: 'LinkedIn', tiktok: 'TikTok', youtube: 'YouTube', telegram: 'Telegram',
+      wechat: 'WeChat', reddit: 'Reddit', website: 'Site', directory: 'Diretório',
     },
+    categories: { company: 'Empresa', affiliate: 'Afiliado / Parceiro', media: 'Plataforma de Mídia' },
   },
   es: {
     eyebrow: 'Descubrimiento',
@@ -101,6 +103,7 @@ const COPY: Record<string, DiscoveryCopy> = {
     urlLabel: 'URL o perfil del negocio *',
     nameLabel: 'Nombre del negocio (opcional)',
     sourceLabel: 'Fuente',
+    categoryLabel: 'Tipo de prospección',
     notesLabel: 'Texto público / notas (opcional)',
     urlPlaceholder: 'https://ejemplo.com',
     namePlaceholder: 'ej.: Luna Travel',
@@ -117,13 +120,11 @@ const COPY: Record<string, DiscoveryCopy> = {
     reviewContacts: 'Revisar en contactos',
     openEngine: 'Abrir motor',
     platforms: {
-      manual: 'Manual',
-      google: 'Google',
-      facebook: 'Facebook',
-      instagram: 'Instagram',
-      website: 'Sitio web',
-      directory: 'Directorio',
+      manual: 'Manual', google: 'Google', facebook: 'Facebook', instagram: 'Instagram',
+      linkedin: 'LinkedIn', tiktok: 'TikTok', youtube: 'YouTube', telegram: 'Telegram',
+      wechat: 'WeChat', reddit: 'Reddit', website: 'Sitio web', directory: 'Directorio',
     },
+    categories: { company: 'Empresa', affiliate: 'Afiliado / Socio', media: 'Plataforma de Medios' },
   },
   pl: {
     eyebrow: 'Odkrywanie',
@@ -132,6 +133,7 @@ const COPY: Record<string, DiscoveryCopy> = {
     urlLabel: 'URL firmy lub profil *',
     nameLabel: 'Nazwa firmy (opcjonalnie)',
     sourceLabel: 'Źródło',
+    categoryLabel: 'Typ outreachu',
     notesLabel: 'Tekst publiczny / notatki (opcjonalnie)',
     urlPlaceholder: 'https://przyklad.com',
     namePlaceholder: 'np. Luna Travel',
@@ -148,13 +150,11 @@ const COPY: Record<string, DiscoveryCopy> = {
     reviewContacts: 'Sprawdź w kontaktach',
     openEngine: 'Otwórz silnik',
     platforms: {
-      manual: 'Manualnie',
-      google: 'Google',
-      facebook: 'Facebook',
-      instagram: 'Instagram',
-      website: 'Strona',
-      directory: 'Katalog',
+      manual: 'Manualnie', google: 'Google', facebook: 'Facebook', instagram: 'Instagram',
+      linkedin: 'LinkedIn', tiktok: 'TikTok', youtube: 'YouTube', telegram: 'Telegram',
+      wechat: 'WeChat', reddit: 'Reddit', website: 'Strona', directory: 'Katalog',
     },
+    categories: { company: 'Firma', affiliate: 'Partner / Afiliacja', media: 'Platforma medialna' },
   },
   ru: {
     eyebrow: 'Поиск',
@@ -163,6 +163,7 @@ const COPY: Record<string, DiscoveryCopy> = {
     urlLabel: 'URL компании или профиль *',
     nameLabel: 'Название компании (необязательно)',
     sourceLabel: 'Источник',
+    categoryLabel: 'Тип аутрича',
     notesLabel: 'Публичный текст / заметки (необязательно)',
     urlPlaceholder: 'https://example.com',
     namePlaceholder: 'например: Luna Travel',
@@ -179,20 +180,17 @@ const COPY: Record<string, DiscoveryCopy> = {
     reviewContacts: 'Проверить в контактах',
     openEngine: 'Открыть движок',
     platforms: {
-      manual: 'Вручную',
-      google: 'Google',
-      facebook: 'Facebook',
-      instagram: 'Instagram',
-      website: 'Сайт',
-      directory: 'Каталог',
+      manual: 'Вручную', google: 'Google', facebook: 'Facebook', instagram: 'Instagram',
+      linkedin: 'LinkedIn', tiktok: 'TikTok', youtube: 'YouTube', telegram: 'Telegram',
+      wechat: 'WeChat', reddit: 'Reddit', website: 'Сайт', directory: 'Каталог',
     },
+    categories: { company: 'Компания', affiliate: 'Партнёр / Аффилиат', media: 'Медиаплатформа' },
   },
 }
 
 function copyFor(lang: string): DiscoveryCopy {
   return COPY[lang] || COPY.en
 }
-
 export default function OutreachDiscoveryPage() {
   const { lang } = useI18n()
   const copy = copyFor(lang)
@@ -200,6 +198,7 @@ export default function OutreachDiscoveryPage() {
   const [businessUrl, setBusinessUrl] = useState('')
   const [businessName, setBusinessName] = useState('')
   const [platform, setPlatform] = useState('manual')
+  const [category, setCategory] = useState('company')
   const [publicText, setPublicText] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -209,11 +208,16 @@ export default function OutreachDiscoveryPage() {
     setError('')
     setResult(null)
 
-    const url = businessUrl.trim()
+    let url = businessUrl.trim()
 
     if (!url) {
       setError(copy.missingUrl)
       return
+    }
+
+    // Normalize: add https:// if the user didn't type a scheme.
+    if (!/^https?:\/\//i.test(url)) {
+      url = `https://${url}`
     }
 
     setLoading(true)
@@ -226,6 +230,8 @@ export default function OutreachDiscoveryPage() {
           business_url: url,
           business_name: businessName.trim() || undefined,
           source_platform: platform,
+          category,
+          language: lang,
           public_text: publicText.trim() || undefined,
         }),
       })
@@ -313,6 +319,26 @@ export default function OutreachDiscoveryPage() {
         </div>
 
         <div style={{ display: 'grid', gap: 6 }}>
+          <label className="sb-eyebrow" htmlFor="biz-category">
+            {copy.categoryLabel}
+          </label>
+
+          <select
+            id="biz-category"
+            className="sb-input"
+            value={category}
+            onChange={(event) => setCategory(event.target.value)}
+            style={{ padding: 12 }}
+          >
+            {CATEGORIES.map((item) => (
+              <option key={item} value={item}>
+                {copy.categories[item] || item}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ display: 'grid', gap: 6 }}>
           <label className="sb-eyebrow" htmlFor="biz-text">
             {copy.notesLabel}
           </label>
@@ -358,7 +384,7 @@ export default function OutreachDiscoveryPage() {
           {result.outreach_message ? (
             <div className="sb-ai-feedback" style={{ marginTop: 12 }}>
               <strong>{copy.draftFirstTouch}</strong>
-              <p>{result.outreach_message}</p>
+              <p style={{ whiteSpace: 'pre-wrap' }}>{result.outreach_message}</p>
             </div>
           ) : null}
 

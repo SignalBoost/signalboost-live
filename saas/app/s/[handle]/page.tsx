@@ -140,6 +140,25 @@ function toEmbedUrl(url?: string): string | null {
   return null
 }
 
+function mediaBackground(url: string | undefined, fallback: string): CSSProperties {
+  return {
+    background: fallback,
+    ...(url ? { backgroundImage: `linear-gradient(0deg, rgba(0,0,0,0), rgba(0,0,0,0)), url(${url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}),
+  }
+}
+
+function logoTileStyle(url: string | undefined, primary: string, accent: string): CSSProperties {
+  return {
+    width: 58,
+    height: 58,
+    borderRadius: 16,
+    marginBottom: 20,
+    boxShadow: `0 14px 34px ${withAlpha(primary, 0.24)}`,
+    background: `linear-gradient(135deg, ${primary}, ${accent})`,
+    ...mediaBackground(url, `linear-gradient(135deg, ${primary}, ${accent})`),
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Section renderer
 // ─────────────────────────────────────────────────────────────────────────────
@@ -169,7 +188,7 @@ function SectionView({ section, theme, displayFont, idx, siteContent }: { sectio
       <section style={{ background: heroBg, color: text, padding: split ? '120px 28px' : '140px 28px', position: 'relative', overflow: 'hidden' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto', display: split ? 'grid' : 'block', gridTemplateColumns: split ? '1.1fr 0.9fr' : undefined, gap: 48, alignItems: 'center', textAlign: split ? 'left' : 'center' }}>
           <div style={{ maxWidth: split ? 'none' : 860, margin: split ? '0' : '0 auto' }}>
-            {siteContent.logo_url && idx === 0 && <img src={siteContent.logo_url} alt={siteContent.logoAlt || `${siteContent.businessName || 'Site'} logo`} style={{ width: 58, height: 58, borderRadius: 16, marginBottom: 20, objectFit: 'cover', boxShadow: `0 14px 34px ${withAlpha(primary, 0.24)}` }} />}
+            {siteContent.logo_url && idx === 0 && <div role="img" aria-label={siteContent.logoAlt || `${siteContent.businessName || 'Site'} logo`} style={logoTileStyle(siteContent.logo_url, primary, accent)} />}
             {eyebrowEl}
             {heading && <h1 style={{ ...headingStyle, fontSize: 'clamp(40px, 7vw, 78px)', fontWeight: 900, lineHeight: 1.02 }}>{heading}</h1>}
             {sub && <p style={{ fontSize: 'clamp(17px, 2.4vw, 23px)', color: muted, lineHeight: 1.5, margin: '20px 0 0', maxWidth: 640, marginLeft: split ? 0 : 'auto', marginRight: split ? 0 : 'auto' }}>{sub}</p>}
@@ -186,7 +205,7 @@ function SectionView({ section, theme, displayFont, idx, siteContent }: { sectio
           </div>
           {split && (
             <div style={{ borderRadius: 24, minHeight: 320, background: `linear-gradient(135deg, ${withAlpha(primary, 0.9)}, ${withAlpha(accent, 0.8)})`, boxShadow: `0 30px 80px ${withAlpha(primary, 0.4)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: displayFont, fontWeight: 900, fontSize: 28, padding: section.image_url ? 0 : 28, textAlign: 'center', overflow: 'hidden' }}>
-              {section.image_url ? <img src={section.image_url} alt={section.imageAlt || heading || ''} style={{ width: '100%', height: '100%', minHeight: 320, objectFit: 'cover', display: 'block' }} /> : (section.body || heading)}
+              {section.image_url ? <div role="img" aria-label={section.imageAlt || heading || ''} style={{ width: '100%', minHeight: 320, ...mediaBackground(section.image_url, `linear-gradient(135deg, ${withAlpha(primary, 0.9)}, ${withAlpha(accent, 0.8)})`) }} /> : (section.body || heading)}
             </div>
           )}
         </div>
@@ -200,7 +219,7 @@ function SectionView({ section, theme, displayFont, idx, siteContent }: { sectio
       <section style={{ background, color: text, padding: '96px 28px' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 56 }}>
-            {siteContent.logo_url && idx === 0 && <img src={siteContent.logo_url} alt={siteContent.logoAlt || `${siteContent.businessName || 'Site'} logo`} style={{ width: 58, height: 58, borderRadius: 16, marginBottom: 20, objectFit: 'cover', boxShadow: `0 14px 34px ${withAlpha(primary, 0.24)}` }} />}
+            {siteContent.logo_url && idx === 0 && <div role="img" aria-label={siteContent.logoAlt || `${siteContent.businessName || 'Site'} logo`} style={logoTileStyle(siteContent.logo_url, primary, accent)} />}
             {eyebrowEl}
             {heading && <h2 style={{ ...headingStyle, fontSize: 'clamp(30px, 4.5vw, 46px)' }}>{heading}</h2>}
             {sub && <p style={{ color: muted, fontSize: 18, marginTop: 14, maxWidth: 620, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.55 }}>{sub}</p>}
@@ -209,7 +228,7 @@ function SectionView({ section, theme, displayFont, idx, siteContent }: { sectio
             {section.items.map((item, j) => (
               <div key={j} style={{ background: surface, border: `1px solid ${withAlpha(text, dark ? 0.08 : 0.06)}`, borderRadius: 20, padding: item.image_url ? 0 : 30, overflow: 'hidden', boxShadow: dark ? 'none' : `0 10px 30px ${withAlpha(text, 0.05)}` }}>
                 {item.image_url ? (
-                  <img src={item.image_url} alt={item.imageAlt || item.title || ''} style={{ width: '100%', height: 190, objectFit: 'cover', display: 'block' }} />
+                  <div role="img" aria-label={item.imageAlt || item.title || ''} style={{ width: '100%', height: 190, ...mediaBackground(item.image_url, surface) }} />
                 ) : (
                   <div style={{ width: 50, height: 50, borderRadius: 14, background: `linear-gradient(135deg, ${primary}, ${accent})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, marginBottom: 18 }}>{item.icon || '◆'}</div>
                 )}
@@ -284,7 +303,7 @@ function SectionView({ section, theme, displayFont, idx, siteContent }: { sectio
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
             {section.items.map((item, j) => (
               <div key={j} style={{ borderRadius: 18, aspectRatio: '4/3', background: `linear-gradient(${135 + j * 25}deg, ${withAlpha(primary, 0.85)}, ${withAlpha(accent, 0.85)})`, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'flex-end', padding: 18, color: '#fff', fontWeight: 800, fontFamily: displayFont, boxShadow: `0 14px 36px ${withAlpha(primary, 0.3)}` }}>
-                {item.image_url && <img src={item.image_url} alt={item.imageAlt || item.title || ''} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+                {item.image_url && <div role="img" aria-label={item.imageAlt || item.title || ''} style={{ position: 'absolute', inset: 0, ...mediaBackground(item.image_url, 'transparent') }} />}
                 <div style={{ position: 'absolute', inset: 0, background: item.image_url ? 'linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.68))' : 'transparent' }} />
                 <span style={{ position: 'relative', zIndex: 1 }}>{item.title}</span>
               </div>
@@ -306,7 +325,7 @@ function SectionView({ section, theme, displayFont, idx, siteContent }: { sectio
               const url = item.logo_url || item.image_url
               return (
                 <div key={j} style={{ background, border: `1px solid ${withAlpha(text, dark ? 0.08 : 0.06)}`, borderRadius: 18, overflow: 'hidden', boxShadow: dark ? 'none' : `0 10px 30px ${withAlpha(text, 0.05)}` }}>
-                  {url && <img src={url} alt={item.logoAlt || item.imageAlt || item.title || ''} style={{ width: '100%', height: 130, objectFit: 'cover', display: 'block' }} />}
+                  {url && <div role="img" aria-label={item.logoAlt || item.imageAlt || item.title || ''} style={{ width: '100%', height: 130, ...mediaBackground(url, surface) }} />}
                   {item.title && <div style={{ padding: 18, fontFamily: displayFont, fontWeight: 800, fontSize: 18 }}>{item.title}</div>}
                 </div>
               )

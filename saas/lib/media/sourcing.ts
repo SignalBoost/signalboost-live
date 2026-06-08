@@ -152,7 +152,7 @@ function isUnsplashFeaturedUrl(value: string): boolean {
 function shouldReplaceGeneratedAsset(value: unknown, promptHasImageUrl: boolean): boolean {
   if (typeof value !== 'string' || value.trim().length === 0) return true
   const trimmed = value.trim()
-  if (isUnsplashFeaturedUrl(trimmed)) return false
+  if (isGeneratedMediaPath(trimmed) || isUnsplashFeaturedUrl(trimmed)) return false
   if (promptHasImageUrl && URL_RE.test(trimmed) && !trimmed.includes('images.unsplash.com/photo-')) return false
   if (trimmed.startsWith('data:image/')) return true
   if (!URL_RE.test(trimmed)) return true
@@ -228,17 +228,27 @@ function keywordCandidates(text: string): string[] {
     .filter(word => word.length > 2 && !stopWords.has(word))
 }
 
-function unsplashFeaturedUrl(keywords: string[]): string {
-  const cleaned = Array.from(new Set(keywords.map(normalizeKeyword).filter(Boolean))).slice(0, 6)
-  const finalKeywords = cleaned.length > 0 ? cleaned : CURATED_MEDIA.generic.keywordSets[0]
-  return `https://images.unsplash.com/featured/1600x900/?${finalKeywords.join(',')}`
+const GENERATED_MEDIA_ROOT = '/media/generated'
+
+function generatedAssetSlug(category: MediaCategory, keywords: string[]): string {
+  const cleaned = Array.from(new Set(keywords.map(normalizeKeyword).filter(Boolean))).slice(0, 4)
+  const finalKeywords = cleaned.length > 0 ? cleaned : CURATED_MEDIA[category].keywordSets[0].map(normalizeKeyword)
+  return `${category}-${finalKeywords.join('-')}`
+}
+
+function generatedMediaUrl(category: MediaCategory, keywords: string[]): string {
+  return `${GENERATED_MEDIA_ROOT}/${category}/${generatedAssetSlug(category, keywords)}.webp`
+}
+
+function isGeneratedMediaPath(value: string): boolean {
+  return value.startsWith(`${GENERATED_MEDIA_ROOT}/`)
 }
 
 function pickUrl(category: MediaCategory, seed: string, offset = 0): string {
   const keywordSets = CURATED_MEDIA[category].keywordSets
   const baseKeywords = keywordSets[(hash(seed) + offset) % keywordSets.length]
-  const contextualKeywords = keywordCandidates(seed).slice(0, 3)
-  return unsplashFeaturedUrl([...contextualKeywords, ...baseKeywords])
+  const contextualKeywords = keywordCandidates(seed).slice(0, 2)
+  return generatedMediaUrl(category, [...contextualKeywords, ...baseKeywords])
 }
 
 function isFootballCategory(content: SiteContent, prompt: string): boolean {

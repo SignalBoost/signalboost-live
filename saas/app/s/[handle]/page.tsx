@@ -13,7 +13,7 @@ import { getAdminSupabase } from '@/utils/supabase/server'
 export const dynamic = 'force-dynamic'
 
 type Palette = { primary?: string; accent?: string; background?: string; surface?: string; text?: string; muted?: string }
-type FeatureItem = { title?: string; body?: string; icon?: string; image_url?: string; imageAlt?: string }
+type FeatureItem = { title?: string; body?: string; icon?: string; image_url?: string; logo_url?: string; imageAlt?: string; logoAlt?: string }
 type StatItem = { value?: string; label?: string }
 type Testimonial = { quote?: string; author?: string; role?: string }
 type Section = {
@@ -207,10 +207,16 @@ function SectionView({ section, theme, displayFont, idx, siteContent }: { sectio
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 22 }}>
             {section.items.map((item, j) => (
-              <div key={j} style={{ background: surface, border: `1px solid ${withAlpha(text, dark ? 0.08 : 0.06)}`, borderRadius: 20, padding: 30, boxShadow: dark ? 'none' : `0 10px 30px ${withAlpha(text, 0.05)}` }}>
-                <div style={{ width: 50, height: 50, borderRadius: 14, background: `linear-gradient(135deg, ${primary}, ${accent})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, marginBottom: 18 }}>{item.icon || '◆'}</div>
-                {item.title && <h3 style={{ fontFamily: displayFont, fontSize: 21, fontWeight: 800, margin: '0 0 10px' }}>{item.title}</h3>}
-                {item.body && <p style={{ color: muted, fontSize: 15, lineHeight: 1.6, margin: 0 }}>{item.body}</p>}
+              <div key={j} style={{ background: surface, border: `1px solid ${withAlpha(text, dark ? 0.08 : 0.06)}`, borderRadius: 20, padding: item.image_url ? 0 : 30, overflow: 'hidden', boxShadow: dark ? 'none' : `0 10px 30px ${withAlpha(text, 0.05)}` }}>
+                {item.image_url ? (
+                  <img src={item.image_url} alt={item.imageAlt || item.title || ''} style={{ width: '100%', height: 190, objectFit: 'cover', display: 'block' }} />
+                ) : (
+                  <div style={{ width: 50, height: 50, borderRadius: 14, background: `linear-gradient(135deg, ${primary}, ${accent})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, marginBottom: 18 }}>{item.icon || '◆'}</div>
+                )}
+                <div style={{ padding: item.image_url ? 24 : 0 }}>
+                  {item.title && <h3 style={{ fontFamily: displayFont, fontSize: 21, fontWeight: 800, margin: '0 0 10px' }}>{item.title}</h3>}
+                  {item.body && <p style={{ color: muted, fontSize: 15, lineHeight: 1.6, margin: 0 }}>{item.body}</p>}
+                </div>
               </div>
             ))}
           </div>
@@ -283,6 +289,28 @@ function SectionView({ section, theme, displayFont, idx, siteContent }: { sectio
                 <span style={{ position: 'relative', zIndex: 1 }}>{item.title}</span>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  // ── LOGOS / SPONSORS ──
+  if ((t === 'logos' || t === 'sponsors') && Array.isArray(section.items) && section.items.length > 0) {
+    return (
+      <section style={{ background: dark ? surface : '#f6f7fb', color: text, padding: '72px 28px' }}>
+        <div style={{ maxWidth: 1120, margin: '0 auto' }}>
+          {heading && <h2 style={{ ...headingStyle, fontSize: 'clamp(28px, 4vw, 40px)', textAlign: 'center', marginBottom: 34 }}>{heading}</h2>}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 18 }}>
+            {section.items.map((item, j) => {
+              const url = item.logo_url || item.image_url
+              return (
+                <div key={j} style={{ background, border: `1px solid ${withAlpha(text, dark ? 0.08 : 0.06)}`, borderRadius: 18, overflow: 'hidden', boxShadow: dark ? 'none' : `0 10px 30px ${withAlpha(text, 0.05)}` }}>
+                  {url && <img src={url} alt={item.logoAlt || item.imageAlt || item.title || ''} style={{ width: '100%', height: 130, objectFit: 'cover', display: 'block' }} />}
+                  {item.title && <div style={{ padding: 18, fontFamily: displayFont, fontWeight: 800, fontSize: 18 }}>{item.title}</div>}
+                </div>
+              )
+            })}
           </div>
         </div>
       </section>

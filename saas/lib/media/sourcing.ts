@@ -6,7 +6,7 @@ type SiteSection = {
   body?: string
   image_url?: string
   imageAlt?: string
-  items?: Array<{ title?: string; body?: string; image_url?: string; imageAlt?: string; [key: string]: unknown }>
+  items?: Array<{ title?: string; body?: string; image_url?: string; logo_url?: string; imageAlt?: string; logoAlt?: string; [key: string]: unknown }>
   [key: string]: unknown
 }
 type SiteContent = {
@@ -35,6 +35,8 @@ const CURATED_MEDIA: Record<MediaCategory, CuratedMedia> = {
       'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1600&q=80',
       'https://images.unsplash.com/photo-1522778119026-d647f0596c20?auto=format&fit=crop&w=1600&q=80',
       'https://images.unsplash.com/photo-1510051640316-cee39563ddab?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1551958219-acbc608c6377?auto=format&fit=crop&w=1600&q=80',
+      'https://images.unsplash.com/photo-1517747614396-d21a78b850e8?auto=format&fit=crop&w=1600&q=80',
     ],
   },
   food: {
@@ -130,6 +132,20 @@ function pickUrl(category: MediaCategory, seed: string, offset = 0): string {
   return urls[(hash(seed) + offset) % urls.length]
 }
 
+function isFootballCategory(content: SiteContent, prompt: string): boolean {
+  return inferCategory(textForDetection(content, prompt)) === 'football'
+}
+
+function isImageLedSection(type = ''): boolean {
+  const t = type.toLowerCase()
+  return t === 'gallery' || t === 'bento' || t === 'team' || t === 'feature-grid' || t.includes('gallery') || t.includes('bento') || t.includes('team')
+}
+
+function isLogoSection(type = ''): boolean {
+  const t = type.toLowerCase()
+  return t === 'logos' || t === 'sponsors' || t.includes('logo') || t.includes('sponsor') || t.includes('partner')
+}
+
 function buildLogoDataUri(name: string, palette: Palette = {}): string {
   const cleanName = name.trim() || 'Site'
   const initials = cleanName.split(/\s+/).slice(0, 2).map(word => word[0]?.toUpperCase()).join('') || 'SB'
@@ -140,7 +156,7 @@ function buildLogoDataUri(name: string, palette: Palette = {}): string {
   return `data:image/svg+xml;utf8,${svg}`
 }
 
-function fallbackGalleryItems(content: SiteContent, category: MediaCategory) {
+function fallbackGalleryItems(content: SiteContent, category: MediaCategory): NonNullable<SiteSection['items']> {
   const sections = content.sections || []
   const sourceItems = sections.flatMap(section => section.items || []).filter(item => item.title || item.body).slice(0, 3)
   if (sourceItems.length > 0) return sourceItems.map(item => ({ title: item.title || 'Featured visual', body: item.body || CURATED_MEDIA[category].label }))
@@ -169,48 +185,78 @@ function fallbackGalleryItems(content: SiteContent, category: MediaCategory) {
 
 export function wantsGeneratedMedia(prompt: string): boolean {
   const lower = prompt.toLowerCase()
-  return includesAny(lower, IMAGE_REQUEST_TERMS) || includesAny(lower, LOGO_REQUEST_TERMS)
+  return includesAny(lower, IMAGE_REQUEST_TERMS) || includesAny(lower, LOGO_REQUEST_TERMS) || includesAny(lower, FOOTBALL_TERMS)
 }
 
 export function enrichSiteMedia(content: any, prompt: string): SiteContent {
   if (!content || typeof content !== 'object' || !Array.isArray(content.sections)) return content
   if (!wantsGeneratedMedia(prompt)) return content
-  if (hasExplicitInputImageUrl(prompt) || hasMediaUrl(content)) return content
 
   const next: SiteContent = {
     ...content,
-    sections: content.sections.map(section => ({ ...section, items: section.items?.map(item => ({ ...item })) })),
+    sections: content.sections.map((section: SiteSection) => ({ ...section, items: section.items?.map(item => ({ ...item })) })),
   }
   const detectionText = textForDetection(next, prompt)
   const category = inferCategory(detectionText)
   const label = CURATED_MEDIA[category].label
-  const firstHero = next.sections?.find(section => section.type === 'hero' || section.type === 'hero-split')
+  const footballPrompt = isFootballCategory(next, prompt)
+  const promptHasImageUrl = hasExplicitInputImageUrl(prompt)
 
-  if (firstHero) {
+  const firstHero = next.sections?.find(section => section.type === 'hero' || section.type === 'hero-split')
+  if (firstHero && (!firstHero.image_url || (footballPrompt && !hasMediaUrl(firstHero.image_url, 'image_url')))) {
     firstHero.type = firstHero.type === 'hero' ? 'hero-split' : firstHero.type
     firstHero.image_url = pickUrl(category, `${prompt}:${firstHero.heading || next.businessName || 'hero'}`)
     firstHero.imageAlt = `${firstHero.heading || next.businessName || 'Website'} — ${label}`
   }
 
-  let gallery = next.sections?.find(section => section.type === 'gallery')
-  if (!gallery && next.sections) {
-    gallery = {
+  let imageSection = next.sections?.find(section => isImageLedSection(section.type) && Array.isArray(section.items))
+  if (!imageSection && next.sections) {
+    imageSection = {
       type: 'gallery',
       heading: category === 'football' ? 'Field visuals' : category === 'food' ? 'Restaurant visuals' : 'Featured visuals',
       items: fallbackGalleryItems(next, category),
     }
-    next.sections.splice(Math.min(2, next.sections.length), 0, gallery)
+    next.sections.splice(Math.min(2, next.sections.length), 0, imageSection)
   }
 
-  if (gallery) {
-    gallery.items = (gallery.items && gallery.items.length > 0 ? gallery.items : fallbackGalleryItems(next, category)).map((item, index) => ({
+  if (imageSection) {
+    const existingItems = imageSection.items && imageSection.items.length > 0 ? imageSection.items : fallbackGalleryItems(next, category)
+    const minItems = footballPrompt ? 3 : existingItems.length
+    const items = [...existingItems]
+    const fallbackItems = fallbackGalleryItems(next, category)
+    while (items.length < minItems) items.push(fallbackItems[items.length % fallbackItems.length])
+
+    imageSection.items = items.map((item, index) => ({
       ...item,
-      image_url: item.image_url || pickUrl(category, `${prompt}:${item.title || 'gallery'}:${index}`, index + 1),
+      image_url: item.image_url || pickUrl(category, `${prompt}:${item.title || imageSection.heading || 'gallery'}:${index}`, index + 1),
       imageAlt: item.imageAlt || `${item.title || 'Gallery image'} — ${label}`,
     }))
   }
 
-  if (includesAny(prompt.toLowerCase(), LOGO_REQUEST_TERMS) && !next.logo_url) {
+  let logoSection = next.sections?.find(section => isLogoSection(section.type) && Array.isArray(section.items))
+  if (footballPrompt && !logoSection && next.sections) {
+    logoSection = {
+      type: 'logos',
+      heading: 'Supporters and sponsors',
+      items: [
+        { title: 'Matchday sponsor', body: 'Local supporter visibility with real football photography.' },
+        { title: 'Community partner', body: 'A sponsor card anchored by a field image.' },
+        { title: 'Club network', body: 'Visual proof for partners and neighborhood backers.' },
+      ],
+    }
+    next.sections.splice(Math.min(3, next.sections.length), 0, logoSection)
+  }
+
+  if (logoSection) {
+    const logoItems = logoSection.items && logoSection.items.length > 0 ? logoSection.items : fallbackGalleryItems(next, category)
+    logoSection.items = logoItems.map((item, index) => ({
+      ...item,
+      logo_url: item.logo_url || item.image_url || pickUrl(category, `${prompt}:${item.title || logoSection.heading || 'logo'}:${index}`, index + 4),
+      logoAlt: item.logoAlt || `${item.title || 'Sponsor logo image'} — ${label}`,
+    }))
+  }
+
+  if (includesAny(prompt.toLowerCase(), LOGO_REQUEST_TERMS) && !next.logo_url && !promptHasImageUrl) {
     next.logo_url = buildLogoDataUri(next.businessName || 'Site', next.palette)
     next.logoAlt = `${next.businessName || 'Site'} logo mark`
   }

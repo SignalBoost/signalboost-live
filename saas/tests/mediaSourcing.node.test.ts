@@ -40,3 +40,25 @@ test('still sources imagery when the prompt contains a non-image business URL', 
 
   assert.match(String(site.sections?.[0]?.image_url), /images\.unsplash\.com/)
 })
+
+
+test('football prompts inject hero, gallery, and sponsor logo imagery without explicit photo words', () => {
+  const site = enrichSiteMedia({
+    businessName: 'DNA da Várzea',
+    sections: [
+      { type: 'hero', heading: 'DNA da Várzea' },
+      { type: 'feature-grid', heading: 'Times da quebrada', items: [{ title: 'Botafogo do Jaçanã' }] },
+      { type: 'contact', heading: 'Fale com a liga' },
+    ],
+  }, 'Crie um site para DNA da Várzea com times de futebol amador de São Paulo')
+
+  const hero = site.sections?.find(section => section.type === 'hero-split')
+  assert.match(String(hero?.image_url), /images\.unsplash\.com/)
+
+  const imageLed = site.sections?.find(section => section.type === 'feature-grid' || section.type === 'gallery')
+  assert.equal(imageLed?.items?.filter(item => item.image_url).length, 3)
+
+  const logos = site.sections?.find(section => section.type === 'logos')
+  assert.ok(logos, 'football prompts should include a sponsor/logo section')
+  assert.ok((logos?.items || []).every(item => String(item.logo_url).includes('images.unsplash.com')))
+})

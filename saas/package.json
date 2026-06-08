@@ -22,7 +22,6 @@
     "@fal-ai/client": "^1.2.0",
     "resend": "^4.0.0",
     "openai": "^4.24.1",
-    "pdf-lib": "^1.17.1",
     "tailwindcss": "^3.4.1",
     "postcss": "^8.4.31",
     "autoprefixer": "^10.4.16",

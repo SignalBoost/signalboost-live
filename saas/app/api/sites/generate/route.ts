@@ -107,10 +107,9 @@ VISUAL DIRECTION:
 - Rich, varied page: strong hero, deliberate sequence of 5-8 sections.
 
 COMPONENT & IMAGE RULES:
-- NEVER use generic file paths such as "hero.jpg", "logo.png", "/images/photo.jpg", or placeholder asset names.
-- Every image asset field you include (image_url, logo_url, or similar) MUST be a highly descriptive, context-specific Unsplash Source URL.
-- Generate relevant photos with exact Unsplash Source API syntax: "https://images.unsplash.com/featured/1600x900/?[comma,separated,keywords]".
-- Keywords must be exact, descriptive, comma-separated terms based on the user's business niche. For SaaS use "software,dashboard,cyberpunk"; for luxury bakery use "croissant,bakery,interior,aesthetic"; for corporate lawyer use "office,architecture,professional".
+- Do NOT output image URLs, file paths, or asset names of any kind (never "hero.jpg", "/images/photo.jpg", or any Unsplash URL).
+- Wherever a section or item should display a photo, set its "image_url" (and "logo_url" for sponsor/partner items) to an empty string "".
+- ALWAYS include a short, descriptive "imageAlt" describing the intended photo. SignalBoost's media layer automatically replaces every empty image_url/logo_url with real, high-resolution, niche-relevant photography — your job is structure, copy, palette, and section sequence, not the images.
 
 SECTION TYPES: hero (eyebrow,heading,subheading,cta,ctaSecondary,image_url,imageAlt), hero-split (+body,image_url,imageAlt), feature-grid (eyebrow,heading,subheading,items[]{icon,title,body,image_url,imageAlt}), stats (heading,stats[]{value,label}), gallery (heading,items[]{title,body,image_url,imageAlt}), video (eyebrow,heading,subheading,videoUrl=""), testimonials (heading,testimonials[]{quote,author,role}), cta (heading,subheading,cta), contact (eyebrow,heading,body,email,phone,address), about/text (eyebrow,heading,body).
 
@@ -131,7 +130,7 @@ function buildRecoveryContent(description: string, items: ValidatedItem[]) {
     fonts: { display: 'Space Grotesk', body: 'DM Sans' },
     palette: { primary: '#2563eb', accent: '#f97316', background: '#f8fafc', surface: '#ffffff', text: '#0f172a', muted: '#64748b' },
     sections: [
-      { type: 'hero', eyebrow: 'AI-ready prompt', heading: 'Your request is ready to launch', subheading: description, cta: 'Explore the data', ctaSecondary: 'Contact us' },
+      { type: 'hero', eyebrow: 'AI-ready prompt', heading: 'Your request is ready to launch', subheading: description, cta: 'Explore the data', ctaSecondary: 'Contact us', image_url: '', imageAlt: 'Editorial brand hero visual' },
       { type: 'feature-grid', eyebrow: 'Fallback data', heading: 'Curated starter items', subheading: 'Demo records keep the page useful while live data recovers.', items: cards },
       { type: 'cta', heading: 'Ready for real data', subheading: 'Connect AI, CSV, scraper, or API sources when available.', cta: 'Generate again' },
       { type: 'contact', eyebrow: 'SignalBoost', heading: 'Keep building', body: 'We recovered gracefully and seeded safe demo content.', email: 'support@signalboostapp.com', phone: '', address: '' },
@@ -370,7 +369,7 @@ export async function POST(req: NextRequest) {
 
         await writer.write(encode({
           type:       'result',
-          content:    enrichSiteMedia(cachedSite, trimmed),
+          content:    await enrichSiteMedia(cachedSite, trimmed),
           preprocessor: {
             mode,
             routedIntent: routed.intent,
@@ -404,7 +403,7 @@ export async function POST(req: NextRequest) {
         seedFallbackItems(trimmed).catch(() => {})
         await writer.write(encode({
           type:    'result',
-          content: enrichSiteMedia(buildRecoveryContent(trimmed, fallbackItems), trimmed),
+          content: await enrichSiteMedia(buildRecoveryContent(trimmed, fallbackItems), trimmed),
           error:   'AI model unavailable. A fallback page was generated.',
         }))
         await writer.close()
@@ -430,7 +429,7 @@ export async function POST(req: NextRequest) {
 
       if (parsed.theme !== 'dark' && parsed.theme !== 'light') parsed.theme = 'light'
 
-      parsed = enrichSiteMedia(parsed, trimmed)
+      parsed = await enrichSiteMedia(parsed, trimmed)
 
       // Save site design to cache for next time — non-blocking
       if (!fallbackSeeded) {
@@ -465,7 +464,7 @@ export async function POST(req: NextRequest) {
         const fallbackItems = buildFallbackItems(null, 8)
         await writer.write(encode({
           type:    'result',
-          content: enrichSiteMedia(buildRecoveryContent('We recovered from an unexpected generation error.', fallbackItems), trimmed),
+          content: await enrichSiteMedia(buildRecoveryContent('We recovered from an unexpected generation error.', fallbackItems), trimmed),
           error:   'Something went wrong. A fallback page was generated.',
         }))
         await writer.close()

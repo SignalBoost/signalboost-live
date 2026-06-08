@@ -202,7 +202,9 @@ export async function POST(req: NextRequest) {
 
   const safeName = businessName.replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 40) || 'partner'
 
-  return new NextResponse(pdf, {
+  const blob = new Blob([pdf], { type: 'application/pdf' })
+
+  return new NextResponse(blob, {
     status: 200,
     headers: {
       'Content-Type': 'application/pdf',

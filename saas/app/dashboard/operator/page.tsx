@@ -6,115 +6,61 @@ import SitePreview, { type SitePreviewContent } from '@/components/operator/Site
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 const COPY: Record<string, Record<Lang, string>> = {
-  eyebrow:       { en: 'Website Optimization System', es: 'Sistema de optimización web', pt: 'Sistema de otimização de sites', pl: 'System optymalizacji stron', ru: 'Система оптимизации сайтов' },
-  title:         { en: 'Optimize Website', es: 'Optimizar sitio web', pt: 'Otimizar site', pl: 'Optymalizuj stronę', ru: 'Оптимизировать сайт' },
-  subtitle:      { en: 'Analyze any site, optimize the findings into a brief, and rebuild an improved version you can publish.', es: 'Analiza cualquier sitio, optimiza los hallazgos en un brief y reconstruye una versión mejorada.', pt: 'Analise qualquer site, otimize os achados em um brief e reconstrua uma versão melhorada.', pl: 'Analizuj dowolną stronę, optymalizuj wyniki w brief i odbuduj ulepszoną wersję.', ru: 'Анализируйте любой сайт, оптимизируйте выводы и пересоздайте улучшенную версию.' },
-  stageAnalyze:  { en: 'Analyze', es: 'Analizar', pt: 'Analisar', pl: 'Analiza', ru: 'Анализ' },
-  stageOptimize: { en: 'Optimize', es: 'Optimizar', pt: 'Otimizar', pl: 'Optymalizuj', ru: 'Оптимизация' },
-  stageRebuild:  { en: 'Rebuild', es: 'Rebuild', pt: 'Reconstruir', pl: 'Przebuduj', ru: 'Пересоздать' },
-  placeholder:   { en: 'yourwebsite.com', es: 'tusitioweb.com', pt: 'seusiteweb.com', pl: 'twojastrona.pl', ru: 'вашсайт.рф' },
-  analyzeBtn:    { en: 'Analyze website', es: 'Analizar sitio', pt: 'Analisar site', pl: 'Analizuj stronę', ru: 'Анализировать' },
-  analyzingBtn:  { en: 'Analyzing…', es: 'Analizando…', pt: 'Analisando…', pl: 'Analizowanie…', ru: 'Анализ…' },
-  analyzingMsg:  { en: 'Fetching the page and running checks…', es: 'Obteniendo la página y ejecutando comprobaciones…', pt: 'Buscando a página e executando verificações…', pl: 'Pobieranie strony i uruchamianie sprawdzeń…', ru: 'Загрузка страницы и выполнение проверок…' },
-  optimizeTitle: { en: 'Optimize → Rebuild brief', es: 'Optimizar → Brief de reconstrucción', pt: 'Otimizar → Brief de reconstrução', pl: 'Optymalizuj → Brief do przebudowy', ru: 'Оптимизация → Бриф' },
-  optimizeDesc:  { en: 'We turned the audit into a brief for the rebuild engine. Edit anything, then rebuild an improved version of the site.', es: 'Convertimos la auditoría en un brief. Edita lo que quieras y reconstruye una versión mejorada.', pt: 'Transformamos a auditoria em um brief. Edite o que quiser e reconstrua uma versão melhorada.', pl: 'Zmieniliśmy audyt w brief. Edytuj co chcesz i odbuduj ulepszoną wersję.', ru: 'Мы превратили аудит в бриф. Редактируйте и пересоздайте улучшенную версию.' },
-  rebuildBtn:    { en: '⚙️ Rebuild improved site', es: '⚙️ Reconstruir sitio mejorado', pt: '⚙️ Reconstruir site melhorado', pl: '⚙️ Przebuduj ulepszoną stronę', ru: '⚙️ Пересоздать улучшенный сайт' },
-  rebuildingBtn: { en: 'Rebuilding…', es: 'Reconstruyendo…', pt: 'Reconstruindo…', pl: 'Przebudowywanie…', ru: 'Пересоздание…' },
-  resetBrief:    { en: 'Reset brief', es: 'Restablecer brief', pt: 'Redefinir brief', pl: 'Resetuj brief', ru: 'Сбросить бриф' },
-  engineTitle:   { en: 'Rebuild engine', es: 'Motor de reconstrucción', pt: 'Motor de reconstrução', pl: 'Silnik przebudowy', ru: 'Движок пересоздания' },
-  publishBtn:    { en: '🚀 Publish improved site', es: '🚀 Publicar sitio mejorado', pt: '🚀 Publicar site melhorado', pl: '🚀 Opublikuj ulepszoną stronę', ru: '🚀 Опубликовать улучшенный сайт' },
-  publishingBtn: { en: 'Publishing…', es: 'Publicando…', pt: 'Publicando…', pl: 'Publikowanie…', ru: 'Публикация…' },
-  viewLive:      { en: 'View live site →', es: 'Ver sitio en vivo →', pt: 'Ver site ao vivo →', pl: 'Zobacz stronę na żywo →', ru: 'Просмотреть сайт →' },
-  errDefault:    { en: 'Could not audit that URL.', es: 'No se pudo auditar esa URL.', pt: 'Não foi possível auditar essa URL.', pl: 'Nie można było przeprowadzić audytu.', ru: 'Не удалось проверить URL.' },
-  errConnect:    { en: 'Could not connect. Please try again.', es: 'No se pudo conectar. Inténtalo de nuevo.', pt: 'Não foi possível conectar. Tente novamente.', pl: 'Nie można połączyć. Spróbuj ponownie.', ru: 'Не удалось подключиться. Попробуйте еще раз.' },
+  eyebrow:      { en: 'AI Website Builder', es: 'Constructor de sitios con IA', pt: 'Construtor de sites com IA', pl: 'Kreator stron z IA', ru: 'ИИ-конструктор сайтов' },
+  title:        { en: 'Build Website', es: 'Construir sitio web', pt: 'Criar site', pl: 'Zbuduj stronę', ru: 'Создать сайт' },
+  subtitle:     { en: 'Describe your business and we\'ll generate a complete, multilingual website you can publish instantly.', es: 'Describe tu negocio y generaremos un sitio web completo y multilingüe que puedes publicar al instante.', pt: 'Descreva seu negócio e geraremos um site completo e multilíngue que você pode publicar instantaneamente.', pl: 'Opisz swoją firmę, a wygenerujemy kompletną, wielojęzyczną stronę, którą możesz natychmiast opublikować.', ru: 'Опишите свой бизнес, и мы создадим полноценный многоязычный сайт, который вы сможете опубликовать немедленно.' },
+  placeholder:  { en: 'e.g. A cozy Italian restaurant in downtown Chicago specializing in homemade pasta and wood-fired pizza…', es: 'p.ej. Un acogedor restaurante italiano en el centro de Chicago especializado en pasta casera y pizza al horno de leña…', pt: 'ex. Um aconchegante restaurante italiano no centro de Chicago especializado em massa artesanal e pizza no forno a lenha…', pl: 'np. Przytulna włoska restauracja w centrum Chicago specjalizująca się w domowym makaronie i pizzy z pieca opalanego drewnem…', ru: 'напр. Уютный итальянский ресторан в центре Чикаго, специализирующийся на домашней пасте и пицце из дровяной печи…' },
+  generateBtn:  { en: '✦ Generate website', es: '✦ Generar sitio web', pt: '✦ Gerar site', pl: '✦ Generuj stronę', ru: '✦ Создать сайт' },
+  generatingBtn:{ en: 'Generating…', es: 'Generando…', pt: 'Gerando…', pl: 'Generowanie…', ru: 'Создание…' },
+  publishBtn:   { en: '🚀 Publish site', es: '🚀 Publicar sitio', pt: '🚀 Publicar site', pl: '🚀 Opublikuj stronę', ru: '🚀 Опубликовать сайт' },
+  publishingBtn:{ en: 'Publishing…', es: 'Publicando…', pt: 'Publicando…', pl: 'Publikowanie…', ru: 'Публикация…' },
+  regenerate:   { en: 'Regenerate', es: 'Regenerar', pt: 'Regenerar', pl: 'Wygeneruj ponownie', ru: 'Создать заново' },
+  viewLive:     { en: 'View live site →', es: 'Ver sitio en vivo →', pt: 'Ver site ao vivo →', pl: 'Zobacz stronę na żywo →', ru: 'Просмотреть сайт →' },
+  previewTitle: { en: 'Preview', es: 'Vista previa', pt: 'Pré-visualização', pl: 'Podgląd', ru: 'Предпросмотр' },
+  engineTitle:  { en: 'Generation engine', es: 'Motor de generación', pt: 'Motor de geração', pl: 'Silnik generowania', ru: 'Движок генерации' },
+  hintLabel:    { en: 'Tips for best results', es: 'Consejos para mejores resultados', pt: 'Dicas para melhores resultados', pl: 'Wskazówki dla najlepszych wyników', ru: 'Советы для лучших результатов' },
+  hint1:        { en: 'Include your business name, location, and what makes you unique', es: 'Incluye el nombre de tu negocio, ubicación y qué te hace único', pt: 'Inclua o nome do seu negócio, localização e o que te torna único', pl: 'Podaj nazwę firmy, lokalizację i co Cię wyróżnia', ru: 'Укажите название бизнеса, местоположение и что вас выделяет' },
+  hint2:        { en: 'Mention your target audience and main services or products', es: 'Menciona tu público objetivo y principales servicios o productos', pt: 'Mencione seu público-alvo e principais serviços ou produtos', pl: 'Wspomnij o grupie docelowej i głównych usługach lub produktach', ru: 'Упомяните целевую аудиторию и основные услуги или продукты' },
+  hint3:        { en: 'Add tone: professional, friendly, bold, minimalist, luxury…', es: 'Agrega tono: profesional, amigable, audaz, minimalista, lujoso…', pt: 'Adicione tom: profissional, amigável, ousado, minimalista, luxuoso…', pl: 'Dodaj ton: profesjonalny, przyjazny, odważny, minimalistyczny, luksusowy…', ru: 'Добавьте тон: профессиональный, дружелюбный, смелый, минималистичный, люксовый…' },
+  errConnect:   { en: 'Could not connect. Please try again.', es: 'No se pudo conectar. Inténtalo de nuevo.', pt: 'Não foi possível conectar. Tente novamente.', pl: 'Nie można połączyć. Spróbuj ponownie.', ru: 'Не удалось подключиться. Попробуйте еще раз.' },
+  charCount:    { en: 'characters', es: 'caracteres', pt: 'caracteres', pl: 'znaków', ru: 'символов' },
 }
 
 function c(key: string, lang: string): string {
   return COPY[key]?.[lang as Lang] ?? COPY[key]?.en ?? key
 }
 
-type Status = 'pass' | 'warn' | 'fail'
-type Check = { id: string; label: string; category: string; status: Status; detail: string; recommendation: string }
-type Audit = { url: string; finalUrl: string; score: number; checks: Check[]; summary: string; source: string }
 type StatusStep = { step: string; message: string }
 
-const STATUS_UI: Record<Status, { color: string; bg: string; border: string; icon: string }> = {
-  pass: { color: '#86efac', bg: 'rgba(134,239,172,.10)', border: 'rgba(134,239,172,.28)', icon: '✓' },
-  warn: { color: '#fde68a', bg: 'rgba(253,230,138,.10)', border: 'rgba(253,230,138,.28)', icon: '!' },
-  fail: { color: '#fca5a5', bg: 'rgba(252,165,165,.10)', border: 'rgba(252,165,165,.28)', icon: '×' },
-}
-
-function scoreColor(s: number) {
-  if (s >= 80) return '#86efac'
-  if (s >= 50) return '#fde68a'
-  return '#fca5a5'
-}
-
-function buildBrief(audit: Audit): string {
-  let host = audit.finalUrl
-  try { host = new URL(audit.finalUrl).hostname.replace(/^www\./, '') } catch {}
-  const issues = audit.checks.filter(ch => ch.status !== 'pass' && ch.recommendation)
-  const fixes = issues.map(ch => `- ${ch.label}: ${ch.recommendation}`).join('\n')
-  return [
-    `Rebuild an improved, modern version of the website ${host}.`,
-    `Keep the same business, brand, and core offering, but fix the issues found in the audit and make it fast, mobile-first, accessible, and conversion-focused with a clear primary call-to-action.`,
-    issues.length ? `\nAddress these specific improvements:\n${fixes}` : '',
-  ].join('\n').trim()
-}
-
-export default function ImproveWebsitePage() {
+export default function OperatorPage() {
   const { lang } = useI18n()
   const l = ['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en'
 
-  const [url, setUrl]               = useState('')
-  const [analyzing, setAnalyzing]   = useState(false)
-  const [error, setError]           = useState('')
-  const [audit, setAudit]           = useState<Audit | null>(null)
-  const [brief, setBrief]           = useState('')
-  const [content, setContent]       = useState<SitePreviewContent | null>(null)
-  const [liveUrl, setLiveUrl]       = useState<string | null>(null)
-  const [building, setBuilding]     = useState(false)
-  const [publishing, setPublishing] = useState(false)
-  const [steps, setSteps]           = useState<StatusStep[]>([])
-  const [message, setMessage]       = useState('')
+  const [description, setDescription] = useState('')
+  const [generating, setGenerating]   = useState(false)
+  const [publishing, setPublishing]   = useState(false)
+  const [steps, setSteps]             = useState<StatusStep[]>([])
+  const [content, setContent]         = useState<SitePreviewContent | null>(null)
+  const [liveUrl, setLiveUrl]         = useState<string | null>(null)
+  const [message, setMessage]         = useState('')
 
-  async function analyze() {
-    const value = url.trim()
-    if (!value || analyzing) return
-    setAnalyzing(true); setError(''); setAudit(null); setContent(null); setLiveUrl(null); setSteps([]); setMessage('')
-    try {
-      const res = await fetch('/api/improve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: value, language: l }),
-      })
-      const data = await res.json()
-      if (!res.ok) { setError(data?.error || c('errDefault', l)); return }
-      setAudit(data)
-      setBrief(buildBrief(data))
-    } catch {
-      setError(c('errConnect', l))
-    } finally {
-      setAnalyzing(false)
-    }
-  }
-
-  async function rebuild() {
-    if (!brief.trim() || building) return
-    setBuilding(true); setMessage(''); setContent(null); setLiveUrl(null); setSteps([])
+  async function generate() {
+    const desc = description.trim()
+    if (!desc || generating) return
+    setGenerating(true); setSteps([]); setContent(null); setLiveUrl(null); setMessage('')
     try {
       const res = await fetch('/api/sites/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description: brief, language: l }),
+        body: JSON.stringify({ description: desc, language: l }),
       })
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({}))
         setMessage(err.error || c('errConnect', l))
-        setBuilding(false)
+        setGenerating(false)
         return
       }
-      const reader = res.body.getReader()
+      const reader  = res.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
       while (true) {
@@ -128,8 +74,9 @@ export default function ImproveWebsitePage() {
           if (!trimmed) continue
           let chunk: any
           try { chunk = JSON.parse(trimmed) } catch { continue }
-          if (chunk.type === 'status') setSteps(prev => [...prev, { step: chunk.step, message: chunk.message }])
-          else if (chunk.type === 'result') {
+          if (chunk.type === 'status') {
+            setSteps(prev => [...prev, { step: chunk.step, message: chunk.message }])
+          } else if (chunk.type === 'result') {
             if (chunk.content) setContent(chunk.content)
             if (chunk.error && !chunk.content) setMessage(chunk.error)
           }
@@ -138,7 +85,7 @@ export default function ImproveWebsitePage() {
     } catch {
       setMessage(c('errConnect', l))
     } finally {
-      setBuilding(false)
+      setGenerating(false)
     }
   }
 
@@ -161,191 +108,219 @@ export default function ImproveWebsitePage() {
     }
   }
 
-  const categories = audit ? Array.from(new Set(audit.checks.map(ch => ch.category))) : []
   const fullUrl = liveUrl
     ? (typeof window !== 'undefined' ? window.location.origin : '') + liveUrl
     : null
 
   return (
     <div className="sb-hmi-shell" style={{ minHeight: '100vh' }}>
-      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 0 80px' }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 0 80px' }}>
 
         {/* Header */}
         <div className="sb-cockpit-hero" style={{ marginBottom: 28 }}>
-          <p className="sb-hmi-kicker">🧭 {c('eyebrow', l)}</p>
+          <p className="sb-hmi-kicker">🌐 {c('eyebrow', l)}</p>
           <h1 className="sb-h2" style={{ margin: '10px 0 12px' }}>{c('title', l)}</h1>
           <p className="sb-hmi-muted" style={{ maxWidth: 680 }}>{c('subtitle', l)}</p>
         </div>
 
-        {/* Stage rail */}
-        <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
-          {[
-            { n: 1, key: 'stageAnalyze',  done: !!audit },
-            { n: 2, key: 'stageOptimize', done: !!audit },
-            { n: 3, key: 'stageRebuild',  done: !!content },
-          ].map(s => (
-            <div key={s.n} style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '8px 18px', borderRadius: 999,
-              background: s.done ? 'rgba(134,239,172,.10)' : 'rgba(255,255,255,.04)',
-              border: `1px solid ${s.done ? 'rgba(134,239,172,.35)' : 'rgba(255,255,255,.10)'}`,
-            }}>
-              <span style={{
-                width: 22, height: 22, borderRadius: '50%',
-                display: 'grid', placeItems: 'center',
-                fontSize: 11, fontWeight: 900,
-                background: s.done ? '#86efac' : 'rgba(255,255,255,.12)',
-                color: s.done ? '#04210f' : '#fff',
-              }}>
-                {s.done ? '✓' : s.n}
-              </span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: s.done ? '#86efac' : 'rgba(255,255,255,.7)' }}>
-                {c(s.key, l)}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {/* Stage 1: Input */}
-        <div className="sb-glass-panel" style={{ marginBottom: 20, padding: 20 }}>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <input
+        {/* Main grid — input left, tips right */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1.6fr) minmax(220px, 1fr)',
+          gap: 18,
+          marginBottom: 24,
+          alignItems: 'start',
+        }}>
+          {/* Input panel */}
+          <div className="sb-glass-panel" style={{ padding: 24 }}>
+            <textarea
               className="sb-input"
-              value={url}
-              onChange={e => setUrl(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') analyze() }}
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) generate() }}
               placeholder={c('placeholder', l)}
-              style={{ flex: 1, minWidth: 240, padding: '13px 16px', borderRadius: 12, fontSize: 14 }}
-              disabled={analyzing}
+              rows={7}
+              maxLength={1200}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '14px 16px',
+                borderRadius: 12,
+                resize: 'vertical',
+                fontSize: 14,
+                lineHeight: 1.7,
+              }}
+              disabled={generating}
             />
-            <button
-              onClick={analyze}
-              disabled={analyzing || !url.trim()}
-              className="sb-button-primary"
-              style={{ borderRadius: 12, padding: '0 28px', opacity: analyzing || !url.trim() ? 0.55 : 1 }}
-            >
-              {analyzing ? c('analyzingBtn', l) : c('analyzeBtn', l)}
-            </button>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginTop: 14,
+              flexWrap: 'wrap',
+              gap: 10,
+            }}>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,.35)' }}>
+                {description.length} / 1200 {c('charCount', l)}
+              </span>
+              <button
+                onClick={generate}
+                disabled={generating || !description.trim()}
+                className="sb-button-primary"
+                style={{
+                  borderRadius: 12,
+                  padding: '12px 28px',
+                  opacity: generating || !description.trim() ? 0.55 : 1,
+                }}
+              >
+                {generating ? c('generatingBtn', l) : c('generateBtn', l)}
+              </button>
+            </div>
           </div>
-          {error && <p style={{ color: '#fca5a5', fontSize: 13, marginTop: 12, marginBottom: 0 }}>{error}</p>}
-          {analyzing && <p className="sb-hmi-muted" style={{ marginTop: 14, marginBottom: 0, fontSize: 14 }}>{c('analyzingMsg', l)}</p>}
+
+          {/* Tips panel */}
+          <div className="sb-neon-panel" style={{ padding: 20 }}>
+            <p className="sb-hmi-kicker" style={{ marginBottom: 14 }}>
+              💡 {c('hintLabel', l)}
+            </p>
+            {[c('hint1', l), c('hint2', l), c('hint3', l)].map((hint, i) => (
+              <div key={i} style={{
+                display: 'flex',
+                gap: 10,
+                alignItems: 'flex-start',
+                marginBottom: 14,
+              }}>
+                <span style={{
+                  flexShrink: 0,
+                  width: 22, height: 22,
+                  borderRadius: '50%',
+                  background: 'rgba(26,240,255,.15)',
+                  border: '1px solid rgba(26,240,255,.3)',
+                  color: '#1af0ff',
+                  fontSize: 11, fontWeight: 900,
+                  display: 'grid', placeItems: 'center',
+                }}>
+                  {i + 1}
+                </span>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,.65)', lineHeight: 1.6 }}>
+                  {hint}
+                </span>
+              </div>
+            ))}
+            <div style={{
+              marginTop: 18,
+              padding: '12px 14px',
+              borderRadius: 12,
+              background: 'rgba(255,195,0,.08)',
+              border: '1px solid rgba(255,195,0,.2)',
+              fontSize: 12,
+              color: 'rgba(255,195,0,.9)',
+              lineHeight: 1.6,
+            }}>
+              ⌘ + Enter {l === 'en' ? 'to generate' : l === 'es' ? 'para generar' : l === 'pt' ? 'para gerar' : l === 'pl' ? 'aby wygenerować' : 'для создания'}
+            </div>
+          </div>
         </div>
 
-        {audit && (
-          <div style={{ display: 'grid', gap: 18 }}>
-
-            {/* Score */}
-            <div className="sb-neon-panel" style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 24, alignItems: 'center', padding: 24 }}>
-              <div style={{
-                width: 100, height: 100, borderRadius: '50%',
-                display: 'grid', placeItems: 'center', flexShrink: 0,
-                border: `5px solid ${scoreColor(audit.score)}`,
-                boxShadow: `0 0 32px ${scoreColor(audit.score)}44`,
-              }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: scoreColor(audit.score), lineHeight: 1 }}>{audit.score}</div>
-                  <div className="sb-caption">/ 100</div>
+        {/* Generation status */}
+        {(generating || steps.length > 0) && !content && (
+          <div className="sb-glass-panel" style={{ padding: 20, marginBottom: 20 }}>
+            <p className="sb-eyebrow" style={{ marginBottom: 14 }}>{c('engineTitle', l)}</p>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {steps.map((s, i) => (
+                <div key={i} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  fontSize: 14,
+                  color: i === steps.length - 1 ? '#fff' : 'rgba(255,255,255,.5)',
+                }}>
+                  <span style={{
+                    flexShrink: 0,
+                    width: 8, height: 8,
+                    borderRadius: '50%',
+                    background: i === steps.length - 1 ? '#1af0ff' : 'rgba(255,255,255,.2)',
+                    boxShadow: i === steps.length - 1 ? '0 0 12px #1af0ff' : 'none',
+                  }} />
+                  {s.message}
                 </div>
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,.4)', marginBottom: 8, wordBreak: 'break-all' }}>{audit.finalUrl}</div>
-                <p style={{ margin: 0, lineHeight: 1.7, color: 'rgba(255,255,255,.85)', fontSize: 14, whiteSpace: 'pre-wrap' }}>{audit.summary}</p>
-              </div>
-            </div>
-
-            {/* Checks */}
-            {categories.map(cat => (
-              <section key={cat}>
-                <h2 className="sb-eyebrow" style={{ marginBottom: 12 }}>{cat}</h2>
-                <div style={{ display: 'grid', gap: 8 }}>
-                  {audit.checks.filter(ch => ch.category === cat).map(ch => {
-                    const ui = STATUS_UI[ch.status]
-                    return (
-                      <div key={ch.id} style={{
-                        padding: '14px 18px', borderRadius: 16,
-                        background: ui.bg, border: `1px solid ${ui.border}`,
-                        display: 'grid', gridTemplateColumns: '30px 1fr',
-                        gap: 14, alignItems: 'start',
-                      }}>
-                        <span style={{
-                          width: 28, height: 28, borderRadius: '50%',
-                          display: 'grid', placeItems: 'center',
-                          background: `${ui.color}22`, color: ui.color,
-                          fontWeight: 900, fontSize: 13, border: `1px solid ${ui.color}44`,
-                        }}>
-                          {ui.icon}
-                        </span>
-                        <div style={{ minWidth: 0 }}>
-                          <strong style={{ color: '#fff', fontSize: 14 }}>{ch.label}</strong>
-                          <div style={{ color: 'rgba(255,255,255,.62)', fontSize: 13, marginTop: 3, lineHeight: 1.6 }}>{ch.detail}</div>
-                          {ch.status !== 'pass' && ch.recommendation && (
-                            <div style={{ fontSize: 13, marginTop: 8, color: ui.color, fontWeight: 700 }}>→ {ch.recommendation}</div>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
+              ))}
+              {generating && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: '#ffc300' }}>
+                  <span style={{
+                    width: 8, height: 8, borderRadius: '50%',
+                    background: '#ffc300',
+                    boxShadow: '0 0 12px #ffc300',
+                    animation: 'pulse 1s infinite',
+                  }} />
+                  {c('generatingBtn', l)}
                 </div>
-              </section>
-            ))}
-
-            {/* Stage 2: Brief */}
-            <div className="sb-glass-panel" style={{ padding: 24, border: '1px solid rgba(26,240,255,.28)' }}>
-              <p className="sb-hmi-kicker" style={{ marginBottom: 8 }}>{c('optimizeTitle', l)}</p>
-              <p style={{ color: 'rgba(255,255,255,.65)', fontSize: 14, lineHeight: 1.7, marginBottom: 14 }}>{c('optimizeDesc', l)}</p>
-              <textarea
-                className="sb-input"
-                value={brief}
-                onChange={e => setBrief(e.target.value)}
-                rows={8}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '14px 16px', borderRadius: 12, resize: 'vertical', fontSize: 13, lineHeight: 1.7 }}
-              />
-              <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
-                <button onClick={rebuild} disabled={building || !brief.trim()} className="sb-button-primary" style={{ borderRadius: 12, padding: '12px 26px', opacity: building || !brief.trim() ? 0.55 : 1 }}>
-                  {building ? c('rebuildingBtn', l) : c('rebuildBtn', l)}
-                </button>
-                <button onClick={() => setBrief(buildBrief(audit))} disabled={building} className="sb-button-secondary">
-                  {c('resetBrief', l)}
-                </button>
-              </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* Stage 3: Output */}
-        {(building || steps.length > 0 || content || message) && (
-          <div style={{ marginTop: 24 }}>
-            <p className="sb-eyebrow" style={{ marginBottom: 14 }}>{c('engineTitle', l)}</p>
+        {message && (
+          <p style={{ color: liveUrl ? '#86efac' : '#fca5a5', fontSize: 13, marginBottom: 16 }}>
+            {message}
+          </p>
+        )}
 
-            {steps.length > 0 && !content && (
-              <div className="sb-glass-panel" style={{ padding: 18, display: 'grid', gap: 8 }}>
-                {steps.map((s, i) => (
-                  <div key={i} style={{ fontSize: 14, color: 'rgba(255,255,255,.78)', lineHeight: 1.6 }}>{s.message}</div>
-                ))}
-              </div>
-            )}
+        {/* Result */}
+        {content && (
+          <div>
+            {/* Action bar */}
+            <div style={{
+              display: 'flex',
+              gap: 10,
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              marginBottom: 18,
+              padding: '14px 18px',
+              borderRadius: 16,
+              background: 'rgba(255,255,255,.04)',
+              border: '1px solid rgba(255,255,255,.10)',
+            }}>
+              <p className="sb-eyebrow" style={{ flex: 1, margin: 0 }}>
+                ✦ {c('previewTitle', l)}
+              </p>
+              <button
+                onClick={publish}
+                disabled={publishing}
+                className="sb-button-primary"
+                style={{ borderRadius: 12, padding: '11px 24px', opacity: publishing ? 0.55 : 1 }}
+              >
+                {publishing ? c('publishingBtn', l) : c('publishBtn', l)}
+              </button>
+              <button
+                onClick={() => { setContent(null); setSteps([]); setMessage(''); setLiveUrl(null) }}
+                className="sb-button-secondary"
+                style={{ borderRadius: 12 }}
+              >
+                {c('regenerate', l)}
+              </button>
+              {fullUrl && (
+                
+                  href={fullUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="sb-button-secondary"
+                  style={{ display: 'inline-flex', alignItems: 'center', borderRadius: 12 }}
+                >
+                  {c('viewLive', l)}
+                </a>
+              )}
+            </div>
 
-            {message && (
-              <p style={{ color: liveUrl ? '#86efac' : '#fca5a5', fontSize: 13, marginTop: 12 }}>{message}</p>
-            )}
-
-            {content && (
-              <div style={{ marginTop: 16 }}>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-                  <button onClick={publish} disabled={publishing} className="sb-button-primary" style={{ borderRadius: 12, padding: '12px 26px', opacity: publishing ? 0.55 : 1 }}>
-                    {publishing ? c('publishingBtn', l) : c('publishBtn', l)}
-                  </button>
-                  {fullUrl && (
-                    <a href={fullUrl} target="_blank" rel="noreferrer" className="sb-button-secondary" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                      {c('viewLive', l)}
-                    </a>
-                  )}
-                </div>
-                <div style={{ borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(255,255,255,.10)', boxShadow: '0 24px 80px rgba(0,0,0,.4)' }}>
-                  <SitePreview content={content} />
-                </div>
-              </div>
-            )}
+            {/* Preview */}
+            <div style={{
+              borderRadius: 20,
+              overflow: 'hidden',
+              border: '1px solid rgba(255,255,255,.10)',
+              boxShadow: '0 24px 80px rgba(0,0,0,.5)',
+            }}>
+              <SitePreview content={content} />
+            </div>
           </div>
         )}
       </div>

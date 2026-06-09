@@ -100,7 +100,7 @@ export default function RootLayout({
             inset: 0,
             zIndex: 0,
             pointerEvents: 'none',
-            overflow: 'hidden',
+            overflow: 'clip',
           }}
         >
           <div
@@ -110,13 +110,11 @@ export default function RootLayout({
               left: '-10%',
               width: '60vw',
               height: '60vw',
-              background:
-                'radial-gradient(circle, rgba(255,195,0,0.18) 0%, rgba(255,195,0,0) 70%)',
+              background: 'radial-gradient(circle, rgba(255,195,0,0.18) 0%, rgba(255,195,0,0) 70%)',
               filter: 'blur(60px)',
               animation: 'meshFloat1 22s ease-in-out infinite',
             }}
           />
-
           <div
             style={{
               position: 'absolute',
@@ -124,14 +122,12 @@ export default function RootLayout({
               right: '-15%',
               width: '55vw',
               height: '55vw',
-              background:
-                'radial-gradient(circle, rgba(59,130,246,0.18) 0%, rgba(59,130,246,0) 70%)',
+              background: 'radial-gradient(circle, rgba(59,130,246,0.18) 0%, rgba(59,130,246,0) 70%)',
               filter: 'blur(60px)',
               animation: 'meshFloat2 26s ease-in-out infinite',
             }}
           />
         </div>
-
         <I18nProvider>
           <Navbar />
           {children}

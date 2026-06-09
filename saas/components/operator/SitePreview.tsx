@@ -53,7 +53,6 @@ function withAlpha(color: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
-
 function toEmbedUrl(url?: string): string | null {
   if (!url || typeof url !== 'string') return null
 
@@ -177,12 +176,14 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
 
         // ── Gallery — rich cards with image, title, description ───────────
         if (s.type === 'gallery' && Array.isArray(s.items) && s.items.length > 0) {
+          const galleryItems = s.items as GalleryItem[]
+          const hasWikipediaContent = galleryItems.some(it => it.wiki_url)
           return (
             <div key={i} style={{ padding: '32px 24px' }}>
               {eyebrow}
               {h && <div style={{ fontFamily: display, fontWeight: 800, fontSize: 20, textAlign: 'center', marginBottom: 18 }}>{h}</div>}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14 }}>
-                {(s.items as GalleryItem[]).map((it, j) => (
+                {galleryItems.map((it, j) => (
                   <div
                     key={j}
                     style={{
@@ -219,10 +220,11 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
                   </div>
                 ))}
               </div>
-              {/* CC-BY-SA attribution if this is Wikipedia content */}
-              <div style={{ marginTop: 12, fontSize: 10, color: muted, textAlign: 'center' }}>
-                Content from Wikipedia · CC BY-SA 4.0
-              </div>
+              {hasWikipediaContent && (
+                <div style={{ marginTop: 12, fontSize: 10, color: muted, textAlign: 'center' }}>
+                  Content from Wikipedia · CC BY-SA 4.0
+                </div>
+              )}
             </div>
           )
         }

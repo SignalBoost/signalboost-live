@@ -18,7 +18,7 @@ const COPY: Record<string, Record<Lang, string>> = {
   generate:      { en: 'Generate Podcast Sketch', es: 'Generar esquema de podcast', pt: 'Gerar esboço de podcast', pl: 'Wygeneruj szkic podcastu', ru: 'Создать концепцию подкаста' },
   generating:    { en: 'Generating…', es: 'Generando…', pt: 'Gerando…', pl: 'Generowanie…', ru: 'Создание…' },
   createPage:    { en: 'Create Podcast Page', es: 'Crear página de podcast', pt: 'Criar página de podcast', pl: 'Utwórz stronę podcastu', ru: 'Создать страницу подкаста' },
-  openStudio:    { en: 'Open Podcast Studio', es: 'Abrir Podcast Studio', pt: 'Abrir Podcast Studio', pl: 'Otwórz Podcast Studio', ru: 'Открыть студию подкастов' },
+  openStudio:    { en: 'Open Podcast Studio', es: 'Abrir Podcast Studio', pt: 'Abrir Podcast Studio', pl: 'Otwórz Podcast Studio', ru: 'Открыть студию podcastów' },
   error:         { en: 'Could not generate podcast sketch.', es: 'No se pudo generar el esquema.', pt: 'Não foi possível gerar o esboço.', pl: 'Nie można wygenerować szkicu.', ru: 'Не удалось создать концепцию.' },
   cardNames:     { en: '🎙️ Podcast Names', es: '🎙️ Nombres del podcast', pt: '🎙️ Nomes do podcast', pl: '🎙️ Nazwy podcastu', ru: '🎙️ Названия подкаста' },
   cardDesc:      { en: '📝 Description', es: '📝 Descripción', pt: '📝 Descrição', pl: '📝 Opis', ru: '📝 Описание' },
@@ -55,7 +55,7 @@ function Card({ title, items, text }: { title: string; items?: string[]; text?: 
   )
 }
 
-export default function PodcastLaunchpad() {
+function PodcastLaunchpadInner() {
   const { lang } = useI18n()
   const l = ['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en'
 
@@ -101,7 +101,6 @@ export default function PodcastLaunchpad() {
   return (
     <div className="sb-hmi-shell" style={{ minHeight: '100vh' }}>
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 0 80px' }}>
-
         <div className="sb-cockpit-hero" style={{ marginBottom: 28 }}>
           <p className="sb-hmi-kicker">🎙️ PODCAST</p>
           <h1 className="sb-h2" style={{ margin: '10px 0 12px' }}>{c('title', l)}</h1>
@@ -149,16 +148,23 @@ export default function PodcastLaunchpad() {
 
         {sketch && (
           <div style={{ display: 'grid', gap: 14 }}>
-            <Card title={c('cardNames', l)}     items={sketch.showNames} />
-            <Card title={c('cardDesc', l)}       text={sketch.showDescription} />
-            <Card title={c('cardAudience', l)}   text={sketch.targetAudience} />
-            <Card title={c('cardEpisodes', l)}   items={sketch.firstEpisodes} />
-            <Card title={c('cardIntro', l)}      text={sketch.introScript} />
-            <Card title={c('cardChecklist', l)}  items={sketch.launchChecklist} />
-            <Card title={c('cardNext', l)}       text={sketch.nextStep} />
+            <Card title={c('cardNames', l)}    items={sketch.showNames} />
+            <Card title={c('cardDesc', l)}      text={sketch.showDescription} />
+            <Card title={c('cardAudience', l)}  text={sketch.targetAudience} />
+            <Card title={c('cardEpisodes', l)}  items={sketch.firstEpisodes} />
+            <Card title={c('cardIntro', l)}     text={sketch.introScript} />
+            <Card title={c('cardChecklist', l)} items={sketch.launchChecklist} />
+            <Card title={c('cardNext', l)}      text={sketch.nextStep} />
           </div>
         )}
       </div>
     </div>
   )
+}
+
+export default function PodcastLaunchpad() {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  if (!mounted) return null
+  return <PodcastLaunchpadInner />
 }

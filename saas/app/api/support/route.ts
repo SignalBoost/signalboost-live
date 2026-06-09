@@ -143,10 +143,10 @@ async function runTool(name: string): Promise<string> {
 
   if (name === 'getBusinessMetrics') {
     const result = await getBusinessMetrics()
-    if (!result.ok) {
-      return `Business metrics could not be retrieved: ${result.error}. Let the owner know and suggest checking Supabase directly.`
+    if (result.ok) {
+      return formatMetricsForAI(result.metrics)
     }
-    return formatMetricsForAI(result.metrics)
+    return `Business metrics could not be retrieved: ${result.error}. Let the owner know and suggest checking Supabase directly.`
   }
 
   return `Unknown tool: ${name}`
@@ -154,11 +154,11 @@ async function runTool(name: string): Promise<string> {
 
 export async function POST(req: NextRequest) {
   try {
-    const body          = await req.json()
-    const messages      = (Array.isArray(body?.messages) ? body.messages : []) as SupportMessage[]
-    const languageCode  = String(body?.context?.language || 'en').toLowerCase()
-    const language      = LANGUAGE_LABELS[languageCode] || 'English'
-    const currentPage   = String(body?.context?.currentPage || '/')
+    const body         = await req.json()
+    const messages     = (Array.isArray(body?.messages) ? body.messages : []) as SupportMessage[]
+    const languageCode = String(body?.context?.language || 'en').toLowerCase()
+    const language     = LANGUAGE_LABELS[languageCode] || 'English'
+    const currentPage  = String(body?.context?.currentPage || '/')
 
     const sanitized = messages
       .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
@@ -195,7 +195,6 @@ export async function POST(req: NextRequest) {
     const systemContent = isPrivileged ? chiefOfStaffPrompt(language) : conciergePrompt(language)
     const tools         = isPrivileged ? CHIEF_OF_STAFF_TOOLS : CONCIERGE_TOOLS
 
-    // Conversation as OpenAI messages.
     const convo: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       { role: 'system', content: systemContent },
       ...sanitized,
@@ -207,7 +206,6 @@ export async function POST(req: NextRequest) {
         new Promise<T>((_, reject) => setTimeout(() => reject(new Error('AI request timeout')), 25000)),
       ])
 
-    // First pass — the model may request a tool.
     let response = await withTimeout(
       openai.chat.completions.create({
         model,
@@ -221,14 +219,11 @@ export async function POST(req: NextRequest) {
     let choice     = response.choices[0]
     let toolRounds = 0
 
-    // Tool loop: run any requested tools, feed results back, ask again. Cap at 3 rounds.
     while (choice?.message?.tool_calls && choice.message.tool_calls.length > 0 && toolRounds < 3) {
       toolRounds++
 
-      // Append the assistant's tool-call message.
       convo.push(choice.message as OpenAI.Chat.Completions.ChatCompletionMessageParam)
 
-      // Run each requested tool and append its result.
       for (const call of choice.message.tool_calls) {
         const toolName = call.function?.name || ''
         const result   = await runTool(toolName)

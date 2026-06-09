@@ -2,9 +2,9 @@ import { createClient } from '@supabase/supabase-js'
 
 // Per-plan credit allowances, by meter.
 // Public plan names:
-// - free    = Free Demo, one-time credits only
-// - starter = Launch
-// - pro     = Growth
+// - free     = Free Demo, one-time credits only
+// - starter  = Launch
+// - pro      = Growth
 // - business = Command
 //
 // Important:
@@ -17,13 +17,10 @@ export type CreditType = 'video' | 'image' | 'ai'
 export const PLAN_VIDEO_CREDITS: Record<string, number> = {
   free: 2,
   demo: 2,
-
   starter: 25,
   launch: 25,
-
   pro: 100,
   growth: 100,
-
   business: 300,
   command: 300,
 }
@@ -31,13 +28,10 @@ export const PLAN_VIDEO_CREDITS: Record<string, number> = {
 export const PLAN_IMAGE_CREDITS: Record<string, number> = {
   free: 5,
   demo: 5,
-
   starter: 50,
   launch: 50,
-
   pro: 200,
   growth: 200,
-
   business: 600,
   command: 600,
 }
@@ -45,13 +39,10 @@ export const PLAN_IMAGE_CREDITS: Record<string, number> = {
 export const PLAN_AI_CREDITS: Record<string, number> = {
   free: 20,
   demo: 20,
-
   starter: 500,
   launch: 500,
-
   pro: 2000,
   growth: 2000,
-
   business: 10000,
   command: 10000,
 }
@@ -63,6 +54,9 @@ const METERS: Record<CreditType, { column: string; allowances: Record<string, nu
   ai:    { column: 'ai_credits',    allowances: PLAN_AI_CREDITS },
 }
 
+// Sentinel value returned for owner/admin — high enough to never block.
+const UNLIMITED = 999999
+
 function adminClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -71,17 +65,41 @@ function adminClient() {
   )
 }
 
+function envList(name: string): string[] {
+  return (process.env[name] || '')
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean)
+}
+
+// ── Owner/admin bypass ────────────────────────────────────────────────────────
+// Looks up the user's email from Supabase auth and checks against
+// OWNER_EMAILS and ADMIN_EMAILS env vars. Returns true for privileged users
+// so credit checks are skipped entirely.
+
+async function isPrivilegedUser(userId: string): Promise<boolean> {
+  try {
+    const supabase = adminClient()
+    const { data, error } = await supabase.auth.admin.getUserById(userId)
+    if (error || !data?.user?.email) return false
+    const email = data.user.email.toLowerCase()
+    return (
+      envList('OWNER_EMAILS').includes(email) ||
+      envList('ADMIN_EMAILS').includes(email)
+    )
+  } catch {
+    return false
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 function monthElapsed(resetAt: string | null): boolean {
   if (!resetAt) return true
-
   const last = new Date(resetAt).getTime()
-
   if (Number.isNaN(last)) return true
-
-  const now = Date.now()
   const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000
-
-  return now - last >= THIRTY_DAYS
+  return Date.now() - last >= THIRTY_DAYS
 }
 
 function isFreeDemoPlan(plan: string | null | undefined) {
@@ -94,11 +112,6 @@ function allowanceFor(meter: CreditType, plan: string | null | undefined) {
   return table[safePlan] ?? table.free
 }
 
-// Back-compat alias for any code that referenced the old helper name.
-function allowanceForPlan(plan: string | null | undefined) {
-  return allowanceFor('video', plan)
-}
-
 type CreditState = {
   plan: string
   credits: number      // video — kept for backwards compatibility
@@ -109,8 +122,22 @@ type CreditState = {
   allowances: { video: number; image: number; ai: number }
 }
 
+function unlimitedState(): CreditState {
+  return {
+    plan:      'command',
+    credits:   UNLIMITED,
+    allowance: UNLIMITED,
+    video:     UNLIMITED,
+    image:     UNLIMITED,
+    ai:        UNLIMITED,
+    allowances: { video: UNLIMITED, image: UNLIMITED, ai: UNLIMITED },
+  }
+}
+
 /*
   Reads the user's subscription and returns current credit state for ALL meters.
+
+  Owner/admin: always returns unlimited credits — no DB decrement ever happens.
 
   Free/demo:
   - One-time credits, do NOT reset monthly.
@@ -119,6 +146,9 @@ type CreditState = {
   - Launch/Growth/Command credits reset monthly (all meters together).
 */
 export async function getCreditState(userId: string): Promise<CreditState> {
+  // Owner/admin bypass — skip DB entirely
+  if (await isPrivilegedUser(userId)) return unlimitedState()
+
   const supabase = adminClient()
 
   const { data, error } = await supabase
@@ -129,7 +159,7 @@ export async function getCreditState(userId: string): Promise<CreditState> {
 
   const buildState = (plan: string, video: number, image: number, ai: number): CreditState => ({
     plan,
-    credits: video,
+    credits:  video,
     allowance: allowanceFor('video', plan),
     video,
     image,
@@ -137,7 +167,7 @@ export async function getCreditState(userId: string): Promise<CreditState> {
     allowances: {
       video: allowanceFor('video', plan),
       image: allowanceFor('image', plan),
-      ai: allowanceFor('ai', plan),
+      ai:    allowanceFor('ai', plan),
     },
   })
 
@@ -162,13 +192,10 @@ export async function getCreditState(userId: string): Promise<CreditState> {
 
   const plan = data.plan || 'free'
 
-  // Fresh allowances for this plan (used on init or monthly reset).
   const freshV = allowanceFor('video', plan)
   const freshI = allowanceFor('image', plan)
   const freshA = allowanceFor('ai', plan)
 
-  // Current values; image/ai may be null on rows created before this feature —
-  // treat null as "not yet granted" and seed the allowance.
   const curV = data.video_credits ?? 0
   const curI = data.image_credits
   const curA = data.ai_credits
@@ -190,21 +217,15 @@ export async function getCreditState(userId: string): Promise<CreditState> {
   }
 
   // Backfill: existing initialized rows that predate the image/ai columns.
-  // Seed those two meters once without disturbing video or the reset clock.
   if (curI === null || curA === null) {
     const seededI = curI === null ? freshI : curI
     const seededA = curA === null ? freshA : curA
 
     await supabase
       .from('subscriptions')
-      .update({
-        image_credits: seededI,
-        ai_credits: seededA,
-      })
+      .update({ image_credits: seededI, ai_credits: seededA })
       .eq('user_id', userId)
 
-    // Free/demo: keep current video; paid: continue to reset check below by
-    // falling through with seeded values.
     if (isFreeDemoPlan(plan)) {
       return buildState(plan, curV, seededI, seededA)
     }
@@ -278,17 +299,17 @@ export async function spendCredit(userId: string, type: CreditType): Promise<{
   plan: string
   reason?: string
 }> {
+  // Owner/admin bypass — always approve, never decrement
+  if (await isPrivilegedUser(userId)) {
+    return { ok: true, remaining: UNLIMITED, plan: 'command' }
+  }
+
   const supabase = adminClient()
   const state = await getCreditState(userId)
   const current = state[type]
 
   if (current <= 0) {
-    return {
-      ok: false,
-      remaining: 0,
-      plan: state.plan,
-      reason: 'no_credits',
-    }
+    return { ok: false, remaining: 0, plan: state.plan, reason: 'no_credits' }
   }
 
   const remaining = current - 1
@@ -300,24 +321,17 @@ export async function spendCredit(userId: string, type: CreditType): Promise<{
     .eq('user_id', userId)
 
   if (error) {
-    return {
-      ok: false,
-      remaining: current,
-      plan: state.plan,
-      reason: 'db_error',
-    }
+    return { ok: false, remaining: current, plan: state.plan, reason: 'db_error' }
   }
 
-  return {
-    ok: true,
-    remaining,
-    plan: state.plan,
-  }
+  return { ok: true, remaining, plan: state.plan }
 }
 
 export async function refundCredit(userId: string, type: CreditType): Promise<void> {
-  const supabase = adminClient()
+  // Owner/admin bypass — nothing to refund
+  if (await isPrivilegedUser(userId)) return
 
+  const supabase = adminClient()
   const column = METERS[type].column
 
   const { data } = await supabase
@@ -328,10 +342,10 @@ export async function refundCredit(userId: string, type: CreditType): Promise<vo
 
   if (!data) return
 
-  const plan = (data as any).plan || 'free'
+  const plan     = (data as any).plan || 'free'
   const allowance = allowanceFor(type, plan)
-  const current = (data as any)[column] ?? 0
-  const refunded = Math.min(current + 1, allowance)
+  const current   = (data as any)[column] ?? 0
+  const refunded  = Math.min(current + 1, allowance)
 
   await supabase
     .from('subscriptions')

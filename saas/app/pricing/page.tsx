@@ -8,7 +8,7 @@ import { t } from '@/lib/i18n/t'
 const CONTACT_EMAIL = 'support@signalboostapp.com'
 
 type Plan = {
-  key: 'free' | 'starter' | 'pro' | 'business'
+  key: 'free' | 'launch' | 'growth' | 'command'
   name: string
   audience: string
   price: string
@@ -60,7 +60,7 @@ export default function PricingPage() {
       ],
     },
     {
-      key: 'starter',
+      key: 'launch',
       name: t(dict, 'pricing_v2.launch.name', 'Launch'),
       audience: t(dict, 'pricing_v2.launch.audience', 'For solo operators and small businesses'),
       price: '$29',
@@ -87,7 +87,7 @@ export default function PricingPage() {
       ],
     },
     {
-      key: 'pro',
+      key: 'growth',
       name: t(dict, 'pricing_v2.growth.name', 'Growth'),
       audience: t(dict, 'pricing_v2.growth.audience', 'For growing businesses and small teams'),
       price: '$99',
@@ -114,7 +114,7 @@ export default function PricingPage() {
       ],
     },
     {
-      key: 'business',
+      key: 'command',
       name: t(dict, 'pricing_v2.command.name', 'Command'),
       audience: t(dict, 'pricing_v2.command.audience', 'For agencies, teams, and serious operators'),
       price: '$249',

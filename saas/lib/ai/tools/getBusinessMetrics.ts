@@ -18,9 +18,12 @@ export type BusinessMetrics = {
   generatedAt: string
 }
 
-export type MetricsResult =
-  | { ok: true;  metrics: BusinessMetrics; source: string }
-  | { ok: false; error: string }
+export type MetricsResult = {
+  ok:       boolean
+  metrics?: BusinessMetrics
+  source?:  string
+  error?:   string
+}
 
 // Monthly revenue per paid plan
 const PLAN_MRR: Record<string, number> = {
@@ -49,7 +52,7 @@ export async function getBusinessMetrics(): Promise<MetricsResult> {
       return { ok: false, error: `Subscriptions query failed: ${subsError.message}` }
     }
 
-    const allSubs   = subs ?? []
+    const allSubs    = subs ?? []
     const totalUsers = allSubs.length
 
     const paidPlans = ['launch', 'growth', 'command']
@@ -88,9 +91,9 @@ export async function getBusinessMetrics(): Promise<MetricsResult> {
       planBreakdown,
       outreachLeads: outreachLeads ?? 0,
       creditsSnapshot: {
-        avgVideoCreditsRemaining:  avg('video_credits'),
-        avgImageCreditsRemaining:  avg('image_credits'),
-        avgAiCreditsRemaining:     avg('ai_credits'),
+        avgVideoCreditsRemaining: avg('video_credits'),
+        avgImageCreditsRemaining: avg('image_credits'),
+        avgAiCreditsRemaining:    avg('ai_credits'),
       },
       generatedAt: new Date().toISOString(),
     }

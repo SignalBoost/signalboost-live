@@ -346,7 +346,7 @@ html, body {
 
 /* Reviews SaaS module — dark neon glassmorphism */
 .sb-reviews-page { display: grid; gap: 22px; margin: 0 auto; max-width: 1180px; padding: clamp(18px, 4vw, 42px) 0 80px; width: min(100% - 28px, 1180px); }
-.sb-reviews-hero { align-items: stretch; background: radial-gradient(circle at 20% 10%, rgba(26,240,255,.24), transparent 28rem), radial-gradient(circle at 80% 20%, rgba(168,85,247,.22), transparent 24rem), linear-gradient(135deg, rgba(255,255,255,.1), rgba(255,255,255,.03)); border: 1px solid rgba(26,240,255,.2); border-radius: 34px; box-shadow: 0 32px 120px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.1); display: grid; gap: 24px; grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); overflow: hidden; padding: clamp(22px, 5vw, 42px); position: relative; }
+.sb-reviews-hero { align-items: stretch; background: radial-gradient(circle at 20% 10%, rgba(26,240,255,.24), transparent 28rem), radial-gradient(circle at 80% 20%, rgba(168,85,247,.22), transparent 24rem), linear-gradient(135deg, rgba(255,255,255,.1), rgba(255,255,255,.03)); border: 1px solid rgba(26,240,255,.2); border-radius: 34px; box-shadow: 0 32px 120px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.1); display: grid; gap: 24px; grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); overflow: visible; padding: clamp(22px, 5vw, 42px); position: relative; }
 .sb-reviews-hero h1 { font-size: clamp(38px, 7vw, 78px); letter-spacing: -.07em; line-height: .9; margin: 8px 0 14px; }
 .sb-reviews-hero p:not(.sb-eyebrow) { color: var(--text-secondary); font-size: clamp(15px, 2vw, 18px); line-height: 1.7; max-width: 720px; }
 .sb-review-hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }

@@ -93,7 +93,7 @@ How you operate:
 - When asked for code or architecture, deliver clean, production-ready solutions and flag operational/security implications.
 - Be honest about the product's real state. Do not overstate capabilities or invent features.
 - For pricing, call the getPricing tool for current numbers.
-- For live business metrics (users, MRR, leads, credits), call the getBusinessMetrics tool — never guess or estimate from memory.
+- ALWAYS call getBusinessMetrics before answering ANY question about users, signups, revenue, MRR, ARR, growth, retention, leads, credits, or platform health. Never answer these from memory — the numbers change and memory is always stale.
 - Ask a clarifying question only when an essential detail is missing.
 - Maintain strict confidentiality; this is an internal advisory channel.
 
@@ -117,7 +117,7 @@ const TOOL_GET_BUSINESS_METRICS: OpenAI.Chat.Completions.ChatCompletionTool = {
   type: 'function',
   function: {
     name: 'getBusinessMetrics',
-    description: 'Get live SignalBoost business metrics directly from the database: total users, paid users, MRR, plan breakdown, outreach leads in queue, and average credit balances. Call this whenever the owner/admin asks about users, revenue, MRR, ARR, growth, leads, or platform health. Always use this tool rather than guessing — data is live from Supabase.',
+    description: 'MUST be called for ANY question about: users, signups, accounts, paid users, free users, revenue, MRR, ARR, monthly recurring revenue, growth, churn, retention, outreach leads, pipeline, credits, credit usage, or platform health. Returns live data from Supabase. Never answer these questions from memory — always call this tool first. Covers: total users, paid vs free breakdown, plan distribution, estimated MRR/ARR, outreach queue size, and average credit balances.',
     parameters: { type: 'object', properties: {}, required: [] },
   },
 }

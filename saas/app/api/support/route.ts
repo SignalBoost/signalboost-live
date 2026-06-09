@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getConciergeAnswer } from '@/lib/platform/unifiedPlatform'
 import { getAccess } from '@/lib/auth/access'
 import { getLivePricing } from '@/lib/ai/tools/getPricing'
+import { getBusinessMetrics, formatMetricsForAI } from '@/lib/ai/tools/getBusinessMetrics'
 
 type SupportMessage = { role?: 'user' | 'assistant' | 'system'; content?: string }
 
@@ -13,12 +14,12 @@ function getOpenAIClient() {
 }
 
 const LANGUAGE_LABELS: Record<string, string> = {
-  en: 'English',
-  pt: 'Portuguese',
+  en:    'English',
+  pt:    'Portuguese',
   'pt-br': 'Portuguese (Brazil)',
-  es: 'Spanish',
-  pl: 'Polish',
-  ru: 'Russian',
+  es:    'Spanish',
+  pl:    'Polish',
+  ru:    'Russian',
 }
 
 const PLATFORM_FACTS = `SIGNALBOOST — FACTUAL PRODUCT KNOWLEDGE (authoritative; never contradict or invent beyond this):
@@ -92,22 +93,42 @@ How you operate:
 - When asked for code or architecture, deliver clean, production-ready solutions and flag operational/security implications.
 - Be honest about the product's real state. Do not overstate capabilities or invent features.
 - For pricing, call the getPricing tool for current numbers.
+- For live business metrics (users, MRR, leads, credits), call the getBusinessMetrics tool — never guess or estimate from memory.
 - Ask a clarifying question only when an essential detail is missing.
 - Maintain strict confidentiality; this is an internal advisory channel.
 
 Tone: professional, direct, kind, efficient — like an excellent chief of staff who tells the principal what they need to hear, not only what they want to hear.`
 }
 
-// ── Tool definitions exposed to the model ───────────────────────────────────────
-const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
-  {
-    type: 'function',
-    function: {
-      name: 'getPricing',
-      description: 'Get the current, live SignalBoost SaaS pricing and plan details (Free Demo, Launch, Growth, Command). Call this whenever the user asks about price, cost, plans, tiers, what a plan includes, or upgrades. Returns the current pricing text from the live pricing page.',
-      parameters: { type: 'object', properties: {}, required: [] },
-    },
+// ── Tool definitions ──────────────────────────────────────────────────────────
+// Concierge: pricing only.
+// Chief of Staff: pricing + live business metrics.
+
+const TOOL_GET_PRICING: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'getPricing',
+    description: 'Get the current, live SignalBoost SaaS pricing and plan details (Free Demo, Launch, Growth, Command). Call this whenever the user asks about price, cost, plans, tiers, what a plan includes, or upgrades. Returns the current pricing text from the live pricing page.',
+    parameters: { type: 'object', properties: {}, required: [] },
   },
+}
+
+const TOOL_GET_BUSINESS_METRICS: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'getBusinessMetrics',
+    description: 'Get live SignalBoost business metrics directly from the database: total users, paid users, MRR, plan breakdown, outreach leads in queue, and average credit balances. Call this whenever the owner/admin asks about users, revenue, MRR, ARR, growth, leads, or platform health. Always use this tool rather than guessing — data is live from Supabase.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+}
+
+const CONCIERGE_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+  TOOL_GET_PRICING,
+]
+
+const CHIEF_OF_STAFF_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+  TOOL_GET_PRICING,
+  TOOL_GET_BUSINESS_METRICS,
 ]
 
 // Run a named tool and return its result as a string for the model.
@@ -119,16 +140,25 @@ async function runTool(name: string): Promise<string> {
     }
     return `Current live SignalBoost SaaS pricing (source: ${result.source}):\n\n${result.pricing}`
   }
+
+  if (name === 'getBusinessMetrics') {
+    const result = await getBusinessMetrics()
+    if (!result.ok) {
+      return `Business metrics could not be retrieved: ${result.error}. Let the owner know and suggest checking Supabase directly.`
+    }
+    return formatMetricsForAI(result.metrics)
+  }
+
   return `Unknown tool: ${name}`
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
-    const messages = (Array.isArray(body?.messages) ? body.messages : []) as SupportMessage[]
-    const languageCode = String(body?.context?.language || 'en').toLowerCase()
-    const language = LANGUAGE_LABELS[languageCode] || 'English'
-    const currentPage = String(body?.context?.currentPage || '/')
+    const body          = await req.json()
+    const messages      = (Array.isArray(body?.messages) ? body.messages : []) as SupportMessage[]
+    const languageCode  = String(body?.context?.language || 'en').toLowerCase()
+    const language      = LANGUAGE_LABELS[languageCode] || 'English'
+    const currentPage   = String(body?.context?.currentPage || '/')
 
     const sanitized = messages
       .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
@@ -160,9 +190,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'AI backend is not configured.' }, { status: 500 })
     }
 
-    const model = isPrivileged ? 'gpt-4o' : 'gpt-4o-mini'
-    const temperature = isPrivileged ? 0.5 : 0.4
+    const model         = isPrivileged ? 'gpt-4o' : 'gpt-4o-mini'
+    const temperature   = isPrivileged ? 0.5 : 0.4
     const systemContent = isPrivileged ? chiefOfStaffPrompt(language) : conciergePrompt(language)
+    const tools         = isPrivileged ? CHIEF_OF_STAFF_TOOLS : CONCIERGE_TOOLS
 
     // Conversation as OpenAI messages.
     const convo: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
@@ -182,15 +213,15 @@ export async function POST(req: NextRequest) {
         model,
         temperature,
         messages: convo,
-        tools: TOOLS,
+        tools,
         tool_choice: 'auto',
       })
     )
 
-    let choice = response.choices[0]
+    let choice     = response.choices[0]
     let toolRounds = 0
 
-    // Tool loop: run any requested tools, feed results back, ask again. Cap rounds.
+    // Tool loop: run any requested tools, feed results back, ask again. Cap at 3 rounds.
     while (choice?.message?.tool_calls && choice.message.tool_calls.length > 0 && toolRounds < 3) {
       toolRounds++
 
@@ -200,11 +231,11 @@ export async function POST(req: NextRequest) {
       // Run each requested tool and append its result.
       for (const call of choice.message.tool_calls) {
         const toolName = call.function?.name || ''
-        const result = await runTool(toolName)
+        const result   = await runTool(toolName)
         convo.push({
-          role: 'tool',
+          role:         'tool',
           tool_call_id: call.id,
-          content: result,
+          content:      result,
         })
       }
 
@@ -213,7 +244,7 @@ export async function POST(req: NextRequest) {
           model,
           temperature,
           messages: convo,
-          tools: TOOLS,
+          tools,
           tool_choice: 'auto',
         })
       )

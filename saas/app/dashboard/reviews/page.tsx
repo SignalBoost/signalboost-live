@@ -67,7 +67,7 @@ const COPY: Record<string, Record<Lang, string>> = {
   filterAll:        { en: 'All', es: 'Todos', pt: 'Todos', pl: 'Wszystkie', ru: 'Все' },
   filterPending:    { en: 'Pending', es: 'Pendientes', pt: 'Pendentes', pl: 'Oczekujące', ru: 'Ожидающие' },
   filterApproved:   { en: 'Approved', es: 'Aprobados', pt: 'Aprovados', pl: 'Zatwierdzone', ru: 'Одобренные' },
-  filterFlagged:    { en: 'Flagged', es: 'Marcados', pt: 'Sinalizados', pl: 'Oflagowane', ru: 'Отмeченные' },
+  filterFlagged:    { en: 'Flagged', es: 'Marcados', pt: 'Sinalizados', pl: 'Oflagowane', ru: 'Отмеченные' },
   generalService:   { en: 'General service', es: 'Servicio general', pt: 'Serviço geral', pl: 'Usługa ogólna', ru: 'Общая услуга' },
   verifiedPartner:  { en: 'Verified partner', es: 'Socio verificado', pt: 'Parceiro verificado', pl: 'Zweryfikowany partner', ru: 'Проверенный партнёр' },
   media:            { en: 'media', es: 'medios', pt: 'mídia', pl: 'media', ru: 'медиа' },
@@ -83,9 +83,9 @@ const COPY: Record<string, Record<Lang, string>> = {
   logsEnabled:      { en: 'Submissions · AI sentiment · moderation logged', es: 'Envíos · Sentimiento IA · moderación', pt: 'Envios · Sentimento IA · moderação', pl: 'Zgłoszenia · Nastroje AI · moderacja', ru: 'Отправки · Настроения ИИ · модерация' },
   localeVolume:     { en: 'Review volume per locale', es: 'Volumen por región', pt: 'Volume por região', pl: 'Wolumen według regionu', ru: 'Объём по регионам' },
   sentimentTrend:   { en: 'Sentiment trend', es: 'Tendencia de sentimiento', pt: 'Tendência de sentimento', pl: 'Trend nastrojów', ru: 'Тенденция настроений' },
-  moderationQueue:  { en: 'Moderation queue', es: 'Cola de moderación', pt: 'Fila de moderação', pl: 'Kolejka moderacji', ru: 'Очередь модерации' },
-  outreachHooks:    { en: 'Outreach + CRM hooks', es: 'Hooks de Outreach + CRM', pt: 'Hooks de Outreach + CRM', pl: 'Haki Outreach + CRM', ru: 'Хуки Outreach + CRM' },
-  crmRegression:    { en: 'Regression guard: approved positive reviews can attach to Leads → Opportunities → Conversions.', es: 'Guardia de regresión: reseñas positivas aprobadas → Leads → Oportunidades → Conversiones.', pt: 'Guarda de regressão: avaliações positivas aprovadas → Leads → Oportunidades → Conversões.', pl: 'Ochrona regresji: zatwierdzone opinie → Leady → Szanse → Konwersje.', ru: 'Защита регрессии: одобренные отзывы → Лиды → Возможности → Конверсии.' },
+  moderationQueue:  { en: 'Moderation queue', es: 'Cola de moderación', pt: 'Fila de moderação', pl: 'Kolejka moderacji', ru: 'Очередь moderacji' },
+  outreachHooks:    { en: 'Outreach + CRM hooks', es: 'Hooks Outreach + CRM', pt: 'Hooks Outreach + CRM', pl: 'Haki Outreach + CRM', ru: 'Хуки Outreach + CRM' },
+  crmRegression:    { en: 'Regression guard: approved positive reviews attach to Leads → Opportunities → Conversions.', es: 'Guardia de regresión: reseñas positivas → Leads → Oportunidades → Conversiones.', pt: 'Guarda de regressão: avaliações positivas → Leads → Oportunidades → Conversões.', pl: 'Ochrona regresji: zatwierdzone opinie → Leady → Szanse → Konwersje.', ru: 'Защита регрессии: одобренные отзывы → Лиды → Возможности → Конверсии.' },
   errSignIn:        { en: 'Please sign in to see your reviews.', es: 'Por favor inicia sesión.', pt: 'Por favor faça login.', pl: 'Zaloguj się.', ru: 'Пожалуйста, войдите.' },
   errLoad:          { en: 'Could not load reviews.', es: 'No se pudieron cargar las reseñas.', pt: 'Não foi possível carregar as avaliações.', pl: 'Nie można załadować opinii.', ru: 'Не удалось загрузить отзывы.' },
   errPickHandle:    { en: 'Pick a handle to continue.', es: 'Elige un identificador para continuar.', pt: 'Escolha um identificador para continuar.', pl: 'Wybierz identyfikator.', ru: 'Выберите идентификатор.' },
@@ -127,28 +127,28 @@ type SlugState =
   | { kind: 'loading' }
   | { kind: 'none' }
   | { kind: 'set', slug: string }
+
 export default function ReviewsPage() {
   const { lang } = useI18n()
   const activeLocale = normalizeReviewLocale(lang)
   const l = ['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en'
 
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [reviews, setReviews] = useState<Review[]>([])
+  const [isAdmin, setIsAdmin]               = useState(false)
+  const [reviews, setReviews]               = useState<Review[]>([])
   const [reviewsLoading, setReviewsLoading] = useState(true)
-  const [reviewsError, setReviewsError] = useState<string | null>(null)
-  const [slug, setSlug] = useState<SlugState>({ kind: 'loading' })
-  const [slugDraft, setSlugDraft] = useState('')
-  const [slugSaving, setSlugSaving] = useState(false)
-  const [slugError, setSlugError] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'flagged'>('all')
+  const [reviewsError, setReviewsError]     = useState<string | null>(null)
+  const [slug, setSlug]                     = useState<SlugState>({ kind: 'loading' })
+  const [slugDraft, setSlugDraft]           = useState('')
+  const [slugSaving, setSlugSaving]         = useState(false)
+  const [slugError, setSlugError]           = useState<string | null>(null)
+  const [copied, setCopied]                 = useState(false)
+  const [statusFilter, setStatusFilter]     = useState<'all' | 'pending' | 'approved' | 'flagged'>('all')
   const [languageFilter, setLanguageFilter] = useState<'all' | ReviewLocale>('all')
-  const [partnerFilter, setPartnerFilter] = useState('all')
-  const [productFilter, setProductFilter] = useState('all')
-  const [sortMode, setSortMode] = useState<ReviewSortMode>('relevance')
+  const [partnerFilter, setPartnerFilter]   = useState('all')
+  const [productFilter, setProductFilter]   = useState('all')
+  const [sortMode, setSortMode]             = useState<ReviewSortMode>('relevance')
   const [translatedReviewId, setTranslatedReviewId] = useState<string | null>(null)
 
-  // Check admin status
   useEffect(() => {
     fetch('/api/auth/me')
       .then(r => r.json())
@@ -213,7 +213,9 @@ export default function ReviewsPage() {
     setReviews(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r))
     try {
       const res = await fetch(`/api/reviews?id=${encodeURIComponent(id)}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
       })
       if (!res.ok) loadReviews()
     } catch { loadReviews() }
@@ -237,11 +239,12 @@ export default function ReviewsPage() {
 
   const enrichedReviews = useMemo(() => reviews.map(review => {
     const sentiment = review.sentiment ?? analyzeReviewSentiment(review.content, review.rating)
-    const flagged = review.flagged || reviewMatchesModerationFlag(review.content)
+    const flagged   = review.flagged || reviewMatchesModerationFlag(review.content)
     return {
       ...review,
       language: normalizeReviewLocale(review.language),
-      sentiment, flagged,
+      sentiment,
+      flagged,
       moderation_status: review.moderation_status ?? (flagged ? 'flagged' : review.approved ? 'approved' : 'pending'),
     }
   }), [reviews])
@@ -250,12 +253,12 @@ export default function ReviewsPage() {
   const products = Array.from(new Set(enrichedReviews.map(r => r.product_name || r.service_name).filter(Boolean))) as string[]
 
   const filteredReviews = enrichedReviews.filter(r => {
-    if (statusFilter === 'pending' && r.approved) return false
+    if (statusFilter === 'pending'  && r.approved)  return false
     if (statusFilter === 'approved' && !r.approved) return false
-    if (statusFilter === 'flagged' && !r.flagged) return false
+    if (statusFilter === 'flagged'  && !r.flagged)  return false
     if (languageFilter !== 'all' && r.language !== languageFilter) return false
-    if (partnerFilter !== 'all' && r.partner_name !== partnerFilter) return false
-    if (productFilter !== 'all' && (r.product_name || r.service_name) !== productFilter) return false
+    if (partnerFilter  !== 'all' && r.partner_name !== partnerFilter) return false
+    if (productFilter  !== 'all' && (r.product_name || r.service_name) !== productFilter) return false
     return true
   })
 
@@ -263,7 +266,7 @@ export default function ReviewsPage() {
   const approvedCount     = enrichedReviews.filter(r => r.approved).length
   const pendingCount      = enrichedReviews.length - approvedCount
   const flaggedCount      = enrichedReviews.filter(r => r.flagged).length
-  const avgRating         = enrichedReviews.length ? enrichedReviews.reduce((sum, r) => sum + r.rating, 0) / enrichedReviews.length : 0
+  const avgRating         = enrichedReviews.length ? enrichedReviews.reduce((s, r) => s + r.rating, 0) / enrichedReviews.length : 0
   const localeTelemetry   = summarizeLocaleTelemetry(enrichedReviews)
   const sentimentTrend    = summarizeSentimentTrend(enrichedReviews)
   const positiveCampaigns = enrichedReviews.filter(r => r.sentiment === 'positive' && r.rating >= 4).map(buildTestimonialCampaign).slice(0, 3)
@@ -271,10 +274,11 @@ export default function ReviewsPage() {
   const summaryLine       = enrichedReviews.length === 0
     ? c('summaryEmpty', l)
     : `${enrichedReviews.length} ${c('total', l)} · ${pendingCount} ${c('pending', l)} · ${approvedCount} ${c('approved', l)} · ${flaggedCount} ${c('flagged', l)} · ${avgRating.toFixed(1)} ★ ${c('avg', l)}`
-return (
+
+  return (
     <div className="sb-reviews-page" style={{ color: 'var(--text-primary)' }}>
 
-      {/* ── Hero ── */}
+      {/* Hero */}
       <section className="sb-reviews-hero" aria-label="Reviews module">
         <div>
           <p className="sb-eyebrow">⭐ {c('kicker', l)}</p>
@@ -286,33 +290,11 @@ return (
           </div>
         </div>
 
-        {/* Wireflow — inline flex column, no CSS grid clipping */}
-        <div aria-hidden="true" style={{
-          background: 'rgba(2,6,23,.52)',
-          border: '1px solid rgba(255,255,255,.14)',
-          borderRadius: 26,
-          padding: 20,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-          alignSelf: 'flex-start',
-          minWidth: 160,
-        }}>
+        {/* Wireflow — vertical flex, no CSS grid clipping */}
+        <div aria-hidden="true" style={{ background: 'rgba(2,6,23,.52)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 26, padding: 20, display: 'flex', flexDirection: 'column', gap: 8, alignSelf: 'flex-start', minWidth: 160 }}>
           {['Submission', 'AI Sentiment', 'Moderation', 'Outreach'].map((label, i, arr) => (
             <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-              <div style={{
-                border: '1px solid rgba(26,240,255,.22)',
-                borderRadius: 14,
-                color: '#dffcff',
-                fontSize: 12,
-                fontWeight: 900,
-                padding: '11px 14px',
-                textAlign: 'center',
-                textTransform: 'uppercase',
-                width: '100%',
-                boxSizing: 'border-box',
-                background: 'rgba(26,240,255,.06)',
-              }}>
+              <div style={{ border: '1px solid rgba(26,240,255,.22)', borderRadius: 14, color: '#dffcff', fontSize: 12, fontWeight: 900, padding: '11px 14px', textAlign: 'center', textTransform: 'uppercase', width: '100%', boxSizing: 'border-box', background: 'rgba(26,240,255,.06)' }}>
                 {label}
               </div>
               {i < arr.length - 1 && (
@@ -325,7 +307,7 @@ return (
 
       {reviewsError && <div className="sb-review-alert">{reviewsError}</div>}
 
-      {/* ── Submit link ── */}
+      {/* Submit link */}
       <section id="submit-review" className="sb-review-grid">
         <article className="sb-review-panel sb-review-panel--wide">
           <div className="sb-review-panel-header">
@@ -375,7 +357,7 @@ return (
         </aside>
       </section>
 
-      {/* ── Filters + feed ── */}
+      {/* Filters */}
       <section className="sb-review-controls" aria-label="Review filters and sorting">
         <div>
           <h2>{c('yourReviews', l)}</h2>
@@ -412,6 +394,7 @@ return (
         </div>
       </section>
 
+      {/* Review feed */}
       <section className="sb-review-feed" aria-label="Review cards">
         {visibleReviews.length === 0 && !reviewsLoading && (
           <div className="sb-review-empty">{c('summaryEmpty', l)}</div>
@@ -438,4 +421,61 @@ return (
               </div>
               <div className="sb-review-actions">
                 <button onClick={() => patchReview(review.id, { approved: !review.approved, moderation_status: !review.approved ? 'approved' : 'pending' })}>{review.approved ? c('unpublish', l) : c('approve', l)}</button>
-                <button onClick={() => patchReview(review.id, { flagged: !revi
+                <button onClick={() => patchReview(review.id, { flagged: !review.flagged, moderation_status: !review.flagged ? 'flagged' : 'pending' })}>{review.flagged ? c('unflag', l) : c('flag', l)}</button>
+                <button onClick={() => setTranslatedReviewId(translatedReviewId === review.id ? null : review.id)}>{c('translate', l)}</button>
+                <button onClick={() => deleteReview(review.id)}>{c('delete', l)}</button>
+              </div>
+              <small>{moderationSuggestion}</small>
+            </article>
+          )
+        })}
+      </section>
+
+      {/* Admin console — owner/admin only */}
+      {isAdmin && (
+        <section id="admin-console" className="sb-admin-review-console" aria-label="Admin Console reviews telemetry">
+          <div className="sb-review-panel-header">
+            <div>
+              <p className="sb-eyebrow">{c('adminConsole', l)}</p>
+              <h2>{c('telemetryTitle', l)}</h2>
+            </div>
+            <span className="sb-review-pill">{c('logsEnabled', l)}</span>
+          </div>
+          <div className="sb-admin-review-grid">
+            <article className="sb-review-panel">
+              <h3>{c('localeVolume', l)}</h3>
+              {localeTelemetry.map(item => (
+                <div key={item.locale} className="sb-bar">
+                  <span>{getFlagForLocale(item.locale)} {item.locale.toUpperCase()}</span>
+                  <i style={{ width: `${Math.max(8, item.percentage)}%`, background: CYAN }} />
+                  <strong>{item.count}</strong>
+                </div>
+              ))}
+            </article>
+            <article className="sb-review-panel">
+              <h3>{c('sentimentTrend', l)}</h3>
+              {sentimentTrend.map(item => (
+                <div key={item.sentiment} className="sb-bar">
+                  <span>{item.sentiment}</span>
+                  <i style={{ width: `${Math.max(8, item.percentage)}%`, background: item.sentiment === 'positive' ? GREEN : item.sentiment === 'negative' ? RED : GOLD }} />
+                  <strong>{item.count}</strong>
+                </div>
+              ))}
+            </article>
+            <article className="sb-review-panel">
+              <h3>{c('moderationQueue', l)}</h3>
+              {enrichedReviews.filter(r => !r.approved || r.flagged).slice(0, 5).map(review => (
+                <p key={review.id}><strong>{review.author_name}</strong> · {review.moderation_status} · {buildModerationSuggestion(review)}</p>
+              ))}
+            </article>
+            <article className="sb-review-panel">
+              <h3>{c('outreachHooks', l)}</h3>
+              {positiveCampaigns.map(campaign => <p key={campaign}>• {campaign}</p>)}
+              <p>• {c('crmRegression', l)}</p>
+            </article>
+          </div>
+        </section>
+      )}
+    </div>
+  )
+}

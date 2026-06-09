@@ -1,300 +1,354 @@
 'use client'
 
-// saas/app/dashboard/operator/page.tsx — streaming version
-// Reads NDJSON chunks from /api/sites/generate and shows live progress updates
-// while the site is being built, then renders the preview the moment it arrives.
-
 import { useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { t } from '@/lib/i18n/t'
 import SitePreview, { type SitePreviewContent } from '@/components/operator/SitePreview'
 
-type StatusStep = {
-  step:    string
-  message: string
-  items?:  string[]
+type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+const COPY: Record<string, Record<Lang, string>> = {
+  eyebrow:       { en: 'Website Optimization System', es: 'Sistema de optimización web', pt: 'Sistema de otimização de sites', pl: 'System optymalizacji stron', ru: 'Система оптимизации сайтов' },
+  title:         { en: 'Optimize Website', es: 'Optimizar sitio web', pt: 'Otimizar site', pl: 'Optymalizuj stronę', ru: 'Оптимизировать сайт' },
+  subtitle:      { en: 'Analyze any site, optimize the findings into a brief, and rebuild an improved version you can publish.', es: 'Analiza cualquier sitio, optimiza los hallazgos en un brief y reconstruye una versión mejorada.', pt: 'Analise qualquer site, otimize os achados em um brief e reconstrua uma versão melhorada.', pl: 'Analizuj dowolną stronę, optymalizuj wyniki w brief i odbuduj ulepszoną wersję.', ru: 'Анализируйте любой сайт, оптимизируйте выводы и пересоздайте улучшенную версию.' },
+  stageAnalyze:  { en: 'Analyze', es: 'Analizar', pt: 'Analisar', pl: 'Analiza', ru: 'Анализ' },
+  stageOptimize: { en: 'Optimize', es: 'Optimizar', pt: 'Otimizar', pl: 'Optymalizuj', ru: 'Оптимизация' },
+  stageRebuild:  { en: 'Rebuild', es: 'Rebuild', pt: 'Reconstruir', pl: 'Przebuduj', ru: 'Пересоздать' },
+  placeholder:   { en: 'yourwebsite.com', es: 'tusitioweb.com', pt: 'seusiteweb.com', pl: 'twojastrona.pl', ru: 'вашсайт.рф' },
+  analyzeBtn:    { en: 'Analyze website', es: 'Analizar sitio', pt: 'Analisar site', pl: 'Analizuj stronę', ru: 'Анализировать' },
+  analyzingBtn:  { en: 'Analyzing…', es: 'Analizando…', pt: 'Analisando…', pl: 'Analizowanie…', ru: 'Анализ…' },
+  analyzingMsg:  { en: 'Fetching the page and running checks…', es: 'Obteniendo la página y ejecutando comprobaciones…', pt: 'Buscando a página e executando verificações…', pl: 'Pobieranie strony i uruchamianie sprawdzeń…', ru: 'Загрузка страницы и выполнение проверок…' },
+  optimizeTitle: { en: 'Optimize → Rebuild brief', es: 'Optimizar → Brief de reconstrucción', pt: 'Otimizar → Brief de reconstrução', pl: 'Optymalizuj → Brief do przebudowy', ru: 'Оптимизация → Бриф' },
+  optimizeDesc:  { en: 'We turned the audit into a brief for the rebuild engine. Edit anything, then rebuild an improved version of the site.', es: 'Convertimos la auditoría en un brief. Edita lo que quieras y reconstruye una versión mejorada.', pt: 'Transformamos a auditoria em um brief. Edite o que quiser e reconstrua uma versão melhorada.', pl: 'Zmieniliśmy audyt w brief. Edytuj co chcesz i odbuduj ulepszoną wersję.', ru: 'Мы превратили аудит в бриф. Редактируйте и пересоздайте улучшенную версию.' },
+  rebuildBtn:    { en: '⚙️ Rebuild improved site', es: '⚙️ Reconstruir sitio mejorado', pt: '⚙️ Reconstruir site melhorado', pl: '⚙️ Przebuduj ulepszoną stronę', ru: '⚙️ Пересоздать улучшенный сайт' },
+  rebuildingBtn: { en: 'Rebuilding…', es: 'Reconstruyendo…', pt: 'Reconstruindo…', pl: 'Przebudowywanie…', ru: 'Пересоздание…' },
+  resetBrief:    { en: 'Reset brief', es: 'Restablecer brief', pt: 'Redefinir brief', pl: 'Resetuj brief', ru: 'Сбросить бриф' },
+  engineTitle:   { en: 'Rebuild engine', es: 'Motor de reconstrucción', pt: 'Motor de reconstrução', pl: 'Silnik przebudowy', ru: 'Движок пересоздания' },
+  publishBtn:    { en: '🚀 Publish improved site', es: '🚀 Publicar sitio mejorado', pt: '🚀 Publicar site melhorado', pl: '🚀 Opublikuj ulepszoną stronę', ru: '🚀 Опубликовать улучшенный сайт' },
+  publishingBtn: { en: 'Publishing…', es: 'Publicando…', pt: 'Publicando…', pl: 'Publikowanie…', ru: 'Публикация…' },
+  viewLive:      { en: 'View live site →', es: 'Ver sitio en vivo →', pt: 'Ver site ao vivo →', pl: 'Zobacz stronę na żywo →', ru: 'Просмотреть сайт →' },
+  errDefault:    { en: 'Could not audit that URL.', es: 'No se pudo auditar esa URL.', pt: 'Não foi possível auditar essa URL.', pl: 'Nie można było przeprowadzić audytu.', ru: 'Не удалось проверить URL.' },
+  errConnect:    { en: 'Could not connect. Please try again.', es: 'No se pudo conectar. Inténtalo de nuevo.', pt: 'Não foi possível conectar. Tente novamente.', pl: 'Nie można połączyć. Spróbuj ponownie.', ru: 'Не удалось подключиться. Попробуйте еще раз.' },
 }
 
-export default function OperatorPage() {
-  const { dict, lang } = useI18n()
-  const tr = (key: string, fallback: string) => t(dict, key, fallback)
+function c(key: string, lang: string): string {
+  return COPY[key]?.[lang as Lang] ?? COPY[key]?.en ?? key
+}
 
-  const [request, setRequest]       = useState('')
+type Status = 'pass' | 'warn' | 'fail'
+type Check = { id: string; label: string; category: string; status: Status; detail: string; recommendation: string }
+type Audit = { url: string; finalUrl: string; score: number; checks: Check[]; summary: string; source: string }
+type StatusStep = { step: string; message: string }
+
+const STATUS_UI: Record<Status, { color: string; bg: string; border: string; icon: string }> = {
+  pass: { color: '#86efac', bg: 'rgba(134,239,172,.10)', border: 'rgba(134,239,172,.28)', icon: '✓' },
+  warn: { color: '#fde68a', bg: 'rgba(253,230,138,.10)', border: 'rgba(253,230,138,.28)', icon: '!' },
+  fail: { color: '#fca5a5', bg: 'rgba(252,165,165,.10)', border: 'rgba(252,165,165,.28)', icon: '×' },
+}
+
+function scoreColor(s: number) {
+  if (s >= 80) return '#86efac'
+  if (s >= 50) return '#fde68a'
+  return '#fca5a5'
+}
+
+function buildBrief(audit: Audit): string {
+  let host = audit.finalUrl
+  try { host = new URL(audit.finalUrl).hostname.replace(/^www\./, '') } catch {}
+  const issues = audit.checks.filter(ch => ch.status !== 'pass' && ch.recommendation)
+  const fixes = issues.map(ch => `- ${ch.label}: ${ch.recommendation}`).join('\n')
+  return [
+    `Rebuild an improved, modern version of the website ${host}.`,
+    `Keep the same business, brand, and core offering, but fix the issues found in the audit and make it fast, mobile-first, accessible, and conversion-focused with a clear primary call-to-action.`,
+    issues.length ? `\nAddress these specific improvements:\n${fixes}` : '',
+  ].join('\n').trim()
+}
+
+export default function ImproveWebsitePage() {
+  const { lang } = useI18n()
+  const l = ['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en'
+
+  const [url, setUrl]               = useState('')
+  const [analyzing, setAnalyzing]   = useState(false)
+  const [error, setError]           = useState('')
+  const [audit, setAudit]           = useState<Audit | null>(null)
+  const [brief, setBrief]           = useState('')
   const [content, setContent]       = useState<SitePreviewContent | null>(null)
   const [liveUrl, setLiveUrl]       = useState<string | null>(null)
-  const [loading, setLoading]       = useState(false)
+  const [building, setBuilding]     = useState(false)
   const [publishing, setPublishing] = useState(false)
-  const [message, setMessage]       = useState('')
   const [steps, setSteps]           = useState<StatusStep[]>([])
-  const [preprocessor, setPreprocessor] = useState<any | null>(null)
+  const [message, setMessage]       = useState('')
 
-  // ── Streaming generate ────────────────────────────────────────────────────
-  async function generate() {
-    setLoading(true)
-    setMessage('')
-    setLiveUrl(null)
-    setContent(null)
-    setSteps([])
-    setPreprocessor(null)
+  async function analyze() {
+    const value = url.trim()
+    if (!value || analyzing) return
+    setAnalyzing(true); setError(''); setAudit(null); setContent(null); setLiveUrl(null); setSteps([]); setMessage('')
+    try {
+      const res = await fetch('/api/improve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: value, language: l }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data?.error || c('errDefault', l)); return }
+      setAudit(data)
+      setBrief(buildBrief(data))
+    } catch {
+      setError(c('errConnect', l))
+    } finally {
+      setAnalyzing(false)
+    }
+  }
 
+  async function rebuild() {
+    if (!brief.trim() || building) return
+    setBuilding(true); setMessage(''); setContent(null); setLiveUrl(null); setSteps([])
     try {
       const res = await fetch('/api/sites/generate', {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ description: request, language: lang }),
+        body: JSON.stringify({ description: brief, language: l }),
       })
-
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({}))
-        setMessage(err.error || tr('operator.errors.plan', 'Could not generate the website.'))
-        setLoading(false)
+        setMessage(err.error || c('errConnect', l))
+        setBuilding(false)
         return
       }
-
-      // Read the NDJSON stream
-      const reader  = res.body.getReader()
+      const reader = res.body.getReader()
       const decoder = new TextDecoder()
-      let   buffer  = ''
-
+      let buffer = ''
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-
         buffer += decoder.decode(value, { stream: true })
-
-        // Process all complete lines in the buffer
         const lines = buffer.split('\n')
-        buffer = lines.pop() ?? '' // keep incomplete last line
-
+        buffer = lines.pop() ?? ''
         for (const line of lines) {
           const trimmed = line.trim()
           if (!trimmed) continue
-
           let chunk: any
           try { chunk = JSON.parse(trimmed) } catch { continue }
-
-          if (chunk.type === 'status') {
-            setSteps(prev => [...prev, { step: chunk.step, message: chunk.message, items: chunk.items }])
-          } else if (chunk.type === 'result') {
-            if (chunk.content) {
-              setContent(chunk.content)
-            }
-            if (chunk.preprocessor) {
-              setPreprocessor(chunk.preprocessor)
-            }
-            if (chunk.error && !chunk.content) {
-              setMessage(chunk.error)
-            }
+          if (chunk.type === 'status') setSteps(prev => [...prev, { step: chunk.step, message: chunk.message }])
+          else if (chunk.type === 'result') {
+            if (chunk.content) setContent(chunk.content)
+            if (chunk.error && !chunk.content) setMessage(chunk.error)
           }
         }
       }
     } catch {
-      setMessage(tr('operator.errors.connect', 'Could not connect. Please try again.'))
+      setMessage(c('errConnect', l))
     } finally {
-      setLoading(false)
+      setBuilding(false)
     }
   }
 
   async function publish() {
-    if (!content) return
+    if (!content || publishing) return
     setPublishing(true); setMessage('')
     try {
       const res = await fetch('/api/sites/publish', {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ content, language: lang }),
+        body: JSON.stringify({ content, language: l }),
       })
       const data = await res.json()
-      if (!res.ok) setMessage(data.error || tr('operator.errors.publish', 'Could not publish the website.'))
-      else { setLiveUrl(data.url || null); setMessage(data.userMessage || tr('operator.success.published', 'Your website is live.')) }
+      if (!res.ok) setMessage(data.error || c('errConnect', l))
+      else { setLiveUrl(data.url || null); setMessage(data.userMessage || '') }
     } catch {
-      setMessage(tr('operator.errors.connect', 'Could not connect. Please try again.'))
+      setMessage(c('errConnect', l))
     } finally {
       setPublishing(false)
     }
   }
 
-  function reset() {
-    setContent(null); setLiveUrl(null); setMessage('')
-    setRequest(''); setLoading(false); setPublishing(false)
-    setSteps([]); setPreprocessor(null)
-  }
-
-  const fullUrl     = liveUrl ? `${typeof window !== 'undefined' ? window.location.origin : ''}${liveUrl}` : null
-  const placeholder = tr('operator.input.placeholder', 'e.g. A cozy Italian restaurant in São Paulo with a menu, our story, and a reservation button')
+  const categories = audit ? Array.from(new Set(audit.checks.map(ch => ch.category))) : []
+  const fullUrl = liveUrl
+    ? (typeof window !== 'undefined' ? window.location.origin : '') + liveUrl
+    : null
 
   return (
-    <main className="sb-page" style={{ maxWidth: 1240 }}>
-      <div
-        style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 440px) 1fr', gap: 24, alignItems: 'start' }}
-        className="sb-operator-grid"
-      >
-        {/* ── Left: input ── */}
-        <section className="hero-panel" style={{ padding: 24, position: 'sticky', top: 16 }}>
-          <div className="sb-kicker">🤖 {tr('operator.title.kicker', 'AI Website Operator')}</div>
-          <h1 className="sb-title" style={{ marginBottom: 8, fontSize: 28 }}>
-            {tr('operator.title.main', 'Describe your website')}
-          </h1>
-          <p className="sb-subtitle" style={{ marginTop: 0 }}>
-            {tr('operator.title.subtitle', 'Tell me about your business. I will design a complete website — and you can publish it live in one click.')}
-          </p>
+    <div className="sb-hmi-shell" style={{ minHeight: '100vh' }}>
+      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 0 80px' }}>
 
-          <textarea
-            value={request}
-            onChange={(e) => setRequest(e.target.value)}
-            rows={5}
-            placeholder={placeholder}
-            style={{ width: '100%', marginTop: 14, borderRadius: 14, border: '1px solid var(--border-soft)', background: 'rgba(255,255,255,.02)', color: '#fff', padding: 12, fontSize: 14, lineHeight: 1.5, resize: 'vertical' }}
-          />
+        {/* Header */}
+        <div className="sb-cockpit-hero" style={{ marginBottom: 28 }}>
+          <p className="sb-hmi-kicker">🧭 {c('eyebrow', l)}</p>
+          <h1 className="sb-h2" style={{ margin: '10px 0 12px' }}>{c('title', l)}</h1>
+          <p className="sb-hmi-muted" style={{ maxWidth: 680 }}>{c('subtitle', l)}</p>
+        </div>
 
-          <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button className="sb-button-primary" onClick={generate} disabled={loading || !request.trim()}>
-              {loading
-                ? `✨ ${tr('operator.cta.designing', 'Designing…')}`
-                : content
-                  ? `↻ ${tr('operator.cta.regenerate', 'Regenerate')}`
-                  : `✨ ${tr('operator.cta.design', 'Design my website')}`}
+        {/* Stage rail */}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
+          {[
+            { n: 1, key: 'stageAnalyze',  done: !!audit },
+            { n: 2, key: 'stageOptimize', done: !!audit },
+            { n: 3, key: 'stageRebuild',  done: !!content },
+          ].map(s => (
+            <div key={s.n} style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '8px 18px', borderRadius: 999,
+              background: s.done ? 'rgba(134,239,172,.10)' : 'rgba(255,255,255,.04)',
+              border: `1px solid ${s.done ? 'rgba(134,239,172,.35)' : 'rgba(255,255,255,.10)'}`,
+            }}>
+              <span style={{
+                width: 22, height: 22, borderRadius: '50%',
+                display: 'grid', placeItems: 'center',
+                fontSize: 11, fontWeight: 900,
+                background: s.done ? '#86efac' : 'rgba(255,255,255,.12)',
+                color: s.done ? '#04210f' : '#fff',
+              }}>
+                {s.done ? '✓' : s.n}
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: s.done ? '#86efac' : 'rgba(255,255,255,.7)' }}>
+                {c(s.key, l)}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Stage 1: Input */}
+        <div className="sb-glass-panel" style={{ marginBottom: 20, padding: 20 }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <input
+              className="sb-input"
+              value={url}
+              onChange={e => setUrl(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') analyze() }}
+              placeholder={c('placeholder', l)}
+              style={{ flex: 1, minWidth: 240, padding: '13px 16px', borderRadius: 12, fontSize: 14 }}
+              disabled={analyzing}
+            />
+            <button
+              onClick={analyze}
+              disabled={analyzing || !url.trim()}
+              className="sb-button-primary"
+              style={{ borderRadius: 12, padding: '0 28px', opacity: analyzing || !url.trim() ? 0.55 : 1 }}
+            >
+              {analyzing ? c('analyzingBtn', l) : c('analyzeBtn', l)}
             </button>
-            {(content || liveUrl || request) && (
-              <button className="sb-button-ghost" onClick={reset} disabled={loading || publishing}>
-                {tr('reset', 'Start over')}
-              </button>
-            )}
           </div>
+          {error && <p style={{ color: '#fca5a5', fontSize: 13, marginTop: 12, marginBottom: 0 }}>{error}</p>}
+          {analyzing && <p className="sb-hmi-muted" style={{ marginTop: 14, marginBottom: 0, fontSize: 14 }}>{c('analyzingMsg', l)}</p>}
+        </div>
 
-          {/* ── Live status stream ── */}
-          {loading && steps.length > 0 && (
-            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {steps.map((step, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display:    'flex',
-                    flexDirection: 'column',
-                    gap:        4,
-                    padding:    '10px 12px',
-                    borderRadius: 10,
-                    background: i === steps.length - 1
-                      ? 'rgba(255,195,0,0.08)'
-                      : 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${i === steps.length - 1 ? 'rgba(255,195,0,0.2)' : 'var(--border-soft)'}`,
-                    fontSize:   13,
-                    color:      i === steps.length - 1 ? '#fff' : 'var(--text-muted)',
-                    transition: 'all 0.3s ease',
-                  }}
-                >
-                  <span>{step.message}</span>
-                  {step.items && step.items.length > 0 && (
-                    <span style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>
-                      {step.items.join(' · ')}
-                      {step.items.length < 20 ? '' : ' · …'}
-                    </span>
+        {audit && (
+          <div style={{ display: 'grid', gap: 18 }}>
+
+            {/* Score */}
+            <div className="sb-neon-panel" style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 24, alignItems: 'center', padding: 24 }}>
+              <div style={{
+                width: 100, height: 100, borderRadius: '50%',
+                display: 'grid', placeItems: 'center', flexShrink: 0,
+                border: `5px solid ${scoreColor(audit.score)}`,
+                boxShadow: `0 0 32px ${scoreColor(audit.score)}44`,
+              }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: scoreColor(audit.score), lineHeight: 1 }}>{audit.score}</div>
+                  <div className="sb-caption">/ 100</div>
+                </div>
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,.4)', marginBottom: 8, wordBreak: 'break-all' }}>{audit.finalUrl}</div>
+                <p style={{ margin: 0, lineHeight: 1.7, color: 'rgba(255,255,255,.85)', fontSize: 14, whiteSpace: 'pre-wrap' }}>{audit.summary}</p>
+              </div>
+            </div>
+
+            {/* Checks */}
+            {categories.map(cat => (
+              <section key={cat}>
+                <h2 className="sb-eyebrow" style={{ marginBottom: 12 }}>{cat}</h2>
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {audit.checks.filter(ch => ch.category === cat).map(ch => {
+                    const ui = STATUS_UI[ch.status]
+                    return (
+                      <div key={ch.id} style={{
+                        padding: '14px 18px', borderRadius: 16,
+                        background: ui.bg, border: `1px solid ${ui.border}`,
+                        display: 'grid', gridTemplateColumns: '30px 1fr',
+                        gap: 14, alignItems: 'start',
+                      }}>
+                        <span style={{
+                          width: 28, height: 28, borderRadius: '50%',
+                          display: 'grid', placeItems: 'center',
+                          background: `${ui.color}22`, color: ui.color,
+                          fontWeight: 900, fontSize: 13, border: `1px solid ${ui.color}44`,
+                        }}>
+                          {ui.icon}
+                        </span>
+                        <div style={{ minWidth: 0 }}>
+                          <strong style={{ color: '#fff', fontSize: 14 }}>{ch.label}</strong>
+                          <div style={{ color: 'rgba(255,255,255,.62)', fontSize: 13, marginTop: 3, lineHeight: 1.6 }}>{ch.detail}</div>
+                          {ch.status !== 'pass' && ch.recommendation && (
+                            <div style={{ fontSize: 13, marginTop: 8, color: ui.color, fontWeight: 700 }}>→ {ch.recommendation}</div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            ))}
+
+            {/* Stage 2: Brief */}
+            <div className="sb-glass-panel" style={{ padding: 24, border: '1px solid rgba(26,240,255,.28)' }}>
+              <p className="sb-hmi-kicker" style={{ marginBottom: 8 }}>{c('optimizeTitle', l)}</p>
+              <p style={{ color: 'rgba(255,255,255,.65)', fontSize: 14, lineHeight: 1.7, marginBottom: 14 }}>{c('optimizeDesc', l)}</p>
+              <textarea
+                className="sb-input"
+                value={brief}
+                onChange={e => setBrief(e.target.value)}
+                rows={8}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '14px 16px', borderRadius: 12, resize: 'vertical', fontSize: 13, lineHeight: 1.7 }}
+              />
+              <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+                <button onClick={rebuild} disabled={building || !brief.trim()} className="sb-button-primary" style={{ borderRadius: 12, padding: '12px 26px', opacity: building || !brief.trim() ? 0.55 : 1 }}>
+                  {building ? c('rebuildingBtn', l) : c('rebuildBtn', l)}
+                </button>
+                <button onClick={() => setBrief(buildBrief(audit))} disabled={building} className="sb-button-secondary">
+                  {c('resetBrief', l)}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Stage 3: Output */}
+        {(building || steps.length > 0 || content || message) && (
+          <div style={{ marginTop: 24 }}>
+            <p className="sb-eyebrow" style={{ marginBottom: 14 }}>{c('engineTitle', l)}</p>
+
+            {steps.length > 0 && !content && (
+              <div className="sb-glass-panel" style={{ padding: 18, display: 'grid', gap: 8 }}>
+                {steps.map((s, i) => (
+                  <div key={i} style={{ fontSize: 14, color: 'rgba(255,255,255,.78)', lineHeight: 1.6 }}>{s.message}</div>
+                ))}
+              </div>
+            )}
+
+            {message && (
+              <p style={{ color: liveUrl ? '#86efac' : '#fca5a5', fontSize: 13, marginTop: 12 }}>{message}</p>
+            )}
+
+            {content && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+                  <button onClick={publish} disabled={publishing} className="sb-button-primary" style={{ borderRadius: 12, padding: '12px 26px', opacity: publishing ? 0.55 : 1 }}>
+                    {publishing ? c('publishingBtn', l) : c('publishBtn', l)}
+                  </button>
+                  {fullUrl && (
+                    <a href={fullUrl} target="_blank" rel="noreferrer" className="sb-button-secondary" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                      {c('viewLive', l)}
+                    </a>
                   )}
                 </div>
-              ))}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', fontSize: 13, color: 'var(--text-faint)' }}>
-                <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span>
-                Working…
-              </div>
-            </div>
-          )}
-
-          {/* ── Publish button ── */}
-          {content && !liveUrl && (
-            <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px solid var(--border-soft)' }}>
-              <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 0 }}>
-                {tr('operator.publish.hint', 'Happy with it? Publish it to a live web address.')}
-              </p>
-              <button className="sb-button-primary" onClick={publish} disabled={publishing} style={{ width: '100%' }}>
-                {publishing
-                  ? `🚀 ${tr('operator.publish.loading', 'Publishing…')}`
-                  : `🚀 ${tr('operator.publish.cta', 'Publish website')}`}
-              </button>
-            </div>
-          )}
-
-          {/* ── Live URL ── */}
-          {liveUrl && fullUrl && (
-            <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px solid var(--border-gold)' }}>
-              <div style={{ color: '#fff', fontWeight: 800, marginBottom: 6 }}>
-                🎉 {tr('operator.live', 'Your website is live')}
-              </div>
-              <a href={liveUrl} target="_blank" rel="noopener noreferrer" className="sb-button-primary"
-                style={{ display: 'inline-block', wordBreak: 'break-all', width: '100%', textAlign: 'center' }}>
-                {fullUrl} ↗
-              </a>
-            </div>
-          )}
-
-          {/* ── Preprocessor debug (collapsed) ── */}
-          {preprocessor && !loading && (
-            <div style={{ marginTop: 14, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border-soft)', background: 'rgba(255,255,255,.02)', fontSize: 11, color: 'var(--text-faint)' }}>
-              Mode: <strong>{preprocessor.mode}</strong>
-              {preprocessor.category ? ` · ${preprocessor.category}` : ''}
-              {preprocessor.localCount ? ` · ${preprocessor.localCount} local items` : ''}
-              {preprocessor.wikiCount  ? ` · ${preprocessor.wikiCount} wiki items`  : ''}
-              {preprocessor.fallbackUsed ? ' · fallback' : ''}
-            </div>
-          )}
-
-          {message && !liveUrl && (
-            <p style={{ marginTop: 14, color: 'var(--text-secondary)', fontSize: 13 }}>{message}</p>
-          )}
-        </section>
-
-        {/* ── Right: live preview ── */}
-        <section className="hero-panel" style={{ padding: 18, minHeight: 360 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ color: 'var(--text-faint)', fontSize: 12, fontWeight: 900, letterSpacing: '.08em', textTransform: 'uppercase' }}>
-              {tr('operator.preview.liveLabel', 'Live preview')}
-            </div>
-            {content && (
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                {content.theme === 'dark' ? `🌙 ${tr('operator.preview.dark', 'dark')}` : `☀️ ${tr('operator.preview.light', 'light')}`}
-                {' · '}
-                {content.sections?.length || 0} {tr('operator.preview.sections', 'sections')}
+                <div style={{ borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(255,255,255,.10)', boxShadow: '0 24px 80px rgba(0,0,0,.4)' }}>
+                  <SitePreview content={content} />
+                </div>
               </div>
             )}
           </div>
-
-          {!content && !loading && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 320, color: 'var(--text-faint)', textAlign: 'center', border: '1px dashed var(--border-soft)', borderRadius: 16, padding: 24 }}>
-              <div>
-                <div style={{ fontSize: 40, marginBottom: 12 }}>🎨</div>
-                <div style={{ fontSize: 14 }}>{tr('operator.preview.empty', 'Your designed website will appear here.')}</div>
-              </div>
-            </div>
-          )}
-
-          {loading && !content && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 320, gap: 16, color: 'var(--text-muted)' }}>
-              <div style={{ fontSize: 40, animation: 'pulse 2s ease-in-out infinite' }}>✨</div>
-              <div style={{ fontSize: 14, textAlign: 'center' }}>
-                {steps.length > 0
-                  ? steps[steps.length - 1].message
-                  : tr('operator.preview.loading', 'Designing your website…')}
-              </div>
-            </div>
-          )}
-
-          {content && <SitePreview content={content} />}
-        </section>
+        )}
       </div>
-
-      <style>{`
-        @media (max-width: 860px) {
-          .sb-operator-grid { grid-template-columns: 1fr !important; }
-          .sb-operator-grid > section:first-child { position: static !important; }
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to   { transform: rotate(360deg); }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 0.5; transform: scale(1); }
-          50%       { opacity: 1;   transform: scale(1.1); }
-        }
-      `}</style>
-    </main>
+    </div>
   )
 }

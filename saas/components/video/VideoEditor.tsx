@@ -350,6 +350,8 @@ function ExportPanel({ canExport, hasSource, job, onExport, onRefresh }: {
 }
 
 export default function VideoEditor() {
+  return null
+}
   const { lang } = useI18n()
   const l = (['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en')
 

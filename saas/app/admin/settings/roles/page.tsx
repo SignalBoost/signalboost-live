@@ -26,13 +26,7 @@ export default function RolesManagementPage() {
 
       const role = (authUser.user_metadata?.role || 'user') as Role
       setCurrentUser({ id: authUser.id, email: authUser.email, role })
-
-      // Seed list with current user and a couple example users when live user directory is unavailable.
-      setUsers([
-        { id: authUser.id, email: authUser.email, role },
-        { id: 'seed-admin', email: 'admin@example.com', role: 'admin' },
-        { id: 'seed-user', email: 'user@example.com', role: 'user' },
-      ])
+      setUsers([{ id: authUser.id, email: authUser.email, role }])
     }
 
     bootstrap()

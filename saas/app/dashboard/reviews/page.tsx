@@ -32,8 +32,8 @@ const COPY: Record<string, Record<Lang, string>> = {
   kicker:           { en: 'Reviews command center', es: 'Centro de mando de reseñas', pt: 'Central de avaliações', pl: 'Centrum zarządzania opiniami', ru: 'Центр управления отзывами' },
   title:            { en: 'Review collector', es: 'Colector de reseñas', pt: 'Coletor de avaliações', pl: 'Kolektor opinii', ru: 'Сборщик отзывов' },
   subtitle:         { en: 'Collect multilingual reviews, approve what publishes, and monitor sentiment.', es: 'Recopila reseñas multilingües, aprueba lo que se publica y monitorea el sentimiento.', pt: 'Colete avaliações multilíngues, aprove o que publica e monitore sentimentos.', pl: 'Zbieraj wielojęzyczne opinie, zatwierdzaj publikacje i monitoruj nastroje.', ru: 'Собирайте многоязычные отзывы, одобряйте публикации и отслеживайте настроения.' },
-  shareCta:         { en: 'Share review link', es: 'Compartir enlace de reseña', pt: 'Compartilhar link de avaliação', pl: 'Udostępnij link do opinii', ru: 'Поделиться ссылкой' },
-  adminCta:         { en: 'View admin telemetry', es: 'Ver telemetría', pt: 'Ver telemetria', pl: 'Zobacz telemetrię', ru: 'Просмотр телеметрии' },
+  shareCta:         { en: 'Share review link', es: 'Compartir enlace', pt: 'Compartilhar link', pl: 'Udostępnij link', ru: 'Поделиться ссылкой' },
+  adminCta:         { en: 'View telemetry', es: 'Ver telemetría', pt: 'Ver telemetria', pl: 'Zobacz telemetrię', ru: 'Телеметрия' },
   sendLinkTitle:    { en: 'Send this link to your customers', es: 'Envía este enlace a tus clientes', pt: 'Envie este link para seus clientes', pl: 'Wyślij ten link swoim klientom', ru: 'Отправьте эту ссылку своим клиентам' },
   submissionTitle:  { en: 'Localized review submission', es: 'Envío de reseña localizada', pt: 'Envio de avaliação localizada', pl: 'Lokalizowane przesyłanie opinii', ru: 'Локализованная отправка отзыва' },
   sendLinkDesc:     { en: 'They click it, leave a review in their own language, attach images, and it appears as Pending until approval.', es: 'Hacen clic, dejan una reseña en su idioma, adjuntan imágenes y aparece como Pendiente.', pt: 'Eles clicam, deixam uma avaliação no seu idioma, anexam imagens e aparece como Pendente.', pl: 'Klikają, zostawiają opinię w swoim języku, dołączają zdjęcia — pojawia się jako Oczekująca.', ru: 'Они нажимают, оставляют отзыв на своём языке — он появляется как Ожидающий.' },
@@ -45,7 +45,7 @@ const COPY: Record<string, Record<Lang, string>> = {
   copied:           { en: 'Copied', es: 'Copiado', pt: 'Copiado', pl: 'Skopiowano', ru: 'Скопировано' },
   copyLink:         { en: 'Copy link', es: 'Copiar enlace', pt: 'Copiar link', pl: 'Kopiuj link', ru: 'Копировать ссылку' },
   openNewTab:       { en: 'Open in new tab', es: 'Abrir en nueva pestaña', pt: 'Abrir em nova aba', pl: 'Otwórz w nowej karcie', ru: 'Открыть в новой вкладке' },
-  previewText:      { en: 'Customer text keeps its original language. Dates and currency render per locale:', es: 'El texto del cliente mantiene su idioma original:', pt: 'O texto do cliente mantém seu idioma original:', pl: 'Tekst klienta zachowuje oryginalny język:', ru: 'Текст клиента сохраняет оригинальный язык:' },
+  previewText:      { en: 'Dates and currency render per locale:', es: 'Fechas y monedas por región:', pt: 'Datas e moedas por localidade:', pl: 'Daty i waluty według regionu:', ru: 'Даты и валюты по локали:' },
   mediaLabel:       { en: 'Optional image attachments', es: 'Archivos de imagen opcionales', pt: 'Anexos de imagem opcionais', pl: 'Opcjonalne załączniki obrazów', ru: 'Необязательные вложения изображений' },
   conciergeTitle:   { en: 'Concierge AI', es: 'Concierge IA', pt: 'Concierge IA', pl: 'Concierge AI', ru: 'Консьерж ИИ' },
   conciergeHeadline:{ en: 'Review-aware recommendations', es: 'Recomendaciones basadas en reseñas', pt: 'Recomendações baseadas em avaliações', pl: 'Rekomendacje oparte na opiniach', ru: 'Рекомендации на основе отзывов' },
@@ -59,7 +59,7 @@ const COPY: Record<string, Record<Lang, string>> = {
   flagged:          { en: 'flagged', es: 'marcado', pt: 'sinalizado', pl: 'oflagowane', ru: 'отмеченных' },
   avg:              { en: 'avg', es: 'prom', pt: 'méd', pl: 'śr', ru: 'ср' },
   sortRelevance:    { en: 'Sort: relevance', es: 'Ordenar: relevancia', pt: 'Ordenar: relevância', pl: 'Sortuj: trafność', ru: 'Сортировка: релевантность' },
-  sortDate:         { en: 'Sort: newest', es: 'Ordenar: más reciente', pt: 'Ordenar: mais reciente', pl: 'Sortuj: najnowsze', ru: 'Сортировка: новейшие' },
+  sortDate:         { en: 'Sort: newest', es: 'Ordenar: más reciente', pt: 'Ordenar: más reciente', pl: 'Sortuj: najnowsze', ru: 'Сортировка: новейшие' },
   sortRating:       { en: 'Sort: rating', es: 'Ordenar: calificación', pt: 'Ordenar: avaliação', pl: 'Sortuj: ocena', ru: 'Сортировка: рейтинг' },
   allLanguages:     { en: 'All languages', es: 'Todos los idiomas', pt: 'Todos os idiomas', pl: 'Wszystkie języki', ru: 'Все языки' },
   allPartners:      { en: 'All partners', es: 'Todos los socios', pt: 'Todos os parceiros', pl: 'Wszyscy partnerzy', ru: 'Все партнёры' },
@@ -213,9 +213,7 @@ export default function ReviewsPage() {
     setReviews(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r))
     try {
       const res = await fetch(`/api/reviews?id=${encodeURIComponent(id)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
       })
       if (!res.ok) loadReviews()
     } catch { loadReviews() }
@@ -243,8 +241,7 @@ export default function ReviewsPage() {
     return {
       ...review,
       language: normalizeReviewLocale(review.language),
-      sentiment,
-      flagged,
+      sentiment, flagged,
       moderation_status: review.moderation_status ?? (flagged ? 'flagged' : review.approved ? 'approved' : 'pending'),
     }
   }), [reviews])
@@ -278,27 +275,59 @@ export default function ReviewsPage() {
   return (
     <div className="sb-reviews-page" style={{ color: 'var(--text-primary)' }}>
 
-      {/* Hero */}
-      <section className="sb-reviews-hero" aria-label="Reviews module">
-        <div>
-          <p className="sb-eyebrow">⭐ {c('kicker', l)}</p>
-          <h1>{c('title', l)}</h1>
-          <p>{c('subtitle', l)}</p>
-          <div className="sb-review-hero-actions">
-            <a href="#submit-review" className="sb-button-primary">{c('shareCta', l)}</a>
-            {isAdmin && <a href="#admin-console" className="sb-button-secondary">{c('adminCta', l)}</a>}
+      {/* ── Hero — compact single column with inline pipeline status bar ── */}
+      <section style={{
+        background: 'radial-gradient(circle at 20% 10%, rgba(26,240,255,.2), transparent 24rem), radial-gradient(circle at 80% 20%, rgba(168,85,247,.18), transparent 20rem), linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02))',
+        border: '1px solid rgba(26,240,255,.2)',
+        borderRadius: 28,
+        padding: '28px 32px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 16,
+      }}>
+        {/* Top row: eyebrow + title + actions */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <p className="sb-eyebrow" style={{ marginBottom: 6 }}>⭐ {c('kicker', l)}</p>
+            <h1 style={{ fontSize: 'clamp(26px, 4vw, 42px)', fontWeight: 900, letterSpacing: '-.04em', lineHeight: 1, margin: 0 }}>{c('title', l)}</h1>
+            <p style={{ color: 'rgba(255,255,255,.6)', fontSize: 14, marginTop: 8, maxWidth: 480, lineHeight: 1.6 }}>{c('subtitle', l)}</p>
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
+            <a href="#submit-review" className="sb-button-primary" style={{ fontSize: 13, padding: '10px 18px' }}>{c('shareCta', l)}</a>
+            {isAdmin && <a href="#admin-console" className="sb-button-secondary" style={{ fontSize: 13, padding: '10px 18px' }}>{c('adminCta', l)}</a>}
           </div>
         </div>
 
-        {/* Wireflow — vertical flex, no CSS grid clipping */}
-        <div aria-hidden="true" style={{ background: 'rgba(2,6,23,.52)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 26, padding: 20, display: 'flex', flexDirection: 'column', gap: 8, alignSelf: 'flex-start', minWidth: 160 }}>
+        {/* Pipeline status bar — horizontal flow, no height issues */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0,
+          background: 'rgba(2,6,23,.4)',
+          border: '1px solid rgba(255,255,255,.1)',
+          borderRadius: 14,
+          padding: '10px 16px',
+          flexWrap: 'wrap',
+          rowGap: 8,
+        }}>
           {['Submission', 'AI Sentiment', 'Moderation', 'Outreach'].map((label, i, arr) => (
-            <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-              <div style={{ border: '1px solid rgba(26,240,255,.22)', borderRadius: 14, color: '#dffcff', fontSize: 12, fontWeight: 900, padding: '11px 14px', textAlign: 'center', textTransform: 'uppercase', width: '100%', boxSizing: 'border-box', background: 'rgba(26,240,255,.06)' }}>
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+              <span style={{
+                fontSize: 11,
+                fontWeight: 900,
+                letterSpacing: '.08em',
+                textTransform: 'uppercase',
+                color: '#dffcff',
+                padding: '5px 12px',
+                border: '1px solid rgba(26,240,255,.2)',
+                borderRadius: 8,
+                background: 'rgba(26,240,255,.06)',
+                whiteSpace: 'nowrap',
+              }}>
                 {label}
-              </div>
+              </span>
               {i < arr.length - 1 && (
-                <div style={{ color: '#ffc300', fontSize: 16, fontWeight: 900, lineHeight: 1 }}>↓</div>
+                <span style={{ color: '#ffc300', fontSize: 14, fontWeight: 900, padding: '0 6px' }}>→</span>
               )}
             </div>
           ))}
@@ -318,7 +347,6 @@ export default function ReviewsPage() {
             <span className="sb-review-pill">LTR · {getLocaleLabel(activeLocale)}</span>
           </div>
           <p className="sb-caption">{c('sendLinkDesc', l)}</p>
-
           {slug.kind === 'loading' && <div className="sb-review-empty">{c('loading', l)}</div>}
           {slug.kind === 'none' && (
             <div className="sb-review-link-builder">

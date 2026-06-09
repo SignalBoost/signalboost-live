@@ -2,24 +2,22 @@
 
 import { useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { t } from '@/lib/i18n/t'
 import SitePreview, { type SitePreviewContent } from '@/components/operator/SitePreview'
 
-// ── Inline translations ───────────────────────────────────────────────────────
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 const COPY: Record<string, Record<Lang, string>> = {
   eyebrow:       { en: 'Website Optimization System', es: 'Sistema de optimización web', pt: 'Sistema de otimização de sites', pl: 'System optymalizacji stron', ru: 'Система оптимизации сайтов' },
   title:         { en: 'Optimize Website', es: 'Optimizar sitio web', pt: 'Otimizar site', pl: 'Optymalizuj stronę', ru: 'Оптимизировать сайт' },
-  subtitle:      { en: 'Analyze any site, optimize the findings into a brief, and rebuild an improved version you can publish.', es: 'Analiza cualquier sitio, optimiza los hallazgos en un brief y reconstruye una versión mejorada que puedas publicar.', pt: 'Analise qualquer site, otimize os achados em um brief e reconstrua uma versão melhorada que você possa publicar.', pl: 'Analizuj dowolną stronę, optymalizuj wyniki w brief i odbuduj ulepszoną wersję do publikacji.', ru: 'Анализируйте любой сайт, оптимизируйте выводы в бриф и пересоздайте улучшенную версию для публикации.' },
+  subtitle:      { en: 'Analyze any site, optimize the findings into a brief, and rebuild an improved version you can publish.', es: 'Analiza cualquier sitio, optimiza los hallazgos en un brief y reconstruye una versión mejorada.', pt: 'Analise qualquer site, otimize os achados em um brief e reconstrua uma versão melhorada.', pl: 'Analizuj dowolną stronę, optymalizuj wyniki w brief i odbuduj ulepszoną wersję.', ru: 'Анализируйте любой сайт, оптимизируйте выводы и пересоздайте улучшенную версию.' },
   stageAnalyze:  { en: 'Analyze', es: 'Analizar', pt: 'Analisar', pl: 'Analiza', ru: 'Анализ' },
   stageOptimize: { en: 'Optimize', es: 'Optimizar', pt: 'Otimizar', pl: 'Optymalizuj', ru: 'Оптимизация' },
-  stageRebuild:  { en: 'Rebuild', es: 'Reconstruir', pt: 'Reconstruir', pl: 'Przebuduj', ru: 'Пересоздать' },
+  stageRebuild:  { en: 'Rebuild', es: 'Rebuild', pt: 'Reconstruir', pl: 'Przebuduj', ru: 'Пересоздать' },
   placeholder:   { en: 'yourwebsite.com', es: 'tusitioweb.com', pt: 'seusiteweb.com', pl: 'twojastrona.pl', ru: 'вашсайт.рф' },
   analyzeBtn:    { en: 'Analyze website', es: 'Analizar sitio', pt: 'Analisar site', pl: 'Analizuj stronę', ru: 'Анализировать' },
   analyzingBtn:  { en: 'Analyzing…', es: 'Analizando…', pt: 'Analisando…', pl: 'Analizowanie…', ru: 'Анализ…' },
   analyzingMsg:  { en: 'Fetching the page and running checks…', es: 'Obteniendo la página y ejecutando comprobaciones…', pt: 'Buscando a página e executando verificações…', pl: 'Pobieranie strony i uruchamianie sprawdzeń…', ru: 'Загрузка страницы и выполнение проверок…' },
-  optimizeTitle: { en: 'Optimize → Rebuild brief', es: 'Optimizar → Brief de reconstrucción', pt: 'Otimizar → Brief de reconstrução', pl: 'Optymalizuj → Brief do przebudowy', ru: 'Оптимизация → Бриф для пересоздания' },
-  optimizeDesc:  { en: 'We turned the audit into a brief for the rebuild engine. Edit anything, then rebuild an improved version of the site.', es: 'Convertimos la auditoría en un brief. Edita lo que quieras y reconstruye una versión mejorada.', pt: 'Transformamos a auditoria em um brief. Edite o que quiser e reconstrua uma versão melhorada.', pl: 'Zmieniliśmy audyt w brief. Edytuj co chcesz i odbuduj ulepszoną wersję strony.', ru: 'Мы превратили аудит в бриф. Редактируйте что угодно и пересоздайте улучшенную версию.' },
+  optimizeTitle: { en: 'Optimize → Rebuild brief', es: 'Optimizar → Brief de reconstrucción', pt: 'Otimizar → Brief de reconstrução', pl: 'Optymalizuj → Brief do przebudowy', ru: 'Оптимизация → Бриф' },
+  optimizeDesc:  { en: 'We turned the audit into a brief for the rebuild engine. Edit anything, then rebuild an improved version of the site.', es: 'Convertimos la auditoría en un brief. Edita lo que quieras y reconstruye una versión mejorada.', pt: 'Transformamos a auditoria em um brief. Edite o que quiser e reconstrua uma versão melhorada.', pl: 'Zmieniliśmy audyt w brief. Edytuj co chcesz i odbuduj ulepszoną wersję.', ru: 'Мы превратили аудит в бриф. Редактируйте и пересоздайте улучшенную версию.' },
   rebuildBtn:    { en: '⚙️ Rebuild improved site', es: '⚙️ Reconstruir sitio mejorado', pt: '⚙️ Reconstruir site melhorado', pl: '⚙️ Przebuduj ulepszoną stronę', ru: '⚙️ Пересоздать улучшенный сайт' },
   rebuildingBtn: { en: 'Rebuilding…', es: 'Reconstruyendo…', pt: 'Reconstruindo…', pl: 'Przebudowywanie…', ru: 'Пересоздание…' },
   resetBrief:    { en: 'Reset brief', es: 'Restablecer brief', pt: 'Redefinir brief', pl: 'Resetuj brief', ru: 'Сбросить бриф' },
@@ -29,14 +27,12 @@ const COPY: Record<string, Record<Lang, string>> = {
   viewLive:      { en: 'View live site →', es: 'Ver sitio en vivo →', pt: 'Ver site ao vivo →', pl: 'Zobacz stronę na żywo →', ru: 'Просмотреть сайт →' },
   errDefault:    { en: 'Could not audit that URL.', es: 'No se pudo auditar esa URL.', pt: 'Não foi possível auditar essa URL.', pl: 'Nie można było przeprowadzić audytu.', ru: 'Не удалось проверить URL.' },
   errConnect:    { en: 'Could not connect. Please try again.', es: 'No se pudo conectar. Inténtalo de nuevo.', pt: 'Não foi possível conectar. Tente novamente.', pl: 'Nie można połączyć. Spróbuj ponownie.', ru: 'Не удалось подключиться. Попробуйте еще раз.' },
-  scoreLabel:    { en: '/ 100', es: '/ 100', pt: '/ 100', pl: '/ 100', ru: '/ 100' },
 }
 
 function c(key: string, lang: string): string {
   return COPY[key]?.[lang as Lang] ?? COPY[key]?.en ?? key
 }
 
-// ── Types ─────────────────────────────────────────────────────────────────────
 type Status = 'pass' | 'warn' | 'fail'
 type Check = { id: string; label: string; category: string; status: Status; detail: string; recommendation: string }
 type Audit = { url: string; finalUrl: string; score: number; checks: Check[]; summary: string; source: string }
@@ -57,29 +53,30 @@ function scoreColor(s: number) {
 function buildBrief(audit: Audit): string {
   let host = audit.finalUrl
   try { host = new URL(audit.finalUrl).hostname.replace(/^www\./, '') } catch {}
-  const issues = audit.checks.filter(c => c.status !== 'pass' && c.recommendation)
-  const fixes = issues.map(c => `- ${c.label}: ${c.recommendation}`).join('\n')
+  const issues = audit.checks.filter(ch => ch.status !== 'pass' && ch.recommendation)
+  const fixes = issues.map(ch => `- ${ch.label}: ${ch.recommendation}`).join('\n')
   return [
     `Rebuild an improved, modern version of the website ${host}.`,
     `Keep the same business, brand, and core offering, but fix the issues found in the audit and make it fast, mobile-first, accessible, and conversion-focused with a clear primary call-to-action.`,
     issues.length ? `\nAddress these specific improvements:\n${fixes}` : '',
   ].join('\n').trim()
 }
+
 export default function ImproveWebsitePage() {
-  const { dict, lang } = useI18n()
+  const { lang } = useI18n()
   const l = ['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en'
 
-  const [url, setUrl]           = useState('')
-  const [analyzing, setAnalyzing] = useState(false)
-  const [error, setError]       = useState('')
-  const [audit, setAudit]       = useState<Audit | null>(null)
-  const [brief, setBrief]       = useState('')
-  const [content, setContent]   = useState<SitePreviewContent | null>(null)
-  const [liveUrl, setLiveUrl]   = useState<string | null>(null)
-  const [building, setBuilding] = useState(false)
+  const [url, setUrl]               = useState('')
+  const [analyzing, setAnalyzing]   = useState(false)
+  const [error, setError]           = useState('')
+  const [audit, setAudit]           = useState<Audit | null>(null)
+  const [brief, setBrief]           = useState('')
+  const [content, setContent]       = useState<SitePreviewContent | null>(null)
+  const [liveUrl, setLiveUrl]       = useState<string | null>(null)
+  const [building, setBuilding]     = useState(false)
   const [publishing, setPublishing] = useState(false)
-  const [steps, setSteps]       = useState<StatusStep[]>([])
-  const [message, setMessage]   = useState('')
+  const [steps, setSteps]           = useState<StatusStep[]>([])
+  const [message, setMessage]       = useState('')
 
   async function analyze() {
     const value = url.trim()
@@ -165,20 +162,22 @@ export default function ImproveWebsitePage() {
   }
 
   const categories = audit ? Array.from(new Set(audit.checks.map(ch => ch.category))) : []
-  const fullUrl = liveUrl ? `${typeof window !== 'undefined' ? window.location.origin : ''}${liveUrl}` : null
+  const fullUrl = liveUrl
+    ? (typeof window !== 'undefined' ? window.location.origin : '') + liveUrl
+    : null
 
   return (
     <div className="sb-hmi-shell" style={{ minHeight: '100vh' }}>
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 0 80px' }}>
 
-        {/* ── Header ── */}
+        {/* Header */}
         <div className="sb-cockpit-hero" style={{ marginBottom: 28 }}>
           <p className="sb-hmi-kicker">🧭 {c('eyebrow', l)}</p>
           <h1 className="sb-h2" style={{ margin: '10px 0 12px' }}>{c('title', l)}</h1>
           <p className="sb-hmi-muted" style={{ maxWidth: 680 }}>{c('subtitle', l)}</p>
         </div>
 
-        {/* ── Stage rail ── */}
+        {/* Stage rail */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
           {[
             { n: 1, key: 'stageAnalyze',  done: !!audit },
@@ -190,7 +189,6 @@ export default function ImproveWebsitePage() {
               padding: '8px 18px', borderRadius: 999,
               background: s.done ? 'rgba(134,239,172,.10)' : 'rgba(255,255,255,.04)',
               border: `1px solid ${s.done ? 'rgba(134,239,172,.35)' : 'rgba(255,255,255,.10)'}`,
-              transition: 'all .18s ease',
             }}>
               <span style={{
                 width: 22, height: 22, borderRadius: '50%',
@@ -208,7 +206,7 @@ export default function ImproveWebsitePage() {
           ))}
         </div>
 
-        {/* ── Stage 1: Analyze ── */}
+        {/* Stage 1: Input */}
         <div className="sb-glass-panel" style={{ marginBottom: 20, padding: 20 }}>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <input
@@ -229,26 +227,15 @@ export default function ImproveWebsitePage() {
               {analyzing ? c('analyzingBtn', l) : c('analyzeBtn', l)}
             </button>
           </div>
-          {error && (
-            <p style={{ color: '#fca5a5', fontSize: 13, marginTop: 12, marginBottom: 0 }}>{error}</p>
-          )}
-          {analyzing && (
-            <p className="sb-hmi-muted" style={{ marginTop: 14, marginBottom: 0, fontSize: 14 }}>
-              {c('analyzingMsg', l)}
-            </p>
-          )}
+          {error && <p style={{ color: '#fca5a5', fontSize: 13, marginTop: 12, marginBottom: 0 }}>{error}</p>}
+          {analyzing && <p className="sb-hmi-muted" style={{ marginTop: 14, marginBottom: 0, fontSize: 14 }}>{c('analyzingMsg', l)}</p>}
         </div>
 
         {audit && (
           <div style={{ display: 'grid', gap: 18 }}>
 
-            {/* Score + summary */}
-            <div className="sb-neon-panel" style={{
-              display: 'grid',
-              gridTemplateColumns: 'auto 1fr',
-              gap: 24, alignItems: 'center',
-              padding: 24,
-            }}>
+            {/* Score */}
+            <div className="sb-neon-panel" style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 24, alignItems: 'center', padding: 24 }}>
               <div style={{
                 width: 100, height: 100, borderRadius: '50%',
                 display: 'grid', placeItems: 'center', flexShrink: 0,
@@ -256,23 +243,17 @@ export default function ImproveWebsitePage() {
                 boxShadow: `0 0 32px ${scoreColor(audit.score)}44`,
               }}>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: scoreColor(audit.score), lineHeight: 1 }}>
-                    {audit.score}
-                  </div>
-                  <div className="sb-caption">{c('scoreLabel', l)}</div>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: scoreColor(audit.score), lineHeight: 1 }}>{audit.score}</div>
+                  <div className="sb-caption">/ 100</div>
                 </div>
               </div>
               <div style={{ minWidth: 0 }}>
-                <div className="sb-caption" style={{ marginBottom: 8, wordBreak: 'break-all', color: 'rgba(255,255,255,.45)' }}>
-                  {audit.finalUrl}
-                </div>
-                <p style={{ margin: 0, lineHeight: 1.7, color: 'rgba(255,255,255,.85)', fontSize: 14, whiteSpace: 'pre-wrap' }}>
-                  {audit.summary}
-                </p>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,.4)', marginBottom: 8, wordBreak: 'break-all' }}>{audit.finalUrl}</div>
+                <p style={{ margin: 0, lineHeight: 1.7, color: 'rgba(255,255,255,.85)', fontSize: 14, whiteSpace: 'pre-wrap' }}>{audit.summary}</p>
               </div>
             </div>
 
-            {/* Checks by category */}
+            {/* Checks */}
             {categories.map(cat => (
               <section key={cat}>
                 <h2 className="sb-eyebrow" style={{ marginBottom: 12 }}>{cat}</h2>
@@ -281,33 +262,24 @@ export default function ImproveWebsitePage() {
                     const ui = STATUS_UI[ch.status]
                     return (
                       <div key={ch.id} style={{
-                        padding: '14px 18px',
-                        borderRadius: 16,
-                        background: ui.bg,
-                        border: `1px solid ${ui.border}`,
-                        display: 'grid',
-                        gridTemplateColumns: '30px 1fr',
-                        gap: 14,
-                        alignItems: 'start',
+                        padding: '14px 18px', borderRadius: 16,
+                        background: ui.bg, border: `1px solid ${ui.border}`,
+                        display: 'grid', gridTemplateColumns: '30px 1fr',
+                        gap: 14, alignItems: 'start',
                       }}>
                         <span style={{
                           width: 28, height: 28, borderRadius: '50%',
                           display: 'grid', placeItems: 'center',
-                          background: `${ui.color}22`,
-                          color: ui.color, fontWeight: 900, fontSize: 13,
-                          border: `1px solid ${ui.color}44`,
+                          background: `${ui.color}22`, color: ui.color,
+                          fontWeight: 900, fontSize: 13, border: `1px solid ${ui.color}44`,
                         }}>
                           {ui.icon}
                         </span>
                         <div style={{ minWidth: 0 }}>
                           <strong style={{ color: '#fff', fontSize: 14 }}>{ch.label}</strong>
-                          <div style={{ color: 'rgba(255,255,255,.62)', fontSize: 13, marginTop: 3, lineHeight: 1.6 }}>
-                            {ch.detail}
-                          </div>
+                          <div style={{ color: 'rgba(255,255,255,.62)', fontSize: 13, marginTop: 3, lineHeight: 1.6 }}>{ch.detail}</div>
                           {ch.status !== 'pass' && ch.recommendation && (
-                            <div style={{ fontSize: 13, marginTop: 8, color: ui.color, fontWeight: 700 }}>
-                              → {ch.recommendation}
-                            </div>
+                            <div style={{ fontSize: 13, marginTop: 8, color: ui.color, fontWeight: 700 }}>→ {ch.recommendation}</div>
                           )}
                         </div>
                       </div>
@@ -317,41 +289,22 @@ export default function ImproveWebsitePage() {
               </section>
             ))}
 
-            {/* ── Stage 2: Optimize brief ── */}
-            <div className="sb-glass-panel" style={{
-              padding: 24,
-              border: '1px solid rgba(26,240,255,.28)',
-            }}>
+            {/* Stage 2: Brief */}
+            <div className="sb-glass-panel" style={{ padding: 24, border: '1px solid rgba(26,240,255,.28)' }}>
               <p className="sb-hmi-kicker" style={{ marginBottom: 8 }}>{c('optimizeTitle', l)}</p>
-              <p style={{ color: 'rgba(255,255,255,.65)', fontSize: 14, lineHeight: 1.7, marginBottom: 14 }}>
-                {c('optimizeDesc', l)}
-              </p>
+              <p style={{ color: 'rgba(255,255,255,.65)', fontSize: 14, lineHeight: 1.7, marginBottom: 14 }}>{c('optimizeDesc', l)}</p>
               <textarea
                 className="sb-input"
                 value={brief}
                 onChange={e => setBrief(e.target.value)}
                 rows={8}
-                style={{
-                  width: '100%', boxSizing: 'border-box',
-                  padding: '14px 16px', borderRadius: 12,
-                  resize: 'vertical', whiteSpace: 'pre-wrap',
-                  fontSize: 13, lineHeight: 1.7,
-                }}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '14px 16px', borderRadius: 12, resize: 'vertical', fontSize: 13, lineHeight: 1.7 }}
               />
               <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
-                <button
-                  onClick={rebuild}
-                  disabled={building || !brief.trim()}
-                  className="sb-button-primary"
-                  style={{ borderRadius: 12, padding: '12px 26px', opacity: building || !brief.trim() ? 0.55 : 1 }}
-                >
+                <button onClick={rebuild} disabled={building || !brief.trim()} className="sb-button-primary" style={{ borderRadius: 12, padding: '12px 26px', opacity: building || !brief.trim() ? 0.55 : 1 }}>
                   {building ? c('rebuildingBtn', l) : c('rebuildBtn', l)}
                 </button>
-                <button
-                  onClick={() => setBrief(buildBrief(audit))}
-                  disabled={building}
-                  className="sb-button-secondary"
-                >
+                <button onClick={() => setBrief(buildBrief(audit))} disabled={building} className="sb-button-secondary">
                   {c('resetBrief', l)}
                 </button>
               </div>
@@ -359,7 +312,7 @@ export default function ImproveWebsitePage() {
           </div>
         )}
 
-        {/* ── Stage 3: Rebuild output ── */}
+        {/* Stage 3: Output */}
         {(building || steps.length > 0 || content || message) && (
           <div style={{ marginTop: 24 }}>
             <p className="sb-eyebrow" style={{ marginBottom: 14 }}>{c('engineTitle', l)}</p>
@@ -367,50 +320,28 @@ export default function ImproveWebsitePage() {
             {steps.length > 0 && !content && (
               <div className="sb-glass-panel" style={{ padding: 18, display: 'grid', gap: 8 }}>
                 {steps.map((s, i) => (
-                  <div key={i} style={{ fontSize: 14, color: 'rgba(255,255,255,.78)', lineHeight: 1.6 }}>
-                    {s.message}
-                  </div>
+                  <div key={i} style={{ fontSize: 14, color: 'rgba(255,255,255,.78)', lineHeight: 1.6 }}>{s.message}</div>
                 ))}
               </div>
             )}
 
             {message && (
-              <p style={{
-                color: liveUrl ? '#86efac' : '#fca5a5',
-                fontSize: 13, marginTop: 12,
-              }}>
-                {message}
-              </p>
+              <p style={{ color: liveUrl ? '#86efac' : '#fca5a5', fontSize: 13, marginTop: 12 }}>{message}</p>
             )}
 
             {content && (
               <div style={{ marginTop: 16 }}>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-                  <button
-                    onClick={publish}
-                    disabled={publishing}
-                    className="sb-button-primary"
-                    style={{ borderRadius: 12, padding: '12px 26px', opacity: publishing ? 0.55 : 1 }}
-                  >
+                  <button onClick={publish} disabled={publishing} className="sb-button-primary" style={{ borderRadius: 12, padding: '12px 26px', opacity: publishing ? 0.55 : 1 }}>
                     {publishing ? c('publishingBtn', l) : c('publishBtn', l)}
                   </button>
                   {fullUrl && (
-                    
-                      href={fullUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="sb-button-secondary"
-                      style={{ display: 'inline-flex', alignItems: 'center' }}
-                    >
+                    <a href={fullUrl} target="_blank" rel="noreferrer" className="sb-button-secondary" style={{ display: 'inline-flex', alignItems: 'center' }}>
                       {c('viewLive', l)}
                     </a>
                   )}
                 </div>
-                <div style={{
-                  borderRadius: 20, overflow: 'hidden',
-                  border: '1px solid rgba(255,255,255,.10)',
-                  boxShadow: '0 24px 80px rgba(0,0,0,.4)',
-                }}>
+                <div style={{ borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(255,255,255,.10)', boxShadow: '0 24px 80px rgba(0,0,0,.4)' }}>
                   <SitePreview content={content} />
                 </div>
               </div>

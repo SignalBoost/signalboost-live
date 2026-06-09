@@ -1,30 +1,32 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import ResetButton from '@/components/ResetButton'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 const COPY: Record<string, Record<Lang, string>> = {
-  title:          { en: '🎙️ Podcast Launchpad', es: '🎙️ Lanzador de Podcast', pt: '🎙️ Lançador de Podcast', pl: '🎙️ Kreator Podcastu', ru: '🎙️ Запуск подкаста' },
-  subtitle:       { en: 'Build your podcast in guided steps', es: 'Construye tu podcast paso a paso', pt: 'Construa seu podcast passo a passo', pl: 'Zbuduj swój podcast krok po kroku', ru: 'Создайте подкаст пошагово' },
-  placeholder:    { en: 'Describe your podcast idea…', es: 'Describe tu idea de podcast…', pt: 'Descreva sua ideia de podcast…', pl: 'Opisz swój pomysł na podcast…', ru: 'Опишите идею подкаста…' },
-  solo:           { en: 'Solo', es: 'Solo', pt: 'Solo', pl: 'Solo', ru: 'Сольный' },
-  interview:      { en: 'Interview', es: 'Entrevista', pt: 'Entrevista', pl: 'Wywiad', ru: 'Интервью' },
-  cohost:         { en: 'Co-host', es: 'Co-presentador', pt: 'Co-apresentador', pl: 'Co-host', ru: 'Со-ведущий' },
-  story:          { en: 'Storytelling', es: 'Narrativa', pt: 'Narrativa', pl: 'Opowiadanie', ru: 'Нарратив' },
-  generate:       { en: 'Generate Podcast Sketch', es: 'Generar esquema de podcast', pt: 'Gerar esboço de podcast', pl: 'Wygeneruj szkic podcastu', ru: 'Создать концепцию подкаста' },
-  generating:     { en: 'Generating…', es: 'Generando…', pt: 'Gerando…', pl: 'Generowanie…', ru: 'Создание…' },
-  createPage:     { en: 'Create Podcast Page', es: 'Crear página de podcast', pt: 'Criar página de podcast', pl: 'Utwórz stronę podcastu', ru: 'Создать страницу подкаста' },
-  openStudio:     { en: 'Open Podcast Studio', es: 'Abrir Podcast Studio', pt: 'Abrir Podcast Studio', pl: 'Otwórz Podcast Studio', ru: 'Открыть студию подкастов' },
-  error:          { en: 'Could not generate podcast sketch.', es: 'No se pudo generar el esquema.', pt: 'Não foi possível gerar o esboço.', pl: 'Nie można wygenerować szkicu.', ru: 'Не удалось создать концепцию.' },
-  cardNames:      { en: '🎙️ Podcast Names', es: '🎙️ Nombres del podcast', pt: '🎙️ Nomes do podcast', pl: '🎙️ Nazwy podcastu', ru: '🎙️ Названия подкаста' },
-  cardDesc:       { en: '📝 Description', es: '📝 Descripción', pt: '📝 Descrição', pl: '📝 Opis', ru: '📝 Описание' },
-  cardAudience:   { en: '👥 Target Audience', es: '👥 Audiencia objetivo', pt: '👥 Público-alvo', pl: '👥 Docelowi słuchacze', ru: '👥 Целевая аудитория' },
-  cardEpisodes:   { en: '🎬 First Episodes', es: '🎬 Primeros episodios', pt: '🎬 Primeiros episódios', pl: '🎬 Pierwsze odcinki', ru: '🎬 Первые эпизоды' },
-  cardIntro:      { en: '🎤 Intro Script', es: '🎤 Guión de intro', pt: '🎤 Script de introdução', pl: '🎤 Skrypt intro', ru: '🎤 Вступительный сценарий' },
-  cardChecklist:  { en: '✅ Launch Checklist', es: '✅ Lista de lanzamiento', pt: '✅ Lista de lançamento', pl: '✅ Lista startowa', ru: '✅ Чеклист запуска' },
-  cardNext:       { en: '➡️ Next Step', es: '➡️ Siguiente paso', pt: '➡️ Próximo passo', pl: '➡️ Następny krok', ru: '➡️ Следующий шаг' },
+  title:         { en: '🎙️ Podcast Launchpad', es: '🎙️ Lanzador de Podcast', pt: '🎙️ Lançador de Podcast', pl: '🎙️ Kreator Podcastu', ru: '🎙️ Запуск подкаста' },
+  subtitle:      { en: 'Build your podcast in guided steps', es: 'Construye tu podcast paso a paso', pt: 'Construa seu podcast passo a passo', pl: 'Zbuduj swój podcast krok po kroku', ru: 'Создайте подкаст пошагово' },
+  placeholder:   { en: 'Describe your podcast idea…', es: 'Describe tu idea de podcast…', pt: 'Descreva sua ideia de podcast…', pl: 'Opisz swój pomysł na podcast…', ru: 'Опишите идею подкаста…' },
+  solo:          { en: 'Solo', es: 'Solo', pt: 'Solo', pl: 'Solo', ru: 'Сольный' },
+  interview:     { en: 'Interview', es: 'Entrevista', pt: 'Entrevista', pl: 'Wywiad', ru: 'Интервью' },
+  cohost:        { en: 'Co-host', es: 'Co-presentador', pt: 'Co-apresentador', pl: 'Co-host', ru: 'Со-ведущий' },
+  story:         { en: 'Storytelling', es: 'Narrativa', pt: 'Narrativa', pl: 'Opowiadanie', ru: 'Нарратив' },
+  generate:      { en: 'Generate Podcast Sketch', es: 'Generar esquema de podcast', pt: 'Gerar esboço de podcast', pl: 'Wygeneruj szkic podcastu', ru: 'Создать концепцию подкаста' },
+  generating:    { en: 'Generating…', es: 'Generando…', pt: 'Gerando…', pl: 'Generowanie…', ru: 'Создание…' },
+  createPage:    { en: 'Create Podcast Page', es: 'Crear página de podcast', pt: 'Criar página de podcast', pl: 'Utwórz stronę podcastu', ru: 'Создать страницу подкаста' },
+  openStudio:    { en: 'Open Podcast Studio', es: 'Abrir Podcast Studio', pt: 'Abrir Podcast Studio', pl: 'Otwórz Podcast Studio', ru: 'Открыть студию подкастов' },
+  error:         { en: 'Could not generate podcast sketch.', es: 'No se pudo generar el esquema.', pt: 'Não foi possível gerar o esboço.', pl: 'Nie można wygenerować szkicu.', ru: 'Не удалось создать концепцию.' },
+  cardNames:     { en: '🎙️ Podcast Names', es: '🎙️ Nombres del podcast', pt: '🎙️ Nomes do podcast', pl: '🎙️ Nazwy podcastu', ru: '🎙️ Названия подкаста' },
+  cardDesc:      { en: '📝 Description', es: '📝 Descripción', pt: '📝 Descrição', pl: '📝 Opis', ru: '📝 Описание' },
+  cardAudience:  { en: '👥 Target Audience', es: '👥 Audiencia objetivo', pt: '👥 Público-alvo', pl: '👥 Docelowi słuchacze', ru: '👥 Целевая аудитория' },
+  cardEpisodes:  { en: '🎬 First Episodes', es: '🎬 Primeros episodios', pt: '🎬 Primeiros episódios', pl: '🎬 Pierwsze odcinki', ru: '🎬 Первые эпизоды' },
+  cardIntro:     { en: '🎤 Intro Script', es: '🎤 Guión de intro', pt: '🎤 Script de introdução', pl: '🎤 Skrypt intro', ru: '🎤 Вступительный сценарий' },
+  cardChecklist: { en: '✅ Launch Checklist', es: '✅ Lista de lanzamiento', pt: '✅ Lista de lançamento', pl: '✅ Lista startowa', ru: '✅ Чеклист запуска' },
+  cardNext:      { en: '➡️ Next Step', es: '➡️ Siguiente paso', pt: '➡️ Próximo passo', pl: '➡️ Następny krok', ru: '➡️ Следующий шаг' },
 }
 
 function c(key: string, lang: string): string {
@@ -100,14 +102,12 @@ export default function PodcastLaunchpad() {
     <div className="sb-hmi-shell" style={{ minHeight: '100vh' }}>
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 0 80px' }}>
 
-        {/* Header */}
         <div className="sb-cockpit-hero" style={{ marginBottom: 28 }}>
           <p className="sb-hmi-kicker">🎙️ PODCAST</p>
           <h1 className="sb-h2" style={{ margin: '10px 0 12px' }}>{c('title', l)}</h1>
           <p className="sb-hmi-muted">{c('subtitle', l)}</p>
         </div>
 
-        {/* Input panel */}
         <div className="sb-glass-panel" style={{ padding: 24, marginBottom: 20 }}>
           <textarea
             value={topic}
@@ -117,7 +117,6 @@ export default function PodcastLaunchpad() {
             className="sb-input"
             style={{ width: '100%', boxSizing: 'border-box', padding: '13px 16px', borderRadius: 12, resize: 'vertical', fontSize: 14, lineHeight: 1.7 }}
           />
-
           <select
             value={format}
             onChange={e => setFormat(e.target.value)}
@@ -129,19 +128,11 @@ export default function PodcastLaunchpad() {
             <option value="cohost">{c('cohost', l)}</option>
             <option value="story">{c('story', l)}</option>
           </select>
-
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
-            <button
-              onClick={generateSketch}
-              disabled={loading || !topic.trim()}
-              className="sb-button-primary"
-              style={{ borderRadius: 12, padding: '12px 28px', opacity: loading || !topic.trim() ? 0.55 : 1 }}
-            >
+            <button onClick={generateSketch} disabled={loading || !topic.trim()} className="sb-button-primary" style={{ borderRadius: 12, padding: '12px 28px', opacity: loading || !topic.trim() ? 0.55 : 1 }}>
               {loading ? c('generating', l) : c('generate', l)}
             </button>
-
             {(sketch || error) && <ResetButton onReset={reset} />}
-
             {sketch && (
               <>
                 <button onClick={() => { window.location.href = '/dashboard/podcast' }} className="sb-button-secondary" style={{ borderRadius: 12 }}>
@@ -153,11 +144,9 @@ export default function PodcastLaunchpad() {
               </>
             )}
           </div>
-
           {error && <p style={{ color: '#fca5a5', marginTop: 12, fontSize: 13 }}>{error}</p>}
         </div>
 
-        {/* Results */}
         {sketch && (
           <div style={{ display: 'grid', gap: 14 }}>
             <Card title={c('cardNames', l)}     items={sketch.showNames} />

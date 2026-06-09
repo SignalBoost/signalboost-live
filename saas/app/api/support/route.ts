@@ -14,12 +14,12 @@ function getOpenAIClient() {
 }
 
 const LANGUAGE_LABELS: Record<string, string> = {
-  en:    'English',
-  pt:    'Portuguese',
+  en:      'English',
+  pt:      'Portuguese',
   'pt-br': 'Portuguese (Brazil)',
-  es:    'Spanish',
-  pl:    'Polish',
-  ru:    'Russian',
+  es:      'Spanish',
+  pl:      'Polish',
+  ru:      'Russian',
 }
 
 const PLATFORM_FACTS = `SIGNALBOOST — FACTUAL PRODUCT KNOWLEDGE (authoritative; never contradict or invent beyond this):
@@ -143,10 +143,10 @@ async function runTool(name: string): Promise<string> {
 
   if (name === 'getBusinessMetrics') {
     const result = await getBusinessMetrics()
-    if (result.ok) {
+    if (result.ok && result.metrics) {
       return formatMetricsForAI(result.metrics)
     }
-    return `Business metrics could not be retrieved: ${result.error}. Let the owner know and suggest checking Supabase directly.`
+    return `Business metrics could not be retrieved: ${result.error ?? 'unknown error'}. Let the owner know and suggest checking Supabase directly.`
   }
 
   return `Unknown tool: ${name}`

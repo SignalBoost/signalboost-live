@@ -75,12 +75,18 @@ Operating rules (apply to every answer):
 Describe SignalBoost using ONLY the factual knowledge above. Never say you "don't have access" to information about SignalBoost — you DO. For prices, call the getPricing tool. If asked about something genuinely not covered, say you'll connect them with the team rather than inventing an answer.`
 }
 
-function chiefOfStaffPrompt(language: string): string {
+function chiefOfStaffPrompt(language: string, liveMetrics: string): string {
   return `You are the Chief of Staff AI for SignalBoost — the trusted senior advisor to the company's owner and administrators. You are speaking with a verified owner/admin, privately.
 
 Reply strictly in ${language}.
 
 ${PLATFORM_FACTS}
+
+── LIVE BUSINESS METRICS (pre-fetched from Supabase for this session) ──
+${liveMetrics}
+── END LIVE METRICS ──
+
+When answering questions about users, revenue, MRR, ARR, growth, leads, or credits — use the live metrics above. They are current as of this session. Call getBusinessMetrics only if you need a refresh mid-conversation.
 
 Your role: act as a seasoned, multi-domain expert and right hand. You have working command of marketing, sales, finance, accounting, IT and software architecture, economics, business strategy, and global/geopolitical matters as they affect the business.
 
@@ -93,7 +99,6 @@ How you operate:
 - When asked for code or architecture, deliver clean, production-ready solutions and flag operational/security implications.
 - Be honest about the product's real state. Do not overstate capabilities or invent features.
 - For pricing, call the getPricing tool for current numbers.
-- ALWAYS call getBusinessMetrics before answering ANY question about users, signups, revenue, MRR, ARR, growth, retention, leads, credits, or platform health. Never answer these from memory — the numbers change and memory is always stale.
 - Ask a clarifying question only when an essential detail is missing.
 - Maintain strict confidentiality; this is an internal advisory channel.
 
@@ -101,14 +106,12 @@ Tone: professional, direct, kind, efficient — like an excellent chief of staff
 }
 
 // ── Tool definitions ──────────────────────────────────────────────────────────
-// Concierge: pricing only.
-// Chief of Staff: pricing + live business metrics.
 
 const TOOL_GET_PRICING: OpenAI.Chat.Completions.ChatCompletionTool = {
   type: 'function',
   function: {
     name: 'getPricing',
-    description: 'Get the current, live SignalBoost SaaS pricing and plan details (Free Demo, Launch, Growth, Command). Call this whenever the user asks about price, cost, plans, tiers, what a plan includes, or upgrades. Returns the current pricing text from the live pricing page.',
+    description: 'Get the current, live SignalBoost SaaS pricing and plan details (Free Demo, Launch, Growth, Command). Call this whenever the user asks about price, cost, plans, tiers, what a plan includes, or upgrades.',
     parameters: { type: 'object', properties: {}, required: [] },
   },
 }
@@ -117,7 +120,7 @@ const TOOL_GET_BUSINESS_METRICS: OpenAI.Chat.Completions.ChatCompletionTool = {
   type: 'function',
   function: {
     name: 'getBusinessMetrics',
-    description: 'MUST be called for ANY question about: users, signups, accounts, paid users, free users, revenue, MRR, ARR, monthly recurring revenue, growth, churn, retention, outreach leads, pipeline, credits, credit usage, or platform health. Returns live data from Supabase. Never answer these questions from memory — always call this tool first. Covers: total users, paid vs free breakdown, plan distribution, estimated MRR/ARR, outreach queue size, and average credit balances.',
+    description: 'Refresh live business metrics from Supabase: users, MRR, plan breakdown, outreach leads, credit balances. Metrics are pre-loaded at session start — call this only if the owner asks for a refresh or asks about something that may have changed during the conversation.',
     parameters: { type: 'object', properties: {}, required: [] },
   },
 }
@@ -131,7 +134,6 @@ const CHIEF_OF_STAFF_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   TOOL_GET_BUSINESS_METRICS,
 ]
 
-// Run a named tool and return its result as a string for the model.
 async function runTool(name: string): Promise<string> {
   if (name === 'getPricing') {
     const result = await getLivePricing()
@@ -190,10 +192,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'AI backend is not configured.' }, { status: 500 })
     }
 
-    const model         = isPrivileged ? 'gpt-4o' : 'gpt-4o-mini'
-    const temperature   = isPrivileged ? 0.5 : 0.4
-    const systemContent = isPrivileged ? chiefOfStaffPrompt(language) : conciergePrompt(language)
-    const tools         = isPrivileged ? CHIEF_OF_STAFF_TOOLS : CONCIERGE_TOOLS
+    const model       = isPrivileged ? 'gpt-4o' : 'gpt-4o-mini'
+    const temperature = isPrivileged ? 0.5 : 0.4
+    const tools       = isPrivileged ? CHIEF_OF_STAFF_TOOLS : CONCIERGE_TOOLS
+
+    // ── Pre-fetch live metrics for Chief of Staff on every request ────────
+    let liveMetrics = 'Metrics unavailable — Supabase query failed.'
+    if (isPrivileged) {
+      try {
+        const metricsResult = await getBusinessMetrics()
+        if (metricsResult.ok && metricsResult.metrics) {
+          liveMetrics = formatMetricsForAI(metricsResult.metrics)
+        }
+      } catch {
+        // non-blocking — fallback text already set
+      }
+    }
+
+    const systemContent = isPrivileged
+      ? chiefOfStaffPrompt(language, liveMetrics)
+      : conciergePrompt(language)
 
     const convo: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       { role: 'system', content: systemContent },

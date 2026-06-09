@@ -52,72 +52,6 @@ type SlugState =
   | { kind: 'none' }
   | { kind: 'set', slug: string }
 
-const SAMPLE_REVIEWS: Review[] = [
-  {
-    id: 'sample-en',
-    author_name: 'Ava Morgan',
-    author_email: 'ava@example.com',
-    rating: 5,
-    content: 'SignalBoost helped our studio collect proof, translate questions for customers, and turn happy reviews into a campaign in one afternoon.',
-    language: 'en',
-    approved: true,
-    created_at: '2026-05-29T10:30:00.000Z',
-    verified_partner: true,
-    partner_name: 'Northstar Studio',
-    product_name: 'Concierge Launch',
-    media_urls: ['https://signalboostapp.com/review-assets/northstar.jpg'],
-  },
-  {
-    id: 'sample-es',
-    author_name: 'Lucía Santos',
-    author_email: 'lucia@example.com',
-    rating: 4,
-    content: 'La experiencia fue clara y rápida. Me gustaría ver más plantillas, pero el soporte en español fue excelente.',
-    language: 'es',
-    approved: false,
-    created_at: '2026-05-28T14:00:00.000Z',
-    partner_name: 'Madrid Growth Lab',
-    service_name: 'Review collector',
-  },
-  {
-    id: 'sample-pt',
-    author_name: 'Rafael Costa',
-    author_email: 'rafael@example.com',
-    rating: 5,
-    content: 'Ótimo produto, atendimento excelente e campanhas automáticas com depoimentos positivos.',
-    language: 'pt',
-    approved: true,
-    created_at: '2026-05-27T09:00:00.000Z',
-    verified_partner: true,
-    partner_name: 'Lisboa Local',
-    product_name: 'Outreach Engine',
-  },
-  {
-    id: 'sample-pl',
-    author_name: 'Maja Nowak',
-    author_email: 'maja@example.com',
-    rating: 3,
-    content: 'Panel jest przydatny, ale kolejka moderacji mogłaby działać szybciej.',
-    language: 'pl',
-    approved: false,
-    created_at: '2026-05-26T12:00:00.000Z',
-    product_name: 'Admin Console',
-  },
-  {
-    id: 'sample-ru',
-    author_name: 'Игорь Волков',
-    author_email: 'igor@example.com',
-    rating: 2,
-    content: 'Интерфейс красивый, но кампания запустилась медленно и нужна помощь модератора.',
-    language: 'ru',
-    approved: false,
-    created_at: '2026-05-25T16:00:00.000Z',
-    flagged: true,
-    moderation_status: 'flagged',
-    service_name: 'Campaign review',
-  },
-]
-
 const translationPreview: Record<ReviewLocale, string> = {
   en: 'AI translation is ready on demand in the selected workspace language.',
   es: 'La traducción con IA está lista bajo demanda en el idioma seleccionado.',
@@ -166,21 +100,20 @@ export default function ReviewsPage() {
     try {
       const res = await fetch('/api/reviews')
       if (res.status === 401) {
-        setReviewsError(t(dict, 'reviews_page.errSignIn', 'Please sign in to see your reviews. Showing demo telemetry.'))
-        setReviews(SAMPLE_REVIEWS)
+        setReviewsError(t(dict, 'reviews_page.errSignIn', 'Please sign in to see your reviews.'))
+        setReviews([])
         return
       }
       const j = await res.json()
       if (!res.ok) {
-        setReviewsError(j?.error || t(dict, 'reviews_page.errLoad', 'Could not load reviews. Showing demo telemetry.'))
-        setReviews(SAMPLE_REVIEWS)
+        setReviewsError(j?.error || t(dict, 'reviews_page.errLoad', 'Could not load reviews.'))
+        setReviews([])
         return
       }
-      const incoming = (j.reviews ?? []) as Review[]
-      setReviews(incoming.length ? incoming : SAMPLE_REVIEWS)
+      setReviews((j.reviews ?? []) as Review[])
     } catch {
-      setReviewsError(t(dict, 'reviews_page.errLoad', 'Could not load reviews. Showing demo telemetry.'))
-      setReviews(SAMPLE_REVIEWS)
+      setReviewsError(t(dict, 'reviews_page.errLoad', 'Could not load reviews.'))
+      setReviews([])
     } finally {
       setReviewsLoading(false)
     }
@@ -212,7 +145,6 @@ export default function ReviewsPage() {
 
   async function patchReview(id: string, patch: Partial<Review>) {
     setReviews(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r))
-    if (id.startsWith('sample-')) return
     try {
       const res = await fetch(`/api/reviews?id=${encodeURIComponent(id)}`, {
         method: 'PATCH',
@@ -229,7 +161,6 @@ export default function ReviewsPage() {
     if (!confirm(t(dict, 'reviews_page.confirmDelete', 'Delete this review? This cannot be undone.'))) return
     const snapshot = reviews
     setReviews(prev => prev.filter(r => r.id !== id))
-    if (id.startsWith('sample-')) return
     try {
       const res = await fetch(`/api/reviews?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
       if (!res.ok) setReviews(snapshot)
@@ -243,8 +174,7 @@ export default function ReviewsPage() {
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
-
-  const enrichedReviews = useMemo(() => reviews.map(review => {
+const enrichedReviews = useMemo(() => reviews.map(review => {
     const sentiment = review.sentiment ?? analyzeReviewSentiment(review.content, review.rating)
     const flagged = review.flagged || reviewMatchesModerationFlag(review.content)
     return {
@@ -392,6 +322,11 @@ export default function ReviewsPage() {
       </section>
 
       <section className="sb-review-feed" aria-label="Review cards">
+        {visibleReviews.length === 0 && !reviewsLoading && (
+          <div className="sb-review-empty">
+            {t(dict, 'reviews_page.summaryEmpty', 'Nothing yet. Share the link above to start.')}
+          </div>
+        )}
         {visibleReviews.map(review => {
           const badge = getSentimentBadge(review.sentiment ?? 'neutral')
           const moderationSuggestion = buildModerationSuggestion(review)

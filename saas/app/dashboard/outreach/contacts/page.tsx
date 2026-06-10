@@ -17,6 +17,14 @@ type Lead = {
 const FILTERS = ['all', 'pending', 'approved', 'rejected'] as const
 type Filter = typeof FILTERS[number]
 
+const TOGGLE_LABELS: Record<string, { more: string; less: string }> = {
+  en: { more: 'Show full draft', less: 'Hide draft' },
+  es: { more: 'Ver borrador completo', less: 'Ocultar borrador' },
+  pt: { more: 'Ver rascunho completo', less: 'Ocultar rascunho' },
+  pl: { more: 'Pokaż pełny szkic', less: 'Ukryj szkic' },
+  ru: { more: 'Показать черновик', less: 'Скрыть черновик' },
+}
+
 const STATUS_COLOR: Record<string, string> = {
   pending: '#fde68a',
   approved: '#86efac',
@@ -351,9 +359,25 @@ export default function OutreachContactsPage() {
               </div>
 
               {lead.outreach_message ? (
-                <p className="sb-body" style={{ fontSize: 14, marginTop: 10 }}>
-                  {lead.outreach_message}
-                </p>
+                <div style={{ marginTop: 10 }}>
+                  <p
+                    className="sb-body"
+                    style={
+                      expandedId === lead.id
+                        ? { fontSize: 13.5, margin: 0, whiteSpace: 'pre-wrap' }
+                        : { fontSize: 13.5, margin: 0, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }
+                    }
+                  >
+                    {lead.outreach_message}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedId(expandedId === lead.id ? null : lead.id)}
+                    style={{ background: 'none', border: 'none', color: '#7dd3fc', fontSize: 12, fontWeight: 800, cursor: 'pointer', padding: '6px 0 0', letterSpacing: '.04em' }}
+                  >
+                    {expandedId === lead.id ? (TOGGLE_LABELS[lang] || TOGGLE_LABELS.en).less + ' ▴' : (TOGGLE_LABELS[lang] || TOGGLE_LABELS.en).more + ' ▾'}
+                  </button>
+                </div>
               ) : null}
 
               <div className="sb-cta-row" style={{ marginTop: 14 }}>

@@ -118,18 +118,17 @@ export default function DataConnectorsPage() {
   return (
     <div style={{ color: 'var(--text-primary)' }}>
 
-      <header className="sb-console">
+      <header className="sb-console" style={{ paddingBottom: 12 }}>
         <div className="sb-console__row">
-          <div>
+          <div style={{ minWidth: 0 }}>
             <span className="sb-eyebrow">🗄️ {c(COPY.eyebrow, l)}</span>
-            <h1>{c(COPY.title, l)}</h1>
-            <p className="sb-body">{c(COPY.subtitle, l)}</p>
+            <h1 style={{ fontSize: 22, margin: '4px 0' }}>{c(COPY.title, l)}</h1>
           </div>
-        </div>
-        <div className="sb-telemetry">
-          <div><b className="gold">{itemCount}</b><span>{c(COPY.tItems, l)}</span></div>
-          <div><b>{categoryCount}</b><span>{c(COPY.tCategories, l)}</span></div>
-          <div><b>{history.sources.length}</b><span>{c(COPY.tSources, l)}</span></div>
+          <div className="sb-telemetry" style={{ marginTop: 0, borderTop: 0 }}>
+            <div style={{ paddingTop: 0 }}><b className="gold">{itemCount}</b><span>{c(COPY.tItems, l)}</span></div>
+            <div style={{ paddingTop: 0 }}><b>{categoryCount}</b><span>{c(COPY.tCategories, l)}</span></div>
+            <div style={{ paddingTop: 0 }}><b>{history.sources.length}</b><span>{c(COPY.tSources, l)}</span></div>
+          </div>
         </div>
       </header>
 
@@ -140,15 +139,15 @@ export default function DataConnectorsPage() {
       ) : null}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 16 }}>
-        <section className="sb-panel" style={{ marginBottom: 0 }}>
+        <section className="sb-panel" style={{ marginBottom: 0, borderTop: 0, paddingTop: 8 }}>
           <div className="sb-panel__head"><h2>📄 {c(COPY.csvTitle, l)}</h2><span className="sb-caption">{c(COPY.csvHint, l)}</span></div>
           <label className="sb-field"><span>{c(COPY.csvLabel, l)}</span>
-            <textarea value={csvText} onChange={(e) => setCsvText(e.target.value)} />
+            <textarea value={csvText} onChange={(e) => setCsvText(e.target.value)} style={{ minHeight: 84 }} />
           </label>
           <button className="sb-button-primary" style={{ width: '100%', border: 'none', cursor: busy ? 'wait' : 'pointer', opacity: busy ? .6 : 1 }} disabled={busy} onClick={() => submit({ mode: 'csv', csvText, fileName: 'manual.csv' })}>{c(COPY.csvBtn, l)}</button>
         </section>
 
-        <section className="sb-panel" style={{ marginBottom: 0 }}>
+        <section className="sb-panel" style={{ marginBottom: 0, borderTop: 0, paddingTop: 8 }}>
           <div className="sb-panel__head"><h2>🔌 {c(COPY.apiTitle, l)}</h2><span className="sb-caption">{c(COPY.apiHint, l)}</span></div>
           <label className="sb-field"><span>{c(COPY.apiEndpoint, l)}</span>
             <input value={apiEndpoint} onChange={(e) => setApiEndpoint(e.target.value)} />
@@ -159,10 +158,10 @@ export default function DataConnectorsPage() {
           <button className="sb-button-primary" style={{ width: '100%', border: 'none', cursor: busy ? 'wait' : 'pointer', opacity: busy ? .6 : 1 }} disabled={busy} onClick={runApi}>{c(COPY.apiBtn, l)}</button>
         </section>
 
-        <section className="sb-panel" style={{ marginBottom: 0 }}>
+        <section className="sb-panel" style={{ marginBottom: 0, borderTop: 0, paddingTop: 8 }}>
           <div className="sb-panel__head"><h2>🕸️ {c(COPY.scrTitle, l)}</h2><span className="sb-caption">{c(COPY.scrHint, l)}</span></div>
           <label className="sb-field"><span>{c(COPY.scrLabel, l)}</span>
-            <textarea value={scraperJson} onChange={(e) => setScraperJson(e.target.value)} />
+            <textarea value={scraperJson} onChange={(e) => setScraperJson(e.target.value)} style={{ minHeight: 84 }} />
           </label>
           <button className="sb-button-primary" style={{ width: '100%', border: 'none', cursor: busy ? 'wait' : 'pointer', opacity: busy ? .6 : 1 }} disabled={busy} onClick={runScraper}>{c(COPY.scrBtn, l)}</button>
         </section>

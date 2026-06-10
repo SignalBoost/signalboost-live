@@ -87,7 +87,7 @@ export default function BusinessLaunchpadPage() {
   const completed = done.filter(Boolean).length
 
   return (
-    <div style={{ maxWidth: 880, margin: '0 auto', padding: 'clamp(18px,4vw,40px) 0 80px', color: 'var(--text-primary)', display: 'grid', gap: 22 }}>
+    <div style={{ maxWidth: 880, margin: '0 auto', color: 'var(--text-primary)', display: 'grid', gap: 20 }}>
 
       {/* Back */}
       <Link href="/dashboard/launchpad" style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -95,18 +95,22 @@ export default function BusinessLaunchpadPage() {
       </Link>
 
       {/* Header */}
-      <div style={{ background: 'radial-gradient(circle at 20% 10%, rgba(255,195,0,.2), transparent 24rem), linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02))', border: '1px solid rgba(255,195,0,.28)', borderRadius: 28, padding: 'clamp(20px,4vw,32px)' }}>
-        <div style={{ display: 'inline-flex', marginBottom: 14, padding: '5px 12px', borderRadius: 999, background: 'rgba(255,195,0,.12)', border: '1px solid rgba(255,195,0,.24)', color: '#ffc300', fontWeight: 900, fontSize: 11, letterSpacing: '.1em' }}>
-          {c(COPY.badge, l)} · {experience.toUpperCase()}
+      <header className="sb-console" style={{ marginBottom: 0 }}>
+        <div className="sb-console__row">
+          <div>
+            <span className="sb-eyebrow">{c(COPY.badge, l)}</span>
+            <h1>{c(COPY.title1, l)} <span style={{ color: '#ffc300' }}>{c(COPY.title2, l)}</span></h1>
+            <p className="sb-body">{c(COPY.subtitle, l)}</p>
+          </div>
         </div>
-        <h1 style={{ fontSize: 'clamp(26px,5vw,48px)', fontWeight: 900, letterSpacing: '-.05em', lineHeight: 1.05, margin: '0 0 12px' }}>
-          {c(COPY.title1, l)} <span style={{ color: '#ffc300' }}>{c(COPY.title2, l)}</span>
-        </h1>
-        <p style={{ color: 'rgba(255,255,255,.6)', fontSize: 14, lineHeight: 1.7, maxWidth: 600, margin: 0 }}>{c(COPY.subtitle, l)}</p>
-      </div>
+        <div className="sb-telemetry">
+          <div><b className="gold">{completed}/{COPY.steps.length}</b><span>{c(COPY.done, l)}</span></div>
+          <div><b style={{ fontSize: 14, textTransform: 'uppercase' }}>{experience}</b><span>{c(COPY.badge, l)}</span></div>
+        </div>
+      </header>
 
       {/* Idea input */}
-      <div style={{ background: 'linear-gradient(145deg, rgba(15,23,42,.78), rgba(3,7,18,.68))', border: '1px solid rgba(255,255,255,.12)', borderRadius: 22, padding: 'clamp(16px,3vw,22px)', display: 'grid', gap: 10 }}>
+      <div style={{ display: 'grid', gap: 10 }}>
         <label style={{ fontSize: 13, fontWeight: 800, color: '#fff' }} htmlFor="idea">{c(COPY.ideaLabel, l)}</label>
         <textarea
           id="idea"
@@ -128,7 +132,7 @@ export default function BusinessLaunchpadPage() {
 
         <div style={{ display: 'grid', gap: 12 }}>
           {COPY.steps.map((step, i) => (
-            <article key={i} style={{ display: 'grid', gridTemplateColumns: '40px minmax(0,1fr) auto', gap: 14, alignItems: 'center', padding: 18, borderRadius: 20, background: done[i] ? 'rgba(134,239,172,.06)' : 'rgba(255,255,255,.03)', border: done[i] ? '1px solid rgba(134,239,172,.32)' : '1px solid rgba(255,255,255,.09)', transition: 'border-color .18s, background .18s' }}>
+            <article key={i} style={{ display: 'grid', gridTemplateColumns: '40px minmax(0,1fr) auto', gap: 14, alignItems: 'center', padding: '16px 0 16px 14px', borderTop: '1px solid rgba(255,255,255,.07)', borderLeft: done[i] ? '2px solid rgba(134,239,172,.7)' : '2px solid rgba(255,255,255,.12)', transition: 'border-color .18s' }}>
               <button
                 onClick={() => toggle(i)}
                 aria-label="Toggle step complete"

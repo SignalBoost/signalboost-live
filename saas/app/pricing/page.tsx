@@ -32,6 +32,7 @@ type PlatformModule = {
 export default function PricingPage() {
   const { dict } = useI18n()
   const [loading, setLoading] = useState<string | null>(null)
+  const [expandedPlan, setExpandedPlan] = useState<string | null>(null)
 
   const plans: Plan[] = [
     {
@@ -393,17 +394,29 @@ export default function PricingPage() {
               {loading === plan.key ? t(dict, 'common.loading', 'Loading…') : plan.cta}
             </button>
 
-            <ul style={{ listStyle: 'none', padding: 0, margin: '12px 0 0', display: 'grid', gap: 6 }}>
-              {plan.features.map((feature) => (
-                <li key={feature} className="sb-caption" style={{ fontSize: 11.5, lineHeight: 1.45 }}>✦ {feature}</li>
-              ))}
-            </ul>
+            <button
+              type="button"
+              onClick={() => setExpandedPlan(expandedPlan === plan.key ? null : plan.key)}
+              style={{ background: 'none', border: 'none', color: '#7dd3fc', fontSize: 12, fontWeight: 800, cursor: 'pointer', padding: '12px 0 0', letterSpacing: '.04em', width: '100%', textAlign: 'center' }}
+            >
+              {t(dict, 'pricing_v2.whatsIncluded', "What's included")} {expandedPlan === plan.key ? '▴' : '▾'}
+            </button>
 
-            <ul style={{ listStyle: 'none', padding: 0, margin: '10px 0 0', display: 'grid', gap: 5 }}>
-              {plan.limits.map((limit) => (
-                <li key={limit} className="sb-caption" style={{ color: 'rgba(255,255,255,.45)', fontSize: 11, lineHeight: 1.4 }}>• {limit}</li>
-              ))}
-            </ul>
+            {expandedPlan === plan.key ? (
+              <>
+                <ul style={{ listStyle: 'none', padding: 0, margin: '10px 0 0', display: 'grid', gap: 6 }}>
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="sb-caption" style={{ fontSize: 11.5, lineHeight: 1.45 }}>✦ {feature}</li>
+                  ))}
+                </ul>
+
+                <ul style={{ listStyle: 'none', padding: 0, margin: '10px 0 0', display: 'grid', gap: 5 }}>
+                  {plan.limits.map((limit) => (
+                    <li key={limit} className="sb-caption" style={{ color: 'rgba(255,255,255,.45)', fontSize: 11, lineHeight: 1.4 }}>• {limit}</li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
           </article>
         ))}
       </section>

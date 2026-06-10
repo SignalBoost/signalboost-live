@@ -255,24 +255,20 @@ export default function OutreachHubPage() {
   const dailyLimit = typeof sendLimit?.limit === 'number' ? sendLimit.limit : null
 
   return (
-    <main className="sb-glass" style={{ padding: 24 }}>
-      <div style={{ marginBottom: 20 }}>
-        <span className="sb-eyebrow">{copy.eyebrow}</span>
-
-        <h1 className="sb-h2" style={{ marginTop: 10 }}>
-          {copy.title}
-        </h1>
-
-        <p className="sb-body" style={{ maxWidth: 640 }}>
-          {copy.subtitle}
-        </p>
-
-        {remaining !== null && dailyLimit !== null ? (
-          <p className="sb-caption" style={{ marginTop: 4 }}>
-            {remaining} {copy.of} {dailyLimit} {copy.sendsLeft}.
-          </p>
-        ) : null}
-      </div>
+    <main style={{ color: 'var(--text-primary)' }}>
+      <header className="sb-console">
+        <span className="sb-eyebrow">📡 {copy.eyebrow}</span>
+        <h1>{copy.title}</h1>
+        <p className="sb-body">{copy.subtitle}</p>
+        <div className="sb-telemetry">
+          {stats.map((stat) => (
+            <div key={stat.label}><b style={{ color: stat.accent }}>{stat.value}</b><span>{stat.label}</span></div>
+          ))}
+          {remaining !== null && dailyLimit !== null ? (
+            <div><b className="gold">{remaining}/{dailyLimit}</b><span>{copy.sendsLeft}</span></div>
+          ) : null}
+        </div>
+      </header>
 
       {loading ? <p className="sb-body">{copy.loading}</p> : null}
 
@@ -282,31 +278,21 @@ export default function OutreachHubPage() {
         </p>
       ) : null}
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12, marginBottom: 24 }}>
-        {stats.map((stat) => (
-          <div key={stat.label} className="sb-card" style={{ padding: 18 }}>
-            <div style={{ fontSize: 32, fontWeight: 900, color: stat.accent }}>{stat.value}</div>
-            <div className="sb-caption">{stat.label}</div>
-          </div>
-        ))}
-      </section>
-
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 14, marginBottom: 24 }}>
         {copy.tools.map((tool) => (
           <Link
             key={tool.title}
             href={tool.href}
-            className="sb-card"
-            style={{ padding: 20, textDecoration: 'none', color: '#fff', display: 'block' }}
+            style={{ borderTop: '1px solid rgba(255,255,255,.07)', borderLeft: '2px solid rgba(26,240,255,.4)', padding: '14px 0 14px 14px', textDecoration: 'none', color: '#fff', display: 'block' }}
           >
-            <div style={{ fontSize: 26 }}>{tool.icon}</div>
-            <h2 className="sb-h3" style={{ margin: '10px 0 4px' }}>{tool.title}</h2>
-            <p className="sb-body" style={{ fontSize: 14, margin: 0 }}>{tool.desc}</p>
+            <div style={{ fontSize: 20 }}>{tool.icon}</div>
+            <h2 className="sb-h3" style={{ margin: '8px 0 4px', fontSize: 15 }}>{tool.title}</h2>
+            <p className="sb-body" style={{ fontSize: 13, margin: 0 }}>{tool.desc}</p>
           </Link>
         ))}
       </section>
 
-      <section className="sb-card" style={{ padding: 20 }}>
+      <section style={{ borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 16, marginTop: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
           <h2 className="sb-h3" style={{ margin: 0 }}>{copy.recentLeads}</h2>
 

@@ -422,7 +422,7 @@ export default function FeedbackPage() {
       {tab === 'submit' && (
         <div style={{ maxWidth: 580 }}>
           {submitted ? (
-            <div style={{ textAlign: 'center', padding: '48px 24px', background: 'rgba(74,222,128,0.05)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 20 }}>
+            <div style={{ textAlign: 'center', padding: '40px 0', borderTop: '1px solid rgba(74,222,128,0.35)' }}>
               <div style={{ fontSize: 48, marginBottom: 16 }}>🎉</div>
 
               <h2 style={{ fontSize: 22, fontWeight: 900, margin: '0 0 12px' }}>
@@ -558,7 +558,7 @@ export default function FeedbackPage() {
                 </div>
               </div>
 
-              <div style={{ background: 'rgba(255,195,0,0.06)', border: '1px solid rgba(255,195,0,0.15)', borderRadius: 12, padding: '12px 16px', marginBottom: 20, fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.6 }}>
+              <div style={{ borderLeft: '2px solid rgba(255,195,0,0.5)', paddingLeft: 14, marginBottom: 20, fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.6 }}>
                 {copy.notice}
               </div>
 
@@ -639,10 +639,9 @@ export default function FeedbackPage() {
                   <div
                     key={item.id}
                     style={{
-                      background: isOwn ? 'rgba(59,130,246,0.05)' : 'rgba(255,255,255,0.02)',
-                      border: `1px solid ${isOwn ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.07)'}`,
-                      borderRadius: 14,
-                      padding: '18px 20px',
+                      borderTop: '1px solid rgba(255,255,255,0.07)',
+                      borderLeft: isOwn ? '2px solid rgba(59,130,246,0.6)' : '2px solid rgba(255,255,255,0.1)',
+                      padding: '14px 0 14px 14px',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10, gap: 12, flexWrap: 'wrap' }}>

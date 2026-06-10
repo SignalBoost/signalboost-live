@@ -312,7 +312,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
 
     return (
       <section className="border-t border-white/10 pt-5">
-        <div className={`relative mx-auto h-[calc(100vh-420px)] min-h-[280px] w-auto max-w-full overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 ${aspectClasses[aspectRatio]}`}>
+        <div className={`relative mx-auto h-[calc(100vh-470px)] min-h-[240px] w-auto max-w-full overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 ${aspectClasses[aspectRatio]}`}>
           <span className="pointer-events-none absolute right-2 top-2 z-10 rounded-full bg-black/70 px-2.5 py-1 font-mono text-[11px] text-white/70 ring-1 ring-white/15">{formatTime(time)} · {aspectRatio}</span>
           {videoUrl ? <video ref={videoRef} src={videoUrl} className="hidden" playsInline crossOrigin="anonymous" onLoadedMetadata={(e) => onDuration(Math.round(e.currentTarget.duration || 0))} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onTimeUpdate={(e) => { const n = e.currentTarget.currentTime; lastReportedRef.current = n; setTime(n); onTime(n) }} /> : null}
           <canvas ref={canvasRef} width={size.width} height={size.height} onPointerDown={(e) => { setDragging(true); e.currentTarget.setPointerCapture(e.pointerId); setPos(e) }} onPointerMove={(e) => dragging && setPos(e)} onPointerUp={(e) => { setDragging(false); e.currentTarget.releasePointerCapture(e.pointerId) }} className="h-full w-full cursor-move touch-none" aria-label="Video canvas with draggable caption overlay" />
@@ -363,7 +363,7 @@ export default function VideoEditor() {
   const [transcriptId, setTranscriptId]   = useState<string | null>(null)
   const [cues, setCues]                   = useState(starterCaptions)
   const [style, setStyle]                 = useState(defaultCaptionStyle)
-  const [aspectRatio, setAspectRatio]     = useState<AspectRatio>('9:16')
+  const [aspectRatio, setAspectRatio]     = useState<AspectRatio>('16:9')
   const [activePreset, setActivePreset]   = useState('signal')
   const [selectedCueId, setSelectedCueId] = useState<string | null>(starterCaptions[0]?.id || null)
   const [currentTime, setCurrentTime]     = useState(0)

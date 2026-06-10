@@ -312,8 +312,8 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
 
     return (
       <section className="border-t border-white/10 pt-5">
-        <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{c('canvasEditor', lang)}</h2><span className="font-mono text-xs text-white/50">{formatTime(time)} · {aspectRatio}</span></div>
-        <div className={`relative mx-auto mt-4 h-[calc(100vh-520px)] min-h-[240px] w-auto max-w-full overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 ${aspectClasses[aspectRatio]}`}>
+        <div className={`relative mx-auto h-[calc(100vh-420px)] min-h-[280px] w-auto max-w-full overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 ${aspectClasses[aspectRatio]}`}>
+          <span className="pointer-events-none absolute right-2 top-2 z-10 rounded-full bg-black/70 px-2.5 py-1 font-mono text-[11px] text-white/70 ring-1 ring-white/15">{formatTime(time)} · {aspectRatio}</span>
           {videoUrl ? <video ref={videoRef} src={videoUrl} className="hidden" playsInline crossOrigin="anonymous" onLoadedMetadata={(e) => onDuration(Math.round(e.currentTarget.duration || 0))} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onTimeUpdate={(e) => { const n = e.currentTarget.currentTime; lastReportedRef.current = n; setTime(n); onTime(n) }} /> : null}
           <canvas ref={canvasRef} width={size.width} height={size.height} onPointerDown={(e) => { setDragging(true); e.currentTarget.setPointerCapture(e.pointerId); setPos(e) }} onPointerMove={(e) => dragging && setPos(e)} onPointerUp={(e) => { setDragging(false); e.currentTarget.releasePointerCapture(e.pointerId) }} className="h-full w-full cursor-move touch-none" aria-label="Video canvas with draggable caption overlay" />
         </div>

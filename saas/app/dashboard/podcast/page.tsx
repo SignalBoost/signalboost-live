@@ -22,21 +22,52 @@ type Sketch = {
 }
 
 export default function PodcastPage() {
-  const { dict } = useI18n()
+  const { dict, lang } = useI18n()
   const tr = (key: string, fallback: string) => t(dict, key, fallback)
 
   const [sketch, setSketch] = useState<Sketch | null>(null)
+  const [translating, setTranslating] = useState(false)
 
+  // Load the source sketch, then localize it to the selected UI language.
+  // Translations are cached per language in localStorage so each language
+  // is paid for only once.
   useEffect(() => {
     const saved = localStorage.getItem('podcastSketch')
-    if (saved) {
-      try {
-        setSketch(JSON.parse(saved))
-      } catch {
-        setSketch(null)
-      }
+    if (!saved) { setSketch(null); return }
+
+    let source: Sketch | null = null
+    try { source = JSON.parse(saved) } catch { setSketch(null); return }
+    if (!source) { setSketch(null); return }
+
+    const target = ['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en'
+    const cacheKey = `podcastSketch_${target}`
+    const cached = localStorage.getItem(cacheKey)
+    if (cached) {
+      try { setSketch(JSON.parse(cached)); return } catch {}
     }
-  }, [])
+
+    // Show the source immediately, translate in the background.
+    setSketch(source)
+    let cancelled = false
+    setTranslating(true)
+    fetch('/api/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: source, targetLang: target }),
+    })
+      .then(r => r.json())
+      .then(j => {
+        if (cancelled) return
+        if (j?.ok && j.translated) {
+          localStorage.setItem(cacheKey, JSON.stringify(j.translated))
+          setSketch(j.translated as Sketch)
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setTranslating(false) })
+
+    return () => { cancelled = true }
+  }, [lang])
 
   const title = sketch?.showNames?.[0] || tr('podcasters.title.fallback', 'Your Podcast')
 
@@ -68,7 +99,7 @@ export default function PodcastPage() {
 
           <div className="sb-telemetry">
             <div><b className="gold">{episodeCount || 3}</b><span>{tr('podcasters.episodes', 'Episodes')}</span></div>
-            <div><b className={sketch ? 'ok' : 'warn'} style={{ fontSize: 14 }}>{sketch ? 'READY' : 'DRAFT'}</b><span>{tr('podcasters.badge', 'Podcast page')}</span></div>
+            <div><b className={translating ? 'warn' : sketch ? 'ok' : 'warn'} style={{ fontSize: 14 }}>{translating ? '...' : sketch ? 'READY' : 'DRAFT'}</b><span>{tr('podcasters.badge', 'Podcast page')}</span></div>
             {checklistCount ? <div><b>{checklistCount}</b><span>{tr('podcasters.checklist', 'Launch checklist')}</span></div> : null}
           </div>
         </header>

@@ -70,7 +70,7 @@ export default function AssistantPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 65px)', maxWidth: 900, margin: '0 auto', padding: '24px 0', width: '100%', boxSizing: 'border-box', color: 'var(--text-primary)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 165px)', minHeight: 480, maxWidth: 900, margin: '0 auto', padding: '24px 0', width: '100%', boxSizing: 'border-box', color: 'var(--text-primary)' }}>
 
       {/* Header */}
       <div style={{ background: 'radial-gradient(circle at 20% 10%, rgba(26,240,255,.16), transparent 22rem), linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02))', border: '1px solid rgba(26,240,255,.18)', borderRadius: 24, padding: '20px 24px', marginBottom: 16, flexShrink: 0 }}>

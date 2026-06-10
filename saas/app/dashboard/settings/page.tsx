@@ -113,8 +113,10 @@ export default function SettingsPage() {
         <p className="sb-body">{tr('settings.loading', 'Loading your settings…')}</p>
       ) : (
         <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0 32px' }}>
+          <div>
           {/* Profile */}
-          <section className="sb-panel">
+          <section className="sb-panel" style={{ paddingTop: 14, paddingBottom: 12 }}>
             <div className="sb-panel__head"><h2>{tr('settings.profile', 'Profile')}</h2></div>
             <div style={{ marginBottom: 14 }}>
               <label style={labelStyle}>{tr('settings.email', 'Account email')}</label>
@@ -134,7 +136,7 @@ export default function SettingsPage() {
           </section>
 
           {/* Language */}
-          <section className="sb-panel">
+          <section className="sb-panel" style={{ paddingTop: 14, paddingBottom: 12 }}>
             <div className="sb-panel__head"><h2>{tr('settings.language', 'Language')}</h2></div>
             <label style={labelStyle} htmlFor="loc">{tr('settings.preferredLanguage', 'Preferred language')}</label>
             <select
@@ -149,8 +151,10 @@ export default function SettingsPage() {
             <p className="sb-caption" style={{ marginTop: 8 }}>{tr('settings.languageHelp', 'Applies across the app when you save.')}</p>
           </section>
 
+          </div>
+          <div>
           {/* Notifications */}
-          <section className="sb-panel">
+          <section className="sb-panel" style={{ paddingTop: 14, paddingBottom: 12 }}>
             <div className="sb-panel__head"><h2>{tr('settings.notifications', 'Notifications')}</h2></div>
             <Toggle
               label={tr('settings.emailNotifs', 'Email notifications')}
@@ -167,8 +171,11 @@ export default function SettingsPage() {
             />
           </section>
 
+          </div>
+          </div>
+
           {/* Save bar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 14, borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 14 }}>
             <button
               onClick={save}
               disabled={saving}

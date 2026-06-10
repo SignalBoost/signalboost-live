@@ -156,25 +156,24 @@ export default function OutreachDiscoveryPage() {
   }
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: 'clamp(18px,4vw,40px) 0 80px', display: 'grid', gap: 20, color: 'var(--text-primary)' }}>
+    <div style={{ maxWidth: 900, margin: '0 auto', display: 'grid', gap: 14, color: 'var(--text-primary)' }}>
 
-      {/* Header */}
-      <div style={{ background: 'radial-gradient(circle at 20% 10%, rgba(26,240,255,.18), transparent 24rem), linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02))', border: '1px solid rgba(26,240,255,.18)', borderRadius: 28, padding: 'clamp(20px,4vw,32px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-        <div>
-          <p className="sb-eyebrow">🔍 {copy.eyebrow}</p>
-          <h1 style={{ fontSize: 'clamp(22px,4vw,36px)', fontWeight: 900, letterSpacing: '-.04em', lineHeight: 1.1, margin: '8px 0 10px' }}>{copy.title}</h1>
-          <p style={{ color: 'rgba(255,255,255,.62)', fontSize: 14, lineHeight: 1.7, maxWidth: 560, margin: 0 }}>{copy.subtitle}</p>
+      {/* Header — compact studio bar */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', borderBottom: '1px solid rgba(255,255,255,.09)', paddingBottom: 12 }}>
+        <div style={{ minWidth: 0 }}>
+          <p className="sb-eyebrow" style={{ margin: 0 }}>🔍 {copy.eyebrow}</p>
+          <h1 style={{ fontSize: 22, fontWeight: 950, letterSpacing: '-.04em', lineHeight: 1.15, margin: '4px 0 0' }}>{copy.title}</h1>
         </div>
-        <Link className="sb-button-secondary" href="/dashboard/outreach/contacts" style={{ fontSize: 13, padding: '10px 16px', whiteSpace: 'nowrap', marginTop: 4 }}>{copy.viewContacts}</Link>
+        <Link className="sb-button-secondary" href="/dashboard/outreach/contacts" style={{ fontSize: 13, padding: '9px 15px', whiteSpace: 'nowrap' }}>{copy.viewContacts}</Link>
       </div>
 
-      {/* Form */}
-      <div style={{ background: 'linear-gradient(145deg, rgba(15,23,42,.78), rgba(3,7,18,.68))', border: '1px solid rgba(255,255,255,.12)', borderRadius: 24, padding: 'clamp(16px,3vw,24px)', display: 'grid', gap: 14 }}>
+      {/* Form — flat */}
+      <div style={{ display: 'grid', gap: 12 }}>
         <div style={{ display: 'grid', gap: 6 }}>
           <label className="sb-eyebrow" style={{ fontSize: 10 }} htmlFor="biz-url">{copy.urlLabel}</label>
           <input id="biz-url" className="sb-input" value={businessUrl} onChange={e => setBusinessUrl(e.target.value)} placeholder={copy.urlPlaceholder} style={{ padding: '11px 14px', borderRadius: 12, fontSize: 14 }} />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,200px)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
           <div style={{ display: 'grid', gap: 6 }}>
             <label className="sb-eyebrow" style={{ fontSize: 10 }} htmlFor="biz-name">{copy.nameLabel}</label>
             <input id="biz-name" className="sb-input" value={businessName} onChange={e => setBusinessName(e.target.value)} placeholder={copy.namePlaceholder} style={{ padding: '11px 14px', borderRadius: 12, fontSize: 14 }} />
@@ -185,16 +184,16 @@ export default function OutreachDiscoveryPage() {
               {PLATFORMS.map(item => <option key={item} value={item}>{copy.platforms[item] || item}</option>)}
             </select>
           </div>
-        </div>
-        <div style={{ display: 'grid', gap: 6 }}>
-          <label className="sb-eyebrow" style={{ fontSize: 10 }} htmlFor="biz-category">{copy.categoryLabel}</label>
-          <select id="biz-category" className="sb-input" value={category} onChange={e => setCategory(e.target.value)} style={{ padding: '11px 14px', borderRadius: 12, fontSize: 14 }}>
-            {CATEGORIES.map(item => <option key={item} value={item}>{copy.categories[item] || item}</option>)}
-          </select>
+          <div style={{ display: 'grid', gap: 6 }}>
+            <label className="sb-eyebrow" style={{ fontSize: 10 }} htmlFor="biz-category">{copy.categoryLabel}</label>
+            <select id="biz-category" className="sb-input" value={category} onChange={e => setCategory(e.target.value)} style={{ padding: '11px 14px', borderRadius: 12, fontSize: 14 }}>
+              {CATEGORIES.map(item => <option key={item} value={item}>{copy.categories[item] || item}</option>)}
+            </select>
+          </div>
         </div>
         <div style={{ display: 'grid', gap: 6 }}>
           <label className="sb-eyebrow" style={{ fontSize: 10 }} htmlFor="biz-text">{copy.notesLabel}</label>
-          <textarea id="biz-text" className="sb-input" value={publicText} onChange={e => setPublicText(e.target.value)} rows={3} placeholder={copy.notesPlaceholder} style={{ padding: '11px 14px', borderRadius: 12, resize: 'vertical', fontSize: 14, lineHeight: 1.6 }} />
+          <textarea id="biz-text" className="sb-input" value={publicText} onChange={e => setPublicText(e.target.value)} rows={2} placeholder={copy.notesPlaceholder} style={{ padding: '11px 14px', borderRadius: 12, resize: 'vertical', fontSize: 14, lineHeight: 1.6 }} />
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button className="sb-button-primary" type="button" onClick={analyze} disabled={loading} style={{ opacity: loading ? 0.7 : 1 }}>
@@ -206,13 +205,13 @@ export default function OutreachDiscoveryPage() {
 
       {/* Result */}
       {result && (
-        <div style={{ background: 'linear-gradient(145deg, rgba(15,23,42,.78), rgba(3,7,18,.68))', border: '1px solid rgba(74,222,128,.22)', borderRadius: 24, padding: 'clamp(16px,3vw,24px)' }}>
+        <div style={{ borderTop: '1px solid rgba(74,222,128,.35)', borderLeft: '2px solid rgba(74,222,128,.5)', paddingTop: 16, paddingLeft: 14 }}>
           <p className="sb-eyebrow" style={{ color: '#86efac' }}>✓ {copy.leadQueued}</p>
           <h2 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.03em', margin: '8px 0 14px' }}>
             {result.business_name || result.analyzer_summary?.business_name || copy.newLead}
           </h2>
           {result.outreach_message && (
-            <div style={{ background: 'rgba(255,195,0,.08)', border: '1px solid rgba(255,195,0,.22)', borderRadius: 16, padding: 14, marginBottom: 14 }}>
+            <div style={{ borderLeft: '2px solid rgba(255,195,0,.55)', paddingLeft: 14, marginBottom: 14 }}>
               <strong style={{ color: '#ffc300', fontSize: 13 }}>{copy.draftFirstTouch}</strong>
               <p style={{ color: 'rgba(255,255,255,.72)', lineHeight: 1.7, whiteSpace: 'pre-wrap', marginTop: 8 }}>{result.outreach_message}</p>
             </div>

@@ -123,11 +123,11 @@ export default function CreativeStudioPage() {
         {error && <p style={{ color: '#fca5a5', fontSize: 13, margin: 0 }}>{error}</p>}
       </div>
 
-      <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 16, minHeight: 'calc(100vh - 480px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 16, minHeight: 'calc(100vh - 540px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {imageUrl ? (
           <div style={{ width: '100%' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imageUrl} alt={prompt} style={{ display: 'block', margin: '0 auto', maxWidth: '100%', maxHeight: 'calc(100vh - 420px)', borderRadius: 16, boxShadow: '0 18px 70px rgba(0,0,0,.45)' }} />
+            <img src={imageUrl} alt={prompt} style={{ display: 'block', margin: '0 auto', maxWidth: '100%', maxHeight: 'calc(100vh - 510px)', borderRadius: 16, boxShadow: '0 18px 70px rgba(0,0,0,.45)' }} />
             <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button onClick={handleDownload} style={{ background: 'linear-gradient(135deg, #7c5cff, #22d3ee)', color: '#fff', fontWeight: 900, fontSize: 14, padding: '11px 24px', borderRadius: 12, border: 'none', cursor: 'pointer' }}>{c.download}</button>
               <button onClick={handleGenerate} className="sb-button-secondary" style={{ borderRadius: 12 }}>{c.again}</button>

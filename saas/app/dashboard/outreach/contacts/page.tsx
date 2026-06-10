@@ -207,6 +207,7 @@ export default function OutreachContactsPage() {
   const [error, setError] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
   const [busyId, setBusyId] = useState('')
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)

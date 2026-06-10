@@ -50,62 +50,33 @@ export default function PodcastPage() {
           tr('podcasters.episode.fallback3', 'Episode 3'),
         ]
 
+  const episodeCount = sketch?.firstEpisodes?.length ?? 0
+  const checklistCount = sketch?.launchChecklist?.length ?? 0
+
   return (
-    <main
-      style={{
-        minHeight: '100vh',
-        padding: '40px 24px',
-        background:
-          'radial-gradient(circle at top right, rgba(255,195,0,.12), transparent 25%), linear-gradient(180deg,#06070c,#0e1119)',
-        color: '#fff',
-      }}
-    >
+    <main style={{ color: 'var(--text-primary)' }}>
       <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-        <div style={{ marginBottom: 40 }}>
-          <div
-            style={{
-              display: 'inline-flex',
-              padding: '6px 14px',
-              borderRadius: 999,
-              background: 'rgba(255,195,0,.1)',
-              border: '1px solid rgba(255,195,0,.2)',
-              color: GOLD,
-              fontSize: 12,
-              fontWeight: 800,
-              marginBottom: 20,
-            }}
-          >
-            🎙️ {tr('podcasters.badge', 'Podcast page')}
-          </div>
+        <header className="sb-console" style={{ marginBottom: 28 }}>
+          <span className="sb-eyebrow">🎙️ {tr('podcasters.badge', 'Podcast page')}</span>
 
-          <h1
-            style={{
-              fontSize: 'clamp(40px,7vw,70px)',
-              margin: 0,
-              lineHeight: 1,
-            }}
-          >
-            {title}
-          </h1>
+          <h1>{title}</h1>
 
-          <p
-            style={{
-              marginTop: 18,
-              color: 'rgba(255,255,255,.65)',
-              lineHeight: 1.7,
-              maxWidth: 760,
-              fontSize: 17,
-            }}
-          >
+          <p className="sb-body">
             {sketch?.showDescription ||
               tr('podcasters.subtitle.fallback', 'This page will become the public home of your podcast.')}
           </p>
-        </div>
+
+          <div className="sb-telemetry">
+            <div><b className="gold">{episodeCount || 3}</b><span>{tr('podcasters.episodes', 'Episodes')}</span></div>
+            <div><b className={sketch ? 'ok' : 'warn'} style={{ fontSize: 14 }}>{sketch ? 'READY' : 'DRAFT'}</b><span>{tr('podcasters.badge', 'Podcast page')}</span></div>
+            {checklistCount ? <div><b>{checklistCount}</b><span>{tr('podcasters.checklist', 'Launch checklist')}</span></div> : null}
+          </div>
+        </header>
 
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'minmax(0,1fr) minmax(300px,.7fr)',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
             gap: 24,
           }}
         >

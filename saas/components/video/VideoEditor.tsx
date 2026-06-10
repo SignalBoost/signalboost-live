@@ -131,7 +131,7 @@ function parseCaptionFile(text: string): CaptionCue[] {
 function QuotaStatusBar({ quota, lang }: { quota: VideoQuota; lang: string }) {
   const pct = Math.min(100, Math.round((quota.usedMinutes / Math.max(1, quota.includedMinutes)) * 100))
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[.04] p-4">
+    <div className="border-b border-white/10 pb-4">
       <div className="flex items-center justify-between text-sm"><span>{c('quotaLabel', lang)}</span><span>{quota.usedMinutes}/{quota.includedMinutes} min</span></div>
       <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[#FFD700]" style={{ width: `${pct}%` }} /></div>
       <p className="mt-2 text-xs text-white/55">{c('quotaNote', lang)}</p>
@@ -150,7 +150,7 @@ function BillingBanner({ quota, lang }: { quota: VideoQuota; lang: string }) {
 
 function PresetPicker({ activePreset, onPreset, lang }: { activePreset: string; onPreset: (p: CaptionPreset) => void; lang: string }) {
   return (
-    <section className="rounded-3xl border border-white/10 bg-black/40 p-5">
+    <section className="border-t border-white/10 pt-5">
       <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{c('templates', lang)}</h2><span className="text-xs text-white/50">{c('templatesHint', lang)}</span></div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {captionPresets.map((p) => (
@@ -166,7 +166,7 @@ function PresetPicker({ activePreset, onPreset, lang }: { activePreset: string; 
 function CaptionTimeline({ cues, currentTime, selectedCueId, onSeek, onSelect, onUpdateText, lang }: { cues: CaptionCue[]; currentTime: number; selectedCueId: string | null; onSeek: (s: number) => void; onSelect: (id: string) => void; onUpdateText: (id: string, text: string) => void; lang: string }) {
   const sel = cues.find((cu) => cu.id === selectedCueId) || activeCue(cues, currentTime) || cues[0]
   return (
-    <section className="rounded-3xl border border-white/10 bg-black/40 p-5">
+    <section className="border-t border-white/10 pt-5">
       <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{c('captionTimeline', lang)}</h2><span className="text-xs text-white/50">{cues.length} {c('cues', lang)}</span></div>
       {sel ? (
         <label className="mt-4 block text-sm">{c('editCaption', lang)}
@@ -188,7 +188,7 @@ function CaptionTimeline({ cues, currentTime, selectedCueId, onSeek, onSelect, o
 
 function StyleControls({ style, aspectRatio, onChange, onAspectRatio, lang }: { style: CaptionStyle; aspectRatio: AspectRatio; onChange: (s: CaptionStyle) => void; onAspectRatio: (r: AspectRatio) => void; lang: string }) {
   return (
-    <section className="rounded-3xl border border-white/10 bg-black/40 p-5">
+    <section className="border-t border-white/10 pt-5">
       <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{c('captionStyle', lang)}</h2><span className="text-xs text-white/50">x {style.x}% · y {style.y}%</span></div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="text-sm">{c('format', lang)}<select className="mt-1 w-full rounded-xl border border-white/10 bg-black p-2" value={aspectRatio} onChange={(e) => onAspectRatio(e.target.value as AspectRatio)}><option value="9:16">9:16 Shorts/Reels/TikTok</option><option value="1:1">1:1 Square</option><option value="16:9">16:9 YouTube</option></select></label>
@@ -312,7 +312,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
     }))
 
     return (
-      <section className="rounded-3xl border border-white/10 bg-black/50 p-5">
+      <section className="border-t border-white/10 pt-5">
         <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{c('canvasEditor', lang)}</h2><span className="font-mono text-xs text-white/50">{formatTime(time)} · {aspectRatio}</span></div>
         <div className={`relative mx-auto mt-4 w-full overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 ${aspectClasses[aspectRatio]}`}>
           {videoUrl ? <video ref={videoRef} src={videoUrl} className="hidden" playsInline crossOrigin="anonymous" onLoadedMetadata={(e) => onDuration(Math.round(e.currentTarget.duration || 0))} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onTimeUpdate={(e) => { const n = e.currentTarget.currentTime; lastReportedRef.current = n; setTime(n); onTime(n) }} /> : null}
@@ -339,7 +339,7 @@ function ExportPanel({ hasSource, exportState, onExport, lang }: { hasSource: bo
   const isRecording = exportState.status === 'recording'
   const isDone = exportState.status === 'ready'
   return (
-    <section className="rounded-3xl border border-white/10 bg-black/40 p-5">
+    <section className="border-t border-white/10 pt-5">
       <h2 className="text-xl font-bold">{c('exportPanel', lang)}</h2>
       <p className="mt-2 text-sm text-white/55">{c('exportNote', lang)}</p>
       <button onClick={onExport} disabled={!hasSource || isRecording} className="mt-4 w-full rounded-full bg-[#FFD700] px-5 py-3 font-bold text-black disabled:opacity-50">
@@ -465,17 +465,17 @@ export default function VideoEditor() {
 
   const updateCueText = (id: string, text: string) => setCues((items) => items.map((cu) => cu.id === id ? { ...cu, text } : cu))
 
-  if (!mounted) return <main className="min-h-screen bg-[#05070b]" />
+  if (!mounted) return <main className="min-h-[60vh]" />
 
   return (
-    <main className="min-h-screen bg-[#05070b] p-6 text-white">
-      <section className="rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,215,0,.20),transparent_35%),linear-gradient(135deg,#101827,#05070b)] p-8">
+    <main className="text-white">
+      <section className="border-b border-white/10 pb-6">
         <p className="text-xs uppercase tracking-[0.35em] text-[#FFD700]">{c('eyebrow', lang)}</p>
         <h1 className="mt-4 text-4xl font-black">{c('heroTitle', lang)}</h1>
         <p className="mt-3 max-w-3xl text-white/70">{c('heroSubtitle', lang)}</p>
       </section>
       <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_.35fr]"><QuotaStatusBar quota={quota} lang={lang} /><BillingBanner quota={quota} lang={lang} /></div>
-      <section className="mt-6 grid gap-4 rounded-3xl border border-white/10 bg-white/[.03] p-5 md:grid-cols-5">
+      <section className="mt-6 grid gap-4 border-t border-white/10 pt-5 md:grid-cols-5">
         <label className="text-sm">{c('videoInput', lang)}<input type="file" accept="video/*" onChange={(e) => e.target.files?.[0] && uploadVideo(e.target.files[0])} className="mt-2 w-full" /></label>
         <div className="text-sm"><span>{c('aiCaptions', lang)}</span><button type="button" onClick={generateCaptions} disabled={!storagePath || captionState.status === 'generating'} className="mt-2 w-full rounded-xl bg-[#FFD700] px-4 py-2 font-bold text-black disabled:opacity-50">{captionState.status === 'generating' ? c('transcribing', lang) : c('genCaptions', lang)}</button></div>
         <label className="text-sm">{c('srtVtt', lang)}<input type="file" accept=".srt,.vtt,text/vtt" onChange={(e) => e.target.files?.[0] && uploadCaptions(e.target.files[0])} className="mt-2 w-full" /></label>
@@ -497,7 +497,7 @@ export default function VideoEditor() {
           <ExportPanel hasSource={Boolean(videoUrl)} exportState={exportState} onExport={exportVideo} lang={lang} />
         </div>
       </div>
-      <footer className="mt-8 rounded-2xl border border-white/10 bg-white/[.03] p-4 text-sm text-white/60">
+      <footer className="mt-8 border-t border-white/10 pt-4 text-sm text-white/60">
         {c('footerTime', lang)} {currentTime.toFixed(2)}s · {c('footerDuration', lang)} {durationSec || 0}s · {cues.length} {c('footerCaptions', lang)} · {c('footerNote', lang)}
       </footer>
     </main>

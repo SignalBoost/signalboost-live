@@ -54,6 +54,7 @@ const COPY = {
   prevFrame:       { en: '- frame', es: '- fotograma', pt: '- quadro', pl: '- klatka', ru: '- кадр' },
   nextFrame:       { en: '+ frame', es: '+ fotograma', pt: '+ quadro', pl: '+ klatka', ru: '+ кадр' },
   restart:         { en: 'Restart', es: 'Reiniciar', pt: 'Reiniciar', pl: 'Uruchom ponownie', ru: 'Перезапуск' },
+  reset:           { en: 'Reset', es: 'Restablecer', pt: 'Redefinir', pl: 'Resetuj', ru: 'Сбросить' },
   exportPanel:     { en: 'Export panel', es: 'Panel de exportacion', pt: 'Painel de exportacao', pl: 'Panel eksportu', ru: 'Панель экспорта' },
   exportNote:      { en: 'Click export then let the video play all the way through. Your browser records the canvas and produces a downloadable .webm file. No server required.', es: 'Haz clic en exportar y deja que el video se reproduzca. Tu navegador graba el canvas y produce un .webm.', pt: 'Clique em exportar e deixe o video reproduzir. Seu navegador grava o canvas e produz um .webm.', pl: 'Kliknij eksport i pozwol wideo sie odtworzyc. Przegladarka nagra canvas i stworzy plik .webm.', ru: 'Нажмите экспорт и дайте видео воспроизвестись. Браузер запишет холст и создаст .webm.' },
   exportBtn:       { en: 'Export captioned video', es: 'Exportar video con subtitulos', pt: 'Exportar video com legendas', pl: 'Eksportuj wideo z napisami', ru: 'Экспорт видео с субтитрами' },
@@ -358,21 +359,21 @@ export default function VideoEditor() {
   const { lang } = useI18n()
   const canvasEditorRef = useRef<CanvasEditorHandle>(null)
 
-  const [locale, setLocale]           = useState<SupportedVideoLocale>('en')
-  const [tier, setTier]               = useState('free')
-  const [durationSec, setDurationSec] = useState(0)
-  const [videoUrl, setVideoUrl]       = useState<string | null>(null)
-  const [storagePath, setStoragePath] = useState<string | null>(null)
-  const [transcriptId, setTranscriptId] = useState<string | null>(null)
-  const [cues, setCues]               = useState(starterCaptions)
-  const [style, setStyle]             = useState(defaultCaptionStyle)
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('9:16')
-  const [activePreset, setActivePreset] = useState('signal')
+  const [locale, setLocale]               = useState<SupportedVideoLocale>('en')
+  const [tier, setTier]                   = useState('free')
+  const [durationSec, setDurationSec]     = useState(0)
+  const [videoUrl, setVideoUrl]           = useState<string | null>(null)
+  const [storagePath, setStoragePath]     = useState<string | null>(null)
+  const [transcriptId, setTranscriptId]   = useState<string | null>(null)
+  const [cues, setCues]                   = useState(starterCaptions)
+  const [style, setStyle]                 = useState(defaultCaptionStyle)
+  const [aspectRatio, setAspectRatio]     = useState<AspectRatio>('9:16')
+  const [activePreset, setActivePreset]   = useState('signal')
   const [selectedCueId, setSelectedCueId] = useState<string | null>(starterCaptions[0]?.id || null)
-  const [currentTime, setCurrentTime] = useState(0)
-  const [uploadState, setUploadState] = useState<UploadState>({ status: 'idle', message: 'Upload a source video to begin.' })
-  const [captionState, setCaptionState] = useState<CaptionGenerationState>({ status: 'idle', message: 'Generate AI captions after uploading a video, or upload SRT/VTT manually.' })
-  const [exportState, setExportState] = useState<ExportState>({ status: 'idle', message: '' })
+  const [currentTime, setCurrentTime]     = useState(0)
+  const [uploadState, setUploadState]     = useState<UploadState>({ status: 'idle', message: 'Upload a source video to begin.' })
+  const [captionState, setCaptionState]   = useState<CaptionGenerationState>({ status: 'idle', message: 'Generate AI captions after uploading a video, or upload SRT/VTT manually.' })
+  const [exportState, setExportState]     = useState<ExportState>({ status: 'idle', message: '' })
 
   const quota = useMemo(() => calculateVideoQuota(tier, Math.ceil(Math.max(1, durationSec) / 60)), [tier, durationSec])
 
@@ -402,6 +403,19 @@ export default function VideoEditor() {
     const timer = setInterval(poll, 3000)
     return () => { cancelled = true; clearInterval(timer) }
   }, [transcriptId])
+
+  function resetAll() {
+    setVideoUrl(null)
+    setStoragePath(null)
+    setTranscriptId(null)
+    setCues(starterCaptions)
+    setSelectedCueId(starterCaptions[0]?.id || null)
+    setCurrentTime(0)
+    setDurationSec(0)
+    setUploadState({ status: 'idle', message: 'Upload a source video to begin.' })
+    setCaptionState({ status: 'idle', message: 'Generate AI captions after uploading a video, or upload SRT/VTT manually.' })
+    setExportState({ status: 'idle', message: '' })
+  }
 
   async function uploadVideo(file: File) {
     setVideoUrl(URL.createObjectURL(file))
@@ -466,7 +480,10 @@ export default function VideoEditor() {
         <label className="text-sm">{c('srtVtt', lang)}<input type="file" accept=".srt,.vtt,text/vtt" onChange={(e) => e.target.files?.[0] && uploadCaptions(e.target.files[0])} className="mt-2 w-full" /></label>
         <label className="text-sm">{c('tierLabel', lang)}<select className="mt-2 w-full rounded-xl bg-black p-2" value={tier} onChange={(e) => setTier(e.target.value)}><option value="free">{c('tierFree', lang)}</option><option value="launch">Launch</option><option value="growth">Growth</option><option value="command">Command</option></select></label>
         <label className="text-sm">{c('localeLabel', lang)}<select className="mt-2 w-full rounded-xl bg-black p-2" value={locale} onChange={(e) => setLocale(e.target.value as SupportedVideoLocale)}><option>en</option><option>es</option><option>pt</option><option>pl</option><option>ru</option></select></label>
-        <p className="text-xs text-white/55 md:col-span-5">{c('storageLabel', lang)} {uploadState.message}<br />{c('captionsLabel', lang)} {captionState.message}</p>
+        <p className="text-xs text-white/55 md:col-span-4">{c('storageLabel', lang)} {uploadState.message}<br />{c('captionsLabel', lang)} {captionState.message}</p>
+        <div className="flex items-end md:col-span-1">
+          <button type="button" onClick={resetAll} className="w-full rounded-xl border border-white/20 px-4 py-2 text-sm text-white/60 hover:border-white/40 hover:text-white/80 transition">↺ {c('reset', lang)}</button>
+        </div>
       </section>
       <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_.42fr]">
         <div className="space-y-6">

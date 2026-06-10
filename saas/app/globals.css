@@ -80,6 +80,12 @@ html, body { margin: 0; padding: 0; font-family: system-ui, sans-serif; backgrou
 
 /* ── Layout ── */
 .sb-page-shell, .sb-dashboard-shell { width: min(1184px, calc(100% - 32px)); margin: 0 auto; }
+
+/* ── App shell: the single container every /dashboard page renders inside.
+     Centers content, sets consistent vertical rhythm, keeps cards anchored. ── */
+.sb-app-shell { width: min(1184px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 72px; box-sizing: border-box; }
+.sb-app-shell > * { box-sizing: border-box; }
+@media (max-width: 640px) { .sb-app-shell { width: calc(100% - 24px); padding: 16px 0 56px; } }
 .sb-section { padding: 64px 0; }
 
 .sb-glass, .sb-sidebar, .sb-live-preview, .sb-card { background: linear-gradient(135deg, rgba(255,255,255,.09), rgba(255,255,255,.035)); border: 1px solid var(--border-soft); border-radius: 24px; box-shadow: 0 24px 80px rgba(0,0,0,.28); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
@@ -98,6 +104,11 @@ html, body { margin: 0; padding: 0; font-family: system-ui, sans-serif; backgrou
 .sb-button-secondary { background: rgba(26, 240, 255, .09); border: 1px solid rgba(26, 240, 255, .24); color: #9ff7ff; }
 
 .sb-dashboard-shell { display: grid; grid-template-columns: 232px minmax(0, 1fr) 292px; gap: 24px; align-items: start; padding: 32px 0 80px; }
+@media (max-width: 1100px) {
+  .sb-dashboard-shell { grid-template-columns: minmax(0, 1fr); padding: 20px 0 64px; }
+  .sb-sidebar, .sb-live-preview { position: static; }
+  .sb-live-preview { display: none; }
+}
 .sb-sidebar, .sb-live-preview { position: sticky; top: 136px; padding: 20px; }
 .sb-sidebar__header h2, .sb-live-preview h3 { margin: 8px 0; font-size: 20px; line-height: 1.12; }
 .sb-sidebar__header p, .sb-live-preview p { color: var(--text-muted); font-size: 13px; line-height: 1.55; margin: 0; }

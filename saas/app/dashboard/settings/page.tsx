@@ -88,24 +88,31 @@ export default function SettingsPage() {
     }
   }
 
-  const card: React.CSSProperties = { padding: 20, marginBottom: 16 }
-  const labelStyle: React.CSSProperties = { display: 'block', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,.7)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }
+  const labelStyle: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 800, color: 'var(--text-faint)', marginBottom: 7, textTransform: 'uppercase', letterSpacing: '.1em' }
+  const langLabel = LANGUAGES.find(x => x.code === settings.locale)?.label || 'English'
 
   return (
-    <main style={{ padding: 24, color: '#fff', maxWidth: 720, margin: '0 auto' }}>
-      <div style={{ marginBottom: 20 }}>
-        <span className="sb-eyebrow">{tr('settings.eyebrow', 'Account')}</span>
-        <h1 className="sb-h2" style={{ marginTop: 8, marginBottom: 2 }}>{tr('settings.title', 'Settings')}</h1>
-        <p className="sb-body" style={{ margin: 0 }}>{tr('settings.subtitle', 'Manage your profile, language, and notifications.')}</p>
-      </div>
+    <main style={{ color: 'var(--text-primary)', maxWidth: 760, margin: '0 auto' }}>
+      <header className="sb-console">
+        <span className="sb-eyebrow">⚙️ {tr('settings.eyebrow', 'Account')}</span>
+        <h1>{tr('settings.title', 'Settings')}</h1>
+        <p className="sb-body">{tr('settings.subtitle', 'Manage your profile, language, and notifications.')}</p>
+        {!loading ? (
+          <div className="sb-telemetry">
+            <div><b className="gold" style={{ fontSize: 14 }}>{email || '—'}</b><span>{tr('settings.email', 'Account email')}</span></div>
+            <div><b style={{ fontSize: 14 }}>{langLabel}</b><span>{tr('settings.language', 'Language')}</span></div>
+            <div><b className={settings.email_notifications ? 'ok' : 'warn'} style={{ fontSize: 14 }}>{settings.email_notifications ? 'ON' : 'OFF'}</b><span>{tr('settings.notifications', 'Notifications')}</span></div>
+          </div>
+        ) : null}
+      </header>
 
       {loading ? (
         <p className="sb-body">{tr('settings.loading', 'Loading your settings…')}</p>
       ) : (
         <>
           {/* Profile */}
-          <section className="sb-card" style={card}>
-            <h2 className="sb-h3" style={{ marginTop: 0 }}>{tr('settings.profile', 'Profile')}</h2>
+          <section className="sb-panel">
+            <div className="sb-panel__head"><h2>{tr('settings.profile', 'Profile')}</h2></div>
             <div style={{ marginBottom: 14 }}>
               <label style={labelStyle}>{tr('settings.email', 'Account email')}</label>
               <div className="sb-body" style={{ fontFamily: 'monospace', color: 'rgba(255,255,255,.85)' }}>{email || '—'}</div>
@@ -124,8 +131,8 @@ export default function SettingsPage() {
           </section>
 
           {/* Language */}
-          <section className="sb-card" style={card}>
-            <h2 className="sb-h3" style={{ marginTop: 0 }}>{tr('settings.language', 'Language')}</h2>
+          <section className="sb-panel">
+            <div className="sb-panel__head"><h2>{tr('settings.language', 'Language')}</h2></div>
             <label style={labelStyle} htmlFor="loc">{tr('settings.preferredLanguage', 'Preferred language')}</label>
             <select
               id="loc"
@@ -140,8 +147,8 @@ export default function SettingsPage() {
           </section>
 
           {/* Notifications */}
-          <section className="sb-card" style={card}>
-            <h2 className="sb-h3" style={{ marginTop: 0 }}>{tr('settings.notifications', 'Notifications')}</h2>
+          <section className="sb-panel">
+            <div className="sb-panel__head"><h2>{tr('settings.notifications', 'Notifications')}</h2></div>
             <Toggle
               label={tr('settings.emailNotifs', 'Email notifications')}
               help={tr('settings.emailNotifsHelp', 'Get notified when long tasks (audio, video, audits) finish.')}
@@ -162,7 +169,8 @@ export default function SettingsPage() {
             <button
               onClick={save}
               disabled={saving}
-              style={{ background: GOLD, color: '#000', border: 'none', borderRadius: 12, padding: '12px 28px', fontWeight: 800, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.6 : 1 }}
+              className="sb-button-primary"
+              style={{ border: 'none', cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.6 : 1 }}
             >
               {saving ? tr('settings.saving', 'Saving…') : tr('settings.save', 'Save changes')}
             </button>

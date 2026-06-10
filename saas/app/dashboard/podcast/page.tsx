@@ -80,15 +80,8 @@ export default function PodcastPage() {
             gap: 24,
           }}
         >
-          <section
-            style={{
-              padding: 25,
-              borderRadius: 24,
-              background: 'rgba(255,255,255,.04)',
-              border: '1px solid rgba(255,255,255,.08)',
-            }}
-          >
-            <h2>{tr('podcasters.aboutShow', 'About the show')}</h2>
+          <section style={{ minWidth: 0 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 900, letterSpacing: '-.02em', margin: '0 0 10px' }}>{tr('podcasters.aboutShow', 'About the show')}</h2>
 
             <p
               style={{
@@ -102,7 +95,7 @@ export default function PodcastPage() {
 
             {sketch?.targetAudience && (
               <>
-                <h2 style={{ marginTop: 30 }}>{tr('podcasters.audience', 'Audience')}</h2>
+                <h2 style={{ marginTop: 26, fontSize: 16, fontWeight: 900, letterSpacing: '-.02em', marginBottom: 10 }}>{tr('podcasters.audience', 'Audience')}</h2>
                 <p
                   style={{
                     color: 'rgba(255,255,255,.7)',
@@ -114,17 +107,14 @@ export default function PodcastPage() {
               </>
             )}
 
-            <h2 style={{ marginTop: 30 }}>{tr('podcasters.episodes', 'Episodes')}</h2>
+            <h2 style={{ marginTop: 26, fontSize: 16, fontWeight: 900, letterSpacing: '-.02em', marginBottom: 4 }}>{tr('podcasters.episodes', 'Episodes')}</h2>
 
             {episodes.map((episode, index) => (
               <div
                 key={`${index}-${episode}`}
                 style={{
-                  padding: 16,
-                  marginTop: 12,
-                  borderRadius: 16,
-                  background: 'rgba(255,255,255,.05)',
-                  border: '1px solid rgba(255,255,255,.08)',
+                  padding: '14px 0',
+                  borderTop: '1px solid rgba(255,255,255,.07)',
                 }}
               >
                 <strong>🎧 {tr('podcasters.episodeLabel', 'Episode {n}').replace('{n}', String(index + 1))}</strong>
@@ -141,15 +131,8 @@ export default function PodcastPage() {
             ))}
           </section>
 
-          <aside
-            style={{
-              padding: 25,
-              borderRadius: 24,
-              background: 'rgba(255,255,255,.04)',
-              border: '1px solid rgba(255,255,255,.08)',
-            }}
-          >
-            <h2>{tr('podcasters.host', 'Host')}</h2>
+          <aside style={{ minWidth: 0, borderLeft: '1px solid rgba(255,255,255,.08)', paddingLeft: 24 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 900, letterSpacing: '-.02em', margin: '0 0 10px' }}>{tr('podcasters.host', 'Host')}</h2>
 
             <div
               style={{
@@ -174,7 +157,7 @@ export default function PodcastPage() {
 
             {sketch?.introScript && (
               <>
-                <h2 style={{ marginTop: 30 }}>{tr('podcasters.introScript', 'Intro script')}</h2>
+                <h2 style={{ marginTop: 26, fontSize: 16, fontWeight: 900, letterSpacing: '-.02em', marginBottom: 10 }}>{tr('podcasters.introScript', 'Intro script')}</h2>
                 <p
                   style={{
                     color: 'rgba(255,255,255,.7)',

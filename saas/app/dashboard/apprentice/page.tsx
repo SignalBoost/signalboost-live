@@ -130,8 +130,6 @@ export default function ApprenticeWorkshopPage() {
         </div>
       </header>
 
-      <OrchestrationPanel module="apprentice" compact />
-
       {/* Tasks */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
         {(['t1', 't2', 't3'] as const).map((tk, i) => (
@@ -182,6 +180,8 @@ export default function ApprenticeWorkshopPage() {
           })}
         </div>
       </div>
+
+      <OrchestrationPanel module="apprentice" compact />
     </div>
   )
 }

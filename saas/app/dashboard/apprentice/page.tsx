@@ -135,7 +135,7 @@ export default function ApprenticeWorkshopPage() {
       {/* Tasks */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
         {(['t1', 't2', 't3'] as const).map((tk, i) => (
-          <div key={tk} style={{ border: `1px solid ${accent}28`, borderRadius: 18, padding: 16, background: `${accent}08`, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div key={tk} style={{ borderTop: '1px solid rgba(255,255,255,.07)', padding: '14px 0', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
             <span style={{ width: 24, height: 24, borderRadius: 999, background: `${accent}22`, border: `1px solid ${accent}44`, color: accent, fontWeight: 900, fontSize: 12, display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}>{i + 1}</span>
             <span style={{ fontSize: 13, lineHeight: 1.6, color: 'rgba(255,255,255,.8)' }}>{c((levelData.tasks as any)[tk], l)}</span>
           </div>
@@ -145,7 +145,7 @@ export default function ApprenticeWorkshopPage() {
       {/* Module grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
         {moduleItems.map(item => (
-          <Link key={item.key} href={item.href} style={{ color: '#fff', textDecoration: 'none', border: `1px solid ${accent}28`, borderRadius: 22, padding: 18, background: 'linear-gradient(145deg, rgba(255,255,255,.08), rgba(255,255,255,.03))', transition: 'border-color .18s, transform .18s', display: 'block' }}>
+          <Link key={item.key} href={item.href} style={{ color: '#fff', textDecoration: 'none', borderTop: '1px solid rgba(255,255,255,.07)', borderLeft: `2px solid ${accent}55`, padding: '14px 0 14px 14px', display: 'block' }}>
             <strong style={{ fontSize: 14, fontWeight: 800, display: 'block', marginBottom: 6 }}>{c((COPY.modules as any)[item.key], l)}</strong>
             <p style={{ color: 'rgba(255,255,255,.55)', fontSize: 13, lineHeight: 1.6, margin: 0 }}>{item.depth}</p>
           </Link>
@@ -160,7 +160,7 @@ export default function ApprenticeWorkshopPage() {
             const tut = COPY.tutorials[key]
             const href = key === 'improve' ? '/dashboard/improve' : '/dashboard/podcast/studio'
             return (
-              <article key={key} style={{ border: '1px solid rgba(255,195,0,.2)', borderRadius: 24, padding: 'clamp(16px,3vw,22px)', background: 'rgba(255,195,0,.05)' }}>
+              <article key={key} style={{ borderTop: '1px solid rgba(255,195,0,.25)', padding: '18px 0 4px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
                   <div style={{ flex: 1, minWidth: 240 }}>
                     <strong style={{ fontSize: 16, fontWeight: 800, display: 'block', marginBottom: 12 }}>{c(tut.title, l)}</strong>

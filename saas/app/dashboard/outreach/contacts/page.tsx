@@ -269,22 +269,23 @@ export default function OutreachContactsPage() {
 
   return (
     <main style={{ color: 'var(--text-primary)' }}>
-      <header className="sb-console">
+      <header className="sb-console" style={{ paddingBottom: 12 }}>
         <div className="sb-console__row">
-          <div>
+          <div style={{ minWidth: 0 }}>
             <span className="sb-eyebrow">🗂️ {copy.eyebrow}</span>
-            <h1>{copy.title}</h1>
-            <p className="sb-body">{copy.subtitle}</p>
+            <h1 style={{ fontSize: 22, margin: '4px 0' }}>{copy.title}</h1>
           </div>
-          <Link className="sb-button-primary" href="/dashboard/outreach/discovery" style={{ whiteSpace: 'nowrap' }}>
-            {copy.discoverNew}
-          </Link>
-        </div>
-        <div className="sb-telemetry">
-          <div><b className="gold">{leads.length}</b><span>{copy.filters.all}</span></div>
-          <div><b className="warn">{countByStatus('pending')}</b><span>{copy.filters.pending}</span></div>
-          <div><b className="ok">{countByStatus('approved')}</b><span>{copy.filters.approved}</span></div>
-          <div><b style={{ color: '#fca5a5' }}>{countByStatus('rejected')}</b><span>{copy.filters.rejected}</span></div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 18, flexWrap: 'wrap' }}>
+            <div className="sb-telemetry" style={{ marginTop: 0, borderTop: 0 }}>
+              <div style={{ paddingTop: 0 }}><b className="gold">{leads.length}</b><span>{copy.filters.all}</span></div>
+              <div style={{ paddingTop: 0 }}><b className="warn">{countByStatus('pending')}</b><span>{copy.filters.pending}</span></div>
+              <div style={{ paddingTop: 0 }}><b className="ok">{countByStatus('approved')}</b><span>{copy.filters.approved}</span></div>
+              <div style={{ paddingTop: 0 }}><b style={{ color: '#fca5a5' }}>{countByStatus('rejected')}</b><span>{copy.filters.rejected}</span></div>
+            </div>
+            <Link className="sb-button-primary" href="/dashboard/outreach/discovery" style={{ whiteSpace: 'nowrap', fontSize: 13, padding: '9px 16px' }}>
+              {copy.discoverNew}
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -295,6 +296,7 @@ export default function OutreachContactsPage() {
             type="button"
             onClick={() => setFilter(filterKey)}
             className={filter === filterKey ? 'sb-button-primary' : 'sb-button-secondary'}
+            style={{ fontSize: 12, padding: '7px 14px' }}
           >
             {copy.filters[filterKey]}
           </button>
@@ -328,7 +330,7 @@ export default function OutreachContactsPage() {
           const status = lead.status || 'pending'
 
           return (
-            <article key={lead.id} style={{ borderTop: '1px solid rgba(255,255,255,.07)', borderLeft: `2px solid ${STATUS_COLOR[status] || 'rgba(255,255,255,.2)'}`, padding: '16px 0 16px 14px' }}>
+            <article key={lead.id} style={{ borderTop: '1px solid rgba(255,255,255,.07)', borderLeft: `2px solid ${STATUS_COLOR[status] || 'rgba(255,255,255,.2)'}`, padding: '12px 0 12px 12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                 <div style={{ minWidth: 0 }}>
                   <h2 className="sb-h3" style={{ margin: 0 }}>
@@ -366,7 +368,7 @@ export default function OutreachContactsPage() {
                     style={
                       expandedId === lead.id
                         ? { fontSize: 13.5, margin: 0, whiteSpace: 'pre-wrap' }
-                        : { fontSize: 13.5, margin: 0, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }
+                        : { fontSize: 13.5, margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }
                     }
                   >
                     {lead.outreach_message}
@@ -381,10 +383,11 @@ export default function OutreachContactsPage() {
                 </div>
               ) : null}
 
-              <div className="sb-cta-row" style={{ marginTop: 14 }}>
+              <div className="sb-cta-row" style={{ marginTop: 10 }}>
                 <button
                   className="sb-button-primary"
                   type="button"
+                  style={{ fontSize: 12, padding: '7px 14px' }}
                   disabled={busyId === lead.id || status === 'approved'}
                   onClick={() => setStatus(lead.id, 'approved')}
                 >
@@ -394,13 +397,14 @@ export default function OutreachContactsPage() {
                 <button
                   className="sb-button-secondary"
                   type="button"
+                  style={{ fontSize: 12, padding: '7px 14px' }}
                   disabled={busyId === lead.id || status === 'rejected'}
                   onClick={() => setStatus(lead.id, 'rejected')}
                 >
                   {status === 'rejected' ? copy.rejected : copy.reject}
                 </button>
 
-                <Link className="sb-button-secondary" href="/dashboard/outreach/outreach">
+                <Link className="sb-button-secondary" href="/dashboard/outreach/outreach" style={{ fontSize: 12, padding: '7px 14px' }}>
                   {copy.openEngine}
                 </Link>
               </div>

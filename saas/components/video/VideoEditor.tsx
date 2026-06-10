@@ -93,7 +93,7 @@ const captionPresets: CaptionPreset[] = [
   { id: 'minimal', label: 'Minimal',      descKey: 'descMinimal', style: { ...defaultCaptionStyle, fontFamily: 'Inter, Arial, sans-serif', fontSize: 32, color: '#ffffff', backgroundColor: 'rgba(15,23,42,0.52)', animation: 'fade', x: 50, y: 84 } },
 ]
 
-const aspectClasses: Record<AspectRatio, string> = { '9:16': 'aspect-[9/16] max-h-[56vh]', '1:1': 'aspect-square max-h-[56vh]', '16:9': 'aspect-video max-h-[56vh]' }
+const aspectClasses: Record<AspectRatio, string> = { '9:16': 'aspect-[9/16]', '1:1': 'aspect-square', '16:9': 'aspect-video' }
 const canvasSizes: Record<AspectRatio, { width: number; height: number }> = { '9:16': { width: 720, height: 1280 }, '1:1': { width: 1080, height: 1080 }, '16:9': { width: 1280, height: 720 } }
 
 function activeCue(cues: CaptionCue[], time: number) { return cues.find((cu) => time >= cu.start && time <= cu.end) || null }
@@ -313,7 +313,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
     return (
       <section className="border-t border-white/10 pt-5">
         <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{c('canvasEditor', lang)}</h2><span className="font-mono text-xs text-white/50">{formatTime(time)} · {aspectRatio}</span></div>
-        <div className={`relative mx-auto mt-4 w-full overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 ${aspectClasses[aspectRatio]}`}>
+        <div className={`relative mx-auto mt-4 h-[calc(100vh-520px)] min-h-[240px] w-auto max-w-full overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 ${aspectClasses[aspectRatio]}`}>
           {videoUrl ? <video ref={videoRef} src={videoUrl} className="hidden" playsInline crossOrigin="anonymous" onLoadedMetadata={(e) => onDuration(Math.round(e.currentTarget.duration || 0))} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onTimeUpdate={(e) => { const n = e.currentTarget.currentTime; lastReportedRef.current = n; setTime(n); onTime(n) }} /> : null}
           <canvas ref={canvasRef} width={size.width} height={size.height} onPointerDown={(e) => { setDragging(true); e.currentTarget.setPointerCapture(e.pointerId); setPos(e) }} onPointerMove={(e) => dragging && setPos(e)} onPointerUp={(e) => { setDragging(false); e.currentTarget.releasePointerCapture(e.pointerId) }} className="h-full w-full cursor-move touch-none" aria-label="Video canvas with draggable caption overlay" />
         </div>
@@ -482,7 +482,7 @@ export default function VideoEditor() {
         <label className="text-sm">{c('srtVtt', lang)}<input type="file" accept=".srt,.vtt,text/vtt" onChange={(e) => e.target.files?.[0] && uploadCaptions(e.target.files[0])} className="mt-2 w-full" /></label>
         <label className="text-sm">{c('tierLabel', lang)}<select className="mt-2 w-full rounded-xl bg-black p-2" value={tier} onChange={(e) => setTier(e.target.value)}><option value="free">{c('tierFree', lang)}</option><option value="launch">Launch</option><option value="growth">Growth</option><option value="command">Command</option></select></label>
         <label className="text-sm">{c('localeLabel', lang)}<select className="mt-2 w-full rounded-xl bg-black p-2" value={locale} onChange={(e) => setLocale(e.target.value as SupportedVideoLocale)}><option>en</option><option>es</option><option>pt</option><option>pl</option><option>ru</option></select></label>
-        <p className="text-xs text-white/55 md:col-span-4">{c('storageLabel', lang)} {uploadState.message}<br />{c('captionsLabel', lang)} {captionState.message}</p>
+        <p className="text-xs text-white/55 md:col-span-4">{c('storageLabel', lang)} {uploadState.message} · {c('captionsLabel', lang)} {captionState.message}</p>
         <div className="flex items-end md:col-span-1">
           <button type="button" onClick={resetAll} className="w-full rounded-xl border border-white/20 px-4 py-2 text-sm text-white/60 hover:border-white/40 hover:text-white/80 transition">↺ {c('reset', lang)}</button>
         </div>

@@ -515,7 +515,7 @@ export default function DashboardOverviewPage() {
             // {termCase(L.quickActions, lang)}
           </h2>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
             {QUICK_ACTIONS.map(item => (
               <Link
                 key={item.type}
@@ -537,7 +537,7 @@ export default function DashboardOverviewPage() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 28 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 28 }}>
           {[
             { label: t(dict, 'dash.stats.activeSites', 'Active sites'), value: projects.filter(p => p.status === 'live').length },
             { label: t(dict, 'dash.stats.projects', 'Projects'), value: `${projects.length}/${projectLimit === 999 ? '∞' : projectLimit}` },
@@ -580,7 +580,7 @@ export default function DashboardOverviewPage() {
               </div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
               {projects.map((p, i) => (
                 <div key={p.id} className="fathom-glass" style={{ borderRadius: 12, padding: 20, animation: `cardIn .3s ease ${i * .04}s both`, background: 'rgba(6, 9, 19, 0.4)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>

@@ -112,8 +112,9 @@ export default function ApprenticeWorkshopPage() {
   const accent = LEVEL_ACCENT[level]
 
   return (
-    <div style={{ maxWidth: 1080, margin: '0 auto', padding: 'clamp(18px,4vw,40px) 0 80px', color: 'var(--text-primary)', display: 'grid', gap: 22 }}>
+    <div style={{ maxWidth: 1080, margin: '0 auto', color: 'var(--text-primary)', display: 'grid', gap: 22 }}>
 
+      <div style={{ minHeight: 'calc(100vh - 125px)', display: 'grid', gap: 22, alignContent: 'start' }}>
       {/* Header */}
       <header className="sb-console" style={{ marginBottom: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
@@ -131,7 +132,7 @@ export default function ApprenticeWorkshopPage() {
       </header>
 
       {/* Tasks */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, alignContent: 'start' }}>
         {(['t1', 't2', 't3'] as const).map((tk, i) => (
           <div key={tk} style={{ borderTop: '1px solid rgba(255,255,255,.07)', padding: '14px 0', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
             <span style={{ width: 24, height: 24, borderRadius: 999, background: `${accent}22`, border: `1px solid ${accent}44`, color: accent, fontWeight: 900, fontSize: 12, display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}>{i + 1}</span>
@@ -150,7 +151,9 @@ export default function ApprenticeWorkshopPage() {
         ))}
       </div>
 
-      {/* Tutorials */}
+      </div>
+
+      {/* Tutorials — starts on the second screen */}
       <div>
         <h2 style={{ fontSize: 'clamp(18px,3vw,26px)', fontWeight: 900, letterSpacing: '-.03em', margin: '0 0 16px' }}>{c(COPY.tutorialsTitle, l)}</h2>
         <div style={{ display: 'grid', gap: 16 }}>

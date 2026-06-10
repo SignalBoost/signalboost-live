@@ -287,7 +287,7 @@ export default function CalendarPage() {
     day === today.getDate() && month === today.getMonth() && year === today.getFullYear()
 
   return (
-    <main style={{ padding: 24, color: '#fff', maxWidth: 1100, margin: '0 auto' }}>
+    <main style={{ color: 'var(--text-primary)', maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 18 }}>
         <div>
           <span className="sb-eyebrow">{copy.eyebrow}</span>
@@ -341,8 +341,9 @@ export default function CalendarPage() {
               }}
               style={{
                 textAlign: 'left',
-                minHeight: 104,
-                padding: 8,
+                height: 'clamp(60px, calc((100vh - 330px) / 6), 118px)',
+                overflow: 'hidden',
+                padding: 6,
                 borderRadius: 12,
                 cursor: 'pointer',
                 background: isToday(day) ? 'rgba(255,195,0,.10)' : 'rgba(255,255,255,.03)',
@@ -411,7 +412,7 @@ export default function CalendarPage() {
             zIndex: 1000,
           }}
         >
-          <div onClick={(event) => event.stopPropagation()} className="sb-card" style={{ padding: 24, width: '100%', maxWidth: 420 }}>
+          <div onClick={(event) => event.stopPropagation()} style={{ padding: 24, width: '100%', maxWidth: 420, background: 'linear-gradient(160deg, #101827, #060913)', border: '1px solid rgba(26,240,255,.25)', borderRadius: 20, boxShadow: '0 32px 110px rgba(0,0,0,.6)' }}>
             <h2 className="sb-h3" style={{ marginTop: 0 }}>
               {copy.addEvent} · {selectedDate}
             </h2>

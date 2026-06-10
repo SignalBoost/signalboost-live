@@ -56,7 +56,7 @@ export default function OrchestrationPanel({ module = 'global', compact = false 
   }
 
   return (
-    <section className="sb-card" style={{ padding: compact ? 16 : 24, borderColor: 'rgba(34,211,238,.26)' }}>
+    <section className="sb-card" style={{ borderTop: '1px solid rgba(34,211,238,.25)', paddingTop: compact ? 16 : 22 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'start' }}>
         <div>
           <span className="sb-eyebrow">
@@ -116,7 +116,7 @@ export default function OrchestrationPanel({ module = 'global', compact = false 
         </div>
 
         <div style={{ display: 'grid', gap: 12 }}>
-          <div className="sb-glass" style={{ padding: 16 }}>
+          <div style={{ borderTop: '1px solid rgba(34,211,238,.25)', borderLeft: '2px solid rgba(34,211,238,.4)', padding: '12px 0 12px 14px', marginTop: 4 }}>
             <span className="sb-caption">
               {t(dict, 'orchestration.intentRouter', 'Intent Router')}
             </span>
@@ -150,12 +150,12 @@ export default function OrchestrationPanel({ module = 'global', compact = false 
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 }}>
-            <div className="sb-glass" style={{ padding: 12 }}>
+            <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', borderLeft: '2px solid rgba(34,211,238,.3)', padding: '10px 0 10px 14px' }}>
               <strong>{t(dict, 'orchestration.memory', 'Memory Layer')}</strong>
               <p className="sb-caption">{plan.memory.map((item) => item.key).join(' · ')}</p>
             </div>
 
-            <div className="sb-glass" style={{ padding: 12 }}>
+            <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', borderLeft: '2px solid rgba(34,211,238,.3)', padding: '10px 0 10px 14px' }}>
               <strong>{t(dict, 'orchestration.operatorFallback', 'Human review path')}</strong>
               <p className="sb-caption">
                 {plan.operatorFallback.enabled
@@ -164,7 +164,7 @@ export default function OrchestrationPanel({ module = 'global', compact = false 
               </p>
             </div>
 
-            <div className="sb-glass" style={{ padding: 12 }}>
+            <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', borderLeft: '2px solid rgba(34,211,238,.3)', padding: '10px 0 10px 14px' }}>
               <strong>{t(dict, 'orchestration.telemetry', 'Telemetry')}</strong>
               <p className="sb-caption">{plan.telemetry.map((event) => event.event).join(' · ')}</p>
             </div>

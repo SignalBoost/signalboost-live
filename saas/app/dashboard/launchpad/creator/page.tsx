@@ -87,7 +87,7 @@ export default function CreatorLaunchpadPage() {
   const completed = done.filter(Boolean).length
 
   return (
-    <div style={{ maxWidth: 880, margin: '0 auto', color: 'var(--text-primary)', display: 'grid', gap: 20 }}>
+    <div style={{ maxWidth: 880, margin: '0 auto', color: 'var(--text-primary)', display: 'grid', gap: 14 }}>
 
       {/* Back */}
       <Link href="/dashboard/launchpad" style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -95,17 +95,16 @@ export default function CreatorLaunchpadPage() {
       </Link>
 
       {/* Header */}
-      <header className="sb-console" style={{ marginBottom: 0 }}>
+      <header className="sb-console" style={{ marginBottom: 0, paddingBottom: 12 }}>
         <div className="sb-console__row">
-          <div>
+          <div style={{ minWidth: 0 }}>
             <span className="sb-eyebrow">{c(COPY.badge, l)}</span>
-            <h1>{c(COPY.title1, l)} <span style={{ color: '#ffc300' }}>{c(COPY.title2, l)}</span></h1>
-            <p className="sb-body">{c(COPY.subtitle, l)}</p>
+            <h1 style={{ fontSize: 22, margin: '4px 0' }}>{c(COPY.title1, l)} <span style={{ color: '#ffc300' }}>{c(COPY.title2, l)}</span></h1>
           </div>
-        </div>
-        <div className="sb-telemetry">
-          <div><b className="gold">{completed}/{COPY.steps.length}</b><span>{c(COPY.done, l)}</span></div>
-          <div><b style={{ fontSize: 14, textTransform: 'uppercase' }}>{experience}</b><span>{c(COPY.badge, l)}</span></div>
+          <div className="sb-telemetry" style={{ marginTop: 0, borderTop: 0 }}>
+            <div style={{ paddingTop: 0 }}><b className="gold">{completed}/{COPY.steps.length}</b><span>{c(COPY.done, l)}</span></div>
+            <div style={{ paddingTop: 0 }}><b style={{ fontSize: 14, textTransform: 'uppercase' }}>{experience}</b><span>{c(COPY.badge, l)}</span></div>
+          </div>
         </div>
       </header>
 
@@ -116,7 +115,7 @@ export default function CreatorLaunchpadPage() {
           id="idea"
           value={idea}
           onChange={e => saveIdea(e.target.value)}
-          rows={3}
+          rows={2}
           placeholder={c(COPY.ideaHolder, l)}
           className="sb-input"
           style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: 12, resize: 'vertical', fontSize: 14, lineHeight: 1.7 }}
@@ -125,26 +124,26 @@ export default function CreatorLaunchpadPage() {
 
       {/* Steps */}
       <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
           <h2 style={{ margin: 0, fontSize: 'clamp(16px,3vw,22px)', fontWeight: 900, letterSpacing: '-.03em' }}>{c(COPY.pathTitle, l)}</h2>
           <span style={{ color: '#ffc300', fontWeight: 900, fontSize: 13 }}>{completed}/{COPY.steps.length} {c(COPY.done, l)}</span>
         </div>
 
         <div style={{ display: 'grid', gap: 12 }}>
           {COPY.steps.map((step, i) => (
-            <article key={i} style={{ display: 'grid', gridTemplateColumns: '40px minmax(0,1fr) auto', gap: 14, alignItems: 'center', padding: '16px 0 16px 14px', borderTop: '1px solid rgba(255,255,255,.07)', borderLeft: done[i] ? '2px solid rgba(134,239,172,.7)' : '2px solid rgba(255,255,255,.12)', transition: 'border-color .18s' }}>
+            <article key={i} style={{ display: 'grid', gridTemplateColumns: '32px minmax(0,1fr) auto', gap: 12, alignItems: 'center', padding: '10px 0 10px 12px', borderTop: '1px solid rgba(255,255,255,.07)', borderLeft: done[i] ? '2px solid rgba(134,239,172,.7)' : '2px solid rgba(255,255,255,.12)', transition: 'border-color .18s' }}>
               <button
                 onClick={() => toggle(i)}
                 aria-label="Toggle step complete"
-                style={{ cursor: 'pointer', width: 34, height: 34, borderRadius: 999, border: done[i] ? '1px solid #86efac' : '1px solid rgba(255,255,255,.28)', background: done[i] ? '#86efac' : 'rgba(255,255,255,.04)', color: done[i] ? '#05210f' : 'rgba(255,255,255,.7)', fontWeight: 900, fontSize: 13, display: 'grid', placeItems: 'center', transition: 'all .18s' }}
+                style={{ cursor: 'pointer', width: 28, height: 28, borderRadius: 999, border: done[i] ? '1px solid #86efac' : '1px solid rgba(255,255,255,.28)', background: done[i] ? '#86efac' : 'rgba(255,255,255,.04)', color: done[i] ? '#05210f' : 'rgba(255,255,255,.7)', fontWeight: 900, fontSize: 13, display: 'grid', placeItems: 'center', transition: 'all .18s' }}
               >
                 {done[i] ? '✓' : i + 1}
               </button>
               <div style={{ minWidth: 0 }}>
-                <strong style={{ display: 'block', fontSize: 14, fontWeight: 800, color: done[i] ? '#86efac' : '#fff', marginBottom: 3 }}>{c(step.label, l)}</strong>
-                <span style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, lineHeight: 1.6 }}>{c(step.desc, l)}</span>
+                <strong style={{ display: 'block', fontSize: 13.5, fontWeight: 800, color: done[i] ? '#86efac' : '#fff', marginBottom: 2 }}>{c(step.label, l)}</strong>
+                <span style={{ color: 'rgba(255,255,255,.5)', fontSize: 12.5, lineHeight: 1.5 }}>{c(step.desc, l)}</span>
               </div>
-              <Link href={step.href} style={{ whiteSpace: 'nowrap', padding: '10px 16px', borderRadius: 12, background: '#ffc300', color: '#1a1300', fontWeight: 900, textDecoration: 'none', fontSize: 13 }}>
+              <Link href={step.href} style={{ whiteSpace: 'nowrap', padding: '8px 14px', borderRadius: 10, background: '#ffc300', color: '#1a1300', fontWeight: 900, textDecoration: 'none', fontSize: 13 }}>
                 {c(COPY.open, l)}
               </Link>
             </article>

@@ -193,11 +193,8 @@ html, body { margin: 0; padding: 0; font-family: system-ui, sans-serif; backgrou
 @media (max-width: 720px) { .sb-orbit-table { overflow-x: auto; } .sb-cockpit-grid, .sb-mission-grid { grid-template-columns: 1fr; } }
 
 /* ── Reviews module ── */
-.sb-reviews-page { display: grid; gap: 22px; margin: 0 auto; max-width: 1180px; padding: clamp(18px, 4vw, 42px) 0 80px; width: min(100% - 28px, 1180px); }
+.sb-reviews-page { display: grid; gap: 18px; }
 
-.sb-reviews-hero { align-items: start; background: radial-gradient(circle at 20% 10%, rgba(26,240,255,.24), transparent 28rem), radial-gradient(circle at 80% 20%, rgba(168,85,247,.22), transparent 24rem), linear-gradient(135deg, rgba(255,255,255,.1), rgba(255,255,255,.03)); border: 1px solid rgba(26,240,255,.2); border-radius: 34px; box-shadow: 0 32px 120px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.1); display: grid; gap: 24px; grid-template-columns: minmax(0, 1.4fr) minmax(160px, .6fr); overflow: visible; padding: clamp(18px, 3vw, 32px); position: relative; }
-.sb-reviews-hero h1 { font-size: clamp(32px, 5vw, 60px); letter-spacing: -.05em; line-height: .95; margin: 8px 0 14px; }
-.sb-reviews-hero p:not(.sb-eyebrow) { color: var(--text-secondary); font-size: clamp(14px, 1.8vw, 16px); line-height: 1.7; max-width: 560px; }
 .sb-review-hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
 
 .sb-review-wireframe { background: rgba(2,6,23,.52); border: 1px solid rgba(255,255,255,.14); border-radius: 20px; padding: 14px; width: 100%; box-sizing: border-box; }
@@ -206,7 +203,7 @@ html, body { margin: 0; padding: 0; font-family: system-ui, sans-serif; backgrou
 
 .sb-review-alert { background: rgba(255,195,0,.08); border: 1px solid rgba(255,195,0,.25); border-radius: 18px; color: #ffe08a; padding: 14px 16px; }
 .sb-review-grid, .sb-admin-review-grid { display: grid; gap: 18px; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .65fr); }
-.sb-review-panel, .sb-review-card, .sb-review-controls, .sb-admin-review-console { background: linear-gradient(145deg, rgba(15,23,42,.78), rgba(3,7,18,.68)); border: 1px solid rgba(255,255,255,.12); border-radius: 26px; box-shadow: 0 24px 80px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.08); padding: clamp(16px, 3vw, 24px); backdrop-filter: blur(18px); }
+.sb-review-panel, .sb-review-card, .sb-review-controls, .sb-admin-review-console { background: linear-gradient(145deg, rgba(15,23,42,.66), rgba(3,7,18,.55)); border: 1px solid rgba(26,240,255,.14); border-radius: 22px; box-shadow: none; padding: 20px; }
 .sb-review-panel--wide { min-width: 0; }
 .sb-review-panel-header { align-items: flex-start; display: flex; gap: 16px; justify-content: space-between; margin-bottom: 12px; }
 .sb-review-panel h2, .sb-review-panel h3, .sb-review-controls h2, .sb-admin-review-console h2 { letter-spacing: -.03em; margin: 0; }

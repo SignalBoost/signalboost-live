@@ -93,15 +93,16 @@ export default function OnboardingAnalyticsDashboardPage() {
   return (
     <main className="dashboardShell">
       <style>{`
-        .dashboardShell { min-height: 100vh; color: #fff; background: radial-gradient(circle at top left, rgba(56,189,248,.16), transparent 32rem), #070b17; padding: clamp(1rem, 3vw, 2rem); font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
-        .hero { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-end; margin-bottom: 1.5rem; }
-        h1 { font-size: clamp(2rem, 5vw, 4rem); line-height: 1; letter-spacing: -.06em; margin: 0; }
-        p, span { color: rgba(255,255,255,.66); }
-        .grid { display: grid; gap: 1rem; }
-        .kpiGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 1rem; }
-        .panelGrid { grid-template-columns: 1.2fr .8fr; align-items: start; }
-        .card { border: 1px solid rgba(255,255,255,.12); border-radius: 26px; background: linear-gradient(145deg, rgba(255,255,255,.12), rgba(255,255,255,.045)); box-shadow: 0 24px 80px rgba(0,0,0,.28); backdrop-filter: blur(18px); padding: 1rem; }
-        .kpi strong { display: block; font-size: clamp(1.8rem, 4vw, 3rem); letter-spacing: -.05em; }
+        .dashboardShell { color: #fff; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+        .dashboardShell .hero { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-end; border-bottom: 1px solid rgba(255,255,255,.09); padding-bottom: .8rem; margin-bottom: 1.1rem; }
+        .dashboardShell h1 { font-size: 22px; font-weight: 950; line-height: 1.1; letter-spacing: -.045em; margin: 4px 0 4px; color: #fff; }
+        .dashboardShell p, .dashboardShell span { color: rgba(255,255,255,.66); }
+        .dashboardShell .grid { display: grid; gap: 1rem; }
+        .dashboardShell .kpiGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 1rem; }
+        .dashboardShell .panelGrid { grid-template-columns: 1.2fr .8fr; align-items: start; }
+        .dashboardShell .card { border: 0; border-top: 1px solid rgba(255,255,255,.08); border-radius: 0; background: transparent; box-shadow: none; padding: .9rem 0 0; }
+        .dashboardShell .kpi { border-top: 0; border-left: 2px solid rgba(26,240,255,.4); padding: 0 0 0 .85rem; }
+        .dashboardShell .kpi strong { display: block; font-size: clamp(1.4rem, 3vw, 2rem); letter-spacing: -.03em; color: #9ff7ff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
         .barRow { display: grid; grid-template-columns: 8rem 1fr 4rem; gap: .75rem; align-items: center; margin: .9rem 0; }
         .barTrack { height: .8rem; border-radius: 999px; background: rgba(255,255,255,.09); overflow: hidden; }
         .barFill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #38bdf8, #ffc300); }
@@ -109,7 +110,7 @@ export default function OnboardingAnalyticsDashboardPage() {
         .legend { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px solid rgba(255,255,255,.09); padding-bottom: .6rem; }
         .dot { display: inline-block; width: .65rem; height: .65rem; border-radius: 999px; margin-right: .4rem; }
         .taskList { display: grid; gap: .65rem; padding: 0; margin: .5rem 0 0; list-style: none; }
-        .taskList li { border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.055); border-radius: 16px; padding: .8rem; }
+        .dashboardShell .taskList li { border: 0; border-top: 1px solid rgba(255,255,255,.07); border-left: 2px solid rgba(56,189,248,.4); padding: .7rem 0 .7rem .8rem; }
         .statusPill { display: inline-flex; border-radius: 999px; padding: .35rem .65rem; background: rgba(34,197,94,.12); color: #86efac; font-size: .82rem; font-weight: 800; }
         .table { width: 100%; border-collapse: collapse; font-size: .9rem; }
         .table th, .table td { text-align: left; border-bottom: 1px solid rgba(255,255,255,.08); padding: .75rem .5rem; }
@@ -122,7 +123,7 @@ export default function OnboardingAnalyticsDashboardPage() {
         <div>
           <span className="statusPill">Live onboarding analytics</span>
           <h1>Onboarding Command Center</h1>
-          <p>Completion, funnel drop-off, consent, tone preference, performance QA, feedback, and A/B testing readiness.</p>
+          <p style={{ fontSize: 13, margin: 0 }}>Completion, funnel drop-off, consent, tone, QA, feedback, A/B readiness.</p>
         </div>
         <p>{loading ? 'Loading data…' : `${events.length} events analyzed`}</p>
       </section>

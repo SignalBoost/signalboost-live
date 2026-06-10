@@ -110,28 +110,30 @@ export default function OperatorPage() {
   const fullUrl = liveUrl ? (typeof window !== 'undefined' ? window.location.origin : '') + liveUrl : null
 
   return (
-    <div className="sb-hmi-shell" style={{ minHeight: '100vh' }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 0 80px' }}>
+    <div style={{ color: 'var(--text-primary)' }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
 
-        {/* Header */}
-        <div className="sb-cockpit-hero" style={{ marginBottom: 28 }}>
-          <p className="sb-hmi-kicker">🌐 {c('eyebrow', l)}</p>
-          <h1 className="sb-h2" style={{ margin: '10px 0 12px' }}>{c('title', l)}</h1>
-          <p className="sb-hmi-muted" style={{ maxWidth: 680 }}>{c('subtitle', l)}</p>
+        {/* Header — compact studio bar */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', borderBottom: '1px solid rgba(255,255,255,.09)', paddingBottom: 12, marginBottom: 18 }}>
+          <div style={{ minWidth: 0 }}>
+            <p className="sb-eyebrow" style={{ margin: 0 }}>🌐 {c('eyebrow', l)}</p>
+            <h1 style={{ fontSize: 22, fontWeight: 950, letterSpacing: '-.04em', lineHeight: 1.15, margin: '4px 0 0' }}>{c('title', l)}</h1>
+          </div>
+          <span className="sb-chip">{generating ? '...' : content ? 'READY' : 'IDLE'}</span>
         </div>
 
         {/* Main grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.6fr) minmax(220px, 1fr)', gap: 18, marginBottom: 24, alignItems: 'start' }}>
 
           {/* Input panel */}
-          <div className="sb-glass-panel" style={{ padding: 24 }}>
+          <div>
             <textarea
               className="sb-input"
               value={description}
               onChange={e => setDescription(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) generate() }}
               placeholder={c('placeholder', l)}
-              rows={7}
+              rows={5}
               maxLength={1200}
               style={{ width: '100%', boxSizing: 'border-box', padding: '14px 16px', borderRadius: 12, resize: 'vertical', fontSize: 14, lineHeight: 1.7 }}
               disabled={generating}
@@ -147,8 +149,8 @@ export default function OperatorPage() {
           </div>
 
           {/* Tips panel */}
-          <div className="sb-neon-panel" style={{ padding: 20 }}>
-            <p className="sb-hmi-kicker" style={{ marginBottom: 14 }}>💡 {c('hintLabel', l)}</p>
+          <div style={{ borderLeft: '1px solid rgba(255,255,255,.08)', paddingLeft: 20 }}>
+            <p className="sb-eyebrow" style={{ marginBottom: 14 }}>💡 {c('hintLabel', l)}</p>
             {[c('hint1', l), c('hint2', l), c('hint3', l)].map((hint, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 14 }}>
                 <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: '50%', background: 'rgba(26,240,255,.15)', border: '1px solid rgba(26,240,255,.3)', color: '#1af0ff', fontSize: 11, fontWeight: 900, display: 'grid', placeItems: 'center' }}>
@@ -165,7 +167,7 @@ export default function OperatorPage() {
 
         {/* Generation status */}
         {(generating || steps.length > 0) && !content && (
-          <div className="sb-glass-panel" style={{ padding: 20, marginBottom: 20 }}>
+          <div style={{ borderTop: '1px solid rgba(26,240,255,.25)', borderLeft: '2px solid rgba(26,240,255,.4)', paddingTop: 14, paddingLeft: 14, marginBottom: 20 }}>
             <p className="sb-eyebrow" style={{ marginBottom: 14 }}>{c('engineTitle', l)}</p>
             <div style={{ display: 'grid', gap: 8 }}>
               {steps.map((s, i) => (
@@ -192,7 +194,7 @@ export default function OperatorPage() {
         {content && (
           <div>
             {/* Action bar */}
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 18, padding: '14px 18px', borderRadius: 16, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.10)' }}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14, borderTop: '1px solid rgba(255,255,255,.09)', paddingTop: 14 }}>
               <p className="sb-eyebrow" style={{ flex: 1, margin: 0 }}>✦ {c('previewTitle', l)}</p>
               <button onClick={publish} disabled={publishing} className="sb-button-primary" style={{ borderRadius: 12, padding: '11px 24px', opacity: publishing ? 0.55 : 1 }}>
                 {publishing ? c('publishingBtn', l) : c('publishBtn', l)}

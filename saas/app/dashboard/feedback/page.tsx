@@ -298,6 +298,18 @@ export default function FeedbackPage() {
   const copy = getCopy(lang)
 
   const [tab, setTab] = useState<'submit' | 'board'>('submit')
+  const [boardPage, setBoardPage] = useState(0)
+  const [boardPageSize, setBoardPageSize] = useState(4)
+
+  // Fit whole feedback rows to the screen, never a cut one.
+  useEffect(() => {
+    function recalc() {
+      setBoardPageSize(Math.max(1, Math.floor((window.innerHeight - 330) / 130)))
+    }
+    recalc()
+    window.addEventListener('resize', recalc)
+    return () => window.removeEventListener('resize', recalc)
+  }, [])
   const [userId, setUserId] = useState('')
   const [userName, setUserName] = useState('')
   const [rating, setRating] = useState(0)
@@ -385,7 +397,7 @@ export default function FeedbackPage() {
 
   return (
     <div style={{ color: '#fff', fontFamily: 'system-ui' }}>
-      <div style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', paddingBottom: 20, marginBottom: 28 }}>
+      <div style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', paddingBottom: 12, marginBottom: 16 }}>
         <h1 style={{ fontSize: 24, fontWeight: 900, margin: 0, letterSpacing: '-0.02em' }}>
           💬 {copy.title}
         </h1>
@@ -395,7 +407,7 @@ export default function FeedbackPage() {
         </p>
       </div>
 
-      <div style={{ display: 'flex', gap: 4, marginBottom: 28, background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: 4, width: 'fit-content' }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: 4, width: 'fit-content' }}>
         {[
           { id: 'submit', label: copy.submitTab },
           { id: 'board', label: `${copy.boardTab} ${allFeedback.length > 0 ? `(${allFeedback.length})` : ''}` },
@@ -455,8 +467,8 @@ export default function FeedbackPage() {
             </div>
           ) : (
             <div>
-              <div style={{ marginBottom: 28 }}>
-                <label style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 12 }}>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 8 }}>
                   {copy.ratingLabel}
                 </label>
 
@@ -468,12 +480,12 @@ export default function FeedbackPage() {
                       onMouseEnter={() => setHoveredRating(star)}
                       onMouseLeave={() => setHoveredRating(0)}
                       style={{
-                        width: 48,
-                        height: 48,
-                        borderRadius: 12,
+                        width: 36,
+                        height: 36,
+                        borderRadius: 10,
                         border: 'none',
                         cursor: 'pointer',
-                        fontSize: 24,
+                        fontSize: 19,
                         background: (hoveredRating || rating) >= star ? 'rgba(255,195,0,0.15)' : 'rgba(255,255,255,0.03)',
                         transition: 'all 0.15s',
                       }}
@@ -490,38 +502,37 @@ export default function FeedbackPage() {
                 </div>
               </div>
 
-              <div style={{ marginBottom: 24 }}>
-                <label style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 12 }}>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 8 }}>
                   {copy.categoryLabel}
                 </label>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
                   {copy.categories.map((cat) => (
                     <div
                       key={cat.id}
                       onClick={() => setCategory(cat.id)}
+                      title={cat.desc}
                       style={{
-                        padding: '14px 16px',
-                        borderRadius: 12,
+                        padding: '10px 12px',
+                        borderRadius: 10,
                         cursor: 'pointer',
                         background: category === cat.id ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.02)',
                         border: `1px solid ${category === cat.id ? BLUE : 'rgba(255,255,255,0.07)'}`,
                         transition: 'all 0.15s',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                        <span style={{ fontSize: 18 }}>{cat.icon}</span>
-                        <span style={{ fontSize: 13, fontWeight: 700 }}>{cat.label}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 16 }}>{cat.icon}</span>
+                        <span style={{ fontSize: 12.5, fontWeight: 700 }}>{cat.label}</span>
                         {category === cat.id && <span style={{ marginLeft: 'auto', color: BLUE }}>✓</span>}
                       </div>
-
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{cat.desc}</div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div style={{ marginBottom: 24 }}>
+              <div style={{ marginBottom: 16 }}>
                 <label style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.6)', display: 'block', marginBottom: 8 }}>
                   {copy.messageLabel}
                 </label>
@@ -530,7 +541,7 @@ export default function FeedbackPage() {
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
                   placeholder={selectedPlaceholder}
-                  rows={5}
+                  rows={3}
                   style={{
                     width: '100%',
                     padding: '12px 14px',
@@ -558,7 +569,7 @@ export default function FeedbackPage() {
                 </div>
               </div>
 
-              <div style={{ borderLeft: '2px solid rgba(255,195,0,0.5)', paddingLeft: 14, marginBottom: 20, fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.6 }}>
+              <div style={{ borderLeft: '2px solid rgba(255,195,0,0.5)', paddingLeft: 14, marginBottom: 14, fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.6 }}>
                 {copy.notice}
               </div>
 
@@ -630,7 +641,7 @@ export default function FeedbackPage() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {filtered.map((item) => {
+              {filtered.slice(boardPage * boardPageSize, boardPage * boardPageSize + boardPageSize).map((item) => {
                 const cat = copy.categories.find((categoryItem) => categoryItem.id === item.category)
                 const isOwn = item.user_id === userId
                 const statusLabel = copy.statuses[item.status] || item.status
@@ -683,6 +694,13 @@ export default function FeedbackPage() {
                   </div>
                 )
               })}
+              {filtered.length > boardPageSize ? (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 16, marginTop: 8, borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 10 }}>
+                  <button type="button" onClick={() => setBoardPage(boardPage - 1)} disabled={boardPage === 0} style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999, padding: '6px 16px', cursor: 'pointer', opacity: boardPage === 0 ? .4 : 1 }}>‹</button>
+                  <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 13, color: 'rgba(255,255,255,.7)' }}>{boardPage + 1} / {Math.max(1, Math.ceil(filtered.length / boardPageSize))}</span>
+                  <button type="button" onClick={() => setBoardPage(boardPage + 1)} disabled={(boardPage + 1) * boardPageSize >= filtered.length} style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999, padding: '6px 16px', cursor: 'pointer', opacity: (boardPage + 1) * boardPageSize >= filtered.length ? .4 : 1 }}>›</button>
+                </div>
+              ) : null}
             </div>
           )}
         </div>

@@ -275,64 +275,27 @@ export default function ReviewsPage() {
   return (
     <div className="sb-reviews-page" style={{ color: 'var(--text-primary)' }}>
 
-      {/* ── Hero — compact single column with inline pipeline status bar ── */}
-      <section style={{
-        background: 'radial-gradient(circle at 20% 10%, rgba(26,240,255,.2), transparent 24rem), radial-gradient(circle at 80% 20%, rgba(168,85,247,.18), transparent 20rem), linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02))',
-        border: '1px solid rgba(26,240,255,.2)',
-        borderRadius: 28,
-        padding: '28px 32px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 16,
-      }}>
-        {/* Top row: eyebrow + title + actions */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+      {/* ── Console header with live review telemetry ── */}
+      <header className="sb-console" style={{ marginBottom: 0 }}>
+        <div className="sb-console__row">
           <div>
-            <p className="sb-eyebrow" style={{ marginBottom: 6 }}>⭐ {c('kicker', l)}</p>
-            <h1 style={{ fontSize: 'clamp(26px, 4vw, 42px)', fontWeight: 900, letterSpacing: '-.04em', lineHeight: 1, margin: 0 }}>{c('title', l)}</h1>
-            <p style={{ color: 'rgba(255,255,255,.6)', fontSize: 14, marginTop: 8, maxWidth: 480, lineHeight: 1.6 }}>{c('subtitle', l)}</p>
+            <span className="sb-eyebrow">⭐ {c('kicker', l)}</span>
+            <h1>{c('title', l)}</h1>
+            <p className="sb-body">{c('subtitle', l)}</p>
           </div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <a href="#submit-review" className="sb-button-primary" style={{ fontSize: 13, padding: '10px 18px' }}>{c('shareCta', l)}</a>
             {isAdmin && <a href="#admin-console" className="sb-button-secondary" style={{ fontSize: 13, padding: '10px 18px' }}>{c('adminCta', l)}</a>}
           </div>
         </div>
-
-        {/* Pipeline status bar — horizontal flow, no height issues */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 0,
-          background: 'rgba(2,6,23,.4)',
-          border: '1px solid rgba(255,255,255,.1)',
-          borderRadius: 14,
-          padding: '10px 16px',
-          flexWrap: 'wrap',
-          rowGap: 8,
-        }}>
-          {['Submission', 'AI Sentiment', 'Moderation', 'Outreach'].map((label, i, arr) => (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-              <span style={{
-                fontSize: 11,
-                fontWeight: 900,
-                letterSpacing: '.08em',
-                textTransform: 'uppercase',
-                color: '#dffcff',
-                padding: '5px 12px',
-                border: '1px solid rgba(26,240,255,.2)',
-                borderRadius: 8,
-                background: 'rgba(26,240,255,.06)',
-                whiteSpace: 'nowrap',
-              }}>
-                {label}
-              </span>
-              {i < arr.length - 1 && (
-                <span style={{ color: '#ffc300', fontSize: 14, fontWeight: 900, padding: '0 6px' }}>→</span>
-              )}
-            </div>
-          ))}
+        <div className="sb-telemetry">
+          <div><b className="gold">{enrichedReviews.length}</b><span>{c('total', l)}</span></div>
+          <div><b className="warn">{pendingCount}</b><span>{c('pending', l)}</span></div>
+          <div><b className="ok">{approvedCount}</b><span>{c('approved', l)}</span></div>
+          <div><b style={{ color: flaggedCount ? '#fca5a5' : undefined }}>{flaggedCount}</b><span>{c('flagged', l)}</span></div>
+          <div><b>{avgRating.toFixed(1)} ★</b><span>{c('avg', l)}</span></div>
         </div>
-      </section>
+      </header>
 
       {reviewsError && <div className="sb-review-alert">{reviewsError}</div>}
 

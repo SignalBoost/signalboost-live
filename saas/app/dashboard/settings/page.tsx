@@ -93,17 +93,20 @@ export default function SettingsPage() {
 
   return (
     <main style={{ color: 'var(--text-primary)', maxWidth: 760, margin: '0 auto' }}>
-      <header className="sb-console">
-        <span className="sb-eyebrow">⚙️ {tr('settings.eyebrow', 'Account')}</span>
-        <h1>{tr('settings.title', 'Settings')}</h1>
-        <p className="sb-body">{tr('settings.subtitle', 'Manage your profile, language, and notifications.')}</p>
-        {!loading ? (
-          <div className="sb-telemetry">
-            <div><b className="gold" style={{ fontSize: 14 }}>{email || '—'}</b><span>{tr('settings.email', 'Account email')}</span></div>
-            <div><b style={{ fontSize: 14 }}>{langLabel}</b><span>{tr('settings.language', 'Language')}</span></div>
-            <div><b className={settings.email_notifications ? 'ok' : 'warn'} style={{ fontSize: 14 }}>{settings.email_notifications ? 'ON' : 'OFF'}</b><span>{tr('settings.notifications', 'Notifications')}</span></div>
+      <header className="sb-console" style={{ paddingBottom: 12 }}>
+        <div className="sb-console__row">
+          <div style={{ minWidth: 0 }}>
+            <span className="sb-eyebrow">⚙️ {tr('settings.eyebrow', 'Account')}</span>
+            <h1 style={{ fontSize: 22, margin: '4px 0' }}>{tr('settings.title', 'Settings')}</h1>
           </div>
-        ) : null}
+          {!loading ? (
+            <div className="sb-telemetry" style={{ marginTop: 0, borderTop: 0 }}>
+              <div style={{ paddingTop: 0 }}><b className="gold" style={{ fontSize: 14 }}>{email || '—'}</b><span>{tr('settings.email', 'Account email')}</span></div>
+              <div style={{ paddingTop: 0 }}><b style={{ fontSize: 14 }}>{langLabel}</b><span>{tr('settings.language', 'Language')}</span></div>
+              <div style={{ paddingTop: 0 }}><b className={settings.email_notifications ? 'ok' : 'warn'} style={{ fontSize: 14 }}>{settings.email_notifications ? 'ON' : 'OFF'}</b><span>{tr('settings.notifications', 'Notifications')}</span></div>
+            </div>
+          ) : null}
+        </div>
       </header>
 
       {loading ? (

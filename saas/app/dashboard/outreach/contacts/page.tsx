@@ -256,25 +256,28 @@ export default function OutreachContactsPage() {
     ? leads
     : leads.filter((lead) => (lead.status || 'pending') === filter)
 
+  const countByStatus = (status: string) => leads.filter((l) => (l.status || 'pending') === status).length
+
   return (
-    <main className="sb-glass" style={{ padding: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
-        <div>
-          <span className="sb-eyebrow">{copy.eyebrow}</span>
-
-          <h1 className="sb-h2" style={{ marginTop: 10 }}>
-            {copy.title}
-          </h1>
-
-          <p className="sb-body" style={{ maxWidth: 620 }}>
-            {copy.subtitle}
-          </p>
+    <main style={{ color: 'var(--text-primary)' }}>
+      <header className="sb-console">
+        <div className="sb-console__row">
+          <div>
+            <span className="sb-eyebrow">🗂️ {copy.eyebrow}</span>
+            <h1>{copy.title}</h1>
+            <p className="sb-body">{copy.subtitle}</p>
+          </div>
+          <Link className="sb-button-primary" href="/dashboard/outreach/discovery" style={{ whiteSpace: 'nowrap' }}>
+            {copy.discoverNew}
+          </Link>
         </div>
-
-        <Link className="sb-button-primary" href="/dashboard/outreach/discovery">
-          {copy.discoverNew}
-        </Link>
-      </div>
+        <div className="sb-telemetry">
+          <div><b className="gold">{leads.length}</b><span>{copy.filters.all}</span></div>
+          <div><b className="warn">{countByStatus('pending')}</b><span>{copy.filters.pending}</span></div>
+          <div><b className="ok">{countByStatus('approved')}</b><span>{copy.filters.approved}</span></div>
+          <div><b style={{ color: '#fca5a5' }}>{countByStatus('rejected')}</b><span>{copy.filters.rejected}</span></div>
+        </div>
+      </header>
 
       <div className="sb-cta-row" style={{ marginBottom: 16 }}>
         {FILTERS.map((filterKey) => (
@@ -298,7 +301,7 @@ export default function OutreachContactsPage() {
       ) : null}
 
       {!loading && !error && visible.length === 0 ? (
-        <div className="sb-card" style={{ padding: 24, textAlign: 'center' }}>
+        <div className="sb-empty">
           <p className="sb-body" style={{ margin: 0 }}>
             {copy.empty}
           </p>
@@ -316,7 +319,7 @@ export default function OutreachContactsPage() {
           const status = lead.status || 'pending'
 
           return (
-            <article key={lead.id} className="sb-card" style={{ padding: 18 }}>
+            <article key={lead.id} style={{ borderTop: '1px solid rgba(255,255,255,.07)', borderLeft: `2px solid ${STATUS_COLOR[status] || 'rgba(255,255,255,.2)'}`, padding: '16px 0 16px 14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                 <div style={{ minWidth: 0 }}>
                   <h2 className="sb-h3" style={{ margin: 0 }}>

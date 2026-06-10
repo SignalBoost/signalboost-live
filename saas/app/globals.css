@@ -333,3 +333,48 @@ html, body { margin: 0; padding: 0; font-family: system-ui, sans-serif; backgrou
 .sb-hmi-preview-card:hover, .sb-hmi-preview-card:focus-visible { border-color: rgba(26,240,255,.48); box-shadow: 0 0 34px rgba(26,240,255,.16); outline: 2px solid rgba(26,240,255,.34); outline-offset: 3px; transform: translateY(-3px); }
 .sb-hmi-preview-card img { aspect-ratio: 16 / 10; display: block; object-fit: cover; width: 100%; }
 .sb-hmi-preview-card span { display: block; font-size: 13px; font-weight: 900; letter-spacing: .05em; padding: 12px 14px; text-transform: uppercase; }
+
+/* ════════════════════════════════════════════════════════════════════
+   SignalBoost Console — shared design system for every app page.
+   One header pattern, one telemetry strip, one panel family, one
+   field style. Pages compose these; they don't invent their own.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Console header: eyebrow + title + subtitle + actions, instrument line on top */
+.sb-console { position: relative; overflow: hidden; border: 1px solid rgba(26,240,255,.18); border-radius: 26px; padding: clamp(20px, 3.5vw, 30px); background: radial-gradient(circle at 12% 0%, rgba(255,195,0,.10), transparent 24rem), linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02)); box-shadow: 0 24px 80px rgba(0,0,0,.28); margin-bottom: 22px; }
+.sb-console::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, rgba(255,195,0,.75) 30%, rgba(26,240,255,.75) 70%, transparent); }
+.sb-console__row { display: flex; justify-content: space-between; align-items: flex-end; gap: 18px; flex-wrap: wrap; }
+.sb-console h1 { font-size: clamp(25px, 4vw, 38px); font-weight: 950; letter-spacing: -.045em; line-height: 1.05; margin: 8px 0; }
+.sb-console .sb-body { max-width: 660px; font-size: 14px; margin: 0; }
+
+/* Telemetry strip: monospaced live readouts — the cockpit signature */
+.sb-telemetry { display: flex; flex-wrap: wrap; margin-top: 18px; border-top: 1px solid rgba(255,255,255,.09); }
+.sb-telemetry > div { padding: 12px 18px 2px 0; margin-right: 18px; border-right: 1px solid rgba(255,255,255,.08); }
+.sb-telemetry > div:last-child { border-right: 0; margin-right: 0; }
+.sb-telemetry b { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 19px; font-weight: 800; color: #9ff7ff; letter-spacing: -.02em; line-height: 1.2; }
+.sb-telemetry b.gold { color: var(--gold); }
+.sb-telemetry b.ok { color: #86efac; }
+.sb-telemetry b.warn { color: #fde68a; }
+.sb-telemetry span { font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--text-faint); }
+
+/* Panel: the one section card. Header row inside. */
+.sb-panel { background: linear-gradient(145deg, rgba(15,23,42,.66), rgba(3,7,18,.55)); border: 1px solid rgba(26,240,255,.14); border-radius: 22px; padding: 20px; margin-bottom: 16px; }
+.sb-panel__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.sb-panel__head h2 { font-size: 16px; font-weight: 900; letter-spacing: -.02em; margin: 0; }
+.sb-panel__head .sb-caption { margin: 0; }
+
+/* Field: label + input/textarea/select, consistent everywhere */
+.sb-field { display: block; margin-bottom: 14px; }
+.sb-field > span { display: block; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 7px; }
+.sb-field input, .sb-field textarea, .sb-field select { width: 100%; box-sizing: border-box; background: rgba(2,6,23,.6); border: 1px solid var(--border-medium); border-radius: 14px; color: var(--text-primary); padding: 12px 14px; font-size: 14px; font-family: inherit; }
+.sb-field textarea { min-height: 110px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.6; }
+.sb-field input:focus, .sb-field textarea:focus, .sb-field select:focus { border-color: rgba(26,240,255,.5); outline: none; box-shadow: 0 0 0 3px rgba(26,240,255,.10); }
+
+/* Empty state + chips */
+.sb-empty { border: 1px dashed rgba(255,255,255,.16); border-radius: 18px; padding: 26px 20px; text-align: center; color: var(--text-muted); font-size: 13px; line-height: 1.6; }
+.sb-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(26,240,255,.22); background: rgba(26,240,255,.07); color: #9ff7ff; border-radius: 999px; padding: 5px 11px; font-size: 11px; font-weight: 800; letter-spacing: .04em; }
+.sb-chip--gold { border-color: rgba(255,195,0,.3); background: rgba(255,195,0,.08); color: var(--gold); }
+.sb-chip--ok { border-color: rgba(134,239,172,.3); background: rgba(134,239,172,.08); color: #86efac; }
+.sb-chip--err { border-color: rgba(252,165,165,.3); background: rgba(252,165,165,.08); color: #fca5a5; }
+
+@media (prefers-reduced-motion: reduce) { .sb-console::before { background: rgba(26,240,255,.4); } }

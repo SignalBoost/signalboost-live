@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 
@@ -9,7 +10,12 @@ const CONTACT_EMAIL = 'support@signalboostapp.com'
 
 export default function Footer() {
   const { dict } = useI18n()
+  const pathname = usePathname()
   const year = new Date().getFullYear()
+
+  // The marketing footer belongs on public pages only — inside the app it
+  // pushes full-height workspaces (assistant, video, calendar) past the viewport.
+  if (pathname?.startsWith('/dashboard') || pathname?.startsWith('/admin')) return null
 
   return (
     <footer

@@ -495,7 +495,7 @@ export default function FeedbackPage() {
                   {copy.categoryLabel}
                 </label>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10 }}>
                   {copy.categories.map((cat) => (
                     <div
                       key={cat.id}

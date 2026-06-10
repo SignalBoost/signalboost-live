@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
@@ -106,13 +106,21 @@ export default function LaunchpadPage() {
 
   const [selected, setSelected]     = useState('')
   const [experience, setExperience] = useState('')
+  const previewRef                  = useRef<HTMLDivElement>(null)
 
   const selectedPath = COPY.paths.find(p => p.id === selected)
   const canContinue  = Boolean(selectedPath && experience)
 
+  // Selecting a path is a real action — bring its 5-step preview into view
+  // so the click visibly does something and the Continue button is found.
+  useEffect(() => {
+    if (selectedPath) previewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [selected, experience, selectedPath])
+
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', color: 'var(--text-primary)', display: 'grid', gap: 22 }}>
 
+      <div style={{ minHeight: 'calc(100vh - 125px)', display: 'grid', gap: 22, alignContent: 'start' }}>
       {/* Header */}
       <div style={{ textAlign: 'center' }}>
         <div style={{ display: 'inline-flex', padding: '5px 12px', borderRadius: 999, background: 'rgba(255,195,0,.1)', border: '1px solid rgba(255,195,0,.22)', color: '#ffc300', fontWeight: 900, fontSize: 10, letterSpacing: '.1em', marginBottom: 10 }}>
@@ -159,9 +167,11 @@ export default function LaunchpadPage() {
         </div>
       </section>
 
-      {/* Preview */}
+      </div>
+
+      {/* Preview — second screen */}
       {selectedPath && (
-        <div style={{ borderTop: '1px solid rgba(255,195,0,.3)', paddingTop: 22 }}>
+        <div ref={previewRef} style={{ borderTop: '1px solid rgba(255,195,0,.3)', paddingTop: 22, scrollMarginTop: 80 }}>
           <h2 style={{ fontSize: 'clamp(16px,2.5vw,20px)', fontWeight: 900, margin: '0 0 20px', letterSpacing: '-.02em' }}>{c(selectedPath.previewTitle, l)}</h2>
           <div style={{ display: 'grid', gap: 10, marginBottom: 20 }}>
             {(['s1','s2','s3','s4','s5'] as const).map((sk, i) => (

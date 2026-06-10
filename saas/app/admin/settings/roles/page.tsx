@@ -84,28 +84,44 @@ export default function RolesManagementPage() {
     return <div className="text-slate-300">You do not have access to Role Management.</div>
   }
 
+  const roleCount = (role: string) => sortedUsers.filter(u => u.role === role).length
+
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Admin Role Management</h1>
-      <p className="text-sm text-slate-400">Only one owner is allowed at a time.</p>
+    <div>
+      <header className="sb-console" style={{ paddingBottom: 12 }}>
+        <div className="sb-console__row">
+          <div style={{ minWidth: 0 }}>
+            <span className="sb-eyebrow">🛡️ Admin · Roles</span>
+            <h1 style={{ fontSize: 22, margin: '4px 0' }}>Role Management</h1>
+          </div>
+          <div className="sb-telemetry" style={{ marginTop: 0, borderTop: 0 }}>
+            <div style={{ paddingTop: 0 }}><b className="gold">{roleCount('owner')}</b><span>Owner</span></div>
+            <div style={{ paddingTop: 0 }}><b>{roleCount('admin')}</b><span>Admins</span></div>
+            <div style={{ paddingTop: 0 }}><b>{sortedUsers.length}</b><span>Total</span></div>
+          </div>
+        </div>
+      </header>
+      <p className="text-sm text-slate-400" style={{ margin: '0 0 14px' }}>Only one owner is allowed at a time.</p>
 
-      {message && <div className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm">{message}</div>}
+      {message && <div style={{ borderLeft: '2px solid rgba(26,240,255,.5)', paddingLeft: 14, marginBottom: 14 }} className="text-sm">{message}</div>}
 
-      <div className="overflow-hidden rounded-xl border border-slate-800">
+      <div>
         <table className="w-full text-sm">
-          <thead className="bg-slate-900 text-slate-300">
-            <tr>
-              <th className="px-4 py-3 text-left">Email</th>
-              <th className="px-4 py-3 text-left">Role</th>
-              <th className="px-4 py-3 text-right">ActionMenu</th>
+          <thead>
+            <tr style={{ borderBottom: '1px solid rgba(255,255,255,.12)' }}>
+              <th className="px-1 py-3 text-left" style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)' }}>Email</th>
+              <th className="px-1 py-3 text-left" style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)' }}>Role</th>
+              <th className="px-1 py-3 text-right" style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {sortedUsers.map(user => (
-              <tr key={user.id} className="border-t border-slate-800">
-                <td className="px-4 py-3">{user.email}</td>
-                <td className="px-4 py-3 capitalize">{user.role}</td>
-                <td className="px-4 py-3 text-right">
+              <tr key={user.id} style={{ borderTop: '1px solid rgba(255,255,255,.07)' }}>
+                <td className="px-1 py-3">{user.email}</td>
+                <td className="px-1 py-3 capitalize">
+                  <span className={user.role === 'owner' ? 'sb-chip sb-chip--gold' : user.role === 'admin' ? 'sb-chip' : ''} style={user.role === 'user' ? { color: 'rgba(255,255,255,.5)' } : undefined}>{user.role}</span>
+                </td>
+                <td className="px-1 py-3 text-right">
                   {isOwner && user.id !== currentUser?.id && (
                     <button
                       className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-500"
@@ -123,7 +139,7 @@ export default function RolesManagementPage() {
 
       {pendingTransfer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-950 p-5">
+          <div className="w-full max-w-md p-5" style={{ background: 'linear-gradient(160deg, #101827, #060913)', border: '1px solid rgba(26,240,255,.25)', borderRadius: 20, boxShadow: '0 32px 110px rgba(0,0,0,.6)' }}>
             <h2 className="text-lg font-semibold">Confirm ownership transfer</h2>
             <p className="mt-3 text-sm text-slate-200">
               Are you sure you want to transfer ownership to {pendingTransfer.email}?

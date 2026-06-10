@@ -13,7 +13,7 @@ type CaptionGenerationState = { status: 'idle' | 'generating' | 'ready' | 'faile
 type AspectRatio = '9:16' | '1:1' | '16:9'
 type CaptionPreset = { id: string; label: string; descKey: string; style: CaptionStyle }
 type CanvasEditorHandle = { startExport: () => Promise<string> }
-type CanvasEditorProps = { videoUrl: string | null; cues: CaptionCue[]; style: CaptionStyle; aspectRatio: AspectRatio; seekTime: number; durationSec: number; onStyleChange: (s: CaptionStyle) => void; onTime: (t: number) => void; onDuration: (s: number) => void }
+type CanvasEditorProps = { videoUrl: string | null; cues: CaptionCue[]; style: CaptionStyle; aspectRatio: AspectRatio; seekTime: number; durationSec: number; lang: string; onStyleChange: (s: CaptionStyle) => void; onTime: (t: number) => void; onDuration: (s: number) => void }
 
 const COPY = {
   eyebrow:         { en: 'Video Studio', es: 'Video Studio', pt: 'Video Studio', pl: 'Video Studio', ru: 'Видео студия' },
@@ -128,9 +128,7 @@ function parseCaptionFile(text: string): CaptionCue[] {
   }
   return cues
 }
-
-function QuotaStatusBar({ quota }: { quota: VideoQuota }) {
-  const { lang } = useI18n()
+function QuotaStatusBar({ quota, lang }: { quota: VideoQuota; lang: string }) {
   const pct = Math.min(100, Math.round((quota.usedMinutes / Math.max(1, quota.includedMinutes)) * 100))
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[.04] p-4">
@@ -142,8 +140,7 @@ function QuotaStatusBar({ quota }: { quota: VideoQuota }) {
   )
 }
 
-function BillingBanner({ quota }: { quota: VideoQuota }) {
-  const { lang } = useI18n()
+function BillingBanner({ quota, lang }: { quota: VideoQuota; lang: string }) {
   if (!quota.requiresOverageCharge) return null
   return (
     <div className="rounded-2xl border border-amber-300/30 bg-amber-300/10 p-4 text-sm text-amber-100">
@@ -152,8 +149,7 @@ function BillingBanner({ quota }: { quota: VideoQuota }) {
   )
 }
 
-function PresetPicker({ activePreset, onPreset }: { activePreset: string; onPreset: (p: CaptionPreset) => void }) {
-  const { lang } = useI18n()
+function PresetPicker({ activePreset, onPreset, lang }: { activePreset: string; onPreset: (p: CaptionPreset) => void; lang: string }) {
   return (
     <section className="rounded-3xl border border-white/10 bg-black/40 p-5">
       <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{c('templates', lang)}</h2><span className="text-xs text-white/50">{c('templatesHint', lang)}</span></div>
@@ -168,8 +164,7 @@ function PresetPicker({ activePreset, onPreset }: { activePreset: string; onPres
   )
 }
 
-function CaptionTimeline({ cues, currentTime, selectedCueId, onSeek, onSelect, onUpdateText }: { cues: CaptionCue[]; currentTime: number; selectedCueId: string | null; onSeek: (s: number) => void; onSelect: (id: string) => void; onUpdateText: (id: string, text: string) => void }) {
-  const { lang } = useI18n()
+function CaptionTimeline({ cues, currentTime, selectedCueId, onSeek, onSelect, onUpdateText, lang }: { cues: CaptionCue[]; currentTime: number; selectedCueId: string | null; onSeek: (s: number) => void; onSelect: (id: string) => void; onUpdateText: (id: string, text: string) => void; lang: string }) {
   const sel = cues.find((cu) => cu.id === selectedCueId) || activeCue(cues, currentTime) || cues[0]
   return (
     <section className="rounded-3xl border border-white/10 bg-black/40 p-5">
@@ -192,8 +187,7 @@ function CaptionTimeline({ cues, currentTime, selectedCueId, onSeek, onSelect, o
   )
 }
 
-function StyleControls({ style, aspectRatio, onChange, onAspectRatio }: { style: CaptionStyle; aspectRatio: AspectRatio; onChange: (s: CaptionStyle) => void; onAspectRatio: (r: AspectRatio) => void }) {
-  const { lang } = useI18n()
+function StyleControls({ style, aspectRatio, onChange, onAspectRatio, lang }: { style: CaptionStyle; aspectRatio: AspectRatio; onChange: (s: CaptionStyle) => void; onAspectRatio: (r: AspectRatio) => void; lang: string }) {
   return (
     <section className="rounded-3xl border border-white/10 bg-black/40 p-5">
       <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{c('captionStyle', lang)}</h2><span className="text-xs text-white/50">x {style.x}% · y {style.y}%</span></div>
@@ -208,22 +202,26 @@ function StyleControls({ style, aspectRatio, onChange, onAspectRatio }: { style:
     </section>
   )
 }
+
 const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
-  ({ videoUrl, cues, style, aspectRatio, seekTime, durationSec, onStyleChange, onTime, onDuration }, ref) => {
-    const { lang } = useI18n()
+  ({ videoUrl, cues, style, aspectRatio, seekTime, durationSec, lang, onStyleChange, onTime, onDuration }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null)
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const [time, setTime] = useState(0)
     const [isPlaying, setIsPlaying] = useState(false)
     const [dragging, setDragging] = useState(false)
     const durationRef = useRef(durationSec)
+    const lastReportedRef = useRef(-1)
     useEffect(() => { durationRef.current = durationSec }, [durationSec])
     const cue = activeCue(cues, time)
     const size = canvasSizes[aspectRatio]
 
     useEffect(() => {
-      if (videoRef.current && Math.abs(videoRef.current.currentTime - seekTime) > 0.08) {
-        videoRef.current.currentTime = seekTime; setTime(seekTime)
+      const video = videoRef.current
+      if (!video) return
+      if (Math.abs(seekTime - lastReportedRef.current) < 0.001) return
+      if (Math.abs(video.currentTime - seekTime) > 0.08) {
+        video.currentTime = seekTime; setTime(seekTime)
       }
     }, [seekTime])
 
@@ -276,7 +274,8 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
 
     const seek = (s: number) => {
       const next = clamp(s, 0, Math.max(0, durationSec || videoRef.current?.duration || 0))
-      if (videoRef.current) videoRef.current.currentTime = next; setTime(next); onTime(next)
+      if (videoRef.current) videoRef.current.currentTime = next
+      lastReportedRef.current = next; setTime(next); onTime(next)
     }
 
     useImperativeHandle(ref, () => ({
@@ -317,7 +316,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
       <section className="rounded-3xl border border-white/10 bg-black/50 p-5">
         <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{c('canvasEditor', lang)}</h2><span className="font-mono text-xs text-white/50">{formatTime(time)} · {aspectRatio}</span></div>
         <div className={`relative mx-auto mt-4 w-full overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 ${aspectClasses[aspectRatio]}`}>
-          {videoUrl ? <video ref={videoRef} src={videoUrl} className="hidden" playsInline crossOrigin="anonymous" onLoadedMetadata={(e) => onDuration(Math.round(e.currentTarget.duration || 0))} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onTimeUpdate={(e) => { const n = e.currentTarget.currentTime; setTime(n); onTime(n) }} /> : null}
+          {videoUrl ? <video ref={videoRef} src={videoUrl} className="hidden" playsInline crossOrigin="anonymous" onLoadedMetadata={(e) => onDuration(Math.round(e.currentTarget.duration || 0))} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onTimeUpdate={(e) => { const n = e.currentTarget.currentTime; lastReportedRef.current = n; setTime(n); onTime(n) }} /> : null}
           <canvas ref={canvasRef} width={size.width} height={size.height} onPointerDown={(e) => { setDragging(true); e.currentTarget.setPointerCapture(e.pointerId); setPos(e) }} onPointerMove={(e) => dragging && setPos(e)} onPointerUp={(e) => { setDragging(false); e.currentTarget.releasePointerCapture(e.pointerId) }} className="h-full w-full cursor-move touch-none" aria-label="Video canvas with draggable caption overlay" />
         </div>
         <div className="mt-4 space-y-3">
@@ -337,8 +336,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
 
 CanvasEditor.displayName = 'CanvasEditor'
 
-function ExportPanel({ canExport, hasSource, exportState, onExport }: { canExport: boolean; hasSource: boolean; exportState: ExportState; onExport: () => void }) {
-  const { lang } = useI18n()
+function ExportPanel({ canExport, hasSource, exportState, onExport, lang }: { canExport: boolean; hasSource: boolean; exportState: ExportState; onExport: () => void; lang: string }) {
   const isRecording = exportState.status === 'recording'
   const isDone = exportState.status === 'ready'
   return (
@@ -354,11 +352,11 @@ function ExportPanel({ canExport, hasSource, exportState, onExport }: { canExpor
     </section>
   )
 }
-
 export default function VideoEditor() {
   const { lang } = useI18n()
   const canvasEditorRef = useRef<CanvasEditorHandle>(null)
 
+  const [mounted, setMounted]             = useState(false)
   const [locale, setLocale]               = useState<SupportedVideoLocale>('en')
   const [tier, setTier]                   = useState('free')
   const [durationSec, setDurationSec]     = useState(0)
@@ -376,6 +374,8 @@ export default function VideoEditor() {
   const [exportState, setExportState]     = useState<ExportState>({ status: 'idle', message: '' })
 
   const quota = useMemo(() => calculateVideoQuota(tier, Math.ceil(Math.max(1, durationSec) / 60)), [tier, durationSec])
+
+  useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -466,6 +466,8 @@ export default function VideoEditor() {
 
   const updateCueText = (id: string, text: string) => setCues((items) => items.map((cu) => cu.id === id ? { ...cu, text } : cu))
 
+  if (!mounted) return <main className="min-h-screen bg-[#05070b]" />
+
   return (
     <main className="min-h-screen bg-[#05070b] p-6 text-white">
       <section className="rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,215,0,.20),transparent_35%),linear-gradient(135deg,#101827,#05070b)] p-8">
@@ -473,7 +475,7 @@ export default function VideoEditor() {
         <h1 className="mt-4 text-4xl font-black">{c('heroTitle', lang)}</h1>
         <p className="mt-3 max-w-3xl text-white/70">{c('heroSubtitle', lang)}</p>
       </section>
-      <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_.35fr]"><QuotaStatusBar quota={quota} /><BillingBanner quota={quota} /></div>
+      <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_.35fr]"><QuotaStatusBar quota={quota} lang={lang} /><BillingBanner quota={quota} lang={lang} /></div>
       <section className="mt-6 grid gap-4 rounded-3xl border border-white/10 bg-white/[.03] p-5 md:grid-cols-5">
         <label className="text-sm">{c('videoInput', lang)}<input type="file" accept="video/*" onChange={(e) => e.target.files?.[0] && uploadVideo(e.target.files[0])} className="mt-2 w-full" /></label>
         <div className="text-sm"><span>{c('aiCaptions', lang)}</span><button type="button" onClick={generateCaptions} disabled={!storagePath || captionState.status === 'generating'} className="mt-2 w-full rounded-xl bg-[#FFD700] px-4 py-2 font-bold text-black disabled:opacity-50">{captionState.status === 'generating' ? c('transcribing', lang) : c('genCaptions', lang)}</button></div>
@@ -487,13 +489,13 @@ export default function VideoEditor() {
       </section>
       <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_.42fr]">
         <div className="space-y-6">
-          <CanvasEditor ref={canvasEditorRef} videoUrl={videoUrl} cues={cues} style={style} aspectRatio={aspectRatio} seekTime={currentTime} durationSec={durationSec} onStyleChange={setStyle} onTime={setCurrentTime} onDuration={setDurationSec} />
-          <StyleControls style={style} aspectRatio={aspectRatio} onChange={setStyle} onAspectRatio={setAspectRatio} />
-          <PresetPicker activePreset={activePreset} onPreset={(p) => { setActivePreset(p.id); setStyle(p.style) }} />
+          <CanvasEditor ref={canvasEditorRef} videoUrl={videoUrl} cues={cues} style={style} aspectRatio={aspectRatio} seekTime={currentTime} durationSec={durationSec} lang={lang} onStyleChange={setStyle} onTime={setCurrentTime} onDuration={setDurationSec} />
+          <StyleControls style={style} aspectRatio={aspectRatio} onChange={setStyle} onAspectRatio={setAspectRatio} lang={lang} />
+          <PresetPicker activePreset={activePreset} onPreset={(p) => { setActivePreset(p.id); setStyle(p.style) }} lang={lang} />
         </div>
         <div className="space-y-6">
-          <CaptionTimeline cues={cues} currentTime={currentTime} selectedCueId={selectedCueId} onSeek={setCurrentTime} onSelect={setSelectedCueId} onUpdateText={updateCueText} />
-          <ExportPanel canExport={quota.exportEnabled} hasSource={Boolean(videoUrl)} exportState={exportState} onExport={exportVideo} />
+          <CaptionTimeline cues={cues} currentTime={currentTime} selectedCueId={selectedCueId} onSeek={setCurrentTime} onSelect={setSelectedCueId} onUpdateText={updateCueText} lang={lang} />
+          <ExportPanel canExport={quota.exportEnabled} hasSource={Boolean(videoUrl)} exportState={exportState} onExport={exportVideo} lang={lang} />
         </div>
       </div>
       <footer className="mt-8 rounded-2xl border border-white/10 bg-white/[.03] p-4 text-sm text-white/60">

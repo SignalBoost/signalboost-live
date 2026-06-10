@@ -262,29 +262,23 @@ export default function PromotePage() {
   }
 
   return (
-    <main style={{ maxWidth: 1240, margin: '0 auto', padding: '32px 24px 80px' }}>
+    <main style={{ maxWidth: 1240, margin: '0 auto' }}>
+      {/* Studio bar */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', borderBottom: '1px solid rgba(255,255,255,.09)', paddingBottom: 12, marginBottom: 18 }}>
+        <div style={{ minWidth: 0 }}>
+          <p className="sb-eyebrow" style={{ margin: 0 }}>📣 {t(dict, 'promote_page.badge', 'Promote My Business')}</p>
+          <h1 style={{ fontSize: 22, fontWeight: 950, letterSpacing: '-.04em', lineHeight: 1.15, margin: '4px 0 0', color: '#fff' }}>{t(dict, 'promote_page.title', 'Create a full campaign')}</h1>
+        </div>
+        <span className="sb-chip" style={campaign ? { borderColor: 'rgba(134,239,172,.3)', background: 'rgba(134,239,172,.08)', color: '#86efac' } : undefined}>{loading ? '...' : campaign ? '✓ ' + ui.success : 'IDLE'}</span>
+      </div>
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
         gap: 24, alignItems: 'start',
       }} className="promote-grid">
 
-        {/* ── LEFT: Form ── */}
-        <section style={{
-          border: '1px solid var(--border-soft)',
-          background: 'rgba(255,255,255,.04)',
-          borderRadius: 24, padding: 28,
-          position: 'sticky', top: 16,
-        }}>
-          <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.12em', textTransform: 'uppercase', color: GOLD, marginBottom: 12 }}>
-            📣 {t(dict, 'promote_page.badge', 'Promote My Business')}
-          </div>
-          <h1 style={{ fontSize: 26, fontWeight: 900, lineHeight: 1.1, margin: '0 0 6px', color: '#fff' }}>
-            {t(dict, 'promote_page.title', 'Create a full campaign')}
-          </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.6, margin: '0 0 20px' }}>
-            {t(dict, 'promote_page.subtitle', 'Describe your offer. We generate website copy, social posts, email, video scripts and more.')}
-          </p>
+        {/* ── LEFT: Form (flat, sticky) ── */}
+        <section style={{ position: 'sticky', top: 16 }}>
 
           {/* Business + Audience */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 12 }}>
@@ -368,13 +362,12 @@ export default function PromotePage() {
 
         {/* ── RIGHT: Results or placeholder ── */}
         <section ref={resultRef} style={{
-          border: `1px solid ${campaign ? 'rgba(255,195,0,0.25)' : 'var(--border-soft)'}`,
-          background: campaign
-            ? 'linear-gradient(180deg, rgba(255,195,0,.06), rgba(255,255,255,.03))'
-            : 'rgba(255,255,255,.02)',
-          borderRadius: 24, padding: 24,
-          minHeight: 480,
-          transition: 'all 0.3s ease',
+          borderLeft: campaign ? '2px solid rgba(255,195,0,.55)' : '1px solid rgba(255,255,255,.08)',
+          paddingLeft: 20,
+          height: 'calc(100vh - 230px)',
+          minHeight: 420,
+          overflowY: 'auto',
+          transition: 'border-color 0.3s ease',
         }}>
           {/* Header */}
           <div style={{

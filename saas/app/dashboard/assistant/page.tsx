@@ -34,7 +34,7 @@ export default function AssistantPage() {
   const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput]       = useState('')
   const [loading, setLoading]   = useState(false)
-  const bottomRef               = useRef<HTMLDivElement>(null)
+  const threadRef               = useRef<HTMLDivElement>(null)
 
   const suggestions = [
     c(COPY.suggestions.s1, l),
@@ -44,7 +44,9 @@ export default function AssistantPage() {
   ]
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (messages.length === 0) return
+    const el = threadRef.current
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }, [messages, loading])
 
   async function send(text: string) {
@@ -78,7 +80,7 @@ export default function AssistantPage() {
       </div>
 
       {/* Message thread */}
-      <div style={{ flex: 1, overflowY: 'auto', background: 'linear-gradient(145deg, rgba(15,23,42,.78), rgba(3,7,18,.68))', border: '1px solid rgba(255,255,255,.1)', borderRadius: 22, padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div ref={threadRef} style={{ flex: 1, overflowY: 'auto', minHeight: 0, background: 'linear-gradient(145deg, rgba(15,23,42,.78), rgba(3,7,18,.68))', border: '1px solid rgba(255,255,255,.1)', borderRadius: 22, padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
 
         {messages.length === 0 && !loading && (
           <div style={{ margin: 'auto', textAlign: 'center', maxWidth: 520 }}>
@@ -108,7 +110,6 @@ export default function AssistantPage() {
           </div>
         )}
 
-        <div ref={bottomRef} />
       </div>
 
       {/* Input row */}

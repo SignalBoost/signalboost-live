@@ -314,15 +314,17 @@ export default function CalendarPage() {
       {error ? <p className="sb-caption" style={{ color: '#fca5a5', marginBottom: 12 }}>{error}</p> : null}
       {loading ? <p className="sb-body">{copy.loading}</p> : null}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 6, marginBottom: 6 }}>
-        {copy.weekdays.map((weekday) => (
-          <div key={weekday} className="sb-caption" style={{ textAlign: 'center', textTransform: 'uppercase', letterSpacing: '.06em' }}>
-            {weekday}
+      <div style={{ overflowX: 'auto' }}>
+        <div style={{ minWidth: 560 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 6, marginBottom: 6 }}>
+            {copy.weekdays.map((weekday) => (
+              <div key={weekday} className="sb-caption" style={{ textAlign: 'center', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                {weekday}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 6 }}>
         {cells.map((day, index) => {
           if (day === null) return <div key={`empty-${index}`} />
 
@@ -386,6 +388,8 @@ export default function CalendarPage() {
             </button>
           )
         })}
+          </div>
+        </div>
       </div>
 
       <p className="sb-caption" style={{ marginTop: 12 }}>

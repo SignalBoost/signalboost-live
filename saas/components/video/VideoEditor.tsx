@@ -135,7 +135,6 @@ function QuotaStatusBar({ quota, lang }: { quota: VideoQuota; lang: string }) {
       <div className="flex items-center justify-between text-sm"><span>{c('quotaLabel', lang)}</span><span>{quota.usedMinutes}/{quota.includedMinutes} min</span></div>
       <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[#FFD700]" style={{ width: `${pct}%` }} /></div>
       <p className="mt-2 text-xs text-white/55">{c('quotaNote', lang)}</p>
-      {quota.demoOnly ? <p className="mt-2 text-sm text-amber-200">{c('demoOnly', lang)}</p> : null}
     </div>
   )
 }
@@ -336,14 +335,14 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
 
 CanvasEditor.displayName = 'CanvasEditor'
 
-function ExportPanel({ canExport, hasSource, exportState, onExport, lang }: { canExport: boolean; hasSource: boolean; exportState: ExportState; onExport: () => void; lang: string }) {
+function ExportPanel({ hasSource, exportState, onExport, lang }: { hasSource: boolean; exportState: ExportState; onExport: () => void; lang: string }) {
   const isRecording = exportState.status === 'recording'
   const isDone = exportState.status === 'ready'
   return (
     <section className="rounded-3xl border border-white/10 bg-black/40 p-5">
       <h2 className="text-xl font-bold">{c('exportPanel', lang)}</h2>
       <p className="mt-2 text-sm text-white/55">{c('exportNote', lang)}</p>
-      <button onClick={onExport} disabled={!canExport || !hasSource || isRecording} className="mt-4 w-full rounded-full bg-[#FFD700] px-5 py-3 font-bold text-black disabled:opacity-50">
+      <button onClick={onExport} disabled={!hasSource || isRecording} className="mt-4 w-full rounded-full bg-[#FFD700] px-5 py-3 font-bold text-black disabled:opacity-50">
         {isRecording ? c('recording', lang) : c('exportBtn', lang)}
       </button>
       {exportState.message ? <p className={`mt-3 text-sm ${exportState.status === 'failed' ? 'text-red-300' : 'text-white/70'}`}>{exportState.message}</p> : null}
@@ -495,7 +494,7 @@ export default function VideoEditor() {
         </div>
         <div className="space-y-6">
           <CaptionTimeline cues={cues} currentTime={currentTime} selectedCueId={selectedCueId} onSeek={setCurrentTime} onSelect={setSelectedCueId} onUpdateText={updateCueText} lang={lang} />
-          <ExportPanel canExport={quota.exportEnabled} hasSource={Boolean(videoUrl)} exportState={exportState} onExport={exportVideo} lang={lang} />
+          <ExportPanel hasSource={Boolean(videoUrl)} exportState={exportState} onExport={exportVideo} lang={lang} />
         </div>
       </div>
       <footer className="mt-8 rounded-2xl border border-white/10 bg-white/[.03] p-4 text-sm text-white/60">

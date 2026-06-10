@@ -93,18 +93,21 @@ export default function CreativeStudioPage() {
   const canGenerate = !loading && prompt.trim().length >= 3
 
   return (
-    <div style={{ maxWidth: 860, margin: '0 auto', padding: 'clamp(18px,4vw,40px) 0 80px', color: 'var(--text-primary)', display: 'grid', gap: 20 }}>
+    <div style={{ maxWidth: 900, margin: '0 auto', color: 'var(--text-primary)', display: 'grid', gap: 18 }}>
 
-      <div style={{ background: 'radial-gradient(circle at 20% 10%, rgba(168,85,247,.2), transparent 24rem), radial-gradient(circle at 80% 80%, rgba(26,240,255,.12), transparent 20rem), linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02))', border: '1px solid rgba(168,85,247,.28)', borderRadius: 28, padding: 'clamp(20px,4vw,32px)' }}>
-        <p className="sb-eyebrow" style={{ color: '#c4b5fd' }}>🎨 {c.eyebrow}</p>
-        <h1 style={{ fontSize: 'clamp(22px,4vw,36px)', fontWeight: 900, letterSpacing: '-.04em', lineHeight: 1.1, margin: '8px 0 10px' }}>{c.title}</h1>
-        <p style={{ color: 'rgba(255,255,255,.62)', fontSize: 14, lineHeight: 1.7, maxWidth: 580, margin: 0 }}>{c.subtitle}</p>
+      {/* Studio bar: compact title + status, no hero */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', borderBottom: '1px solid rgba(255,255,255,.09)', paddingBottom: 14 }}>
+        <div>
+          <p className="sb-eyebrow" style={{ color: '#c4b5fd', margin: 0 }}>🎨 {c.eyebrow}</p>
+          <h1 style={{ fontSize: 24, fontWeight: 950, letterSpacing: '-.04em', lineHeight: 1.1, margin: '4px 0 0' }}>{c.title}</h1>
+        </div>
+        <span className="sb-chip" style={{ borderColor: 'rgba(196,181,253,.3)', background: 'rgba(196,181,253,.08)', color: '#c4b5fd' }}>{loading ? c.generating : imageUrl ? '✓' : aspectRatio}</span>
       </div>
 
-      <div style={{ background: 'linear-gradient(145deg, rgba(15,23,42,.78), rgba(3,7,18,.68))', border: '1px solid rgba(255,255,255,.12)', borderRadius: 24, padding: 'clamp(16px,3vw,24px)', display: 'grid', gap: 14 }}>
+      <div style={{ display: 'grid', gap: 12 }}>
         <div style={{ display: 'grid', gap: 6 }}>
           <label style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.1em', textTransform: 'uppercase', color: '#c4b5fd' }}>{c.promptLabel}</label>
-          <textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder={c.promptPlaceholder} rows={4} className="sb-input" style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: 12, resize: 'vertical', fontSize: 14, lineHeight: 1.7 }} />
+          <textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder={c.promptPlaceholder} rows={3} className="sb-input" style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: 12, resize: 'vertical', fontSize: 14, lineHeight: 1.7 }} />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <label style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.6)', whiteSpace: 'nowrap' }}>{c.aspect}</label>
@@ -120,18 +123,18 @@ export default function CreativeStudioPage() {
         {error && <p style={{ color: '#fca5a5', fontSize: 13, margin: 0 }}>{error}</p>}
       </div>
 
-      <div style={{ background: 'linear-gradient(145deg, rgba(15,23,42,.78), rgba(3,7,18,.68))', border: '1px solid rgba(255,255,255,.12)', borderRadius: 24, padding: 'clamp(16px,3vw,24px)', minHeight: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 16, minHeight: 'calc(100vh - 480px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {imageUrl ? (
           <div style={{ width: '100%' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imageUrl} alt={prompt} style={{ width: '100%', borderRadius: 16, display: 'block' }} />
+            <img src={imageUrl} alt={prompt} style={{ display: 'block', margin: '0 auto', maxWidth: '100%', maxHeight: 'calc(100vh - 420px)', borderRadius: 16, boxShadow: '0 18px 70px rgba(0,0,0,.45)' }} />
             <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button onClick={handleDownload} style={{ background: 'linear-gradient(135deg, #7c5cff, #22d3ee)', color: '#fff', fontWeight: 900, fontSize: 14, padding: '11px 24px', borderRadius: 12, border: 'none', cursor: 'pointer' }}>{c.download}</button>
               <button onClick={handleGenerate} className="sb-button-secondary" style={{ borderRadius: 12 }}>{c.again}</button>
             </div>
           </div>
         ) : (
-          <span style={{ color: 'rgba(255,255,255,.35)', fontSize: 14 }}>{loading ? c.generating : c.empty}</span>
+          <div className="sb-empty" style={{ width: '100%' }}>{loading ? c.generating : c.empty}</div>
         )}
       </div>
     </div>

@@ -111,17 +111,17 @@ export default function LaunchpadPage() {
   const canContinue  = Boolean(selectedPath && experience)
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', color: 'var(--text-primary)', display: 'grid', gap: 30 }}>
+    <div style={{ maxWidth: 1100, margin: '0 auto', color: 'var(--text-primary)', display: 'grid', gap: 22 }}>
 
       {/* Header */}
       <div style={{ textAlign: 'center' }}>
-        <div style={{ display: 'inline-flex', padding: '6px 14px', borderRadius: 999, background: 'rgba(255,195,0,.1)', border: '1px solid rgba(255,195,0,.22)', color: '#ffc300', fontWeight: 900, fontSize: 11, letterSpacing: '.1em', marginBottom: 20 }}>
+        <div style={{ display: 'inline-flex', padding: '5px 12px', borderRadius: 999, background: 'rgba(255,195,0,.1)', border: '1px solid rgba(255,195,0,.22)', color: '#ffc300', fontWeight: 900, fontSize: 10, letterSpacing: '.1em', marginBottom: 10 }}>
           {c(COPY.badge, l)}
         </div>
-        <h1 style={{ fontSize: 'clamp(36px,7vw,72px)', fontWeight: 900, lineHeight: 1, margin: '0 0 16px', letterSpacing: '-.05em' }}>
-          {c(COPY.title1, l)}<br /><span style={{ color: '#ffc300' }}>{c(COPY.title2, l)}</span>
+        <h1 style={{ fontSize: 'clamp(26px,3.5vw,40px)', fontWeight: 950, lineHeight: 1.05, margin: '0 0 8px', letterSpacing: '-.045em' }}>
+          {c(COPY.title1, l)} <span style={{ color: '#ffc300' }}>{c(COPY.title2, l)}</span>
         </h1>
-        <p style={{ maxWidth: 640, margin: '0 auto', color: 'rgba(255,255,255,.55)', lineHeight: 1.8, fontSize: 15 }}>{c(COPY.subtitle, l)}</p>
+        <p style={{ maxWidth: 640, margin: '0 auto', color: 'rgba(255,255,255,.55)', lineHeight: 1.6, fontSize: 13 }}>{c(COPY.subtitle, l)}</p>
       </div>
 
       {/* Step 1 — path */}
@@ -131,8 +131,8 @@ export default function LaunchpadPage() {
           {COPY.paths.map(path => {
             const active = selected === path.id
             return (
-              <button key={path.id} onClick={() => setSelected(path.id)} style={{ cursor: 'pointer', padding: 24, borderRadius: 22, background: active ? 'rgba(255,195,0,.08)' : 'rgba(255,255,255,.03)', border: active ? '1px solid rgba(255,195,0,.42)' : '1px solid rgba(255,255,255,.09)', transition: 'all .2s', color: '#fff', textAlign: 'left', boxShadow: active ? '0 0 32px rgba(255,195,0,.12)' : 'none' }}>
-                <div style={{ fontSize: 36, marginBottom: 12 }}>{path.icon}</div>
+              <button key={path.id} onClick={() => setSelected(path.id)} style={{ cursor: 'pointer', padding: 16, borderRadius: 18, background: active ? 'rgba(255,195,0,.08)' : 'rgba(255,255,255,.03)', border: active ? '1px solid rgba(255,195,0,.42)' : '1px solid rgba(255,255,255,.09)', transition: 'all .2s', color: '#fff', textAlign: 'left', boxShadow: active ? '0 0 32px rgba(255,195,0,.12)' : 'none' }}>
+                <div style={{ fontSize: 26, marginBottom: 8 }}>{path.icon}</div>
                 <h3 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 800 }}>{c(path.title, l)}</h3>
                 <p style={{ fontSize: 13, lineHeight: 1.6, color: 'rgba(255,255,255,.5)', margin: 0 }}>{c(path.desc, l)}</p>
               </button>
@@ -149,8 +149,8 @@ export default function LaunchpadPage() {
           {COPY.experiences.map(level => {
             const active = experience === level.id
             return (
-              <button key={level.id} onClick={() => setExperience(level.id)} style={{ cursor: 'pointer', padding: 22, borderRadius: 20, background: active ? 'rgba(59,130,246,.1)' : 'rgba(255,255,255,.03)', border: active ? '1px solid rgba(59,130,246,.44)' : '1px solid rgba(255,255,255,.09)', transition: 'all .2s', color: '#fff', textAlign: 'left', boxShadow: active ? '0 0 28px rgba(59,130,246,.14)' : 'none' }}>
-                <div style={{ fontSize: 30, marginBottom: 10 }}>{level.icon}</div>
+              <button key={level.id} onClick={() => setExperience(level.id)} style={{ cursor: 'pointer', padding: 16, borderRadius: 18, background: active ? 'rgba(59,130,246,.1)' : 'rgba(255,255,255,.03)', border: active ? '1px solid rgba(59,130,246,.44)' : '1px solid rgba(255,255,255,.09)', transition: 'all .2s', color: '#fff', textAlign: 'left', boxShadow: active ? '0 0 28px rgba(59,130,246,.14)' : 'none' }}>
+                <div style={{ fontSize: 24, marginBottom: 8 }}>{level.icon}</div>
                 <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 800 }}>{c(level.title, l)}</h3>
                 <p style={{ fontSize: 13, lineHeight: 1.6, color: 'rgba(255,255,255,.5)', margin: 0 }}>{c(level.desc, l)}</p>
               </button>

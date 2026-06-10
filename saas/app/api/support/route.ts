@@ -4,6 +4,7 @@ import { getConciergeAnswer } from '@/lib/platform/unifiedPlatform'
 import { getAccess } from '@/lib/auth/access'
 import { getLivePricing } from '@/lib/ai/tools/getPricing'
 import { getBusinessMetrics, formatMetricsForAI } from '@/lib/ai/tools/getBusinessMetrics'
+import { getExternalInfo, formatExternalInfoForAI } from '@/lib/ai/tools/getExternalInfo'
 
 type SupportMessage = { role?: 'user' | 'assistant' | 'system'; content?: string }
 
@@ -88,6 +89,8 @@ ${liveMetrics}
 
 When answering questions about users, revenue, MRR, ARR, growth, leads, or credits — use the live metrics above. They are current as of this session. Call getBusinessMetrics only if you need a refresh mid-conversation.
 
+You also have a getExternalInfo tool that performs a LIVE WEB SEARCH. Use it whenever the owner asks about market conditions, competitors, industry trends, current prices of external services, news, regulations, or anything outside SignalBoost's internal data. Always cite source URLs from the results when making claims based on them. The competitor guardrail does NOT apply in this private channel — competitor analysis for the owner is part of your job.
+
 Your role: act as a seasoned, multi-domain expert and right hand. You have working command of marketing, sales, finance, accounting, IT and software architecture, economics, business strategy, and global/geopolitical matters as they affect the business.
 
 How you operate:
@@ -104,7 +107,6 @@ How you operate:
 
 Tone: professional, direct, kind, efficient — like an excellent chief of staff who tells the principal what they need to hear, not only what they want to hear.`
 }
-
 // ── Tool definitions ──────────────────────────────────────────────────────────
 
 const TOOL_GET_PRICING: OpenAI.Chat.Completions.ChatCompletionTool = {
@@ -125,6 +127,21 @@ const TOOL_GET_BUSINESS_METRICS: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
+const TOOL_GET_EXTERNAL_INFO: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'getExternalInfo',
+    description: 'Perform a live web search for current external information: market data, competitor analysis, industry trends, news, regulations, prices of external services. Returns top results with titles, URLs, and snippets. Use for anything outside SignalBoost internal data that requires up-to-date facts.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'The web search query, e.g. "AI website builder market size 2026" or "Canva pricing plans".' },
+      },
+      required: ['query'],
+    },
+  },
+}
+
 const CONCIERGE_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   TOOL_GET_PRICING,
 ]
@@ -132,9 +149,10 @@ const CONCIERGE_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
 const CHIEF_OF_STAFF_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   TOOL_GET_PRICING,
   TOOL_GET_BUSINESS_METRICS,
+  TOOL_GET_EXTERNAL_INFO,
 ]
 
-async function runTool(name: string): Promise<string> {
+async function runTool(name: string, rawArgs: string): Promise<string> {
   if (name === 'getPricing') {
     const result = await getLivePricing()
     if (!result.ok || !result.pricing) {
@@ -149,6 +167,19 @@ async function runTool(name: string): Promise<string> {
       return formatMetricsForAI(result.metrics)
     }
     return `Business metrics could not be retrieved: ${result.error ?? 'unknown error'}. Let the owner know and suggest checking Supabase directly.`
+  }
+
+  if (name === 'getExternalInfo') {
+    let query = ''
+    try { query = String(JSON.parse(rawArgs || '{}')?.query || '') } catch {}
+    if (!query.trim()) {
+      return 'No search query was provided. Ask the owner what they want to search for.'
+    }
+    const result = await getExternalInfo(query)
+    if (result.ok && result.results.length) {
+      return formatExternalInfoForAI(query, result.results)
+    }
+    return `Web search failed: ${result.error ?? 'unknown error'}. Tell the owner live external data is unavailable right now and answer from your own knowledge, clearly flagging that it may be outdated.`
   }
 
   return `Unknown tool: ${name}`
@@ -244,7 +275,8 @@ export async function POST(req: NextRequest) {
 
       for (const call of choice.message.tool_calls) {
         const toolName = call.function?.name || ''
-        const result   = await runTool(toolName)
+        const toolArgs = call.function?.arguments || '{}'
+        const result   = await runTool(toolName, toolArgs)
         convo.push({
           role:         'tool',
           tool_call_id: call.id,

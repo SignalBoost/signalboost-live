@@ -115,17 +115,20 @@ export default function ApprenticeWorkshopPage() {
     <div style={{ maxWidth: 1080, margin: '0 auto', padding: 'clamp(18px,4vw,40px) 0 80px', color: 'var(--text-primary)', display: 'grid', gap: 22 }}>
 
       {/* Header */}
-      <div style={{ background: `radial-gradient(circle at 20% 10%, ${accent}28, transparent 24rem), linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02))`, border: `1px solid ${accent}38`, borderRadius: 28, padding: 'clamp(20px,4vw,32px)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
-          <p className="sb-eyebrow" style={{ margin: 0 }}>🛠️ {c(COPY.eyebrow, l)}</p>
+      <header className="sb-console" style={{ marginBottom: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
+          <span className="sb-eyebrow">🛠️ {c(COPY.eyebrow, l)}</span>
           <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.08em', textTransform: 'uppercase', color: accent, background: `${accent}18`, border: `1px solid ${accent}44`, borderRadius: 999, padding: '4px 10px' }}>{c(levelData.badge, l)}</span>
         </div>
-        <h1 style={{ fontSize: 'clamp(24px,5vw,48px)', fontWeight: 900, letterSpacing: '-.05em', lineHeight: 1, margin: '0 0 12px' }}>{c(COPY.title, l)}</h1>
-        <p style={{ color: 'rgba(255,255,255,.62)', fontSize: 14, lineHeight: 1.7, maxWidth: 640, margin: '0 0 6px' }}>{c(levelData.subtitle, l)}</p>
-        <p style={{ color: 'rgba(255,255,255,.4)', fontSize: 12, margin: 0 }}>
-          {c(COPY.toneLabel, l)}: <strong style={{ color: 'rgba(255,255,255,.7)' }}>{profile.tone_preference || 'friendly'}</strong> · {c(COPY.roleLabel, l)}: <strong style={{ color: 'rgba(255,255,255,.7)' }}>{profile.role || c(COPY.notSet, l)}</strong>
-        </p>
-      </div>
+        <h1>{c(COPY.title, l)}</h1>
+        <p className="sb-body">{c(levelData.subtitle, l)}</p>
+        <div className="sb-telemetry">
+          <div><b className="gold" style={{ fontSize: 14, textTransform: 'capitalize' }}>{level}</b><span>{c(levelData.badge, l)}</span></div>
+          <div><b style={{ fontSize: 14, textTransform: 'capitalize' }}>{profile.tone_preference || 'friendly'}</b><span>{c(COPY.toneLabel, l)}</span></div>
+          <div><b style={{ fontSize: 14 }}>{profile.role || c(COPY.notSet, l)}</b><span>{c(COPY.roleLabel, l)}</span></div>
+          <div><b>{moduleItems.length}</b><span>{c(COPY.tutorialsTitle, l)}</span></div>
+        </div>
+      </header>
 
       <OrchestrationPanel module="apprentice" compact />
 

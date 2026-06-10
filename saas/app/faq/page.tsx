@@ -31,16 +31,17 @@ export default function FAQPage() {
 
   return (
     <main className="sb-page" style={{ maxWidth: 980 }}>
-      <section className="hero-panel" style={{ padding: 28, marginBottom: 18 }}>
-        <div className="sb-kicker">❓ {t(dict, 'faq.kicker', 'Help center')}</div>
-        <h1 className="sb-title" style={{ marginBottom: 8 }}>{t(dict, 'faq.title', 'Frequently asked questions')}</h1>
-        <p className="sb-subtitle" style={{ marginTop: 0 }}>{t(dict, 'faq.subtitle', 'Search localized answers, browse categories, or contact support when you need a human handoff.')}</p>
+      <section style={{ borderBottom: '1px solid rgba(255,255,255,.09)', paddingBottom: 14, marginBottom: 14, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div style={{ minWidth: 0 }}>
+          <div className="sb-kicker">❓ {t(dict, 'faq.kicker', 'Help center')}</div>
+          <h1 style={{ fontSize: 24, fontWeight: 950, letterSpacing: '-.04em', lineHeight: 1.1, margin: '4px 0 0' }}>{t(dict, 'faq.title', 'Frequently asked questions')}</h1>
+        </div>
         <input
           className="sb-input"
           value={query}
           onChange={event => setQuery(event.target.value)}
           placeholder={t(dict, 'faq.search', 'Search questions...')}
-          style={{ width: '100%', padding: 14, marginTop: 14 }}
+          style={{ flex: '1 1 260px', maxWidth: 360, padding: '11px 14px' }}
         />
       </section>
 
@@ -53,15 +54,15 @@ export default function FAQPage() {
         ))}
       </div>
 
-      <section style={{ display: 'grid', gap: 12 }}>
+      <section style={{ display: 'grid', gap: 0 }}>
         {rows.map(item => (
-          <details key={item.q} className="hero-panel" style={{ padding: 18 }}>
-            <summary style={{ cursor: 'pointer', fontWeight: 900, fontSize: 17 }}>{t(dict, item.q, item.qFallback)}</summary>
-            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>{t(dict, item.a, item.aFallback)}</p>
+          <details key={item.q} style={{ borderTop: '1px solid rgba(255,255,255,.08)', padding: '14px 0' }}>
+            <summary style={{ cursor: 'pointer', fontWeight: 900, fontSize: 15.5, listStyle: 'none' }}>{t(dict, item.q, item.qFallback)}</summary>
+            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.7, fontSize: 13.5, borderLeft: '2px solid rgba(255,195,0,.5)', paddingLeft: 14, margin: '10px 0 0' }}>{t(dict, item.a, item.aFallback)}</p>
           </details>
         ))}
         {!rows.length && (
-          <div className="hero-panel" style={{ padding: 18, color: 'var(--text-secondary)' }}>
+          <div className="sb-empty">
             {t(dict, 'faq.empty', 'No answers matched your search.')}
           </div>
         )}

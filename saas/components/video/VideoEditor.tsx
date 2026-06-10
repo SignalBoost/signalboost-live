@@ -93,7 +93,7 @@ const captionPresets: CaptionPreset[] = [
   { id: 'minimal', label: 'Minimal',      descKey: 'descMinimal', style: { ...defaultCaptionStyle, fontFamily: 'Inter, Arial, sans-serif', fontSize: 32, color: '#ffffff', backgroundColor: 'rgba(15,23,42,0.52)', animation: 'fade', x: 50, y: 84 } },
 ]
 
-const aspectClasses: Record<AspectRatio, string> = { '9:16': 'aspect-[9/16] max-h-[72vh]', '1:1': 'aspect-square max-h-[72vh]', '16:9': 'aspect-video' }
+const aspectClasses: Record<AspectRatio, string> = { '9:16': 'aspect-[9/16] max-h-[56vh]', '1:1': 'aspect-square max-h-[56vh]', '16:9': 'aspect-video max-h-[56vh]' }
 const canvasSizes: Record<AspectRatio, { width: number; height: number }> = { '9:16': { width: 720, height: 1280 }, '1:1': { width: 1080, height: 1080 }, '16:9': { width: 1280, height: 720 } }
 
 function activeCue(cues: CaptionCue[], time: number) { return cues.find((cu) => time >= cu.start && time <= cu.end) || null }
@@ -131,10 +131,9 @@ function parseCaptionFile(text: string): CaptionCue[] {
 function QuotaStatusBar({ quota, lang }: { quota: VideoQuota; lang: string }) {
   const pct = Math.min(100, Math.round((quota.usedMinutes / Math.max(1, quota.includedMinutes)) * 100))
   return (
-    <div className="border-b border-white/10 pb-4">
-      <div className="flex items-center justify-between text-sm"><span>{c('quotaLabel', lang)}</span><span>{quota.usedMinutes}/{quota.includedMinutes} min</span></div>
-      <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[#FFD700]" style={{ width: `${pct}%` }} /></div>
-      <p className="mt-2 text-xs text-white/55">{c('quotaNote', lang)}</p>
+    <div title={c('quotaNote', lang)}>
+      <div className="flex items-center justify-between text-xs text-white/60"><span>{c('quotaLabel', lang)}</span><span className="font-mono">{quota.usedMinutes}/{quota.includedMinutes} min</span></div>
+      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[#FFD700]" style={{ width: `${pct}%` }} /></div>
     </div>
   )
 }
@@ -469,13 +468,15 @@ export default function VideoEditor() {
 
   return (
     <main className="text-white">
-      <section className="border-b border-white/10 pb-6">
-        <p className="text-xs uppercase tracking-[0.35em] text-[#FFD700]">{c('eyebrow', lang)}</p>
-        <h1 className="mt-4 text-4xl font-black">{c('heroTitle', lang)}</h1>
-        <p className="mt-3 max-w-3xl text-white/70">{c('heroSubtitle', lang)}</p>
+      <section className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.3em] text-[#FFD700]">{c('eyebrow', lang)}</p>
+          <h1 className="mt-1 text-2xl font-black leading-tight">{c('heroTitle', lang)}</h1>
+        </div>
+        <div className="min-w-[240px] max-w-xs flex-1"><QuotaStatusBar quota={quota} lang={lang} /></div>
       </section>
-      <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_.35fr]"><QuotaStatusBar quota={quota} lang={lang} /><BillingBanner quota={quota} lang={lang} /></div>
-      <section className="mt-6 grid gap-4 border-t border-white/10 pt-5 md:grid-cols-5">
+      <BillingBanner quota={quota} lang={lang} />
+      <section className="mt-4 grid gap-3 pb-4 text-sm md:grid-cols-5">
         <label className="text-sm">{c('videoInput', lang)}<input type="file" accept="video/*" onChange={(e) => e.target.files?.[0] && uploadVideo(e.target.files[0])} className="mt-2 w-full" /></label>
         <div className="text-sm"><span>{c('aiCaptions', lang)}</span><button type="button" onClick={generateCaptions} disabled={!storagePath || captionState.status === 'generating'} className="mt-2 w-full rounded-xl bg-[#FFD700] px-4 py-2 font-bold text-black disabled:opacity-50">{captionState.status === 'generating' ? c('transcribing', lang) : c('genCaptions', lang)}</button></div>
         <label className="text-sm">{c('srtVtt', lang)}<input type="file" accept=".srt,.vtt,text/vtt" onChange={(e) => e.target.files?.[0] && uploadCaptions(e.target.files[0])} className="mt-2 w-full" /></label>
@@ -486,7 +487,7 @@ export default function VideoEditor() {
           <button type="button" onClick={resetAll} className="w-full rounded-xl border border-white/20 px-4 py-2 text-sm text-white/60 hover:border-white/40 hover:text-white/80 transition">↺ {c('reset', lang)}</button>
         </div>
       </section>
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_.42fr]">
+      <div className="grid gap-6 border-t border-white/10 pt-5 xl:grid-cols-[1fr_.42fr]">
         <div className="space-y-6">
           <CanvasEditor ref={canvasEditorRef} videoUrl={videoUrl} cues={cues} style={style} aspectRatio={aspectRatio} seekTime={currentTime} durationSec={durationSec} lang={lang} onStyleChange={setStyle} onTime={setCurrentTime} onDuration={setDurationSec} />
           <StyleControls style={style} aspectRatio={aspectRatio} onChange={setStyle} onAspectRatio={setAspectRatio} lang={lang} />

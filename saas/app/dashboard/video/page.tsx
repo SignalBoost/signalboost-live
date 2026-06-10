@@ -1,5 +1,2 @@
-'use client'
-import VideoEditor from '@/components/video/VideoEditor'
-export default function VideoPage() {
-  return <VideoEditor />
-}
+export { default } from '@/components/video/VideoEditor'
+export const dynamic = 'force-dynamic'

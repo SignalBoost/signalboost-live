@@ -55,23 +55,15 @@ export default function SalesPage() {
       : '#'
 
   return (
-    <main
-      style={{
-        minHeight: '100vh',
-        padding: 40,
-        background: '#060913',
-        color: '#fff',
-        fontFamily: 'system-ui',
-      }}
-    >
-      <div style={{ maxWidth: 1000, margin: '0 auto' }}>
-        <h1 style={{ fontSize: 42, marginBottom: 10 }}>
-          {t('sales.title', '🧠 AI Sales Agent')}
-        </h1>
-
-        <p style={{ color: 'rgba(255,255,255,.6)', marginBottom: 30 }}>
-          {t('sales.subtitle', 'Give the AI a prospect. It drafts a professional sales email for you to review and send.')}
-        </p>
+    <main style={{ color: 'var(--text-primary)' }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', borderBottom: '1px solid rgba(255,255,255,.09)', paddingBottom: 12, marginBottom: 18 }}>
+          <div style={{ minWidth: 0 }}>
+            <p className="sb-eyebrow" style={{ margin: 0 }}>🧠 {t('sales.eyebrow', 'Sales')}</p>
+            <h1 style={{ fontSize: 22, fontWeight: 950, letterSpacing: '-.04em', lineHeight: 1.15, margin: '4px 0 0' }}>{t('sales.title', 'AI Sales Agent')}</h1>
+          </div>
+          <span className="sb-chip" style={draft ? { borderColor: 'rgba(134,239,172,.3)', background: 'rgba(134,239,172,.08)', color: '#86efac' } : undefined}>{loading ? '...' : draft ? '✓' : 'IDLE'}</span>
+        </div>
 
         <div
           style={{
@@ -80,15 +72,8 @@ export default function SalesPage() {
             gap: 24,
           }}
         >
-          <section
-            style={{
-              padding: 24,
-              borderRadius: 18,
-              background: 'rgba(255,255,255,.04)',
-              border: '1px solid rgba(255,255,255,.08)',
-            }}
-          >
-            <h2>{t('sales.prospect', 'Prospect')}</h2>
+          <section>
+            <h2 style={{ fontSize: 15, fontWeight: 900, letterSpacing: '-.02em', margin: '0 0 4px' }}>{t('sales.prospect', 'Prospect')}</h2>
 
             {[
               ['company', t('sales.company', 'Company name')],
@@ -122,7 +107,7 @@ export default function SalesPage() {
               }
               style={{
                 ...inputStyle,
-                minHeight: 120,
+                minHeight: 70,
                 resize: 'vertical',
               }}
             />
@@ -136,20 +121,13 @@ export default function SalesPage() {
             </button>
           </section>
 
-          <section
-            style={{
-              padding: 24,
-              borderRadius: 18,
-              background: 'rgba(255,255,255,.04)',
-              border: '1px solid rgba(255,255,255,.08)',
-            }}
-          >
-            <h2>{t('sales.aiDraft', 'AI Draft')}</h2>
+          <section style={{ borderLeft: draft ? '2px solid rgba(255,195,0,.55)' : '1px solid rgba(255,255,255,.08)', paddingLeft: 20, height: 'calc(100vh - 230px)', minHeight: 380, overflowY: 'auto', transition: 'border-color .3s ease' }}>
+            <h2 style={{ fontSize: 15, fontWeight: 900, letterSpacing: '-.02em', margin: '0 0 4px' }}>{t('sales.aiDraft', 'AI Draft')}</h2>
 
             {!draft && (
-              <p style={{ color: 'rgba(255,255,255,.5)' }}>
+              <div className="sb-empty" style={{ marginTop: 30 }}>
                 {t('sales.emptyDraft', 'The sales email will appear here.')}
-              </p>
+              </div>
             )}
 
             {draft && (
@@ -182,8 +160,8 @@ export default function SalesPage() {
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
-  marginTop: 12,
-  padding: 14,
+  marginTop: 10,
+  padding: 11,
   borderRadius: 10,
   border: '1px solid rgba(255,255,255,.08)',
   background: 'rgba(0,0,0,.25)',
@@ -204,8 +182,7 @@ const buttonStyle: React.CSSProperties = {
 const boxStyle: React.CSSProperties = {
   whiteSpace: 'pre-wrap',
   lineHeight: 1.7,
-  padding: 16,
-  borderRadius: 12,
-  background: 'rgba(0,0,0,.25)',
-  border: '1px solid rgba(255,255,255,.08)',
+  padding: '12px 0',
+  borderTop: '1px solid rgba(255,255,255,.08)',
+  fontSize: 13.5,
 }

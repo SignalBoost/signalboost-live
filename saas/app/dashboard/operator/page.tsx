@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import SitePreview, { type SitePreviewContent } from '@/components/operator/SitePreview'
 
@@ -42,6 +42,12 @@ export default function OperatorPage() {
   const [steps, setSteps]             = useState<StatusStep[]>([])
   const [content, setContent]         = useState<SitePreviewContent | null>(null)
   const [liveUrl, setLiveUrl]         = useState<string | null>(null)
+  const resultRef = useRef<HTMLDivElement>(null)
+
+  // When the site is generated, bring the action bar + framed preview into view.
+  useEffect(() => {
+    if (content) resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [content])
   const [message, setMessage]         = useState('')
 
   async function generate() {
@@ -192,7 +198,7 @@ export default function OperatorPage() {
 
         {/* Result */}
         {content && (
-          <div>
+          <div ref={resultRef} style={{ scrollMarginTop: 80 }}>
             {/* Action bar */}
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14, borderTop: '1px solid rgba(255,255,255,.09)', paddingTop: 14 }}>
               <p className="sb-eyebrow" style={{ flex: 1, margin: 0 }}>✦ {c('previewTitle', l)}</p>
@@ -206,8 +212,10 @@ export default function OperatorPage() {
             </div>
 
             {/* Preview */}
-            <div style={{ borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(255,255,255,.10)', boxShadow: '0 24px 80px rgba(0,0,0,.5)' }}>
-              <SitePreview content={content} />
+            <div style={{ borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(255,255,255,.10)', boxShadow: '0 24px 80px rgba(0,0,0,.5)', height: 'calc(100vh - 250px)', minHeight: 320 }}>
+              <div style={{ height: '100%', overflowY: 'auto' }}>
+                <SitePreview content={content} />
+              </div>
             </div>
           </div>
         )}

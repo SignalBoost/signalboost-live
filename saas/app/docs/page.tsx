@@ -59,23 +59,26 @@ export default function DocsPage() {
   return (
     <div className="sb-page-shell" style={{ padding: 'clamp(18px,4vw,48px) 0 80px', color: 'var(--text-primary)', display: 'grid', gap: 22 }}>
 
-      {/* Header */}
-      <section style={{ background: 'radial-gradient(circle at 20% 10%, rgba(26,240,255,.16), transparent 24rem), linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02))', border: '1px solid rgba(26,240,255,.18)', borderRadius: 28, padding: 'clamp(22px,4vw,36px)' }}>
-        <p className="sb-eyebrow">📖 {c(COPY.eyebrow, l)}</p>
-        <h1 style={{ fontSize: 'clamp(24px,5vw,48px)', fontWeight: 900, letterSpacing: '-.05em', lineHeight: 1.05, margin: '10px 0 12px' }}>{c(COPY.title, l)}</h1>
-        <p style={{ color: 'rgba(255,255,255,.62)', fontSize: 14, lineHeight: 1.7, maxWidth: 720, margin: '0 0 20px' }}>{c(COPY.subtitle, l)}</p>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {quickLinks.map(({ label, href }) => (
-            <Link key={href} className="sb-button-secondary" href={href} style={{ fontSize: 13, padding: '9px 16px' }}>{label}</Link>
-          ))}
+      {/* Header — flat compact bar */}
+      <section style={{ borderBottom: '1px solid rgba(255,255,255,.09)', paddingBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ minWidth: 0 }}>
+            <p className="sb-eyebrow" style={{ margin: 0 }}>📖 {c(COPY.eyebrow, l)}</p>
+            <h1 style={{ fontSize: 24, fontWeight: 950, letterSpacing: '-.045em', lineHeight: 1.1, margin: '4px 0 0' }}>{c(COPY.title, l)}</h1>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {quickLinks.map(({ label, href }) => (
+              <Link key={href} className="sb-button-secondary" href={href} style={{ fontSize: 12, padding: '7px 13px' }}>{label}</Link>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* Body */}
-      <section style={{ display: 'grid', gridTemplateColumns: '260px minmax(0,1fr)', gap: 20, alignItems: 'start' }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20, alignItems: 'start' }} className="sb-docs-grid">
 
         {/* Sidebar nav */}
-        <aside style={{ background: 'linear-gradient(145deg, rgba(15,23,42,.78), rgba(3,7,18,.68))', border: '1px solid rgba(255,255,255,.1)', borderRadius: 22, padding: 20, position: 'sticky', top: 100 }}>
+        <aside style={{ borderRight: '1px solid rgba(255,255,255,.08)', paddingRight: 20, position: 'sticky', top: 90 }}>
           <p className="sb-eyebrow" style={{ marginBottom: 14 }}>{c(COPY.scanPath, l)}</p>
           <nav style={{ display: 'grid', gap: 10 }}>
             {COPY.sections.map(s => (
@@ -90,7 +93,7 @@ export default function DocsPage() {
         {/* Steps */}
         <div style={{ display: 'grid', gap: 14 }}>
           {COPY.sections.map(s => (
-            <article key={s.step} id={`step-${s.step}`} style={{ background: 'linear-gradient(145deg, rgba(15,23,42,.78), rgba(3,7,18,.68))', border: '1px solid rgba(255,255,255,.1)', borderRadius: 22, padding: 'clamp(18px,3vw,26px)' }}>
+            <article key={s.step} id={`step-${s.step}`} style={{ borderTop: '1px solid rgba(255,255,255,.08)', padding: '18px 0 6px', scrollMarginTop: 90 }}>
               <p className="sb-eyebrow" style={{ marginBottom: 8 }}>{c(COPY.step, l)} {s.step}</p>
               <h2 style={{ fontSize: 'clamp(16px,2.5vw,22px)', fontWeight: 900, letterSpacing: '-.03em', margin: '0 0 10px' }}>{c(s.title, l)}</h2>
               <p style={{ color: 'rgba(255,255,255,.65)', lineHeight: 1.7, fontSize: 14, margin: 0 }}>{c(s.body, l)}</p>

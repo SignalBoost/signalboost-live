@@ -502,3 +502,227 @@ export default function VideoEditor() {
     </main>
   )
 }
+'use client'
+
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import type { PointerEvent } from 'react'
+import { defaultCaptionStyle, type CaptionCue, type CaptionStyle, type SupportedVideoLocale, type VideoQuota } from '@/lib/video/types'
+import { calculateVideoQuota } from '@/lib/video/subscription'
+import { useI18n } from '@/components/i18n/I18nProvider'
+
+type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type ExportState = { status: 'idle' | 'recording' | 'ready' | 'failed'; message: string; url?: string }
+type UploadState = { status: 'idle' | 'uploading' | 'ready' | 'failed'; message: string }
+type CaptionGenerationState = { status: 'idle' | 'generating' | 'ready' | 'failed'; message: string }
+type AspectRatio = '9:16' | '1:1' | '16:9'
+type CaptionPreset = { id: string; label: string; descKey: string; style: CaptionStyle }
+type CanvasEditorHandle = { startExport: () => Promise<string> }
+type CanvasEditorProps = { videoUrl: string | null; cues: CaptionCue[]; style: CaptionStyle; aspectRatio: AspectRatio; seekTime: number; durationSec: number; onStyleChange: (s: CaptionStyle) => void; onTime: (t: number) => void; onDuration: (s: number) => void; lang: string }
+
+const COPY = {
+  eyebrow:         { en: 'Video Studio', es: 'Video Studio', pt: 'Video Studio', pl: 'Video Studio', ru: 'Видео студия' },
+  heroTitle:       { en: 'AI caption video editor', es: 'Editor de video con subtitulos IA', pt: 'Editor de video com legendas IA', pl: 'Edytor wideo z napisami AI', ru: 'Редактор видео с субтитрами AI' },
+  heroSubtitle:    { en: 'Upload a video, generate synced AI captions, drag styled overlays on canvas, and export a captioned video file.', es: 'Sube un video, genera subtitulos IA, arrastra overlays y exporta.', pt: 'Faca upload, gere legendas IA, arraste overlays e exporte.', pl: 'Przeslij wideo, generuj napisy AI i eksportuj.', ru: 'Загрузите видео, создайте субтитры и экспортируйте.' },
+  quotaLabel:      { en: 'Quota', es: 'Cuota', pt: 'Cota', pl: 'Limit', ru: 'Квота' },
+  quotaNote:       { en: 'Exports record live in your browser. Export time equals video duration.', es: 'Las exportaciones se graban en tu navegador.', pt: 'As exportacoes sao gravadas no navegador.', pl: 'Eksporty nagrywane sa w przegladarce.', ru: 'Экспорты записываются в браузере.' },
+  demoOnly:        { en: 'Free/demo users get preview playback only. Upgrade to export.', es: 'Usuarios gratuitos solo pueden previsualizar.', pt: 'Usuarios gratuitos apenas visualizam.', pl: 'Bezplatni uzytkownicy tylko podgladaja.', ru: 'Бесплатные пользователи только просматривают.' },
+  overage:         { en: 'Overage:', es: 'Exceso:', pt: 'Excesso:', pl: 'Przekroczenie:', ru: 'Превышение:' },
+  overageAt:       { en: 'extra minute(s) at', es: 'minuto(s) adicional(es) a', pt: 'minuto(s) extra a', pl: 'dodatkowych min po', ru: 'доп. минут по' },
+  overageEnd:      { en: '/min. SignalBoost will open a billing session.', es: '/min. SignalBoost abrira una sesion de facturacion.', pt: '/min. SignalBoost abrira uma sessao de faturamento.', pl: '/min. SignalBoost otworzy sesje rozliczeniowa.', ru: '/мин. SignalBoost откроет сеанс оплаты.' },
+  templates:       { en: 'Templates', es: 'Plantillas', pt: 'Templates', pl: 'Szablony', ru: 'Шаблоны' },
+  templatesHint:   { en: 'Canva-style starting points', es: 'Puntos de partida estilo Canva', pt: 'Pontos de partida estilo Canva', pl: 'Punkty startowe w stylu Canva', ru: 'Стартовые точки в стиле Canva' },
+  descSignal:      { en: 'Gold business captions.', es: 'Subtitulos dorados para negocios.', pt: 'Legendas douradas para negocios.', pl: 'Zlote napisy dla biznesu.', ru: 'Золотые бизнес-субтитры.' },
+  descTiktok:      { en: 'Large white pop captions.', es: 'Subtitulos pop grandes y blancos.', pt: 'Legendas pop grandes e brancas.', pl: 'Duze biale napisy pop.', ru: 'Большие белые поп-субтитры.' },
+  descHormozi:     { en: 'High-contrast yellow captions.', es: 'Subtitulos amarillos de alto contraste.', pt: 'Legendas amarelas de alto contraste.', pl: 'Zolte napisy o wysokim kontrascie.', ru: 'Желтые субтитры с высоким контрастом.' },
+  descMinimal:     { en: 'Clean lower-third captions.', es: 'Subtitulos de tercio inferior limpio.', pt: 'Legendas de tercio inferior limpo.', pl: 'Czyste napisy w dolnej trzeciej.', ru: 'Чистые субтитры в нижней трети.' },
+  captionTimeline: { en: 'Caption timeline', es: 'Linea de tiempo', pt: 'Linha do tempo', pl: 'Os czasu napisow', ru: 'Временная шкала' },
+  cues:            { en: 'cues', es: 'senales', pt: 'indicacoes', pl: 'wskazowki', ru: 'реплик' },
+  editCaption:     { en: 'Edit selected caption', es: 'Editar subtitulo', pt: 'Editar legenda', pl: 'Edytuj napis', ru: 'Редактировать субтитр' },
+  noCaptions:      { en: 'Generate AI captions or upload SRT/VTT to populate the timeline.', es: 'Genera subtitulos IA o sube SRT/VTT.', pt: 'Gere legendas IA ou faca upload de SRT/VTT.', pl: 'Wygeneruj napisy AI lub przeslij SRT/VTT.', ru: 'Создайте AI-субтитры или загрузите SRT/VTT.' },
+  captionStyle:    { en: 'Caption style', es: 'Estilo de subtitulos', pt: 'Estilo de legendas', pl: 'Styl napisow', ru: 'Стиль субтитров' },
+  format:          { en: 'Format', es: 'Formato', pt: 'Formato', pl: 'Format', ru: 'Формат' },
+  fontFamily:      { en: 'Font family', es: 'Familia tipografica', pt: 'Familia de fonte', pl: 'Rodzina czcionek', ru: 'Семейство шрифтов' },
+  fontSize:        { en: 'Size', es: 'Tamano', pt: 'Tamanho', pl: 'Rozmiar', ru: 'Размер' },
+  textColor:       { en: 'Text color', es: 'Color del texto', pt: 'Cor do texto', pl: 'Kolor tekstu', ru: 'Цвет tekstu' },
+  animation:       { en: 'Animation', es: 'Animacion', pt: 'Animacao', pl: 'Animacja', ru: 'Анимация' },
+  background:      { en: 'Background', es: 'Fondo', pt: 'Fundo', pl: 'Tlo', ru: 'Фон' },
+  animNone:        { en: 'None', es: 'Ninguna', pt: 'Nenhuma', pl: 'Brak', ru: 'Нет' },
+  animFade:        { en: 'Fade', es: 'Desvanecimiento', pt: 'Fade', pl: 'Zanikanie', ru: 'Затухание' },
+  animSlide:       { en: 'Slide', es: 'Deslizamiento', pt: 'Deslizamiento', pl: 'Przesuniecie', ru: 'Слайд' },
+  animPop:         { en: 'Pop', es: 'Pop', pt: 'Pop', pl: 'Pop', ru: 'Поп' },
+  canvasEditor:    { en: 'Canvas editor', es: 'Editor de lienzo', pt: 'Editor de canvas', pl: 'Edytor canvas', ru: 'Редактор холста' },
+  uploadPrompt:    { en: 'Upload a source video to start editing', es: 'Sube un video para empezar', pt: 'Faca upload para comecar', pl: 'Przeslij wideo aby edytowac', ru: 'Загрузите видео для редактирования' },
+  playing:         { en: 'Playing', es: 'Reproduciendo', pt: 'Reproduzindo', pl: 'Odtwarzanie', ru: 'Воспроизведение' },
+  play:            { en: 'Play', es: 'Reproducir', pt: 'Reproduzir', pl: 'Odtwórz', ru: 'Играть' },
+  pause:           { en: 'Pause', es: 'Pausar', pt: 'Pausar', pl: 'Pauza', ru: 'Пауза' },
+  prevFrame:       { en: '- frame', es: '- fotograma', pt: '- quadro', pl: '- klatka', ru: '- кадр' },
+  nextFrame:       { en: '+ frame', es: '+ fotograma', pt: '+ quadro', pl: '+ klatka', ru: '+ кадр' },
+  restart:         { en: 'Restart', es: 'Reiniciar', pt: 'Reiniciar', pl: 'Uruchom ponownie', ru: 'Перезапуск' },
+  reset:           { en: 'Reset', es: 'Restablecer', pt: 'Redefinir', pl: 'Resetuj', ru: 'Сбросить' },
+  exportPanel:     { en: 'Export panel', es: 'Panel de exportacion', pt: 'Painel de exportacao', pl: 'Panel eksportu', ru: 'Панель экспорта' },
+  exportNote:      { en: 'Click export then let the video play all the way through. Your browser records the canvas and produces a downloadable .webm file.', es: 'Haz clic en exportar y deja que el video se reproduzca. Tu navegador graba el canvas.', pt: 'Clique em exportar e deixe o video reproduzir. Seu navegador grava o canvas.', pl: 'Kliknij eksport i pozwol wideo sie odtworzyc.', ru: 'Нажмите экспорт и дайте видео воспроизвестись.' },
+  exportBtn:       { en: 'Export captioned video', es: 'Exportar video con subtitulos', pt: 'Exportar video com legendas', pl: 'Eksportuj wideo z napisami', ru: 'Экспорт видео с субтитрами' },
+  recording:       { en: 'Recording - let video play through...', es: 'Grabando - deja que el video se reproduzca...', pt: 'Gravando - deixe o video reproduzir...', pl: 'Nagrywanie - pozwol odtworzyc wideo...', ru: 'Запись - дайте видео воспроизвестись...' },
+  downloadBtn:     { en: 'Download captioned video (.webm)', es: 'Descargar video con subtitulos (.webm)', pt: 'Baixar video com legendas (.webm)', pl: 'Pobierz wideo z napisami (.webm)', ru: 'Скачать видео с субтитрами (.webm)' },
+  webmNote:        { en: '.webm plays in Chrome, Edge, Firefox. Convert to MP4 with HandBrake or cloudconvert.com.', es: '.webm funciona en Chrome, Edge y Firefox.', pt: '.webm funciona no Chrome, Edge e Firefox.', pl: '.webm dziala w Chrome, Edge i Firefox.', ru: '.webm работает в Chrome, Edge, Firefox.' },
+  videoInput:      { en: 'Video', es: 'Video', pt: 'Video', pl: 'Wideo', ru: 'Видео' },
+  aiCaptions:      { en: 'AI captions', es: 'Subtitulos IA', pt: 'Legendas IA', pl: 'Napisy AI', ru: 'AI-субтитры' },
+  srtVtt:          { en: 'Optional SRT/VTT', es: 'SRT/VTT opcional', pt: 'SRT/VTT opcional', pl: 'Opcjonalny SRT/VTT', ru: 'Необязательный SRT/VTT' },
+  tierLabel:       { en: 'Tier', es: 'Plan', pt: 'Plano', pl: 'Plan', ru: 'Тариф' },
+  localeLabel:     { en: 'Locale', es: 'Idioma', pt: 'Idioma', pl: 'Jezyk', ru: 'Язык' },
+  genCaptions:     { en: 'Generate Captions', es: 'Generar subtitulos', pt: 'Gerar legendas', pl: 'Generuj napisy', ru: 'Создать субтитры' },
+  transcribing:    { en: 'Transcribing...', es: 'Transcribiendo...', pt: 'Transcrevendo...', pl: 'Transkrybowanie...', ru: 'Транскрибирование...' },
+  tierFree:        { en: 'Free/demo', es: 'Gratuito/demo', pt: 'Gratuito/demo', pl: 'Bezplatny/demo', ru: 'Бесплатный/демо' },
+  storageLabel:    { en: 'Storage:', es: 'Almacenamiento:', pt: 'Armazenamento:', pl: 'Przechowywanie:', ru: 'Хранилище:' },
+  captionsLabel:   { en: 'Captions:', es: 'Subtitulos:', pt: 'Legendas:', pl: 'Napisy:', ru: 'Субтитры:' },
+  footerTime:      { en: 'Canvas time', es: 'Tiempo canvas', pt: 'Tempo canvas', pl: 'Czas canvas', ru: 'Время холста' },
+  footerDuration:  { en: 'duration', es: 'duracion', pt: 'duracao', pl: 'czas trwania', ru: 'длительность' },
+  footerCaptions:  { en: 'captions', es: 'subtitulos', pt: 'legendas', pl: 'napisy', ru: 'субтитров' },
+  footerNote:      { en: 'exports record from canvas in real time.', es: 'las exportaciones se graban en tiempo real.', pt: 'exportacoes gravam em tempo real.', pl: 'eksporty nagrywane sa w czasie rzeczywistym.', ru: 'экспорты записываются в реальном времени.' },
+}
+
+function c(key: string, lang: string): string {
+  return (COPY as any)[key]?.[lang as Lang] ?? (COPY as any)[key]?.en ?? key
+}
+
+const starterCaptions: CaptionCue[] = [
+  { id: 'cue-1', start: 0, end: 2.8, text: 'Upload a video, then click Generate Captions to create synced AI captions.' },
+  { id: 'cue-2', start: 3, end: 6, text: 'Drag the caption on the canvas, style it, then export your video.' },
+]
+
+const captionPresets: CaptionPreset[] = [
+  { id: 'signal',  label: 'SignalBoost', descKey: 'descSignal',  style: defaultCaptionStyle },
+  { id: 'tiktok',  label: 'TikTok bold', descKey: 'descTiktok',  style: { ...defaultCaptionStyle, fontFamily: 'Arial Black, Inter, sans-serif', fontSize: 48, color: '#ffffff', backgroundColor: 'rgba(0,0,0,0.72)', animation: 'pop', x: 50, y: 76 } },
+  { id: 'hormozi', label: 'Hormozi',      descKey: 'descHormozi', style: { ...defaultCaptionStyle, fontFamily: 'Impact, Inter, sans-serif', fontSize: 52, color: '#FFD700', backgroundColor: 'rgba(0,0,0,0.86)', animation: 'pop', x: 50, y: 70 } },
+  { id: 'minimal', label: 'Minimal',      descKey: 'descMinimal', style: { ...defaultCaptionStyle, fontFamily: 'Inter, Arial, sans-serif', fontSize: 32, color: '#ffffff', backgroundColor: 'rgba(15,23,42,0.52)', animation: 'fade', x: 50, y: 84 } },
+]
+
+const aspectClasses: Record<AspectRatio, string> = { '9:16': 'aspect-[9/16] max-h-[72vh]', '1:1': 'aspect-square max-h-[72vh]', '16:9': 'aspect-video' }
+const canvasSizes: Record<AspectRatio, { width: number; height: number }> = { '9:16': { width: 720, height: 1280 }, '1:1': { width: 1080, height: 1080 }, '16:9': { width: 1280, height: 720 } }
+
+function activeCue(cues: CaptionCue[], time: number) { return cues.find((cu) => time >= cu.start && time <= cu.end) || null }
+function clamp(v: number, min: number, max: number) { return Math.min(max, Math.max(min, v)) }
+function formatTime(s: number) { const safe = Math.max(0, Number(s) || 0); const m = Math.floor(safe / 60); const sec = Math.floor(safe % 60); const t = Math.floor((safe - Math.floor(safe)) * 10); return `${m}:${String(sec).padStart(2, '0')}.${t}` }
+
+function wrapCaption(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
+  const words = text.split(/\s+/).filter(Boolean); const lines: string[] = []; let cur = ''
+  for (const w of words) { const next = cur ? `${cur} ${w}` : w; if (ctx.measureText(next).width <= maxWidth || !cur) cur = next; else { lines.push(cur); cur = w } }
+  if (cur) lines.push(cur)
+  return lines.slice(0, 4)
+}
+
+function drawRoundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  const sr = Math.min(r, w / 2, h / 2)
+  ctx.beginPath(); ctx.moveTo(x + sr, y); ctx.lineTo(x + w - sr, y); ctx.quadraticCurveTo(x + w, y, x + w, y + sr)
+  ctx.lineTo(x + w, y + h - sr); ctx.quadraticCurveTo(x + w, y + h, x + w - sr, y + h)
+  ctx.lineTo(x + sr, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - sr)
+  ctx.lineTo(x, y + sr); ctx.quadraticCurveTo(x, y, x + sr, y); ctx.closePath()
+}
+
+function parseCaptionFile(text: string): CaptionCue[] {
+  const parseTime = (s: string) => { const t = s.trim().replace(',', '.'); const p = t.split(':'); return p.length === 3 ? +p[0] * 3600 + +p[1] * 60 + +p[2] : 0 }
+  const body = text.replace(/^WEBVTT[^\n]*\n?/, '').trim(); const cues: CaptionCue[] = []
+  for (const block of body.split(/\n{2,}/)) {
+    const lines = block.trim().split('\n'); const ti = lines.findIndex(l => l.includes('-->'))
+    if (ti < 0) continue
+    const [a, b] = lines[ti].split('-->')
+    const txt = lines.slice(ti + 1).join(' ').replace(/<[^>]+>/g, '').trim()
+    if (!txt) continue
+    cues.push({ id: `cue-${cues.length + 1}`, start: parseTime(a), end: parseTime(b), text: txt })
+  }
+  return cues
+}
+
+// ── Sub-components receive lang as prop — no hook calls inside ─────────────────
+
+function QuotaStatusBar({ quota, lang }: { quota: VideoQuota; lang: string }) {
+  const pct = Math.min(100, Math.round((quota.usedMinutes / Math.max(1, quota.includedMinutes)) * 100))
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[.04] p-4">
+      <div className="flex items-center justify-between text-sm"><span>{c('quotaLabel', lang)}</span><span>{quota.usedMinutes}/{quota.includedMinutes} min</span></div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[#FFD700]" style={{ width: `${pct}%` }} /></div>
+      <p className="mt-2 text-xs text-white/55">{c('quotaNote', lang)}</p>
+      {quota.demoOnly ? <p className="mt-2 text-sm text-amber-200">{c('demoOnly', lang)}</p> : null}
+    </div>
+  )
+}
+
+function BillingBanner({ quota, lang }: { quota: VideoQuota; lang: string }) {
+  if (!quota.requiresOverageCharge) return null
+  return (
+    <div className="rounded-2xl border border-amber-300/30 bg-amber-300/10 p-4 text-sm text-amber-100">
+      {c('overage', lang)} {quota.overageMinutes} {c('overageAt', lang)} ${quota.overageRateUsd.toFixed(2)}{c('overageEnd', lang)}
+    </div>
+  )
+}
+
+function PresetPicker({ activePreset, onPreset, lang }: { activePreset: string; onPreset: (p: CaptionPreset) => void; lang: string }) {
+  return (
+    <section className="rounded-3xl border border-white/10 bg-black/40 p-5">
+      <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{c('templates', lang)}</h2><span className="text-xs text-white/50">{c('templatesHint', lang)}</span></div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {captionPresets.map((p) => (
+          <button key={p.id} type="button" onClick={() => onPreset(p)} className={`rounded-2xl border p-4 text-left transition ${activePreset === p.id ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-white/10 bg-white/[.03] hover:border-white/25'}`}>
+            <span className="font-bold">{p.label}</span><span className="mt-1 block text-xs text-white/55">{c(p.descKey, lang)}</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function CaptionTimeline({ cues, currentTime, selectedCueId, onSeek, onSelect, onUpdateText, lang }: { cues: CaptionCue[]; currentTime: number; selectedCueId: string | null; onSeek: (s: number) => void; onSelect: (id: string) => void; onUpdateText: (id: string, text: string) => void; lang: string }) {
+  const sel = cues.find((cu) => cu.id === selectedCueId) || activeCue(cues, currentTime) || cues[0]
+  return (
+    <section className="rounded-3xl border border-white/10 bg-black/40 p-5">
+      <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{c('captionTimeline', lang)}</h2><span className="text-xs text-white/50">{cues.length} {c('cues', lang)}</span></div>
+      {sel ? (
+        <label className="mt-4 block text-sm">{c('editCaption', lang)}
+          <textarea className="mt-2 min-h-24 w-full rounded-2xl border border-white/10 bg-white/10 p-3" value={sel.text} onChange={(e) => onUpdateText(sel.id, e.target.value)} />
+          <span className="mt-1 block font-mono text-xs text-[#FFD700]">{formatTime(sel.start)} → {formatTime(sel.end)}</span>
+        </label>
+      ) : null}
+      <div className="mt-4 max-h-72 space-y-2 overflow-auto">
+        {cues.length === 0 ? <p className="rounded-2xl border border-dashed border-white/15 p-4 text-sm text-white/55">{c('noCaptions', lang)}</p> : null}
+        {cues.map((cu) => (
+          <button key={cu.id} type="button" onClick={() => { onSelect(cu.id); onSeek(cu.start) }} className={`w-full rounded-2xl border p-3 text-left text-sm transition ${sel?.id === cu.id || (currentTime >= cu.start && currentTime <= cu.end) ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-white/10 bg-white/[.03] hover:border-white/25'}`}>
+            <span className="font-mono text-xs text-[#FFD700]">{formatTime(cu.start)} → {formatTime(cu.end)}</span><br />{cu.text}
+          </button>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function StyleControls({ style, aspectRatio, onChange, onAspectRatio, lang }: { style: CaptionStyle; aspectRatio: AspectRatio; onChange: (s: CaptionStyle) => void; onAspectRatio: (r: AspectRatio) => void; lang: string }) {
+  return (
+    <section className="rounded-3xl border border-white/10 bg-black/40 p-5">
+      <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{c('captionStyle', lang)}</h2><span className="text-xs text-white/50">x {style.x}% · y {style.y}%</span></div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <label className="text-sm">{c('format', lang)}<select className="mt-1 w-full rounded-xl border border-white/10 bg-black p-2" value={aspectRatio} onChange={(e) => onAspectRatio(e.target.value as AspectRatio)}><option value="9:16">9:16 Shorts/Reels/TikTok</option><option value="1:1">1:1 Square</option><option value="16:9">16:9 YouTube</option></select></label>
+        <label className="text-sm">{c('fontFamily', lang)}<input className="mt-1 w-full rounded-xl border border-white/10 bg-white/10 p-2" value={style.fontFamily} onChange={(e) => onChange({ ...style, fontFamily: e.target.value })} /></label>
+        <label className="text-sm">{c('fontSize', lang)}: {style.fontSize}px<input type="range" min="18" max="84" value={style.fontSize} onChange={(e) => onChange({ ...style, fontSize: Number(e.target.value) })} className="mt-3 w-full" /></label>
+        <label className="text-sm">{c('textColor', lang)}<input type="color" value={style.color} onChange={(e) => onChange({ ...style, color: e.target.value })} className="mt-1 block h-10 w-full rounded-xl" /></label>
+        <label className="text-sm">{c('animation', lang)}<select className="mt-1 w-full rounded-xl border border-white/10 bg-black p-2" value={style.animation} onChange={(e) => onChange({ ...style, animation: e.target.value as CaptionStyle['animation'] })}><option value="none">{c('animNone', lang)}</option><option value="fade">{c('animFade', lang)}</option><option value="slide">{c('animSlide', lang)}</option><option value="pop">{c('animPop', lang)}</option></select></label>
+        <label className="text-sm">{c('background', lang)}<input className="mt-1 w-full rounded-xl border border-white/10 bg-white/10 p-2" value={style.backgroundColor} onChange={(e) => onChange({ ...style, backgroundColor: e.target.value })} /></label>
+      </div>
+    </section>
+  )
+}
+
+function ExportPanel({ canExport, hasSource, exportState, onExport, lang }: { canExport: boolean; hasSource: boolean; exportState: ExportState; onExport: () => void; lang: string }) {
+  const isRecording = exportState.status === 'recording'
+  const isDone = exportState.status === 'ready'
+  return (
+    <section className="rounded-3xl border border-white/10 bg-black/40 p-5">
+      <h2 className="text-xl font-bold">{c('exportPanel', lang)}</h2>
+      <p className="mt-2 text-sm text-white/55">{c('exportNote', lang)}</p>
+      <button onClick={onExport} disabled={!canExport || !hasSource || isRecording} className="mt-4 w-full rounded-full bg-[#FFD700] px-5 py-3 font-bold text-black disabled:opacity-50">
+        {isRecording ? c('recording', lang) : c('exportBtn', lang)}
+      </button>
+      {exportState.message ? <p className={`mt-3 text-sm ${exportState.status === 'failed' ? 'text-red-300' : 'text-white/70'}`}>{exportState.message}</p> : null}
+      {isDone && exportState.url ? <a href={exportState.url} download="captioned-video.webm" className="mt-3 block rounded-full border border-[#FFD700] px-5 py-2 text-center font-bold text-[#FFD700]">{c('downloadBtn', lang)}</a> : null}
+      <p className="mt-3 text-xs text-white/40">{c('webmNote', lang)}</p>
+    </section>
+  )
+}

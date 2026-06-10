@@ -339,7 +339,7 @@ export default function PricingPage() {
             key={plan.key}
             className="sb-card sb-pricing-panel"
             style={{
-              padding: 24,
+              padding: 16,
               position: 'relative',
             }}
           >
@@ -357,32 +357,24 @@ export default function PricingPage() {
               <span className="sb-caption">{plan.seats}</span>
             </div>
 
-            <div style={{ fontSize: 44, fontWeight: 950, marginTop: 16 }}>
+            <div style={{ fontSize: 32, fontWeight: 950, marginTop: 8, fontFamily: 'ui-monospace, Menlo, monospace', letterSpacing: '-.03em' }}>
               {plan.price}
               {plan.period ? <span className="sb-caption">{plan.period}</span> : null}
             </div>
 
-            <p className="sb-body" style={{ fontSize: 14, minHeight: 74 }}>
+            <p className="sb-body" style={{ fontSize: 12.5, margin: '6px 0 0', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={plan.description}>
               {plan.description}
             </p>
 
             <div
-              style={{
-                border: '1px solid rgba(26,240,255,.18)',
-                borderRadius: 16,
-                padding: 12,
-                marginTop: 14,
-                background: 'rgba(26,240,255,.05)',
-              }}
+              style={{ borderLeft: '2px solid rgba(26,240,255,.45)', paddingLeft: 10, marginTop: 10 }}
+              title={plan.key === 'free'
+                ? t(dict, 'pricing_v2.free.creditExplainerShort', 'One-time demo credits for AI captions or MP4 export testing.')
+                : t(dict, 'pricing_v2.creditExplainerShort', 'Credits are used for AI captions and MP4 exports. Preview/editing is free.')}
             >
-              <strong style={{ display: 'block', color: '#fff', fontSize: 13 }}>
-                {plan.credits}
+              <strong style={{ display: 'block', color: '#9ff7ff', fontSize: 12.5 }}>
+                ⚡ {plan.credits}
               </strong>
-              <span className="sb-caption">
-                {plan.key === 'free'
-                  ? t(dict, 'pricing_v2.free.creditExplainerShort', 'One-time demo credits for AI captions or MP4 export testing.')
-                  : t(dict, 'pricing_v2.creditExplainerShort', 'Credits are used for AI captions and MP4 exports. Preview/editing is free.')}
-              </span>
             </div>
 
             <button
@@ -391,7 +383,9 @@ export default function PricingPage() {
                 width: '100%',
                 border: plan.key === 'free' ? undefined : 'none',
                 cursor: 'pointer',
-                marginTop: 18,
+                marginTop: 12,
+                fontSize: 13,
+                padding: '10px 16px',
               }}
               onClick={() => handleCheckout(plan.key)}
               disabled={loading === plan.key}
@@ -399,15 +393,15 @@ export default function PricingPage() {
               {loading === plan.key ? t(dict, 'common.loading', 'Loading…') : plan.cta}
             </button>
 
-            <ul style={{ listStyle: 'none', padding: 0, margin: '20px 0 0', display: 'grid', gap: 10 }}>
+            <ul style={{ listStyle: 'none', padding: 0, margin: '12px 0 0', display: 'grid', gap: 6 }}>
               {plan.features.map((feature) => (
-                <li key={feature} className="sb-caption">✦ {feature}</li>
+                <li key={feature} className="sb-caption" style={{ fontSize: 11.5, lineHeight: 1.45 }}>✦ {feature}</li>
               ))}
             </ul>
 
-            <ul style={{ listStyle: 'none', padding: 0, margin: '16px 0 0', display: 'grid', gap: 8 }}>
+            <ul style={{ listStyle: 'none', padding: 0, margin: '10px 0 0', display: 'grid', gap: 5 }}>
               {plan.limits.map((limit) => (
-                <li key={limit} className="sb-caption" style={{ color: 'rgba(255,255,255,.48)' }}>• {limit}</li>
+                <li key={limit} className="sb-caption" style={{ color: 'rgba(255,255,255,.45)', fontSize: 11, lineHeight: 1.4 }}>• {limit}</li>
               ))}
             </ul>
           </article>

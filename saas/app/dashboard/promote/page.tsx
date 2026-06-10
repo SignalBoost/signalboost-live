@@ -265,7 +265,7 @@ export default function PromotePage() {
     <main style={{ maxWidth: 1240, margin: '0 auto', padding: '32px 24px 80px' }}>
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
         gap: 24, alignItems: 'start',
       }} className="promote-grid">
 
@@ -287,7 +287,7 @@ export default function PromotePage() {
           </p>
 
           {/* Business + Audience */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 12 }}>
             <label style={{ display: 'grid', gap: 6 }}>
               <span style={labelStyle}>{t(dict, 'promote_page.businessName', 'Business name')}</span>
               <input value={businessName} onChange={e => setBusinessName(e.target.value)}
@@ -303,7 +303,7 @@ export default function PromotePage() {
           </div>
 
           {/* Website + File */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 12 }}>
             <label style={{ display: 'grid', gap: 6 }}>
               <span style={labelStyle}>{ui.websiteUrl}</span>
               <input value={websiteUrl} onChange={e => setWebsiteUrl(e.target.value)}

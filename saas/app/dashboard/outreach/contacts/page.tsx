@@ -208,6 +208,18 @@ export default function OutreachContactsPage() {
   const [filter, setFilter] = useState<Filter>('all')
   const [busyId, setBusyId] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(3)
+
+  // Fit exactly as many whole lead cards as the screen has room for.
+  useEffect(() => {
+    function recalc() {
+      setPageSize(Math.max(1, Math.floor((window.innerHeight - 400) / 215)))
+    }
+    recalc()
+    window.addEventListener('resize', recalc)
+    return () => window.removeEventListener('resize', recalc)
+  }, [])
 
   async function load() {
     setLoading(true)
@@ -294,7 +306,7 @@ export default function OutreachContactsPage() {
           <button
             key={filterKey}
             type="button"
-            onClick={() => setFilter(filterKey)}
+            onClick={() => { setFilter(filterKey); setPage(0) }}
             className={filter === filterKey ? 'sb-button-primary' : 'sb-button-secondary'}
             style={{ fontSize: 12, padding: '7px 14px' }}
           >
@@ -326,7 +338,7 @@ export default function OutreachContactsPage() {
       ) : null}
 
       <section style={{ display: 'grid', gap: 12 }}>
-        {visible.map((lead) => {
+        {visible.slice(page * pageSize, page * pageSize + pageSize).map((lead) => {
           const status = lead.status || 'pending'
 
           return (
@@ -412,6 +424,14 @@ export default function OutreachContactsPage() {
           )
         })}
       </section>
+
+      {visible.length > pageSize ? (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 16, marginTop: 16, borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 12 }}>
+          <button type="button" className="sb-button-secondary" style={{ fontSize: 13, padding: '7px 16px', opacity: page === 0 ? .4 : 1 }} disabled={page === 0} onClick={() => setPage(page - 1)}>‹</button>
+          <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 13, color: 'rgba(255,255,255,.7)' }}>{page + 1} / {Math.max(1, Math.ceil(visible.length / pageSize))}</span>
+          <button type="button" className="sb-button-secondary" style={{ fontSize: 13, padding: '7px 16px', opacity: (page + 1) * pageSize >= visible.length ? .4 : 1 }} disabled={(page + 1) * pageSize >= visible.length} onClick={() => setPage(page + 1)}>›</button>
+        </div>
+      ) : null}
     </main>
   )
 }

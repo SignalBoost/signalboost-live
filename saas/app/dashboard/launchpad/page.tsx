@@ -111,7 +111,7 @@ export default function LaunchpadPage() {
   const canContinue  = Boolean(selectedPath && experience)
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', padding: 'clamp(18px,4vw,48px) 0 80px', color: 'var(--text-primary)', display: 'grid', gap: 32 }}>
+    <div style={{ maxWidth: 1100, margin: '0 auto', color: 'var(--text-primary)', display: 'grid', gap: 30 }}>
 
       {/* Header */}
       <div style={{ textAlign: 'center' }}>
@@ -161,7 +161,7 @@ export default function LaunchpadPage() {
 
       {/* Preview */}
       {selectedPath && (
-        <div style={{ background: 'linear-gradient(145deg, rgba(15,23,42,.78), rgba(3,7,18,.68))', border: '1px solid rgba(255,255,255,.12)', borderRadius: 26, padding: 'clamp(20px,4vw,32px)' }}>
+        <div style={{ borderTop: '1px solid rgba(255,195,0,.3)', paddingTop: 22 }}>
           <h2 style={{ fontSize: 'clamp(16px,2.5vw,20px)', fontWeight: 900, margin: '0 0 20px', letterSpacing: '-.02em' }}>{c(selectedPath.previewTitle, l)}</h2>
           <div style={{ display: 'grid', gap: 10, marginBottom: 20 }}>
             {(['s1','s2','s3','s4','s5'] as const).map((sk, i) => (

@@ -262,12 +262,15 @@ export default function OutreachContactsPage() {
       const data = await res.json()
 
       if (res.ok && data.outreach) {
+        setError('')
         setLeads((previous) =>
           previous.map((lead) => (lead.id === id ? { ...lead, ...data.outreach } : lead)),
         )
+      } else {
+        setError(String(data?.error || `Could not set status to ${status}.`))
       }
     } catch {
-      // keep current state; user can retry
+      setError(`Could not set status to ${status}. Please retry.`)
     } finally {
       setBusyId('')
     }
@@ -356,21 +359,32 @@ export default function OutreachContactsPage() {
                   ) : null}
                 </div>
 
-                <span
-                  style={{
-                    alignSelf: 'flex-start',
-                    fontSize: 12,
-                    fontWeight: 800,
-                    letterSpacing: '.08em',
-                    textTransform: 'uppercase',
-                    color: STATUS_COLOR[status] || '#fff',
-                    border: `1px solid ${STATUS_COLOR[status] || '#fff'}`,
-                    borderRadius: 999,
-                    padding: '4px 12px',
-                  }}
-                >
-                  {copy.statuses[status] || status}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, alignSelf: 'flex-start', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  {lead.source_platform === 'strategist' ? (
+                    <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', color: '#c4b5fd', border: '1px solid rgba(196,181,253,.5)', borderRadius: 999, padding: '4px 10px' }}>
+                      🧠 Strategist
+                    </span>
+                  ) : null}
+                  {lead.created_at ? (
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', fontFamily: 'ui-monospace, Menlo, monospace' }}>
+                      {new Date(lead.created_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                    </span>
+                  ) : null}
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 800,
+                      letterSpacing: '.08em',
+                      textTransform: 'uppercase',
+                      color: STATUS_COLOR[status] || '#fff',
+                      border: `1px solid ${STATUS_COLOR[status] || '#fff'}`,
+                      borderRadius: 999,
+                      padding: '4px 12px',
+                    }}
+                  >
+                    {copy.statuses[status] || status}
+                  </span>
+                </div>
               </div>
 
               {lead.outreach_message ? (

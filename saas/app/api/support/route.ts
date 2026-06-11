@@ -11,6 +11,7 @@ import { persistTurn, searchPastConversations, formatHistoryForAI, deleteAllConv
 import { listRecentAlerts, formatAlertsForAI } from '@/lib/ai/opportunityScanner'
 import { proposeGrowthPlan, setGrowthPlanStatus, listGrowthPlans, formatPlansForAI, createOutreachDraft, type PlanStatus } from '@/lib/ai/growthPlans'
 import { isOutreachEligible, createCustomerDraft, listCustomerDrafts, formatCustomerDraftsForAI } from '@/lib/outreach/customer'
+import { listRepoFiles, readRepoFile, formatFileListForAI, formatFileForAI } from '@/lib/ai/tools/repoReader'
 
 type SupportMessage = { role?: 'user' | 'assistant' | 'system'; content?: string }
 
@@ -83,7 +84,7 @@ Operating rules (apply to every answer):
 9. Customer-support manner: polite, clear, helpful, strictly logical and technical.
 10. Consistency — apply these rules across all subjects.
 
-CUSTOMER OUTREACH (Growth & Command plans): logged-in users on these plans can have you write outreach messages for THEIR OWN business. When a user asks you to draft outreach, a partnership message, or a cold email for their business: write a polished message of 40-2,400 characters (no guaranteed-results promises), confirm the target business name and website URL, then call createMyOutreachDraft. Tell them to review, approve, and send it from the My Outreach page (Grow menu). Use listMyOutreachDrafts when they ask about their drafts. If the tool says their plan doesn't include outreach, warmly explain it's a Growth/Command feature and suggest upgrading — never pretend the draft was created.
+CUSTOMER OUTREACH (Growth & Command plans): logged-in users on these plans can have you write outreach messages for THEIR OWN business. When a user asks you to draft outreach, a partnership message, or a cold email for their business: FIRST collect everything needed for a complete message — the target business name and website URL, AND the user's own business name and sender name. NEVER save a draft containing bracketed placeholders like [Your Name] or [Your Bakery Name]; if any detail is missing, ask for it before calling the tool. Then write a polished, fully personalized message of 40-2,400 characters (no guaranteed-results promises) and call createMyOutreachDraft. Tell them to review, approve, and send it from the My Outreach page (Grow menu). Use listMyOutreachDrafts when they ask about their drafts. If the tool says their plan doesn't include outreach, warmly explain it's a Growth/Command feature and suggest upgrading — never pretend the draft was created.
 
 Describe SignalBoost using ONLY the factual knowledge above. Never say you "don't have access" to information about SignalBoost — you DO. For prices, call the getPricing tool. If asked about something genuinely not covered, say you'll connect them with the team rather than inventing an answer.`
 }
@@ -117,6 +118,8 @@ STRATEGIST PROTOCOL:
 - An automated daily scanner also stores opportunity alerts; call getOpportunityAlerts to review its latest findings when the owner asks "what's new", "any opportunities", or about the radar.
 - Ground strategy in live data: business metrics for internal numbers, web search for external facts. If live data is unavailable, say so and reason from clearly stated assumptions instead.
 - Deliver strategies as actionable playbooks: campaign ideas, outreach scripts, pricing models, funnels, retention tactics — tailored to SignalBoost's SaaS + affiliate-mall model and its five-language audience.
+
+CODEBASE ACCESS (read-only "eyes"): you can read the platform's live source code. Use listRepoFiles to explore the repository tree (the app lives under saas/) and readRepoFile to read any file. ALWAYS read the relevant files before answering questions about the code, architecture, configs, or schemas — never guess at code you have not read, and cite exact file paths in your answers. You CANNOT write, commit, or deploy: when code changes are needed, produce complete paste-ready files for the owner to commit via the GitHub web UI, following the repo's existing patterns and conventions.
 
 GROWTH PLAN WORKFLOW (analysis → proposal → owner approval → execution):
 1. ANALYZE: study radar alerts (getOpportunityAlerts), live metrics, and web research before planning.
@@ -219,6 +222,36 @@ const TOOL_GET_OPPORTUNITY_ALERTS: OpenAI.Chat.Completions.ChatCompletionTool = 
     name: 'getOpportunityAlerts',
     description: 'Get the latest opportunity alerts produced by the automated daily market scanner (competitor moves, market gaps, partnerships, pricing changes, trends). Call when the owner asks about new opportunities, the opportunity radar, market alerts, or "anything new in the market".',
     parameters: { type: 'object', properties: {}, required: [] },
+  },
+}
+
+const TOOL_LIST_REPO_FILES: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'listRepoFiles',
+    description: 'List files in the platform\'s live GitHub repository (read-only). Use to explore the codebase structure before reading files. The application code lives under saas/.',
+    parameters: {
+      type: 'object',
+      properties: {
+        prefix: { type: 'string', description: 'Optional path prefix filter, e.g. "saas/app/api" or "saas/lib". Empty lists everything (capped).' },
+      },
+      required: [],
+    },
+  },
+}
+
+const TOOL_READ_REPO_FILE: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'readRepoFile',
+    description: 'Read one file from the platform\'s live GitHub repository (read-only). ALWAYS read the relevant file before answering questions about the code. Use exact paths from listRepoFiles, e.g. "saas/app/api/support/route.ts".',
+    parameters: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Full file path from the repo root, e.g. "saas/lib/ai/tools/getPricing.ts".' },
+      },
+      required: ['path'],
+    },
   },
 }
 
@@ -349,6 +382,8 @@ const CHIEF_OF_STAFF_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   TOOL_GET_EXTERNAL_INFO,
   TOOL_GET_AFFILIATE_COUNT,
   TOOL_GET_OPPORTUNITY_ALERTS,
+  TOOL_LIST_REPO_FILES,
+  TOOL_READ_REPO_FILE,
   TOOL_PROPOSE_PLAN,
   TOOL_UPDATE_PLAN_STATUS,
   TOOL_LIST_PLANS,
@@ -431,6 +466,26 @@ async function runTool(name: string, rawArgs: string, userId: string | null, con
       return `Opportunity alerts could not be retrieved: ${result.error ?? 'unknown error'}. Tell the owner the radar is temporarily unavailable.`
     }
     return formatAlertsForAI(result.alerts)
+  }
+
+  if (name === 'listRepoFiles') {
+    let prefix = ''
+    try { prefix = String(JSON.parse(rawArgs || '{}')?.prefix || '') } catch {}
+    const result = await listRepoFiles(prefix || undefined)
+    if (!result.ok) {
+      return `Repo listing failed: ${result.error ?? 'unknown error'}.`
+    }
+    return formatFileListForAI(prefix || undefined, result.files)
+  }
+
+  if (name === 'readRepoFile') {
+    let path = ''
+    try { path = String(JSON.parse(rawArgs || '{}')?.path || '') } catch {}
+    const result = await readRepoFile(path)
+    if (!result.ok) {
+      return `Repo read failed: ${result.error ?? 'unknown error'}.`
+    }
+    return formatFileForAI(path, result.content, result.truncated)
   }
 
   if (name === 'proposeGrowthPlan') {

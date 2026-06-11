@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getCurrentUser } from '@/utils/supabase/server'
 import OpenAI from 'openai'
 
 export const dynamic = 'force-dynamic'
@@ -159,6 +160,13 @@ async function aiSummary(checks: Check[], score: number, url: string, language: 
 }
 
 export async function POST(req: NextRequest) {
+  // Auth: paid-API route — signed-in users only.
+  const authedUser = await getCurrentUser()
+  if (!authedUser) {
+    return NextResponse.json({ error: 'Please sign in.' }, { status: 401 })
+  }
+
+
   try {
     let body: any
     try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }

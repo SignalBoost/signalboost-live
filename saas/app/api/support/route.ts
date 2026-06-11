@@ -119,7 +119,7 @@ GROWTH PLAN WORKFLOW (analysis → proposal → owner approval → execution):
 1. ANALYZE: study radar alerts (getOpportunityAlerts), live metrics, and web research before planning.
 2. PROPOSE: when you have a concrete strategy worth pursuing, present it fully in chat AND store it with proposeGrowthPlan (title, objective, full plan with numbered actions). Begin the presentation with a header line containing today's date (e.g. "PROPOSAL — 12 Jun 2026"). Tell the owner it awaits their approval.
 3. APPROVAL: NEVER mark a plan approved unless the owner has explicitly approved it in this conversation ("approved", "yes, proceed", or equivalent). On approval call updateGrowthPlanStatus with status approved; on rejection, rejected. Use the exact plan id from the PENDING PLANS block above; if it is not there, call listGrowthPlans to locate it — never guess an id. If the owner requests changes, revise and propose again.
-4. EXECUTE: only for APPROVED plans. Use createOutreachDraft to place ready-to-send outreach messages into the outreach pipeline (one call per target; requires the target's business name and website URL — ask the owner if unknown). Drafts enter as 'pending' and still pass the outreach system's own approval, guardrails, daily limits, and audit before anything is sent — tell the owner to finalize sends in the Outreach dashboard. Mark the plan 'executing' once drafts are created, 'completed' when the owner says the work is done.
+4. EXECUTE: only for APPROVED plans. Use createOutreachDraft to place ready-to-send outreach messages into the outreach pipeline (one call per target; requires the target's business name and website URL — ask the owner if unknown). Each message MUST be 40-2,400 characters and must not promise guaranteed results — longer or non-compliant messages are auto-rejected by the pipeline guardrails. If a draft is rejected, shorten or fix it and retry once, then report the outcome honestly. Drafts enter as 'pending' and still pass the outreach system's own approval, guardrails, daily limits, and audit before anything is sent — tell the owner to finalize sends in the Outreach dashboard. Mark the plan 'executing' once drafts are created, 'completed' when the owner says the work is done.
 5. Use listGrowthPlans when the owner asks about plan status or past plans. Never invent plan contents — read them from the tool.
 
 How you operate:
@@ -272,7 +272,7 @@ const TOOL_CREATE_OUTREACH_DRAFT: OpenAI.Chat.Completions.ChatCompletionTool = {
       properties: {
         businessName: { type: 'string', description: 'Target business or partner name.' },
         businessUrl: { type: 'string', description: 'Target website URL, must start with http(s)://.' },
-        message: { type: 'string', description: 'The complete, polished outreach message ready to send.' },
+        message: { type: 'string', description: 'The complete, polished outreach message ready to send. HARD LIMIT: between 40 and 2,400 characters (the pipeline rejects longer); concise beats long. Never promise guaranteed revenue, sales, rankings, or results.' },
       },
       required: ['businessName', 'businessUrl', 'message'],
     },

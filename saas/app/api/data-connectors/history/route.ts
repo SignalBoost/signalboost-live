@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getCurrentUser } from '@/utils/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 
 function getDb() {
@@ -6,6 +7,13 @@ function getDb() {
 }
 
 export async function GET() {
+  // Auth: paid-API route — signed-in users only.
+  const authedUser = await getCurrentUser()
+  if (!authedUser) {
+    return NextResponse.json({ error: 'Please sign in.' }, { status: 401 })
+  }
+
+
   const db = getDb()
 
   const [{ data: categories }, { data: items }, { data: sources }] = await Promise.all([

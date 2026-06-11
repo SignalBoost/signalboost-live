@@ -1,13 +1,16 @@
 // saas/lib/ai/tools/getAffiliateCount.ts
 // Live affiliate/partner count for the AI personas.
-// Queries the MARKETING-site Supabase project (separate from the SaaS project),
-// where the `partners` table lives.
+// Queries the MARKETING-site Supabase project (separate from the SaaS project).
+// The affiliate catalog lives in the `affiliate_partners` table (140+ rows);
+// the older `partners` table exists but is empty.
 //
 // Required env vars (Vercel > signalboost-live > Settings > Environment Variables):
 //   MARKETING_SUPABASE_URL                e.g. https://vdtxulrusfvyxdtatryx.supabase.co
-//   MARKETING_SUPABASE_SERVICE_ROLE_KEY   service/secret key of the marketing project
+//   MARKETING_SUPABASE_SERVICE_ROLE_KEY   secret key of the marketing project
 
 import { createClient } from '@supabase/supabase-js'
+
+const AFFILIATES_TABLE = 'affiliate_partners'
 
 export type AffiliateMetrics = {
   totalAffiliates: number
@@ -25,7 +28,7 @@ function marketingSupabase() {
   const url = process.env.MARKETING_SUPABASE_URL
   const key = process.env.MARKETING_SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) return null
-  return createClient(url, key)
+  return createClient(url.replace(/\/rest\/v1\/?$/, ''), key)
 }
 
 export async function getAffiliateCount(): Promise<AffiliateResult> {
@@ -40,32 +43,35 @@ export async function getAffiliateCount(): Promise<AffiliateResult> {
 
     // ── Total count (cheap head request, no rows transferred) ─────────────
     const { count, error: countError } = await db
-      .from('partners')
-      .select('id', { count: 'exact', head: true })
+      .from(AFFILIATES_TABLE)
+      .select('*', { count: 'exact', head: true })
 
     if (countError) {
-      return { ok: false, error: `Partners count query failed: ${countError.message}` }
+      return { ok: false, error: `Affiliate count query failed: ${countError.message}` }
     }
 
-    // ── Optional category breakdown — degrades gracefully if the column
-    //    does not exist or the query fails ─────────────────────────────────
+    // ── Optional category breakdown — tries common column names and
+    //    degrades gracefully if none of them exist ─────────────────────────
     const byCategory: Record<string, number> = {}
-    try {
-      const { data: rows, error: catError } = await db
-        .from('partners')
-        .select('category')
-        .limit(2000)
+    for (const column of ['category', 'category_name', 'vertical', 'sector', 'type']) {
+      try {
+        const { data: rows, error: catError } = await db
+          .from(AFFILIATES_TABLE)
+          .select(column)
+          .limit(2000)
 
-      if (!catError && Array.isArray(rows)) {
+        if (catError || !Array.isArray(rows)) continue
+
         for (const row of rows) {
-          const key = String((row as { category?: unknown }).category || 'uncategorized')
+          const value = String((row as Record<string, unknown>)[column] ?? 'uncategorized')
             .trim()
             .toLowerCase() || 'uncategorized'
-          byCategory[key] = (byCategory[key] ?? 0) + 1
+          byCategory[value] = (byCategory[value] ?? 0) + 1
         }
+        break // first column that works wins
+      } catch {
+        // try the next candidate column
       }
-    } catch {
-      // breakdown is optional — total count above is the authoritative number
     }
 
     return {
@@ -91,7 +97,7 @@ export function formatAffiliatesForAI(metrics: AffiliateMetrics): string {
     .map(([cat, n]) => ` - ${cat}: ${n}`)
     .join('\n')
 
-  return `LIVE AFFILIATE COUNT (source: marketing Supabase "partners" table, as of ${new Date(metrics.generatedAt).toUTCString()}):
+  return `LIVE AFFILIATE COUNT (source: marketing Supabase "${AFFILIATES_TABLE}" table, as of ${new Date(metrics.generatedAt).toUTCString()}):
 
 Total affiliates: ${metrics.totalAffiliates}
 ${categoryLines ? `\nBy category:\n${categoryLines}` : ''}

@@ -35,6 +35,7 @@ export default function AssistantPage() {
   const [input, setInput]       = useState('')
   const [loading, setLoading]   = useState(false)
   const threadRef               = useRef<HTMLDivElement>(null)
+  const conversationIdRef       = useRef<string>('')
 
   const suggestions = [
     c(COPY.suggestions.s1, l),
@@ -52,13 +53,14 @@ export default function AssistantPage() {
   async function send(text: string) {
     const content = text.trim()
     if (!content || loading) return
+    if (!conversationIdRef.current) conversationIdRef.current = crypto.randomUUID()
     const next: Msg[] = [...messages, { role: 'user', content }]
     setMessages(next); setInput(''); setLoading(true)
     try {
       const res = await fetch('/api/concierge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: next, context: { language: lang, currentPage: '/dashboard/assistant' } }),
+        body: JSON.stringify({ messages: next, context: { language: lang, currentPage: '/dashboard/assistant', conversationId: conversationIdRef.current } }),
       })
       const data = await res.json()
       setMessages([...next, { role: 'assistant', content: data?.reply || data?.error || c(COPY.error, l) }])

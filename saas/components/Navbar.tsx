@@ -570,9 +570,9 @@ export default function Navbar() {
     cursor: 'pointer',
     color: active ? '#fff' : 'var(--text-secondary)',
     fontWeight: active ? 700 : 600,
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: 'inherit',
-    padding: '8px 4px',
+    padding: '8px 2px',
     whiteSpace: 'nowrap',
     textDecoration: 'none',
   })
@@ -653,7 +653,7 @@ export default function Navbar() {
           onClick={() => setOpenMenu(open ? null : id)}
           style={{ ...trigger(lit), ...(lit ? { color: accent } : {}) }}
         >
-          <span aria-hidden="true" style={{ display: 'inline-block', width: 6, height: 6, borderRadius: 999, background: accent, marginRight: 7, opacity: lit ? 1 : .65, boxShadow: lit ? `0 0 8px ${accent}` : 'none' }} />
+          <span aria-hidden="true" style={{ display: 'inline-block', width: 5, height: 5, borderRadius: 999, background: accent, marginRight: 5, opacity: lit ? 1 : .65, boxShadow: lit ? `0 0 8px ${accent}` : 'none' }} />
           {label}
           <span
             style={{
@@ -711,8 +711,8 @@ export default function Navbar() {
   return (
     <>
       <style>{`
-        .sbnav-desktop { display: flex; align-items: center; gap: 18px; }
-        .sbnav-right { display: flex; align-items: center; gap: 10px; }
+        .sbnav-desktop { display: flex; align-items: center; gap: 10px; }
+        .sbnav-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
         .sbnav-burger { display: none; }
         .sbnav-mobile-auth { display: none; }
         .sbnav-row { transition: background .15s ease; border-radius: 12px; }
@@ -740,7 +740,7 @@ export default function Navbar() {
           backdropFilter: 'blur(12px)',
         }}
       >
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0, marginRight: 26 }}>
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0, marginRight: 14 }}>
           <canvas ref={canvasRef} style={{ width: 40, height: 40 }} />
           <span style={{ color: '#fff', fontWeight: 800, fontSize: 17 }}>
             signal<span style={{ color: GOLD }}>boost</span>

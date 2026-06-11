@@ -796,10 +796,10 @@ export default function Navbar() {
           {user ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
               <span
-                title={tr(lang, 'title.videoCredits')}
-                style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,195,0,0.95)', fontFamily: 'monospace' }}
+                title={`${tr(lang, 'title.videoCredits')}: ${credits.toLocaleString()}`}
+                style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,195,0,0.95)', fontFamily: 'monospace', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 3 }}
               >
-                ⚡ {credits}
+                ⚡{credits >= 100000 ? `${Math.floor(credits / 1000)}K` : credits.toLocaleString()}
               </span>
               <span
                 title={`${tr(lang, 'title.currentPlan')}: ${planLabel}`}

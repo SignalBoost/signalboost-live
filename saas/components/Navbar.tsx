@@ -65,6 +65,16 @@ const GROW: Item[] = [
   { icon: '📈', key: 'grow.salesPipeline', href: '/dashboard/sales/pipeline' },
 ]
 
+const DASHBOARD_MENU: Item[] = [
+  { icon: '🏠', key: 'ws.dashboard', href: '/dashboard' },
+  { icon: '📢', key: 'grow.promote', href: '/dashboard/promote' },
+  { icon: '🌐', key: 'web.build', href: '/dashboard/builder' },
+  { icon: '⭐', key: 'web.reviews', href: '/dashboard/reviews' },
+  { icon: '🎬', key: 'con.video', href: '/dashboard/video' },
+  { icon: '🎚️', key: 'pod.optimize', href: '/dashboard/podcast/studio' },
+  { icon: '🛠️', key: 'con.apprentice', href: '/dashboard/apprentice' },
+]
+
 const WORKSPACE: Item[] = [
   { icon: '🏠', key: 'ws.dashboard', href: '/dashboard' },
   { icon: '🤖', key: 'ws.assistant', href: '/dashboard/assistant' },
@@ -404,6 +414,7 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   // Localized menu groups (recomputed when language changes)
+  const dashboardItems = localize(DASHBOARD_MENU, lang)
   const websiteItems   = localize(WEBSITE, lang)
   const podcastItems   = localize(PODCAST, lang)
   const contentItems   = localize(CONTENT, lang)
@@ -727,9 +738,7 @@ export default function Navbar() {
           </Link>
 
           {user ? (
-            <Link href="/dashboard" style={{ ...trigger(pathname === '/dashboard'), display: 'inline-flex' }}>
-              {tr(lang, 'nav.dashboard')}
-            </Link>
+            <Group id="dashboard" label={tr(lang, 'nav.dashboard')} items={dashboardItems} width={340} />
           ) : null}
 
           <Group id="website"   label={tr(lang, 'group.website')}   items={websiteItems}   width={340} />

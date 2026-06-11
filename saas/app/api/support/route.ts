@@ -8,6 +8,7 @@ import { getExternalInfo, formatExternalInfoForAI } from '@/lib/ai/tools/getExte
 import { getAffiliateCount, formatAffiliatesForAI } from '@/lib/ai/tools/getAffiliateCount'
 import { loadUserMemories, formatMemoriesForAI, saveUserMemory, forgetUserMemory } from '@/lib/ai/tools/userMemory'
 import { persistTurn, searchPastConversations, formatHistoryForAI, deleteAllConversations } from '@/lib/ai/tools/conversationHistory'
+import { listRecentAlerts, formatAlertsForAI } from '@/lib/ai/opportunityScanner'
 
 type SupportMessage = { role?: 'user' | 'assistant' | 'system'; content?: string }
 
@@ -96,7 +97,14 @@ When answering questions about users, revenue, MRR, ARR, growth, leads, or credi
 
 You also have a getExternalInfo tool that performs a LIVE WEB SEARCH. Use it whenever the owner asks about market conditions, competitors, industry trends, current prices of external services, news, regulations, or anything outside SignalBoost's internal data. Always cite source URLs from the results when making claims based on them. The competitor guardrail does NOT apply in this private channel — competitor analysis for the owner is part of your job.
 
-Your role: act as a seasoned, multi-domain expert and right hand. You have working command of marketing, sales, finance, accounting, IT and software architecture, economics, business strategy, and global/geopolitical matters as they affect the business.
+Your role: act as a seasoned, multi-domain expert and right hand — Chief of Staff AND Chief Marketing & Sales Strategist, operating at the level of a top-tier MBA hire. You have working command of marketing, sales, finance, accounting, IT and software architecture, economics, business strategy, and global/geopolitical matters as they affect the business.
+
+STRATEGIST PROTOCOL:
+- When the owner asks to scan for opportunities, research competitors, or analyze the market, run getExternalInfo searches FIRST (multiple searches for broad requests), then interpret the live signals with strategic frameworks (SWOT, STP/positioning, funnel design, pricing strategy).
+- Format opportunity findings as structured alerts: WHAT HAPPENED (the event/launch/change) → WHY IT MATTERS (growth potential or competitive impact for SignalBoost) → RECOMMENDED ACTION (copy / improve / partner / monitor / ignore, with a concrete next step). Cite source URLs.
+- An automated daily scanner also stores opportunity alerts; call getOpportunityAlerts to review its latest findings when the owner asks "what's new", "any opportunities", or about the radar.
+- Ground strategy in live data: business metrics for internal numbers, web search for external facts. If live data is unavailable, say so and reason from clearly stated assumptions instead.
+- Deliver strategies as actionable playbooks: campaign ideas, outreach scripts, pricing models, funnels, retention tactics — tailored to SignalBoost's SaaS + affiliate-mall model and its five-language audience.
 
 How you operate:
 - Be precise and reasoning-driven. Show the logic behind recommendations, including assumptions and key risks.
@@ -186,6 +194,14 @@ const TOOL_FORGET_FACT: OpenAI.Chat.Completions.ChatCompletionTool = {
     },
   },
 }
+const TOOL_GET_OPPORTUNITY_ALERTS: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'getOpportunityAlerts',
+    description: 'Get the latest opportunity alerts produced by the automated daily market scanner (competitor moves, market gaps, partnerships, pricing changes, trends). Call when the owner asks about new opportunities, the opportunity radar, market alerts, or "anything new in the market".',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+}
 
 const TOOL_SEARCH_HISTORY: OpenAI.Chat.Completions.ChatCompletionTool = {
   type: 'function',
@@ -227,6 +243,7 @@ const CHIEF_OF_STAFF_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   TOOL_GET_BUSINESS_METRICS,
   TOOL_GET_EXTERNAL_INFO,
   TOOL_GET_AFFILIATE_COUNT,
+  TOOL_GET_OPPORTUNITY_ALERTS,
 ]
 
 async function runTool(name: string, rawArgs: string, userId: string | null, conversationId: string | null): Promise<string> {
@@ -297,6 +314,14 @@ async function runTool(name: string, rawArgs: string, userId: string | null, con
     return result.deleted > 0
       ? `Deleted ${result.deleted} memor${result.deleted === 1 ? 'y' : 'ies'} matching "${match}". Confirm briefly to the user.`
       : `No saved memories matched "${match}". Tell the user nothing matching that was found.`
+  }
+
+  if (name === 'getOpportunityAlerts') {
+    const result = await listRecentAlerts(10)
+    if (!result.ok) {
+      return `Opportunity alerts could not be retrieved: ${result.error ?? 'unknown error'}. Tell the owner the radar is temporarily unavailable.`
+    }
+    return formatAlertsForAI(result.alerts)
   }
 
   if (name === 'searchPastConversations') {
@@ -486,6 +511,8 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
     })
   } catch (error) {
     console.error('Support API error', error)
-    return NextResponse.json({ error: 'Could not process your request right now.' }, { status: 500 })
+    return NextResponse.json({ ok: false }, { status: 500 })
   }
 }
+
+

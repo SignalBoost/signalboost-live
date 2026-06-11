@@ -85,7 +85,7 @@ Operating rules (apply to every answer):
 Describe SignalBoost using ONLY the factual knowledge above. Never say you "don't have access" to information about SignalBoost — you DO. For prices, call the getPricing tool. If asked about something genuinely not covered, say you'll connect them with the team rather than inventing an answer.`
 }
 
-function chiefOfStaffPrompt(language: string, liveMetrics: string): string {
+function chiefOfStaffPrompt(language: string, liveMetrics: string, pendingPlans: string): string {
   return `You are the Chief of Staff AI for SignalBoost — the trusted senior advisor to the company's owner and administrators. You are speaking with a verified owner/admin, privately.
 
 Today's date: ${new Date().toUTCString().slice(0, 16)}.
@@ -97,6 +97,10 @@ ${PLATFORM_FACTS}
 ── LIVE BUSINESS METRICS (pre-fetched from Supabase for this session) ──
 ${liveMetrics}
 ── END LIVE METRICS ──
+
+── GROWTH PLANS AWAITING DECISION (pre-fetched this session; use these exact ids) ──
+${pendingPlans}
+── END PENDING PLANS ──
 
 When answering questions about users, revenue, MRR, ARR, growth, leads, or credits — use the live metrics above. They are current as of this session. Call getBusinessMetrics only if you need a refresh mid-conversation.
 
@@ -114,7 +118,7 @@ STRATEGIST PROTOCOL:
 GROWTH PLAN WORKFLOW (analysis → proposal → owner approval → execution):
 1. ANALYZE: study radar alerts (getOpportunityAlerts), live metrics, and web research before planning.
 2. PROPOSE: when you have a concrete strategy worth pursuing, present it fully in chat AND store it with proposeGrowthPlan (title, objective, full plan with numbered actions). Begin the presentation with a header line containing today's date (e.g. "PROPOSAL — 12 Jun 2026"). Tell the owner it awaits their approval.
-3. APPROVAL: NEVER mark a plan approved unless the owner has explicitly approved it in this conversation ("approved", "yes, proceed", or equivalent). On approval call updateGrowthPlanStatus with status approved; on rejection, rejected. If the owner requests changes, revise and propose again.
+3. APPROVAL: NEVER mark a plan approved unless the owner has explicitly approved it in this conversation ("approved", "yes, proceed", or equivalent). On approval call updateGrowthPlanStatus with status approved; on rejection, rejected. Use the exact plan id from the PENDING PLANS block above; if it is not there, call listGrowthPlans to locate it — never guess an id. If the owner requests changes, revise and propose again.
 4. EXECUTE: only for APPROVED plans. Use createOutreachDraft to place ready-to-send outreach messages into the outreach pipeline (one call per target; requires the target's business name and website URL — ask the owner if unknown). Drafts enter as 'pending' and still pass the outreach system's own approval, guardrails, daily limits, and audit before anything is sent — tell the owner to finalize sends in the Outreach dashboard. Mark the plan 'executing' once drafts are created, 'completed' when the owner says the work is done.
 5. Use listGrowthPlans when the owner asks about plan status or past plans. Never invent plan contents — read them from the tool.
 
@@ -530,6 +534,7 @@ export async function POST(req: NextRequest) {
 
     // ── Pre-fetch live metrics for Chief of Staff on every request ────────
     let liveMetrics = 'Metrics unavailable — Supabase query failed.'
+    let pendingPlans = 'No plans awaiting decision.'
     if (isPrivileged) {
       try {
         const metricsResult = await getBusinessMetrics()
@@ -539,10 +544,23 @@ export async function POST(req: NextRequest) {
       } catch {
         // non-blocking — fallback text already set
       }
+      try {
+        const plansResult = await listGrowthPlans(10)
+        if (plansResult.ok) {
+          const open = plansResult.plans.filter(p => p.status === 'proposed' || p.status === 'approved' || p.status === 'executing')
+          if (open.length) {
+            pendingPlans = open
+              .map(p => `- id: ${p.id} | status: ${p.status} | "${p.title}" — ${p.objective}`)
+              .join('\n')
+          }
+        }
+      } catch {
+        // non-blocking — fallback text already set
+      }
     }
 
     let systemContent = isPrivileged
-      ? chiefOfStaffPrompt(language, liveMetrics)
+      ? chiefOfStaffPrompt(language, liveMetrics, pendingPlans)
       : conciergePrompt(language)
 
     // ── Long-term user memory (logged-in users only) ──────────────────────
@@ -586,7 +604,7 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
     let choice     = response.choices[0]
     let toolRounds = 0
 
-    while (choice?.message?.tool_calls && choice.message.tool_calls.length > 0 && toolRounds < 3) {
+    while (choice?.message?.tool_calls && choice.message.tool_calls.length > 0 && toolRounds < 6) {
       toolRounds++
 
       convo.push(choice.message as OpenAI.Chat.Completions.ChatCompletionMessageParam)

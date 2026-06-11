@@ -740,7 +740,7 @@ export default function Navbar() {
           backdropFilter: 'blur(12px)',
         }}
       >
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0 }}>
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0, marginRight: 26 }}>
           <canvas ref={canvasRef} style={{ width: 40, height: 40 }} />
           <span style={{ color: '#fff', fontWeight: 800, fontSize: 17 }}>
             signal<span style={{ color: GOLD }}>boost</span>

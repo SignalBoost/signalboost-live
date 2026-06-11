@@ -35,6 +35,7 @@ const PODCAST: Item[] = [
   { icon: '🎙️', key: 'pod.build', href: '/dashboard/launchpad/podcast' },
   { icon: '🎚️', key: 'pod.optimize', href: '/dashboard/podcast/studio' },
   { icon: '📻', key: 'pod.hub', href: '/dashboard/podcast' },
+  { icon: '🌍', key: 'pod.public', href: '/podcasters' },
 ]
 
 const CONTENT: Item[] = [
@@ -73,6 +74,7 @@ const WORKSPACE: Item[] = [
 ]
 
 const ADMIN: Item[] = [
+  { icon: '🛰️', key: 'adm.mission', href: '/admin' },
   { icon: '🌌', key: 'adm.overview', href: '/admin/overview' },
   { icon: '💰', key: 'adm.revenue', href: '/admin/revenue' },
   { icon: '🔌', key: 'adm.data', href: '/dashboard/data' },
@@ -97,14 +99,14 @@ const COPY: Record<Lang, Record<string, string>> = {
     'group.website': 'Website', 'group.podcast': 'Podcast', 'group.content': 'Content',
     'group.launchpad': 'Launchpad', 'group.grow': 'Grow', 'group.workspace': 'Workspace',
     'group.admin': 'Admin', 'group.help': 'Help',
-    'nav.home': 'Home', 'nav.pricing': 'Pricing', 'nav.more': 'More',
+    'nav.home': 'Home', 'nav.dashboard': 'Dashboard', 'nav.pricing': 'Pricing', 'nav.more': 'More',
     'plan.freeDemo': 'Free Demo', 'plan.launch': 'Launch', 'plan.growth': 'Growth', 'plan.command': 'Command',
     'title.videoCredits': 'Available video credits', 'title.currentPlan': 'Current plan',
     'web.build.l': 'Build a Website', 'web.build.d': 'Generate a full site from a prompt.',
     'web.optimize.l': 'Optimize Website', 'web.optimize.d': 'Analyze, optimize, and rebuild an improved site.',
     'web.reviews.l': 'Reviews', 'web.reviews.d': 'Collect and showcase customer reviews.',
     'web.improve.l': 'Improve Content', 'web.improve.d': 'Polish pages for SEO and conversion.',
-    'pod.build.l': 'Build a Podcast', 'pod.build.d': 'Start a podcast from scratch.',
+    'pod.public.l': 'For Podcasters', 'pod.public.d': 'Public page for podcast creators.', 'pod.build.l': 'Build a Podcast', 'pod.build.d': 'Start a podcast from scratch.',
     'pod.optimize.l': 'Optimize Podcast Studio', 'pod.optimize.d': 'Audit your feed for Apple, Spotify, and growth.',
     'pod.hub.l': 'Podcast Hub', 'pod.hub.d': 'Your podcast page and tools.',
     'con.audio.l': 'Audio Studio', 'con.audio.d': 'Native voice and audio content.',
@@ -130,7 +132,7 @@ const COPY: Record<Lang, Record<string, string>> = {
     'ws.calendar.l': 'Calendar', 'ws.calendar.d': 'Events and cultural dates.',
     'ws.spreadsheets.l': 'Spreadsheets', 'ws.spreadsheets.d': 'Your imported data, in a grid.',
     'ws.feedback.l': 'Feedback', 'ws.feedback.d': 'Send us your feedback.',
-    'adm.overview.l': 'Overview', 'adm.overview.d': 'Real counts from live data.',
+    'adm.mission.l': 'Mission Control', 'adm.mission.d': 'Unified executive admin cockpit.', 'adm.overview.l': 'Overview', 'adm.overview.d': 'Real counts from live data.',
     'adm.revenue.l': 'Revenue', 'adm.revenue.d': 'Live MRR from active subscriptions.',
     'adm.data.l': 'Data Connectors', 'adm.data.d': 'Import and manage connected data sources.',
     'adm.metrics.l': 'Metrics & Credits', 'adm.metrics.d': 'Usage, credits, and operating metrics.',
@@ -146,14 +148,14 @@ const COPY: Record<Lang, Record<string, string>> = {
     'group.website': 'Sitio web', 'group.podcast': 'Podcast', 'group.content': 'Contenido',
     'group.launchpad': 'Launchpad', 'group.grow': 'Crecer', 'group.workspace': 'Espacio de trabajo',
     'group.admin': 'Admin', 'group.help': 'Ayuda',
-    'nav.home': 'Inicio', 'nav.pricing': 'Precios', 'nav.more': 'Más',
+    'nav.home': 'Inicio', 'nav.dashboard': 'Panel', 'nav.pricing': 'Precios', 'nav.more': 'Más',
     'plan.freeDemo': 'Demo gratis', 'plan.launch': 'Launch', 'plan.growth': 'Growth', 'plan.command': 'Command',
     'title.videoCredits': 'Créditos de video disponibles', 'title.currentPlan': 'Plan actual',
     'web.build.l': 'Crear un sitio web', 'web.build.d': 'Genera un sitio completo desde una indicación.',
     'web.optimize.l': 'Optimizar sitio web', 'web.optimize.d': 'Analiza, optimiza y reconstruye un sitio mejorado.',
     'web.reviews.l': 'Reseñas', 'web.reviews.d': 'Recopila y muestra reseñas de clientes.',
     'web.improve.l': 'Mejorar contenido', 'web.improve.d': 'Pule páginas para SEO y conversión.',
-    'pod.build.l': 'Crear un podcast', 'pod.build.d': 'Inicia un podcast desde cero.',
+    'pod.public.l': 'Para podcasters', 'pod.public.d': 'Página pública para creadores de podcasts.', 'pod.build.l': 'Crear un podcast', 'pod.build.d': 'Inicia un podcast desde cero.',
     'pod.optimize.l': 'Optimizar estudio de podcast', 'pod.optimize.d': 'Audita tu feed para Apple, Spotify y crecimiento.',
     'pod.hub.l': 'Centro de podcast', 'pod.hub.d': 'Tu página y herramientas de podcast.',
     'con.audio.l': 'Estudio de audio', 'con.audio.d': 'Voz y contenido de audio nativos.',
@@ -179,7 +181,7 @@ const COPY: Record<Lang, Record<string, string>> = {
     'ws.calendar.l': 'Calendario', 'ws.calendar.d': 'Eventos y fechas culturales.',
     'ws.spreadsheets.l': 'Hojas de cálculo', 'ws.spreadsheets.d': 'Tus datos importados, en una cuadrícula.',
     'ws.feedback.l': 'Comentarios', 'ws.feedback.d': 'Envíanos tus comentarios.',
-    'adm.overview.l': 'Resumen', 'adm.overview.d': 'Conteos reales de datos en vivo.',
+    'adm.mission.l': 'Control de misión', 'adm.mission.d': 'Cabina ejecutiva unificada de administración.', 'adm.overview.l': 'Resumen', 'adm.overview.d': 'Conteos reales de datos en vivo.',
     'adm.revenue.l': 'Ingresos', 'adm.revenue.d': 'MRR en vivo de suscripciones activas.',
     'adm.data.l': 'Conectores de datos', 'adm.data.d': 'Importa y gestiona fuentes de datos conectadas.',
     'adm.metrics.l': 'Métricas y créditos', 'adm.metrics.d': 'Uso, créditos y métricas operativas.',
@@ -195,14 +197,14 @@ const COPY: Record<Lang, Record<string, string>> = {
     'group.website': 'Site', 'group.podcast': 'Podcast', 'group.content': 'Conteúdo',
     'group.launchpad': 'Launchpad', 'group.grow': 'Crescer', 'group.workspace': 'Espaço de trabalho',
     'group.admin': 'Admin', 'group.help': 'Ajuda',
-    'nav.home': 'Início', 'nav.pricing': 'Preços', 'nav.more': 'Mais',
+    'nav.home': 'Início', 'nav.dashboard': 'Painel', 'nav.pricing': 'Preços', 'nav.more': 'Mais',
     'plan.freeDemo': 'Demo grátis', 'plan.launch': 'Launch', 'plan.growth': 'Growth', 'plan.command': 'Command',
     'title.videoCredits': 'Créditos de vídeo disponíveis', 'title.currentPlan': 'Plano atual',
     'web.build.l': 'Criar um site', 'web.build.d': 'Gere um site completo a partir de um prompt.',
     'web.optimize.l': 'Otimizar site', 'web.optimize.d': 'Analise, otimize e reconstrua um site melhorado.',
     'web.reviews.l': 'Avaliações', 'web.reviews.d': 'Colete e exiba avaliações de clientes.',
     'web.improve.l': 'Melhorar conteúdo', 'web.improve.d': 'Aprimore páginas para SEO e conversão.',
-    'pod.build.l': 'Criar um podcast', 'pod.build.d': 'Comece um podcast do zero.',
+    'pod.public.l': 'Para podcasters', 'pod.public.d': 'Página pública para criadores de podcasts.', 'pod.build.l': 'Criar um podcast', 'pod.build.d': 'Comece um podcast do zero.',
     'pod.optimize.l': 'Otimizar estúdio de podcast', 'pod.optimize.d': 'Audite seu feed para Apple, Spotify e crescimento.',
     'pod.hub.l': 'Central de podcast', 'pod.hub.d': 'Sua página e ferramentas de podcast.',
     'con.audio.l': 'Estúdio de áudio', 'con.audio.d': 'Voz e conteúdo de áudio nativos.',
@@ -228,7 +230,7 @@ const COPY: Record<Lang, Record<string, string>> = {
     'ws.calendar.l': 'Calendário', 'ws.calendar.d': 'Eventos e datas culturais.',
     'ws.spreadsheets.l': 'Planilhas', 'ws.spreadsheets.d': 'Seus dados importados, em uma grade.',
     'ws.feedback.l': 'Feedback', 'ws.feedback.d': 'Envie seu feedback.',
-    'adm.overview.l': 'Visão geral', 'adm.overview.d': 'Contagens reais de dados ao vivo.',
+    'adm.mission.l': 'Controle de missão', 'adm.mission.d': 'Cockpit executivo unificado de administração.', 'adm.overview.l': 'Visão geral', 'adm.overview.d': 'Contagens reais de dados ao vivo.',
     'adm.revenue.l': 'Receita', 'adm.revenue.d': 'MRR ao vivo de assinaturas ativas.',
     'adm.data.l': 'Conectores de dados', 'adm.data.d': 'Importe e gerencie fontes de dados conectadas.',
     'adm.metrics.l': 'Métricas e créditos', 'adm.metrics.d': 'Uso, créditos e métricas operacionais.',
@@ -244,14 +246,14 @@ const COPY: Record<Lang, Record<string, string>> = {
     'group.website': 'Strona', 'group.podcast': 'Podcast', 'group.content': 'Treść',
     'group.launchpad': 'Launchpad', 'group.grow': 'Rozwój', 'group.workspace': 'Przestrzeń robocza',
     'group.admin': 'Admin', 'group.help': 'Pomoc',
-    'nav.home': 'Strona główna', 'nav.pricing': 'Cennik', 'nav.more': 'Więcej',
+    'nav.home': 'Strona główna', 'nav.dashboard': 'Panel', 'nav.pricing': 'Cennik', 'nav.more': 'Więcej',
     'plan.freeDemo': 'Darmowe demo', 'plan.launch': 'Launch', 'plan.growth': 'Growth', 'plan.command': 'Command',
     'title.videoCredits': 'Dostępne kredyty wideo', 'title.currentPlan': 'Bieżący plan',
     'web.build.l': 'Stwórz stronę', 'web.build.d': 'Wygeneruj całą stronę z polecenia.',
     'web.optimize.l': 'Optymalizuj stronę', 'web.optimize.d': 'Analizuj, optymalizuj i przebuduj ulepszoną stronę.',
     'web.reviews.l': 'Opinie', 'web.reviews.d': 'Zbieraj i prezentuj opinie klientów.',
     'web.improve.l': 'Ulepsz treść', 'web.improve.d': 'Dopracuj strony pod SEO i konwersję.',
-    'pod.build.l': 'Stwórz podcast', 'pod.build.d': 'Załóż podcast od zera.',
+    'pod.public.l': 'Dla podcasterów', 'pod.public.d': 'Publiczna strona dla twórców podcastów.', 'pod.build.l': 'Stwórz podcast', 'pod.build.d': 'Załóż podcast od zera.',
     'pod.optimize.l': 'Optymalizuj studio podcastu', 'pod.optimize.d': 'Sprawdź swój kanał pod Apple, Spotify i rozwój.',
     'pod.hub.l': 'Centrum podcastu', 'pod.hub.d': 'Twoja strona i narzędzia podcastu.',
     'con.audio.l': 'Studio audio', 'con.audio.d': 'Natywny głos i treści audio.',
@@ -277,7 +279,7 @@ const COPY: Record<Lang, Record<string, string>> = {
     'ws.calendar.l': 'Kalendarz', 'ws.calendar.d': 'Wydarzenia i daty kulturalne.',
     'ws.spreadsheets.l': 'Arkusze', 'ws.spreadsheets.d': 'Twoje zaimportowane dane w tabeli.',
     'ws.feedback.l': 'Opinie', 'ws.feedback.d': 'Wyślij nam swoją opinię.',
-    'adm.overview.l': 'Przegląd', 'adm.overview.d': 'Rzeczywiste dane na żywo.',
+    'adm.mission.l': 'Centrum dowodzenia', 'adm.mission.d': 'Zunifikowany kokpit administracyjny.', 'adm.overview.l': 'Przegląd', 'adm.overview.d': 'Rzeczywiste dane na żywo.',
     'adm.revenue.l': 'Przychód', 'adm.revenue.d': 'Bieżący MRR z aktywnych subskrypcji.',
     'adm.data.l': 'Łączniki danych', 'adm.data.d': 'Importuj i zarządzaj połączonymi źródłami danych.',
     'adm.metrics.l': 'Metryki i kredyty', 'adm.metrics.d': 'Zużycie, kredyty i metryki operacyjne.',
@@ -293,14 +295,14 @@ const COPY: Record<Lang, Record<string, string>> = {
     'group.website': 'Сайт', 'group.podcast': 'Подкаст', 'group.content': 'Контент',
     'group.launchpad': 'Launchpad', 'group.grow': 'Рост', 'group.workspace': 'Рабочая область',
     'group.admin': 'Админ', 'group.help': 'Помощь',
-    'nav.home': 'Главная', 'nav.pricing': 'Цены', 'nav.more': 'Ещё',
+    'nav.home': 'Главная', 'nav.dashboard': 'Панель', 'nav.pricing': 'Цены', 'nav.more': 'Ещё',
     'plan.freeDemo': 'Бесплатное демо', 'plan.launch': 'Launch', 'plan.growth': 'Growth', 'plan.command': 'Command',
     'title.videoCredits': 'Доступные видеокредиты', 'title.currentPlan': 'Текущий план',
     'web.build.l': 'Создать сайт', 'web.build.d': 'Создайте полный сайт из запроса.',
     'web.optimize.l': 'Оптимизировать сайт', 'web.optimize.d': 'Анализируйте, оптимизируйте и пересоберите улучшенный сайт.',
     'web.reviews.l': 'Отзывы', 'web.reviews.d': 'Собирайте и показывайте отзывы клиентов.',
     'web.improve.l': 'Улучшить контент', 'web.improve.d': 'Доработайте страницы для SEO и конверсии.',
-    'pod.build.l': 'Создать подкаст', 'pod.build.d': 'Создайте подкаст с нуля.',
+    'pod.public.l': 'Для подкастеров', 'pod.public.d': 'Публичная страница для авторов подкастов.', 'pod.build.l': 'Создать подкаст', 'pod.build.d': 'Создайте подкаст с нуля.',
     'pod.optimize.l': 'Оптимизировать студию подкаста', 'pod.optimize.d': 'Проверьте свой фид для Apple, Spotify и роста.',
     'pod.hub.l': 'Центр подкаста', 'pod.hub.d': 'Ваша страница и инструменты подкаста.',
     'con.audio.l': 'Аудиостудия', 'con.audio.d': 'Естественный голос и аудиоконтент.',
@@ -326,7 +328,7 @@ const COPY: Record<Lang, Record<string, string>> = {
     'ws.calendar.l': 'Календарь', 'ws.calendar.d': 'События и культурные даты.',
     'ws.spreadsheets.l': 'Таблицы', 'ws.spreadsheets.d': 'Ваши импортированные данные в таблице.',
     'ws.feedback.l': 'Отзывы', 'ws.feedback.d': 'Отправьте нам свой отзыв.',
-    'adm.overview.l': 'Обзор', 'adm.overview.d': 'Реальные данные в реальном времени.',
+    'adm.mission.l': 'Центр управления', 'adm.mission.d': 'Единый административный кокпит.', 'adm.overview.l': 'Обзор', 'adm.overview.d': 'Реальные данные в реальном времени.',
     'adm.revenue.l': 'Доход', 'adm.revenue.d': 'Текущий MRR от активных подписок.',
     'adm.data.l': 'Коннекторы данных', 'adm.data.d': 'Импортируйте и управляйте подключёнными источниками данных.',
     'adm.metrics.l': 'Метрики и кредиты', 'adm.metrics.d': 'Использование, кредиты и операционные метрики.',
@@ -723,6 +725,12 @@ export default function Navbar() {
           <Link href="/" style={{ ...trigger(pathname === '/'), display: 'inline-flex' }}>
             {tr(lang, 'nav.home')}
           </Link>
+
+          {user ? (
+            <Link href="/dashboard" style={{ ...trigger(pathname === '/dashboard'), display: 'inline-flex' }}>
+              {tr(lang, 'nav.dashboard')}
+            </Link>
+          ) : null}
 
           <Group id="website"   label={tr(lang, 'group.website')}   items={websiteItems}   width={340} />
           <Group id="podcast"   label={tr(lang, 'group.podcast')}   items={podcastItems}   width={340} />

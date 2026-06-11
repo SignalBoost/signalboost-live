@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getCurrentUser } from '@/utils/supabase/server'
 
 type CreativeImageRequest = {
   prompt?: string
@@ -6,6 +7,13 @@ type CreativeImageRequest = {
 }
 
 export async function POST(req: Request) {
+  // Auth: paid-API route — signed-in users only.
+  const authedUser = await getCurrentUser()
+  if (!authedUser) {
+    return NextResponse.json({ error: 'Please sign in.' }, { status: 401 })
+  }
+
+
   try {
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(

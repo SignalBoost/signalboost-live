@@ -10,6 +10,7 @@ import { loadUserMemories, formatMemoriesForAI, saveUserMemory, forgetUserMemory
 import { persistTurn, searchPastConversations, formatHistoryForAI, deleteAllConversations } from '@/lib/ai/tools/conversationHistory'
 import { listRecentAlerts, formatAlertsForAI } from '@/lib/ai/opportunityScanner'
 import { proposeGrowthPlan, setGrowthPlanStatus, listGrowthPlans, formatPlansForAI, createOutreachDraft, type PlanStatus } from '@/lib/ai/growthPlans'
+import { isOutreachEligible, createCustomerDraft, listCustomerDrafts, formatCustomerDraftsForAI } from '@/lib/outreach/customer'
 
 type SupportMessage = { role?: 'user' | 'assistant' | 'system'; content?: string }
 
@@ -81,6 +82,8 @@ Operating rules (apply to every answer):
 8. When asked for code, provide clean, production-ready snippets.
 9. Customer-support manner: polite, clear, helpful, strictly logical and technical.
 10. Consistency — apply these rules across all subjects.
+
+CUSTOMER OUTREACH (Growth & Command plans): logged-in users on these plans can have you write outreach messages for THEIR OWN business. When a user asks you to draft outreach, a partnership message, or a cold email for their business: write a polished message of 40-2,400 characters (no guaranteed-results promises), confirm the target business name and website URL, then call createMyOutreachDraft. Tell them to review, approve, and send it from the My Outreach page (Grow menu). Use listMyOutreachDrafts when they ask about their drafts. If the tool says their plan doesn't include outreach, warmly explain it's a Growth/Command feature and suggest upgrading — never pretend the draft was created.
 
 Describe SignalBoost using ONLY the factual knowledge above. Never say you "don't have access" to information about SignalBoost — you DO. For prices, call the getPricing tool. If asked about something genuinely not covered, say you'll connect them with the team rather than inventing an answer.`
 }
@@ -279,6 +282,32 @@ const TOOL_CREATE_OUTREACH_DRAFT: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
+const TOOL_CREATE_MY_OUTREACH: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'createMyOutreachDraft',
+    description: 'Create an outreach draft for THE USER\'S OWN business (Growth/Command plans). Call after writing the message and confirming the target. The draft lands on their My Outreach page for review, approval, and sending from their own email.',
+    parameters: {
+      type: 'object',
+      properties: {
+        businessName: { type: 'string', description: 'Target business name.' },
+        businessUrl: { type: 'string', description: 'Target website URL, must start with http(s)://.' },
+        message: { type: 'string', description: 'The complete outreach message, 40-2,400 characters, no guaranteed-results promises.' },
+      },
+      required: ['businessName', 'businessUrl', 'message'],
+    },
+  },
+}
+
+const TOOL_LIST_MY_OUTREACH: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'listMyOutreachDrafts',
+    description: 'List the user\'s own outreach drafts and their statuses. Call when they ask about their drafts, pending messages, or outreach progress.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+}
+
 const TOOL_SEARCH_HISTORY: OpenAI.Chat.Completions.ChatCompletionTool = {
   type: 'function',
   function: {
@@ -453,6 +482,43 @@ async function runTool(name: string, rawArgs: string, userId: string | null, con
       : `Outreach draft failed: ${result.error ?? 'unknown error'}.`
   }
 
+  if (name === 'createMyOutreachDraft') {
+    if (!userId) {
+      return 'Outreach drafts require a logged-in account. Invite the user to sign in.'
+    }
+    const eligible = await isOutreachEligible(userId)
+    if (!eligible) {
+      return 'PLAN GATE: this user\'s plan does not include outreach (Growth/Command feature). Do NOT create the draft. Warmly explain the feature and suggest upgrading via the Pricing page.'
+    }
+    let args: any = {}
+    try { args = JSON.parse(rawArgs || '{}') } catch {}
+    const result = await createCustomerDraft({
+      userId,
+      businessName: String(args?.businessName || ''),
+      businessUrl: String(args?.businessUrl || ''),
+      message: String(args?.message || ''),
+      source: 'concierge',
+    })
+    return result.ok
+      ? `Draft created (id ${result.id}), status PENDING. Tell the user to review, approve, and send it from the My Outreach page in the Grow menu.`
+      : `Draft failed: ${result.error ?? 'unknown error'}. Fix the issue (e.g. shorten the message or get a valid URL) and retry once, or report honestly.`
+  }
+
+  if (name === 'listMyOutreachDrafts') {
+    if (!userId) {
+      return 'Outreach drafts require a logged-in account. Invite the user to sign in.'
+    }
+    const eligible = await isOutreachEligible(userId)
+    if (!eligible) {
+      return 'PLAN GATE: this user\'s plan does not include outreach (Growth/Command feature). Warmly explain and suggest upgrading.'
+    }
+    const result = await listCustomerDrafts(userId, 10)
+    if (!result.ok) {
+      return `Drafts could not be retrieved: ${result.error ?? 'unknown error'}.`
+    }
+    return formatCustomerDraftsForAI(result.drafts)
+  }
+
   if (name === 'searchPastConversations') {
     if (!userId) {
       return 'Conversation history is only available for logged-in users. Do not mention this technical detail; just continue helping.'
@@ -530,7 +596,10 @@ export async function POST(req: NextRequest) {
     const model       = isPrivileged ? 'gpt-4o' : 'gpt-4o-mini'
     const temperature = isPrivileged ? 0.5 : 0.4
     const baseTools   = isPrivileged ? CHIEF_OF_STAFF_TOOLS : CONCIERGE_TOOLS
-    const tools       = userId ? [...baseTools, TOOL_REMEMBER_FACT, TOOL_FORGET_FACT, TOOL_SEARCH_HISTORY, TOOL_DELETE_HISTORY] : baseTools
+    const customerTools = userId && !isPrivileged ? [TOOL_CREATE_MY_OUTREACH, TOOL_LIST_MY_OUTREACH] : []
+    const tools       = userId
+      ? [...baseTools, ...customerTools, TOOL_REMEMBER_FACT, TOOL_FORGET_FACT, TOOL_SEARCH_HISTORY, TOOL_DELETE_HISTORY]
+      : baseTools
 
     // ── Pre-fetch live metrics for Chief of Staff on every request ────────
     let liveMetrics = 'Metrics unavailable — Supabase query failed.'

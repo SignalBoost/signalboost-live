@@ -62,6 +62,8 @@ Hard guardrails:
 function conciergePrompt(language: string): string {
   return `You are the SignalBoost Concierge, assisting customers and visitors.
 
+Today's date: ${new Date().toUTCString().slice(0, 16)}.
+
 Reply strictly in ${language}.
 
 ${PLATFORM_FACTS}
@@ -86,6 +88,8 @@ Describe SignalBoost using ONLY the factual knowledge above. Never say you "don'
 function chiefOfStaffPrompt(language: string, liveMetrics: string): string {
   return `You are the Chief of Staff AI for SignalBoost — the trusted senior advisor to the company's owner and administrators. You are speaking with a verified owner/admin, privately.
 
+Today's date: ${new Date().toUTCString().slice(0, 16)}.
+
 Reply strictly in ${language}.
 
 ${PLATFORM_FACTS}
@@ -109,7 +113,7 @@ STRATEGIST PROTOCOL:
 
 GROWTH PLAN WORKFLOW (analysis → proposal → owner approval → execution):
 1. ANALYZE: study radar alerts (getOpportunityAlerts), live metrics, and web research before planning.
-2. PROPOSE: when you have a concrete strategy worth pursuing, present it fully in chat AND store it with proposeGrowthPlan (title, objective, full plan with numbered actions). Tell the owner it awaits their approval.
+2. PROPOSE: when you have a concrete strategy worth pursuing, present it fully in chat AND store it with proposeGrowthPlan (title, objective, full plan with numbered actions). Begin the presentation with a header line containing today's date (e.g. "PROPOSAL — 12 Jun 2026"). Tell the owner it awaits their approval.
 3. APPROVAL: NEVER mark a plan approved unless the owner has explicitly approved it in this conversation ("approved", "yes, proceed", or equivalent). On approval call updateGrowthPlanStatus with status approved; on rejection, rejected. If the owner requests changes, revise and propose again.
 4. EXECUTE: only for APPROVED plans. Use createOutreachDraft to place ready-to-send outreach messages into the outreach pipeline (one call per target; requires the target's business name and website URL — ask the owner if unknown). Drafts enter as 'pending' and still pass the outreach system's own approval, guardrails, daily limits, and audit before anything is sent — tell the owner to finalize sends in the Outreach dashboard. Mark the plan 'executing' once drafts are created, 'completed' when the owner says the work is done.
 5. Use listGrowthPlans when the owner asks about plan status or past plans. Never invent plan contents — read them from the tool.
@@ -406,7 +410,7 @@ async function runTool(name: string, rawArgs: string, userId: string | null, con
       plan: String(args?.plan || ''),
     })
     return result.ok
-      ? `Growth plan stored as PROPOSED with id ${result.id}. Tell the owner it awaits their explicit approval before any execution.`
+      ? `Growth plan stored as PROPOSED on ${new Date().toUTCString().slice(0, 16)} with id ${result.id}. Tell the owner it awaits their explicit approval before any execution.`
       : `Plan could not be stored: ${result.error ?? 'unknown error'}.`
   }
 

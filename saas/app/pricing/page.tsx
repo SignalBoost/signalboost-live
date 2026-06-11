@@ -302,11 +302,11 @@ export default function PricingPage() {
           {t(dict, 'pricing_v2.kicker', 'Multilingual AI operations platform')}
         </span>
 
-        <h1 style={{ marginTop: 10, fontSize: 'clamp(26px, 3.5vw, 40px)', fontWeight: 950, letterSpacing: '-.045em', lineHeight: 1.08 }}>
+        <h1 style={{ marginTop: 10, fontSize: 'clamp(22px, 2.8vw, 32px)', fontWeight: 950, letterSpacing: '-.04em', lineHeight: 1.1 }}>
           {t(dict, 'pricing_v2.title', 'Build, publish, optimize, and grow in 5 languages.')}
         </h1>
 
-        <p className="sb-body" style={{ maxWidth: 760, margin: '12px auto 0', fontSize: 14 }}>
+        <p className="sb-body" style={{ maxWidth: 700, margin: '10px auto 0', fontSize: 13 }}>
           {t(
             dict,
             'pricing_v2.subtitle',
@@ -348,7 +348,7 @@ export default function PricingPage() {
             key={plan.key}
             className="sb-card sb-pricing-panel"
             style={{
-              padding: 16,
+              padding: 14,
               position: 'relative',
             }}
           >
@@ -360,13 +360,13 @@ export default function PricingPage() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline', marginTop: plan.badge ? 12 : 0 }}>
               <div>
-                <h2 className="sb-h3">{plan.name}</h2>
+                <h2 style={{ fontSize: 17, fontWeight: 900, letterSpacing: '-.02em', margin: 0 }}>{plan.name}</h2>
                 <p className="sb-caption" style={{ marginTop: 4 }}>{plan.audience}</p>
               </div>
               <span className="sb-caption">{plan.seats}</span>
             </div>
 
-            <div style={{ fontSize: 32, fontWeight: 950, marginTop: 8, fontFamily: 'ui-monospace, Menlo, monospace', letterSpacing: '-.03em' }}>
+            <div style={{ fontSize: 27, fontWeight: 950, marginTop: 6, fontFamily: 'ui-monospace, Menlo, monospace', letterSpacing: '-.03em' }}>
               {plan.price}
               {plan.period ? <span className="sb-caption">{plan.period}</span> : null}
             </div>
@@ -418,19 +418,19 @@ export default function PricingPage() {
             </button>
 
             {expandedPlan === plan.key ? (
-              <>
-                <ul style={{ listStyle: 'none', padding: 0, margin: '10px 0 0', display: 'grid', gap: 6 }}>
+              <div style={{ maxHeight: 180, overflowY: 'auto', marginTop: 8, paddingRight: 6, borderTop: '1px solid rgba(255,255,255,.08)' }}>
+                <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 0', display: 'grid', gap: 6 }}>
                   {plan.features.map((feature) => (
-                    <li key={feature} className="sb-caption" style={{ fontSize: 11.5, lineHeight: 1.45 }}>✦ {feature}</li>
+                    <li key={feature} className="sb-caption" style={{ fontSize: 11, lineHeight: 1.45 }}>✦ {feature}</li>
                   ))}
                 </ul>
 
-                <ul style={{ listStyle: 'none', padding: 0, margin: '10px 0 0', display: 'grid', gap: 5 }}>
+                <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 0', display: 'grid', gap: 5 }}>
                   {plan.limits.map((limit) => (
-                    <li key={limit} className="sb-caption" style={{ color: 'rgba(255,255,255,.45)', fontSize: 11, lineHeight: 1.4 }}>• {limit}</li>
+                    <li key={limit} className="sb-caption" style={{ color: 'rgba(255,255,255,.45)', fontSize: 10.5, lineHeight: 1.4 }}>• {limit}</li>
                   ))}
                 </ul>
-              </>
+              </div>
             ) : null}
           </article>
         ))}

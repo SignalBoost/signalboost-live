@@ -296,17 +296,17 @@ export default function PricingPage() {
   }
 
   return (
-    <main className="sb-page-shell sb-section sb-pricing-cockpit">
-      <section style={{ textAlign: 'center', marginBottom: 22 }}>
+    <main className="sb-page-shell sb-pricing-cockpit" style={{ padding: '18px 0 56px' }}>
+      <section style={{ textAlign: 'center', marginBottom: 14 }}>
         <span className="sb-eyebrow">
           {t(dict, 'pricing_v2.kicker', 'Multilingual AI operations platform')}
         </span>
 
-        <h1 style={{ marginTop: 10, fontSize: 'clamp(22px, 2.8vw, 32px)', fontWeight: 950, letterSpacing: '-.04em', lineHeight: 1.1 }}>
+        <h1 style={{ marginTop: 10, fontSize: 'clamp(19px, 2.2vw, 26px)', fontWeight: 950, letterSpacing: '-.035em', lineHeight: 1.12 }}>
           {t(dict, 'pricing_v2.title', 'Build, publish, optimize, and grow in 5 languages.')}
         </h1>
 
-        <p className="sb-body" style={{ maxWidth: 700, margin: '10px auto 0', fontSize: 13 }}>
+        <p className="sb-body" style={{ maxWidth: 680, margin: '6px auto 0', fontSize: 12, lineHeight: 1.5 }}>
           {t(
             dict,
             'pricing_v2.subtitle',
@@ -314,7 +314,7 @@ export default function PricingPage() {
           )}
         </p>
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 14 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 10 }}>
           {['English', 'Portuguese', 'Spanish', 'Polish', 'Russian'].map((language) => (
             <span
               key={language}
@@ -322,8 +322,8 @@ export default function PricingPage() {
               style={{
                 border: '1px solid rgba(255,195,0,.28)',
                 borderRadius: 999,
-                padding: '5px 10px',
-                fontSize: 11,
+                padding: '3px 9px',
+                fontSize: 10,
                 background: 'rgba(255,195,0,.08)',
                 color: 'rgba(255,255,255,.82)',
               }}
@@ -335,8 +335,8 @@ export default function PricingPage() {
       </section>
 
       {/* Value anchor: what others charge vs what SignalBoost costs */}
-      <section style={{ borderLeft: '3px solid rgba(255,195,0,.6)', paddingLeft: 16, margin: '0 0 20px' }}>
-        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6, color: 'rgba(255,255,255,.85)' }}>
+      <section style={{ borderLeft: '3px solid rgba(255,195,0,.6)', paddingLeft: 14, margin: '0 0 14px' }}>
+        <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: 'rgba(255,255,255,.8)' }}>
           <strong style={{ color: '#fff' }}>{t(dict, 'pricing_v2.anchor.line1', 'Most enterprise marketing suites cost $2,499/month or more.')}</strong>{' '}
           {t(dict, 'pricing_v2.anchor.line2', 'SignalBoost gives you the same power — websites, video, podcasts, reviews, outreach, in 5 languages — starting at just $29/month.')}
         </p>
@@ -360,25 +360,25 @@ export default function PricingPage() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline', marginTop: plan.badge ? 12 : 0 }}>
               <div>
-                <h2 style={{ fontSize: 17, fontWeight: 900, letterSpacing: '-.02em', margin: 0 }}>{plan.name}</h2>
+                <h2 style={{ fontSize: 15.5, fontWeight: 900, letterSpacing: '-.02em', margin: 0 }}>{plan.name}</h2>
                 <p className="sb-caption" style={{ marginTop: 4 }}>{plan.audience}</p>
               </div>
               <span className="sb-caption">{plan.seats}</span>
             </div>
 
-            <div style={{ fontSize: 27, fontWeight: 950, marginTop: 6, fontFamily: 'ui-monospace, Menlo, monospace', letterSpacing: '-.03em' }}>
+            <div style={{ fontSize: 24, fontWeight: 950, marginTop: 4, fontFamily: 'ui-monospace, Menlo, monospace', letterSpacing: '-.03em' }}>
               {plan.price}
               {plan.period ? <span className="sb-caption">{plan.period}</span> : null}
             </div>
 
             {plan.key === 'launch' ? (
-              <p style={{ margin: '4px 0 0', fontSize: 11.5, fontWeight: 800, color: '#86efac' }}>{t(dict, 'pricing_v2.anchor.launch', 'Less than 2% of the $2,499 enterprise benchmark.')}</p>
+              <p style={{ margin: '4px 0 0', fontSize: 10.5, fontWeight: 800, color: '#86efac' }}>{t(dict, 'pricing_v2.anchor.launch', 'Less than 2% of the $2,499 enterprise benchmark.')}</p>
             ) : plan.key === 'growth' ? (
-              <p style={{ margin: '4px 0 0', fontSize: 11.5, fontWeight: 800, color: '#86efac' }}>{t(dict, 'pricing_v2.anchor.growth', 'Under 4% of the $2,499 enterprise benchmark.')}</p>
+              <p style={{ margin: '4px 0 0', fontSize: 10.5, fontWeight: 800, color: '#86efac' }}>{t(dict, 'pricing_v2.anchor.growth', 'Under 4% of the $2,499 enterprise benchmark.')}</p>
             ) : plan.key === 'command' ? (
-              <p style={{ margin: '4px 0 0', fontSize: 11.5, fontWeight: 800, color: '#86efac' }}>{t(dict, 'pricing_v2.anchor.command', 'The full suite for under 10% of typical enterprise cost.')}</p>
+              <p style={{ margin: '4px 0 0', fontSize: 10.5, fontWeight: 800, color: '#86efac' }}>{t(dict, 'pricing_v2.anchor.command', 'The full suite for under 10% of typical enterprise cost.')}</p>
             ) : null}
-            <p className="sb-body" style={{ fontSize: 12.5, margin: '6px 0 0', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={plan.description}>
+            <p className="sb-body" style={{ fontSize: 11.5, margin: '5px 0 0', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={plan.description}>
               {plan.description}
             </p>
 

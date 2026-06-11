@@ -613,6 +613,18 @@ export default function Navbar() {
   const planLabel = publicPlanLabel(plan, lang)
   const displayName = userName || user?.email || ''
 
+  const MENU_ACCENTS: Record<string, string> = {
+    dashboard: '#ffc300',
+    website:   '#1af0ff',
+    podcast:   '#a78bfa',
+    content:   '#f472b6',
+    launchpad: '#fb923c',
+    grow:      '#4ade80',
+    workspace: '#60a5fa',
+    admin:     '#f87171',
+    help:      '#94a3b8',
+  }
+
   function Group({
     id,
     label,
@@ -629,6 +641,8 @@ export default function Navbar() {
     width?: number
   }) {
     const open = openMenu === id
+    const accent = MENU_ACCENTS[id] || 'rgba(255,255,255,.6)'
+    const lit = open || groupActive(items)
 
     return (
       <div style={{ position: 'relative' }} onMouseEnter={() => openNow(id)} onMouseLeave={closeSoon}>
@@ -637,8 +651,9 @@ export default function Navbar() {
           aria-haspopup="true"
           aria-expanded={open}
           onClick={() => setOpenMenu(open ? null : id)}
-          style={trigger(open || groupActive(items))}
+          style={{ ...trigger(lit), ...(lit ? { color: accent } : {}) }}
         >
+          <span aria-hidden="true" style={{ display: 'inline-block', width: 6, height: 6, borderRadius: 999, background: accent, marginRight: 7, opacity: lit ? 1 : .65, boxShadow: lit ? `0 0 8px ${accent}` : 'none' }} />
           {label}
           <span
             style={{

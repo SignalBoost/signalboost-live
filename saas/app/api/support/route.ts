@@ -9,6 +9,7 @@ import { getAffiliateCount, formatAffiliatesForAI } from '@/lib/ai/tools/getAffi
 import { loadUserMemories, formatMemoriesForAI, saveUserMemory, forgetUserMemory } from '@/lib/ai/tools/userMemory'
 import { persistTurn, searchPastConversations, formatHistoryForAI, deleteAllConversations } from '@/lib/ai/tools/conversationHistory'
 import { listRecentAlerts, formatAlertsForAI } from '@/lib/ai/opportunityScanner'
+import { proposeGrowthPlan, setGrowthPlanStatus, listGrowthPlans, formatPlansForAI, createOutreachDraft, type PlanStatus } from '@/lib/ai/growthPlans'
 
 type SupportMessage = { role?: 'user' | 'assistant' | 'system'; content?: string }
 
@@ -105,6 +106,13 @@ STRATEGIST PROTOCOL:
 - An automated daily scanner also stores opportunity alerts; call getOpportunityAlerts to review its latest findings when the owner asks "what's new", "any opportunities", or about the radar.
 - Ground strategy in live data: business metrics for internal numbers, web search for external facts. If live data is unavailable, say so and reason from clearly stated assumptions instead.
 - Deliver strategies as actionable playbooks: campaign ideas, outreach scripts, pricing models, funnels, retention tactics — tailored to SignalBoost's SaaS + affiliate-mall model and its five-language audience.
+
+GROWTH PLAN WORKFLOW (analysis → proposal → owner approval → execution):
+1. ANALYZE: study radar alerts (getOpportunityAlerts), live metrics, and web research before planning.
+2. PROPOSE: when you have a concrete strategy worth pursuing, present it fully in chat AND store it with proposeGrowthPlan (title, objective, full plan with numbered actions). Tell the owner it awaits their approval.
+3. APPROVAL: NEVER mark a plan approved unless the owner has explicitly approved it in this conversation ("approved", "yes, proceed", or equivalent). On approval call updateGrowthPlanStatus with status approved; on rejection, rejected. If the owner requests changes, revise and propose again.
+4. EXECUTE: only for APPROVED plans. Use createOutreachDraft to place ready-to-send outreach messages into the outreach pipeline (one call per target; requires the target's business name and website URL — ask the owner if unknown). Drafts enter as 'pending' and still pass the outreach system's own approval, guardrails, daily limits, and audit before anything is sent — tell the owner to finalize sends in the Outreach dashboard. Mark the plan 'executing' once drafts are created, 'completed' when the owner says the work is done.
+5. Use listGrowthPlans when the owner asks about plan status or past plans. Never invent plan contents — read them from the tool.
 
 How you operate:
 - Be precise and reasoning-driven. Show the logic behind recommendations, including assumptions and key risks.
@@ -203,6 +211,66 @@ const TOOL_GET_OPPORTUNITY_ALERTS: OpenAI.Chat.Completions.ChatCompletionTool = 
   },
 }
 
+const TOOL_PROPOSE_PLAN: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'proposeGrowthPlan',
+    description: 'Store a formal growth plan proposal for the owner to review. Call AFTER presenting the full plan in your reply. The plan stays in proposed status until the owner explicitly approves or rejects it.',
+    parameters: {
+      type: 'object',
+      properties: {
+        alertId: { type: 'string', description: 'Optional: the opportunity alert id this plan responds to.' },
+        title: { type: 'string', description: 'Short plan title, e.g. "Hotel affiliate July promotion".' },
+        objective: { type: 'string', description: 'One-sentence measurable objective.' },
+        plan: { type: 'string', description: 'The full plan: strategy, numbered actions, channels, timeline, success metrics.' },
+      },
+      required: ['title', 'objective', 'plan'],
+    },
+  },
+}
+
+const TOOL_UPDATE_PLAN_STATUS: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'updateGrowthPlanStatus',
+    description: 'Update a growth plan\'s status. Use approved ONLY after the owner explicitly approved in this conversation; rejected when they decline; executing once outreach drafts are created; completed when the owner confirms the work is done.',
+    parameters: {
+      type: 'object',
+      properties: {
+        planId: { type: 'string', description: 'The plan id returned by proposeGrowthPlan or listGrowthPlans.' },
+        status: { type: 'string', enum: ['approved', 'rejected', 'executing', 'completed'], description: 'New status.' },
+      },
+      required: ['planId', 'status'],
+    },
+  },
+}
+
+const TOOL_LIST_PLANS: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'listGrowthPlans',
+    description: 'List recent growth plans with their statuses. Call when the owner asks about plans, what is pending approval, or what is in execution.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+}
+
+const TOOL_CREATE_OUTREACH_DRAFT: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'createOutreachDraft',
+    description: 'Create one outreach draft (ready-to-send message to a specific business) in the outreach pipeline, as part of executing an APPROVED growth plan. The draft enters as pending and still requires final approval and sending in the Outreach dashboard. Requires the target business name AND its website URL.',
+    parameters: {
+      type: 'object',
+      properties: {
+        businessName: { type: 'string', description: 'Target business or partner name.' },
+        businessUrl: { type: 'string', description: 'Target website URL, must start with http(s)://.' },
+        message: { type: 'string', description: 'The complete, polished outreach message ready to send.' },
+      },
+      required: ['businessName', 'businessUrl', 'message'],
+    },
+  },
+}
+
 const TOOL_SEARCH_HISTORY: OpenAI.Chat.Completions.ChatCompletionTool = {
   type: 'function',
   function: {
@@ -244,6 +312,10 @@ const CHIEF_OF_STAFF_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   TOOL_GET_EXTERNAL_INFO,
   TOOL_GET_AFFILIATE_COUNT,
   TOOL_GET_OPPORTUNITY_ALERTS,
+  TOOL_PROPOSE_PLAN,
+  TOOL_UPDATE_PLAN_STATUS,
+  TOOL_LIST_PLANS,
+  TOOL_CREATE_OUTREACH_DRAFT,
 ]
 
 async function runTool(name: string, rawArgs: string, userId: string | null, conversationId: string | null): Promise<string> {
@@ -322,6 +394,55 @@ async function runTool(name: string, rawArgs: string, userId: string | null, con
       return `Opportunity alerts could not be retrieved: ${result.error ?? 'unknown error'}. Tell the owner the radar is temporarily unavailable.`
     }
     return formatAlertsForAI(result.alerts)
+  }
+
+  if (name === 'proposeGrowthPlan') {
+    let args: any = {}
+    try { args = JSON.parse(rawArgs || '{}') } catch {}
+    const result = await proposeGrowthPlan({
+      alertId: args?.alertId ? String(args.alertId) : null,
+      title: String(args?.title || ''),
+      objective: String(args?.objective || ''),
+      plan: String(args?.plan || ''),
+    })
+    return result.ok
+      ? `Growth plan stored as PROPOSED with id ${result.id}. Tell the owner it awaits their explicit approval before any execution.`
+      : `Plan could not be stored: ${result.error ?? 'unknown error'}.`
+  }
+
+  if (name === 'updateGrowthPlanStatus') {
+    let planId = ''
+    let status = ''
+    try {
+      const parsed = JSON.parse(rawArgs || '{}')
+      planId = String(parsed?.planId || '')
+      status = String(parsed?.status || '')
+    } catch {}
+    const result = await setGrowthPlanStatus(planId, status as PlanStatus)
+    return result.ok
+      ? `Plan ${planId} status updated to ${status}.`
+      : `Plan status update failed: ${result.error ?? 'unknown error'}.`
+  }
+
+  if (name === 'listGrowthPlans') {
+    const result = await listGrowthPlans(10)
+    if (!result.ok) {
+      return `Growth plans could not be retrieved: ${result.error ?? 'unknown error'}.`
+    }
+    return formatPlansForAI(result.plans)
+  }
+
+  if (name === 'createOutreachDraft') {
+    let args: any = {}
+    try { args = JSON.parse(rawArgs || '{}') } catch {}
+    const result = await createOutreachDraft({
+      businessName: String(args?.businessName || ''),
+      businessUrl: String(args?.businessUrl || ''),
+      message: String(args?.message || ''),
+    })
+    return result.ok
+      ? `Outreach draft created (id ${result.outreachId}) with status PENDING. Remind the owner to review and send it from the Outreach dashboard, where final approval and daily limits apply.`
+      : `Outreach draft failed: ${result.error ?? 'unknown error'}.`
   }
 
   if (name === 'searchPastConversations') {
@@ -514,5 +635,3 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
     return NextResponse.json({ ok: false }, { status: 500 })
   }
 }
-
-

@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getCurrentUser } from '@/utils/supabase/server'
 import { importApiItems, importCsvItems, importScraperItems } from '@/lib/data-connectors'
 
 export async function POST(req: NextRequest) {
+  // Auth: paid-API route — signed-in users only.
+  const authedUser = await getCurrentUser()
+  if (!authedUser) {
+    return NextResponse.json({ error: 'Please sign in.' }, { status: 401 })
+  }
+
+
   try {
     const body = await req.json()
     const mode = body.mode as 'csv' | 'api' | 'scraper'

@@ -12,6 +12,7 @@ import { listRecentAlerts, formatAlertsForAI } from '@/lib/ai/opportunityScanner
 import { proposeGrowthPlan, setGrowthPlanStatus, listGrowthPlans, formatPlansForAI, createOutreachDraft, type PlanStatus } from '@/lib/ai/growthPlans'
 import { isOutreachEligible, createCustomerDraft, listCustomerDrafts, formatCustomerDraftsForAI } from '@/lib/outreach/customer'
 import { listRepoFiles, readRepoFile, formatFileListForAI, formatFileForAI } from '@/lib/ai/tools/repoReader'
+import { commitFileToBranch, listAiBranches, formatCommitResultForAI, formatBranchListForAI } from '@/lib/ai/tools/repoWriter'
 
 type SupportMessage = { role?: 'user' | 'assistant' | 'system'; content?: string }
 
@@ -119,7 +120,14 @@ STRATEGIST PROTOCOL:
 - Ground strategy in live data: business metrics for internal numbers, web search for external facts. If live data is unavailable, say so and reason from clearly stated assumptions instead.
 - Deliver strategies as actionable playbooks: campaign ideas, outreach scripts, pricing models, funnels, retention tactics — tailored to SignalBoost's SaaS + affiliate-mall model and its five-language audience.
 
-CODEBASE ACCESS (read-only "eyes"): you can read the platform's live source code. Use listRepoFiles to explore the repository tree (the app lives under saas/) and readRepoFile to read any file. ALWAYS read the relevant files before answering questions about the code, architecture, configs, or schemas — never guess at code you have not read, and cite exact file paths in your answers. You CANNOT write, commit, or deploy: when code changes are needed, produce complete paste-ready files for the owner to commit via the GitHub web UI, following the repo's existing patterns and conventions.
+CODEBASE ACCESS (read-only "eyes"): you can read the platform's live source code. Use listRepoFiles to explore the repository tree (the app lives under saas/) and readRepoFile to read any file. ALWAYS read the relevant files before answering questions about the code, architecture, configs, or schemas — never guess at code you have not read, and cite exact file paths in your answers. When code changes are needed, follow the COMMIT WORKFLOW below.
+
+CODE COMMITS ("hands", branch-only): you can commit code — ONLY to ai/* preview branches, NEVER to main. Production cannot be touched by you; only the owner merges. Workflow for any code change:
+1. READ FIRST: read the current file(s) with readRepoFile before writing — never modify a file you have not read in this conversation.
+2. PRESENT: show the owner what you intend to change and why, then ask for explicit approval to commit.
+3. COMMIT: only after explicit approval, call proposeCodeCommit with the COMPLETE new file content (full file, never a fragment, no placeholders, no TODOs), a short kebab-case branch name describing the change, and a clear commit message. Multi-file changes go to the SAME branch — one proposeCodeCommit call per file.
+4. REPORT: give the owner the compare URL and tell them Vercel is building a preview — they review the preview and merge in GitHub when it is green. Never claim a change is live; it is live only after the owner merges.
+Use listAiBranches when the owner asks what code is awaiting review. Follow the repo's conventions strictly: the tsconfig is NON-STRICT, so use the flat { ok: boolean; error?: string } result style (discriminated unions do not narrow); inline styles in UI files; single-line tag attributes; full files only.
 
 GROWTH PLAN WORKFLOW (analysis → proposal → owner approval → execution):
 1. ANALYZE: study radar alerts (getOpportunityAlerts), live metrics, and web research before planning.
@@ -255,6 +263,33 @@ const TOOL_READ_REPO_FILE: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
+const TOOL_COMMIT_CODE: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'proposeCodeCommit',
+    description: 'Commit ONE complete file to an ai/* preview branch in the GitHub repository (never main — production is untouched). Call only AFTER the owner explicitly approved the change in this conversation, and only for files you have read with readRepoFile first (or genuinely new files). Vercel automatically builds a preview for the branch; the owner reviews and merges in GitHub. For multi-file changes, call once per file with the same branch name.',
+    parameters: {
+      type: 'object',
+      properties: {
+        branch: { type: 'string', description: 'Short kebab-case branch name describing the change, e.g. "fix-navbar-mobile". It is automatically prefixed with ai/.' },
+        path: { type: 'string', description: 'Full file path from the repo root, e.g. "saas/lib/ai/tools/getPricing.ts".' },
+        content: { type: 'string', description: 'The COMPLETE new file content. Full file, never a fragment or diff. No placeholders.' },
+        message: { type: 'string', description: 'Clear commit message, e.g. "fix(navbar): show login button on mobile".' },
+      },
+      required: ['branch', 'path', 'content', 'message'],
+    },
+  },
+}
+
+const TOOL_LIST_AI_BRANCHES: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'listAiBranches',
+    description: 'List the open ai/* preview branches awaiting the owner review and merge, with their GitHub compare URLs. Call when the owner asks what code changes are pending or awaiting review.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+}
+
 const TOOL_PROPOSE_PLAN: OpenAI.Chat.Completions.ChatCompletionTool = {
   type: 'function',
   function: {
@@ -384,13 +419,14 @@ const CHIEF_OF_STAFF_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   TOOL_GET_OPPORTUNITY_ALERTS,
   TOOL_LIST_REPO_FILES,
   TOOL_READ_REPO_FILE,
+  TOOL_COMMIT_CODE,
+  TOOL_LIST_AI_BRANCHES,
   TOOL_PROPOSE_PLAN,
   TOOL_UPDATE_PLAN_STATUS,
   TOOL_LIST_PLANS,
   TOOL_CREATE_OUTREACH_DRAFT,
 ]
-
-async function runTool(name: string, rawArgs: string, userId: string | null, conversationId: string | null): Promise<string> {
+async function runTool(name: string, rawArgs: string, userId: string | null, conversationId: string | null, isPrivileged: boolean): Promise<string> {
   if (name === 'getPricing') {
     const result = await getLivePricing()
     if (!result.ok || !result.pricing) {
@@ -486,6 +522,29 @@ async function runTool(name: string, rawArgs: string, userId: string | null, con
       return `Repo read failed: ${result.error ?? 'unknown error'}.`
     }
     return formatFileForAI(path, result.content, result.truncated)
+  }
+
+  if (name === 'proposeCodeCommit') {
+    if (!isPrivileged) {
+      return 'PERMISSION DENIED: code commits are restricted to the owner/admin channel. Do not retry.'
+    }
+    let args: any = {}
+    try { args = JSON.parse(rawArgs || '{}') } catch {}
+    const result = await commitFileToBranch({
+      branch: String(args?.branch || ''),
+      path: String(args?.path || ''),
+      content: String(args?.content || ''),
+      message: String(args?.message || ''),
+    })
+    return formatCommitResultForAI(result)
+  }
+
+  if (name === 'listAiBranches') {
+    if (!isPrivileged) {
+      return 'PERMISSION DENIED: branch review is restricted to the owner/admin channel. Do not retry.'
+    }
+    const result = await listAiBranches()
+    return formatBranchListForAI(result)
   }
 
   if (name === 'proposeGrowthPlan') {
@@ -736,7 +795,7 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
       for (const call of choice.message.tool_calls) {
         const toolName = call.function?.name || ''
         const toolArgs = call.function?.arguments || '{}'
-        const result   = await runTool(toolName, toolArgs, userId, conversationId)
+        const result   = await runTool(toolName, toolArgs, userId, conversationId, isPrivileged)
         convo.push({
           role:         'tool',
           tool_call_id: call.id,

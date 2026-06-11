@@ -26,6 +26,7 @@ export default function Concierge() {
   const [input, setInput]     = useState('')
   const [loading, setLoading] = useState(false)
   const logRef = useRef<HTMLDivElement>(null)
+  const conversationIdRef = useRef<string>('')
 
   // Scroll to bottom on new message
   useEffect(() => {
@@ -42,12 +43,14 @@ export default function Concierge() {
     setInput('')
     setLoading(false)
     setMessages([])
+    conversationIdRef.current = '' // next message starts a new stored conversation
   }
 
   async function ask(text: string) {
     const content = text.trim()
     if (!content || loading) return
 
+    if (!conversationIdRef.current) conversationIdRef.current = crypto.randomUUID()
     const nextMessages: Message[] = [...messages, { role: 'user', content }]
     setMessages(nextMessages)
     setInput('')
@@ -59,7 +62,7 @@ export default function Concierge() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: nextMessages,
-          context: { currentPage: pathname, language: activeLang },
+          context: { currentPage: pathname, language: activeLang, conversationId: conversationIdRef.current },
         }),
       })
       const data = await res.json()

@@ -4,6 +4,16 @@ import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
 import { cookies } from 'next/headers'
 
 // ─── Website plan price IDs (new prices at correct amounts) ───────────────────
+// Public plan names (pricing page) map onto the internal plan tiers:
+//   launch → starter, growth → pro, command → business.
+// Internal names stay the single dialect in Stripe metadata and the database;
+// a full platform-wide rename is a post-launch cleanup task.
+const PUBLIC_TO_INTERNAL_PLAN: Record<string, string> = {
+  launch:  'starter',
+  growth:  'pro',
+  command: 'business',
+}
+
 const WEBSITE_PRICE_IDS: Record<string, string> = {
   starter:  process.env.STRIPE_PRICE_WEBSITE_STARTER  as string,
   pro:      process.env.STRIPE_PRICE_WEBSITE_PRO      as string,
@@ -20,7 +30,10 @@ const PODCAST_PRICE_IDS: Record<string, string> = {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const plan: string = body.plan
+    const requestedPlan: string = String(body.plan || '').toLowerCase()
+    // Translate public names (launch/growth/command) to internal tiers; pass
+    // internal names through unchanged for backward compatibility.
+    const plan: string = PUBLIC_TO_INTERNAL_PLAN[requestedPlan] || requestedPlan
     // productLine defaults to 'website' so the existing pricing page works unchanged
     const productLine: 'website' | 'podcast' = body.productLine ?? 'website'
 

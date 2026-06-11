@@ -6,6 +6,7 @@ import { getLivePricing } from '@/lib/ai/tools/getPricing'
 import { getBusinessMetrics, formatMetricsForAI } from '@/lib/ai/tools/getBusinessMetrics'
 import { getExternalInfo, formatExternalInfoForAI } from '@/lib/ai/tools/getExternalInfo'
 import { getAffiliateCount, formatAffiliatesForAI } from '@/lib/ai/tools/getAffiliateCount'
+import { loadUserMemories, formatMemoriesForAI, saveUserMemory, forgetUserMemory } from '@/lib/ai/tools/userMemory'
 
 type SupportMessage = { role?: 'user' | 'assistant' | 'system'; content?: string }
 
@@ -154,6 +155,37 @@ const TOOL_GET_AFFILIATE_COUNT: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
+const TOOL_REMEMBER_FACT: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'rememberFact',
+    description: 'Save a LASTING fact about the user to long-term memory so future conversations remember it. Use when the user states a durable preference (language, tone, format), a fact about themselves or their business (name, industry, location), or a goal. One concise fact per call. Do NOT save passwords, payment data, or temporary details.',
+    parameters: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', enum: ['preference', 'fact', 'goal'], description: 'Type of memory.' },
+        content: { type: 'string', description: 'The fact to remember, short and self-contained, e.g. "Prefers replies in Polish" or "Runs a bakery in Mérida, Mexico".' },
+      },
+      required: ['kind', 'content'],
+    },
+  },
+}
+
+const TOOL_FORGET_FACT: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'forgetFact',
+    description: 'Delete saved memories about the user that match a phrase. Use when the user asks you to forget something or says a saved fact is no longer true.',
+    parameters: {
+      type: 'object',
+      properties: {
+        match: { type: 'string', description: 'A distinctive phrase from the memory to delete, e.g. "bakery" or "Polish".' },
+      },
+      required: ['match'],
+    },
+  },
+}
+
 const CONCIERGE_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   TOOL_GET_PRICING,
   TOOL_GET_AFFILIATE_COUNT,
@@ -166,7 +198,7 @@ const CHIEF_OF_STAFF_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   TOOL_GET_AFFILIATE_COUNT,
 ]
 
-async function runTool(name: string, rawArgs: string): Promise<string> {
+async function runTool(name: string, rawArgs: string, userId: string | null): Promise<string> {
   if (name === 'getPricing') {
     const result = await getLivePricing()
     if (!result.ok || !result.pricing) {
@@ -204,6 +236,38 @@ async function runTool(name: string, rawArgs: string): Promise<string> {
     return `Live affiliate count could not be retrieved: ${result.error ?? 'unknown error'}. Tell the user the live count is temporarily unavailable instead of guessing a number.`
   }
 
+  if (name === 'rememberFact') {
+    if (!userId) {
+      return 'Memory is only available for logged-in users. Do not mention this technical detail; just continue helping.'
+    }
+    let kind = ''
+    let memoryContent = ''
+    try {
+      const parsed = JSON.parse(rawArgs || '{}')
+      kind = String(parsed?.kind || '')
+      memoryContent = String(parsed?.content || '')
+    } catch {}
+    const result = await saveUserMemory(userId, kind, memoryContent)
+    return result.ok
+      ? `Memory saved: [${kind}] ${memoryContent}. Acknowledge briefly and naturally.`
+      : `Memory could not be saved (${result.error ?? 'unknown error'}). Continue helping without mentioning technical details.`
+  }
+
+  if (name === 'forgetFact') {
+    if (!userId) {
+      return 'Memory is only available for logged-in users. Do not mention this technical detail; just continue helping.'
+    }
+    let match = ''
+    try { match = String(JSON.parse(rawArgs || '{}')?.match || '') } catch {}
+    const result = await forgetUserMemory(userId, match)
+    if (!result.ok) {
+      return `Memories could not be deleted (${result.error ?? 'unknown error'}).`
+    }
+    return result.deleted > 0
+      ? `Deleted ${result.deleted} memor${result.deleted === 1 ? 'y' : 'ies'} matching "${match}". Confirm briefly to the user.`
+      : `No saved memories matched "${match}". Tell the user nothing matching that was found.`
+  }
+
   return `Unknown tool: ${name}`
 }
 
@@ -221,9 +285,11 @@ export async function POST(req: NextRequest) {
       .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content as string }))
 
     let isPrivileged = false
+    let userId: string | null = null
     try {
       const access = await getAccess()
       isPrivileged = access.isAdmin
+      userId = access.userId
     } catch {
       isPrivileged = false
     }
@@ -247,7 +313,8 @@ export async function POST(req: NextRequest) {
 
     const model       = isPrivileged ? 'gpt-4o' : 'gpt-4o-mini'
     const temperature = isPrivileged ? 0.5 : 0.4
-    const tools       = isPrivileged ? CHIEF_OF_STAFF_TOOLS : CONCIERGE_TOOLS
+    const baseTools   = isPrivileged ? CHIEF_OF_STAFF_TOOLS : CONCIERGE_TOOLS
+    const tools       = userId ? [...baseTools, TOOL_REMEMBER_FACT, TOOL_FORGET_FACT] : baseTools
 
     // ── Pre-fetch live metrics for Chief of Staff on every request ────────
     let liveMetrics = 'Metrics unavailable — Supabase query failed.'
@@ -262,9 +329,24 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const systemContent = isPrivileged
+    let systemContent = isPrivileged
       ? chiefOfStaffPrompt(language, liveMetrics)
       : conciergePrompt(language)
+
+    // ── Long-term user memory (logged-in users only) ──────────────────────
+    if (userId) {
+      try {
+        const memories = await loadUserMemories(userId)
+        const memoryBlock = formatMemoriesForAI(memories)
+        systemContent += `
+
+${memoryBlock || 'No saved memories for this user yet.'}
+
+MEMORY RULES: Use saved memories to personalize answers naturally — never recite the list back. When the user states a LASTING preference, a fact about themselves or their business, or a goal, call rememberFact to save it (one concise fact per call). When the user asks you to forget something or corrects a saved fact, call forgetFact. Never save secrets, passwords, or payment details.`
+      } catch {
+        // memory is non-blocking — continue without it
+      }
+    }
 
     const convo: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       { role: 'system', content: systemContent },
@@ -298,7 +380,7 @@ export async function POST(req: NextRequest) {
       for (const call of choice.message.tool_calls) {
         const toolName = call.function?.name || ''
         const toolArgs = call.function?.arguments || '{}'
-        const result   = await runTool(toolName, toolArgs)
+        const result   = await runTool(toolName, toolArgs, userId)
         convo.push({
           role:         'tool',
           tool_call_id: call.id,

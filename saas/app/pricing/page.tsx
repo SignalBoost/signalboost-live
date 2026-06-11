@@ -334,6 +334,14 @@ export default function PricingPage() {
         </div>
       </section>
 
+      {/* Value anchor: what others charge vs what SignalBoost costs */}
+      <section style={{ borderLeft: '3px solid rgba(255,195,0,.6)', paddingLeft: 16, margin: '0 0 20px' }}>
+        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6, color: 'rgba(255,255,255,.85)' }}>
+          <strong style={{ color: '#fff' }}>{t(dict, 'pricing_v2.anchor.line1', 'Most enterprise marketing suites cost $2,499/month or more.')}</strong>{' '}
+          {t(dict, 'pricing_v2.anchor.line2', 'SignalBoost gives you the same power — websites, video, podcasts, reviews, outreach, in 5 languages — starting at just $29/month.')}
+        </p>
+      </section>
+
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
         {plans.map((plan) => (
           <article
@@ -363,6 +371,13 @@ export default function PricingPage() {
               {plan.period ? <span className="sb-caption">{plan.period}</span> : null}
             </div>
 
+            {plan.key === 'launch' ? (
+              <p style={{ margin: '4px 0 0', fontSize: 11.5, fontWeight: 800, color: '#86efac' }}>{t(dict, 'pricing_v2.anchor.launch', 'Less than 2% of the $2,499 enterprise benchmark.')}</p>
+            ) : plan.key === 'growth' ? (
+              <p style={{ margin: '4px 0 0', fontSize: 11.5, fontWeight: 800, color: '#86efac' }}>{t(dict, 'pricing_v2.anchor.growth', 'Under 4% of the $2,499 enterprise benchmark.')}</p>
+            ) : plan.key === 'command' ? (
+              <p style={{ margin: '4px 0 0', fontSize: 11.5, fontWeight: 800, color: '#86efac' }}>{t(dict, 'pricing_v2.anchor.command', 'The full suite for under 10% of typical enterprise cost.')}</p>
+            ) : null}
             <p className="sb-body" style={{ fontSize: 12.5, margin: '6px 0 0', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={plan.description}>
               {plan.description}
             </p>

@@ -5,6 +5,7 @@ import { getAccess } from '@/lib/auth/access'
 import { getLivePricing } from '@/lib/ai/tools/getPricing'
 import { getBusinessMetrics, formatMetricsForAI } from '@/lib/ai/tools/getBusinessMetrics'
 import { getExternalInfo, formatExternalInfoForAI } from '@/lib/ai/tools/getExternalInfo'
+import { getAffiliateCount, formatAffiliatesForAI } from '@/lib/ai/tools/getAffiliateCount'
 
 type SupportMessage = { role?: 'user' | 'assistant' | 'system'; content?: string }
 
@@ -27,7 +28,7 @@ const PLATFORM_FACTS = `SIGNALBOOST — FACTUAL PRODUCT KNOWLEDGE (authoritative
 
 SignalBoost is TWO live platforms that work together:
 
-1) signalboostapp.com — a digital AI shopping mall with 125+ affiliates (e.g. Trivago, Expedia, Booking.com). Every customer purchase or booking through the mall generates commission payouts. Includes Cowork tools (calendar, spreadsheets).
+1) signalboostapp.com — a digital AI shopping mall featuring major affiliates such as Trivago, Expedia, and Booking.com. Every customer purchase or booking through the mall generates commission payouts. Includes Cowork tools (calendar, spreadsheets). For the CURRENT total number of affiliates, ALWAYS call the getAffiliateCount tool — never state a count from memory.
 
 2) saas.signalboostapp.com — a full SaaS platform with:
 - AI Website Builder (generate a full site from a prompt)
@@ -40,7 +41,7 @@ SignalBoost is TWO live platforms that work together:
 - Calendar + Spreadsheets (Cowork tools)
 - Multilingual system: English, Spanish, Portuguese, Polish, Russian
 
-One-liner: SignalBoost is both a digital AI shopping mall (125+ affiliates, commission-based) and a full SaaS platform for building websites and branded content — multilingual.
+One-liner: SignalBoost is both a digital AI shopping mall (commission-based affiliate network — call getAffiliateCount for the current count) and a full SaaS platform for building websites and branded content — multilingual.
 
 Plans (SaaS): Free Demo, Launch, Growth, Command. For exact current prices and what each plan includes, CALL the getPricing tool — do not guess prices from memory.
 
@@ -50,6 +51,7 @@ Hard guardrails:
 - Never mention, recommend, or direct users to competitor platforms or services. Keep all answers focused on SignalBoost.
 - Do NOT claim features that aren't listed above (e.g. no SMS marketing, no drip campaigns, no CRM integrations).
 - For pricing, ALWAYS use the getPricing tool for current numbers rather than stating prices from memory.
+- For affiliate/partner counts, ALWAYS use the getAffiliateCount tool rather than stating numbers from memory.
 - No speculation about future features. No overpromising. No filler.`
 
 function conciergePrompt(language: string): string {
@@ -142,14 +144,25 @@ const TOOL_GET_EXTERNAL_INFO: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
+const TOOL_GET_AFFILIATE_COUNT: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'getAffiliateCount',
+    description: 'Get the LIVE, current number of affiliates/partners in the SignalBoost shopping mall, queried directly from the partners database. Call this whenever the user asks how many affiliates, partners, brands, or stores the platform has. Never answer affiliate counts from memory.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+}
+
 const CONCIERGE_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   TOOL_GET_PRICING,
+  TOOL_GET_AFFILIATE_COUNT,
 ]
 
 const CHIEF_OF_STAFF_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   TOOL_GET_PRICING,
   TOOL_GET_BUSINESS_METRICS,
   TOOL_GET_EXTERNAL_INFO,
+  TOOL_GET_AFFILIATE_COUNT,
 ]
 
 async function runTool(name: string, rawArgs: string): Promise<string> {
@@ -180,6 +193,14 @@ async function runTool(name: string, rawArgs: string): Promise<string> {
       return formatExternalInfoForAI(query, result.results)
     }
     return `Web search failed: ${result.error ?? 'unknown error'}. Tell the owner live external data is unavailable right now and answer from your own knowledge, clearly flagging that it may be outdated.`
+  }
+
+  if (name === 'getAffiliateCount') {
+    const result = await getAffiliateCount()
+    if (result.ok && result.metrics) {
+      return formatAffiliatesForAI(result.metrics)
+    }
+    return `Live affiliate count could not be retrieved: ${result.error ?? 'unknown error'}. Tell the user the live count is temporarily unavailable instead of guessing a number.`
   }
 
   return `Unknown tool: ${name}`

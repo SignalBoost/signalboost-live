@@ -186,7 +186,7 @@ export default function PodcastersPage() {
         style={{
           maxWidth:              1180,
           margin:                '0 auto',
-          padding:               '72px 24px 44px',
+          padding:               '36px 24px 36px',
           display:               'grid',
           gridTemplateColumns:   '1fr 1.05fr',
           gap:                   34,
@@ -217,7 +217,7 @@ export default function PodcastersPage() {
 
           <h1
             style={{
-              fontSize:      'clamp(42px, 7vw, 84px)',
+              fontSize:      'clamp(34px, 5vw, 60px)',
               lineHeight:    .96,
               letterSpacing: '-.06em',
               margin:        0,
@@ -231,11 +231,11 @@ export default function PodcastersPage() {
             <span style={{ color: GOLD }}>{P('hero.line3', 'Your global audience.')}</span>
           </h1>
 
-          <p style={{ marginTop: 22, color: 'rgba(255,255,255,.58)', fontSize: 18, lineHeight: 1.7, maxWidth: 620 }}>
+          <p style={{ marginTop: 16, color: 'rgba(255,255,255,.58)', fontSize: 15, lineHeight: 1.65, maxWidth: 560 }}>
             {P('hero.subtitle', 'Upload one episode and let SignalBoost help create transcripts, clips, captions, multilingual audio, show notes and distribution assets from a single studio workspace.')}
           </p>
 
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 30 }}>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 22 }}>
             <Link
               href="/dashboard/podcast/studio"
               style={{ background: GOLD, color: '#000', fontWeight: 900, padding: '14px 28px', borderRadius: 999, textDecoration: 'none' }}
@@ -257,7 +257,7 @@ export default function PodcastersPage() {
           className="studio-card"
           style={{
             position:   'relative',
-            minHeight:  560,
+            minHeight:  'min(520px, calc(100vh - 250px))',
             borderRadius: 34,
             padding:    22,
             background: 'linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03))',
@@ -353,7 +353,7 @@ export default function PodcastersPage() {
           {productions.map(item => (
             <div
               key={item.title}
-              style={{ borderRadius: 22, padding: 18, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}
+              style={{ borderTop: '1px solid rgba(255,255,255,.08)', borderLeft: '2px solid rgba(168,85,247,.45)', padding: '14px 0 14px 14px' }}
             >
               <div style={{ fontSize: 28, marginBottom: 12 }}>🎧</div>
               <h3 style={{ margin: 0, fontSize: 18 }}>{item.title}</h3>
@@ -381,7 +381,7 @@ export default function PodcastersPage() {
           {deliverables.map(item => (
             <div
               key={item.title}
-              style={{ borderRadius: 22, padding: 22, background: 'rgba(255,255,255,.035)', border: '1px solid rgba(255,255,255,.08)' }}
+              style={{ borderTop: '1px solid rgba(255,255,255,.08)', borderLeft: '2px solid rgba(59,130,246,.45)', padding: '16px 0 16px 14px' }}
             >
               <div style={{ fontSize: 30, marginBottom: 14 }}>{item.icon}</div>
               <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>{item.title}</h3>
@@ -406,7 +406,7 @@ export default function PodcastersPage() {
           ].map(step => (
             <div
               key={step[0]}
-              style={{ borderRadius: 20, padding: 20, background: 'rgba(255,255,255,.035)', border: '1px solid rgba(255,255,255,.08)' }}
+              style={{ borderTop: '1px solid rgba(255,195,0,.25)', padding: '16px 0 4px' }}
             >
               <div style={{ fontSize: 44, color: 'rgba(255,195,0,.18)', fontWeight: 950, marginBottom: 8 }}>
                 {step[0]}

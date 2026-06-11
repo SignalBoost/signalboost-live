@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/opportunity-scan",
+      "schedule": "0 12 * * *"
+    }
+  ]
+}

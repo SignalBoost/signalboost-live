@@ -297,6 +297,7 @@ export default function PricingPage() {
 
   return (
     <main className="sb-page-shell sb-pricing-cockpit" style={{ padding: '18px 0 56px' }}>
+      <div style={{ minHeight: 'calc(100vh - 150px)', display: 'grid', alignContent: 'start' }}>
       <section style={{ textAlign: 'center', marginBottom: 14 }}>
         <span className="sb-eyebrow">
           {t(dict, 'pricing_v2.kicker', 'Multilingual AI operations platform')}
@@ -435,6 +436,7 @@ export default function PricingPage() {
           </article>
         ))}
       </section>
+      </div>
 
       <section style={{ marginTop: 38 }}>
         <span className="sb-eyebrow">

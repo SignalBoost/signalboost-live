@@ -45,7 +45,8 @@ const COPY: Record<string, Record<Lang, string>> = {
   copied:           { en: 'Copied', es: 'Copiado', pt: 'Copiado', pl: 'Skopiowano', ru: 'Скопировано' },
   copyLink:         { en: 'Copy link', es: 'Copiar enlace', pt: 'Copiar link', pl: 'Kopiuj link', ru: 'Копировать ссылку' },
   openNewTab:       { en: 'Open in new tab', es: 'Abrir en nueva pestaña', pt: 'Abrir em nova aba', pl: 'Otwórz w nowej karcie', ru: 'Открыть в новой вкладке' },
-  previewText:      { en: 'Dates and currency render per locale:', es: 'Fechas y monedas por región:', pt: 'Datas e moedas por localidade:', pl: 'Daty i waluty według regionu:', ru: 'Даты и валюты по локали:' },
+  previewText:      { en: 'Example of how a customer review displays — dates and amounts adapt to each language:', es: 'Ejemplo de cómo se muestra una reseña — fechas y montos se adaptan a cada idioma:', pt: 'Exemplo de como uma avaliação aparece — datas e valores se adaptam a cada idioma:', pl: 'Przykład wyświetlania opinii — daty i kwoty dostosowują się do języka:', ru: 'Пример отображения отзыва — даты и суммы адаптируются к языку:' },
+  sampleBadge:      { en: 'Sample preview', es: 'Vista de ejemplo', pt: 'Prévia de exemplo', pl: 'Przykładowy podgląd', ru: 'Пример' },
   mediaLabel:       { en: 'Optional image attachments', es: 'Archivos de imagen opcionales', pt: 'Anexos de imagem opcionais', pl: 'Opcjonalne załączniki obrazów', ru: 'Необязательные вложения изображений' },
   conciergeTitle:   { en: 'Concierge AI', es: 'Concierge IA', pt: 'Concierge IA', pl: 'Concierge AI', ru: 'Консьерж ИИ' },
   conciergeHeadline:{ en: 'Review-aware recommendations', es: 'Recomendaciones basadas en reseñas', pt: 'Recomendações baseadas em avaliações', pl: 'Rekomendacje oparte na opiniach', ru: 'Рекомендации на основе отзывов' },
@@ -329,10 +330,11 @@ export default function ReviewsPage() {
               <a href={reviewLink} target="_blank" rel="noopener noreferrer">{c('openNewTab', l)} ↗</a>
             </div>
           )}
-          <div className="sb-review-submission-preview">
+          <div className="sb-review-submission-preview" style={{ background: 'transparent', border: 0, borderLeft: '2px solid rgba(26,240,255,.4)', borderRadius: 0, padding: '4px 0 4px 14px' }}>
+            <span className="sb-chip" style={{ marginBottom: 8 }}>{c('sampleBadge', l)}</span>
             <div className="sb-stars" aria-label="5 star rating">★★★★★</div>
             <p>{c('previewText', l)}</p>
-            <strong>{formatReviewDate('2026-05-29T10:30:00.000Z', activeLocale)} · {formatReviewCurrency(2499, activeLocale)}</strong>
+            <strong>{formatReviewDate('2026-05-29T10:30:00.000Z', activeLocale)} · {formatReviewCurrency(49, activeLocale)}</strong>
             <label>
               {c('mediaLabel', l)}
               <input type="file" accept="image/*" multiple aria-label={c('mediaLabel', l)} />

@@ -55,6 +55,7 @@ const LAUNCHPAD: Item[] = [
 ]
 
 const GROW: Item[] = [
+  { icon: '🛸', key: 'grow.myOutreach', href: '/dashboard/my-outreach' },
   { icon: '📣', key: 'grow.campaigns', href: '/dashboard/campaigns' },
   { icon: '📢', key: 'grow.promote', href: '/dashboard/promote' },
   { icon: '💼', key: 'grow.sales', href: '/dashboard/sales' },
@@ -135,6 +136,7 @@ const COPY: Record<Lang, Record<string, string>> = {
     'grow.contacts.l': 'Contacts', 'grow.contacts.d': 'Review and approve leads.',
     'grow.pipeline.l': 'Pipeline', 'grow.pipeline.d': 'Track prospects by stage.',
     'grow.campaigns.l': 'Campaigns', 'grow.campaigns.d': 'Plan campaigns, A/B tests, and funnel tracking.',
+    'grow.myOutreach.l': 'My Outreach', 'grow.myOutreach.d': 'AI-written outreach for your business — review and send.',
     'grow.promote.l': 'Promote', 'grow.promote.d': 'Run promotion campaigns.',
     'grow.sales.l': 'Sales', 'grow.sales.d': 'Sales overview.',
     'grow.salesPipeline.l': 'Sales Pipeline', 'grow.salesPipeline.d': 'Deals in progress.',
@@ -185,6 +187,7 @@ const COPY: Record<Lang, Record<string, string>> = {
     'grow.contacts.l': 'Contactos', 'grow.contacts.d': 'Revisa y aprueba prospectos.',
     'grow.pipeline.l': 'Embudo', 'grow.pipeline.d': 'Sigue prospectos por etapa.',
     'grow.campaigns.l': 'Campañas', 'grow.campaigns.d': 'Planifica campañas, pruebas A/B y seguimiento de embudo.',
+    'grow.myOutreach.l': 'Mi prospección', 'grow.myOutreach.d': 'Prospección escrita por IA para tu negocio — revisa y envía.',
     'grow.promote.l': 'Promocionar', 'grow.promote.d': 'Ejecuta campañas de promoción.',
     'grow.sales.l': 'Ventas', 'grow.sales.d': 'Resumen de ventas.',
     'grow.salesPipeline.l': 'Embudo de ventas', 'grow.salesPipeline.d': 'Negocios en curso.',
@@ -235,6 +238,7 @@ const COPY: Record<Lang, Record<string, string>> = {
     'grow.contacts.l': 'Contatos', 'grow.contacts.d': 'Revise e aprove leads.',
     'grow.pipeline.l': 'Funil', 'grow.pipeline.d': 'Acompanhe prospects por etapa.',
     'grow.campaigns.l': 'Campanhas', 'grow.campaigns.d': 'Planeje campanhas, testes A/B e acompanhamento de funil.',
+    'grow.myOutreach.l': 'Minha prospecção', 'grow.myOutreach.d': 'Prospecção escrita por IA para o seu negócio — revise e envie.',
     'grow.promote.l': 'Promover', 'grow.promote.d': 'Realize campanhas de promoção.',
     'grow.sales.l': 'Vendas', 'grow.sales.d': 'Visão geral de vendas.',
     'grow.salesPipeline.l': 'Funil de vendas', 'grow.salesPipeline.d': 'Negócios em andamento.',
@@ -285,6 +289,7 @@ const COPY: Record<Lang, Record<string, string>> = {
     'grow.contacts.l': 'Kontakty', 'grow.contacts.d': 'Przeglądaj i zatwierdzaj klientów.',
     'grow.pipeline.l': 'Lejek', 'grow.pipeline.d': 'Śledź klientów według etapu.',
     'grow.campaigns.l': 'Kampanie', 'grow.campaigns.d': 'Planuj kampanie, testy A/B i śledzenie lejka.',
+    'grow.myOutreach.l': 'Mój outreach', 'grow.myOutreach.d': 'Outreach pisany przez AI dla Twojej firmy — sprawdź i wyślij.',
     'grow.promote.l': 'Promuj', 'grow.promote.d': 'Prowadź kampanie promocyjne.',
     'grow.sales.l': 'Sprzedaż', 'grow.sales.d': 'Przegląd sprzedaży.',
     'grow.salesPipeline.l': 'Lejek sprzedaży', 'grow.salesPipeline.d': 'Transakcje w toku.',
@@ -335,6 +340,7 @@ const COPY: Record<Lang, Record<string, string>> = {
     'grow.contacts.l': 'Контакты', 'grow.contacts.d': 'Просматривайте и одобряйте лидов.',
     'grow.pipeline.l': 'Воронка', 'grow.pipeline.d': 'Отслеживайте лидов по этапам.',
     'grow.campaigns.l': 'Кампании', 'grow.campaigns.d': 'Планируйте кампании, A/B-тесты и отслеживание воронки.',
+    'grow.myOutreach.l': 'Мой аутрич', 'grow.myOutreach.d': 'Аутрич от ИИ для вашего бизнеса — проверьте и отправьте.',
     'grow.promote.l': 'Продвигать', 'grow.promote.d': 'Запускайте промо-кампании.',
     'grow.sales.l': 'Продажи', 'grow.sales.d': 'Обзор продаж.',
     'grow.salesPipeline.l': 'Воронка продаж', 'grow.salesPipeline.d': 'Сделки в процессе.',

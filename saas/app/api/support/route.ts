@@ -7,6 +7,7 @@ import { getBusinessMetrics, formatMetricsForAI } from '@/lib/ai/tools/getBusine
 import { getExternalInfo, formatExternalInfoForAI } from '@/lib/ai/tools/getExternalInfo'
 import { getAffiliateCount, formatAffiliatesForAI } from '@/lib/ai/tools/getAffiliateCount'
 import { loadUserMemories, formatMemoriesForAI, saveUserMemory, forgetUserMemory } from '@/lib/ai/tools/userMemory'
+import { persistTurn, searchPastConversations, formatHistoryForAI, deleteAllConversations } from '@/lib/ai/tools/conversationHistory'
 
 type SupportMessage = { role?: 'user' | 'assistant' | 'system'; content?: string }
 
@@ -186,6 +187,36 @@ const TOOL_FORGET_FACT: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
+const TOOL_SEARCH_HISTORY: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'searchPastConversations',
+    description: 'Search this user\'s past conversations with you (titles, summaries, and message content). Call this when the user references an earlier discussion — "what did we talk about last week", "the campaign we discussed", "continue where we left off", "have I asked you this before". Pass a short topic query, or an empty query to list their most recent conversations.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Short topic keywords, e.g. "outreach campaign" or "pricing". Empty string lists recent conversations.' },
+      },
+      required: ['query'],
+    },
+  },
+}
+
+const TOOL_DELETE_HISTORY: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'deleteConversationHistory',
+    description: 'Permanently delete ALL of this user\'s stored conversation history. Only call after the user has EXPLICITLY confirmed they want everything deleted. Pass confirm: true only when that explicit confirmation was given in this conversation.',
+    parameters: {
+      type: 'object',
+      properties: {
+        confirm: { type: 'boolean', description: 'Must be true, and only after explicit user confirmation.' },
+      },
+      required: ['confirm'],
+    },
+  },
+}
+
 const CONCIERGE_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   TOOL_GET_PRICING,
   TOOL_GET_AFFILIATE_COUNT,
@@ -198,7 +229,7 @@ const CHIEF_OF_STAFF_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   TOOL_GET_AFFILIATE_COUNT,
 ]
 
-async function runTool(name: string, rawArgs: string, userId: string | null): Promise<string> {
+async function runTool(name: string, rawArgs: string, userId: string | null, conversationId: string | null): Promise<string> {
   if (name === 'getPricing') {
     const result = await getLivePricing()
     if (!result.ok || !result.pricing) {
@@ -268,6 +299,35 @@ async function runTool(name: string, rawArgs: string, userId: string | null): Pr
       : `No saved memories matched "${match}". Tell the user nothing matching that was found.`
   }
 
+  if (name === 'searchPastConversations') {
+    if (!userId) {
+      return 'Conversation history is only available for logged-in users. Do not mention this technical detail; just continue helping.'
+    }
+    let query = ''
+    try { query = String(JSON.parse(rawArgs || '{}')?.query || '') } catch {}
+    const result = await searchPastConversations(userId, query, conversationId)
+    if (!result.ok) {
+      return `History search failed: ${result.error ?? 'unknown error'}. Tell the user their conversation history is temporarily unavailable.`
+    }
+    return formatHistoryForAI(query, result.results)
+  }
+
+  if (name === 'deleteConversationHistory') {
+    if (!userId) {
+      return 'Conversation history is only available for logged-in users. Do not mention this technical detail; just continue helping.'
+    }
+    let confirm = false
+    try { confirm = JSON.parse(rawArgs || '{}')?.confirm === true } catch {}
+    if (!confirm) {
+      return 'Deletion NOT performed. Ask the user to explicitly confirm they want their entire conversation history permanently deleted, then call this tool again with confirm: true.'
+    }
+    const result = await deleteAllConversations(userId)
+    if (!result.ok) {
+      return `History deletion failed: ${result.error ?? 'unknown error'}.`
+    }
+    return `Deleted ${result.deletedConversations} conversation(s) permanently. Confirm to the user that their history is gone.`
+  }
+
   return `Unknown tool: ${name}`
 }
 
@@ -278,6 +338,8 @@ export async function POST(req: NextRequest) {
     const languageCode = String(body?.context?.language || 'en').toLowerCase()
     const language     = LANGUAGE_LABELS[languageCode] || 'English'
     const currentPage  = String(body?.context?.currentPage || '/')
+    const rawConvId    = String(body?.context?.conversationId || '')
+    const conversationId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawConvId) ? rawConvId : null
 
     const sanitized = messages
       .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
@@ -314,7 +376,7 @@ export async function POST(req: NextRequest) {
     const model       = isPrivileged ? 'gpt-4o' : 'gpt-4o-mini'
     const temperature = isPrivileged ? 0.5 : 0.4
     const baseTools   = isPrivileged ? CHIEF_OF_STAFF_TOOLS : CONCIERGE_TOOLS
-    const tools       = userId ? [...baseTools, TOOL_REMEMBER_FACT, TOOL_FORGET_FACT] : baseTools
+    const tools       = userId ? [...baseTools, TOOL_REMEMBER_FACT, TOOL_FORGET_FACT, TOOL_SEARCH_HISTORY, TOOL_DELETE_HISTORY] : baseTools
 
     // ── Pre-fetch live metrics for Chief of Staff on every request ────────
     let liveMetrics = 'Metrics unavailable — Supabase query failed.'
@@ -342,7 +404,9 @@ export async function POST(req: NextRequest) {
 
 ${memoryBlock || 'No saved memories for this user yet.'}
 
-MEMORY RULES: Use saved memories to personalize answers naturally — never recite the list back. When the user states a LASTING preference, a fact about themselves or their business, or a goal, call rememberFact to save it (one concise fact per call). When the user asks you to forget something or corrects a saved fact, call forgetFact. Never save secrets, passwords, or payment details.`
+MEMORY RULES: Use saved memories to personalize answers naturally — never recite the list back. When the user states a LASTING preference, a fact about themselves or their business, or a goal, call rememberFact to save it (one concise fact per call). When the user asks you to forget something or corrects a saved fact, call forgetFact. Never save secrets, passwords, or payment details.
+
+CONVERSATION HISTORY: This user's conversations with you are stored. When they reference an earlier discussion ("what did we talk about", "the campaign we discussed", "continue where we left off"), call searchPastConversations with short topic keywords before answering — never claim you cannot recall past conversations without searching first. If they ask to delete their history, ask for explicit confirmation, then call deleteConversationHistory with confirm: true.`
       } catch {
         // memory is non-blocking — continue without it
       }
@@ -380,7 +444,7 @@ MEMORY RULES: Use saved memories to personalize answers naturally — never reci
       for (const call of choice.message.tool_calls) {
         const toolName = call.function?.name || ''
         const toolArgs = call.function?.arguments || '{}'
-        const result   = await runTool(toolName, toolArgs, userId)
+        const result   = await runTool(toolName, toolArgs, userId, conversationId)
         convo.push({
           role:         'tool',
           tool_call_id: call.id,
@@ -403,6 +467,16 @@ MEMORY RULES: Use saved memories to personalize answers naturally — never reci
     const reply = choice?.message?.content?.trim()
     if (!reply) {
       return NextResponse.json({ error: 'AI returned an empty response.' }, { status: 502 })
+    }
+
+    // ── Persist this exchange to conversation history (logged-in users) ───
+    if (userId && conversationId && latestUserMessage) {
+      await persistTurn({
+        conversationId,
+        userId,
+        userMessage: latestUserMessage,
+        assistantReply: reply,
+      })
     }
 
     return NextResponse.json({

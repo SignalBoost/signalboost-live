@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getCurrentUser } from '@/utils/supabase/server'
 import { getCultureProfile } from '@/lib/culture-engine'
 
 type Prospect = {
@@ -13,6 +14,13 @@ type Prospect = {
 }
 
 export async function POST(req: NextRequest) {
+  // Auth: paid-API route — signed-in users only.
+  const authedUser = await getCurrentUser()
+  if (!authedUser) {
+    return NextResponse.json({ error: 'Please sign in.' }, { status: 401 })
+  }
+
+
   try {
     const { prospect } = await req.json()
 

@@ -50,28 +50,25 @@ export async function getAffiliateCount(): Promise<AffiliateResult> {
       return { ok: false, error: `Affiliate count query failed: ${countError.message}` }
     }
 
-    // ── Optional category breakdown — tries common column names and
-    //    degrades gracefully if none of them exist ─────────────────────────
+    // ── Category breakdown from the "category" column (confirmed in schema);
+    //    degrades gracefully if the query fails ─────────────────────────────
     const byCategory: Record<string, number> = {}
-    for (const column of ['category', 'category_name', 'vertical', 'sector', 'type']) {
-      try {
-        const { data: rows, error: catError } = await db
-          .from(AFFILIATES_TABLE)
-          .select(column)
-          .limit(2000)
+    try {
+      const { data: rows, error: catError } = await db
+        .from(AFFILIATES_TABLE)
+        .select('category')
+        .limit(2000)
 
-        if (catError || !Array.isArray(rows)) continue
-
+      if (!catError && Array.isArray(rows)) {
         for (const row of rows) {
-          const value = String((row as Record<string, unknown>)[column] ?? 'uncategorized')
+          const value = String((row as unknown as Record<string, unknown>).category ?? 'uncategorized')
             .trim()
             .toLowerCase() || 'uncategorized'
           byCategory[value] = (byCategory[value] ?? 0) + 1
         }
-        break // first column that works wins
-      } catch {
-        // try the next candidate column
       }
+    } catch {
+      // breakdown is optional — total count above is the authoritative number
     }
 
     return {

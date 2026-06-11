@@ -10,7 +10,10 @@ import { getAccess } from '@/lib/auth/access'
 import { assertSafeOutreachMessage } from '@/lib/ai/guardrails'
 
 const OUTREACH_TABLE = 'outreach_queue'
-export const OUTREACH_PLANS = ['growth', 'command']
+// Internal DB plan names: paid website tiers are 'pro' (public: Growth) and
+// 'business' (public: Command). The public names are accepted too so the gate
+// keeps working after the post-launch naming unification.
+export const OUTREACH_PLANS = ['pro', 'business', 'growth', 'command']
 export const DAILY_DRAFT_CAP = 10
 
 // House pattern (see lib/auth/access.ts): all fields always present, no narrowing needed.

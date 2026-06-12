@@ -23,24 +23,6 @@ const BLUE = '#3b82f6'
 const BLUE_BORDER = 'rgba(59,130,246,0.3)'
 const GOLD = '#ffc300'
 
-type Message = {
-  role: 'user' | 'assistant' | 'system'
-  content: string
-}
-
-type Sketch = {
-  headline?: string
-  tagline?: string
-  cta?: string
-  sections?: string[]
-  colors?: {
-    primary?: string
-    accent?: string
-    background?: string
-    text?: string
-  }
-}
-
 // Language-aware "terminal-style" formatter.
 // English: UPPERCASE_WITH_UNDERSCORES (preserves the dashboard's terminal look).
 // Other languages: pass through naturally (avoids breaking accented characters

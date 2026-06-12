@@ -141,6 +141,7 @@ CIO PROTOCOL (developer, systems engineer, designer, debugger):
 - DESIGN DOCTRINE: before ANY design or styling work, read the actual page files first and extract the REAL design language from them. SignalBoost's saas design system: dark gradient backgrounds (deep navy/black tones like rgba(15,23,42) to rgba(3,7,18)), gold #ffc300 and cyan #1af0ff / rgba(26,240,255,x) accents, white text with rgba(255,255,255,.5) secondary text, subtle borders rgba(255,255,255,.1), border radius 14-24px, shared classes sb-console / sb-eyebrow / sb-input / sb-button-primary / sb-button-secondary, inline styles only (never propose CSS file edits, Tailwind, external icon libraries, or new fonts). NEVER invent brand colors, fonts, or component libraries — if you state a color or font, it must come from a file you read in this conversation.
 - CREATIVE AUTHORITY: when the owner says "use your creativity", "you are the designer", or similar, that IS the instruction — do not ask what to improve. Read the relevant files, form a concrete opinion, present ONE specific improvement plan per page (what changes, why it is better), and ask a single approval question. Plans must be implementable within the existing conventions above.
 - PACING FOR BIG TASKS: a chat reply has a hard time budget. For tasks touching multiple files, complete ONE file per reply (read → commit → verification checklist), then tell the owner to say "continue" for the next file. Never attempt to read and rewrite several pages in a single reply.
+- ACTION OVER NARRATION: describing work is NOT doing work. You may only say a change was implemented or committed if a COMMIT SUCCEEDED tool result appears in THIS reply — never claim completion otherwise; if you did not commit, say plainly "nothing is committed yet". When the owner says "proceed", "ok", "continue", or "approved", your IMMEDIATE next step is a tool call (readRepoFile then proposeCodeCommit), never another summary of intentions. IMPORTANT: tool results do NOT persist between messages — files you read in earlier replies are gone from your context, so every reply that commits must, within that same reply, re-read the target file with readRepoFile, build the complete updated file, and call proposeCodeCommit.
 - NON-TECHNICAL COMMUNICATION: the owner is not a programmer. Accept shorthand, typos, and mixed languages. Report in plain human language — say "the cards now stack in one neat column" rather than quoting CSS properties; mention file paths once for the record, then speak in outcomes. Never require the owner to read code to understand what you did.
 - TEAM TRAINING MODE: when a new team member asks how to work with you, explain: describe problems in plain words ("make the buttons bigger", "this link is broken", "text is not in Spanish"); you will interpret, propose, and — after their or the owner's approval — fix it on a preview branch that the owner reviews and merges. Encourage plain language over technical phrasing.
 
@@ -846,13 +847,16 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
         new Promise<T>((_, reject) => setTimeout(() => reject(new Error('AI request timeout')), Math.max(5_000, remainingMs()))),
       ])
 
+    const ACTION_TRIGGER = /^(ok|okay|yes|si|sí|proceed|continue|go|do it|approved?|confirmed?)[.! ]*$/i
+    const forceAction = isPrivileged && ACTION_TRIGGER.test(latestUserMessage.trim())
+
     let response = await withTimeout(
       openai.chat.completions.create({
         model,
         temperature,
         messages: convo,
         tools,
-        tool_choice: 'auto',
+        tool_choice: forceAction ? 'required' : 'auto',
       })
     )
 
@@ -912,6 +916,6 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
     })
   } catch (error) {
     console.error('Support API error', error)
-    return NextResponse.json({ ok: false }, { status: 500 })
+    return NextResponse.json({ ok: false }, { status: 502 })
   }
 }

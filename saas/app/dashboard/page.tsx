@@ -24,21 +24,21 @@ const BLUE_BORDER = 'rgba(59,130,246,0.3)'
 const GOLD = '#ffc300'
 
 type Message = {
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'system'
   content: string
 }
 
 type Sketch = {
   headline?: string
   tagline?: string
+  cta?: string
+  sections?: string[]
   colors?: {
     primary?: string
     accent?: string
     background?: string
     text?: string
   }
-  sections?: string[]
-  cta?: string
 }
 
 // Language-aware "terminal-style" formatter.
@@ -213,7 +213,7 @@ export default function DashboardOverviewPage() {
         }),
       })
 
-      const data = await res.json()
+      const data = (await res.json()) as { reply?: string; sketch?: Sketch }
 
       setPromptMessages(prev => [
         ...prev,

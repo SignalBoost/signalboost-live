@@ -386,5 +386,5 @@ export function formatBranchListForAI(result: BranchListResult): string {
   if (!result.ok) return `Could not list branches: ${result.error}`
   if (result.branches.length === 0) return 'There are no open ai/* branches right now.'
   const lines = result.branches.map(b => `• ${b.name} — ${b.compareUrl}`)
-  return `Refused-list fallback`
+  return `Open AI branches awaiting review:\n${lines.join('\n')}`
 }

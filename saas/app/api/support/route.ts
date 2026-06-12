@@ -14,6 +14,8 @@ import { isOutreachEligible, createCustomerDraft, listCustomerDrafts, formatCust
 import { listRepoFiles, readRepoFile, formatFileListForAI, formatFileForAI } from '@/lib/ai/tools/repoReader'
 import { commitFileToBranch, listAiBranches, formatCommitResultForAI, formatBranchListForAI, listDeletableBranches, deleteBranches, formatDeletableForAI, formatDeleteResultForAI } from '@/lib/ai/tools/repoWriter'
 
+export const maxDuration = 60
+
 type SupportMessage = { role?: 'user' | 'assistant' | 'system'; content?: string }
 
 function getOpenAIClient() {
@@ -135,7 +137,12 @@ CIO PROTOCOL (developer, systems engineer, designer, debugger):
 - DEBUGGING PERSISTENCE: when a tool call fails or a commit is REFUSED, the error message tells you exactly what to fix — read it, correct that specific issue, and retry within this conversation. Never repeat an identical failing call unchanged. Never give up after one failure. If genuinely blocked after retries, report plainly: what you tried, why each attempt failed, and the safest fallback for the owner.
 - HONEST QA LIMITS: you cannot render pages, click buttons, switch languages in a browser, run builds, or measure performance. NEVER claim you tested, validated, or visually confirmed anything. Instead, after every commit, give the owner a short VERIFICATION CHECKLIST for the Vercel preview: which URL path to open, what to look for, and which languages to spot-check. The owner's eyes on the preview are the QA — your job is to make their check effortless.
 - FIX REPORT FORMAT: What was wrong → Why it happened → What changed (exact file path and what was touched) → How the owner verifies it on the preview.
-- NEW FEATURE / APP REQUESTS: extract the features, user flows, pages, components, data model, and API needs from the owner's description; present that plan for approval first; then implement through the commit workflow. Brand-new files require the owner's explicit approval and createNewFile: true.
+- NEW FEATURE / APP REQUESTS — use this APP IDEA TEMPLATE: from the owner's description (however informal), extract and present: Purpose (what problem, for whom) → Core Features → User Flow → Design Style → Platform → Extra Notes (multilingual, integrations). If details are missing, infer logical defaults consistent with SignalBoost's existing design (dark theme, gold/cyan, inline styles, five languages) and SAY which details you inferred. Get the owner's approval on the plan, then implement through the commit workflow. Brand-new files require the owner's explicit approval and createNewFile: true.
+- DESIGN DOCTRINE: before ANY design or styling work, read the actual page files first and extract the REAL design language from them. SignalBoost's saas design system: dark gradient backgrounds (deep navy/black tones like rgba(15,23,42) to rgba(3,7,18)), gold #ffc300 and cyan #1af0ff / rgba(26,240,255,x) accents, white text with rgba(255,255,255,.5) secondary text, subtle borders rgba(255,255,255,.1), border radius 14-24px, shared classes sb-console / sb-eyebrow / sb-input / sb-button-primary / sb-button-secondary, inline styles only (never propose CSS file edits, Tailwind, external icon libraries, or new fonts). NEVER invent brand colors, fonts, or component libraries — if you state a color or font, it must come from a file you read in this conversation.
+- CREATIVE AUTHORITY: when the owner says "use your creativity", "you are the designer", or similar, that IS the instruction — do not ask what to improve. Read the relevant files, form a concrete opinion, present ONE specific improvement plan per page (what changes, why it is better), and ask a single approval question. Plans must be implementable within the existing conventions above.
+- PACING FOR BIG TASKS: a chat reply has a hard time budget. For tasks touching multiple files, complete ONE file per reply (read → commit → verification checklist), then tell the owner to say "continue" for the next file. Never attempt to read and rewrite several pages in a single reply.
+- NON-TECHNICAL COMMUNICATION: the owner is not a programmer. Accept shorthand, typos, and mixed languages. Report in plain human language — say "the cards now stack in one neat column" rather than quoting CSS properties; mention file paths once for the record, then speak in outcomes. Never require the owner to read code to understand what you did.
+- TEAM TRAINING MODE: when a new team member asks how to work with you, explain: describe problems in plain words ("make the buttons bigger", "this link is broken", "text is not in Spanish"); you will interpret, propose, and — after their or the owner's approval — fix it on a preview branch that the owner reviews and merges. Encourage plain language over technical phrasing.
 
 GROWTH PLAN WORKFLOW (analysis → proposal → owner approval → execution):
 1. ANALYZE: study radar alerts (getOpportunityAlerts), live metrics, and web research before planning.
@@ -830,10 +837,13 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
       ...sanitized,
     ]
 
+    const startedAt = Date.now()
+    const BUDGET_MS = 50_000
+    const remainingMs = () => BUDGET_MS - (Date.now() - startedAt)
     const withTimeout = <T,>(p: Promise<T>): Promise<T> =>
       Promise.race([
         p,
-        new Promise<T>((_, reject) => setTimeout(() => reject(new Error('AI request timeout')), 25000)),
+        new Promise<T>((_, reject) => setTimeout(() => reject(new Error('AI request timeout')), Math.max(5_000, remainingMs()))),
       ])
 
     let response = await withTimeout(
@@ -849,7 +859,7 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
     let choice     = response.choices[0]
     let toolRounds = 0
 
-    while (choice?.message?.tool_calls && choice.message.tool_calls.length > 0 && toolRounds < 6) {
+    while (choice?.message?.tool_calls && choice.message.tool_calls.length > 0 && toolRounds < 6 && remainingMs() > 12_000) {
       toolRounds++
 
       convo.push(choice.message as OpenAI.Chat.Completions.ChatCompletionMessageParam)
@@ -877,7 +887,10 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
       choice = response.choices[0]
     }
 
-    const reply = choice?.message?.content?.trim()
+    let reply = choice?.message?.content?.trim()
+    if (!reply && remainingMs() <= 12_000) {
+      reply = 'I ran out of time mid-task — any commits already made are safe on the preview branch. Say "continue" and I will pick up where I left off, one file at a time.'
+    }
     if (!reply) {
       return NextResponse.json({ error: 'AI returned an empty response.' }, { status: 502 })
     }

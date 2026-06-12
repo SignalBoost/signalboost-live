@@ -12,7 +12,7 @@ import { listRecentAlerts, formatAlertsForAI } from '@/lib/ai/opportunityScanner
 import { proposeGrowthPlan, setGrowthPlanStatus, listGrowthPlans, formatPlansForAI, createOutreachDraft, type PlanStatus } from '@/lib/ai/growthPlans'
 import { isOutreachEligible, createCustomerDraft, listCustomerDrafts, formatCustomerDraftsForAI } from '@/lib/outreach/customer'
 import { listRepoFiles, readRepoFile, formatFileListForAI, formatFileForAI } from '@/lib/ai/tools/repoReader'
-import { commitFileToBranch, listAiBranches, formatCommitResultForAI, formatBranchListForAI } from '@/lib/ai/tools/repoWriter'
+import { commitFileToBranch, listAiBranches, formatCommitResultForAI, formatBranchListForAI, listDeletableBranches, deleteBranches, formatDeletableForAI, formatDeleteResultForAI } from '@/lib/ai/tools/repoWriter'
 
 type SupportMessage = { role?: 'user' | 'assistant' | 'system'; content?: string }
 
@@ -127,7 +127,7 @@ CODE COMMITS ("hands", branch-only): you can commit code — ONLY to ai/* previe
 2. PRESENT: show the owner what you intend to change and why, then ask for explicit approval to commit.
 3. COMMIT: only after explicit approval, call proposeCodeCommit with the COMPLETE new file content (full file, never a fragment, no placeholders, no TODOs), a short kebab-case branch name describing the change, and a clear commit message. Multi-file changes go to the SAME branch — one proposeCodeCommit call per file.
 4. REPORT: give the owner the compare URL and tell them Vercel is building a preview — they review the preview and merge in GitHub when it is green. Never claim a change is live; it is live only after the owner merges.
-Use listAiBranches when the owner asks what code is awaiting review. Follow the repo's conventions strictly: the tsconfig is NON-STRICT, so use the flat { ok: boolean; error?: string } result style (discriminated unions do not narrow); inline styles in UI files; single-line tag attributes; full files only.
+Use listAiBranches when the owner asks what code is awaiting review. BRANCH CLEANUP: when the owner asks to clean up old branches, call listCleanupBranches, show them the list, and delete with deleteBranches ONLY after their explicit confirmation — the tool itself refuses main and anything outside ai/*, codex/*, SignalBoost/patch-*. Follow the repo's conventions strictly: the tsconfig is NON-STRICT, so use the flat { ok: boolean; error?: string } result style (discriminated unions do not narrow); inline styles in UI files; single-line tag attributes; full files only.
 
 GROWTH PLAN WORKFLOW (analysis → proposal → owner approval → execution):
 1. ANALYZE: study radar alerts (getOpportunityAlerts), live metrics, and web research before planning.
@@ -275,6 +275,8 @@ const TOOL_COMMIT_CODE: OpenAI.Chat.Completions.ChatCompletionTool = {
         path: { type: 'string', description: 'Full file path from the repo root, e.g. "saas/lib/ai/tools/getPricing.ts".' },
         content: { type: 'string', description: 'The COMPLETE new file content. Full file, never a fragment or diff. No placeholders.' },
         message: { type: 'string', description: 'Clear commit message, e.g. "fix(navbar): show login button on mobile".' },
+        createNewFile: { type: 'boolean', description: 'Set true ONLY when the owner explicitly approved creating a brand-new file that does not exist in the repo yet. Default false.' },
+        allowRewrite: { type: 'boolean', description: 'Set true ONLY when the owner explicitly approved a full rewrite of an existing file. Default false — normal edits must preserve most of the original lines.' },
       },
       required: ['branch', 'path', 'content', 'message'],
     },
@@ -287,6 +289,30 @@ const TOOL_LIST_AI_BRANCHES: OpenAI.Chat.Completions.ChatCompletionTool = {
     name: 'listAiBranches',
     description: 'List the open ai/* preview branches awaiting the owner review and merge, with their GitHub compare URLs. Call when the owner asks what code changes are pending or awaiting review.',
     parameters: { type: 'object', properties: {}, required: [] },
+  },
+}
+
+const TOOL_LIST_CLEANUP_BRANCHES: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'listCleanupBranches',
+    description: 'List all cleanup-eligible branches in the repository: ai/*, codex/*, and SignalBoost/patch-* only. Call when the owner asks to clean up, prune, or review old branches. main and all other branches are never included and can never be deleted.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+}
+
+const TOOL_DELETE_BRANCHES: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'deleteBranches',
+    description: 'Permanently delete repository branches. HARD LIMITS enforced in code: only ai/*, codex/*, and SignalBoost/patch-* branches can be deleted; main/master and all other branches are refused automatically. Workflow: call listCleanupBranches first, show the owner the list, and only after their explicit confirmation in this conversation call this tool with the exact branch names. Production code is never affected — deleting branches does not touch main.',
+    parameters: {
+      type: 'object',
+      properties: {
+        names: { type: 'array', items: { type: 'string' }, description: 'Exact branch names to delete, copied from listCleanupBranches output.' },
+      },
+      required: ['names'],
+    },
   },
 }
 
@@ -421,6 +447,8 @@ const CHIEF_OF_STAFF_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   TOOL_READ_REPO_FILE,
   TOOL_COMMIT_CODE,
   TOOL_LIST_AI_BRANCHES,
+  TOOL_LIST_CLEANUP_BRANCHES,
+  TOOL_DELETE_BRANCHES,
   TOOL_PROPOSE_PLAN,
   TOOL_UPDATE_PLAN_STATUS,
   TOOL_LIST_PLANS,
@@ -535,6 +563,8 @@ async function runTool(name: string, rawArgs: string, userId: string | null, con
       path: String(args?.path || ''),
       content: String(args?.content || ''),
       message: String(args?.message || ''),
+      createNewFile: args?.createNewFile === true,
+      allowRewrite: args?.allowRewrite === true,
     })
     return formatCommitResultForAI(result)
   }
@@ -545,6 +575,30 @@ async function runTool(name: string, rawArgs: string, userId: string | null, con
     }
     const result = await listAiBranches()
     return formatBranchListForAI(result)
+  }
+
+  if (name === 'listCleanupBranches') {
+    if (!isPrivileged) {
+      return 'PERMISSION DENIED: branch management is restricted to the owner/admin channel. Do not retry.'
+    }
+    const result = await listDeletableBranches()
+    return formatDeletableForAI(result)
+  }
+
+  if (name === 'deleteBranches') {
+    if (!isPrivileged) {
+      return 'PERMISSION DENIED: branch deletion is restricted to the owner/admin channel. Do not retry.'
+    }
+    let names: string[] = []
+    try {
+      const parsed = JSON.parse(rawArgs || '{}')
+      if (Array.isArray(parsed?.names)) names = parsed.names.map((n: any) => String(n))
+    } catch {}
+    if (!names.length) {
+      return 'No branch names were provided. Call listCleanupBranches first, show the owner the list, get explicit confirmation, then call deleteBranches with the exact names.'
+    }
+    const result = await deleteBranches(names)
+    return formatDeleteResultForAI(result)
   }
 
   if (name === 'proposeGrowthPlan') {

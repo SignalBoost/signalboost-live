@@ -186,10 +186,10 @@ export default function PodcastersPage() {
         style={{
           maxWidth:              1180,
           margin:                '0 auto',
-          padding:               '50px 24px 50px',
+          padding:               '36px 24px 36px',
           display:               'grid',
           gridTemplateColumns:   '1fr 1.05fr',
-          gap:                   40,
+          gap:                   34,
           alignItems:            'center',
         }}
       >
@@ -348,8 +348,8 @@ export default function PodcastersPage() {
       </section>
 
       {/* ── Episode cards ─────────────────────────────────────────────────── */}
-      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '25px 24px 60px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }} className="how-grid">
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '18px 24px 56px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }} className="how-grid">
           {productions.map(item => (
             <div
               key={item.title}
@@ -369,7 +369,7 @@ export default function PodcastersPage() {
       </section>
 
       {/* ── Deliverables ──────────────────────────────────────────────────── */}
-      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '30px 24px 80px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '20px 24px 70px' }}>
         <h2 style={{ fontSize: 'clamp(30px, 5vw, 52px)', margin: '0 0 14px', letterSpacing: '-.04em', textAlign: 'center' }}>
           {P('section.fullStudioTitle', 'A full production studio after you record')}
         </h2>
@@ -377,7 +377,7 @@ export default function PodcastersPage() {
           {P('section.fullStudioSubtitle', 'You focus on the conversation. SignalBoost helps turn that episode into clips, captions, translated content, voiceovers, pages and promotional assets.')}
         </p>
 
-        <div className="deliver-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
+        <div className="deliver-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
           {deliverables.map(item => (
             <div
               key={item.title}
@@ -392,12 +392,12 @@ export default function PodcastersPage() {
       </section>
 
       {/* ── How it works ──────────────────────────────────────────────────── */}
-      <section id="how-it-works" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 80px' }}>
+      <section id="how-it-works" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 70px' }}>
         <h2 style={{ textAlign: 'center', fontSize: 38, marginBottom: 36 }}>
           {t(dict, 'podcasters_page.howTitle', 'How it works')}
         </h2>
 
-        <div className="how-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20 }}>
+        <div className="how-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
           {[
             ['01', P('how.step1.title', 'Upload your episode'), P('how.step1.desc', 'Bring the finished audio or video.')],
             ['02', P('how.step2.title', 'Choose outputs'),      P('how.step2.desc', 'Clips, captions, languages, voiceover and show notes.')],
@@ -419,7 +419,7 @@ export default function PodcastersPage() {
       </section>
 
       {/* ── Pricing ───────────────────────────────────────────────────────── */}
-      <section id="plans" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 100px' }}>
+      <section id="plans" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 90px' }}>
         <h2 style={{ fontSize: 38, fontWeight: 900, textAlign: 'center', marginBottom: 12 }}>
           {t(dict, 'podcasters_page.plansTitle', 'Podcast plans')}
         </h2>

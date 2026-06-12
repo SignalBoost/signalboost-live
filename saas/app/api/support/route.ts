@@ -14,7 +14,7 @@ import { isOutreachEligible, createCustomerDraft, listCustomerDrafts, formatCust
 import { listRepoFiles, readRepoFile, formatFileListForAI, formatFileForAI } from '@/lib/ai/tools/repoReader'
 import { commitFileToBranch, listAiBranches, formatCommitResultForAI, formatBranchListForAI, listDeletableBranches, deleteBranches, formatDeletableForAI, formatDeleteResultForAI } from '@/lib/ai/tools/repoWriter'
 
-export const maxDuration = 60
+export const maxDuration = 300
 
 type SupportMessage = { role?: 'user' | 'assistant' | 'system'; content?: string }
 
@@ -133,6 +133,9 @@ Use listAiBranches when the owner asks what code is awaiting review. BRANCH CLEA
 
 CIO PROTOCOL (developer, systems engineer, designer, debugger):
 - You are also the company's CIO. Translate the owner's plain-language reports into technical fixes even when written hastily, with typos, or in shorthand. If a request is ambiguous, state your interpretation in ONE line ("Interpreting: ...") before acting — then act.
+- REDESIGN-ONLY PHRASES: when the owner says "no code changes", "just design", "don't change how it works", they mean: redesign the LOOK ONLY — improve styling, spacing, colors, typography, and visual polish — while preserving ALL functionality exactly (same buttons, links, handlers, data, translations, logic). This still requires editing the page file and is full authorization to commit styling-level changes through the normal workflow. Never reply with a conceptual plan instead of committing, and never alter behavior under a redesign request.
+- AFFIRMATION = CONTINUE: short affirmations — "go", "go ahead", "start", "let's start", "next", "ok", "yes", "sure", "dale", "adelante" — ALL mean continue with the pending work, exactly like "continue". Never respond to them with inaction or by repeating an instruction to say continue. If genuinely ambiguous, say "Interpreting that as: continue" and proceed in the same reply.
+- MULTI-PAGE QUEUE: when given several pages in one request, your FIRST reply must list the queue in order (e.g. "Queue: 1. /dashboard 2. /pricing ..."), then immediately read and commit page 1 in that same reply. On every "continue", restate the queue with done items checked, then do the next page. The queue in your own previous replies is your task memory — rely on it. If you genuinely cannot tell what remains, ask "which page is next?" — never call an unrelated tool just to call something.
 - BUG TRANSLATION LIBRARY (symptom → where to look): "card is cut off / cards all over the place" → grid/layout styles in that page's wrapper divs; "button not aligned" → flex/grid alignment with neighboring elements; "text not translated" → missing or incomplete keys in the page's COPY object (must cover all five languages: en, es, pt, pl, ru); "link doesn't work" → wrong href or non-existent route; "page fails to load" → the API route it calls and its error handling; "broke after deploy" → re-read the changed file for type errors or invalid imports.
 - DEBUGGING PERSISTENCE: when a tool call fails or a commit is REFUSED, the error message tells you exactly what to fix — read it, correct that specific issue, and retry within this conversation. Never repeat an identical failing call unchanged. Never give up after one failure. If genuinely blocked after retries, report plainly: what you tried, why each attempt failed, and the safest fallback for the owner.
 - HONEST QA LIMITS: you cannot render pages, click buttons, switch languages in a browser, run builds, or measure performance. NEVER claim you tested, validated, or visually confirmed anything. Instead, after every commit, give the owner a short VERIFICATION CHECKLIST for the Vercel preview: which URL path to open, what to look for, and which languages to spot-check. The owner's eyes on the preview are the QA — your job is to make their check effortless.
@@ -141,7 +144,7 @@ CIO PROTOCOL (developer, systems engineer, designer, debugger):
 - DESIGN DOCTRINE: before ANY design or styling work, read the actual page files first and extract the REAL design language from them. SignalBoost's saas design system: dark gradient backgrounds (deep navy/black tones like rgba(15,23,42) to rgba(3,7,18)), gold #ffc300 and cyan #1af0ff / rgba(26,240,255,x) accents, white text with rgba(255,255,255,.5) secondary text, subtle borders rgba(255,255,255,.1), border radius 14-24px, shared classes sb-console / sb-eyebrow / sb-input / sb-button-primary / sb-button-secondary, inline styles only (never propose CSS file edits, Tailwind, external icon libraries, or new fonts). NEVER invent brand colors, fonts, or component libraries — if you state a color or font, it must come from a file you read in this conversation.
 - CREATIVE AUTHORITY: when the owner says "use your creativity", "you are the designer", or similar, that IS the instruction — do not ask what to improve and do not ask permission. Read the first page's file, summarize your improvements in a few short lines, and COMMIT that page in the same reply; tell the owner to say "continue" for the next page. Improvements must stay within the existing conventions above.
 - PACING FOR BIG TASKS: a chat reply has a hard time budget. For tasks touching multiple files, complete ONE file per reply (read → commit → verification checklist), then tell the owner to say "continue" for the next file. Never attempt to read and rewrite several pages in a single reply.
-- ACTION OVER NARRATION: describing work is NOT doing work. You may only say a change was implemented or committed if a COMMIT SUCCEEDED tool result appears in THIS reply — never claim completion otherwise; if you did not commit, say plainly "nothing is committed yet". When the owner says "proceed", "ok", "continue", or "approved", your IMMEDIATE next step is a tool call (readRepoFile then proposeCodeCommit), never another summary of intentions. IMPORTANT: tool results do NOT persist between messages — files you read in earlier replies are gone from your context, so every reply that commits must, within that same reply, re-read the target file with readRepoFile, build the complete updated file, and call proposeCodeCommit.
+- ACTION OVER NARRATION: describing work is NOT doing work. A "redesign plan", "improvement plan", or verification checklist is NEVER a valid deliverable on its own for a fix or design request — the deliverable is a commit; plans may only appear in a reply that also contains a COMMIT SUCCEEDED result. You may only say a change was implemented or committed if a COMMIT SUCCEEDED tool result appears in THIS reply — never claim completion otherwise; if you did not commit, say plainly "nothing is committed yet". When the owner says "proceed", "ok", "continue", or "approved", your IMMEDIATE next step is a tool call (readRepoFile then proposeCodeCommit), never another summary of intentions. IMPORTANT: tool results do NOT persist between messages — files you read in earlier replies are gone from your context, so every reply that commits must, within that same reply, re-read the target file with readRepoFile, build the complete updated file, and call proposeCodeCommit.
 - NON-TECHNICAL COMMUNICATION: the owner is not a programmer. Accept shorthand, typos, and mixed languages. Report in plain human language — say "the cards now stack in one neat column" rather than quoting CSS properties; mention file paths once for the record, then speak in outcomes. Never require the owner to read code to understand what you did.
 - TEAM TRAINING MODE: when a new team member asks how to work with you, explain: describe problems in plain words ("make the buttons bigger", "this link is broken", "text is not in Spanish"); you will interpret and fix it on a preview branch that the owner reviews and merges. Encourage plain language over technical phrasing.
 
@@ -839,7 +842,7 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
     ]
 
     const startedAt = Date.now()
-    const BUDGET_MS = 50_000
+    const BUDGET_MS = 110_000
     const remainingMs = () => BUDGET_MS - (Date.now() - startedAt)
     const withTimeout = <T,>(p: Promise<T>): Promise<T> =>
       Promise.race([
@@ -867,8 +870,14 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
       }
     }
 
-    const ACTION_TRIGGER = /^(ok|okay|yes|si|sí|proceed|continue|go|do it|approved?|confirmed?)[.! ]*$/i
+    const ACTION_TRIGGER = /^(ok(ay)?|yes|si|sí|sure|proceed|continue|go(\s*ahead)?|do it|start|let'?s\s*(start|go)|next(\s*page)?|approved?|confirmed?|dale|adelante|sigue|empieza)[.!\s]*$/i
     const forceAction = isPrivileged && ACTION_TRIGGER.test(latestUserMessage.trim())
+    if (forceAction) {
+      convo.push({
+        role: 'system',
+        content: 'OWNER COMMAND: an affirmation ("continue"/"go"/"yes" or similar) was received. Immediately perform the next pending action — for multi-page tasks, read the next queued page file and COMMIT it within this reply. Do not output a plan, do not ask anything, do not repeat instructions to say continue.',
+      })
+    }
 
     let choice     = await callModel(forceAction ? 'required' : 'auto')
     let toolRounds = 0

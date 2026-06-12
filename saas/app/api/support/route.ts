@@ -847,23 +847,34 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
         new Promise<T>((_, reject) => setTimeout(() => reject(new Error('AI request timeout')), Math.max(5_000, remainingMs()))),
       ])
 
+    // Calls the model; returns null on time-budget expiry instead of throwing,
+    // so a long task degrades into a graceful "say continue" reply, never a 500.
+    const callModel = async (choiceMode: 'auto' | 'required') => {
+      try {
+        const r = await withTimeout(
+          openai.chat.completions.create({
+            model,
+            temperature,
+            messages: convo,
+            tools,
+            tool_choice: choiceMode,
+          })
+        )
+        return r.choices[0] ?? null
+      } catch (err) {
+        if (err instanceof Error && err.message === 'AI request timeout') return null
+        throw err
+      }
+    }
+
     const ACTION_TRIGGER = /^(ok|okay|yes|si|sí|proceed|continue|go|do it|approved?|confirmed?)[.! ]*$/i
     const forceAction = isPrivileged && ACTION_TRIGGER.test(latestUserMessage.trim())
 
-    let response = await withTimeout(
-      openai.chat.completions.create({
-        model,
-        temperature,
-        messages: convo,
-        tools,
-        tool_choice: forceAction ? 'required' : 'auto',
-      })
-    )
-
-    let choice     = response.choices[0]
+    let choice     = await callModel(forceAction ? 'required' : 'auto')
     let toolRounds = 0
+    let timedOut   = choice === null
 
-    while (choice?.message?.tool_calls && choice.message.tool_calls.length > 0 && toolRounds < 6 && remainingMs() > 12_000) {
+    while (!timedOut && choice?.message?.tool_calls && choice.message.tool_calls.length > 0 && toolRounds < 6 && remainingMs() > 12_000) {
       toolRounds++
 
       convo.push(choice.message as OpenAI.Chat.Completions.ChatCompletionMessageParam)
@@ -879,21 +890,21 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
         })
       }
 
-      response = await withTimeout(
-        openai.chat.completions.create({
-          model,
-          temperature,
-          messages: convo,
-          tools,
-          tool_choice: 'auto',
-        })
-      )
-      choice = response.choices[0]
+      const next = await callModel('auto')
+      if (next === null) { timedOut = true; break }
+      choice = next
     }
 
-    let reply = choice?.message?.content?.trim()
-    if (!reply && remainingMs() <= 12_000) {
-      reply = 'I ran out of time mid-task — any commits already made are safe on the preview branch. Say "continue" and I will pick up where I left off, one file at a time.'
+    let reply = choice && choice.message && choice.message.content ? choice.message.content.trim() : ''
+    if (!reply) {
+      const committedSomething = convo.some(
+        (m: any) => m && m.role === 'tool' && typeof m.content === 'string' && m.content.includes('COMMIT SUCCEEDED')
+      )
+      if (timedOut || remainingMs() <= 12_000) {
+        reply = committedSomething
+          ? 'I committed part of the work — a preview is building for it now. I ran out of time before finishing everything, so say "continue" and I will do the next page.'
+          : 'That task is too large for a single reply. Say "continue" and I will work through it one page at a time, starting immediately.'
+      }
     }
     if (!reply) {
       return NextResponse.json({ error: 'AI returned an empty response.' }, { status: 502 })
@@ -916,6 +927,6 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
     })
   } catch (error) {
     console.error('Support API error', error)
-    return NextResponse.json({ ok: false }, { status: 502 })
+    return NextResponse.json({ ok: false }, { status: 500 })
   }
 }

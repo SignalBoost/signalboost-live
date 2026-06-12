@@ -2,7 +2,7 @@
 // Hub Console — Phase 1B read-only aggregator.
 // Owner/admin only. Fetches live Stripe prices, Supabase health, and Vercel env names.
 // STRICTLY READ-ONLY: no write calls anywhere. Only display-safe values are returned
-// to the browser — never secret values, never full keys.
+// to the browser — never secret values, never full keys.  
 
 import { NextResponse } from 'next/server'
 import { getAdminSupabase } from '@/utils/supabase/server'

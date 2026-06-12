@@ -11,16 +11,7 @@ import { t } from '@/lib/i18n/t'
 
 const GOLD = '#ffc300'
 
-type Sketch = {
-  showNames?: string[]
-  showDescription?: string
-  targetAudience?: string
-  firstEpisodes?: string[]
-  introScript?: string
-  launchChecklist?: string[]
-  nextStep?: string
-}
-
+// The PodcastPage component handles the display and translation of podcast-related content.
 export default function PodcastPage() {
   const { dict, lang } = useI18n()
   const tr = (key: string, fallback: string) => t(dict, key, fallback)

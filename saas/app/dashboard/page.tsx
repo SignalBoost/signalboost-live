@@ -23,40 +23,6 @@ const BLUE = '#3b82f6'
 const BLUE_BORDER = 'rgba(59,130,246,0.3)'
 const GOLD = '#ffc300'
 
-type Message = {
-  role: 'user' | 'assistant' | 'system'
-  content: string
-}
-
-type Sketch = {
-  headline?: string
-  tagline?: string
-  cta?: string
-  sections?: string[]
-  colors?: {
-    primary?: string
-    accent?: string
-    background?: string
-    text?: string
-  }
-}
-
-// Language-aware "terminal-style" formatter.
-// English: UPPERCASE_WITH_UNDERSCORES (preserves the dashboard's terminal look).
-// Other languages: pass through naturally (avoids breaking accented characters
-// and unnatural ALL-CAPS rendering in PT/ES/PL/RU).
-function termCase(value: string, lang: string): string {
-  if (!value) return ''
-  if (lang === 'en') return value.toUpperCase().replace(/ /g, '_')
-  return value
-}
-
-// Plain upper-case helper that's still safe for non-Latin scripts (e.g. ASCII codes).
-// Use only for things like language codes / status enums that are ASCII by design.
-function safeUpper(value: string): string {
-  return (value || '').toUpperCase()
-}
-
 export default function DashboardOverviewPage() {
   const { dict, lang } = useI18n()
 
@@ -286,9 +252,6 @@ export default function DashboardOverviewPage() {
     text: sketch?.colors?.text || '#2C1A0E',
   }
 
-  // Translated labels. Defaults are English values; for the terminal aesthetic,
-  // termCase(value, lang) handles language-aware casing in render — so JSON
-  // values should be NATURAL (e.g. "Quick actions"), not pre-shouted.
   const L = {
     quickActions: t(dict, 'dash.preview.quickActions', 'Quick actions'),
     yourProjects: t(dict, 'dash.preview.yourProjects', 'Your projects'),
@@ -580,9 +543,9 @@ export default function DashboardOverviewPage() {
               </div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
               {projects.map((p, i) => (
-                <div key={p.id} className="fathom-glass" style={{ borderRadius: 12, padding: 20, animation: `cardIn .3s ease ${i * .04}s both`, background: 'rgba(6, 9, 19, 0.4)' }}>
+                <div key={p.id} className="fathom-glass" style={{ borderRadius: 12, padding: 20, animation: `cardIn .3s ease ${i * .04}s both`, background: 'rgba(6, 9, 19, 0.4)', width: '100%' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', gap: 10, minWidth: 0 }}>
                       <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(59,130,246,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.05)' }}>

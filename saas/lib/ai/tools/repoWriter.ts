@@ -371,6 +371,76 @@ export async function listAiBranches(): Promise<BranchListResult> {
   return { ok: true, branches, error: '' }
 }
 
+// ── Branch cleanup (owner-approved housekeeping) ───────────────────────────────
+// Only branches with these prefixes may EVER be deleted. main/master and any
+// other branch are refused in code regardless of what the model asks for.
+const DELETABLE_PREFIXES = ['ai/', 'codex/', 'signalboost/patch-']
+
+function isDeletable(name: string): boolean {
+  const lower = String(name || '').trim().toLowerCase()
+  if (!lower || lower === 'main' || lower === 'master') return false
+  for (const prefix of DELETABLE_PREFIXES) {
+    if (lower.startsWith(prefix)) return true
+  }
+  return false
+}
+
+export async function listDeletableBranches(): Promise<BranchListResult> {
+  const branches: AiBranch[] = []
+  for (let page = 1; page <= 3; page++) {
+    const res = await gh(`/repos/${REPO}/branches?per_page=100&page=${page}`)
+    if (!res.ok) return { ok: false, branches: [], error: res.error }
+    const all = Array.isArray(res.data) ? res.data : []
+    for (const b of all) {
+      if (b && typeof b.name === 'string' && isDeletable(b.name)) {
+        branches.push({ name: b.name, compareUrl: `https://github.com/${REPO}/compare/${BASE_BRANCH}...${encodeURIComponent(b.name)}` })
+      }
+    }
+    if (all.length < 100) break
+  }
+  return { ok: true, branches, error: '' }
+}
+
+export type DeleteBranchesResult = { ok: boolean; deleted: string[]; refused: string[]; error: string }
+
+export async function deleteBranches(names: string[]): Promise<DeleteBranchesResult> {
+  const deleted: string[] = []
+  const refused: string[] = []
+  const list = Array.isArray(names) ? names.slice(0, 120) : []
+  for (const raw of list) {
+    const name = String(raw || '').trim()
+    if (!isDeletable(name)) {
+      refused.push(`${name || '(empty)'} — protected, only ai/*, codex/*, SignalBoost/patch-* can be deleted`)
+      continue
+    }
+    const res = await gh(`/repos/${REPO}/git/refs/heads/${encodeURIComponent(name)}`, { method: 'DELETE' })
+    if (res.ok) {
+      deleted.push(name)
+    } else if (res.status === 404 || res.status === 422) {
+      refused.push(`${name} — not found (already deleted?)`)
+    } else {
+      refused.push(`${name} — ${res.error}`)
+    }
+  }
+  return { ok: refused.length === 0, deleted, refused, error: refused.length ? 'Some branches were not deleted.' : '' }
+}
+
+export function formatDeletableForAI(result: BranchListResult): string {
+  if (!result.ok) return `Could not list branches: ${result.error}`
+  if (result.branches.length === 0) return 'There are no cleanup-eligible branches (ai/*, codex/*, SignalBoost/patch-*). The repo is clean.'
+  const lines = result.branches.map(b => `• ${b.name}`)
+  return `Cleanup-eligible branches (${result.branches.length} total — only these prefixes can ever be deleted; main is protected):\n${lines.join('\n')}\nPresent this list to the owner and get explicit confirmation BEFORE calling deleteBranches.`
+}
+
+export function formatDeleteResultForAI(result: DeleteBranchesResult): string {
+  const parts: string[] = []
+  parts.push(`Deleted ${result.deleted.length} branch(es).`)
+  if (result.deleted.length) parts.push(result.deleted.map(n => `✓ ${n}`).join('\n'))
+  if (result.refused.length) parts.push(`Not deleted (${result.refused.length}):\n${result.refused.map(n => `✗ ${n}`).join('\n')}`)
+  parts.push('main and all non-cleanup branches are untouched. Report the counts to the owner.')
+  return parts.join('\n')
+}
+
 // ── Format results for the AI ───────────────────────────────────────────────────
 export function formatCommitResultForAI(result: CommitResult): string {
   if (!result.ok) return `COMMIT FAILED: ${result.error}`

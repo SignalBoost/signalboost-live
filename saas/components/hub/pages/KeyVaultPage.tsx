@@ -8,6 +8,7 @@
 // SECTION 2 "Platform keys": read-only mirror of Vercel env variable NAMES.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { PageProps, Lang, c, TONES, Tone, cardStyle, bodyStyle, labelStyle, rowStyle, monoStyle, Band, Status } from '../shared'
 
 // ── Local translations (vault-specific) ─────────────────────────────────────
@@ -263,8 +264,8 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
         )}
       </section>
 
-      {/* ── Add Key modal ──────────────────────────────────────────── */}
-      {showAdd && (
+      {/* ── Add Key modal (portal: escapes the slider's CSS transform) ── */}
+      {showAdd && typeof document !== 'undefined' && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(3,7,18,.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 18 }} onClick={() => !savingKey && setShowAdd(false)}>
           <div onClick={e => e.stopPropagation()} style={{ width: 'min(440px, 100%)', borderRadius: 16, border: '1px solid rgba(255,195,0,.4)', background: 'linear-gradient(160deg, rgba(15,23,42,.97), rgba(3,7,18,.99))', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 12, boxShadow: '0 30px 80px rgba(0,0,0,.6)' }}>
             <div style={{ fontSize: 16, fontWeight: 800 }}>🔐 {v('addKey', lang).replace('+ ', '')}</div>
@@ -286,10 +287,10 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
-      {/* ── Delete confirmation modal ──────────────────────────────── */}
-      {confirmId && (
+      {/* ── Delete confirmation modal (portal) ─────────────────────── */}
+      {confirmId && typeof document !== 'undefined' && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(3,7,18,.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 18 }} onClick={() => setConfirmId(null)}>
           <div onClick={e => e.stopPropagation()} style={{ width: 'min(400px, 100%)', borderRadius: 16, border: '1px solid rgba(239,68,68,.45)', background: 'linear-gradient(160deg, rgba(15,23,42,.97), rgba(3,7,18,.99))', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 12, boxShadow: '0 30px 80px rgba(0,0,0,.6)' }}>
             <div style={{ fontSize: 16, fontWeight: 800 }}>🗑 {v('confirmTitle', lang)}</div>
@@ -300,7 +301,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   )
 }

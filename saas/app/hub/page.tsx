@@ -1,19 +1,22 @@
 'use client'
 
 // saas/app/hub/page.tsx
-// SignalBoost Hub Console — Phase 1A static prototype (HMI redesign).
-// Mock data only. No live API calls, no write operations. Safe by design.
-// Card pattern: Color band (icon + title + plain-language role) → Status → Simple details → Expandable advanced details → Action button.
+// SignalBoost Hub Console — Phase 1B: live, read-only.
+// Data comes from /api/hub/status (owner-gated). No write operations exist.
+// Governance timeline remains sample data until an audit source ships.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
 const COPY: Record<string, Record<Lang, string>> = {
   title:        { en: 'SignalBoost Hub Console', es: 'Consola Hub de SignalBoost', pt: 'Console Hub da SignalBoost', pl: 'Konsola Hub SignalBoost', ru: 'Консоль Hub SignalBoost' },
   subtitle:     { en: 'Unified operations for data, payments and deployment', es: 'Operaciones unificadas de datos, pagos y despliegue', pt: 'Operações unificadas de dados, pagamentos e implantação', pl: 'Zunifikowane operacje danych, płatności i wdrożeń', ru: 'Единое управление данными, платежами и развёртыванием' },
-  phaseBadge:   { en: 'Phase 1A · Mock data', es: 'Fase 1A · Datos de prueba', pt: 'Fase 1A · Dados fictícios', pl: 'Faza 1A · Dane testowe', ru: 'Фаза 1A · Тестовые данные' },
+  phaseBadge:   { en: 'Phase 1B · Live, read-only', es: 'Fase 1B · En vivo, solo lectura', pt: 'Fase 1B · Ao vivo, somente leitura', pl: 'Faza 1B · Na żywo, tylko odczyt', ru: 'Фаза 1B · Живые данные, только чтение' },
   systemHealth: { en: 'System health', es: 'Estado del sistema', pt: 'Saúde do sistema', pl: 'Stan systemu', ru: 'Состояние системы' },
+  refresh:      { en: 'Refresh', es: 'Actualizar', pt: 'Atualizar', pl: 'Odśwież', ru: 'Обновить' },
+  loading:      { en: 'Loading live data…', es: 'Cargando datos en vivo…', pt: 'Carregando dados ao vivo…', pl: 'Ładowanie danych na żywo…', ru: 'Загрузка живых данных…' },
+  loadError:    { en: 'Could not load live data. Try refresh.', es: 'No se pudieron cargar los datos. Intenta actualizar.', pt: 'Não foi possível carregar os dados. Tente atualizar.', pl: 'Nie udało się załadować danych. Spróbuj odświeżyć.', ru: 'Не удалось загрузить данные. Попробуйте обновить.' },
   yourData:     { en: 'Your Data', es: 'Tus Datos', pt: 'Seus Dados', pl: 'Twoje Dane', ru: 'Ваши данные' },
   yourPayments: { en: 'Your Payments', es: 'Tus Pagos', pt: 'Seus Pagamentos', pl: 'Twoje Płatności', ru: 'Ваши платежи' },
   yourWebsite:  { en: 'Your Website', es: 'Tu Sitio Web', pt: 'Seu Site', pl: 'Twoja Strona', ru: 'Ваш сайт' },
@@ -23,8 +26,12 @@ const COPY: Record<string, Record<Lang, string>> = {
   manageHost:   { en: 'Manage your hosting & versions.', es: 'Gestiona tu alojamiento y versiones.', pt: 'Gerencie sua hospedagem e versões.', pl: 'Zarządzaj hostingiem i wersjami.', ru: 'Управляйте хостингом и версиями.' },
   manageTeam:   { en: 'Manage roles & activity history.', es: 'Gestiona roles e historial de actividad.', pt: 'Gerencie funções e histórico de atividade.', pl: 'Zarządzaj rolami i historią aktywności.', ru: 'Управляйте ролями и историей действий.' },
   statusDb:     { en: 'Database is online', es: 'Base de datos en línea', pt: 'Banco de dados online', pl: 'Baza danych działa', ru: 'База данных в сети' },
+  statusDbDown: { en: 'Database problem', es: 'Problema con la base de datos', pt: 'Problema no banco de dados', pl: 'Problem z bazą danych', ru: 'Проблема с базой данных' },
   statusPay:    { en: 'Payments connected', es: 'Pagos conectados', pt: 'Pagamentos conectados', pl: 'Płatności połączone', ru: 'Платежи подключены' },
-  statusHost:   { en: 'Hosting active', es: 'Alojamiento activo', pt: 'Hospedagem ativa', pl: 'Hosting aktywny', ru: 'Хостинг активен' },
+  statusPayDown:{ en: 'Payments problem', es: 'Problema con pagos', pt: 'Problema nos pagamentos', pl: 'Problem z płatnościami', ru: 'Проблема с платежами' },
+  statusHost:   { en: 'Hosting connected', es: 'Alojamiento conectado', pt: 'Hospedagem conectada', pl: 'Hosting połączony', ru: 'Хостинг подключён' },
+  statusNoToken:{ en: 'Not connected yet', es: 'Aún no conectado', pt: 'Ainda não conectado', pl: 'Jeszcze nie połączono', ru: 'Ещё не подключено' },
+  tokenHint:    { en: 'Add a VERCEL_TOKEN environment variable to activate this card.', es: 'Agrega la variable de entorno VERCEL_TOKEN para activar esta tarjeta.', pt: 'Adicione a variável de ambiente VERCEL_TOKEN para ativar este cartão.', pl: 'Dodaj zmienną środowiskową VERCEL_TOKEN, aby aktywować tę kartę.', ru: 'Добавьте переменную окружения VERCEL_TOKEN, чтобы активировать эту карту.' },
   statusRoles:  { en: 'Roles assigned', es: 'Roles asignados', pt: 'Funções atribuídas', pl: 'Role przypisane', ru: 'Роли назначены' },
   openSupabase: { en: 'Open Supabase Settings', es: 'Abrir Configuración de Supabase', pt: 'Abrir Configurações do Supabase', pl: 'Otwórz Ustawienia Supabase', ru: 'Открыть настройки Supabase' },
   openStripe:   { en: 'Open Stripe Plans', es: 'Abrir Planes de Stripe', pt: 'Abrir Planos da Stripe', pl: 'Otwórz Plany Stripe', ru: 'Открыть тарифы Stripe' },
@@ -32,25 +39,23 @@ const COPY: Record<string, Record<Lang, string>> = {
   openTeam:     { en: 'Open Team Activity', es: 'Abrir Actividad del Equipo', pt: 'Abrir Atividade da Equipe', pl: 'Otwórz Aktywność Zespołu', ru: 'Открыть активность команды' },
   showDetails:  { en: 'Show details', es: 'Mostrar detalles', pt: 'Mostrar detalhes', pl: 'Pokaż szczegóły', ru: 'Показать детали' },
   hideDetails:  { en: 'Hide details', es: 'Ocultar detalles', pt: 'Ocultar detalhes', pl: 'Ukryj szczegóły', ru: 'Скрыть детали' },
-  projectUrl:   { en: 'Project URL', es: 'URL del proyecto', pt: 'URL do projeto', pl: 'URL projektu', ru: 'URL проекта' },
+  projectUrl:   { en: 'Project', es: 'Proyecto', pt: 'Projeto', pl: 'Projekt', ru: 'Проект' },
   anonKey:      { en: 'Public anon key', es: 'Clave anónima pública', pt: 'Chave anônima pública', pl: 'Publiczny klucz anon', ru: 'Публичный anon-ключ' },
-  apiHealth:    { en: 'Health check', es: 'Chequeo de salud', pt: 'Verificação de saúde', pl: 'Kontrola stanu', ru: 'Проверка состояния' },
-  healthy:      { en: 'Healthy', es: 'Saludable', pt: 'Saudável', pl: 'Sprawne', ru: 'Исправно' },
+  latency:      { en: 'Response time', es: 'Tiempo de respuesta', pt: 'Tempo de resposta', pl: 'Czas odpowiedzi', ru: 'Время ответа' },
   webhooks:     { en: 'Webhook subscriptions', es: 'Suscripciones de webhooks', pt: 'Assinaturas de webhooks', pl: 'Subskrypcje webhooków', ru: 'Подписки вебхуков' },
-  active:       { en: 'Active', es: 'Activo', pt: 'Ativo', pl: 'Aktywny', ru: 'Активен' },
-  failing:      { en: 'Failing', es: 'Fallando', pt: 'Falhando', pl: 'Błędy', ru: 'Сбои' },
+  events:       { en: 'events', es: 'eventos', pt: 'eventos', pl: 'zdarzeń', ru: 'событий' },
+  priceIds:     { en: 'Price IDs', es: 'IDs de precios', pt: 'IDs de preços', pl: 'ID cen', ru: 'ID цен' },
   settingsCount:{ en: 'settings', es: 'ajustes', pt: 'configurações', pl: 'ustawień', ru: 'настроек' },
   envVars:      { en: 'Variable names (values hidden)', es: 'Nombres de variables (valores ocultos)', pt: 'Nomes de variáveis (valores ocultos)', pl: 'Nazwy zmiennych (wartości ukryte)', ru: 'Имена переменных (значения скрыты)' },
-  timeline:     { en: 'Activity timeline', es: 'Línea de actividad', pt: 'Linha de atividade', pl: 'Oś aktywności', ru: 'Лента активности' },
+  timeline:     { en: 'Activity timeline (sample)', es: 'Línea de actividad (ejemplo)', pt: 'Linha de atividade (exemplo)', pl: 'Oś aktywności (przykład)', ru: 'Лента активности (пример)' },
   alerts:       { en: 'Alerts', es: 'Alertas', pt: 'Alertas', pl: 'Alerty', ru: 'Оповещения' },
-  alertStripe:  { en: 'Stripe Price ID mismatch: Launch plan differs from configuration.', es: 'Discrepancia de Price ID en Stripe: el plan Launch difiere de la configuración.', pt: 'Divergência de Price ID na Stripe: o plano Launch difere da configuração.', pl: 'Niezgodność Price ID w Stripe: plan Launch różni się od konfiguracji.', ru: 'Несовпадение Price ID в Stripe: план Launch отличается от конфигурации.' },
-  alertEnv:     { en: 'Settings differ between environments.', es: 'Los ajustes difieren entre entornos.', pt: 'As configurações diferem entre ambientes.', pl: 'Ustawienia różnią się między środowiskami.', ru: 'Настройки различаются между окружениями.' },
-  review:       { en: 'Check now', es: 'Revisar', pt: 'Verificar', pl: 'Sprawdź', ru: 'Проверить' },
-  phaseNote:    { en: 'Connects in Phase 1B (read-only API). Nothing executes in this prototype.', es: 'Se conecta en la Fase 1B (API de solo lectura). Nada se ejecuta en este prototipo.', pt: 'Conecta na Fase 1B (API somente leitura). Nada é executado neste protótipo.', pl: 'Połączenie w Fazie 1B (API tylko do odczytu). Nic nie jest wykonywane w tym prototypie.', ru: 'Подключение в Фазе 1B (API только для чтения). В этом прототипе ничего не выполняется.' },
+  allClear:     { en: 'All systems in sync — no issues found.', es: 'Todos los sistemas sincronizados — sin problemas.', pt: 'Todos os sistemas sincronizados — nenhum problema.', pl: 'Wszystkie systemy zsynchronizowane — brak problemów.', ru: 'Все системы синхронизированы — проблем нет.' },
+  fixStripe:    { en: 'Fix in Stripe', es: 'Corregir en Stripe', pt: 'Corrigir na Stripe', pl: 'Napraw w Stripe', ru: 'Исправить в Stripe' },
+  fixVercel:    { en: 'Fix in Vercel', es: 'Corregir en Vercel', pt: 'Corrigir na Vercel', pl: 'Napraw w Vercel', ru: 'Исправить в Vercel' },
   roleBilling:  { en: 'Billing Admin', es: 'Admin de Facturación', pt: 'Admin de Cobrança', pl: 'Admin Rozliczeń', ru: 'Админ биллинга' },
   roleDev:      { en: 'Developer', es: 'Desarrollador', pt: 'Desenvolvedor', pl: 'Programista', ru: 'Разработчик' },
   roleTeam:     { en: 'Team Member', es: 'Miembro del Equipo', pt: 'Membro da Equipe', pl: 'Członek Zespołu', ru: 'Участник команды' },
-  perMonth:     { en: '/mo', es: '/mes', pt: '/mês', pl: '/mies.', ru: '/мес' },
+  perInterval:  { en: '/', es: '/', pt: '/', pl: '/', ru: '/' },
   futureTitle:  { en: 'Provider slots ready', es: 'Espacios de proveedor listos', pt: 'Slots de provedores prontos', pl: 'Gotowe miejsca na dostawców', ru: 'Слоты для провайдеров готовы' },
   futureNote:   { en: 'Each new provider is one card. Planned for the AI expansion phase.', es: 'Cada nuevo proveedor es una tarjeta. Planificado para la fase de expansión de IA.', pt: 'Cada novo provedor é um cartão. Planejado para a fase de expansão de IA.', pl: 'Każdy nowy dostawca to jedna karta. Zaplanowane na fazę ekspansji AI.', ru: 'Каждый новый провайдер — одна карта. Запланировано на фазу расширения ИИ.' },
 }
@@ -64,28 +69,17 @@ function c(key: string, lang: Lang): string {
 const LANGS: Lang[] = ['en', 'es', 'pt', 'pl', 'ru']
 
 type Role = 'billing' | 'dev' | 'team'
-type Scope = 'Production' | 'Preview' | 'Development'
 
-const MOCK_TIERS = [
-  { name: 'Free',    price: '$0',   id: 'price_MOCK_free_xxxxxx',   status: 'ok' },
-  { name: 'Launch',  price: '$29',  id: 'price_MOCK_launch_xxxxxx', status: 'mismatch' },
-  { name: 'Growth',  price: '$79',  id: 'price_MOCK_growth_xxxxxx', status: 'ok' },
-  { name: 'Command', price: '$199', id: 'price_MOCK_command_xxxxx', status: 'ok' },
-]
-
-const MOCK_WEBHOOKS = [
-  { event: 'checkout.session.completed', status: 'active' },
-  { event: 'customer.subscription.updated', status: 'active' },
-  { event: 'invoice.payment_failed', status: 'failing' },
-]
-
-const MOCK_SCOPES: { scope: Scope; vars: number; state: string }[] = [
-  { scope: 'Production',  vars: 14, state: 'ok' },
-  { scope: 'Preview',     vars: 13, state: 'warn' },
-  { scope: 'Development', vars: 14, state: 'ok' },
-]
-
-const MOCK_ENV_VARS = ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'OPENAI_API_KEY', 'GITHUB_WRITE_TOKEN']
+type Tier = { name: string; priceId: string; amount: number; interval: string; mismatch: boolean }
+type Webhook = { url: string; status: string; events: number }
+type ScopeInfo = { scope: string; count: number; names: string[] }
+type HubData = {
+  generatedAt: string
+  stripe: { ok: boolean; tiers: Tier[]; webhooks: Webhook[]; mismatches: string[]; error?: string }
+  supabase: { ok: boolean; latencyMs: number; projectHost: string; anonKeyMasked: string; error?: string }
+  vercel: { ok: boolean; configured: boolean; scopes: ScopeInfo[]; error?: string }
+  alerts: { stripeMismatches: string[]; envSync: string[] }
+}
 
 const MOCK_AUDIT: { time: string; actor: string; action: string; roles: Role[] }[] = [
   { time: '12 Jun · 14:32', actor: 'owner', action: 'Updated Stripe price for Launch plan', roles: ['billing'] },
@@ -131,8 +125,8 @@ function Band({ tone, icon, title, plain, sub }: { tone: Tone; icon: string; tit
   )
 }
 
-function Status({ text }: { text: string }) {
-  return <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 600, color: '#22c55e' }}><span>✅</span>{text}</div>
+function Status({ ok, text }: { ok: boolean; text: string }) {
+  return <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 600, color: ok ? '#22c55e' : '#ffc300' }}><span>{ok ? '✅' : '⚠️'}</span>{text}</div>
 }
 
 function ActionButton({ tone, label, href }: { tone: Tone; label: string; href: string }) {
@@ -146,25 +140,53 @@ function DetailsToggle({ open, onClick, lang }: { open: boolean; onClick: () => 
 export default function HubConsolePage() {
   const [lang, setLang] = useState<Lang>('en')
   const [role, setRole] = useState<Role>('billing')
-  const [scope, setScope] = useState<Scope>('Production')
-  const [openNote, setOpenNote] = useState<string | null>(null)
+  const [scopeIdx, setScopeIdx] = useState(0)
   const [open, setOpen] = useState<Record<string, boolean>>({})
+  const [data, setData] = useState<HubData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
+
+  const load = async () => {
+    setLoading(true)
+    setFailed(false)
+    try {
+      const res = await fetch('/api/hub/status', { cache: 'no-store' })
+      if (!res.ok) throw new Error(String(res.status))
+      const json = await res.json()
+      setData(json)
+    } catch {
+      setFailed(true)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [])
 
   const toggle = (key: string) => setOpen(prev => ({ ...prev, [key]: !prev[key] }))
   const audit = MOCK_AUDIT.filter(e => e.roles.includes(role))
   const roleLabel: Record<Role, string> = { billing: c('roleBilling', lang), dev: c('roleDev', lang), team: c('roleTeam', lang) }
-  const selectedScope = MOCK_SCOPES.find(s => s.scope === scope) || MOCK_SCOPES[0]
+
+  const supaOk = !!data?.supabase.ok
+  const stripeOk = !!data?.stripe.ok
+  const vercelConfigured = !!data?.vercel.configured
+  const vercelOk = !!data?.vercel.ok
+  const scopes = data?.vercel.scopes || []
+  const selScope = scopes[scopeIdx] || null
+  const redAlerts = data?.alerts.stripeMismatches || []
+  const yellowAlerts = data?.alerts.envSync || []
+  const noAlerts = !loading && !failed && redAlerts.length === 0 && yellowAlerts.length === 0
 
   return (
     <div className="hub-root" style={{ minHeight: '100vh', background: 'radial-gradient(1100px 500px at 80% -10%, rgba(26,240,255,.10), transparent 60%), radial-gradient(900px 480px at 0% 110%, rgba(255,195,0,.07), transparent 55%), linear-gradient(180deg, #0b1220 0%, #030712 100%)', color: '#fff', padding: '18px clamp(14px, 1.6vw, 34px) 14px', fontFamily: 'Inter, system-ui, -apple-system, sans-serif' }}>
-      <style>{`.hub-card{transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease;} .hub-card:hover{transform:translateY(-3px); box-shadow:0 24px 60px rgba(0,0,0,.55);} .hub-chip{transition:background .15s ease, color .15s ease, border-color .15s ease; cursor:pointer;} .hub-chip:hover{border-color:rgba(255,195,0,.6);} .hub-btn{transition:filter .15s ease, transform .12s ease; cursor:pointer;} .hub-btn:hover{transform:translateY(-1px); filter:brightness(1.25);} .hub-panel::-webkit-scrollbar{width:8px;} .hub-panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:8px;} .hub-panel::-webkit-scrollbar-track{background:transparent;} @media (min-width:1100px){ .hub-root{height:calc(100vh - 80px);min-height:0;overflow:hidden;} .hub-frame{display:flex;flex-direction:column;height:100%;min-height:0;} .hub-main{flex:1;min-height:0;grid-auto-rows:minmax(0,1fr);} .hub-panel{overflow-y:auto;min-height:0;} }`}</style>
+      <style>{`.hub-card{transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease;} .hub-card:hover{transform:translateY(-3px); box-shadow:0 24px 60px rgba(0,0,0,.55);} .hub-chip{transition:background .15s ease, color .15s ease, border-color .15s ease; cursor:pointer;} .hub-chip:hover{border-color:rgba(255,195,0,.6);} .hub-btn{transition:filter .15s ease, transform .12s ease; cursor:pointer;} .hub-btn:hover{transform:translateY(-1px); filter:brightness(1.25);} .hub-panel::-webkit-scrollbar{width:8px;} .hub-panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:8px;} .hub-panel::-webkit-scrollbar-track{background:transparent;} @keyframes hubPulse{0%,100%{opacity:.45}50%{opacity:1}} .hub-loading{animation:hubPulse 1.4s ease infinite;} @media (min-width:1100px){ .hub-root{height:calc(100vh - 80px);min-height:0;overflow:hidden;} .hub-frame{display:flex;flex-direction:column;height:100%;min-height:0;} .hub-main{flex:1;min-height:0;grid-auto-rows:minmax(0,1fr);} .hub-panel{overflow-y:auto;min-height:0;} }`}</style>
 
       <div className="hub-frame" style={{ width: '100%' }}>
       {/* ── Header row ─────────────────────────────────────────────── */}
       <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 14, marginBottom: 12 }}>
         <div style={{ minWidth: 0 }}>
           <h1 style={{ margin: 0, fontSize: 'clamp(22px, 2.6vw, 30px)', fontWeight: 800, letterSpacing: '-.02em', background: 'linear-gradient(90deg, #fff 30%, #1af0ff 75%, #ffc300 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{c('title', lang)}</h1>
-          <p style={{ margin: '3px 0 0', fontSize: 13, color: 'rgba(255,255,255,.55)' }}>{c('subtitle', lang)} · <span style={{ color: '#ffc300' }}>{c('phaseBadge', lang)}</span></p>
+          <p style={{ margin: '3px 0 0', fontSize: 13, color: 'rgba(255,255,255,.55)' }}>{c('subtitle', lang)} · <span style={{ color: '#1af0ff' }}>{c('phaseBadge', lang)}</span></p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: 6 }}>
@@ -174,27 +196,33 @@ export default function HubConsolePage() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '8px 14px', borderRadius: 12, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.04)' }}>
             <span style={labelStyle}>{c('systemHealth', lang)}</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}><Dot tone="green" /> Supabase</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}><Dot tone="green" /> Stripe</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}><Dot tone="yellow" /> Vercel</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}><Dot tone={loading ? 'yellow' : supaOk ? 'green' : 'red'} /> Supabase</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}><Dot tone={loading ? 'yellow' : stripeOk ? 'green' : 'red'} /> Stripe</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}><Dot tone={loading ? 'yellow' : !vercelConfigured ? 'yellow' : vercelOk ? 'green' : 'red'} /> Vercel</span>
           </div>
+          <button onClick={load} className="hub-btn" style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(26,240,255,.4)', background: 'rgba(26,240,255,.1)', color: '#1af0ff', fontSize: 12.5, fontWeight: 700 }}>{loading ? '…' : '↻ ' + c('refresh', lang)}</button>
         </div>
       </header>
 
-      {/* ── Alerts ─────────────────────────────────────────────────── */}
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: 10, marginBottom: 14 }}>
-        <div className="hub-card" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 11, padding: '11px 14px', borderRadius: 12, border: '1px solid rgba(239,68,68,.45)', background: 'rgba(239,68,68,.09)' }}>
-          <span style={{ fontSize: 15 }}>⚠️</span>
-          <span style={{ flex: 1, minWidth: 200, fontSize: 13 }}>{c('alertStripe', lang)}</span>
-          <button onClick={() => setOpenNote(openNote === 'stripe' ? null : 'stripe')} className="hub-btn" style={{ padding: '6px 13px', borderRadius: 9, border: '1px solid rgba(239,68,68,.5)', background: 'rgba(239,68,68,.14)', color: '#fca5a5', fontSize: 12.5, fontWeight: 700 }}>{c('review', lang)}</button>
-          {openNote === 'stripe' && <div style={{ flexBasis: '100%', fontSize: 12.5, color: 'rgba(255,255,255,.6)' }}>{c('phaseNote', lang)}</div>}
-        </div>
-        <div className="hub-card" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 11, padding: '11px 14px', borderRadius: 12, border: '1px solid rgba(255,195,0,.45)', background: 'rgba(255,195,0,.07)' }}>
-          <span style={{ fontSize: 15 }}>⚠️</span>
-          <span style={{ flex: 1, minWidth: 200, fontSize: 13 }}>{c('alertEnv', lang)}</span>
-          <button onClick={() => setOpenNote(openNote === 'env' ? null : 'env')} className="hub-btn" style={{ padding: '6px 13px', borderRadius: 9, border: '1px solid rgba(255,195,0,.5)', background: 'rgba(255,195,0,.12)', color: '#ffc300', fontSize: 12.5, fontWeight: 700 }}>{c('review', lang)}</button>
-          {openNote === 'env' && <div style={{ flexBasis: '100%', fontSize: 12.5, color: 'rgba(255,255,255,.6)' }}>{c('phaseNote', lang)}</div>}
-        </div>
+      {/* ── Alerts (live) ──────────────────────────────────────────── */}
+      <section style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+        {loading && <div className="hub-loading" style={{ padding: '11px 14px', borderRadius: 12, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)', fontSize: 13, color: 'rgba(255,255,255,.6)' }}>{c('loading', lang)}</div>}
+        {failed && <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 14px', borderRadius: 12, border: '1px solid rgba(239,68,68,.45)', background: 'rgba(239,68,68,.09)', fontSize: 13 }}><span>⚠️</span>{c('loadError', lang)}</div>}
+        {noAlerts && <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 14px', borderRadius: 12, border: '1px solid rgba(34,197,94,.4)', background: 'rgba(34,197,94,.08)', fontSize: 13, color: '#86efac' }}><span>✅</span>{c('allClear', lang)}</div>}
+        {redAlerts.map((a, i) => (
+          <div key={'r' + i} className="hub-card" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 11, padding: '10px 14px', borderRadius: 12, border: '1px solid rgba(239,68,68,.45)', background: 'rgba(239,68,68,.09)' }}>
+            <span style={{ fontSize: 15 }}>⚠️</span>
+            <span style={{ flex: 1, minWidth: 200, fontSize: 13 }}>{a}</span>
+            <a href="https://dashboard.stripe.com/prices" target="_blank" rel="noreferrer" className="hub-btn" style={{ padding: '6px 13px', borderRadius: 9, border: '1px solid rgba(239,68,68,.5)', background: 'rgba(239,68,68,.14)', color: '#fca5a5', fontSize: 12.5, fontWeight: 700, textDecoration: 'none' }}>{c('fixStripe', lang)}</a>
+          </div>
+        ))}
+        {yellowAlerts.map((a, i) => (
+          <div key={'y' + i} className="hub-card" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 11, padding: '10px 14px', borderRadius: 12, border: '1px solid rgba(255,195,0,.45)', background: 'rgba(255,195,0,.07)' }}>
+            <span style={{ fontSize: 15 }}>⚠️</span>
+            <span style={{ flex: 1, minWidth: 200, fontSize: 13 }}>{a}</span>
+            <a href="https://vercel.com/dashboard" target="_blank" rel="noreferrer" className="hub-btn" style={{ padding: '6px 13px', borderRadius: 9, border: '1px solid rgba(255,195,0,.5)', background: 'rgba(255,195,0,.12)', color: '#ffc300', fontSize: 12.5, fontWeight: 700, textDecoration: 'none' }}>{c('fixVercel', lang)}</a>
+          </div>
+        ))}
       </section>
 
       {/* ── Provider cards ─────────────────────────────────────────── */}
@@ -204,13 +232,14 @@ export default function HubConsolePage() {
         <section className="hub-card hub-panel" style={cardStyle}>
           <Band tone={TONES.green} icon="🗄️" title="Supabase" plain={c('yourData', lang)} sub={c('manageData', lang)} />
           <div style={bodyStyle}>
-            <Status text={c('statusDb', lang)} />
+            <Status ok={supaOk} text={supaOk ? c('statusDb', lang) : c('statusDbDown', lang)} />
+            {data && <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.6)' }}>{c('latency', lang)}</span><span style={{ color: data.supabase.latencyMs < 400 ? '#22c55e' : '#ffc300', fontWeight: 700 }}>{data.supabase.latencyMs} ms</span></div>}
             <DetailsToggle open={!!open.supa} onClick={() => toggle('supa')} lang={lang} />
-            {open.supa && (
+            {open.supa && data && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.6)' }}>{c('projectUrl', lang)}</span><span style={monoStyle}>https://mock-project.supabase.co</span></div>
-                <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.6)' }}>{c('anonKey', lang)}</span><span style={monoStyle}>eyJh••••••••••3kQ</span></div>
-                <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.6)' }}>{c('apiHealth', lang)}</span><span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><Dot tone="green" /><span style={{ color: '#22c55e', fontWeight: 600 }}>{c('healthy', lang)}</span></span></div>
+                <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.6)' }}>{c('projectUrl', lang)}</span><span style={monoStyle}>{data.supabase.projectHost}</span></div>
+                <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.6)' }}>{c('anonKey', lang)}</span><span style={monoStyle}>{data.supabase.anonKeyMasked}</span></div>
+                {data.supabase.error && <div style={{ ...rowStyle, color: '#fca5a5' }}>{data.supabase.error}</div>}
               </div>
             )}
             <ActionButton tone={TONES.green} label={c('openSupabase', lang)} href="https://supabase.com/dashboard/project/qpblefwtnbivuusxmabv" />
@@ -221,26 +250,28 @@ export default function HubConsolePage() {
         <section className="hub-card hub-panel" style={cardStyle}>
           <Band tone={TONES.blue} icon="💳" title="Stripe" plain={c('yourPayments', lang)} sub={c('managePay', lang)} />
           <div style={bodyStyle}>
-            <Status text={c('statusPay', lang)} />
+            <Status ok={stripeOk} text={stripeOk ? c('statusPay', lang) : c('statusPayDown', lang)} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-              {MOCK_TIERS.map(t => (
-                <div key={t.name} style={{ ...rowStyle, border: t.status === 'mismatch' ? '1px solid rgba(239,68,68,.55)' : rowStyle.border, background: t.status === 'mismatch' ? 'rgba(239,68,68,.08)' : rowStyle.background }}>
-                  <span style={{ fontWeight: 700 }}>{t.name}</span>
-                  <span style={{ color: '#ffc300', fontWeight: 800, fontSize: 14 }}>{t.price}<span style={{ color: 'rgba(255,255,255,.45)', fontWeight: 400, fontSize: 12 }}>{c('perMonth', lang)}</span></span>
+              {(data?.stripe.tiers || []).slice(0, open.stripe ? 50 : 4).map(t => (
+                <div key={t.priceId} style={rowStyle}>
+                  <span style={{ fontWeight: 700, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</span>
+                  <span style={{ color: '#ffc300', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>${t.amount}<span style={{ color: 'rgba(255,255,255,.45)', fontWeight: 400, fontSize: 11.5 }}>{c('perInterval', lang)}{t.interval}</span></span>
                 </div>
               ))}
+              {loading && <div className="hub-loading" style={{ ...rowStyle, color: 'rgba(255,255,255,.5)' }}>{c('loading', lang)}</div>}
             </div>
             <DetailsToggle open={!!open.stripe} onClick={() => toggle('stripe')} lang={lang} />
-            {open.stripe && (
+            {open.stripe && data && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div style={labelStyle}>{c('webhooks', lang)}</div>
-                {MOCK_WEBHOOKS.map(w => (
-                  <div key={w.event} style={rowStyle}>
-                    <span style={monoStyle}>{w.event}</span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Dot tone={w.status === 'active' ? 'green' : 'red'} /><span style={{ color: w.status === 'active' ? '#22c55e' : '#ef4444', fontWeight: 600, fontSize: 12 }}>{w.status === 'active' ? c('active', lang) : c('failing', lang)}</span></span>
+                {data.stripe.webhooks.map(w => (
+                  <div key={w.url} style={rowStyle}>
+                    <span style={{ ...monoStyle, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.url.replace('https://', '')}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}><Dot tone={w.status === 'enabled' ? 'green' : 'red'} /><span style={{ fontSize: 11.5, color: 'rgba(255,255,255,.55)' }}>{w.events} {c('events', lang)}</span></span>
                   </div>
                 ))}
-                {MOCK_TIERS.map(t => (<div key={t.id} style={rowStyle}><span style={{ fontWeight: 600 }}>{t.name}</span><span style={monoStyle}>{t.id}</span></div>))}
+                <div style={labelStyle}>{c('priceIds', lang)}</div>
+                {data.stripe.tiers.map(t => (<div key={'id' + t.priceId} style={rowStyle}><span style={{ fontWeight: 600, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</span><span style={{ ...monoStyle, flexShrink: 0 }}>{t.priceId.slice(0, 18)}…</span></div>))}
               </div>
             )}
             <ActionButton tone={TONES.blue} label={c('openStripe', lang)} href="https://dashboard.stripe.com" />
@@ -251,20 +282,27 @@ export default function HubConsolePage() {
         <section className="hub-card hub-panel" style={cardStyle}>
           <Band tone={TONES.purple} icon="🌐" title="Vercel" plain={c('yourWebsite', lang)} sub={c('manageHost', lang)} />
           <div style={bodyStyle}>
-            <Status text={c('statusHost', lang)} />
-            <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-              {MOCK_SCOPES.map(s => (
-                <button key={s.scope} onClick={() => setScope(s.scope)} className="hub-chip" style={{ padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 7, background: scope === s.scope ? TONES.purple.soft : 'rgba(255,255,255,.04)', border: scope === s.scope ? `1px solid ${TONES.purple.border}` : '1px solid rgba(255,255,255,.12)', color: scope === s.scope ? '#c4b5fd' : 'rgba(255,255,255,.6)' }}>{s.scope}<Dot tone={s.state === 'ok' ? 'green' : 'yellow'} /></button>
-              ))}
-            </div>
-            <div style={{ ...rowStyle, justifyContent: 'flex-start', gap: 8 }}><span style={{ fontWeight: 700 }}>{selectedScope.scope}</span><span style={{ color: 'rgba(255,255,255,.55)' }}>· {selectedScope.vars} {c('settingsCount', lang)}</span></div>
-            <DetailsToggle open={!!open.vercel} onClick={() => toggle('vercel')} lang={lang} />
-            {open.vercel && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={labelStyle}>{c('envVars', lang)}</div>
-                {MOCK_ENV_VARS.map(v => (<div key={v} style={rowStyle}><span style={monoStyle}>{v}</span><span style={{ ...monoStyle, color: 'rgba(255,255,255,.35)' }}>••••••••</span></div>))}
+            <Status ok={vercelConfigured && vercelOk} text={vercelConfigured ? c('statusHost', lang) : c('statusNoToken', lang)} />
+            {!vercelConfigured && !loading && <div style={{ ...rowStyle, fontSize: 12.5, color: 'rgba(255,255,255,.6)' }}>{c('tokenHint', lang)}</div>}
+            {vercelConfigured && (
+              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                {scopes.map((s, i) => (
+                  <button key={s.scope} onClick={() => setScopeIdx(i)} className="hub-chip" style={{ padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 7, background: scopeIdx === i ? TONES.purple.soft : 'rgba(255,255,255,.04)', border: scopeIdx === i ? `1px solid ${TONES.purple.border}` : '1px solid rgba(255,255,255,.12)', color: scopeIdx === i ? '#c4b5fd' : 'rgba(255,255,255,.6)' }}>{s.scope}<span style={{ color: 'rgba(255,255,255,.5)' }}>{s.count}</span></button>
+                ))}
               </div>
             )}
+            {vercelConfigured && selScope && (
+              <>
+                <DetailsToggle open={!!open.vercel} onClick={() => toggle('vercel')} lang={lang} />
+                {open.vercel && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={labelStyle}>{c('envVars', lang)}</div>
+                    {selScope.names.map(v => (<div key={v} style={rowStyle}><span style={monoStyle}>{v}</span><span style={{ ...monoStyle, color: 'rgba(255,255,255,.35)' }}>••••••••</span></div>))}
+                  </div>
+                )}
+              </>
+            )}
+            {data?.vercel.error && <div style={{ ...rowStyle, color: '#fca5a5', fontSize: 12.5 }}>{data.vercel.error}</div>}
             <ActionButton tone={TONES.purple} label={c('openVercel', lang)} href="https://vercel.com/dashboard" />
           </div>
         </section>
@@ -273,7 +311,7 @@ export default function HubConsolePage() {
         <section className="hub-card hub-panel" style={cardStyle}>
           <Band tone={TONES.gray} icon="👥" title="Governance" plain={c('yourTeam', lang)} sub={c('manageTeam', lang)} />
           <div style={bodyStyle}>
-            <Status text={c('statusRoles', lang)} />
+            <Status ok={true} text={c('statusRoles', lang)} />
             <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
               {(['billing', 'dev', 'team'] as Role[]).map(r => (
                 <button key={r} onClick={() => setRole(r)} className="hub-chip" style={{ padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600, background: role === r ? 'rgba(255,195,0,.14)' : 'rgba(255,255,255,.04)', border: role === r ? '1px solid rgba(255,195,0,.55)' : '1px solid rgba(255,255,255,.12)', color: role === r ? '#ffc300' : 'rgba(255,255,255,.6)' }}>{roleLabel[r]}</button>

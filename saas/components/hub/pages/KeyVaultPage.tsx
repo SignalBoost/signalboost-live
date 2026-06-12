@@ -52,6 +52,9 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
   }, [scopes])
 
   const allScopeNames = scopes.map(s => s.scope)
+  // Development is informational only: this platform deploys GitHub -> Vercel
+  // with no local dev environment. Warnings apply to Production/Preview gaps.
+  const coreNames = allScopeNames.filter(s => s !== 'Development')
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: 12 }}>
@@ -80,16 +83,16 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
               <section key={g.key} className="hub-card hub-panel" style={cardStyle}>
                 <Band tone={g.tone} icon={g.icon} title={title} plain={`${items.length} ${c('vaultKeys', lang)}`} sub={c('vaultCoverage', lang)} />
                 <div style={bodyStyle}>
-                  <Status ok={items.every(i => i.envs.size === allScopeNames.length)} text={items.every(i => i.envs.size === allScopeNames.length) ? c('allClear', lang) : `${items.filter(i => i.envs.size < allScopeNames.length).length} ⚠️`} />
+                  <Status ok={items.every(i => coreNames.every(s => i.envs.has(s)))} text={items.every(i => coreNames.every(s => i.envs.has(s))) ? c('allClear', lang) : `${items.filter(i => !coreNames.every(s => i.envs.has(s))).length} ⚠️`} />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                     {shown.map(item => {
-                      const missing = allScopeNames.filter(s => !item.envs.has(s))
+                      const missing = coreNames.filter(s => !item.envs.has(s))
                       return (
                         <div key={item.name} style={{ ...rowStyle, border: missing.length ? '1px solid rgba(255,195,0,.45)' : rowStyle.border }}>
                           <span style={{ ...monoStyle, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
                           <span style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
                             {allScopeNames.map(s => (
-                              <span key={s} title={s} style={{ width: 18, height: 18, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, background: item.envs.has(s) ? 'rgba(34,197,94,.18)' : 'rgba(239,68,68,.16)', border: item.envs.has(s) ? '1px solid rgba(34,197,94,.45)' : '1px solid rgba(239,68,68,.4)', color: item.envs.has(s) ? '#86efac' : '#fca5a5' }}>{s[0]}</span>
+                              <span key={s} title={s} style={{ width: 18, height: 18, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, background: item.envs.has(s) ? 'rgba(34,197,94,.18)' : s === 'Development' ? 'rgba(255,255,255,.05)' : 'rgba(239,68,68,.16)', border: item.envs.has(s) ? '1px solid rgba(34,197,94,.45)' : s === 'Development' ? '1px solid rgba(255,255,255,.14)' : '1px solid rgba(239,68,68,.4)', color: item.envs.has(s) ? '#86efac' : s === 'Development' ? 'rgba(255,255,255,.35)' : '#fca5a5' }}>{s[0]}</span>
                             ))}
                           </span>
                         </div>

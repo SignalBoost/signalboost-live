@@ -85,7 +85,7 @@ const MOCK_AUDIT: { time: string; actor: string; action: string; roles: Role[] }
   { time: '11 Jun 2026 · 09:40', actor: 'system', action: 'Stripe webhook invoice.payment_failed retried (3rd attempt)', roles: ['billing'] },
 ]
 
-const panelStyle: React.CSSProperties = { background: 'linear-gradient(160deg, rgba(15,23,42,.72), rgba(3,7,18,.86))', border: '1px solid rgba(255,255,255,.1)', borderRadius: 18, padding: '22px 24px', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', boxShadow: '0 18px 48px rgba(0,0,0,.42)', display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }
+const panelStyle: React.CSSProperties = { background: 'linear-gradient(160deg, rgba(15,23,42,.72), rgba(3,7,18,.86))', border: '1px solid rgba(255,255,255,.1)', borderRadius: 18, padding: '18px 20px', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', boxShadow: '0 18px 48px rgba(0,0,0,.42)', display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }
 const labelStyle: React.CSSProperties = { fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)' }
 const rowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '9px 12px', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 10, fontSize: 13 }
 const monoStyle: React.CSSProperties = { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12, color: 'rgba(255,255,255,.78)' }
@@ -116,15 +116,15 @@ export default function HubConsolePage() {
   const roleLabel: Record<Role, string> = { billing: c('roleBilling', lang), dev: c('roleDev', lang), team: c('roleTeam', lang) }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'radial-gradient(1100px 500px at 80% -10%, rgba(26,240,255,.10), transparent 60%), radial-gradient(900px 480px at 0% 110%, rgba(255,195,0,.07), transparent 55%), linear-gradient(180deg, #0b1220 0%, #030712 100%)', color: '#fff', padding: '26px clamp(14px, 1.6vw, 34px)', fontFamily: 'Inter, system-ui, -apple-system, sans-serif' }}>
-      <style>{`.hub-card{transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease;} .hub-card:hover{transform:translateY(-3px); border-color:rgba(26,240,255,.35); box-shadow:0 24px 60px rgba(0,0,0,.55);} .hub-chip{transition:background .15s ease, color .15s ease, border-color .15s ease; cursor:pointer;} .hub-chip:hover{border-color:rgba(255,195,0,.6);} .hub-btn{transition:background .15s ease, transform .12s ease; cursor:pointer;} .hub-btn:hover{transform:translateY(-1px); background:rgba(26,240,255,.16);}`}</style>
+    <div className="hub-root" style={{ minHeight: '100vh', background: 'radial-gradient(1100px 500px at 80% -10%, rgba(26,240,255,.10), transparent 60%), radial-gradient(900px 480px at 0% 110%, rgba(255,195,0,.07), transparent 55%), linear-gradient(180deg, #0b1220 0%, #030712 100%)', color: '#fff', padding: '20px clamp(14px, 1.6vw, 34px) 16px', fontFamily: 'Inter, system-ui, -apple-system, sans-serif' }}>
+      <style>{`.hub-card{transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease;} .hub-card:hover{transform:translateY(-3px); border-color:rgba(26,240,255,.35); box-shadow:0 24px 60px rgba(0,0,0,.55);} .hub-chip{transition:background .15s ease, color .15s ease, border-color .15s ease; cursor:pointer;} .hub-chip:hover{border-color:rgba(255,195,0,.6);} .hub-btn{transition:background .15s ease, transform .12s ease; cursor:pointer;} .hub-btn:hover{transform:translateY(-1px); background:rgba(26,240,255,.16);} .hub-panel::-webkit-scrollbar{width:8px;} .hub-panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:8px;} .hub-panel::-webkit-scrollbar-track{background:transparent;} @media (min-width:1100px){ .hub-root{height:100vh;overflow:hidden;} .hub-frame{display:flex;flex-direction:column;height:100%;min-height:0;} .hub-main{flex:1;min-height:0;grid-auto-rows:minmax(0,1fr);} .hub-panel{overflow-y:auto;min-height:0;} }`}</style>
 
-      <div style={{ width: '100%' }}>
+      <div className="hub-frame" style={{ width: '100%' }}>
       {/* ── Header row ─────────────────────────────────────────────── */}
-      <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 18, marginBottom: 26 }}>
+      <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 18, marginBottom: 16 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 12px', borderRadius: 999, border: '1px solid rgba(255,195,0,.4)', background: 'rgba(255,195,0,.08)', color: '#ffc300', fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 12 }}>{c('phaseBadge', lang)}</div>
-          <h1 style={{ margin: 0, fontSize: 'clamp(26px, 3.4vw, 38px)', fontWeight: 800, letterSpacing: '-.02em', background: 'linear-gradient(90deg, #fff 30%, #1af0ff 75%, #ffc300 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{c('title', lang)}</h1>
+          <h1 style={{ margin: 0, fontSize: 'clamp(24px, 3vw, 32px)', fontWeight: 800, letterSpacing: '-.02em', background: 'linear-gradient(90deg, #fff 30%, #1af0ff 75%, #ffc300 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{c('title', lang)}</h1>
           <p style={{ margin: '6px 0 0', fontSize: 14, color: 'rgba(255,255,255,.55)' }}>{c('subtitle', lang)}</p>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 12 }}>
@@ -143,7 +143,7 @@ export default function HubConsolePage() {
       </header>
 
       {/* ── Alerts ─────────────────────────────────────────────────── */}
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(480px, 1fr))', gap: 10, marginBottom: 26 }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(480px, 1fr))', gap: 10, marginBottom: 16 }}>
         <div style={{ ...labelStyle, gridColumn: '1 / -1' }}>{c('alerts', lang)}</div>
         <div className="hub-card" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '13px 16px', borderRadius: 12, border: '1px solid rgba(239,68,68,.45)', background: 'rgba(239,68,68,.09)' }}>
           <Dot tone="red" />
@@ -160,10 +160,10 @@ export default function HubConsolePage() {
       </section>
 
       {/* ── Main grid: four panels ─────────────────────────────────── */}
-      <main style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 18 }}>
+      <main className="hub-main" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 14 }}>
 
         {/* 1 · Supabase */}
-        <section className="hub-card" style={panelStyle}>
+        <section className="hub-card hub-panel" style={panelStyle}>
           <PanelTitle icon="🗄️" kicker={c('database', lang)} title="Supabase" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.6)' }}>{c('projectUrl', lang)}</span><span style={monoStyle}>https://mock-project.supabase.co</span></div>
@@ -174,7 +174,7 @@ export default function HubConsolePage() {
         </section>
 
         {/* 2 · Stripe */}
-        <section className="hub-card" style={panelStyle}>
+        <section className="hub-card hub-panel" style={panelStyle}>
           <PanelTitle icon="💳" kicker={c('payments', lang)} title="Stripe" />
           <div style={labelStyle}>{c('priceTiers', lang)}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -198,7 +198,7 @@ export default function HubConsolePage() {
         </section>
 
         {/* 3 · Vercel */}
-        <section className="hub-card" style={panelStyle}>
+        <section className="hub-card hub-panel" style={panelStyle}>
           <PanelTitle icon="▲" kicker={c('hosting', lang)} title="Vercel" />
           <div style={labelStyle}>{c('envScopes', lang)}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -219,7 +219,7 @@ export default function HubConsolePage() {
         </section>
 
         {/* 4 · Governance */}
-        <section className="hub-card" style={panelStyle}>
+        <section className="hub-card hub-panel" style={panelStyle}>
           <PanelTitle icon="🛡️" kicker={c('governance', lang)} title={c('rolesView', lang)} />
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {(['billing', 'dev', 'team'] as Role[]).map(r => (
@@ -227,7 +227,7 @@ export default function HubConsolePage() {
             ))}
           </div>
           <div style={labelStyle}>{c('auditLog', lang)}</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 280, overflowY: 'auto', paddingRight: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingRight: 4 }}>
             {audit.map((e, i) => (
               <div key={i} style={{ ...rowStyle, alignItems: 'flex-start', flexDirection: 'column', gap: 4 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: 10 }}><span style={{ ...monoStyle, color: '#1af0ff' }}>{e.time}</span><span style={{ ...monoStyle, color: 'rgba(255,255,255,.45)' }}>{e.actor}</span></div>
@@ -238,7 +238,7 @@ export default function HubConsolePage() {
         </section>
 
         {/* 5 · Provider expansion slot — the scalability foundation made visible */}
-        <section style={{ ...panelStyle, border: '1px dashed rgba(255,255,255,.18)', background: 'rgba(255,255,255,.02)', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 10, minHeight: 220 }}>
+        <section className="hub-panel" style={{ ...panelStyle, border: '1px dashed rgba(255,255,255,.18)', background: 'rgba(255,255,255,.02)', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 10, minHeight: 220 }}>
           <span style={{ fontSize: 26, opacity: .8 }}>➕</span>
           <div style={{ fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,.85)' }}>{c('futureTitle', lang)}</div>
           <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.45)', maxWidth: 280 }}>{c('futureNote', lang)}</div>

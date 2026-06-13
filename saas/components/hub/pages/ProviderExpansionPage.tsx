@@ -111,7 +111,7 @@ export default function ProviderExpansionPage(_props: PageProps) {
 
   return (
     <div className="provider-playbook" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: 12 }}>
-      <style>{`.provider-playbook-main{scroll-snap-type:y proximity}.provider-section{scroll-snap-align:start}.provider-section.is-disabled{opacity:.48;filter:saturate(.65)}.provider-visual{min-height:92px;border-radius:22px;border:1px solid rgba(255,255,255,.1);background:linear-gradient(135deg,rgba(26,240,255,.11),rgba(255,195,0,.08),rgba(255,255,255,.035));display:flex;align-items:center;justify-content:center;text-align:center;padding:14px;font-size:12px;font-weight:900;color:rgba(255,255,255,.78)}.provider-down{width:40px;height:40px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.08);color:#fff;font-size:21px;cursor:pointer;box-shadow:0 18px 50px rgba(0,0,0,.35)}.provider-down:hover{border-color:rgba(26,240,255,.55);color:#1af0ff}.provider-toggle{white-space:nowrap}.tier-tab{white-space:nowrap}@media(max-width:780px){.provider-visual-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.provider-section{min-height:76vh!important}}`}</style>
+      <style>{`.provider-playbook-main{scroll-snap-type:y proximity}.provider-section{scroll-snap-align:start}.provider-section.is-disabled{opacity:.48;filter:saturate(.65)}.provider-visual{min-height:92px;border-radius:22px;border:1px solid rgba(255,255,255,.1);background:linear-gradient(135deg,rgba(26,240,255,.11),rgba(255,195,0,.08),rgba(255,255,255,.035));display:flex;align-items:center;justify-content:center;text-align:center;padding:14px;font-size:12px;font-weight:900;color:rgba(255,255,255,.78)}.provider-down{width:40px;height:40px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.08);color:#fff;font-size:21px;cursor:pointer;box-shadow:0 18px 50px rgba(0,0,0,.35)}.provider-down:hover{border-color:rgba(26,240,255,.55);color:#1af0ff}.provider-toggle{white-space:nowrap}.tier-tab{white-space:nowrap}.provider-pref-chip{white-space:nowrap}@media(max-width:780px){.provider-visual-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.provider-section{min-height:76vh!important}}`}</style>
 
       <section style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexShrink: 0 }}>
         <div>
@@ -126,6 +126,26 @@ export default function ProviderExpansionPage(_props: PageProps) {
               {item.icon} Tier {index + 1}
             </button>
           ))}
+        </div>
+      </section>
+
+      <section style={{ ...cardStyle, padding: 14, flexShrink: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 950 }}>Provider Preferences</div>
+            <div style={{ color: 'rgba(255,255,255,.52)', fontSize: 12.5, marginTop: 2 }}>Turn providers on/off here without scrolling through the manual.</div>
+          </div>
+          <div style={{ color: 'rgba(255,255,255,.52)', fontSize: 12.5 }}>{enabledCount} of {allProviderNames.length} active</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {allProviderNames.map(name => {
+            const enabled = enabledProviders[name] !== false
+            return (
+              <button key={name} onClick={() => toggleProvider(name)} className="hub-chip provider-pref-chip" style={{ padding: '7px 11px', borderRadius: 999, border: enabled ? '1px solid rgba(34,197,94,.38)' : '1px solid rgba(255,255,255,.14)', background: enabled ? 'rgba(34,197,94,.10)' : 'rgba(255,255,255,.045)', color: enabled ? '#86efac' : 'rgba(255,255,255,.52)', fontSize: 12, fontWeight: 900 }}>
+                {enabled ? '●' : '○'} {name}
+              </button>
+            )
+          })}
         </div>
       </section>
 

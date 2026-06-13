@@ -5,6 +5,7 @@
 // SECTION 1 "My Safe": Bitwarden-style encrypted storage (vault_items table).
 //   Add (modal) -> encrypted at rest. Reveal (eye) -> decrypts one key for 15s,
 //   stamps last_accessed_at. Delete -> confirmation modal. Values never logged.
+// Provider catalog: pick from known providers — canonical names, no typos.
 // Activity timeline: vault_audit entries with action filters.
 // Clipboard auto-clears 10s after copy. Expiration dates raise severity banners.
 // SECTION 2 "Platform keys": read-only mirror of Vercel env variable NAMES.
@@ -67,15 +68,53 @@ function groupFor(name: string): string {
   return 'other'
 }
 
-const LABEL_SUGGESTIONS: Record<string, string[]> = {
-  stripe: ['Production API Key', 'Test API Key', 'Webhook Secret'],
-  supabase: ['Service Role Key', 'Anon Public Key'],
-  openai: ['Production Key', 'Test Key'],
-  elevenlabs: ['Production Key'],
-  github: ['Write Token', 'Read Token'],
-  vercel: ['API Token'],
-  anthropic: ['Production Key'],
-}
+// Provider catalog: pick, don't type. Canonical names eliminate human error.
+// Each provider carries its usual key labels; validation matches by name.
+type CatalogEntry = { name: string; icon: string; labels: string[] }
+const PROVIDERS: CatalogEntry[] = [
+  { name: 'Stripe', icon: '💳', labels: ['Production API Key', 'Test API Key', 'Webhook Secret', 'Publishable Key'] },
+  { name: 'Supabase', icon: '🗄️', labels: ['Service Role Key', 'Anon Public Key', 'Database Password'] },
+  { name: 'Vercel', icon: '🌐', labels: ['API Token'] },
+  { name: 'OpenAI', icon: '🤖', labels: ['Production Key', 'Test Key'] },
+  { name: 'Anthropic', icon: '🧠', labels: ['Production Key'] },
+  { name: 'GitHub', icon: '🐙', labels: ['Write Token', 'Read Token', 'Personal Access Token'] },
+  { name: 'ElevenLabs', icon: '🎙️', labels: ['Production Key'] },
+  { name: 'AssemblyAI', icon: '📝', labels: ['API Key'] },
+  { name: 'Google Cloud', icon: '☁️', labels: ['API Key', 'Service Account JSON'] },
+  { name: 'AWS', icon: '🟧', labels: ['Access Key ID', 'Secret Access Key'] },
+  { name: 'Azure', icon: '🔷', labels: ['API Key', 'Connection String'] },
+  { name: 'Cloudflare', icon: '🛡️', labels: ['API Token', 'Zone API Key'] },
+  { name: 'Resend', icon: '✉️', labels: ['API Key'] },
+  { name: 'SendGrid', icon: '📧', labels: ['API Key'] },
+  { name: 'Mailgun', icon: '📮', labels: ['API Key', 'SMTP Password'] },
+  { name: 'Twilio', icon: '📞', labels: ['Account SID', 'Auth Token'] },
+  { name: 'Slack', icon: '💬', labels: ['Bot Token', 'Webhook URL'] },
+  { name: 'Discord', icon: '🎮', labels: ['Bot Token', 'Webhook URL'] },
+  { name: 'Telegram', icon: '✈️', labels: ['Bot Token'] },
+  { name: 'Notion', icon: '📓', labels: ['Integration Token'] },
+  { name: 'Airtable', icon: '📊', labels: ['API Key', 'Personal Access Token'] },
+  { name: 'Shopify', icon: '🛍️', labels: ['Admin API Token', 'Storefront Token'] },
+  { name: 'PayPal', icon: '💰', labels: ['Client ID', 'Client Secret'] },
+  { name: 'Meta', icon: '📘', labels: ['App Secret', 'Access Token'] },
+  { name: 'X / Twitter', icon: '🐦', labels: ['API Key', 'Bearer Token'] },
+  { name: 'LinkedIn', icon: '💼', labels: ['Client ID', 'Client Secret'] },
+  { name: 'TikTok', icon: '🎵', labels: ['Client Key', 'Client Secret'] },
+  { name: 'YouTube', icon: '▶️', labels: ['API Key'] },
+  { name: 'MongoDB', icon: '🍃', labels: ['Connection String'] },
+  { name: 'Neon', icon: '⚡', labels: ['Connection String', 'API Key'] },
+  { name: 'Upstash', icon: '🔺', labels: ['REST Token', 'Redis URL'] },
+  { name: 'Firebase', icon: '🔥', labels: ['API Key', 'Service Account JSON'] },
+  { name: 'Netlify', icon: '🌊', labels: ['Personal Access Token'] },
+  { name: 'DigitalOcean', icon: '🌀', labels: ['API Token'] },
+  { name: 'Algolia', icon: '🔍', labels: ['Admin API Key', 'Search-Only Key'] },
+  { name: 'Pinecone', icon: '🌲', labels: ['API Key'] },
+  { name: 'Hugging Face', icon: '🤗', labels: ['Access Token'] },
+  { name: 'Replicate', icon: '🔁', labels: ['API Token'] },
+  { name: 'Sentry', icon: '🚨', labels: ['Auth Token', 'DSN'] },
+  { name: 'Mapbox', icon: '🗺️', labels: ['Access Token'] },
+  { name: 'Unsplash', icon: '📷', labels: ['Access Key', 'Secret Key'] },
+  { name: 'Brave Search', icon: '🦁', labels: ['API Key'] },
+]
 
 // Non-blocking format hints: warn when a value does not match the provider's usual shape.
 function formatLooksOff(provider: string, value: string): boolean {
@@ -108,6 +147,8 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [fExpires, setFExpires] = useState('')
+  const [pSearch, setPSearch] = useState('')
+  const [customP, setCustomP] = useState(false)
   const [audit, setAudit] = useState<AuditEntry[]>([])
   const [tlFilter, setTlFilter] = useState('all')
   const timersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
@@ -147,7 +188,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
       if (!res.ok) throw new Error(json?.error || String(res.status))
       setItems(prev => [...prev, json.item].sort((a, b) => a.provider.localeCompare(b.provider) || a.label.localeCompare(b.label)))
       setShowAdd(false)
-      setFProvider(''); setFLabel(''); setFValue(''); setFExpires('')
+      setFProvider(''); setFLabel(''); setFValue(''); setFExpires(''); setPSearch(''); setCustomP(false)
       loadAudit()
     } catch (err: any) {
       setSafeError(err?.message || 'Failed to save key')
@@ -371,13 +412,29 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
             <div style={{ fontSize: 16, fontWeight: 800 }}>🔐 {v('addKey', lang).replace('+ ', '')}</div>
             <div>
               <div style={{ ...labelStyle, marginBottom: 5 }}>{v('provider', lang)}</div>
-              <input value={fProvider} onChange={e => setFProvider(e.target.value)} placeholder="OpenAI, Stripe, ElevenLabs…" style={inputStyle} />
+              {!customP && (
+                <>
+                  <input value={pSearch} onChange={e => setPSearch(e.target.value)} placeholder="🔍" style={{ ...inputStyle, marginBottom: 7 }} />
+                  <div className="hub-panel" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxHeight: 132, overflowY: 'auto', padding: 2 }}>
+                    {PROVIDERS.filter(p => p.name.toLowerCase().includes(pSearch.trim().toLowerCase())).map(p => (
+                      <button key={p.name} onClick={() => { setFProvider(p.name); if (!fLabel) setFLabel(p.labels[0]) }} className="hub-chip" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, background: fProvider === p.name ? 'rgba(255,195,0,.14)' : 'rgba(255,255,255,.04)', border: fProvider === p.name ? '1px solid rgba(255,195,0,.55)' : '1px solid rgba(255,255,255,.12)', color: fProvider === p.name ? '#ffc300' : 'rgba(255,255,255,.7)' }}>{p.icon} {p.name}</button>
+                    ))}
+                    <button onClick={() => { setCustomP(true); setFProvider('') }} className="hub-chip" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, background: 'rgba(255,255,255,.04)', border: '1px dashed rgba(255,255,255,.25)', color: 'rgba(255,255,255,.55)' }}>✏️ Custom…</button>
+                  </div>
+                </>
+              )}
+              {customP && (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input value={fProvider} onChange={e => setFProvider(e.target.value)} placeholder="Provider name" style={inputStyle} autoFocus />
+                  <button onClick={() => { setCustomP(false); setFProvider('') }} className="hub-chip" style={{ padding: '6px 12px', borderRadius: 10, fontSize: 12.5, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.15)', color: 'rgba(255,255,255,.6)', flexShrink: 0 }}>↩</button>
+                </div>
+              )}
             </div>
             <div>
               <div style={{ ...labelStyle, marginBottom: 5 }}>{v('labelF', lang)}</div>
               <input value={fLabel} onChange={e => setFLabel(e.target.value)} placeholder="Production API key" style={inputStyle} />
               {(() => {
-                const sugg = LABEL_SUGGESTIONS[fProvider.trim().toLowerCase()] || []
+                const sugg = PROVIDERS.find(p => p.name === fProvider)?.labels || []
                 if (sugg.length === 0) return null
                 return (
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>

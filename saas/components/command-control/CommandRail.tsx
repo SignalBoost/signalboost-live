@@ -59,6 +59,14 @@ function isPrimaryActive(itemKey: string, itemPageKey: CommandPageKey | undefine
   return itemKey === 'providers' && activePage === 'providers'
 }
 
+function handleRailClick(itemKey: string, pageKey: CommandPageKey | undefined, onNavigate: (pageKey: CommandPageKey) => void) {
+  if (!pageKey) return
+  if (pageKey === 'providers') {
+    window.dispatchEvent(new CustomEvent('signalboost:partner-page', { detail: itemKey }))
+  }
+  onNavigate(pageKey)
+}
+
 export default function CommandRail({ sections, activePage, onNavigate }: CommandRailProps) {
   return (
     <aside className="command-rail" style={railStyle}>
@@ -86,7 +94,7 @@ export default function CommandRail({ sections, activePage, onNavigate }: Comman
                     key={item.key}
                     className="hub-chip"
                     disabled={disabled}
-                    onClick={() => item.pageKey && onNavigate(item.pageKey)}
+                    onClick={() => handleRailClick(item.key, item.pageKey, onNavigate)}
                     style={itemStyle(active, disabled)}
                     title={disabled ? 'Planned workspace' : item.label}
                   >

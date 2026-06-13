@@ -57,7 +57,7 @@ const PAGES: PartnerPage[] = [
     ],
   },
   {
-    id: 'infrastructure',
+    id: 'cloud',
     title: 'Infrastructure Partners',
     subtitle: 'Cloud and infrastructure partners that support production workloads.',
     partners: [
@@ -68,25 +68,36 @@ const PAGES: PartnerPage[] = [
     ],
   },
   {
-    id: 'edge-communication',
-    title: 'Edge + Communication Partners',
-    subtitle: 'DNS, edge, messaging, and transactional communication.',
+    id: 'edge-app',
+    title: 'Application + Edge Partners',
+    subtitle: 'DNS, edge, application backend, SSL, rules, and edge protection.',
     partners: [
       partner('Cloudflare', 'Edge/DNS', 'DNS, SSL, workers, proxy', 'Needs Review', ['DNS warning', 'SSL healthy', 'Proxy review', 'Workers healthy'], [action('Open Cloudflare', 'primary', 'https://dash.cloudflare.com/'), action('Open DNS'), action('Check SSL'), action('Review Proxy')]),
+      partner('Firebase', 'App Backend', 'Auth, rules, storage', 'Healthy', ['Auth healthy', 'Rules healthy', 'Storage healthy', 'Usage normal'], [action('Open Firebase', 'primary', 'https://console.firebase.google.com/'), action('Review Rules'), action('Check Auth'), action('View Usage')]),
+      partner('Netlify', 'Hosting', 'Sites, deploys, domains', 'Healthy', ['Sites healthy', 'Deploys healthy', 'Domains healthy', 'Forms healthy'], [action('Open Netlify', 'primary', 'https://app.netlify.com/'), action('View Deploys'), action('Open Domains'), action('Review Env Vars')]),
+      partner('Railway', 'Runtime', 'Services, databases, deploys', 'Healthy', ['Services healthy', 'Deploys healthy', 'Databases healthy', 'Usage normal'], [action('Open Railway', 'primary', 'https://railway.app/'), action('View Services'), action('Check Deployments'), action('View Usage')]),
+    ],
+  },
+  {
+    id: 'communication',
+    title: 'Communication Partners',
+    subtitle: 'Messaging and transactional communication used by the operation.',
+    partners: [
       partner('Twilio', 'Messaging', 'SMS, verify, phone', 'Healthy', ['SMS healthy', 'Verify healthy', 'Cost normal', 'Delivery healthy'], [action('Open Twilio', 'primary', 'https://console.twilio.com/'), action('View SMS'), action('Check Verify'), action('View Usage')]),
       partner('SendGrid', 'Email', 'Transactional email', 'Healthy', ['Delivery healthy', 'Bounces normal', 'Domain healthy', 'API active'], [action('Open SendGrid', 'primary', 'https://app.sendgrid.com/'), action('Check Delivery'), action('Review Bounces'), action('Domain Auth')]),
       partner('Postmark', 'Email', 'Transactional email', 'Healthy', ['Delivery healthy', 'Bounces normal', 'DKIM healthy', 'SPF healthy'], [action('Open Postmark', 'primary', 'https://account.postmarkapp.com/'), action('Check Delivery'), action('Review Bounces'), action('Domain Auth')]),
+      partner('Mailgun', 'Email', 'Transactional email and routing', 'Healthy', ['Delivery healthy', 'Routes healthy', 'Domain healthy', 'API active'], [action('Open Mailgun', 'primary', 'https://app.mailgun.com/'), action('Check Delivery'), action('Review Routes'), action('Domain Auth')]),
     ],
   },
   {
     id: 'identity-data',
     title: 'Identity + Data Partners',
-    subtitle: 'Identity, authentication, app backend, and database partners.',
+    subtitle: 'Identity, authentication, database, and cache partners.',
     partners: [
       partner('Auth0', 'Identity', 'Clients, MFA, tenant, actions', 'Needs Review', ['Client secret aging', 'MFA healthy', 'Tenant healthy', 'Actions healthy'], [action('Open Auth0', 'primary', 'https://manage.auth0.com/'), action('Review Clients'), action('Check MFA'), action('Rotate Secret')]),
-      partner('Firebase', 'App Backend', 'Auth, rules, storage', 'Healthy', ['Auth healthy', 'Rules healthy', 'Storage healthy', 'Usage normal'], [action('Open Firebase', 'primary', 'https://console.firebase.google.com/'), action('Review Rules'), action('Check Auth'), action('View Usage')]),
       partner('MongoDB Atlas', 'Database', 'Clusters, backups, network', 'Healthy', ['Cluster healthy', 'Backups healthy', 'Network healthy', 'Connections normal'], [action('Open MongoDB Atlas', 'primary', 'https://cloud.mongodb.com/'), action('Check Clusters'), action('Review Backups'), action('Network Access')]),
       partner('Redis', 'Cache', 'Cache, sessions, queues', 'Healthy', ['Cache healthy', 'Memory ok', 'Connections ok', 'Latency normal'], [action('Open Redis Console', 'primary'), action('View Metrics'), action('Check Memory'), action('Review Access')]),
+      partner('Okta', 'Identity', 'SSO, users, apps', 'Healthy', ['SSO healthy', 'Apps healthy', 'Users healthy', 'Policies healthy'], [action('Open Okta', 'primary', 'https://login.okta.com/'), action('Review Apps'), action('Check Users'), action('Review Policies')]),
     ],
   },
   {
@@ -101,6 +112,17 @@ const PAGES: PartnerPage[] = [
     ],
   },
 ]
+
+const RAIL_PAGE_MAP: Record<string, number> = {
+  partners: 0,
+  'mission-critical': 0,
+  'growth-ai': 1,
+  cloud: 2,
+  'edge-app': 3,
+  communication: 4,
+  'identity-data': 5,
+  'ops-visibility': 6,
+}
 
 const allPartnerNames = PAGES.flatMap(page => page.partners.map(partner => partner.name))
 function defaultPreferences(): Record<string, boolean> { return Object.fromEntries(allPartnerNames.map(name => [name, true])) }
@@ -127,6 +149,15 @@ export default function ProviderExpansionPage(_props: PageProps) {
     } catch {}
   }, [])
   useEffect(() => { try { localStorage.setItem(PREF_KEY, JSON.stringify(enabledPartners)) } catch {} }, [enabledPartners])
+  useEffect(() => {
+    const onPartnerPage = (event: Event) => {
+      const detail = (event as CustomEvent<string>).detail
+      const next = RAIL_PAGE_MAP[detail]
+      if (typeof next === 'number') setPageIndex(next)
+    }
+    window.addEventListener('signalboost:partner-page', onPartnerPage)
+    return () => window.removeEventListener('signalboost:partner-page', onPartnerPage)
+  }, [])
 
   const enabledCount = useMemo(() => Object.values(enabledPartners).filter(Boolean).length, [enabledPartners])
   const togglePartner = (name: string) => setEnabledPartners(prev => ({ ...prev, [name]: prev[name] === false }))

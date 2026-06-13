@@ -68,8 +68,10 @@ export default function DashboardPage({ lang, data, loading, failed }: PageProps
             <DetailsToggle open={!!open.supa} onClick={() => toggle('supa')} lang={lang} />
             {open.supa && data && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.6)' }}>Status</span><span style={{ color: supaOk ? '#22c55e' : '#fca5a5', fontWeight: 700 }}>{supaOk ? c('statusDb', lang) : c('statusDbDown', lang)}</span></div>
                 <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.6)' }}>{c('projectUrl', lang)}</span><span style={monoStyle}>{data.supabase.projectHost}</span></div>
                 <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.6)' }}>{c('anonKey', lang)}</span><span style={monoStyle}>{data.supabase.anonKeyMasked}</span></div>
+                <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.6)' }}>{c('latency', lang)}</span><span style={{ color: data.supabase.latencyMs < 400 ? '#22c55e' : '#ffc300', fontWeight: 700 }}>{data.supabase.latencyMs} ms</span></div>
                 {data.supabase.error && <div style={{ ...rowStyle, color: '#fca5a5' }}>{data.supabase.error}</div>}
               </div>
             )}
@@ -93,7 +95,10 @@ export default function DashboardPage({ lang, data, loading, failed }: PageProps
             <DetailsToggle open={!!open.stripe} onClick={() => toggle('stripe')} lang={lang} />
             {open.stripe && data && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={labelStyle}>{c('webhooks', lang)}</div>
+                <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.6)' }}>Status</span><span style={{ color: stripeOk ? '#22c55e' : '#fca5a5', fontWeight: 700 }}>{stripeOk ? c('statusPay', lang) : c('statusPayDown', lang)}</span></div>
+                <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.6)' }}>{c('priceIds', lang)}</span><span style={{ color: '#ffc300', fontWeight: 800 }}>{data.stripe.tiers.length}</span></div>
+                <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.6)' }}>{c('webhooks', lang)}</span><span style={{ color: '#1af0ff', fontWeight: 800 }}>{data.stripe.webhooks.length}</span></div>
+                {data.stripe.webhooks.length > 0 && <div style={labelStyle}>{c('webhooks', lang)}</div>}
                 {data.stripe.webhooks.map(w => (
                   <div key={w.url} style={rowStyle}>
                     <span style={{ ...monoStyle, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.url.replace('https://', '')}</span>
@@ -102,6 +107,7 @@ export default function DashboardPage({ lang, data, loading, failed }: PageProps
                 ))}
                 <div style={labelStyle}>{c('priceIds', lang)}</div>
                 {data.stripe.tiers.map(t => (<div key={'id' + t.priceId} style={rowStyle}><span style={{ fontWeight: 600, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</span><span style={{ ...monoStyle, flexShrink: 0 }}>{t.priceId.slice(0, 18)}…</span></div>))}
+                {data.stripe.error && <div style={{ ...rowStyle, color: '#fca5a5' }}>{data.stripe.error}</div>}
               </div>
             )}
             <ActionButton tone={TONES.blue} label={c('openStripe', lang)} href="https://dashboard.stripe.com" />
@@ -125,6 +131,8 @@ export default function DashboardPage({ lang, data, loading, failed }: PageProps
                 <DetailsToggle open={!!open.vercel} onClick={() => toggle('vercel')} lang={lang} />
                 {open.vercel && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.6)' }}>Status</span><span style={{ color: data?.vercel.ok ? '#22c55e' : '#fca5a5', fontWeight: 700 }}>{data?.vercel.ok ? c('statusHost', lang) : c('statusNoToken', lang)}</span></div>
+                    <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.6)' }}>{selScope.scope}</span><span style={{ color: '#c4b5fd', fontWeight: 800 }}>{selScope.count}</span></div>
                     <div style={labelStyle}>{c('envVars', lang)}</div>
                     {selScope.names.map(v => (<div key={v} style={rowStyle}><span style={monoStyle}>{v}</span><span style={{ ...monoStyle, color: 'rgba(255,255,255,.35)' }}>••••••••</span></div>))}
                   </div>

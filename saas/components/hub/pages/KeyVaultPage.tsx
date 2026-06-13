@@ -219,10 +219,18 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
 
   const refreshNow = async () => {
     if (!selProvider) return
-    await retrieveKeys(selProvider)
-    await loadAudit()
-    setRefreshFlash(true)
-    setTimeout(() => setRefreshFlash(false), 1600)
+    try {
+      setSafeLoading(true)
+      await retrieveKeys(selProvider)
+      await loadAudit()
+      setRefreshFlash(true)
+      setTimeout(() => setRefreshFlash(false), 1600)
+    } catch (err: any) {
+      setSafeError(err?.message || 'Refresh failed')
+      console.error('[Vault Refresh]', err)
+    } finally {
+      setSafeLoading(false)
+    }
   }
 
   const loadAudit = async () => {
@@ -375,7 +383,11 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
             </div>
           )}
         </div>
-        {selProvider && <button onClick={refreshNow} className="hub-btn" title={v('refreshBtn', lang)} style={{ padding: '11px 14px', borderRadius: 11, border: refreshFlash ? '1px solid rgba(34,197,94,.6)' : '1px solid rgba(26,240,255,.4)', background: refreshFlash ? 'rgba(34,197,94,.14)' : 'rgba(26,240,255,.08)', color: refreshFlash ? '#86efac' : '#1af0ff', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>{safeLoading ? '⏳' : refreshFlash ? '✓' : '↻'}</button>}
+        {selProvider && (
+          <button onClick={refreshNow} disabled={safeLoading} className="hub-btn" title="Refresh keys" style={{ padding: '11px 14px', borderRadius: 11, border: '1px solid rgba(26,240,255,.4)', background: 'rgba(26,240,255,.08)', color: refreshFlash ? '#86efac' : '#1af0ff', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', cursor: safeLoading ? 'wait' : 'pointer', opacity: safeLoading ? 0.6 : 1 }}>
+            {safeLoading ? '⏳' : refreshFlash ? '✓' : '↻'}
+          </button>
+        )}
         </div>
 
         {safeLoading && <div className="hub-loading" style={{ padding: '10px 13px', borderRadius: 11, border: '1px solid rgba(26,240,255,.3)', background: 'rgba(26,240,255,.05)', fontSize: 12.5, color: '#1af0ff', marginBottom: 8 }}>⏳ {v('retrieving', lang)}</div>}

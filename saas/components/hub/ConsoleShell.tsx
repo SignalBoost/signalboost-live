@@ -1,15 +1,17 @@
 'use client'
 
 // saas/components/hub/ConsoleShell.tsx
-// Hub Console — Dashboard and Providers monitor shell with direct Vault link.
+// Hub Console — Dashboard, Vault, and Providers with arrows and direct buttons.
 
 import { useCallback, useEffect, useState } from 'react'
 import { Lang, LANGS, HubData, c, labelStyle, Dot } from './shared'
 import DashboardPage from './pages/DashboardPage'
+import VaultMonitorPage from './pages/VaultMonitorPage'
 import ProviderExpansionPage from './pages/ProviderExpansionPage'
 
 const PAGES = [
   { key: 'dashboard', icon: '🛰️', title: 'Dashboard', Component: DashboardPage },
+  { key: 'vault', icon: '🔐', title: 'Vault', Component: VaultMonitorPage },
   { key: 'providers', icon: '🧭', title: 'Providers', Component: ProviderExpansionPage },
 ] as const
 
@@ -59,6 +61,12 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
     return () => window.removeEventListener('signalboost:hub-refresh', onRefresh)
   }, [load])
 
+  const go = useCallback((pageIndex: number) => {
+    const next = Math.max(0, Math.min(pageIndex, PAGES.length - 1))
+    setIdx(next)
+    window.history.replaceState(null, '', '#' + PAGES[next].key)
+  }, [])
+
   useEffect(() => {
     const fromHash = () => {
       const h = window.location.hash.replace('#', '')
@@ -78,13 +86,7 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
       window.removeEventListener('hashchange', fromHash)
       window.removeEventListener('keydown', onKey)
     }
-  }, [idx])
-
-  const go = (pageIndex: number) => {
-    const next = Math.max(0, Math.min(pageIndex, PAGES.length - 1))
-    setIdx(next)
-    window.history.replaceState(null, '', '#' + PAGES[next].key)
-  }
+  }, [go, idx])
 
   const navButtonStyle = (active: boolean): React.CSSProperties => ({
     display: 'flex', alignItems: 'center', gap: 7, padding: '7px 13px', borderRadius: 10,
@@ -124,8 +126,8 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <nav style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <button onClick={() => go(0)} className="hub-chip" style={navButtonStyle(idx === 0)}>🛰️ Dashboard</button>
-              <a href="/hub/vault" className="hub-chip" style={navButtonStyle(false)}>🔐 Vault</a>
-              <button onClick={() => go(1)} className="hub-chip" style={navButtonStyle(idx === 1)}>🧭 Providers</button>
+              <button onClick={() => go(1)} className="hub-chip" style={navButtonStyle(idx === 1)}>🔐 Vault</button>
+              <button onClick={() => go(2)} className="hub-chip" style={navButtonStyle(idx === 2)}>🧭 Providers</button>
             </nav>
             <div style={{ display: 'flex', gap: 6 }}>
               {LANGS.map(l => (

@@ -32,14 +32,17 @@ const COMMAND_SECTIONS: CommandRailSection[] = [
     ],
   },
   {
-    title: 'Providers',
+    title: 'Provider Monitors',
     items: [
       { key: 'providers', icon: '🧭', label: 'Provider Manual', pageKey: 'providers' },
-      { key: 'tier-1', icon: '🧱', label: 'Tier 1 — Core', pageKey: 'providers' },
-      { key: 'tier-2', icon: '⚙️', label: 'Tier 2 — Common', pageKey: 'providers' },
-      { key: 'tier-3', icon: '🧠', label: 'Tier 3 — AI / Data', pageKey: 'providers' },
-      { key: 'tier-4', icon: '🛠️', label: 'Tier 4 — DevOps', disabled: true },
-      { key: 'tier-5', icon: '📣', label: 'Tier 5 — Marketing', disabled: true },
+      { key: 'monitor-1', icon: '🧱', label: 'Monitor 1 — Core Cloud + AI', pageKey: 'providers' },
+      { key: 'monitor-2', icon: '🚀', label: 'Monitor 2 — Platform Core', pageKey: 'providers' },
+      { key: 'monitor-3', icon: '🏢', label: 'Monitor 3 — Enterprise Clouds', pageKey: 'providers' },
+      { key: 'monitor-4', icon: '🌐', label: 'Monitor 4 — App, DNS + Edge', pageKey: 'providers' },
+      { key: 'monitor-5', icon: '✉️', label: 'Monitor 5 — Messaging + Email', pageKey: 'providers' },
+      { key: 'monitor-6', icon: '🗄️', label: 'Monitor 6 — Data + Identity', pageKey: 'providers' },
+      { key: 'monitor-7', icon: '🧠', label: 'Monitor 7 — AI Expansion', pageKey: 'providers' },
+      { key: 'monitor-8', icon: '🛠️', label: 'Monitor 8 — Incident Ops', pageKey: 'providers' },
     ],
   },
   {

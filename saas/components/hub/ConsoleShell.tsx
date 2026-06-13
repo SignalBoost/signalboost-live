@@ -10,10 +10,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { Lang, LANGS, HubData, c, labelStyle, Dot } from './shared'
 import DashboardPage from './pages/DashboardPage'
 import KeyVaultPage from './pages/KeyVaultPage'
+import ProviderRegistryPage from './pages/ProviderRegistryPage'
 
 const PAGES = [
-  { key: 'dashboard', icon: '🛰️', titleKey: 'pageDashboard', Component: DashboardPage },
-  { key: 'vault',     icon: '🔐', titleKey: 'pageVault',     Component: KeyVaultPage },
+  { key: 'dashboard', icon: '🛰️', title: 'Monitor 1 · Dashboard', Component: DashboardPage },
+  { key: 'vault', icon: '🔐', title: 'Monitor 2 · Key Vault', Component: KeyVaultPage },
+  { key: 'providers', icon: '🧭', title: 'Monitor 3 · Providers', Component: ProviderRegistryPage },
 ] as const
 
 function isRefreshButton(button: HTMLButtonElement | null): boolean {
@@ -72,7 +74,6 @@ export default function ConsoleShell() {
     return () => window.removeEventListener('signalboost:hub-refresh', onRefresh)
   }, [load])
 
-  // Bookmarkable pages via URL hash (#vault), plus keyboard arrows.
   useEffect(() => {
     const fromHash = () => {
       const h = window.location.hash.replace('#', '')
@@ -117,17 +118,15 @@ export default function ConsoleShell() {
       <style>{`.hub-card{transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease;} .hub-card:hover{transform:translateY(-3px); box-shadow:0 24px 60px rgba(0,0,0,.55);} .hub-chip{transition:background .15s ease, color .15s ease, border-color .15s ease; cursor:pointer;} .hub-chip:hover{border-color:rgba(255,195,0,.6);} .hub-btn{transition:filter .15s ease, transform .12s ease; cursor:pointer;} .hub-btn:hover{transform:translateY(-1px); filter:brightness(1.25);} .hub-panel::-webkit-scrollbar{width:8px;} .hub-panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:8px;} .hub-panel::-webkit-scrollbar-track{background:transparent;} @keyframes hubPulse{0%,100%{opacity:.45}50%{opacity:1}} .hub-loading{animation:hubPulse 1.4s ease infinite;} .hub-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:20;width:38px;height:64px;display:flex;align-items:center;justify-content:center;font-size:20px;color:rgba(255,255,255,.55);background:rgba(15,23,42,.6);border:1px solid rgba(255,255,255,.12);cursor:pointer;backdrop-filter:blur(8px);transition:color .15s ease, background .15s ease;} .hub-arrow:hover{color:#1af0ff;background:rgba(15,23,42,.85);} @media (min-width:1100px){ .hub-root{height:calc(100vh - 80px);min-height:0;} .hub-frame{display:flex;flex-direction:column;height:100%;min-height:0;} .hub-stage{flex:1;min-height:0;} .hub-main{grid-auto-rows:minmax(0,1fr);} .hub-panel{overflow-y:auto;min-height:0;} }`}</style>
 
       <div className="hub-frame" style={{ width: '100%' }}>
-        {/* Shell header */}
         <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 14, marginBottom: 12, flexShrink: 0 }}>
           <div style={{ minWidth: 0 }}>
             <h1 style={{ margin: 0, fontSize: 'clamp(22px, 2.6vw, 30px)', fontWeight: 800, letterSpacing: '-.02em', background: 'linear-gradient(90deg, #fff 30%, #1af0ff 75%, #ffc300 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{c('title', lang)}</h1>
             <p style={{ margin: '3px 0 0', fontSize: 13, color: 'rgba(255,255,255,.55)' }}><span style={{ color: '#1af0ff' }}>{c('phaseBadge', lang)}</span></p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            {/* Quick-jump */}
             <nav style={{ display: 'flex', gap: 6 }}>
               {PAGES.map((p, i) => (
-                <button key={p.key} onClick={() => go(i)} className="hub-chip" style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 13px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, background: idx === i ? 'rgba(255,195,0,.12)' : 'rgba(255,255,255,.04)', border: idx === i ? '1px solid rgba(255,195,0,.5)' : '1px solid rgba(255,255,255,.12)', color: idx === i ? '#ffc300' : 'rgba(255,255,255,.65)' }}>{p.icon} {c(p.titleKey, lang)}</button>
+                <button key={p.key} onClick={() => go(i)} className="hub-chip" style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 13px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, background: idx === i ? 'rgba(255,195,0,.12)' : 'rgba(255,255,255,.04)', border: idx === i ? '1px solid rgba(255,195,0,.5)' : '1px solid rgba(255,255,255,.12)', color: idx === i ? '#ffc300' : 'rgba(255,255,255,.65)' }}>{p.icon} {p.title}</button>
               ))}
             </nav>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -145,7 +144,6 @@ export default function ConsoleShell() {
           </div>
         </header>
 
-        {/* Sliding stage */}
         <div className="hub-stage" style={{ position: 'relative', overflow: 'hidden', flex: 1, minHeight: 0 }}>
           {idx > 0 && <button onClick={() => go(idx - 1)} className="hub-arrow" style={{ left: 0, borderRadius: '0 12px 12px 0', borderLeft: 'none' }}>‹</button>}
           {idx < PAGES.length - 1 && <button onClick={() => go(idx + 1)} className="hub-arrow" style={{ right: 0, borderRadius: '12px 0 0 12px', borderRight: 'none' }}>›</button>}
@@ -158,10 +156,9 @@ export default function ConsoleShell() {
           </div>
         </div>
 
-        {/* Page indicators */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: 8, paddingTop: 10, flexShrink: 0 }}>
           {PAGES.map((p, i) => (
-            <button key={p.key} onClick={() => go(i)} aria-label={c(p.titleKey, lang)} style={{ width: idx === i ? 22 : 8, height: 8, borderRadius: 999, border: 'none', cursor: 'pointer', background: idx === i ? '#ffc300' : 'rgba(255,255,255,.22)', transition: 'all .25s ease' }} />
+            <button key={p.key} onClick={() => go(i)} aria-label={p.title} style={{ width: idx === i ? 22 : 8, height: 8, borderRadius: 999, border: 'none', cursor: 'pointer', background: idx === i ? '#ffc300' : 'rgba(255,255,255,.22)', transition: 'all .25s ease' }} />
           ))}
         </div>
       </div>

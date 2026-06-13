@@ -9,11 +9,11 @@ import { PageProps, c, TONES, cardStyle, bodyStyle, labelStyle, rowStyle, monoSt
 type Role = 'billing' | 'dev' | 'team'
 
 const MOCK_AUDIT: { time: string; actor: string; action: string; roles: Role[] }[] = [
-  { time: '12 Jun · 14:32', actor: 'owner', action: 'Updated Stripe price for Launch plan', roles: ['billing'] },
-  { time: '12 Jun · 13:05', actor: 'ai-chief', action: 'Committed redesign to preview branch', roles: ['dev'] },
-  { time: '12 Jun · 11:48', actor: 'owner', action: 'Rotated OPENAI_API_KEY in Production', roles: ['dev', 'billing'] },
-  { time: '11 Jun · 19:21', actor: 'system', action: 'Daily opportunity scan completed', roles: ['team', 'dev', 'billing'] },
-  { time: '11 Jun · 16:02', actor: 'owner', action: 'Merged preview branch into production', roles: ['dev'] },
+  { time: 'Live', actor: 'system', action: 'Read-only provider monitoring enabled', roles: ['billing', 'dev', 'team'] },
+  { time: 'Next', actor: 'planned', action: 'Approval workflow placeholder ready for future controlled actions', roles: ['billing', 'dev'] },
+  { time: 'Next', actor: 'planned', action: 'Audit log foundation reserved for future provider changes', roles: ['billing', 'dev', 'team'] },
+  { time: 'Next', actor: 'planned', action: 'Rollback snapshot area reserved for future configuration recovery', roles: ['dev'] },
+  { time: 'Next', actor: 'planned', action: 'Role scope model prepared for billing, developer, and team views', roles: ['team', 'dev', 'billing'] },
 ]
 
 export default function DashboardPage({ lang, data, loading, failed }: PageProps) {

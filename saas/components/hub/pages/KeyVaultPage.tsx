@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useRouter } from 'next/navigation'
 import { PageProps, Lang, c, TONES, Tone, cardStyle, bodyStyle, labelStyle, rowStyle, monoStyle, Band, Status } from '../shared'
 
 const V: Record<string, Record<Lang, string>> = {
@@ -160,6 +161,7 @@ const DAY = 86400000
 const inputStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.16)', background: 'rgba(255,255,255,.05)', color: '#fff', fontSize: 13.5, outline: 'none' }
 
 export default function KeyVaultPage({ lang, data, loading }: PageProps) {
+  const router = useRouter()
   const [items, setItems] = useState<VaultItem[]>([])
   const [safeLoading, setSafeLoading] = useState(true)
   const [safeError, setSafeError] = useState<string | null>(null)
@@ -181,6 +183,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
   const [selProvider, setSelProvider] = useState<string | null>(null)
   const [ddOpen, setDdOpen] = useState(false)
   const [refreshFlash, setRefreshFlash] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const timersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const clipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -218,18 +221,30 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
   }
 
   const refreshNow = async () => {
-    if (!selProvider) return
+    const provider = selProvider
+    if (!provider || refreshing) return
+
+    setRefreshing(true)
+    setSafeError(null)
     try {
-      setSafeLoading(true)
-      await retrieveKeys(selProvider)
+      // Refresh the selected safe provider.
+      await retrieveKeys(provider)
+
+      // Refresh provider counts and audit timeline.
+      await loadProviders()
       await loadAudit()
+
+      // Refresh parent/server data too. This is required for the
+      // Platform keys / Vercel mirror section because it comes from props.
+      router.refresh()
+
       setRefreshFlash(true)
       setTimeout(() => setRefreshFlash(false), 1600)
     } catch (err: any) {
       setSafeError(err?.message || 'Refresh failed')
       console.error('[Vault Refresh]', err)
     } finally {
-      setSafeLoading(false)
+      setRefreshing(false)
     }
   }
 
@@ -384,8 +399,8 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
           )}
         </div>
         {selProvider && (
-          <button onClick={refreshNow} disabled={safeLoading} className="hub-btn" title="Refresh keys" style={{ padding: '11px 14px', borderRadius: 11, border: '1px solid rgba(26,240,255,.4)', background: 'rgba(26,240,255,.08)', color: refreshFlash ? '#86efac' : '#1af0ff', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', cursor: safeLoading ? 'wait' : 'pointer', opacity: safeLoading ? 0.6 : 1 }}>
-            {safeLoading ? '⏳' : refreshFlash ? '✓' : '↻'}
+          <button onClick={refreshNow} disabled={safeLoading || refreshing} className="hub-btn" title={v('refreshBtn', lang)} style={{ padding: '11px 14px', borderRadius: 11, border: '1px solid rgba(26,240,255,.4)', background: 'rgba(26,240,255,.08)', color: refreshFlash ? '#86efac' : '#1af0ff', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', cursor: safeLoading || refreshing ? 'wait' : 'pointer', opacity: safeLoading || refreshing ? 0.6 : 1 }}>
+            {safeLoading || refreshing ? '⏳' : refreshFlash ? v('refreshed', lang) : v('refreshBtn', lang)}
           </button>
         )}
         </div>

@@ -316,23 +316,51 @@ async function executeStripeAction(template: any, payload: Record<string, unknow
   // Key rotation: generate new API key
   if (template.id === 'stripe.rotate_key') {
     try {
-      // In production: call Stripe API to create new restricted API key
-      // For now: simulate rotation
-      await new Promise(resolve => setTimeout(resolve, 800))
+      const stripeKey = process.env.STRIPE_SECRET_KEY
+      if (!stripeKey) {
+        return { ok: false, error: 'STRIPE_SECRET_KEY not configured' }
+      }
 
-      const newKeyMasked = 'sk_live_' + Math.random().toString(36).substring(2, 12).toUpperCase()
+      // Create new restricted API key
+      const createRes = await fetch('https://api.stripe.com/v1/api_keys', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Basic ' + Buffer.from(stripeKey + ':').toString('base64'),
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          name: 'SignalBoost-Vault-Rotated-' + Date.now(),
+          type: 'restricted_api_key',
+          'restrictions[account_operations][allowed_operations][]': 'read',
+        }).toString(),
+      })
 
-      // TODO: Sync to Vercel env var STRIPE_SECRET_KEY
-      // const vercelSync = await syncToVercel('STRIPE_SECRET_KEY', newKeyValue)
+      if (!createRes.ok) {
+        const error = await createRes.text()
+        return { ok: false, error: `Failed to create new key: ${error}` }
+      }
+
+      const newKeyData = await createRes.json()
+      const newKey = newKeyData.secret
+
+      // Revoke old key if available
+      if (apiKey && apiKey !== stripeKey) {
+        await fetch(`https://api.stripe.com/v1/api_keys/${apiKey.split('_')[2]}/revoke`, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Basic ' + Buffer.from(stripeKey + ':').toString('base64'),
+          },
+        }).catch(() => null) // Non-fatal if revoke fails
+      }
 
       return {
         ok: true,
         message: 'Stripe API key rotated successfully',
         data: {
           oldKey: apiKey.substring(0, 12) + '****' + apiKey.substring(apiKey.length - 4),
-          newKey: newKeyMasked,
+          newKey: newKey.substring(0, 12) + '****' + newKey.substring(newKey.length - 4),
           rotatedAt: new Date().toISOString(),
-          syncedToVercel: true,
+          syncedToVercel: false, // Manual step required
           auditLogged: true,
         },
       }
@@ -395,24 +423,45 @@ async function executeSupabaseAction(template: any, payload: Record<string, unkn
   // Key rotation: generate new service key
   if (template.id === 'supabase.rotate_key') {
     try {
-      // In production: call Supabase Management API to create new service key
-      // For now: simulate rotation
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+      if (!supabaseUrl || !supabaseKey) {
+        return { ok: false, error: 'Supabase credentials not configured' }
+      }
 
-      const newKeyMasked = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.' + Math.random().toString(36).substring(2, 20) + '****'
+      // Extract project ID from URL
+      const projectId = supabaseUrl.split('//')[1].split('.')[0]
 
-      // TODO: Sync to Vercel env var SUPABASE_SERVICE_ROLE_KEY
-      // const vercelSync = await syncToVercel('SUPABASE_SERVICE_ROLE_KEY', newKeyValue)
+      // Note: Supabase doesn't have a direct key rotation API in Management API
+      // Instead, we can create a new service key via the dashboard or API
+      // For now, log the rotation intent to the vault audit table
+      const auditRes = await createClient(supabaseUrl, supabaseKey)
+        .from('hub_vault_audit_log')
+        .insert([
+          {
+            secret_id: 'supabase-service-key',
+            action: 'rotated',
+            user_email: 'system@signalboost.local',
+            timestamp: new Date().toISOString(),
+            status: 'success',
+            message: 'Service key rotation initiated - generate new key via Supabase dashboard',
+          },
+        ])
+
+      if (auditRes.error) {
+        return { ok: false, error: `Audit logging failed: ${auditRes.error.message}` }
+      }
 
       return {
         ok: true,
-        message: 'Supabase service key rotated successfully',
+        message: 'Supabase service key rotation initiated',
         data: {
           oldKey: key.substring(0, 20) + '****' + key.substring(key.length - 4),
-          newKey: newKeyMasked,
+          newKey: '(generate via dashboard)', 
           rotatedAt: new Date().toISOString(),
-          syncedToVercel: true,
+          syncedToVercel: false,
           auditLogged: true,
+          note: 'Manual step: Generate new service key in Supabase dashboard > Project Settings > API Keys',
         },
       }
     } catch (err) {
@@ -528,25 +577,50 @@ async function executeVercelAction(template: any, payload: Record<string, unknow
   // Token rotation: generate new Vercel deploy token
   if (template.id === 'vercel.rotate_token') {
     try {
-      // In production: call Vercel API to create new token
-      // const res = await fetch('https://api.vercel.com/v9/tokens', {
-      //   method: 'POST',
-      //   headers: { 'Authorization': 'Bearer ' + token },
-      //   body: JSON.stringify({ name: 'vercel_deploy_rotated' })
-      // })
+      const vercelToken = process.env.VERCEL_TOKEN
+      if (!vercelToken) {
+        return { ok: false, error: 'VERCEL_TOKEN not configured' }
+      }
 
-      // For now: simulate rotation
-      await new Promise(resolve => setTimeout(resolve, 900))
+      // Create new Vercel token
+      const createRes = await fetch('https://api.vercel.com/v9/tokens', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${vercelToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: `SignalBoost-Vault-Rotated-${Date.now()}`,
+          expiresAt: Math.floor(Date.now() / 1000) + 90 * 24 * 60 * 60, // 90 days
+        }),
+      })
 
-      const newTokenMasked = 'vercel_' + Math.random().toString(36).substring(2, 10).toUpperCase() + '****'
+      if (!createRes.ok) {
+        const error = await createRes.text()
+        return { ok: false, error: `Failed to create new token: ${error}` }
+      }
+
+      const newTokenData = await createRes.json()
+      const newToken = newTokenData.token
+
+      // Revoke old token if available
+      if (token && token !== vercelToken) {
+        await fetch(`https://api.vercel.com/v9/tokens/${token}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${vercelToken}`,
+          },
+        }).catch(() => null) // Non-fatal if revoke fails
+      }
 
       return {
         ok: true,
         message: 'Vercel deploy token rotated successfully',
         data: {
           oldToken: token.substring(0, 15) + '****' + token.substring(token.length - 4),
-          newToken: newTokenMasked,
+          newToken: newToken.substring(0, 15) + '****' + newToken.substring(newToken.length - 4),
           rotatedAt: new Date().toISOString(),
+          expiresIn: '90 days',
           auditLogged: true,
         },
       }

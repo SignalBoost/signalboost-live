@@ -1,7 +1,9 @@
 // saas/app/api/hub/vault/route.ts
 // Key Vault API — owner/admin only.
-// GET    -> list items (names, provider, last4, dates — never values)
-//           GET ?audit=1 -> activity timeline (last 60 entries)
+// GET    -> ?providers=1 -> provider list (name + count) for the dropdown
+//           ?provider=Name -> that provider's keys only (dynamic retrieval)
+//           (no params)   -> all items (names, provider, last4, dates — never values)
+//           ?audit=1      -> activity timeline (last 60 entries)
 // POST   -> add item   { provider, label, value, expiresAt? }  (encrypted at rest)
 // PUT    -> reveal     { id }  (decrypts ONE item, stamps last_accessed_at)
 // DELETE -> remove     { id }
@@ -28,6 +30,18 @@ export async function GET(req: Request) {
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
   const admin = getAdminSupabase()
   const url = new URL(req.url)
+  // ?providers=1 -> lightweight list of providers that have keys (name + count).
+  // The home screen shows this dropdown; keys are fetched per provider on demand.
+  if (url.searchParams.get('providers') === '1') {
+    const { data, error } = await admin.from('vault_items').select('provider')
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    const counts: Record<string, number> = {}
+    for (const row of data || []) counts[row.provider] = (counts[row.provider] || 0) + 1
+    const providers = Object.entries(counts)
+      .map(([provider, count]) => ({ provider, count }))
+      .sort((a, b) => a.provider.localeCompare(b.provider))
+    return NextResponse.json({ providers })
+  }
   if (url.searchParams.get('audit') === '1') {
     const { data, error } = await admin
       .from('vault_audit')
@@ -37,11 +51,15 @@ export async function GET(req: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ audit: data || [] })
   }
-  const { data, error } = await admin
+  // ?provider=Name -> dynamic retrieval: only that provider's keys are fetched.
+  const providerFilter = url.searchParams.get('provider')
+  let query = admin
     .from('vault_items')
     .select('id, provider, label, last4, created_at, last_accessed_at, expires_at')
     .order('provider', { ascending: true })
     .order('label', { ascending: true })
+  if (providerFilter) query = query.eq('provider', providerFilter)
+  const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ items: data || [] })
 }

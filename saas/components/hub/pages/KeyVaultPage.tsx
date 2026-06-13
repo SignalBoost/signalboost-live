@@ -45,6 +45,8 @@ const V: Record<string, Record<Lang, string>> = {
   pickProv:    { en: 'Select a provider to retrieve its keys…', es: 'Selecciona un proveedor para recuperar sus claves…', pt: 'Selecione um provedor para recuperar suas chaves…', pl: 'Wybierz dostawcę, aby pobrać jego klucze…', ru: 'Выберите провайдера, чтобы получить его ключи…' },
   retrieving:  { en: 'Retrieving keys…', es: 'Recuperando claves…', pt: 'Recuperando chaves…', pl: 'Pobieranie kluczy…', ru: 'Получение ключей…' },
   noProviders: { en: 'The safe is empty. Add your first key — it will be encrypted before it is stored.', es: 'La caja está vacía. Agrega tu primera clave — se cifrará antes de guardarse.', pt: 'O cofre está vazio. Adicione sua primeira chave — ela será criptografada antes de ser armazenada.', pl: 'Sejf jest pusty. Dodaj pierwszy klucz — zostanie zaszyfrowany przed zapisaniem.', ru: 'Сейф пуст. Добавьте первый ключ — он будет зашифрован перед сохранением.' },
+  refreshed:   { en: '✓ Updated', es: '✓ Actualizado', pt: '✓ Atualizado', pl: '✓ Zaktualizowano', ru: '✓ Обновлено' },
+  refreshBtn:  { en: '↻ Refresh', es: '↻ Actualizar', pt: '↻ Atualizar', pl: '↻ Odśwież', ru: '↻ Обновить' },
 }
 function v(key: string, lang: Lang): string { const e = V[key]; return e ? (e[lang] || e.en) : key }
 
@@ -178,6 +180,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
   const [provList, setProvList] = useState<{ provider: string; count: number }[]>([])
   const [selProvider, setSelProvider] = useState<string | null>(null)
   const [ddOpen, setDdOpen] = useState(false)
+  const [refreshFlash, setRefreshFlash] = useState(false)
   const timersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const clipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -212,6 +215,14 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
     } finally {
       setSafeLoading(false)
     }
+  }
+
+  const refreshNow = async () => {
+    if (!selProvider) return
+    await retrieveKeys(selProvider)
+    await loadAudit()
+    setRefreshFlash(true)
+    setTimeout(() => setRefreshFlash(false), 1600)
   }
 
   const loadAudit = async () => {
@@ -330,7 +341,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
             <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.55)', maxWidth: 720 }}>{v('safeSub', lang)}</div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            {selProvider && <button onClick={() => { const p = selProvider; if (p) retrieveKeys(p) }} className="hub-btn" title="Refresh" style={{ padding: '9px 14px', borderRadius: 10, border: '1px solid rgba(26,240,255,.4)', background: 'rgba(26,240,255,.08)', color: '#1af0ff', fontSize: 14, fontWeight: 700 }}>{safeLoading ? '…' : '↻'}</button>}
+            {selProvider && <button onClick={refreshNow} className="hub-btn" title="Refresh" style={{ padding: '9px 14px', borderRadius: 10, border: refreshFlash ? '1px solid rgba(34,197,94,.6)' : '1px solid rgba(26,240,255,.4)', background: refreshFlash ? 'rgba(34,197,94,.14)' : 'rgba(26,240,255,.08)', color: refreshFlash ? '#86efac' : '#1af0ff', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>{safeLoading ? '…' : refreshFlash ? v('refreshed', lang) : v('refreshBtn', lang)}</button>}
             <button onClick={() => setShowAdd(true)} className="hub-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid rgba(255,195,0,.5)', background: 'rgba(255,195,0,.12)', color: '#ffc300', fontSize: 13, fontWeight: 800 }}>{v('addKey', lang)}</button>
           </div>
         </div>

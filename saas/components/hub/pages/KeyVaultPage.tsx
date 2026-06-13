@@ -6,6 +6,7 @@
 //   Add (modal) -> encrypted at rest. Reveal (eye) -> decrypts one key for 15s,
 //   stamps last_accessed_at. Delete -> confirmation modal. Values never logged.
 // Provider catalog: pick from known providers — canonical names, no typos.
+// Key details drawer: metadata, per-key history, provider dashboard links.
 // Activity timeline: vault_audit entries with action filters.
 // Clipboard auto-clears 10s after copy. Expiration dates raise severity banners.
 // SECTION 2 "Platform keys": read-only mirror of Vercel env variable NAMES.
@@ -46,6 +47,11 @@ const V: Record<string, Record<Lang, string>> = {
   timelineT:   { en: 'Activity timeline', es: 'Línea de actividad', pt: 'Linha de atividade', pl: 'Oś aktywności', ru: 'Лента активности' },
   tlAll:       { en: 'All', es: 'Todas', pt: 'Todas', pl: 'Wszystkie', ru: 'Все' },
   suggest:     { en: 'Suggestions', es: 'Sugerencias', pt: 'Sugestões', pl: 'Sugestie', ru: 'Подсказки' },
+  detailsT:    { en: 'Key details', es: 'Detalles de la clave', pt: 'Detalhes da chave', pl: 'Szczegóły klucza', ru: 'Детали ключа' },
+  createdT:    { en: 'Created', es: 'Creada', pt: 'Criada', pl: 'Utworzono', ru: 'Создан' },
+  historyT:    { en: 'History of this key', es: 'Historial de esta clave', pt: 'Histórico desta chave', pl: 'Historia tego klucza', ru: 'История этого ключа' },
+  openDash:    { en: 'Open provider dashboard', es: 'Abrir panel del proveedor', pt: 'Abrir painel do provedor', pl: 'Otwórz panel dostawcy', ru: 'Открыть панель провайдера' },
+  noHistory:   { en: 'No recorded actions yet.', es: 'Aún no hay acciones registradas.', pt: 'Ainda não há ações registradas.', pl: 'Brak zarejestrowanych działań.', ru: 'Действий пока не записано.' },
 }
 function v(key: string, lang: Lang): string { const e = V[key]; return e ? (e[lang] || e.en) : key }
 
@@ -116,6 +122,27 @@ const PROVIDERS: CatalogEntry[] = [
   { name: 'Brave Search', icon: '🦁', labels: ['API Key'] },
 ]
 
+// Direct links to each provider's dashboard for the details drawer.
+const PROVIDER_DASH: Record<string, string> = {
+  'Stripe': 'https://dashboard.stripe.com/apikeys',
+  'Supabase': 'https://supabase.com/dashboard',
+  'Vercel': 'https://vercel.com/account/settings/tokens',
+  'OpenAI': 'https://platform.openai.com/api-keys',
+  'Anthropic': 'https://console.anthropic.com/settings/keys',
+  'GitHub': 'https://github.com/settings/tokens',
+  'ElevenLabs': 'https://elevenlabs.io/app/settings/api-keys',
+  'AssemblyAI': 'https://www.assemblyai.com/app',
+  'Google Cloud': 'https://console.cloud.google.com/apis/credentials',
+  'AWS': 'https://console.aws.amazon.com/iam/home',
+  'Cloudflare': 'https://dash.cloudflare.com/profile/api-tokens',
+  'Resend': 'https://resend.com/api-keys',
+  'SendGrid': 'https://app.sendgrid.com/settings/api_keys',
+  'Twilio': 'https://console.twilio.com',
+  'Slack': 'https://api.slack.com/apps',
+  'Shopify': 'https://admin.shopify.com',
+  'Firebase': 'https://console.firebase.google.com',
+}
+
 // Non-blocking format hints: warn when a value does not match the provider's usual shape.
 function formatLooksOff(provider: string, value: string): boolean {
   if (!value) return false
@@ -151,6 +178,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
   const [customP, setCustomP] = useState(false)
   const [audit, setAudit] = useState<AuditEntry[]>([])
   const [tlFilter, setTlFilter] = useState('all')
+  const [drawerId, setDrawerId] = useState<string | null>(null)
   const timersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const clipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -244,6 +272,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
       if (!res.ok) throw new Error(json?.error || String(res.status))
       hideKey(id)
       setItems(prev => prev.filter(i => i.id !== id))
+      setDrawerId(null)
       loadAudit()
     } catch (err: any) {
       setSafeError(err?.message || 'Delete failed')
@@ -307,9 +336,9 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
             return (
               <div key={item.id} className="hub-card" style={{ borderRadius: 14, border: `1px solid ${tone.border}`, background: 'linear-gradient(160deg, rgba(15,23,42,.72), rgba(3,7,18,.86))', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                  <div style={{ minWidth: 0 }}>
+                  <div style={{ minWidth: 0, cursor: 'pointer' }} onClick={() => setDrawerId(item.id)} title={v('detailsT', lang)}>
                     <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: tone.strong }}>{item.provider}</div>
-                    <div style={{ fontSize: 14.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</div>
+                    <div style={{ fontSize: 14.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label} <span style={{ color: 'rgba(255,255,255,.35)', fontSize: 12 }}>›</span></div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                     <button onClick={() => shown ? hideKey(item.id) : revealKey(item.id)} title="Reveal" className="hub-chip" style={{ padding: '6px 10px', borderRadius: 9, fontSize: 14, background: shown ? 'rgba(26,240,255,.14)' : 'rgba(255,255,255,.05)', border: shown ? '1px solid rgba(26,240,255,.45)' : '1px solid rgba(255,255,255,.15)' }}>{shown ? '🙈' : '👁'}</button>
@@ -404,6 +433,65 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
           </div>
         )}
       </section>
+
+      {/* ── Key details drawer (portal) ─────────────────────────────── */}
+      {drawerId && typeof document !== 'undefined' && (() => {
+        const item = items.find(i => i.id === drawerId)
+        if (!item) return null
+        const tone = toneFor(item.provider)
+        const icon = PROVIDERS.find(p => p.name === item.provider)?.icon || '🧩'
+        const dash = PROVIDER_DASH[item.provider]
+        const history = audit.filter(a => a.provider === item.provider && a.label === item.label).slice(0, 15)
+        const expT = item.expires_at ? new Date(item.expires_at).getTime() : null
+        const expired = expT !== null && expT < Date.now()
+        const soon = expT !== null && !expired && expT < Date.now() + 14 * DAY
+        return createPortal(
+          <div style={{ position: 'fixed', inset: 0, zIndex: 55, background: 'rgba(3,7,18,.55)', backdropFilter: 'blur(3px)' }} onClick={() => setDrawerId(null)}>
+            <div onClick={e => e.stopPropagation()} className="hub-panel" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(420px, 92vw)', background: 'linear-gradient(200deg, rgba(15,23,42,.99), rgba(3,7,18,1))', borderLeft: `1px solid ${tone.border}`, boxShadow: '-30px 0 80px rgba(0,0,0,.55)', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                  <span style={{ width: 40, height: 40, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, background: tone.soft, border: `1px solid ${tone.border}`, flexShrink: 0 }}>{icon}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: tone.strong }}>{item.provider}</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</div>
+                  </div>
+                </div>
+                <button onClick={() => setDrawerId(null)} className="hub-chip" style={{ padding: '7px 12px', borderRadius: 9, fontSize: 14, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.15)', color: 'rgba(255,255,255,.7)', flexShrink: 0 }}>✕</button>
+              </div>
+
+              <div style={{ ...monoStyle, fontSize: 13, padding: '10px 13px', borderRadius: 10, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>••••••••••••{item.last4}</div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.55)' }}>{v('createdT', lang)}</span><span style={monoStyle}>{fmtDate(item.created_at)}</span></div>
+                <div style={rowStyle}><span style={{ color: 'rgba(255,255,255,.55)' }}>{v('lastUsed', lang)}</span><span style={monoStyle}>{fmtDate(item.last_accessed_at)}</span></div>
+                <div style={{ ...rowStyle, border: expired ? '1px solid rgba(239,68,68,.5)' : soon ? '1px solid rgba(255,195,0,.5)' : rowStyle.border }}>
+                  <span style={{ color: 'rgba(255,255,255,.55)' }}>{v('expires', lang)}</span>
+                  <span style={{ ...monoStyle, color: expired ? '#fca5a5' : soon ? '#ffc300' : undefined }}>{item.expires_at ? (expired ? '⛔ ' : soon ? '⚠️ ' : '') + fmtDate(item.expires_at) : '—'}</span>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ ...labelStyle, marginBottom: 7 }}>{v('historyT', lang)}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {history.map(a => (
+                    <div key={a.id} style={{ ...rowStyle, gap: 10 }}>
+                      <span style={{ ...monoStyle, color: '#1af0ff', flexShrink: 0 }}>{fmtDate(a.created_at)}</span>
+                      <span style={{ fontSize: 11.5, fontWeight: 800, textTransform: 'uppercase', flexShrink: 0, color: a.action === 'delete' ? '#fca5a5' : a.action === 'reveal' ? '#ffc300' : a.action === 'copy' ? '#1af0ff' : '#86efac' }}>{a.action}</span>
+                      <span style={{ ...monoStyle, color: 'rgba(255,255,255,.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'right' }}>{a.actor}</span>
+                    </div>
+                  ))}
+                  {history.length === 0 && <div style={{ ...rowStyle, color: 'rgba(255,255,255,.45)' }}>{v('noHistory', lang)}</div>}
+                </div>
+              </div>
+
+              <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 9 }}>
+                {dash && <a href={dash} target="_blank" rel="noreferrer" className="hub-btn" style={{ display: 'block', textAlign: 'center', padding: '11px 14px', borderRadius: 11, border: `1px solid ${tone.border}`, background: tone.soft, color: '#fff', fontSize: 13.5, fontWeight: 700, textDecoration: 'none' }}>↗ {v('openDash', lang)}</a>}
+                <button onClick={() => setConfirmId(item.id)} className="hub-btn" style={{ padding: '11px 14px', borderRadius: 11, border: '1px solid rgba(239,68,68,.45)', background: 'rgba(239,68,68,.1)', color: '#fca5a5', fontSize: 13.5, fontWeight: 800 }}>🗑 {v('deleteBtn', lang)}</button>
+              </div>
+            </div>
+          </div>
+        , document.body)
+      })()}
 
       {/* ── Add Key modal (portal: escapes the slider's CSS transform) ── */}
       {showAdd && typeof document !== 'undefined' && createPortal(

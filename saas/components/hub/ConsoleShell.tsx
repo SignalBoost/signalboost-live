@@ -1,7 +1,7 @@
 'use client'
 
 // saas/components/hub/ConsoleShell.tsx
-// Hub Console — direct workspace navigation for Dashboard, Vault, and Providers.
+// Hub Console — Dashboard and Providers monitor shell with direct Vault link.
 
 import { useCallback, useEffect, useState } from 'react'
 import { Lang, LANGS, HubData, c, labelStyle, Dot } from './shared'
@@ -17,19 +17,8 @@ type PageKey = typeof PAGES[number]['key']
 
 function isRefreshButton(button: HTMLButtonElement | null): boolean {
   if (!button) return false
-  const text = button.textContent || ''
-  const title = button.getAttribute('title') || ''
-  const haystack = `${text} ${title}`.toLowerCase()
-
-  return (
-    haystack.includes('refresh') ||
-    haystack.includes('updated') ||
-    haystack.includes('actualizar') ||
-    haystack.includes('atualizar') ||
-    haystack.includes('odśwież') ||
-    haystack.includes('обновить') ||
-    haystack.includes('↻')
-  )
+  const haystack = `${button.textContent || ''} ${button.getAttribute('title') || ''}`.toLowerCase()
+  return ['refresh', 'updated', 'actualizar', 'atualizar', 'odśwież', 'обновить', '↻'].some(word => haystack.includes(word))
 }
 
 function navigateToFreshHub() {
@@ -64,7 +53,6 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
   }, [])
 
   useEffect(() => { load() }, [load])
-
   useEffect(() => {
     const onRefresh = () => { void load() }
     window.addEventListener('signalboost:hub-refresh', onRefresh)
@@ -74,45 +62,43 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
   useEffect(() => {
     const fromHash = () => {
       const h = window.location.hash.replace('#', '')
-      const i = PAGES.findIndex(p => p.key === h)
-      if (i >= 0) setIdx(i)
+      const next = PAGES.findIndex(p => p.key === h)
+      if (next >= 0) setIdx(next)
     }
     fromHash()
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
-      if (e.key === 'ArrowRight') setIdx(i => Math.min(i + 1, PAGES.length - 1))
-      if (e.key === 'ArrowLeft') setIdx(i => Math.max(i - 1, 0))
+      if (event.key === 'ArrowRight') go(idx + 1)
+      if (event.key === 'ArrowLeft') go(idx - 1)
     }
     window.addEventListener('hashchange', fromHash)
     window.addEventListener('keydown', onKey)
-    return () => { window.removeEventListener('hashchange', fromHash); window.removeEventListener('keydown', onKey) }
-  }, [])
+    return () => {
+      window.removeEventListener('hashchange', fromHash)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [idx])
 
-  const go = (i: number) => {
-    const next = Math.max(0, Math.min(i, PAGES.length - 1))
+  const go = (pageIndex: number) => {
+    const next = Math.max(0, Math.min(pageIndex, PAGES.length - 1))
     setIdx(next)
     window.history.replaceState(null, '', '#' + PAGES[next].key)
   }
+
+  const navButtonStyle = (active: boolean): React.CSSProperties => ({
+    display: 'flex', alignItems: 'center', gap: 7, padding: '7px 13px', borderRadius: 10,
+    fontSize: 12.5, fontWeight: 700, textDecoration: 'none',
+    background: active ? 'rgba(255,195,0,.12)' : 'rgba(255,255,255,.04)',
+    border: active ? '1px solid rgba(255,195,0,.5)' : '1px solid rgba(255,255,255,.12)',
+    color: active ? '#ffc300' : 'rgba(255,255,255,.65)',
+  })
 
   const supaOk = !!data?.supabase.ok
   const stripeOk = !!data?.stripe.ok
   const vercelConfigured = !!data?.vercel.configured
   const vercelOk = !!data?.vercel.ok
-
-  const navButtonStyle = (active: boolean): React.CSSProperties => ({
-    display: 'flex',
-    alignItems: 'center',
-    gap: 7,
-    padding: '7px 13px',
-    borderRadius: 10,
-    fontSize: 12.5,
-    fontWeight: 700,
-    background: active ? 'rgba(255,195,0,.12)' : 'rgba(255,255,255,.04)',
-    border: active ? '1px solid rgba(255,195,0,.5)' : '1px solid rgba(255,255,255,.12)',
-    color: active ? '#ffc300' : 'rgba(255,255,255,.65)',
-    textDecoration: 'none',
-  })
+  const ActivePage = PAGES[idx].Component
 
   return (
     <div
@@ -126,7 +112,7 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
       }}
       style={{ minHeight: '100vh', background: 'radial-gradient(1100px 500px at 80% -10%, rgba(26,240,255,.10), transparent 60%), radial-gradient(900px 480px at 0% 110%, rgba(255,195,0,.07), transparent 55%), linear-gradient(180deg, #0b1220 0%, #030712 100%)', color: '#fff', padding: '18px clamp(14px, 1.6vw, 34px) 14px', fontFamily: 'Inter, system-ui, -apple-system, sans-serif', overflow: 'hidden' }}
     >
-      <style>{`.hub-card{transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease;} .hub-card:hover{transform:translateY(-3px); box-shadow:0 24px 60px rgba(0,0,0,.55);} .hub-chip{transition:background .15s ease, color .15s ease, border-color .15s ease; cursor:pointer;} .hub-chip:hover{border-color:rgba(255,195,0,.6);} .hub-btn{transition:filter .15s ease, transform .12s ease; cursor:pointer;} .hub-btn:hover{transform:translateY(-1px); filter:brightness(1.25);} .hub-panel::-webkit-scrollbar{width:8px;} .hub-panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:8px;} .hub-panel::-webkit-scrollbar-track{background:transparent;} @keyframes hubPulse{0%,100%{opacity:.45}50%{opacity:1}} .hub-loading{animation:hubPulse 1.4s ease infinite;} @media (min-width:1100px){ .hub-root{height:calc(100vh - 80px);min-height:0;} .hub-frame{display:flex;flex-direction:column;height:100%;min-height:0;} .hub-stage{flex:1;min-height:0;} .hub-main{grid-auto-rows:minmax(0,1fr);} .hub-panel{overflow-y:auto;min-height:0;} }`}</style>
+      <style>{`.hub-card{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}.hub-card:hover{transform:translateY(-3px);box-shadow:0 24px 60px rgba(0,0,0,.55)}.hub-chip{transition:background .15s ease,color .15s ease,border-color .15s ease;cursor:pointer}.hub-btn{transition:filter .15s ease,transform .12s ease;cursor:pointer}.hub-btn:hover{transform:translateY(-1px);filter:brightness(1.25)}.hub-panel::-webkit-scrollbar{width:8px}.hub-panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:8px}.hub-panel::-webkit-scrollbar-track{background:transparent}@keyframes hubPulse{0%,100%{opacity:.45}50%{opacity:1}}.hub-loading{animation:hubPulse 1.4s ease infinite}.hub-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:20;width:42px;height:70px;display:flex;align-items:center;justify-content:center;font-size:24px;color:rgba(255,255,255,.65);background:rgba(15,23,42,.72);border:1px solid rgba(255,255,255,.14);cursor:pointer;backdrop-filter:blur(8px)}.hub-arrow:hover{color:#1af0ff;background:rgba(15,23,42,.9)}@media (min-width:1100px){.hub-root{height:calc(100vh - 80px);min-height:0}.hub-frame{display:flex;flex-direction:column;height:100%;min-height:0}.hub-stage{flex:1;min-height:0}.hub-panel{overflow-y:auto;min-height:0}}`}</style>
 
       <div className="hub-frame" style={{ width: '100%' }}>
         <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 14, marginBottom: 12, flexShrink: 0 }}>
@@ -134,6 +120,7 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
             <h1 style={{ margin: 0, fontSize: 'clamp(22px, 2.6vw, 30px)', fontWeight: 800, letterSpacing: '-.02em', background: 'linear-gradient(90deg, #fff 30%, #1af0ff 75%, #ffc300 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{c('title', lang)}</h1>
             <p style={{ margin: '3px 0 0', fontSize: 13, color: 'rgba(255,255,255,.55)' }}><span style={{ color: '#1af0ff' }}>{c('phaseBadge', lang)}</span></p>
           </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <nav style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <button onClick={() => go(0)} className="hub-chip" style={navButtonStyle(idx === 0)}>🛰️ Dashboard</button>
@@ -156,13 +143,9 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
         </header>
 
         <div className="hub-stage" style={{ position: 'relative', overflow: 'hidden', flex: 1, minHeight: 0 }}>
-          <div style={{ display: 'flex', width: `${PAGES.length * 100}%`, height: '100%', transform: `translateX(-${idx * (100 / PAGES.length)}%)`, transition: 'transform .45s cubic-bezier(.22,.8,.3,1)' }}>
-            {PAGES.map(p => (
-              <div key={p.key} style={{ width: `${100 / PAGES.length}%`, height: '100%', minHeight: 0, padding: '2px 2px 0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                <p.Component lang={lang} data={data} loading={loading} failed={failed} />
-              </div>
-            ))}
-          </div>
+          {idx > 0 && <button onClick={() => go(idx - 1)} className="hub-arrow" style={{ left: 0, borderRadius: '0 12px 12px 0', borderLeft: 'none' }}>‹</button>}
+          {idx < PAGES.length - 1 && <button onClick={() => go(idx + 1)} className="hub-arrow" style={{ right: 0, borderRadius: '12px 0 0 12px', borderRight: 'none' }}>›</button>}
+          <ActivePage lang={lang} data={data} loading={loading} failed={failed} />
         </div>
       </div>
     </div>

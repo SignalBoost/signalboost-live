@@ -94,7 +94,8 @@ export async function scanAWSUsers(
 
     const text = await response.text()
     // Parse XML response (simplified - extract user entries)
-    const userMatches = text.match(/<User>.*?<\/User>/gs) || []
+    const normalized = text.replace(/\n/g, '') // Remove newlines
+    const userMatches = normalized.match(/<User>.*?<\/User>/g) || []
     const users: AWSUser[] = userMatches.map(xml => {
       const usernameMatch = xml.match(/<UserName>(.*?)<\/UserName>/)
       const arnMatch = xml.match(/<Arn>(.*?)<\/Arn>/)

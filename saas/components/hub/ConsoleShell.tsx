@@ -2,15 +2,15 @@
 'use client'
 
 import { useState } from 'react'
-import { DashboardHubPage } from './pages/DashboardHubPage'
-import { KeyVaultV2Page } from './pages/KeyVaultV2Page'
-import { ProviderGridPage } from './pages/ProviderGridPage'
-import { DomainsPage } from './pages/DomainsPage'
-import { LogsPage } from './pages/LogsPage'
-import { DeploymentsPage } from './pages/DeploymentsPage'
-import { SettingsPage } from './pages/SettingsPage'
-import { WebhooksPage } from './pages/WebhooksPage'
-import { UsersPage } from './pages/UsersPage'
+import DashboardPage from './pages/DashboardPage'
+import KeyVaultV2Page from './pages/KeyVaultV2Page'
+import ProviderGridPage from './pages/ProviderGridPage'
+import DomainsPage from './pages/DomainsPage'
+import LogsPage from './pages/LogsPage'
+import DeploymentsPage from './pages/DeploymentsPage'
+import SettingsPage from './pages/SettingsPage'
+import WebhooksPage from './pages/WebhooksPage'
+import UsersPage from './pages/UsersPage'
 
 type PageKey = 'dashboard' | 'vault' | 'providers' | 'domains' | 'logs' | 'deployments' | 'settings' | 'webhooks' | 'users'
 
@@ -22,18 +22,18 @@ interface Page {
 }
 
 const PAGES: Page[] = [
-  { key: 'dashboard', label: 'Dashboard Hub', icon: '🛰️', component: <DashboardHubPage /> },
-  { key: 'vault', label: 'Key Vault', icon: '🔐', component: <KeyVaultV2Page /> },
-  { key: 'providers', label: 'AI Providers', icon: '🧭', component: <ProviderGridPage /> },
-  { key: 'domains', label: 'Domains/DNS', icon: '🌐', component: <DomainsPage /> },
-  { key: 'logs', label: 'Logs', icon: '📊', component: <LogsPage /> },
-  { key: 'deployments', label: 'Deployments', icon: '🚀', component: <DeploymentsPage /> },
-  { key: 'webhooks', label: 'Webhooks', icon: '🔗', component: <WebhooksPage /> },
-  { key: 'settings', label: 'Settings', icon: '⚙️', component: <SettingsPage /> },
-  { key: 'users', label: 'Team', icon: '👥', component: <UsersPage /> },
+  { key: 'dashboard', label: 'Dashboard Hub', icon: '🛰️', component: <DashboardPage lang="en" /> },
+  { key: 'vault', label: 'Key Vault', icon: '🔐', component: <KeyVaultV2Page lang="en" /> },
+  { key: 'providers', label: 'AI Providers', icon: '🧭', component: <ProviderGridPage lang="en" /> },
+  { key: 'domains', label: 'Domains/DNS', icon: '🌐', component: <DomainsPage lang="en" /> },
+  { key: 'logs', label: 'Logs', icon: '📊', component: <LogsPage lang="en" /> },
+  { key: 'deployments', label: 'Deployments', icon: '🚀', component: <DeploymentsPage lang="en" /> },
+  { key: 'webhooks', label: 'Webhooks', icon: '🔗', component: <WebhooksPage lang="en" /> },
+  { key: 'settings', label: 'Settings', icon: '⚙️', component: <SettingsPage lang="en" /> },
+  { key: 'users', label: 'Team', icon: '👥', component: <UsersPage lang="en" /> },
 ]
 
-export function ConsoleShell({ initialPage = 'dashboard' }: { initialPage?: PageKey }) {
+export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPage?: PageKey }) {
   const [currentPage, setCurrentPage] = useState<PageKey>(initialPage)
 
   const activePage = PAGES.find(p => p.key === currentPage) || PAGES[0]

@@ -48,9 +48,11 @@ export default function RotationModal({ secret, onClose, onRotate, requiresMFA =
           // Send success notification
           await notifyBoth({
             event: 'rotation_success',
-            secret_id: secret.id,
+            secretName: secret.secret_name,
             provider: secret.provider_name,
-            secret_name: secret.secret_name,
+            severity: 'info',
+            message: `Successfully rotated ${secret.secret_name} for ${secret.provider_name}`,
+            timestamp: new Date().toISOString(),
           })
         } else {
           setError(result.error || 'Rotation failed')
@@ -58,10 +60,11 @@ export default function RotationModal({ secret, onClose, onRotate, requiresMFA =
           // Send failure notification
           await notifyBoth({
             event: 'rotation_failed',
-            secret_id: secret.id,
+            secretName: secret.secret_name,
             provider: secret.provider_name,
-            secret_name: secret.secret_name,
-            error: result.error,
+            severity: 'critical',
+            message: `Failed to rotate ${secret.secret_name}: ${result.error}`,
+            timestamp: new Date().toISOString(),
           })
         }
       } else {
@@ -72,9 +75,11 @@ export default function RotationModal({ secret, onClose, onRotate, requiresMFA =
         // Send demo notification
         await notifyBoth({
           event: 'rotation_success',
-          secret_id: secret.id,
+          secretName: secret.secret_name,
           provider: secret.provider_name,
-          secret_name: secret.secret_name,
+          severity: 'info',
+          message: `Successfully rotated ${secret.secret_name} for ${secret.provider_name}`,
+          timestamp: new Date().toISOString(),
         })
       }
     } catch (err) {
@@ -84,10 +89,11 @@ export default function RotationModal({ secret, onClose, onRotate, requiresMFA =
       // Send error notification
       await notifyBoth({
         event: 'rotation_failed',
-        secret_id: secret.id,
+        secretName: secret.secret_name,
         provider: secret.provider_name,
-        secret_name: secret.secret_name,
-        error: msg,
+        severity: 'critical',
+        message: `Error rotating ${secret.secret_name}: ${msg}`,
+        timestamp: new Date().toISOString(),
       })
     }
   }

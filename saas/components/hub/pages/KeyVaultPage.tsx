@@ -188,7 +188,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
     setSafeLoading(true)
     setSafeError(null)
     try {
-      const res = await fetch('/api/hub/vault?providers=1', { cache: 'no-store' })
+      const res = await fetch('/api/hub/vault?providers=1&t=' + Date.now(), { cache: 'no-store' })
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || String(res.status))
       setProvList(json.providers || [])
@@ -206,7 +206,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
     setSafeLoading(true)
     setSafeError(null)
     try {
-      const res = await fetch('/api/hub/vault?provider=' + encodeURIComponent(provider), { cache: 'no-store' })
+      const res = await fetch('/api/hub/vault?provider=' + encodeURIComponent(provider) + '&t=' + Date.now(), { cache: 'no-store' })
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || String(res.status))
       setItems(json.items || [])
@@ -235,7 +235,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
 
   const loadAudit = async () => {
     try {
-      const res = await fetch('/api/hub/vault?audit=1', { cache: 'no-store' })
+      const res = await fetch('/api/hub/vault?audit=1&t=' + Date.now(), { cache: 'no-store' })
       const json = await res.json()
       if (res.ok) setAudit(json.audit || [])
     } catch {}

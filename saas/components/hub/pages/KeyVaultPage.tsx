@@ -1,23 +1,12 @@
 'use client'
 
 // saas/components/hub/pages/KeyVaultPage.tsx
-// Console Page 2 — Key Vault.
-// SECTION 1 "My Safe": Bitwarden-style encrypted storage (vault_items table).
-//   Dynamic retrieval: provider dropdown (grouped by category) loads first;
-//   keys are fetched from Supabase only when a provider is selected.
-//   Add (modal) -> encrypted at rest. Reveal (eye) -> decrypts one key for 15s,
-//   stamps last_accessed_at. Delete -> confirmation modal. Values never logged.
-// Provider catalog: pick from known providers — canonical names, no typos.
-// Key details drawer: metadata, per-key history, provider dashboard links.
-// Activity timeline: vault_audit entries with action filters.
-// Clipboard auto-clears 10s after copy. Expiration dates raise severity banners.
-// SECTION 2 "Platform keys": read-only mirror of Vercel env variable NAMES.
+// Console Page 2 — Key Vault. Dynamic retrieval + safe + drawer + timeline.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { PageProps, Lang, c, TONES, Tone, cardStyle, bodyStyle, labelStyle, rowStyle, monoStyle, Band, Status } from '../shared'
 
-// ── Local translations (vault-specific) ─────────────────────────────────────
 const V: Record<string, Record<Lang, string>> = {
   mySafe:      { en: 'My Safe', es: 'Mi Caja Fuerte', pt: 'Meu Cofre', pl: 'Mój Sejf', ru: 'Мой сейф' },
   safeSub:     { en: 'Your encrypted key storage. Paste a key once — retrieve it whenever you need it.', es: 'Tu almacenamiento cifrado de claves. Pega una clave una vez — recupérala cuando la necesites.', pt: 'Seu armazenamento criptografado de chaves. Cole uma chave uma vez — recupere quando precisar.', pl: 'Twoje zaszyfrowane klucze. Wklej klucz raz — odzyskaj go, gdy będzie potrzebny.', ru: 'Ваше зашифрованное хранилище ключей. Вставьте ключ один раз — получите его, когда нужно.' },
@@ -25,7 +14,7 @@ const V: Record<string, Record<Lang, string>> = {
   provider:    { en: 'Provider', es: 'Proveedor', pt: 'Provedor', pl: 'Dostawca', ru: 'Провайдер' },
   labelF:      { en: 'Name / label', es: 'Nombre / etiqueta', pt: 'Nome / rótulo', pl: 'Nazwa / etykieta', ru: 'Имя / метка' },
   valueF:      { en: 'Secret value', es: 'Valor secreto', pt: 'Valor secreto', pl: 'Wartość sekretna', ru: 'Секретное значение' },
-  save:        { en: 'Save to safe', es: 'Guardar en la caja', pt: 'Salvar no cofre', pl: 'Zapisz w sejfie', ru: 'Сохранить в сeyф' },
+  save:        { en: 'Save to safe', es: 'Guardar en la caja', pt: 'Salvar no cofre', pl: 'Zapisz w sejfie', ru: 'Сохранить в сейф' },
   saving:      { en: 'Encrypting…', es: 'Cifrando…', pt: 'Criptografando…', pl: 'Szyfrowanie…', ru: 'Шифрование…' },
   cancel:      { en: 'Cancel', es: 'Cancelar', pt: 'Cancelar', pl: 'Anuluj', ru: 'Отмена' },
   copyBtn:     { en: 'Copy', es: 'Copiar', pt: 'Copiar', pl: 'Kopiuj', ru: 'Копировать' },
@@ -35,7 +24,6 @@ const V: Record<string, Record<Lang, string>> = {
   confirmBody: { en: 'This permanently removes it from the safe. The provider key itself is not affected.', es: 'Esto la elimina permanentemente de la caja. La clave del proveedor no se ve afectada.', pt: 'Isso a remove permanentemente do cofre. A chave do provedor não é afetada.', pl: 'To trwale usuwa go z sejfu. Sam klucz dostawcy nie jest naruszony.', ru: 'Это навсегда удалит его из сейфа. Сам ключ провайдера не затрагивается.' },
   lastUsed:    { en: 'Last revealed', es: 'Última revelación', pt: 'Última revelação', pl: 'Ostatnio ujawniono', ru: 'Последний просмотр' },
   never:       { en: 'never', es: 'nunca', pt: 'nunca', pl: 'nigdy', ru: 'никогда' },
-  emptySafe:   { en: 'The safe is empty. Add your first key — it will be encrypted before it is stored.', es: 'La caja está vacía. Agrega tu primera clave — se cifrará antes de guardarse.', pt: 'O cofre está vazio. Adicione sua primeira chave — ela será criptografada antes de ser armazenada.', pl: 'Sejf jest pusty. Dodaj pierwszy klucz — zostanie zaszyfrowany przed zapisaniem.', ru: 'Сейф пуст. Добавьте первый ключ — он будет зашифрован перед сохранением.' },
   platformKeys:{ en: 'Platform keys (Vercel mirror, read-only)', es: 'Claves de la plataforma (espejo de Vercel, solo lectura)', pt: 'Chaves da plataforma (espelho da Vercel, somente leitura)', pl: 'Klucze platformy (lustro Vercel, tylko odczyt)', ru: 'Ключи платформы (зеркало Vercel, только чтение)' },
   hidesSoon:   { en: 'hides automatically in 15s', es: 'se oculta automáticamente en 15s', pt: 'oculta automaticamente em 15s', pl: 'ukryje się automatycznie za 15s', ru: 'скроется автоматически через 15с' },
   clipClears:  { en: 'clipboard clears in 10s', es: 'el portapapeles se borra en 10s', pt: 'a área de transferência limpa em 10s', pl: 'schowek wyczyści się za 10s', ru: 'буфер очистится через 10с' },
@@ -342,7 +330,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
             <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.55)', maxWidth: 720 }}>{v('safeSub', lang)}</div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-           {selProvider && <button onClick={() => { if (selProvider) retrieveKeys(selProvider) }} className="hub-btn" style={{ padding: '9px 14px', borderRadius: 10, border: '1px solid rgba(26,240,255,.4)', background: 'rgba(26,240,255,.08)', color: '#1af0ff', fontSize: 13, fontWeight: 700 }}>{safeLoading ? '…' : '↻'}</button>}
+            {selProvider && <button onClick={() => { const p = selProvider; if (p) retrieveKeys(p) }} className="hub-btn" title="Refresh" style={{ padding: '9px 14px', borderRadius: 10, border: '1px solid rgba(26,240,255,.4)', background: 'rgba(26,240,255,.08)', color: '#1af0ff', fontSize: 14, fontWeight: 700 }}>{safeLoading ? '…' : '↻'}</button>}
             <button onClick={() => setShowAdd(true)} className="hub-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid rgba(255,195,0,.5)', background: 'rgba(255,195,0,.12)', color: '#ffc300', fontSize: 13, fontWeight: 800 }}>{v('addKey', lang)}</button>
           </div>
         </div>
@@ -444,7 +432,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
           {audit.filter(a => tlFilter === 'all' || a.action === tlFilter).slice(0, 40).map(a => (
             <div key={a.id} style={{ ...rowStyle, gap: 12 }}>
               <span style={{ ...monoStyle, color: '#1af0ff', flexShrink: 0 }}>{fmtDate(a.created_at)}</span>
-              <span style={{ fontSize: 11.5, fontWeight: 800, textTransform: 'uppercase', flexShrink: 0, color: a.action === 'delete' ? '#fca5a5' : a.action === 'reveal' ? '#ffc300' : a.action === 'copy' ? '#1af0ff' : '#86efac' }}>{a.action}</span>
+              <span style={{ fontSize: 11.5, fontWeight: 800, textTransform: 'uppercase', flexShrink: 0, color: a.action === 'delete' ? '#fca5a5' : a.action === 'reveal' ? '#ffc300' : a.action === 'copy' ? '#1af0ff' : a.action === 'sync_vercel' ? '#c4b5fd' : '#86efac' }}>{a.action}</span>
               <span style={{ fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{a.provider} · {a.label}</span>
               <span style={{ ...monoStyle, color: 'rgba(255,255,255,.4)', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 160 }}>{a.actor}</span>
             </div>

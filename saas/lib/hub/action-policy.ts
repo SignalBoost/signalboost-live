@@ -203,6 +203,17 @@ export const HUB_ACTION_POLICIES: Record<string, HubActionPolicy> = {
     productionSensitive: false,
     description: 'Create a prediction against a Replicate model. API calls incur cost and require admin approval and audit.',
   },
+  rotate_credential: {
+    id: 'rotate_credential',
+    label: 'Rotate credential',
+    level: 'execute_change',
+    risk: 'high',
+    approval: 'owner_with_audit',
+    auditRequired: true,
+    rollbackRequired: true,
+    productionSensitive: true,
+    description: 'Generate new credential, revoke old one, sync to environment. Requires owner approval and audit trail. Rollback support required.',
+  },
 }
 
 export function getHubActionPolicy(actionId: string): HubActionPolicy {

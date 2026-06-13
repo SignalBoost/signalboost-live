@@ -209,7 +209,7 @@ export default function RotationModal({ secret, onClose, onRotate, requiresMFA =
         {step === 'mfa' && (
           <MFAVerification
             operation="rotation"
-            secret name={secret.secret_name}
+            secret_name={secret.secret_name}
             onSuccess={handleMFASuccess}
             onCancel={onClose}
           />

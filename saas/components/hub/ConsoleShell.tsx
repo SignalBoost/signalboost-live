@@ -1,55 +1,63 @@
 'use client'
 
 // saas/components/hub/ConsoleShell.tsx
-// SignalBoost Command Control — unified shell for Dashboard, Vault, Provider Health, and Providers.
+// SignalBoost Command Control — unified shell for all command monitors.
 
 import { useCallback, useEffect, useState } from 'react'
 import { Lang, HubData } from './shared'
 import DashboardPage from './pages/DashboardPage'
 import VaultMonitorPage from './pages/VaultMonitorPage'
 import ProviderHealthPage from './pages/ProviderHealthPage'
+import SecurityAlertsPage from './pages/SecurityAlertsPage'
+import UsageCostPage from './pages/UsageCostPage'
+import AuditLogPage from './pages/AuditLogPage'
+import TeamAccessPage from './pages/TeamAccessPage'
+import SetupCenterPage from './pages/SetupCenterPage'
+import AIOperationsPage from './pages/AIOperationsPage'
 import ProviderExpansionPage from './pages/ProviderExpansionPage'
 import CommandShell from '../command-control/CommandShell'
 import type { CommandPage, CommandPageKey, CommandRailSection } from '../command-control/types'
 
 const PAGES: CommandPage[] = [
-  { key: 'dashboard', icon: '🛰️', title: 'Dashboard', eyebrow: 'Main console', description: 'Live internal platform status for Supabase, Stripe, and Vercel.', Component: DashboardPage },
-  { key: 'vault', icon: '🔐', title: 'Keys & Secrets', eyebrow: 'Governance workspace', description: 'Credential inventory, environment coverage, and future key rotation workflows.', Component: VaultMonitorPage },
-  { key: 'health', icon: '🩺', title: 'Provider Health', eyebrow: 'Operations monitor', description: 'Essential health and risk signals for enabled cloud and SaaS providers.', Component: ProviderHealthPage },
-  { key: 'providers', icon: '🧭', title: 'Providers', eyebrow: 'Provider manual', description: 'Provider setup guidance, automation value, and enable/disable preferences.', Component: ProviderExpansionPage },
+  { key: 'dashboard', icon: '🛰️', title: 'Dashboard', eyebrow: 'Monitor 1', description: 'Live internal platform status for Supabase, Stripe, and Vercel.', Component: DashboardPage },
+  { key: 'vault', icon: '🔐', title: 'Keys & Secrets', eyebrow: 'Monitor 2', description: 'Credential inventory, environment coverage, and future key rotation workflows.', Component: VaultMonitorPage },
+  { key: 'health', icon: '🩺', title: 'Provider Health', eyebrow: 'Monitor 3', description: 'Essential health and risk signals for enabled cloud and SaaS providers.', Component: ProviderHealthPage },
+  { key: 'security', icon: '🛡️', title: 'Security Alerts', eyebrow: 'Monitor 5', description: 'Security findings, severity, impact, and recommended fixes.', Component: SecurityAlertsPage },
+  { key: 'usage', icon: '📊', title: 'Usage & Cost', eyebrow: 'Monitor 6', description: 'Usage increases, cost spikes, and threshold alerts.', Component: UsageCostPage },
+  { key: 'audit', icon: '🧾', title: 'Audit Log', eyebrow: 'Monitor 7', description: 'A record of important user, system, and provider actions.', Component: AuditLogPage },
+  { key: 'team', icon: '👥', title: 'Team & Access', eyebrow: 'Monitor 8', description: 'Role visibility and access governance for the command center.', Component: TeamAccessPage },
+  { key: 'setup', icon: '🧩', title: 'Setup Center', eyebrow: 'Monitor 9', description: 'Step-by-step provider connection guidance for non-technical users.', Component: SetupCenterPage },
+  { key: 'aiops', icon: '🧠', title: 'AI Operations Center', eyebrow: 'Monitor 10', description: 'Recommended actions across security, health, cost, and setup.', Component: AIOperationsPage },
+  { key: 'providers', icon: '🧭', title: 'Providers', eyebrow: 'Monitor 4', description: 'Provider setup guidance, automation value, and enable/disable preferences.', Component: ProviderExpansionPage },
 ]
 
 const COMMAND_SECTIONS: CommandRailSection[] = [
   {
-    title: 'Main',
+    title: 'Main Monitors',
     items: [
-      { key: 'dashboard', icon: '🛰️', label: 'Dashboard', pageKey: 'dashboard' },
-      { key: 'health', icon: '🩺', label: 'Provider Health', pageKey: 'health' },
-      { key: 'vault', icon: '🔐', label: 'Keys & Secrets', pageKey: 'vault' },
-      { key: 'security-alerts', icon: '🛡️', label: 'Security Alerts', disabled: true, badge: 'Next' },
-      { key: 'usage-cost', icon: '📊', label: 'Usage & Cost', disabled: true },
-      { key: 'audit-log', icon: '🧾', label: 'Audit Log', disabled: true, badge: 'Next' },
+      { key: 'dashboard', icon: '🛰️', label: 'Monitor 1 — Dashboard', pageKey: 'dashboard' },
+      { key: 'vault', icon: '🔐', label: 'Monitor 2 — Keys & Secrets', pageKey: 'vault' },
+      { key: 'health', icon: '🩺', label: 'Monitor 3 — Provider Health', pageKey: 'health' },
+      { key: 'providers', icon: '🧭', label: 'Monitor 4 — Provider Manual', pageKey: 'providers' },
+      { key: 'security', icon: '🛡️', label: 'Monitor 5 — Security Alerts', pageKey: 'security' },
+      { key: 'usage', icon: '📊', label: 'Monitor 6 — Usage & Cost', pageKey: 'usage' },
+      { key: 'audit', icon: '🧾', label: 'Monitor 7 — Audit Log', pageKey: 'audit' },
+      { key: 'team', icon: '👥', label: 'Monitor 8 — Team & Access', pageKey: 'team' },
+      { key: 'setup', icon: '🧩', label: 'Monitor 9 — Setup Center', pageKey: 'setup' },
+      { key: 'aiops', icon: '🧠', label: 'Monitor 10 — AI Operations', pageKey: 'aiops' },
     ],
   },
   {
-    title: 'Provider Monitors',
+    title: 'Provider Manual Pages',
     items: [
-      { key: 'providers', icon: '🧭', label: 'Provider Manual', pageKey: 'providers' },
-      { key: 'monitor-1', icon: '🧱', label: 'Monitor 1 — Core Cloud + AI', pageKey: 'providers' },
-      { key: 'monitor-2', icon: '🚀', label: 'Monitor 2 — Platform Core', pageKey: 'providers' },
-      { key: 'monitor-3', icon: '🏢', label: 'Monitor 3 — Enterprise Clouds', pageKey: 'providers' },
-      { key: 'monitor-4', icon: '🌐', label: 'Monitor 4 — App, DNS + Edge', pageKey: 'providers' },
-      { key: 'monitor-5', icon: '✉️', label: 'Monitor 5 — Messaging + Email', pageKey: 'providers' },
-      { key: 'monitor-6', icon: '🗄️', label: 'Monitor 6 — Data + Identity', pageKey: 'providers' },
-      { key: 'monitor-7', icon: '🧠', label: 'Monitor 7 — AI Expansion', pageKey: 'providers' },
-      { key: 'monitor-8', icon: '🛠️', label: 'Monitor 8 — Incident Ops', pageKey: 'providers' },
-    ],
-  },
-  {
-    title: 'Settings',
-    items: [
-      { key: 'team-access', icon: '👥', label: 'Team & Access', disabled: true },
-      { key: 'settings', icon: '⚙️', label: 'Settings', disabled: true },
+      { key: 'monitor-1', icon: '🧱', label: 'Provider Page 1 — Core Cloud + AI', pageKey: 'providers' },
+      { key: 'monitor-2', icon: '🚀', label: 'Provider Page 2 — Platform Core', pageKey: 'providers' },
+      { key: 'monitor-3', icon: '🏢', label: 'Provider Page 3 — Enterprise Clouds', pageKey: 'providers' },
+      { key: 'monitor-4', icon: '🌐', label: 'Provider Page 4 — App, DNS + Edge', pageKey: 'providers' },
+      { key: 'monitor-5', icon: '✉️', label: 'Provider Page 5 — Messaging + Email', pageKey: 'providers' },
+      { key: 'monitor-6', icon: '🗄️', label: 'Provider Page 6 — Data + Identity', pageKey: 'providers' },
+      { key: 'monitor-7', icon: '🧠', label: 'Provider Page 7 — AI Expansion', pageKey: 'providers' },
+      { key: 'monitor-8', icon: '🛠️', label: 'Provider Page 8 — Incident Ops', pageKey: 'providers' },
     ],
   },
   {

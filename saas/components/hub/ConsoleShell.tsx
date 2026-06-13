@@ -33,6 +33,13 @@ function isRefreshButton(button: HTMLButtonElement | null): boolean {
   )
 }
 
+function navigateToFreshHub() {
+  const nextUrl = new URL(window.location.href)
+  nextUrl.searchParams.set('refresh', String(Date.now()))
+  if (!nextUrl.hash) nextUrl.hash = 'vault'
+  window.location.assign(nextUrl.toString())
+}
+
 export default function ConsoleShell() {
   const [lang, setLang] = useState<Lang>('en')
   const [idx, setIdx] = useState(0)
@@ -102,7 +109,7 @@ export default function ConsoleShell() {
         const button = (event.target as HTMLElement).closest('button')
         if (isRefreshButton(button)) {
           window.setTimeout(() => { void load() }, 0)
-          window.setTimeout(() => { void load() }, 600)
+          window.setTimeout(navigateToFreshHub, 250)
         }
       }}
       style={{ minHeight: '100vh', background: 'radial-gradient(1100px 500px at 80% -10%, rgba(26,240,255,.10), transparent 60%), radial-gradient(900px 480px at 0% 110%, rgba(255,195,0,.07), transparent 55%), linear-gradient(180deg, #0b1220 0%, #030712 100%)', color: '#fff', padding: '18px clamp(14px, 1.6vw, 34px) 14px', fontFamily: 'Inter, system-ui, -apple-system, sans-serif', overflow: 'hidden' }}

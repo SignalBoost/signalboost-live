@@ -1,17 +1,19 @@
 'use client'
 
 // saas/components/hub/ConsoleShell.tsx
-// Hub Console — Dashboard, Vault, and Providers with arrows and direct buttons.
+// Hub Console — Dashboard, Vault, Provider Health, and Providers with arrows and direct buttons.
 
 import { useCallback, useEffect, useState } from 'react'
 import { Lang, LANGS, HubData, c, labelStyle, Dot } from './shared'
 import DashboardPage from './pages/DashboardPage'
 import VaultMonitorPage from './pages/VaultMonitorPage'
+import ProviderHealthPage from './pages/ProviderHealthPage'
 import ProviderExpansionPage from './pages/ProviderExpansionPage'
 
 const PAGES = [
   { key: 'dashboard', icon: '🛰️', title: 'Dashboard', Component: DashboardPage },
   { key: 'vault', icon: '🔐', title: 'Vault', Component: VaultMonitorPage },
+  { key: 'health', icon: '🩺', title: 'Provider Health', Component: ProviderHealthPage },
   { key: 'providers', icon: '🧭', title: 'Providers', Component: ProviderExpansionPage },
 ] as const
 
@@ -125,9 +127,9 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <nav style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <button onClick={() => go(0)} className="hub-chip" style={navButtonStyle(idx === 0)}>🛰️ Dashboard</button>
-              <button onClick={() => go(1)} className="hub-chip" style={navButtonStyle(idx === 1)}>🔐 Vault</button>
-              <button onClick={() => go(2)} className="hub-chip" style={navButtonStyle(idx === 2)}>🧭 Providers</button>
+              {PAGES.map((page, pageIndex) => (
+                <button key={page.key} onClick={() => go(pageIndex)} className="hub-chip" style={navButtonStyle(idx === pageIndex)}>{page.icon} {page.title}</button>
+              ))}
             </nav>
             <div style={{ display: 'flex', gap: 6 }}>
               {LANGS.map(l => (

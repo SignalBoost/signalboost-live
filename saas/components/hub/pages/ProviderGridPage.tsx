@@ -5,7 +5,8 @@
 // Real data from provider-registry.ts + live actions from provider-templates.ts.
 
 import { useMemo, useState } from 'react'
-import { HUB_PROVIDERS, HUB_PROVIDER_TIERS, getProviderTemplates, type HubProviderTierId } from '@/lib/hub/provider-registry'
+import { HUB_PROVIDERS, HUB_PROVIDER_TIERS, type HubProviderTierId } from '@/lib/hub/provider-registry'
+import { getProviderTemplates } from '@/lib/hub/provider-templates'
 import ProviderActionLauncher from '../ProviderActionLauncher'
 import { PageProps, cardStyle, labelStyle, TONES } from '../shared'
 

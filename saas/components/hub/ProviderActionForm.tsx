@@ -9,7 +9,7 @@
 // governs behavior.
 
 import { useCallback, useState } from 'react'
-import { getTemplate, validateTemplatePayload, type ProviderActionTemplate, type ProviderFormField, type FieldType } from '@/saas/lib/hub/provider-templates'
+import { getTemplate, validateTemplatePayload, type ProviderActionTemplate, type ProviderFormField, type FieldType } from '@/lib/hub/provider-templates'
 import { c, Lang, cardStyle, bodyStyle, labelStyle, rowStyle, monoStyle, Dot, ActionButton, TONES } from './shared'
 
 type FormState = 'idle' | 'validating' | 'preview' | 'confirm' | 'submitting' | 'success' | 'error'

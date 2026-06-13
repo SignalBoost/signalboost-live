@@ -21,42 +21,55 @@ function maskTail(value: string | undefined, visible: number = 3): string {
   return '••••••••' + tail
 }
 
+function stripePriceEnvEntries(): [string, string][] {
+  return Object.entries(process.env).filter(([envName, envValue]) => {
+    return envName.startsWith('STRIPE_PRICE_') && typeof envValue === 'string' && envValue.startsWith('price_')
+  }) as [string, string][]
+}
+
 // ── Stripe (live, read-only) ─────────────────────────────────────────────────
 async function fetchStripe(): Promise<{ ok: boolean; tiers: Tier[]; webhooks: Webhook[]; mismatches: string[]; error?: string }> {
   const key = process.env.STRIPE_SECRET_KEY
   if (!key) return { ok: false, tiers: [], webhooks: [], mismatches: [], error: 'STRIPE_SECRET_KEY not configured' }
   try {
+    const configuredPriceEntries = stripePriceEnvEntries()
+    const configuredPriceIds = new Set(configuredPriceEntries.map(([, priceId]) => priceId))
+
     const [pricesRes, hooksRes] = await Promise.all([
-      fetch('https://api.stripe.com/v1/prices?active=true&limit=50&expand[]=data.product', { headers: { Authorization: `Bearer ${key}` }, cache: 'no-store' }),
+      fetch('https://api.stripe.com/v1/prices?active=true&limit=100&expand[]=data.product', { headers: { Authorization: `Bearer ${key}` }, cache: 'no-store' }),
       fetch('https://api.stripe.com/v1/webhook_endpoints?limit=20', { headers: { Authorization: `Bearer ${key}` }, cache: 'no-store' }),
     ])
     if (!pricesRes.ok) return { ok: false, tiers: [], webhooks: [], mismatches: [], error: `Stripe prices HTTP ${pricesRes.status}` }
     const prices = await pricesRes.json()
     const liveIds = new Set<string>()
     const tiers: Tier[] = []
+
     for (const p of prices.data || []) {
-      liveIds.add(String(p.id))
-      const productName = p.product && typeof p.product === 'object' ? String(p.product.name || p.id) : String(p.id)
+      const priceId = String(p.id)
+      liveIds.add(priceId)
+
+      // The dashboard should show the prices the SaaS app actually uses, not every
+      // historical active product left in the Stripe catalog.
+      if (!configuredPriceIds.has(priceId)) continue
+
+      const productName = p.product && typeof p.product === 'object' ? String(p.product.name || priceId) : priceId
       tiers.push({
         name: productName,
-        priceId: String(p.id),
+        priceId,
         amount: (p.unit_amount || 0) / 100,
         interval: p.recurring?.interval || 'one-time',
         mismatch: false,
       })
     }
+
     // Cross-check every configured STRIPE_PRICE_* env var against live active prices.
     const mismatches: string[] = []
-    for (const [envName, envValue] of Object.entries(process.env)) {
-      if (!envName.startsWith('STRIPE_PRICE_') || !envValue) continue
+    for (const [envName, envValue] of configuredPriceEntries) {
       if (!liveIds.has(envValue)) {
         mismatches.push(`${envName} points to a price that is not active in Stripe`)
       }
     }
-    for (const t of tiers) {
-      const configured = Object.entries(process.env).some(([n, v]) => n.startsWith('STRIPE_PRICE_') && v === t.priceId)
-      if (!configured) t.mismatch = false // live-but-unconfigured prices are informational, not errors
-    }
+
     let webhooks: Webhook[] = []
     if (hooksRes.ok) {
       const hooks = await hooksRes.json()

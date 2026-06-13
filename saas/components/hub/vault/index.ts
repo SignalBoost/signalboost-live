@@ -12,3 +12,6 @@ export type { VaultAuditLogProps } from './VaultAuditLog'
 
 export { default as RotationModal } from './RotationModal'
 export type { RotationModalProps } from './RotationModal'
+
+export { default as ProviderSelect } from './ProviderSelect'
+export type { ProviderSelectProps } from './ProviderSelect'

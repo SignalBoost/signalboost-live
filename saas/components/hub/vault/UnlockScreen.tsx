@@ -72,7 +72,7 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
 
       setTotpSetup({
         secret: data.secret,
-        qrCode: data.qrCode,
+        qrCodeUrl: data.qrCodeUrl,
         backupCodes: data.backupCodes,
       })
       setStep('totp-setup')

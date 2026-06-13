@@ -15,7 +15,7 @@ type UnlockStep = 'password' | 'totp-setup' | 'totp-verify' | 'waiting'
 
 interface TOTPSetup {
   secret: string
-  qrCode: string
+  qrCodeUrl: string
   backupCodes: string[]
 }
 
@@ -271,7 +271,7 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
           <form onSubmit={handleTOTPSetupConfirm} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ textAlign: 'center' }}>
               <img
-                src={totpSetup.qrCode}
+                src={totpSetup.qrCodeUrl}
                 alt="TOTP QR Code"
                 style={{ width: 200, height: 200, borderRadius: 10, border: '2px solid rgba(26,240,255,.2)' }}
               />

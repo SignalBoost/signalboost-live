@@ -1,19 +1,8 @@
 // saas/app/api/vault/totp/generate/route.ts
-// Generate TOTP secret and QR code for 2FA setup
+// Generate TOTP secret for 2FA setup
 
 import { NextRequest, NextResponse } from 'next/server'
-import QRCode from 'qrcode'
-import { generateTOTPSecret } from '@/lib/auth/totp-service'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase env vars')
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey)
+import { generateTOTPSecret, generateBackupCodes } from '@/lib/auth/totp-service'
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,24 +16,17 @@ export async function POST(req: NextRequest) {
     }
 
     // Generate secret
-    const { secret, backupCodes } = generateTOTPSecret(userEmail)
+    const secret = generateTOTPSecret()
+    const backupCodes = generateBackupCodes()
 
-    // Generate QR code
-    const qrCode = await QRCode.toDataURL(secret, {
-      errorCorrectionLevel: 'H',
-      type: 'image/png',
-      width: 300,
-      margin: 1,
-      color: {
-        dark: '#000000',
-        light: '#FFFFFF',
-      },
-    })
+    // Generate QR code URL using Google Charts API (no server-side dependency)
+    const otpauthUrl = `otpauth://totp/SignalBoost:${userEmail}?secret=${secret}&issuer=SignalBoost`
+    const qrCodeUrl = `https://chart.googleapis.com/chart?chs=300x300&chld=H|0&cht=qr&chl=${encodeURIComponent(otpauthUrl)}`
 
     return NextResponse.json({
       ok: true,
       secret,
-      qrCode,
+      qrCodeUrl,
       backupCodes,
     })
   } catch (err) {

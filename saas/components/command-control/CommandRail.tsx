@@ -53,6 +53,12 @@ function itemStyle(active: boolean, disabled?: boolean): CSSProperties {
   }
 }
 
+function isPrimaryActive(itemKey: string, itemPageKey: CommandPageKey | undefined, activePage: CommandPageKey): boolean {
+  if (!itemPageKey) return false
+  if (itemKey === activePage) return true
+  return itemKey === 'providers' && activePage === 'providers'
+}
+
 export default function CommandRail({ sections, activePage, onNavigate }: CommandRailProps) {
   return (
     <aside className="command-rail" style={railStyle}>
@@ -73,7 +79,7 @@ export default function CommandRail({ sections, activePage, onNavigate }: Comman
             <div style={sectionTitleStyle}>{section.title}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {section.items.map(item => {
-                const active = item.pageKey === activePage
+                const active = isPrimaryActive(item.key, item.pageKey, activePage)
                 const disabled = item.disabled || !item.pageKey
                 return (
                   <button

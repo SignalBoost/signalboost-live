@@ -15,11 +15,13 @@ import TeamAccessPage from './pages/TeamAccessPage'
 import SetupCenterPage from './pages/SetupCenterPage'
 import AIOperationsPage from './pages/AIOperationsPage'
 import ProviderExpansionPage from './pages/ProviderExpansionPage'
+import ProviderGridPage from './pages/ProviderGridPage'
 import CommandShell from '../command-control/CommandShell'
 import type { CommandPage, CommandPageKey, CommandRailSection } from '../command-control/types'
 
 const PAGES: CommandPage[] = [
   { key: 'providers', icon: '🧭', title: 'Business Operating Partners', eyebrow: 'Operations & Production', description: 'Partners that support daily operations: data, hosting, revenue, source control, AI, cloud, and communications.', Component: ProviderExpansionPage },
+  { key: 'providers-all', icon: '📋', title: 'All Operating Partners', eyebrow: 'Operations & Production', description: 'All 30 providers in one searchable grid with live template actions.', Component: ProviderGridPage },
   { key: 'dashboard', icon: '🛰️', title: 'Dashboard', eyebrow: 'Command Monitor', description: 'Live internal platform status for mission-critical operating partners.', Component: DashboardPage },
   { key: 'vault', icon: '🔐', title: 'Keys & Secrets', eyebrow: 'Command Monitor', description: 'Credential inventory, environment coverage, and future key rotation workflows.', Component: VaultMonitorPage },
   { key: 'health', icon: '🩺', title: 'Operating Partner Health', eyebrow: 'Command Monitor', description: 'Health and risk signals for enabled Business Operating Partners.', Component: ProviderHealthPage },
@@ -35,6 +37,7 @@ const COMMAND_SECTIONS: CommandRailSection[] = [
   {
     title: 'Operations & Production',
     items: [
+      { key: 'all-partners', icon: '📋', label: 'All Operating Partners', pageKey: 'providers-all' },
       { key: 'partners', icon: '🧭', label: 'Business Operating Partners', pageKey: 'providers' },
       { key: 'mission-critical', icon: '⭐', label: 'Mission Critical Partners', pageKey: 'providers' },
       { key: 'growth-ai', icon: '🧠', label: 'Growth Partners — AI', pageKey: 'providers' },

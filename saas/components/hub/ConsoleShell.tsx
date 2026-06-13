@@ -5,12 +5,12 @@ import { useState } from 'react'
 import DashboardPage from './pages/DashboardPage'
 import KeyVaultV2Page from './pages/KeyVaultV2Page'
 import ProviderGridPage from './pages/ProviderGridPage'
-import DomainsPage from './pages/DomainsPage'
-import LogsPage from './pages/LogsPage'
-import DeploymentsPage from './pages/DeploymentsPage'
-import SettingsPage from './pages/SettingsPage'
-import WebhooksPage from './pages/WebhooksPage'
-import UsersPage from './pages/UsersPage'
+import { DomainsPage } from './pages/DomainsPage'
+import { LogsPage } from './pages/LogsPage'
+import { DeploymentsPage } from './pages/DeploymentsPage'
+import { SettingsPage } from './pages/SettingsPage'
+import { WebhooksPage } from './pages/WebhooksPage'
+import { UsersPage } from './pages/UsersPage'
 
 type PageKey = 'dashboard' | 'vault' | 'providers' | 'domains' | 'logs' | 'deployments' | 'settings' | 'webhooks' | 'users'
 
@@ -22,15 +22,15 @@ interface Page {
 }
 
 const PAGES: Page[] = [
-  { key: 'dashboard', label: 'Dashboard Hub', icon: '🛰️', component: <DashboardPage lang="en" /> },
-  { key: 'vault', label: 'Key Vault', icon: '🔐', component: <KeyVaultV2Page lang="en" /> },
-  { key: 'providers', label: 'AI Providers', icon: '🧭', component: <ProviderGridPage lang="en" /> },
-  { key: 'domains', label: 'Domains/DNS', icon: '🌐', component: <DomainsPage lang="en" /> },
-  { key: 'logs', label: 'Logs', icon: '📊', component: <LogsPage lang="en" /> },
-  { key: 'deployments', label: 'Deployments', icon: '🚀', component: <DeploymentsPage lang="en" /> },
-  { key: 'webhooks', label: 'Webhooks', icon: '🔗', component: <WebhooksPage lang="en" /> },
-  { key: 'settings', label: 'Settings', icon: '⚙️', component: <SettingsPage lang="en" /> },
-  { key: 'users', label: 'Team', icon: '👥', component: <UsersPage lang="en" /> },
+  { key: 'dashboard', label: 'Dashboard Hub', icon: '🛰️', component: <DashboardPage lang="en" data={null} loading={false} failed={false} /> },
+  { key: 'vault', label: 'Key Vault', icon: '🔐', component: <KeyVaultV2Page lang="en" data={null} loading={false} failed={false} /> },
+  { key: 'providers', label: 'AI Providers', icon: '🧭', component: <ProviderGridPage lang="en" data={null} loading={false} failed={false} /> },
+  { key: 'domains', label: 'Domains/DNS', icon: '🌐', component: <DomainsPage /> },
+  { key: 'logs', label: 'Logs', icon: '📊', component: <LogsPage /> },
+  { key: 'deployments', label: 'Deployments', icon: '🚀', component: <DeploymentsPage /> },
+  { key: 'webhooks', label: 'Webhooks', icon: '🔗', component: <WebhooksPage /> },
+  { key: 'settings', label: 'Settings', icon: '⚙️', component: <SettingsPage /> },
+  { key: 'users', label: 'Team', icon: '👥', component: <UsersPage /> },
 ]
 
 export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPage?: PageKey }) {

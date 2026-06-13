@@ -1,7 +1,7 @@
 'use client'
 
 // saas/components/hub/vault/UnlockScreen.tsx
-// Vault access control — password/MFA verification before showing secrets.
+// Vault access control — password + real TOTP verification before showing secrets.
 
 import { useState } from 'react'
 import { cardStyle, labelStyle } from '../shared'
@@ -11,13 +11,22 @@ export type UnlockScreenProps = {
   isLoading?: boolean
 }
 
-type UnlockStep = 'password' | 'mfa' | 'waiting'
+type UnlockStep = 'password' | 'totp-setup' | 'totp-verify' | 'waiting'
+
+interface TOTPSetup {
+  secret: string
+  qrCode: string
+  backupCodes: string[]
+}
 
 export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScreenProps) {
   const [step, setStep] = useState<UnlockStep>('password')
   const [password, setPassword] = useState('')
-  const [mfaCode, setMfaCode] = useState('')
+  const [totpCode, setTotpCode] = useState('')
   const [error, setError] = useState('')
+  const [totpSetup, setTotpSetup] = useState<TOTPSetup | null>(null)
+  const [isVerifying, setIsVerifying] = useState(false)
+  const [userEmail, setUserEmail] = useState('')
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,43 +37,143 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
       return
     }
 
-    // TODO: Verify password against Supabase auth
-    // For now, accept any non-empty password for demo
-    setStep('mfa')
+    // TODO: Real password verification against auth
+    // For now: any non-empty password works
+    // Extract email from user context (hardcoded for demo)
+    const demoEmail = 'luis@signalboost.com'
+    setUserEmail(demoEmail)
+
+    // Check if user has TOTP enabled
+    const hasTOTP = localStorage.getItem(`totp_enabled_${demoEmail}`)
+    
+    if (!hasTOTP) {
+      // First time: show TOTP setup
+      await generateTOTPSetup(demoEmail)
+    } else {
+      // Already has TOTP: go to verification
+      setStep('totp-verify')
+    }
   }
 
-  const handleMFASubmit = async (e: React.FormEvent) => {
+  const generateTOTPSetup = async (email: string) => {
+    try {
+      const response = await fetch('/api/vault/totp/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userEmail: email }),
+      })
+
+      const data = await response.json()
+
+      if (!data.ok) {
+        setError(data.error || 'Failed to generate TOTP')
+        return
+      }
+
+      setTotpSetup({
+        secret: data.secret,
+        qrCode: data.qrCode,
+        backupCodes: data.backupCodes,
+      })
+      setStep('totp-setup')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      setError(`Setup failed: ${msg}`)
+    }
+  }
+
+  const handleTOTPSetupConfirm = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
-    if (!mfaCode.trim() || mfaCode.length !== 6) {
+    if (!totpCode.trim() || totpCode.length !== 6) {
       setError('Enter a valid 6-digit code')
       return
     }
 
-    setStep('waiting')
+    setIsVerifying(true)
 
-    // TODO: Verify MFA code via Supabase or TOTP library
-    // For demo, accept any 6-digit code
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800))
+      const response = await fetch('/api/vault/totp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: totpCode,
+          userEmail,
+          totpSecret: totpSetup?.secret,
+        }),
+      })
 
-      const sessionId = 'vault_' + Math.random().toString(36).substr(2, 9)
-      onUnlock(sessionId)
+      const data = await response.json()
+
+      if (!data.ok) {
+        setError(data.error || 'Invalid code')
+        setTotpCode('')
+        setIsVerifying(false)
+        return
+      }
+
+      // Mark TOTP as enabled
+      localStorage.setItem(`totp_enabled_${userEmail}`, 'true')
+      localStorage.setItem(`totp_secret_${userEmail}`, totpSetup?.secret || '')
+
+      // Unlock vault
+      onUnlock(data.sessionId)
     } catch (err) {
-      setError('MFA verification failed. Please try again.')
-      setStep('mfa')
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      setError(`Verification failed: ${msg}`)
+      setIsVerifying(false)
+    }
+  }
+
+  const handleTOTPVerify = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+
+    if (!totpCode.trim() || totpCode.length !== 6) {
+      setError('Enter a valid 6-digit code')
+      return
+    }
+
+    setIsVerifying(true)
+
+    try {
+      const secret = localStorage.getItem(`totp_secret_${userEmail}`)
+      
+      const response = await fetch('/api/vault/totp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: totpCode,
+          userEmail,
+          totpSecret: secret,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!data.ok) {
+        setError(data.error || 'Invalid code')
+        setTotpCode('')
+        setIsVerifying(false)
+        return
+      }
+
+      // Unlock vault
+      onUnlock(data.sessionId)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      setError(`Verification failed: ${msg}`)
+      setIsVerifying(false)
     }
   }
 
   const handleGoBack = () => {
-    if (step === 'mfa') {
-      setPassword('')
-      setMfaCode('')
-      setError('')
-      setStep('password')
-    }
+    setPassword('')
+    setTotpCode('')
+    setError('')
+    setTotpSetup(null)
+    setStep('password')
   }
 
   return (
@@ -83,8 +192,7 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
       <div
         style={{
           ...cardStyle,
-          width: '100%',
-          maxWidth: 380,
+          maxWidth: 420,
           padding: 24,
           display: 'flex',
           flexDirection: 'column',
@@ -94,43 +202,49 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
         {/* Header */}
         <div>
           <div style={labelStyle}>Secure Access Required</div>
-          <h2 style={{ margin: '6px 0 2px', fontSize: 20, fontWeight: 900, letterSpacing: '-.02em' }}>
-            Unlock Vault
+          <h2 style={{ margin: '6px 0 2px', fontSize: 18, fontWeight: 900 }}>
+            {step === 'password' && 'Unlock Vault'}
+            {step === 'totp-setup' && 'Enable 2FA'}
+            {step === 'totp-verify' && 'Enter 2FA Code'}
           </h2>
-          <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,.55)', lineHeight: 1.5 }}>
-            {step === 'password' && 'Enter your password to access credentials.'}
-            {step === 'mfa' && 'Enter your 6-digit authentication code.'}
-            {step === 'waiting' && 'Verifying credentials...'}
+          <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,.55)' }}>
+            {step === 'password' && 'Enter your password'}
+            {step === 'totp-setup' && 'Scan QR code with Google Authenticator'}
+            {step === 'totp-verify' && 'This session will expire in 30 minutes for security.'}
           </p>
         </div>
 
-        {/* Form */}
+        {/* Password Step */}
         {step === 'password' && (
           <form onSubmit={handlePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,.72)' }}>Password</label>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', display: 'block', marginBottom: 6 }}>
+                Password
+              </label>
               <input
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="Enter your password"
+                placeholder="••••••••"
                 autoFocus
                 style={{
+                  width: '100%',
                   padding: '11px 12px',
                   borderRadius: 10,
-                  border: '1px solid rgba(255,255,255,.15)',
+                  border: error ? '1px solid #ef4444' : '1px solid rgba(255,255,255,.15)',
                   background: 'rgba(255,255,255,.04)',
                   color: '#fff',
-                  fontSize: 14,
+                  fontSize: 13,
                   outline: 'none',
-                  transition: 'border-color .2s',
                 }}
-                onFocus={e => (e.target.style.borderColor = 'rgba(26,240,255,.4)')}
-                onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,.15)')}
               />
             </div>
 
-            {error && <div style={{ fontSize: 12, color: '#ef4444', fontWeight: 500 }}>{error}</div>}
+            {error && (
+              <div style={{ fontSize: 12, color: '#fca5a5', fontWeight: 500 }}>
+                {error}
+              </div>
+            )}
 
             <button
               type="submit"
@@ -145,7 +259,6 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
                 fontWeight: 900,
                 cursor: isLoading ? 'not-allowed' : 'pointer',
                 opacity: isLoading ? 0.6 : 1,
-                transition: 'opacity .2s',
               }}
             >
               {isLoading ? 'Verifying...' : 'Continue'}
@@ -153,43 +266,66 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
           </form>
         )}
 
-        {step === 'mfa' && (
-          <form onSubmit={handleMFASubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,.72)' }}>
-                2FA Code
+        {/* TOTP Setup Step */}
+        {step === 'totp-setup' && totpSetup && (
+          <form onSubmit={handleTOTPSetupConfirm} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ textAlign: 'center' }}>
+              <img
+                src={totpSetup.qrCode}
+                alt="TOTP QR Code"
+                style={{ width: 200, height: 200, borderRadius: 10, border: '2px solid rgba(26,240,255,.2)' }}
+              />
+              <p style={{ margin: '12px 0 0', fontSize: 11, color: 'rgba(255,255,255,.6)' }}>
+                Scan with Google Authenticator, Microsoft Authenticator, or Authy
+              </p>
+            </div>
+
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', display: 'block', marginBottom: 6 }}>
+                Enter 6-digit code to confirm
               </label>
               <input
                 type="text"
-                value={mfaCode}
-                onChange={e => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                value={totpCode}
+                onChange={e => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="000000"
                 maxLength={6}
                 autoFocus
                 style={{
+                  width: '100%',
                   padding: '11px 12px',
                   borderRadius: 10,
-                  border: '1px solid rgba(255,255,255,.15)',
+                  border: error ? '1px solid #ef4444' : '1px solid rgba(255,255,255,.15)',
                   background: 'rgba(255,255,255,.04)',
                   color: '#fff',
-                  fontSize: 16,
+                  fontSize: 18,
                   fontFamily: 'monospace',
-                  letterSpacing: '0.15em',
+                  letterSpacing: '0.2em',
+                  textAlign: 'center',
                   outline: 'none',
-                  transition: 'border-color .2s',
                 }}
-                onFocus={e => (e.target.style.borderColor = 'rgba(26,240,255,.4)')}
-                onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,.15)')}
               />
             </div>
 
-            {error && <div style={{ fontSize: 12, color: '#ef4444', fontWeight: 500 }}>{error}</div>}
+            {error && (
+              <div style={{ fontSize: 12, color: '#fca5a5', fontWeight: 500 }}>
+                {error}
+              </div>
+            )}
+
+            <div style={{ borderRadius: 8, background: 'rgba(255,193,0,.1)', border: '1px solid rgba(255,193,0,.2)', padding: 10 }}>
+              <p style={{ margin: 0, fontSize: 10, color: 'rgba(255,193,0,.8)', lineHeight: 1.5 }}>
+                <strong>Save these backup codes:</strong>
+                <br />
+                {totpSetup.backupCodes.join(', ')}
+              </p>
+            </div>
 
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 type="button"
                 onClick={handleGoBack}
-                disabled={isLoading}
+                disabled={isVerifying}
                 style={{
                   flex: 1,
                   padding: '11px 14px',
@@ -199,15 +335,15 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
                   color: 'rgba(255,255,255,.72)',
                   fontSize: 13,
                   fontWeight: 600,
-                  cursor: isLoading ? 'not-allowed' : 'pointer',
-                  opacity: isLoading ? 0.5 : 1,
+                  cursor: isVerifying ? 'not-allowed' : 'pointer',
+                  opacity: isVerifying ? 0.5 : 1,
                 }}
               >
                 Back
               </button>
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isVerifying || totpCode.length !== 6}
                 style={{
                   flex: 1,
                   padding: '11px 14px',
@@ -217,37 +353,93 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
                   color: '#000',
                   fontSize: 13,
                   fontWeight: 900,
-                  cursor: isLoading ? 'not-allowed' : 'pointer',
-                  opacity: isLoading ? 0.6 : 1,
+                  cursor: isVerifying || totpCode.length !== 6 ? 'not-allowed' : 'pointer',
+                  opacity: isVerifying || totpCode.length !== 6 ? 0.6 : 1,
                 }}
               >
-                {isLoading ? 'Verifying...' : 'Unlock'}
+                {isVerifying ? 'Verifying...' : 'Unlock'}
               </button>
             </div>
           </form>
         )}
 
-        {step === 'waiting' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', padding: '20px 0' }}>
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: '50%',
-                border: '2px solid rgba(26,240,255,.2)',
-                borderTopColor: '#1af0ff',
-                animation: 'spin 1s linear infinite',
-              }}
-            />
-            <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,.55)' }}>Verifying credentials...</p>
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-          </div>
-        )}
+        {/* TOTP Verify Step */}
+        {step === 'totp-verify' && (
+          <form onSubmit={handleTOTPVerify} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', display: 'block', marginBottom: 6 }}>
+                2FA Code
+              </label>
+              <input
+                type="text"
+                value={totpCode}
+                onChange={e => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                maxLength={6}
+                autoFocus
+                style={{
+                  width: '100%',
+                  padding: '11px 12px',
+                  borderRadius: 10,
+                  border: error ? '1px solid #ef4444' : '1px solid rgba(255,255,255,.15)',
+                  background: 'rgba(255,255,255,.04)',
+                  color: '#fff',
+                  fontSize: 18,
+                  fontFamily: 'monospace',
+                  letterSpacing: '0.2em',
+                  textAlign: 'center',
+                  outline: 'none',
+                }}
+              />
+            </div>
 
-        {/* Footer */}
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', textAlign: 'center' }}>
-          This session will expire in 30 minutes for security.
-        </div>
+            {error && (
+              <div style={{ fontSize: 12, color: '#fca5a5', fontWeight: 500 }}>
+                {error}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={handleGoBack}
+                disabled={isVerifying}
+                style={{
+                  flex: 1,
+                  padding: '11px 14px',
+                  borderRadius: 10,
+                  border: '1px solid rgba(255,255,255,.15)',
+                  background: 'rgba(255,255,255,.04)',
+                  color: 'rgba(255,255,255,.72)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: isVerifying ? 'not-allowed' : 'pointer',
+                  opacity: isVerifying ? 0.5 : 1,
+                }}
+              >
+                Back
+              </button>
+              <button
+                type="submit"
+                disabled={isVerifying || totpCode.length !== 6}
+                style={{
+                  flex: 1,
+                  padding: '11px 14px',
+                  borderRadius: 10,
+                  border: 'none',
+                  background: '#1af0ff',
+                  color: '#000',
+                  fontSize: 13,
+                  fontWeight: 900,
+                  cursor: isVerifying || totpCode.length !== 6 ? 'not-allowed' : 'pointer',
+                  opacity: isVerifying || totpCode.length !== 6 ? 0.6 : 1,
+                }}
+              >
+                {isVerifying ? 'Verifying...' : 'Unlock'}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   )

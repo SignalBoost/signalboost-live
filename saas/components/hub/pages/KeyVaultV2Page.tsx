@@ -3,145 +3,25 @@
 // saas/components/hub/pages/KeyVaultV2Page.tsx
 // Vault v2 Wave 1 (W1) — Read-only unlocked view with secrets grid and audit log.
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { UnlockScreen, VaultSecretsGrid, VaultAuditLog, ProviderSelect } from '../vault'
 import { VaultSecret, VaultExpirationAlert, VaultAuditLog as VaultAuditLogType, VaultStats } from '@/lib/hub/vault-types'
+import { getVaultSecrets, getVaultAuditLog, getVaultStats } from '@/lib/hub/vault-operations'
 import { notifyBoth } from '@/lib/hub/vault-notifications'
 import { PageProps, cardStyle, labelStyle } from '../shared'
 
-// Mock data for W1 (read-only demo)
-const MOCK_SECRETS: VaultSecret[] = [
-  {
-    id: '1',
-    provider_id: 'stripe',
-    provider_name: 'Stripe',
-    secret_type: 'api_key',
-    secret_name: 'sk_live_prod',
-    masked_value: 'sk_live_4J3****Xx2',
-    created_at: '2024-01-15T10:00:00Z',
-    updated_at: '2024-06-10T14:30:00Z',
-    expires_at: undefined,
-    last_rotated_at: '2024-05-01T09:00:00Z',
-    last_accessed_at: '2024-06-13T08:45:00Z',
-    status: 'active',
-    tags: ['production', 'billing'],
-    environment: 'production',
-  },
-  {
-    id: '2',
-    provider_id: 'supabase',
-    provider_name: 'Supabase',
-    secret_type: 'api_key',
-    secret_name: 'service_key',
-    masked_value: 'eyJhbGciOiJI****YXJ0aWZhY3Q',
-    created_at: '2024-02-20T10:00:00Z',
-    updated_at: '2024-06-05T12:00:00Z',
-    expires_at: '2025-02-20T10:00:00Z',
-    last_rotated_at: '2024-02-20T10:00:00Z',
-    last_accessed_at: '2024-06-13T09:30:00Z',
-    status: 'active',
-    tags: ['database', 'production'],
-    environment: 'production',
-  },
-  {
-    id: '3',
-    provider_id: 'vercel',
-    provider_name: 'Vercel',
-    secret_type: 'token',
-    secret_name: 'vc_deploy_token',
-    masked_value: 'vercel_****mK2t',
-    created_at: '2024-03-10T10:00:00Z',
-    updated_at: '2024-06-01T11:00:00Z',
-    expires_at: '2024-09-10T10:00:00Z',
-    last_rotated_at: null,
-    last_accessed_at: '2024-06-13T06:00:00Z',
-    status: 'expiring_soon',
-    tags: ['deployments', 'production'],
-    environment: 'production',
-  },
-  {
-    id: '4',
-    provider_id: 'github',
-    provider_name: 'GitHub',
-    secret_type: 'token',
-    secret_name: 'github_pat',
-    masked_value: 'ghp_****KqL9',
-    created_at: '2024-04-05T10:00:00Z',
-    updated_at: '2024-06-01T10:00:00Z',
-    expires_at: '2025-04-05T10:00:00Z',
-    last_rotated_at: '2024-06-01T10:00:00Z',
-    last_accessed_at: '2024-06-13T07:15:00Z',
-    status: 'active',
-    tags: ['ci-cd', 'repos'],
-    environment: 'production',
-  },
-]
+// Mock data for W1 (read-only demo) — REMOVE AFTER TESTING
+// For now, use empty defaults and fetch from Supabase
 
-const MOCK_ALERTS: VaultExpirationAlert[] = [
-  {
-    id: '1',
-    secret_id: '3',
-    days_until_expiry: 88,
-    severity: 'warning',
-    notified_at: '2024-06-01T10:00:00Z',
-    dismissed_at: null,
-  },
-]
-
-const MOCK_AUDIT_LOGS: VaultAuditLogType[] = [
-  {
-    id: '1',
-    secret_id: '1',
-    action: 'accessed',
-    user_id: 'user-1',
-    user_email: 'luis@signalboost.com',
-    timestamp: '2024-06-13T08:45:00Z',
-    ip_address: '192.168.1.1',
-    status: 'success',
-    message: 'Stripe API key accessed',
-  },
-  {
-    id: '2',
-    secret_id: '4',
-    action: 'rotated',
-    user_id: 'user-1',
-    user_email: 'luis@signalboost.com',
-    timestamp: '2024-06-01T10:00:00Z',
-    ip_address: '192.168.1.1',
-    status: 'success',
-    message: 'GitHub PAT rotated',
-  },
-  {
-    id: '3',
-    secret_id: '2',
-    action: 'accessed',
-    user_id: 'user-1',
-    user_email: 'luis@signalboost.com',
-    timestamp: '2024-06-13T09:30:00Z',
-    ip_address: '192.168.1.1',
-    status: 'success',
-    message: 'Supabase service key accessed',
-  },
-  {
-    id: '4',
-    secret_id: '3',
-    action: 'created',
-    user_id: 'user-1',
-    user_email: 'luis@signalboost.com',
-    timestamp: '2024-03-10T10:00:00Z',
-    ip_address: '192.168.1.1',
-    status: 'success',
-    message: 'Vercel deploy token created',
-  },
-]
-
+const MOCK_ALERTS: VaultExpirationAlert[] = []
+const MOCK_AUDIT_LOGS: VaultAuditLogType[] = []
 const MOCK_STATS: VaultStats = {
-  total_secrets: 4,
-  active_secrets: 3,
-  expiring_soon: 1,
+  total_secrets: 0,
+  active_secrets: 0,
+  expiring_soon: 0,
   expired: 0,
-  last_rotation: '2024-06-01T10:00:00Z',
-  next_rotation: '2024-07-01T10:00:00Z',
+  last_rotation: new Date().toISOString(),
+  next_rotation: new Date().toISOString(),
 }
 
 export default function KeyVaultV2Page({ lang }: PageProps) {
@@ -150,10 +30,51 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
   const [selectedSecret, setSelectedSecret] = useState<VaultSecret | null>(null)
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null)
   const [selectedProviderName, setSelectedProviderName] = useState<string | null>(null)
+  
+  // Real data from Supabase
+  const [secrets, setSecrets] = useState<VaultSecret[]>([])
+  const [auditLogs, setAuditLogs] = useState<VaultAuditLogType[]>([])
+  const [stats, setStats] = useState<VaultStats>(MOCK_STATS)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleUnlock = (sid: string) => {
     setSessionId(sid)
     setIsUnlocked(true)
+    // Fetch real data when unlocked
+    fetchVaultData()
+  }
+
+  const fetchVaultData = async () => {
+    setIsLoading(true)
+    setError(null)
+    
+    try {
+      // Fetch secrets
+      const secretsResult = await getVaultSecrets()
+      if (secretsResult.ok && secretsResult.secrets) {
+        setSecrets(secretsResult.secrets)
+      } else {
+        setError(secretsResult.error || 'Failed to fetch secrets')
+      }
+      
+      // Fetch audit log
+      const logsResult = await getVaultAuditLog()
+      if (logsResult.ok && logsResult.logs) {
+        setAuditLogs(logsResult.logs)
+      }
+      
+      // Fetch stats
+      const statsResult = await getVaultStats()
+      if (statsResult.ok && statsResult.stats) {
+        setStats(statsResult.stats)
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      setError(msg)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleProviderSelect = (providerId: string, providerName: string) => {
@@ -172,14 +93,14 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
     
     // Filter by selected provider if one is chosen
     const filteredSecrets = selectedProviderId 
-      ? MOCK_SECRETS.filter(s => s.provider_id === selectedProviderId)
-      : MOCK_SECRETS
+      ? secrets.filter(s => s.provider_id === selectedProviderId)
+      : secrets
     
     filteredSecrets.forEach(s => {
       groups[s.status].push(s)
     })
     return groups
-  }, [selectedProviderId])
+  }, [selectedProviderId, secrets])
 
   if (!isUnlocked) {
     return <UnlockScreen onUnlock={handleUnlock} />
@@ -266,7 +187,7 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
               <div style={{ ...labelStyle, marginBottom: 12 }}>
                 {statusLabels[status]} — {secrets.length} secret{secrets.length === 1 ? '' : 's'}
               </div>
-              <VaultSecretsGrid secrets={secrets} alerts={MOCK_ALERTS} onSelectSecret={setSelectedSecret} />
+              <VaultSecretsGrid secrets={secrets} alerts={[]} onSelectSecret={setSelectedSecret} />
             </section>
           )
         })
@@ -274,7 +195,7 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
 
         {/* Audit log */}
         <section style={{ minHeight: '54vh' }}>
-          <VaultAuditLog logs={MOCK_AUDIT_LOGS} />
+          <VaultAuditLog logs={auditLogs} />
         </section>
       </main>
 

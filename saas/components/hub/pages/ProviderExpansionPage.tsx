@@ -6,6 +6,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { PageProps, TONES, cardStyle, labelStyle } from '../shared'
+import ProviderActionLauncher from '../ProviderActionLauncher'
 
 type PartnerStatus = 'Healthy' | 'Needs Review' | 'Action Needed'
 type PartnerAction = { label: string; kind: 'primary' | 'neutral'; url?: string }
@@ -29,6 +30,40 @@ type PartnerPage = {
 
 const PREF_KEY = 'signalboost:enabledOperatingPartners'
 const oldPrefKey = 'signalboost:enabledProviders'
+
+// Map partner names to provider IDs for ProviderActionLauncher
+const PARTNER_TO_PROVIDER_ID: Record<string, string> = {
+  'Supabase': 'supabase',
+  'Vercel': 'vercel',
+  'Stripe': 'stripe',
+  'GitHub': 'github',
+  'AWS': 'aws',
+  'Google Cloud': 'google-cloud',
+  'Azure': 'azure',
+  'DigitalOcean': 'digitalocean',
+  'OpenAI': 'openai',
+  'Anthropic': 'anthropic',
+  'Hugging Face': 'hugging-face',
+  'Replicate': 'replicate',
+  'Cloudflare': 'cloudflare',
+  'Firebase': 'firebase',
+  'Netlify': 'netlify',
+  'Railway': 'railway',
+  'Twilio': 'twilio',
+  'SendGrid': 'sendgrid',
+  'Postmark': 'postmark',
+  'Auth0': 'auth0',
+  'Datadog': 'datadog',
+  'Sentry': 'sentry',
+  'PagerDuty': 'pagerduty',
+  'Docker Hub': 'docker-hub',
+  'Terraform Cloud': 'terraform-cloud',
+  'Mixpanel': 'mixpanel',
+  'Segment': 'segment',
+  'GA4': 'ga4',
+  'HubSpot': 'hubspot',
+  'Intercom': 'intercom',
+}
 
 const action = (label: string, kind: PartnerAction['kind'] = 'neutral', url?: string): PartnerAction => ({ label, kind, url })
 const partner = (name: string, category: string, subtitle: string, status: PartnerStatus, signals: string[], actions: PartnerAction[], region = 'global'): Partner => ({ name, category, subtitle, status, signals, actions, region, lastChecked: '1 min ago' })
@@ -137,7 +172,7 @@ function openAction(item: PartnerAction) {
   if (item.url) window.open(item.url, '_blank', 'noopener,noreferrer')
 }
 
-export default function ProviderExpansionPage(_props: PageProps) {
+export default function ProviderExpansionPage({ lang }: PageProps) {
   const [pageIndex, setPageIndex] = useState(0)
   const [enabledPartners, setEnabledPartners] = useState<Record<string, boolean>>(defaultPreferences)
   const page = PAGES[pageIndex]
@@ -224,6 +259,14 @@ export default function ProviderExpansionPage(_props: PageProps) {
                 <div style={{ marginTop: 'auto' }}>
                   <div style={{ ...labelStyle, marginBottom: 8 }}>Actions</div>
                   <div style={{ display: 'grid', gap: 8 }}>
+                    {PARTNER_TO_PROVIDER_ID[item.name] && (
+                      <ProviderActionLauncher
+                        providerId={PARTNER_TO_PROVIDER_ID[item.name]}
+                        lang={lang}
+                        variant="primary"
+                        label="Hub Actions"
+                      />
+                    )}
                     {item.actions.map((button, index) => <button key={button.label} onClick={() => openAction(button)} className="hub-chip partner-action" style={{ padding: '9px 10px', borderRadius: 11, border: button.kind === 'primary' ? '1px solid rgba(26,240,255,.42)' : '1px solid rgba(255,255,255,.13)', background: button.kind === 'primary' ? 'rgba(26,240,255,.12)' : 'rgba(255,255,255,.045)', color: button.kind === 'primary' ? '#1af0ff' : 'rgba(255,255,255,.78)', fontSize: 12.5, fontWeight: 900 }}>{index === 0 ? '↗' : '⚙'} {button.label}</button>)}
                   </div>
                 </div>

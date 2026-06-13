@@ -3,6 +3,8 @@
 // saas/components/hub/pages/KeyVaultPage.tsx
 // Console Page 2 — Key Vault.
 // SECTION 1 "My Safe": Bitwarden-style encrypted storage (vault_items table).
+//   Dynamic retrieval: provider dropdown (grouped by category) loads first;
+//   keys are fetched from Supabase only when a provider is selected.
 //   Add (modal) -> encrypted at rest. Reveal (eye) -> decrypts one key for 15s,
 //   stamps last_accessed_at. Delete -> confirmation modal. Values never logged.
 // Provider catalog: pick from known providers — canonical names, no typos.
@@ -52,6 +54,9 @@ const V: Record<string, Record<Lang, string>> = {
   historyT:    { en: 'History of this key', es: 'Historial de esta clave', pt: 'Histórico desta chave', pl: 'Historia tego klucza', ru: 'История этого ключа' },
   openDash:    { en: 'Open provider dashboard', es: 'Abrir panel del proveedor', pt: 'Abrir painel do provedor', pl: 'Otwórz panel dostawcy', ru: 'Открыть панель провайдера' },
   noHistory:   { en: 'No recorded actions yet.', es: 'Aún no hay acciones registradas.', pt: 'Ainda não há ações registradas.', pl: 'Brak zarejestrowanych działań.', ru: 'Действий пока не записано.' },
+  pickProv:    { en: 'Select a provider to retrieve its keys…', es: 'Selecciona un proveedor para recuperar sus claves…', pt: 'Selecione um provedor para recuperar suas chaves…', pl: 'Wybierz dostawcę, aby pobrać jego klucze…', ru: 'Выберите провайдера, чтобы получить его ключи…' },
+  retrieving:  { en: 'Retrieving keys…', es: 'Recuperando claves…', pt: 'Recuperando chaves…', pl: 'Pobieranie kluczy…', ru: 'Получение ключей…' },
+  noProviders: { en: 'The safe is empty. Add your first key — it will be encrypted before it is stored.', es: 'La caja está vacía. Agrega tu primera clave — se cifrará antes de guardarse.', pt: 'O cofre está vazio. Adicione sua primeira chave — ela será criptografada antes de ser armazenada.', pl: 'Sejf jest pusty. Dodaj pierwszy klucz — zostanie zaszyfrowany przed zapisaniem.', ru: 'Сейф пуст. Добавьте первый ключ — он будет зашифрован перед сохранением.' },
 }
 function v(key: string, lang: Lang): string { const e = V[key]; return e ? (e[lang] || e.en) : key }
 
@@ -122,6 +127,16 @@ const PROVIDERS: CatalogEntry[] = [
   { name: 'Brave Search', icon: '🦁', labels: ['API Key'] },
 ]
 
+// Category grouping for the provider dropdown (spec: Payments / Data / AI / Infrastructure…).
+const CATEGORY: Record<string, string> = {
+  'Stripe': 'Payments', 'PayPal': 'Payments', 'Shopify': 'Payments',
+  'Supabase': 'Data', 'MongoDB': 'Data', 'Neon': 'Data', 'Upstash': 'Data', 'Firebase': 'Data', 'Airtable': 'Data', 'Algolia': 'Data', 'Pinecone': 'Data',
+  'OpenAI': 'AI', 'Anthropic': 'AI', 'ElevenLabs': 'AI', 'AssemblyAI': 'AI', 'Hugging Face': 'AI', 'Replicate': 'AI',
+  'Vercel': 'Infrastructure', 'GitHub': 'Infrastructure', 'Google Cloud': 'Infrastructure', 'AWS': 'Infrastructure', 'Azure': 'Infrastructure', 'Cloudflare': 'Infrastructure', 'Netlify': 'Infrastructure', 'DigitalOcean': 'Infrastructure', 'Sentry': 'Infrastructure', 'Mapbox': 'Infrastructure',
+  'Resend': 'Communication', 'SendGrid': 'Communication', 'Mailgun': 'Communication', 'Twilio': 'Communication', 'Slack': 'Communication', 'Discord': 'Communication', 'Telegram': 'Communication',
+}
+const CAT_ORDER = ['Payments', 'Data', 'AI', 'Infrastructure', 'Communication', 'Other']
+
 // Direct links to each provider's dashboard for the details drawer.
 const PROVIDER_DASH: Record<string, string> = {
   'Stripe': 'https://dashboard.stripe.com/apikeys',
@@ -179,19 +194,42 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
   const [audit, setAudit] = useState<AuditEntry[]>([])
   const [tlFilter, setTlFilter] = useState('all')
   const [drawerId, setDrawerId] = useState<string | null>(null)
+  const [provList, setProvList] = useState<{ provider: string; count: number }[]>([])
+  const [selProvider, setSelProvider] = useState<string | null>(null)
+  const [ddOpen, setDdOpen] = useState(false)
   const timersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const clipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const loadSafe = async () => {
+  // Dynamic retrieval: the list of providers loads first; keys are fetched
+  // from Supabase only when a provider is selected (spec module 3).
+  const loadProviders = async () => {
     setSafeLoading(true)
     setSafeError(null)
     try {
-      const res = await fetch('/api/hub/vault', { cache: 'no-store' })
+      const res = await fetch('/api/hub/vault?providers=1', { cache: 'no-store' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || String(res.status))
+      setProvList(json.providers || [])
+    } catch (err: any) {
+      setSafeError(err?.message || 'Failed to load safe')
+    } finally {
+      setSafeLoading(false)
+    }
+  }
+
+  const retrieveKeys = async (provider: string) => {
+    setSelProvider(provider)
+    setDdOpen(false)
+    setItems([])
+    setSafeLoading(true)
+    setSafeError(null)
+    try {
+      const res = await fetch('/api/hub/vault?provider=' + encodeURIComponent(provider), { cache: 'no-store' })
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || String(res.status))
       setItems(json.items || [])
     } catch (err: any) {
-      setSafeError(err?.message || 'Failed to load safe')
+      setSafeError(err?.message || 'Failed to retrieve keys')
     } finally {
       setSafeLoading(false)
     }
@@ -203,7 +241,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
       if (res.ok) setAudit(json.audit || [])
     } catch {}
   }
-  useEffect(() => { loadSafe(); loadAudit() }, [])
+  useEffect(() => { loadProviders(); loadAudit() }, [])
   useEffect(() => () => { Object.values(timersRef.current).forEach(clearTimeout) }, [])
 
   const addKey = async () => {
@@ -214,9 +252,11 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
       const res = await fetch('/api/hub/vault', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: fProvider, label: fLabel, value: fValue, expiresAt: fExpires ? new Date(fExpires).toISOString() : null }) })
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || String(res.status))
-      setItems(prev => [...prev, json.item].sort((a, b) => a.provider.localeCompare(b.provider) || a.label.localeCompare(b.label)))
       setShowAdd(false)
+      const addedProvider = fProvider
       setFProvider(''); setFLabel(''); setFValue(''); setFExpires(''); setPSearch(''); setCustomP(false)
+      loadProviders()
+      retrieveKeys(addedProvider)
       loadAudit()
     } catch (err: any) {
       setSafeError(err?.message || 'Failed to save key')
@@ -273,6 +313,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
       hideKey(id)
       setItems(prev => prev.filter(i => i.id !== id))
       setDrawerId(null)
+      loadProviders()
       loadAudit()
     } catch (err: any) {
       setSafeError(err?.message || 'Delete failed')
@@ -313,10 +354,38 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
         </div>
 
         {safeError && <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px', borderRadius: 11, border: '1px solid rgba(239,68,68,.45)', background: 'rgba(239,68,68,.09)', fontSize: 12.5, marginBottom: 8 }}><span>⚠️</span><span style={{ flex: 1 }}>{safeError}</span><button onClick={() => setSafeError(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.6)', cursor: 'pointer' }}>×</button></div>}
-        {safeLoading && <div className="hub-loading" style={{ padding: '10px 13px', borderRadius: 11, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)', fontSize: 12.5, color: 'rgba(255,255,255,.6)' }}>{c('loading', lang)}</div>}
-        {!safeLoading && items.length === 0 && !safeError && (
-          <div style={{ padding: '16px 14px', borderRadius: 12, border: '1px dashed rgba(255,255,255,.18)', background: 'rgba(255,255,255,.02)', fontSize: 13, color: 'rgba(255,255,255,.55)', textAlign: 'center' }}>{v('emptySafe', lang)}</div>
-        )}
+
+        {/* Provider dropdown: grouped by category; keys retrieved on selection */}
+        <div style={{ position: 'relative', marginBottom: 10, maxWidth: 440 }}>
+          <button onClick={() => setDdOpen(o => !o)} className="hub-chip" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '11px 14px', borderRadius: 11, fontSize: 13.5, fontWeight: 700, background: 'rgba(255,255,255,.05)', border: ddOpen ? '1px solid rgba(26,240,255,.5)' : '1px solid rgba(255,255,255,.16)', color: selProvider ? '#fff' : 'rgba(255,255,255,.5)', textAlign: 'left' }}>
+            <span style={{ fontSize: 16 }}>{selProvider ? (PROVIDERS.find(p => p.name === selProvider)?.icon || '🧩') : '🗂️'}</span>
+            <span style={{ flex: 1 }}>{selProvider || v('pickProv', lang)}</span>
+            <span style={{ color: 'rgba(255,255,255,.45)' }}>{ddOpen ? '▴' : '▾'}</span>
+          </button>
+          {ddOpen && (
+            <div className="hub-panel" style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 30, maxHeight: 280, overflowY: 'auto', borderRadius: 12, border: '1px solid rgba(26,240,255,.35)', background: 'linear-gradient(180deg, rgba(15,23,42,.99), rgba(3,7,18,1))', boxShadow: '0 24px 60px rgba(0,0,0,.6)', padding: 8 }}>
+              {provList.length === 0 && <div style={{ padding: '10px 12px', fontSize: 12.5, color: 'rgba(255,255,255,.5)' }}>{v('noProviders', lang)}</div>}
+              {CAT_ORDER.map(cat => {
+                const inCat = provList.filter(p => (CATEGORY[p.provider] || 'Other') === cat)
+                if (inCat.length === 0) return null
+                return (
+                  <div key={cat} style={{ marginBottom: 6 }}>
+                    <div style={{ ...labelStyle, padding: '5px 8px 3px' }}>{cat}</div>
+                    {inCat.map(p => (
+                      <button key={p.provider} onClick={() => retrieveKeys(p.provider)} className="hub-chip" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 9, fontSize: 13, fontWeight: 600, background: selProvider === p.provider ? 'rgba(255,195,0,.12)' : 'transparent', border: '1px solid transparent', color: selProvider === p.provider ? '#ffc300' : 'rgba(255,255,255,.78)', textAlign: 'left' }}>
+                        <span style={{ fontSize: 15 }}>{PROVIDERS.find(x => x.name === p.provider)?.icon || '🧩'}</span>
+                        <span style={{ flex: 1 }}>{p.provider}</span>
+                        <span style={{ ...monoStyle, color: 'rgba(255,255,255,.4)' }}>{p.count}</span>
+                      </button>
+                    ))}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {safeLoading && <div className="hub-loading" style={{ padding: '10px 13px', borderRadius: 11, border: '1px solid rgba(26,240,255,.3)', background: 'rgba(26,240,255,.05)', fontSize: 12.5, color: '#1af0ff', marginBottom: 8 }}>⏳ {v('retrieving', lang)}</div>}
 
         {(() => {
           const now = Date.now()

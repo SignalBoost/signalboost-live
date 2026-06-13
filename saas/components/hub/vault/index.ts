@@ -9,3 +9,6 @@ export type { VaultSecretsGridProps } from './VaultSecretsGrid'
 
 export { default as VaultAuditLog } from './VaultAuditLog'
 export type { VaultAuditLogProps } from './VaultAuditLog'
+
+export { default as RotationModal } from './RotationModal'
+export type { RotationModalProps } from './RotationModal'

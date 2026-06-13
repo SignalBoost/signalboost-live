@@ -6,7 +6,7 @@
 // language, and the single live data fetch shared by all pages.
 // Adding a future page = one entry in the PAGES registry.
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Lang, LANGS, HubData, c, labelStyle, Dot } from './shared'
 import DashboardPage from './pages/DashboardPage'
 import KeyVaultPage from './pages/KeyVaultPage'
@@ -23,11 +23,14 @@ export default function ConsoleShell() {
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     setFailed(false)
     try {
-      const res = await fetch('/api/hub/status', { cache: 'no-store' })
+      const res = await fetch('/api/hub/status?t=' + Date.now(), {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' },
+      })
       if (!res.ok) throw new Error(String(res.status))
       setData(await res.json())
     } catch {
@@ -35,9 +38,9 @@ export default function ConsoleShell() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
   // Bookmarkable pages via URL hash (#vault), plus keyboard arrows.
   useEffect(() => {
@@ -70,7 +73,15 @@ export default function ConsoleShell() {
   const vercelOk = !!data?.vercel.ok
 
   return (
-    <div className="hub-root" style={{ minHeight: '100vh', background: 'radial-gradient(1100px 500px at 80% -10%, rgba(26,240,255,.10), transparent 60%), radial-gradient(900px 480px at 0% 110%, rgba(255,195,0,.07), transparent 55%), linear-gradient(180deg, #0b1220 0%, #030712 100%)', color: '#fff', padding: '18px clamp(14px, 1.6vw, 34px) 14px', fontFamily: 'Inter, system-ui, -apple-system, sans-serif', overflow: 'hidden' }}>
+    <div
+      className="hub-root"
+      onClickCapture={(event) => {
+        const button = (event.target as HTMLElement).closest('button')
+        const title = button?.getAttribute('title') || ''
+        if (title.startsWith('↻')) window.setTimeout(() => { void load() }, 0)
+      }}
+      style={{ minHeight: '100vh', background: 'radial-gradient(1100px 500px at 80% -10%, rgba(26,240,255,.10), transparent 60%), radial-gradient(900px 480px at 0% 110%, rgba(255,195,0,.07), transparent 55%), linear-gradient(180deg, #0b1220 0%, #030712 100%)', color: '#fff', padding: '18px clamp(14px, 1.6vw, 34px) 14px', fontFamily: 'Inter, system-ui, -apple-system, sans-serif', overflow: 'hidden' }}
+    >
       <style>{`.hub-card{transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease;} .hub-card:hover{transform:translateY(-3px); box-shadow:0 24px 60px rgba(0,0,0,.55);} .hub-chip{transition:background .15s ease, color .15s ease, border-color .15s ease; cursor:pointer;} .hub-chip:hover{border-color:rgba(255,195,0,.6);} .hub-btn{transition:filter .15s ease, transform .12s ease; cursor:pointer;} .hub-btn:hover{transform:translateY(-1px); filter:brightness(1.25);} .hub-panel::-webkit-scrollbar{width:8px;} .hub-panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:8px;} .hub-panel::-webkit-scrollbar-track{background:transparent;} @keyframes hubPulse{0%,100%{opacity:.45}50%{opacity:1}} .hub-loading{animation:hubPulse 1.4s ease infinite;} .hub-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:20;width:38px;height:64px;display:flex;align-items:center;justify-content:center;font-size:20px;color:rgba(255,255,255,.55);background:rgba(15,23,42,.6);border:1px solid rgba(255,255,255,.12);cursor:pointer;backdrop-filter:blur(8px);transition:color .15s ease, background .15s ease;} .hub-arrow:hover{color:#1af0ff;background:rgba(15,23,42,.85);} @media (min-width:1100px){ .hub-root{height:calc(100vh - 80px);min-height:0;} .hub-frame{display:flex;flex-direction:column;height:100%;min-height:0;} .hub-stage{flex:1;min-height:0;} .hub-main{grid-auto-rows:minmax(0,1fr);} .hub-panel{overflow-y:auto;min-height:0;} }`}</style>
 
       <div className="hub-frame" style={{ width: '100%' }}>

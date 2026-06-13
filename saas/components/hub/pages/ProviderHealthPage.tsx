@@ -71,6 +71,16 @@ const severityStyle: Record<Severity, { color: string; bg: string; border: strin
   Medium: { color: '#1af0ff', bg: 'rgba(26,240,255,.09)', border: 'rgba(26,240,255,.35)' },
 }
 
+const criticalBadgeStyle: React.CSSProperties = {
+  padding: '7px 11px',
+  borderRadius: 999,
+  border: '1px solid rgba(239,68,68,.45)',
+  background: 'rgba(239,68,68,.12)',
+  color: '#fca5a5',
+  fontSize: 12.5,
+  fontWeight: 900,
+}
+
 export default function ProviderHealthPage(_props: PageProps) {
   const [environment, setEnvironment] = useState<Env>('Production')
   const [provider, setProvider] = useState('All')
@@ -92,7 +102,7 @@ export default function ProviderHealthPage(_props: PageProps) {
           <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5, maxWidth: 780 }}>Essential view: are critical providers healthy, broken, or risky? No graphs, no noise.</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ padding: '7px 11px', borderRadius: 999, border: `1px solid ${TONES.red.border}`, background: TONES.red.soft, color: '#fca5a5', fontSize: 12.5, fontWeight: 900 }}>{criticalCount} Critical</span>
+          <span style={criticalBadgeStyle}>{criticalCount} Critical</span>
           <span style={{ padding: '7px 11px', borderRadius: 999, border: `1px solid ${TONES.gold.border}`, background: TONES.gold.soft, color: '#ffc300', fontSize: 12.5, fontWeight: 900 }}>{openCount} Open</span>
         </div>
       </section>

@@ -340,42 +340,42 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
             <div style={{ fontSize: 17, fontWeight: 800 }}>🔐 {v('mySafe', lang)}</div>
             <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.55)', maxWidth: 720 }}>{v('safeSub', lang)}</div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {selProvider && <button onClick={refreshNow} className="hub-btn" title="Refresh" style={{ padding: '9px 14px', borderRadius: 10, border: refreshFlash ? '1px solid rgba(34,197,94,.6)' : '1px solid rgba(26,240,255,.4)', background: refreshFlash ? 'rgba(34,197,94,.14)' : 'rgba(26,240,255,.08)', color: refreshFlash ? '#86efac' : '#1af0ff', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>{safeLoading ? '…' : refreshFlash ? v('refreshed', lang) : v('refreshBtn', lang)}</button>}
-            <button onClick={() => setShowAdd(true)} className="hub-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid rgba(255,195,0,.5)', background: 'rgba(255,195,0,.12)', color: '#ffc300', fontSize: 13, fontWeight: 800 }}>{v('addKey', lang)}</button>
-          </div>
+          <button onClick={() => setShowAdd(true)} className="hub-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid rgba(255,195,0,.5)', background: 'rgba(255,195,0,.12)', color: '#ffc300', fontSize: 13, fontWeight: 800 }}>{v('addKey', lang)}</button>
         </div>
 
         {safeError && <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px', borderRadius: 11, border: '1px solid rgba(239,68,68,.45)', background: 'rgba(239,68,68,.09)', fontSize: 12.5, marginBottom: 8 }}><span>⚠️</span><span style={{ flex: 1 }}>{safeError}</span><button onClick={() => setSafeError(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.6)', cursor: 'pointer' }}>×</button></div>}
 
         {/* Provider dropdown: grouped by category; keys retrieved on selection */}
-        <div style={{ position: 'relative', marginBottom: 10, maxWidth: 440 }}>
-          <button onClick={() => setDdOpen(o => !o)} className="hub-chip" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '11px 14px', borderRadius: 11, fontSize: 13.5, fontWeight: 700, background: 'rgba(255,255,255,.05)', border: ddOpen ? '1px solid rgba(26,240,255,.5)' : '1px solid rgba(255,255,255,.16)', color: selProvider ? '#fff' : 'rgba(255,255,255,.5)', textAlign: 'left' }}>
-            <span style={{ fontSize: 16 }}>{selProvider ? (PROVIDERS.find(p => p.name === selProvider)?.icon || '🧩') : '🗂️'}</span>
-            <span style={{ flex: 1 }}>{selProvider || v('pickProv', lang)}</span>
-            <span style={{ color: 'rgba(255,255,255,.45)' }}>{ddOpen ? '▴' : '▾'}</span>
-          </button>
-          {ddOpen && (
-            <div className="hub-panel" style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 30, maxHeight: 280, overflowY: 'auto', borderRadius: 12, border: '1px solid rgba(26,240,255,.35)', background: 'linear-gradient(180deg, rgba(15,23,42,.99), rgba(3,7,18,1))', boxShadow: '0 24px 60px rgba(0,0,0,.6)', padding: 8 }}>
-              {provList.length === 0 && <div style={{ padding: '10px 12px', fontSize: 12.5, color: 'rgba(255,255,255,.5)' }}>{v('noProviders', lang)}</div>}
-              {CAT_ORDER.map(cat => {
-                const inCat = provList.filter(p => (CATEGORY[p.provider] || 'Other') === cat)
-                if (inCat.length === 0) return null
-                return (
-                  <div key={cat} style={{ marginBottom: 6 }}>
-                    <div style={{ ...labelStyle, padding: '5px 8px 3px' }}>{cat}</div>
-                    {inCat.map(p => (
-                      <button key={p.provider} onClick={() => retrieveKeys(p.provider)} className="hub-chip" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 9, fontSize: 13, fontWeight: 600, background: selProvider === p.provider ? 'rgba(255,195,0,.12)' : 'transparent', border: '1px solid transparent', color: selProvider === p.provider ? '#ffc300' : 'rgba(255,255,255,.78)', textAlign: 'left' }}>
-                        <span style={{ fontSize: 15 }}>{PROVIDERS.find(x => x.name === p.provider)?.icon || '🧩'}</span>
-                        <span style={{ flex: 1 }}>{p.provider}</span>
-                        <span style={{ ...monoStyle, color: 'rgba(255,255,255,.4)' }}>{p.count}</span>
-                      </button>
-                    ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+          <div style={{ position: 'relative', flex: 1, maxWidth: 440 }}>
+            <button onClick={() => setDdOpen(o => !o)} className="hub-chip" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '11px 14px', borderRadius: 11, fontSize: 13.5, fontWeight: 700, background: 'rgba(255,255,255,.05)', border: ddOpen ? '1px solid rgba(26,240,255,.5)' : '1px solid rgba(255,255,255,.16)', color: selProvider ? '#fff' : 'rgba(255,255,255,.5)', textAlign: 'left' }}>
+              <span style={{ fontSize: 16 }}>{selProvider ? (PROVIDERS.find(p => p.name === selProvider)?.icon || '🧩') : '🗂️'}</span>
+              <span style={{ flex: 1 }}>{selProvider || v('pickProv', lang)}</span>
+              <span style={{ color: 'rgba(255,255,255,.45)' }}>{ddOpen ? '▴' : '▾'}</span>
+            </button>
+            {ddOpen && (
+              <div className="hub-panel" style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 30, maxHeight: 280, overflowY: 'auto', borderRadius: 12, border: '1px solid rgba(26,240,255,.35)', background: 'linear-gradient(180deg, rgba(15,23,42,.99), rgba(3,7,18,1))', boxShadow: '0 24px 60px rgba(0,0,0,.6)', padding: 8 }}>
+                {provList.length === 0 && <div style={{ padding: '10px 12px', fontSize: 12.5, color: 'rgba(255,255,255,.5)' }}>{v('noProviders', lang)}</div>}
+                {CAT_ORDER.map(cat => {
+                  const inCat = provList.filter(p => (CATEGORY[p.provider] || 'Other') === cat)
+                  if (inCat.length === 0) return null
+                  return (
+                    <div key={cat} style={{ marginBottom: 6 }}>
+                      <div style={{ ...labelStyle, padding: '5px 8px 3px' }}>{cat}</div>
+                      {inCat.map(p => (
+                        <button key={p.provider} onClick={() => retrieveKeys(p.provider)} className="hub-chip" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 9, fontSize: 13, fontWeight: 600, background: selProvider === p.provider ? 'rgba(255,195,0,.12)' : 'transparent', border: '1px solid transparent', color: selProvider === p.provider ? '#ffc300' : 'rgba(255,255,255,.78)', textAlign: 'left' }}>
+                          <span style={{ fontSize: 15 }}>{PROVIDERS.find(x => x.name === p.provider)?.icon || '🧩'}</span>
+                          <span style={{ flex: 1 }}>{p.provider}</span>
+                          <span style={{ ...monoStyle, color: 'rgba(255,255,255,.4)' }}>{p.count}</span>
+                        </button>
+                      ))}
                   </div>
                 )
               })}
             </div>
           )}
+        </div>
+        {selProvider && <button onClick={refreshNow} className="hub-btn" title={v('refreshBtn', lang)} style={{ padding: '11px 14px', borderRadius: 11, border: refreshFlash ? '1px solid rgba(34,197,94,.6)' : '1px solid rgba(26,240,255,.4)', background: refreshFlash ? 'rgba(34,197,94,.14)' : 'rgba(26,240,255,.08)', color: refreshFlash ? '#86efac' : '#1af0ff', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>{safeLoading ? '⏳' : refreshFlash ? '✓' : '↻'}</button>}
         </div>
 
         {safeLoading && <div className="hub-loading" style={{ padding: '10px 13px', borderRadius: 11, border: '1px solid rgba(26,240,255,.3)', background: 'rgba(26,240,255,.05)', fontSize: 12.5, color: '#1af0ff', marginBottom: 8 }}>⏳ {v('retrieving', lang)}</div>}

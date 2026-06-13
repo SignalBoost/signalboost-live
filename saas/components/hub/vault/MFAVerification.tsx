@@ -8,7 +8,7 @@ import { cardStyle, labelStyle } from '../shared'
 
 export type MFAVerificationProps = {
   operation: 'rotation' | 'revocation' | 'export'
-  secret name: string
+  secret_name: string
   onSuccess: () => void
   onCancel: () => void
 }
@@ -18,7 +18,7 @@ type VerificationStep = 'method-select' | 'verification' | 'success'
 
 export default function MFAVerification({
   operation,
-  secret name,
+  secret_name,
   onSuccess,
   onCancel,
 }: MFAVerificationProps) {
@@ -105,7 +105,7 @@ export default function MFAVerification({
             Verify Your Identity
           </h2>
           <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,.55)' }}>
-            {operationLabels[operation]}: {secret name}
+            {operationLabels[operation]}: {secret_name}
           </p>
         </div>
 

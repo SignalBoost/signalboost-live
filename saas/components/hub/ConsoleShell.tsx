@@ -16,6 +16,23 @@ const PAGES = [
   { key: 'vault',     icon: '🔐', titleKey: 'pageVault',     Component: KeyVaultPage },
 ] as const
 
+function isRefreshButton(button: HTMLButtonElement | null): boolean {
+  if (!button) return false
+  const text = button.textContent || ''
+  const title = button.getAttribute('title') || ''
+  const haystack = `${text} ${title}`.toLowerCase()
+
+  return (
+    haystack.includes('refresh') ||
+    haystack.includes('updated') ||
+    haystack.includes('actualizar') ||
+    haystack.includes('atualizar') ||
+    haystack.includes('odśwież') ||
+    haystack.includes('обновить') ||
+    haystack.includes('↻')
+  )
+}
+
 export default function ConsoleShell() {
   const [lang, setLang] = useState<Lang>('en')
   const [idx, setIdx] = useState(0)
@@ -41,6 +58,12 @@ export default function ConsoleShell() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    const onRefresh = () => { void load() }
+    window.addEventListener('signalboost:hub-refresh', onRefresh)
+    return () => window.removeEventListener('signalboost:hub-refresh', onRefresh)
+  }, [load])
 
   // Bookmarkable pages via URL hash (#vault), plus keyboard arrows.
   useEffect(() => {
@@ -77,8 +100,10 @@ export default function ConsoleShell() {
       className="hub-root"
       onClickCapture={(event) => {
         const button = (event.target as HTMLElement).closest('button')
-        const title = button?.getAttribute('title') || ''
-        if (title.startsWith('↻')) window.setTimeout(() => { void load() }, 0)
+        if (isRefreshButton(button)) {
+          window.setTimeout(() => { void load() }, 0)
+          window.setTimeout(() => { void load() }, 600)
+        }
       }}
       style={{ minHeight: '100vh', background: 'radial-gradient(1100px 500px at 80% -10%, rgba(26,240,255,.10), transparent 60%), radial-gradient(900px 480px at 0% 110%, rgba(255,195,0,.07), transparent 55%), linear-gradient(180deg, #0b1220 0%, #030712 100%)', color: '#fff', padding: '18px clamp(14px, 1.6vw, 34px) 14px', fontFamily: 'Inter, system-ui, -apple-system, sans-serif', overflow: 'hidden' }}
     >

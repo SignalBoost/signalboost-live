@@ -1,23 +1,61 @@
 'use client'
 
 // saas/components/hub/ConsoleShell.tsx
-// Hub Console — Dashboard, Vault, Provider Health, and Providers with arrows and direct buttons.
+// SignalBoost Command Control — unified shell for Dashboard, Vault, Provider Health, and Providers.
 
 import { useCallback, useEffect, useState } from 'react'
-import { Lang, LANGS, HubData, c, labelStyle, Dot } from './shared'
+import { Lang, HubData } from './shared'
 import DashboardPage from './pages/DashboardPage'
 import VaultMonitorPage from './pages/VaultMonitorPage'
 import ProviderHealthPage from './pages/ProviderHealthPage'
 import ProviderExpansionPage from './pages/ProviderExpansionPage'
+import CommandShell from '../command-control/CommandShell'
+import type { CommandPage, CommandPageKey, CommandRailSection } from '../command-control/types'
 
-const PAGES = [
-  { key: 'dashboard', icon: '🛰️', title: 'Dashboard', Component: DashboardPage },
-  { key: 'vault', icon: '🔐', title: 'Vault', Component: VaultMonitorPage },
-  { key: 'health', icon: '🩺', title: 'Provider Health', Component: ProviderHealthPage },
-  { key: 'providers', icon: '🧭', title: 'Providers', Component: ProviderExpansionPage },
-] as const
+const PAGES: CommandPage[] = [
+  { key: 'dashboard', icon: '🛰️', title: 'Dashboard', eyebrow: 'Main console', description: 'Live internal platform status for Supabase, Stripe, and Vercel.', Component: DashboardPage },
+  { key: 'vault', icon: '🔐', title: 'Keys & Secrets', eyebrow: 'Governance workspace', description: 'Credential inventory, environment coverage, and future key rotation workflows.', Component: VaultMonitorPage },
+  { key: 'health', icon: '🩺', title: 'Provider Health', eyebrow: 'Operations monitor', description: 'Essential health and risk signals for enabled cloud and SaaS providers.', Component: ProviderHealthPage },
+  { key: 'providers', icon: '🧭', title: 'Providers', eyebrow: 'Provider manual', description: 'Provider setup guidance, automation value, and enable/disable preferences.', Component: ProviderExpansionPage },
+]
 
-type PageKey = typeof PAGES[number]['key']
+const COMMAND_SECTIONS: CommandRailSection[] = [
+  {
+    title: 'Main',
+    items: [
+      { key: 'dashboard', icon: '🛰️', label: 'Dashboard', pageKey: 'dashboard' },
+      { key: 'health', icon: '🩺', label: 'Provider Health', pageKey: 'health' },
+      { key: 'vault', icon: '🔐', label: 'Keys & Secrets', pageKey: 'vault' },
+      { key: 'security-alerts', icon: '🛡️', label: 'Security Alerts', disabled: true, badge: 'Next' },
+      { key: 'usage-cost', icon: '📊', label: 'Usage & Cost', disabled: true },
+      { key: 'audit-log', icon: '🧾', label: 'Audit Log', disabled: true, badge: 'Next' },
+    ],
+  },
+  {
+    title: 'Providers',
+    items: [
+      { key: 'providers', icon: '🧭', label: 'Provider Manual', pageKey: 'providers' },
+      { key: 'tier-1', icon: '🧱', label: 'Tier 1 — Core', pageKey: 'providers' },
+      { key: 'tier-2', icon: '⚙️', label: 'Tier 2 — Common', pageKey: 'providers' },
+      { key: 'tier-3', icon: '🧠', label: 'Tier 3 — AI / Data', pageKey: 'providers' },
+      { key: 'tier-4', icon: '🛠️', label: 'Tier 4 — DevOps', disabled: true },
+      { key: 'tier-5', icon: '📣', label: 'Tier 5 — Marketing', disabled: true },
+    ],
+  },
+  {
+    title: 'Settings',
+    items: [
+      { key: 'team-access', icon: '👥', label: 'Team & Access', disabled: true },
+      { key: 'settings', icon: '⚙️', label: 'Settings', disabled: true },
+    ],
+  },
+  {
+    title: 'Support',
+    items: [
+      { key: 'help-docs', icon: '📚', label: 'Help & Docs', disabled: true },
+    ],
+  },
+]
 
 function isRefreshButton(button: HTMLButtonElement | null): boolean {
   if (!button) return false
@@ -31,10 +69,13 @@ function navigateToFreshHub() {
   window.location.assign(nextUrl.toString())
 }
 
-export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPage?: PageKey }) {
-  const initialIdx = Math.max(0, PAGES.findIndex(p => p.key === initialPage))
+function pageIndexFromKey(key: CommandPageKey): number {
+  return Math.max(0, PAGES.findIndex(page => page.key === key))
+}
+
+export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPage?: CommandPageKey }) {
   const [lang, setLang] = useState<Lang>('en')
-  const [idx, setIdx] = useState(initialIdx)
+  const [idx, setIdx] = useState(pageIndexFromKey(initialPage))
   const [data, setData] = useState<HubData | null>(null)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
@@ -69,6 +110,10 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
     window.history.replaceState(null, '', '#' + PAGES[next].key)
   }, [])
 
+  const goByKey = useCallback((pageKey: CommandPageKey) => {
+    go(pageIndexFromKey(pageKey))
+  }, [go])
+
   useEffect(() => {
     const fromHash = () => {
       const h = window.location.hash.replace('#', '')
@@ -90,19 +135,8 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
     }
   }, [go, idx])
 
-  const navButtonStyle = (active: boolean): React.CSSProperties => ({
-    display: 'flex', alignItems: 'center', gap: 7, padding: '7px 13px', borderRadius: 10,
-    fontSize: 12.5, fontWeight: 700, textDecoration: 'none',
-    background: active ? 'rgba(255,195,0,.12)' : 'rgba(255,255,255,.04)',
-    border: active ? '1px solid rgba(255,195,0,.5)' : '1px solid rgba(255,255,255,.12)',
-    color: active ? '#ffc300' : 'rgba(255,255,255,.65)',
-  })
-
-  const supaOk = !!data?.supabase.ok
-  const stripeOk = !!data?.stripe.ok
-  const vercelConfigured = !!data?.vercel.configured
-  const vercelOk = !!data?.vercel.ok
-  const ActivePage = PAGES[idx].Component
+  const activePage = PAGES[idx]
+  const ActivePage = activePage.Component
 
   return (
     <div
@@ -114,44 +148,25 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
           window.setTimeout(navigateToFreshHub, 250)
         }
       }}
-      style={{ minHeight: '100vh', background: 'radial-gradient(1100px 500px at 80% -10%, rgba(26,240,255,.10), transparent 60%), radial-gradient(900px 480px at 0% 110%, rgba(255,195,0,.07), transparent 55%), linear-gradient(180deg, #0b1220 0%, #030712 100%)', color: '#fff', padding: '18px clamp(14px, 1.6vw, 34px) 14px', fontFamily: 'Inter, system-ui, -apple-system, sans-serif', overflow: 'hidden' }}
+      style={{ minHeight: '100vh', background: 'radial-gradient(1100px 500px at 80% -10%, rgba(26,240,255,.10), transparent 60%), radial-gradient(900px 480px at 0% 110%, rgba(255,195,0,.07), transparent 55%), linear-gradient(180deg, #0b1220 0%, #030712 100%)', color: '#fff', padding: '16px clamp(12px, 1.4vw, 26px)', fontFamily: 'Inter, system-ui, -apple-system, sans-serif', overflow: 'hidden' }}
     >
-      <style>{`.hub-card{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}.hub-card:hover{transform:translateY(-3px);box-shadow:0 24px 60px rgba(0,0,0,.55)}.hub-chip{transition:background .15s ease,color .15s ease,border-color .15s ease;cursor:pointer}.hub-btn{transition:filter .15s ease,transform .12s ease;cursor:pointer}.hub-btn:hover{transform:translateY(-1px);filter:brightness(1.25)}.hub-panel::-webkit-scrollbar{width:8px}.hub-panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:8px}.hub-panel::-webkit-scrollbar-track{background:transparent}@keyframes hubPulse{0%,100%{opacity:.45}50%{opacity:1}}.hub-loading{animation:hubPulse 1.4s ease infinite}.hub-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:20;width:42px;height:70px;display:flex;align-items:center;justify-content:center;font-size:24px;color:rgba(255,255,255,.65);background:rgba(15,23,42,.72);border:1px solid rgba(255,255,255,.14);cursor:pointer;backdrop-filter:blur(8px)}.hub-arrow:hover{color:#1af0ff;background:rgba(15,23,42,.9)}@media (min-width:1100px){.hub-root{height:calc(100vh - 80px);min-height:0}.hub-frame{display:flex;flex-direction:column;height:100%;min-height:0}.hub-stage{flex:1;min-height:0}.hub-panel{overflow-y:auto;min-height:0}}`}</style>
+      <style>{`.hub-card{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}.hub-card:hover{transform:translateY(-3px);box-shadow:0 24px 60px rgba(0,0,0,.55)}.hub-chip{transition:background .15s ease,color .15s ease,border-color .15s ease;cursor:pointer}.hub-chip:disabled{cursor:not-allowed}.hub-btn{transition:filter .15s ease,transform .12s ease;cursor:pointer}.hub-btn:hover{transform:translateY(-1px);filter:brightness(1.25)}.hub-panel::-webkit-scrollbar,.command-rail::-webkit-scrollbar{width:8px}.hub-panel::-webkit-scrollbar-thumb,.command-rail::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:8px}.hub-panel::-webkit-scrollbar-track,.command-rail::-webkit-scrollbar-track{background:transparent}@keyframes hubPulse{0%,100%{opacity:.45}50%{opacity:1}}.hub-loading{animation:hubPulse 1.4s ease infinite}.hub-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:20;width:42px;height:70px;display:flex;align-items:center;justify-content:center;font-size:24px;color:rgba(255,255,255,.65);background:rgba(15,23,42,.72);border:1px solid rgba(255,255,255,.14);cursor:pointer;backdrop-filter:blur(8px)}.hub-arrow:hover{color:#1af0ff;background:rgba(15,23,42,.9)}@media (min-width:1100px){.hub-root{height:calc(100vh - 80px);min-height:0}.command-shell{height:100%;min-height:0}.hub-panel{overflow-y:auto;min-height:0}}@media (max-width:980px){.command-shell{flex-direction:column}.command-rail{width:auto!important;flex:0 0 auto!important;max-height:270px}.mission-bar{align-items:flex-start!important}.command-stage{min-height:70vh!important}}`}</style>
 
-      <div className="hub-frame" style={{ width: '100%' }}>
-        <header style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 14, marginBottom: 12, flexShrink: 0 }}>
-          <div style={{ minWidth: 0 }}>
-            <h1 style={{ margin: 0, fontSize: 'clamp(22px, 2.6vw, 30px)', fontWeight: 800, letterSpacing: '-.02em', background: 'linear-gradient(90deg, #fff 30%, #1af0ff 75%, #ffc300 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{c('title', lang)}</h1>
-            <p style={{ margin: '3px 0 0', fontSize: 13, color: 'rgba(255,255,255,.55)' }}><span style={{ color: '#1af0ff' }}>{c('phaseBadge', lang)}</span></p>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <nav style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {PAGES.map((page, pageIndex) => (
-                <button key={page.key} onClick={() => go(pageIndex)} className="hub-chip" style={navButtonStyle(idx === pageIndex)}>{page.icon} {page.title}</button>
-              ))}
-            </nav>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {LANGS.map(l => (
-                <button key={l} onClick={() => setLang(l)} className="hub-chip" style={{ padding: '4px 10px', borderRadius: 8, fontSize: 12, fontWeight: 600, textTransform: 'uppercase', background: lang === l ? 'rgba(26,240,255,.16)' : 'rgba(255,255,255,.04)', border: lang === l ? '1px solid rgba(26,240,255,.5)' : '1px solid rgba(255,255,255,.12)', color: lang === l ? '#1af0ff' : 'rgba(255,255,255,.6)' }}>{l}</button>
-              ))}
-            </div>
-            {idx === 0 && <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '8px 14px', borderRadius: 12, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.04)' }}>
-              <span style={labelStyle}>{c('systemHealth', lang)}</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}><Dot tone={loading ? 'yellow' : supaOk ? 'green' : 'red'} /> Supabase</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}><Dot tone={loading ? 'yellow' : stripeOk ? 'green' : 'red'} /> Stripe</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}><Dot tone={loading ? 'yellow' : !vercelConfigured ? 'yellow' : vercelOk ? 'green' : 'red'} /> Vercel</span>
-            </div>}
-            <button onClick={load} className="hub-btn" style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(26,240,255,.4)', background: 'rgba(26,240,255,.1)', color: '#1af0ff', fontSize: 12.5, fontWeight: 700 }}>{loading ? '…' : '↻ ' + c('refresh', lang)}</button>
-          </div>
-        </header>
-
-        <div className="hub-stage" style={{ position: 'relative', overflow: 'hidden', flex: 1, minHeight: 0 }}>
-          {idx > 0 && <button onClick={() => go(idx - 1)} className="hub-arrow" style={{ left: 0, borderRadius: '0 12px 12px 0', borderLeft: 'none' }}>‹</button>}
-          {idx < PAGES.length - 1 && <button onClick={() => go(idx + 1)} className="hub-arrow" style={{ right: 0, borderRadius: '12px 0 0 12px', borderRight: 'none' }}>›</button>}
-          <ActivePage lang={lang} data={data} loading={loading} failed={failed} />
-        </div>
-      </div>
+      <CommandShell
+        sections={COMMAND_SECTIONS}
+        activePage={activePage}
+        activePageKey={activePage.key}
+        lang={lang}
+        data={data}
+        loading={loading}
+        onNavigate={goByKey}
+        onLanguageChange={setLang}
+        onRefresh={load}
+      >
+        {idx > 0 && <button onClick={() => go(idx - 1)} className="hub-arrow" style={{ left: 0, borderRadius: '0 12px 12px 0', borderLeft: 'none' }}>‹</button>}
+        {idx < PAGES.length - 1 && <button onClick={() => go(idx + 1)} className="hub-arrow" style={{ right: 0, borderRadius: '12px 0 0 12px', borderRight: 'none' }}>›</button>}
+        <ActivePage lang={lang} data={data} loading={loading} failed={failed} />
+      </CommandShell>
     </div>
   )
 }

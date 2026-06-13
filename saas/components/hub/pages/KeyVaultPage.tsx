@@ -412,12 +412,22 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
             <div style={{ fontSize: 16, fontWeight: 800 }}>🔐 {v('addKey', lang).replace('+ ', '')}</div>
             <div>
               <div style={{ ...labelStyle, marginBottom: 5 }}>{v('provider', lang)}</div>
-              {!customP && (
+              {!customP && fProvider && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '10px 13px', borderRadius: 10, border: '1px solid rgba(255,195,0,.55)', background: 'rgba(255,195,0,.1)', fontSize: 14, fontWeight: 800, color: '#ffc300' }}>
+                    <span style={{ fontSize: 17 }}>{PROVIDERS.find(p => p.name === fProvider)?.icon || '🧩'}</span>
+                    {fProvider}
+                    <span style={{ marginLeft: 'auto', color: '#86efac' }}>✓</span>
+                  </div>
+                  <button onClick={() => { setFProvider(''); setPSearch('') }} className="hub-chip" style={{ padding: '9px 14px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.18)', color: 'rgba(255,255,255,.65)', flexShrink: 0 }}>↩ Change</button>
+                </div>
+              )}
+              {!customP && !fProvider && (
                 <>
                   <input value={pSearch} onChange={e => setPSearch(e.target.value)} placeholder="🔍" style={{ ...inputStyle, marginBottom: 7 }} />
                   <div className="hub-panel" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxHeight: 132, overflowY: 'auto', padding: 2 }}>
                     {PROVIDERS.filter(p => p.name.toLowerCase().includes(pSearch.trim().toLowerCase())).map(p => (
-                      <button key={p.name} onClick={() => { setFProvider(p.name); if (!fLabel) setFLabel(p.labels[0]) }} className="hub-chip" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, background: fProvider === p.name ? 'rgba(255,195,0,.14)' : 'rgba(255,255,255,.04)', border: fProvider === p.name ? '1px solid rgba(255,195,0,.55)' : '1px solid rgba(255,255,255,.12)', color: fProvider === p.name ? '#ffc300' : 'rgba(255,255,255,.7)' }}>{p.icon} {p.name}</button>
+                      <button key={p.name} onClick={() => { setFProvider(p.name); setPSearch(''); if (!fLabel) setFLabel(p.labels[0]) }} className="hub-chip" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.12)', color: 'rgba(255,255,255,.7)' }}>{p.icon} {p.name}</button>
                     ))}
                     <button onClick={() => { setCustomP(true); setFProvider('') }} className="hub-chip" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, background: 'rgba(255,255,255,.04)', border: '1px dashed rgba(255,255,255,.25)', color: 'rgba(255,255,255,.55)' }}>✏️ Custom…</button>
                   </div>

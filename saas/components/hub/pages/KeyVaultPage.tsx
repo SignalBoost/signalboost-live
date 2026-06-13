@@ -5,6 +5,8 @@
 // SECTION 1 "My Safe": Bitwarden-style encrypted storage (vault_items table).
 //   Add (modal) -> encrypted at rest. Reveal (eye) -> decrypts one key for 15s,
 //   stamps last_accessed_at. Delete -> confirmation modal. Values never logged.
+// Activity timeline: vault_audit entries with action filters.
+// Clipboard auto-clears 10s after copy. Expiration dates raise severity banners.
 // SECTION 2 "Platform keys": read-only mirror of Vercel env variable NAMES.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -32,10 +34,21 @@ const V: Record<string, Record<Lang, string>> = {
   emptySafe:   { en: 'The safe is empty. Add your first key — it will be encrypted before it is stored.', es: 'La caja está vacía. Agrega tu primera clave — se cifrará antes de guardarse.', pt: 'O cofre está vazio. Adicione sua primeira chave — ela será criptografada antes de ser armazenada.', pl: 'Sejf jest pusty. Dodaj pierwszy klucz — zostanie zaszyfrowany przed zapisaniem.', ru: 'Сейф пуст. Добавьте первый ключ — он будет зашифрован перед сохранением.' },
   platformKeys:{ en: 'Platform keys (Vercel mirror, read-only)', es: 'Claves de la plataforma (espejo de Vercel, solo lectura)', pt: 'Chaves da plataforma (espelho da Vercel, somente leitura)', pl: 'Klucze platformy (lustro Vercel, tylko odczyt)', ru: 'Ключи платформы (зеркало Vercel, только чтение)' },
   hidesSoon:   { en: 'hides automatically in 15s', es: 'se oculta automáticamente en 15s', pt: 'oculta automaticamente em 15s', pl: 'ukryje się automatycznie za 15s', ru: 'скроется автоматически через 15с' },
+  clipClears:  { en: 'clipboard clears in 10s', es: 'el portapapeles se borra en 10s', pt: 'a área de transferência limpa em 10s', pl: 'schowek wyczyści się za 10s', ru: 'буфер очистится через 10с' },
+  expiresF:    { en: 'Expiration date (optional)', es: 'Fecha de expiración (opcional)', pt: 'Data de expiração (opcional)', pl: 'Data wygaśnięcia (opcjonalnie)', ru: 'Срок действия (необязательно)' },
+  expires:     { en: 'Expires', es: 'Expira', pt: 'Expira', pl: 'Wygasa', ru: 'Истекает' },
+  expired:     { en: 'EXPIRED', es: 'EXPIRADA', pt: 'EXPIRADA', pl: 'WYGASŁ', ru: 'ИСТЁК' },
+  expSoon:     { en: 'expiring soon', es: 'expira pronto', pt: 'expirando em breve', pl: 'wkrótce wygaśnie', ru: 'скоро истекает' },
+  expBannerRed:{ en: 'key(s) have EXPIRED — replace them.', es: 'clave(s) han EXPIRADO — reemplázalas.', pt: 'chave(s) EXPIRARAM — substitua-as.', pl: 'klucz(e) WYGASŁY — wymień je.', ru: 'ключ(и) ИСТЕКЛИ — замените их.' },
+  expBannerYel:{ en: 'key(s) expiring within 14 days.', es: 'clave(s) expiran en 14 días.', pt: 'chave(s) expiram em 14 dias.', pl: 'klucz(e) wygasają w ciągu 14 dni.', ru: 'ключ(и) истекают в течение 14 дней.' },
+  formatWarn:  { en: 'This does not look like a typical key for this provider. Double-check before saving.', es: 'No parece una clave típica de este proveedor. Verifica antes de guardar.', pt: 'Não parece uma chave típica deste provedor. Verifique antes de salvar.', pl: 'To nie wygląda jak typowy klucz tego dostawcy. Sprawdź przed zapisaniem.', ru: 'Это не похоже на типичный ключ этого провайдера. Проверьте перед сохранением.' },
+  timelineT:   { en: 'Activity timeline', es: 'Línea de actividad', pt: 'Linha de atividade', pl: 'Oś aktywności', ru: 'Лента активности' },
+  tlAll:       { en: 'All', es: 'Todas', pt: 'Todas', pl: 'Wszystkie', ru: 'Все' },
+  suggest:     { en: 'Suggestions', es: 'Sugerencias', pt: 'Sugestões', pl: 'Sugestie', ru: 'Подсказки' },
 }
 function v(key: string, lang: Lang): string { const e = V[key]; return e ? (e[lang] || e.en) : key }
 
-type VaultItem = { id: string; provider: string; label: string; last4: string; created_at: string; last_accessed_at: string | null }
+type VaultItem = { id: string; provider: string; label: string; last4: string; created_at: string; last_accessed_at: string | null; expires_at: string | null }
 
 const PROVIDER_TONES: Record<string, Tone> = { supabase: TONES.green, stripe: TONES.blue, vercel: TONES.purple, openai: TONES.cyan, github: TONES.gray }
 function toneFor(provider: string): Tone { return PROVIDER_TONES[provider.toLowerCase()] || TONES.gold }
@@ -54,6 +67,31 @@ function groupFor(name: string): string {
   return 'other'
 }
 
+const LABEL_SUGGESTIONS: Record<string, string[]> = {
+  stripe: ['Production API Key', 'Test API Key', 'Webhook Secret'],
+  supabase: ['Service Role Key', 'Anon Public Key'],
+  openai: ['Production Key', 'Test Key'],
+  elevenlabs: ['Production Key'],
+  github: ['Write Token', 'Read Token'],
+  vercel: ['API Token'],
+  anthropic: ['Production Key'],
+}
+
+// Non-blocking format hints: warn when a value does not match the provider's usual shape.
+function formatLooksOff(provider: string, value: string): boolean {
+  if (!value) return false
+  const p = provider.toLowerCase()
+  if (p.includes('stripe')) return !value.startsWith('sk_') && !value.startsWith('pk_') && !value.startsWith('whsec_') && !value.startsWith('price_')
+  if (p.includes('openai')) return !value.startsWith('sk-')
+  if (p.includes('aws')) return !value.startsWith('AKIA')
+  if (p.includes('github')) return !(value.startsWith('ghp_') || value.startsWith('github_pat_'))
+  if (p.includes('supabase')) return !(value.startsWith('eyJ') || value.startsWith('sb'))
+  return false
+}
+
+type AuditEntry = { id: string; actor: string; action: string; provider: string; label: string; created_at: string }
+const DAY = 86400000
+
 const inputStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.16)', background: 'rgba(255,255,255,.05)', color: '#fff', fontSize: 13.5, outline: 'none' }
 
 export default function KeyVaultPage({ lang, data, loading }: PageProps) {
@@ -69,7 +107,11 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
   const [revealed, setRevealed] = useState<Record<string, string>>({})
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [fExpires, setFExpires] = useState('')
+  const [audit, setAudit] = useState<AuditEntry[]>([])
+  const [tlFilter, setTlFilter] = useState('all')
   const timersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const clipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const loadSafe = async () => {
     setSafeLoading(true)
@@ -85,7 +127,14 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
       setSafeLoading(false)
     }
   }
-  useEffect(() => { loadSafe() }, [])
+  const loadAudit = async () => {
+    try {
+      const res = await fetch('/api/hub/vault?audit=1', { cache: 'no-store' })
+      const json = await res.json()
+      if (res.ok) setAudit(json.audit || [])
+    } catch {}
+  }
+  useEffect(() => { loadSafe(); loadAudit() }, [])
   useEffect(() => () => { Object.values(timersRef.current).forEach(clearTimeout) }, [])
 
   const addKey = async () => {
@@ -93,12 +142,13 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
     setSavingKey(true)
     setSafeError(null)
     try {
-      const res = await fetch('/api/hub/vault', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: fProvider, label: fLabel, value: fValue }) })
+      const res = await fetch('/api/hub/vault', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: fProvider, label: fLabel, value: fValue, expiresAt: fExpires ? new Date(fExpires).toISOString() : null }) })
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || String(res.status))
       setItems(prev => [...prev, json.item].sort((a, b) => a.provider.localeCompare(b.provider) || a.label.localeCompare(b.label)))
       setShowAdd(false)
-      setFProvider(''); setFLabel(''); setFValue('')
+      setFProvider(''); setFLabel(''); setFValue(''); setFExpires('')
+      loadAudit()
     } catch (err: any) {
       setSafeError(err?.message || 'Failed to save key')
     } finally {
@@ -117,6 +167,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
       timersRef.current[id] = setTimeout(() => {
         setRevealed(prev => { const next = { ...prev }; delete next[id]; return next })
       }, 15000)
+      loadAudit()
     } catch (err: any) {
       setSafeError(err?.message || 'Reveal failed')
     }
@@ -130,7 +181,18 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
   const copyKey = async (id: string) => {
     const value = revealed[id]
     if (!value) return
-    try { await navigator.clipboard.writeText(value); setCopiedId(id); setTimeout(() => setCopiedId(null), 1800) } catch {}
+    const item = items.find(i => i.id === id)
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopiedId(id)
+      setTimeout(() => setCopiedId(null), 1800)
+      // Spec: clipboard auto-clear after 10 seconds (best effort; requires window focus).
+      if (clipTimerRef.current) clearTimeout(clipTimerRef.current)
+      clipTimerRef.current = setTimeout(async () => {
+        try { if (document.hasFocus()) await navigator.clipboard.writeText('') } catch {}
+      }, 10000)
+      fetch('/api/hub/vault', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'copy', provider: item?.provider, label: item?.label }) }).then(() => loadAudit()).catch(() => {})
+    } catch {}
   }
 
   const deleteKey = async (id: string) => {
@@ -141,12 +203,12 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
       if (!res.ok) throw new Error(json?.error || String(res.status))
       hideKey(id)
       setItems(prev => prev.filter(i => i.id !== id))
+      loadAudit()
     } catch (err: any) {
       setSafeError(err?.message || 'Delete failed')
     }
   }
-
-  // ── Platform keys (Vercel mirror) ──
+// ── Platform keys (Vercel mirror) ──
   const configured = !!data?.vercel.configured
   const scopes = data?.vercel.scopes || []
   const inventory = useMemo(() => {
@@ -186,6 +248,17 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
           <div style={{ padding: '16px 14px', borderRadius: 12, border: '1px dashed rgba(255,255,255,.18)', background: 'rgba(255,255,255,.02)', fontSize: 13, color: 'rgba(255,255,255,.55)', textAlign: 'center' }}>{v('emptySafe', lang)}</div>
         )}
 
+        {(() => {
+          const now = Date.now()
+          const nExpired = items.filter(i => i.expires_at && new Date(i.expires_at).getTime() < now).length
+          const nSoon = items.filter(i => i.expires_at && new Date(i.expires_at).getTime() >= now && new Date(i.expires_at).getTime() < now + 14 * DAY).length
+          return (
+            <>
+              {nExpired > 0 && <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px', borderRadius: 11, border: '1px solid rgba(239,68,68,.5)', background: 'rgba(239,68,68,.1)', fontSize: 12.5, marginBottom: 8 }}><span>⛔</span>{nExpired} {v('expBannerRed', lang)}</div>}
+              {nSoon > 0 && <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px', borderRadius: 11, border: '1px solid rgba(255,195,0,.5)', background: 'rgba(255,195,0,.08)', fontSize: 12.5, marginBottom: 8 }}><span>⚠️</span>{nSoon} {v('expBannerYel', lang)}</div>}
+            </>
+          )
+        })()}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))', gap: 10 }}>
           {items.map(item => {
             const tone = toneFor(item.provider)
@@ -208,14 +281,41 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
                     <div style={{ ...monoStyle, fontSize: 12, wordBreak: 'break-all', padding: '8px 10px', borderRadius: 9, background: 'rgba(26,240,255,.06)', border: '1px solid rgba(26,240,255,.3)' }}>{shown}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <button onClick={() => copyKey(item.id)} className="hub-btn" style={{ padding: '6px 13px', borderRadius: 9, border: '1px solid rgba(26,240,255,.45)', background: 'rgba(26,240,255,.1)', color: '#1af0ff', fontSize: 12, fontWeight: 700 }}>{copiedId === item.id ? v('copied', lang) : v('copyBtn', lang)}</button>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>{v('hidesSoon', lang)}</span>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>{v('hidesSoon', lang)} · {v('clipClears', lang)}</span>
                     </div>
                   </div>
                 )}
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>{v('lastUsed', lang)}: {fmtDate(item.last_accessed_at)}</div>
+                {item.expires_at && (() => {
+                  const t = new Date(item.expires_at).getTime()
+                  const expired = t < Date.now()
+                  const soon = !expired && t < Date.now() + 14 * DAY
+                  return <div style={{ fontSize: 11, fontWeight: 700, color: expired ? '#fca5a5' : soon ? '#ffc300' : 'rgba(255,255,255,.45)' }}>{expired ? '⛔ ' + v('expired', lang) : (soon ? '⚠️ ' : '') + v('expires', lang) + ': ' + fmtDate(item.expires_at)}{soon && !expired ? ' · ' + v('expSoon', lang) : ''}</div>
+                })()}
               </div>
             )
           })}
+        </div>
+      </section>
+
+      {/* ── Activity timeline (vault_audit) ─────────────────────────── */}
+      <section style={{ flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+          <div style={labelStyle}>{v('timelineT', lang)}</div>
+          {['all', 'add', 'reveal', 'copy', 'delete'].map(f => (
+            <button key={f} onClick={() => setTlFilter(f)} className="hub-chip" style={{ padding: '4px 11px', borderRadius: 999, fontSize: 11.5, fontWeight: 700, textTransform: f === 'all' ? 'none' : 'lowercase', background: tlFilter === f ? 'rgba(26,240,255,.14)' : 'rgba(255,255,255,.04)', border: tlFilter === f ? '1px solid rgba(26,240,255,.45)' : '1px solid rgba(255,255,255,.12)', color: tlFilter === f ? '#1af0ff' : 'rgba(255,255,255,.55)' }}>{f === 'all' ? v('tlAll', lang) : f}</button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 240, overflowY: 'auto', paddingRight: 4 }} className="hub-panel">
+          {audit.filter(a => tlFilter === 'all' || a.action === tlFilter).slice(0, 40).map(a => (
+            <div key={a.id} style={{ ...rowStyle, gap: 12 }}>
+              <span style={{ ...monoStyle, color: '#1af0ff', flexShrink: 0 }}>{fmtDate(a.created_at)}</span>
+              <span style={{ fontSize: 11.5, fontWeight: 800, textTransform: 'uppercase', flexShrink: 0, color: a.action === 'delete' ? '#fca5a5' : a.action === 'reveal' ? '#ffc300' : a.action === 'copy' ? '#1af0ff' : '#86efac' }}>{a.action}</span>
+              <span style={{ fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{a.provider} · {a.label}</span>
+              <span style={{ ...monoStyle, color: 'rgba(255,255,255,.4)', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 160 }}>{a.actor}</span>
+            </div>
+          ))}
+          {audit.length === 0 && <div style={{ ...rowStyle, color: 'rgba(255,255,255,.45)' }}>—</div>}
         </div>
       </section>
 
@@ -276,10 +376,25 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
             <div>
               <div style={{ ...labelStyle, marginBottom: 5 }}>{v('labelF', lang)}</div>
               <input value={fLabel} onChange={e => setFLabel(e.target.value)} placeholder="Production API key" style={inputStyle} />
+              {(() => {
+                const sugg = LABEL_SUGGESTIONS[fProvider.trim().toLowerCase()] || []
+                if (sugg.length === 0) return null
+                return (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                    <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,.4)', alignSelf: 'center' }}>{v('suggest', lang)}:</span>
+                    {sugg.map(s => (<button key={s} onClick={() => setFLabel(s)} className="hub-chip" style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11.5, background: 'rgba(26,240,255,.08)', border: '1px solid rgba(26,240,255,.3)', color: '#1af0ff' }}>{s}</button>))}
+                  </div>
+                )
+              })()}
             </div>
             <div>
               <div style={{ ...labelStyle, marginBottom: 5 }}>{v('valueF', lang)}</div>
               <input value={fValue} onChange={e => setFValue(e.target.value)} type="password" autoComplete="off" placeholder="sk-…" style={inputStyle} />
+              {formatLooksOff(fProvider, fValue) && <div style={{ display: 'flex', gap: 7, marginTop: 6, fontSize: 11.5, color: '#ffc300' }}><span>⚠️</span>{v('formatWarn', lang)}</div>}
+            </div>
+            <div>
+              <div style={{ ...labelStyle, marginBottom: 5 }}>{v('expiresF', lang)}</div>
+              <input value={fExpires} onChange={e => setFExpires(e.target.value)} type="date" style={{ ...inputStyle, colorScheme: 'dark' }} />
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
               <button onClick={() => setShowAdd(false)} disabled={savingKey} className="hub-chip" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,.18)', background: 'rgba(255,255,255,.05)', color: 'rgba(255,255,255,.7)', fontSize: 13, fontWeight: 700 }}>{v('cancel', lang)}</button>

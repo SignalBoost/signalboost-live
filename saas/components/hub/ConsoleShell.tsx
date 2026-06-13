@@ -1,20 +1,16 @@
 'use client'
 
 // saas/components/hub/ConsoleShell.tsx
-// Hub Console — the horizontal multi-page shell ("sliding monitors").
-// Owns: navigation (arrows, indicators, quick-jump), header chrome,
-// language, and the single live data fetch shared by all pages.
-// Adding a future page = one entry in the PAGES registry.
+// Hub Console — horizontal monitor shell for live dashboard and expansion map.
+// Vault has its own standalone route at /hub/vault.
 
 import { useCallback, useEffect, useState } from 'react'
 import { Lang, LANGS, HubData, c, labelStyle, Dot } from './shared'
 import DashboardPage from './pages/DashboardPage'
-import KeyVaultPage from './pages/KeyVaultPage'
 import ProviderExpansionPage from './pages/ProviderExpansionPage'
 
 const PAGES = [
   { key: 'dashboard', icon: '🛰️', title: 'Monitor 1 · Dashboard', Component: DashboardPage },
-  { key: 'vault', icon: '🔐', title: 'Monitor 2 · Key Vault', Component: KeyVaultPage },
   { key: 'providers', icon: '🧭', title: 'Monitor 3 · Providers', Component: ProviderExpansionPage },
 ] as const
 
@@ -40,7 +36,6 @@ function isRefreshButton(button: HTMLButtonElement | null): boolean {
 function navigateToFreshHub() {
   const nextUrl = new URL(window.location.href)
   nextUrl.searchParams.set('refresh', String(Date.now()))
-  if (!nextUrl.hash) nextUrl.hash = 'vault'
   window.location.assign(nextUrl.toString())
 }
 
@@ -131,6 +126,7 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
               {PAGES.map((p, i) => (
                 <button key={p.key} onClick={() => go(i)} className="hub-chip" style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 13px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, background: idx === i ? 'rgba(255,195,0,.12)' : 'rgba(255,255,255,.04)', border: idx === i ? '1px solid rgba(255,195,0,.5)' : '1px solid rgba(255,255,255,.12)', color: idx === i ? '#ffc300' : 'rgba(255,255,255,.65)' }}>{p.icon} {p.title}</button>
               ))}
+              <a href="/hub/vault" className="hub-chip" style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 13px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.12)', color: 'rgba(255,255,255,.65)', textDecoration: 'none' }}>🔐 Vault</a>
             </nav>
             <div style={{ display: 'flex', gap: 6 }}>
               {LANGS.map(l => (

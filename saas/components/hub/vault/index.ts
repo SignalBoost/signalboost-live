@@ -15,3 +15,6 @@ export type { RotationModalProps } from './RotationModal'
 
 export { default as ProviderSelect } from './ProviderSelect'
 export type { ProviderSelectProps } from './ProviderSelect'
+
+export { default as MFAVerification } from './MFAVerification'
+export type { MFAVerificationProps } from './MFAVerification'

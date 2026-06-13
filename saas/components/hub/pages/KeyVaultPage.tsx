@@ -342,7 +342,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
             <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.55)', maxWidth: 720 }}>{v('safeSub', lang)}</div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            {selProvider && <button onClick={() => retrieveKeys(selProvider)} disabled={safeLoading} className="hub-btn" style={{ padding: '9px 14px', borderRadius: 10, border: '1px solid rgba(26,240,255,.4)', background: 'rgba(26,240,255,.08)', color: '#1af0ff', fontSize: 13, fontWeight: 700 }}>{safeLoading ? '…' : '↻'}</button>}
+           {selProvider && <button onClick={() => { if (selProvider) retrieveKeys(selProvider) }} className="hub-btn" style={{ padding: '9px 14px', borderRadius: 10, border: '1px solid rgba(26,240,255,.4)', background: 'rgba(26,240,255,.08)', color: '#1af0ff', fontSize: 13, fontWeight: 700 }}>{safeLoading ? '…' : '↻'}</button>}/button>}
             <button onClick={() => setShowAdd(true)} className="hub-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid rgba(255,195,0,.5)', background: 'rgba(255,195,0,.12)', color: '#ffc300', fontSize: 13, fontWeight: 800 }}>{v('addKey', lang)}</button>
           </div>
         </div>

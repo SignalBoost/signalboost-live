@@ -12,6 +12,7 @@ export type CommandPageKey =
   | 'setup'
   | 'aiops'
   | 'providers'
+  | 'providers-all'
 
 export type CommandPage = {
   key: CommandPageKey

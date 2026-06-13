@@ -142,8 +142,16 @@ export async function GET() {
 
   const [stripe, supabase, vercel] = await Promise.all([fetchStripe(), fetchSupabase(), fetchVercel()])
 
+  // Health alerts keep the top banner honest. The green all-clear should only show
+  // when provider checks and environment sync checks are actually clean.
+  const healthAlerts: string[] = []
+  if (!supabase.ok) healthAlerts.push(`Supabase health check failed${supabase.error ? `: ${supabase.error}` : ''}`)
+  if (!stripe.ok) healthAlerts.push(`Stripe health check failed${stripe.error ? `: ${stripe.error}` : ''}`)
+  if (!vercel.configured) healthAlerts.push('Vercel token is not configured; environment coverage cannot be checked')
+  else if (!vercel.ok) healthAlerts.push(`Vercel health check failed${vercel.error ? `: ${vercel.error}` : ''}`)
+
   // Env-sync alert: variable names that exist in Production but not in Preview (or vice versa).
-  const envAlerts: string[] = []
+  const envAlerts: string[] = [...healthAlerts]
   if (vercel.ok && vercel.configured && vercel.scopes.length === 3) {
     const prod = new Set(vercel.scopes[0].names)
     const prev = new Set(vercel.scopes[1].names)

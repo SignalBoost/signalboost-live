@@ -25,7 +25,7 @@ const V: Record<string, Record<Lang, string>> = {
   provider:    { en: 'Provider', es: 'Proveedor', pt: 'Provedor', pl: 'Dostawca', ru: 'Провайдер' },
   labelF:      { en: 'Name / label', es: 'Nombre / etiqueta', pt: 'Nome / rótulo', pl: 'Nazwa / etykieta', ru: 'Имя / метка' },
   valueF:      { en: 'Secret value', es: 'Valor secreto', pt: 'Valor secreto', pl: 'Wartość sekretna', ru: 'Секретное значение' },
-  save:        { en: 'Save to safe', es: 'Guardar en la caja', pt: 'Salvar no cofre', pl: 'Zapisz w sejfie', ru: 'Сохранить в сейф' },
+  save:        { en: 'Save to safe', es: 'Guardar en la caja', pt: 'Salvar no cofre', pl: 'Zapisz w sejfie', ru: 'Сохранить в сeyф' },
   saving:      { en: 'Encrypting…', es: 'Cifrando…', pt: 'Criptografando…', pl: 'Szyfrowanie…', ru: 'Шифрование…' },
   cancel:      { en: 'Cancel', es: 'Cancelar', pt: 'Cancelar', pl: 'Anuluj', ru: 'Отмена' },
   copyBtn:     { en: 'Copy', es: 'Copiar', pt: 'Copiar', pl: 'Kopiuj', ru: 'Копировать' },
@@ -79,8 +79,6 @@ function groupFor(name: string): string {
   return 'other'
 }
 
-// Provider catalog: pick, don't type. Canonical names eliminate human error.
-// Each provider carries its usual key labels; validation matches by name.
 type CatalogEntry = { name: string; icon: string; labels: string[] }
 const PROVIDERS: CatalogEntry[] = [
   { name: 'Stripe', icon: '💳', labels: ['Production API Key', 'Test API Key', 'Webhook Secret', 'Publishable Key'] },
@@ -127,7 +125,6 @@ const PROVIDERS: CatalogEntry[] = [
   { name: 'Brave Search', icon: '🦁', labels: ['API Key'] },
 ]
 
-// Category grouping for the provider dropdown (spec: Payments / Data / AI / Infrastructure…).
 const CATEGORY: Record<string, string> = {
   'Stripe': 'Payments', 'PayPal': 'Payments', 'Shopify': 'Payments',
   'Supabase': 'Data', 'MongoDB': 'Data', 'Neon': 'Data', 'Upstash': 'Data', 'Firebase': 'Data', 'Airtable': 'Data', 'Algolia': 'Data', 'Pinecone': 'Data',
@@ -137,7 +134,6 @@ const CATEGORY: Record<string, string> = {
 }
 const CAT_ORDER = ['Payments', 'Data', 'AI', 'Infrastructure', 'Communication', 'Other']
 
-// Direct links to each provider's dashboard for the details drawer.
 const PROVIDER_DASH: Record<string, string> = {
   'Stripe': 'https://dashboard.stripe.com/apikeys',
   'Supabase': 'https://supabase.com/dashboard',
@@ -158,7 +154,6 @@ const PROVIDER_DASH: Record<string, string> = {
   'Firebase': 'https://console.firebase.google.com',
 }
 
-// Non-blocking format hints: warn when a value does not match the provider's usual shape.
 function formatLooksOff(provider: string, value: string): boolean {
   if (!value) return false
   const p = provider.toLowerCase()
@@ -172,11 +167,9 @@ function formatLooksOff(provider: string, value: string): boolean {
 
 type AuditEntry = { id: string; actor: string; action: string; provider: string; label: string; created_at: string }
 const DAY = 86400000
-
 const inputStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.16)', background: 'rgba(255,255,255,.05)', color: '#fff', fontSize: 13.5, outline: 'none' }
 
 export default function KeyVaultPage({ lang, data, loading }: PageProps) {
-  // ── My Safe state ──
   const [items, setItems] = useState<VaultItem[]>([])
   const [safeLoading, setSafeLoading] = useState(true)
   const [safeError, setSafeError] = useState<string | null>(null)
@@ -200,8 +193,6 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
   const timersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const clipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Dynamic retrieval: the list of providers loads first; keys are fetched
-  // from Supabase only when a provider is selected (spec module 3).
   const loadProviders = async () => {
     setSafeLoading(true)
     setSafeError(null)
@@ -234,6 +225,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
       setSafeLoading(false)
     }
   }
+
   const loadAudit = async () => {
     try {
       const res = await fetch('/api/hub/vault?audit=1', { cache: 'no-store' })
@@ -295,7 +287,6 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
       await navigator.clipboard.writeText(value)
       setCopiedId(id)
       setTimeout(() => setCopiedId(null), 1800)
-      // Spec: clipboard auto-clear after 10 seconds (best effort; requires window focus).
       if (clipTimerRef.current) clearTimeout(clipTimerRef.current)
       clipTimerRef.current = setTimeout(async () => {
         try { if (document.hasFocus()) await navigator.clipboard.writeText('') } catch {}
@@ -350,7 +341,10 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
             <div style={{ fontSize: 17, fontWeight: 800 }}>🔐 {v('mySafe', lang)}</div>
             <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.55)', maxWidth: 720 }}>{v('safeSub', lang)}</div>
           </div>
-          <button onClick={() => setShowAdd(true)} className="hub-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid rgba(255,195,0,.5)', background: 'rgba(255,195,0,.12)', color: '#ffc300', fontSize: 13, fontWeight: 800 }}>{v('addKey', lang)}</button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {selProvider && <button onClick={() => retrieveKeys(selProvider)} disabled={safeLoading} className="hub-btn" style={{ padding: '9px 14px', borderRadius: 10, border: '1px solid rgba(26,240,255,.4)', background: 'rgba(26,240,255,.08)', color: '#1af0ff', fontSize: 13, fontWeight: 700 }}>{safeLoading ? '…' : '↻'}</button>}
+            <button onClick={() => setShowAdd(true)} className="hub-btn" style={{ padding: '9px 16px', borderRadius: 10, border: '1px solid rgba(255,195,0,.5)', background: 'rgba(255,195,0,.12)', color: '#ffc300', fontSize: 13, fontWeight: 800 }}>{v('addKey', lang)}</button>
+          </div>
         </div>
 
         {safeError && <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px', borderRadius: 11, border: '1px solid rgba(239,68,68,.45)', background: 'rgba(239,68,68,.09)', fontSize: 12.5, marginBottom: 8 }}><span>⚠️</span><span style={{ flex: 1 }}>{safeError}</span><button onClick={() => setSafeError(null)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.6)', cursor: 'pointer' }}>×</button></div>}
@@ -398,6 +392,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
             </>
           )
         })()}
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))', gap: 10 }}>
           {items.map(item => {
             const tone = toneFor(item.provider)
@@ -562,7 +557,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
         , document.body)
       })()}
 
-      {/* ── Add Key modal (portal: escapes the slider's CSS transform) ── */}
+      {/* ── Add Key modal (portal) ──────────────────────────────────── */}
       {showAdd && typeof document !== 'undefined' && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(3,7,18,.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 18 }} onClick={() => !savingKey && setShowAdd(false)}>
           <div onClick={e => e.stopPropagation()} style={{ width: 'min(440px, 100%)', borderRadius: 16, border: '1px solid rgba(255,195,0,.4)', background: 'linear-gradient(160deg, rgba(15,23,42,.97), rgba(3,7,18,.99))', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 12, boxShadow: '0 30px 80px rgba(0,0,0,.6)' }}>

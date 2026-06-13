@@ -172,7 +172,7 @@ export default function DashboardPage({ lang, data, loading, failed }: PageProps
           <div style={{ fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,.85)' }}>{c('futureTitle', lang)}</div>
           <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.45)', maxWidth: 260 }}>{c('futureNote', lang)}</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-            {['OpenAI', 'Anthropic', 'ElevenLabs'].map(p => (<span key={p} style={{ padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(26,240,255,.25)', color: 'rgba(26,240,255,.7)', fontSize: 11.5 }}>{p}</span>))}
+            {['GitHub', 'Anthropic', 'ElevenLabs'].map(p => (<span key={p} style={{ padding: '4px 10px', borderRadius: 999, border: '1px solid rgba(26,240,255,.25)', color: 'rgba(26,240,255,.7)', fontSize: 11.5 }}>{p}</span>))}
           </div>
         </section>
 

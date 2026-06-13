@@ -1,7 +1,9 @@
 // saas/lib/hub/gcp-scanner.ts
-// Scan GCP service accounts and keys
+// Scan GCP service accounts and keys using JWT authentication
 
-interface GCPServiceAccount {
+import { getGCPAccessToken, validateGCPKeyFormat } from '@/lib/auth/gcp-jwt'
+
+export interface GCPServiceAccount {
   email: string
   projectId: string
   displayName?: string
@@ -9,7 +11,7 @@ interface GCPServiceAccount {
   disabled: boolean
 }
 
-interface GCPServiceAccountKey {
+export interface GCPServiceAccountKey {
   name: string
   publicKeyData: string
   validAfterTime: string
@@ -19,34 +21,30 @@ interface GCPServiceAccountKey {
 
 /**
  * Scan GCP service accounts
- * Requires: GOOGLE_APPLICATION_CREDENTIALS env var with service account JSON
  */
-export async function scanGCPServiceAccounts(projectId: string, serviceAccountKey: string): Promise<{
+export async function scanGCPServiceAccounts(
+  projectId: string,
+  serviceAccountKey: string
+): Promise<{
   ok: boolean
   accounts?: GCPServiceAccount[]
   error?: string
 }> {
   try {
-    // Parse service account key
-    let credentials
-    try {
-      credentials = JSON.parse(serviceAccountKey)
-    } catch {
-      return { ok: false, error: 'Invalid service account key JSON' }
-    }
-
-    if (!credentials.project_id) {
-      return { ok: false, error: 'Service account key missing project_id' }
+    // Validate key format
+    const validation = validateGCPKeyFormat(serviceAccountKey)
+    if (!validation.ok) {
+      return { ok: false, error: validation.error }
     }
 
     // Get access token
-    const tokenResponse = await getGCPAccessToken(credentials)
+    const tokenResponse = await getGCPAccessToken(serviceAccountKey)
     if (!tokenResponse.ok || !tokenResponse.token) {
       return { ok: false, error: tokenResponse.error || 'Failed to get access token' }
     }
 
     const token = tokenResponse.token
-    const projId = projectId || credentials.project_id
+    const projId = projectId || validation.projectId
 
     // List service accounts
     const response = await fetch(
@@ -60,7 +58,7 @@ export async function scanGCPServiceAccounts(projectId: string, serviceAccountKe
 
     if (!response.ok) {
       const error = await response.text()
-      return { ok: false, error: `GCP API error: ${error}` }
+      return { ok: false, error: `GCP API error: ${response.status} ${error}` }
     }
 
     const data = await response.json()
@@ -92,22 +90,20 @@ export async function scanGCPServiceAccountKeys(
   error?: string
 }> {
   try {
-    // Parse service account key
-    let credentials
-    try {
-      credentials = JSON.parse(serviceAccountKey)
-    } catch {
-      return { ok: false, error: 'Invalid service account key JSON' }
+    // Validate key format
+    const validation = validateGCPKeyFormat(serviceAccountKey)
+    if (!validation.ok) {
+      return { ok: false, error: validation.error }
     }
 
     // Get access token
-    const tokenResponse = await getGCPAccessToken(credentials)
+    const tokenResponse = await getGCPAccessToken(serviceAccountKey)
     if (!tokenResponse.ok || !tokenResponse.token) {
       return { ok: false, error: tokenResponse.error || 'Failed to get access token' }
     }
 
     const token = tokenResponse.token
-    const projId = projectId || credentials.project_id
+    const projId = projectId || validation.projectId
 
     // List keys for service account
     const response = await fetch(
@@ -121,7 +117,7 @@ export async function scanGCPServiceAccountKeys(
 
     if (!response.ok) {
       const error = await response.text()
-      return { ok: false, error: `GCP API error: ${error}` }
+      return { ok: false, error: `GCP API error: ${response.status} ${error}` }
     }
 
     const data = await response.json()
@@ -143,69 +139,34 @@ export async function scanGCPServiceAccountKeys(
 }
 
 /**
- * Validate GCP credentials and get access token
+ * Validate GCP credentials and get project ID
  */
 export async function validateGCPCredentials(serviceAccountKey: string): Promise<{
   ok: boolean
   projectId?: string
+  email?: string
   error?: string
 }> {
   try {
-    let credentials
-    try {
-      credentials = JSON.parse(serviceAccountKey)
-    } catch {
-      return { ok: false, error: 'Invalid JSON' }
+    // Validate key format first
+    const validation = validateGCPKeyFormat(serviceAccountKey)
+    if (!validation.ok) {
+      return { ok: false, error: validation.error }
     }
 
-    if (!credentials.project_id || !credentials.private_key || !credentials.client_email) {
-      return { ok: false, error: 'Missing required fields: project_id, private_key, client_email' }
-    }
-
-    const tokenResponse = await getGCPAccessToken(credentials)
+    // Try to get access token
+    const tokenResponse = await getGCPAccessToken(serviceAccountKey)
     if (!tokenResponse.ok) {
       return { ok: false, error: tokenResponse.error || 'Authentication failed' }
     }
 
-    return { ok: true, projectId: credentials.project_id }
+    return {
+      ok: true,
+      projectId: validation.projectId,
+      email: validation.email,
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
-    return { ok: false, error: msg }
-  }
-}
-
-/**
- * Get GCP access token using service account key
- */
-async function getGCPAccessToken(credentials: any): Promise<{
-  ok: boolean
-  token?: string
-  error?: string
-}> {
-  try {
-    // Create JWT
-    const header = {
-      alg: 'RS256',
-      typ: 'JWT',
-    }
-
-    const now = Math.floor(Date.now() / 1000)
-    const payload = {
-      iss: credentials.client_email,
-      scope: 'https://www.googleapis.com/auth/cloud-platform',
-      aud: 'https://oauth2.googleapis.com/token',
-      exp: now + 3600,
-      iat: now,
-    }
-
-    // Note: In production, use proper JWT signing library
-    // For now, return error (requires crypto implementation)
-    return {
-      ok: false,
-      error: 'JWT signing not implemented - use proper OAuth library in production',
-    }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Token generation failed'
     return { ok: false, error: msg }
   }
 }

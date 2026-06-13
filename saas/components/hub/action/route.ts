@@ -306,6 +306,33 @@ async function executeStripeAction(template: any, payload: Record<string, unknow
   if (!apiKey) return { ok: false, error: 'STRIPE_SECRET_KEY not set' }
 
   const url = 'https://api.stripe.com' + template.api.endpoint
+
+  // Health check: GET request, read-only
+  if (template.api.method === 'GET') {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': 'Bearer ' + apiKey,
+      },
+    })
+    if (!res.ok) {
+      const error = await res.text()
+      return { ok: false, error: error || res.statusText }
+    }
+    const data = await res.json()
+    const productCount = (data.data || []).length
+    return {
+      ok: true,
+      message: `Stripe health: ${productCount} product${productCount === 1 ? '' : 's'} found`,
+      data: {
+        productCount,
+        hasMore: data.has_more || false,
+        products: (data.data || []).slice(0, 5).map((p: any) => ({ id: p.id, name: p.name })),
+      },
+    }
+  }
+
+  // Write action: create product (POST)
   const res = await fetch(url, {
     method: template.api.method,
     headers: {
@@ -330,8 +357,41 @@ async function executeSupabaseAction(template: any, payload: Record<string, unkn
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) return { ok: false, error: 'Supabase not configured' }
 
-  const client = createClient(url, key)
-  // Template-specific dispatch (e.g., invite_supabase_user)
+  // Health check: read-only status
+  if (template.id === 'supabase.read_health') {
+    try {
+      // Call Supabase status endpoint
+      const res = await fetch(`${url}/v1/projects/${url.split('.')[0].split('//')[1]}/status`, {
+        method: 'GET',
+        headers: {
+          'Authorization': 'Bearer ' + key,
+        },
+      }).catch(() => null)
+
+      // If status endpoint fails, try a simple health check via the database
+      const client = createClient(url, key)
+      const { data, error } = await client.from('information_schema.tables').select('table_name', { count: 'exact' }).limit(1)
+
+      if (error) {
+        return { ok: false, error: 'Database connection failed: ' + error.message }
+      }
+
+      return {
+        ok: true,
+        message: 'Supabase health: database is online',
+        data: {
+          status: 'healthy',
+          endpoint: url,
+          timestamp: new Date().toISOString(),
+        },
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      return { ok: false, error: 'Health check failed: ' + msg }
+    }
+  }
+
+  // Write action: invite user
   if (template.id === 'supabase.invite_user') {
     const { email, redirect_to } = payload
     // Use Supabase Admin API to invite user
@@ -363,6 +423,39 @@ async function executeVercelAction(template: any, payload: Record<string, unknow
   const endpoint = template.api.endpoint.replace('{projectId}', projectId)
   const url = 'https://api.vercel.com' + endpoint
 
+  // Health check: read-only deployments list
+  if (template.api.method === 'GET') {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+      },
+    })
+
+    if (!res.ok) {
+      const error = await res.text()
+      return { ok: false, error }
+    }
+
+    const data = await res.json()
+    const deploymentCount = (data.deployments || []).length
+    const latestDeployment = (data.deployments || [])[0]
+
+    return {
+      ok: true,
+      message: `Vercel health: ${deploymentCount} deployment${deploymentCount === 1 ? '' : 's'} found`,
+      data: {
+        deploymentCount,
+        latestDeployment: latestDeployment ? {
+          id: latestDeployment.id,
+          state: latestDeployment.state,
+          createdAt: latestDeployment.createdAt,
+        } : null,
+      },
+    }
+  }
+
+  // Write action: set environment variable
   const res = await fetch(url, {
     method: template.api.method,
     headers: {

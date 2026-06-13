@@ -1,8 +1,7 @@
 // saas/lib/auth/totp-service.ts
-// TOTP (Time-based One-Time Password) for 2FA using speakeasy + qrcode
+// TOTP (Time-based One-Time Password) for 2FA using speakeasy
 
 import speakeasy from 'speakeasy'
-import QRCode from 'qrcode'
 
 /**
  * Generate new TOTP secret for user
@@ -11,33 +10,12 @@ export function generateTOTPSecret(userEmail: string) {
   const secret = speakeasy.generateSecret({
     name: `SignalBoost Vault (${userEmail})`,
     issuer: 'SignalBoost',
-    length: 32, // Longer secret = more secure
+    length: 32,
   })
 
   return {
-    secret: secret.base32, // Store this in Supabase (encrypted)
-    backupCodes: generateBackupCodes(), // Show user once
-  }
-}
-
-/**
- * Generate QR code as data URL
- */
-export async function generateQRCode(secret: string): Promise<string> {
-  try {
-    const qrCode = await QRCode.toDataURL(secret, {
-      errorCorrectionLevel: 'H',
-      type: 'image/png',
-      width: 300,
-      margin: 1,
-      color: {
-        dark: '#000000',
-        light: '#FFFFFF',
-      },
-    })
-    return qrCode
-  } catch (err) {
-    throw new Error(`Failed to generate QR code: ${err instanceof Error ? err.message : String(err)}`)
+    secret: secret.base32,
+    backupCodes: generateBackupCodes(),
   }
 }
 
@@ -49,8 +27,8 @@ export function verifyTOTPCode(secret: string, token: string, window = 2): boole
     return speakeasy.totp.verify({
       secret,
       encoding: 'base32',
-      token: token.replace(/\s/g, ''), // Remove spaces
-      window, // Allow codes from ±2 time windows (±60 seconds)
+      token: token.replace(/\s/g, ''),
+      window,
     })
   } catch (err) {
     return false

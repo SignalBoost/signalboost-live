@@ -1,9 +1,7 @@
 'use client'
 
 // saas/components/hub/pages/ProviderExpansionPage.tsx
-// Monitor 3 — Tiered Provider Automation Playbook.
-// Providers are separated by tier so each one has room for automation value,
-// business value, phase planning, and user enable/disable preference.
+// Provider Manual — separated into 8 monitor pages so providers are not crowded.
 
 import { useEffect, useMemo, useState } from 'react'
 import { PageProps, TONES, cardStyle, labelStyle } from '../shared'
@@ -17,7 +15,7 @@ type ProviderIdea = {
   phase: 'Phase 1' | 'Phase 2' | 'Phase 3'
 }
 
-type TierPage = {
+type ProviderPage = {
   id: string
   icon: string
   title: string
@@ -27,55 +25,57 @@ type TierPage = {
 
 const PREF_KEY = 'signalboost:enabledProviders'
 
-const TIERS: TierPage[] = [
-  {
-    id: 'tier-1',
-    icon: '🧱',
-    title: 'Tier 1 Providers — High-Value Automations',
-    subtitle: 'Start here: cloud, AI, identity, cost, and security visibility with the strongest enterprise value.',
-    providers: [
-      { name: 'AWS', subtitle: 'IAM, S3, Lambda', visual: ['IAM keys', 'S3 access', 'Lambda status', 'Least privilege'], phase: 'Phase 1', automate: ['IAM key expiration monitoring', 'IAM key rotation reminders', 'S3 bucket access verification', 'Lambda function status + last deployment', 'Detect unused IAM keys', 'Show least-privilege warnings'], why: 'AWS is complex. Your console becomes a simple security dashboard.' },
-      { name: 'OpenAI', subtitle: 'API keys, usage, cost', visual: ['Token usage', 'Cost spikes', 'Rate limits', 'Model status'], phase: 'Phase 1', automate: ['Usage monitoring for tokens and cost', 'Model availability status', 'Automatic alerts when hitting rate limits', 'Key age and rotation reminders', 'Cost spike detection'], why: 'OpenAI usage is expensive — visibility saves money.' },
-      { name: 'Google Cloud', subtitle: 'Service accounts, OAuth', visual: ['Service accounts', 'OAuth clients', 'IAM roles', 'Key age'], phase: 'Phase 2', automate: ['Detect expiring service account keys', 'Show which roles each key has', 'OAuth client ID visibility', 'Alerts when a key is over-privileged', 'Environment mapping for service keys'], why: 'GCP service accounts are a nightmare to track manually.' },
-      { name: 'Azure', subtitle: 'Enterprise identity', visual: ['App secrets', 'Certificates', 'Role assignments', 'Tenant config'], phase: 'Phase 2', automate: ['Azure AD app secret expiration', 'Certificate expiration', 'Role assignment visibility', 'Key rotation reminders', 'Misconfiguration warnings'], why: 'Azure is where enterprise identity risk hides.' },
-    ],
-  },
-  {
-    id: 'tier-2',
-    icon: '⚙️',
-    title: 'Tier 2 Providers — Practical Automations',
-    subtitle: 'High-frequency operational providers: auth, messaging, email, DNS, and edge infrastructure.',
-    providers: [
-      { name: 'Firebase', subtitle: 'Auth, realtime DB', visual: ['Auth config', 'API usage', 'Token age', 'Rules health'], phase: 'Phase 1', automate: ['API key usage visibility', 'Auth domain configuration checks', 'Token expiration alerts', 'Misconfiguration warnings'], why: 'Firebase grows fast and security drift is easy to miss.' },
-      { name: 'Twilio', subtitle: 'SMS, phone verification', visual: ['SMS usage', 'Cost alerts', 'Delivery rate', 'Verify health'], phase: 'Phase 1', automate: ['SMS usage monitoring', 'Cost alerts', 'Phone verification success rate', 'Key rotation reminders'], why: 'Messaging costs can spike quickly when nobody is watching.' },
-      { name: 'SendGrid', subtitle: 'Transactional email', visual: ['Deliverability', 'Bounces', 'Domain auth', 'API keys'], phase: 'Phase 1', automate: ['Email deliverability stats', 'Bounce rate alerts', 'API key expiration', 'Domain authentication status'], why: 'Email failure is business failure. Users need visibility.' },
-      { name: 'Cloudflare', subtitle: 'DNS, Workers, KV', visual: ['DNS health', 'Workers', 'SSL', 'KV usage'], phase: 'Phase 2', automate: ['DNS health checks', 'Worker script status', 'KV namespace usage', 'SSL expiration alerts', 'CAA and security record warnings'], why: 'Cloudflare sits in front of everything — small issues have big blast radius.' },
-    ],
-  },
-  {
-    id: 'tier-3',
-    icon: '🧠',
-    title: 'Tier 3 Providers — Data, Identity, Infrastructure',
-    subtitle: 'Premium operations: databases, identity tenants, delivery providers, and cloud infrastructure hygiene.',
-    providers: [
-      { name: 'MongoDB Atlas', subtitle: 'Database provider', visual: ['Cluster health', 'Backups', 'IP whitelist', 'Connections'], phase: 'Phase 2', automate: ['Cluster health', 'Connection string visibility', 'IP whitelist monitoring', 'Backup status'], why: 'Database health is too important to discover after an outage.' },
-      { name: 'Auth0', subtitle: 'Enterprise identity', visual: ['Client secrets', 'MFA', 'Tenant config', 'Rules/actions'], phase: 'Phase 2', automate: ['Client secret expiration', 'Tenant configuration checks', 'MFA enforcement visibility', 'Misconfiguration alerts'], why: 'Identity configuration is critical and rarely reviewed often enough.' },
-      { name: 'DigitalOcean', subtitle: 'Droplets, spaces, firewalls', visual: ['Droplet health', 'Spaces usage', 'Firewall rules', 'Token age'], phase: 'Phase 1', automate: ['Droplet health', 'Spaces bucket usage', 'API token expiration', 'Firewall misconfigurations'], why: 'Small teams need cloud hygiene without a DevOps department.' },
-      { name: 'Postmark', subtitle: 'Email delivery', visual: ['Delivery rate', 'Bounces', 'DKIM/SPF', 'API token'], phase: 'Phase 1', automate: ['Delivery rate', 'Bounce alerts', 'Domain DKIM/SPF status', 'Key rotation reminders'], why: 'Transactional email should be monitored like payment infrastructure.' },
-    ],
-  },
+const PAGES: ProviderPage[] = [
+  { id: 'p1', icon: '🧱', title: 'Monitor 1 — Core Cloud + AI', subtitle: 'High-value operating providers that should never be squeezed together.', providers: [
+    { name: 'AWS', subtitle: 'Cloud operations', visual: ['IAM', 'S3', 'Compute', 'Alerts'], phase: 'Phase 1', automate: ['Access review reminders', 'Storage exposure checks', 'Unused credential reminders', 'Cloud health signals'], why: 'AWS is powerful but complex. SignalBoost should make the most important risks easy to understand.' },
+    { name: 'OpenAI', subtitle: 'AI usage and cost', visual: ['Usage', 'Cost', 'Limits', 'Models'], phase: 'Phase 1', automate: ['Usage visibility', 'Cost spike alerts', 'Rate-limit alerts', 'Credential age reminders'], why: 'AI usage can become expensive quickly. Owners need a simple way to see cost and limits.' },
+  ]},
+  { id: 'p2', icon: '🚀', title: 'Monitor 2 — SignalBoost Platform Core', subtitle: 'The providers that power this SaaS platform.', providers: [
+    { name: 'Supabase', subtitle: 'Database and auth', visual: ['Database', 'Auth', 'Storage', 'Coverage'], phase: 'Phase 1', automate: ['Database health', 'Auth status', 'Environment coverage', 'Storage policy review'], why: 'Supabase is core infrastructure. Data and auth status should always be visible.' },
+    { name: 'Vercel', subtitle: 'Hosting and deploys', visual: ['Deploys', 'Builds', 'Domains', 'Env'], phase: 'Phase 1', automate: ['Deployment health', 'Environment comparison', 'Domain status', 'Failed build alerts'], why: 'Vercel is where the product lives. Deployment and environment drift must be easy to catch.' },
+    { name: 'GitHub', subtitle: 'Code and releases', visual: ['Repos', 'PRs', 'Branches', 'Access'], phase: 'Phase 1', automate: ['Repository activity', 'Release visibility', 'Open PR summary', 'Access review guidance'], why: 'GitHub connects code, releases, and access. It belongs in the command center.' },
+  ]},
+  { id: 'p3', icon: '🏢', title: 'Monitor 3 — Enterprise Clouds', subtitle: 'Large cloud providers get their own room.', providers: [
+    { name: 'Google Cloud', subtitle: 'Cloud accounts and apps', visual: ['Accounts', 'OAuth', 'Roles', 'Projects'], phase: 'Phase 2', automate: ['Account inventory', 'Role visibility', 'App review reminders', 'Environment mapping'], why: 'Google Cloud configuration can sprawl. SignalBoost should turn it into a clear checklist.' },
+    { name: 'Azure', subtitle: 'Enterprise identity', visual: ['Apps', 'Certificates', 'Roles', 'Tenant'], phase: 'Phase 2', automate: ['App expiration reminders', 'Certificate checks', 'Role visibility', 'Configuration warnings'], why: 'Azure identity and app settings need calm, readable monitoring.' },
+  ]},
+  { id: 'p4', icon: '🌐', title: 'Monitor 4 — App, DNS + Edge', subtitle: 'App configuration, DNS, SSL, and edge settings.', providers: [
+    { name: 'Firebase', subtitle: 'App backend', visual: ['Auth', 'Rules', 'Storage', 'Usage'], phase: 'Phase 1', automate: ['Auth configuration', 'Rules review', 'Storage status', 'Usage visibility'], why: 'Firebase grows quickly and configuration drift is easy to miss.' },
+    { name: 'Cloudflare', subtitle: 'DNS and edge', visual: ['DNS', 'SSL', 'Workers', 'Proxy'], phase: 'Phase 1', automate: ['DNS health', 'SSL status', 'Worker status', 'Proxy review'], why: 'Cloudflare sits in front of everything. Small mistakes can affect the whole business.' },
+  ]},
+  { id: 'p5', icon: '✉️', title: 'Monitor 5 — Messaging + Email', subtitle: 'Customer communication providers need space.', providers: [
+    { name: 'Twilio', subtitle: 'SMS and verification', visual: ['SMS', 'Verify', 'Cost', 'Delivery'], phase: 'Phase 1', automate: ['SMS usage', 'Cost alerts', 'Delivery visibility', 'Verification health'], why: 'Messaging failures block users and cost spikes can arrive fast.' },
+    { name: 'SendGrid', subtitle: 'Transactional email', visual: ['Delivery', 'Bounces', 'Domain', 'API'], phase: 'Phase 1', automate: ['Deliverability stats', 'Bounce alerts', 'Domain status', 'API health'], why: 'Email failure is business failure. Users need delivery visibility.' },
+    { name: 'Postmark', subtitle: 'Email delivery', visual: ['Delivery', 'Bounces', 'DKIM', 'SPF'], phase: 'Phase 1', automate: ['Delivery rate', 'Bounce alerts', 'Domain checks', 'Account health'], why: 'Transactional email powers receipts, logins, and alerts.' },
+  ]},
+  { id: 'p6', icon: '🗄️', title: 'Monitor 6 — Data, Identity + Infrastructure', subtitle: 'Database, identity, and simple infrastructure providers.', providers: [
+    { name: 'MongoDB Atlas', subtitle: 'Database provider', visual: ['Clusters', 'Backups', 'Network', 'Connections'], phase: 'Phase 2', automate: ['Cluster health', 'Backup status', 'Network review', 'Connection visibility'], why: 'Database health should not be discovered only after an outage.' },
+    { name: 'Auth0', subtitle: 'Identity provider', visual: ['Clients', 'MFA', 'Tenant', 'Actions'], phase: 'Phase 2', automate: ['Client inventory', 'MFA visibility', 'Tenant review', 'Configuration alerts'], why: 'Identity settings are critical and rarely reviewed often enough.' },
+    { name: 'DigitalOcean', subtitle: 'Cloud infrastructure', visual: ['Droplets', 'Spaces', 'Firewalls', 'Usage'], phase: 'Phase 1', automate: ['Droplet health', 'Storage usage', 'Firewall review', 'Account usage'], why: 'Small teams need cloud hygiene without a full DevOps department.' },
+  ]},
+  { id: 'p7', icon: '🧠', title: 'Monitor 7 — AI Provider Expansion', subtitle: 'AI providers have their own monitor page.', providers: [
+    { name: 'Anthropic', subtitle: 'Claude API', visual: ['Usage', 'Cost', 'Limits', 'Access'], phase: 'Phase 2', automate: ['Usage visibility', 'Cost alerts', 'Limit warnings', 'Access review'], why: 'AI providers need cost and usage visibility just like cloud providers.' },
+    { name: 'Hugging Face', subtitle: 'Models and endpoints', visual: ['Models', 'Spaces', 'Endpoints', 'Access'], phase: 'Phase 3', automate: ['Endpoint health', 'Model usage', 'Access review', 'Space status'], why: 'Model operations should be understandable to non-technical owners.' },
+    { name: 'Replicate', subtitle: 'Model runs', visual: ['Runs', 'Spend', 'Models', 'Status'], phase: 'Phase 3', automate: ['Run status', 'Spend alerts', 'Model usage', 'Account health'], why: 'Model workloads can become expensive. Owners need early warning.' },
+  ]},
+  { id: 'p8', icon: '🛠️', title: 'Monitor 8 — Observability + Incident Ops', subtitle: 'Future incident command providers.', providers: [
+    { name: 'Sentry', subtitle: 'Errors and releases', visual: ['Errors', 'Releases', 'Alerts', 'Projects'], phase: 'Phase 2', automate: ['Error summary', 'Release health', 'Alert visibility', 'Trend detection'], why: 'Errors should become recommended actions, not noise.' },
+    { name: 'Datadog', subtitle: 'Metrics and logs', visual: ['Monitors', 'Logs', 'Metrics', 'Incidents'], phase: 'Phase 3', automate: ['Monitor summary', 'Incident visibility', 'Log volume alerts', 'Usage checks'], why: 'Datadog is powerful but can overwhelm small teams.' },
+    { name: 'PagerDuty', subtitle: 'Incident response', visual: ['Incidents', 'Services', 'Escalation', 'On-call'], phase: 'Phase 3', automate: ['Incident summary', 'Service health', 'Escalation visibility', 'On-call status'], why: 'Incident tools connect alerts to people. They belong in Command Control.' },
+    { name: 'New Relic', subtitle: 'APM and uptime', visual: ['APM', 'Logs', 'Alerts', 'Uptime'], phase: 'Phase 3', automate: ['App health', 'Alert visibility', 'Uptime checks', 'Performance trends'], why: 'Performance data is most useful when translated into next actions.' },
+  ]},
 ]
 
-const allProviderNames = TIERS.flatMap(tier => tier.providers.map(provider => provider.name))
+const allProviderNames = PAGES.flatMap(page => page.providers.map(provider => provider.name))
 
 function defaultPreferences(): Record<string, boolean> {
   return Object.fromEntries(allProviderNames.map(name => [name, true]))
 }
 
 export default function ProviderExpansionPage(_props: PageProps) {
-  const [tierIndex, setTierIndex] = useState(0)
+  const [pageIndex, setPageIndex] = useState(0)
   const [enabledProviders, setEnabledProviders] = useState<Record<string, boolean>>(defaultPreferences)
-  const tier = TIERS[tierIndex]
+  const page = PAGES[pageIndex]
 
   useEffect(() => {
     try {
@@ -96,10 +96,10 @@ export default function ProviderExpansionPage(_props: PageProps) {
     setEnabledProviders(prev => ({ ...prev, [name]: prev[name] === false }))
   }
 
-  const setTierProviders = (enabled: boolean) => {
+  const setPageProviders = (enabled: boolean) => {
     setEnabledProviders(prev => {
       const next = { ...prev }
-      for (const provider of tier.providers) next[provider.name] = enabled
+      for (const provider of page.providers) next[provider.name] = enabled
       return next
     })
   }
@@ -117,15 +117,11 @@ export default function ProviderExpansionPage(_props: PageProps) {
         <div>
           <div style={labelStyle}>Monitor 4</div>
           <h2 style={{ margin: '3px 0 4px', fontSize: 24, letterSpacing: '-.02em' }}>Provider Manual</h2>
-          <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5, maxWidth: 850 }}>Enable the providers you use. Disable providers you do not have so health checks and alerts can stay focused.</p>
+          <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5, maxWidth: 850 }}>Providers are separated into {PAGES.length} readable monitor pages. No squeezing, no crowded grid.</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={{ padding: '8px 12px', borderRadius: 999, border: '1px solid rgba(26,240,255,.35)', background: 'rgba(26,240,255,.08)', color: '#1af0ff', fontSize: 12.5, fontWeight: 900 }}>{enabledCount} enabled</span>
-          {TIERS.map((item, index) => (
-            <button key={item.id} onClick={() => setTierIndex(index)} className="hub-chip tier-tab" style={{ padding: '8px 12px', borderRadius: 12, border: tierIndex === index ? `1px solid ${TONES.gold.border}` : '1px solid rgba(255,255,255,.12)', background: tierIndex === index ? TONES.gold.soft : 'rgba(255,255,255,.04)', color: tierIndex === index ? '#ffc300' : 'rgba(255,255,255,.68)', fontSize: 12.5, fontWeight: 900 }}>
-              {item.icon} Tier {index + 1}
-            </button>
-          ))}
+          <span style={{ padding: '8px 12px', borderRadius: 999, border: `1px solid ${TONES.gold.border}`, background: TONES.gold.soft, color: '#ffc300', fontSize: 12.5, fontWeight: 900 }}>{pageIndex + 1} / {PAGES.length}</span>
         </div>
       </section>
 
@@ -152,23 +148,32 @@ export default function ProviderExpansionPage(_props: PageProps) {
       <section style={{ ...cardStyle, flexShrink: 0, overflow: 'hidden' }}>
         <div style={{ padding: '15px 17px', background: 'linear-gradient(135deg, rgba(255,195,0,.12), rgba(26,240,255,.06), rgba(3,7,18,0))', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 950, letterSpacing: '-.02em' }}>{tier.icon} {tier.title}</div>
-            <div style={{ color: 'rgba(255,255,255,.58)', fontSize: 13.5, marginTop: 5 }}>{tier.subtitle}</div>
+            <div style={{ fontSize: 22, fontWeight: 950, letterSpacing: '-.02em' }}>{page.icon} {page.title}</div>
+            <div style={{ color: 'rgba(255,255,255,.58)', fontSize: 13.5, marginTop: 5 }}>{page.subtitle}</div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button onClick={() => setTierProviders(true)} className="hub-chip" style={{ padding: '7px 11px', borderRadius: 10, border: '1px solid rgba(34,197,94,.38)', background: 'rgba(34,197,94,.08)', color: '#86efac', fontSize: 12, fontWeight: 900 }}>Enable tier</button>
-            <button onClick={() => setTierProviders(false)} className="hub-chip" style={{ padding: '7px 11px', borderRadius: 10, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.045)', color: 'rgba(255,255,255,.68)', fontSize: 12, fontWeight: 900 }}>Disable tier</button>
+            <button onClick={() => setPageIndex(Math.max(0, pageIndex - 1))} disabled={pageIndex === 0} className="hub-chip" style={{ padding: '7px 11px', borderRadius: 10, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.045)', color: pageIndex === 0 ? 'rgba(255,255,255,.28)' : 'rgba(255,255,255,.72)', fontSize: 12, fontWeight: 900 }}>Previous</button>
+            <button onClick={() => setPageIndex(Math.min(PAGES.length - 1, pageIndex + 1))} disabled={pageIndex === PAGES.length - 1} className="hub-chip" style={{ padding: '7px 11px', borderRadius: 10, border: `1px solid ${TONES.blue.border}`, background: TONES.blue.soft, color: pageIndex === PAGES.length - 1 ? 'rgba(255,255,255,.32)' : '#1af0ff', fontSize: 12, fontWeight: 900 }}>Next</button>
+            <button onClick={() => setPageProviders(true)} className="hub-chip" style={{ padding: '7px 11px', borderRadius: 10, border: '1px solid rgba(34,197,94,.38)', background: 'rgba(34,197,94,.08)', color: '#86efac', fontSize: 12, fontWeight: 900 }}>Enable page</button>
+            <button onClick={() => setPageProviders(false)} className="hub-chip" style={{ padding: '7px 11px', borderRadius: 10, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.045)', color: 'rgba(255,255,255,.68)', fontSize: 12, fontWeight: 900 }}>Disable page</button>
           </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '12px 14px', borderTop: '1px solid rgba(255,255,255,.08)' }}>
+          {PAGES.map((item, index) => (
+            <button key={item.id} onClick={() => setPageIndex(index)} className="hub-chip tier-tab" style={{ padding: '8px 10px', borderRadius: 12, border: pageIndex === index ? `1px solid ${TONES.gold.border}` : '1px solid rgba(255,255,255,.12)', background: pageIndex === index ? TONES.gold.soft : 'rgba(255,255,255,.04)', color: pageIndex === index ? '#ffc300' : 'rgba(255,255,255,.68)', fontSize: 12, fontWeight: 900 }}>
+              {item.icon} {index + 1}
+            </button>
+          ))}
         </div>
       </section>
 
       <main className="provider-playbook-main hub-panel" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 8 }}>
-        {tier.providers.map((provider, index) => {
-          const id = `${tier.id}-${index}`
-          const next = tier.providers[index + 1]
+        {page.providers.map((provider, index) => {
+          const id = `${page.id}-${index}`
+          const next = page.providers[index + 1]
           const enabled = enabledProviders[provider.name] !== false
           return (
-            <section key={provider.name} id={id} className={`provider-section ${enabled ? '' : 'is-disabled'}`} style={{ minHeight: '72vh', padding: '22px 0 26px', borderBottom: index < tier.providers.length - 1 ? '1px solid rgba(255,255,255,.12)' : 'none' }}>
+            <section key={provider.name} id={id} className={`provider-section ${enabled ? '' : 'is-disabled'}`} style={{ minHeight: '72vh', padding: '22px 0 26px', borderBottom: index < page.providers.length - 1 ? '1px solid rgba(255,255,255,.12)' : 'none' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 18 }}>
                 <div>
                   <div style={{ ...labelStyle, color: enabled ? '#ffc300' : 'rgba(255,255,255,.45)' }}>{provider.phase}</div>
@@ -186,19 +191,19 @@ export default function ProviderExpansionPage(_props: PageProps) {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(260px, .58fr)', gap: 18, alignItems: 'start' }}>
                 <div style={{ ...cardStyle, padding: 18 }}>
-                  <h4 style={{ margin: '0 0 12px', fontSize: 18 }}>What you can automate:</h4>
+                  <h4 style={{ margin: '0 0 12px', fontSize: 18 }}>What SignalBoost can monitor:</h4>
                   <ul style={{ margin: 0, paddingLeft: 20, color: 'rgba(255,255,255,.74)', lineHeight: 1.8, fontSize: 13.5 }}>
                     {provider.automate.map(item => <li key={item}>{item}</li>)}
                   </ul>
                 </div>
                 <div style={{ ...cardStyle, padding: 18, background: 'linear-gradient(135deg, rgba(255,195,0,.08), rgba(255,255,255,.035))' }}>
-                  <h4 style={{ margin: '0 0 10px', fontSize: 18 }}>Why users love it:</h4>
+                  <h4 style={{ margin: '0 0 10px', fontSize: 18 }}>Why users care:</h4>
                   <p style={{ margin: 0, color: 'rgba(255,255,255,.72)', lineHeight: 1.55, fontSize: 13.5 }}>{provider.why}</p>
                   {!enabled && <p style={{ margin: '12px 0 0', color: 'rgba(255,255,255,.48)', lineHeight: 1.45, fontSize: 12.5 }}>This provider is disabled for this browser. It can be enabled later if your team uses it.</p>}
                 </div>
               </div>
 
-              {next && <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 18 }}><button className="provider-down" onClick={() => jumpTo(`${tier.id}-${index + 1}`)} title={`Next: ${next.name}`}>↓</button></div>}
+              {next && <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 18 }}><button className="provider-down" onClick={() => jumpTo(`${page.id}-${index + 1}`)} title={`Next: ${next.name}`}>↓</button></div>}
             </section>
           )
         })}

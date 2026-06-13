@@ -172,8 +172,8 @@ export function createProtectedRoute(
 
     if (!result.ok) {
       return NextResponse.json(
-        { ok: false, error: result.error },
-        { status: result.status }
+        { ok: false, error: (result as any).error },
+        { status: (result as any).status }
       )
     }
 
@@ -193,8 +193,8 @@ export function createProtectedRouteAll(
 
     if (!result.ok) {
       return NextResponse.json(
-        { ok: false, error: result.error },
-        { status: result.status }
+        { ok: false, error: (result as any).error },
+        { status: (result as any).status }
       )
     }
 
@@ -214,8 +214,8 @@ export function createProtectedRouteAny(
 
     if (!result.ok) {
       return NextResponse.json(
-        { ok: false, error: result.error },
-        { status: result.status }
+        { ok: false, error: (result as any).error },
+        { status: (result as any).status }
       )
     }
 

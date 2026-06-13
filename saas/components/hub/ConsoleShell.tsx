@@ -10,13 +10,15 @@ import { useCallback, useEffect, useState } from 'react'
 import { Lang, LANGS, HubData, c, labelStyle, Dot } from './shared'
 import DashboardPage from './pages/DashboardPage'
 import KeyVaultPage from './pages/KeyVaultPage'
-import ProviderRegistryPage from './pages/ProviderRegistryPage'
+import ProviderExpansionPage from './pages/ProviderExpansionPage'
 
 const PAGES = [
   { key: 'dashboard', icon: '🛰️', title: 'Monitor 1 · Dashboard', Component: DashboardPage },
   { key: 'vault', icon: '🔐', title: 'Monitor 2 · Key Vault', Component: KeyVaultPage },
-  { key: 'providers', icon: '🧭', title: 'Monitor 3 · Providers', Component: ProviderRegistryPage },
+  { key: 'providers', icon: '🧭', title: 'Monitor 3 · Providers', Component: ProviderExpansionPage },
 ] as const
+
+type PageKey = typeof PAGES[number]['key']
 
 function isRefreshButton(button: HTMLButtonElement | null): boolean {
   if (!button) return false
@@ -42,9 +44,10 @@ function navigateToFreshHub() {
   window.location.assign(nextUrl.toString())
 }
 
-export default function ConsoleShell() {
+export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPage?: PageKey }) {
+  const initialIdx = Math.max(0, PAGES.findIndex(p => p.key === initialPage))
   const [lang, setLang] = useState<Lang>('en')
-  const [idx, setIdx] = useState(0)
+  const [idx, setIdx] = useState(initialIdx)
   const [data, setData] = useState<HubData | null>(null)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
@@ -134,12 +137,12 @@ export default function ConsoleShell() {
                 <button key={l} onClick={() => setLang(l)} className="hub-chip" style={{ padding: '4px 10px', borderRadius: 8, fontSize: 12, fontWeight: 600, textTransform: 'uppercase', background: lang === l ? 'rgba(26,240,255,.16)' : 'rgba(255,255,255,.04)', border: lang === l ? '1px solid rgba(26,240,255,.5)' : '1px solid rgba(255,255,255,.12)', color: lang === l ? '#1af0ff' : 'rgba(255,255,255,.6)' }}>{l}</button>
               ))}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '8px 14px', borderRadius: 12, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.04)' }}>
+            {idx === 0 && <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '8px 14px', borderRadius: 12, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.04)' }}>
               <span style={labelStyle}>{c('systemHealth', lang)}</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}><Dot tone={loading ? 'yellow' : supaOk ? 'green' : 'red'} /> Supabase</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}><Dot tone={loading ? 'yellow' : stripeOk ? 'green' : 'red'} /> Stripe</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}><Dot tone={loading ? 'yellow' : !vercelConfigured ? 'yellow' : vercelOk ? 'green' : 'red'} /> Vercel</span>
-            </div>
+            </div>}
             <button onClick={load} className="hub-btn" style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(26,240,255,.4)', background: 'rgba(26,240,255,.1)', color: '#1af0ff', fontSize: 12.5, fontWeight: 700 }}>{loading ? '…' : '↻ ' + c('refresh', lang)}</button>
           </div>
         </header>

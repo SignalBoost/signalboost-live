@@ -3,7 +3,7 @@
 
 'use client'
 
-import { useContext, createContext, ReactNode } from 'react'
+import React, { useContext, createContext, ReactNode } from 'react'
 import { HubUser, Permission } from './rbac-types'
 import { hasPermission, hasAllPermissions, hasAnyPermission } from './rbac-service'
 
@@ -55,7 +55,7 @@ export function PermissionGate({
   fallback?: ReactNode
 }) {
   const hasAccess = usePermission(permission)
-  return hasAccess ? <>{children}</> : <>{fallback}</>
+  return hasAccess ? React.createElement(React.Fragment, {}, children) : React.createElement(React.Fragment, {}, fallback)
 }
 
 /**
@@ -71,7 +71,7 @@ export function AllPermissionsGate({
   fallback?: ReactNode
 }) {
   const hasAccess = useAllPermissions(permissions)
-  return hasAccess ? <>{children}</> : <>{fallback}</>
+  return hasAccess ? React.createElement(React.Fragment, {}, children) : React.createElement(React.Fragment, {}, fallback)
 }
 
 /**
@@ -87,5 +87,5 @@ export function AnyPermissionGate({
   fallback?: ReactNode
 }) {
   const hasAccess = useAnyPermission(permissions)
-  return hasAccess ? <>{children}</> : <>{fallback}</>
+  return hasAccess ? React.createElement(React.Fragment, {}, children) : React.createElement(React.Fragment, {}, fallback)
 }

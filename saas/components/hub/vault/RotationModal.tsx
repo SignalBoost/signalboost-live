@@ -1,27 +1,42 @@
 'use client'
 
 // saas/components/hub/vault/RotationModal.tsx
-// Initiate and monitor key rotation process.
+// Initiate and monitor key rotation process with MFA verification and notifications.
 
 import { useState } from 'react'
 import { VaultSecret } from '@/lib/hub/vault-types'
+import { notifyBoth } from '@/lib/hub/vault-notifications'
+import { MFAVerification } from './index'
 import { cardStyle, labelStyle } from '../shared'
 
 export type RotationModalProps = {
   secret: VaultSecret
   onClose: () => void
   onRotate?: (secretId: string) => Promise<{ ok: boolean; newValue?: string; error?: string }>
+  requiresMFA?: boolean
 }
 
-type RotationStep = 'confirm' | 'rotating' | 'success' | 'error'
+type RotationStep = 'confirm' | 'mfa' | 'rotating' | 'success' | 'error'
 
-export default function RotationModal({ secret, onClose, onRotate }: RotationModalProps) {
+export default function RotationModal({ secret, onClose, onRotate, requiresMFA = true }: RotationModalProps) {
   const [step, setStep] = useState<RotationStep>('confirm')
   const [newValue, setNewValue] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const handleRotate = async () => {
+  const handleStartRotation = () => {
+    if (requiresMFA) {
+      setStep('mfa')
+    } else {
+      handleRotate()
+    }
+  }
+
+  const handleMFASuccess = () => {
     setStep('rotating')
+    handleRotate()
+  }
+
+  const handleRotate = async () => {
     setError(null)
 
     try {
@@ -30,20 +45,50 @@ export default function RotationModal({ secret, onClose, onRotate }: RotationMod
         if (result.ok) {
           setNewValue(result.newValue || null)
           setStep('success')
+          // Send success notification
+          await notifyBoth({
+            event: 'rotation_success',
+            secret_id: secret.id,
+            provider: secret.provider_name,
+            secret_name: secret.secret_name,
+          })
         } else {
           setError(result.error || 'Rotation failed')
           setStep('error')
+          // Send failure notification
+          await notifyBoth({
+            event: 'rotation_failed',
+            secret_id: secret.id,
+            provider: secret.provider_name,
+            secret_name: secret.secret_name,
+            error: result.error,
+          })
         }
       } else {
         // Demo mode: simulate rotation
         await new Promise(resolve => setTimeout(resolve, 1500))
         setNewValue('sk_live_8KL****Qp9')
         setStep('success')
+        // Send demo notification
+        await notifyBoth({
+          event: 'rotation_success',
+          secret_id: secret.id,
+          provider: secret.provider_name,
+          secret_name: secret.secret_name,
+        })
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error'
       setError(msg)
       setStep('error')
+      // Send error notification
+      await notifyBoth({
+        event: 'rotation_failed',
+        secret_id: secret.id,
+        provider: secret.provider_name,
+        secret_name: secret.secret_name,
+        error: msg,
+      })
     }
   }
 
@@ -142,7 +187,7 @@ export default function RotationModal({ secret, onClose, onRotate }: RotationMod
                 Cancel
               </button>
               <button
-                onClick={handleRotate}
+                onClick={handleStartRotation}
                 style={{
                   flex: 1,
                   padding: '11px 14px',
@@ -159,6 +204,15 @@ export default function RotationModal({ secret, onClose, onRotate }: RotationMod
               </button>
             </div>
           </div>
+        )}
+
+        {step === 'mfa' && (
+          <MFAVerification
+            operation="rotation"
+            secret name={secret.secret_name}
+            onSuccess={handleMFASuccess}
+            onCancel={onClose}
+          />
         )}
 
         {step === 'rotating' && (

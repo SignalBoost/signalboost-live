@@ -1,7 +1,17 @@
 import type { ComponentType } from 'react'
 import type { PageProps } from '../hub/shared'
 
-export type CommandPageKey = 'dashboard' | 'vault' | 'health' | 'providers'
+export type CommandPageKey =
+  | 'dashboard'
+  | 'vault'
+  | 'health'
+  | 'security'
+  | 'usage'
+  | 'audit'
+  | 'team'
+  | 'setup'
+  | 'aiops'
+  | 'providers'
 
 export type CommandPage = {
   key: CommandPageKey

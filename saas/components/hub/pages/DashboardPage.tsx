@@ -58,7 +58,7 @@ export default function DashboardPage({ lang, data, loading, failed }: PageProps
       </section>
 
       {/* Provider cards */}
-      <main className="hub-main" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(295px, 1fr))', gap: 14, flex: 1, minHeight: 0, gridAutoRows: 'minmax(0, 1fr)' }}>
+      <main className="hub-main" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(295px, 1fr))', gap: 14, flex: '1 1 auto', minHeight: 0, alignItems: 'start', alignContent: 'start', overflowY: 'auto', paddingBottom: 8 }}>
 
         <section className="hub-card hub-panel" style={cardStyle}>
           <Band tone={TONES.green} icon="🗄️" title="Supabase" plain={c('yourData', lang)} sub={c('manageData', lang)} />
@@ -82,7 +82,7 @@ export default function DashboardPage({ lang, data, loading, failed }: PageProps
           <div style={bodyStyle}>
             <Status ok={stripeOk} text={stripeOk ? c('statusPay', lang) : c('statusPayDown', lang)} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-              {(data?.stripe.tiers || []).slice(0, open.stripe ? 50 : 4).map(t => (
+              {(data?.stripe.tiers || []).map(t => (
                 <div key={t.priceId} style={rowStyle}>
                   <span style={{ fontWeight: 700, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</span>
                   <span style={{ color: '#ffc300', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>${t.amount}<span style={{ color: 'rgba(255,255,255,.45)', fontWeight: 400, fontSize: 11.5 }}>/{t.interval}</span></span>

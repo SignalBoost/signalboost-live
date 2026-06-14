@@ -23,6 +23,8 @@ import { getTemplate, validateTemplatePayload } from '@/lib/hub/provider-templat
 import { getHubActionPolicy, isActionBlocked, requiresOwnerApproval } from '@/lib/hub/action-policy'
 import { getCurrentUser as resolveHubUser } from '@/lib/auth/permission-middleware'
 import { vaultEncrypt, vaultDecrypt } from '@/lib/vault/crypto'
+import { scanAWSUsers, scanAWSAccessKeys } from '@/lib/hub/aws-scanner'
+import { scanGCPServiceAccounts } from '@/lib/hub/gcp-scanner'
 
 // ============================================================================
 // Types & Setup
@@ -448,7 +450,7 @@ async function executeStripeAction(template: any, payload: Record<string, unknow
 
   // Create a product (name + description only; pricing handled by create_price)
   if (template.id === 'stripe.create_product') {
-const params: Record<string, string> = { name: String(payload.name || '') }
+    const params: Record<string, string> = { name: String(payload.name || '') }
     if (payload.description) params.description = String(payload.description)
     const res = await fetch('https://api.stripe.com/v1/products', {
       method: 'POST',
@@ -461,6 +463,68 @@ const params: Record<string, string> = { name: String(payload.name || '') }
     }
     const data = await res.json()
     return { ok: true, message: 'Product created: ' + (data.id || 'unknown'), data: { id: data.id, name: data.name } }
+  }
+
+  // Edit a product (name/description/active)
+  if (template.id === 'stripe.edit_product') {
+    const id = String(payload.id || '')
+    if (!id) return { ok: false, error: 'Product ID is required' }
+    const params: Record<string, string> = {}
+    if (payload.name) params.name = String(payload.name)
+    if (payload.description) params.description = String(payload.description)
+    if (payload.active !== undefined && payload.active !== '') params.active = String(payload.active) === 'true' ? 'true' : 'false'
+    const res = await fetch('https://api.stripe.com/v1/products/' + encodeURIComponent(id), {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(params).toString(),
+    })
+if (!res.ok) {
+      const e = await res.text()
+      return { ok: false, error: e || res.statusText }
+    }
+    const data = await res.json()
+    return { ok: true, message: 'Product updated: ' + (data.id || id), data: { id: data.id, name: data.name, active: data.active } }
+  }
+
+  // View prices (read-only)
+  if (template.id === 'stripe.view_prices') {
+    const product = String(payload.product || '')
+    const qs = product ? `?product=${encodeURIComponent(product)}&limit=20` : '?limit=20'
+    const res = await fetch('https://api.stripe.com/v1/prices' + qs, {
+      method: 'GET',
+      headers: { 'Authorization': 'Bearer ' + apiKey },
+    })
+    if (!res.ok) {
+      const e = await res.text()
+      return { ok: false, error: e || res.statusText }
+    }
+    const data = await res.json()
+    const prices = data.data || []
+    return {
+      ok: true,
+      message: `Stripe: ${prices.length} price${prices.length === 1 ? '' : 's'}`,
+      data: { count: prices.length, prices: prices.slice(0, 20).map((p: any) => ({ id: p.id, product: p.product, unit_amount: p.unit_amount, currency: p.currency, active: p.active })) },
+    }
+  }
+
+  // Edit a price (active flag + nickname; Stripe prices are otherwise immutable)
+  if (template.id === 'stripe.edit_price') {
+    const id = String(payload.id || '')
+    if (!id) return { ok: false, error: 'Price ID is required' }
+    const params: Record<string, string> = {}
+    if (payload.active !== undefined && payload.active !== '') params.active = String(payload.active) === 'true' ? 'true' : 'false'
+    if (payload.nickname) params.nickname = String(payload.nickname)
+    const res = await fetch('https://api.stripe.com/v1/prices/' + encodeURIComponent(id), {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(params).toString(),
+    })
+    if (!res.ok) {
+      const e = await res.text()
+      return { ok: false, error: e || res.statusText }
+    }
+    const data = await res.json()
+    return { ok: true, message: 'Price updated: ' + (data.id || id), data: { id: data.id, active: data.active, nickname: data.nickname } }
   }
 
   // Health check: GET request, read-only
@@ -705,6 +769,53 @@ async function executeSupabaseAction(template: any, payload: Record<string, unkn
     return { ok: true, message: 'Recovery email sent to ' + email, data: { email } }
   }
 
+  // Edit a user (admin attributes: email, ban, confirm, metadata)
+  if (template.id === 'supabase.edit_user') {
+    const id = String(payload.user_id || '')
+    if (!id) return { ok: false, error: 'User ID is required' }
+    const patch: Record<string, unknown> = {}
+    if (payload.email) patch.email = String(payload.email)
+    if (payload.email_confirm !== undefined && payload.email_confirm !== '') patch.email_confirm = String(payload.email_confirm) === 'true'
+    if (payload.ban_duration) patch.ban_duration = String(payload.ban_duration)
+    if (Object.keys(patch).length === 0) return { ok: false, error: 'No fields to update' }
+    const res = await fetch(`${url}/auth/v1/admin/users/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key, apikey: key },
+      body: JSON.stringify(patch),
+    })
+    if (!res.ok) {
+      const e = await res.text()
+      return { ok: false, error: e || 'Failed to update user' }
+    }
+    const data = await res.json()
+    return { ok: true, message: 'User updated: ' + (data.email || id), data: { id: data.id || id, email: data.email } }
+  }
+
+  // SQL Editor — runs read-style SQL via the gated hub_exec_sql RPC.
+  if (template.id === 'supabase.sql_editor') {
+    const query = String(payload.query || '').trim()
+    if (!query) return { ok: false, error: 'SQL query is required' }
+    const res = await fetch(`${url}/rest/v1/rpc/hub_exec_sql`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key, apikey: key },
+      body: JSON.stringify({ query }),
+    })
+    if (!res.ok) {
+      const e = await res.text()
+      return { ok: false, error: e || 'Query failed' }
+    }
+    const data = await res.json()
+    if (data && typeof data === 'object' && data.error) {
+      return { ok: false, error: String(data.error) }
+    }
+    const rows = Array.isArray(data) ? data : []
+    return {
+      ok: true,
+      message: `Query returned ${rows.length} row${rows.length === 1 ? '' : 's'}`,
+      data: { rowCount: rows.length, rows: rows.slice(0, 50) },
+    }
+  }
+
   return { ok: false, error: 'Unknown Supabase action' }
 }
 
@@ -807,6 +918,27 @@ async function executeVercelAction(template: any, payload: Record<string, unknow
     return { ok: true, message: 'Env variable deleted', data: { id } }
   }
 
+  // Edit an environment variable (value and/or target)
+  if (template.id === 'vercel.edit_env') {
+    const id = String(payload.id || '')
+    if (!id) return { ok: false, error: 'Env Variable ID is required' }
+    const patch: Record<string, unknown> = {}
+    if (payload.value !== undefined && payload.value !== '') patch.value = String(payload.value)
+    if (payload.target) patch.target = [String(payload.target)]
+    if (Object.keys(patch).length === 0) return { ok: false, error: 'No fields to update' }
+    const res = await fetch(`https://api.vercel.com/v9/projects/${projectId}/env/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(patch),
+    })
+    if (!res.ok) {
+      const e = await res.text()
+      return { ok: false, error: e }
+    }
+    const data = await res.json()
+    return { ok: true, message: 'Env variable updated', data: { id: data.id || id, key: data.key, target: data.target } }
+  }
+
   // Health check: read-only deployments list
   if (template.api.method === 'GET') {
     const res = await fetch(url, {
@@ -826,7 +958,7 @@ async function executeVercelAction(template: any, payload: Record<string, unknow
     const latestDeployment = (data.deployments || [])[0]
 
     return {
-      ok: true,
+ok: true,
       message: `Vercel health: ${deploymentCount} deployment${deploymentCount === 1 ? '' : 's'} found`,
       data: {
         deploymentCount,
@@ -898,7 +1030,7 @@ async function executeGitHubAction(template: any, payload: Record<string, unknow
     return { ok: true, message: 'Issue opened: #' + data.number, data: { number: data.number, url: data.html_url } }
   }
   if (template.id === 'github.view_repos') {
-const repos = Array.isArray(data) ? data : []
+    const repos = Array.isArray(data) ? data : []
     return {
       ok: true,
       message: `GitHub repos: ${repos.length} accessible`,
@@ -969,58 +1101,42 @@ async function executeAWSAction(template: any, payload: Record<string, unknown>)
   const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY
   if (!accessKeyId || !secretAccessKey) return { ok: false, error: 'AWS credentials not configured' }
 
-  // For AWS, we'd normally use the AWS SDK. For now, return a placeholder scan result.
-  // In production, use: import { IAMClient, ListUsersCommand } from "@aws-sdk/client-iam"
-  if (template.id === 'aws.scan_iam_users') {
+  // List IAM users — real IAM ListUsers via SigV4 (aws-scanner).
+  if (template.id === 'aws.list_iam_users' || template.id === 'aws.scan_iam_users') {
+    const res = await scanAWSUsers(accessKeyId, secretAccessKey)
+    if (!res.ok) return { ok: false, error: res.error }
+    const users = res.users || []
     return {
       ok: true,
-      message: 'AWS IAM scan complete (placeholder — use AWS SDK in production)',
-      data: {
-        scanType: 'iam_users',
-        timestamp: new Date().toISOString(),
-        status: 'pending_implementation',
-        note: 'Requires AWS SDK (@aws-sdk/client-iam) to be installed and configured',
-      },
+      message: `AWS IAM: ${users.length} user${users.length === 1 ? '' : 's'}`,
+      data: { count: users.length, users: users.slice(0, 40).map(u => ({ username: u.username, arn: u.arn, created: u.created })) },
     }
   }
 
+  // Scan access keys — real IAM call via aws-scanner.
   if (template.id === 'aws.scan_access_keys') {
-    return {
-      ok: true,
-      message: 'AWS access key scan complete (placeholder)',
-      data: {
-        scanType: 'access_keys',
-        timestamp: new Date().toISOString(),
-        status: 'pending_implementation',
-        note: 'Requires AWS SDK (@aws-sdk/client-iam) to be installed and configured',
-      },
-    }
+    const res = await scanAWSAccessKeys(accessKeyId, secretAccessKey)
+    if (!res.ok) return { ok: false, error: res.error }
+    return { ok: true, message: 'AWS access key scan complete', data: res }
   }
 
-  // Console CRUD actions — clean, honest placeholders until the AWS SDK is wired.
+  // Write operations the read-only IAM scanner can't perform — honest placeholders.
   if (template.id === 'aws.create_bucket') {
     return {
       ok: true,
-      message: 'AWS create bucket queued (placeholder — wire @aws-sdk/client-s3 to execute)',
-      data: { action: 'create_bucket', status: 'pending_implementation', note: 'Install @aws-sdk/client-s3 and call CreateBucketCommand.' },
-    }
-  }
-  if (template.id === 'aws.list_iam_users') {
-    return {
-      ok: true,
-      message: 'AWS IAM users (placeholder — wire @aws-sdk/client-iam to execute)',
-      data: { action: 'list_iam_users', status: 'pending_implementation', note: 'Install @aws-sdk/client-iam and call ListUsersCommand.' },
+      message: 'AWS create bucket queued (write op — requires @aws-sdk/client-s3)',
+      data: { action: 'create_bucket', status: 'pending_implementation', note: 'Read-only IAM scanner is live; bucket creation needs the S3 SDK.' },
     }
   }
   if (template.id === 'aws.disable_iam_user') {
     return {
       ok: true,
-      message: 'AWS disable IAM user queued (placeholder — wire @aws-sdk/client-iam to execute)',
-      data: { action: 'disable_iam_user', user: String(payload.user_name || ''), status: 'pending_implementation' },
+      message: 'AWS disable IAM user queued (write op — requires @aws-sdk/client-iam)',
+      data: { action: 'disable_iam_user', user: String(payload.user_name || ''), status: 'pending_implementation', note: 'Read-only IAM scanner is live; disabling a user needs the IAM SDK write path.' },
     }
   }
 
-  return { ok: false, error: 'Unknown AWS scanning action' }
+  return { ok: false, error: 'Unknown AWS action' }
 }
 
 // ---- GCP ----
@@ -1028,30 +1144,20 @@ async function executeGCPAction(template: any, payload: Record<string, unknown>)
   const gcpKeyJson = process.env.GOOGLE_APPLICATION_CREDENTIALS
   if (!gcpKeyJson) return { ok: false, error: 'GCP credentials not configured' }
 
-  // For GCP, we'd use the Google Cloud Client Library. For now, placeholder.
-  // In production: import { IAMClient } from "@google-cloud/iam"
-  if (template.id === 'gcp.scan_service_accounts') {
+  // List / scan service accounts — real GCP IAM call via gcp-scanner (JWT auth).
+  if (template.id === 'gcp.scan_service_accounts' || template.id === 'google-cloud.list_service_accounts') {
+    const projectId = String(payload.project_id || process.env.GCP_PROJECT_ID || '')
+    const res = await scanGCPServiceAccounts(projectId, gcpKeyJson)
+    if (!res.ok) return { ok: false, error: res.error }
+    const accounts = res.accounts || []
     return {
       ok: true,
-      message: 'GCP service account scan complete (placeholder)',
-      data: {
-        scanType: 'service_accounts',
-        timestamp: new Date().toISOString(),
-        status: 'pending_implementation',
-        note: 'Requires Google Cloud Client Library (@google-cloud/iam) and configuration',
-      },
+      message: `GCP: ${accounts.length} service account${accounts.length === 1 ? '' : 's'}`,
+      data: { count: accounts.length, accounts: accounts.slice(0, 40) },
     }
   }
 
-  if (template.id === 'google-cloud.list_service_accounts') {
-    return {
-      ok: true,
-      message: 'GCP service accounts (placeholder — wire @google-cloud/iam to execute)',
-      data: { action: 'list_service_accounts', status: 'pending_implementation', note: 'Install @google-cloud/iam and list service accounts.' },
-    }
-  }
-
-  return { ok: false, error: 'Unknown GCP scanning action' }
+  return { ok: false, error: 'Unknown GCP action' }
 }
 
 // ---- Auth0 ----

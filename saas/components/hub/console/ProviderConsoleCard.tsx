@@ -17,7 +17,7 @@ type CardProps = {
 export function ProviderConsoleCard({ provider, lang, onExpand, onRun }: CardProps) {
   return (
     <div style={{ background: 'rgba(13, 18, 32, 0.45)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: 14, overflow: 'hidden' }}>
-      <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyコンテンツ: 'space-between' }}>
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 10, height: 10, borderRadius: '50%', background: provider.accent, boxShadow: `0 0 10px ${provider.accent}` }} />
           <div>

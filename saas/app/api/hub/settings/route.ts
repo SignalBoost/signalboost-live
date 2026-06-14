@@ -1,6 +1,7 @@
 // saas/app/api/hub/settings/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getConsoleSettings, updateConsoleSettings } from '@/lib/hub/settings-service'
+import { requirePermission } from '@/lib/auth/permission-middleware'
 
 type SettingsRequest = {
   requireMFA?: boolean
@@ -18,6 +19,14 @@ type SettingsRequest = {
 }
 
 export async function GET(req: NextRequest) {
+  const perm = await requirePermission(req, 'settings:read')
+  if (!perm.ok) {
+    return NextResponse.json(
+      { ok: false, error: (perm as any).error },
+      { status: (perm as any).status }
+    )
+  }
+
   try {
     const result = await getConsoleSettings()
     return NextResponse.json(result)
@@ -28,6 +37,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const perm = await requirePermission(req, 'settings:write')
+  if (!perm.ok) {
+    return NextResponse.json(
+      { ok: false, error: (perm as any).error },
+      { status: (perm as any).status }
+    )
+  }
+
   try {
     const body: SettingsRequest = await req.json()
 

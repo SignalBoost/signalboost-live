@@ -2,6 +2,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import DashboardPage from './pages/DashboardPage'
 import KeyVaultV2Page from './pages/KeyVaultV2Page'
 import ProviderGridPage from './pages/ProviderGridPage'
@@ -39,7 +40,7 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
   const activePage = PAGES.find(p => p.key === currentPage) || PAGES[0]
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: '#0a0a0a', color: '#fff' }}>
+    <div style={{ display: 'flex', height: '100vh', background: '#0a0a0a', color: '#fff', position: 'relative', zIndex: 1 }}>
       {/* Sidebar Navigation */}
       <div
         style={{
@@ -50,13 +51,46 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
           flexDirection: 'column',
           overflowY: 'auto',
           padding: '1rem 0',
+          position: 'relative',
+          zIndex: 100,
         }}
       >
-        <div style={{ padding: '1rem', borderBottom: '1px solid #333', marginBottom: '1rem' }}>
-          <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#1af0ff', marginBottom: '0.25rem' }}>
+        {/* Exit Hub Button - Always visible, always accessible */}
+        <div style={{ padding: '0 0.5rem', marginBottom: '0.75rem' }}>
+          <Link
+            href="/dashboard"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '0.75rem 1rem',
+              background: 'rgba(255, 195, 0, 0.1)',
+              color: '#ffc300',
+              border: '1px solid #ffc300',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              textAlign: 'left',
+              fontSize: '0.85rem',
+              fontWeight: 'bold',
+              textDecoration: 'none',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255, 195, 0, 0.2)'
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255, 195, 0, 0.1)'
+            }}
+          >
+            <span style={{ marginRight: '0.5rem' }}>←</span>
+            Exit Hub
+          </Link>
+        </div>
+
+        <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #333', marginBottom: '1rem' }}>
+          <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#1af0ff', marginBottom: '0.25rem' }}>
             Hub Console
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#888' }}>
+          <div style={{ fontSize: '0.7rem', color: '#888' }}>
             Phase 1C + Phase 2
           </div>
         </div>
@@ -95,7 +129,7 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
           ))}
         </nav>
 
-        <div style={{ padding: '1rem', borderTop: '1px solid #333', fontSize: '0.75rem', color: '#666' }}>
+        <div style={{ padding: '1rem', borderTop: '1px solid #333', fontSize: '0.7rem', color: '#666' }}>
           <div>9 Pages</div>
           <div>Phase 1C ✅</div>
           <div>Phase 2 ✅</div>
@@ -128,6 +162,20 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
             </div>
           </div>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', fontSize: '0.85rem', color: '#888' }}>
+            <Link
+              href="/dashboard"
+              style={{
+                color: '#ffc300',
+                textDecoration: 'none',
+                fontSize: '0.85rem',
+                padding: '0.4rem 0.8rem',
+                border: '1px solid #ffc300',
+                borderRadius: '4px',
+                background: 'rgba(255, 195, 0, 0.08)',
+              }}
+            >
+              ← Exit Hub
+            </Link>
             <span>SignalBoost Command Control</span>
           </div>
         </div>

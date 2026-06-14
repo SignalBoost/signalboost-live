@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getTemplate, validateTemplatePayload } from '@/lib/hub/provider-templates'
 import { getHubActionPolicy, isActionBlocked, requiresOwnerApproval } from '@/lib/hub/action-policy'
+import { getCurrentUser as resolveHubUser } from '@/lib/auth/permission-middleware'
 
 // ============================================================================
 // Types & Setup
@@ -37,22 +38,12 @@ type ActionResponse = {
   error?: string
 }
 
-// Get the current user from the request (integrates with existing auth).
-// If no authenticated user, return null — the route will reject.
+// Get the current user from the request via the Phase 2 RBAC middleware.
+// Returns real user data from hub_workspace_users (or synthetic owner fallback).
 async function getCurrentUser(req: NextRequest) {
-  // This integration point assumes your auth system sets a user context.
-  // Common pattern: check Authorization header, JWT, or session cookie.
-  // For now, we'll check for a Bearer token in the Authorization header
-  // and validate it against your auth table.
-  const authHeader = req.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) {
-    return null
-  }
-
-  // In a real implementation, you'd validate the token here.
-  // For this skeleton, we assume a token means authenticated.
-  // TODO: Replace with your actual token validation logic.
-  return { id: 'user-from-token', role: 'admin' } // placeholder
+  const user = await resolveHubUser(req)
+  if (!user) return null
+  return { id: user.id, role: user.role, email: user.email }
 }
 
 // Map provider IDs to environment variable names and base URLs.

@@ -1,6 +1,7 @@
 'use client'
 
 // saas/components/hub/ProviderActionForm.tsx
+// Hub Console — Universal form renderer for provider actions.
 
 import { useCallback, useState, type CSSProperties } from 'react'
 import {
@@ -8,23 +9,9 @@ import {
   validateTemplatePayload,
   type ProviderFormField,
 } from '@/lib/hub/provider-templates'
-import {
-  c,
-  Lang,
-  cardStyle,
-  bodyStyle,
-  labelStyle,
-  monoStyle,
-} from './shared'
+import { Lang, cardStyle, bodyStyle, labelStyle, monoStyle } from './shared'
 
-type FormState =
-  | 'idle'
-  | 'validating'
-  | 'preview'
-  | 'confirm'
-  | 'submitting'
-  | 'success'
-  | 'error'
+type FormState = 'idle' | 'preview' | 'confirm' | 'submitting' | 'success' | 'error'
 
 export type ProviderActionFormProps = {
   templateId: string
@@ -34,13 +21,7 @@ export type ProviderActionFormProps = {
   onClose?: () => void
 }
 
-export default function ProviderActionForm({
-  templateId,
-  lang,
-  onSuccess,
-  onError,
-  onClose,
-}: ProviderActionFormProps) {
+export default function ProviderActionForm({ templateId, lang, onSuccess, onError, onClose }: ProviderActionFormProps) {
   const template = getTemplate(templateId)
 
   if (!template) {
@@ -50,25 +31,16 @@ export default function ProviderActionForm({
   const [state, setState] = useState<FormState>('idle')
   const [values, setValues] = useState<Record<string, unknown>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [result, setResult] = useState<{
-    ok: boolean
-    message?: string
-    error?: string
-    data?: any
-  } | null>(null)
+  const [result, setResult] = useState<{ ok: boolean; message?: string; error?: string; data?: any } | null>(null)
 
   const validate = useCallback((): boolean => {
     const validation = validateTemplatePayload(templateId, values)
 
     if (!validation.ok) {
       const newErrors: Record<string, string> = {}
-
-      if (validation.missing) {
-        validation.missing.forEach(fieldId => {
-          newErrors[fieldId] = 'This field is required'
-        })
-      }
-
+      validation.missing?.forEach(fieldId => {
+        newErrors[fieldId] = 'This field is required'
+      })
       setErrors(newErrors)
       return false
     }
@@ -121,12 +93,7 @@ export default function ProviderActionForm({
       const data = await res.json()
 
       if (res.ok) {
-        setResult({
-          ok: true,
-          message: data.message || 'Action completed successfully.',
-          data: data.data,
-        })
-
+        setResult({ ok: true, message: data.message || 'Action completed successfully.', data: data.data })
         setState('success')
 
         if (template.api.method !== 'GET') {
@@ -150,32 +117,28 @@ export default function ProviderActionForm({
     <div
       style={{
         ...cardStyle,
+        width: '100%',
+        height: '100%',
+        maxHeight: '100%',
+        minHeight: 0,
         display: 'flex',
         flexDirection: 'column',
-        maxHeight: 'calc(100vh - 80px)',
         overflow: 'hidden',
       }}
     >
       <div
         style={{
           padding: '14px 16px 12px',
-          background:
-            'linear-gradient(135deg, rgba(26,240,255,.10), rgba(3,7,18,.0))',
+          background: 'linear-gradient(135deg, rgba(26,240,255,.10), rgba(3,7,18,.0))',
           borderBottom: '1px solid rgba(26,240,255,.2)',
           flex: '0 0 auto',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 24 }}>{template.icon}</span>
-
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>
-              {template.label}
-            </div>
-
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.55)' }}>
-              {template.description}
-            </div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>{template.label}</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.55)' }}>{template.description}</div>
           </div>
         </div>
       </div>
@@ -190,16 +153,9 @@ export default function ProviderActionForm({
         }}
       >
         {state === 'idle' && (
-          <div style={{ overflowY: 'auto', minHeight: 0, paddingRight: 2 }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 2 }}>
             {template.fields.length === 0 ? (
-              <div
-                style={{
-                  padding: '20px',
-                  textAlign: 'center',
-                  color: 'rgba(255,255,255,.6)',
-                  fontSize: 13,
-                }}
-              >
+              <div style={{ padding: '20px', textAlign: 'center', color: 'rgba(255,255,255,.6)', fontSize: 13 }}>
                 This action requires no additional information.
               </div>
             ) : (
@@ -219,206 +175,74 @@ export default function ProviderActionForm({
 
         {state === 'preview' && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
-            <div
-              style={{
-                padding: 12,
-                background: 'rgba(26,240,255,.08)',
-                border: '1px solid rgba(26,240,255,.2)',
-                borderRadius: 10,
-                fontSize: 12,
-                color: 'rgba(255,255,255,.7)',
-              }}
-            >
+            <div style={{ padding: 12, background: 'rgba(26,240,255,.08)', border: '1px solid rgba(26,240,255,.2)', borderRadius: 10, fontSize: 12, color: 'rgba(255,255,255,.7)', flex: '0 0 auto' }}>
               Review the action that will be sent to {template.api.service}. Once confirmed, this cannot be undone.
             </div>
-
-            <div
-              style={{
-                flex: 1,
-                padding: 12,
-                background: 'rgba(3,7,18,.5)',
-                border: '1px solid rgba(255,255,255,.08)',
-                borderRadius: 10,
-                fontFamily: monoStyle.fontFamily,
-                fontSize: 11,
-                color: 'rgba(26,240,255,.8)',
-                whiteSpace: 'pre-wrap',
-                overflow: 'auto',
-                minHeight: 0,
-              }}
-            >
-              {JSON.stringify(
-                {
-                  template: templateId,
-                  api: `${template.api.method} ${template.api.endpoint}`,
-                  payload: values,
-                },
-                null,
-                2,
-              )}
+            <div style={{ flex: 1, minHeight: 0, padding: 12, background: 'rgba(3,7,18,.5)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, fontFamily: monoStyle.fontFamily, fontSize: 11, color: 'rgba(26,240,255,.8)', whiteSpace: 'pre-wrap', overflow: 'auto' }}>
+              {JSON.stringify({ template: templateId, api: `${template.api.method} ${template.api.endpoint}`, payload: values }, null, 2)}
             </div>
           </div>
         )}
 
         {state === 'confirm' && (
-          <div
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 16,
-              justifyContent: 'center',
-              alignItems: 'center',
-              textAlign: 'center',
-              padding: 20,
-            }}
-          >
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: 20, minHeight: 0 }}>
             <div style={{ fontSize: 32 }}>⚠️</div>
-
             <div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 6 }}>
-                Confirm action
-              </div>
-
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,.6)' }}>
-                You are about to execute <strong>{template.label}</strong> on {template.api.service}.
-              </div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 6 }}>Confirm action</div>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,.6)' }}>You are about to execute <strong>{template.label}</strong> on {template.api.service}.</div>
             </div>
           </div>
         )}
 
         {state === 'submitting' && (
-          <div
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
-              justifyContent: 'center',
-              alignItems: 'center',
-              textAlign: 'center',
-              padding: 20,
-            }}
-          >
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: 20, minHeight: 0 }}>
             <div style={{ fontSize: 18, animation: 'spin 2s linear infinite' }}>⏳</div>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,.6)' }}>Executing action…</div>
           </div>
         )}
 
         {state === 'success' && result?.ok && (
-          <div
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
-              minHeight: 0,
-              overflow: 'hidden',
-            }}
-          >
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0, overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 auto' }}>
               <span style={{ fontSize: 18 }}>✅</span>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#22c55e' }}>
-                {result.message}
-              </div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#22c55e' }}>{result.message}</div>
             </div>
-
             <ResultView data={result.data} />
           </div>
         )}
 
         {state === 'error' && result?.error && (
-          <div
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
-              justifyContent: 'center',
-              alignItems: 'center',
-              textAlign: 'center',
-              padding: 20,
-            }}
-          >
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: 20, minHeight: 0 }}>
             <div style={{ fontSize: 32 }}>❌</div>
-
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#ef4444' }}>
-                Error
-              </div>
-
-              <div
-                style={{
-                  fontSize: 12,
-                  color: 'rgba(255,255,255,.6)',
-                  marginTop: 4,
-                  fontFamily: monoStyle.fontFamily,
-                }}
-              >
-                {result.error}
-              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#ef4444' }}>Error</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', marginTop: 4, fontFamily: monoStyle.fontFamily }}>{result.error}</div>
             </div>
           </div>
         )}
       </div>
 
-      <div
-        style={{
-          padding: '12px 16px',
-          background: 'rgba(255,255,255,.02)',
-          borderTop: '1px solid rgba(255,255,255,.07)',
-          display: 'flex',
-          gap: 10,
-          justifyContent: 'flex-end',
-          flex: '0 0 auto',
-        }}
-      >
+      <div style={footerStyle}>
         {state === 'idle' && (
           <>
-            {onClose && (
-              <button onClick={onClose} className="hub-chip" style={secondaryButtonStyle}>
-                Cancel
-              </button>
-            )}
-
-            <button onClick={handleSubmit} className="hub-btn" style={primaryButtonStyle}>
-              {template.previewBeforeSubmit ? 'Preview' : template.requiresConfirm ? 'Confirm' : 'Execute'}
-            </button>
+            {onClose && <button onClick={onClose} className="hub-chip" style={secondaryButtonStyle}>Cancel</button>}
+            <button onClick={handleSubmit} className="hub-btn" style={primaryButtonStyle}>{template.previewBeforeSubmit ? 'Preview' : template.requiresConfirm ? 'Confirm' : 'Execute'}</button>
           </>
         )}
-
         {state === 'preview' && (
           <>
-            <button onClick={() => setState('idle')} className="hub-chip" style={secondaryButtonStyle}>
-              Back
-            </button>
-
-            <button
-              onClick={() => (template.requiresConfirm ? setState('confirm') : executeAction())}
-              className="hub-btn"
-              style={warningButtonStyle}
-            >
-              {template.requiresConfirm ? 'Confirm' : 'Execute'}
-            </button>
+            <button onClick={() => setState('idle')} className="hub-chip" style={secondaryButtonStyle}>Back</button>
+            <button onClick={() => (template.requiresConfirm ? setState('confirm') : executeAction())} className="hub-btn" style={warningButtonStyle}>{template.requiresConfirm ? 'Confirm' : 'Execute'}</button>
           </>
         )}
-
         {state === 'confirm' && (
           <>
-            <button onClick={() => setState('preview')} className="hub-chip" style={secondaryButtonStyle}>
-              Cancel
-            </button>
-
-            <button onClick={executeAction} className="hub-btn" style={dangerButtonStyle}>
-              Execute Now
-            </button>
+            <button onClick={() => setState('preview')} className="hub-chip" style={secondaryButtonStyle}>Cancel</button>
+            <button onClick={executeAction} className="hub-btn" style={dangerButtonStyle}>Execute Now</button>
           </>
         )}
-
         {(state === 'submitting' || state === 'success' || state === 'error') && onClose && (
-          <button onClick={onClose} className="hub-btn" style={closeButtonStyle}>
-            Close
-          </button>
+          <button onClick={onClose} className="hub-btn" style={closeButtonStyle}>Close</button>
         )}
       </div>
 
@@ -458,87 +282,26 @@ function FormField({ field, value, error, onChange }: FormFieldProps) {
       case 'text':
       case 'email':
       case 'phone':
-        return (
-          <input
-            type={field.type === 'email' ? 'email' : field.type === 'phone' ? 'tel' : 'text'}
-            value={(value as string) || ''}
-            onChange={e => onChange(e.target.value)}
-            placeholder={field.placeholder}
-            maxLength={field.maxLength}
-            style={baseStyle}
-          />
-        )
-
+        return <input type={field.type === 'email' ? 'email' : field.type === 'phone' ? 'tel' : 'text'} value={(value as string) || ''} onChange={e => onChange(e.target.value)} placeholder={field.placeholder} maxLength={field.maxLength} style={baseStyle} />
       case 'textarea':
-        return (
-          <textarea
-            value={(value as string) || ''}
-            onChange={e => onChange(e.target.value)}
-            placeholder={field.placeholder}
-            maxLength={field.maxLength}
-            style={{ ...baseStyle, minHeight: 100, resize: 'vertical' }}
-          />
-        )
-
+        return <textarea value={(value as string) || ''} onChange={e => onChange(e.target.value)} placeholder={field.placeholder} maxLength={field.maxLength} style={{ ...baseStyle, minHeight: 100, resize: 'vertical' }} />
       case 'number':
       case 'currency_cents':
-        return (
-          <input
-            type="number"
-            value={(value as number) ?? ''}
-            onChange={e => onChange(e.target.value ? parseFloat(e.target.value) : '')}
-            min={field.min}
-            max={field.max}
-            step={field.type === 'currency_cents' ? 0.01 : 1}
-            placeholder={field.placeholder}
-            style={baseStyle}
-          />
-        )
-
+        return <input type="number" value={(value as number) ?? ''} onChange={e => onChange(e.target.value ? parseFloat(e.target.value) : '')} min={field.min} max={field.max} step={field.type === 'currency_cents' ? 0.01 : 1} placeholder={field.placeholder} style={baseStyle} />
       case 'secret':
-        return (
-          <input
-            type="password"
-            value={(value as string) || ''}
-            onChange={e => onChange(e.target.value)}
-            placeholder={field.placeholder}
-            maxLength={field.maxLength}
-            style={baseStyle}
-          />
-        )
-
+        return <input type="password" value={(value as string) || ''} onChange={e => onChange(e.target.value)} placeholder={field.placeholder} maxLength={field.maxLength} style={baseStyle} />
       case 'select':
         return (
-          <select
-            value={(value as string) || ''}
-            onChange={e => onChange(e.target.value)}
-            style={{ ...baseStyle, cursor: 'pointer' }}
-          >
-            <option value="" disabled>
-              {field.placeholder || 'Select an option'}
-            </option>
-
-            {field.options?.map(opt => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
+          <select value={(value as string) || ''} onChange={e => onChange(e.target.value)} style={{ ...baseStyle, cursor: 'pointer' }}>
+            <option value="" disabled>{field.placeholder || 'Select an option'}</option>
+            {field.options?.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
           </select>
         )
-
       case 'toggle':
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <input
-              type="checkbox"
-              checked={(value as boolean) || false}
-              onChange={e => onChange(e.target.checked)}
-              style={{ width: 18, height: 18, cursor: 'pointer' }}
-            />
-
-            <label style={{ fontSize: 12, color: 'rgba(255,255,255,.7)', cursor: 'pointer' }}>
-              {field.label}
-            </label>
+            <input type="checkbox" checked={(value as boolean) || false} onChange={e => onChange(e.target.checked)} style={{ width: 18, height: 18, cursor: 'pointer' }} />
+            <label style={{ fontSize: 12, color: 'rgba(255,255,255,.7)', cursor: 'pointer' }}>{field.label}</label>
           </div>
         )
     }
@@ -552,20 +315,9 @@ function FormField({ field, value, error, onChange }: FormFieldProps) {
           {field.required && <span style={{ color: '#ef4444' }}>*</span>}
         </label>
       )}
-
       {renderInput()}
-
-      {field.help && (
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: -2 }}>
-          {field.help}
-        </div>
-      )}
-
-      {error && (
-        <div style={{ fontSize: 11, color: '#ef4444', marginTop: -2 }}>
-          ⚠️ {error}
-        </div>
-      )}
+      {field.help && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: -2 }}>{field.help}</div>}
+      {error && <div style={{ fontSize: 11, color: '#ef4444', marginTop: -2 }}>⚠️ {error}</div>}
     </div>
   )
 }
@@ -573,259 +325,82 @@ function FormField({ field, value, error, onChange }: FormFieldProps) {
 function ResultView({ data }: { data: any }) {
   if (data === null || data === undefined) return null
 
-  const arrayKey =
-    data && typeof data === 'object'
-      ? Object.keys(data).find(k => Array.isArray(data[k]) && data[k].length > 0)
-      : null
+  const arrayKey = data && typeof data === 'object'
+    ? Object.keys(data).find(k => Array.isArray(data[k]) && data[k].length > 0)
+    : null
 
   if (arrayKey) {
     const rows: any[] = data[arrayKey]
     const first = rows[0]
 
     if (first && typeof first === 'object' && !Array.isArray(first)) {
-      return (
-        <div
-          style={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: 'auto',
-            paddingRight: 4,
-            paddingBottom: 8,
-          }}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {rows.slice(0, 100).map((row: any, i: number) => {
-              const entries = Object.entries(row).filter(
-                ([, v]) => v !== null && v !== undefined && v !== '',
-              )
-
-              const title =
-                row.name ||
-                row.label ||
-                row.email ||
-                row.username ||
-                row.key ||
-                row.id ||
-                `Item ${i + 1}`
-
-              const rest = entries.filter(
-                ([k]) => !['name', 'label', 'email', 'username'].includes(k),
-              )
-
-              return (
-                <div
-                  key={i}
-                  style={{
-                    padding: '10px 12px',
-                    borderRadius: 10,
-                    background:
-                      'linear-gradient(160deg, rgba(20,28,46,.6), rgba(8,11,20,.4))',
-                    border: '1px solid rgba(255,255,255,.09)',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 10,
-                      marginBottom: rest.length ? 7 : 0,
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: 11.5,
-                        fontWeight: 700,
-                        color: '#fff',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        minWidth: 0,
-                      }}
-                      title={formatCell(title)}
-                    >
-                      {formatCell(title)}
-                    </div>
-
-                    <div
-                      style={{
-                        fontSize: 9.5,
-                        color: 'rgba(255,255,255,.35)',
-                        fontWeight: 700,
-                        flex: '0 0 auto',
-                      }}
-                    >
-                      #{i + 1}
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    {rest.map(([k, v]) => (
-                      <div
-                        key={k}
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '90px minmax(0, 1fr)',
-                          gap: 12,
-                          fontSize: 10,
-                          alignItems: 'center',
-                        }}
-                      >
-                        <span
-                          style={{
-                            color: 'rgba(255,255,255,.4)',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {k}
-                        </span>
-
-                        <span
-                          style={{
-                            color: 'rgba(26,240,255,.8)',
-                            fontFamily: monoStyle.fontFamily,
-                            textAlign: 'right',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            minWidth: 0,
-                          }}
-                          title={formatCell(v)}
-                        >
-                          {formatCell(v)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )
+      return <ObjectTable rows={rows} />
     }
 
     return (
-      <div
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          border: '1px solid rgba(255,255,255,.08)',
-          borderRadius: 10,
-          padding: 10,
-          minHeight: 0,
-        }}
-      >
+      <div style={scrollPanelStyle}>
         {rows.slice(0, 100).map((v: any, i: number) => (
-          <div
-            key={i}
-            style={{
-              fontSize: 12,
-              color: 'rgba(255,255,255,.82)',
-              fontFamily: monoStyle.fontFamily,
-              padding: '5px 0',
-              borderBottom: '1px solid rgba(255,255,255,.05)',
-            }}
-          >
-            {formatCell(v)}
-          </div>
+          <div key={i} style={{ fontSize: 12, color: 'rgba(255,255,255,.82)', fontFamily: monoStyle.fontFamily, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>{formatCell(v)}</div>
         ))}
       </div>
     )
   }
 
   if (data && typeof data === 'object' && typeof data.value === 'string') {
-    return (
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: 'auto',
-          padding: 12,
-          background: 'rgba(3,7,18,.5)',
-          border: '1px solid rgba(255,255,255,.08)',
-          borderRadius: 10,
-          fontFamily: monoStyle.fontFamily,
-          fontSize: 12,
-          color: 'rgba(26,240,255,.85)',
-          wordBreak: 'break-word',
-        }}
-      >
-        {data.value}
-      </div>
-    )
+    return <div style={{ ...scrollPanelStyle, color: 'rgba(26,240,255,.85)', wordBreak: 'break-word' }}>{data.value}</div>
   }
 
   if (data && typeof data === 'object') {
-    const entries = Object.entries(data).filter(
-      ([, v]) => v === null || ['string', 'number', 'boolean'].includes(typeof v),
-    )
-
-    if (entries.length > 0) {
-      return (
-        <div
-          style={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: 'auto',
-            border: '1px solid rgba(255,255,255,.08)',
-            borderRadius: 10,
-            padding: 10,
-          }}
-        >
-          {entries.map(([k, v]) => (
-            <div
-              key={k}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '120px minmax(0, 1fr)',
-                gap: 12,
-                padding: '5px 0',
-                fontSize: 12,
-                borderBottom: '1px solid rgba(255,255,255,.05)',
-              }}
-            >
-              <span style={{ color: 'rgba(255,255,255,.5)' }}>{k}</span>
-
-              <span
-                style={{
-                  color: 'rgba(255,255,255,.85)',
-                  fontFamily: monoStyle.fontFamily,
-                  textAlign: 'right',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-                title={formatCell(v)}
-              >
-                {formatCell(v)}
-              </span>
-            </div>
-          ))}
-        </div>
-      )
-    }
+    const entries = Object.entries(data).filter(([, v]) => v === null || ['string', 'number', 'boolean'].includes(typeof v))
+    if (entries.length > 0) return <KeyValueTable entries={entries} />
   }
 
+  return <pre style={{ ...scrollPanelStyle, whiteSpace: 'pre-wrap', margin: 0 }}>{JSON.stringify(data, null, 2)}</pre>
+}
+
+function ObjectTable({ rows }: { rows: any[] }) {
+  const visibleRows = rows.slice(0, 100)
+  const first = visibleRows[0] || {}
+  const preferred = ['name', 'label', 'email', 'username', 'id', 'active', 'created', 'createdAt', 'updatedAt']
+  const keys = preferred.filter(k => k in first)
+  const fallbackKeys = Object.keys(first).filter(k => !keys.includes(k)).slice(0, Math.max(0, 5 - keys.length))
+  const columns = [...keys, ...fallbackKeys].slice(0, 6)
+
   return (
-    <div
-      style={{
-        flex: 1,
-        minHeight: 0,
-        padding: 12,
-        background: 'rgba(3,7,18,.5)',
-        border: '1px solid rgba(255,255,255,.08)',
-        borderRadius: 10,
-        fontFamily: monoStyle.fontFamily,
-        fontSize: 11,
-        color: 'rgba(255,255,255,.7)',
-        whiteSpace: 'pre-wrap',
-        overflowY: 'auto',
-      }}
-    >
-      {JSON.stringify(data, null, 2)}
+    <div style={scrollPanelStyle}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+        <thead style={{ position: 'sticky', top: 0, background: 'rgba(7,11,22,.96)', zIndex: 1 }}>
+          <tr>
+            {columns.map(k => (
+              <th key={k} style={{ padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,.10)', color: 'rgba(255,255,255,.55)', fontSize: 10.5, textAlign: k === columns[0] ? 'left' : 'right', textTransform: 'uppercase', letterSpacing: '.08em' }}>{k}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {visibleRows.map((row, i) => (
+            <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+              {columns.map((k, colIndex) => (
+                <td key={k} title={formatCell(row[k])} style={{ padding: '8px 10px', color: colIndex === 0 ? '#fff' : 'rgba(26,240,255,.82)', fontFamily: colIndex === 0 ? 'inherit' : monoStyle.fontFamily, fontSize: colIndex === 0 ? 12 : 10.5, fontWeight: colIndex === 0 ? 700 : 600, textAlign: colIndex === 0 ? 'left' : 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {formatCell(row[k])}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function KeyValueTable({ entries }: { entries: [string, unknown][] }) {
+  return (
+    <div style={scrollPanelStyle}>
+      {entries.map(([k, v]) => (
+        <div key={k} style={{ display: 'grid', gridTemplateColumns: '120px minmax(0, 1fr)', gap: 12, padding: '5px 0', fontSize: 12, borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+          <span style={{ color: 'rgba(255,255,255,.5)' }}>{k}</span>
+          <span title={formatCell(v)} style={{ color: 'rgba(255,255,255,.85)', fontFamily: monoStyle.fontFamily, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatCell(v)}</span>
+        </div>
+      ))}
     </div>
   )
 }
@@ -835,6 +410,26 @@ function formatCell(v: any): string {
   if (typeof v === 'boolean') return v ? 'yes' : 'no'
   if (typeof v === 'object') return JSON.stringify(v)
   return String(v)
+}
+
+const footerStyle: CSSProperties = {
+  padding: '12px 16px',
+  background: 'rgba(255,255,255,.02)',
+  borderTop: '1px solid rgba(255,255,255,.07)',
+  display: 'flex',
+  gap: 10,
+  justifyContent: 'flex-end',
+  flex: '0 0 auto',
+}
+
+const scrollPanelStyle: CSSProperties = {
+  flex: 1,
+  minHeight: 0,
+  overflowY: 'auto',
+  border: '1px solid rgba(255,255,255,.08)',
+  borderRadius: 10,
+  padding: 10,
+  background: 'rgba(3,7,18,.25)',
 }
 
 const secondaryButtonStyle: CSSProperties = {

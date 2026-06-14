@@ -15,7 +15,6 @@ import { useState } from 'react'
 import {
   CONSOLE_TIERS,
   CONSOLE_UTILITY_PAGES,
-  CONSOLE_SYSTEM_PAGES,
   ConsoleTierId,
   getConsoleTier,
   getConsoleProvider,
@@ -24,14 +23,10 @@ import {
 import { Lang } from '../shared'
 import ProviderActionForm from '../ProviderActionForm'
 import { ProviderConsoleCard, ProviderWorkspace } from './ProviderConsoleCard'
-import DashboardPage from '../pages/DashboardPage'
-import KeyVaultV2Page from '../pages/KeyVaultV2Page'
 import { DomainsPage } from '../pages/DomainsPage'
 import { DeploymentsPage } from '../pages/DeploymentsPage'
 import { LogsPage } from '../pages/LogsPage'
 import { SettingsPage } from '../pages/SettingsPage'
-import { WebhooksPage } from '../pages/WebhooksPage'
-import { UsersPage } from '../pages/UsersPage'
 
 const PER_PAGE = 2
 
@@ -175,44 +170,6 @@ export default function CommandConsole({
                   border: '1px solid transparent',
                   background: active ? 'rgba(255,195,0,.12)' : 'transparent',
                   color: active ? '#ffc300' : 'rgba(255,255,255,.7)',
-                  fontSize: 13.5,
-                  fontWeight: active ? 800 : 600,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-                onMouseEnter={e => {
-                  if (!active) e.currentTarget.style.background = 'rgba(255,255,255,.05)'
-                }}
-                onMouseLeave={e => {
-                  if (!active) e.currentTarget.style.background = 'transparent'
-                }}
-              >
-                <span style={{ fontSize: 15, flex: '0 0 auto' }}>{u.icon}</span>
-                {u.label}
-              </button>
-            )
-          })}
-        </nav>
-
-        <div style={{ height: 1, background: 'rgba(255,255,255,.08)', margin: '14px 6px' }} />
-
-        {/* System / workspace pages */}
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {CONSOLE_SYSTEM_PAGES.map(u => {
-            const active = utilityId === u.id
-            return (
-              <button
-                key={u.id}
-                onClick={() => openUtility(u.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 11,
-                  padding: '9px 11px',
-                  borderRadius: 10,
-                  border: '1px solid transparent',
-                  background: active ? 'rgba(26,240,255,.1)' : 'transparent',
-                  color: active ? '#1af0ff' : 'rgba(255,255,255,.62)',
                   fontSize: 13.5,
                   fontWeight: active ? 800 : 600,
                   cursor: 'pointer',
@@ -379,9 +336,5 @@ function UtilityFrame({ id, lang }: { id: string; lang: Lang }) {
   if (id === 'deployments') return <DeploymentsPage />
   if (id === 'logs') return <LogsPage />
   if (id === 'settings') return <SettingsPage />
-  if (id === 'webhooks') return <WebhooksPage />
-  if (id === 'team') return <UsersPage />
-  if (id === 'dashboard') return <DashboardPage lang={lang} data={null} loading={false} failed={false} />
-  if (id === 'vault') return <KeyVaultV2Page lang={lang} data={null} loading={false} failed={false} />
   return <div style={{ color: 'rgba(255,255,255,.6)' }}>Unknown page.</div>
 }

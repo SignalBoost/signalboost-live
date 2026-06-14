@@ -140,21 +140,23 @@ export const CONSOLE_PROVIDERS: Record<string, ConsoleProvider> = {
   stripe: {
     id: 'stripe', name: 'Stripe', subtitle: 'PAYMENTS & BILLING', accent: '#635bff', mark: 'S', status: 'live',
     sections: [
-      { title: 'Catalog', templateIds: ['stripe.create_product', 'stripe.create_price', 'stripe.view_products', 'stripe.delete_product'] },
+      { title: 'Catalog', templateIds: ['stripe.create_product', 'stripe.edit_product', 'stripe.view_products', 'stripe.delete_product'] },
+      { title: 'Prices', templateIds: ['stripe.create_price', 'stripe.view_prices', 'stripe.edit_price'] },
       { title: 'API Keys', templateIds: ['stripe.add_api_key', 'stripe.rotate_key'] },
     ],
   },
   supabase: {
     id: 'supabase', name: 'Supabase', subtitle: 'DATABASE & AUTHENTICATION', accent: '#3ecf8e', mark: '◓', status: 'live',
     sections: [
-      { title: 'Users', templateIds: ['supabase.invite_user', 'supabase.delete_user', 'supabase.view_users', 'supabase.reset_password'] },
+      { title: 'Users', templateIds: ['supabase.invite_user', 'supabase.edit_user', 'supabase.view_users', 'supabase.delete_user', 'supabase.reset_password'] },
+      { title: 'Database', templateIds: ['supabase.sql_editor'] },
       { title: 'Project Settings', templateIds: ['vercel.set_env', 'vercel.delete_env', 'vercel.view_env'] },
     ],
   },
   vercel: {
     id: 'vercel', name: 'Vercel', subtitle: 'HOSTING & DEPLOYMENT', accent: '#e5e7eb', mark: '▲', status: 'live',
     sections: [
-      { title: 'Environment', templateIds: ['vercel.set_env', 'vercel.delete_env', 'vercel.view_env'] },
+      { title: 'Environment', templateIds: ['vercel.set_env', 'vercel.edit_env', 'vercel.view_env', 'vercel.delete_env'] },
       { title: 'Tokens', templateIds: ['vercel.rotate_token'] },
     ],
   },

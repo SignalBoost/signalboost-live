@@ -12,7 +12,7 @@
 // Integrates cleanly with the existing ProviderExpansionPage without
 // needing to refactor it.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import ProviderActionModal from './ProviderActionModal'
 import { Lang } from './shared'
 
@@ -33,10 +33,50 @@ export default function ProviderActionLauncher({
 }: ProviderActionLauncherProps) {
   const [showModal, setShowModal] = useState(false)
 
+  useEffect(() => {
+    if (!showModal) return
+
+    const previousBodyOverflow = document.body.style.overflow
+    const previousHtmlOverflow = document.documentElement.style.overflow
+
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow
+      document.documentElement.style.overflow = previousHtmlOverflow
+    }
+  }, [showModal])
+
   if (showModal) {
     return (
-      <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-        <div style={{ width: '100%', maxWidth: 500, maxHeight: '90vh', borderRadius: 18, overflow: 'hidden' }}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 1000,
+          background: 'rgba(0,0,0,.78)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 20,
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            width: '100%',
+            maxWidth: 560,
+            height: 'min(90vh, 760px)',
+            maxHeight: '90vh',
+            borderRadius: 18,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
           <ProviderActionModal
             providerId={providerId}
             lang={lang}

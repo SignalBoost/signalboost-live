@@ -68,10 +68,11 @@ export async function getCurrentUser(req: NextRequest): Promise<HubUser | null> 
       id: 'synthetic-owner',
       email: 'owner@signalboost.local',
       role: 'owner',
-      mfa_enabled: false,
-      created_at: new Date().toISOString(),
-      last_login: new Date().toISOString(),
-      status: 'active',
+      mfaEnabled: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      lastLogin: new Date().toISOString(),
+      active: true,
     } as HubUser
   } catch (err) {
     // On error, return synthetic owner so console remains accessible
@@ -79,10 +80,11 @@ export async function getCurrentUser(req: NextRequest): Promise<HubUser | null> 
       id: 'synthetic-owner',
       email: 'owner@signalboost.local',
       role: 'owner',
-      mfa_enabled: false,
-      created_at: new Date().toISOString(),
-      last_login: new Date().toISOString(),
-      status: 'active',
+      mfaEnabled: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      lastLogin: new Date().toISOString(),
+      active: true,
     } as HubUser
   }
 }

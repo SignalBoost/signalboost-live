@@ -4,7 +4,6 @@
 // Vault access control — password + real TOTP verification before showing secrets.
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { cardStyle, labelStyle } from '../shared'
 
 export type UnlockScreenProps = {
@@ -193,9 +192,9 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
         zIndex: 50,
       }}
     >
-      {/* Exit Hub - Always visible escape route */}
-      <Link
-        href="/dashboard"
+      {/* Refresh - Reload page to escape unlock vault */}
+      <button
+        onClick={() => window.location.reload()}
         style={{
           position: 'absolute',
           top: 24,
@@ -205,15 +204,18 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
           color: '#000',
           border: 'none',
           borderRadius: 8,
-          textDecoration: 'none',
           fontSize: 14,
           fontWeight: 900,
           zIndex: 51,
+          cursor: 'pointer',
           boxShadow: '0 4px 12px rgba(255, 195, 0, 0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
         }}
       >
-        ← Exit Hub
-      </Link>
+        ↻ Refresh
+      </button>
 
       <div
         style={{

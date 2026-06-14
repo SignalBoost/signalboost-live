@@ -508,7 +508,7 @@ async function executeStripeAction(template: any, payload: Record<string, unknow
   }
 
   // Edit a price (active flag + nickname; Stripe prices are otherwise immutable)
-if (template.id === 'stripe.edit_price') {
+  if (template.id === 'stripe.edit_price') {
     const id = String(payload.id || '')
     if (!id) return { ok: false, error: 'Price ID is required' }
     const params: Record<string, string> = {}
@@ -564,13 +564,15 @@ if (template.id === 'stripe.edit_price') {
     const products = (prodData.data || []).map((p: any) => ({
       name: p.name,
       id: p.id,
-      price: priceByProduct[p.id] || '—',
+      PRICE: priceByProduct[p.id] || 'NO-PRICE',
       active: p.active,
       created: p.created ? new Date(p.created * 1000).toISOString().slice(0, 10) : '',
     }))
+    const totalPrices = (priceData.data || []).length
+    const withPrice = products.filter((p: any) => p.price !== '—').length
     return {
       ok: true,
-      message: `Stripe: ${products.length} product${products.length === 1 ? '' : 's'}`,
+      message: `Stripe: ${products.length} products · ${totalPrices} prices found · ${withPrice} matched`,
       data: { count: products.length, products },
     }
   }
@@ -1008,7 +1010,7 @@ async function executeVercelAction(template: any, payload: Record<string, unknow
     return {
       ok: true,
       message: `Vercel health: ${deploymentCount} deployment${deploymentCount === 1 ? '' : 's'} found`,
-data: {
+      data: {
         deploymentCount,
         latestDeployment: latestDeployment ? {
           id: latestDeployment.id,

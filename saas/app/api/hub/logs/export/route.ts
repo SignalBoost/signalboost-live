@@ -1,8 +1,17 @@
 // saas/app/api/hub/logs/export/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { exportLogsAsCSV } from '@/lib/hub/logs-service'
+import { requirePermission } from '@/lib/auth/permission-middleware'
 
 export async function GET(req: NextRequest) {
+  const perm = await requirePermission(req, 'logs:export')
+  if (!perm.ok) {
+    return NextResponse.json(
+      { ok: false, error: (perm as any).error },
+      { status: (perm as any).status }
+    )
+  }
+
   try {
     const action = req.nextUrl.searchParams.get('action') || undefined
     const status = req.nextUrl.searchParams.get('status') || undefined

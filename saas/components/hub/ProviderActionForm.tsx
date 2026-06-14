@@ -31,7 +31,15 @@ export default function ProviderActionForm({
   const template = getTemplate(templateId)
 
   const [state, setState] = useState<FormState>('idle')
-  const [values, setValues] = useState<Record<string, unknown>>({})
+  const [values, setValues] = useState<Record<string, unknown>>(() => {
+    const defaults: Record<string, unknown> = {}
+    template?.fields.forEach(field => {
+      if (field.defaultValue !== undefined) {
+        defaults[field.id] = field.defaultValue
+      }
+    })
+    return defaults
+  })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [result, setResult] = useState<{ ok: boolean; message?: string; error?: string; data?: any } | null>(null)
 
@@ -216,7 +224,12 @@ function FormField({ field, value, error, onChange }: FormFieldProps) {
       case 'secret':
         return <input type="password" value={(value as string) || ''} onChange={e => onChange(e.target.value)} placeholder={field.placeholder} maxLength={field.maxLength} style={baseStyle} />
       case 'select':
-        return <select value={(value as string) || ''} onChange={e => onChange(e.target.value)} style={{ ...baseStyle, cursor: 'pointer' }}><option value="" disabled>{field.placeholder || 'Select an option'}</option>{field.options?.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select>
+        return (
+          <select value={(value as string) || ''} onChange={e => onChange(e.target.value)} style={{ ...baseStyle, cursor: 'pointer' }}>
+            <option value="" disabled style={{ color: '#111', background: '#fff' }}>{field.placeholder || 'Select an option'}</option>
+            {field.options?.map(opt => <option key={opt.value} value={opt.value} style={{ color: '#111', background: '#fff' }}>{opt.label}</option>)}
+          </select>
+        )
       case 'toggle':
         return <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: 'rgba(255,255,255,.7)', cursor: 'pointer' }}><input type="checkbox" checked={(value as boolean) || false} onChange={e => onChange(e.target.checked)} style={{ width: 18, height: 18, cursor: 'pointer' }} />{field.label}</label>
     }

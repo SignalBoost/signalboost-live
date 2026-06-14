@@ -1,8 +1,17 @@
 // saas/app/api/hub/domains/list/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { listVercelDomains } from '@/lib/hub/vercel-domains'
+import { requirePermission } from '@/lib/auth/permission-middleware'
 
 export async function GET(req: NextRequest) {
+  const perm = await requirePermission(req, 'domains:read')
+  if (!perm.ok) {
+    return NextResponse.json(
+      { ok: false, error: (perm as any).error },
+      { status: (perm as any).status }
+    )
+  }
+
   try {
     const vercelToken = process.env.VERCEL_TOKEN
     const vercelTeamId = process.env.VERCEL_TEAM_ID

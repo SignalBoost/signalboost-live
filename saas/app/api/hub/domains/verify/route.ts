@@ -2,12 +2,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyVercelDomain } from '@/lib/hub/vercel-domains'
 import { createClient } from '@supabase/supabase-js'
+import { requirePermission } from '@/lib/auth/permission-middleware'
 
 type VerifyRequest = {
   domain: string
 }
 
 export async function POST(req: NextRequest) {
+  const perm = await requirePermission(req, 'domains:manage')
+  if (!perm.ok) {
+    return NextResponse.json(
+      { ok: false, error: (perm as any).error },
+      { status: (perm as any).status }
+    )
+  }
+
   try {
     const body: VerifyRequest = await req.json()
     const { domain } = body
@@ -44,7 +53,7 @@ export async function POST(req: NextRequest) {
           {
             secret_id: `domain:${domain}`,
             action: 'verified',
-            user_email: 'system@signalboost.local',
+            user_email: perm.user.email,
             timestamp: new Date().toISOString(),
             status: result.verified ? 'success' : 'pending',
             message: result.verified ? 'Domain verified successfully' : 'Verification pending - DNS not yet propagated',

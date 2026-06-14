@@ -126,7 +126,7 @@ export default function ProviderActionForm({ templateId, lang, onSuccess, onErro
       </div>
 
       {/* Body: form fields, preview, confirm, or result */}
-      <div style={{ ...bodyStyle, gap: 16, minHeight: state === 'success' ? 280 : 200, maxHeight: '70vh' }}>
+      <div style={{ ...bodyStyle, gap: 16, minHeight: state === 'success' ? 420 : 200, maxHeight: '78vh' }}>
         {state === 'idle' && (
           <>
             {template.fields.length === 0 ? (
@@ -382,45 +382,47 @@ function ResultView({ data }: { data: any }) {
   if (arrayKey) {
     const rows: any[] = (data as any)[arrayKey]
     const first = rows[0]
-    // Array of objects -> table
+    // Array of objects -> vertical card feed (tall, scrollable, TikTok-style)
     if (first && typeof first === 'object' && !Array.isArray(first)) {
-      const colSet = new Set<string>()
-      rows.slice(0, 50).forEach((r: any) => {
-        Object.keys(r || {}).forEach(k => colSet.add(k))
-      })
-      const cols: string[] = Array.from(colSet).slice(0, 6)
       return (
-        <div style={{ flex: 1, overflow: 'auto', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-            <thead>
-              <tr>
-                {cols.map(col => (
-                  <th key={col} style={{ textAlign: 'left', padding: '8px 10px', position: 'sticky', top: 0, background: 'rgba(8,11,20,.96)', color: '#1af0ff', fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,.1)', whiteSpace: 'nowrap' }}>
-                    {col}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.slice(0, 50).map((row: any, i: number) => (
-                <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,.05)' }}>
-                  {cols.map(col => (
-                    <td key={col} style={{ padding: '7px 10px', color: 'rgba(255,255,255,.82)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', whiteSpace: 'nowrap', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {formatCell(row?.[col])}
-                    </td>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, overflow: 'auto', minHeight: 0 }}>
+          {rows.slice(0, 100).map((row: any, i: number) => {
+            const entries = Object.entries(row).filter(([, v]) => v !== null && v !== undefined && v !== '')
+            const title = row.name || row.label || row.email || row.username || row.key || row.id || `Item ${i + 1}`
+            const rest = entries.filter(([k]) => k !== 'name' && k !== 'label' && k !== 'email' && k !== 'username')
+            return (
+              <div
+                key={i}
+                style={{
+                  padding: 14,
+                  borderRadius: 12,
+                  background: 'linear-gradient(160deg, rgba(20,28,46,.6), rgba(8,11,20,.4))',
+                  border: '1px solid rgba(255,255,255,.09)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: rest.length ? 10 : 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatCell(title)}</div>
+                  <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,.4)', fontWeight: 700, flex: '0 0 auto' }}>#{i + 1}</div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {rest.map(([k, v]) => (
+                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 11.5 }}>
+                      <span style={{ color: 'rgba(255,255,255,.45)', flex: '0 0 auto' }}>{k}</span>
+                      <span style={{ color: 'rgba(26,240,255,.85)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', textAlign: 'right', wordBreak: 'break-all' }}>{formatCell(v)}</span>
+                    </div>
                   ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )
     }
     // Array of scalars -> simple list
     return (
-      <div style={{ flex: 1, overflow: 'auto', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: 10 }}>
+      <div style={{ flex: 1, overflow: 'auto', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: 10, minHeight: 0 }}>
         {rows.slice(0, 100).map((v: any, i: number) => (
-          <div key={i} style={{ fontSize: 12, color: 'rgba(255,255,255,.82)', fontFamily: 'ui-monospace, monospace', padding: '3px 0' }}>{formatCell(v)}</div>
+          <div key={i} style={{ fontSize: 12, color: 'rgba(255,255,255,.82)', fontFamily: 'ui-monospace, monospace', padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>{formatCell(v)}</div>
         ))}
       </div>
     )

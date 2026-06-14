@@ -181,13 +181,16 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
     <div
       style={{
         position: 'fixed',
-        inset: 0,
+        top: 80,
+        left: 0,
+        right: 0,
+        bottom: 0,
         background: 'rgba(0,0,0,.88)',
         backdropFilter: 'blur(8px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 9999,
+        zIndex: 50,
       }}
     >
       {/* Exit Hub - Always visible escape route */}
@@ -197,15 +200,16 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
           position: 'absolute',
           top: 24,
           left: 24,
-          padding: '8px 14px',
-          background: 'rgba(255, 195, 0, 0.1)',
-          color: '#ffc300',
-          border: '1px solid #ffc300',
+          padding: '10px 18px',
+          background: '#ffc300',
+          color: '#000',
+          border: 'none',
           borderRadius: 8,
           textDecoration: 'none',
-          fontSize: 13,
-          fontWeight: 700,
-          zIndex: 10000,
+          fontSize: 14,
+          fontWeight: 900,
+          zIndex: 51,
+          boxShadow: '0 4px 12px rgba(255, 195, 0, 0.3)',
         }}
       >
         ← Exit Hub

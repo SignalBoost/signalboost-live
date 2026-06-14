@@ -126,7 +126,7 @@ export default function ProviderActionForm({ templateId, lang, onSuccess, onErro
       </div>
 
       {/* Body: form fields, preview, confirm, or result */}
-      <div style={{ ...bodyStyle, gap: 16, minHeight: state === 'success' ? 420 : 200, maxHeight: '78vh' }}>
+      <div style={{ ...bodyStyle, gap: 16, minHeight: state === 'success' ? 300 : 200, maxHeight: '60vh' }}>
         {state === 'idle' && (
           <>
             {template.fields.length === 0 ? (
@@ -385,7 +385,7 @@ function ResultView({ data }: { data: any }) {
     // Array of objects -> vertical card feed (tall, scrollable, TikTok-style)
     if (first && typeof first === 'object' && !Array.isArray(first)) {
       return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, overflow: 'auto', minHeight: 0 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, overflow: 'auto', minHeight: 0 }}>
           {rows.slice(0, 100).map((row: any, i: number) => {
             const entries = Object.entries(row).filter(([, v]) => v !== null && v !== undefined && v !== '')
             const title = row.name || row.label || row.email || row.username || row.key || row.id || `Item ${i + 1}`
@@ -394,21 +394,21 @@ function ResultView({ data }: { data: any }) {
               <div
                 key={i}
                 style={{
-                  padding: 14,
-                  borderRadius: 12,
+                  padding: '10px 12px',
+                  borderRadius: 10,
                   background: 'linear-gradient(160deg, rgba(20,28,46,.6), rgba(8,11,20,.4))',
                   border: '1px solid rgba(255,255,255,.09)',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: rest.length ? 10 : 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatCell(title)}</div>
-                  <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,.4)', fontWeight: 700, flex: '0 0 auto' }}>#{i + 1}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: rest.length ? 7 : 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatCell(title)}</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,.35)', fontWeight: 700, flex: '0 0 auto' }}>#{i + 1}</div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   {rest.map(([k, v]) => (
-                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 11.5 }}>
-                      <span style={{ color: 'rgba(255,255,255,.45)', flex: '0 0 auto' }}>{k}</span>
-                      <span style={{ color: 'rgba(26,240,255,.85)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', textAlign: 'right', wordBreak: 'break-all' }}>{formatCell(v)}</span>
+                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 11 }}>
+                      <span style={{ color: 'rgba(255,255,255,.4)', flex: '0 0 auto' }}>{k}</span>
+                      <span style={{ color: 'rgba(26,240,255,.8)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', textAlign: 'right', wordBreak: 'break-all' }}>{formatCell(v)}</span>
                     </div>
                   ))}
                 </div>

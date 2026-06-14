@@ -2,6 +2,7 @@
 
 // saas/components/hub/console/ProviderConsoleCard.tsx
 // Hub Command Console — Child layout representations.
+// Fully self-contained action grid mapping.
 
 import { type ConsoleProvider, isDestructiveTemplate } from '@/lib/hub/console-catalog'
 import { getTemplate } from '@/lib/hub/provider-templates'
@@ -48,6 +49,17 @@ export function ProviderConsoleCard({ provider, lang, onExpand, onRun }: CardPro
                   </button>
                 )
               })}
+              
+              {/* Force rendering the Archive option inside the Stripe Catalog manually */}
+              {provider.id === 'stripe' && section.title === 'Catalog' && (
+                <button 
+                  onClick={() => onRun('stripe.archive_product')} 
+                  style={{ padding: '8px 10px', borderRadius: 8, textAlign: 'left', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, border: '1px solid rgba(255, 195, 0, 0.25)', background: 'rgba(255, 195, 0, 0.06)', color: '#ffc300' }}
+                >
+                  <span>🗄️</span>
+                  <span>Archive Product</span>
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -96,6 +108,23 @@ export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onRun }: 
                   </div>
                 )
               })}
+
+              {/* Force rendering inside workspace view as well */}
+              {provider.id === 'stripe' && section.title === 'Catalog' && (
+                <div 
+                  onClick={() => onRun('stripe.archive_product')} 
+                  style={{ padding: 12, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255, 195, 0, 0.2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontSize: 18 }}>🗄️</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#ffc300' }}>Archive Product</div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>Deactivate an existing product catalog track instantly to stop new checkouts.</div>
+                    </div>
+                  </div>
+                  <span style={{ color: '#ffc300', fontWeight: 800 }}>→</span>
+                </div>
+              )}
             </div>
           </div>
         ))}

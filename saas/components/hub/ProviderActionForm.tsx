@@ -256,5 +256,214 @@ type FormFieldProps = {
   value: unknown
   error?: string
   onChange: (value: unknown) => void
+  
+function FormField({ field, value, error, onChange, lang }: FormFieldProps) {
+  const renderInput = () => {
+    const baseStyle: React.CSSProperties = {
+      width: '100%',
+      padding: '10px 12px',
+      borderRadius: 8,
+      border: error ? '1px solid rgba(239,68,68,.5)' : '1px solid rgba(255,255,255,.15)',
+      background: 'rgba(255,255,255,.04)',
+      color: '#fff',
+      fontSize: 13,
+      fontFamily: 'inherit',
+      outline: 'none',
+    }
+
+    switch (field.type) {
+      case 'text':
+      case 'email':
+      case 'phone':
+        return (
+          <input
+            type={field.type === 'email' ? 'email' : field.type === 'phone' ? 'tel' : 'text'}
+            value={(value as string) || ''}
+            onChange={e => onChange(e.target.value)}
+            placeholder={field.placeholder}
+            maxLength={field.maxLength}
+            style={baseStyle}
+          />
+        )
+      case 'textarea':
+        return (
+          <textarea
+            value={(value as string) || ''}
+            onChange={e => onChange(e.target.value)}
+            placeholder={field.placeholder}
+            maxLength={field.maxLength}
+            style={{ ...baseStyle, minHeight: 100, fontFamily: 'inherit', resize: 'vertical' }}
+          />
+        )
+      case 'number':
+      case 'currency_cents':
+        return (
+          <input
+            type="number"
+            value={(value as number) ?? ''}
+            onChange={e => onChange(e.target.value ? parseFloat(e.target.value) : '')}
+            min={field.min}
+            max={field.max}
+            step={field.type === 'currency_cents' ? 0.01 : 1}
+            placeholder={field.placeholder}
+            style={baseStyle}
+          />
+        )
+      case 'secret':
+        return (
+          <input
+            type="password"
+            value={(value as string) || ''}
+            onChange={e => onChange(e.target.value)}
+            placeholder={field.placeholder}
+            maxLength={field.maxLength}
+            style={baseStyle}
+          />
+        )
+      case 'select':
+        return (
+          <select value={(value as string) || ''} onChange={e => onChange(e.target.value)} style={{ ...baseStyle, cursor: 'pointer' }}>
+            <option value="" disabled>
+              {field.placeholder || 'Select an option'}
+            </option>
+            {field.options?.map(opt => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        )
+      case 'toggle':
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input
+              type="checkbox"
+              checked={(value as boolean) || false}
+              onChange={e => onChange(e.target.checked)}
+              style={{ width: 18, height: 18, cursor: 'pointer' }}
+            />
+            <label style={{ fontSize: 12, color: 'rgba(255,255,255,.7)', cursor: 'pointer' }}>
+              {field.label}
+            </label>
+          </div>
+        )
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {field.type !== 'toggle' && (
+        <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 6 }}>
+          {field.label}
+          {field.required && <span style={{ color: '#ef4444' }}>*</span>}
+        </label>
+      )}
+      {renderInput()}
+      {field.help && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: -2 }}>{field.help}</div>}
+      {error && <div style={{ fontSize: 11, color: '#ef4444', marginTop: -2 }}>⚠️ {error}</div>}
+    </div>
+  )
+}
+
+// Renders the data payload returned by a Hub action. Auto-detects the first
+// array in the payload (products, prices, users, keys, env vars, accounts,
+// repos, rows, …) and renders it as a readable table; falls back to key/value
+// rows for scalar payloads, and to formatted JSON for anything unusual.
+function ResultView({ data }: { data: any }) {
+  if (data === null || data === undefined) return null
+
+  // SQL editor / generic row arrays
+  const arrayKey = data && typeof data === 'object'
+    ? Object.keys(data).find(k => Array.isArray((data as any)[k]) && (data as any)[k].length > 0)
+    : null
+
+  if (arrayKey) {
+    const rows: any[] = (data as any)[arrayKey]
+    const first = rows[0]
+    // Array of objects -> table
+    if (first && typeof first === 'object' && !Array.isArray(first)) {
+      const colSet = new Set<string>()
+      rows.slice(0, 50).forEach((r: any) => {
+        Object.keys(r || {}).forEach(k => colSet.add(k))
+      })
+      const cols: string[] = Array.from(colSet).slice(0, 6)
+      return (
+        <div style={{ flex: 1, overflow: 'auto', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr>
+                {cols.map(col => (
+                  <th key={col} style={{ textAlign: 'left', padding: '8px 10px', position: 'sticky', top: 0, background: 'rgba(8,11,20,.96)', color: '#1af0ff', fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,.1)', whiteSpace: 'nowrap' }}>
+                    {col}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.slice(0, 50).map((row: any, i: number) => (
+                <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+                  {cols.map(col => (
+                    <td key={col} style={{ padding: '7px 10px', color: 'rgba(255,255,255,.82)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', whiteSpace: 'nowrap', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {formatCell(row?.[col])}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
+    }
+    // Array of scalars -> simple list
+    return (
+      <div style={{ flex: 1, overflow: 'auto', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: 10 }}>
+        {rows.slice(0, 100).map((v: any, i: number) => (
+          <div key={i} style={{ fontSize: 12, color: 'rgba(255,255,255,.82)', fontFamily: 'ui-monospace, monospace', padding: '3px 0' }}>{formatCell(v)}</div>
+        ))}
+      </div>
+    )
+  }
+
+  // Reveal-style single value
+  if (data && typeof data === 'object' && typeof (data as any).value === 'string') {
+    return (
+      <div style={{ flex: 1, padding: 12, background: 'rgba(3,7,18,.5)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, fontFamily: 'ui-monospace, monospace', fontSize: 12, color: 'rgba(26,240,255,.85)', wordBreak: 'break-all' }}>
+        {(data as any).value}
+      </div>
+    )
+  }
+
+  // Scalar key/value object
+  if (data && typeof data === 'object') {
+    const entries = Object.entries(data).filter(([, v]) => v === null || ['string', 'number', 'boolean'].includes(typeof v))
+    if (entries.length > 0) {
+      return (
+        <div style={{ flex: 1, overflow: 'auto', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: 10 }}>
+          {entries.map(([k, v]) => (
+            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '5px 0', fontSize: 12, borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+              <span style={{ color: 'rgba(255,255,255,.5)' }}>{k}</span>
+              <span style={{ color: 'rgba(255,255,255,.85)', fontFamily: 'ui-monospace, monospace', textAlign: 'right', wordBreak: 'break-all' }}>{formatCell(v)}</span>
+            </div>
+          ))}
+        </div>
+      )
+    }
+  }
+
+  // Fallback: pretty JSON
+  return (
+    <div style={{ flex: 1, padding: 12, background: 'rgba(3,7,18,.5)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, fontFamily: 'ui-monospace, monospace', fontSize: 11, color: 'rgba(255,255,255,.7)', whiteSpace: 'pre-wrap', overflow: 'auto', maxHeight: 320 }}>
+      {JSON.stringify(data, null, 2)}
+    </div>
+  )
+}
+
+function formatCell(v: any): string {
+  if (v === null || v === undefined) return '—'
+  if (typeof v === 'boolean') return v ? 'yes' : 'no'
+  if (typeof v === 'object') return JSON.stringify(v)
+  return String(v)
+}
+
   lang: Lang
 }

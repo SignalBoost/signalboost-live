@@ -2,7 +2,6 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import DashboardPage from './pages/DashboardPage'
 import KeyVaultV2Page from './pages/KeyVaultV2Page'
 import ProviderGridPage from './pages/ProviderGridPage'
@@ -64,30 +63,6 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
           padding: '1rem 0',
         }}
       >
-        {/* Exit Hub Button */}
-        <div style={{ padding: '0 0.5rem', marginBottom: '0.75rem' }}>
-          <Link
-            href="/dashboard"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '0.75rem 1rem',
-              background: '#ffc300',
-              color: '#000',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              textAlign: 'center',
-              fontSize: '0.9rem',
-              fontWeight: 'bold',
-              textDecoration: 'none',
-            }}
-          >
-            ← Exit Hub
-          </Link>
-        </div>
-
         <div style={{ padding: '0.5rem 1rem', borderBottom: '1px solid #333', marginBottom: '1rem' }}>
           <div style={{ fontSize: '1rem', fontWeight: 'bold', color: '#1af0ff' }}>
             Hub Console
@@ -176,7 +151,7 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
             </div>
           </div>
 
-          {/* Right: Forward arrow + Exit Hub */}
+          {/* Right: Forward arrow */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button
               onClick={goToNext}
@@ -194,21 +169,6 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
             >
               →
             </button>
-            <Link
-              href="/dashboard"
-              style={{
-                color: '#000',
-                textDecoration: 'none',
-                fontSize: '0.85rem',
-                fontWeight: 'bold',
-                padding: '0.5rem 1rem',
-                border: 'none',
-                borderRadius: '6px',
-                background: '#ffc300',
-              }}
-            >
-              ← Exit Hub
-            </Link>
           </div>
         </div>
 

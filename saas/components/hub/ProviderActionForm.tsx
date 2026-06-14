@@ -126,7 +126,7 @@ export default function ProviderActionForm({ templateId, lang, onSuccess, onErro
       </div>
 
       {/* Body: form fields, preview, confirm, or result */}
-      <div style={{ ...bodyStyle, gap: 16, minHeight: 200 }}>
+      <div style={{ ...bodyStyle, gap: 16, minHeight: state === 'success' ? 280 : 200, maxHeight: '70vh' }}>
         {state === 'idle' && (
           <>
             {template.fields.length === 0 ? (
@@ -466,4 +466,3 @@ function formatCell(v: any): string {
   if (typeof v === 'object') return JSON.stringify(v)
   return String(v)
 }
-

@@ -1,167 +1,180 @@
 'use client'
 
-// saas/components/hub/console/ProviderConsoleCard.tsx
-// Hub Command Console — Child layout representations.
-//
-// Renders individual provider brand blocks, action buttons, and full workspaces
-// based on sections defined in console-catalog.ts.
+// saas/components/hub/console/CommandConsole.tsx
+// Hub Command Console — provider-centric, tiered orchestrator.
 
-import { type ConsoleProvider, isDestructiveTemplate } from '@/lib/hub/console-catalog'
+import { useState } from 'react'
+import {
+  CONSOLE_TIERS,
+  CONSOLE_UTILITY_PAGES,
+  ConsoleTierId,
+  getConsoleTier,
+  getConsoleProvider,
+  getTierProviders,
+} from '@/lib/hub/console-catalog'
+import { Lang } from '../shared'
+import ProviderActionForm from '../ProviderActionForm'
 import { getTemplate } from '@/lib/hub/provider-templates'
-import { type Lang } from '../shared'
+import { ProviderConsoleCard, ProviderWorkspace } from './ProviderConsoleCard'
+import { DomainsPage } from '../pages/DomainsPage'
+import { DeploymentsPage } from '../pages/DeploymentsPage'
+import { LogsPage } from '../pages/LogsPage'
+import { SettingsPage } from '../pages/SettingsPage'
 
-type CardProps = {
-  provider: ConsoleProvider
-  lang: Lang
-  onExpand: () => void
-  onRun: (templateId: string) => void
-}
+const PER_PAGE = 2
 
-export function ProviderConsoleCard({ provider, lang, onExpand, onRun }: CardProps) {
+export default function CommandConsole({
+  lang = 'en',
+  initialTier = 'core',
+}: {
+  lang?: Lang
+  initialTier?: ConsoleTierId
+}) {
+  const [tierId, setTierId] = useState<ConsoleTierId>(initialTier)
+  const [page, setPage] = useState(0)
+  const [focusProviderId, setFocusProviderId] = useState<string | null>(null)
+  const [utilityId, setUtilityId] = useState<string | null>(null)
+  const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null)
+
+  const tier = getConsoleTier(tierId)
+  const providers = getTierProviders(tierId)
+  const pageCount = Math.max(1, Math.ceil(providers.length / PER_PAGE))
+  const safePage = Math.min(page, pageCount - 1)
+  const visible = providers.slice(safePage * PER_PAGE, safePage * PER_PAGE + PER_PAGE)
+
+  const selectTier = (id: ConsoleTierId) => {
+    setTierId(id)
+    setPage(0)
+    setFocusProviderId(null)
+    setUtilityId(null)
+  }
+  const openProvider = (id: string) => {
+    setFocusProviderId(id)
+    setUtilityId(null)
+  }
+  const openUtility = (id: string) => {
+    setUtilityId(id)
+    setFocusProviderId(null)
+  }
+  const run = (templateId: string) => setActiveTemplateId(templateId)
+
+  const focusProvider = focusProviderId ? getConsoleProvider(focusProviderId) : null
+
   return (
-    <div style={{ background: 'rgba(13, 18, 32, 0.45)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: 14, overflow: 'hidden' }}>
-      {/* Brand Header */}
-      <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 10, height: 10, borderRadius: '50%', background: provider.accent, boxShadow: `0 0 10px ${provider.accent}` }} />
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', letterSpacing: '0.03em' }}>{provider.name}</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', fontWeight: 700 }}>{provider.subtitle}</div>
+    <div style={{ display: 'flex', minHeight: 'calc(100vh - 80px)', background: '#070b14', color: '#fff', position: 'relative' }}>
+      {/* Sidebar */}
+      <aside style={{ width: 248, flex: '0 0 248px', background: 'linear-gradient(180deg, rgba(13,18,32,.9), rgba(8,11,20,.9))', borderRight: '1px solid rgba(255,255,255,.07)', display: 'flex', flexDirection: 'column', padding: '16px 12px', overflowY: 'auto' }}>
+        <div style={{ padding: '4px 8px 12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, color: 'rgba(255,255,255,.92)', fontWeight: 800, fontSize: 14 }}>
+            <span style={{ color: 'rgba(255,255,255,.55)' }}>≡</span>
+            {tier?.sidebarTitle}
+          </div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 11 }}>
+            {CONSOLE_TIERS.map(t => {
+              const active = t.id === tierId
+              return (
+                <button key={t.id} onClick={() => selectTier(t.id)} style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: active ? '1px solid rgba(26,240,255,.5)' : '1px solid rgba(255,255,255,.1)', background: active ? 'rgba(26,240,255,.14)' : 'rgba(255,255,255,.03)', color: active ? '#1af0ff' : 'rgba(255,255,255,.6)', fontSize: 12, fontWeight: 900, cursor: 'pointer' }}>
+                  {t.index}
+                </button>
+              )
+            })}
           </div>
         </div>
-        <button 
-          onClick={onExpand}
-          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '5px 10px', borderRadius: 8, color: '#1af0ff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
-        >
-          Workspace →
-        </button>
-      </div>
 
-      {/* Render Actions Catalog List */}
-      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {provider.sections.map((section, idx) => (
-          <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255, 255, 255, 0.35)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              {section.title}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              {section.templateIds.map(id => {
-                const template = getTemplate(id)
-                if (!template) return null
-                const isDestructive = isDestructiveTemplate(id)
-                const isArchive = id.includes('archive')
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 4 }}>
+          {providers.map(p => {
+            const active = focusProviderId === p.id
+            return (
+              <button key={p.id} onClick={() => openProvider(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 11px', borderRadius: 10, border: '1px solid transparent', background: active ? 'rgba(26,240,255,.14)' : 'transparent', color: active ? '#1af0ff' : 'rgba(255,255,255,.78)', fontSize: 13.5, fontWeight: active ? 800 : 600, cursor: 'pointer', textAlign: 'left' }}>
+                <span style={{ width: 9, height: 9, borderRadius: 3, background: p.accent, flex: '0 0 auto', boxShadow: `0 0 8px ${p.accent}66` }} />
+                {p.name}
+              </button>
+            )
+          })}
+        </nav>
 
-                return (
-                  <button
-                    key={id}
-                    onClick={() => onRun(id)}
-                    style={{
-                      padding: '8px 10px',
-                      borderRadius: 8,
-                      textAlign: 'left',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      border: isDestructive 
-                        ? '1px solid rgba(239, 68, 68, 0.25)' 
-                        : isArchive 
-                        ? '1px solid rgba(255, 195, 0, 0.25)' 
-                        : '1px solid rgba(255, 255, 255, 0.08)',
-                      background: isDestructive 
-                        ? 'rgba(239, 68, 68, 0.06)' 
-                        : isArchive 
-                        ? 'rgba(255, 195, 0, 0.06)' 
-                        : 'rgba(255, 255, 255, 0.03)',
-                      color: isDestructive 
-                        ? '#ef4444' 
-                        : isArchive 
-                        ? '#ffc300' 
-                        : 'rgba(255, 255, 255, 0.85)',
-                    }}
-                  >
-                    <span>{template.icon}</span>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{template.label}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
+        <div style={{ height: 1, background: 'rgba(255,255,255,.08)', margin: '14px 6px' }} />
 
-type WorkspaceProps = {
-  provider: ConsoleProvider
-  tierLabel: string
-  lang: Lang
-  onBack: () => void
-  onRun: (templateId: string) => void
-}
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {CONSOLE_UTILITY_PAGES.map(u => {
+            const active = utilityId === u.id
+            return (
+              <button key={u.id} onClick={() => openUtility(u.id)} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 11px', borderRadius: 10, border: '1px solid transparent', background: active ? 'rgba(255,195,0,.12)' : 'transparent', color: active ? '#ffc300' : 'rgba(255,255,255,.7)', fontSize: 13.5, fontWeight: active ? 800 : 600, cursor: 'pointer', textAlign: 'left' }}>
+                <span style={{ fontSize: 15, flex: '0 0 auto' }}>{u.icon}</span>
+                {u.label}
+              </button>
+            )
+          })}
+        </nav>
+      </aside>
 
-export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onRun }: WorkspaceProps) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Workspace Navigation Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        <button 
-          onClick={onBack}
-          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: 700, cursor: 'pointer', padding: 0 }}
-        >
-          ← {tierLabel}
-        </button>
-        <h2 style={{ fontSize: 22, fontWeight: 900, color: '#fff', margin: 0 }}>{provider.name} Workspace</h2>
-      </div>
-
-      {/* Expanded Grid Presentation Layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
-        {provider.sections.map((section, idx) => (
-          <div key={idx} style={{ background: 'rgba(13, 18, 32, 0.3)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: 12, padding: 18 }}>
-            <h3 style={{ fontSize: 12, fontWeight: 800, color: '#1af0ff', textTransform: 'uppercase', margin: '0 0 14px 0', letterSpacing: '0.04em' }}>
-              {section.title}
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {section.templateIds.map(id => {
-                const template = getTemplate(id)
-                if (!template) return null
-                const isDestructive = isDestructiveTemplate(id)
-                const isArchive = id.includes('archive')
-
-                return (
-                  <div 
-                    key={id}
-                    onClick={() => onRun(id)}
-                    style={{
-                      padding: 12,
-                      borderRadius: 10,
-                      background: 'rgba(255,255,255,0.02)',
-                      border: '1px solid rgba(255,255,255,0.06)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      transition: 'border-color 0.2s'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span style={{ fontSize: 18 }}>{template.icon}</span>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: isDestructive ? '#ef4444' : isArchive ? '#ffc300' : '#fff' }}>{template.label}</div>
-                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>{template.description}</div>
-                      </div>
-                    </div>
-                    <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: 800 }}>→</span>
+      {/* Content Main Area */}
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: '26px 30px' }}>
+          {utilityId ? (
+            <UtilityFrame id={utilityId} lang={lang} />
+          ) : focusProvider ? (
+            <ProviderWorkspace provider={focusProvider} tierLabel={tier?.label ? `Tier ${tier.index} · ${tier.label}` : 'Tier'} lang={lang} onBack={() => setFocusProviderId(null)} onRun={run} />
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: '#fff' }}>Tier {tier?.index} · {tier?.label} Providers</div>
+                  <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.5)', marginTop: 4, maxWidth: 560 }}>{tier?.blurb}</div>
+                </div>
+                {pageCount > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <PagerButton label="←" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={safePage === 0} />
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', fontWeight: 700, minWidth: 86, textAlign: 'center' }}>Page {safePage + 1} of {pageCount}</span>
+                    <PagerButton label="→" onClick={() => setPage(p => Math.min(pageCount - 1, p + 1))} disabled={safePage >= pageCount - 1} />
                   </div>
-                )
-              })}
+                )}
+              </div>
+
+              <div className="sb-console-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
+                {visible.map(p => (
+                  <ProviderConsoleCard key={p.id} provider={p} lang={lang} onExpand={() => openProvider(p.id)} onRun={run} />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Audit footer */}
+        <div style={{ borderTop: '1px solid rgba(255,255,255,.07)', padding: '14px 30px', textAlign: 'center', fontSize: 12.5, color: 'rgba(255,255,255,.55)', background: 'rgba(8,11,20,.6)' }}>
+          <strong style={{ color: 'rgba(255,255,255,.8)' }}>Audit Log:</strong> All actions are recorded for compliance.{' '}
+          <button onClick={() => openUtility('logs')} style={{ background: 'none', border: 'none', color: '#1af0ff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}>View log →</button>
+        </div>
+      </main>
+
+      {/* Action form modal overlay */}
+      {activeTemplateId && (() => {
+        const t = getTemplate(activeTemplateId)
+        const isView = t?.api.method === 'GET'
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setActiveTemplateId(null)}>
+            <div style={{ width: '100%', maxWidth: isView ? 560 : 520, maxHeight: '82vh', overflow: 'auto', borderRadius: 18 }} onClick={e => e.stopPropagation()}>
+              <ProviderActionForm templateId={activeTemplateId} lang={lang} onClose={() => setActiveTemplateId(null)} onSuccess={() => setActiveTemplateId(null)} onError={() => {}} />
             </div>
           </div>
-        ))}
-      </div>
+        )
+      })()}
     </div>
   )
+}
+
+function PagerButton({ label, onClick, disabled }: { label: string; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button onClick={onClick} disabled={disabled} style={{ padding: '6px 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,.14)', background: disabled ? 'rgba(255,255,255,.02)' : 'rgba(255,255,255,.05)', color: disabled ? 'rgba(255,255,255,.25)' : '#1af0ff', fontSize: 14, fontWeight: 900, cursor: disabled ? 'default' : 'pointer' }}>
+      {label}
+    </button>
+  )
+}
+
+function UtilityFrame({ id, lang }: { id: string; lang: Lang }) {
+  if (id === 'domains') return <DomainsPage />
+  if (id === 'deployments') return <DeploymentsPage />
+  if (id === 'logs') return <LogsPage />
+  if (id === 'settings') return <SettingsPage />
+  return <div style={{ color: 'rgba(255,255,255,.6)' }}>Unknown page.</div>
 }

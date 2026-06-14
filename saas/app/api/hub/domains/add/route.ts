@@ -1,12 +1,21 @@
 // saas/app/api/hub/domains/add/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { addVercelDomain } from '@/lib/hub/vercel-domains'
+import { requirePermission } from '@/lib/auth/permission-middleware'
 
 type AddRequest = {
   domain: string
 }
 
 export async function POST(req: NextRequest) {
+  const perm = await requirePermission(req, 'domains:manage')
+  if (!perm.ok) {
+    return NextResponse.json(
+      { ok: false, error: (perm as any).error },
+      { status: (perm as any).status }
+    )
+  }
+
   try {
     const body: AddRequest = await req.json()
     const { domain } = body

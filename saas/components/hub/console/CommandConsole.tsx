@@ -295,7 +295,7 @@ export default function CommandConsole({
             style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
             onClick={() => setActiveTemplateId(null)}
           >
-            <div style={{ width: '100%', maxWidth: isView ? 560 : 520, maxHeight: '92vh', overflow: 'auto', borderRadius: 18 }} onClick={e => e.stopPropagation()}>
+            <div style={{ width: '100%', maxWidth: isView ? 560 : 520, maxHeight: '82vh', overflow: 'auto', borderRadius: 18 }} onClick={e => e.stopPropagation()}>
               <ProviderActionForm
                 templateId={activeTemplateId}
                 lang={lang}

@@ -486,7 +486,7 @@ async function executeStripeAction(template: any, payload: Record<string, unknow
     return { ok: true, message: 'Product updated: ' + (data.id || id), data: { id: data.id, name: data.name, active: data.active } }
   }
 
-  // View prices (read-only)
+  // View prices (read-only) — Custom target check placed ABOVE the generic check
   if (template.id === 'stripe.view_prices') {
     const product = String(payload.product || '')
     const qs = product ? `?product=${encodeURIComponent(product)}&limit=20` : '?limit=20'
@@ -505,50 +505,24 @@ async function executeStripeAction(template: any, payload: Record<string, unknow
       message: `Stripe: ${prices.length} price${prices.length === 1 ? '' : 's'}`,
       data: {
         count: prices.length,
-        prices: prices.slice(0, 20).map((p: any) => {
-          const amount = typeof p.unit_amount === 'number'
-            ? (p.unit_amount / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })
-            : '—'
-          const cur = (p.currency || 'usd').toUpperCase()
-          const interval = p.recurring?.interval ? `/${p.recurring.interval}` : ''
-          return {
-            name: `${amount} ${cur}${interval}`,
-            id: p.id,
-            product: typeof p.product === 'string' ? p.product : p.product?.id || '—',
-            active: p.active,
-            type: p.type,
-          }
-        }),
+        prices: prices.slice(0, 20).map((p: any) => ({
+          name: p.nickname || p.id,
+          id: p.id,
+          product: typeof p.product === 'string' ? p.product : p.product?.id || '—',
+          unit_amount: p.unit_amount,
+          currency: p.currency,
+          active: p.active
+        }))
       },
     }
   }
 
-  // Edit a price (active flag + nickname; Stripe prices are otherwise immutable)
-  if (template.id === 'stripe.edit_price') {
-    const id = String(payload.id || '')
-    if (!id) return { ok: false, error: 'Price ID is required' }
-    const params: Record<string, string> = {}
-    if (payload.active !== undefined && payload.active !== '') params.active = String(payload.active) === 'true' ? 'true' : 'false'
-    if (payload.nickname) params.nickname = String(payload.nickname)
-    const res = await fetch('https://api.stripe.com/v1/prices/' + encodeURIComponent(id), {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams(params).toString(),
-    })
-    if (!res.ok) {
-      const e = await res.text()
-      return { ok: false, error: e || res.statusText }
-    }
-    const data = await res.json()
-    return { ok: true, message: 'Price updated: ' + (data.id || id), data: { id: data.id, active: data.active, nickname: data.nickname } }
-  }
-
-  // View Products — full catalog list (dedicated, before the generic health GET)
+  // View Products — full catalog list (Custom layout check placed ABOVE generic layout rule)
   if (template.id === 'stripe.view_products') {
     // Fetch products and prices separately, then match — more reliable than
     // default_price, which is only set if a product has an explicit default.
     const [prodRes, priceRes] = await Promise.all([
-      fetch('https://api.stripe.com/v1/products?limit=100&active=true', {
+      fetch('https://api.stripe.com/v1/products?limit=100', {
         method: 'GET',
         headers: { 'Authorization': 'Bearer ' + apiKey },
       }),
@@ -598,7 +572,27 @@ async function executeStripeAction(template: any, payload: Record<string, unknow
     }
   }
 
-  // Health check: GET request, read-only
+  // Edit a price (active flag + nickname; Stripe prices are otherwise immutable)
+  if (template.id === 'stripe.edit_price') {
+    const id = String(payload.id || '')
+    if (!id) return { ok: false, error: 'Price ID is required' }
+    const params: Record<string, string> = {}
+    if (payload.active !== undefined && payload.active !== '') params.active = String(payload.active) === 'true' ? 'true' : 'false'
+    if (payload.nickname) params.nickname = String(payload.nickname)
+    const res = await fetch('https://api.stripe.com/v1/prices/' + encodeURIComponent(id), {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(params).toString(),
+    })
+    if (!res.ok) {
+      const e = await res.text()
+      return { ok: false, error: e || res.statusText }
+    }
+    const data = await res.json()
+    return { ok: true, message: 'Price updated: ' + (data.id || id), data: { id: data.id, active: data.active, nickname: data.nickname } }
+  }
+
+  // Health check: GET request, read-only fallback handler
   if (template.api.method === 'GET') {
     const res = await fetch(url, {
       method: 'GET',
@@ -1162,10 +1156,6 @@ async function executeAnthropicAction(template: any, payload: Record<string, unk
   return { ok: true, message: 'Anthropic API call succeeded', data }
 }
 
-// ============================================================================
-// Audit Logging
-// ============================================================================
-
 // ---- AWS ----
 async function executeAWSAction(template: any, payload: Record<string, unknown>) {
   const accessKeyId = process.env.AWS_ACCESS_KEY_ID
@@ -1505,7 +1495,7 @@ async function logAuditEvent(
 
     const client = createClient(supabaseUrl, supabaseKey)
 
-    // Insert into hub_action_audit_log table (you will create this).
+    // Insert into hub_action_audit_log table.
     // Schema: id, created_at, user_id, template_id, status, message, result_data
     await client.from('hub_action_audit_log').insert({
       user_id: userId,

@@ -140,7 +140,8 @@ export const CONSOLE_PROVIDERS: Record<string, ConsoleProvider> = {
   stripe: {
     id: 'stripe', name: 'Stripe', subtitle: 'PAYMENTS & BILLING', accent: '#635bff', mark: 'S', status: 'live',
     sections: [
-      { title: 'Catalog', templateIds: ['stripe.create_product', 'stripe.edit_product', 'stripe.view_products', 'stripe.delete_product'] },
+      // Registered 'stripe.archive_product' inside the UI layout rendering track here:
+      { title: 'Catalog', templateIds: ['stripe.create_product', 'stripe.edit_product', 'stripe.archive_product', 'stripe.view_products', 'stripe.delete_product'] },
       { title: 'Prices', templateIds: ['stripe.create_price', 'stripe.view_prices', 'stripe.edit_price'] },
       { title: 'API Keys', templateIds: ['stripe.add_api_key', 'stripe.rotate_key'] },
     ],
@@ -288,7 +289,6 @@ export function getConsoleProvider(providerId: string): ConsoleProvider | undefi
   return CONSOLE_PROVIDERS[providerId]
 }
 
-// Providers for a tier, in declared order, skipping any without a card.
 export function getTierProviders(tierId: ConsoleTierId): ConsoleProvider[] {
   const tier = getConsoleTier(tierId)
   if (!tier) return []
@@ -300,7 +300,6 @@ export function getTierProviders(tierId: ConsoleTierId): ConsoleProvider[] {
   return out
 }
 
-// Total template count for a provider card (used for layout hints).
 export function providerActionCount(providerId: string): number {
   const p = CONSOLE_PROVIDERS[providerId]
   if (!p) return 0

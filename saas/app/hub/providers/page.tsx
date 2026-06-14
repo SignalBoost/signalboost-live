@@ -6,5 +6,5 @@
 import ConsoleShell from '@/components/hub/ConsoleShell'
 
 export default function HubProvidersPage() {
-  return <ConsoleShell initialPage="providers" />
+  return <ConsoleShell />
 }

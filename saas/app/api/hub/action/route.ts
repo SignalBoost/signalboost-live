@@ -498,7 +498,7 @@ async function executeStripeAction(template: any, payload: Record<string, unknow
       const e = await res.text()
       return { ok: false, error: e || res.statusText }
     }
-const data = await res.json()
+    const data = await res.json()
     const prices = data.data || []
     return {
       ok: true,
@@ -508,7 +508,7 @@ const data = await res.json()
   }
 
   // Edit a price (active flag + nickname; Stripe prices are otherwise immutable)
-  if (template.id === 'stripe.edit_price') {
+if (template.id === 'stripe.edit_price') {
     const id = String(payload.id || '')
     if (!id) return { ok: false, error: 'Price ID is required' }
     const params: Record<string, string> = {}
@@ -529,34 +529,45 @@ const data = await res.json()
 
   // View Products — full catalog list (dedicated, before the generic health GET)
   if (template.id === 'stripe.view_products') {
-    // Expand the default price so each product shows its amount (the product
-    // list endpoint does NOT include prices unless expanded).
-    const res = await fetch('https://api.stripe.com/v1/products?limit=100&active=true&expand[]=data.default_price', {
-      method: 'GET',
-      headers: { 'Authorization': 'Bearer ' + apiKey },
-    })
-    if (!res.ok) {
-      const error = await res.text()
-      return { ok: false, error: error || res.statusText }
+    // Fetch products and prices separately, then match — more reliable than
+    // default_price, which is only set if a product has an explicit default.
+    const [prodRes, priceRes] = await Promise.all([
+      fetch('https://api.stripe.com/v1/products?limit=100&active=true', {
+        method: 'GET',
+        headers: { 'Authorization': 'Bearer ' + apiKey },
+      }),
+      fetch('https://api.stripe.com/v1/prices?limit=100&active=true', {
+        method: 'GET',
+        headers: { 'Authorization': 'Bearer ' + apiKey },
+      }),
+    ])
+    if (!prodRes.ok) {
+      const error = await prodRes.text()
+      return { ok: false, error: error || prodRes.statusText }
     }
-    const data = await res.json()
-    const products = (data.data || []).map((p: any) => {
-      const dp = p.default_price
-      let price = '—'
-      if (dp && typeof dp === 'object' && typeof dp.unit_amount === 'number') {
-        const amount = (dp.unit_amount / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })
-        const cur = (dp.currency || 'usd').toUpperCase()
-        const interval = dp.recurring?.interval ? `/${dp.recurring.interval}` : ''
-        price = `${amount} ${cur}${interval}`
+    const prodData = await prodRes.json()
+    const priceData = priceRes.ok ? await priceRes.json() : { data: [] }
+
+    // Map productId -> first formatted price
+    const priceByProduct: Record<string, string> = {}
+    for (const pr of (priceData.data || [])) {
+      const prodId = typeof pr.product === 'string' ? pr.product : pr.product?.id
+      if (!prodId || priceByProduct[prodId]) continue
+      if (typeof pr.unit_amount === 'number') {
+        const amount = (pr.unit_amount / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })
+        const cur = (pr.currency || 'usd').toUpperCase()
+        const interval = pr.recurring?.interval ? `/${pr.recurring.interval}` : ''
+        priceByProduct[prodId] = `${amount} ${cur}${interval}`
       }
-      return {
-        name: p.name,
-        id: p.id,
-        price,
-        active: p.active,
-        created: p.created ? new Date(p.created * 1000).toISOString().slice(0, 10) : '',
-      }
-    })
+    }
+
+    const products = (prodData.data || []).map((p: any) => ({
+      name: p.name,
+      id: p.id,
+      price: priceByProduct[p.id] || '—',
+      active: p.active,
+      created: p.created ? new Date(p.created * 1000).toISOString().slice(0, 10) : '',
+    }))
     return {
       ok: true,
       message: `Stripe: ${products.length} product${products.length === 1 ? '' : 's'}`,
@@ -997,8 +1008,8 @@ async function executeVercelAction(template: any, payload: Record<string, unknow
     return {
       ok: true,
       message: `Vercel health: ${deploymentCount} deployment${deploymentCount === 1 ? '' : 's'} found`,
-      data: {
-deploymentCount,
+data: {
+        deploymentCount,
         latestDeployment: latestDeployment ? {
           id: latestDeployment.id,
           state: latestDeployment.state,

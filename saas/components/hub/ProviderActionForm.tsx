@@ -256,7 +256,9 @@ type FormFieldProps = {
   value: unknown
   error?: string
   onChange: (value: unknown) => void
-  
+  lang: Lang
+}
+
 function FormField({ field, value, error, onChange, lang }: FormFieldProps) {
   const renderInput = () => {
     const baseStyle: React.CSSProperties = {
@@ -465,5 +467,3 @@ function formatCell(v: any): string {
   return String(v)
 }
 
-  lang: Lang
-}

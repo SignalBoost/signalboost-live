@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { updateUserRole } from '@/lib/auth/rbac-service'
 import { Role } from '@/lib/auth/rbac-types'
+import { requirePermission } from '@/lib/auth/permission-middleware'
 
 type RoleUpdateRequest = {
   userId: string
@@ -9,6 +10,14 @@ type RoleUpdateRequest = {
 }
 
 export async function POST(req: NextRequest) {
+  const perm = await requirePermission(req, 'users:write')
+  if (!perm.ok) {
+    return NextResponse.json(
+      { ok: false, error: (perm as any).error },
+      { status: (perm as any).status }
+    )
+  }
+
   try {
     const body: RoleUpdateRequest = await req.json()
 

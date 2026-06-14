@@ -56,7 +56,7 @@ export const CONSOLE_TIERS: ConsoleTier[] = [
     label: 'Core',
     sidebarTitle: 'Tier 1 Providers',
     blurb: 'Primary infrastructure: cloud, payments, data, hosting, and source control.',
-    providerIds: ['aws', 'google-cloud', 'azure', 'stripe', 'supabase', 'vercel', 'github', 'openai'],
+    providerIds: ['aws', 'google-cloud', 'azure', 'stripe', 'supabase', 'vercel', 'github', 'openai', 'vault'],
   },
   {
     id: 'common',
@@ -113,6 +113,7 @@ export const DESTRUCTIVE_TEMPLATE_IDS: Set<string> = new Set([
   'supabase.delete_user',
   'vercel.delete_env',
   'aws.disable_iam_user',
+  'vault.delete_key',
 ])
 
 export function isDestructiveTemplate(templateId: string): boolean {
@@ -177,6 +178,13 @@ export const CONSOLE_PROVIDERS: Record<string, ConsoleProvider> = {
     id: 'openai', name: 'OpenAI', subtitle: 'AI PLATFORM', accent: '#10a37f', mark: 'AI', status: 'live',
     sections: [
       { title: 'Models', templateIds: ['openai.test_key'] },
+    ],
+  },
+  vault: {
+    id: 'vault', name: 'Key Vault', subtitle: 'SECRETS & API KEYS', accent: '#ffc300', mark: '🔐', status: 'live',
+    sections: [
+      { title: 'Keys', templateIds: ['vault.view_keys', 'vault.add_key', 'vault.reveal_key', 'vault.edit_key'] },
+      { title: 'Lifecycle', templateIds: ['vault.archive_key', 'vault.delete_key'] },
     ],
   },
 

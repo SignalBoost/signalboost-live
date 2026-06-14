@@ -22,6 +22,7 @@ import {
 } from '@/lib/hub/console-catalog'
 import { Lang } from '../shared'
 import ProviderActionForm from '../ProviderActionForm'
+import { getTemplate } from '@/lib/hub/provider-templates'
 import { ProviderConsoleCard, ProviderWorkspace } from './ProviderConsoleCard'
 import { DomainsPage } from '../pages/DomainsPage'
 import { DeploymentsPage } from '../pages/DeploymentsPage'
@@ -283,23 +284,29 @@ export default function CommandConsole({
         <span style={{ fontSize: 16 }}>?</span> Concierge
       </button>
 
-      {/* Action overlay — auth + policy + audit enforced server-side */}
-      {activeTemplateId && (
-        <div
-          style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
-          onClick={() => setActiveTemplateId(null)}
-        >
-          <div style={{ width: '100%', maxWidth: 520, maxHeight: '90vh', overflow: 'auto', borderRadius: 18 }} onClick={e => e.stopPropagation()}>
-            <ProviderActionForm
-              templateId={activeTemplateId}
-              lang={lang}
-              onClose={() => setActiveTemplateId(null)}
-              onSuccess={() => setActiveTemplateId(null)}
-              onError={() => {}}
-            />
+      {/* Action overlay — auth + policy + audit enforced server-side.
+          Read-only views get a wide panel so tables (catalogs, user lists,
+          query results) have room; forms stay compact. */}
+      {activeTemplateId && (() => {
+        const t = getTemplate(activeTemplateId)
+        const isView = t?.api.method === 'GET'
+        return (
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+            onClick={() => setActiveTemplateId(null)}
+          >
+            <div style={{ width: '100%', maxWidth: isView ? 920 : 520, maxHeight: '90vh', overflow: 'auto', borderRadius: 18 }} onClick={e => e.stopPropagation()}>
+              <ProviderActionForm
+                templateId={activeTemplateId}
+                lang={lang}
+                onClose={() => setActiveTemplateId(null)}
+                onSuccess={() => setActiveTemplateId(null)}
+                onError={() => {}}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       <style>{`
         @media (max-width: 980px) {

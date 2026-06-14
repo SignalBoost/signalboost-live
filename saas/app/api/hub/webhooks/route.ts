@@ -7,6 +7,7 @@ import {
   deleteWebhook,
   testWebhook,
 } from '@/lib/hub/webhooks-service'
+import { requirePermission } from '@/lib/auth/permission-middleware'
 
 type WebhookRequest = {
   url: string
@@ -19,6 +20,14 @@ type WebhookRequest = {
 }
 
 export async function GET(req: NextRequest) {
+  const perm = await requirePermission(req, 'webhooks:read')
+  if (!perm.ok) {
+    return NextResponse.json(
+      { ok: false, error: (perm as any).error },
+      { status: (perm as any).status }
+    )
+  }
+
   try {
     const result = await listWebhooks()
     return NextResponse.json(result)
@@ -29,6 +38,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const perm = await requirePermission(req, 'webhooks:write')
+  if (!perm.ok) {
+    return NextResponse.json(
+      { ok: false, error: (perm as any).error },
+      { status: (perm as any).status }
+    )
+  }
+
   try {
     const body: WebhookRequest = await req.json()
 
@@ -59,6 +76,14 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const perm = await requirePermission(req, 'webhooks:write')
+  if (!perm.ok) {
+    return NextResponse.json(
+      { ok: false, error: (perm as any).error },
+      { status: (perm as any).status }
+    )
+  }
+
   try {
     const id = req.nextUrl.searchParams.get('id')
 

@@ -488,3 +488,959 @@ export const PROVIDER_TEMPLATES: ProviderActionTemplate[] = [
     label: 'Rotate API Key',
     description: 'Generate new Stripe API key, revoke old one, sync to Vercel.',
     icon: '🔄',
+policyActionId: 'rotate_credential',
+    api: { service: 'stripe', method: 'POST', endpoint: '/v1/keys/rotate', docsUrl: 'https://docs.stripe.com/api/authentication' },
+    fields: [],
+    requiresAuth: true,
+    requiresConfirm: true,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+  {
+    id: 'supabase.rotate_key',
+    providerId: 'supabase',
+    tier: 'core',
+    label: 'Rotate Service Key',
+    description: 'Generate new Supabase service key, revoke old one, sync to Vercel.',
+    icon: '🔄',
+    policyActionId: 'rotate_credential',
+    api: { service: 'supabase', method: 'POST', endpoint: '/auth/v1/keys/rotate', docsUrl: 'https://supabase.com/docs/guides/auth' },
+    fields: [],
+    requiresAuth: true,
+    requiresConfirm: true,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+  {
+    id: 'vercel.rotate_token',
+    providerId: 'vercel',
+    tier: 'core',
+    label: 'Rotate Deploy Token',
+    description: 'Generate new Vercel deployment token, revoke old one.',
+    icon: '🔄',
+    policyActionId: 'rotate_credential',
+    api: { service: 'vercel', method: 'POST', endpoint: '/v9/tokens', docsUrl: 'https://vercel.com/docs/rest-api#endpoints/authentication-and-tokens' },
+    fields: [],
+    requiresAuth: true,
+    requiresConfirm: true,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+  {
+    id: 'github.rotate_token',
+    providerId: 'github',
+    tier: 'common',
+    label: 'Rotate Personal Access Token',
+    description: 'Generate new GitHub PAT, revoke old one, sync to Vercel.',
+    icon: '🔄',
+    policyActionId: 'rotate_credential',
+    api: { service: 'github', method: 'POST', endpoint: '/user/gpg_keys', docsUrl: 'https://docs.github.com/en/rest/users/gpg-keys' },
+    fields: [],
+    requiresAuth: true,
+    requiresConfirm: true,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+
+  // ---- Tier 1: Azure ------------------------------------------------------
+  {
+    id: 'azure.list_resources',
+    providerId: 'azure',
+    tier: 'core',
+    label: 'List Resource Groups',
+    description: 'List Azure resource groups in the configured subscription.',
+    icon: '☁️',
+    policyActionId: 'read_provider_status',
+    api: { service: 'azure', method: 'GET', endpoint: '/subscriptions/{subscriptionId}/resourcegroups?api-version=2021-04-01', docsUrl: 'https://learn.microsoft.com/en-us/rest/api/resources/resource-groups/list' },
+    fields: [],
+    requiresAuth: true,
+    requiresConfirm: false,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+  {
+    id: 'azure.test_connection',
+    providerId: 'azure',
+    tier: 'core',
+    label: 'Verify Connection',
+    description: 'Test the Azure tenant connection and credentials.',
+    icon: '✓',
+    policyActionId: 'read_provider_status',
+    api: { service: 'azure', method: 'GET', endpoint: '/subscriptions?api-version=2020-01-01', docsUrl: 'https://learn.microsoft.com/en-us/rest/api/resources/subscriptions/list' },
+    fields: [],
+    requiresAuth: true,
+    requiresConfirm: false,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+
+  // ---- Tier 2: Firebase ---------------------------------------------------
+  {
+    id: 'firebase.list_users',
+    providerId: 'firebase',
+    tier: 'common',
+    label: 'List Users',
+    description: 'List Firebase Auth users (up to 1000 at a time).',
+    icon: '🔥',
+    policyActionId: 'read_provider_status',
+    api: { service: 'firebase', method: 'GET', endpoint: '/v1/projects/{projectId}/accounts:batchGet', docsUrl: 'https://cloud.google.com/identity-platform/docs/reference/rest/v1/projects.accounts/batchGet' },
+    fields: [],
+    requiresAuth: true,
+    requiresConfirm: false,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+  {
+    id: 'firebase.send_notification',
+    providerId: 'firebase',
+    tier: 'common',
+    label: 'Send Push Notification',
+    description: 'Send a Firebase Cloud Messaging push notification.',
+    icon: '🔔',
+    policyActionId: 'send_message',
+    api: { service: 'firebase', method: 'POST', endpoint: '/v1/projects/{projectId}/messages:send', docsUrl: 'https://firebase.google.com/docs/cloud-messaging/send-message' },
+    fields: [
+      { id: 'token', label: 'Device token', type: 'text', required: true, placeholder: 'fcm-device-token' },
+      { id: 'title', label: 'Title', type: 'text', required: true, maxLength: 100 },
+      { id: 'body', label: 'Body', type: 'textarea', required: true, maxLength: 500 },
+    ],
+    requiresAuth: true,
+    requiresConfirm: true,
+    auditAction: true,
+    previewBeforeSubmit: true,
+  },
+
+  // ---- Tier 2: MongoDB ----------------------------------------------------
+  {
+    id: 'mongodb.list_databases',
+    providerId: 'mongodb',
+    tier: 'common',
+    label: 'List Databases',
+    description: 'List databases in your MongoDB Atlas cluster.',
+    icon: '🍃',
+    policyActionId: 'read_provider_status',
+    api: { service: 'mongodb', method: 'GET', endpoint: '/api/atlas/v2/groups/{groupId}/databases', docsUrl: 'https://www.mongodb.com/docs/atlas/reference/api-resources-spec/v2/' },
+    fields: [],
+    requiresAuth: true,
+    requiresConfirm: false,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+  {
+    id: 'mongodb.list_clusters',
+    providerId: 'mongodb',
+    tier: 'common',
+    label: 'List Clusters',
+    description: 'List MongoDB Atlas clusters in the project.',
+    icon: '📊',
+    policyActionId: 'read_provider_status',
+    api: { service: 'mongodb', method: 'GET', endpoint: '/api/atlas/v2/groups/{groupId}/clusters', docsUrl: 'https://www.mongodb.com/docs/atlas/reference/api-resources-spec/v2/' },
+    fields: [],
+    requiresAuth: true,
+    requiresConfirm: false,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+
+  // ---- Tier 2: DigitalOcean -----------------------------------------------
+  {
+    id: 'digitalocean.list_droplets',
+    providerId: 'digitalocean',
+    tier: 'common',
+    label: 'List Droplets',
+    description: 'List all Droplets in your DigitalOcean account.',
+    icon: '🌊',
+    policyActionId: 'read_provider_status',
+    api: { service: 'digitalocean', method: 'GET', endpoint: '/v2/droplets', docsUrl: 'https://docs.digitalocean.com/reference/api/api-reference/#tag/Droplets' },
+    fields: [],
+    requiresAuth: true,
+    requiresConfirm: false,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+  {
+    id: 'digitalocean.list_apps',
+    providerId: 'digitalocean',
+    tier: 'common',
+    label: 'List Apps',
+    description: 'List App Platform applications.',
+    icon: '📱',
+    policyActionId: 'read_provider_status',
+    api: { service: 'digitalocean', method: 'GET', endpoint: '/v2/apps', docsUrl: 'https://docs.digitalocean.com/reference/api/api-reference/#tag/Apps' },
+    fields: [],
+    requiresAuth: true,
+    requiresConfirm: false,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+
+  // ---- Tier 3: Hugging Face -----------------------------------------------
+  {
+    id: 'hugging-face.test_key',
+    providerId: 'hugging-face',
+    tier: 'ai',
+    label: 'Verify API Token',
+    description: 'Check the Hugging Face token is valid.',
+    icon: '🤗',
+    policyActionId: 'read_provider_status',
+    api: { service: 'hugging-face', method: 'GET', endpoint: '/api/whoami-v2', docsUrl: 'https://huggingface.co/docs/hub/api' },
+    fields: [],
+    requiresAuth: true,
+    requiresConfirm: false,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+  {
+    id: 'hugging-face.run_inference',
+    providerId: 'hugging-face',
+    tier: 'ai',
+    label: 'Run Inference',
+    description: 'Run inference on a Hugging Face hosted model.',
+    icon: '🤖',
+    policyActionId: 'invoke_model',
+    api: { service: 'hugging-face', method: 'POST', endpoint: '/models/{model}', docsUrl: 'https://huggingface.co/docs/api-inference/' },
+    fields: [
+      { id: 'model', label: 'Model', type: 'text', required: true, placeholder: 'meta-llama/Llama-2-7b-chat-hf' },
+      { id: 'inputs', label: 'Input', type: 'textarea', required: true, maxLength: 2000 },
+    ],
+    requiresAuth: true,
+    requiresConfirm: false,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+
+  // ---- Tier 3: Stability AI -----------------------------------------------
+  {
+    id: 'stability-ai.list_engines',
+    providerId: 'stability-ai',
+    tier: 'ai',
+    label: 'List Available Engines',
+    description: 'List Stability AI image generation engines.',
+    icon: '🎨',
+    policyActionId: 'read_provider_status',
+    api: { service: 'stability-ai', method: 'GET', endpoint: '/v1/engines/list', docsUrl: 'https://platform.stability.ai/docs/api-reference' },
+    fields: [],
+    requiresAuth: true,
+    requiresConfirm: false,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+  {
+    id: 'stability-ai.generate_image',
+    providerId: 'stability-ai',
+    tier: 'ai',
+    label: 'Generate Image',
+    description: 'Generate an image from a text prompt.',
+    icon: '🖼️',
+    policyActionId: 'invoke_model',
+    api: { service: 'stability-ai', method: 'POST', endpoint: '/v1/generation/{engine_id}/text-to-image', docsUrl: 'https://platform.stability.ai/docs/api-reference' },
+    fields: [
+      { id: 'engine_id', label: 'Engine', type: 'select', required: true, defaultValue: 'stable-diffusion-xl-1024-v1-0', options: [{ value: 'stable-diffusion-xl-1024-v1-0', label: 'SDXL 1.0' }, { value: 'stable-diffusion-v1-6', label: 'SD 1.6' }] },
+      { id: 'prompt', label: 'Prompt', type: 'textarea', required: true, maxLength: 1000 },
+    ],
+    requiresAuth: true,
+    requiresConfirm: false,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+
+  // ---- Tier 4: Docker Hub -------------------------------------------------
+  {
+    id: 'docker-hub.list_repos',
+    providerId: 'docker-hub',
+    tier: 'devops',
+    label: 'List Repositories',
+    description: 'List your Docker Hub repositories.',
+    icon: '🐳',
+    policyActionId: 'read_provider_status',
+    api: { service: 'docker-hub', method: 'GET', endpoint: '/v2/repositories/{username}/', docsUrl: 'https://docs.docker.com/docker-hub/api/latest/' },
+    fields: [],
+    requiresAuth: true,
+    requiresConfirm: false,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+
+  // ---- Tier 4: Terraform Cloud --------------------------------------------
+  {
+    id: 'terraform-cloud.list_workspaces',
+    providerId: 'terraform-cloud',
+    tier: 'devops',
+    label: 'List Workspaces',
+    description: 'List workspaces in your Terraform Cloud organization.',
+    icon: '🏗️',
+    policyActionId: 'read_provider_status',
+    api: { service: 'terraform-cloud', method: 'GET', endpoint: '/api/v2/organizations/{organization}/workspaces', docsUrl: 'https://developer.hashicorp.com/terraform/cloud-docs/api-docs/workspaces' },
+    fields: [],
+    requiresAuth: true,
+    requiresConfirm: false,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+  {
+    id: 'terraform-cloud.trigger_run',
+    providerId: 'terraform-cloud',
+    tier: 'devops',
+    label: 'Trigger Plan Run',
+    description: 'Trigger a Terraform plan run on a workspace.',
+    icon: '▶️',
+    policyActionId: 'invoke_action',
+    api: { service: 'terraform-cloud', method: 'POST', endpoint: '/api/v2/runs', docsUrl: 'https://developer.hashicorp.com/terraform/cloud-docs/api-docs/run' },
+    fields: [
+      { id: 'workspace_id', label: 'Workspace ID', type: 'text', required: true, placeholder: 'ws-...' },
+      { id: 'message', label: 'Message', type: 'text', required: false, maxLength: 200 },
+    ],
+    requiresAuth: true,
+    requiresConfirm: true,
+    auditAction: true,
+    previewBeforeSubmit: true,
+  },
+
+  // ---- Tier 5: Mixpanel ---------------------------------------------------
+  {
+    id: 'mixpanel.list_events',
+    providerId: 'mixpanel',
+    tier: 'marketing',
+    label: 'List Top Events',
+    description: 'Get the top tracked events from Mixpanel.',
+    icon: '📊',
+    policyActionId: 'read_provider_status',
+    api: { service: 'mixpanel', method: 'GET', endpoint: '/api/2.0/events/names', docsUrl: 'https://developer.mixpanel.com/reference/overview' },
+    fields: [],
+    requiresAuth: true,
+    requiresConfirm: false,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+  {
+    id: 'mixpanel.track_event',
+    providerId: 'mixpanel',
+    tier: 'marketing',
+    label: 'Track Event',
+    description: 'Send a tracking event to Mixpanel.',
+    icon: '📝',
+    policyActionId: 'send_data',
+    api: { service: 'mixpanel', method: 'POST', endpoint: '/track', docsUrl: 'https://developer.mixpanel.com/reference/track-event' },
+    fields: [
+      { id: 'event', label: 'Event name', type: 'text', required: true, maxLength: 100 },
+      { id: 'distinct_id', label: 'User ID', type: 'text', required: true, maxLength: 100 },
+    ],
+    requiresAuth: true,
+    requiresConfirm: false,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+
+  // ---- Tier 5: Segment ----------------------------------------------------
+  {
+    id: 'segment.list_sources',
+    providerId: 'segment',
+    tier: 'marketing',
+    label: 'List Sources',
+    description: 'List your Segment data sources.',
+    icon: '🔌',
+    policyActionId: 'read_provider_status',
+    api: { service: 'segment', method: 'GET', endpoint: '/v1beta/workspaces/{workspaceId}/sources', docsUrl: 'https://segment.com/docs/api/config-api/' },
+    fields: [],
+    requiresAuth: true,
+    requiresConfirm: false,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+  {
+    id: 'segment.track_event',
+    providerId: 'segment',
+    tier: 'marketing',
+    label: 'Track Event',
+    description: 'Send a tracking event through Segment.',
+    icon: '📝',
+    policyActionId: 'send_data',
+    api: { service: 'segment', method: 'POST', endpoint: '/v1/track', docsUrl: 'https://segment.com/docs/connections/sources/catalog/libraries/server/http-api/' },
+    fields: [
+      { id: 'event', label: 'Event name', type: 'text', required: true, maxLength: 100 },
+      { id: 'userId', label: 'User ID', type: 'text', required: true, maxLength: 100 },
+    ],
+    requiresAuth: true,
+    requiresConfirm: false,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+
+  // ---- Tier 5: GA4 (Google Analytics) -------------------------------------
+  {
+    id: 'ga4.run_report',
+    providerId: 'ga4',
+    tier: 'marketing',
+    label: 'Run Report',
+    description: 'Run a GA4 analytics report (active users last 7 days).',
+    icon: '📈',
+    policyActionId: 'read_provider_status',
+    api: { service: 'ga4', method: 'POST', endpoint: '/v1beta/properties/{propertyId}:runReport', docsUrl: 'https://developers.google.com/analytics/devguides/reporting/data/v1' },
+    fields: [],
+    requiresAuth: true,
+    requiresConfirm: false,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+  {
+    id: 'ga4.list_accounts',
+    providerId: 'ga4',
+    tier: 'marketing',
+    label: 'List Accounts',
+    description: 'List GA4 accounts visible to the configured user.',
+    icon: '👤',
+    policyActionId: 'read_provider_status',
+    api: { service: 'ga4', method: 'GET', endpoint: '/v1beta/accountSummaries', docsUrl: 'https://developers.google.com/analytics/devguides/config/admin/v1' },
+    fields: [],
+    requiresAuth: true,
+    requiresConfirm: false,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+
+  // ---- Tier 5: HubSpot ----------------------------------------------------
+  {
+    id: 'hubspot.list_contacts',
+    providerId: 'hubspot',
+    tier: 'marketing',
+    label: 'List Contacts',
+    description: 'List recent HubSpot contacts (last 100).',
+    icon: '👥',
+    policyActionId: 'read_provider_status',
+    api: { service: 'hubspot', method: 'GET', endpoint: '/crm/v3/objects/contacts', docsUrl: 'https://developers.hubspot.com/docs/api/crm/contacts' },
+    fields: [],
+    requiresAuth: true,
+    requiresConfirm: false,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+  {
+    id: 'hubspot.create_contact',
+    providerId: 'hubspot',
+    tier: 'marketing',
+    label: 'Create Contact',
+    description: 'Create a new contact in HubSpot CRM.',
+    icon: '➕',
+    policyActionId: 'create_record',
+    api: { service: 'hubspot', method: 'POST', endpoint: '/crm/v3/objects/contacts', docsUrl: 'https://developers.hubspot.com/docs/api/crm/contacts' },
+    fields: [
+      { id: 'email', label: 'Email', type: 'email', required: true },
+      { id: 'firstname', label: 'First name', type: 'text', required: false, maxLength: 100 },
+      { id: 'lastname', label: 'Last name', type: 'text', required: false, maxLength: 100 },
+      { id: 'company', label: 'Company', type: 'text', required: false, maxLength: 200 },
+    ],
+    requiresAuth: true,
+    requiresConfirm: true,
+    auditAction: true,
+    previewBeforeSubmit: true,
+  },
+
+  // ---- Tier 5: Intercom ---------------------------------------------------
+  {
+    id: 'intercom.list_conversations',
+    providerId: 'intercom',
+    tier: 'marketing',
+    label: 'List Conversations',
+    description: 'List recent Intercom conversations.',
+    icon: '💬',
+    policyActionId: 'read_provider_status',
+    api: { service: 'intercom', method: 'GET', endpoint: '/conversations', docsUrl: 'https://developers.intercom.com/intercom-api-reference/reference/conversations' },
+    fields: [],
+    requiresAuth: true,
+    requiresConfirm: false,
+    auditAction: true,
+    previewBeforeSubmit: false,
+  },
+  {
+    id: 'intercom.send_message',
+    providerId: 'intercom',
+    tier: 'marketing',
+    label: 'Send Message to User',
+    description: 'Send an Intercom message to a known user.',
+    icon: '✉️',
+    policyActionId: 'send_message',
+    api: { service: 'intercom', method: 'POST', endpoint: '/messages', docsUrl: 'https://developers.intercom.com/intercom-api-reference/reference/create-a-message' },
+    fields: [
+      { id: 'user_id', label: 'User ID', type: 'text', required: true, maxLength: 100 },
+      { id: 'subject', label: 'Subject', type: 'text', required: true, maxLength: 200 },
+      { id: 'body', label: 'Body', type: 'textarea', required: true, maxLength: 5000 },
+    ],
+    requiresAuth: true,
+    requiresConfirm: true,
+    auditAction: true,
+    previewBeforeSubmit: true,
+  },
+
+  // ===========================================================================
+  // CONSOLE REDESIGN — CRUD coverage for the tiered provider console.
+  // Card sectioning + branding live in lib/hub/console-catalog.ts.
+  // Endpoints are upstream paths; /api/hub/action owns base URLs + credentials.
+  // ===========================================================================
+
+  // ---- Stripe (Catalog + API Keys) --------------------------------------
+{
+    id: 'stripe.create_price',
+    providerId: 'stripe', tier: 'core',
+    label: 'Create Price',
+    description: 'Attach a new recurring or one-time price to an existing Stripe product.',
+    icon: '🏷️', policyActionId: 'create_stripe_price',
+    api: { service: 'stripe', method: 'POST', endpoint: '/v1/prices', docsUrl: 'https://docs.stripe.com/api/prices/create' },
+    fields: [
+      { id: 'product', label: 'Product ID', type: 'text', required: true, placeholder: 'prod_...', help: 'The Stripe product this price belongs to.' },
+      { id: 'unit_amount', label: 'Price (USD)', type: 'currency_cents', required: true, min: 0, help: 'Entered in dollars, sent to Stripe in cents.' },
+      { id: 'currency', label: 'Currency', type: 'select', required: true, defaultValue: 'usd', options: [{ value: 'usd', label: 'USD' }, { value: 'eur', label: 'EUR' }, { value: 'gbp', label: 'GBP' }, { value: 'mxn', label: 'MXN' }] },
+      { id: 'interval', label: 'Billing interval', type: 'select', required: true, defaultValue: 'month', options: [{ value: 'month', label: 'Monthly' }, { value: 'year', label: 'Yearly' }, { value: 'one_time', label: 'One-time' }] },
+    ],
+    requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: true,
+  },
+  {
+    id: 'stripe.view_products',
+    providerId: 'stripe', tier: 'core',
+    label: 'View Products',
+    description: 'List live Stripe products and their identifiers.',
+    icon: '📦', policyActionId: 'read_provider_status',
+    api: { service: 'stripe', method: 'GET', endpoint: '/v1/products?limit=20', docsUrl: 'https://docs.stripe.com/api/products/list' },
+    fields: [],
+    requiresAuth: true, requiresConfirm: false, auditAction: false, previewBeforeSubmit: false,
+  },
+  {
+    id: 'stripe.delete_product',
+    providerId: 'stripe', tier: 'core',
+    label: 'Delete Product',
+    description: 'Permanently delete a Stripe product. Only products with no active prices can be deleted.',
+    icon: '🗑️', policyActionId: 'delete_stripe_product',
+    api: { service: 'stripe', method: 'DELETE', endpoint: '/v1/products/{id}', docsUrl: 'https://docs.stripe.com/api/products/delete' },
+    fields: [
+      { id: 'id', label: 'Product ID', type: 'text', required: true, placeholder: 'prod_...' },
+    ],
+    requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: true,
+  },
+  {
+    id: 'stripe.add_api_key',
+    providerId: 'stripe', tier: 'core',
+    label: 'Add API Key',
+    description: 'Create a new restricted Stripe API key for a scoped integration.',
+    icon: '🔑', policyActionId: 'manage_stripe_keys',
+    api: { service: 'stripe', method: 'POST', endpoint: '/v1/api_keys', docsUrl: 'https://docs.stripe.com/keys' },
+    fields: [
+      { id: 'name', label: 'Key name', type: 'text', required: true, maxLength: 120, placeholder: 'partner-readonly' },
+    ],
+    requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: false,
+  },
+
+  // ---- Supabase (Users) -------------------------------------------------
+  {
+    id: 'supabase.view_users',
+    providerId: 'supabase', tier: 'core',
+    label: 'View Users',
+    description: 'List Supabase Auth users with their confirmation status.',
+    icon: '👥', policyActionId: 'read_provider_status',
+    api: { service: 'supabase', method: 'GET', endpoint: '/auth/v1/admin/users?per_page=50', docsUrl: 'https://supabase.com/docs/reference/javascript/auth-admin-listusers' },
+    fields: [],
+    requiresAuth: true, requiresConfirm: false, auditAction: false, previewBeforeSubmit: false,
+  },
+  {
+    id: 'supabase.delete_user',
+    providerId: 'supabase', tier: 'core',
+    label: 'Delete User',
+    description: 'Permanently delete a Supabase Auth user by ID.',
+    icon: '🗑️', policyActionId: 'delete_supabase_user',
+    api: { service: 'supabase', method: 'DELETE', endpoint: '/auth/v1/admin/users/{id}', docsUrl: 'https://supabase.com/docs/reference/javascript/auth-admin-deleteuser' },
+    fields: [
+      { id: 'user_id', label: 'User ID (UUID)', type: 'text', required: true, placeholder: '00000000-0000-...' },
+    ],
+    requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: true,
+  },
+  {
+    id: 'supabase.reset_password',
+    providerId: 'supabase', tier: 'core',
+    label: 'Reset User Password',
+    description: 'Send a Supabase password recovery email to a user.',
+    icon: '🔁', policyActionId: 'reset_supabase_password',
+    api: { service: 'supabase', method: 'POST', endpoint: '/auth/v1/recover', docsUrl: 'https://supabase.com/docs/reference/javascript/auth-resetpasswordforemail' },
+    fields: [
+      { id: 'email', label: 'Email', type: 'email', required: true, placeholder: 'name@email.com' },
+    ],
+    requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: false,
+  },
+
+  // ---- Vercel (Environment) — also surfaced under Supabase Project Settings
+  {
+    id: 'vercel.view_env',
+    providerId: 'vercel', tier: 'core',
+    label: 'View Env Variables',
+    description: 'List project environment variable names and targets (values stay masked).',
+    icon: '📋', policyActionId: 'read_provider_status',
+    api: { service: 'vercel', method: 'GET', endpoint: '/v9/projects/{projectId}/env', docsUrl: 'https://vercel.com/docs/rest-api/reference/endpoints/projects/retrieve-the-environment-variables-of-a-project-by-id-or-name' },
+    fields: [],
+    requiresAuth: true, requiresConfirm: false, auditAction: false, previewBeforeSubmit: false,
+  },
+  {
+    id: 'vercel.delete_env',
+    providerId: 'vercel', tier: 'core',
+    label: 'Delete Env Variable',
+    description: 'Remove an environment variable from the project by its ID.',
+    icon: '🗑️', policyActionId: 'delete_vercel_env',
+    api: { service: 'vercel', method: 'DELETE', endpoint: '/v9/projects/{projectId}/env/{id}', docsUrl: 'https://vercel.com/docs/rest-api/reference/endpoints/projects/remove-an-environment-variable' },
+    fields: [
+      { id: 'id', label: 'Env Variable ID', type: 'text', required: true, placeholder: 'Use View Env Variables to find the ID' },
+    ],
+    requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: true,
+  },
+
+  // ---- GitHub (Repository) ----------------------------------------------
+  {
+    id: 'github.view_repos',
+    providerId: 'github', tier: 'core',
+    label: 'View Repos',
+    description: 'List repositories the connected token can access, most recently updated first.',
+    icon: '📚', policyActionId: 'read_provider_status',
+    api: { service: 'github', method: 'GET', endpoint: '/user/repos?per_page=20&sort=updated', docsUrl: 'https://docs.github.com/en/rest/repos/repos#list-repositories-for-the-authenticated-user' },
+    fields: [],
+    requiresAuth: true, requiresConfirm: false, auditAction: false, previewBeforeSubmit: false,
+  },
+
+  // ---- AWS (IAM) --------------------------------------------------------
+  {
+    id: 'aws.list_iam_users',
+    providerId: 'aws', tier: 'core',
+    label: 'List IAM Users',
+    description: 'List AWS IAM users and the age of their access keys.',
+    icon: '👤', policyActionId: 'read_provider_status',
+    api: { service: 'aws', method: 'GET', endpoint: '/iam/users', docsUrl: 'https://docs.aws.amazon.com/IAM/latest/APIReference/API_ListUsers.html' },
+    fields: [],
+    requiresAuth: true, requiresConfirm: false, auditAction: false, previewBeforeSubmit: false,
+  },
+  {
+    id: 'aws.disable_iam_user',
+    providerId: 'aws', tier: 'core',
+    label: 'Disable IAM User',
+    description: 'Deactivate an IAM user access keys to revoke programmatic access.',
+    icon: '⛔', policyActionId: 'disable_aws_iam_user',
+    api: { service: 'aws', method: 'POST', endpoint: '/iam/users/{user}/disable', docsUrl: 'https://docs.aws.amazon.com/IAM/latest/APIReference/API_UpdateAccessKey.html' },
+    fields: [
+      { id: 'user_name', label: 'IAM user name', type: 'text', required: true, placeholder: 'deploy-bot' },
+    ],
+    requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: true,
+  },
+
+  // ---- Google Cloud (IAM) ----------------------------------------------
+  {
+    id: 'google-cloud.list_service_accounts',
+    providerId: 'google-cloud', tier: 'core',
+    label: 'List Service Accounts',
+    description: 'Audit GCP service accounts and their key bindings.',
+    icon: '🔍', policyActionId: 'read_provider_status',
+    api: { service: 'gcp', method: 'GET', endpoint: '/v1/projects/{projectId}/serviceAccounts', docsUrl: 'https://cloud.google.com/iam/docs/reference/rest/v1/projects.serviceAccounts/list' },
+    fields: [],
+    requiresAuth: true, requiresConfirm: false, auditAction: false, previewBeforeSubmit: false,
+  },
+
+  // ---- Twilio -----------------------------------------------------------
+  {
+    id: 'twilio.verify_number',
+    providerId: 'twilio', tier: 'common',
+    label: 'Verify Number',
+    description: 'Start a phone verification via Twilio Verify.',
+    icon: '✅', policyActionId: 'twilio_verify_number',
+    api: { service: 'twilio', method: 'POST', endpoint: '/v2/Services/{ServiceSid}/Verifications', docsUrl: 'https://www.twilio.com/docs/verify/api/verification' },
+    fields: [
+      { id: 'to', label: 'Phone (E.164)', type: 'phone', required: true, placeholder: '+15551234567' },
+      { id: 'channel', label: 'Channel', type: 'select', required: true, defaultValue: 'sms', options: [{ value: 'sms', label: 'SMS' }, { value: 'call', label: 'Voice call' }] },
+    ],
+    requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: false,
+  },
+
+  // ---- SendGrid ---------------------------------------------------------
+  {
+    id: 'sendgrid.check_domain',
+    providerId: 'sendgrid', tier: 'common',
+    label: 'Check Domain Auth',
+    description: 'List authenticated sending domains and their DNS validation state.',
+    icon: '🛡️', policyActionId: 'read_provider_status',
+    api: { service: 'sendgrid', method: 'GET', endpoint: '/v3/whitelabel/domains', docsUrl: 'https://www.twilio.com/docs/sendgrid/api-reference/domain-authentication/list-all-authenticated-domains' },
+    fields: [],
+    requiresAuth: true, requiresConfirm: false, auditAction: false, previewBeforeSubmit: false,
+  },
+
+  // ---- Cloudflare (DNS) -------------------------------------------------
+  {
+    id: 'cloudflare.add_dns',
+    providerId: 'cloudflare', tier: 'common',
+    label: 'Add DNS Record',
+    description: 'Create a DNS record in the configured Cloudflare zone.',
+    icon: '🧭', policyActionId: 'cloudflare_add_dns',
+    api: { service: 'cloudflare', method: 'POST', endpoint: '/client/v4/zones/{zoneId}/dns_records', docsUrl: 'https://developers.cloudflare.com/api/resources/dns/subresources/records/methods/create/' },
+    fields: [
+      { id: 'type', label: 'Type', type: 'select', required: true, defaultValue: 'A', options: [{ value: 'A', label: 'A' }, { value: 'AAAA', label: 'AAAA' }, { value: 'CNAME', label: 'CNAME' }, { value: 'TXT', label: 'TXT' }] },
+      { id: 'name', label: 'Name', type: 'text', required: true, placeholder: 'app.signalboostapp.com' },
+      { id: 'content', label: 'Content', type: 'text', required: true, placeholder: '76.76.21.21' },
+      { id: 'proxied', label: 'Proxy through Cloudflare', type: 'toggle', required: false, defaultValue: true },
+    ],
+    requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: true,
+  },
+  {
+    id: 'cloudflare.toggle_proxy',
+    providerId: 'cloudflare', tier: 'common',
+    label: 'Toggle Proxy',
+    description: 'Turn Cloudflare proxy (orange cloud) on or off for an existing DNS record.',
+    icon: '🔀', policyActionId: 'cloudflare_toggle_proxy',
+    api: { service: 'cloudflare', method: 'PATCH', endpoint: '/client/v4/zones/{zoneId}/dns_records/{id}', docsUrl: 'https://developers.cloudflare.com/api/resources/dns/subresources/records/methods/edit/' },
+    fields: [
+      { id: 'id', label: 'DNS Record ID', type: 'text', required: true, placeholder: 'Record ID from Cloudflare' },
+      { id: 'proxied', label: 'Proxied', type: 'toggle', required: false, defaultValue: true },
+    ],
+    requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: false,
+  },
+
+  // ---- Firebase (Security Rules) ---------------------------------------
+  {
+    id: 'firebase.view_rules',
+    providerId: 'firebase', tier: 'common',
+    label: 'View Rules',
+    description: 'Fetch the currently published Firestore / Storage security rules.',
+    icon: '📜', policyActionId: 'read_provider_status',
+    api: { service: 'firebase', method: 'GET', endpoint: '/v1/projects/{projectId}/rulesets', docsUrl: 'https://firebase.google.com/docs/rules/manage-deploy' },
+    fields: [],
+    requiresAuth: true, requiresConfirm: false, auditAction: false, previewBeforeSubmit: false,
+  },
+  {
+    id: 'firebase.upload_rules',
+    providerId: 'firebase', tier: 'common',
+    label: 'Upload Rules',
+    description: 'Publish a new Firestore / Storage security ruleset.',
+    icon: '⬆️', policyActionId: 'firebase_upload_rules',
+    api: { service: 'firebase', method: 'POST', endpoint: '/v1/projects/{projectId}/rulesets', docsUrl: 'https://firebase.google.com/docs/rules/manage-deploy' },
+    fields: [
+      { id: 'source', label: 'Rules source', type: 'textarea', required: true, maxLength: 8000, placeholder: 'rules_version = "2"; service cloud.firestore { ... }' },
+    ],
+    requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: true,
+  },
+
+  // ---- DigitalOcean (Compute) ------------------------------------------
+  {
+    id: 'digitalocean.create_droplet',
+    providerId: 'digitalocean', tier: 'common',
+    label: 'Create Droplet',
+    description: 'Provision a new DigitalOcean Droplet.',
+    icon: '🌊', policyActionId: 'create_droplet',
+    api: { service: 'digitalocean', method: 'POST', endpoint: '/v2/droplets', docsUrl: 'https://docs.digitalocean.com/reference/api/api-reference/#operation/droplets_create' },
+    fields: [
+      { id: 'name', label: 'Droplet name', type: 'text', required: true, placeholder: 'web-01' },
+      { id: 'region', label: 'Region', type: 'select', required: true, defaultValue: 'nyc3', options: [{ value: 'nyc3', label: 'New York 3' }, { value: 'sfo3', label: 'San Francisco 3' }, { value: 'ams3', label: 'Amsterdam 3' }] },
+      { id: 'size', label: 'Size', type: 'select', required: true, defaultValue: 's-1vcpu-1gb', options: [{ value: 's-1vcpu-1gb', label: '1 vCPU / 1 GB' }, { value: 's-2vcpu-2gb', label: '2 vCPU / 2 GB' }] },
+      { id: 'image', label: 'Image', type: 'text', required: true, defaultValue: 'ubuntu-24-04-x64', placeholder: 'ubuntu-24-04-x64' },
+    ],
+    requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: true,
+  },
+
+  // ---- Datadog (Observability) -----------------------------------------
+  {
+    id: 'datadog.check_metrics',
+    providerId: 'datadog', tier: 'devops',
+    label: 'Check Metrics',
+    description: 'Query a Datadog timeseries metric over the last hour.',
+    icon: '📈', policyActionId: 'read_provider_status',
+    api: { service: 'datadog', method: 'GET', endpoint: '/api/v1/query', docsUrl: 'https://docs.datadoghq.com/api/latest/metrics/' },
+    fields: [
+      { id: 'query', label: 'Metric query', type: 'text', required: true, defaultValue: 'avg:system.cpu.user{*}', placeholder: 'avg:system.cpu.user{*}' },
+    ],
+    requiresAuth: true, requiresConfirm: false, auditAction: false, previewBeforeSubmit: false,
+  },
+  {
+    id: 'datadog.create_monitor',
+    providerId: 'datadog', tier: 'devops',
+    label: 'Create Monitor',
+    description: 'Create a Datadog metric alert monitor.',
+    icon: '🚦', policyActionId: 'datadog_create_monitor',
+    api: { service: 'datadog', method: 'POST', endpoint: '/api/v1/monitor', docsUrl: 'https://docs.datadoghq.com/api/latest/monitors/' },
+    fields: [
+      { id: 'name', label: 'Monitor name', type: 'text', required: true, maxLength: 120 },
+      { id: 'query', label: 'Alert query', type: 'text', required: true, placeholder: 'avg(last_5m):avg:system.cpu.user{*} > 0.9' },
+      { id: 'message', label: 'Notification message', type: 'textarea', required: false, maxLength: 1000 },
+    ],
+    requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: true,
+  },
+
+  // ---- Sentry (Issues) --------------------------------------------------
+  {
+    id: 'sentry.resolve_issue',
+    providerId: 'sentry', tier: 'devops',
+    label: 'Resolve Issue',
+    description: 'Mark a Sentry issue as resolved by its ID.',
+    icon: '✔️', policyActionId: 'sentry_resolve_issue',
+    api: { service: 'sentry', method: 'PUT', endpoint: '/api/0/issues/{id}/', docsUrl: 'https://docs.sentry.io/api/events/update-an-issue/' },
+    fields: [
+      { id: 'id', label: 'Issue ID', type: 'text', required: true, placeholder: 'Issue ID from List Issues' },
+    ],
+    requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: false,
+  },
+
+  // ---- PagerDuty (Incidents) -------------------------------------------
+  {
+    id: 'pagerduty.list_incidents',
+    providerId: 'pagerduty', tier: 'devops',
+    label: 'List Incidents',
+    description: 'List currently triggered and acknowledged PagerDuty incidents.',
+    icon: '📟', policyActionId: 'read_provider_status',
+    api: { service: 'pagerduty', method: 'GET', endpoint: '/incidents?statuses[]=triggered&statuses[]=acknowledged', docsUrl: 'https://developer.pagerduty.com/api-reference/9d0b4b12e36f9-list-incidents' },
+    fields: [],
+    requiresAuth: true, requiresConfirm: false, auditAction: false, previewBeforeSubmit: false,
+  },
+  {
+    id: 'pagerduty.trigger_incident',
+    providerId: 'pagerduty', tier: 'devops',
+    label: 'Trigger Incident',
+    description: 'Open a new PagerDuty incident on a service.',
+    icon: '🚨', policyActionId: 'pagerduty_trigger_incident',
+    api: { service: 'pagerduty', method: 'POST', endpoint: '/incidents', docsUrl: 'https://developer.pagerduty.com/api-reference/a7d81b0e9200f-create-an-incident' },
+    fields: [
+      { id: 'title', label: 'Incident title', type: 'text', required: true, maxLength: 200 },
+      { id: 'service_id', label: 'Service ID', type: 'text', required: true, placeholder: 'PXXXXXX' },
+      { id: 'urgency', label: 'Urgency', type: 'select', required: true, defaultValue: 'high', options: [{ value: 'high', label: 'High' }, { value: 'low', label: 'Low' }] },
+    ],
+    requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: true,
+  },
+
+  // ---- Compliance (Audit) — internal, no external credentials ----------
+  {
+    id: 'compliance.run_audit',
+    providerId: 'compliance', tier: 'devops',
+    label: 'Run Audit',
+    description: 'Scan provider credential coverage and configuration across the platform.',
+    icon: '🛡️', policyActionId: 'compliance_run_audit',
+    api: { service: 'compliance', method: 'POST', endpoint: '/internal/compliance/audit', docsUrl: '' },
+    fields: [
+      { id: 'scope', label: 'Scope', type: 'select', required: true, defaultValue: 'all', options: [{ value: 'all', label: 'All providers' }, { value: 'core', label: 'Core providers only' }, { value: 'secrets', label: 'Secrets & keys only' }] },
+    ],
+    requiresAuth: true, requiresConfirm: false, auditAction: true, previewBeforeSubmit: false,
+  },
+  {
+    id: 'compliance.list_findings',
+    providerId: 'compliance', tier: 'devops',
+    label: 'List Findings',
+    description: 'Show the latest compliance findings and their severity.',
+    icon: '📋', policyActionId: 'read_provider_status',
+    api: { service: 'compliance', method: 'GET', endpoint: '/internal/compliance/findings', docsUrl: '' },
+    fields: [],
+    requiresAuth: true, requiresConfirm: false, auditAction: false, previewBeforeSubmit: false,
+  },
+  {
+    id: 'vault.view_keys',
+    providerId: 'vault', tier: 'core',
+    label: 'View Keys',
+    description: 'List stored vault keys with provider, label, and last 4 — never the secret value.',
+    icon: '🗝️', policyActionId: 'read_provider_status',
+    api: { service: 'vault', method: 'GET', endpoint: '/internal/vault/keys', docsUrl: '' },
+    fields: [
+      { id: 'provider', label: 'Filter by provider', type: 'text', required: false, placeholder: 'Stripe (optional)' },
+    ],
+    requiresAuth: true, requiresConfirm: false, auditAction: false, previewBeforeSubmit: false,
+  },
+  {
+    id: 'vault.add_key',
+    providerId: 'vault', tier: 'core',
+    label: 'Add Key',
+    description: 'Store a new secret in the vault, encrypted at rest (AES-256-GCM).',
+    icon: '➕', policyActionId: 'vault_add_key',
+    api: { service: 'vault', method: 'POST', endpoint: '/internal/vault/keys', docsUrl: '' },
+    fields: [
+      { id: 'provider', label: 'Provider', type: 'text', required: true, maxLength: 60, placeholder: 'Stripe' },
+      { id: 'label', label: 'Label', type: 'text', required: true, maxLength: 120, placeholder: 'Production secret key' },
+      { id: 'value', label: 'Secret value', type: 'secret', required: true, masked: true, placeholder: 'sk_live_...' },
+      { id: 'expiresAt', label: 'Expires (optional)', type: 'text', required: false, placeholder: 'YYYY-MM-DD' },
+    ],
+    requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: false,
+  },
+  {
+    id: 'vault.reveal_key',
+    providerId: 'vault', tier: 'core',
+    label: 'Reveal Key',
+    description: 'Decrypt and reveal a single secret value. Audited.',
+    icon: '👁️', policyActionId: 'vault_reveal_key',
+    api: { service: 'vault', method: 'POST', endpoint: '/internal/vault/reveal', docsUrl: '' },
+    fields: [
+      { id: 'id', label: 'Key ID', type: 'text', required: true, placeholder: 'Key UUID from View Keys' },
+    ],
+    requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: false,
+  },
+  {
+    id: 'vault.edit_key',
+    providerId: 'vault', tier: 'core',
+    label: 'Edit Key',
+    description: 'Replace a stored secret with a new value. Re-encrypts at rest.',
+    icon: '✏️', policyActionId: 'vault_edit_key',
+    api: { service: 'vault', method: 'PATCH', endpoint: '/internal/vault/keys', docsUrl: '' },
+    fields: [
+      { id: 'id', label: 'Key ID', type: 'text', required: true, placeholder: 'Key UUID from View Keys' },
+      { id: 'value', label: 'New secret value', type: 'secret', required: true, masked: true, placeholder: 'sk_live_...' },
+    ],
+    requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: false,
+  },
+  {
+    id: 'vault.archive_key',
+    providerId: 'vault', tier: 'core',
+    label: 'Archive Key',
+    description: 'Soft-delete a key — hidden from the active list but recoverable.',
+    icon: '🗄️', policyActionId: 'vault_archive_key',
+    api: { service: 'vault', method: 'PATCH', endpoint: '/internal/vault/archive', docsUrl: '' },
+    fields: [
+      { id: 'id', label: 'Key ID', type: 'text', required: true, placeholder: 'Key UUID from View Keys' },
+    ],
+    requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: false,
+  },
+  {
+    id: 'vault.delete_key',
+    providerId: 'vault', tier: 'core',
+    label: 'Delete Key',
+    description: 'Permanently delete a key from the vault. This cannot be undone.',
+    icon: '🗑️', policyActionId: 'vault_delete_key',
+    api: { service: 'vault', method: 'DELETE', endpoint: '/internal/vault/keys', docsUrl: '' },
+    fields: [
+      { id: 'id', label: 'Key ID', type: 'text', required: true, placeholder: 'Key UUID from View Keys' },
+    ],
+    requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: true,
+  },
+]
+
+// ---------------------------------------------------------------------------
+// Selectors
+// ---------------------------------------------------------------------------
+
+export function getProviderTemplates(providerId: string): ProviderActionTemplate[] {
+  return PROVIDER_TEMPLATES.filter(template => template.providerId === providerId)
+}
+
+export function getTemplate(templateId: string): ProviderActionTemplate | undefined {
+  return PROVIDER_TEMPLATES.find(template => template.id === templateId)
+}
+
+export function getTemplatesByTier(tier: HubProviderTierId): ProviderActionTemplate[] {
+  return PROVIDER_TEMPLATES.filter(template => template.tier === tier)
+}
+
+export function getWriteTemplates(): ProviderActionTemplate[] {
+  return PROVIDER_TEMPLATES.filter(template => template.api.method !== 'GET')
+}
+
+export function getReadOnlyTemplates(): ProviderActionTemplate[] {
+  return PROVIDER_TEMPLATES.filter(template => template.api.method === 'GET')
+}
+
+// Validate a submitted form against its template. Flat { ok, error? } result
+// style per repo convention — no thrown errors, no union narrowing.
+export function validateTemplatePayload(
+  templateId: string,
+  payload: Record<string, unknown>,
+): { ok: boolean; error?: string; missing?: string[] } {
+  const template = getTemplate(templateId)
+  if (!template) return { ok: false, error: 'Unknown template: ' + templateId }
+  const missing: string[] = []
+  for (const field of template.fields) {
+    if (!field.required) continue
+    const value = payload[field.id]
+    if (value === undefined || value === null || value === '') missing.push(field.id)
+  }
+  if (missing.length > 0) return { ok: false, error: 'Missing required fields', missing }
+  return { ok: true }
+}

@@ -563,10 +563,10 @@ async function executeStripeAction(template: any, payload: Record<string, unknow
 
     const products = (prodData.data || []).map((p: any) => ({
       name: p.name,
-      id: p.id,
       price: priceByProduct[p.id] || '—',
       active: p.active,
       created: p.created ? new Date(p.created * 1000).toISOString().slice(0, 10) : '',
+      id: p.id,
     }))
     const withPrice = products.filter((p: any) => p.price !== '—').length
     return {

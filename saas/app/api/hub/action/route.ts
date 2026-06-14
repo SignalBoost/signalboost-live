@@ -488,7 +488,7 @@ async function executeStripeAction(template: any, payload: Record<string, unknow
 
   // View prices (read-only)
   if (template.id === 'stripe.view_prices') {
-const product = String(payload.product || '')
+    const product = String(payload.product || '')
     const qs = product ? `?product=${encodeURIComponent(product)}&limit=20` : '?limit=20'
     const res = await fetch('https://api.stripe.com/v1/prices' + qs, {
       method: 'GET',
@@ -498,7 +498,7 @@ const product = String(payload.product || '')
       const e = await res.text()
       return { ok: false, error: e || res.statusText }
     }
-    const data = await res.json()
+const data = await res.json()
     const prices = data.data || []
     return {
       ok: true,
@@ -529,7 +529,9 @@ const product = String(payload.product || '')
 
   // View Products — full catalog list (dedicated, before the generic health GET)
   if (template.id === 'stripe.view_products') {
-    const res = await fetch('https://api.stripe.com/v1/products?limit=100&active=true', {
+    // Expand the default price so each product shows its amount (the product
+    // list endpoint does NOT include prices unless expanded).
+    const res = await fetch('https://api.stripe.com/v1/products?limit=100&active=true&expand[]=data.default_price', {
       method: 'GET',
       headers: { 'Authorization': 'Bearer ' + apiKey },
     })
@@ -538,13 +540,23 @@ const product = String(payload.product || '')
       return { ok: false, error: error || res.statusText }
     }
     const data = await res.json()
-    const products = (data.data || []).map((p: any) => ({
-      id: p.id,
-      name: p.name,
-      active: p.active,
-      created: p.created ? new Date(p.created * 1000).toISOString().slice(0, 10) : '',
-      description: p.description || '',
-    }))
+    const products = (data.data || []).map((p: any) => {
+      const dp = p.default_price
+      let price = '—'
+      if (dp && typeof dp === 'object' && typeof dp.unit_amount === 'number') {
+        const amount = (dp.unit_amount / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })
+        const cur = (dp.currency || 'usd').toUpperCase()
+        const interval = dp.recurring?.interval ? `/${dp.recurring.interval}` : ''
+        price = `${amount} ${cur}${interval}`
+      }
+      return {
+        name: p.name,
+        id: p.id,
+        price,
+        active: p.active,
+        created: p.created ? new Date(p.created * 1000).toISOString().slice(0, 10) : '',
+      }
+    })
     return {
       ok: true,
       message: `Stripe: ${products.length} product${products.length === 1 ? '' : 's'}`,
@@ -977,7 +989,8 @@ async function executeVercelAction(template: any, payload: Record<string, unknow
       const error = await res.text()
       return { ok: false, error }
     }
-const data = await res.json()
+
+    const data = await res.json()
     const deploymentCount = (data.deployments || []).length
     const latestDeployment = (data.deployments || [])[0]
 
@@ -985,7 +998,7 @@ const data = await res.json()
       ok: true,
       message: `Vercel health: ${deploymentCount} deployment${deploymentCount === 1 ? '' : 's'} found`,
       data: {
-        deploymentCount,
+deploymentCount,
         latestDeployment: latestDeployment ? {
           id: latestDeployment.id,
           state: latestDeployment.state,

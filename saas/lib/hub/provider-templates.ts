@@ -1341,6 +1341,18 @@ label: 'Add API Key',
     requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: true,
   },
   {
+    id: 'stripe.archive_product',
+    providerId: 'stripe', tier: 'core',
+    label: 'Archive Product',
+    description: 'Archive a Stripe product (sets it inactive — recoverable by editing it active again).',
+    icon: '🗄️', policyActionId: 'archive_stripe_product',
+    api: { service: 'stripe', method: 'POST', endpoint: '/v1/products/{id}', docsUrl: 'https://docs.stripe.com/api/products/update' },
+    fields: [
+      { id: 'id', label: 'Product ID', type: 'text', required: true, placeholder: 'prod_...' },
+    ],
+    requiresAuth: true, requiresConfirm: true, auditAction: true, previewBeforeSubmit: true,
+  },
+  {
     id: 'stripe.view_prices',
     providerId: 'stripe', tier: 'core',
     label: 'View Prices',

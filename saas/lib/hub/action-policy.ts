@@ -378,6 +378,13 @@ export const HUB_ACTION_POLICIES: Record<string, HubActionPolicy> = {
     auditRequired: true, rollbackRequired: false, productionSensitive: true,
     description: 'Update a Stripe product. Admin approval and audit trail.',
   },
+  archive_stripe_product: {
+    id: 'archive_stripe_product',
+    label: 'Archive Stripe product',
+    level: 'execute_change', risk: 'medium', approval: 'admin',
+    auditRequired: true, rollbackRequired: true, productionSensitive: false,
+    description: 'Archive a Stripe product (sets it inactive — recoverable). Admin approval and audit trail.',
+  },
   edit_stripe_price: {
     id: 'edit_stripe_price',
     label: 'Edit Stripe price',

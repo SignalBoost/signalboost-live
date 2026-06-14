@@ -95,15 +95,6 @@ export const CONSOLE_UTILITY_PAGES: UtilityPage[] = [
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ]
 
-// Secondary "workspace" group — keeps the console self-contained so the
-// redesign orphans no page (Dashboard Hub, Key Vault, Webhooks, Team).
-export const CONSOLE_SYSTEM_PAGES: UtilityPage[] = [
-  { id: 'dashboard', label: 'Dashboard Hub', icon: '🛰️' },
-  { id: 'vault', label: 'Key Vault', icon: '🔐' },
-  { id: 'webhooks', label: 'Webhooks', icon: '🔗' },
-  { id: 'team', label: 'Team', icon: '👥' },
-]
-
 // ---------------------------------------------------------------------------
 // Destructive template ids — rendered with a red accent and require confirm.
 // ---------------------------------------------------------------------------

@@ -564,15 +564,14 @@ async function executeStripeAction(template: any, payload: Record<string, unknow
     const products = (prodData.data || []).map((p: any) => ({
       name: p.name,
       id: p.id,
-      PRICE: priceByProduct[p.id] || 'NO-PRICE',
+      price: priceByProduct[p.id] || '—',
       active: p.active,
       created: p.created ? new Date(p.created * 1000).toISOString().slice(0, 10) : '',
     }))
-    const totalPrices = (priceData.data || []).length
     const withPrice = products.filter((p: any) => p.price !== '—').length
     return {
       ok: true,
-      message: `Stripe: ${products.length} products · ${totalPrices} prices found · ${withPrice} matched`,
+      message: `Stripe: ${products.length} products (${withPrice} priced)`,
       data: { count: products.length, products },
     }
   }

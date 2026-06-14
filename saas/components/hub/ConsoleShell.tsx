@@ -37,10 +37,21 @@ const PAGES: Page[] = [
 export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPage?: PageKey }) {
   const [currentPage, setCurrentPage] = useState<PageKey>(initialPage)
 
-  const activePage = PAGES.find(p => p.key === currentPage) || PAGES[0]
+  const activePageIndex = PAGES.findIndex(p => p.key === currentPage)
+  const activePage = PAGES[activePageIndex] || PAGES[0]
+
+  const goToPrev = () => {
+    const newIndex = activePageIndex > 0 ? activePageIndex - 1 : PAGES.length - 1
+    setCurrentPage(PAGES[newIndex].key)
+  }
+
+  const goToNext = () => {
+    const newIndex = activePageIndex < PAGES.length - 1 ? activePageIndex + 1 : 0
+    setCurrentPage(PAGES[newIndex].key)
+  }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: '#0a0a0a', color: '#fff', position: 'relative', zIndex: 1 }}>
+    <div style={{ display: 'flex', minHeight: 'calc(100vh - 80px)', background: '#0a0a0a', color: '#fff', position: 'relative' }}>
       {/* Sidebar Navigation */}
       <div
         style={{
@@ -51,64 +62,52 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
           flexDirection: 'column',
           overflowY: 'auto',
           padding: '1rem 0',
-          position: 'relative',
-          zIndex: 100,
         }}
       >
-        {/* Exit Hub Button - Always visible, always accessible */}
+        {/* Exit Hub Button */}
         <div style={{ padding: '0 0.5rem', marginBottom: '0.75rem' }}>
           <Link
             href="/dashboard"
             style={{
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'center',
               padding: '0.75rem 1rem',
-              background: 'rgba(255, 195, 0, 0.1)',
-              color: '#ffc300',
-              border: '1px solid #ffc300',
-              borderRadius: '4px',
+              background: '#ffc300',
+              color: '#000',
+              border: 'none',
+              borderRadius: '6px',
               cursor: 'pointer',
-              textAlign: 'left',
-              fontSize: '0.85rem',
+              textAlign: 'center',
+              fontSize: '0.9rem',
               fontWeight: 'bold',
               textDecoration: 'none',
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255, 195, 0, 0.2)'
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255, 195, 0, 0.1)'
             }}
           >
-            <span style={{ marginRight: '0.5rem' }}>←</span>
-            Exit Hub
+            ← Exit Hub
           </Link>
         </div>
 
-        <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #333', marginBottom: '1rem' }}>
-          <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#1af0ff', marginBottom: '0.25rem' }}>
+        <div style={{ padding: '0.5rem 1rem', borderBottom: '1px solid #333', marginBottom: '1rem' }}>
+          <div style={{ fontSize: '1rem', fontWeight: 'bold', color: '#1af0ff' }}>
             Hub Console
-          </div>
-          <div style={{ fontSize: '0.7rem', color: '#888' }}>
-            Phase 1C + Phase 2
           </div>
         </div>
 
-        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0 0.5rem' }}>
+        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem', padding: '0 0.5rem' }}>
           {PAGES.map(page => (
             <button
               key={page.key}
               onClick={() => setCurrentPage(page.key)}
               style={{
-                padding: '0.75rem 1rem',
+                padding: '0.7rem 1rem',
                 background: currentPage === page.key ? '#1af0ff' : 'transparent',
                 color: currentPage === page.key ? '#000' : '#aaa',
                 border: 'none',
                 borderRadius: '4px',
                 cursor: 'pointer',
                 textAlign: 'left',
-                fontSize: '0.9rem',
+                fontSize: '0.85rem',
                 fontWeight: currentPage === page.key ? 'bold' : 'normal',
                 transition: 'all 0.2s',
               }}
@@ -130,9 +129,7 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
         </nav>
 
         <div style={{ padding: '1rem', borderTop: '1px solid #333', fontSize: '0.7rem', color: '#666' }}>
-          <div>9 Pages</div>
-          <div>Phase 1C ✅</div>
-          <div>Phase 2 ✅</div>
+          <div>Page {activePageIndex + 1} of {PAGES.length}</div>
         </div>
       </div>
 
@@ -142,10 +139,9 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden',
         }}
       >
-        {/* Page Header */}
+        {/* Page Header with Forward/Back Arrows */}
         <div
           style={{
             padding: '1rem 2rem',
@@ -154,29 +150,65 @@ export default function ConsoleShell({ initialPage = 'dashboard' }: { initialPag
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            gap: '1rem',
           }}
         >
-          <div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1af0ff' }}>
+          {/* Left: Back arrow + title */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
+            <button
+              onClick={goToPrev}
+              title="Previous page"
+              style={{
+                padding: '0.5rem 0.9rem',
+                background: '#1a1a1a',
+                color: '#1af0ff',
+                border: '1px solid #1af0ff',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '1rem',
+                fontWeight: 'bold',
+              }}
+            >
+              ←
+            </button>
+            <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#1af0ff' }}>
               {activePage.icon} {activePage.label}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', fontSize: '0.85rem', color: '#888' }}>
+
+          {/* Right: Forward arrow + Exit Hub */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button
+              onClick={goToNext}
+              title="Next page"
+              style={{
+                padding: '0.5rem 0.9rem',
+                background: '#1a1a1a',
+                color: '#1af0ff',
+                border: '1px solid #1af0ff',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '1rem',
+                fontWeight: 'bold',
+              }}
+            >
+              →
+            </button>
             <Link
               href="/dashboard"
               style={{
-                color: '#ffc300',
+                color: '#000',
                 textDecoration: 'none',
                 fontSize: '0.85rem',
-                padding: '0.4rem 0.8rem',
-                border: '1px solid #ffc300',
-                borderRadius: '4px',
-                background: 'rgba(255, 195, 0, 0.08)',
+                fontWeight: 'bold',
+                padding: '0.5rem 1rem',
+                border: 'none',
+                borderRadius: '6px',
+                background: '#ffc300',
               }}
             >
               ← Exit Hub
             </Link>
-            <span>SignalBoost Command Control</span>
           </div>
         </div>
 

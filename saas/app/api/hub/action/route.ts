@@ -22,6 +22,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getTemplate, validateTemplatePayload } from '@/lib/hub/provider-templates'
 import { getHubActionPolicy, isActionBlocked, requiresOwnerApproval } from '@/lib/hub/action-policy'
 import { getCurrentUser as resolveHubUser } from '@/lib/auth/permission-middleware'
+import { vaultEncrypt, vaultDecrypt } from '@/lib/vault/crypto'
 
 // ============================================================================
 // Types & Setup
@@ -82,6 +83,10 @@ const PROVIDER_CREDENTIALS: Record<
   compliance: {
     envVars: [], // internal audit — no external credentials required
     baseUrl: undefined,
+  },
+  vault: {
+    envVars: ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'VAULT_MASTER_KEY'],
+    baseUrl: undefined, // internal — handled by vault crypto + admin client
   },
   openai: {
     envVars: ['OPENAI_API_KEY'],
@@ -303,6 +308,8 @@ async function executeProviderAction(
       return await executeGCPAction(template, payload)
     case 'compliance':
       return await executeComplianceAction(template, payload)
+    case 'vault':
+      return await executeVaultAction(template, payload)
     case 'auth0':
       return await executeAuth0Action(template, payload)
     // Add more service handlers as templates expand.
@@ -441,7 +448,7 @@ async function executeStripeAction(template: any, payload: Record<string, unknow
 
   // Create a product (name + description only; pricing handled by create_price)
   if (template.id === 'stripe.create_product') {
-    const params: Record<string, string> = { name: String(payload.name || '') }
+const params: Record<string, string> = { name: String(payload.name || '') }
     if (payload.description) params.description = String(payload.description)
     const res = await fetch('https://api.stripe.com/v1/products', {
       method: 'POST',
@@ -499,6 +506,7 @@ async function executeStripeAction(template: any, payload: Record<string, unknow
   const data = await res.json()
   return { ok: true, message: 'Created: ' + (data.id || 'unknown'), data }
 }
+
 // ---- Supabase ----
 async function executeSupabaseAction(template: any, payload: Record<string, unknown>) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -849,6 +857,7 @@ async function executeVercelAction(template: any, payload: Record<string, unknow
   const data = await res.json()
   return { ok: true, message: 'Environment variable set', data }
 }
+
 // ---- GitHub ----
 async function executeGitHubAction(template: any, payload: Record<string, unknown>) {
   const token = process.env.GITHUB_WRITE_TOKEN
@@ -889,7 +898,7 @@ async function executeGitHubAction(template: any, payload: Record<string, unknow
     return { ok: true, message: 'Issue opened: #' + data.number, data: { number: data.number, url: data.html_url } }
   }
   if (template.id === 'github.view_repos') {
-    const repos = Array.isArray(data) ? data : []
+const repos = Array.isArray(data) ? data : []
     return {
       ok: true,
       message: `GitHub repos: ${repos.length} accessible`,
@@ -1168,6 +1177,137 @@ async function executeComplianceAction(template: any, payload: Record<string, un
     message: `Compliance findings: ${failed.length} open (${highOpen} high)`,
     data: { summary, findings: failed.length ? failed : findings },
   }
+}
+
+// ---- Vault (internal — encrypted secret store) ----
+async function executeVaultAction(template: any, payload: Record<string, unknown>) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return { ok: false, error: 'Vault storage not configured' }
+  const admin = createClient(url, key)
+
+  // View keys (names + metadata only — never values)
+  if (template.id === 'vault.view_keys') {
+    const provider = String(payload.provider || '').trim()
+    let q = admin
+      .from('vault_items')
+      .select('id, provider, label, last4, created_at, last_accessed_at, expires_at, status')
+      .eq('status', 'active')
+      .order('provider', { ascending: true })
+      .order('label', { ascending: true })
+    if (provider) q = q.eq('provider', provider)
+    const { data, error } = await q
+    if (error) return { ok: false, error: error.message }
+    const items = data || []
+    return {
+      ok: true,
+      message: `Vault: ${items.length} active key${items.length === 1 ? '' : 's'}`,
+      data: { count: items.length, keys: items.slice(0, 40).map((i: any) => ({ id: i.id, provider: i.provider, label: i.label, last4: i.last4, expires_at: i.expires_at })) },
+    }
+  }
+
+  // Add a key (encrypted at rest)
+  if (template.id === 'vault.add_key') {
+    const provider = String(payload.provider || '').trim().slice(0, 60)
+    const label = String(payload.label || '').trim().slice(0, 120)
+    const value = String(payload.value || '')
+    if (!provider || !label || !value) return { ok: false, error: 'provider, label and value are required' }
+    if (value.length > 4000) return { ok: false, error: 'Value too long' }
+    const enc = vaultEncrypt(value)
+    if (!enc.ok) return { ok: false, error: enc.error }
+    const expiresAt = payload.expiresAt ? String(payload.expiresAt) : null
+    const { data, error } = await admin
+      .from('vault_items')
+      .insert({
+        owner_id: '00000000-0000-0000-0000-000000000000',
+        provider,
+        label,
+        value_encrypted: enc.valueEncrypted,
+        iv: enc.iv,
+        tag: enc.tag,
+        last4: value.slice(-4),
+        expires_at: expiresAt,
+        status: 'active',
+      })
+      .select('id, provider, label, last4')
+      .single()
+    if (error) return { ok: false, error: error.message }
+    await admin.from('vault_audit').insert({ actor: 'console', action: 'add', provider, label }).then(() => {}, () => {})
+    return { ok: true, message: `Key added: ${provider} / ${label}`, data: { id: data?.id, last4: data?.last4 } }
+  }
+
+  // Reveal a key (decrypts ONE item)
+  if (template.id === 'vault.reveal_key') {
+    const id = String(payload.id || '')
+    if (!id) return { ok: false, error: 'Key ID is required' }
+    const { data, error } = await admin
+      .from('vault_items')
+      .select('value_encrypted, iv, tag, provider, label')
+      .eq('id', id)
+      .single()
+    if (error || !data) return { ok: false, error: 'Item not found' }
+    const dec = vaultDecrypt(data.value_encrypted, data.iv, data.tag)
+    if (!dec.ok) return { ok: false, error: dec.error }
+    await admin.from('vault_items').update({ last_accessed_at: new Date().toISOString() }).eq('id', id)
+    await admin.from('vault_audit').insert({ actor: 'console', action: 'reveal', provider: data.provider, label: data.label }).then(() => {}, () => {})
+    return { ok: true, message: `Revealed: ${data.provider} / ${data.label}`, data: { value: dec.value } }
+  }
+
+  // Edit a key (re-encrypts a new value)
+  if (template.id === 'vault.edit_key') {
+    const id = String(payload.id || '')
+    const value = String(payload.value || '')
+    if (!id) return { ok: false, error: 'Key ID is required' }
+    if (!value) return { ok: false, error: 'New value is required' }
+    if (value.length > 4000) return { ok: false, error: 'Value too long' }
+    const { data: existing, error: findErr } = await admin
+      .from('vault_items')
+      .select('provider, label')
+      .eq('id', id)
+      .single()
+    if (findErr || !existing) return { ok: false, error: 'Item not found' }
+    const enc = vaultEncrypt(value)
+    if (!enc.ok) return { ok: false, error: enc.error }
+    const { error } = await admin
+      .from('vault_items')
+      .update({ value_encrypted: enc.valueEncrypted, iv: enc.iv, tag: enc.tag, last4: value.slice(-4), last_accessed_at: new Date().toISOString() })
+      .eq('id', id)
+    if (error) return { ok: false, error: error.message }
+    await admin.from('vault_audit').insert({ actor: 'console', action: 'edit', provider: existing.provider, label: existing.label }).then(() => {}, () => {})
+    return { ok: true, message: `Key updated: ${existing.provider} / ${existing.label}`, data: { id } }
+  }
+
+  // Archive a key (soft delete via status column)
+  if (template.id === 'vault.archive_key') {
+    const id = String(payload.id || '')
+    if (!id) return { ok: false, error: 'Key ID is required' }
+    const { data: existing, error: findErr } = await admin
+      .from('vault_items')
+      .select('provider, label')
+      .eq('id', id)
+      .single()
+    if (findErr || !existing) return { ok: false, error: 'Item not found' }
+    const { error } = await admin
+      .from('vault_items')
+      .update({ status: 'archived', archived_at: new Date().toISOString() })
+      .eq('id', id)
+    if (error) return { ok: false, error: error.message }
+    await admin.from('vault_audit').insert({ actor: 'console', action: 'archive', provider: existing.provider, label: existing.label }).then(() => {}, () => {})
+    return { ok: true, message: `Key archived: ${existing.provider} / ${existing.label}`, data: { id } }
+  }
+
+  // Delete a key (permanent)
+  if (template.id === 'vault.delete_key') {
+    const id = String(payload.id || '')
+    if (!id) return { ok: false, error: 'Key ID is required' }
+    const { data: item } = await admin.from('vault_items').select('provider, label').eq('id', id).single()
+    const { error } = await admin.from('vault_items').delete().eq('id', id)
+    if (error) return { ok: false, error: error.message }
+    await admin.from('vault_audit').insert({ actor: 'console', action: 'delete', provider: item?.provider || '?', label: item?.label || '?' }).then(() => {}, () => {})
+    return { ok: true, message: 'Key deleted', data: { id } }
+  }
+
+  return { ok: false, error: 'Unknown vault action' }
 }
 
 async function logAuditEvent(

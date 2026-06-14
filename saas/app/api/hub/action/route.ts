@@ -569,6 +569,12 @@ async function executeStripeAction(template: any, payload: Record<string, unknow
       id: p.id,
     }))
     const withPrice = products.filter((p: any) => p.price !== '—').length
+    console.log('[VIEW_PRODUCTS]', JSON.stringify({
+      productCount: products.length,
+      priceCount: (priceData.data || []).length,
+      matched: withPrice,
+      sample: products[0],
+    }))
     return {
       ok: true,
       message: `Stripe: ${products.length} products (${withPrice} priced)`,

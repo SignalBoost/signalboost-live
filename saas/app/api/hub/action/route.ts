@@ -503,7 +503,23 @@ async function executeStripeAction(template: any, payload: Record<string, unknow
     return {
       ok: true,
       message: `Stripe: ${prices.length} price${prices.length === 1 ? '' : 's'}`,
-      data: { count: prices.length, prices: prices.slice(0, 20).map((p: any) => ({ id: p.id, product: p.product, unit_amount: p.unit_amount, currency: p.currency, active: p.active })) },
+      data: {
+        count: prices.length,
+        prices: prices.slice(0, 20).map((p: any) => {
+          const amount = typeof p.unit_amount === 'number'
+            ? (p.unit_amount / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })
+            : '—'
+          const cur = (p.currency || 'usd').toUpperCase()
+          const interval = p.recurring?.interval ? `/${p.recurring.interval}` : ''
+          return {
+            name: `${amount} ${cur}${interval}`,
+            id: p.id,
+            product: typeof p.product === 'string' ? p.product : p.product?.id || '—',
+            active: p.active,
+            type: p.type,
+          }
+        }),
+      },
     }
   }
 

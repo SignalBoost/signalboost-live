@@ -86,12 +86,11 @@ export default function ProviderActionModal({ providerId, lang, onClose, onSucce
     )
   }
 
-  // Render the selected form inside a fixed-height shell so only the result
-  // area scrolls. This prevents the double-scrollbar modal bug.
   if (state === 'form' && selectedTemplateId) {
     return (
       <div style={{ width: '100%', height: '100%', maxHeight: '100%', overflow: 'hidden' }}>
         <ProviderActionForm
+          key={selectedTemplateId}
           templateId={selectedTemplateId}
           lang={lang}
           onClose={() => {
@@ -110,10 +109,8 @@ export default function ProviderActionModal({ providerId, lang, onClose, onSucce
     )
   }
 
-  // Action list view
   return (
     <div style={modalShellStyle}>
-      {/* Header */}
       <div style={{ padding: '14px 16px 12px', background: 'linear-gradient(135deg, rgba(26,240,255,.10), rgba(3,7,18,.0))', borderBottom: '1px solid rgba(26,240,255,.2)', flex: '0 0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 24 }}>🎯</span>
@@ -124,7 +121,6 @@ export default function ProviderActionModal({ providerId, lang, onClose, onSucce
         </div>
       </div>
 
-      {/* Body: list of actions */}
       <div style={{ ...bodyStyle, flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {templates.map(template => (
@@ -171,7 +167,6 @@ export default function ProviderActionModal({ providerId, lang, onClose, onSucce
         </div>
       </div>
 
-      {/* Footer: close button */}
       <div style={footerStyle}>
         <button onClick={onClose} style={closeButtonStyle}>Close</button>
       </div>

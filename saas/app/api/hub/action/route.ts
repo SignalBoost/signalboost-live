@@ -478,7 +478,7 @@ async function executeStripeAction(template: any, payload: Record<string, unknow
       headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams(params).toString(),
     })
-if (!res.ok) {
+    if (!res.ok) {
       const e = await res.text()
       return { ok: false, error: e || res.statusText }
     }
@@ -488,7 +488,7 @@ if (!res.ok) {
 
   // View prices (read-only)
   if (template.id === 'stripe.view_prices') {
-    const product = String(payload.product || '')
+const product = String(payload.product || '')
     const qs = product ? `?product=${encodeURIComponent(product)}&limit=20` : '?limit=20'
     const res = await fetch('https://api.stripe.com/v1/prices' + qs, {
       method: 'GET',
@@ -525,6 +525,31 @@ if (!res.ok) {
     }
     const data = await res.json()
     return { ok: true, message: 'Price updated: ' + (data.id || id), data: { id: data.id, active: data.active, nickname: data.nickname } }
+  }
+
+  // View Products — full catalog list (dedicated, before the generic health GET)
+  if (template.id === 'stripe.view_products') {
+    const res = await fetch('https://api.stripe.com/v1/products?limit=100&active=true', {
+      method: 'GET',
+      headers: { 'Authorization': 'Bearer ' + apiKey },
+    })
+    if (!res.ok) {
+      const error = await res.text()
+      return { ok: false, error: error || res.statusText }
+    }
+    const data = await res.json()
+    const products = (data.data || []).map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      active: p.active,
+      created: p.created ? new Date(p.created * 1000).toISOString().slice(0, 10) : '',
+      description: p.description || '',
+    }))
+    return {
+      ok: true,
+      message: `Stripe: ${products.length} product${products.length === 1 ? '' : 's'}`,
+      data: { count: products.length, products },
+    }
   }
 
   // Health check: GET request, read-only
@@ -952,13 +977,12 @@ async function executeVercelAction(template: any, payload: Record<string, unknow
       const error = await res.text()
       return { ok: false, error }
     }
-
-    const data = await res.json()
+const data = await res.json()
     const deploymentCount = (data.deployments || []).length
     const latestDeployment = (data.deployments || [])[0]
 
     return {
-ok: true,
+      ok: true,
       message: `Vercel health: ${deploymentCount} deployment${deploymentCount === 1 ? '' : 's'} found`,
       data: {
         deploymentCount,

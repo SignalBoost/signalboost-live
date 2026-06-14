@@ -1,8 +1,17 @@
 // saas/app/api/hub/deployments/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getVercelDeployments } from '@/lib/hub/deployments-service'
+import { requirePermission } from '@/lib/auth/permission-middleware'
 
 export async function GET(req: NextRequest) {
+  const perm = await requirePermission(req, 'deployments:read')
+  if (!perm.ok) {
+    return NextResponse.json(
+      { ok: false, error: (perm as any).error },
+      { status: (perm as any).status }
+    )
+  }
+
   try {
     const vercelToken = process.env.VERCEL_TOKEN
     const vercelTeamId = process.env.VERCEL_TEAM_ID

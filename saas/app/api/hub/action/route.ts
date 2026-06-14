@@ -257,7 +257,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ActionRespons
     // 10. Return result to client
     if (result.ok) {
       return NextResponse.json(
-        { ok: true, message: result.message || 'Action completed successfully' },
+        { ok: true, message: result.message || 'Action completed successfully', data: result.data },
         { status: 200 },
       )
     } else {

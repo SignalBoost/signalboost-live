@@ -29,7 +29,7 @@ export default function ProviderActionForm({ templateId, lang, onSuccess, onErro
   const [state, setState] = useState<FormState>('idle')
   const [values, setValues] = useState<Record<string, unknown>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [result, setResult] = useState<{ ok: boolean; message?: string; error?: string } | null>(null)
+  const [result, setResult] = useState<{ ok: boolean; message?: string; error?: string; data?: any } | null>(null)
 
   const validate = useCallback((): boolean => {
     const validation = validateTemplatePayload(templateId, values)
@@ -92,9 +92,12 @@ export default function ProviderActionForm({ templateId, lang, onSuccess, onErro
 
       const data = await res.json()
       if (res.ok) {
-        setResult({ ok: true, message: data.message || 'Action completed successfully.' })
+        setResult({ ok: true, message: data.message || 'Action completed successfully.', data: data.data })
         setState('success')
-        window.setTimeout(() => onSuccess?.(), 1200)
+        // Read-only views shouldn't auto-close — let the operator read the results.
+        if (template.api.method !== 'GET') {
+          window.setTimeout(() => onSuccess?.(), 1200)
+        }
       } else {
         setResult({ ok: false, error: data.error || 'Action failed.' })
         setState('error')
@@ -173,12 +176,12 @@ export default function ProviderActionForm({ templateId, lang, onSuccess, onErro
         )}
 
         {state === 'success' && result?.ok && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: 20 }}>
-            <div style={{ fontSize: 32 }}>✅</div>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#22c55e' }}>Success</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', marginTop: 4 }}>{result.message}</div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, padding: '8px 4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 18 }}>✅</span>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#22c55e' }}>{result.message}</div>
             </div>
+            <ResultView data={result.data} />
           </div>
         )}
 
@@ -254,112 +257,4 @@ type FormFieldProps = {
   error?: string
   onChange: (value: unknown) => void
   lang: Lang
-}
-
-function FormField({ field, value, error, onChange, lang }: FormFieldProps) {
-  const renderInput = () => {
-    const baseStyle: React.CSSProperties = {
-      width: '100%',
-      padding: '10px 12px',
-      borderRadius: 8,
-      border: error ? '1px solid rgba(239,68,68,.5)' : '1px solid rgba(255,255,255,.15)',
-      background: 'rgba(255,255,255,.04)',
-      color: '#fff',
-      fontSize: 13,
-      fontFamily: 'inherit',
-      outline: 'none',
-    }
-
-    switch (field.type) {
-      case 'text':
-      case 'email':
-      case 'phone':
-        return (
-          <input
-            type={field.type === 'email' ? 'email' : field.type === 'phone' ? 'tel' : 'text'}
-            value={(value as string) || ''}
-            onChange={e => onChange(e.target.value)}
-            placeholder={field.placeholder}
-            maxLength={field.maxLength}
-            style={baseStyle}
-          />
-        )
-      case 'textarea':
-        return (
-          <textarea
-            value={(value as string) || ''}
-            onChange={e => onChange(e.target.value)}
-            placeholder={field.placeholder}
-            maxLength={field.maxLength}
-            style={{ ...baseStyle, minHeight: 100, fontFamily: 'inherit', resize: 'vertical' }}
-          />
-        )
-      case 'number':
-      case 'currency_cents':
-        return (
-          <input
-            type="number"
-            value={(value as number) ?? ''}
-            onChange={e => onChange(e.target.value ? parseFloat(e.target.value) : '')}
-            min={field.min}
-            max={field.max}
-            step={field.type === 'currency_cents' ? 0.01 : 1}
-            placeholder={field.placeholder}
-            style={baseStyle}
-          />
-        )
-      case 'secret':
-        return (
-          <input
-            type="password"
-            value={(value as string) || ''}
-            onChange={e => onChange(e.target.value)}
-            placeholder={field.placeholder}
-            maxLength={field.maxLength}
-            style={baseStyle}
-          />
-        )
-      case 'select':
-        return (
-          <select value={(value as string) || ''} onChange={e => onChange(e.target.value)} style={{ ...baseStyle, cursor: 'pointer' }}>
-            <option value="" disabled>
-              {field.placeholder || 'Select an option'}
-            </option>
-            {field.options?.map(opt => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        )
-      case 'toggle':
-        return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <input
-              type="checkbox"
-              checked={(value as boolean) || false}
-              onChange={e => onChange(e.target.checked)}
-              style={{ width: 18, height: 18, cursor: 'pointer' }}
-            />
-            <label style={{ fontSize: 12, color: 'rgba(255,255,255,.7)', cursor: 'pointer' }}>
-              {field.label}
-            </label>
-          </div>
-        )
-    }
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {field.type !== 'toggle' && (
-        <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 6 }}>
-          {field.label}
-          {field.required && <span style={{ color: '#ef4444' }}>*</span>}
-        </label>
-      )}
-      {renderInput()}
-      {field.help && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: -2 }}>{field.help}</div>}
-      {error && <div style={{ fontSize: 11, color: '#ef4444', marginTop: -2 }}>⚠️ {error}</div>}
-    </div>
-  )
 }

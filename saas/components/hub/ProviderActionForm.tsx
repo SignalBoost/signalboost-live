@@ -401,12 +401,12 @@ function ResultView({ data }: { data: any }) {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: rest.length ? 7 : 0 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatCell(title)}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,.35)', fontWeight: 700, flex: '0 0 auto' }}>#{i + 1}</div>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatCell(title)}</div>
+                  <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,.35)', fontWeight: 700, flex: '0 0 auto' }}>#{i + 1}</div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   {rest.map(([k, v]) => (
-                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 11 }}>
+                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 10 }}>
                       <span style={{ color: 'rgba(255,255,255,.4)', flex: '0 0 auto' }}>{k}</span>
                       <span style={{ color: 'rgba(26,240,255,.8)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', textAlign: 'right', wordBreak: 'break-all' }}>{formatCell(v)}</span>
                     </div>

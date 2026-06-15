@@ -41,7 +41,7 @@ export function ProviderConsoleCard({ provider, lang, onExpand, onRun }: CardPro
             
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, width: '100%', boxSizing: 'border-box' }}>
               {section.templateIds.map(id => {
-                const template = getTemplate(id)
+                const template = getTemplate(id, lang)
                 if (!template) return null
                 const isDestructive = isDestructiveTemplate(id)
                 const isArchive = id.includes('archive')
@@ -107,7 +107,7 @@ export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onHome, o
             
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, width: '100%', boxSizing: 'border-box' }}>
               {section.templateIds.map(id => {
-                const template = getTemplate(id)
+                const template = getTemplate(id, lang)
                 if (!template) return null
                 const isDestructive = isDestructiveTemplate(id)
                 const isArchive = id.includes('archive')

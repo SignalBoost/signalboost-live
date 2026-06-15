@@ -22,7 +22,6 @@ import { createClient } from '@supabase/supabase-js'
 import { getTemplate, validateTemplatePayload } from '@/lib/hub/provider-templates'
 import { getHubActionPolicy, isActionBlocked, requiresOwnerApproval } from '@/lib/hub/action-policy'
 import { getCurrentUser as resolveHubUser } from '@/lib/auth/permission-middleware'
-import { vaultEncrypt, vaultDecrypt } from '@/lib/vault/crypto'
 import { scanAWSUsers, scanAWSAccessKeys } from '@/lib/hub/aws-scanner'
 import { scanGCPServiceAccounts } from '@/lib/hub/gcp-scanner'
 
@@ -461,7 +460,7 @@ async function executeStripeAction(template: any, payload: Record<string, unknow
     return { ok: true, message: 'Price updated: ' + (data.id || id), data: { id: data.id, active: data.active, nickname: data.nickname } }
   }
 
-  // == ENHANCED CRASH-PROOF PRICE VIEWER ==
+  // == CRASH-PROOF ENHANCED PRICE VIEWER ==
   if (template.id === 'stripe.view_prices') {
     const product = String(payload?.product || '')
     const qs = product ? `?product=${encodeURIComponent(product)}&limit=50` : '?limit=50'
@@ -477,7 +476,7 @@ async function executeStripeAction(template: any, payload: Record<string, unknow
     const prices = Array.isArray(data.data) ? data.data : []
     return {
       ok: true,
-      message: `Stripe: ${prices.length} price resources retrieved`,
+      message: `Stripe: ${prices.length} price records retrieved`,
       data: {
         count: prices.length,
         prices: prices.map((p: any) => {
@@ -633,7 +632,6 @@ async function executeSupabaseAction(template: any, payload: Record<string, unkn
     return { ok: true, message: `Query returned ${rows.length} rows`, data: { rowCount: rows.length, rows: rows.slice(0, 50) } }
   }
 
-  const client = createClient(url, key)
   return { ok: true, message: 'Supabase operational execution layer complete', data: {} }
 }
 

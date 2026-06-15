@@ -131,6 +131,9 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
   },
 
   // ===================== GITHUB =====================
+  // ===================== GITHUB =====================
+  // Repo + PR/issue/branch fields are remote_select: populated live from list
+  // actions and chosen from a dropdown — no typing ids that might be wrong/closed.
   'github.list_repos': {
     id: 'github.list_repos',
     label: 'View Repos',
@@ -140,6 +143,106 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     api: { service: 'GitHub', method: 'GET', endpoint: '/v1/repos' },
     fields: [],
   },
+  'github.list_prs': {
+    id: 'github.list_prs',
+    label: 'List Pull Requests',
+    description: 'Show open pull requests (newest first) for a repository.',
+    icon: '🔀',
+    policyActionId: 'read_provider_status',
+    api: { service: 'GitHub', method: 'GET', endpoint: '/v1/pulls' },
+    fields: [
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+    ],
+  },
+  'github.view_pr_files': {
+    id: 'github.view_pr_files',
+    label: 'View PR Files',
+    description: 'List the files changed in a pull request.',
+    icon: '📂',
+    policyActionId: 'read_provider_status',
+    api: { service: 'GitHub', method: 'GET', endpoint: '/v1/pulls/files' },
+    fields: [
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'number', label: 'Pull Request', type: 'remote_select', required: true, source: { action: 'github.list_prs', dataPath: 'pulls', valueKey: 'number', labelTemplate: '#{number} — {title} ({branch})', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
+    ],
+  },
+  'github.merge_pr': {
+    id: 'github.merge_pr',
+    label: 'Merge PR',
+    description: 'Merge a pull request into its base branch.',
+    icon: '✅',
+    requiresConfirm: true,
+    policyActionId: 'crud_actions',
+    api: { service: 'GitHub', method: 'PUT', endpoint: '/v1/pulls/merge' },
+    fields: [
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'number', label: 'Pull Request', type: 'remote_select', required: true, source: { action: 'github.list_prs', dataPath: 'pulls', valueKey: 'number', labelTemplate: '#{number} — {title} ({branch})', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
+      { id: 'method', label: 'Merge Method', type: 'select', defaultValue: 'merge', options: [
+        { label: 'Merge commit', value: 'merge' },
+        { label: 'Squash', value: 'squash' },
+        { label: 'Rebase', value: 'rebase' },
+      ] },
+    ],
+  },
+  'github.close_pr': {
+    id: 'github.close_pr',
+    label: 'Close PR',
+    description: 'Close a pull request without merging.',
+    icon: '🚫',
+    requiresConfirm: true,
+    policyActionId: 'crud_actions',
+    api: { service: 'GitHub', method: 'PATCH', endpoint: '/v1/pulls/close' },
+    fields: [
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'number', label: 'Pull Request', type: 'remote_select', required: true, source: { action: 'github.list_prs', dataPath: 'pulls', valueKey: 'number', labelTemplate: '#{number} — {title} ({branch})', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
+    ],
+  },
+  'github.list_branches': {
+    id: 'github.list_branches',
+    label: 'List Branches',
+    description: 'List branches in a repository (useful for ai/* cleanup).',
+    icon: '🌿',
+    policyActionId: 'read_provider_status',
+    api: { service: 'GitHub', method: 'GET', endpoint: '/v1/branches' },
+    fields: [
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+    ],
+  },
+  'github.delete_branch': {
+    id: 'github.delete_branch',
+    label: 'Delete Branch',
+    description: 'Delete a branch by name (main is protected).',
+    icon: '🗑️',
+    requiresConfirm: true,
+    policyActionId: 'crud_actions',
+    api: { service: 'GitHub', method: 'DELETE', endpoint: '/v1/branches' },
+    fields: [
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'branch', label: 'Branch', type: 'remote_select', required: true, source: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
+    ],
+  },
+  'github.list_commits': {
+    id: 'github.list_commits',
+    label: 'Recent Commits',
+    description: 'Show the most recent commits on a repository.',
+    icon: '📜',
+    policyActionId: 'read_provider_status',
+    api: { service: 'GitHub', method: 'GET', endpoint: '/v1/commits' },
+    fields: [
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+    ],
+  },
+  'github.list_issues': {
+    id: 'github.list_issues',
+    label: 'List Issues',
+    description: 'Show open issues for a repository.',
+    icon: '🐛',
+    policyActionId: 'read_provider_status',
+    api: { service: 'GitHub', method: 'GET', endpoint: '/v1/issues' },
+    fields: [
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+    ],
+  },
   'github.open_issue': {
     id: 'github.open_issue',
     label: 'Open Issue',
@@ -148,7 +251,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'crud_actions',
     api: { service: 'GitHub', method: 'POST', endpoint: '/v1/issues' },
     fields: [
-      { id: 'repo', label: 'Repo (owner/name)', type: 'text', required: true, placeholder: 'SignalBoost/signalboost-live' },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
       { id: 'title', label: 'Title', type: 'text', required: true },
       { id: 'body', label: 'Description', type: 'textarea' },
     ],
@@ -156,18 +259,30 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
   'github.edit_issue': {
     id: 'github.edit_issue',
     label: 'Edit Issue',
-    description: 'Update an issue\'s title, body, or open/closed state.',
+    description: 'Update an issue\u2019s title or open/closed state.',
     icon: '✏️',
     policyActionId: 'crud_actions',
     api: { service: 'GitHub', method: 'POST', endpoint: '/v1/issues/update' },
     fields: [
-      { id: 'repo', label: 'Repo (owner/name)', type: 'text', required: true },
-      { id: 'number', label: 'Issue #', type: 'number', required: true },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'number', label: 'Issue', type: 'remote_select', required: true, source: { action: 'github.list_issues', dataPath: 'issues', valueKey: 'number', labelTemplate: '#{number} — {title}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
       { id: 'title', label: 'New Title', type: 'text' },
       { id: 'state', label: 'State', type: 'select', options: [
         { label: 'Open', value: 'open' },
         { label: 'Closed', value: 'closed' },
       ] },
+    ],
+  },
+  'github.close_issue': {
+    id: 'github.close_issue',
+    label: 'Close Issue',
+    description: 'Close an open issue.',
+    icon: '✔️',
+    policyActionId: 'crud_actions',
+    api: { service: 'GitHub', method: 'PATCH', endpoint: '/v1/issues/close' },
+    fields: [
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'number', label: 'Issue', type: 'remote_select', required: true, source: { action: 'github.list_issues', dataPath: 'issues', valueKey: 'number', labelTemplate: '#{number} — {title}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
     ],
   },
   'github.rotate_token': {
@@ -188,7 +303,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'crud_actions',
     api: { service: 'GitHub', method: 'POST', endpoint: '/v1/secrets' },
     fields: [
-      { id: 'repo', label: 'Repo (owner/name)', type: 'text', required: true },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
       { id: 'name', label: 'Secret Name', type: 'text', required: true, placeholder: 'API_KEY' },
       { id: 'value', label: 'Secret Value', type: 'secret', required: true },
     ],
@@ -487,108 +602,4 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     ],
   },
   // ===================== GITHUB (console expansion) =====================
-  'github.list_prs': {
-    id: 'github.list_prs',
-    label: 'List Pull Requests',
-    description: 'Show open pull requests (newest first) for a repository.',
-    icon: '🔀',
-    policyActionId: 'read_provider_status',
-    api: { service: 'GitHub', method: 'GET', endpoint: '/v1/pulls' },
-    fields: [{ id: 'repo', label: 'Repo (owner/name)', type: 'text', placeholder: 'SignalBoost/signalboost-live' }],
-  },
-  'github.view_pr_files': {
-    id: 'github.view_pr_files',
-    label: 'View PR Files',
-    description: 'List the files changed in a pull request.',
-    icon: '📂',
-    policyActionId: 'read_provider_status',
-    api: { service: 'GitHub', method: 'GET', endpoint: '/v1/pulls/files' },
-    fields: [
-      { id: 'repo', label: 'Repo (owner/name)', type: 'text', placeholder: 'SignalBoost/signalboost-live' },
-      { id: 'number', label: 'PR #', type: 'number', required: true },
-    ],
-  },
-  'github.merge_pr': {
-    id: 'github.merge_pr',
-    label: 'Merge PR',
-    description: 'Merge a pull request into its base branch.',
-    icon: '✅',
-    requiresConfirm: true,
-    policyActionId: 'crud_actions',
-    api: { service: 'GitHub', method: 'PUT', endpoint: '/v1/pulls/merge' },
-    fields: [
-      { id: 'repo', label: 'Repo (owner/name)', type: 'text', placeholder: 'SignalBoost/signalboost-live' },
-      { id: 'number', label: 'PR #', type: 'number', required: true },
-      { id: 'method', label: 'Merge Method', type: 'select', options: [
-        { label: 'Merge commit', value: 'merge' },
-        { label: 'Squash', value: 'squash' },
-        { label: 'Rebase', value: 'rebase' },
-      ] },
-    ],
-  },
-  'github.close_pr': {
-    id: 'github.close_pr',
-    label: 'Close PR',
-    description: 'Close a pull request without merging.',
-    icon: '🚫',
-    requiresConfirm: true,
-    policyActionId: 'crud_actions',
-    api: { service: 'GitHub', method: 'PATCH', endpoint: '/v1/pulls/close' },
-    fields: [
-      { id: 'repo', label: 'Repo (owner/name)', type: 'text', placeholder: 'SignalBoost/signalboost-live' },
-      { id: 'number', label: 'PR #', type: 'number', required: true },
-    ],
-  },
-  'github.list_branches': {
-    id: 'github.list_branches',
-    label: 'List Branches',
-    description: 'List branches in a repository (useful for ai/* cleanup).',
-    icon: '🌿',
-    policyActionId: 'read_provider_status',
-    api: { service: 'GitHub', method: 'GET', endpoint: '/v1/branches' },
-    fields: [{ id: 'repo', label: 'Repo (owner/name)', type: 'text', placeholder: 'SignalBoost/signalboost-live' }],
-  },
-  'github.delete_branch': {
-    id: 'github.delete_branch',
-    label: 'Delete Branch',
-    description: 'Delete a branch by name (main is protected by GitHub).',
-    icon: '🗑️',
-    requiresConfirm: true,
-    policyActionId: 'crud_actions',
-    api: { service: 'GitHub', method: 'DELETE', endpoint: '/v1/branches' },
-    fields: [
-      { id: 'repo', label: 'Repo (owner/name)', type: 'text', placeholder: 'SignalBoost/signalboost-live' },
-      { id: 'branch', label: 'Branch Name', type: 'text', required: true, placeholder: 'ai/feature-x' },
-    ],
-  },
-  'github.list_commits': {
-    id: 'github.list_commits',
-    label: 'Recent Commits',
-    description: 'Show the most recent commits on a repository.',
-    icon: '📜',
-    policyActionId: 'read_provider_status',
-    api: { service: 'GitHub', method: 'GET', endpoint: '/v1/commits' },
-    fields: [{ id: 'repo', label: 'Repo (owner/name)', type: 'text', placeholder: 'SignalBoost/signalboost-live' }],
-  },
-  'github.list_issues': {
-    id: 'github.list_issues',
-    label: 'List Issues',
-    description: 'Show open issues for a repository.',
-    icon: '🐛',
-    policyActionId: 'read_provider_status',
-    api: { service: 'GitHub', method: 'GET', endpoint: '/v1/issues' },
-    fields: [{ id: 'repo', label: 'Repo (owner/name)', type: 'text', placeholder: 'SignalBoost/signalboost-live' }],
-  },
-  'github.close_issue': {
-    id: 'github.close_issue',
-    label: 'Close Issue',
-    description: 'Close an open issue.',
-    icon: '✔️',
-    policyActionId: 'crud_actions',
-    api: { service: 'GitHub', method: 'PATCH', endpoint: '/v1/issues/close' },
-    fields: [
-      { id: 'repo', label: 'Repo (owner/name)', type: 'text', placeholder: 'SignalBoost/signalboost-live' },
-      { id: 'number', label: 'Issue #', type: 'number', required: true },
-    ],
-  },
 }

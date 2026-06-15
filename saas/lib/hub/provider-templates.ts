@@ -23,7 +23,7 @@ export interface ProviderTemplate {
   icon: string
   requiresConfirm?: boolean
   previewBeforeSubmit?: boolean
-  policyActionId?: string // Maps explicit access parameters for route policy handling
+  policyActionId?: string
   api: {
     service: string
     method: 'GET' | 'POST' | 'PUT' | 'DELETE'
@@ -297,6 +297,14 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     api: { service: 'Vercel', method: 'GET', endpoint: '/v1/deployments' },
     fields: []
   },
+  'vercel.list_env_vars': {
+    id: 'vercel.list_env_vars',
+    label: 'View Env Vars',
+    description: 'List all active environment variable configurations on this project tracking ring.',
+    icon: '🔑',
+    api: { service: 'Vercel', method: 'GET', endpoint: '/v1/projects/env' },
+    fields: []
+  },
   'vercel.trigger_rollback': {
     id: 'vercel.trigger_rollback',
     label: 'Rollback Deploy',
@@ -320,7 +328,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     id: 'vercel.add_env_var',
     label: 'Environment Variables',
     description: 'Inject variables globally across Production, Preview, or Staging development paths.',
-    icon: '🔑',
+    icon: '➕',
     api: { service: 'Vercel', method: 'POST', endpoint: '/v1/projects/env' },
     fields: [
       { id: 'key', label: 'Variable Key String', type: 'text', required: true, placeholder: 'NEXT_PUBLIC_API_URL' },
@@ -444,7 +452,6 @@ export function getTemplate(id: string): ProviderTemplate | null {
   return PROVIDER_TEMPLATES[id] || null
 }
 
-// Fixed to accept an optional providerId string to return filtered actions list tracks safely
 export function getProviderTemplates(providerId?: string): ProviderTemplate[] {
   const templates = Object.values(PROVIDER_TEMPLATES)
   if (!providerId) return templates

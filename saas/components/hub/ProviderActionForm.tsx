@@ -895,13 +895,13 @@ function ObjectArrayTable({ rows }: { rows: any[] }) {
 
   return (
     <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10 }}>
-      <div style={{ height: '100%', overflowY: 'auto', overflowX: 'hidden' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: gridColumns, gap: 10, padding: '8px 10px', position: 'sticky', top: 0, background: 'rgba(8,11,20,.98)', borderBottom: '1px solid rgba(255,255,255,.08)', zIndex: 1 }}>
+      <div style={{ height: '100%', overflowY: 'auto', overflowX: 'auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: gridColumns, gap: 8, padding: '8px 10px', position: 'sticky', top: 0, background: 'rgba(8,11,20,.98)', borderBottom: '1px solid rgba(255,255,255,.08)', zIndex: 1 }}>
           {columns.map(col => <div key={col} style={tableHeadStyle}>{niceLabel(col)}</div>)}
         </div>
 
         {rows.slice(0, 100).map((row, i) => (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: gridColumns, gap: 10, padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,.06)', alignItems: 'center' }}>
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: gridColumns, gap: 8, padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,.06)', alignItems: 'center' }}>
             {columns.map(col => (
               <div
                 key={col}
@@ -934,10 +934,11 @@ function makeColumns(columns: string[]) {
   if (columns.length <= 1) return 'minmax(0, 1fr)'
 
   return columns.map((column, index) => {
-    if (index === 0) return 'minmax(160px, 1.7fr)'
-    if (column === 'active') return '70px'
-    if (column.toLowerCase().includes('created')) return '105px'
-    return 'minmax(90px, 1fr)'
+    if (index === 0) return 'minmax(120px, 1.6fr)'
+    if (column === 'active') return '54px'
+    if (column.toLowerCase().includes('created')) return '88px'
+    if (column.toLowerCase().includes('price')) return 'minmax(74px, 1fr)'
+    return 'minmax(70px, 1fr)'
   }).join(' ')
 }
 

@@ -76,8 +76,8 @@ export async function POST(req: NextRequest): Promise<NextResponse<ActionRespons
       return NextResponse.json({ ok: false, error: 'Requires owner permissions' }, { status: 403 })
     }
 
-    // Force strict lowercase conversion across all template lookups
-    const serviceKey = String(template.api?.service || template.service || '').toLowerCase().trim()
+    // Fixed: Clean property access matching the strict ProviderTemplate type definition interface
+    const serviceKey = String(template.api?.service || '').toLowerCase().trim()
     const envVars = PROVIDER_CREDENTIALS[serviceKey]
     
     if (!envVars) {
@@ -97,7 +97,6 @@ export async function POST(req: NextRequest): Promise<NextResponse<ActionRespons
       return NextResponse.json({ ok: false, error: result.error || 'Action failed execution check' }, { status: 400 })
     }
   } catch (err) {
-    // Capture the exact crash error string to prevent anonymous masking
     const errorMsg = err instanceof Error ? err.message : 'Unknown exception'
     console.error('Fatal API pipeline crash stack:', err)
     return NextResponse.json({ ok: false, error: 'Internal server error pipeline anomaly: ' + errorMsg }, { status: 500 })

@@ -1,7 +1,11 @@
 // saas/app/api/hub/domains/add/route.ts
+// Hub Console — add a domain to the Vercel project (gated: domains:manage).
+// Project id + creds resolve via the shared resolver. teamId is optional.
+
 import { NextRequest, NextResponse } from 'next/server'
 import { addVercelDomain } from '@/lib/hub/vercel-domains'
 import { requirePermission } from '@/lib/auth/permission-middleware'
+import { resolveVercelProject } from '@/lib/hub/vercel-project'
 
 type AddRequest = {
   domain: string
@@ -21,25 +25,16 @@ export async function POST(req: NextRequest) {
     const { domain } = body
 
     if (!domain) {
-      return NextResponse.json(
-        { ok: false, error: 'Domain name required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ ok: false, error: 'Domain name required' }, { status: 400 })
     }
 
-    const vercelToken = process.env.VERCEL_TOKEN
-    const vercelTeamId = process.env.VERCEL_TEAM_ID
-    const vercelProjectId = process.env.VERCEL_HUB_PROJECT
-
-    if (!vercelToken || !vercelTeamId || !vercelProjectId) {
-      return NextResponse.json(
-        { ok: false, error: 'Vercel credentials not configured' },
-        { status: 500 }
-      )
+    const creds = await resolveVercelProject()
+    if (!creds.ok || !creds.token || !creds.projectId) {
+      return NextResponse.json({ ok: false, error: creds.error || 'Vercel not configured' }, { status: 500 })
     }
 
-    const result = await addVercelDomain(vercelTeamId, vercelProjectId, domain, vercelToken)
-    return NextResponse.json(result)
+    const result = await addVercelDomain(creds.teamId, creds.projectId, domain, creds.token)
+    return NextResponse.json(result, { status: result.ok ? 200 : 502 })
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json({ ok: false, error: msg }, { status: 500 })

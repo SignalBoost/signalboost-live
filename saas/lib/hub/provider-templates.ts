@@ -1,6 +1,8 @@
 // saas/lib/hub/provider-templates.ts
 // Hub Console — Complete universal action form templates synchronized with backend policy dictionaries.
 
+import { EXTRA_TEMPLATES } from './provider-templates-extra'
+
 export interface ProviderFormField {
   id: string
   label: string
@@ -480,6 +482,12 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     fields: []
   }
 }
+
+// Merge in the Wave-1 extended template set (Twilio, SendGrid, Cloudflare,
+// Firebase, DigitalOcean, Datadog, Sentry, PagerDuty + Stripe/Supabase/GitHub/
+// AWS/Vault/Governance gaps). Kept in a separate file so this registry stays
+// readable; getTemplate() and validateTemplatePayload() see them transparently.
+Object.assign(PROVIDER_TEMPLATES, EXTRA_TEMPLATES)
 
 export function getTemplate(id: string): ProviderTemplate | null {
   return PROVIDER_TEMPLATES[id] || null

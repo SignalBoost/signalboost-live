@@ -674,7 +674,7 @@ function EmbeddedVercelEnvList() {
   if (envs.length === 0) return <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', padding: '4px 0' }}>No active configuration keys found.</div>
 
   return (
-    <div style={{ maxHeight: '160px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, background: 'rgba(0,0,0,0.2)', padding: '6px 10px' }}>
+    <div style={{贼maxHeight: '160px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, background: 'rgba(0,0,0,0.2)', padding: '6px 10px' }}>
       {envs.map(env => (
         <div key={env.id || env.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 12.5 }}>
           <span style={{ fontFamily: monoStyle.fontFamily, color: 'rgba(26,240,255,0.9)', fontWeight: 600 }}>{env.key}</span>
@@ -742,4 +742,256 @@ function ObjectArrayTable({ rows }: { rows: any[] }) {
   return (
     <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10 }}>
       <div style={{ height: '100%', overflowY: 'auto', overflowX: 'hidden' }}>
-        <div style={{ display: 'grid', gridTemplateColumns
+        <div style={{ display: 'grid', gridTemplateColumns: gridColumns, gap: 10, padding: '8px 10px', position: 'sticky', top: 0, background: 'rgba(8,11,20,.98)', borderBottom: '1px solid rgba(255,255,255,.08)', zIndex: 1 }}>
+          {columns.map(col => <div key={col} style={tableHeadStyle}>{niceLabel(col)}</div>)}
+        </div>
+
+        {rows.slice(0, 100).map((row, i) => (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: gridColumns, gap: 10, padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,.06)', alignItems: 'center' }}>
+            {columns.map(col => (
+              <div
+                key={col}
+                title={formatCell(row[col])}
+                style={col === 'name' || col === 'label' || col === 'key' ? tableMainCellStyle : tableCellStyle}
+              >
+                {formatCell(row[col])}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function getDisplayColumns(rows: any[]): string[] {
+  const preferred = ['key', 'name', 'label', 'id', 'type', 'target', 'active', 'created', 'createdAt']
+  const existing = new Set<string>()
+
+  rows.forEach(row => Object.keys(row || {}).forEach(k => existing.add(k)))
+
+  const preferredExisting = preferred.filter(k => existing.has(k))
+  const rest = Array.from(existing).filter(k => !preferred.includes(k)).slice(0, Math.max(0, 5 - preferredExisting.length))
+
+  return [...preferredExisting, ...rest].slice(0, 5)
+}
+
+function makeColumns(columns: string[]) {
+  if (columns.length <= 1) return 'minmax(0, 1fr)'
+
+  return columns.map((column, index) => {
+    if (index === 0) return 'minmax(160px, 1.7fr)'
+    if (column === 'active') return '70px'
+    if (column.toLowerCase().includes('created')) return '105px'
+    return 'minmax(90px, 1fr)'
+  }).join(' ')
+}
+
+function niceLabel(key: string): string {
+  return key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim()
+}
+
+function formatCell(v: any): string {
+  if (v === null || v === undefined || v === '') return '—'
+  if (typeof v === 'boolean') return v ? 'yes' : 'no'
+  if (typeof v === 'object') return JSON.stringify(v)
+  return String(v)
+}
+
+function CenteredState({
+  icon,
+  title,
+  titleColor = '#fff',
+  spin = false,
+  children,
+}: {
+  icon: string
+  title: string
+  titleColor?: string
+  spin?: boolean
+  children?: React.ReactNode
+}) {
+  return (
+    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12, justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: 20 }}>
+      <div style={{ fontSize: spin ? 18 : 32, animation: spin ? 'spin 2s linear infinite' : undefined }}>{icon}</div>
+      <div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: titleColor }}>{title}</div>
+        {children && <div style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', marginTop: 4 }}>{children}</div>}
+      </div>
+    </div>
+  )
+}
+
+const footerStyle: CSSProperties = {
+  padding: '12px 16px',
+  background: 'rgba(255,255,255,.02)',
+  borderTop: '1px solid rgba(255,255,255,.07)',
+  display: 'flex',
+  gap: 10,
+  justifyContent: 'flex-end',
+  flex: '0 0 auto',
+}
+
+const noticeStyle: CSSProperties = {
+  padding: 12,
+  background: 'rgba(26,240,255,.08)',
+  border: '1px solid rgba(26,240,255,.2)',
+  borderRadius: 10,
+  fontSize: 12,
+  color: 'rgba(255,255,255,.7)',
+  flex: '0 0 auto',
+}
+
+const jsonBoxStyle: CSSProperties = {
+  flex: 1,
+  minHeight: 0,
+  padding: 12,
+  background: 'rgba(3,7,18,.5)',
+  border: '1px solid rgba(255,255,255,.08)',
+  borderRadius: 10,
+  fontFamily: monoStyle.fontFamily,
+  fontSize: 11,
+  color: 'rgba(255,255,255,.7)',
+  whiteSpace: 'pre-wrap',
+  overflow: 'auto',
+}
+
+const scrollBoxStyle: CSSProperties = {
+  flex: 1,
+  minHeight: 0,
+  overflowY: 'auto',
+  border: '1px solid rgba(255,255,255,.08)',
+  borderRadius: 10,
+  padding: 10,
+}
+
+const scalarRowStyle: CSSProperties = {
+  fontSize: 12,
+  color: 'rgba(255,255,255,.82)',
+  fontFamily: monoStyle.fontFamily,
+  padding: '5px 0',
+  borderBottom: '1px solid rgba(255,255,255,.05)',
+}
+
+const keyValueRowStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '120px minmax(0, 1fr)',
+  gap: 12,
+  padding: '5px 0',
+  fontSize: 12,
+  borderBottom: '1px solid rgba(255,255,255,.05)',
+}
+
+const valueTextStyle: CSSProperties = {
+  color: 'rgba(255,255,255,.85)',
+  fontFamily: monoStyle.fontFamily,
+  textAlign: 'right',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+}
+
+const pickerBoxStyle: CSSProperties = {
+  width: '100%',
+  padding: '10px 12px',
+  borderRadius: 8,
+  border: '1px solid rgba(255,255,255,.15)',
+  background: 'rgba(255,255,255,.04)',
+  color: 'rgba(255,255,255,.65)',
+  fontSize: 13,
+}
+
+const pickerInputStyle: CSSProperties = {
+  width: '100%',
+  padding: '10px 12px',
+  borderRadius: 8,
+  background: 'rgba(255,255,255,.04)',
+  color: '#fff',
+  fontSize: 13,
+  fontFamily: 'inherit',
+  outline: 'none',
+  cursor: 'pointer',
+}
+
+const tableHeadStyle: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 800,
+  letterSpacing: '.08em',
+  textTransform: 'uppercase',
+  color: 'rgba(255,255,255,.45)',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+}
+
+const tableCellStyle: CSSProperties = {
+  fontSize: 11,
+  color: 'rgba(26,240,255,.82)',
+  fontFamily: monoStyle.fontFamily,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  minWidth: 0,
+}
+
+const tableMainCellStyle: CSSProperties = {
+  ...tableCellStyle,
+  color: '#fff',
+  fontWeight: 700,
+  fontFamily: 'inherit',
+}
+
+const secondaryButtonStyle: CSSProperties = {
+  padding: '8px 14px',
+  borderRadius: 10,
+  border: '1px solid rgba(255,255,255,.15)',
+  background: 'rgba(255,255,255,.05)',
+  color: 'rgba(255,255,255,.7)',
+  fontSize: 12,
+  fontWeight: 600,
+  cursor: 'pointer',
+}
+
+const primaryButtonStyle: CSSProperties = {
+  padding: '8px 14px',
+  borderRadius: 10,
+  border: '1px solid rgba(26,240,255,.35)',
+  background: 'rgba(26,240,255,.10)',
+  color: '#1af0ff',
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: 'pointer',
+}
+
+const warningButtonStyle: CSSProperties = {
+  padding: '8px 14px',
+  borderRadius: 10,
+  border: '1px solid rgba(255,195,0,.35)',
+  background: 'rgba(255,195,0,.10)',
+  color: '#ffc300',
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: 'pointer',
+}
+
+const dangerButtonStyle: CSSProperties = {
+  padding: '8px 14px',
+  borderRadius: 10,
+  border: '1px solid rgba(239,68,68,.4)',
+  background: 'rgba(239,68,68,.15)',
+  color: '#ef4444',
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: 'pointer',
+}
+
+const closeButtonStyle: CSSProperties = {
+  padding: '8px 14px',
+  borderRadius: 10,
+  border: '1px solid rgba(148,163,184,.35)',
+  background: 'rgba(148,163,184,.10)',
+  color: 'rgba(255,255,255,.7)',
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: 'pointer',
+}

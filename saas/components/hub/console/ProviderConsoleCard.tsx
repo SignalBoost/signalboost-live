@@ -64,7 +64,7 @@ export function ProviderConsoleCard({ provider, lang, onExpand, onRun }: CardPro
         {provider.sections.map((section, idx) => (
           <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255, 255, 255, 0.35)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{section.title}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
               {section.templateIds.map(id => {
                 const template = getTemplate(id)
                 if (!template) return null

@@ -1,23 +1,34 @@
 // saas/lib/hub/vercel-domains.ts
-// Vercel domain and DNS record management
+// Vercel domain and DNS record management.
+//
+// teamId is optional. The old code appended `?teamId=${teamId}` to every URL
+// unconditionally, so a personal/non-team project (empty teamId) produced
+// `?teamId=` and Vercel rejected it — the Domains/DNS panel came back empty.
+// teamUrl() now omits the teamId param entirely when it's blank.
 
 import { VercelDomain, DNSRecord, Domain, DNSCheckResult, SSLCertificate } from './domains-types'
 
 const VERCEL_API = 'https://api.vercel.com'
 
+// Append ?teamId=... (or &teamId=...) only when a team id is actually present.
+function teamUrl(path: string, teamId?: string): string {
+  const base = `${VERCEL_API}${path}`
+  if (!teamId) return base
+  const sep = path.includes('?') ? '&' : '?'
+  return `${base}${sep}teamId=${encodeURIComponent(teamId)}`
+}
+
 /**
  * List all domains in Vercel project
  */
-export async function listVercelDomains(teamId: string, projectId: string, token: string): Promise<{
+export async function listVercelDomains(teamId: string | undefined, projectId: string, token: string): Promise<{
   ok: boolean
   domains?: VercelDomain[]
   error?: string
 }> {
   try {
-    const res = await fetch(`${VERCEL_API}/v9/projects/${projectId}/domains?teamId=${teamId}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+    const res = await fetch(teamUrl(`/v9/projects/${projectId}/domains`, teamId), {
+      headers: { Authorization: `Bearer ${token}` },
     })
 
     if (!res.ok) {
@@ -36,20 +47,15 @@ export async function listVercelDomains(teamId: string, projectId: string, token
 /**
  * Get domain details including SSL and DNS records
  */
-export async function getVercelDomain(teamId: string, projectId: string, domain: string, token: string): Promise<{
+export async function getVercelDomain(teamId: string | undefined, projectId: string, domain: string, token: string): Promise<{
   ok: boolean
   domain?: VercelDomain & { records?: DNSRecord[] }
   error?: string
 }> {
   try {
-    const res = await fetch(
-      `${VERCEL_API}/v9/projects/${projectId}/domains/${domain}?teamId=${teamId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    )
+    const res = await fetch(teamUrl(`/v9/projects/${projectId}/domains/${domain}`, teamId), {
+      headers: { Authorization: `Bearer ${token}` },
+    })
 
     if (!res.ok) {
       const error = await res.text()
@@ -67,14 +73,14 @@ export async function getVercelDomain(teamId: string, projectId: string, domain:
 /**
  * Add domain to Vercel project
  */
-export async function addVercelDomain(teamId: string, projectId: string, domain: string, token: string): Promise<{
+export async function addVercelDomain(teamId: string | undefined, projectId: string, domain: string, token: string): Promise<{
   ok: boolean
   domain?: VercelDomain
   verification?: { type: string; value: string; domain: string }
   error?: string
 }> {
   try {
-    const res = await fetch(`${VERCEL_API}/v9/projects/${projectId}/domains?teamId=${teamId}`, {
+    const res = await fetch(teamUrl(`/v9/projects/${projectId}/domains`, teamId), {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -103,22 +109,17 @@ export async function addVercelDomain(teamId: string, projectId: string, domain:
 /**
  * Verify domain ownership
  */
-export async function verifyVercelDomain(teamId: string, projectId: string, domain: string, token: string): Promise<{
+export async function verifyVercelDomain(teamId: string | undefined, projectId: string, domain: string, token: string): Promise<{
   ok: boolean
   verified: boolean
   domain?: VercelDomain
   error?: string
 }> {
   try {
-    const res = await fetch(
-      `${VERCEL_API}/v9/projects/${projectId}/domains/${domain}/verify?teamId=${teamId}`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    )
+    const res = await fetch(teamUrl(`/v9/projects/${projectId}/domains/${domain}/verify`, teamId), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    })
 
     if (!res.ok) {
       const error = await res.text()
@@ -140,20 +141,15 @@ export async function verifyVercelDomain(teamId: string, projectId: string, doma
 /**
  * Remove domain from Vercel project
  */
-export async function removeVercelDomain(teamId: string, projectId: string, domain: string, token: string): Promise<{
+export async function removeVercelDomain(teamId: string | undefined, projectId: string, domain: string, token: string): Promise<{
   ok: boolean
   error?: string
 }> {
   try {
-    const res = await fetch(
-      `${VERCEL_API}/v9/projects/${projectId}/domains/${domain}?teamId=${teamId}`,
-      {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    )
+    const res = await fetch(teamUrl(`/v9/projects/${projectId}/domains/${domain}`, teamId), {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
 
     if (!res.ok) {
       const error = await res.text()
@@ -170,20 +166,15 @@ export async function removeVercelDomain(teamId: string, projectId: string, doma
 /**
  * Get SSL certificate status
  */
-export async function getSSLStatus(teamId: string, projectId: string, domain: string, token: string): Promise<{
+export async function getSSLStatus(teamId: string | undefined, projectId: string, domain: string, token: string): Promise<{
   ok: boolean
   ssl?: SSLCertificate
   error?: string
 }> {
   try {
-    const res = await fetch(
-      `${VERCEL_API}/v9/projects/${projectId}/domains/${domain}?teamId=${teamId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    )
+    const res = await fetch(teamUrl(`/v9/projects/${projectId}/domains/${domain}`, teamId), {
+      headers: { Authorization: `Bearer ${token}` },
+    })
 
     if (!res.ok) {
       const error = await res.text()

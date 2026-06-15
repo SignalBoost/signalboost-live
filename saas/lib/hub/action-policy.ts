@@ -1,5 +1,3 @@
-'use client'
-
 // saas/lib/hub/action-policy.ts
 // Hub Console Action Policy Layer
 //

@@ -1,3 +1,4 @@
+import { localizeProvider, cHub } from '@/lib/i18n/consoleCopy'
 // saas/lib/hub/console-catalog.ts
 // Hub Command Console — Complete Tier and Provider Orchestration Register.
 //
@@ -281,30 +282,25 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
       { title: 'Transcripts', templateIds: ['assemblyai.list_transcripts', 'assemblyai.transcript_details'] }
     ]
   }
-  ,
-  {
-    id: 'supabase_mkt', name: 'Supabase — Marketing', subtitle: 'MARKETING DB', accent: '#3ecf8e', tier: 'core',
-    sections: [
-      { title: 'Data', templateIds: ['supabase_mkt.list_tables', 'supabase_mkt.list_rows'] },
-      { title: 'Auth', templateIds: ['supabase_mkt.list_users'] },
-      { title: 'Storage', templateIds: ['supabase_mkt.list_buckets'] }
-    ]
-  }
 ]
 
-export function getConsoleTier(id: ConsoleTierId) {
-  return CONSOLE_TIERS.find(t => t.id === id) || CONSOLE_TIERS[0]
+export function getConsoleTier(id: ConsoleTierId, lang?: string) {
+  const tier = CONSOLE_TIERS.find(t => t.id === id) || CONSOLE_TIERS[0]
+  if (!lang || lang === 'en') return tier
+  return { ...tier, label: cHub(lang, `hub.tier.${tier.id}`, tier.label), sidebarTitle: cHub(lang, `hub.tier.sidebar.${tier.id}`, tier.sidebarTitle), blurb: cHub(lang, `hub.tier.blurb.${tier.id}`, (tier as any).blurb || '') }
 }
 
-export function getConsoleProvider(id: string) {
-  return CONSOLE_PROVIDERS.find(p => p.id === id) || null
+export function getConsoleProvider(id: string, lang?: string) {
+  const p = CONSOLE_PROVIDERS.find(p => p.id === id) || null
+  return p && lang && lang !== 'en' ? localizeProvider(p, lang) : p
 }
 
-export function getTierProviders(tierId: ConsoleTierId) {
+export function getTierProviders(tierId: ConsoleTierId, lang?: string) {
   const known = CONSOLE_TIERS.some(t => t.id === tierId)
   // Unknown/legacy tier ids fall back to Core so nothing ever renders empty.
   const target = known ? tierId : 'core'
-  return CONSOLE_PROVIDERS.filter(p => p.tier === target)
+  const list = CONSOLE_PROVIDERS.filter(p => p.tier === target)
+  return (lang && lang !== 'en') ? list.map(p => localizeProvider(p, lang)) : list
 }
 
 export function isDestructiveTemplate(id: string): boolean {

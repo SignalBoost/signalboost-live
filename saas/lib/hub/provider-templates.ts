@@ -1,5 +1,5 @@
 // saas/lib/hub/provider-templates.ts
-// Hub Console — Complete universal action form templates.
+// Hub Console — Complete universal action form templates with explicit policy mappings.
 
 export interface ProviderFormField {
   id: string
@@ -23,7 +23,7 @@ export interface ProviderTemplate {
   icon: string
   requiresConfirm?: boolean
   previewBeforeSubmit?: boolean
-  policyActionId?: string
+  policyActionId?: string // Authorizes the action against the backend compliance policy router
   api: {
     service: string
     method: 'GET' | 'POST' | 'PUT' | 'DELETE'
@@ -294,6 +294,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Deployments Panel',
     description: 'Inspect running build tracks, commit records, and production target assignments.',
     icon: '🚀',
+    policyActionId: 'vercel.list_deployments',
     api: { service: 'Vercel', method: 'GET', endpoint: '/v1/deployments' },
     fields: []
   },
@@ -302,6 +303,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'View Env Vars',
     description: 'List all active environment variable configurations on this project tracking ring.',
     icon: '🔑',
+    policyActionId: 'vercel.list_env_vars', // Unlocks the security policy gate
     api: { service: 'Vercel', method: 'GET', endpoint: '/v1/projects/env' },
     fields: []
   },
@@ -311,6 +313,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     description: 'Instantly point production edge domain targets back to a historical deployment hash.',
     icon: '↩️',
     requiresConfirm: true,
+    policyActionId: 'vercel.trigger_rollback',
     api: { service: 'Vercel', method: 'POST', endpoint: '/v1/projects/rollback' },
     fields: [
       { id: 'deploymentId', label: 'Deployment ID', type: 'text', required: true, placeholder: 'dpl_...' }
@@ -321,6 +324,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Cancel Build',
     description: 'Abort an active compiling orchestration queue element directly at the gateway.',
     icon: '🛑',
+    policyActionId: 'vercel.cancel_build',
     api: { service: 'Vercel', method: 'POST', endpoint: '/v1/builds/cancel' },
     fields: [{ id: 'buildId', label: 'Build ID', type: 'text', required: true }]
   },
@@ -329,6 +333,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Environment Variables',
     description: 'Inject variables globally across Production, Preview, or Staging development paths.',
     icon: '➕',
+    policyActionId: 'vercel.add_env_var',
     api: { service: 'Vercel', method: 'POST', endpoint: '/v1/projects/env' },
     fields: [
       { id: 'key', label: 'Variable Key String', type: 'text', required: true, placeholder: 'NEXT_PUBLIC_API_URL' },
@@ -345,6 +350,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     description: 'Wipe environment variable keys completely off the active build pipeline.',
     icon: '🗑️',
     requiresConfirm: true,
+    policyActionId: 'vercel.delete_env_var', // Unlocks the security policy gate
     api: { service: 'Vercel', method: 'DELETE', endpoint: '/v1/projects/env' },
     fields: [{ id: 'key', label: 'Variable Key String', type: 'text', required: true }]
   },
@@ -353,6 +359,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Domains/DNS',
     description: 'Configure canonical configurations, alias paths, or trigger edge SSL certification rules.',
     icon: '🌐',
+    policyActionId: 'vercel.sync_dns_domain',
     api: { service: 'Vercel', method: 'POST', endpoint: '/v1/domains/sync' },
     fields: [{ id: 'domain', label: 'Domain Address string', type: 'text', required: true, placeholder: 'app.domain.com' }]
   },

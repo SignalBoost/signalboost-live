@@ -56,19 +56,24 @@ export default function CommandConsole({
     setUtilityId(id)
     setFocusProviderId(null)
   }
+  const resetToHome = () => {
+    setFocusProviderId(null)
+    setUtilityId(null)
+    setPage(0)
+  }
   const run = (templateId: string) => setActiveTemplateId(templateId)
 
   const focusProvider = focusProviderId ? getConsoleProvider(focusProviderId) : null
 
   return (
-    <div style={{ display: 'flex', minHeight: 'calc(100vh - 80px)', background: '#070b14', color: '#fff', position: 'relative' }}>
+    <div style={{ display: 'flex', minHeight: 'calc(100vh - 80px)', background: '#070b14', color: '#fff', position: 'relative', boxSizing: 'border-box' }}>
       {/* Sidebar */}
-      <aside style={{ width: 248, flex: '0 0 248px', background: 'linear-gradient(180deg, rgba(13,18,32,.9), rgba(8,11,20,.9))', borderRight: '1px solid rgba(255,255,255,.07)', display: 'flex', flexDirection: 'column', padding: '16px 12px', overflowY: 'auto' }}>
+      <aside style={{ width: 248, flex: '0 0 248px', background: 'linear-gradient(180deg, rgba(13,18,32,.9), rgba(8,11,20,.9))', borderRight: '1px solid rgba(255,255,255,.07)', display: 'flex', flexDirection: 'column', padding: '16px 12px', overflowY: 'auto', boxSizing: 'border-box' }}>
         <div style={{ padding: '4px 8px 12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, color: 'rgba(255,255,255,.92)', fontWeight: 800, fontSize: 14 }}>
-            <span style={{ color: 'rgba(255,255,255,.55)' }}>≡</span>
+          <button onClick={resetToHome} style={{ background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: 9, color: 'rgba(255,255,255,.92)', fontWeight: 800, fontSize: 14, cursor: 'pointer', padding: 0, textAlign: 'left' }}>
+            <span style={{ color: '#1af0ff' }}>≡</span>
             {tier?.sidebarTitle}
-          </div>
+          </button>
           <div style={{ display: 'flex', gap: 6, marginTop: 11 }}>
             {CONSOLE_TIERS.map(t => {
               const active = t.id === tierId
@@ -108,13 +113,25 @@ export default function CommandConsole({
         </nav>
       </aside>
 
-      {/* Content Main Area */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <div style={{ flex: 1, overflow: 'auto', padding: '26px 30px' }}>
+      {/* Content Area */}
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, boxSizing: 'border-box' }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: '24px 24px', boxSizing: 'border-box' }}>
           {utilityId ? (
-            <UtilityFrame id={utilityId} lang={lang} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>
+                <button onClick={resetToHome} style={{ background: 'none', border: 'none', color: '#1af0ff', cursor: 'pointer', padding: 0, fontSize: 11, fontWeight: 700 }}>🎛️ Hub Home</button> / Utility Views
+              </div>
+              <UtilityFrame id={utilityId} lang={lang} />
+            </div>
           ) : focusProvider ? (
-            <ProviderWorkspace provider={focusProvider} tierLabel={tier?.label ? `Tier ${tier.index} · ${tier.label}` : 'Tier'} lang={lang} onBack={() => setFocusProviderId(null)} onRun={run} />
+            <ProviderWorkspace 
+              provider={focusProvider} 
+              tierLabel={tier?.label ? `Tier ${tier.index} · ${tier.label}` : 'Tier'} 
+              lang={lang} 
+              onBack={() => setFocusProviderId(null)} 
+              onHome={resetToHome}
+              onRun={run} 
+            />
           ) : (
             <>
               <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
@@ -131,7 +148,7 @@ export default function CommandConsole({
                 )}
               </div>
 
-              <div className="sb-console-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
+              <div className="sb-console-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start', boxSizing: 'border-box' }}>
                 {visible.map(p => (
                   <ProviderConsoleCard key={p.id} provider={p} lang={lang} onExpand={() => openProvider(p.id)} onRun={run} />
                 ))}
@@ -141,13 +158,13 @@ export default function CommandConsole({
         </div>
 
         {/* Audit footer */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,.07)', padding: '14px 30px', textAlign: 'center', fontSize: 12.5, color: 'rgba(255,255,255,.55)', background: 'rgba(8,11,20,.6)' }}>
+        <div style={{ borderTop: '1px solid rgba(255,255,255,.07)', padding: '14px 24px', textAlign: 'center', fontSize: 12.5, color: 'rgba(255,255,255,.55)', background: 'rgba(8,11,20,.6)' }}>
           <strong style={{ color: 'rgba(255,255,255,.8)' }}>Audit Log:</strong> All actions are recorded for compliance.{' '}
           <button onClick={() => openUtility('logs')} style={{ background: 'none', border: 'none', color: '#1af0ff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}>View log →</button>
         </div>
       </main>
 
-      {/* Action form modal overlay */}
+      {/* Action modal overlay */}
       {activeTemplateId && (() => {
         const t = getTemplate(activeTemplateId)
         const isView = t?.api.method === 'GET'

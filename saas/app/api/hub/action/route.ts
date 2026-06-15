@@ -25,6 +25,13 @@ import { getCurrentUser as resolveHubUser } from '@/lib/auth/permission-middlewa
 import { vaultEncrypt, vaultDecrypt } from '@/lib/vault/crypto'
 import { scanAWSUsers, scanAWSAccessKeys } from '@/lib/hub/aws-scanner'
 import { scanGCPServiceAccounts } from '@/lib/hub/gcp-scanner'
+import { executeTwilioAction } from '@/lib/hub/providers/twilio'
+import { executeSendGridAction } from '@/lib/hub/providers/sendgrid'
+import { executeCloudflareAction } from '@/lib/hub/providers/cloudflare'
+import { executeDigitalOceanAction } from '@/lib/hub/providers/digitalocean'
+import { executeDatadogAction } from '@/lib/hub/providers/datadog'
+import { executeSentryAction } from '@/lib/hub/providers/sentry'
+import { executePagerDutyAction } from '@/lib/hub/providers/pagerduty'
 
 // ============================================================================
 // Types & Setup
@@ -125,6 +132,10 @@ const PROVIDER_CREDENTIALS: Record<
   datadog: {
     envVars: ['DATADOG_API_KEY', 'DATADOG_API_URL'],
     baseUrl: undefined, // From env
+  },
+  digitalocean: {
+    envVars: ['DIGITALOCEAN_TOKEN'],
+    baseUrl: 'https://api.digitalocean.com',
   },
   pagerduty: {
     envVars: ['PAGERDUTY_API_KEY'],
@@ -314,6 +325,20 @@ async function executeProviderAction(
       return await executeVaultAction(template, payload)
     case 'auth0':
       return await executeAuth0Action(template, payload)
+    case 'twilio':
+      return await executeTwilioAction(template, payload)
+    case 'sendgrid':
+      return await executeSendGridAction(template, payload)
+    case 'cloudflare':
+      return await executeCloudflareAction(template, payload)
+    case 'digitalocean':
+      return await executeDigitalOceanAction(template, payload)
+    case 'datadog':
+      return await executeDatadogAction(template, payload)
+    case 'sentry':
+      return await executeSentryAction(template, payload)
+    case 'pagerduty':
+      return await executePagerDutyAction(template, payload)
     // Add more service handlers as templates expand.
     default:
       return { ok: false, error: 'Provider not implemented: ' + service }

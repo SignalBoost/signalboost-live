@@ -17,11 +17,23 @@ import ProviderActionForm from '../ProviderActionForm'
 import { getTemplate } from '@/lib/hub/provider-templates'
 import { ProviderConsoleCard, ProviderWorkspace } from './ProviderConsoleCard'
 import { DomainsPage } from '../pages/DomainsPage'
+import EnvVarsPage from '../pages/EnvVarsPage'
 import { DeploymentsPage } from '../pages/DeploymentsPage'
 import { LogsPage } from '../pages/LogsPage'
 import { SettingsPage } from '../pages/SettingsPage'
 
 const PER_PAGE = 2
+
+// Vercel env cards that should open the full view/add/edit/delete CRUD panel
+// instead of the single-action template form.
+const ENV_CRUD_TEMPLATES = new Set<string>([
+  'vercel.add_env_var',
+  'vercel.list_env_vars',
+  'vercel.delete_env_var',
+  'vercel.view_env',
+  'vercel.delete_env',
+  'vercel.edit_env',
+])
 
 export default function CommandConsole({
   lang = 'en',
@@ -168,10 +180,24 @@ export default function CommandConsole({
       {activeTemplateId && (() => {
         const t = getTemplate(activeTemplateId)
         const isView = t?.api.method === 'GET'
+        const isEnvCrud = ENV_CRUD_TEMPLATES.has(activeTemplateId)
         return (
           <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setActiveTemplateId(null)}>
-            <div style={{ width: '100%', maxWidth: isView ? 560 : 520, maxHeight: '82vh', overflow: 'auto', borderRadius: 18 }} onClick={e => e.stopPropagation()}>
-              <ProviderActionForm templateId={activeTemplateId} lang={lang} onClose={() => setActiveTemplateId(null)} onSuccess={() => setActiveTemplateId(null)} onError={() => {}} />
+            <div style={{ width: '100%', maxWidth: isEnvCrud ? 1040 : isView ? 560 : 520, maxHeight: '88vh', overflow: 'auto', borderRadius: 18 }} onClick={e => e.stopPropagation()}>
+              {isEnvCrud ? (
+                <div style={{ background: 'linear-gradient(160deg, rgba(15,23,42,.96), rgba(3,7,18,.98))', border: '1px solid rgba(255,255,255,.1)', borderRadius: 18, padding: '18px 18px 22px', boxShadow: '0 24px 70px rgba(0,0,0,.6)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
+                    <div>
+                      <div style={{ fontSize: 16, fontWeight: 900, color: '#fff' }}>Environment Variables</div>
+                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginTop: 2 }}>View, add, edit, and delete variables across Production, Preview, and Development.</div>
+                    </div>
+                    <button onClick={() => setActiveTemplateId(null)} style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 9, color: 'rgba(255,255,255,.7)', fontSize: 13, fontWeight: 800, cursor: 'pointer', padding: '7px 12px' }}>✕ Close</button>
+                  </div>
+                  <EnvVarsPage />
+                </div>
+              ) : (
+                <ProviderActionForm templateId={activeTemplateId} lang={lang} onClose={() => setActiveTemplateId(null)} onSuccess={() => setActiveTemplateId(null)} onError={() => {}} />
+              )}
             </div>
           </div>
         )

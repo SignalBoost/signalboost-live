@@ -13,7 +13,14 @@ export interface ProviderFormField {
   step?: number
   defaultValue?: any
   help?: string
-  source?: string
+  // Expands source to allow both simple string endpoints and advanced object definitions safely
+  source?: string | {
+    action: string
+    dataPath?: string
+    valueKey?: string
+    labelTemplate?: string
+    dependsOn?: string[]
+  }
   options?: { label: string; value: string }[]
 }
 
@@ -27,7 +34,7 @@ export interface ProviderTemplate {
   policyActionId?: string 
   api: {
     service: string
-    method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' // Officially allowed PATCH requests here
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
     endpoint: string
   }
   fields: ProviderFormField[]

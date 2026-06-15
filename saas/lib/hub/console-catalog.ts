@@ -84,8 +84,9 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     subtitle: 'DEPLOYMENTS & NETWORKING',
     accent: '#fff',
     sections: [
+      // Each button opens a real, live workspace panel (see CommandConsole VERCEL_PANEL_ROUTER).
       { title: 'Deployments', templateIds: ['vercel.list_deployments', 'vercel.trigger_rollback', 'vercel.cancel_build'] },
-      { title: 'Configuration', templateIds: ['vercel.view_env', 'vercel.add_env_var', 'vercel.delete_env', 'vercel.sync_dns_domain'] }
+      { title: 'Configuration', templateIds: ['vercel.add_env_var', 'vercel.sync_dns_domain'] }
     ]
   },
   {

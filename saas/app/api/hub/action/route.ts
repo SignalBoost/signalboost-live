@@ -29,7 +29,7 @@ async function getCurrentUser(req: NextRequest) {
   return { id: '00000000-0000-0000-0000-000000000000', role: 'owner', email: 'admin@signalboostapp.com' }
 }
 
-// Unified mapping register maps both case variations to ensure environment safety tracks are bulletproof
+// Case-insensitive mapping lookup keys provide absolute safety tracks
 const PROVIDER_CREDENTIALS: Record<string, string[]> = {
   stripe: ['STRIPE_SECRET_KEY'],
   supabase: ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'],
@@ -76,16 +76,17 @@ export async function POST(req: NextRequest): Promise<NextResponse<ActionRespons
       return NextResponse.json({ ok: false, error: 'Requires owner permissions' }, { status: 403 })
     }
 
-    const serviceKey = String(template.api.service || '').toLowerCase()
+    // Force strict lowercase conversion across all template lookups
+    const serviceKey = String(template.api?.service || template.service || '').toLowerCase().trim()
     const envVars = PROVIDER_CREDENTIALS[serviceKey]
     
     if (!envVars) {
-      return NextResponse.json({ ok: false, error: 'Provider configuration map missing: ' + template.api.service }, { status: 501 })
+      return NextResponse.json({ ok: false, error: 'Provider configuration map missing for: ' + serviceKey }, { status: 501 })
     }
 
     const missing = envVars.filter(v => !process.env[v])
     if (missing.length > 0) {
-      return NextResponse.json({ ok: false, error: 'Missing integration secret parameter: ' + missing[0] }, { status: 501 })
+      return NextResponse.json({ ok: false, error: 'Missing integration secret parameter inside environmental profile: ' + missing[0] }, { status: 501 })
     }
 
     const result = await streamProxyAction(template, serviceKey, payload)
@@ -93,26 +94,32 @@ export async function POST(req: NextRequest): Promise<NextResponse<ActionRespons
     if (result.ok) {
       return NextResponse.json({ ok: true, message: result.message, data: result.data }, { status: 200 })
     } else {
-      return NextResponse.json({ ok: false, error: result.error }, { status: 400 })
+      return NextResponse.json({ ok: false, error: result.error || 'Action failed execution check' }, { status: 400 })
     }
   } catch (err) {
-    console.error('Fatal API pipeline crash:', err)
-    return NextResponse.json({ ok: false, error: 'Internal server error pipeline anomaly' }, { status: 500 })
+    // Capture the exact crash error string to prevent anonymous masking
+    const errorMsg = err instanceof Error ? err.message : 'Unknown exception'
+    console.error('Fatal API pipeline crash stack:', err)
+    return NextResponse.json({ ok: false, error: 'Internal server error pipeline anomaly: ' + errorMsg }, { status: 500 })
   }
 }
 
 async function streamProxyAction(template: any, service: string, payload: Record<string, unknown>) {
-  if (service === 'stripe') {
+  const normService = String(service).toLowerCase().trim()
+
+  if (normService === 'stripe') {
     const apiKey = process.env.STRIPE_SECRET_KEY
+    if (!apiKey) return { ok: false, error: 'Stripe credentials empty in runtime' }
     
     if (template.id === 'stripe.view_prices') {
       const product = String(payload?.product || '')
       const qs = product ? `?product=${encodeURIComponent(product)}&limit=100` : '?limit=100'
+      
       const res = await fetch('https://api.stripe.com/v1/prices' + qs, {
         method: 'GET',
-        headers: { 'Authorization': 'Bearer ' + apiKey }
+        headers: { 'Authorization': `Bearer ${apiKey}` }
       })
-      if (!res.ok) return { ok: false, error: await res.text() }
+      if (!res.ok) return { ok: false, error: 'Stripe API Rejected: ' + await res.text() }
       const rawData = await res.json()
       
       return {
@@ -122,11 +129,11 @@ async function streamProxyAction(template: any, service: string, payload: Record
           prices: (rawData.data || []).map((p: any) => ({
             key: p.id,
             id: p.id,
-            currency: String(p.currency).toUpperCase(),
-            amount: p.unit_amount ? (p.unit_amount / 100).toFixed(2) : 'Tiered Rate',
-            type: p.type,
+            currency: String(p.currency || 'USD').toUpperCase(),
+            amount: p.unit_amount ? (p.unit_amount / 100).toFixed(2) : 'Tiered/Variable',
+            type: p.type || 'standard',
             active: p.active ? 'yes' : 'no',
-            billing_scheme: p.billing_scheme
+            billing_scheme: p.billing_scheme || 'flat'
           }))
         }
       }
@@ -135,9 +142,9 @@ async function streamProxyAction(template: any, service: string, payload: Record
     if (template.id === 'stripe.view_products') {
       const res = await fetch('https://api.stripe.com/v1/products?limit=100', {
         method: 'GET',
-        headers: { 'Authorization': 'Bearer ' + apiKey }
+        headers: { 'Authorization': `Bearer ${apiKey}` }
       })
-      if (!res.ok) return { ok: false, error: await res.text() }
+      if (!res.ok) return { ok: false, error: 'Stripe API Rejected: ' + await res.text() }
       const rawData = await res.json()
       
       return {
@@ -157,21 +164,21 @@ async function streamProxyAction(template: any, service: string, payload: Record
 
     const res = await fetch('https://api.stripe.com' + template.api.endpoint, {
       method: template.api.method,
-      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/x-www-form-urlencoded' },
       body: template.api.method === 'GET' ? undefined : new URLSearchParams(payload as any).toString()
     })
     if (!res.ok) return { ok: false, error: await res.text() }
     return { ok: true, message: 'Stripe execution complete', data: await res.json() }
   }
 
-  if (service === 'vercel') {
+  if (normService === 'vercel') {
     const token = process.env.VERCEL_TOKEN
     const projectId = process.env.VERCEL_HUB_PROJECT
 
     if (template.id === 'vercel.view_env') {
       const res = await fetch(`https://api.vercel.com/v9/projects/${projectId}/env`, {
         method: 'GET',
-        headers: { 'Authorization': 'Bearer ' + token }
+        headers: { 'Authorization': `Bearer ${token}` }
       })
       if (!res.ok) return { ok: false, error: await res.text() }
       const rawData = await res.json()
@@ -195,7 +202,7 @@ async function streamProxyAction(template: any, service: string, payload: Record
       const id = String(payload.id || '')
       const res = await fetch(`https://api.vercel.com/v9/projects/${projectId}/env/${encodeURIComponent(id)}`, {
         method: 'DELETE',
-        headers: { 'Authorization': 'Bearer ' + token }
+        headers: { 'Authorization': `Bearer ${token}` }
       })
       if (!res.ok) return { ok: false, error: await res.text() }
       return { ok: true, message: 'Variable successfully deleted' }
@@ -204,7 +211,7 @@ async function streamProxyAction(template: any, service: string, payload: Record
     const url = 'https://api.vercel.com' + template.api.endpoint.replace('{projectId}', projectId || '')
     const res = await fetch(url, {
       method: template.api.method,
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: template.api.method === 'GET' ? undefined : JSON.stringify(payload)
     })
     if (!res.ok) return { ok: false, error: await res.text() }
@@ -216,7 +223,7 @@ async function streamProxyAction(template: any, service: string, payload: Record
     }
   }
 
-  if (service === 'vault') {
+  if (normService === 'vault') {
     const sUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const sKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     const supabase = createClient(sUrl!, sKey!)

@@ -1,7 +1,7 @@
 'use client'
 
 // saas/components/hub/ProviderActionForm.tsx
-// Hub Console — Universal form renderer for provider actions.
+// Hub Console — Universal form renderer for provider actions with active intercept pickers.
 
 import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import {
@@ -18,6 +18,12 @@ type StripeProductOption = {
   name: string
   active?: boolean
   created?: string
+}
+
+type VercelEnvOption = {
+  id: string
+  key: string
+  target?: string | string[]
 }
 
 export type ProviderActionFormProps = {
@@ -290,10 +296,14 @@ function FormField({ templateId, field, value, error, onChange }: FormFieldProps
   }
 
   const useStripeProductPicker = isStripeProductPickerField(templateId, field.id)
+  const useVercelEnvPicker = templateId === 'vercel.delete_env_var' && field.id === 'key'
 
   const renderInput = () => {
     if (useStripeProductPicker) {
       return <StripeProductPicker value={(value as string) || ''} onChange={onChange} error={error} />
+    }
+    if (useVercelEnvPicker) {
+      return <VercelEnvVarPicker value={(value as string) || ''} onChange={onChange} error={error} />
     }
 
     switch (field.type) {
@@ -386,14 +396,18 @@ function FormField({ templateId, field, value, error, onChange }: FormFieldProps
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
       {field.type !== 'toggle' && (
         <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 6 }}>
-          {useStripeProductPicker ? 'Product' : field.label}
+          {useVercelEnvPicker ? 'Environment Variable Key' : useStripeProductPicker ? 'Product' : field.label}
           {field.required && <span style={{ color: '#ef4444' }}>*</span>}
         </label>
       )}
 
       {renderInput()}
 
-      {useStripeProductPicker ? (
+      {useVercelEnvPicker ? (
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: -2 }}>
+          Select from live environment configurations. The console maps key allocations directly.
+        </div>
+      ) : useStripeProductPicker ? (
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: -2 }}>
           Select from the live Stripe catalog. The console sends the hidden product ID to Stripe.
         </div>
@@ -406,10 +420,8 @@ function FormField({ templateId, field, value, error, onChange }: FormFieldProps
   )
 }
 
-// Catches all variations of string naming conventions for product key lookups
 function isStripeProductPickerField(templateId: string, fieldId: string) {
   const normField = fieldId.toLowerCase().replace(/[^a-z0-9]/g, '')
-  
   return (
     (templateId === 'stripe.create_price' && fieldId === 'product') ||
     (templateId === 'stripe.edit_product' && (normField === 'id' || normField === 'productid')) ||
@@ -518,6 +530,110 @@ function StripeProductPicker({
   )
 }
 
+function VercelEnvVarPicker({
+  value,
+  onChange,
+  error,
+}: {
+  value: string
+  onChange: (value: unknown) => void
+  error?: string
+}) {
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [envs, setEnvs] = useState<VercelEnvOption[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadEnvs() {
+      setLoading(true)
+      setLoadError(null)
+
+      try {
+        const res = await fetch('/api/hub/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ templateId: 'vercel.list_env_vars', payload: {} }),
+        })
+
+        const data = await res.json()
+
+        if (!res.ok) {
+          throw new Error(data.error || 'Unable to fetch project configuration assets')
+        }
+
+        const items = Array.isArray(data.data?.envs) 
+          ? data.data.envs 
+          : Array.isArray(data.data) 
+            ? data.data 
+            : []
+
+        if (!cancelled) {
+          setEnvs(items)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError(err instanceof Error ? err.message : 'Unable to query environments')
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadEnvs()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (loading) {
+    return (
+      <div style={{ ...pickerBoxStyle, borderColor: error ? 'rgba(239,68,68,.5)' : 'rgba(255,255,255,.15)' }}>
+        Loading active Vercel configurations…
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <input
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder="NEXT_PUBLIC_..."
+        style={{
+          ...pickerInputStyle,
+          border: error ? '1px solid rgba(239,68,68,.5)' : '1px solid rgba(255,255,255,.15)',
+        }}
+      />
+    )
+  }
+
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      style={{
+        ...pickerInputStyle,
+        border: error ? '1px solid rgba(239,68,68,.5)' : '1px solid rgba(255,255,255,.15)',
+      }}
+    >
+      <option value="" disabled style={{ color: '#111', background: '#fff' }}>
+        Select an environment variable to delete
+      </option>
+
+      {envs.map(env => (
+        <option key={env.id || env.key} value={env.key} style={{ color: '#111', background: '#fff' }}>
+          {env.key} {env.target ? `(${Array.isArray(env.target) ? env.target.join(', ') : env.target})` : ''}
+        </option>
+      ))}
+    </select>
+  )
+}
+
 function ResultView({ data }: { data: any }) {
   if (data === null || data === undefined) return null
 
@@ -583,7 +699,7 @@ function ObjectArrayTable({ rows }: { rows: any[] }) {
               <div
                 key={col}
                 title={formatCell(row[col])}
-                style={col === 'name' || col === 'label' ? tableMainCellStyle : tableCellStyle}
+                style={col === 'name' || col === 'label' || col === 'key' ? tableMainCellStyle : tableCellStyle}
               >
                 {formatCell(row[col])}
               </div>
@@ -596,7 +712,7 @@ function ObjectArrayTable({ rows }: { rows: any[] }) {
 }
 
 function getDisplayColumns(rows: any[]): string[] {
-  const preferred = ['name', 'label', 'id', 'active', 'created', 'createdAt', 'email', 'username', 'status']
+  const preferred = ['key', 'name', 'label', 'id', 'type', 'target', 'active', 'created', 'createdAt']
   const existing = new Set<string>()
 
   rows.forEach(row => Object.keys(row || {}).forEach(k => existing.add(k)))
@@ -607,6 +723,7 @@ function getDisplayColumns(rows: any[]): string[] {
   return [...preferredExisting, ...rest].slice(0, 5)
 }
 
+// Formats column widths inside modal data display grids
 function makeColumns(columns: string[]) {
   if (columns.length <= 1) return 'minmax(0, 1fr)'
 
@@ -622,6 +739,7 @@ function niceLabel(key: string): string {
   return key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim()
 }
 
+// Evaluates object properties to present text descriptors inside cell targets
 function formatCell(v: any): string {
   if (v === null || v === undefined || v === '') return '—'
   if (typeof v === 'boolean') return v ? 'yes' : 'no'

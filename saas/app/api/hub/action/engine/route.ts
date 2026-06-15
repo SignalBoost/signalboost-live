@@ -21,6 +21,7 @@ import '@/console-core/executors/anthropic'
 import '@/console-core/executors/gemini'
 import '@/console-core/executors/resend'
 import '@/console-core/executors/assemblyai'
+import '@/console-core/executors/supabase-marketing'
 
 export async function POST(req: NextRequest) {
   try {

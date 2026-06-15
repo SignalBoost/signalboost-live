@@ -13,8 +13,7 @@ export interface ProviderFormField {
   step?: number
   defaultValue?: any
   help?: string
-  // Added optional emptyHint support to fully satisfy the other agent's cascading select configurations
-  source?: string | {
+  source?: {
     action: string
     dataPath?: string
     valueKey?: string

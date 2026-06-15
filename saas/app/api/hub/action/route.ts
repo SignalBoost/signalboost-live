@@ -259,15 +259,20 @@ export async function POST(req: NextRequest): Promise<NextResponse<ActionRespons
       )
     }
 
-    // 9. Log the action
+    // 9. Log the action (non-fatal — an audit-log failure must NEVER fail a
+    //    successful action; the work already happened, logging is best-effort).
     if (policy.auditRequired) {
-      await logAuditEvent(
-        actorId,
-        templateId,
-        result.ok ? 'SUCCESS' : 'FAILURE',
-        result.message || (result.ok ? 'Action completed' : 'Action failed'),
-        result.data,
-      )
+      try {
+        await logAuditEvent(
+          actorId,
+          templateId,
+          result.ok ? 'SUCCESS' : 'FAILURE',
+          result.message || (result.ok ? 'Action completed' : 'Action failed'),
+          result.data,
+        )
+      } catch (auditErr) {
+        console.error('Audit logging failed (non-fatal):', auditErr)
+      }
     }
 
     // 10. Return result to client
@@ -286,7 +291,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ActionRespons
     const errorMsg = err instanceof Error ? err.message : 'Internal server error'
     console.error('Hub action route error:', errorMsg, err)
     return NextResponse.json(
-      { ok: false, error: 'Internal server error' },
+      { ok: false, error: errorMsg },
       { status: 500 },
     )
   }

@@ -259,20 +259,15 @@ export async function POST(req: NextRequest): Promise<NextResponse<ActionRespons
       )
     }
 
-    // 9. Log the action (non-fatal — an audit-log failure must NEVER fail a
-    //    successful action; the work already happened, logging is best-effort).
+    // 9. Log the action
     if (policy.auditRequired) {
-      try {
-        await logAuditEvent(
-          actorId,
-          templateId,
-          result.ok ? 'SUCCESS' : 'FAILURE',
-          result.message || (result.ok ? 'Action completed' : 'Action failed'),
-          result.data,
-        )
-      } catch (auditErr) {
-        console.error('Audit logging failed (non-fatal):', auditErr)
-      }
+      await logAuditEvent(
+        actorId,
+        templateId,
+        result.ok ? 'SUCCESS' : 'FAILURE',
+        result.message || (result.ok ? 'Action completed' : 'Action failed'),
+        result.data,
+      )
     }
 
     // 10. Return result to client
@@ -291,7 +286,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ActionRespons
     const errorMsg = err instanceof Error ? err.message : 'Internal server error'
     console.error('Hub action route error:', errorMsg, err)
     return NextResponse.json(
-      { ok: false, error: errorMsg },
+      { ok: false, error: 'Internal server error' },
       { status: 500 },
     )
   }
@@ -674,6 +669,69 @@ async function executeStripeAction(template: any, payload: Record<string, unknow
         hasMore: data.has_more || false,
         products: (data.data || []).slice(0, 5).map((p: any) => ({ id: p.id, name: p.name })),
       },
+    }
+  }
+
+  // Read action: list customers (source for the customer picker on Adjust Balance)
+  if (template.id === 'stripe.list_customers') {
+    const res = await fetch('https://api.stripe.com/v1/customers?limit=100', {
+      method: 'GET',
+      headers: { 'Authorization': 'Bearer ' + apiKey },
+    })
+    if (!res.ok) {
+      const e = await res.text()
+      return { ok: false, error: e || res.statusText }
+    }
+    const data = await res.json()
+    const customers = (data.data || []).map((c: any) => {
+      let created = ''
+      try { created = c.created ? new Date(c.created * 1000).toISOString().slice(0, 10) : '' } catch { created = '' }
+      const label = c.email || c.name || c.id
+      return {
+        customer: label,
+        email: c.email || '—',
+        name: c.name || '—',
+        created,
+        id: c.id,
+      }
+    })
+    return {
+      ok: true,
+      message: `Stripe: ${customers.length} customer${customers.length === 1 ? '' : 's'}`,
+      data: { count: customers.length, customers },
+    }
+  }
+
+  // Read action: list charges (source for the charge picker on Refund/Adjustments)
+  if (template.id === 'stripe.list_charges') {
+    const res = await fetch('https://api.stripe.com/v1/charges?limit=100', {
+      method: 'GET',
+      headers: { 'Authorization': 'Bearer ' + apiKey },
+    })
+    if (!res.ok) {
+      const e = await res.text()
+      return { ok: false, error: e || res.statusText }
+    }
+    const data = await res.json()
+    const charges = (data.data || []).map((ch: any) => {
+      const amt = typeof ch.amount === 'number' ? (ch.amount / 100).toFixed(2) : '—'
+      const cur = (ch.currency || 'usd').toUpperCase()
+      let created = ''
+      try { created = ch.created ? new Date(ch.created * 1000).toISOString().slice(0, 10) : '' } catch { created = '' }
+      const desc = ch.description || (ch.billing_details && ch.billing_details.email) || ch.id
+      return {
+        charge: `$${amt} ${cur} — ${desc}`,
+        amount: `$${amt} ${cur}`,
+        status: ch.status || '—',
+        refunded: ch.refunded ? 'yes' : 'no',
+        created,
+        id: ch.id,
+      }
+    })
+    return {
+      ok: true,
+      message: `Stripe: ${charges.length} charge${charges.length === 1 ? '' : 's'}`,
+      data: { count: charges.length, charges },
     }
   }
 

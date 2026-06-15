@@ -444,9 +444,11 @@ export function getTemplate(id: string): ProviderTemplate | null {
   return PROVIDER_TEMPLATES[id] || null
 }
 
-// Satisfies legacy lookup requirements inside secondary component modals
-export function getProviderTemplates() {
-  return PROVIDER_TEMPLATES
+// Fixed to accept an optional providerId string to return filtered actions list tracks safely
+export function getProviderTemplates(providerId?: string): ProviderTemplate[] {
+  const templates = Object.values(PROVIDER_TEMPLATES)
+  if (!providerId) return templates
+  return templates.filter(t => t.id.startsWith(providerId + '.'))
 }
 
 export function validateTemplatePayload(templateId: string, payload: Record<string, any>) {

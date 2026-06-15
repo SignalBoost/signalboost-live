@@ -4,7 +4,8 @@
 export interface ProviderFormField {
   id: string
   label: string
-  type: 'text' | 'email' | 'phone' | 'textarea' | 'number' | 'currency_cents' | 'secret' | 'select' | 'toggle'
+  // Added 'remote_select' to satisfy the component form layout rendering engines perfectly
+  type: 'text' | 'email' | 'phone' | 'textarea' | 'number' | 'currency_cents' | 'secret' | 'select' | 'toggle' | 'remote_select'
   required?: boolean
   placeholder?: string
   maxLength?: number
@@ -13,6 +14,7 @@ export interface ProviderFormField {
   step?: number
   defaultValue?: any
   help?: string
+  source?: string // Used by the remote selection fetchers
   options?: { label: string; value: string }[]
 }
 

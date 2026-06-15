@@ -444,6 +444,11 @@ export function getTemplate(id: string): ProviderTemplate | null {
   return PROVIDER_TEMPLATES[id] || null
 }
 
+// Satisfies legacy lookup requirements inside secondary component modals
+export function getProviderTemplates() {
+  return PROVIDER_TEMPLATES
+}
+
 export function validateTemplatePayload(templateId: string, payload: Record<string, any>) {
   const template = getTemplate(templateId)
   if (!template) return { ok: false, missing: [], error: 'Template layout not registered' }

@@ -1,3 +1,5 @@
+'use client'
+
 // saas/lib/hub/action-policy.ts
 // Hub Console Action Policy Layer
 //
@@ -6,9 +8,6 @@
 // - Keep read-only monitoring automatic.
 // - Require explicit human approval for sensitive writes, secrets, billing,
 //   production changes, destructive operations, and role changes.
-//
-// This file does not execute provider actions. It is a safety contract used by
-// future Hub automation flows.
 
 export type HubActionLevel = 'read' | 'suggest' | 'prepare_change' | 'execute_change'
 export type HubRiskLevel = 'low' | 'medium' | 'high' | 'critical'
@@ -305,9 +304,6 @@ export const HUB_ACTION_POLICIES: Record<string, HubActionPolicy> = {
     description: 'Run an internal credential and configuration audit. Read-only; admin approval and audit record.',
   },
 
-  // Generic capability policies referenced by provider templates. Without these,
-  // getHubActionPolicy fail-closes the action to BLOCKED. Gating them at admin
-  // keeps the actions usable while still requiring approval + audit.
   invoke_model: {
     id: 'invoke_model',
     label: 'Invoke AI model',
@@ -520,9 +516,11 @@ export const HUB_ACTION_POLICIES: Record<string, HubActionPolicy> = {
   },
 }
 
-export function getHubActionPolicy(actionId: string): HubActionPolicy {
-  return HUB_ACTION_POLICIES[actionId] || {
-    id: actionId,
+// Accepts an optional actionId to securely match incoming policy properties from route.ts
+export function getHubActionPolicy(actionId?: string): HubActionPolicy {
+  const targetId = actionId || 'unknown'
+  return HUB_ACTION_POLICIES[targetId] || {
+    id: targetId,
     label: 'Unknown Hub action',
     level: 'execute_change',
     risk: 'critical',
@@ -534,16 +532,16 @@ export function getHubActionPolicy(actionId: string): HubActionPolicy {
   }
 }
 
-export function canRunWithoutApproval(actionId: string): boolean {
+export function canRunWithoutApproval(actionId?: string): boolean {
   const policy = getHubActionPolicy(actionId)
   return policy.approval === 'none' && policy.risk === 'low'
 }
 
-export function requiresOwnerApproval(actionId: string): boolean {
+export function requiresOwnerApproval(actionId?: string): boolean {
   const policy = getHubActionPolicy(actionId)
   return policy.approval === 'owner' || policy.approval === 'owner_with_audit'
 }
 
-export function isActionBlocked(actionId: string): boolean {
+export function isActionBlocked(actionId?: string): boolean {
   return getHubActionPolicy(actionId).approval === 'blocked'
 }

@@ -85,7 +85,7 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     accent: '#fff',
     sections: [
       { title: 'Deployments', templateIds: ['vercel.list_deployments', 'vercel.trigger_rollback', 'vercel.cancel_build'] },
-      { title: 'Configuration', templateIds: ['vercel.list_env_vars', 'vercel.add_env_var', 'vercel.delete_env_var', 'vercel.sync_dns_domain'] }
+      { title: 'Configuration', templateIds: ['vercel.view_env', 'vercel.add_env_var', 'vercel.delete_env', 'vercel.sync_dns_domain'] }
     ]
   },
   {

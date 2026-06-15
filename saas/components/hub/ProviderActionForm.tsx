@@ -10,11 +10,12 @@ import {
   type ProviderFormField,
 } from '@/lib/hub/provider-templates'
 import { Lang, cardStyle, bodyStyle, labelStyle, monoStyle } from './shared'
+import { cHub } from '@/lib/i18n/consoleCopy'
 
 // Providers migrated to the portable action engine. Their actions + pickers
 // target /api/hub/action/engine; everything else stays on the legacy route.
 // The engine accepts the same { templateId, payload } body, so only the URL changes.
-const ENGINE_PROVIDERS = ['github', 'openai', 'elevenlabs', 'anthropic', 'gemini', 'resend', 'assemblyai', 'supabase_mkt']
+const ENGINE_PROVIDERS = ['github', 'openai', 'elevenlabs', 'anthropic', 'gemini', 'resend', 'assemblyai']
 function hubActionEndpoint(templateId: string): string {
   const provider = String(templateId || '').split('.')[0]
   return ENGINE_PROVIDERS.includes(provider) ? '/api/hub/action/engine' : '/api/hub/action'
@@ -50,7 +51,7 @@ export default function ProviderActionForm({
   onError,
   onClose,
 }: ProviderActionFormProps) {
-  const template = getTemplate(templateId)
+  const template = getTemplate(templateId, lang)
 
   const [state, setState] = useState<FormState>('idle')
   const [values, setValues] = useState<Record<string, unknown>>(() => {
@@ -224,7 +225,7 @@ export default function ProviderActionForm({
         {state === 'preview' && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0, overflow: 'hidden' }}>
             <div style={noticeStyle}>
-              Review the action that will be sent to {template.api.service}. Once confirmed, this cannot be undone.
+              {cHub(lang, 'hub.ui.review_action', 'Review the action that will be sent to')} {template.api.service}. {cHub(lang, 'hub.ui.cannot_undo', 'Once confirmed, this cannot be undone.')}
             </div>
             <div style={jsonBoxStyle}>
               {JSON.stringify({ template: templateId, api: `${template.api.method} ${template.api.endpoint}`, payload: values }, null, 2)}
@@ -234,7 +235,7 @@ export default function ProviderActionForm({
 
         {state === 'confirm' && (
           <CenteredState icon="⚠️" title="Confirm action">
-            You are about to execute <strong>{template.label}</strong> on {template.api.service}.
+            {cHub(lang, 'hub.ui.about_to_execute', 'You are about to execute')} <strong>{template.label}</strong> {cHub(lang, 'hub.ui.on', 'on')} {template.api.service}.
           </CenteredState>
         )}
 
@@ -251,7 +252,7 @@ export default function ProviderActionForm({
         )}
 
         {state === 'error' && result?.error && (
-          <CenteredState icon="❌" title="Error" titleColor="#ef4444">
+          <CenteredState icon="❌" title={cHub(lang, "hub.ui.error", "Error")} titleColor="#ef4444">
             <span style={{ fontFamily: monoStyle.fontFamily }}>{result.error}</span>
           </CenteredState>
         )}
@@ -260,9 +261,9 @@ export default function ProviderActionForm({
       <div style={footerStyle}>
         {state === 'idle' && (
           <>
-            {onClose && <button onClick={onClose} className="hub-chip" style={secondaryButtonStyle}>Cancel</button>}
+            {onClose && <button onClick={onClose} className="hub-chip" style={secondaryButtonStyle}>{cHub(lang, 'hub.ui.cancel', 'Cancel')}</button>}
             <button onClick={handleSubmit} className="hub-btn" style={primaryButtonStyle}>
-              {template.previewBeforeSubmit ? 'Preview' : template.requiresConfirm ? 'Confirm' : 'Execute'}
+              {template.previewBeforeSubmit ? cHub(lang, 'hub.ui.preview', 'Preview') : template.requiresConfirm ? cHub(lang, 'hub.ui.confirm', 'Confirm') : cHub(lang, 'hub.ui.execute', 'Execute')}
             </button>
           </>
         )}
@@ -271,7 +272,7 @@ export default function ProviderActionForm({
           <>
             <button onClick={() => setState('idle')} className="hub-chip" style={secondaryButtonStyle}>Back</button>
             <button onClick={() => (template.requiresConfirm ? setState('confirm') : executeAction())} className="hub-btn" style={warningButtonStyle}>
-              {template.requiresConfirm ? 'Confirm' : 'Execute'}
+              {template.requiresConfirm ? cHub(lang, 'hub.ui.confirm', 'Confirm') : cHub(lang, 'hub.ui.execute', 'Execute')}
             </button>
           </>
         )}
@@ -284,7 +285,7 @@ export default function ProviderActionForm({
         )}
 
         {(state === 'submitting' || state === 'success' || state === 'error') && onClose && (
-          <button onClick={onClose} className="hub-btn" style={closeButtonStyle}>Close</button>
+          <button onClick={onClose} className="hub-btn" style={closeButtonStyle}>{cHub(lang, 'hub.ui.close', 'Close')}</button>
         )}
       </div>
 
@@ -895,13 +896,13 @@ function ObjectArrayTable({ rows }: { rows: any[] }) {
 
   return (
     <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10 }}>
-      <div style={{ height: '100%', overflowY: 'auto', overflowX: 'auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: gridColumns, gap: 8, padding: '8px 10px', position: 'sticky', top: 0, background: 'rgba(8,11,20,.98)', borderBottom: '1px solid rgba(255,255,255,.08)', zIndex: 1 }}>
+      <div style={{ height: '100%', overflowY: 'auto', overflowX: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: gridColumns, gap: 10, padding: '8px 10px', position: 'sticky', top: 0, background: 'rgba(8,11,20,.98)', borderBottom: '1px solid rgba(255,255,255,.08)', zIndex: 1 }}>
           {columns.map(col => <div key={col} style={tableHeadStyle}>{niceLabel(col)}</div>)}
         </div>
 
         {rows.slice(0, 100).map((row, i) => (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: gridColumns, gap: 8, padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,.06)', alignItems: 'center' }}>
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: gridColumns, gap: 10, padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,.06)', alignItems: 'center' }}>
             {columns.map(col => (
               <div
                 key={col}
@@ -934,11 +935,10 @@ function makeColumns(columns: string[]) {
   if (columns.length <= 1) return 'minmax(0, 1fr)'
 
   return columns.map((column, index) => {
-    if (index === 0) return 'minmax(120px, 1.6fr)'
-    if (column === 'active') return '54px'
-    if (column.toLowerCase().includes('created')) return '88px'
-    if (column.toLowerCase().includes('price')) return 'minmax(74px, 1fr)'
-    return 'minmax(70px, 1fr)'
+    if (index === 0) return 'minmax(160px, 1.7fr)'
+    if (column === 'active') return '70px'
+    if (column.toLowerCase().includes('created')) return '105px'
+    return 'minmax(90px, 1fr)'
   }).join(' ')
 }
 

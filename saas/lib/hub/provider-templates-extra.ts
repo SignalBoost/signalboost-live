@@ -18,6 +18,13 @@
 import type { ProviderTemplate } from './provider-templates'
 
 export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
+  // ---- Supabase (Marketing project) read actions — portable engine ----
+  'supabase_mkt.list_tables': { id: 'supabase_mkt.list_tables', label: 'List Tables', description: 'Public tables in the marketing project.', icon: '🗃️', policyActionId: 'read_provider_status', api: { service: 'supabase_mkt', method: 'GET', endpoint: '/rest/v1/' }, fields: [] },
+  'supabase_mkt.list_rows': { id: 'supabase_mkt.list_rows', label: 'List Rows', description: 'Rows from a chosen table.', icon: '📄', policyActionId: 'read_provider_status', api: { service: 'supabase_mkt', method: 'GET', endpoint: '/rest/v1/' }, fields: [
+      { id: 'table', label: 'Table', type: 'remote_select', required: true, source: { action: 'supabase_mkt.list_tables', dataPath: 'tables', valueKey: 'name', labelTemplate: '{name}' } },
+    ] },
+  'supabase_mkt.list_users': { id: 'supabase_mkt.list_users', label: 'List Users', description: 'Auth users in the marketing project.', icon: '👤', policyActionId: 'read_provider_status', api: { service: 'supabase_mkt', method: 'GET', endpoint: '/auth/v1/admin/users' }, fields: [] },
+  'supabase_mkt.list_buckets': { id: 'supabase_mkt.list_buckets', label: 'List Buckets', description: 'Storage buckets in the marketing project.', icon: '🪣', policyActionId: 'read_provider_status', api: { service: 'supabase_mkt', method: 'GET', endpoint: '/storage/v1/bucket' }, fields: [] },
   // ---- Batch: Anthropic / Gemini / Resend / AssemblyAI (portable engine) ----
   'anthropic.list_models': { id: 'anthropic.list_models', label: 'View Models', description: 'Models available to the API key.', icon: '🧠', policyActionId: 'read_provider_status', api: { service: 'anthropic', method: 'GET', endpoint: '/v1/models' }, fields: [] },
   'anthropic.retrieve_model': { id: 'anthropic.retrieve_model', label: 'Model Details', description: 'Details for a specific model.', icon: '🔎', policyActionId: 'read_provider_status', api: { service: 'anthropic', method: 'GET', endpoint: '/v1/models' }, fields: [

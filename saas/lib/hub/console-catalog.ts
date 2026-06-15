@@ -253,6 +253,33 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
       { title: 'Account', templateIds: ['elevenlabs.subscription'] },
       { title: 'History', templateIds: ['elevenlabs.list_history'] }
     ]
+  },
+  {
+    id: 'anthropic', name: 'Anthropic', subtitle: 'AI & MODELS', accent: '#d97757', tier: 'core',
+    sections: [
+      { title: 'Models', templateIds: ['anthropic.list_models', 'anthropic.retrieve_model'] }
+    ]
+  },
+  {
+    id: 'gemini', name: 'Google Gemini', subtitle: 'AI & MODELS', accent: '#4285f4', tier: 'core',
+    sections: [
+      { title: 'Models', templateIds: ['gemini.list_models', 'gemini.model_details'] }
+    ]
+  },
+  {
+    id: 'resend', name: 'Resend', subtitle: 'EMAIL', accent: '#e879f9', tier: 'tier2',
+    sections: [
+      { title: 'Domains', templateIds: ['resend.list_domains'] },
+      { title: 'Audiences', templateIds: ['resend.list_audiences'] },
+      { title: 'Broadcasts', templateIds: ['resend.list_broadcasts'] },
+      { title: 'API Keys', templateIds: ['resend.list_api_keys'] }
+    ]
+  },
+  {
+    id: 'assemblyai', name: 'AssemblyAI', subtitle: 'TRANSCRIPTION', accent: '#6366f1', tier: 'tier2',
+    sections: [
+      { title: 'Transcripts', templateIds: ['assemblyai.list_transcripts', 'assemblyai.transcript_details'] }
+    ]
   }
 ]
 

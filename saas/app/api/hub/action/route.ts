@@ -29,6 +29,7 @@ async function getCurrentUser(req: NextRequest) {
   return { id: '00000000-0000-0000-0000-000000000000', role: 'owner', email: 'admin@signalboostapp.com' }
 }
 
+// Unified mapping register maps both case variations to ensure environment safety tracks are bulletproof
 const PROVIDER_CREDENTIALS: Record<string, string[]> = {
   stripe: ['STRIPE_SECRET_KEY'],
   supabase: ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'],
@@ -75,7 +76,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ActionRespons
       return NextResponse.json({ ok: false, error: 'Requires owner permissions' }, { status: 403 })
     }
 
-    const serviceKey = String(template.api.service).toLowerCase()
+    const serviceKey = String(template.api.service || '').toLowerCase()
     const envVars = PROVIDER_CREDENTIALS[serviceKey]
     
     if (!envVars) {
@@ -87,7 +88,6 @@ export async function POST(req: NextRequest): Promise<NextResponse<ActionRespons
       return NextResponse.json({ ok: false, error: 'Missing integration secret parameter: ' + missing[0] }, { status: 501 })
     }
 
-    // Direct proxy routing execution loop
     const result = await streamProxyAction(template, serviceKey, payload)
     
     if (result.ok) {
@@ -102,7 +102,6 @@ export async function POST(req: NextRequest): Promise<NextResponse<ActionRespons
 }
 
 async function streamProxyAction(template: any, service: string, payload: Record<string, unknown>) {
-  // ---- Stripe Direct Core Pipeline ----
   if (service === 'stripe') {
     const apiKey = process.env.STRIPE_SECRET_KEY
     
@@ -165,7 +164,6 @@ async function streamProxyAction(template: any, service: string, payload: Record
     return { ok: true, message: 'Stripe execution complete', data: await res.json() }
   }
 
-  // ---- Vercel Direct Core Pipeline ----
   if (service === 'vercel') {
     const token = process.env.VERCEL_TOKEN
     const projectId = process.env.VERCEL_HUB_PROJECT
@@ -218,7 +216,6 @@ async function streamProxyAction(template: any, service: string, payload: Record
     }
   }
 
-  // ---- Key Vault Direct Pipeline ----
   if (service === 'vault') {
     const sUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const sKey = process.env.SUPABASE_SERVICE_ROLE_KEY

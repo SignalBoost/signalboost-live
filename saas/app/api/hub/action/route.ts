@@ -691,7 +691,7 @@ async function executeSupabaseAction(template: any, payload: Record<string, unkn
   if (!url || !key) return { ok: false, error: 'Supabase not configured' }
 
   // Key rotation: generate new service key
-  if (template.id === 'supabase.rotate_key') {
+  if (template.id === 'supabase.rotate_key' || template.id === 'supabase.rotate_service_key') {
     try {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
       const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -853,7 +853,7 @@ async function executeSupabaseAction(template: any, payload: Record<string, unkn
 
   // Delete a user by id
   if (template.id === 'supabase.delete_user') {
-    const id = String(payload.user_id || '')
+    const id = String(payload.userId || payload.user_id || '')
     if (!id) return { ok: false, error: 'User ID is required' }
     const res = await fetch(`${url}/auth/v1/admin/users/${encodeURIComponent(id)}`, {
       method: 'DELETE',
@@ -884,7 +884,7 @@ async function executeSupabaseAction(template: any, payload: Record<string, unkn
 
   // Edit a user (admin attributes: email, ban, confirm, metadata)
   if (template.id === 'supabase.edit_user') {
-    const id = String(payload.user_id || '')
+    const id = String(payload.userId || payload.user_id || '')
     if (!id) return { ok: false, error: 'User ID is required' }
     const patch: Record<string, unknown> = {}
     if (payload.email) patch.email = String(payload.email)
@@ -927,6 +927,120 @@ async function executeSupabaseAction(template: any, payload: Record<string, unkn
       message: `Query returned ${rows.length} row${rows.length === 1 ? '' : 's'}`,
       data: { rowCount: rows.length, rows: rows.slice(0, 50) },
     }
+  }
+
+  // --- Table CRUD + storage + migrations (REST/Storage API) ---
+  const restBase = `${url}/rest/v1`
+  const writeHeaders = { 'Content-Type': 'application/json', apikey: key, 'Authorization': 'Bearer ' + key, Prefer: 'return=representation' }
+
+  // Run a migration / arbitrary SQL via the gated RPC
+  if (template.id === 'supabase.run_migration') {
+    const migration = String(payload.migration || '').trim()
+    if (!migration) return { ok: false, error: 'Migration SQL is required' }
+    const res = await fetch(`${url}/rest/v1/rpc/hub_exec_sql`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: key, 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({ query: migration }),
+    })
+    if (!res.ok) return { ok: false, error: (await res.text()) || 'Migration failed' }
+    const data = await res.json().catch(() => null)
+    if (data && typeof data === 'object' && (data as any).error) return { ok: false, error: String((data as any).error) }
+    return { ok: true, message: 'Migration executed', data: { result: data } }
+  }
+
+  // Insert a row
+  if (template.id === 'supabase.insert_row') {
+    const table = String(payload.table || '').trim()
+    if (!table) return { ok: false, error: 'Table is required' }
+    let row: unknown
+    try { row = JSON.parse(String(payload.data || '{}')) } catch { return { ok: false, error: 'Data must be valid JSON' } }
+    const res = await fetch(`${restBase}/${encodeURIComponent(table)}`, { method: 'POST', headers: writeHeaders, body: JSON.stringify(row) })
+    if (!res.ok) return { ok: false, error: (await res.text()) || 'Insert failed' }
+    const data = await res.json().catch(() => [])
+    return { ok: true, message: `Row inserted into ${table}`, data: { rows: data } }
+  }
+
+  // Edit a row (match "column=value")
+  if (template.id === 'supabase.edit_row') {
+    const table = String(payload.table || '').trim()
+    const match = String(payload.match || '').trim()
+    if (!table || !match) return { ok: false, error: 'Table and match are required' }
+    const eq = match.indexOf('=')
+    if (eq < 1) return { ok: false, error: 'Match must look like column=value' }
+    const col = match.slice(0, eq).trim()
+    const val = match.slice(eq + 1).trim()
+    let values: unknown
+    try { values = JSON.parse(String(payload.values || '{}')) } catch { return { ok: false, error: 'Values must be valid JSON' } }
+    const res = await fetch(`${restBase}/${encodeURIComponent(table)}?${encodeURIComponent(col)}=eq.${encodeURIComponent(val)}`, { method: 'PATCH', headers: writeHeaders, body: JSON.stringify(values) })
+    if (!res.ok) return { ok: false, error: (await res.text()) || 'Update failed' }
+    const data = await res.json().catch(() => [])
+    return { ok: true, message: `Updated ${Array.isArray(data) ? data.length : 0} row(s) in ${table}`, data: { rows: data } }
+  }
+
+  // Archive a row (sets archived=true; table needs an "archived" column)
+  if (template.id === 'supabase.archive_row') {
+    const table = String(payload.table || '').trim()
+    const rowId = String(payload.rowId || '').trim()
+    if (!table || !rowId) return { ok: false, error: 'Table and row id are required' }
+    const res = await fetch(`${restBase}/${encodeURIComponent(table)}?id=eq.${encodeURIComponent(rowId)}`, { method: 'PATCH', headers: writeHeaders, body: JSON.stringify({ archived: true }) })
+    if (!res.ok) return { ok: false, error: (await res.text()) || 'Archive failed (table needs an "archived" column)' }
+    const data = await res.json().catch(() => [])
+    return { ok: true, message: `Archived row ${rowId} in ${table}`, data: { rows: data } }
+  }
+
+  // Delete a row by id
+  if (template.id === 'supabase.delete_row') {
+    const table = String(payload.table || '').trim()
+    const rowId = String(payload.rowId || '').trim()
+    if (!table || !rowId) return { ok: false, error: 'Table and row id are required' }
+    const res = await fetch(`${restBase}/${encodeURIComponent(table)}?id=eq.${encodeURIComponent(rowId)}`, { method: 'DELETE', headers: { apikey: key, 'Authorization': 'Bearer ' + key, Prefer: 'return=representation' } })
+    if (!res.ok) return { ok: false, error: (await res.text()) || 'Delete failed' }
+    const data = await res.json().catch(() => [])
+    return { ok: true, message: `Deleted row ${rowId} from ${table}`, data: { rows: data } }
+  }
+
+  // Create a storage bucket
+  if (template.id === 'supabase.create_bucket') {
+    const name = String(payload.name || '').trim()
+    if (!name) return { ok: false, error: 'Bucket name is required' }
+    const res = await fetch(`${url}/storage/v1/bucket`, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: key, 'Authorization': 'Bearer ' + key }, body: JSON.stringify({ id: name, name, public: false }) })
+    if (!res.ok) return { ok: false, error: (await res.text()) || 'Bucket creation failed' }
+    const data = await res.json().catch(() => ({}))
+    return { ok: true, message: `Bucket created: ${name}`, data }
+  }
+
+  // Empty a storage bucket
+  if (template.id === 'supabase.empty_bucket') {
+    const name = String(payload.name || '').trim()
+    if (!name) return { ok: false, error: 'Bucket name is required' }
+    const res = await fetch(`${url}/storage/v1/bucket/${encodeURIComponent(name)}/empty`, { method: 'POST', headers: { apikey: key, 'Authorization': 'Bearer ' + key } })
+    if (!res.ok) return { ok: false, error: (await res.text()) || 'Empty bucket failed' }
+    return { ok: true, message: `Bucket emptied: ${name}`, data: { name } }
+  }
+
+  // Storage panel: list objects, or create a signed download URL
+  if (template.id === 'supabase.storage_panel') {
+    const bucket = String(payload.bucket || '').trim()
+    const action = String(payload.action || 'list')
+    const path = String(payload.path || '')
+    if (!bucket) return { ok: false, error: 'Bucket is required' }
+    if (action === 'list') {
+      const res = await fetch(`${url}/storage/v1/object/list/${encodeURIComponent(bucket)}`, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: key, 'Authorization': 'Bearer ' + key }, body: JSON.stringify({ prefix: path, limit: 100, sortBy: { column: 'name', order: 'asc' } }) })
+      if (!res.ok) return { ok: false, error: (await res.text()) || 'List failed' }
+      const data = await res.json().catch(() => [])
+      const objs = Array.isArray(data) ? data : []
+      return { ok: true, message: `${objs.length} object(s) in ${bucket}`, data: { objects: objs.slice(0, 50).map((o: any) => ({ name: o.name, size: o.metadata?.size })) } }
+    }
+    if (action === 'download') {
+      if (!path) return { ok: false, error: 'Object path is required to create a download link' }
+      const signPath = path.split('/').map(encodeURIComponent).join('/')
+      const res = await fetch(`${url}/storage/v1/object/sign/${encodeURIComponent(bucket)}/${signPath}`, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: key, 'Authorization': 'Bearer ' + key }, body: JSON.stringify({ expiresIn: 3600 }) })
+      if (!res.ok) return { ok: false, error: (await res.text()) || 'Could not sign URL' }
+      const data = await res.json().catch(() => ({}))
+      const signed = (data as any).signedURL || (data as any).signedUrl
+      return { ok: true, message: `Signed download link (1h) for ${path}`, data: { url: signed ? `${url}/storage/v1${signed}` : null } }
+    }
+    return { ok: false, error: 'Upload from the console needs a file input — use list or download here, or upload via the Storage UI.' }
   }
 
   return { ok: false, error: 'Unknown Supabase action' }
@@ -1106,51 +1220,86 @@ async function executeVercelAction(template: any, payload: Record<string, unknow
 // ---- GitHub ----
 async function executeGitHubAction(template: any, payload: Record<string, unknown>) {
   const token = process.env.GITHUB_WRITE_TOKEN
-  if (!token) return { ok: false, error: 'GitHub not configured' }
-
-  const OWNER = String(payload.owner || process.env.GITHUB_DEFAULT_OWNER || 'SignalBoost')
-  const REPO = String(payload.repo || process.env.GITHUB_DEFAULT_REPO || 'signalboost-live')
-
-  const endpoint = String(template.api.endpoint)
-    .replace('{owner}', OWNER)
-    .replace('{repo}', REPO)
-  const url = 'https://api.github.com' + endpoint
-  const method = template.api.method || 'GET'
+  if (!token) return { ok: false, error: 'GitHub not configured — set GITHUB_WRITE_TOKEN' }
 
   const headers: Record<string, string> = {
     'Authorization': 'Bearer ' + token,
     'Accept': 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
   }
 
-  let body: string | undefined
-  if (method !== 'GET') {
-    headers['Content-Type'] = 'application/json'
-    if (template.id === 'github.open_issue') {
-      body = JSON.stringify({ title: payload.title, body: payload.body })
-    } else {
-      body = JSON.stringify(payload)
-    }
+  // Resolve "owner/name" from the repo field (falls back to env defaults).
+  const raw = String(payload.repo || '').trim()
+  let owner = String(process.env.GITHUB_DEFAULT_OWNER || 'SignalBoost')
+  let name = raw || String(process.env.GITHUB_DEFAULT_REPO || 'signalboost-live')
+  if (raw.includes('/')) {
+    const parts = raw.split('/')
+    owner = parts[0]
+    name = parts[1]
   }
 
-  const res = await fetch(url, { method, headers, body })
-  if (!res.ok) {
-    const error = await res.text()
-    return { ok: false, error }
-  }
-  const data = await res.json()
-
-  if (template.id === 'github.open_issue') {
-    return { ok: true, message: 'Issue opened: #' + data.number, data: { number: data.number, url: data.html_url } }
-  }
-  if (template.id === 'github.view_repos') {
+  // View repos accessible to the token
+  if (template.id === 'github.list_repos' || template.id === 'github.view_repos') {
+    const res = await fetch('https://api.github.com/user/repos?per_page=50&sort=updated', { headers })
+    if (!res.ok) return { ok: false, error: `GitHub error (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}` }
+    const data = await res.json()
     const repos = Array.isArray(data) ? data : []
     return {
       ok: true,
-      message: `GitHub repos: ${repos.length} accessible`,
-      data: { count: repos.length, repos: repos.slice(0, 12).map((r: any) => ({ name: r.full_name, private: r.private, updated_at: r.updated_at })) },
+      message: `${repos.length} repositor${repos.length === 1 ? 'y' : 'ies'} accessible`,
+      data: { count: repos.length, repos: repos.slice(0, 25).map((r: any) => ({ name: r.full_name, private: r.private, updated_at: r.updated_at })) },
     }
   }
-  return { ok: true, message: 'GitHub action completed', data }
+
+  // Open an issue
+  if (template.id === 'github.open_issue') {
+    const title = String(payload.title || '')
+    if (!title) return { ok: false, error: 'Issue title is required' }
+    const res = await fetch(`https://api.github.com/repos/${owner}/${name}/issues`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, body: String(payload.body || '') }),
+    })
+    if (!res.ok) return { ok: false, error: `GitHub error (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}` }
+    const data = await res.json()
+    return { ok: true, message: `Issue opened: #${data.number}`, data: { number: data.number, url: data.html_url } }
+  }
+
+  // Edit an issue (title / state)
+  if (template.id === 'github.edit_issue') {
+    const number = String(payload.number || '')
+    if (!number) return { ok: false, error: 'Issue number is required' }
+    const patch: Record<string, unknown> = {}
+    if (payload.title) patch.title = String(payload.title)
+    if (payload.state) patch.state = String(payload.state)
+    if (Object.keys(patch).length === 0) return { ok: false, error: 'Provide a new title or state' }
+    const res = await fetch(`https://api.github.com/repos/${owner}/${name}/issues/${encodeURIComponent(number)}`, {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    if (!res.ok) return { ok: false, error: `GitHub error (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}` }
+    const data = await res.json()
+    return { ok: true, message: `Issue #${data.number} updated (${data.state})`, data: { number: data.number, state: data.state, url: data.html_url } }
+  }
+
+  // Rotate token — GitHub PATs cannot be rotated via API (honest, not a fake success)
+  if (template.id === 'github.rotate_token') {
+    return {
+      ok: false,
+      error: 'GitHub personal access tokens cannot be rotated via API. Regenerate it at github.com/settings/tokens, then update GITHUB_WRITE_TOKEN in Vercel and redeploy.',
+    }
+  }
+
+  // Manage secrets — requires libsodium sealed-box encryption of the value
+  if (template.id === 'github.manage_secrets') {
+    return {
+      ok: false,
+      error: 'Setting an Actions secret requires libsodium sealed-box encryption of the value, and no crypto dependency is installed yet. Ask me to wire it and I will add the dependency plus the real implementation.',
+    }
+  }
+
+  return { ok: false, error: 'Unknown GitHub action: ' + template.id }
 }
 
 // ---- OpenAI ----

@@ -1,31 +1,25 @@
 // saas/app/api/hub/domains/list/route.ts
+// Hub Console — list Vercel project domains (read-only, NOT auth-gated).
+//
+// Read-only domain metadata, no secrets. Decoupled from the Supabase auth layer
+// for the same reason as the env + deployments lists: getCurrentUser() returns
+// null when SUPABASE_SERVICE_ROLE_KEY is absent, which used to 401 the panel into
+// an empty placeholder on a green build. Project id + creds resolve via the shared
+// resolver (handles the empty VERCEL_HUB_PROJECT case). teamId is optional.
+
 import { NextRequest, NextResponse } from 'next/server'
 import { listVercelDomains } from '@/lib/hub/vercel-domains'
-import { requirePermission } from '@/lib/auth/permission-middleware'
+import { resolveVercelProject } from '@/lib/hub/vercel-project'
 
-export async function GET(req: NextRequest) {
-  const perm = await requirePermission(req, 'domains:read')
-  if (!perm.ok) {
-    return NextResponse.json(
-      { ok: false, error: (perm as any).error },
-      { status: (perm as any).status }
-    )
+export async function GET(_req: NextRequest) {
+  const creds = await resolveVercelProject()
+  if (!creds.ok || !creds.token || !creds.projectId) {
+    return NextResponse.json({ ok: false, error: creds.error || 'Vercel not configured' }, { status: 500 })
   }
 
   try {
-    const vercelToken = process.env.VERCEL_TOKEN
-    const vercelTeamId = process.env.VERCEL_TEAM_ID
-    const vercelProjectId = process.env.VERCEL_HUB_PROJECT
-
-    if (!vercelToken || !vercelTeamId || !vercelProjectId) {
-      return NextResponse.json(
-        { ok: false, error: 'Vercel credentials not configured' },
-        { status: 500 }
-      )
-    }
-
-    const result = await listVercelDomains(vercelTeamId, vercelProjectId, vercelToken)
-    return NextResponse.json(result)
+    const result = await listVercelDomains(creds.teamId, creds.projectId, creds.token)
+    return NextResponse.json(result, { status: result.ok ? 200 : 502 })
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json({ ok: false, error: msg }, { status: 500 })

@@ -2,10 +2,12 @@
 //
 // Engine-backed action route — PARALLEL to /api/hub/action (which is untouched).
 // Runs any provider+action that has a registered executor through the portable
-// engine: validate → permission → execute → log. As providers migrate to
-// executors, they move from the legacy route to this one with no UI change.
+// engine: validate → permission → execute → log.
 //
-// POST body: { providerId, actionId, input? }
+// Accepts BOTH request shapes:
+//   native : { providerId, actionId, input? }
+//   legacy : { templateId: "provider.action", payload? }   ← so the existing form
+//            can target this route with only a URL change, no body change.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { runAction } from '@/console-core/actionEngine'
@@ -18,14 +20,34 @@ import '@/console-core/executors/github'
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null)
-    if (!body || typeof body.providerId !== 'string' || typeof body.actionId !== 'string') {
-      return NextResponse.json({ ok: false, error: 'providerId and actionId are required' }, { status: 400 })
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json({ ok: false, error: 'Invalid request body' }, { status: 400 })
     }
+
+    let providerId: unknown = (body as any).providerId
+    let actionId: unknown = (body as any).actionId
+    let input: unknown = (body as any).input
+
+    // Legacy-shape alias: split "provider.action" → providerId + actionId.
+    if ((typeof providerId !== 'string' || typeof actionId !== 'string') && typeof (body as any).templateId === 'string') {
+      const tid = String((body as any).templateId)
+      const dot = tid.indexOf('.')
+      if (dot > 0) {
+        providerId = tid.slice(0, dot)
+        actionId = tid.slice(dot + 1)
+      }
+      if (input === undefined) input = (body as any).payload
+    }
+
+    if (typeof providerId !== 'string' || typeof actionId !== 'string') {
+      return NextResponse.json({ ok: false, error: 'providerId and actionId (or templateId) are required' }, { status: 400 })
+    }
+
     const host = createDefaultHost(req)
     const result = await runAction(host, {
-      providerId: body.providerId,
-      actionId: body.actionId,
-      input: (body.input && typeof body.input === 'object') ? body.input : {},
+      providerId,
+      actionId,
+      input: (input && typeof input === 'object') ? (input as Record<string, unknown>) : {},
     })
     const { status, ...rest } = result
     return NextResponse.json(rest, { status: status || (rest.ok ? 200 : 400) })

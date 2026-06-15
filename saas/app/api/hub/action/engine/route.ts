@@ -17,6 +17,10 @@ import { createDefaultHost, listRegistered } from '@/console-core/defaultHost'
 import '@/console-core/executors/openai'
 import '@/console-core/executors/github'
 import '@/console-core/executors/elevenlabs'
+import '@/console-core/executors/anthropic'
+import '@/console-core/executors/gemini'
+import '@/console-core/executors/resend'
+import '@/console-core/executors/assemblyai'
 
 export async function POST(req: NextRequest) {
   try {

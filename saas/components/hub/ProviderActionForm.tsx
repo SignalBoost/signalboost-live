@@ -11,6 +11,15 @@ import {
 } from '@/lib/hub/provider-templates'
 import { Lang, cardStyle, bodyStyle, labelStyle, monoStyle } from './shared'
 
+// Providers migrated to the portable action engine. Their actions + pickers
+// target /api/hub/action/engine; everything else stays on the legacy route.
+// The engine accepts the same { templateId, payload } body, so only the URL changes.
+const ENGINE_PROVIDERS = ['github']
+function hubActionEndpoint(templateId: string): string {
+  const provider = String(templateId || '').split('.')[0]
+  return ENGINE_PROVIDERS.includes(provider) ? '/api/hub/action/engine' : '/api/hub/action'
+}
+
 type FormState = 'idle' | 'preview' | 'confirm' | 'submitting' | 'success' | 'error'
 
 type StripeProductOption = {
@@ -115,7 +124,7 @@ export default function ProviderActionForm({
     setState('submitting')
 
     try {
-      const res = await fetch('/api/hub/action', {
+      const res = await fetch(hubActionEndpoint(templateId), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ templateId, payload: values }),
@@ -737,7 +746,7 @@ function RemoteSelect({
     deps.forEach(d => {
       payload[d] = allValues?.[d]
     })
-    fetch('/api/hub/action', {
+    fetch(hubActionEndpoint(source.action), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ templateId: source.action, payload }),

@@ -3,10 +3,25 @@
 
 import { EXTRA_TEMPLATES } from './provider-templates-extra'
 
+// A remote_select field is populated from a live list-action instead of typed input.
+// The form calls `source.action` (a read template id), reads the array at
+// result.data[source.dataPath], and builds each option from the item:
+//   value = item[source.valueKey], label = source.labelTemplate with {key} placeholders.
+// If source.dependsOn is set, those field values are sent as the action payload and
+// the list re-fetches whenever they change (e.g. pick a repo -> its PRs populate).
+export interface RemoteSource {
+  action: string
+  dataPath: string
+  valueKey: string
+  labelTemplate: string
+  dependsOn?: string[]
+  emptyHint?: string
+}
+
 export interface ProviderFormField {
   id: string
   label: string
-  type: 'text' | 'email' | 'phone' | 'textarea' | 'number' | 'currency_cents' | 'secret' | 'select' | 'toggle'
+  type: 'text' | 'email' | 'phone' | 'textarea' | 'number' | 'currency_cents' | 'secret' | 'select' | 'toggle' | 'remote_select'
   required?: boolean
   placeholder?: string
   maxLength?: number
@@ -16,6 +31,7 @@ export interface ProviderFormField {
   defaultValue?: any
   help?: string
   options?: { label: string; value: string }[]
+  source?: RemoteSource
 }
 
 export interface ProviderTemplate {

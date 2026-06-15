@@ -99,7 +99,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'view_products',
     api: { service: 'stripe', method: 'POST', endpoint: '/v1/products/update' },
     fields: [
-      { id: 'id', label: 'Product ID', type: 'text', required: true, placeholder: 'prod_...' },
+      { id: 'id', label: 'Product', type: 'remote_select', required: true, source: { action: 'stripe.view_products', dataPath: 'products', valueKey: 'id', labelTemplate: '{name} — {price}' } },
       { id: 'name', label: 'New Product Name', type: 'text', required: true }
     ]
   },
@@ -120,7 +120,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     requiresConfirm: true,
     policyActionId: 'view_products',
     api: { service: 'stripe', method: 'DELETE', endpoint: '/v1/products' },
-    fields: [{ id: 'id', label: 'Product ID', type: 'text', required: true }]
+    fields: [{ id: 'id', label: 'Product', type: 'remote_select', required: true, source: { action: 'stripe.view_products', dataPath: 'products', valueKey: 'id', labelTemplate: '{name} — {price}' } }]
   },
   'stripe.archive_product': {
     id: 'stripe.archive_product',
@@ -129,7 +129,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     icon: '🗄️',
     policyActionId: 'view_products',
     api: { service: 'stripe', method: 'POST', endpoint: '/v1/products/archive' },
-    fields: [{ id: 'id', label: 'Product ID', type: 'text', required: true }]
+    fields: [{ id: 'id', label: 'Product', type: 'remote_select', required: true, source: { action: 'stripe.view_products', dataPath: 'products', valueKey: 'id', labelTemplate: '{name} — {price}' } }]
   },
   'stripe.create_price': {
     id: 'stripe.create_price',
@@ -139,7 +139,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'manage_prices',
     api: { service: 'stripe', method: 'POST', endpoint: '/v1/prices' },
     fields: [
-      { id: 'product', label: 'Product ID', type: 'text', required: true, placeholder: 'prod_...' },
+      { id: 'product', label: 'Product', type: 'remote_select', required: true, source: { action: 'stripe.view_products', dataPath: 'products', valueKey: 'id', labelTemplate: '{name} — {price}' } },
       { id: 'amount', label: 'Amount (USD)', type: 'number', required: true, placeholder: '29' }
     ]
   },
@@ -148,7 +148,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'View Prices',
     description: 'List Stripe prices, optionally filtered by product.',
     icon: '🏷️',
-    policyActionId: 'manage_prices',
+    policyActionId: 'view_products',
     api: { service: 'stripe', method: 'GET', endpoint: '/v1/prices' },
     fields: []
   },
@@ -159,7 +159,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     icon: '✏️',
     policyActionId: 'manage_prices',
     api: { service: 'stripe', method: 'POST', endpoint: '/v1/prices/update' },
-    fields: [{ id: 'id', label: 'Price ID', type: 'text', required: true }]
+    fields: [{ id: 'id', label: 'Price', type: 'remote_select', required: true, source: { action: 'stripe.view_prices', dataPath: 'prices', valueKey: 'priceId', labelTemplate: '{product} — {price}' } }]
   },
   'stripe.apply_tier_template': {
     id: 'stripe.apply_tier_template',
@@ -185,6 +185,15 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     api: { service: 'stripe', method: 'GET', endpoint: '/v1/customers' },
     fields: []
   },
+  'stripe.list_charges': {
+    id: 'stripe.list_charges',
+    label: 'List Charges',
+    description: 'List recent Stripe charges (source for refund selection).',
+    icon: '💳',
+    policyActionId: 'view_products',
+    api: { service: 'stripe', method: 'GET', endpoint: '/v1/charges' },
+    fields: []
+  },
   'stripe.adjust_balance': {
     id: 'stripe.adjust_balance',
     label: 'Adjust Balance',
@@ -193,7 +202,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'refunds',
     api: { service: 'stripe', method: 'POST', endpoint: '/v1/customers/balance' },
     fields: [
-      { id: 'customerId', label: 'Customer ID', type: 'text', required: true },
+      { id: 'customerId', label: 'Customer', type: 'remote_select', required: true, source: { action: 'stripe.list_customers', dataPath: 'customers', valueKey: 'id', labelTemplate: '{customer}' } },
       { id: 'amount_cents', label: 'Amount (Cents)', type: 'number', required: true }
     ]
   },
@@ -206,7 +215,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'refunds',
     api: { service: 'stripe', method: 'POST', endpoint: '/v1/refunds' },
     fields: [
-      { id: 'chargeId', label: 'Charge ID (ch_...)', type: 'text', required: true, placeholder: 'ch_3M...' },
+      { id: 'chargeId', label: 'Charge', type: 'remote_select', required: true, source: { action: 'stripe.list_charges', dataPath: 'charges', valueKey: 'id', labelTemplate: '{charge}' } },
       { id: 'amount_cents', label: 'Amount (in Cents)', type: 'number', required: true, placeholder: '1000' }
     ]
   },

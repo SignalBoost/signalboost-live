@@ -8,6 +8,8 @@
 // PL/RU are careful translations; a native speaker should verify before a sale,
 // consistent with the existing suiteCopy.ts convention.
 
+import { HUB_TEMPLATE_STRINGS } from './consoleCopyTemplates'
+
 export type HubLang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
 type Five = { en: string; es: string; pt: string; pl: string; ru: string }
@@ -182,6 +184,9 @@ export const HUB_STRINGS: Record<string, Five> = {
   'hub.tier.blurb.tier3': { en: 'App platform, observability, error tracking, and incident response.', es: 'Plataforma de apps, observabilidad, seguimiento de errores y respuesta a incidentes.', pt: 'Plataforma de apps, observabilidade, rastreamento de erros e resposta a incidentes.', pl: 'Platforma aplikacji, obserwowalność, śledzenie błędów i reagowanie na incydenty.', ru: 'Платформа приложений, наблюдаемость, отслеживание ошибок и реагирование на инциденты.' },
   'hub.tier.blurb.tier4': { en: 'Encrypted secrets vault and team governance.', es: 'Bóveda de secretos cifrada y gobernanza de equipo.', pt: 'Cofre de segredos criptografado e governança de equipe.', pl: 'Szyfrowany sejf sekretów i zarządzanie zespołem.', ru: 'Зашифрованное хранилище секретов и управление командой.' },
 }
+
+// Merge Phase 2 (per-action template label/description strings).
+Object.assign(HUB_STRINGS, HUB_TEMPLATE_STRINGS)
 
 // ---- localizers (operate on plain catalog/template objects) -----------------
 

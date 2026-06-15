@@ -240,6 +240,19 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
       { title: 'Team Access', templateIds: ['gov.assign_role', 'gov.change_permissions', 'gov.deactivate_member'] },
       { title: 'Compliance & Audit', templateIds: ['gov.view_timeline', 'gov.run_compliance_audit', 'gov.clear_stale_sessions'] }
     ]
+  },
+  {
+    id: 'elevenlabs',
+    name: 'ElevenLabs',
+    subtitle: 'VOICE & AUDIO',
+    accent: '#a78bfa',
+    tier: 'tier2',
+    sections: [
+      { title: 'Voices', templateIds: ['elevenlabs.list_voices', 'elevenlabs.voice_details'] },
+      { title: 'Models', templateIds: ['elevenlabs.list_models'] },
+      { title: 'Account', templateIds: ['elevenlabs.subscription'] },
+      { title: 'History', templateIds: ['elevenlabs.list_history'] }
+    ]
   }
 ]
 

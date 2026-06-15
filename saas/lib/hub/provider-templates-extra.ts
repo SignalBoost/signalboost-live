@@ -18,6 +18,24 @@
 import type { ProviderTemplate } from './provider-templates'
 
 export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
+  // ---- Supabase read sources for select-don't-type pickers ----
+  'supabase.list_tables': {
+    id: 'supabase.list_tables', label: 'List Tables', description: 'List public tables (picker source).', icon: '🗃️',
+    policyActionId: 'read_provider_status', api: { service: 'supabase', method: 'GET', endpoint: '/rest/v1/' }, fields: []
+  },
+  'supabase.list_rows': {
+    id: 'supabase.list_rows', label: 'List Rows', description: 'List rows for a table (picker source).', icon: '📋',
+    policyActionId: 'read_provider_status', api: { service: 'supabase', method: 'GET', endpoint: '/rest/v1' },
+    fields: [{ id: 'table', label: 'Table', type: 'text' }]
+  },
+  'supabase.list_users': {
+    id: 'supabase.list_users', label: 'List Users', description: 'List auth users (picker source).', icon: '👤',
+    policyActionId: 'read_provider_status', api: { service: 'supabase', method: 'GET', endpoint: '/auth/v1/admin/users' }, fields: []
+  },
+  'supabase.list_buckets': {
+    id: 'supabase.list_buckets', label: 'List Buckets', description: 'List storage buckets (picker source).', icon: '🪣',
+    policyActionId: 'read_provider_status', api: { service: 'supabase', method: 'GET', endpoint: '/storage/v1/bucket' }, fields: []
+  },
   // ===================== STRIPE (gap) =====================
   'stripe.archive_price': {
     id: 'stripe.archive_price',
@@ -38,7 +56,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     icon: '✉️',
     policyActionId: 'invite_supabase_user',
     api: { service: 'Supabase', method: 'POST', endpoint: '/v1/auth/invite' },
-    fields: [{ id: 'email', label: 'Email', type: 'email', required: true, placeholder: 'user@domain.com' }],
+    fields: [{ id: 'email', label: 'User Email', type: 'email', required: true, placeholder: 'newuser@domain.com' }],
   },
   'supabase.edit_user': {
     id: 'supabase.edit_user',
@@ -48,7 +66,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'edit_supabase_user',
     api: { service: 'Supabase', method: 'POST', endpoint: '/v1/auth/users/update' },
     fields: [
-      { id: 'userId', label: 'User ID', type: 'text', required: true, placeholder: 'uuid' },
+      { id: 'userId', label: 'User', type: 'remote_select', required: true, source: { action: 'supabase.list_users', dataPath: 'users', valueKey: 'id', labelTemplate: '{label}' } },
       { id: 'email', label: 'New Email', type: 'email' },
     ],
   },
@@ -60,7 +78,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     requiresConfirm: true,
     policyActionId: 'delete_supabase_user',
     api: { service: 'Supabase', method: 'DELETE', endpoint: '/v1/auth/users' },
-    fields: [{ id: 'userId', label: 'User ID', type: 'text', required: true, placeholder: 'uuid' }],
+    fields: [{ id: 'userId', label: 'User', type: 'remote_select', required: true, source: { action: 'supabase.list_users', dataPath: 'users', valueKey: 'id', labelTemplate: '{label}' } }],
   },
   'supabase.reset_password': {
     id: 'supabase.reset_password',
@@ -69,7 +87,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     icon: '🔁',
     policyActionId: 'reset_supabase_password',
     api: { service: 'Supabase', method: 'POST', endpoint: '/v1/auth/recover' },
-    fields: [{ id: 'email', label: 'Email', type: 'email', required: true, placeholder: 'user@domain.com' }],
+    fields: [{ id: 'email', label: 'User Email', type: 'remote_select', required: true, source: { action: 'supabase.list_users', dataPath: 'users', valueKey: 'email', labelTemplate: '{label}' } }],
   },
   'supabase.edit_row': {
     id: 'supabase.edit_row',
@@ -79,7 +97,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'table_crud',
     api: { service: 'Supabase', method: 'POST', endpoint: '/v1/data/update' },
     fields: [
-      { id: 'table', label: 'Table', type: 'text', required: true, placeholder: 'public.orders' },
+      { id: 'table', label: 'Table', type: 'remote_select', required: true, source: { action: 'supabase.list_tables', dataPath: 'tables', valueKey: 'name', labelTemplate: '{name}' } },
       { id: 'match', label: 'Match (column=value)', type: 'text', required: true, placeholder: 'id=42' },
       { id: 'values', label: 'New Values (JSON)', type: 'textarea', required: true, placeholder: '{ "status": "paid" }' },
     ],
@@ -92,7 +110,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'storage_panel',
     api: { service: 'Supabase', method: 'POST', endpoint: '/v1/storage/panel' },
     fields: [
-      { id: 'bucket', label: 'Bucket', type: 'text', required: true, placeholder: 'assets' },
+      { id: 'bucket', label: 'Bucket', type: 'remote_select', required: true, source: { action: 'supabase.list_buckets', dataPath: 'buckets', valueKey: 'name', labelTemplate: '{name}' } },
       { id: 'action', label: 'Operation', type: 'select', required: true, options: [
         { label: 'List objects', value: 'list' },
         { label: 'Upload', value: 'upload' },

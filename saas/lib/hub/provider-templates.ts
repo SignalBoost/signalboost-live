@@ -26,6 +26,8 @@ export interface ProviderFormField {
   options?: { label: string; value: string }[]
 }
 
+import { localizeTemplate } from '@/lib/i18n/consoleCopy'
+
 export interface ProviderTemplate {
   id: string
   label: string
@@ -505,8 +507,9 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
 // null for those ids and their workspace cards render with no action buttons.
 Object.assign(PROVIDER_TEMPLATES, EXTRA_TEMPLATES)
 
-export function getTemplate(id: string): ProviderTemplate | null {
-  return PROVIDER_TEMPLATES[id] || null
+export function getTemplate(id: string, lang?: string): ProviderTemplate | null {
+  const t = PROVIDER_TEMPLATES[id] || null
+  return t && lang && lang !== 'en' ? localizeTemplate(t, lang) : t
 }
 
 export function getProviderTemplates(providerId?: string): ProviderTemplate[] {

@@ -13,6 +13,7 @@ import { createDefaultHost, listRegistered } from '@/console-core/defaultHost'
 
 // Side-effect imports: each registers its provider's executors at module load.
 import '@/console-core/executors/openai'
+import '@/console-core/executors/github'
 
 export async function POST(req: NextRequest) {
   try {

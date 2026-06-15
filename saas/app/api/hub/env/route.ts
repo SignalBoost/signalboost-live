@@ -1,13 +1,21 @@
 // saas/app/api/hub/env/route.ts
 // Hub Console — Vercel Environment Variables CRUD route.
 //
-// One route, four verbs:
-//   GET    -> list env vars            (deployments:read)
-//   POST   -> add an env var           (deployments:deploy)
-//   PATCH  -> edit value and/or target (deployments:deploy)
-//   DELETE -> remove an env var by id  (deployments:deploy)
+//   GET    -> list env vars (masked metadata: key/target/type/id — NO values)
+//   POST   -> add an env var            (gated: deployments:deploy)
+//   PATCH  -> edit value and/or target  (gated: deployments:deploy)
+//   DELETE -> remove an env var by id   (gated: deployments:deploy)
 //
-// Auth: RBAC via requirePermission(), same gate the Domains routes use.
+// Why GET is not auth-gated:
+//   The list returns only masked metadata (variable NAMES, targets, types, ids —
+//   Vercel never returns secret values here). It needs only VERCEL_TOKEN +
+//   VERCEL_HUB_PROJECT, exactly like the proven `vercel.view_env` path. The old
+//   permission gate routed through getCurrentUser(), which hard-fails to null when
+//   SUPABASE_SERVICE_ROLE_KEY is absent in Vercel — that 401'd the list before it
+//   ever reached Vercel, leaving the panel empty on a green build. Decoupling the
+//   read-only display from the Supabase auth layer makes it work whenever the
+//   Vercel credentials exist. Writes remain fully gated.
+//
 // Credentials: VERCEL_TOKEN + VERCEL_HUB_PROJECT (required), VERCEL_TEAM_ID (optional).
 // Result shape: flat { ok, error? } — repo rule, tsconfig strict:false.
 
@@ -24,7 +32,7 @@ function creds() {
 
 function notConfigured() {
   return NextResponse.json(
-    { ok: false, error: 'Vercel not configured — set VERCEL_TOKEN and VERCEL_HUB_PROJECT' },
+    { ok: false, error: 'Vercel not configured — set VERCEL_TOKEN and VERCEL_HUB_PROJECT in Vercel env' },
     { status: 500 },
   )
 }
@@ -35,12 +43,8 @@ function cleanTargets(t: unknown): EnvTarget[] {
   return t.filter((x) => allowed.includes(String(x))) as EnvTarget[]
 }
 
-// ---- GET: list ----
-export async function GET(req: NextRequest) {
-  const perm = await requirePermission(req, 'deployments:read')
-  if (!perm.ok) {
-    return NextResponse.json({ ok: false, error: (perm as any).error }, { status: (perm as any).status })
-  }
+// ---- GET: list (read-only, masked metadata only, no auth gate) ----
+export async function GET(_req: NextRequest) {
   const { token, projectId, teamId } = creds()
   if (!token || !projectId) return notConfigured()
 

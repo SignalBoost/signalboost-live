@@ -28,7 +28,7 @@ export interface ProviderTemplate {
   policyActionId?: string
   api: {
     service: string
-    method: 'GET' | 'POST' | 'PUT' | 'DELETE'
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
     endpoint: string
   }
   fields: ProviderFormField[]

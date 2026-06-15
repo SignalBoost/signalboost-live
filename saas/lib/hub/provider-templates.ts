@@ -253,7 +253,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'table_crud',
     api: { service: 'supabase', method: 'POST', endpoint: '/v1/db/insert' },
     fields: [
-      { id: 'table', label: 'Table Name', type: 'text', required: true },
+      { id: 'table', label: 'Table', type: 'remote_select', required: true, source: { action: 'supabase.list_tables', dataPath: 'tables', valueKey: 'name', labelTemplate: '{name}' } },
       { id: 'data', label: 'JSON Row Object', type: 'textarea', required: true }
     ]
   },
@@ -265,8 +265,8 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'table_crud',
     api: { service: 'supabase', method: 'POST', endpoint: '/v1/db/archive' },
     fields: [
-      { id: 'table', label: 'Target Table Name', type: 'text', required: true, placeholder: 'profiles' },
-      { id: 'rowId', label: 'Target Row UUID', type: 'text', required: true, placeholder: 'uuid-string' }
+      { id: 'table', label: 'Table', type: 'remote_select', required: true, source: { action: 'supabase.list_tables', dataPath: 'tables', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'rowId', label: 'Row', type: 'remote_select', required: true, source: { action: 'supabase.list_rows', dataPath: 'rows', valueKey: 'id', labelTemplate: '{label}', dependsOn: ['table'], emptyHint: 'Pick a table first' } }
     ]
   },
   'supabase.delete_row': {
@@ -278,8 +278,8 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'table_crud',
     api: { service: 'supabase', method: 'DELETE', endpoint: '/v1/db/row' },
     fields: [
-      { id: 'table', label: 'Table Name', type: 'text', required: true },
-      { id: 'rowId', label: 'Row Primary Key ID', type: 'text', required: true }
+      { id: 'table', label: 'Table', type: 'remote_select', required: true, source: { action: 'supabase.list_tables', dataPath: 'tables', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'rowId', label: 'Row', type: 'remote_select', required: true, source: { action: 'supabase.list_rows', dataPath: 'rows', valueKey: 'id', labelTemplate: '{label}', dependsOn: ['table'], emptyHint: 'Pick a table first' } }
     ]
   },
   'supabase.manage_user': {
@@ -325,7 +325,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     requiresConfirm: true,
     policyActionId: 'storage_panel',
     api: { service: 'supabase', method: 'POST', endpoint: '/v1/storage/buckets/empty' },
-    fields: [{ id: 'name', label: 'Bucket Identifier', type: 'text', required: true }]
+    fields: [{ id: 'name', label: 'Bucket', type: 'remote_select', required: true, source: { action: 'supabase.list_buckets', dataPath: 'buckets', valueKey: 'name', labelTemplate: '{name}' } }]
   },
 
   // === VERCEL ===

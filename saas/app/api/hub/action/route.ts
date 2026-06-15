@@ -1003,6 +1003,67 @@ async function executeSupabaseAction(template: any, payload: Record<string, unkn
   const restBase = `${url}/rest/v1`
   const writeHeaders = { 'Content-Type': 'application/json', apikey: key, 'Authorization': 'Bearer ' + key, Prefer: 'return=representation' }
 
+  // ---- Read sources for the select-don't-type pickers ----
+
+  // List tables via PostgREST's OpenAPI root (no custom RPC needed).
+  if (template.id === 'supabase.list_tables') {
+    const res = await fetch(`${restBase}/`, {
+      method: 'GET',
+      headers: { apikey: key, 'Authorization': 'Bearer ' + key, Accept: 'application/openapi+json' },
+    })
+    if (!res.ok) { const e = await res.text(); return { ok: false, error: e || 'Failed to list tables' } }
+    const spec = await res.json()
+    const defs = spec && spec.definitions ? Object.keys(spec.definitions) : []
+    const tables = defs.filter((n: string) => n && !n.startsWith('(')).map((n: string) => ({ name: n }))
+    return { ok: true, message: `${tables.length} table${tables.length === 1 ? '' : 's'}`, data: { count: tables.length, tables } }
+  }
+
+  // List rows for a chosen table (value = id, label = id + a friendly column).
+  if (template.id === 'supabase.list_rows') {
+    const table = String(payload.table || '')
+    if (!table) return { ok: false, error: 'Table is required' }
+    const res = await fetch(`${restBase}/${encodeURIComponent(table)}?limit=100`, {
+      method: 'GET',
+      headers: { apikey: key, 'Authorization': 'Bearer ' + key },
+    })
+    if (!res.ok) { const e = await res.text(); return { ok: false, error: e || 'Failed to list rows' } }
+    const data = await res.json()
+    const list = Array.isArray(data) ? data : []
+    const rows = list.map((r: any) => {
+      const id = r?.id ?? r?.uuid ?? r?.pk ?? ''
+      const friendly = r?.name ?? r?.title ?? r?.email ?? r?.slug ?? r?.label ?? ''
+      const label = friendly ? `${id} — ${friendly}` : String(id)
+      return { id: String(id), label }
+    }).filter((r: any) => r.id !== '')
+    return { ok: true, message: `${rows.length} row${rows.length === 1 ? '' : 's'}`, data: { count: rows.length, rows } }
+  }
+
+  // List auth users (value = id, label = email).
+  if (template.id === 'supabase.list_users') {
+    const res = await fetch(`${url}/auth/v1/admin/users?per_page=100`, {
+      method: 'GET',
+      headers: { apikey: key, 'Authorization': 'Bearer ' + key },
+    })
+    if (!res.ok) { const e = await res.text(); return { ok: false, error: e || 'Failed to list users' } }
+    const data = await res.json()
+    const list = Array.isArray(data?.users) ? data.users : (Array.isArray(data) ? data : [])
+    const users = list.map((u: any) => ({ id: u.id, email: u.email || u.id, label: u.email || u.id })).filter((u: any) => u.id)
+    return { ok: true, message: `${users.length} user${users.length === 1 ? '' : 's'}`, data: { count: users.length, users } }
+  }
+
+  // List storage buckets (value = name).
+  if (template.id === 'supabase.list_buckets') {
+    const res = await fetch(`${url}/storage/v1/bucket`, {
+      method: 'GET',
+      headers: { apikey: key, 'Authorization': 'Bearer ' + key },
+    })
+    if (!res.ok) { const e = await res.text(); return { ok: false, error: e || 'Failed to list buckets' } }
+    const data = await res.json()
+    const list = Array.isArray(data) ? data : []
+    const buckets = list.map((b: any) => ({ name: b.name || b.id, id: b.id, public: b.public })).filter((b: any) => b.name)
+    return { ok: true, message: `${buckets.length} bucket${buckets.length === 1 ? '' : 's'}`, data: { count: buckets.length, buckets } }
+  }
+
   // Run a migration / arbitrary SQL via the gated RPC
   if (template.id === 'supabase.run_migration') {
     const migration = String(payload.migration || '').trim()

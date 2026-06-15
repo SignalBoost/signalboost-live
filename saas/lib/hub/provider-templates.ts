@@ -1,5 +1,5 @@
 // saas/lib/hub/provider-templates.ts
-// Hub Console — Complete universal action form templates with authorized policy keys.
+// Hub Console — Complete universal action form templates synchronized with backend policy dictionaries.
 
 export interface ProviderFormField {
   id: string
@@ -23,7 +23,7 @@ export interface ProviderTemplate {
   icon: string
   requiresConfirm?: boolean
   previewBeforeSubmit?: boolean
-  policyActionId?: string // Authorizes the action against the backend compliance policy router
+  policyActionId?: string // Must map exactly to keys in your JSON policy configuration
   api: {
     service: string
     method: 'GET' | 'POST' | 'PUT' | 'DELETE'
@@ -76,6 +76,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Create Product',
     description: 'Create a new Stripe product and its first recurring price.',
     icon: '💳',
+    policyActionId: 'view_products',
     api: { service: 'Stripe', method: 'POST', endpoint: '/v1/products' },
     fields: [
       { id: 'name', label: 'Product Name', type: 'text', required: true, placeholder: 'Standard SaaS' },
@@ -87,6 +88,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Edit Product',
     description: 'Update a Stripe product name, description, or active state.',
     icon: '✏️',
+    policyActionId: 'view_products',
     api: { service: 'Stripe', method: 'POST', endpoint: '/v1/products/update' },
     fields: [
       { id: 'id', label: 'Product ID', type: 'text', required: true, placeholder: 'prod_...' },
@@ -98,6 +100,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'View Products',
     description: 'List live Stripe products and their identifiers.',
     icon: '📦',
+    policyActionId: 'view_products',
     api: { service: 'Stripe', method: 'GET', endpoint: '/v1/products' },
     fields: []
   },
@@ -107,6 +110,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     description: 'Permanently delete a Stripe product. Only products with no active prices can be deleted.',
     icon: '🗑️',
     requiresConfirm: true,
+    policyActionId: 'view_products',
     api: { service: 'Stripe', method: 'DELETE', endpoint: '/v1/products' },
     fields: [{ id: 'id', label: 'Product ID', type: 'text', required: true }]
   },
@@ -115,6 +119,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Archive Product',
     description: 'Archive a Stripe product (sets it inactive — recoverable by editing it active again).',
     icon: '🗄️',
+    policyActionId: 'view_products',
     api: { service: 'Stripe', method: 'POST', endpoint: '/v1/products/archive' },
     fields: [{ id: 'id', label: 'Product ID', type: 'text', required: true }]
   },
@@ -123,6 +128,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Create Price',
     description: 'Attach a new recurring or one-time price to an existing Stripe product.',
     icon: '🏷️',
+    policyActionId: 'manage_prices',
     api: { service: 'Stripe', method: 'POST', endpoint: '/v1/prices' },
     fields: [
       { id: 'product', label: 'Product ID', type: 'text', required: true, placeholder: 'prod_...' },
@@ -134,6 +140,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'View Prices',
     description: 'List Stripe prices, optionally filtered by product.',
     icon: '🏷️',
+    policyActionId: 'manage_prices',
     api: { service: 'Stripe', method: 'GET', endpoint: '/v1/prices' },
     fields: []
   },
@@ -142,6 +149,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Edit Price',
     description: 'Update a price nickname or activate/deactivate it (amounts are immutable in Stripe).',
     icon: '✏️',
+    policyActionId: 'manage_prices',
     api: { service: 'Stripe', method: 'POST', endpoint: '/v1/prices/update' },
     fields: [{ id: 'id', label: 'Price ID', type: 'text', required: true }]
   },
@@ -150,6 +158,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Plan Templates',
     description: 'Instantly build out standardized Indie, Pro, or Growth checkout tracks.',
     icon: '📋',
+    policyActionId: 'manage_prices',
     api: { service: 'Stripe', method: 'POST', endpoint: '/v1/plans/template' },
     fields: [
       { id: 'tier', label: 'Subscription Tier', type: 'select', required: true, options: [
@@ -164,6 +173,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Customer View',
     description: 'List customers, invoices, and active recurring payment metrics.',
     icon: '👥',
+    policyActionId: 'view_products',
     api: { service: 'Stripe', method: 'GET', endpoint: '/v1/customers' },
     fields: []
   },
@@ -172,6 +182,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Adjust Balance',
     description: 'Apply manual customer balance ledger modifications or transaction adjustments.',
     icon: '⚖️',
+    policyActionId: 'refunds',
     api: { service: 'Stripe', method: 'POST', endpoint: '/v1/customers/balance' },
     fields: [
       { id: 'customerId', label: 'Customer ID', type: 'text', required: true },
@@ -184,6 +195,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     description: 'Revert a processed transaction balance or apply a manual service credit charge.',
     icon: '💸',
     requiresConfirm: true,
+    policyActionId: 'refunds',
     api: { service: 'Stripe', method: 'POST', endpoint: '/v1/refunds' },
     fields: [
       { id: 'chargeId', label: 'Charge ID (ch_...)', type: 'text', required: true, placeholder: 'ch_3M...' },
@@ -198,6 +210,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     description: 'Run arbitrary raw queries directly against your data tables.',
     icon: '⚡',
     previewBeforeSubmit: true,
+    policyActionId: 'sql_editor',
     api: { service: 'Supabase', method: 'POST', endpoint: '/v1/rpc/execute_sql' },
     fields: [
       { id: 'query', label: 'SQL Raw Statement', type: 'textarea', required: true, defaultValue: 'SELECT * FROM users LIMIT 10;' }
@@ -209,6 +222,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     description: 'Execute compiled data definition schema migrations over the query bridge.',
     icon: '🚀',
     requiresConfirm: true,
+    policyActionId: 'sql_editor',
     api: { service: 'Supabase', method: 'POST', endpoint: '/v1/db/migrate' },
     fields: [{ id: 'migration', label: 'Migration Payload', type: 'textarea', required: true }]
   },
@@ -217,6 +231,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Insert Row',
     description: 'Directly inject structured row data records into an existing schema.',
     icon: '➕',
+    policyActionId: 'table_crud',
     api: { service: 'Supabase', method: 'POST', endpoint: '/v1/db/insert' },
     fields: [
       { id: 'table', label: 'Table Name', type: 'text', required: true },
@@ -228,6 +243,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Archive Rows',
     description: 'Flip active visibility flags on a specific database item record.',
     icon: '🗄️',
+    policyActionId: 'table_crud',
     api: { service: 'Supabase', method: 'POST', endpoint: '/v1/db/archive' },
     fields: [
       { id: 'table', label: 'Target Table Name', type: 'text', required: true, placeholder: 'profiles' },
@@ -240,6 +256,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     description: 'Hard purge row records out of the storage layer completely.',
     icon: '🗑️',
     requiresConfirm: true,
+    policyActionId: 'table_crud',
     api: { service: 'Supabase', method: 'DELETE', endpoint: '/v1/db/row' },
     fields: [
       { id: 'table', label: 'Table Name', type: 'text', required: true },
@@ -251,6 +268,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Auth Management',
     description: 'Directly alter raw metadata configurations or update confirmation state metrics.',
     icon: '👤',
+    policyActionId: 'auth_management',
     api: { service: 'Supabase', method: 'POST', endpoint: '/v1/auth/manage' },
     fields: [
       { id: 'email', label: 'User Email Address', type: 'email', required: true, placeholder: 'name@domain.com' },
@@ -267,6 +285,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     description: 'Invalidate current service_role JSON tokens and issue fresh credentials.',
     icon: '🔄',
     requiresConfirm: true,
+    policyActionId: 'auth_management',
     api: { service: 'Supabase', method: 'POST', endpoint: '/v1/auth/keys/rotate' },
     fields: []
   },
@@ -275,6 +294,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Create Bucket',
     description: 'Instantiate a fresh media or binary object storage file container.',
     icon: '🪣',
+    policyActionId: 'storage_panel',
     api: { service: 'Supabase', method: 'POST', endpoint: '/v1/storage/buckets' },
     fields: [{ id: 'name', label: 'Bucket Identifier', type: 'text', required: true }]
   },
@@ -284,6 +304,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     description: 'Purge all nested objects and binary layout leaves without dropping the core asset container.',
     icon: '💥',
     requiresConfirm: true,
+    policyActionId: 'storage_panel',
     api: { service: 'Supabase', method: 'POST', endpoint: '/v1/storage/buckets/empty' },
     fields: [{ id: 'name', label: 'Bucket Identifier', type: 'text', required: true }]
   },
@@ -294,7 +315,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Deployments Panel',
     description: 'Inspect running build tracks, commit records, and production target assignments.',
     icon: '🚀',
-    policyActionId: 'vercel.list_deployments',
+    policyActionId: 'deployments_panel',
     api: { service: 'Vercel', method: 'GET', endpoint: '/v1/deployments' },
     fields: []
   },
@@ -303,7 +324,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'View Env Vars',
     description: 'List all active environment variable configurations on this project tracking ring.',
     icon: '🔑',
-    policyActionId: 'vercel.add_env_var', // Piggybacks on your existing approved environment variable policy token
+    policyActionId: 'view_env_vars',
     api: { service: 'Vercel', method: 'GET', endpoint: '/v1/projects/env' },
     fields: []
   },
@@ -313,7 +334,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     description: 'Instantly point production edge domain targets back to a historical deployment hash.',
     icon: '↩️',
     requiresConfirm: true,
-    policyActionId: 'vercel.trigger_rollback',
+    policyActionId: 'rollback_deploy',
     api: { service: 'Vercel', method: 'POST', endpoint: '/v1/projects/rollback' },
     fields: [
       { id: 'deploymentId', label: 'Deployment ID', type: 'text', required: true, placeholder: 'dpl_...' }
@@ -324,7 +345,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Cancel Build',
     description: 'Abort an active compiling orchestration queue element directly at the gateway.',
     icon: '🛑',
-    policyActionId: 'vercel.cancel_build',
+    policyActionId: 'cancel_build',
     api: { service: 'Vercel', method: 'POST', endpoint: '/v1/builds/cancel' },
     fields: [{ id: 'buildId', label: 'Build ID', type: 'text', required: true }]
   },
@@ -333,7 +354,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Environment Variables',
     description: 'Inject variables globally across Production, Preview, or Staging development paths.',
     icon: '➕',
-    policyActionId: 'vercel.add_env_var',
+    policyActionId: 'view_env_vars',
     api: { service: 'Vercel', method: 'POST', endpoint: '/v1/projects/env' },
     fields: [
       { id: 'key', label: 'Variable Key String', type: 'text', required: true, placeholder: 'NEXT_PUBLIC_API_URL' },
@@ -350,7 +371,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     description: 'Wipe environment variable keys completely off the active build pipeline.',
     icon: '🗑️',
     requiresConfirm: true,
-    policyActionId: 'vercel.add_env_var', // Piggybacks on your existing approved environment variable policy token
+    policyActionId: 'view_env_vars',
     api: { service: 'Vercel', method: 'DELETE', endpoint: '/v1/projects/env' },
     fields: [{ id: 'key', label: 'Variable Key String', type: 'text', required: true }]
   },
@@ -359,7 +380,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Domains/DNS',
     description: 'Configure canonical configurations, alias paths, or trigger edge SSL certification rules.',
     icon: '🌐',
-    policyActionId: 'vercel.sync_dns_domain',
+    policyActionId: 'deployments_panel',
     api: { service: 'Vercel', method: 'POST', endpoint: '/v1/domains/sync' },
     fields: [{ id: 'domain', label: 'Domain Address string', type: 'text', required: true, placeholder: 'app.domain.com' }]
   },
@@ -412,6 +433,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Unlock Vault',
     description: 'Supply your system-wide Master Passphrase to load sensitive key vectors.',
     icon: '🔓',
+    policyActionId: 'unlock_form',
     api: { service: 'Vault', method: 'POST', endpoint: '/v1/vault/unlock' },
     fields: [
       { id: 'passphrase', label: 'Master Passphrase', type: 'secret', required: true }
@@ -422,6 +444,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Seal Vault',
     description: 'Instantly purge decrypted memory layers and lock all core operations back down.',
     icon: '🔒',
+    policyActionId: 'unlock_form',
     api: { service: 'Vault', method: 'POST', endpoint: '/v1/vault/seal' },
     fields: []
   },
@@ -430,6 +453,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Add Secret',
     description: 'Inject highly secure, encrypted variable storage strings.',
     icon: '➕',
+    policyActionId: 'crud_actions',
     api: { service: 'Vault', method: 'POST', endpoint: '/v1/vault/secrets' },
     fields: [
       { id: 'key', label: 'Secret Key Reference', type: 'text', required: true },
@@ -442,6 +466,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     description: 'Permanently scrub key reference objects from storage blocks.',
     icon: '🗑️',
     requiresConfirm: true,
+    policyActionId: 'crud_actions',
     api: { service: 'Vault', method: 'DELETE', endpoint: '/v1/vault/secrets' },
     fields: [{ id: 'key', label: 'Secret Key Reference', type: 'text', required: true }]
   },
@@ -450,6 +475,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Audit Log Keys',
     description: 'Inspect compliance trail paths mapping recent decryption events.',
     icon: '📜',
+    policyActionId: 'audit_log',
     api: { service: 'Vault', method: 'GET', endpoint: '/v1/vault/audit' },
     fields: []
   }

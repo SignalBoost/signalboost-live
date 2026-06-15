@@ -480,7 +480,8 @@ function StripeProductPicker({
           throw new Error(data.error || 'Unable to load Stripe products')
         }
 
-        const items = Array.isArray(data.data?.products) ? data.data.products : []
+        // Deep fallback parsing layout captures data fields whether nested under data.products, data.data.products, or raw roots.
+        const items = data.data?.products || data.products || (Array.isArray(data.data) ? data.data : [])
 
         if (!cancelled) {
           setProducts(items)
@@ -489,7 +490,7 @@ function StripeProductPicker({
         if (!cancelled) {
           setLoadError(err instanceof Error ? err.message : 'Unable to load Stripe products')
         }
-      } final_track: {
+      } finally {
         if (!cancelled) {
           setLoading(false)
         }
@@ -713,7 +714,6 @@ function RemoteSelect({
   useEffect(() => {
     if (!field.source) return
 
-    // Safely handles both raw endpoint string paths and object representations to prevent build failures
     const sourcePath = typeof field.source === 'string' ? field.source : (field.source as any).url || ''
     if (!sourcePath) return
 

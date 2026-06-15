@@ -15,6 +15,7 @@ import {
 import { Lang } from '../shared'
 import ProviderActionForm from '../ProviderActionForm'
 import { getTemplate } from '@/lib/hub/provider-templates'
+import { cHub } from '@/lib/i18n/consoleCopy'
 import { ProviderConsoleCard, ProviderWorkspace } from './ProviderConsoleCard'
 import { DomainsPage } from '../pages/DomainsPage'
 import EnvVarsPage from '../pages/EnvVarsPage'
@@ -107,8 +108,8 @@ export default function CommandConsole({
   const [utilityId, setUtilityId] = useState<string | null>(null)
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null)
 
-  const tier = getConsoleTier(tierId)
-  const providers = getTierProviders(tierId)
+  const tier = getConsoleTier(tierId, lang)
+  const providers = getTierProviders(tierId, lang)
   const pageCount = Math.max(1, Math.ceil(providers.length / PER_PAGE))
   const safePage = Math.min(page, pageCount - 1)
   const visible = providers.slice(safePage * PER_PAGE, safePage * PER_PAGE + PER_PAGE)
@@ -134,7 +135,7 @@ export default function CommandConsole({
   }
   const run = (templateId: string) => setActiveTemplateId(templateId)
 
-  const focusProvider = focusProviderId ? getConsoleProvider(focusProviderId) : null
+  const focusProvider = focusProviderId ? getConsoleProvider(focusProviderId, lang) : null
 
   return (
     <div style={{ display: 'flex', minHeight: 'calc(100vh - 80px)', background: '#070b14', color: '#fff', position: 'relative', boxSizing: 'border-box' }}>
@@ -177,7 +178,7 @@ export default function CommandConsole({
             return (
               <button key={u.id} onClick={() => openUtility(u.id)} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 11px', borderRadius: 10, border: '1px solid transparent', background: active ? 'rgba(255,195,0,.12)' : 'transparent', color: active ? '#ffc300' : 'rgba(255,255,255,.7)', fontSize: 13.5, fontWeight: active ? 800 : 600, cursor: 'pointer', textAlign: 'left' }}>
                 <span style={{ fontSize: 15, flex: '0 0 auto' }}>{u.icon}</span>
-                {u.label}
+                {cHub(lang, `hub.util.${u.id}`, u.label)}
               </button>
             )
           })}
@@ -190,14 +191,14 @@ export default function CommandConsole({
           {utilityId ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>
-                <button onClick={resetToHome} style={{ background: 'none', border: 'none', color: '#1af0ff', cursor: 'pointer', padding: 0, fontSize: 11, fontWeight: 700 }}>🎛️ Hub Home</button> / Utility Views
+                <button onClick={resetToHome} style={{ background: 'none', border: 'none', color: '#1af0ff', cursor: 'pointer', padding: 0, fontSize: 11, fontWeight: 700 }}>🎛️ {cHub(lang, 'hub.ui.hub_home', 'Hub Home')}</button> / {cHub(lang, 'hub.ui.utility_views', 'Utility Views')}
               </div>
               <UtilityFrame id={utilityId} lang={lang} />
             </div>
           ) : focusProvider ? (
             <ProviderWorkspace
               provider={focusProvider}
-              tierLabel={tier?.label ? `Tier ${tier.index} · ${tier.label}` : 'Tier'}
+              tierLabel={tier?.label ? `${cHub(lang, 'hub.ui.tier', 'Tier')} ${tier.index} · ${tier.label}` : cHub(lang, 'hub.ui.tier', 'Tier')}
               lang={lang}
               onBack={() => setFocusProviderId(null)}
               onHome={resetToHome}
@@ -207,7 +208,7 @@ export default function CommandConsole({
             <>
               <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
                 <div>
-                  <div style={{ fontSize: 20, fontWeight: 900, color: '#fff' }}>Tier {tier?.index} · {tier?.label} Providers</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: '#fff' }}>{cHub(lang, 'hub.ui.tier', 'Tier')} {tier?.index} · {tier?.label} {cHub(lang, 'hub.ui.providers', 'Providers')}</div>
                   <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.5)', marginTop: 4, maxWidth: 560 }}>{tier?.blurb}</div>
                 </div>
                 {pageCount > 1 && (

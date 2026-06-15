@@ -18,6 +18,23 @@
 import type { ProviderTemplate } from './provider-templates'
 
 export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
+  // ---- Batch: Anthropic / Gemini / Resend / AssemblyAI (portable engine) ----
+  'anthropic.list_models': { id: 'anthropic.list_models', label: 'View Models', description: 'Models available to the API key.', icon: '🧠', policyActionId: 'read_provider_status', api: { service: 'anthropic', method: 'GET', endpoint: '/v1/models' }, fields: [] },
+  'anthropic.retrieve_model': { id: 'anthropic.retrieve_model', label: 'Model Details', description: 'Details for a specific model.', icon: '🔎', policyActionId: 'read_provider_status', api: { service: 'anthropic', method: 'GET', endpoint: '/v1/models' }, fields: [
+      { id: 'model', label: 'Model', type: 'remote_select', required: true, source: { action: 'anthropic.list_models', dataPath: 'models', valueKey: 'id', labelTemplate: '{display_name}' } },
+    ] },
+  'gemini.list_models': { id: 'gemini.list_models', label: 'View Models', description: 'Models available to the Gemini key.', icon: '🧠', policyActionId: 'read_provider_status', api: { service: 'gemini', method: 'GET', endpoint: '/v1beta/models' }, fields: [] },
+  'gemini.model_details': { id: 'gemini.model_details', label: 'Model Details', description: 'Details for a specific model.', icon: '🔎', policyActionId: 'read_provider_status', api: { service: 'gemini', method: 'GET', endpoint: '/v1beta/models' }, fields: [
+      { id: 'model', label: 'Model', type: 'remote_select', required: true, source: { action: 'gemini.list_models', dataPath: 'models', valueKey: 'name', labelTemplate: '{displayName}' } },
+    ] },
+  'resend.list_domains': { id: 'resend.list_domains', label: 'List Domains', description: 'Sending domains and verification status.', icon: '🌐', policyActionId: 'read_provider_status', api: { service: 'resend', method: 'GET', endpoint: '/domains' }, fields: [] },
+  'resend.list_audiences': { id: 'resend.list_audiences', label: 'List Audiences', description: 'Contact audiences.', icon: '👥', policyActionId: 'read_provider_status', api: { service: 'resend', method: 'GET', endpoint: '/audiences' }, fields: [] },
+  'resend.list_broadcasts': { id: 'resend.list_broadcasts', label: 'List Broadcasts', description: 'Recent broadcasts.', icon: '📣', policyActionId: 'read_provider_status', api: { service: 'resend', method: 'GET', endpoint: '/broadcasts' }, fields: [] },
+  'resend.list_api_keys': { id: 'resend.list_api_keys', label: 'List API Keys', description: 'API keys on the account.', icon: '🔑', policyActionId: 'read_provider_status', api: { service: 'resend', method: 'GET', endpoint: '/api-keys' }, fields: [] },
+  'assemblyai.list_transcripts': { id: 'assemblyai.list_transcripts', label: 'Recent Transcripts', description: 'Most recent transcription jobs.', icon: '🎧', policyActionId: 'read_provider_status', api: { service: 'assemblyai', method: 'GET', endpoint: '/v2/transcript' }, fields: [] },
+  'assemblyai.transcript_details': { id: 'assemblyai.transcript_details', label: 'Transcript Details', description: 'Inspect a transcription job.', icon: '🔎', policyActionId: 'read_provider_status', api: { service: 'assemblyai', method: 'GET', endpoint: '/v2/transcript' }, fields: [
+      { id: 'id', label: 'Transcript', type: 'remote_select', required: true, source: { action: 'assemblyai.list_transcripts', dataPath: 'transcripts', valueKey: 'id', labelTemplate: '{id} ({status})' } },
+    ] },
   // ---- ElevenLabs read actions (run through the portable engine) ----
   'elevenlabs.list_voices': {
     id: 'elevenlabs.list_voices', label: 'List Voices', description: 'Voices available to the account.', icon: '🎙️',

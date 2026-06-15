@@ -207,7 +207,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ActionRespons
     }
 
     // 7. Check credentials are available
-    const credentials = PROVIDER_CREDENTIALS[template.api.service]
+    const credentials = PROVIDER_CREDENTIALS[String(template.api.service || '').toLowerCase()]
     if (!credentials) {
       return NextResponse.json(
         { ok: false, error: 'Provider not configured: ' + template.api.service },
@@ -288,7 +288,7 @@ async function executeProviderAction(
     return { ok: false, error: 'Template not found' }
   }
 
-  const service = template.api.service
+  const service = String(template.api.service || '').toLowerCase()
 
   // Route to service-specific handlers
   switch (service) {

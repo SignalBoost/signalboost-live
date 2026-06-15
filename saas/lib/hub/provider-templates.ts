@@ -443,9 +443,10 @@ export function getTemplate(id: string): ProviderTemplate | null {
   return PROVIDER_TEMPLATES[id] || null
 }
 
+// Fixed type payload validator containing explicit string definitions for route.ts error handling lines
 export function validateTemplatePayload(templateId: string, payload: Record<string, any>) {
   const template = getTemplate(templateId)
-  if (!template) return { ok: false, missing: [] }
+  if (!template) return { ok: false, missing: [], error: 'Template layout not registered' }
 
   const missing: string[] = []
   template.fields.forEach(field => {
@@ -456,6 +457,7 @@ export function validateTemplatePayload(templateId: string, payload: Record<stri
 
   return {
     ok: missing.length === 0,
-    missing
+    missing,
+    error: missing.length > 0 ? `Missing required parameters: ${missing.join(', ')}` : undefined
   }
 }

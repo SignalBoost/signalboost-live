@@ -14,7 +14,7 @@ import { Lang, cardStyle, bodyStyle, labelStyle, monoStyle } from './shared'
 // Providers migrated to the portable action engine. Their actions + pickers
 // target /api/hub/action/engine; everything else stays on the legacy route.
 // The engine accepts the same { templateId, payload } body, so only the URL changes.
-const ENGINE_PROVIDERS = ['github', 'openai']
+const ENGINE_PROVIDERS = ['github', 'openai', 'elevenlabs']
 function hubActionEndpoint(templateId: string): string {
   const provider = String(templateId || '').split('.')[0]
   return ENGINE_PROVIDERS.includes(provider) ? '/api/hub/action/engine' : '/api/hub/action'

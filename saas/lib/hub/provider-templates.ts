@@ -1,6 +1,8 @@
 // saas/lib/hub/provider-templates.ts
 // Hub Console — Complete universal action form templates synchronized with backend policy dictionaries.
 
+import { EXTRA_TEMPLATES } from './provider-templates-extra'
+
 export interface ProviderFormField {
   id: string
   label: string
@@ -497,6 +499,11 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     fields: []
   }
 }
+
+// Merge the extended provider templates (GitHub and others defined in the
+// companion file) into the main registry. Without this, getTemplate() returns
+// null for those ids and their workspace cards render with no action buttons.
+Object.assign(PROVIDER_TEMPLATES, EXTRA_TEMPLATES)
 
 export function getTemplate(id: string): ProviderTemplate | null {
   return PROVIDER_TEMPLATES[id] || null

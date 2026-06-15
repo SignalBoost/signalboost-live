@@ -51,6 +51,23 @@ const VERCEL_PANEL_ROUTER: Record<string, VercelPanel> = {
     subtitle: 'View, add, edit, and delete variables across Production, Preview, and Development.',
     render: () => <EnvVarsPage />,
   },
+  // Edit / delete env open the same full CRUD panel (handles all operations inline).
+  'vercel.edit_env': {
+    title: 'Environment Variables',
+    subtitle: 'View, add, edit, and delete variables across Production, Preview, and Development.',
+    render: () => <EnvVarsPage />,
+  },
+  'vercel.delete_env': {
+    title: 'Environment Variables',
+    subtitle: 'View, add, edit, and delete variables across Production, Preview, and Development.',
+    render: () => <EnvVarsPage />,
+  },
+  // Logs Viewer — live platform / build / runtime logs
+  'vercel.logs': {
+    title: 'Logs Viewer',
+    subtitle: 'Recent platform, build, and runtime log events.',
+    render: () => <LogsPage />,
+  },
   // Deployments — read-only history
   'vercel.list_deployments': {
     title: 'Deployments Panel',

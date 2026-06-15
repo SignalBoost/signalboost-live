@@ -195,6 +195,7 @@ export default function ProviderActionForm({
                   error={errors[field.id]}
                   onChange={value => handleFieldChange(field.id, value)}
                   lang={lang}
+                  allValues={values}
                 />
               ))
             )}
@@ -290,9 +291,10 @@ type FormFieldProps = {
   error?: string
   onChange: (value: unknown) => void
   lang: Lang
+  allValues?: Record<string, unknown>
 }
 
-function FormField({ templateId, field, value, error, onChange }: FormFieldProps) {
+function FormField({ templateId, field, value, error, onChange, allValues }: FormFieldProps) {
   const baseStyle: CSSProperties = {
     width: '100%',
     padding: '10px 12px',
@@ -309,6 +311,9 @@ function FormField({ templateId, field, value, error, onChange }: FormFieldProps
   const useVercelEnvPicker = templateId === 'vercel.delete_env' && field.id === 'id'
 
   const renderInput = () => {
+    if (field.type === 'remote_select' && field.source) {
+      return <RemoteSelect field={field} value={value} onChange={onChange} error={error} allValues={allValues || {}} />
+    }
     if (useStripeProductPicker) {
       return <StripeProductPicker value={(value as string) || ''} onChange={onChange} error={error} />
     }
@@ -994,4 +999,147 @@ const closeButtonStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
   cursor: 'pointer',
+}
+
+// ---------------------------------------------------------------------------
+// RemoteSelect — a dropdown populated live from a list-action (field.source).
+// Prevents human error: instead of typing an id/number/branch, the operator
+// chooses from items that actually exist. Supports dependsOn so a downstream
+// list re-fetches when an upstream choice changes (pick repo -> its PRs load).
+// ---------------------------------------------------------------------------
+function interpolateLabel(tpl: string, item: any): string {
+  return String(tpl).replace(/\{(\w+)\}/g, (_m, k) => {
+    const v = item?.[k]
+    return v === undefined || v === null ? '' : String(v)
+  })
+}
+
+function RemoteSelect({
+  field,
+  value,
+  onChange,
+  error,
+  allValues,
+}: {
+  field: ProviderFormField
+  value: unknown
+  onChange: (v: unknown) => void
+  error?: string
+  allValues: Record<string, unknown>
+}) {
+  const source = field.source!
+  const deps = source.dependsOn || []
+  const depValues = deps.map(d => String(allValues?.[d] ?? ''))
+  const depsReady = deps.every((_d, i) => depValues[i] !== '')
+  const depKey = JSON.stringify(depValues)
+
+  const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [options, setOptions] = useState<{ label: string; value: string }[]>([])
+
+  useEffect(() => {
+    if (!depsReady) {
+      setOptions([])
+      return
+    }
+    let active = true
+    setLoading(true)
+    setLoadError(null)
+    const payload: Record<string, unknown> = {}
+    deps.forEach(d => {
+      payload[d] = allValues?.[d]
+    })
+    fetch('/api/hub/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ templateId: source.action, payload }),
+    })
+      .then(r => r.json())
+      .then(res => {
+        if (!active) return
+        if (!res?.ok) {
+          setLoadError(res?.error || 'Could not load options')
+          setOptions([])
+          return
+        }
+        const arr = res?.data?.[source.dataPath]
+        const list = Array.isArray(arr) ? arr : []
+        const opts = list.map((it: any) => ({
+          value: String(it?.[source.valueKey] ?? ''),
+          label: interpolateLabel(source.labelTemplate, it),
+        }))
+        setOptions(opts)
+        // If a dependency changed and the previously-selected value no longer
+        // exists in the new list, clear it so a stale id can't be submitted.
+        if (deps.length > 0) {
+          const cur = String(value ?? '')
+          if (cur && !opts.some(o => o.value === cur)) onChange('')
+        }
+      })
+      .catch(() => {
+        if (active) setLoadError('Could not load options')
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [depKey, depsReady, source.action, source.dataPath, source.valueKey, source.labelTemplate])
+
+  const baseStyle: CSSProperties = {
+    width: '100%',
+    padding: '10px 12px',
+    borderRadius: 8,
+    border: error ? '1px solid rgba(239,68,68,.5)' : '1px solid rgba(255,255,255,.15)',
+    background: 'rgba(255,255,255,.04)',
+    color: '#fff',
+    fontSize: 13,
+    fontFamily: 'inherit',
+    outline: 'none',
+    cursor: 'pointer',
+  }
+
+  if (!depsReady) {
+    return (
+      <div style={{ ...baseStyle, color: 'rgba(255,255,255,.45)', cursor: 'default' }}>
+        {source.emptyHint || 'Select a previous field first'}
+      </div>
+    )
+  }
+
+  const current = String(value ?? '')
+  const hasCurrent = options.some(o => o.value === current)
+
+  return (
+    <div>
+      <select
+        value={current}
+        onChange={e => onChange(e.target.value)}
+        style={baseStyle}
+        disabled={loading}
+      >
+        <option value="" disabled style={{ color: '#111', background: '#fff' }}>
+          {loading ? 'Loading…' : options.length ? 'Select…' : 'No options found'}
+        </option>
+        {!hasCurrent && current !== '' && (
+          <option value={current} style={{ color: '#111', background: '#fff' }}>
+            {current}
+          </option>
+        )}
+        {options.map(o => (
+          <option key={o.value} value={o.value} style={{ color: '#111', background: '#fff' }}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      {loadError && (
+        <div style={{ fontSize: 11, color: 'rgba(239,68,68,.85)', marginTop: 4 }}>{loadError}</div>
+      )}
+      {!loading && !loadError && options.length === 0 && (
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 4 }}>Nothing to select here yet.</div>
+      )}
+    </div>
+  )
 }

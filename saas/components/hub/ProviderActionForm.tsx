@@ -695,48 +695,88 @@ function EmbeddedVercelEnvList() {
   )
 }
 
+function interpolateLabel(tpl: string, item: any): string {
+  return String(tpl).replace(/\{(\w+)\}/g, (_m, k) => {
+    const v = item?.[k]
+    return v === undefined || v === null ? '' : String(v)
+  })
+}
+
 function RemoteSelect({
   field,
-  allValues,
   value,
+  onChange,
   error,
-  onChange
+  allValues,
 }: {
   field: ProviderFormField
-  allValues?: Record<string, unknown>
   value: unknown
+  onChange: (v: unknown) => void
   error?: string
-  onChange: (value: unknown) => void
+  allValues: Record<string, unknown>
 }) {
+  const source = field.source!
+  const deps = source.dependsOn || []
+  const depValues = deps.map(d => String(allValues?.[d] ?? ''))
+  const depsReady = deps.every((_d, i) => depValues[i] !== '')
+  const depKey = JSON.stringify(depValues)
+
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [options, setOptions] = useState<{ label: string; value: string }[]>([])
 
   useEffect(() => {
-    if (!field.source) return
-
-    const sourcePath = typeof field.source === 'string' ? field.source : (field.source as any).url || ''
-    if (!sourcePath) return
-
-    let cancelled = false
-    async function loadOptions() {
-      setLoading(true)
-      try {
-        const res = await fetch(sourcePath, { method: 'POST', body: JSON.stringify(allValues) })
-        const data = await res.json()
-        if (!cancelled && Array.isArray(data.options)) {
-          setOptions(data.options)
-        }
-      } catch {
-        // Fallback gracefully on fetch issues
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
+    if (!depsReady) {
+      setOptions([])
+      return
     }
-    loadOptions()
-    return () => { cancelled = true }
-  }, [field.source, allValues])
+    let active = true
+    setLoading(true)
+    setLoadError(null)
+    const payload: Record<string, unknown> = {}
+    deps.forEach(d => {
+      payload[d] = allValues?.[d]
+    })
+    fetch('/api/hub/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ templateId: source.action, payload }),
+    })
+      .then(r => r.json())
+      .then(res => {
+        if (!active) return
+        if (!res?.ok) {
+          setLoadError(res?.error || 'Could not load options')
+          setOptions([])
+          return
+        }
+        const arr = res?.data?.[source.dataPath]
+        const list = Array.isArray(arr) ? arr : []
+        const opts = list.map((it: any) => ({
+          value: String(it?.[source.valueKey] ?? ''),
+          label: interpolateLabel(source.labelTemplate, it),
+        }))
+        setOptions(opts)
+        // If a dependency changed and the previously-selected value no longer
+        // exists in the new list, clear it so a stale id can't be submitted.
+        if (deps.length > 0) {
+          const cur = String(value ?? '')
+          if (cur && !opts.some(o => o.value === cur)) onChange('')
+        }
+      })
+      .catch(() => {
+        if (active) setLoadError('Could not load options')
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [depKey, depsReady, source.action, source.dataPath, source.valueKey, source.labelTemplate])
 
-  const selectStyle: CSSProperties = {
+  const baseStyle: CSSProperties = {
     width: '100%',
     padding: '10px 12px',
     borderRadius: 8,
@@ -744,24 +784,51 @@ function RemoteSelect({
     background: 'rgba(255,255,255,.04)',
     color: '#fff',
     fontSize: 13,
+    fontFamily: 'inherit',
     outline: 'none',
     cursor: 'pointer',
   }
 
+  if (!depsReady) {
+    return (
+      <div style={{ ...baseStyle, color: 'rgba(255,255,255,.45)', cursor: 'default' }}>
+        {source.emptyHint || 'Select a previous field first'}
+      </div>
+    )
+  }
+
+  const current = String(value ?? '')
+  const hasCurrent = options.some(o => o.value === current)
+
   return (
-    <select
-      value={(value as string) || ''}
-      onChange={e => onChange(e.target.value)}
-      style={selectStyle}
-      disabled={loading}
-    >
-      <option value="">{loading ? 'Loading remote records…' : field.placeholder || 'Select live record option'}</option>
-      {options.map(opt => (
-        <option key={opt.value} value={opt.value} style={{ color: '#111', background: '#fff' }}>
-          {opt.label}
+    <div>
+      <select
+        value={current}
+        onChange={e => onChange(e.target.value)}
+        style={baseStyle}
+        disabled={loading}
+      >
+        <option value="" disabled style={{ color: '#111', background: '#fff' }}>
+          {loading ? 'Loading…' : options.length ? 'Select…' : 'No options found'}
         </option>
-      ))}
-    </select>
+        {!hasCurrent && current !== '' && (
+          <option value={current} style={{ color: '#111', background: '#fff' }}>
+            {current}
+          </option>
+        )}
+        {options.map(o => (
+          <option key={o.value} value={o.value} style={{ color: '#111', background: '#fff' }}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      {loadError && (
+        <div style={{ fontSize: 11, color: 'rgba(239,68,68,.85)', marginTop: 4 }}>{loadError}</div>
+      )}
+      {!loading && !loadError && options.length === 0 && (
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 4 }}>Nothing to select here yet.</div>
+      )}
+    </div>
   )
 }
 

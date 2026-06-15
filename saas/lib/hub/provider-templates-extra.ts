@@ -18,6 +18,30 @@
 import type { ProviderTemplate } from './provider-templates'
 
 export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
+  // ---- ElevenLabs read actions (run through the portable engine) ----
+  'elevenlabs.list_voices': {
+    id: 'elevenlabs.list_voices', label: 'List Voices', description: 'Voices available to the account.', icon: '🎙️',
+    policyActionId: 'read_provider_status', api: { service: 'elevenlabs', method: 'GET', endpoint: '/v1/voices' }, fields: [],
+  },
+  'elevenlabs.voice_details': {
+    id: 'elevenlabs.voice_details', label: 'Voice Details', description: 'Inspect a specific voice.', icon: '🔎',
+    policyActionId: 'read_provider_status', api: { service: 'elevenlabs', method: 'GET', endpoint: '/v1/voices' },
+    fields: [
+      { id: 'voice_id', label: 'Voice', type: 'remote_select', required: true, source: { action: 'elevenlabs.list_voices', dataPath: 'voices', valueKey: 'voice_id', labelTemplate: '{name}' } },
+    ],
+  },
+  'elevenlabs.list_models': {
+    id: 'elevenlabs.list_models', label: 'List Models', description: 'Speech models available to the account.', icon: '🧠',
+    policyActionId: 'read_provider_status', api: { service: 'elevenlabs', method: 'GET', endpoint: '/v1/models' }, fields: [],
+  },
+  'elevenlabs.subscription': {
+    id: 'elevenlabs.subscription', label: 'Subscription & Usage', description: 'Plan tier and character quota usage.', icon: '📊',
+    policyActionId: 'read_provider_status', api: { service: 'elevenlabs', method: 'GET', endpoint: '/v1/user/subscription' }, fields: [],
+  },
+  'elevenlabs.list_history': {
+    id: 'elevenlabs.list_history', label: 'Generation History', description: 'Recent text-to-speech generations.', icon: '🕓',
+    policyActionId: 'read_provider_status', api: { service: 'elevenlabs', method: 'GET', endpoint: '/v1/history' }, fields: [],
+  },
   // ---- OpenAI read actions (run through the portable engine) ----
   'openai.list_models': {
     id: 'openai.list_models', label: 'View Models', description: 'List models available to the configured API key.', icon: '🧠',

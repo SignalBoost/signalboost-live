@@ -189,19 +189,24 @@ export async function POST(req: NextRequest): Promise<NextResponse<ActionRespons
       )
     }
 
-    // 4. Check authentication
+    // 4. Check authentication.
+    //    Read-only actions (policy approval 'none') are NOT auth-gated, so live-data
+    //    pickers (remote_select) and view/list actions populate even when the Supabase
+    //    auth layer is unavailable. Every mutating action still requires authentication.
+    const policy = getHubActionPolicy(template.policyActionId)
+    const isReadOnly = policy.approval === 'none'
     const user = await getCurrentUser(req)
-    if (!user) {
+    if (!user && !isReadOnly) {
       return NextResponse.json(
         { ok: false, error: 'Not authenticated' },
         { status: 401 },
       )
     }
+    const actorId = user?.id || 'console'
 
     // 5. Enforce action policy
-    const policy = getHubActionPolicy(template.policyActionId)
     if (isActionBlocked(template.policyActionId)) {
-      await logAuditEvent(user.id, templateId, 'BLOCKED', 'Action is blocked by policy', null)
+      await logAuditEvent(actorId, templateId, 'BLOCKED', 'Action is blocked by policy', null)
       return NextResponse.json(
         { ok: false, error: 'This action is blocked by policy' },
         { status: 403 },
@@ -209,8 +214,8 @@ export async function POST(req: NextRequest): Promise<NextResponse<ActionRespons
     }
 
     // 6. Check approval requirements
-    if (requiresOwnerApproval(template.policyActionId) && user.role !== 'owner') {
-      await logAuditEvent(user.id, templateId, 'DENIED', 'Requires owner approval', null)
+    if (requiresOwnerApproval(template.policyActionId) && (!user || user.role !== 'owner')) {
+      await logAuditEvent(actorId, templateId, 'DENIED', 'Requires owner approval', null)
       return NextResponse.json(
         { ok: false, error: 'This action requires owner approval' },
         { status: 403 },
@@ -229,7 +234,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ActionRespons
     const missingVars = credentials.envVars.filter(v => !process.env[v])
     if (missingVars.length > 0) {
       await logAuditEvent(
-        user.id,
+        actorId,
         templateId,
         'CONFIG_ERROR',
         'Missing env vars: ' + missingVars.join(', '),
@@ -247,7 +252,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ActionRespons
       result = await executeProviderAction(template, payload)
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error'
-      await logAuditEvent(user.id, templateId, 'ERROR', errorMsg, null)
+      await logAuditEvent(actorId, templateId, 'ERROR', errorMsg, null)
       return NextResponse.json(
         { ok: false, error: 'Provider error: ' + errorMsg },
         { status: 500 },
@@ -257,7 +262,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ActionRespons
     // 9. Log the action
     if (policy.auditRequired) {
       await logAuditEvent(
-        user.id,
+        actorId,
         templateId,
         result.ok ? 'SUCCESS' : 'FAILURE',
         result.message || (result.ok ? 'Action completed' : 'Action failed'),

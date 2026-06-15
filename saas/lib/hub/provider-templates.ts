@@ -13,13 +13,14 @@ export interface ProviderFormField {
   step?: number
   defaultValue?: any
   help?: string
-  // Expands source to allow both simple string endpoints and advanced object definitions safely
+  // Added optional emptyHint support to fully satisfy the other agent's cascading select configurations
   source?: string | {
     action: string
     dataPath?: string
     valueKey?: string
     labelTemplate?: string
     dependsOn?: string[]
+    emptyHint?: string
   }
   options?: { label: string; value: string }[]
 }
@@ -460,7 +461,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     id: 'vault.add_secret',
     label: 'Add Secret',
     description: 'Inject highly secure, encrypted variable storage strings.',
-    icon: '➕',
+    icon: '#',
     policyActionId: 'crud_actions',
     api: { service: 'Vault', method: 'POST', endpoint: '/v1/vault/secrets' },
     fields: [

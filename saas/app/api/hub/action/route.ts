@@ -1299,6 +1299,130 @@ async function executeGitHubAction(template: any, payload: Record<string, unknow
     }
   }
 
+  // List open pull requests
+  if (template.id === 'github.list_prs') {
+    const res = await fetch(`https://api.github.com/repos/${owner}/${name}/pulls?state=open&per_page=30&sort=updated&direction=desc`, { headers })
+    if (!res.ok) return { ok: false, error: `GitHub error (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}` }
+    const data = await res.json()
+    const prs = Array.isArray(data) ? data : []
+    return {
+      ok: true,
+      message: `${prs.length} open PR${prs.length === 1 ? '' : 's'}`,
+      data: { count: prs.length, pulls: prs.slice(0, 30).map((p: any) => ({ number: p.number, title: p.title, branch: p.head?.ref, url: p.html_url })) },
+    }
+  }
+
+  // View files changed in a pull request
+  if (template.id === 'github.view_pr_files') {
+    const number = String(payload.number || '')
+    if (!number) return { ok: false, error: 'PR number is required' }
+    const res = await fetch(`https://api.github.com/repos/${owner}/${name}/pulls/${encodeURIComponent(number)}/files?per_page=100`, { headers })
+    if (!res.ok) return { ok: false, error: `GitHub error (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}` }
+    const data = await res.json()
+    const files = Array.isArray(data) ? data : []
+    return {
+      ok: true,
+      message: `PR #${number}: ${files.length} file${files.length === 1 ? '' : 's'} changed`,
+      data: { count: files.length, files: files.slice(0, 100).map((f: any) => ({ file: f.filename, status: f.status, additions: f.additions, deletions: f.deletions })) },
+    }
+  }
+
+  // Merge a pull request
+  if (template.id === 'github.merge_pr') {
+    const number = String(payload.number || '')
+    if (!number) return { ok: false, error: 'PR number is required' }
+    const merge_method = ['merge', 'squash', 'rebase'].includes(String(payload.method)) ? String(payload.method) : 'merge'
+    const res = await fetch(`https://api.github.com/repos/${owner}/${name}/pulls/${encodeURIComponent(number)}/merge`, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ merge_method }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) return { ok: false, error: data?.message || `GitHub merge error (HTTP ${res.status})` }
+    return { ok: true, message: `PR #${number} merged (${merge_method})`, data: { merged: data?.merged, sha: data?.sha } }
+  }
+
+  // Close a pull request without merging
+  if (template.id === 'github.close_pr') {
+    const number = String(payload.number || '')
+    if (!number) return { ok: false, error: 'PR number is required' }
+    const res = await fetch(`https://api.github.com/repos/${owner}/${name}/pulls/${encodeURIComponent(number)}`, {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: 'closed' }),
+    })
+    if (!res.ok) return { ok: false, error: `GitHub error (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}` }
+    const data = await res.json()
+    return { ok: true, message: `PR #${number} closed`, data: { number: data.number, state: data.state } }
+  }
+
+  // List branches
+  if (template.id === 'github.list_branches') {
+    const res = await fetch(`https://api.github.com/repos/${owner}/${name}/branches?per_page=100`, { headers })
+    if (!res.ok) return { ok: false, error: `GitHub error (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}` }
+    const data = await res.json()
+    const branches = Array.isArray(data) ? data : []
+    return {
+      ok: true,
+      message: `${branches.length} branch${branches.length === 1 ? '' : 'es'}`,
+      data: { count: branches.length, branches: branches.slice(0, 100).map((b: any) => ({ name: b.name, protected: b.protected })) },
+    }
+  }
+
+  // Delete a branch
+  if (template.id === 'github.delete_branch') {
+    const branch = String(payload.branch || '').trim()
+    if (!branch) return { ok: false, error: 'Branch name is required' }
+    if (branch === 'main' || branch === 'master') return { ok: false, error: 'Refusing to delete the default branch' }
+    const ref = branch.split('/').map(encodeURIComponent).join('/')
+    const res = await fetch(`https://api.github.com/repos/${owner}/${name}/git/refs/heads/${ref}`, { method: 'DELETE', headers })
+    if (res.status !== 204) {
+      const e = await res.text()
+      return { ok: false, error: `GitHub error (HTTP ${res.status}): ${e.slice(0, 300)}` }
+    }
+    return { ok: true, message: `Branch deleted: ${branch}`, data: { branch } }
+  }
+
+  // Recent commits
+  if (template.id === 'github.list_commits') {
+    const res = await fetch(`https://api.github.com/repos/${owner}/${name}/commits?per_page=20`, { headers })
+    if (!res.ok) return { ok: false, error: `GitHub error (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}` }
+    const data = await res.json()
+    const commits = Array.isArray(data) ? data : []
+    return {
+      ok: true,
+      message: `${commits.length} recent commit${commits.length === 1 ? '' : 's'}`,
+      data: { count: commits.length, commits: commits.slice(0, 20).map((c: any) => ({ sha: String(c.sha || '').slice(0, 7), message: String(c.commit?.message || '').split('\n')[0].slice(0, 100), author: c.commit?.author?.name, date: c.commit?.author?.date })) },
+    }
+  }
+
+  // List open issues (filter out PRs, which the issues endpoint also returns)
+  if (template.id === 'github.list_issues') {
+    const res = await fetch(`https://api.github.com/repos/${owner}/${name}/issues?state=open&per_page=30`, { headers })
+    if (!res.ok) return { ok: false, error: `GitHub error (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}` }
+    const data = await res.json()
+    const issues = (Array.isArray(data) ? data : []).filter((i: any) => !i.pull_request)
+    return {
+      ok: true,
+      message: `${issues.length} open issue${issues.length === 1 ? '' : 's'}`,
+      data: { count: issues.length, issues: issues.slice(0, 30).map((i: any) => ({ number: i.number, title: i.title, url: i.html_url })) },
+    }
+  }
+
+  // Close an issue
+  if (template.id === 'github.close_issue') {
+    const number = String(payload.number || '')
+    if (!number) return { ok: false, error: 'Issue number is required' }
+    const res = await fetch(`https://api.github.com/repos/${owner}/${name}/issues/${encodeURIComponent(number)}`, {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: 'closed' }),
+    })
+    if (!res.ok) return { ok: false, error: `GitHub error (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}` }
+    const data = await res.json()
+    return { ok: true, message: `Issue #${number} closed`, data: { number: data.number, state: data.state } }
+  }
+
   return { ok: false, error: 'Unknown GitHub action: ' + template.id }
 }
 

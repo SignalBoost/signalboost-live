@@ -23,6 +23,7 @@ export interface ProviderTemplate {
   icon: string
   requiresConfirm?: boolean
   previewBeforeSubmit?: boolean
+  policyActionId?: string // Maps explicit access parameters for route policy handling
   api: {
     service: string
     method: 'GET' | 'POST' | 'PUT' | 'DELETE'
@@ -443,7 +444,6 @@ export function getTemplate(id: string): ProviderTemplate | null {
   return PROVIDER_TEMPLATES[id] || null
 }
 
-// Fixed type payload validator containing explicit string definitions for route.ts error handling lines
 export function validateTemplatePayload(templateId: string, payload: Record<string, any>) {
   const template = getTemplate(templateId)
   if (!template) return { ok: false, missing: [], error: 'Template layout not registered' }

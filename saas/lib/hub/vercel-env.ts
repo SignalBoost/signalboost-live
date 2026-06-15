@@ -6,7 +6,10 @@
 // tsconfig strict:false — no narrowing unions).
 //
 // Reads no env here; the caller (the API route) passes token / projectId / teamId.
-// teamId is optional: only appended when the project lives under a Vercel team.
+// teamId is optional. For LIST we try with teamId (if given) and automatically
+// retry WITHOUT it on failure — a personal project rejects a team-scoped query,
+// and that mismatch was silently returning an empty list before.
+// All failures return Vercel's verbatim status + body so the UI can show the cause.
 
 const VERCEL_API = 'https://api.vercel.com'
 
@@ -55,22 +58,27 @@ function normVar(e: any): EnvVar {
 }
 
 // ---------------------------------------------------------------------------
-// LIST
+// LIST  (with automatic team -> no-team retry, verbatim errors)
 // ---------------------------------------------------------------------------
 export async function listEnv(
   projectId: string,
   token: string,
   teamId?: string,
 ): Promise<ListResult> {
+  async function call(withTeam: boolean) {
+    const url = `${VERCEL_API}/v9/projects/${encodeURIComponent(projectId)}/env${withTeam ? qs(teamId) : ''}`
+    return fetch(url, { method: 'GET', headers: baseHeaders(token), cache: 'no-store' })
+  }
+
   try {
-    const res = await fetch(`${VERCEL_API}/v9/projects/${projectId}/env${qs(teamId)}`, {
-      method: 'GET',
-      headers: baseHeaders(token),
-      cache: 'no-store',
-    })
+    let res = await call(Boolean(teamId))
+    // A personal project rejects a team-scoped query — retry without the team.
+    if (!res.ok && teamId) {
+      res = await call(false)
+    }
     if (!res.ok) {
       const e = await res.text()
-      return { ok: false, error: `List failed (${res.status}): ${e}` }
+      return { ok: false, error: `Vercel env list failed (HTTP ${res.status}): ${e.slice(0, 400)}` }
     }
     const data = await res.json()
     const raw = data.envs || (Array.isArray(data) ? data : [])
@@ -101,15 +109,14 @@ export async function addEnv(
     const body: Record<string, unknown> = { key, value: String(input.value), type, target }
     if (input.gitBranch) body.gitBranch = input.gitBranch
 
-    // v10 supports upsert + returns the created record.
-    const res = await fetch(`${VERCEL_API}/v10/projects/${projectId}/env${qs(teamId)}`, {
+    const res = await fetch(`${VERCEL_API}/v10/projects/${encodeURIComponent(projectId)}/env${qs(teamId)}`, {
       method: 'POST',
       headers: { ...baseHeaders(token), 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
     if (!res.ok) {
       const e = await res.text()
-      return { ok: false, error: `Add failed (${res.status}): ${e}` }
+      return { ok: false, error: `Add failed (HTTP ${res.status}): ${e.slice(0, 400)}` }
     }
     const data = await res.json()
     const created = data.created || data
@@ -140,14 +147,14 @@ export async function updateEnv(
 
     if (Object.keys(body).length === 0) return { ok: false, error: 'Nothing to update' }
 
-    const res = await fetch(`${VERCEL_API}/v9/projects/${projectId}/env/${encodeURIComponent(id)}${qs(teamId)}`, {
+    const res = await fetch(`${VERCEL_API}/v9/projects/${encodeURIComponent(projectId)}/env/${encodeURIComponent(id)}${qs(teamId)}`, {
       method: 'PATCH',
       headers: { ...baseHeaders(token), 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
     if (!res.ok) {
       const e = await res.text()
-      return { ok: false, error: `Update failed (${res.status}): ${e}` }
+      return { ok: false, error: `Update failed (HTTP ${res.status}): ${e.slice(0, 400)}` }
     }
     const data = await res.json()
     return { ok: true, var: normVar(data) }
@@ -167,13 +174,13 @@ export async function deleteEnv(
 ): Promise<DeleteResult> {
   try {
     if (!id) return { ok: false, error: 'Env variable id is required' }
-    const res = await fetch(`${VERCEL_API}/v9/projects/${projectId}/env/${encodeURIComponent(id)}${qs(teamId)}`, {
+    const res = await fetch(`${VERCEL_API}/v9/projects/${encodeURIComponent(projectId)}/env/${encodeURIComponent(id)}${qs(teamId)}`, {
       method: 'DELETE',
       headers: baseHeaders(token),
     })
     if (!res.ok) {
       const e = await res.text()
-      return { ok: false, error: `Delete failed (${res.status}): ${e}` }
+      return { ok: false, error: `Delete failed (HTTP ${res.status}): ${e.slice(0, 400)}` }
     }
     return { ok: true, id }
   } catch (err) {

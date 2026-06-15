@@ -112,7 +112,10 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     tier: 'core',
     sections: [
       { title: 'Repositories', templateIds: ['github.list_repos'] },
-      { title: 'Issues', templateIds: ['github.open_issue', 'github.edit_issue'] },
+      { title: 'Pull Requests', templateIds: ['github.list_prs', 'github.view_pr_files', 'github.merge_pr', 'github.close_pr'] },
+      { title: 'Branches', templateIds: ['github.list_branches', 'github.delete_branch'] },
+      { title: 'Issues', templateIds: ['github.list_issues', 'github.open_issue', 'github.edit_issue', 'github.close_issue'] },
+      { title: 'Activity', templateIds: ['github.list_commits'] },
       { title: 'Secrets & Tokens', templateIds: ['github.rotate_token', 'github.manage_secrets'] }
     ]
   },

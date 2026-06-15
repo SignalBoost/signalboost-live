@@ -296,7 +296,7 @@ function FormField({ templateId, field, value, error, onChange }: FormFieldProps
   }
 
   const useStripeProductPicker = isStripeProductPickerField(templateId, field.id)
-  const useVercelEnvPicker = templateId === 'vercel.delete_env_var' && field.id === 'key'
+  const useVercelEnvPicker = templateId === 'vercel.delete_env' && field.id === 'id'
 
   const renderInput = () => {
     if (useStripeProductPicker) {
@@ -396,7 +396,7 @@ function FormField({ templateId, field, value, error, onChange }: FormFieldProps
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
       {field.type !== 'toggle' && (
         <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 6 }}>
-          {useVercelEnvPicker ? 'Environment Variable Key' : useStripeProductPicker ? 'Product' : field.label}
+          {useVercelEnvPicker ? 'Environment Variable Profile Target' : useStripeProductPicker ? 'Product' : field.label}
           {field.required && <span style={{ color: '#ef4444' }}>*</span>}
         </label>
       )}
@@ -405,7 +405,7 @@ function FormField({ templateId, field, value, error, onChange }: FormFieldProps
 
       {useVercelEnvPicker ? (
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: -2 }}>
-          Select from live environment configurations. The console maps key allocations directly.
+          Select from live environment configurations. The console maps core variable IDs directly.
         </div>
       ) : useStripeProductPicker ? (
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: -2 }}>
@@ -554,27 +554,23 @@ function VercelEnvVarPicker({
         const res = await fetch('/api/hub/action', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ templateId: 'vercel.list_env_vars', payload: {} }),
+          body: JSON.stringify({ templateId: 'vercel.view_env', payload: {} }),
         })
 
         const data = await res.json()
 
         if (!res.ok) {
-          throw new Error(data.error || 'Unable to fetch project configuration assets')
+          throw new Error(data.error || 'Unable to fetch project configurations')
         }
 
-        const items = Array.isArray(data.data?.envs) 
-          ? data.data.envs 
-          : Array.isArray(data.data) 
-            ? data.data 
-            : []
+        const items = data.data?.vars || data.data?.envs || (Array.isArray(data.data) ? data.data : [])
 
         if (!cancelled) {
           setEnvs(items)
         }
       } catch (err) {
         if (!cancelled) {
-          setLoadError(err instanceof Error ? err.message : 'Unable to query environments')
+          setLoadError(err instanceof Error ? err.message : 'Unable to query environment payload fields')
         }
       } finally {
         if (!cancelled) {
@@ -603,7 +599,7 @@ function VercelEnvVarPicker({
       <input
         value={value}
         onChange={e => onChange(e.target.value)}
-        placeholder="NEXT_PUBLIC_..."
+        placeholder="Select key ID..."
         style={{
           ...pickerInputStyle,
           border: error ? '1px solid rgba(239,68,68,.5)' : '1px solid rgba(255,255,255,.15)',
@@ -626,7 +622,7 @@ function VercelEnvVarPicker({
       </option>
 
       {envs.map(env => (
-        <option key={env.id || env.key} value={env.key} style={{ color: '#111', background: '#fff' }}>
+        <option key={env.id || env.key} value={env.id} style={{ color: '#111', background: '#fff' }}>
           {env.key} {env.target ? `(${Array.isArray(env.target) ? env.target.join(', ') : env.target})` : ''}
         </option>
       ))}
@@ -723,7 +719,6 @@ function getDisplayColumns(rows: any[]): string[] {
   return [...preferredExisting, ...rest].slice(0, 5)
 }
 
-// Formats column widths inside modal data display grids
 function makeColumns(columns: string[]) {
   if (columns.length <= 1) return 'minmax(0, 1fr)'
 
@@ -739,7 +734,6 @@ function niceLabel(key: string): string {
   return key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim()
 }
 
-// Evaluates object properties to present text descriptors inside cell targets
 function formatCell(v: any): string {
   if (v === null || v === undefined || v === '') return '—'
   if (typeof v === 'boolean') return v ? 'yes' : 'no'

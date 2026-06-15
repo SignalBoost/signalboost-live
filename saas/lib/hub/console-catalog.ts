@@ -1,13 +1,18 @@
 // saas/lib/hub/console-catalog.ts
 // Hub Command Console — Complete Tier and Provider Orchestration Register.
+//
+// Cards render straight from this file: each provider's `sections[].templateIds`
+// become the buttons shown on its card and workspace. Every id here resolves via
+// getTemplate() (provider-templates.ts + provider-templates-extra.ts). Tier
+// placement is data-driven via the `tier` field below.
 
-export type ConsoleTierId = 'core' | 'utility' | string
+export type ConsoleTierId = 'core' | 'tier2' | 'tier3' | 'tier4' | string
 
 export const CONSOLE_TIERS = [
   { id: 'core', index: '1', label: 'Core', sidebarTitle: 'Tier 1 Providers', blurb: 'Primary infrastructure: cloud, payments, data, hosting, and source control.' },
-  { id: 'tier2', index: '2', label: 'Scale', sidebarTitle: 'Tier 2 Providers', blurb: 'Scaling infrastructure and integrations.' },
-  { id: 'tier3', index: '3', label: 'Enterprise', sidebarTitle: 'Tier 3 Providers', blurb: 'Enterprise security and data systems.' },
-  { id: 'tier4', index: '4', label: 'Internal', sidebarTitle: 'Tier 4 Tools', blurb: 'Internal tooling and operational hooks.' }
+  { id: 'tier2', index: '2', label: 'Scale', sidebarTitle: 'Tier 2 Providers', blurb: 'Messaging, email, edge networking, and compute integrations.' },
+  { id: 'tier3', index: '3', label: 'Enterprise', sidebarTitle: 'Tier 3 Providers', blurb: 'App platform, observability, error tracking, and incident response.' },
+  { id: 'tier4', index: '4', label: 'Internal', sidebarTitle: 'Tier 4 Tools', blurb: 'Encrypted secrets vault and team governance.' }
 ]
 
 export const CONSOLE_UTILITY_PAGES = [
@@ -22,6 +27,7 @@ export interface ConsoleProvider {
   name: string
   subtitle: string
   accent: string
+  tier: ConsoleTierId
   sections: {
     title: string
     templateIds: string[]
@@ -29,14 +35,17 @@ export interface ConsoleProvider {
 }
 
 export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
+  // ============================ TIER 1 · CORE ============================
   {
     id: 'aws',
     name: 'AWS',
     subtitle: 'CLOUD INFRASTRUCTURE',
     accent: '#ff9900',
+    tier: 'core',
     sections: [
       { title: 'Storage', templateIds: ['aws.create_s3_bucket'] },
-      { title: 'IAM', templateIds: ['aws.list_iam_users', 'aws.disable_iam_user'] }
+      { title: 'IAM', templateIds: ['aws.list_iam_users', 'aws.disable_iam_user'] },
+      { title: 'Credentials', templateIds: ['aws.rotate_credential'] }
     ]
   },
   {
@@ -44,6 +53,7 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     name: 'GCP',
     subtitle: 'CLOUD PLATFORM',
     accent: '#4285f4',
+    tier: 'core',
     sections: [
       { title: 'IAM', templateIds: ['gcp.list_service_accounts'] }
     ]
@@ -53,6 +63,7 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     name: 'Azure',
     subtitle: 'MICROSOFT CLOUD',
     accent: '#0078d4',
+    tier: 'core',
     sections: []
   },
   {
@@ -60,9 +71,10 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     name: 'Stripe',
     subtitle: 'PAYMENTS & BILLING',
     accent: '#635bff',
+    tier: 'core',
     sections: [
-      { title: 'Catalog', templateIds: ['stripe.create_product', 'stripe.edit_product', 'stripe.view_products', 'stripe.delete_product', 'stripe.archive_product'] },
-      { title: 'Prices & Tiers', templateIds: ['stripe.create_price', 'stripe.view_prices', 'stripe.edit_price', 'stripe.apply_tier_template'] },
+      { title: 'Catalog', templateIds: ['stripe.create_product', 'stripe.edit_product', 'stripe.view_products', 'stripe.archive_product', 'stripe.delete_product'] },
+      { title: 'Prices & Tiers', templateIds: ['stripe.create_price', 'stripe.view_prices', 'stripe.edit_price', 'stripe.archive_price', 'stripe.apply_tier_template'] },
       { title: 'Customers', templateIds: ['stripe.list_customers', 'stripe.adjust_balance', 'stripe.issue_refund'] }
     ]
   },
@@ -71,11 +83,12 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     name: 'Supabase',
     subtitle: 'DATABASE & AUTHENTICATION',
     accent: '#3ecf8e',
+    tier: 'core',
     sections: [
       { title: 'SQL Engine', templateIds: ['supabase.sql_editor', 'supabase.run_migration'] },
-      { title: 'Data CRUD', templateIds: ['supabase.insert_row', 'supabase.archive_row', 'supabase.delete_row'] },
-      { title: 'Access & Auth', templateIds: ['supabase.manage_user', 'supabase.rotate_service_key'] },
-      { title: 'Storage Buckets', templateIds: ['supabase.create_bucket', 'supabase.empty_bucket'] }
+      { title: 'Table CRUD', templateIds: ['supabase.insert_row', 'supabase.edit_row', 'supabase.archive_row', 'supabase.delete_row'] },
+      { title: 'Users & Access', templateIds: ['supabase.invite_user', 'supabase.edit_user', 'supabase.delete_user', 'supabase.reset_password', 'supabase.rotate_service_key'] },
+      { title: 'Storage', templateIds: ['supabase.storage_panel', 'supabase.create_bucket', 'supabase.empty_bucket'] }
     ]
   },
   {
@@ -83,34 +96,131 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     name: 'Vercel',
     subtitle: 'DEPLOYMENTS & NETWORKING',
     accent: '#fff',
+    tier: 'core',
     sections: [
-      // Each button opens a real, live workspace panel (see CommandConsole VERCEL_PANEL_ROUTER).
+      // Buttons open real, live workspace panels (see CommandConsole VERCEL_PANEL_ROUTER).
       { title: 'Deployments', templateIds: ['vercel.list_deployments', 'vercel.trigger_rollback', 'vercel.cancel_build'] },
-      { title: 'Configuration', templateIds: ['vercel.add_env_var', 'vercel.sync_dns_domain'] }
+      { title: 'Environment Variables', templateIds: ['vercel.view_env', 'vercel.edit_env', 'vercel.delete_env'] },
+      { title: 'Networking & Logs', templateIds: ['vercel.sync_dns_domain', 'vercel.logs'] }
     ]
   },
   {
     id: 'github',
     name: 'GitHub',
     subtitle: 'SOURCE CONTROL',
-    accent: '#24292e',
-    sections: []
+    accent: '#8b949e',
+    tier: 'core',
+    sections: [
+      { title: 'Repositories', templateIds: ['github.list_repos'] },
+      { title: 'Issues', templateIds: ['github.open_issue', 'github.edit_issue'] },
+      { title: 'Secrets & Tokens', templateIds: ['github.rotate_token', 'github.manage_secrets'] }
+    ]
   },
   {
     id: 'openai',
     name: 'OpenAI',
     subtitle: 'AI & MODELS',
     accent: '#10a37f',
+    tier: 'core',
     sections: []
   },
+
+  // ============================ TIER 2 · SCALE ============================
+  {
+    id: 'twilio',
+    name: 'Twilio',
+    subtitle: 'MESSAGING & SMS',
+    accent: '#f22f46',
+    tier: 'tier2',
+    sections: [
+      { title: 'Messaging', templateIds: ['twilio.send_sms', 'twilio.verify_number'] }
+    ]
+  },
+  {
+    id: 'sendgrid',
+    name: 'SendGrid',
+    subtitle: 'TRANSACTIONAL EMAIL',
+    accent: '#1a82e2',
+    tier: 'tier2',
+    sections: [
+      { title: 'Email', templateIds: ['sendgrid.send_email', 'sendgrid.check_domain_auth'] }
+    ]
+  },
+  {
+    id: 'cloudflare',
+    name: 'Cloudflare',
+    subtitle: 'DNS, CDN & EDGE',
+    accent: '#f38020',
+    tier: 'tier2',
+    sections: [
+      { title: 'DNS', templateIds: ['cloudflare.add_dns_record', 'cloudflare.toggle_proxy'] },
+      { title: 'Cache', templateIds: ['cloudflare.purge_cache'] }
+    ]
+  },
+  {
+    id: 'digitalocean',
+    name: 'DigitalOcean',
+    subtitle: 'CLOUD COMPUTE',
+    accent: '#0080ff',
+    tier: 'tier2',
+    sections: [
+      { title: 'Compute', templateIds: ['digitalocean.create_droplet', 'digitalocean.view_droplets'] }
+    ]
+  },
+
+  // ========================== TIER 3 · ENTERPRISE =========================
+  {
+    id: 'firebase',
+    name: 'Firebase',
+    subtitle: 'APP PLATFORM',
+    accent: '#ffca28',
+    tier: 'tier3',
+    sections: [
+      { title: 'Security Rules', templateIds: ['firebase.upload_rules', 'firebase.view_rules'] }
+    ]
+  },
+  {
+    id: 'datadog',
+    name: 'Datadog',
+    subtitle: 'OBSERVABILITY',
+    accent: '#632ca6',
+    tier: 'tier3',
+    sections: [
+      { title: 'Monitoring', templateIds: ['datadog.create_monitor', 'datadog.check_metrics'] }
+    ]
+  },
+  {
+    id: 'sentry',
+    name: 'Sentry',
+    subtitle: 'ERROR MONITORING',
+    accent: '#b39ddb',
+    tier: 'tier3',
+    sections: [
+      { title: 'Issues', templateIds: ['sentry.list_issues', 'sentry.resolve_issue'] }
+    ]
+  },
+  {
+    id: 'pagerduty',
+    name: 'PagerDuty',
+    subtitle: 'INCIDENT RESPONSE',
+    accent: '#06ac38',
+    tier: 'tier3',
+    sections: [
+      { title: 'Incidents', templateIds: ['pagerduty.list_incidents', 'pagerduty.trigger_incident'] }
+    ]
+  },
+
+  // =========================== TIER 4 · INTERNAL ==========================
   {
     id: 'keyvault',
     name: 'Key Vault',
     subtitle: 'ENCRYPTED SECRET VAULT',
     accent: '#eab308',
+    tier: 'tier4',
     sections: [
       { title: 'Security', templateIds: ['vault.unlock_vault', 'vault.seal_vault'] },
-      { title: 'Secrets Storage', templateIds: ['vault.add_secret', 'vault.delete_secret', 'vault.view_keys'] }
+      { title: 'Secrets Storage', templateIds: ['vault.add_secret', 'vault.edit_secret', 'vault.reveal_secret', 'vault.archive_secret', 'vault.delete_secret', 'vault.view_keys'] },
+      { title: 'Audit', templateIds: ['vault.audit_log'] }
     ]
   },
   {
@@ -118,9 +228,10 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     name: 'Governance',
     subtitle: 'TEAM ACCESS & COMPLIANCE',
     accent: '#f43f5e',
+    tier: 'tier4',
     sections: [
-      { title: 'Team Access', templateIds: ['gov.assign_role', 'gov.deactivate_member'] },
-      { title: 'Audit Traces', templateIds: ['gov.view_timeline', 'gov.clear_stale_sessions'] }
+      { title: 'Team Access', templateIds: ['gov.assign_role', 'gov.change_permissions', 'gov.deactivate_member'] },
+      { title: 'Compliance & Audit', templateIds: ['gov.view_timeline', 'gov.run_compliance_audit', 'gov.clear_stale_sessions'] }
     ]
   }
 ]
@@ -134,13 +245,13 @@ export function getConsoleProvider(id: string) {
 }
 
 export function getTierProviders(tierId: ConsoleTierId) {
-  if (tierId === 'core') {
-    return CONSOLE_PROVIDERS.filter(p => ['aws', 'gcp', 'azure', 'stripe', 'supabase', 'vercel', 'github', 'openai', 'keyvault', 'governance'].includes(p.id))
-  }
-  return CONSOLE_PROVIDERS.filter(p => !['aws', 'gcp', 'azure', 'stripe', 'supabase', 'vercel', 'github', 'openai', 'keyvault', 'governance'].includes(p.id))
+  const known = CONSOLE_TIERS.some(t => t.id === tierId)
+  // Unknown/legacy tier ids fall back to Core so nothing ever renders empty.
+  const target = known ? tierId : 'core'
+  return CONSOLE_PROVIDERS.filter(p => p.tier === target)
 }
 
 export function isDestructiveTemplate(id: string): boolean {
   const norm = id.toLowerCase()
-  return norm.includes('delete') || norm.includes('remove') || norm.includes('ban') || norm.includes('deactivate') || norm.includes('cancel') || norm.includes('empty') || norm.includes('seal')
+  return norm.includes('delete') || norm.includes('remove') || norm.includes('ban') || norm.includes('deactivate') || norm.includes('cancel') || norm.includes('empty') || norm.includes('seal') || norm.includes('purge') || norm.includes('disable')
 }

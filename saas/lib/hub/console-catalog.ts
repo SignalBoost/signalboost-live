@@ -125,7 +125,11 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     subtitle: 'AI & MODELS',
     accent: '#10a37f',
     tier: 'core',
-    sections: []
+    sections: [
+      { title: 'Models', templateIds: ['openai.list_models', 'openai.retrieve_model'] },
+      { title: 'Files', templateIds: ['openai.list_files'] },
+      { title: 'Jobs', templateIds: ['openai.list_fine_tunes', 'openai.list_batches'] }
+    ]
   },
 
   // ============================ TIER 2 · SCALE ============================

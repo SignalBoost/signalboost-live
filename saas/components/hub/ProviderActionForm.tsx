@@ -406,11 +406,15 @@ function FormField({ templateId, field, value, error, onChange }: FormFieldProps
   )
 }
 
+// Catches all variations of string naming conventions for product key lookups
 function isStripeProductPickerField(templateId: string, fieldId: string) {
+  const normField = fieldId.toLowerCase().replace(/[^a-z0-9]/g, '')
+  
   return (
     (templateId === 'stripe.create_price' && fieldId === 'product') ||
-    (templateId === 'stripe.edit_product' && fieldId === 'id') ||
-    (templateId === 'stripe.delete_product' && fieldId === 'id')
+    (templateId === 'stripe.edit_product' && (normField === 'id' || normField === 'productid')) ||
+    (templateId === 'stripe.delete_product' && (normField === 'id' || normField === 'productid')) ||
+    (templateId === 'stripe.archive_product' && (normField === 'id' || normField === 'productid' || normField === 'product'))
   )
 }
 

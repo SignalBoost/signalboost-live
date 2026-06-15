@@ -2,7 +2,7 @@
 
 // saas/components/hub/console/ProviderConsoleCard.tsx
 // Hub Command Console — Child layout representations.
-// Uses a flexible wrapping block layout to absolutely prevent container cut-offs.
+// Uses clean full-width vertical rows for maximum data layout scannability.
 
 import { type ConsoleProvider, isDestructiveTemplate } from '@/lib/hub/console-catalog'
 import { getTemplate } from '@/lib/hub/provider-templates'
@@ -18,7 +18,6 @@ type CardProps = {
 export function ProviderConsoleCard({ provider, lang, onExpand, onRun }: CardProps) {
   return (
     <div style={{ background: 'rgba(13, 18, 32, 0.45)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: 14, overflow: 'hidden' }}>
-      {/* Card Header Band */}
       <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 10, height: 10, borderRadius: '50%', background: provider.accent, boxShadow: `0 0 10px ${provider.accent}` }} />
@@ -32,16 +31,11 @@ export function ProviderConsoleCard({ provider, lang, onExpand, onRun }: CardPro
         </button>
       </div>
 
-      {/* Render Actions Layout */}
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
         {provider.sections.map((section, idx) => (
           <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255, 255, 255, 0.35)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              {section.title}
-            </div>
-            
-            {/* Flex container forces items to wrap onto lines naturally if they exceed constraints */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, width: '100%' }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255, 255, 255, 0.35)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{section.title}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {section.templateIds.map(id => {
                 const template = getTemplate(id)
                 if (!template) return null
@@ -49,57 +43,15 @@ export function ProviderConsoleCard({ provider, lang, onExpand, onRun }: CardPro
                 const isArchive = id.includes('archive')
 
                 return (
-                  <button 
-                    key={id} 
-                    onClick={() => onRun(id)} 
-                    style={{ 
-                      flex: '1 1 calc(50% - 4px)',
-                      minWidth: '140px',
-                      padding: '8px 10px', 
-                      borderRadius: 8, 
-                      textAlign: 'left', 
-                      fontSize: 12, 
-                      fontWeight: 600, 
-                      cursor: 'pointer', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 8, 
-                      border: isDestructive ? '1px solid rgba(239, 68, 68, 0.25)' : isArchive ? '1px solid rgba(255, 195, 0, 0.25)' : '1px solid rgba(255, 255, 255, 0.08)', 
-                      background: isDestructive ? 'rgba(239, 68, 68, 0.06)' : isArchive ? 'rgba(255, 195, 0, 0.06)' : 'rgba(255, 255, 255, 0.03)', 
-                      color: isDestructive ? '#ef4444' : isArchive ? '#ffc300' : 'rgba(255, 255, 255, 0.85)' 
-                    }}
-                  >
-                    <span>{template.icon}</span>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{template.label}</span>
+                  <button key={id} onClick={() => onRun(id)} style={{ width: '100%', padding: '10px 14px', borderRadius: 10, textAlign: 'left', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: isDestructive ? '1px solid rgba(239, 68, 68, 0.25)' : isArchive ? '1px solid rgba(255, 195, 0, 0.25)' : '1px solid rgba(255, 255, 255, 0.08)', background: isDestructive ? 'rgba(239, 68, 68, 0.06)' : isArchive ? 'rgba(255, 195, 0, 0.06)' : 'rgba(255, 255, 255, 0.03)', color: isDestructive ? '#ef4444' : isArchive ? '#ffc300' : 'rgba(255, 255, 255, 0.85)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span>{template.icon}</span>
+                      <span>{template.label}</span>
+                    </div>
+                    <span style={{ opacity: 0.35 }}>→</span>
                   </button>
                 )
               })}
-              
-              {/* Hardcoded manual entry fallback element to break open cache tracks */}
-              {provider.id === 'stripe' && section.title === 'Catalog' && (
-                <button 
-                  onClick={() => onRun('stripe.archive_product')} 
-                  style={{ 
-                    flex: '1 1 calc(50% - 4px)',
-                    minWidth: '140px',
-                    padding: '8px 10px', 
-                    borderRadius: 8, 
-                    textAlign: 'left', 
-                    fontSize: 12, 
-                    fontWeight: 600, 
-                    cursor: 'pointer', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 8, 
-                    border: '1px solid rgba(255, 195, 0, 0.25)', 
-                    background: 'rgba(255, 195, 0, 0.06)', 
-                    color: '#ffc300' 
-                  }}
-                >
-                  <span>🗄️</span>
-                  <span>Archive Product</span>
-                </button>
-              )}
             </div>
           </div>
         ))}
@@ -124,9 +76,9 @@ export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onRun }: 
         <h2 style={{ fontSize: 22, fontWeight: 900, color: '#fff', margin: 0 }}>{provider.name} Workspace</h2>
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'start' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24, alignItems: 'stretch' }}>
         {provider.sections.map((section, idx) => (
-          <div key={idx} style={{ background: 'rgba(13, 18, 32, 0.3)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: 12, padding: 18, flex: '1 1 calc(50% - 10px)', minWidth: '280px' }}>
+          <div key={idx} style={{ background: 'rgba(13, 18, 32, 0.3)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: 12, padding: 18 }}>
             <h3 style={{ fontSize: 12, fontWeight: 800, color: '#1af0ff', textTransform: 'uppercase', margin: '0 0 14px 0', letterSpacing: '0.04em' }}>{section.title}</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {section.templateIds.map(id => {
@@ -136,20 +88,7 @@ export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onRun }: 
                 const isArchive = id.includes('archive')
 
                 return (
-                  <div 
-                    key={id} 
-                    onClick={() => onRun(id)} 
-                    style={{ 
-                      padding: 12, 
-                      borderRadius: 10, 
-                      background: 'rgba(255,255,255,0.02)', 
-                      border: '1px solid rgba(255,255,255,0.06)', 
-                      cursor: 'pointer', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'space-between' 
-                    }}
-                  >
+                  <div key={id} onClick={() => onRun(id)} style={{ padding: 12, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <span style={{ fontSize: 18 }}>{template.icon}</span>
                       <div>
@@ -157,26 +96,10 @@ export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onRun }: 
                         <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>{template.description}</div>
                       </div>
                     </div>
-                    <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: 800 }}>→</span>
+                    <span style={{ color: isDestructive ? '#ef4444' : isArchive ? '#ffc300' : 'rgba(255,255,255,0.25)', fontWeight: 800 }}>→</span>
                   </div>
                 )
               })}
-
-              {provider.id === 'stripe' && section.title === 'Catalog' && (
-                <div 
-                  onClick={() => onRun('stripe.archive_product')} 
-                  style={{ padding: 12, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255, 195, 0, 0.2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span style={{ fontSize: 18 }}>🗄️</span>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#ffc300' }}>Archive Product</div>
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>Deactivate an existing product catalog track instantly to stop new checkouts.</div>
-                    </div>
-                  </div>
-                  <span style={{ color: '#ffc300', fontWeight: 800 }}>→</span>
-                </div>
-              )}
             </div>
           </div>
         ))}

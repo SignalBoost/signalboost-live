@@ -18,6 +18,30 @@
 import type { ProviderTemplate } from './provider-templates'
 
 export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
+  // ---- OpenAI read actions (run through the portable engine) ----
+  'openai.list_models': {
+    id: 'openai.list_models', label: 'View Models', description: 'List models available to the configured API key.', icon: '🧠',
+    policyActionId: 'read_provider_status', api: { service: 'openai', method: 'GET', endpoint: '/v1/models' }, fields: [],
+  },
+  'openai.retrieve_model': {
+    id: 'openai.retrieve_model', label: 'Model Details', description: 'Show details for a specific model.', icon: '🔎',
+    policyActionId: 'read_provider_status', api: { service: 'openai', method: 'GET', endpoint: '/v1/models' },
+    fields: [
+      { id: 'model', label: 'Model', type: 'remote_select', required: true, source: { action: 'openai.list_models', dataPath: 'models', valueKey: 'id', labelTemplate: '{id}' } },
+    ],
+  },
+  'openai.list_files': {
+    id: 'openai.list_files', label: 'List Files', description: 'Files uploaded to the OpenAI account.', icon: '📄',
+    policyActionId: 'read_provider_status', api: { service: 'openai', method: 'GET', endpoint: '/v1/files' }, fields: [],
+  },
+  'openai.list_fine_tunes': {
+    id: 'openai.list_fine_tunes', label: 'Fine-tuning Jobs', description: 'Recent fine-tuning jobs and their status.', icon: '🎛️',
+    policyActionId: 'read_provider_status', api: { service: 'openai', method: 'GET', endpoint: '/v1/fine_tuning/jobs' }, fields: [],
+  },
+  'openai.list_batches': {
+    id: 'openai.list_batches', label: 'Batch Jobs', description: 'Recent batch jobs and their status.', icon: '📦',
+    policyActionId: 'read_provider_status', api: { service: 'openai', method: 'GET', endpoint: '/v1/batches' }, fields: [],
+  },
   // ---- Supabase read sources for select-don't-type pickers ----
   'supabase.list_tables': {
     id: 'supabase.list_tables', label: 'List Tables', description: 'List public tables (picker source).', icon: '🗃️',

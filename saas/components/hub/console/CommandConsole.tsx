@@ -174,7 +174,7 @@ export default function CommandConsole({
                   {panel.render()}
                 </div>
               ) : (
-                <ProviderActionForm templateId={activeTemplateId} lang={lang} onClose={() => setActiveTemplateId(null)} onSuccess={() => setActiveTemplateId(null)} onError={() => {}} />
+                <ProviderActionForm templateId={activeTemplateId} lang={lang} onClose={() => setActiveTemplateId(null)} onSuccess={() => {}} onError={() => {}} />
               )}
             </div>
           </div>

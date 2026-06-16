@@ -93,7 +93,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Create Product',
     description: 'Create a new Stripe product and its first recurring price.',
     icon: '💳',
-    policyActionId: 'view_products',
+    policyActionId: 'edit_stripe_product',
     api: { service: 'stripe', method: 'POST', endpoint: '/v1/products' },
     fields: [
       { id: 'name', label: 'Product Name', type: 'text', required: true, placeholder: 'Standard SaaS' },
@@ -105,7 +105,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Edit Product',
     description: 'Update a Stripe product name, description, or active state.',
     icon: '✏️',
-    policyActionId: 'view_products',
+    policyActionId: 'edit_stripe_product',
     api: { service: 'stripe', method: 'POST', endpoint: '/v1/products/update' },
     fields: [
       { id: 'id', label: 'Product', type: 'remote_select', required: true, source: { action: 'stripe.view_products', dataPath: 'products', valueKey: 'id', labelTemplate: '{name} — {price}' } },
@@ -127,7 +127,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     description: 'Permanently delete a Stripe product. Only products with no active prices can be deleted.',
     icon: '🗑️',
     requiresConfirm: true,
-    policyActionId: 'view_products',
+    policyActionId: 'delete_stripe_product',
     api: { service: 'stripe', method: 'DELETE', endpoint: '/v1/products' },
     fields: [{ id: 'id', label: 'Product', type: 'remote_select', required: true, source: { action: 'stripe.view_products', dataPath: 'products', valueKey: 'id', labelTemplate: '{name} — {price}' } }]
   },
@@ -136,7 +136,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Archive Product',
     description: 'Archive a Stripe product (sets it inactive — recoverable by editing it active again).',
     icon: '🗄️',
-    policyActionId: 'view_products',
+    policyActionId: 'archive_stripe_product',
     api: { service: 'stripe', method: 'POST', endpoint: '/v1/products/archive' },
     fields: [{ id: 'id', label: 'Product', type: 'remote_select', required: true, source: { action: 'stripe.view_products', dataPath: 'products', valueKey: 'id', labelTemplate: '{name} — {price}' } }]
   },
@@ -320,7 +320,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Create Bucket',
     description: 'Instantiate a fresh media or binary object storage file container.',
     icon: '🪣',
-    policyActionId: 'storage_panel',
+    policyActionId: 'crud_actions',
     api: { service: 'supabase', method: 'POST', endpoint: '/v1/storage/buckets' },
     fields: [{ id: 'name', label: 'Bucket Identifier', type: 'text', required: true }]
   },
@@ -330,7 +330,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     description: 'Purge all nested objects and binary layout leaves without dropping the core asset container.',
     icon: '💥',
     requiresConfirm: true,
-    policyActionId: 'storage_panel',
+    policyActionId: 'crud_actions',
     api: { service: 'supabase', method: 'POST', endpoint: '/v1/storage/buckets/empty' },
     fields: [{ id: 'name', label: 'Bucket', type: 'remote_select', required: true, source: { action: 'supabase.list_buckets', dataPath: 'buckets', valueKey: 'name', labelTemplate: '{name}' } }]
   },
@@ -380,7 +380,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Environment Variables',
     description: 'Inject variables globally across Production, Preview, or Staging development paths.',
     icon: '➕',
-    policyActionId: 'view_env_vars',
+    policyActionId: 'edit_vercel_env',
     api: { service: 'vercel', method: 'POST', endpoint: '/v1/projects/env' },
     fields: [
       { id: 'key', label: 'Variable Key String', type: 'text', required: true, placeholder: 'NEXT_PUBLIC_API_URL' },
@@ -397,7 +397,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     description: 'Wipe environment variable keys completely off the active build pipeline.',
     icon: '🗑️',
     requiresConfirm: true,
-    policyActionId: 'view_env_vars',
+    policyActionId: 'delete_vercel_env',
     api: { service: 'vercel', method: 'DELETE', endpoint: '/v9/projects/{projectId}/env' },
     fields: [{ id: 'id', label: 'Env Variable Key Reference', type: 'text', required: true }]
   },
@@ -474,7 +474,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     label: 'Seal Vault',
     description: 'Instantly purge decrypted memory layers and lock all core operations back down.',
     icon: '🔒',
-    policyActionId: 'unlock_form',
+    policyActionId: 'vault_edit_key',
     api: { service: 'Vault', method: 'POST', endpoint: '/v1/vault/seal' },
     fields: []
   },

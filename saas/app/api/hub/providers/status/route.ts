@@ -10,6 +10,7 @@
 // redeploy that picks them up). No code change needed to add a provider — edit the JSON.
 
 import { NextResponse } from 'next/server'
+import { requireOwner } from '@/lib/auth/access'
 import providerMap from '@/config/provider-map.json'
 
 type EnvSlot = { key: string; label: string; required: boolean; secret: boolean }
@@ -23,6 +24,9 @@ type Provider = {
 }
 
 export async function GET() {
+  const guard = await requireOwner()
+  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
+
   const providers = (providerMap as any).providers as Record<string, Provider>
   const out: Record<string, unknown> = {}
 

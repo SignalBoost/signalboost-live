@@ -3,7 +3,7 @@
 // saas/components/hub/console/CommandConsole.tsx
 // Hub Command Console — provider-centric, tiered orchestrator.
 
-import { useState, ReactNode } from 'react'
+import { useState } from 'react'
 import {
   CONSOLE_TIERS,
   CONSOLE_UTILITY_PAGES,
@@ -14,86 +14,11 @@ import {
 } from '@/lib/hub/console-catalog'
 import { Lang } from '../shared'
 import ProviderActionForm from '../ProviderActionForm'
-import { getTemplate } from '@/lib/hub/provider-templates'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { ProviderConsoleCard, ProviderWorkspace } from './ProviderConsoleCard'
-import { DomainsPage } from '../pages/DomainsPage'
-import EnvVarsPage from '../pages/EnvVarsPage'
-import { DeploymentsPage } from '../pages/DeploymentsPage'
-import { LogsPage } from '../pages/LogsPage'
-import { SettingsPage } from '../pages/SettingsPage'
+import { signalboostConsoleUI } from '@/console-host/consoleHostConfig'
 
 const PER_PAGE = 2
-
-// Vercel workspace buttons that should open a real, live workspace panel inside
-// the modal instead of the single-action template form. This is what keeps every
-// Vercel button leading to a working surface — no dead links, no fake endpoints.
-type VercelPanel = { title: string; subtitle: string; render: () => ReactNode }
-
-const VERCEL_PANEL_ROUTER: Record<string, VercelPanel> = {
-  // Environment Variables — full view / add / edit / delete CRUD
-  'vercel.add_env_var': {
-    title: 'Environment Variables',
-    subtitle: 'View, add, edit, and delete variables across Production, Preview, and Development.',
-    render: () => <EnvVarsPage />,
-  },
-  'vercel.list_env_vars': {
-    title: 'Environment Variables',
-    subtitle: 'View, add, edit, and delete variables across Production, Preview, and Development.',
-    render: () => <EnvVarsPage />,
-  },
-  'vercel.view_env': {
-    title: 'Environment Variables',
-    subtitle: 'View, add, edit, and delete variables across Production, Preview, and Development.',
-    render: () => <EnvVarsPage />,
-  },
-  'vercel.delete_env_var': {
-    title: 'Environment Variables',
-    subtitle: 'View, add, edit, and delete variables across Production, Preview, and Development.',
-    render: () => <EnvVarsPage />,
-  },
-  // Edit / delete env open the same full CRUD panel (handles all operations inline).
-  'vercel.edit_env': {
-    title: 'Environment Variables',
-    subtitle: 'View, add, edit, and delete variables across Production, Preview, and Development.',
-    render: () => <EnvVarsPage />,
-  },
-  'vercel.delete_env': {
-    title: 'Environment Variables',
-    subtitle: 'View, add, edit, and delete variables across Production, Preview, and Development.',
-    render: () => <EnvVarsPage />,
-  },
-  // Logs Viewer — live platform / build / runtime logs
-  'vercel.logs': {
-    title: 'Logs Viewer',
-    subtitle: 'Recent platform, build, and runtime log events.',
-    render: () => <LogsPage />,
-  },
-  // Deployments — read-only history
-  'vercel.list_deployments': {
-    title: 'Deployments Panel',
-    subtitle: 'Inspect running build tracks, commit records, and production targets.',
-    render: () => <DeploymentsPage mode="view" />,
-  },
-  // Rollback — promote a previous deployment back to production
-  'vercel.trigger_rollback': {
-    title: 'Rollback Deploy',
-    subtitle: 'Promote a previous READY deployment back to production.',
-    render: () => <DeploymentsPage mode="rollback" />,
-  },
-  // Cancel — abort an in-progress build
-  'vercel.cancel_build': {
-    title: 'Cancel Build',
-    subtitle: 'Abort an in-progress build (BUILDING, QUEUED, or INITIALIZING).',
-    render: () => <DeploymentsPage mode="cancel" />,
-  },
-  // Domains / DNS — full domains workspace
-  'vercel.sync_dns_domain': {
-    title: 'Domains / DNS',
-    subtitle: 'Configure domains, alias paths, verification, and SSL.',
-    render: () => <DomainsPage />,
-  },
-}
 
 export default function CommandConsole({
   lang = 'en',
@@ -239,7 +164,7 @@ export default function CommandConsole({
 
       {/* Action modal overlay */}
       {activeTemplateId && (() => {
-        const panel = VERCEL_PANEL_ROUTER[activeTemplateId]
+        const panel = signalboostConsoleUI.panelRouter[activeTemplateId]
         const isPanel = Boolean(panel)
         return (
           <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setActiveTemplateId(null)}>
@@ -275,9 +200,7 @@ function PagerButton({ label, onClick, disabled }: { label: string; onClick: () 
 }
 
 function UtilityFrame({ id, lang }: { id: string; lang: Lang }) {
-  if (id === 'domains') return <DomainsPage />
-  if (id === 'deployments') return <DeploymentsPage />
-  if (id === 'logs') return <LogsPage />
-  if (id === 'settings') return <SettingsPage />
+  const renderPage = signalboostConsoleUI.utilityPages[id]
+  if (renderPage) return <>{renderPage()}</>
   return <div style={{ color: 'rgba(255,255,255,.6)' }}>Unknown page.</div>
 }

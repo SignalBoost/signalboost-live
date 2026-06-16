@@ -161,7 +161,7 @@ export default function CommandConsole({
         const isPanel = Boolean(panel)
         return (
           <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setActiveTemplateId(null)}>
-            <div style={{ width: '100%', maxWidth: isPanel ? 1040 : 520, maxHeight: '88vh', overflow: 'auto', borderRadius: 18 }} onClick={e => e.stopPropagation()}>
+            <div style={{ width: '100%', maxWidth: isPanel ? 1040 : 820, maxHeight: '92vh', overflow: 'auto', borderRadius: 18 }} onClick={e => e.stopPropagation()}>
               {isPanel ? (
                 <div style={{ background: 'linear-gradient(160deg, rgba(15,23,42,.96), rgba(3,7,18,.98))', border: '1px solid rgba(255,255,255,.1)', borderRadius: 18, padding: '18px 18px 22px', boxShadow: '0 24px 70px rgba(0,0,0,.6)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>

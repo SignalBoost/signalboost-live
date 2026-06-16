@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import type { CSSProperties } from 'react'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 
@@ -20,13 +20,13 @@ type ModuleWireframe = {
   panels: string[]
 }
 
-const moduleKeys: Array<Pick<ModuleWireframe, 'key' | 'icon' | 'href' | 'accent' | 'metric'>> = [
-  { key: 'promote', icon: '📣', href: '/dashboard/promote', accent: '#ffc300', metric: '+38%' },
-  { key: 'reviews', icon: '⭐', href: '/dashboard/reviews', accent: '#f59e0b', metric: '4.8' },
-  { key: 'calendar', icon: '📅', href: '/dashboard/calendar', accent: '#1af0ff', metric: '12' },
-  { key: 'spreadsheets', icon: '▦', href: '/dashboard/spreadsheets', accent: '#4ade80', metric: '8' },
-  { key: 'outreach', icon: '📡', href: '/dashboard/outreach', accent: '#ff4fd8', metric: '71%' },
-  { key: 'assistant', icon: '🛰️', href: '/dashboard/assistant', accent: '#a78bfa', metric: '24' },
+const moduleKeys: Array<Pick<ModuleWireframe, 'key' | 'icon' | 'href' | 'accent'>> = [
+  { key: 'promote', icon: '📣', href: '/dashboard/promote', accent: '#ffc300' },
+  { key: 'reviews', icon: '⭐', href: '/dashboard/reviews', accent: '#f59e0b' },
+  { key: 'calendar', icon: '📅', href: '/dashboard/calendar', accent: '#1af0ff' },
+  { key: 'spreadsheets', icon: '▦', href: '/dashboard/spreadsheets', accent: '#4ade80' },
+  { key: 'outreach', icon: '📡', href: '/dashboard/outreach', accent: '#ff4fd8' },
+  { key: 'assistant', icon: '🛰️', href: '/dashboard/assistant', accent: '#a78bfa' },
 ]
 
 const panelFallbacks: Record<ModuleKey, string[]> = {
@@ -127,11 +127,23 @@ function ModulePreview({ module, openLabel }: { module: ModuleWireframe; openLab
 
 export default function SaaSWireframesPage() {
   const { dict } = useI18n()
+  const [metrics, setMetrics] = useState<Record<string, string | null> | null>(null)
+
+  useEffect(() => {
+    let active = true
+    fetch('/api/dashboard/module-metrics', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (active && d) setMetrics(d) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
 
   const modules = useMemo<ModuleWireframe[]>(
     () =>
       moduleKeys.map((module) => ({
         ...module,
+        // Real value from /api/dashboard/module-metrics; "—" until loaded or when absent.
+        metric: metrics?.[module.key] ?? '—',
         title: t(
           dict,
           `wireframes.modules.${module.key}.title`,
@@ -148,7 +160,7 @@ export default function SaaSWireframesPage() {
           dict,
           `wireframes.modules.${module.key}.metricLabel`,
           {
-            promote: 'Conversion lift',
+            promote: 'Campaigns',
             reviews: 'Trust score',
             calendar: 'Events queued',
             spreadsheets: 'Shared sheets',
@@ -172,7 +184,7 @@ export default function SaaSWireframesPage() {
           t(dict, `wireframes.modules.${module.key}.panel${index + 1}`, fallback),
         ),
       })),
-    [dict],
+    [dict, metrics],
   )
 
   return (

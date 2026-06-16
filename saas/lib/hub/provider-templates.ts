@@ -27,6 +27,7 @@ export interface ProviderFormField {
 }
 
 import { localizeTemplate } from '@/lib/i18n/consoleCopy'
+import type { Dict } from '@/lib/i18n/loadLanguage'
 
 export interface ProviderTemplate {
   id: string
@@ -507,9 +508,9 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
 // null for those ids and their workspace cards render with no action buttons.
 Object.assign(PROVIDER_TEMPLATES, EXTRA_TEMPLATES)
 
-export function getTemplate(id: string, lang?: string): ProviderTemplate | null {
-  const t = PROVIDER_TEMPLATES[id] || null
-  return t && lang && lang !== 'en' ? localizeTemplate(t, lang) : t
+export function getTemplate(id: string, dict?: Dict | null): ProviderTemplate | null {
+  const tpl = PROVIDER_TEMPLATES[id] || null
+  return tpl && dict ? localizeTemplate(tpl, dict) : tpl
 }
 
 export function getProviderTemplates(providerId?: string): ProviderTemplate[] {

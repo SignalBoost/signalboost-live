@@ -4,7 +4,7 @@ import { requireOwner } from '@/lib/auth/access'
 
 // Reads live env + session + DB; must never be cached.
 export const dynamic = 'force-dynamic'
-export const maxDuration = 15
+export const maxDuration = 20
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -98,25 +98,52 @@ export async function GET() {
   if (!appUrlPresent) failures.push('NEXT_PUBLIC_APP_URL is missing')
 
   // ── Price IDs (the 6 the checkout + webhook depend on) ──────────────────────
-  const priceIds = {
-    website: {
-      starter: present(process.env.STRIPE_PRICE_WEBSITE_STARTER),
-      pro: present(process.env.STRIPE_PRICE_WEBSITE_PRO),
-      business: present(process.env.STRIPE_PRICE_WEBSITE_BUSINESS),
-    },
-    podcast: {
-      indie: present(process.env.STRIPE_PRICE_PODCAST_INDIE),
-      pro: present(process.env.STRIPE_PRICE_PODCAST_PRO),
-      network: present(process.env.STRIPE_PRICE_PODCAST_NETWORK),
-    },
-  }
-  const missingPrices: string[] = []
-  for (const [line, plans] of Object.entries(priceIds)) {
-    for (const [plan, ok] of Object.entries(plans)) {
-      if (!ok) missingPrices.push(`STRIPE_PRICE_${line.toUpperCase()}_${plan.toUpperCase()}`)
+  // Presence alone is not enough: Stripe price IDs are account-scoped, so a price
+  // set in one account 404s under another account's key. When the key authenticates
+  // we ping each price to prove it lives on the SAME account — catching the
+  // cross-account mismatch that would otherwise only surface as "No such price"
+  // mid-checkout.
+  const priceEnv: Array<{ envVar: string; id: string | undefined }> = [
+    { envVar: 'STRIPE_PRICE_WEBSITE_STARTER', id: process.env.STRIPE_PRICE_WEBSITE_STARTER },
+    { envVar: 'STRIPE_PRICE_WEBSITE_PRO', id: process.env.STRIPE_PRICE_WEBSITE_PRO },
+    { envVar: 'STRIPE_PRICE_WEBSITE_BUSINESS', id: process.env.STRIPE_PRICE_WEBSITE_BUSINESS },
+    { envVar: 'STRIPE_PRICE_PODCAST_INDIE', id: process.env.STRIPE_PRICE_PODCAST_INDIE },
+    { envVar: 'STRIPE_PRICE_PODCAST_PRO', id: process.env.STRIPE_PRICE_PODCAST_PRO },
+    { envVar: 'STRIPE_PRICE_PODCAST_NETWORK', id: process.env.STRIPE_PRICE_PODCAST_NETWORK },
+  ]
+
+  async function checkPrice(id: string | undefined): Promise<boolean | null> {
+    // null = could not check (price unset, or key absent/unauthenticated)
+    if (!present(id) || !secretPresent || !apiReachable) return null
+    try {
+      const r = await fetch(`https://api.stripe.com/v1/prices/${id}`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${secretKey}` },
+      })
+      return r.ok
+    } catch {
+      return false
     }
   }
+
+  const priceResults = await Promise.all(priceEnv.map((p) => checkPrice(p.id)))
+  const price_ids = priceEnv.map((p, i) => ({
+    env_var: p.envVar,
+    present: present(p.id),
+    valid_on_account: priceResults[i], // true | false | null(not-checked)
+  }))
+
+  const missingPrices = price_ids.filter((p) => !p.present).map((p) => p.env_var)
   if (missingPrices.length) failures.push(`Missing price env vars: ${missingPrices.join(', ')}`)
+
+  const wrongAccountPrices = price_ids
+    .filter((p) => p.present && p.valid_on_account === false)
+    .map((p) => p.env_var)
+  if (wrongAccountPrices.length) {
+    failures.push(
+      `Price IDs not found on the authenticated Stripe account (cross-account mismatch): ${wrongAccountPrices.join(', ')}`,
+    )
+  }
 
   // ── Phase D: read back THIS owner's subscription row ────────────────────────
   // Informational — only populated after a real purchase. Does not gate config_ok.
@@ -167,7 +194,7 @@ export async function GET() {
     webhook_secret_present: webhookSecretPresent,
     supabase: { url_present: present(supabaseUrl), service_role_present: serviceRolePresent },
     app_url_present: appUrlPresent,
-    price_ids: priceIds,
+    price_ids,
     subscription,
     failures,
   })

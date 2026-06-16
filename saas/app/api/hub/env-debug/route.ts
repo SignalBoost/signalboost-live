@@ -9,6 +9,7 @@
 // targets, and types). No auth gate, so nothing can silently block it.
 
 import { NextResponse } from 'next/server'
+import { requireOwner } from '@/lib/auth/access'
 
 const VERCEL_API = 'https://api.vercel.com'
 
@@ -58,6 +59,9 @@ async function probe(projectId: string, token: string, teamId: string | undefine
 }
 
 export async function GET() {
+  const guard = await requireOwner()
+  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
+
   const token = process.env.VERCEL_TOKEN
   const projectId = process.env.VERCEL_HUB_PROJECT
   const teamId = process.env.VERCEL_TEAM_ID || undefined

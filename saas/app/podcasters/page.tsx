@@ -28,6 +28,7 @@ export default function PodcastersPage() {
 
   const [currency, setCurrency]   = useState('USD')
   const [loading, setLoading]     = useState<string | null>(null)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
 
   // ── Podcast checkout handler ────────────────────────────────────────────────
   async function handlePodcastCheckout(planKey: string) {
@@ -40,6 +41,7 @@ export default function PodcastersPage() {
     }
 
     try {
+      setCheckoutError(null)
       setLoading(planKey)
 
       const { createClient } = await import('@supabase/supabase-js')
@@ -65,10 +67,10 @@ export default function PodcastersPage() {
       if (data.url) {
         window.location.href = data.url
       } else {
-        alert(t(dict, 'pricing_page.errorGeneric', 'Something went wrong.'))
+        setCheckoutError(t(dict, 'pricing_page.errorGeneric', 'Something went wrong.'))
       }
     } catch {
-      alert(t(dict, 'pricing_page.errorGeneric', 'Something went wrong.'))
+      setCheckoutError(t(dict, 'pricing_page.errorGeneric', 'Something went wrong.'))
     } finally {
       setLoading(null)
     }
@@ -164,6 +166,12 @@ export default function PodcastersPage() {
         overflow:   'hidden',
       }}
     >
+      {checkoutError && (
+        <div role="alert" style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 1000, maxWidth: 480, width: 'calc(100% - 32px)', padding: '12px 16px', borderRadius: 12, background: 'rgba(255,59,48,.14)', border: '1px solid rgba(255,107,107,.5)', color: '#ffb3b3', fontSize: 13, display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 8px 30px rgba(0,0,0,.5)', backdropFilter: 'blur(6px)' }}>
+          <span style={{ flex: 1 }}>{checkoutError}</span>
+          <button onClick={() => setCheckoutError(null)} aria-label="Dismiss" style={{ background: 'transparent', border: 'none', color: '#ffb3b3', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0 }}>×</button>
+        </div>
+      )}
       <style>{`
         @keyframes wave {
           0%,100% { height: 18%; opacity: .45; }

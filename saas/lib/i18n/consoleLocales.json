@@ -119,7 +119,62 @@
       "price": "Price",
       "query": "Query",
       "operation": "Operation",
-      "phone_number": "Phone Number"
+      "phone_number": "Phone Number",
+      "bucket_name": "Bucket Name",
+      "username": "Username",
+      "iam_username": "IAM Username",
+      "product_name": "Product Name",
+      "new_product_name": "New Product Name",
+      "amount_usd": "Amount (USD)",
+      "price_id": "Price ID",
+      "subscription_tier": "Subscription Tier",
+      "customer": "Customer",
+      "amount_cents": "Amount (Cents)",
+      "charge": "Charge",
+      "amount_in_cents": "Amount (in Cents)",
+      "sql_raw_statement": "SQL Raw Statement",
+      "migration_payload": "Migration Payload",
+      "json_row_object": "JSON Row Object",
+      "match_column_value": "Match (column=value)",
+      "new_values_json": "New Values (JSON)",
+      "row": "Row",
+      "user_email": "User Email",
+      "user": "User",
+      "object_path": "Object Path",
+      "bucket_identifier": "Bucket Identifier",
+      "deployment_id": "Deployment ID",
+      "build_id": "Build ID",
+      "env_variable_id": "Env Variable ID",
+      "new_value": "New Value",
+      "target": "Target",
+      "env_variable_key_reference": "Env Variable Key Reference",
+      "domain_address_string": "Domain Address string",
+      "to": "To",
+      "subject": "Subject",
+      "type": "Type",
+      "ttl_sec": "TTL (sec)",
+      "proxied": "Proxied",
+      "record_id": "Record ID",
+      "droplet_name": "Droplet Name",
+      "size": "Size",
+      "image": "Image",
+      "rules_source": "Rules Source",
+      "monitor_name": "Monitor Name",
+      "alert_message": "Alert Message",
+      "metric_query": "Metric Query",
+      "project_slug": "Project Slug",
+      "issue_id": "Issue ID",
+      "service_id": "Service ID",
+      "urgency": "Urgency",
+      "master_passphrase": "Master Passphrase",
+      "secret_key_reference": "Secret Key Reference",
+      "encrypted_value": "Encrypted Value",
+      "key_name": "Key Name",
+      "team_member_id": "Team Member ID",
+      "target_privilege_domain_access_tier": "Target Privilege Domain Access Tier",
+      "member_id": "Member ID",
+      "permissions_comma_separated": "Permissions (comma-separated)",
+      "scope": "Scope"
     },
     "opt": {
       "open": "Open",
@@ -129,7 +184,22 @@
       "rebase": "Rebase",
       "production": "Production",
       "preview": "Preview",
-      "development": "Development"
+      "development": "Development",
+      "indie_tier_9_mo": "Indie Tier ($9/mo)",
+      "pro_tier_29_mo": "Pro Tier ($29/mo)",
+      "growth_tier_79_mo": "Growth Tier ($79/mo)",
+      "list_objects": "List objects",
+      "upload": "Upload",
+      "download": "Download",
+      "high": "High",
+      "low": "Low",
+      "billing_administrator": "Billing Administrator",
+      "platform_core_developer": "Platform Core Developer",
+      "standard_team_member": "Standard Team Member",
+      "everything": "Everything",
+      "access_and_roles": "Access & Roles",
+      "billing": "Billing",
+      "data": "Data"
     },
     "ui": {
       "execute": "Execute",
@@ -319,6 +389,324 @@
         "list_buckets": {
           "label": "List Buckets",
           "desc": "Storage buckets in the marketing project."
+        }
+      },
+      "aws": {
+        "create_s3_bucket": {
+          "label": "Create S3 Bucket",
+          "desc": "Create a new globally unique S3 bucket container."
+        },
+        "list_iam_users": {
+          "label": "List IAM Users",
+          "desc": "Fetch all current identity directory users."
+        },
+        "disable_iam_user": {
+          "label": "Disable IAM User",
+          "desc": "Deactivate user keys and credentials immediately."
+        },
+        "rotate_credential": {
+          "label": "Rotate Credential",
+          "desc": "Rotate an IAM access key pair for a user."
+        }
+      },
+      "gcp": {
+        "list_service_accounts": {
+          "label": "List Service Accounts",
+          "desc": "Fetch all system identity service accounts."
+        }
+      },
+      "stripe": {
+        "create_product": {
+          "label": "Create Product",
+          "desc": "Create a new Stripe product and its first recurring price."
+        },
+        "edit_product": {
+          "label": "Edit Product",
+          "desc": "Update a Stripe product name, description, or active state."
+        },
+        "view_products": {
+          "label": "View Products",
+          "desc": "List live Stripe products and their identifiers."
+        },
+        "archive_product": {
+          "label": "Archive Product",
+          "desc": "Archive a Stripe product (sets it inactive — recoverable by editing it active again)."
+        },
+        "delete_product": {
+          "label": "Delete Product",
+          "desc": "Permanently delete a Stripe product. Only products with no active prices can be deleted."
+        },
+        "create_price": {
+          "label": "Create Price",
+          "desc": "Attach a new recurring or one-time price to an existing Stripe product."
+        },
+        "view_prices": {
+          "label": "View Prices",
+          "desc": "List Stripe prices, optionally filtered by product."
+        },
+        "edit_price": {
+          "label": "Edit Price",
+          "desc": "Update a price nickname or activate/deactivate it (amounts are immutable in Stripe)."
+        },
+        "archive_price": {
+          "label": "Archive Price",
+          "desc": "Deactivate a price so it can no longer be purchased (recoverable)."
+        },
+        "apply_tier_template": {
+          "label": "Plan Templates",
+          "desc": "Instantly build out standardized Indie, Pro, or Growth checkout tracks."
+        },
+        "list_customers": {
+          "label": "Customer View",
+          "desc": "List customers, invoices, and active recurring payment metrics."
+        },
+        "adjust_balance": {
+          "label": "Adjust Balance",
+          "desc": "Apply manual customer balance ledger modifications or transaction adjustments."
+        },
+        "issue_refund": {
+          "label": "Refund/Adjustments",
+          "desc": "Revert a processed transaction balance or apply a manual service credit charge."
+        }
+      },
+      "supabase": {
+        "sql_editor": {
+          "label": "SQL Editor",
+          "desc": "Run arbitrary raw queries directly against your data tables."
+        },
+        "run_migration": {
+          "label": "Run Migration",
+          "desc": "Execute compiled data definition schema migrations over the query bridge."
+        },
+        "insert_row": {
+          "label": "Insert Row",
+          "desc": "Directly inject structured row data records into an existing schema."
+        },
+        "edit_row": {
+          "label": "Edit Row",
+          "desc": "Update an existing table row matched by a filter expression."
+        },
+        "archive_row": {
+          "label": "Archive Rows",
+          "desc": "Flip active visibility flags on a specific database item record."
+        },
+        "delete_row": {
+          "label": "Delete Row",
+          "desc": "Hard purge row records out of the storage layer completely."
+        },
+        "invite_user": {
+          "label": "Invite User",
+          "desc": "Send an email invite to provision a new authenticated user."
+        },
+        "edit_user": {
+          "label": "Edit User",
+          "desc": "Update a user's email, metadata, or confirmation state."
+        },
+        "delete_user": {
+          "label": "Delete User",
+          "desc": "Permanently remove an authenticated user and their identity."
+        },
+        "reset_password": {
+          "label": "Reset Password",
+          "desc": "Trigger a password-recovery email for a user account."
+        },
+        "rotate_service_key": {
+          "label": "Rotate Keys",
+          "desc": "Invalidate current service_role JSON tokens and issue fresh credentials."
+        },
+        "storage_panel": {
+          "label": "Storage Panel",
+          "desc": "Upload, download, or list objects inside a storage bucket."
+        },
+        "create_bucket": {
+          "label": "Create Bucket",
+          "desc": "Instantiate a fresh media or binary object storage file container."
+        },
+        "empty_bucket": {
+          "label": "Empty Bucket",
+          "desc": "Purge all nested objects and binary layout leaves without dropping the core asset container."
+        }
+      },
+      "vercel": {
+        "list_deployments": {
+          "label": "Deployments Panel",
+          "desc": "Inspect running build tracks, commit records, and production target assignments."
+        },
+        "trigger_rollback": {
+          "label": "Rollback Deploy",
+          "desc": "Instantly point production edge domain targets back to a historical deployment hash."
+        },
+        "cancel_build": {
+          "label": "Cancel Build",
+          "desc": "Abort an active compiling orchestration queue element directly at the gateway."
+        },
+        "view_env": {
+          "label": "View Env Vars",
+          "desc": "List all active environment variable configurations on this project tracking ring."
+        },
+        "edit_env": {
+          "label": "Edit Env Var",
+          "desc": "Update the value and/or target environments of a variable."
+        },
+        "delete_env": {
+          "label": "Delete Env Var",
+          "desc": "Wipe environment variable keys completely off the active build pipeline."
+        },
+        "sync_dns_domain": {
+          "label": "Domains/DNS",
+          "desc": "Configure canonical configurations, alias paths, or trigger edge SSL certification rules."
+        },
+        "logs": {
+          "label": "Logs Viewer",
+          "desc": "Stream recent platform, build, and runtime log events."
+        }
+      },
+      "twilio": {
+        "send_sms": {
+          "label": "Send SMS",
+          "desc": "Send an outbound SMS message from your Twilio number."
+        },
+        "verify_number": {
+          "label": "Verify Number",
+          "desc": "Start phone-number verification (sends a one-time code)."
+        }
+      },
+      "sendgrid": {
+        "send_email": {
+          "label": "Send Email",
+          "desc": "Send a transactional email through SendGrid."
+        },
+        "check_domain_auth": {
+          "label": "Check Domain Auth",
+          "desc": "Inspect sender-domain authentication (SPF/DKIM) status."
+        }
+      },
+      "cloudflare": {
+        "add_dns_record": {
+          "label": "Add DNS Record",
+          "desc": "Create a DNS record in the configured Cloudflare zone."
+        },
+        "toggle_proxy": {
+          "label": "Toggle Proxy",
+          "desc": "Turn the orange-cloud proxy on or off for a record."
+        },
+        "purge_cache": {
+          "label": "Purge Cache",
+          "desc": "Purge the entire Cloudflare edge cache for the zone."
+        }
+      },
+      "digitalocean": {
+        "create_droplet": {
+          "label": "Create Droplet",
+          "desc": "Provision a new DigitalOcean compute droplet."
+        },
+        "view_droplets": {
+          "label": "View Droplets",
+          "desc": "List active droplets and their status."
+        }
+      },
+      "firebase": {
+        "upload_rules": {
+          "label": "Upload Rules",
+          "desc": "Publish a new Firestore/Storage security ruleset."
+        },
+        "view_rules": {
+          "label": "View Rules",
+          "desc": "Show the currently published security ruleset."
+        }
+      },
+      "datadog": {
+        "create_monitor": {
+          "label": "Create Monitor",
+          "desc": "Create a metric/alert monitor."
+        },
+        "check_metrics": {
+          "label": "Check Metrics",
+          "desc": "Run a metric query and view the latest series."
+        }
+      },
+      "sentry": {
+        "list_issues": {
+          "label": "List Issues",
+          "desc": "List unresolved issues for a project."
+        },
+        "resolve_issue": {
+          "label": "Resolve Issue",
+          "desc": "Mark an issue as resolved."
+        }
+      },
+      "pagerduty": {
+        "list_incidents": {
+          "label": "List Incidents",
+          "desc": "List recent and active incidents."
+        },
+        "trigger_incident": {
+          "label": "Trigger Incident",
+          "desc": "Manually trigger a new incident on a service."
+        }
+      },
+      "vault": {
+        "unlock_vault": {
+          "label": "Unlock Vault",
+          "desc": "Supply your system-wide Master Passphrase to load sensitive key vectors."
+        },
+        "seal_vault": {
+          "label": "Seal Vault",
+          "desc": "Instantly purge decrypted memory layers and lock all core operations back down."
+        },
+        "add_secret": {
+          "label": "Add Secret",
+          "desc": "Inject highly secure, encrypted variable storage strings."
+        },
+        "edit_secret": {
+          "label": "Edit Key",
+          "desc": "Update the value of an existing vault secret."
+        },
+        "reveal_secret": {
+          "label": "Reveal Key",
+          "desc": "Decrypt and reveal a secret value (audit-logged)."
+        },
+        "archive_secret": {
+          "label": "Archive Key",
+          "desc": "Archive a secret (hidden but recoverable)."
+        },
+        "delete_secret": {
+          "label": "Delete Secret",
+          "desc": "Permanently scrub key reference objects from storage blocks."
+        },
+        "view_keys": {
+          "label": "Audit Log Keys",
+          "desc": "Inspect compliance trail paths mapping recent decryption events."
+        },
+        "audit_log": {
+          "label": "Audit Log",
+          "desc": "View the vault access and mutation audit trail."
+        }
+      },
+      "gov": {
+        "assign_role": {
+          "label": "Role Assignment",
+          "desc": "Provision platform access parameters across specific organizational personnel tracks."
+        },
+        "change_permissions": {
+          "label": "Change Role Permissions",
+          "desc": "Adjust the permission set attached to a member or role."
+        },
+        "deactivate_member": {
+          "label": "Archive Member",
+          "desc": "Suspend org permissions and turn off account access parameters globally."
+        },
+        "view_timeline": {
+          "label": "Activity Timeline",
+          "desc": "Audit trace lines tracking all recent cluster execution contexts."
+        },
+        "run_compliance_audit": {
+          "label": "Run Compliance Audit",
+          "desc": "Run a compliance sweep across the selected scope."
+        },
+        "clear_stale_sessions": {
+          "label": "Clear Sessions",
+          "desc": "Force log out inactive tokens and refresh authorization parameters."
         }
       }
     },
@@ -621,7 +1009,62 @@
       "price": "Precio",
       "query": "Consulta",
       "operation": "Operación",
-      "phone_number": "Número de Teléfono"
+      "phone_number": "Número de Teléfono",
+      "bucket_name": "Nombre del bucket",
+      "username": "Nombre de usuario",
+      "iam_username": "Usuario IAM",
+      "product_name": "Nombre del producto",
+      "new_product_name": "Nuevo nombre del producto",
+      "amount_usd": "Importe (USD)",
+      "price_id": "ID de precio",
+      "subscription_tier": "Nivel de suscripción",
+      "customer": "Cliente",
+      "amount_cents": "Importe (centavos)",
+      "charge": "Cargo",
+      "amount_in_cents": "Importe (en centavos)",
+      "sql_raw_statement": "Sentencia SQL cruda",
+      "migration_payload": "Carga de migración",
+      "json_row_object": "Objeto de fila JSON",
+      "match_column_value": "Coincidencia (columna=valor)",
+      "new_values_json": "Nuevos valores (JSON)",
+      "row": "Fila",
+      "user_email": "Correo del usuario",
+      "user": "Usuario",
+      "object_path": "Ruta del objeto",
+      "bucket_identifier": "Identificador del bucket",
+      "deployment_id": "ID de despliegue",
+      "build_id": "ID de build",
+      "env_variable_id": "ID de variable de entorno",
+      "new_value": "Nuevo valor",
+      "target": "Destino",
+      "env_variable_key_reference": "Referencia de clave de variable de entorno",
+      "domain_address_string": "Dirección de dominio",
+      "to": "Para",
+      "subject": "Asunto",
+      "type": "Tipo",
+      "ttl_sec": "TTL (s)",
+      "proxied": "Con proxy",
+      "record_id": "ID de registro",
+      "droplet_name": "Nombre del droplet",
+      "size": "Tamaño",
+      "image": "Imagen",
+      "rules_source": "Origen de las reglas",
+      "monitor_name": "Nombre del monitor",
+      "alert_message": "Mensaje de alerta",
+      "metric_query": "Consulta de métrica",
+      "project_slug": "Slug del proyecto",
+      "issue_id": "ID de incidencia",
+      "service_id": "ID de servicio",
+      "urgency": "Urgencia",
+      "master_passphrase": "Frase maestra",
+      "secret_key_reference": "Referencia de clave secreta",
+      "encrypted_value": "Valor cifrado",
+      "key_name": "Nombre de la clave",
+      "team_member_id": "ID del miembro del equipo",
+      "target_privilege_domain_access_tier": "Nivel de acceso de privilegio objetivo",
+      "member_id": "ID del miembro",
+      "permissions_comma_separated": "Permisos (separados por comas)",
+      "scope": "Ámbito"
     },
     "opt": {
       "open": "Abierto",
@@ -631,7 +1074,22 @@
       "rebase": "Rebase",
       "production": "Producción",
       "preview": "Vista previa",
-      "development": "Desarrollo"
+      "development": "Desarrollo",
+      "indie_tier_9_mo": "Nivel Indie ($9/mes)",
+      "pro_tier_29_mo": "Nivel Pro ($29/mes)",
+      "growth_tier_79_mo": "Nivel Growth ($79/mes)",
+      "list_objects": "Listar objetos",
+      "upload": "Subir",
+      "download": "Descargar",
+      "high": "Alta",
+      "low": "Baja",
+      "billing_administrator": "Administrador de facturación",
+      "platform_core_developer": "Desarrollador principal de la plataforma",
+      "standard_team_member": "Miembro estándar del equipo",
+      "everything": "Todo",
+      "access_and_roles": "Acceso y roles",
+      "billing": "Facturación",
+      "data": "Datos"
     },
     "ui": {
       "execute": "Ejecutar",
@@ -821,6 +1279,324 @@
         "list_buckets": {
           "label": "Listar Buckets",
           "desc": "Buckets de almacenamiento del proyecto de marketing."
+        }
+      },
+      "aws": {
+        "create_s3_bucket": {
+          "label": "Crear bucket S3",
+          "desc": "Crea un nuevo contenedor de bucket S3 con nombre único global."
+        },
+        "list_iam_users": {
+          "label": "Listar usuarios IAM",
+          "desc": "Obtén todos los usuarios actuales del directorio de identidades."
+        },
+        "disable_iam_user": {
+          "label": "Desactivar usuario IAM",
+          "desc": "Desactiva de inmediato las claves y credenciales del usuario."
+        },
+        "rotate_credential": {
+          "label": "Rotar credencial",
+          "desc": "Rota un par de claves de acceso IAM de un usuario."
+        }
+      },
+      "gcp": {
+        "list_service_accounts": {
+          "label": "Listar cuentas de servicio",
+          "desc": "Obtén todas las cuentas de servicio de identidad del sistema."
+        }
+      },
+      "stripe": {
+        "create_product": {
+          "label": "Crear producto",
+          "desc": "Crea un nuevo producto de Stripe y su primer precio recurrente."
+        },
+        "edit_product": {
+          "label": "Editar producto",
+          "desc": "Actualiza el nombre, la descripción o el estado activo de un producto de Stripe."
+        },
+        "view_products": {
+          "label": "Ver productos",
+          "desc": "Lista los productos activos de Stripe y sus identificadores."
+        },
+        "archive_product": {
+          "label": "Archivar producto",
+          "desc": "Archiva un producto de Stripe (lo deja inactivo; recuperable al reactivarlo)."
+        },
+        "delete_product": {
+          "label": "Eliminar producto",
+          "desc": "Elimina permanentemente un producto de Stripe. Solo se pueden eliminar productos sin precios activos."
+        },
+        "create_price": {
+          "label": "Crear precio",
+          "desc": "Adjunta un nuevo precio recurrente o único a un producto de Stripe existente."
+        },
+        "view_prices": {
+          "label": "Ver precios",
+          "desc": "Lista los precios de Stripe, opcionalmente filtrados por producto."
+        },
+        "edit_price": {
+          "label": "Editar precio",
+          "desc": "Actualiza el alias de un precio o actívalo/desactívalo (los importes son inmutables en Stripe)."
+        },
+        "archive_price": {
+          "label": "Archivar precio",
+          "desc": "Desactiva un precio para que ya no pueda comprarse (recuperable)."
+        },
+        "apply_tier_template": {
+          "label": "Plantillas de plan",
+          "desc": "Crea al instante vías de pago estandarizadas Indie, Pro o Growth."
+        },
+        "list_customers": {
+          "label": "Vista de clientes",
+          "desc": "Lista clientes, facturas y métricas de pagos recurrentes activos."
+        },
+        "adjust_balance": {
+          "label": "Ajustar saldo",
+          "desc": "Aplica modificaciones manuales al libro de saldo del cliente o ajustes de transacción."
+        },
+        "issue_refund": {
+          "label": "Reembolso/Ajustes",
+          "desc": "Revierte el saldo de una transacción procesada o aplica un crédito de servicio manual."
+        }
+      },
+      "supabase": {
+        "sql_editor": {
+          "label": "Editor SQL",
+          "desc": "Ejecuta consultas crudas arbitrarias directamente contra tus tablas de datos."
+        },
+        "run_migration": {
+          "label": "Ejecutar migración",
+          "desc": "Ejecuta migraciones de esquema de definición de datos compiladas a través del puente de consultas."
+        },
+        "insert_row": {
+          "label": "Insertar fila",
+          "desc": "Inyecta directamente registros estructurados de fila en un esquema existente."
+        },
+        "edit_row": {
+          "label": "Editar fila",
+          "desc": "Actualiza una fila de tabla existente que coincida con una expresión de filtro."
+        },
+        "archive_row": {
+          "label": "Archivar filas",
+          "desc": "Cambia los indicadores de visibilidad activa en un registro de elemento de base de datos específico."
+        },
+        "delete_row": {
+          "label": "Eliminar fila",
+          "desc": "Purga por completo los registros de fila de la capa de almacenamiento."
+        },
+        "invite_user": {
+          "label": "Invitar usuario",
+          "desc": "Envía una invitación por correo para aprovisionar un nuevo usuario autenticado."
+        },
+        "edit_user": {
+          "label": "Editar usuario",
+          "desc": "Actualiza el correo, los metadatos o el estado de confirmación de un usuario."
+        },
+        "delete_user": {
+          "label": "Eliminar usuario",
+          "desc": "Elimina permanentemente un usuario autenticado y su identidad."
+        },
+        "reset_password": {
+          "label": "Restablecer contraseña",
+          "desc": "Envía un correo de recuperación de contraseña para una cuenta de usuario."
+        },
+        "rotate_service_key": {
+          "label": "Rotar claves",
+          "desc": "Invalida los tokens JSON service_role actuales y emite credenciales nuevas."
+        },
+        "storage_panel": {
+          "label": "Panel de almacenamiento",
+          "desc": "Sube, descarga o lista objetos dentro de un bucket de almacenamiento."
+        },
+        "create_bucket": {
+          "label": "Crear bucket",
+          "desc": "Crea un nuevo contenedor de almacenamiento de objetos multimedia o binarios."
+        },
+        "empty_bucket": {
+          "label": "Vaciar bucket",
+          "desc": "Purga todos los objetos anidados sin eliminar el contenedor de activos principal."
+        }
+      },
+      "vercel": {
+        "list_deployments": {
+          "label": "Panel de despliegues",
+          "desc": "Inspecciona builds en ejecución, registros de commit y asignaciones de destino de producción."
+        },
+        "trigger_rollback": {
+          "label": "Revertir despliegue",
+          "desc": "Apunta al instante los destinos de dominio de producción a un hash de despliegue anterior."
+        },
+        "cancel_build": {
+          "label": "Cancelar build",
+          "desc": "Aborta un elemento de la cola de compilación activa directamente en el gateway."
+        },
+        "view_env": {
+          "label": "Ver variables de entorno",
+          "desc": "Lista todas las configuraciones de variables de entorno activas en este proyecto."
+        },
+        "edit_env": {
+          "label": "Editar variable de entorno",
+          "desc": "Actualiza el valor o los entornos de destino de una variable."
+        },
+        "delete_env": {
+          "label": "Eliminar variable de entorno",
+          "desc": "Borra por completo las claves de variables de entorno del pipeline de build activo."
+        },
+        "sync_dns_domain": {
+          "label": "Dominios/DNS",
+          "desc": "Configura ajustes canónicos, rutas de alias o reglas de certificación SSL en el edge."
+        },
+        "logs": {
+          "label": "Visor de registros",
+          "desc": "Transmite eventos recientes de registro de plataforma, build y runtime."
+        }
+      },
+      "twilio": {
+        "send_sms": {
+          "label": "Enviar SMS",
+          "desc": "Envía un mensaje SMS saliente desde tu número de Twilio."
+        },
+        "verify_number": {
+          "label": "Verificar número",
+          "desc": "Inicia la verificación del número de teléfono (envía un código de un solo uso)."
+        }
+      },
+      "sendgrid": {
+        "send_email": {
+          "label": "Enviar correo",
+          "desc": "Envía un correo transaccional a través de SendGrid."
+        },
+        "check_domain_auth": {
+          "label": "Verificar autenticación de dominio",
+          "desc": "Inspecciona el estado de autenticación del dominio remitente (SPF/DKIM)."
+        }
+      },
+      "cloudflare": {
+        "add_dns_record": {
+          "label": "Agregar registro DNS",
+          "desc": "Crea un registro DNS en la zona de Cloudflare configurada."
+        },
+        "toggle_proxy": {
+          "label": "Alternar proxy",
+          "desc": "Activa o desactiva el proxy de nube naranja para un registro."
+        },
+        "purge_cache": {
+          "label": "Purgar caché",
+          "desc": "Purga toda la caché del edge de Cloudflare para la zona."
+        }
+      },
+      "digitalocean": {
+        "create_droplet": {
+          "label": "Crear droplet",
+          "desc": "Aprovisiona un nuevo droplet de cómputo de DigitalOcean."
+        },
+        "view_droplets": {
+          "label": "Ver droplets",
+          "desc": "Lista los droplets activos y su estado."
+        }
+      },
+      "firebase": {
+        "upload_rules": {
+          "label": "Subir reglas",
+          "desc": "Publica un nuevo conjunto de reglas de seguridad de Firestore/Storage."
+        },
+        "view_rules": {
+          "label": "Ver reglas",
+          "desc": "Muestra el conjunto de reglas de seguridad publicado actualmente."
+        }
+      },
+      "datadog": {
+        "create_monitor": {
+          "label": "Crear monitor",
+          "desc": "Crea un monitor de métrica/alerta."
+        },
+        "check_metrics": {
+          "label": "Consultar métricas",
+          "desc": "Ejecuta una consulta de métrica y ve la serie más reciente."
+        }
+      },
+      "sentry": {
+        "list_issues": {
+          "label": "Listar incidencias",
+          "desc": "Lista las incidencias sin resolver de un proyecto."
+        },
+        "resolve_issue": {
+          "label": "Resolver incidencia",
+          "desc": "Marca una incidencia como resuelta."
+        }
+      },
+      "pagerduty": {
+        "list_incidents": {
+          "label": "Listar incidentes",
+          "desc": "Lista los incidentes recientes y activos."
+        },
+        "trigger_incident": {
+          "label": "Activar incidente",
+          "desc": "Activa manualmente un nuevo incidente en un servicio."
+        }
+      },
+      "vault": {
+        "unlock_vault": {
+          "label": "Desbloquear bóveda",
+          "desc": "Proporciona tu frase maestra del sistema para cargar los vectores de clave sensibles."
+        },
+        "seal_vault": {
+          "label": "Sellar bóveda",
+          "desc": "Purga al instante las capas de memoria descifradas y bloquea de nuevo las operaciones principales."
+        },
+        "add_secret": {
+          "label": "Agregar secreto",
+          "desc": "Inyecta cadenas de almacenamiento de variables cifradas altamente seguras."
+        },
+        "edit_secret": {
+          "label": "Editar clave",
+          "desc": "Actualiza el valor de un secreto existente en la bóveda."
+        },
+        "reveal_secret": {
+          "label": "Revelar clave",
+          "desc": "Descifra y revela el valor de un secreto (queda registrado en la auditoría)."
+        },
+        "archive_secret": {
+          "label": "Archivar clave",
+          "desc": "Archiva un secreto (oculto pero recuperable)."
+        },
+        "delete_secret": {
+          "label": "Eliminar secreto",
+          "desc": "Borra permanentemente los objetos de referencia de clave de los bloques de almacenamiento."
+        },
+        "view_keys": {
+          "label": "Claves del registro de auditoría",
+          "desc": "Inspecciona las rutas de la traza de cumplimiento que mapean eventos de descifrado recientes."
+        },
+        "audit_log": {
+          "label": "Registro de auditoría",
+          "desc": "Ve la traza de auditoría de acceso y mutación de la bóveda."
+        }
+      },
+      "gov": {
+        "assign_role": {
+          "label": "Asignación de rol",
+          "desc": "Aprovisiona parámetros de acceso a la plataforma para personal organizativo específico."
+        },
+        "change_permissions": {
+          "label": "Cambiar permisos de rol",
+          "desc": "Ajusta el conjunto de permisos asociado a un miembro o rol."
+        },
+        "deactivate_member": {
+          "label": "Archivar miembro",
+          "desc": "Suspende los permisos de la organización y desactiva el acceso a la cuenta globalmente."
+        },
+        "view_timeline": {
+          "label": "Línea de tiempo de actividad",
+          "desc": "Líneas de traza de auditoría que registran los contextos de ejecución recientes del clúster."
+        },
+        "run_compliance_audit": {
+          "label": "Ejecutar auditoría de cumplimiento",
+          "desc": "Ejecuta un barrido de cumplimiento en el ámbito seleccionado."
+        },
+        "clear_stale_sessions": {
+          "label": "Borrar sesiones",
+          "desc": "Fuerza el cierre de sesión de tokens inactivos y actualiza los parámetros de autorización."
         }
       }
     },
@@ -1123,7 +1899,62 @@
       "price": "Preço",
       "query": "Consulta",
       "operation": "Operação",
-      "phone_number": "Número de Telefone"
+      "phone_number": "Número de Telefone",
+      "bucket_name": "Nome do bucket",
+      "username": "Nome de usuário",
+      "iam_username": "Usuário IAM",
+      "product_name": "Nome do produto",
+      "new_product_name": "Novo nome do produto",
+      "amount_usd": "Valor (USD)",
+      "price_id": "ID do preço",
+      "subscription_tier": "Nível de assinatura",
+      "customer": "Cliente",
+      "amount_cents": "Valor (centavos)",
+      "charge": "Cobrança",
+      "amount_in_cents": "Valor (em centavos)",
+      "sql_raw_statement": "Instrução SQL bruta",
+      "migration_payload": "Payload de migração",
+      "json_row_object": "Objeto de linha JSON",
+      "match_column_value": "Correspondência (coluna=valor)",
+      "new_values_json": "Novos valores (JSON)",
+      "row": "Linha",
+      "user_email": "E-mail do usuário",
+      "user": "Usuário",
+      "object_path": "Caminho do objeto",
+      "bucket_identifier": "Identificador do bucket",
+      "deployment_id": "ID da implantação",
+      "build_id": "ID do build",
+      "env_variable_id": "ID da variável de ambiente",
+      "new_value": "Novo valor",
+      "target": "Destino",
+      "env_variable_key_reference": "Referência da chave da variável de ambiente",
+      "domain_address_string": "Endereço de domínio",
+      "to": "Para",
+      "subject": "Assunto",
+      "type": "Tipo",
+      "ttl_sec": "TTL (s)",
+      "proxied": "Com proxy",
+      "record_id": "ID do registro",
+      "droplet_name": "Nome do droplet",
+      "size": "Tamanho",
+      "image": "Imagem",
+      "rules_source": "Origem das regras",
+      "monitor_name": "Nome do monitor",
+      "alert_message": "Mensagem de alerta",
+      "metric_query": "Consulta de métrica",
+      "project_slug": "Slug do projeto",
+      "issue_id": "ID da issue",
+      "service_id": "ID do serviço",
+      "urgency": "Urgência",
+      "master_passphrase": "Frase mestra",
+      "secret_key_reference": "Referência da chave secreta",
+      "encrypted_value": "Valor criptografado",
+      "key_name": "Nome da chave",
+      "team_member_id": "ID do membro da equipe",
+      "target_privilege_domain_access_tier": "Nível de acesso de privilégio alvo",
+      "member_id": "ID do membro",
+      "permissions_comma_separated": "Permissões (separadas por vírgula)",
+      "scope": "Escopo"
     },
     "opt": {
       "open": "Aberto",
@@ -1133,7 +1964,22 @@
       "rebase": "Rebase",
       "production": "Produção",
       "preview": "Pré-visualização",
-      "development": "Desenvolvimento"
+      "development": "Desenvolvimento",
+      "indie_tier_9_mo": "Nível Indie ($9/mês)",
+      "pro_tier_29_mo": "Nível Pro ($29/mês)",
+      "growth_tier_79_mo": "Nível Growth ($79/mês)",
+      "list_objects": "Listar objetos",
+      "upload": "Enviar",
+      "download": "Baixar",
+      "high": "Alta",
+      "low": "Baixa",
+      "billing_administrator": "Administrador de faturamento",
+      "platform_core_developer": "Desenvolvedor principal da plataforma",
+      "standard_team_member": "Membro padrão da equipe",
+      "everything": "Tudo",
+      "access_and_roles": "Acesso e funções",
+      "billing": "Faturamento",
+      "data": "Dados"
     },
     "ui": {
       "execute": "Executar",
@@ -1323,6 +2169,324 @@
         "list_buckets": {
           "label": "Listar Buckets",
           "desc": "Buckets de armazenamento do projeto de marketing."
+        }
+      },
+      "aws": {
+        "create_s3_bucket": {
+          "label": "Criar bucket S3",
+          "desc": "Crie um novo contêiner de bucket S3 com nome único global."
+        },
+        "list_iam_users": {
+          "label": "Listar usuários IAM",
+          "desc": "Obtenha todos os usuários atuais do diretório de identidades."
+        },
+        "disable_iam_user": {
+          "label": "Desativar usuário IAM",
+          "desc": "Desative imediatamente as chaves e credenciais do usuário."
+        },
+        "rotate_credential": {
+          "label": "Rotacionar credencial",
+          "desc": "Rotacione um par de chaves de acesso IAM de um usuário."
+        }
+      },
+      "gcp": {
+        "list_service_accounts": {
+          "label": "Listar contas de serviço",
+          "desc": "Obtenha todas as contas de serviço de identidade do sistema."
+        }
+      },
+      "stripe": {
+        "create_product": {
+          "label": "Criar produto",
+          "desc": "Crie um novo produto da Stripe e seu primeiro preço recorrente."
+        },
+        "edit_product": {
+          "label": "Editar produto",
+          "desc": "Atualize o nome, a descrição ou o estado ativo de um produto da Stripe."
+        },
+        "view_products": {
+          "label": "Ver produtos",
+          "desc": "Liste os produtos ativos da Stripe e seus identificadores."
+        },
+        "archive_product": {
+          "label": "Arquivar produto",
+          "desc": "Arquive um produto da Stripe (deixa inativo; recuperável ao reativá-lo)."
+        },
+        "delete_product": {
+          "label": "Excluir produto",
+          "desc": "Exclua permanentemente um produto da Stripe. Apenas produtos sem preços ativos podem ser excluídos."
+        },
+        "create_price": {
+          "label": "Criar preço",
+          "desc": "Anexe um novo preço recorrente ou único a um produto existente da Stripe."
+        },
+        "view_prices": {
+          "label": "Ver preços",
+          "desc": "Liste os preços da Stripe, opcionalmente filtrados por produto."
+        },
+        "edit_price": {
+          "label": "Editar preço",
+          "desc": "Atualize o apelido de um preço ou ative/desative-o (os valores são imutáveis na Stripe)."
+        },
+        "archive_price": {
+          "label": "Arquivar preço",
+          "desc": "Desative um preço para que não possa mais ser comprado (recuperável)."
+        },
+        "apply_tier_template": {
+          "label": "Modelos de plano",
+          "desc": "Crie instantaneamente trilhas de checkout padronizadas Indie, Pro ou Growth."
+        },
+        "list_customers": {
+          "label": "Visão de clientes",
+          "desc": "Liste clientes, faturas e métricas de pagamentos recorrentes ativos."
+        },
+        "adjust_balance": {
+          "label": "Ajustar saldo",
+          "desc": "Aplique modificações manuais no livro de saldo do cliente ou ajustes de transação."
+        },
+        "issue_refund": {
+          "label": "Reembolso/Ajustes",
+          "desc": "Reverta o saldo de uma transação processada ou aplique um crédito de serviço manual."
+        }
+      },
+      "supabase": {
+        "sql_editor": {
+          "label": "Editor SQL",
+          "desc": "Execute consultas brutas arbitrárias diretamente nas suas tabelas de dados."
+        },
+        "run_migration": {
+          "label": "Executar migração",
+          "desc": "Execute migrações de esquema de definição de dados compiladas pela ponte de consultas."
+        },
+        "insert_row": {
+          "label": "Inserir linha",
+          "desc": "Injete diretamente registros estruturados de linha em um esquema existente."
+        },
+        "edit_row": {
+          "label": "Editar linha",
+          "desc": "Atualize uma linha de tabela existente que corresponda a uma expressão de filtro."
+        },
+        "archive_row": {
+          "label": "Arquivar linhas",
+          "desc": "Altere os indicadores de visibilidade ativa em um registro de item de banco de dados específico."
+        },
+        "delete_row": {
+          "label": "Excluir linha",
+          "desc": "Purgue completamente os registros de linha da camada de armazenamento."
+        },
+        "invite_user": {
+          "label": "Convidar usuário",
+          "desc": "Envie um convite por e-mail para provisionar um novo usuário autenticado."
+        },
+        "edit_user": {
+          "label": "Editar usuário",
+          "desc": "Atualize o e-mail, os metadados ou o estado de confirmação de um usuário."
+        },
+        "delete_user": {
+          "label": "Excluir usuário",
+          "desc": "Remova permanentemente um usuário autenticado e sua identidade."
+        },
+        "reset_password": {
+          "label": "Redefinir senha",
+          "desc": "Envie um e-mail de recuperação de senha para uma conta de usuário."
+        },
+        "rotate_service_key": {
+          "label": "Rotacionar chaves",
+          "desc": "Invalide os tokens JSON service_role atuais e emita novas credenciais."
+        },
+        "storage_panel": {
+          "label": "Painel de armazenamento",
+          "desc": "Envie, baixe ou liste objetos dentro de um bucket de armazenamento."
+        },
+        "create_bucket": {
+          "label": "Criar bucket",
+          "desc": "Crie um novo contêiner de armazenamento de objetos de mídia ou binários."
+        },
+        "empty_bucket": {
+          "label": "Esvaziar bucket",
+          "desc": "Purgue todos os objetos aninhados sem remover o contêiner de ativos principal."
+        }
+      },
+      "vercel": {
+        "list_deployments": {
+          "label": "Painel de implantações",
+          "desc": "Inspecione builds em execução, registros de commit e atribuições de destino de produção."
+        },
+        "trigger_rollback": {
+          "label": "Reverter implantação",
+          "desc": "Aponte instantaneamente os destinos de domínio de produção para um hash de implantação anterior."
+        },
+        "cancel_build": {
+          "label": "Cancelar build",
+          "desc": "Aborte um elemento da fila de compilação ativa diretamente no gateway."
+        },
+        "view_env": {
+          "label": "Ver variáveis de ambiente",
+          "desc": "Liste todas as configurações de variáveis de ambiente ativas neste projeto."
+        },
+        "edit_env": {
+          "label": "Editar variável de ambiente",
+          "desc": "Atualize o valor ou os ambientes de destino de uma variável."
+        },
+        "delete_env": {
+          "label": "Excluir variável de ambiente",
+          "desc": "Apague completamente as chaves de variáveis de ambiente do pipeline de build ativo."
+        },
+        "sync_dns_domain": {
+          "label": "Domínios/DNS",
+          "desc": "Configure ajustes canônicos, caminhos de alias ou regras de certificação SSL no edge."
+        },
+        "logs": {
+          "label": "Visualizador de registros",
+          "desc": "Transmita eventos recentes de registro de plataforma, build e runtime."
+        }
+      },
+      "twilio": {
+        "send_sms": {
+          "label": "Enviar SMS",
+          "desc": "Envie uma mensagem SMS de saída do seu número Twilio."
+        },
+        "verify_number": {
+          "label": "Verificar número",
+          "desc": "Inicie a verificação do número de telefone (envia um código de uso único)."
+        }
+      },
+      "sendgrid": {
+        "send_email": {
+          "label": "Enviar e-mail",
+          "desc": "Envie um e-mail transacional pela SendGrid."
+        },
+        "check_domain_auth": {
+          "label": "Verificar autenticação de domínio",
+          "desc": "Inspecione o status de autenticação do domínio remetente (SPF/DKIM)."
+        }
+      },
+      "cloudflare": {
+        "add_dns_record": {
+          "label": "Adicionar registro DNS",
+          "desc": "Crie um registro DNS na zona Cloudflare configurada."
+        },
+        "toggle_proxy": {
+          "label": "Alternar proxy",
+          "desc": "Ative ou desative o proxy de nuvem laranja para um registro."
+        },
+        "purge_cache": {
+          "label": "Limpar cache",
+          "desc": "Limpe todo o cache de edge da Cloudflare para a zona."
+        }
+      },
+      "digitalocean": {
+        "create_droplet": {
+          "label": "Criar droplet",
+          "desc": "Provisione um novo droplet de computação da DigitalOcean."
+        },
+        "view_droplets": {
+          "label": "Ver droplets",
+          "desc": "Liste os droplets ativos e seu status."
+        }
+      },
+      "firebase": {
+        "upload_rules": {
+          "label": "Enviar regras",
+          "desc": "Publique um novo conjunto de regras de segurança do Firestore/Storage."
+        },
+        "view_rules": {
+          "label": "Ver regras",
+          "desc": "Mostre o conjunto de regras de segurança publicado atualmente."
+        }
+      },
+      "datadog": {
+        "create_monitor": {
+          "label": "Criar monitor",
+          "desc": "Crie um monitor de métrica/alerta."
+        },
+        "check_metrics": {
+          "label": "Verificar métricas",
+          "desc": "Execute uma consulta de métrica e veja a série mais recente."
+        }
+      },
+      "sentry": {
+        "list_issues": {
+          "label": "Listar issues",
+          "desc": "Liste as issues não resolvidas de um projeto."
+        },
+        "resolve_issue": {
+          "label": "Resolver issue",
+          "desc": "Marque uma issue como resolvida."
+        }
+      },
+      "pagerduty": {
+        "list_incidents": {
+          "label": "Listar incidentes",
+          "desc": "Liste os incidentes recentes e ativos."
+        },
+        "trigger_incident": {
+          "label": "Disparar incidente",
+          "desc": "Dispare manualmente um novo incidente em um serviço."
+        }
+      },
+      "vault": {
+        "unlock_vault": {
+          "label": "Desbloquear cofre",
+          "desc": "Forneça sua frase mestra do sistema para carregar os vetores de chave sensíveis."
+        },
+        "seal_vault": {
+          "label": "Selar cofre",
+          "desc": "Purgue instantaneamente as camadas de memória descriptografadas e bloqueie novamente as operações principais."
+        },
+        "add_secret": {
+          "label": "Adicionar segredo",
+          "desc": "Injete strings de armazenamento de variáveis criptografadas altamente seguras."
+        },
+        "edit_secret": {
+          "label": "Editar chave",
+          "desc": "Atualize o valor de um segredo existente no cofre."
+        },
+        "reveal_secret": {
+          "label": "Revelar chave",
+          "desc": "Descriptografe e revele o valor de um segredo (registrado na auditoria)."
+        },
+        "archive_secret": {
+          "label": "Arquivar chave",
+          "desc": "Arquive um segredo (oculto, mas recuperável)."
+        },
+        "delete_secret": {
+          "label": "Excluir segredo",
+          "desc": "Apague permanentemente os objetos de referência de chave dos blocos de armazenamento."
+        },
+        "view_keys": {
+          "label": "Chaves do registro de auditoria",
+          "desc": "Inspecione os caminhos da trilha de conformidade que mapeiam eventos de descriptografia recentes."
+        },
+        "audit_log": {
+          "label": "Registro de auditoria",
+          "desc": "Veja a trilha de auditoria de acesso e mutação do cofre."
+        }
+      },
+      "gov": {
+        "assign_role": {
+          "label": "Atribuição de função",
+          "desc": "Provisione parâmetros de acesso à plataforma para pessoal organizacional específico."
+        },
+        "change_permissions": {
+          "label": "Alterar permissões de função",
+          "desc": "Ajuste o conjunto de permissões associado a um membro ou função."
+        },
+        "deactivate_member": {
+          "label": "Arquivar membro",
+          "desc": "Suspenda as permissões da organização e desative o acesso à conta globalmente."
+        },
+        "view_timeline": {
+          "label": "Linha do tempo de atividade",
+          "desc": "Linhas de trilha de auditoria que registram os contextos de execução recentes do cluster."
+        },
+        "run_compliance_audit": {
+          "label": "Executar auditoria de conformidade",
+          "desc": "Execute uma varredura de conformidade no escopo selecionado."
+        },
+        "clear_stale_sessions": {
+          "label": "Limpar sessões",
+          "desc": "Force o logout de tokens inativos e atualize os parâmetros de autorização."
         }
       }
     },
@@ -1625,7 +2789,62 @@
       "price": "Cena",
       "query": "Zapytanie",
       "operation": "Operacja",
-      "phone_number": "Numer Telefonu"
+      "phone_number": "Numer Telefonu",
+      "bucket_name": "Nazwa bucketa",
+      "username": "Nazwa użytkownika",
+      "iam_username": "Nazwa użytkownika IAM",
+      "product_name": "Nazwa produktu",
+      "new_product_name": "Nowa nazwa produktu",
+      "amount_usd": "Kwota (USD)",
+      "price_id": "ID ceny",
+      "subscription_tier": "Poziom subskrypcji",
+      "customer": "Klient",
+      "amount_cents": "Kwota (centy)",
+      "charge": "Obciążenie",
+      "amount_in_cents": "Kwota (w centach)",
+      "sql_raw_statement": "Surowa instrukcja SQL",
+      "migration_payload": "Ładunek migracji",
+      "json_row_object": "Obiekt wiersza JSON",
+      "match_column_value": "Dopasowanie (kolumna=wartość)",
+      "new_values_json": "Nowe wartości (JSON)",
+      "row": "Wiersz",
+      "user_email": "E-mail użytkownika",
+      "user": "Użytkownik",
+      "object_path": "Ścieżka obiektu",
+      "bucket_identifier": "Identyfikator bucketa",
+      "deployment_id": "ID wdrożenia",
+      "build_id": "ID build",
+      "env_variable_id": "ID zmiennej środowiskowej",
+      "new_value": "Nowa wartość",
+      "target": "Cel",
+      "env_variable_key_reference": "Odniesienie klucza zmiennej środowiskowej",
+      "domain_address_string": "Adres domeny",
+      "to": "Do",
+      "subject": "Temat",
+      "type": "Typ",
+      "ttl_sec": "TTL (s)",
+      "proxied": "Przez proxy",
+      "record_id": "ID rekordu",
+      "droplet_name": "Nazwa dropleta",
+      "size": "Rozmiar",
+      "image": "Obraz",
+      "rules_source": "Źródło reguł",
+      "monitor_name": "Nazwa monitora",
+      "alert_message": "Wiadomość alertu",
+      "metric_query": "Zapytanie metryki",
+      "project_slug": "Slug projektu",
+      "issue_id": "ID zgłoszenia",
+      "service_id": "ID usługi",
+      "urgency": "Pilność",
+      "master_passphrase": "Fraza główna",
+      "secret_key_reference": "Odniesienie klucza sekretnego",
+      "encrypted_value": "Wartość zaszyfrowana",
+      "key_name": "Nazwa klucza",
+      "team_member_id": "ID członka zespołu",
+      "target_privilege_domain_access_tier": "Docelowy poziom dostępu uprawnień",
+      "member_id": "ID członka",
+      "permissions_comma_separated": "Uprawnienia (oddzielone przecinkami)",
+      "scope": "Zakres"
     },
     "opt": {
       "open": "Otwarte",
@@ -1635,7 +2854,22 @@
       "rebase": "Rebase",
       "production": "Produkcja",
       "preview": "Podgląd",
-      "development": "Programowanie"
+      "development": "Programowanie",
+      "indie_tier_9_mo": "Poziom Indie ($9/mies.)",
+      "pro_tier_29_mo": "Poziom Pro ($29/mies.)",
+      "growth_tier_79_mo": "Poziom Growth ($79/mies.)",
+      "list_objects": "Lista obiektów",
+      "upload": "Prześlij",
+      "download": "Pobierz",
+      "high": "Wysoka",
+      "low": "Niska",
+      "billing_administrator": "Administrator rozliczeń",
+      "platform_core_developer": "Główny programista platformy",
+      "standard_team_member": "Standardowy członek zespołu",
+      "everything": "Wszystko",
+      "access_and_roles": "Dostęp i role",
+      "billing": "Rozliczenia",
+      "data": "Dane"
     },
     "ui": {
       "execute": "Wykonaj",
@@ -1825,6 +3059,324 @@
         "list_buckets": {
           "label": "Lista Bucketów",
           "desc": "Buckety pamięci w projekcie marketingowym."
+        }
+      },
+      "aws": {
+        "create_s3_bucket": {
+          "label": "Utwórz bucket S3",
+          "desc": "Utwórz nowy globalnie unikalny kontener bucketa S3."
+        },
+        "list_iam_users": {
+          "label": "Lista użytkowników IAM",
+          "desc": "Pobierz wszystkich bieżących użytkowników katalogu tożsamości."
+        },
+        "disable_iam_user": {
+          "label": "Wyłącz użytkownika IAM",
+          "desc": "Natychmiast dezaktywuj klucze i poświadczenia użytkownika."
+        },
+        "rotate_credential": {
+          "label": "Rotuj poświadczenie",
+          "desc": "Rotuj parę kluczy dostępu IAM użytkownika."
+        }
+      },
+      "gcp": {
+        "list_service_accounts": {
+          "label": "Lista kont usług",
+          "desc": "Pobierz wszystkie systemowe konta usług tożsamości."
+        }
+      },
+      "stripe": {
+        "create_product": {
+          "label": "Utwórz produkt",
+          "desc": "Utwórz nowy produkt Stripe i jego pierwszą cenę cykliczną."
+        },
+        "edit_product": {
+          "label": "Edytuj produkt",
+          "desc": "Zaktualizuj nazwę, opis lub stan aktywności produktu Stripe."
+        },
+        "view_products": {
+          "label": "Zobacz produkty",
+          "desc": "Wyświetl aktywne produkty Stripe i ich identyfikatory."
+        },
+        "archive_product": {
+          "label": "Archiwizuj produkt",
+          "desc": "Zarchiwizuj produkt Stripe (ustawia nieaktywny; odzyskiwalny po ponownej aktywacji)."
+        },
+        "delete_product": {
+          "label": "Usuń produkt",
+          "desc": "Trwale usuń produkt Stripe. Usunąć można tylko produkty bez aktywnych cen."
+        },
+        "create_price": {
+          "label": "Utwórz cenę",
+          "desc": "Dołącz nową cenę cykliczną lub jednorazową do istniejącego produktu Stripe."
+        },
+        "view_prices": {
+          "label": "Zobacz ceny",
+          "desc": "Wyświetl ceny Stripe, opcjonalnie filtrowane według produktu."
+        },
+        "edit_price": {
+          "label": "Edytuj cenę",
+          "desc": "Zaktualizuj alias ceny lub aktywuj/dezaktywuj ją (kwoty w Stripe są niezmienne)."
+        },
+        "archive_price": {
+          "label": "Archiwizuj cenę",
+          "desc": "Dezaktywuj cenę, aby nie można jej już kupić (odzyskiwalne)."
+        },
+        "apply_tier_template": {
+          "label": "Szablony planów",
+          "desc": "Natychmiast utwórz standardowe ścieżki płatności Indie, Pro lub Growth."
+        },
+        "list_customers": {
+          "label": "Widok klientów",
+          "desc": "Wyświetl klientów, faktury i metryki aktywnych płatności cyklicznych."
+        },
+        "adjust_balance": {
+          "label": "Skoryguj saldo",
+          "desc": "Zastosuj ręczne modyfikacje księgi salda klienta lub korekty transakcji."
+        },
+        "issue_refund": {
+          "label": "Zwrot/Korekty",
+          "desc": "Cofnij saldo przetworzonej transakcji lub zastosuj ręczny kredyt serwisowy."
+        }
+      },
+      "supabase": {
+        "sql_editor": {
+          "label": "Edytor SQL",
+          "desc": "Wykonuj dowolne surowe zapytania bezpośrednio na tabelach danych."
+        },
+        "run_migration": {
+          "label": "Uruchom migrację",
+          "desc": "Uruchom skompilowane migracje schematu danych przez most zapytań."
+        },
+        "insert_row": {
+          "label": "Wstaw wiersz",
+          "desc": "Wstrzyknij bezpośrednio ustrukturyzowane rekordy wiersza do istniejącego schematu."
+        },
+        "edit_row": {
+          "label": "Edytuj wiersz",
+          "desc": "Zaktualizuj istniejący wiersz tabeli pasujący do wyrażenia filtra."
+        },
+        "archive_row": {
+          "label": "Archiwizuj wiersze",
+          "desc": "Przełącz flagi widoczności aktywnej dla konkretnego rekordu elementu bazy danych."
+        },
+        "delete_row": {
+          "label": "Usuń wiersz",
+          "desc": "Całkowicie usuń rekordy wiersza z warstwy pamięci."
+        },
+        "invite_user": {
+          "label": "Zaproś użytkownika",
+          "desc": "Wyślij zaproszenie e-mail, aby utworzyć nowego uwierzytelnionego użytkownika."
+        },
+        "edit_user": {
+          "label": "Edytuj użytkownika",
+          "desc": "Zaktualizuj e-mail, metadane lub stan potwierdzenia użytkownika."
+        },
+        "delete_user": {
+          "label": "Usuń użytkownika",
+          "desc": "Trwale usuń uwierzytelnionego użytkownika i jego tożsamość."
+        },
+        "reset_password": {
+          "label": "Zresetuj hasło",
+          "desc": "Wyślij e-mail odzyskiwania hasła dla konta użytkownika."
+        },
+        "rotate_service_key": {
+          "label": "Rotuj klucze",
+          "desc": "Unieważnij bieżące tokeny JSON service_role i wydaj nowe poświadczenia."
+        },
+        "storage_panel": {
+          "label": "Panel pamięci",
+          "desc": "Przesyłaj, pobieraj lub wyświetlaj obiekty w buckecie pamięci."
+        },
+        "create_bucket": {
+          "label": "Utwórz bucket",
+          "desc": "Utwórz nowy kontener pamięci obiektów multimedialnych lub binarnych."
+        },
+        "empty_bucket": {
+          "label": "Opróżnij bucket",
+          "desc": "Usuń wszystkie zagnieżdżone obiekty bez usuwania głównego kontenera zasobów."
+        }
+      },
+      "vercel": {
+        "list_deployments": {
+          "label": "Panel wdrożeń",
+          "desc": "Sprawdź trwające buildy, rekordy commitów i przypisania celu produkcyjnego."
+        },
+        "trigger_rollback": {
+          "label": "Przywróć wdrożenie",
+          "desc": "Natychmiast skieruj cele domeny produkcyjnej na wcześniejszy hash wdrożenia."
+        },
+        "cancel_build": {
+          "label": "Anuluj build",
+          "desc": "Przerwij element aktywnej kolejki kompilacji bezpośrednio w bramie."
+        },
+        "view_env": {
+          "label": "Zobacz zmienne środowiskowe",
+          "desc": "Wyświetl wszystkie aktywne konfiguracje zmiennych środowiskowych w tym projekcie."
+        },
+        "edit_env": {
+          "label": "Edytuj zmienną środowiskową",
+          "desc": "Zaktualizuj wartość lub środowiska docelowe zmiennej."
+        },
+        "delete_env": {
+          "label": "Usuń zmienną środowiskową",
+          "desc": "Całkowicie usuń klucze zmiennych środowiskowych z aktywnego pipeline'u build."
+        },
+        "sync_dns_domain": {
+          "label": "Domeny/DNS",
+          "desc": "Skonfiguruj ustawienia kanoniczne, ścieżki aliasów lub reguły certyfikacji SSL na edge."
+        },
+        "logs": {
+          "label": "Podgląd dzienników",
+          "desc": "Strumieniuj ostatnie zdarzenia dzienników platformy, build i runtime."
+        }
+      },
+      "twilio": {
+        "send_sms": {
+          "label": "Wyślij SMS",
+          "desc": "Wyślij wychodzącą wiadomość SMS z numeru Twilio."
+        },
+        "verify_number": {
+          "label": "Zweryfikuj numer",
+          "desc": "Rozpocznij weryfikację numeru telefonu (wysyła kod jednorazowy)."
+        }
+      },
+      "sendgrid": {
+        "send_email": {
+          "label": "Wyślij e-mail",
+          "desc": "Wyślij e-mail transakcyjny przez SendGrid."
+        },
+        "check_domain_auth": {
+          "label": "Sprawdź uwierzytelnianie domeny",
+          "desc": "Sprawdź status uwierzytelniania domeny nadawcy (SPF/DKIM)."
+        }
+      },
+      "cloudflare": {
+        "add_dns_record": {
+          "label": "Dodaj rekord DNS",
+          "desc": "Utwórz rekord DNS w skonfigurowanej strefie Cloudflare."
+        },
+        "toggle_proxy": {
+          "label": "Przełącz proxy",
+          "desc": "Włącz lub wyłącz proxy pomarańczowej chmury dla rekordu."
+        },
+        "purge_cache": {
+          "label": "Wyczyść pamięć podręczną",
+          "desc": "Wyczyść całą pamięć podręczną edge Cloudflare dla strefy."
+        }
+      },
+      "digitalocean": {
+        "create_droplet": {
+          "label": "Utwórz droplet",
+          "desc": "Utwórz nowy droplet obliczeniowy DigitalOcean."
+        },
+        "view_droplets": {
+          "label": "Zobacz droplety",
+          "desc": "Wyświetl aktywne droplety i ich status."
+        }
+      },
+      "firebase": {
+        "upload_rules": {
+          "label": "Prześlij reguły",
+          "desc": "Opublikuj nowy zestaw reguł bezpieczeństwa Firestore/Storage."
+        },
+        "view_rules": {
+          "label": "Zobacz reguły",
+          "desc": "Pokaż aktualnie opublikowany zestaw reguł bezpieczeństwa."
+        }
+      },
+      "datadog": {
+        "create_monitor": {
+          "label": "Utwórz monitor",
+          "desc": "Utwórz monitor metryki/alertu."
+        },
+        "check_metrics": {
+          "label": "Sprawdź metryki",
+          "desc": "Wykonaj zapytanie metryki i zobacz najnowszą serię."
+        }
+      },
+      "sentry": {
+        "list_issues": {
+          "label": "Lista zgłoszeń",
+          "desc": "Wyświetl nierozwiązane zgłoszenia projektu."
+        },
+        "resolve_issue": {
+          "label": "Rozwiąż zgłoszenie",
+          "desc": "Oznacz zgłoszenie jako rozwiązane."
+        }
+      },
+      "pagerduty": {
+        "list_incidents": {
+          "label": "Lista incydentów",
+          "desc": "Wyświetl ostatnie i aktywne incydenty."
+        },
+        "trigger_incident": {
+          "label": "Wywołaj incydent",
+          "desc": "Ręcznie wywołaj nowy incydent w usłudze."
+        }
+      },
+      "vault": {
+        "unlock_vault": {
+          "label": "Odblokuj sejf",
+          "desc": "Podaj systemową frazę główną, aby załadować wrażliwe wektory kluczy."
+        },
+        "seal_vault": {
+          "label": "Zapieczętuj sejf",
+          "desc": "Natychmiast usuń odszyfrowane warstwy pamięci i ponownie zablokuj operacje główne."
+        },
+        "add_secret": {
+          "label": "Dodaj sekret",
+          "desc": "Wstrzyknij wysoce bezpieczne, szyfrowane łańcuchy przechowywania zmiennych."
+        },
+        "edit_secret": {
+          "label": "Edytuj klucz",
+          "desc": "Zaktualizuj wartość istniejącego sekretu w sejfie."
+        },
+        "reveal_secret": {
+          "label": "Pokaż klucz",
+          "desc": "Odszyfruj i pokaż wartość sekretu (zapisane w audycie)."
+        },
+        "archive_secret": {
+          "label": "Archiwizuj klucz",
+          "desc": "Zarchiwizuj sekret (ukryty, ale odzyskiwalny)."
+        },
+        "delete_secret": {
+          "label": "Usuń sekret",
+          "desc": "Trwale usuń obiekty referencji klucza z bloków pamięci."
+        },
+        "view_keys": {
+          "label": "Klucze dziennika audytu",
+          "desc": "Sprawdź ścieżki śladu zgodności mapujące ostatnie zdarzenia odszyfrowania."
+        },
+        "audit_log": {
+          "label": "Dziennik audytu",
+          "desc": "Zobacz ślad audytu dostępu i zmian sejfu."
+        }
+      },
+      "gov": {
+        "assign_role": {
+          "label": "Przypisanie roli",
+          "desc": "Udostępnij parametry dostępu do platformy dla konkretnego personelu organizacji."
+        },
+        "change_permissions": {
+          "label": "Zmień uprawnienia roli",
+          "desc": "Dostosuj zestaw uprawnień przypisany do członka lub roli."
+        },
+        "deactivate_member": {
+          "label": "Archiwizuj członka",
+          "desc": "Zawieś uprawnienia organizacji i wyłącz dostęp do konta globalnie."
+        },
+        "view_timeline": {
+          "label": "Oś czasu aktywności",
+          "desc": "Linie śladu audytu rejestrujące ostatnie konteksty wykonania klastra."
+        },
+        "run_compliance_audit": {
+          "label": "Uruchom audyt zgodności",
+          "desc": "Uruchom skanowanie zgodności w wybranym zakresie."
+        },
+        "clear_stale_sessions": {
+          "label": "Wyczyść sesje",
+          "desc": "Wymuś wylogowanie nieaktywnych tokenów i odśwież parametry autoryzacji."
         }
       }
     },
@@ -2127,7 +3679,62 @@
       "price": "Цена",
       "query": "Запрос",
       "operation": "Операция",
-      "phone_number": "Номер телефона"
+      "phone_number": "Номер телефона",
+      "bucket_name": "Имя бакета",
+      "username": "Имя пользователя",
+      "iam_username": "Имя пользователя IAM",
+      "product_name": "Название продукта",
+      "new_product_name": "Новое название продукта",
+      "amount_usd": "Сумма (USD)",
+      "price_id": "ID цены",
+      "subscription_tier": "Уровень подписки",
+      "customer": "Клиент",
+      "amount_cents": "Сумма (центы)",
+      "charge": "Списание",
+      "amount_in_cents": "Сумма (в центах)",
+      "sql_raw_statement": "Сырой SQL-запрос",
+      "migration_payload": "Данные миграции",
+      "json_row_object": "JSON-объект строки",
+      "match_column_value": "Совпадение (столбец=значение)",
+      "new_values_json": "Новые значения (JSON)",
+      "row": "Строка",
+      "user_email": "Эл. почта пользователя",
+      "user": "Пользователь",
+      "object_path": "Путь объекта",
+      "bucket_identifier": "Идентификатор бакета",
+      "deployment_id": "ID развёртывания",
+      "build_id": "ID сборки",
+      "env_variable_id": "ID переменной окружения",
+      "new_value": "Новое значение",
+      "target": "Цель",
+      "env_variable_key_reference": "Ссылка на ключ переменной окружения",
+      "domain_address_string": "Адрес домена",
+      "to": "Кому",
+      "subject": "Тема",
+      "type": "Тип",
+      "ttl_sec": "TTL (с)",
+      "proxied": "Через прокси",
+      "record_id": "ID записи",
+      "droplet_name": "Имя дроплета",
+      "size": "Размер",
+      "image": "Образ",
+      "rules_source": "Источник правил",
+      "monitor_name": "Имя монитора",
+      "alert_message": "Текст оповещения",
+      "metric_query": "Запрос метрики",
+      "project_slug": "Slug проекта",
+      "issue_id": "ID задачи",
+      "service_id": "ID сервиса",
+      "urgency": "Срочность",
+      "master_passphrase": "Мастер-фраза",
+      "secret_key_reference": "Ссылка на секретный ключ",
+      "encrypted_value": "Зашифрованное значение",
+      "key_name": "Имя ключа",
+      "team_member_id": "ID участника команды",
+      "target_privilege_domain_access_tier": "Целевой уровень доступа привилегий",
+      "member_id": "ID участника",
+      "permissions_comma_separated": "Права (через запятую)",
+      "scope": "Область"
     },
     "opt": {
       "open": "Открыто",
@@ -2137,7 +3744,22 @@
       "rebase": "Rebase",
       "production": "Продакшн",
       "preview": "Превью",
-      "development": "Разработка"
+      "development": "Разработка",
+      "indie_tier_9_mo": "Тариф Indie ($9/мес)",
+      "pro_tier_29_mo": "Тариф Pro ($29/мес)",
+      "growth_tier_79_mo": "Тариф Growth ($79/мес)",
+      "list_objects": "Список объектов",
+      "upload": "Загрузить",
+      "download": "Скачать",
+      "high": "Высокая",
+      "low": "Низкая",
+      "billing_administrator": "Администратор биллинга",
+      "platform_core_developer": "Основной разработчик платформы",
+      "standard_team_member": "Стандартный участник команды",
+      "everything": "Всё",
+      "access_and_roles": "Доступ и роли",
+      "billing": "Биллинг",
+      "data": "Данные"
     },
     "ui": {
       "execute": "Выполнить",
@@ -2327,6 +3949,324 @@
         "list_buckets": {
           "label": "Список бакетов",
           "desc": "Бакеты хранилища маркетингового проекта."
+        }
+      },
+      "aws": {
+        "create_s3_bucket": {
+          "label": "Создать бакет S3",
+          "desc": "Создать новый глобально уникальный контейнер-бакет S3."
+        },
+        "list_iam_users": {
+          "label": "Список пользователей IAM",
+          "desc": "Получить всех текущих пользователей каталога удостоверений."
+        },
+        "disable_iam_user": {
+          "label": "Отключить пользователя IAM",
+          "desc": "Немедленно деактивировать ключи и учётные данные пользователя."
+        },
+        "rotate_credential": {
+          "label": "Ротация учётных данных",
+          "desc": "Ротация пары ключей доступа IAM пользователя."
+        }
+      },
+      "gcp": {
+        "list_service_accounts": {
+          "label": "Список сервисных аккаунтов",
+          "desc": "Получить все системные сервисные аккаунты удостоверений."
+        }
+      },
+      "stripe": {
+        "create_product": {
+          "label": "Создать продукт",
+          "desc": "Создать новый продукт Stripe и его первую регулярную цену."
+        },
+        "edit_product": {
+          "label": "Изменить продукт",
+          "desc": "Обновить имя, описание или активность продукта Stripe."
+        },
+        "view_products": {
+          "label": "Просмотр продуктов",
+          "desc": "Список активных продуктов Stripe и их идентификаторов."
+        },
+        "archive_product": {
+          "label": "Архивировать продукт",
+          "desc": "Архивировать продукт Stripe (делает неактивным; восстанавливается повторной активацией)."
+        },
+        "delete_product": {
+          "label": "Удалить продукт",
+          "desc": "Безвозвратно удалить продукт Stripe. Удалять можно только продукты без активных цен."
+        },
+        "create_price": {
+          "label": "Создать цену",
+          "desc": "Привязать новую регулярную или разовую цену к существующему продукту Stripe."
+        },
+        "view_prices": {
+          "label": "Просмотр цен",
+          "desc": "Список цен Stripe, при необходимости с фильтром по продукту."
+        },
+        "edit_price": {
+          "label": "Изменить цену",
+          "desc": "Обновить псевдоним цены или включить/выключить её (суммы в Stripe неизменяемы)."
+        },
+        "archive_price": {
+          "label": "Архивировать цену",
+          "desc": "Деактивировать цену, чтобы её нельзя было купить (восстановимо)."
+        },
+        "apply_tier_template": {
+          "label": "Шаблоны планов",
+          "desc": "Мгновенно создать стандартные сценарии оплаты Indie, Pro или Growth."
+        },
+        "list_customers": {
+          "label": "Просмотр клиентов",
+          "desc": "Список клиентов, счетов и метрик активных регулярных платежей."
+        },
+        "adjust_balance": {
+          "label": "Корректировать баланс",
+          "desc": "Применить ручные изменения в книге баланса клиента или корректировки транзакций."
+        },
+        "issue_refund": {
+          "label": "Возврат/Корректировки",
+          "desc": "Отменить баланс обработанной транзакции или применить ручной сервисный кредит."
+        }
+      },
+      "supabase": {
+        "sql_editor": {
+          "label": "Редактор SQL",
+          "desc": "Выполнять произвольные сырые запросы к вашим таблицам данных."
+        },
+        "run_migration": {
+          "label": "Запустить миграцию",
+          "desc": "Выполнить скомпилированные миграции схемы данных через мост запросов."
+        },
+        "insert_row": {
+          "label": "Вставить строку",
+          "desc": "Напрямую вставить структурированные записи строки в существующую схему."
+        },
+        "edit_row": {
+          "label": "Изменить строку",
+          "desc": "Обновить существующую строку таблицы по выражению фильтра."
+        },
+        "archive_row": {
+          "label": "Архивировать строки",
+          "desc": "Переключить флаги активной видимости конкретной записи элемента БД."
+        },
+        "delete_row": {
+          "label": "Удалить строку",
+          "desc": "Полностью удалить записи строки из слоя хранения."
+        },
+        "invite_user": {
+          "label": "Пригласить пользователя",
+          "desc": "Отправить приглашение по эл. почте для нового аутентифицированного пользователя."
+        },
+        "edit_user": {
+          "label": "Изменить пользователя",
+          "desc": "Обновить эл. почту, метаданные или статус подтверждения пользователя."
+        },
+        "delete_user": {
+          "label": "Удалить пользователя",
+          "desc": "Безвозвратно удалить аутентифицированного пользователя и его удостоверение."
+        },
+        "reset_password": {
+          "label": "Сбросить пароль",
+          "desc": "Отправить письмо восстановления пароля для учётной записи."
+        },
+        "rotate_service_key": {
+          "label": "Ротация ключей",
+          "desc": "Аннулировать текущие токены service_role и выпустить новые учётные данные."
+        },
+        "storage_panel": {
+          "label": "Панель хранилища",
+          "desc": "Загружать, скачивать или просматривать объекты в бакете хранилища."
+        },
+        "create_bucket": {
+          "label": "Создать бакет",
+          "desc": "Создать новый контейнер хранилища медиа- или бинарных объектов."
+        },
+        "empty_bucket": {
+          "label": "Очистить бакет",
+          "desc": "Удалить все вложенные объекты, не удаляя основной контейнер ресурсов."
+        }
+      },
+      "vercel": {
+        "list_deployments": {
+          "label": "Панель развёртываний",
+          "desc": "Просмотр выполняемых сборок, записей коммитов и назначений продакшен-цели."
+        },
+        "trigger_rollback": {
+          "label": "Откат развёртывания",
+          "desc": "Мгновенно перенаправить продакшен-домены на прежний хеш развёртывания."
+        },
+        "cancel_build": {
+          "label": "Отменить сборку",
+          "desc": "Прервать элемент очереди активной сборки прямо на шлюзе."
+        },
+        "view_env": {
+          "label": "Просмотр переменных окружения",
+          "desc": "Список всех активных переменных окружения этого проекта."
+        },
+        "edit_env": {
+          "label": "Изменить переменную окружения",
+          "desc": "Обновить значение или целевые окружения переменной."
+        },
+        "delete_env": {
+          "label": "Удалить переменную окружения",
+          "desc": "Полностью удалить ключи переменных окружения из активного конвейера сборки."
+        },
+        "sync_dns_domain": {
+          "label": "Домены/DNS",
+          "desc": "Настроить канонические параметры, пути псевдонимов или правила SSL-сертификации на edge."
+        },
+        "logs": {
+          "label": "Просмотр журналов",
+          "desc": "Транслировать недавние события журналов платформы, сборки и среды выполнения."
+        }
+      },
+      "twilio": {
+        "send_sms": {
+          "label": "Отправить SMS",
+          "desc": "Отправить исходящее SMS с вашего номера Twilio."
+        },
+        "verify_number": {
+          "label": "Проверить номер",
+          "desc": "Начать проверку номера телефона (отправляет одноразовый код)."
+        }
+      },
+      "sendgrid": {
+        "send_email": {
+          "label": "Отправить письмо",
+          "desc": "Отправить транзакционное письмо через SendGrid."
+        },
+        "check_domain_auth": {
+          "label": "Проверить аутентификацию домена",
+          "desc": "Проверить статус аутентификации домена отправителя (SPF/DKIM)."
+        }
+      },
+      "cloudflare": {
+        "add_dns_record": {
+          "label": "Добавить DNS-запись",
+          "desc": "Создать DNS-запись в настроенной зоне Cloudflare."
+        },
+        "toggle_proxy": {
+          "label": "Переключить прокси",
+          "desc": "Включить или выключить прокси «оранжевое облако» для записи."
+        },
+        "purge_cache": {
+          "label": "Очистить кэш",
+          "desc": "Очистить весь edge-кэш Cloudflare для зоны."
+        }
+      },
+      "digitalocean": {
+        "create_droplet": {
+          "label": "Создать дроплет",
+          "desc": "Создать новый вычислительный дроплет DigitalOcean."
+        },
+        "view_droplets": {
+          "label": "Просмотр дроплетов",
+          "desc": "Список активных дроплетов и их статуса."
+        }
+      },
+      "firebase": {
+        "upload_rules": {
+          "label": "Загрузить правила",
+          "desc": "Опубликовать новый набор правил безопасности Firestore/Storage."
+        },
+        "view_rules": {
+          "label": "Просмотр правил",
+          "desc": "Показать текущий опубликованный набор правил безопасности."
+        }
+      },
+      "datadog": {
+        "create_monitor": {
+          "label": "Создать монитор",
+          "desc": "Создать монитор метрики/оповещения."
+        },
+        "check_metrics": {
+          "label": "Проверить метрики",
+          "desc": "Выполнить запрос метрики и просмотреть последнюю серию."
+        }
+      },
+      "sentry": {
+        "list_issues": {
+          "label": "Список задач",
+          "desc": "Список нерешённых задач проекта."
+        },
+        "resolve_issue": {
+          "label": "Решить задачу",
+          "desc": "Отметить задачу как решённую."
+        }
+      },
+      "pagerduty": {
+        "list_incidents": {
+          "label": "Список инцидентов",
+          "desc": "Список недавних и активных инцидентов."
+        },
+        "trigger_incident": {
+          "label": "Создать инцидент",
+          "desc": "Вручную создать новый инцидент в сервисе."
+        }
+      },
+      "vault": {
+        "unlock_vault": {
+          "label": "Разблокировать хранилище",
+          "desc": "Введите системную мастер-фразу для загрузки чувствительных векторов ключей."
+        },
+        "seal_vault": {
+          "label": "Запечатать хранилище",
+          "desc": "Мгновенно очистить расшифрованные слои памяти и заблокировать основные операции."
+        },
+        "add_secret": {
+          "label": "Добавить секрет",
+          "desc": "Внести строго защищённые зашифрованные строки хранения переменных."
+        },
+        "edit_secret": {
+          "label": "Изменить ключ",
+          "desc": "Обновить значение существующего секрета в хранилище."
+        },
+        "reveal_secret": {
+          "label": "Показать ключ",
+          "desc": "Расшифровать и показать значение секрета (записывается в аудит)."
+        },
+        "archive_secret": {
+          "label": "Архивировать ключ",
+          "desc": "Архивировать секрет (скрыт, но восстановим)."
+        },
+        "delete_secret": {
+          "label": "Удалить секрет",
+          "desc": "Безвозвратно удалить объекты-ссылки ключей из блоков хранения."
+        },
+        "view_keys": {
+          "label": "Ключи журнала аудита",
+          "desc": "Просмотр путей следа соответствия с недавними событиями расшифровки."
+        },
+        "audit_log": {
+          "label": "Журнал аудита",
+          "desc": "Просмотр аудита доступа и изменений хранилища."
+        }
+      },
+      "gov": {
+        "assign_role": {
+          "label": "Назначение роли",
+          "desc": "Назначить параметры доступа к платформе для конкретного персонала организации."
+        },
+        "change_permissions": {
+          "label": "Изменить права роли",
+          "desc": "Изменить набор прав, привязанный к участнику или роли."
+        },
+        "deactivate_member": {
+          "label": "Архивировать участника",
+          "desc": "Приостановить права организации и глобально отключить доступ к аккаунту."
+        },
+        "view_timeline": {
+          "label": "Лента активности",
+          "desc": "Линии аудита, фиксирующие недавние контексты выполнения кластера."
+        },
+        "run_compliance_audit": {
+          "label": "Запустить аудит соответствия",
+          "desc": "Запустить проверку соответствия в выбранной области."
+        },
+        "clear_stale_sessions": {
+          "label": "Очистить сессии",
+          "desc": "Принудительно завершить неактивные токены и обновить параметры авторизации."
         }
       }
     },

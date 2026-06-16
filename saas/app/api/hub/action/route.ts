@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getTemplate, validateTemplatePayload } from '@/lib/hub/provider-templates'
 import { getHubActionPolicy, isActionBlocked, requiresOwnerApproval } from '@/lib/hub/action-policy'
+import { recordAuditEvent, normalizeStatus } from '@/lib/hub/audit'
 import { getCurrentUser as resolveHubUser } from '@/lib/auth/permission-middleware'
 import { vaultEncrypt, vaultDecrypt } from '@/lib/vault/crypto'
 import { scanAWSUsers, scanAWSAccessKeys } from '@/lib/hub/aws-scanner'
@@ -1733,28 +1734,12 @@ async function logAuditEvent(
   message: string,
   resultData: unknown,
 ) {
-  try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!supabaseUrl || !supabaseKey) {
-      console.warn('Supabase not configured; audit log skipped')
-      return
-    }
-
-    const client = createClient(supabaseUrl, supabaseKey)
-
-    // Insert into hub_action_audit_log table (you will create this).
-    // Schema: id, created_at, user_id, template_id, status, message, result_data
-    await client.from('hub_action_audit_log').insert({
-      user_id: userId,
-      template_id: templateId,
-      status,
-      message,
-      result_data: resultData ? JSON.stringify(resultData) : null,
-    })
-  } catch (err) {
-    console.error('Failed to log audit event:', err)
-    // Don't fail the action if logging fails; just log the error.
-  }
+  // Routed through the unified audit adapter (lib/hub/audit.ts) — single sink.
+  await recordAuditEvent({
+    actor: userId,
+    action: templateId,
+    status: normalizeStatus(status),
+    message,
+    metadata: resultData,
+  })
 }

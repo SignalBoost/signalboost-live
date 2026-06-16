@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/utils/supabase/client'
+import { useI18n } from '@/components/i18n/I18nProvider'
+import { t } from '@/lib/i18n/t'
 
 type Role = 'developer' | 'non_developer' | ''
 type ItLevel = 'beginner' | 'intermediate' | 'advanced' | ''
@@ -132,6 +134,7 @@ function reportClientError(error: unknown, userId?: string) {
 
 export default function OnboardingPage() {
   const router = useRouter()
+  const { dict } = useI18n()
   const [step, setStep] = useState(0)
   const [firstName, setFirstName] = useState('there')
   const [userId, setUserId] = useState<string | undefined>()
@@ -270,7 +273,7 @@ export default function OnboardingPage() {
   if (checking) {
     return (
       <main style={{ minHeight: '100vh', background: '#080b18', display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.64)' }}>
-        Loading onboarding…
+        {t(dict, 'onboarding.loading', 'Loading onboarding…')}
       </main>
     )
   }
@@ -314,18 +317,18 @@ export default function OnboardingPage() {
 
       <header className="topbar">
         <div className="brand">signal<span style={{ color: GOLD }}>boost</span></div>
-        <button className="skipButton" onClick={() => finish(true)} disabled={saving}>Skip to dashboard →</button>
+        <button className="skipButton" onClick={() => finish(true)} disabled={saving}>{t(dict, 'onboarding.skip', 'Skip to dashboard →')}</button>
       </header>
 
       <section className="layout" aria-label="SignalBoost onboarding flow">
         <aside className="sidebar" aria-label="Onboarding progress">
-          <strong>{Math.round(progress)}% complete</strong>
+          <strong>{t(dict, 'onboarding.progressComplete', '{pct}% complete').replace('{pct}', String(Math.round(progress)))}</strong>
           <div className="progressTrack" aria-hidden="true"><div className="progressFill" style={{ width: `${progress}%` }} /></div>
           <div className="stepList">
             {STEPS.map((item, index) => (
               <div key={item.key} className={`stepItem ${index === step ? 'stepItemActive' : ''}`}>
                 <span>{item.icon}</span>
-                <span><strong>{item.label}</strong><small style={{ display: 'block' }}>{item.kicker}</small></span>
+                <span><strong>{t(dict, 'onboarding.steps.' + item.key + '.label', item.label)}</strong><small style={{ display: 'block' }}>{t(dict, 'onboarding.steps.' + item.key + '.kicker', item.kicker)}</small></span>
               </div>
             ))}
           </div>
@@ -335,14 +338,14 @@ export default function OnboardingPage() {
           {activeStep.key === 'welcome' && (
             <div>
               <div className="kicker">{activeStep.kicker}</div>
-              <h1>Welcome, {firstName}. Build faster with a smarter setup.</h1>
-              <p>SignalBoost will tailor Apprentice Workshop guidance, AI tone, and product defaults from four quick preferences. Every choice can be changed later in settings.</p>
+              <h1>{t(dict, 'onboarding.welcome.title', 'Welcome, {name}. Build faster with a smarter setup.').replace('{name}', firstName)}</h1>
+              <p>{t(dict, 'onboarding.welcome.intro', 'SignalBoost will tailor Apprentice Workshop guidance, AI tone, and product defaults from four quick preferences. Every choice can be changed later in settings.')}</p>
               <div className="workshopPreview">
-                <strong>Storyboard</strong>
-                <p style={{ marginBottom: 0 }}>Welcome → profile your skill level → choose privacy consent → pick the assistant tone → confirm your setup.</p>
+                <strong>{t(dict, 'onboarding.welcome.storyboardLabel', 'Storyboard')}</strong>
+                <p style={{ marginBottom: 0 }}>{t(dict, 'onboarding.welcome.storyboardBody', 'Welcome → profile your skill level → choose privacy consent → pick the assistant tone → confirm your setup.')}</p>
               </div>
               <div className="footerActions">
-                <button className="primaryButton" onClick={() => goTo(1)}>Start onboarding →</button>
+                <button className="primaryButton" onClick={() => goTo(1)}>{t(dict, 'onboarding.welcome.start', 'Start onboarding →')}</button>
               </div>
             </div>
           )}
@@ -350,29 +353,29 @@ export default function OnboardingPage() {
           {activeStep.key === 'profiling' && (
             <div>
               <div className="kicker">{activeStep.kicker}</div>
-              <h2>Help us adapt the Apprentice Workshop.</h2>
-              <p>Choose the path that best matches how you want SignalBoost to explain setup, dashboards, and technical decisions.</p>
+              <h2>{t(dict, 'onboarding.profiling.heading', 'Help us adapt the Apprentice Workshop.')}</h2>
+              <p>{t(dict, 'onboarding.profiling.intro', 'Choose the path that best matches how you want SignalBoost to explain setup, dashboards, and technical decisions.')}</p>
               <div className="optionGrid">
                 {ROLE_OPTIONS.map((option) => (
                   <button key={option.value} className={`optionCard ${answers.role === option.value ? 'optionCardActive' : ''}`} onClick={() => setAnswers((current) => ({ ...current, role: option.value }))}>
                     <span style={{ fontSize: '1.7rem' }}>{option.icon}</span>
-                    <h3>{option.title}</h3>
-                    <p>{option.body}</p>
+                    <h3>{t(dict, 'onboarding.roles.' + option.value + '.title', option.title)}</h3>
+                    <p>{t(dict, 'onboarding.roles.' + option.value + '.body', option.body)}</p>
                   </button>
                 ))}
               </div>
-              <strong>IT comfort level</strong>
+              <strong>{t(dict, 'onboarding.profiling.itComfort', 'IT comfort level')}</strong>
               <div className="levelGrid">
                 {IT_LEVEL_OPTIONS.map((option) => (
                   <button key={option.value} className={`optionCard ${answers.itLevel === option.value ? 'optionCardActive' : ''}`} onClick={() => setAnswers((current) => ({ ...current, itLevel: option.value }))}>
-                    <h3>{option.title}</h3>
-                    <p>{option.body}</p>
+                    <h3>{t(dict, 'onboarding.itLevels.' + option.value + '.title', option.title)}</h3>
+                    <p>{t(dict, 'onboarding.itLevels.' + option.value + '.body', option.body)}</p>
                   </button>
                 ))}
               </div>
               <div className="footerActions">
-                <button className="ghostButton" onClick={() => goTo(0, 'back')}>← Back</button>
-                <button className="primaryButton" onClick={() => goTo(2)} disabled={!canContinue}>Continue →</button>
+                <button className="ghostButton" onClick={() => goTo(0, 'back')}>{t(dict, 'onboarding.common.back', '← Back')}</button>
+                <button className="primaryButton" onClick={() => goTo(2)} disabled={!canContinue}>{t(dict, 'onboarding.common.continue', 'Continue →')}</button>
               </div>
             </div>
           )}
@@ -380,18 +383,18 @@ export default function OnboardingPage() {
           {activeStep.key === 'consent' && (
             <div>
               <div className="kicker">{activeStep.kicker}</div>
-              <h2>Choose your AI training preference.</h2>
-              <p>Consent is optional and unchecked by default. SignalBoost can still personalize your account without using your data for AI training.</p>
+              <h2>{t(dict, 'onboarding.consent.heading', 'Choose your AI training preference.')}</h2>
+              <p>{t(dict, 'onboarding.consent.intro', 'Consent is optional and unchecked by default. SignalBoost can still personalize your account without using your data for AI training.')}</p>
               <label className="consentBox">
                 <input type="checkbox" checked={answers.consentAiTraining} onChange={(event) => setAnswers((current) => ({ ...current, consentAiTraining: event.target.checked }))} />
                 <span>
-                  <strong>I consent to SignalBoost using my onboarding preferences to improve AI training.</strong>
-                  <p style={{ margin: '.35rem 0 0' }}>We store this preference with a timestamp, provide opt-out controls later, and avoid selling personal data.</p>
+                  <strong>{t(dict, 'onboarding.consent.checkboxLabel', 'I consent to SignalBoost using my onboarding preferences to improve AI training.')}</strong>
+                  <p style={{ margin: '.35rem 0 0' }}>{t(dict, 'onboarding.consent.checkboxBody', 'We store this preference with a timestamp, provide opt-out controls later, and avoid selling personal data.')}</p>
                 </span>
               </label>
               <div className="footerActions">
-                <button className="ghostButton" onClick={() => goTo(1, 'back')}>← Back</button>
-                <button className="primaryButton" onClick={() => goTo(3)}>{answers.consentAiTraining ? 'Save consent →' : 'Continue without consent →'}</button>
+                <button className="ghostButton" onClick={() => goTo(1, 'back')}>{t(dict, 'onboarding.common.back', '← Back')}</button>
+                <button className="primaryButton" onClick={() => goTo(3)}>{answers.consentAiTraining ? t(dict, 'onboarding.consent.save', 'Save consent →') : t(dict, 'onboarding.consent.continueWithout', 'Continue without consent →')}</button>
               </div>
             </div>
           )}
@@ -399,20 +402,20 @@ export default function OnboardingPage() {
           {activeStep.key === 'tone' && (
             <div>
               <div className="kicker">{activeStep.kicker}</div>
-              <h2>Pick your assistant tone.</h2>
-              <p>This preference follows you into content generation, support copy, and Apprentice Workshop explanations.</p>
+              <h2>{t(dict, 'onboarding.tone.heading', 'Pick your assistant tone.')}</h2>
+              <p>{t(dict, 'onboarding.tone.intro', 'This preference follows you into content generation, support copy, and Apprentice Workshop explanations.')}</p>
               <div className="toneGrid">
                 {TONE_OPTIONS.map((option) => (
                   <button key={option.value} className={`optionCard ${answers.tonePreference === option.value ? 'optionCardActive' : ''}`} onClick={() => setAnswers((current) => ({ ...current, tonePreference: option.value }))}>
                     <span style={{ fontSize: '2rem' }}>{option.emoji}</span>
-                    <h3>{option.title}</h3>
-                    <p>“{option.sample}”</p>
+                    <h3>{t(dict, 'onboarding.tones.' + option.value + '.title', option.title)}</h3>
+                    <p>“{t(dict, 'onboarding.tones.' + option.value + '.sample', option.sample)}”</p>
                   </button>
                 ))}
               </div>
               <div className="footerActions">
-                <button className="ghostButton" onClick={() => goTo(2, 'back')}>← Back</button>
-                <button className="primaryButton" onClick={() => goTo(4)} disabled={!canContinue}>Continue →</button>
+                <button className="ghostButton" onClick={() => goTo(2, 'back')}>{t(dict, 'onboarding.common.back', '← Back')}</button>
+                <button className="primaryButton" onClick={() => goTo(4)} disabled={!canContinue}>{t(dict, 'onboarding.common.continue', 'Continue →')}</button>
               </div>
             </div>
           )}
@@ -420,21 +423,21 @@ export default function OnboardingPage() {
           {activeStep.key === 'confirmation' && (
             <div>
               <div className="kicker">{activeStep.kicker}</div>
-              <h2>Confirm your personalized setup.</h2>
-              <p>Review the onboarding summary before opening your dashboard. Your choices are stored in profile settings and used by Apprentice Workshop.</p>
+              <h2>{t(dict, 'onboarding.confirm.heading', 'Confirm your personalized setup.')}</h2>
+              <p>{t(dict, 'onboarding.confirm.intro', 'Review the onboarding summary before opening your dashboard. Your choices are stored in profile settings and used by Apprentice Workshop.')}</p>
               <div className="summaryGrid">
-                <div className="summaryCard"><span>Role</span><h3>{answers.role === 'developer' ? 'Developer' : 'Non-developer'}</h3></div>
-                <div className="summaryCard"><span>IT level</span><h3>{answers.itLevel || 'Not selected'}</h3></div>
-                <div className="summaryCard"><span>Tone</span><h3>{answers.tonePreference || 'friendly'}</h3></div>
-                <div className="summaryCard"><span>AI training consent</span><h3>{answers.consentAiTraining ? 'Granted' : 'Not granted'}</h3></div>
+                <div className="summaryCard"><span>{t(dict, 'onboarding.confirm.role', 'Role')}</span><h3>{answers.role === 'developer' ? t(dict, 'onboarding.roles.developer.title', 'Developer') : t(dict, 'onboarding.roles.non_developer.title', 'Non-developer')}</h3></div>
+                <div className="summaryCard"><span>{t(dict, 'onboarding.confirm.itLevel', 'IT level')}</span><h3>{answers.itLevel ? t(dict, 'onboarding.itLevels.' + answers.itLevel + '.title', answers.itLevel) : t(dict, 'onboarding.confirm.notSelected', 'Not selected')}</h3></div>
+                <div className="summaryCard"><span>{t(dict, 'onboarding.confirm.tone', 'Tone')}</span><h3>{t(dict, 'onboarding.tones.' + (answers.tonePreference || 'friendly') + '.title', answers.tonePreference || 'friendly')}</h3></div>
+                <div className="summaryCard"><span>{t(dict, 'onboarding.confirm.consent', 'AI training consent')}</span><h3>{answers.consentAiTraining ? t(dict, 'onboarding.confirm.granted', 'Granted') : t(dict, 'onboarding.confirm.notGranted', 'Not granted')}</h3></div>
               </div>
               <div className="workshopPreview">
-                <strong>Apprentice Workshop preview</strong>
-                <p style={{ marginBottom: 0 }}>{answers.itLevel === 'advanced' ? 'You will see faster technical paths, diagnostics, and deployment checks.' : answers.itLevel === 'intermediate' ? 'You will see balanced guidance with configurable shortcuts.' : 'You will see beginner-friendly lessons, definitions, and safe defaults.'}</p>
+                <strong>{t(dict, 'onboarding.confirm.previewLabel', 'Apprentice Workshop preview')}</strong>
+                <p style={{ marginBottom: 0 }}>{answers.itLevel === 'advanced' ? t(dict, 'onboarding.confirm.previewAdvanced', 'You will see faster technical paths, diagnostics, and deployment checks.') : answers.itLevel === 'intermediate' ? t(dict, 'onboarding.confirm.previewIntermediate', 'You will see balanced guidance with configurable shortcuts.') : t(dict, 'onboarding.confirm.previewBeginner', 'You will see beginner-friendly lessons, definitions, and safe defaults.')}</p>
               </div>
               <div className="footerActions">
-                <button className="ghostButton" onClick={() => goTo(3, 'back')}>← Edit tone</button>
-                <button className="primaryButton" onClick={() => finish()} disabled={saving}>{saving ? 'Saving…' : 'Complete onboarding →'}</button>
+                <button className="ghostButton" onClick={() => goTo(3, 'back')}>{t(dict, 'onboarding.confirm.editTone', '← Edit tone')}</button>
+                <button className="primaryButton" onClick={() => finish()} disabled={saving}>{saving ? t(dict, 'onboarding.confirm.saving', 'Saving…') : t(dict, 'onboarding.confirm.complete', 'Complete onboarding →')}</button>
               </div>
             </div>
           )}

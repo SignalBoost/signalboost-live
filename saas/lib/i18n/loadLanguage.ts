@@ -2,6 +2,7 @@
 // per-language files) so it builds reliably and a buyer translates the console
 // by editing string values in that single JSON.
 import consoleLocales from './consoleLocales.json'
+import onboardingLocales from './onboardingLocales.json'
 
 export type DictValue = string | string[] | Dict
 export type Dict = { [key: string]: DictValue }
@@ -21,6 +22,11 @@ const dictionaries: Record<string, () => Promise<Dict>> = {
 
 function loadConsole(lang: string): Dict {
   const table = consoleLocales as unknown as Record<string, Dict>
+  return table[lang] || table.en || {}
+}
+
+function loadOnboarding(lang: string): Dict {
+  const table = onboardingLocales as unknown as Record<string, Dict>
   return table[lang] || table.en || {}
 }
 
@@ -48,7 +54,7 @@ export async function loadLanguage(lang: string): Promise<Dict> {
   const enConsole = loadConsole('en')
   if (lang === 'en' || !dictionaries[lang]) {
     // Stamp the active language so suite copy (lib/i18n/suiteCopy.ts) can resolve correctly.
-    return { ...english, console: enConsole, __lang: 'en' }
+    return { ...english, console: enConsole, onboarding: loadOnboarding('en'), __lang: 'en' }
   }
 
   try {
@@ -56,9 +62,10 @@ export async function loadLanguage(lang: string): Promise<Dict> {
     const merged = mergeWithEnglishFallback(english, localized)
     // English fallback for any console key missing in the target language.
     merged.console = mergeWithEnglishFallback(enConsole, loadConsole(lang))
+    merged.onboarding = mergeWithEnglishFallback(loadOnboarding('en'), loadOnboarding(lang))
     merged.__lang = lang
     return merged
   } catch {
-    return { ...english, console: enConsole, __lang: 'en' }
+    return { ...english, console: enConsole, onboarding: loadOnboarding('en'), __lang: 'en' }
   }
 }

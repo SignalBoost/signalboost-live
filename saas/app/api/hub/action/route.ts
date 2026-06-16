@@ -20,7 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getTemplate, validateTemplatePayload } from '@/lib/hub/provider-templates'
-import { getHubActionPolicy, isActionBlocked, requiresOwnerApproval } from '@/lib/hub/action-policy'
+import { isActionBlocked, requiresOwnerApproval } from '@/lib/hub/action-policy'
 import { recordAuditEvent, normalizeStatus } from '@/lib/hub/audit'
 import { getCurrentUser as resolveHubUser } from '@/lib/auth/permission-middleware'
 import { vaultEncrypt, vaultDecrypt } from '@/lib/vault/crypto'
@@ -190,20 +190,17 @@ export async function POST(req: NextRequest): Promise<NextResponse<ActionRespons
       )
     }
 
-    // 4. Check authentication.
-    //    Read-only actions (policy approval 'none') are NOT auth-gated, so live-data
-    //    pickers (remote_select) and view/list actions populate even when the Supabase
-    //    auth layer is unavailable. Every mutating action still requires authentication.
-    const policy = getHubActionPolicy(template.policyActionId)
-    const isReadOnly = policy.approval === 'none'
+    // 4. Require authentication for ALL hub actions — no read-only bypass.
+    //    Every action touches real provider data (Stripe, Supabase, GitHub, …) and
+    //    the console is owner/admin-only, so unauthenticated access is never allowed.
     const user = await getCurrentUser(req)
-    if (!user && !isReadOnly) {
+    if (!user) {
       return NextResponse.json(
         { ok: false, error: 'Not authenticated' },
         { status: 401 },
       )
     }
-    const actorId = user?.id || 'console'
+    const actorId = user.id
 
     // 5. Enforce action policy
     if (isActionBlocked(template.policyActionId)) {

@@ -1430,7 +1430,7 @@ async function executeAWSAction(template: any, payload: Record<string, unknown>)
   }
 
   // Write operations the read-only IAM scanner can't perform — honest placeholders.
-  if (template.id === 'aws.create_bucket') {
+  if (template.id === 'aws.create_s3_bucket') {
     return {
       ok: true,
       message: 'AWS create bucket queued (write op — requires @aws-sdk/client-s3)',
@@ -1441,7 +1441,7 @@ async function executeAWSAction(template: any, payload: Record<string, unknown>)
     return {
       ok: true,
       message: 'AWS disable IAM user queued (write op — requires @aws-sdk/client-iam)',
-      data: { action: 'disable_iam_user', user: String(payload.user_name || ''), status: 'pending_implementation', note: 'Read-only IAM scanner is live; disabling a user needs the IAM SDK write path.' },
+      data: { action: 'disable_iam_user', user: String(payload.username || ''), status: 'pending_implementation', note: 'Read-only IAM scanner is live; disabling a user needs the IAM SDK write path.' },
     }
   }
 

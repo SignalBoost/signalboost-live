@@ -50,6 +50,18 @@ function scoreColor(s: number) {
   return '#fca5a5'
 }
 
+function buildBrief(audit: Audit): string {
+  let host = audit.finalUrl
+  try { host = new URL(audit.finalUrl).hostname.replace(/^www\./, '') } catch {}
+  const issues = audit.checks.filter(ch => ch.status !== 'pass' && ch.recommendation)
+  const fixes = issues.map(ch => `- ${ch.label}: ${ch.recommendation}`).join('\n')
+  return [
+    `Rebuild an improved, modern version of the website ${host}.`,
+    `Keep the same business, brand, and core offering, but fix the issues found in the audit and make it fast, mobile-first, accessible, and conversion-focused with a clear primary call-to-action.`,
+    issues.length ? `\nAddress these specific improvements:\n${fixes}` : '',
+  ].join('\n').trim()
+}
+
 // Render light markdown from AI summaries: **bold** + line breaks. Avoids raw ** bleeding into the UI.
 function renderRichText(text: string) {
   // The AI's formatting is unreliable run to run — sometimes newlines + **bold**,

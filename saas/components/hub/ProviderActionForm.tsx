@@ -10,7 +10,7 @@ import {
   type ProviderFormField,
 } from '@/lib/hub/provider-templates'
 import { Lang, cardStyle, bodyStyle, labelStyle, monoStyle } from './shared'
-import { cHub } from '@/lib/i18n/consoleCopy'
+import { useTranslation } from '@/components/i18n/useTranslation'
 
 // Providers migrated to the portable action engine. Their actions + pickers
 // target /api/hub/action/engine; everything else stays on the legacy route.
@@ -51,7 +51,8 @@ export default function ProviderActionForm({
   onError,
   onClose,
 }: ProviderActionFormProps) {
-  const template = getTemplate(templateId, lang)
+  const { t, dict } = useTranslation()
+  const template = getTemplate(templateId, dict)
 
   const [state, setState] = useState<FormState>('idle')
   const [values, setValues] = useState<Record<string, unknown>>(() => {
@@ -225,7 +226,7 @@ export default function ProviderActionForm({
         {state === 'preview' && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0, overflow: 'hidden' }}>
             <div style={noticeStyle}>
-              {cHub(lang, 'hub.ui.review_action', 'Review the action that will be sent to')} {template.api.service}. {cHub(lang, 'hub.ui.cannot_undo', 'Once confirmed, this cannot be undone.')}
+              {t('console.ui.review_action', 'Review the action that will be sent to')} {template.api.service}. {t('console.ui.cannot_undo', 'Once confirmed, this cannot be undone.')}
             </div>
             <div style={jsonBoxStyle}>
               {JSON.stringify({ template: templateId, api: `${template.api.method} ${template.api.endpoint}`, payload: values }, null, 2)}
@@ -235,7 +236,7 @@ export default function ProviderActionForm({
 
         {state === 'confirm' && (
           <CenteredState icon="⚠️" title="Confirm action">
-            {cHub(lang, 'hub.ui.about_to_execute', 'You are about to execute')} <strong>{template.label}</strong> {cHub(lang, 'hub.ui.on', 'on')} {template.api.service}.
+            {t('console.ui.about_to_execute', 'You are about to execute')} <strong>{template.label}</strong> {t('console.ui.on', 'on')} {template.api.service}.
           </CenteredState>
         )}
 
@@ -252,7 +253,7 @@ export default function ProviderActionForm({
         )}
 
         {state === 'error' && result?.error && (
-          <CenteredState icon="❌" title={cHub(lang, "hub.ui.error", "Error")} titleColor="#ef4444">
+          <CenteredState icon="❌" title={t("console.ui.error", "Error")} titleColor="#ef4444">
             <span style={{ fontFamily: monoStyle.fontFamily }}>{result.error}</span>
           </CenteredState>
         )}
@@ -261,9 +262,9 @@ export default function ProviderActionForm({
       <div style={footerStyle}>
         {state === 'idle' && (
           <>
-            {onClose && <button onClick={onClose} className="hub-chip" style={secondaryButtonStyle}>{cHub(lang, 'hub.ui.cancel', 'Cancel')}</button>}
+            {onClose && <button onClick={onClose} className="hub-chip" style={secondaryButtonStyle}>{t('console.ui.cancel', 'Cancel')}</button>}
             <button onClick={handleSubmit} className="hub-btn" style={primaryButtonStyle}>
-              {template.previewBeforeSubmit ? cHub(lang, 'hub.ui.preview', 'Preview') : template.requiresConfirm ? cHub(lang, 'hub.ui.confirm', 'Confirm') : cHub(lang, 'hub.ui.execute', 'Execute')}
+              {template.previewBeforeSubmit ? t('console.ui.preview', 'Preview') : template.requiresConfirm ? t('console.ui.confirm', 'Confirm') : t('console.ui.execute', 'Execute')}
             </button>
           </>
         )}
@@ -272,7 +273,7 @@ export default function ProviderActionForm({
           <>
             <button onClick={() => setState('idle')} className="hub-chip" style={secondaryButtonStyle}>Back</button>
             <button onClick={() => (template.requiresConfirm ? setState('confirm') : executeAction())} className="hub-btn" style={warningButtonStyle}>
-              {template.requiresConfirm ? cHub(lang, 'hub.ui.confirm', 'Confirm') : cHub(lang, 'hub.ui.execute', 'Execute')}
+              {template.requiresConfirm ? t('console.ui.confirm', 'Confirm') : t('console.ui.execute', 'Execute')}
             </button>
           </>
         )}
@@ -285,7 +286,7 @@ export default function ProviderActionForm({
         )}
 
         {(state === 'submitting' || state === 'success' || state === 'error') && onClose && (
-          <button onClick={onClose} className="hub-btn" style={closeButtonStyle}>{cHub(lang, 'hub.ui.close', 'Close')}</button>
+          <button onClick={onClose} className="hub-btn" style={closeButtonStyle}>{t('console.ui.close', 'Close')}</button>
         )}
       </div>
 

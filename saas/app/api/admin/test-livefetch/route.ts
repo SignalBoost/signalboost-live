@@ -13,12 +13,16 @@
 //   /api/admin/test-livefetch?key=YOUR_SECRET&q=canva+pricing&affiliates=1
 
 import { NextRequest, NextResponse } from 'next/server'
+import { requireOwner } from '@/lib/auth/access'
 import { getExternalInfo, formatExternalInfoForAI } from '@/lib/ai/tools/getExternalInfo'
 import { getAffiliateCount, formatAffiliatesForAI } from '@/lib/ai/tools/getAffiliateCount'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
+  const guard = await requireOwner()
+  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
+
   const secret = process.env.LIVEFETCH_TEST_KEY
   const key = req.nextUrl.searchParams.get('key')
 

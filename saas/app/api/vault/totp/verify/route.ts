@@ -5,14 +5,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyTOTPCode } from '@/lib/auth/totp-service'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase env vars')
+// Lazy init: read env at request time, not module load, so `next build`
+// page-data collection never fails when build-time env is absent.
+function getSupabase() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Missing Supabase env vars')
+  }
+  return createClient(supabaseUrl, supabaseKey)
 }
-
-const supabase = createClient(supabaseUrl, supabaseKey)
 
 export async function POST(req: NextRequest) {
   try {
@@ -41,6 +43,7 @@ export async function POST(req: NextRequest) {
     // Create unlock session in Supabase
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 min
     
+    const supabase = getSupabase()
     const { error } = await supabase
       .from('vault_unlock_sessions')
       .insert([

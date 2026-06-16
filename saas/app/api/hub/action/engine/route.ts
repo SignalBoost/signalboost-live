@@ -11,7 +11,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { runAction } from '@/console-core/actionEngine'
-import { createDefaultHost, listRegistered } from '@/console-core/defaultHost'
+import { listRegistered } from '@/console-core/defaultHost'
+import { createSignalBoostHost } from '@/console-host/signalboostHost'
 
 // Side-effect imports: each registers its provider's executors at module load.
 import '@/console-core/executors/openai'
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'providerId and actionId (or templateId) are required' }, { status: 400 })
     }
 
-    const host = createDefaultHost(req)
+    const host = createSignalBoostHost(req)
     const result = await runAction(host, {
       providerId,
       actionId,

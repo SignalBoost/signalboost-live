@@ -540,6 +540,15 @@ export function requiresOwnerApproval(actionId?: string): boolean {
   return policy.approval === 'owner' || policy.approval === 'owner_with_audit'
 }
 
+/**
+ * True for actions whose policy approval level is 'admin'. These require an
+ * admin OR owner to run (owner is a superset of admin). Enforced in both the
+ * legacy action route and the portable engine host.
+ */
+export function requiresAdminApproval(actionId?: string): boolean {
+  return getHubActionPolicy(actionId).approval === 'admin'
+}
+
 export function isActionBlocked(actionId?: string): boolean {
   return getHubActionPolicy(actionId).approval === 'blocked'
 }

@@ -26,6 +26,15 @@ function accountFamily(key: string | undefined): 'SaaS' | 'Operations' | 'unknow
   return 'unknown'
 }
 
+// Canonical Stripe account for SaaS billing. Set to 'Operations' per owner
+// decision (2026-06-16): subscriptions bill into the Operations account. Flip
+// this single constant to 'SaaS' if billing is ever migrated to the 51H8a account.
+const EXPECTED_FAMILY: 'SaaS' | 'Operations' = 'Operations'
+
+const EXPECTED_MARKER = EXPECTED_FAMILY === 'Operations' ? '51TVXg' : '51H8a'
+const OTHER_FAMILY = EXPECTED_FAMILY === 'Operations' ? 'SaaS' : 'Operations'
+const OTHER_MARKER = EXPECTED_FAMILY === 'Operations' ? '51H8a' : '51TVXg'
+
 // ─── route ──────────────────────────────────────────────────────────────────
 
 export async function GET() {
@@ -48,10 +57,10 @@ export async function GET() {
   const secretPresent = present(secretKey)
 
   if (!secretPresent) failures.push('STRIPE_SECRET_KEY is missing')
-  if (secretPresent && family !== 'SaaS') {
+  if (secretPresent && family !== EXPECTED_FAMILY) {
     failures.push(
-      family === 'Operations'
-        ? 'STRIPE_SECRET_KEY belongs to the Operations account (51TVXg) — must be the SaaS account (51H8a)'
+      family === OTHER_FAMILY
+        ? `STRIPE_SECRET_KEY belongs to the ${OTHER_FAMILY} account (${OTHER_MARKER}) — must be the ${EXPECTED_FAMILY} account (${EXPECTED_MARKER})`
         : 'STRIPE_SECRET_KEY account family is unrecognised (neither 51H8a nor 51TVXg)',
     )
   }
@@ -185,7 +194,8 @@ export async function GET() {
       secret_key_present: secretPresent,
       key_mode: mode,
       account_family: family,
-      account_family_ok: family === 'SaaS',
+      expected_account: EXPECTED_FAMILY,
+      account_family_ok: family === EXPECTED_FAMILY,
       api_reachable: apiReachable,
       account_id: accountId,
       account_name: accountName,

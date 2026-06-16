@@ -10,8 +10,12 @@
 // Delete this route once the dropdowns are confirmed working.
 
 import { NextResponse } from 'next/server'
+import { requireOwner } from '@/lib/auth/access'
 
 export async function GET() {
+  const guard = await requireOwner()
+  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
+
   const token = process.env.GITHUB_WRITE_TOKEN
   const out: Record<string, unknown> = {
     GITHUB_WRITE_TOKEN: token ? `present (${token.slice(0, 4)}…${token.slice(-4)}, len ${token.length})` : '(MISSING)',

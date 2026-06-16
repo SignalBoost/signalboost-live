@@ -316,3 +316,16 @@ export function isDestructiveTemplate(id: string): boolean {
   const norm = id.toLowerCase()
   return norm.includes('delete') || norm.includes('remove') || norm.includes('ban') || norm.includes('deactivate') || norm.includes('cancel') || norm.includes('empty') || norm.includes('seal') || norm.includes('purge') || norm.includes('disable')
 }
+
+// Providers whose actions are fully implemented and execute for real today.
+// Everything else renders as "Coming soon" (disabled) so a buyer never clicks an
+// action that returns 501. Utility/page tiers (core/domains/...) are always live.
+export const LIVE_PROVIDER_IDS = new Set<string>([
+  'stripe', 'supabase', 'vercel', 'keyvault',
+  'github', 'openai', 'anthropic', 'elevenlabs', 'gemini', 'resend', 'assemblyai', 'supabase_mkt',
+  'core', 'domains', 'deployments', 'logs', 'settings',
+])
+
+export function isProviderLive(id: string): boolean {
+  return LIVE_PROVIDER_IDS.has(id)
+}

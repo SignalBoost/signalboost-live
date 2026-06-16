@@ -5,6 +5,7 @@
 // picker is empty. Delete this route once both are confirmed working.
 
 import { NextResponse } from 'next/server'
+import { requireOwner } from '@/lib/auth/access'
 
 function mask(v?: string) {
   return v ? `present (${v.slice(0, 4)}…${v.slice(-4)}, len ${v.length})` : '(MISSING)'
@@ -50,6 +51,9 @@ async function probeGitHub() {
 }
 
 export async function GET() {
+  const guard = await requireOwner()
+  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
+
   const [stripe, github] = await Promise.all([probeStripe(), probeGitHub()])
   return NextResponse.json({
     env: {

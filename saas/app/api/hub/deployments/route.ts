@@ -1,16 +1,14 @@
 // saas/app/api/hub/deployments/route.ts
 // Hub Console — Vercel deployments.
-//   GET  -> list recent deployments  (read-only metadata; NOT auth-gated)
+//   GET  -> list recent deployments  (read-only metadata; gated: deployments:read)
 //   POST -> { action: 'rollback' | 'cancel', deploymentId }  (gated: deployments:deploy)
 //
-// Why GET is not auth-gated:
+// GET is gated at read level (deployments:read), like the mutating POST.
 //   The list returns only deployment metadata (url, state, commit, timestamps) —
-//   no secrets. The old requirePermission('deployments:read') gate routed through
-//   getCurrentUser(), which returns null whenever SUPABASE_SERVICE_ROLE_KEY is
-//   absent in Vercel, hard-401'ing the panel before it ever reached Vercel and
-//   leaving it looking like a dead placeholder on a green build. Decoupling the
-//   read-only list from the Supabase auth layer makes it work whenever the Vercel
-//   token exists. The mutating POST stays fully gated.
+//   no secrets. The gate was previously removed because the Supabase auth layer
+//   returned null whenever SUPABASE_SERVICE_ROLE_KEY was absent at runtime,
+//   401'ing the panel; that env fragility is resolved (env is read lazily), so the
+//   gate is safe to enforce. Unauthenticated callers no longer see deployment data.
 //
 // Project id + creds resolve via the shared resolver (handles the empty
 // VERCEL_HUB_PROJECT case). Flat { ok, error? } result style — repo rule.
@@ -24,8 +22,12 @@ import {
 import { requirePermission } from '@/lib/auth/permission-middleware'
 import { resolveVercelProject } from '@/lib/hub/vercel-project'
 
-// ---- GET: list deployments (read-only, no auth gate) ----
+// ---- GET: list deployments (read-only — gated: deployments:read) ----
 export async function GET(req: NextRequest) {
+  const perm = await requirePermission(req, 'deployments:read')
+  if (!perm.ok) {
+    return NextResponse.json({ ok: false, error: (perm as any).error }, { status: (perm as any).status })
+  }
   const creds = await resolveVercelProject()
   if (!creds.ok || !creds.token || !creds.projectId) {
     return NextResponse.json({ ok: false, error: creds.error || 'Vercel not configured' }, { status: 500 })

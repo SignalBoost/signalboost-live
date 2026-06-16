@@ -1,5 +1,6 @@
 import OpenAI from 'openai'
 import { NextResponse } from 'next/server'
+import { getCurrentUser } from '@/utils/supabase/server'
 
 function getOpenAIClient() {
   const apiKey = process.env.OPENAI_API_KEY
@@ -9,6 +10,11 @@ function getOpenAIClient() {
 
 export async function POST(req: Request) {
   try {
+    const authedUser = await getCurrentUser()
+    if (!authedUser) {
+      return NextResponse.json({ error: 'Please sign in.' }, { status: 401 })
+    }
+
     const openai = getOpenAIClient()
     if (!openai) {
       return NextResponse.json(

@@ -141,10 +141,8 @@ export default function ProviderActionForm({
           data: data.data,
         })
         setState('success')
-
-        if (template.api.method !== 'GET') {
-          window.setTimeout(() => onSuccess?.(), 1200)
-        }
+        // Keep the result card open after a successful run. It is dismissed only
+        // by the user (Close/Cancel) — no timer, and no onSuccess auto-close.
       } else {
         const error = data.error || 'Action failed.'
         setResult({ ok: false, error })

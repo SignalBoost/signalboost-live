@@ -2,19 +2,50 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 
-// ─── Plan lookup maps ─────────────────────────────────────────────────────────
+// ─── Price-ID → internal plan maps ────────────────────────────────────────────
+// Defect #5 fix: build the maps from ONLY the env vars that are actually set.
+// Previously an unset STRIPE_PRICE_* var became the literal string key
+// "undefined", and two unset vars collided on that same key — silently
+// misrouting plans. We now skip undefined entries and log any that are missing.
 
-const WEBSITE_PLAN_MAP: Record<string, string> = {
-  [process.env.STRIPE_PRICE_WEBSITE_STARTER!]:  'starter',
-  [process.env.STRIPE_PRICE_WEBSITE_PRO!]:      'pro',
-  [process.env.STRIPE_PRICE_WEBSITE_BUSINESS!]: 'business',
+function buildPriceMap(
+  entries: Array<[string | undefined, string]>,
+  label: string,
+): Record<string, string> {
+  const map: Record<string, string> = {}
+  const missing: string[] = []
+  for (const [priceId, plan] of entries) {
+    if (priceId && priceId.trim()) {
+      map[priceId] = plan
+    } else {
+      missing.push(plan)
+    }
+  }
+  if (missing.length) {
+    console.warn(
+      `Webhook: missing ${label} price env vars for plan(s): ${missing.join(', ')}`,
+    )
+  }
+  return map
 }
 
-const PODCAST_PLAN_MAP: Record<string, string> = {
-  [process.env.STRIPE_PRICE_PODCAST_INDIE!]:   'indie',
-  [process.env.STRIPE_PRICE_PODCAST_PRO!]:     'pro',
-  [process.env.STRIPE_PRICE_PODCAST_NETWORK!]: 'network',
-}
+const WEBSITE_PLAN_MAP: Record<string, string> = buildPriceMap(
+  [
+    [process.env.STRIPE_PRICE_WEBSITE_STARTER, 'starter'],
+    [process.env.STRIPE_PRICE_WEBSITE_PRO, 'pro'],
+    [process.env.STRIPE_PRICE_WEBSITE_BUSINESS, 'business'],
+  ],
+  'website',
+)
+
+const PODCAST_PLAN_MAP: Record<string, string> = buildPriceMap(
+  [
+    [process.env.STRIPE_PRICE_PODCAST_INDIE, 'indie'],
+    [process.env.STRIPE_PRICE_PODCAST_PRO, 'pro'],
+    [process.env.STRIPE_PRICE_PODCAST_NETWORK, 'network'],
+  ],
+  'podcast',
+)
 
 function resolvePlanAndLine(
   priceId: string | undefined,
@@ -30,7 +61,8 @@ function resolvePlanAndLine(
       return { plan: PODCAST_PLAN_MAP[priceId], productLine: 'podcast' }
     }
   }
-  // 2. Fall back to metadata (useful during transition / unknown prices)
+  // 2. Fall back to metadata (set by our /api/checkout route, so reliable for
+  //    sessions we create; also covers unknown/transition prices)
   const productLine: 'website' | 'podcast' =
     metaProductLine === 'podcast' ? 'podcast' : 'website'
   const plan =
@@ -39,37 +71,124 @@ function resolvePlanAndLine(
   return { plan, productLine }
 }
 
+// ─── Status normalisation ─────────────────────────────────────────────────────
+// Defect #1 fix: the `subscriptions` CHECK constraint only permits
+// ('active','trialing','cancelled','past_due') — note UK 'cancelled'.
+// Stripe emits US 'canceled' plus other statuses ('unpaid','incomplete',
+// 'incomplete_expired','paused') that are NOT in the constraint, so writing
+// `sub.status` raw causes Postgres to REJECT the update. We map every Stripe
+// status onto the allowed set. Unknown values resolve to 'past_due' (a safe
+// middle that never silently grants access).
+
+type DbStatus = 'active' | 'trialing' | 'cancelled' | 'past_due'
+
+function normalizeStatus(stripeStatus: string | undefined): DbStatus {
+  switch (stripeStatus) {
+    case 'active':
+      return 'active'
+    case 'trialing':
+      return 'trialing'
+    case 'past_due':
+      return 'past_due'
+    case 'unpaid':
+    case 'incomplete':
+      // payment not (yet) good — withhold access without fully cancelling
+      return 'past_due'
+    case 'canceled':            // Stripe US spelling
+    case 'cancelled':           // defensive
+    case 'incomplete_expired':
+    case 'paused':
+      return 'cancelled'
+    default:
+      return 'past_due'
+  }
+}
+
 // ─── Stripe signature verification ───────────────────────────────────────────
+// Defect #6 (partial) fix: a signature header may carry MULTIPLE v1 signatures
+// (e.g. during webhook-secret rotation). The previous reducer kept only the
+// last one. We now accept the event if ANY v1 signature matches.
+
+function safeEqualHex(a: string, b: string): boolean {
+  try {
+    const ab = Buffer.from(a, 'hex')
+    const bb = Buffer.from(b, 'hex')
+    if (ab.length === 0 || ab.length !== bb.length) return false
+    return crypto.timingSafeEqual(ab, bb)
+  } catch {
+    return false
+  }
+}
 
 function verifyStripeSignature(
   payload: string,
-  sig: string,
+  sigHeader: string,
   secret: string,
 ): boolean {
   try {
-    const parts = sig.split(',').reduce(
-      (acc: Record<string, string>, part) => {
-        const [key, val] = part.split('=')
-        acc[key] = val
-        return acc
-      },
-      {},
-    )
-    const timestamp = parts['t']
-    const signature = parts['v1']
-    if (!timestamp || !signature) return false
-    const signed   = `${timestamp}.${payload}`
+    let timestamp = ''
+    const v1Signatures: string[] = []
+    for (const part of sigHeader.split(',')) {
+      const idx = part.indexOf('=')
+      if (idx === -1) continue
+      const key = part.slice(0, idx).trim()
+      const val = part.slice(idx + 1).trim()
+      if (key === 't') timestamp = val
+      else if (key === 'v1') v1Signatures.push(val)
+    }
+    if (!timestamp || v1Signatures.length === 0) return false
+
+    const signed = `${timestamp}.${payload}`
     const expected = crypto
       .createHmac('sha256', secret)
       .update(signed)
       .digest('hex')
-    return crypto.timingSafeEqual(
-      Buffer.from(expected),
-      Buffer.from(signature),
-    )
+
+    return v1Signatures.some((candidate) => safeEqualHex(expected, candidate))
   } catch {
     return false
   }
+}
+
+// ─── period-end extraction ────────────────────────────────────────────────────
+// Defect #4 fix: recent Stripe API versions relocated `current_period_end` from
+// the subscription object onto each subscription item. Read both locations so
+// the value is captured regardless of the account's API version.
+
+function extractPeriodEnd(sub: any): string | null {
+  const epoch =
+    sub?.current_period_end ??
+    sub?.items?.data?.[0]?.current_period_end ??
+    null
+  return epoch ? new Date(epoch * 1000).toISOString() : null
+}
+
+// ─── Defect #3 fix: look up an auth user by email via the admin API ───────────
+// The previous code queried `.from('auth.users')`, which resolves against the
+// PUBLIC schema and therefore never matches — a silent dead end. The service
+// role can enumerate auth users through the admin API. This fallback only fires
+// when a session has no metadata.userId (sessions created by our own checkout
+// route always include it), so a bounded scan is acceptable.
+
+async function findUserIdByEmail(
+  supabase: any,
+  email: string,
+): Promise<string | null> {
+  const target = email.toLowerCase()
+  const perPage = 200
+  const maxPages = 20 // hard cap so a large user base can never hang the webhook
+  for (let page = 1; page <= maxPages; page++) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage })
+    if (error) {
+      console.error('Webhook: admin.listUsers failed during email fallback', error.message)
+      return null
+    }
+    const users = data?.users ?? []
+    const match = users.find((u) => (u.email || '').toLowerCase() === target)
+    if (match?.id) return match.id
+    if (users.length < perPage) break // last page reached
+  }
+  return null
 }
 
 // ─── Webhook handler ──────────────────────────────────────────────────────────
@@ -117,12 +236,7 @@ export async function POST(req: NextRequest) {
             'Webhook: metadata.userId missing, falling back to email lookup',
             session.customer_email,
           )
-          const { data: userByEmail } = await supabase
-            .from('auth.users')
-            .select('id')
-            .eq('email', session.customer_email)
-            .maybeSingle()
-          if (userByEmail?.id) userId = userByEmail.id
+          userId = await findUserIdByEmail(supabase, session.customer_email)
         }
 
         if (!userId) {
@@ -179,41 +293,40 @@ export async function POST(req: NextRequest) {
 
       // ── Plan change / renewal ──────────────────────────────────────────────
       case 'customer.subscription.updated': {
-        const sub     = event.data.object
-        const priceId = sub.items?.data?.[0]?.price?.id
-        const metaLine = sub.metadata?.productLine
-        const metaPlan = sub.metadata?.plan
+        const sub      = event.data.object
+        const priceId  = sub.items?.data?.[0]?.price?.id
+        const metaLine  = sub.metadata?.productLine
+        const metaPlan  = sub.metadata?.plan
         const { plan, productLine } = resolvePlanAndLine(priceId, metaLine, metaPlan)
-        const periodEnd = sub.current_period_end
-          ? new Date(sub.current_period_end * 1000).toISOString()
-          : null
+        const periodEnd = extractPeriodEnd(sub)
+        const status    = normalizeStatus(sub.status)
 
         if (productLine === 'podcast') {
           const { error } = await supabase
             .from('subscriptions')
             .update({
               podcast_plan:                   plan,
-              podcast_status:                 sub.status,
+              podcast_status:                 status,
               podcast_current_period_ends_at: periodEnd,
               updated_at:                     new Date().toISOString(),
             })
             .eq('podcast_stripe_subscription_id', sub.id)
 
           if (error) console.error('Webhook subscription.updated (podcast): supabase error', error)
-          else console.log('Webhook: podcast subscription updated', sub.id, '->', plan, sub.status)
+          else console.log('Webhook: podcast subscription updated', sub.id, '->', plan, status)
         } else {
           const { error } = await supabase
             .from('subscriptions')
             .update({
               plan,
-              status:                 sub.status,
+              status,
               current_period_ends_at: periodEnd,
               updated_at:             new Date().toISOString(),
             })
             .eq('stripe_subscription_id', sub.id)
 
           if (error) console.error('Webhook subscription.updated (website): supabase error', error)
-          else console.log('Webhook: website subscription updated', sub.id, '->', plan, sub.status)
+          else console.log('Webhook: website subscription updated', sub.id, '->', plan, status)
         }
         break
       }
@@ -234,26 +347,26 @@ export async function POST(req: NextRequest) {
             .from('subscriptions')
             .update({
               plan:       'free',
-              status:     'canceled',
+              status:     'cancelled', // Defect #1: was 'canceled' → constraint violation
               updated_at: new Date().toISOString(),
             })
             .eq('stripe_subscription_id', sub.id)
 
           if (error) console.error('Webhook subscription.deleted (website): supabase error', error)
-          else console.log('Webhook: website subscription canceled', sub.id)
+          else console.log('Webhook: website subscription cancelled', sub.id)
         } else {
           // Try podcast subscription
           const { error } = await supabase
             .from('subscriptions')
             .update({
               podcast_plan:   null,
-              podcast_status: 'canceled',
+              podcast_status: 'cancelled', // Defect #1: was 'canceled'
               updated_at:     new Date().toISOString(),
             })
             .eq('podcast_stripe_subscription_id', sub.id)
 
           if (error) console.error('Webhook subscription.deleted (podcast): supabase error', error)
-          else console.log('Webhook: podcast subscription canceled', sub.id)
+          else console.log('Webhook: podcast subscription cancelled', sub.id)
         }
         break
       }

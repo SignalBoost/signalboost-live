@@ -1,0 +1,557 @@
+{
+  "en": {
+    "loading": "Loading onboarding…",
+    "skip": "Skip to dashboard →",
+    "progressComplete": "{pct}% complete",
+    "steps": {
+      "welcome": {
+        "label": "Welcome",
+        "kicker": "Step 1"
+      },
+      "profiling": {
+        "label": "Profiling",
+        "kicker": "Step 2"
+      },
+      "consent": {
+        "label": "Consent",
+        "kicker": "Step 3"
+      },
+      "tone": {
+        "label": "Tone",
+        "kicker": "Step 4"
+      },
+      "confirmation": {
+        "label": "Confirmation",
+        "kicker": "Step 5"
+      }
+    },
+    "roles": {
+      "developer": {
+        "title": "Developer",
+        "body": "Show me technical controls, logs, deploy details, and code-aware guidance."
+      },
+      "non_developer": {
+        "title": "Non-developer",
+        "body": "Keep setup guided, plain-English, and focused on outcomes."
+      }
+    },
+    "itLevels": {
+      "beginner": {
+        "title": "Beginner",
+        "body": "Give me guided checklists, definitions, and one-click defaults."
+      },
+      "intermediate": {
+        "title": "Intermediate",
+        "body": "Balance guidance with configuration shortcuts and examples."
+      },
+      "advanced": {
+        "title": "Advanced",
+        "body": "Prioritize diagnostics, advanced settings, and faster workflows."
+      }
+    },
+    "tones": {
+      "friendly": {
+        "title": "Friendly",
+        "sample": "I will guide you step by step and keep things clear."
+      },
+      "professional": {
+        "title": "Professional",
+        "sample": "I will keep recommendations concise, direct, and business-ready."
+      },
+      "playful": {
+        "title": "Playful",
+        "sample": "I will keep setup upbeat, creative, and momentum-focused."
+      }
+    },
+    "welcome": {
+      "title": "Welcome, {name}. Build faster with a smarter setup.",
+      "intro": "SignalBoost will tailor Apprentice Workshop guidance, AI tone, and product defaults from four quick preferences. Every choice can be changed later in settings.",
+      "storyboardLabel": "Storyboard",
+      "storyboardBody": "Welcome → profile your skill level → choose privacy consent → pick the assistant tone → confirm your setup.",
+      "start": "Start onboarding →"
+    },
+    "profiling": {
+      "heading": "Help us adapt the Apprentice Workshop.",
+      "intro": "Choose the path that best matches how you want SignalBoost to explain setup, dashboards, and technical decisions.",
+      "itComfort": "IT comfort level"
+    },
+    "consent": {
+      "heading": "Choose your AI training preference.",
+      "intro": "Consent is optional and unchecked by default. SignalBoost can still personalize your account without using your data for AI training.",
+      "checkboxLabel": "I consent to SignalBoost using my onboarding preferences to improve AI training.",
+      "checkboxBody": "We store this preference with a timestamp, provide opt-out controls later, and avoid selling personal data.",
+      "save": "Save consent →",
+      "continueWithout": "Continue without consent →"
+    },
+    "tone": {
+      "heading": "Pick your assistant tone.",
+      "intro": "This preference follows you into content generation, support copy, and Apprentice Workshop explanations."
+    },
+    "confirm": {
+      "heading": "Confirm your personalized setup.",
+      "intro": "Review the onboarding summary before opening your dashboard. Your choices are stored in profile settings and used by Apprentice Workshop.",
+      "role": "Role",
+      "itLevel": "IT level",
+      "tone": "Tone",
+      "consent": "AI training consent",
+      "notSelected": "Not selected",
+      "granted": "Granted",
+      "notGranted": "Not granted",
+      "previewLabel": "Apprentice Workshop preview",
+      "previewAdvanced": "You will see faster technical paths, diagnostics, and deployment checks.",
+      "previewIntermediate": "You will see balanced guidance with configurable shortcuts.",
+      "previewBeginner": "You will see beginner-friendly lessons, definitions, and safe defaults.",
+      "editTone": "← Edit tone",
+      "saving": "Saving…",
+      "complete": "Complete onboarding →"
+    },
+    "common": {
+      "back": "← Back",
+      "continue": "Continue →"
+    }
+  },
+  "es": {
+    "loading": "Cargando incorporación…",
+    "skip": "Saltar al panel →",
+    "progressComplete": "{pct}% completado",
+    "steps": {
+      "welcome": {
+        "label": "Bienvenida",
+        "kicker": "Paso 1"
+      },
+      "profiling": {
+        "label": "Perfilado",
+        "kicker": "Paso 2"
+      },
+      "consent": {
+        "label": "Consentimiento",
+        "kicker": "Paso 3"
+      },
+      "tone": {
+        "label": "Tono",
+        "kicker": "Paso 4"
+      },
+      "confirmation": {
+        "label": "Confirmación",
+        "kicker": "Paso 5"
+      }
+    },
+    "roles": {
+      "developer": {
+        "title": "Desarrollador",
+        "body": "Muéstrame controles técnicos, registros, detalles de despliegue y orientación con conocimiento del código."
+      },
+      "non_developer": {
+        "title": "No desarrollador",
+        "body": "Mantén la configuración guiada, en lenguaje claro y centrada en resultados."
+      }
+    },
+    "itLevels": {
+      "beginner": {
+        "title": "Principiante",
+        "body": "Dame listas guiadas, definiciones y valores por defecto de un clic."
+      },
+      "intermediate": {
+        "title": "Intermedio",
+        "body": "Equilibra la orientación con atajos de configuración y ejemplos."
+      },
+      "advanced": {
+        "title": "Avanzado",
+        "body": "Prioriza diagnósticos, ajustes avanzados y flujos de trabajo más rápidos."
+      }
+    },
+    "tones": {
+      "friendly": {
+        "title": "Amigable",
+        "sample": "Te guiaré paso a paso y mantendré todo claro."
+      },
+      "professional": {
+        "title": "Profesional",
+        "sample": "Mantendré las recomendaciones concisas, directas y listas para el negocio."
+      },
+      "playful": {
+        "title": "Desenfadado",
+        "sample": "Mantendré la configuración animada, creativa y con impulso."
+      }
+    },
+    "welcome": {
+      "title": "Bienvenido, {name}. Crea más rápido con una configuración más inteligente.",
+      "intro": "SignalBoost adaptará la orientación del Apprentice Workshop, el tono de la IA y los valores por defecto a partir de cuatro preferencias rápidas. Cada elección se puede cambiar después en ajustes.",
+      "storyboardLabel": "Guion",
+      "storyboardBody": "Bienvenida → perfila tu nivel → elige el consentimiento de privacidad → elige el tono del asistente → confirma tu configuración.",
+      "start": "Comenzar incorporación →"
+    },
+    "profiling": {
+      "heading": "Ayúdanos a adaptar el Apprentice Workshop.",
+      "intro": "Elige el camino que mejor refleje cómo quieres que SignalBoost explique la configuración, los paneles y las decisiones técnicas.",
+      "itComfort": "Nivel de comodidad con TI"
+    },
+    "consent": {
+      "heading": "Elige tu preferencia de entrenamiento de IA.",
+      "intro": "El consentimiento es opcional y está desmarcado por defecto. SignalBoost puede personalizar tu cuenta sin usar tus datos para el entrenamiento de IA.",
+      "checkboxLabel": "Doy mi consentimiento para que SignalBoost use mis preferencias de incorporación para mejorar el entrenamiento de IA.",
+      "checkboxBody": "Almacenamos esta preferencia con una marca de tiempo, ofrecemos controles de exclusión más adelante y evitamos vender datos personales.",
+      "save": "Guardar consentimiento →",
+      "continueWithout": "Continuar sin consentimiento →"
+    },
+    "tone": {
+      "heading": "Elige el tono de tu asistente.",
+      "intro": "Esta preferencia te acompaña en la generación de contenido, los textos de soporte y las explicaciones del Apprentice Workshop."
+    },
+    "confirm": {
+      "heading": "Confirma tu configuración personalizada.",
+      "intro": "Revisa el resumen de incorporación antes de abrir tu panel. Tus elecciones se guardan en los ajustes del perfil y las usa el Apprentice Workshop.",
+      "role": "Rol",
+      "itLevel": "Nivel de TI",
+      "tone": "Tono",
+      "consent": "Consentimiento de entrenamiento de IA",
+      "notSelected": "Sin seleccionar",
+      "granted": "Concedido",
+      "notGranted": "No concedido",
+      "previewLabel": "Vista previa del Apprentice Workshop",
+      "previewAdvanced": "Verás rutas técnicas más rápidas, diagnósticos y comprobaciones de despliegue.",
+      "previewIntermediate": "Verás orientación equilibrada con atajos configurables.",
+      "previewBeginner": "Verás lecciones para principiantes, definiciones y valores por defecto seguros.",
+      "editTone": "← Editar tono",
+      "saving": "Guardando…",
+      "complete": "Completar incorporación →"
+    },
+    "common": {
+      "back": "← Atrás",
+      "continue": "Continuar →"
+    }
+  },
+  "pt": {
+    "loading": "Carregando integração…",
+    "skip": "Pular para o painel →",
+    "progressComplete": "{pct}% concluído",
+    "steps": {
+      "welcome": {
+        "label": "Boas-vindas",
+        "kicker": "Passo 1"
+      },
+      "profiling": {
+        "label": "Perfil",
+        "kicker": "Passo 2"
+      },
+      "consent": {
+        "label": "Consentimento",
+        "kicker": "Passo 3"
+      },
+      "tone": {
+        "label": "Tom",
+        "kicker": "Passo 4"
+      },
+      "confirmation": {
+        "label": "Confirmação",
+        "kicker": "Passo 5"
+      }
+    },
+    "roles": {
+      "developer": {
+        "title": "Desenvolvedor",
+        "body": "Mostre-me controles técnicos, registros, detalhes de implantação e orientação com reconhecimento de código."
+      },
+      "non_developer": {
+        "title": "Não desenvolvedor",
+        "body": "Mantenha a configuração guiada, em linguagem simples e focada em resultados."
+      }
+    },
+    "itLevels": {
+      "beginner": {
+        "title": "Iniciante",
+        "body": "Dê-me checklists guiados, definições e padrões de um clique."
+      },
+      "intermediate": {
+        "title": "Intermediário",
+        "body": "Equilibre orientação com atalhos de configuração e exemplos."
+      },
+      "advanced": {
+        "title": "Avançado",
+        "body": "Priorize diagnósticos, configurações avançadas e fluxos de trabalho mais rápidos."
+      }
+    },
+    "tones": {
+      "friendly": {
+        "title": "Amigável",
+        "sample": "Vou guiá-lo passo a passo e manter tudo claro."
+      },
+      "professional": {
+        "title": "Profissional",
+        "sample": "Vou manter as recomendações concisas, diretas e prontas para o negócio."
+      },
+      "playful": {
+        "title": "Descontraído",
+        "sample": "Vou manter a configuração animada, criativa e com ritmo."
+      }
+    },
+    "welcome": {
+      "title": "Bem-vindo, {name}. Crie mais rápido com uma configuração mais inteligente.",
+      "intro": "O SignalBoost vai personalizar a orientação do Apprentice Workshop, o tom da IA e os padrões do produto a partir de quatro preferências rápidas. Cada escolha pode ser alterada depois nas configurações.",
+      "storyboardLabel": "Roteiro",
+      "storyboardBody": "Boas-vindas → defina o seu nível → escolha o consentimento de privacidade → escolha o tom do assistente → confirme a configuração.",
+      "start": "Iniciar integração →"
+    },
+    "profiling": {
+      "heading": "Ajude-nos a adaptar o Apprentice Workshop.",
+      "intro": "Escolha o caminho que melhor combina com a forma como você quer que o SignalBoost explique a configuração, os painéis e as decisões técnicas.",
+      "itComfort": "Nível de conforto com TI"
+    },
+    "consent": {
+      "heading": "Escolha sua preferência de treinamento de IA.",
+      "intro": "O consentimento é opcional e está desmarcado por padrão. O SignalBoost ainda pode personalizar sua conta sem usar seus dados para treinamento de IA.",
+      "checkboxLabel": "Eu consinto que o SignalBoost use minhas preferências de integração para melhorar o treinamento de IA.",
+      "checkboxBody": "Armazenamos essa preferência com um carimbo de data/hora, fornecemos controles de exclusão depois e evitamos vender dados pessoais.",
+      "save": "Salvar consentimento →",
+      "continueWithout": "Continuar sem consentimento →"
+    },
+    "tone": {
+      "heading": "Escolha o tom do seu assistente.",
+      "intro": "Essa preferência acompanha você na geração de conteúdo, nos textos de suporte e nas explicações do Apprentice Workshop."
+    },
+    "confirm": {
+      "heading": "Confirme sua configuração personalizada.",
+      "intro": "Revise o resumo da integração antes de abrir seu painel. Suas escolhas são salvas nas configurações de perfil e usadas pelo Apprentice Workshop.",
+      "role": "Função",
+      "itLevel": "Nível de TI",
+      "tone": "Tom",
+      "consent": "Consentimento de treinamento de IA",
+      "notSelected": "Não selecionado",
+      "granted": "Concedido",
+      "notGranted": "Não concedido",
+      "previewLabel": "Prévia do Apprentice Workshop",
+      "previewAdvanced": "Você verá caminhos técnicos mais rápidos, diagnósticos e verificações de implantação.",
+      "previewIntermediate": "Você verá orientação equilibrada com atalhos configuráveis.",
+      "previewBeginner": "Você verá lições para iniciantes, definições e padrões seguros.",
+      "editTone": "← Editar tom",
+      "saving": "Salvando…",
+      "complete": "Concluir integração →"
+    },
+    "common": {
+      "back": "← Voltar",
+      "continue": "Continuar →"
+    }
+  },
+  "pl": {
+    "loading": "Ładowanie wdrożenia…",
+    "skip": "Przejdź do panelu →",
+    "progressComplete": "Ukończono {pct}%",
+    "steps": {
+      "welcome": {
+        "label": "Powitanie",
+        "kicker": "Krok 1"
+      },
+      "profiling": {
+        "label": "Profilowanie",
+        "kicker": "Krok 2"
+      },
+      "consent": {
+        "label": "Zgoda",
+        "kicker": "Krok 3"
+      },
+      "tone": {
+        "label": "Ton",
+        "kicker": "Krok 4"
+      },
+      "confirmation": {
+        "label": "Potwierdzenie",
+        "kicker": "Krok 5"
+      }
+    },
+    "roles": {
+      "developer": {
+        "title": "Programista",
+        "body": "Pokaż mi kontrolki techniczne, logi, szczegóły wdrożeń i wskazówki świadome kodu."
+      },
+      "non_developer": {
+        "title": "Nie-programista",
+        "body": "Zachowaj konfigurację prowadzoną, w prostym języku i skupioną na efektach."
+      }
+    },
+    "itLevels": {
+      "beginner": {
+        "title": "Początkujący",
+        "body": "Daj mi prowadzone listy kontrolne, definicje i domyślne ustawienia jednym kliknięciem."
+      },
+      "intermediate": {
+        "title": "Średnio zaawansowany",
+        "body": "Wyważ wskazówki ze skrótami konfiguracji i przykładami."
+      },
+      "advanced": {
+        "title": "Zaawansowany",
+        "body": "Priorytetowo traktuj diagnostykę, zaawansowane ustawienia i szybsze przepływy pracy."
+      }
+    },
+    "tones": {
+      "friendly": {
+        "title": "Przyjazny",
+        "sample": "Poprowadzę Cię krok po kroku i zachowam jasność."
+      },
+      "professional": {
+        "title": "Profesjonalny",
+        "sample": "Zachowam rekomendacje zwięzłe, bezpośrednie i gotowe do biznesu."
+      },
+      "playful": {
+        "title": "Swobodny",
+        "sample": "Zachowam konfigurację energiczną, kreatywną i pełną tempa."
+      }
+    },
+    "welcome": {
+      "title": "Witaj, {name}. Twórz szybciej dzięki inteligentniejszej konfiguracji.",
+      "intro": "SignalBoost dostosuje wskazówki Apprentice Workshop, ton AI i domyślne ustawienia produktu na podstawie czterech szybkich preferencji. Każdy wybór można później zmienić w ustawieniach.",
+      "storyboardLabel": "Scenariusz",
+      "storyboardBody": "Powitanie → określ swój poziom → wybierz zgodę na prywatność → wybierz ton asystenta → potwierdź konfigurację.",
+      "start": "Rozpocznij wdrożenie →"
+    },
+    "profiling": {
+      "heading": "Pomóż nam dostosować Apprentice Workshop.",
+      "intro": "Wybierz ścieżkę, która najlepiej pasuje do tego, jak SignalBoost ma wyjaśniać konfigurację, panele i decyzje techniczne.",
+      "itComfort": "Poziom komfortu z IT"
+    },
+    "consent": {
+      "heading": "Wybierz preferencję trenowania AI.",
+      "intro": "Zgoda jest opcjonalna i domyślnie odznaczona. SignalBoost może spersonalizować Twoje konto bez używania Twoich danych do trenowania AI.",
+      "checkboxLabel": "Wyrażam zgodę, aby SignalBoost używał moich preferencji wdrożenia do ulepszania trenowania AI.",
+      "checkboxBody": "Przechowujemy tę preferencję ze znacznikiem czasu, później udostępniamy opcje rezygnacji i nie sprzedajemy danych osobowych.",
+      "save": "Zapisz zgodę →",
+      "continueWithout": "Kontynuuj bez zgody →"
+    },
+    "tone": {
+      "heading": "Wybierz ton asystenta.",
+      "intro": "Ta preferencja towarzyszy Ci w generowaniu treści, tekstach wsparcia i objaśnieniach Apprentice Workshop."
+    },
+    "confirm": {
+      "heading": "Potwierdź spersonalizowaną konfigurację.",
+      "intro": "Przejrzyj podsumowanie wdrożenia przed otwarciem panelu. Twoje wybory są zapisywane w ustawieniach profilu i używane przez Apprentice Workshop.",
+      "role": "Rola",
+      "itLevel": "Poziom IT",
+      "tone": "Ton",
+      "consent": "Zgoda na trenowanie AI",
+      "notSelected": "Nie wybrano",
+      "granted": "Udzielono",
+      "notGranted": "Nie udzielono",
+      "previewLabel": "Podgląd Apprentice Workshop",
+      "previewAdvanced": "Zobaczysz szybsze ścieżki techniczne, diagnostykę i kontrole wdrożeń.",
+      "previewIntermediate": "Zobaczysz wyważone wskazówki z konfigurowalnymi skrótami.",
+      "previewBeginner": "Zobaczysz lekcje dla początkujących, definicje i bezpieczne ustawienia domyślne.",
+      "editTone": "← Edytuj ton",
+      "saving": "Zapisywanie…",
+      "complete": "Zakończ wdrożenie →"
+    },
+    "common": {
+      "back": "← Wstecz",
+      "continue": "Kontynuuj →"
+    }
+  },
+  "ru": {
+    "loading": "Загрузка онбординга…",
+    "skip": "Перейти к панели →",
+    "progressComplete": "Готово {pct}%",
+    "steps": {
+      "welcome": {
+        "label": "Приветствие",
+        "kicker": "Шаг 1"
+      },
+      "profiling": {
+        "label": "Профиль",
+        "kicker": "Шаг 2"
+      },
+      "consent": {
+        "label": "Согласие",
+        "kicker": "Шаг 3"
+      },
+      "tone": {
+        "label": "Тон",
+        "kicker": "Шаг 4"
+      },
+      "confirmation": {
+        "label": "Подтверждение",
+        "kicker": "Шаг 5"
+      }
+    },
+    "roles": {
+      "developer": {
+        "title": "Разработчик",
+        "body": "Показывай технические настройки, журналы, детали развёртывания и подсказки с учётом кода."
+      },
+      "non_developer": {
+        "title": "Не разработчик",
+        "body": "Оставь настройку пошаговой, простым языком и с упором на результат."
+      }
+    },
+    "itLevels": {
+      "beginner": {
+        "title": "Новичок",
+        "body": "Дай мне пошаговые чек-листы, определения и настройки по умолчанию в один клик."
+      },
+      "intermediate": {
+        "title": "Средний",
+        "body": "Сочетай подсказки с быстрыми настройками и примерами."
+      },
+      "advanced": {
+        "title": "Продвинутый",
+        "body": "Ставь в приоритет диагностику, расширенные настройки и более быстрые процессы."
+      }
+    },
+    "tones": {
+      "friendly": {
+        "title": "Дружелюбный",
+        "sample": "Я проведу вас шаг за шагом и всё объясню понятно."
+      },
+      "professional": {
+        "title": "Профессиональный",
+        "sample": "Я буду давать рекомендации кратко, по делу и готово к работе."
+      },
+      "playful": {
+        "title": "Непринуждённый",
+        "sample": "Я сделаю настройку бодрой, креативной и динамичной."
+      }
+    },
+    "welcome": {
+      "title": "Добро пожаловать, {name}. Создавайте быстрее с умной настройкой.",
+      "intro": "SignalBoost настроит подсказки Apprentice Workshop, тон ИИ и параметры продукта по умолчанию на основе четырёх быстрых предпочтений. Любой выбор можно изменить позже в настройках.",
+      "storyboardLabel": "Сценарий",
+      "storyboardBody": "Приветствие → определите свой уровень → выберите согласие на конфиденциальность → выберите тон ассистента → подтвердите настройку.",
+      "start": "Начать онбординг →"
+    },
+    "profiling": {
+      "heading": "Помогите нам адаптировать Apprentice Workshop.",
+      "intro": "Выберите путь, который лучше всего отражает, как SignalBoost должен объяснять настройку, панели и технические решения.",
+      "itComfort": "Уровень владения ИТ"
+    },
+    "consent": {
+      "heading": "Выберите предпочтение по обучению ИИ.",
+      "intro": "Согласие необязательно и по умолчанию не отмечено. SignalBoost может персонализировать ваш аккаунт, не используя ваши данные для обучения ИИ.",
+      "checkboxLabel": "Я согласен, чтобы SignalBoost использовал мои предпочтения онбординга для улучшения обучения ИИ.",
+      "checkboxBody": "Мы сохраняем это предпочтение с отметкой времени, позже предоставляем элементы отказа и не продаём персональные данные.",
+      "save": "Сохранить согласие →",
+      "continueWithout": "Продолжить без согласия →"
+    },
+    "tone": {
+      "heading": "Выберите тон ассистента.",
+      "intro": "Это предпочтение сопровождает вас при генерации контента, в текстах поддержки и в объяснениях Apprentice Workshop."
+    },
+    "confirm": {
+      "heading": "Подтвердите персональную настройку.",
+      "intro": "Просмотрите сводку онбординга перед открытием панели. Ваш выбор сохраняется в настройках профиля и используется Apprentice Workshop.",
+      "role": "Роль",
+      "itLevel": "Уровень ИТ",
+      "tone": "Тон",
+      "consent": "Согласие на обучение ИИ",
+      "notSelected": "Не выбрано",
+      "granted": "Предоставлено",
+      "notGranted": "Не предоставлено",
+      "previewLabel": "Предпросмотр Apprentice Workshop",
+      "previewAdvanced": "Вы увидите более быстрые технические пути, диагностику и проверки развёртывания.",
+      "previewIntermediate": "Вы увидите сбалансированные подсказки с настраиваемыми быстрыми действиями.",
+      "previewBeginner": "Вы увидите уроки для начинающих, определения и безопасные настройки по умолчанию.",
+      "editTone": "← Изменить тон",
+      "saving": "Сохранение…",
+      "complete": "Завершить онбординг →"
+    },
+    "common": {
+      "back": "← Назад",
+      "continue": "Продолжить →"
+    }
+  }
+}

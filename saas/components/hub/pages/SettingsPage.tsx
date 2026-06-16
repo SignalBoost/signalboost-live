@@ -4,8 +4,10 @@
 import { useState, useEffect } from 'react'
 import { ConsoleSettings, ApprovalPolicy } from '@/lib/hub/settings-service'
 import { cardStyle, labelStyle } from '../shared'
+import { useTranslation } from '@/components/i18n/useTranslation'
 
 export function SettingsPage() {
+  const { t } = useTranslation()
   const [settings, setSettings] = useState<ConsoleSettings | null>(null)
   const [policies, setPolicies] = useState<ApprovalPolicy[]>([])
   const [loading, setLoading] = useState(true)
@@ -26,10 +28,10 @@ export function SettingsPage() {
         setSettings(data.settings)
         setPolicies(data.policies || [])
       } else {
-        setError(data.error || 'Failed to load settings')
+        setError(data.error || t('console.settings.err_load', 'Failed to load settings'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error loading settings')
+      setError(err instanceof Error ? err.message : t('console.settings.err_load2', 'Error loading settings'))
     } finally {
       setLoading(false)
     }
@@ -53,19 +55,17 @@ export function SettingsPage() {
         setSaved(true)
         setTimeout(() => setSaved(false), 2000)
       } else {
-        setError(data.error || 'Failed to update setting')
+        setError(data.error || t('console.settings.err_update', 'Failed to update setting'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error updating setting')
+      setError(err instanceof Error ? err.message : t('console.settings.err_update2', 'Error updating setting'))
     }
   }
 
   if (loading) {
     return (
       <div style={{ padding: '2rem' }}>
-        <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>
-          Loading settings...
-        </div>
+        <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>{t('console.settings.loading', 'Loading settings...')}</div>
       </div>
     )
   }
@@ -74,7 +74,7 @@ export function SettingsPage() {
     return (
       <div style={{ padding: '2rem' }}>
         <div style={{ ...cardStyle, padding: '1rem', background: '#1a0000', color: '#ff6b6b' }}>
-          {error || 'Failed to load settings'}
+          {error || t('console.settings.err_load', 'Failed to load settings')}
         </div>
       </div>
     )
@@ -83,12 +83,8 @@ export function SettingsPage() {
   return (
     <div style={{ padding: '2rem', maxWidth: '1000px' }}>
       <div style={{ marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#1af0ff' }}>
-          Console Settings
-        </h2>
-        <p style={{ color: '#888', fontSize: '0.9rem' }}>
-          Configure security policies, approvals, and audit settings
-        </p>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#1af0ff' }}>{t('console.settings.title', 'Console Settings')}</h2>
+        <p style={{ color: '#888', fontSize: '0.9rem' }}>{t('console.settings.subtitle', 'Configure security policies, approvals, and audit settings')}</p>
       </div>
 
       {saved && (
@@ -101,9 +97,7 @@ export function SettingsPage() {
             marginBottom: '1.5rem',
             fontSize: '0.9rem',
           }}
-        >
-          ✓ Settings saved
-        </div>
+        >{'✓ ' + t('console.settings.saved', 'Settings saved')}</div>
       )}
 
       {error && (
@@ -123,32 +117,32 @@ export function SettingsPage() {
 
       {/* Security Settings */}
       <div style={{ ...cardStyle, marginBottom: '2rem' }}>
-        <h3 style={{ ...labelStyle, marginBottom: '1.5rem' }}>🔒 Security</h3>
+        <h3 style={{ ...labelStyle, marginBottom: '1.5rem' }}>{'🔒 ' + t('console.settings.sec_security', 'Security')}</h3>
 
         <ToggleSetting
-          label="Require MFA for Unlock"
-          description="Users must authenticate with TOTP before accessing the vault"
+          label={t('console.settings.mfa_l', 'Require MFA for Unlock')}
+          description={t('console.settings.mfa_d', 'Users must authenticate with TOTP before accessing the vault')}
           enabled={settings.requireMFA}
           onChange={value => updateSetting('requireMFA', value)}
         />
 
         <ToggleSetting
-          label="Require Approval for Key Rotation"
-          description="Key rotations must be approved before execution"
+          label={t('console.settings.rot_approval_l', 'Require Approval for Key Rotation')}
+          description={t('console.settings.rot_approval_d', 'Key rotations must be approved before execution')}
           enabled={settings.requireApprovalForRotation}
           onChange={value => updateSetting('requireApprovalForRotation', value)}
         />
 
         <ToggleSetting
-          label="Require Approval for Export"
-          description="Exporting secrets requires explicit approval"
+          label={t('console.settings.exp_approval_l', 'Require Approval for Export')}
+          description={t('console.settings.exp_approval_d', 'Exporting secrets requires explicit approval')}
           enabled={settings.requireApprovalForExport}
           onChange={value => updateSetting('requireApprovalForExport', value)}
         />
 
         <ToggleSetting
-          label="Encryption Enabled"
-          description="All secrets encrypted at rest"
+          label={t('console.settings.enc_l', 'Encryption Enabled')}
+          description={t('console.settings.enc_d', 'All secrets encrypted at rest')}
           enabled={settings.encryptionEnabled}
           onChange={value => updateSetting('encryptionEnabled', value)}
         />
@@ -156,18 +150,18 @@ export function SettingsPage() {
 
       {/* Automation Settings */}
       <div style={{ ...cardStyle, marginBottom: '2rem' }}>
-        <h3 style={{ ...labelStyle, marginBottom: '1.5rem' }}>⚙️ Automation</h3>
+        <h3 style={{ ...labelStyle, marginBottom: '1.5rem' }}>{'⚙️ ' + t('console.settings.sec_automation', 'Automation')}</h3>
 
         <ToggleSetting
-          label="Auto-Rotate Keys"
-          description="Automatically rotate keys on a schedule"
+          label={t('console.settings.autorot_l', 'Auto-Rotate Keys')}
+          description={t('console.settings.autorot_d', 'Automatically rotate keys on a schedule')}
           enabled={settings.autoRotateKeys}
           onChange={value => updateSetting('autoRotateKeys', value)}
         />
 
         {settings.autoRotateKeys && (
           <NumberSetting
-            label="Auto-Rotate Interval (Days)"
+            label={t('console.settings.autorot_int_l', 'Auto-Rotate Interval (Days)')}
             value={settings.autoRotateIntervalDays}
             min={7}
             max={365}
@@ -178,48 +172,48 @@ export function SettingsPage() {
 
       {/* Audit & Retention */}
       <div style={{ ...cardStyle, marginBottom: '2rem' }}>
-        <h3 style={{ ...labelStyle, marginBottom: '1.5rem' }}>📊 Audit & Retention</h3>
+        <h3 style={{ ...labelStyle, marginBottom: '1.5rem' }}>{'📊 ' + t('console.settings.sec_audit', 'Audit & Retention')}</h3>
 
         <NumberSetting
-          label="Audit Log Retention (Days)"
+          label={t('console.settings.audit_ret_l', 'Audit Log Retention (Days)')}
           value={settings.auditLogRetentionDays}
           min={7}
           max={365}
-          description="How long to keep audit logs"
+          description={t('console.settings.audit_ret_d', 'How long to keep audit logs')}
           onChange={value => updateSetting('auditLogRetentionDays', value)}
         />
 
         <NumberSetting
-          label="Session Timeout (Minutes)"
+          label={t('console.settings.session_l', 'Session Timeout (Minutes)')}
           value={settings.sessionTimeoutMinutes}
           min={5}
           max={480}
-          description="Idle timeout before re-authentication required"
+          description={t('console.settings.session_d', 'Idle timeout before re-authentication required')}
           onChange={value => updateSetting('sessionTimeoutMinutes', value)}
         />
       </div>
 
       {/* Notifications */}
       <div style={{ ...cardStyle, marginBottom: '2rem' }}>
-        <h3 style={{ ...labelStyle, marginBottom: '1.5rem' }}>🔔 Notifications</h3>
+        <h3 style={{ ...labelStyle, marginBottom: '1.5rem' }}>{'🔔 ' + t('console.settings.sec_notifications', 'Notifications')}</h3>
 
         <ToggleSetting
-          label="Notify on Unauthorized Access"
-          description="Send alerts when unauthorized access is detected"
+          label={t('console.settings.notify_unauth_l', 'Notify on Unauthorized Access')}
+          description={t('console.settings.notify_unauth_d', 'Send alerts when unauthorized access is detected')}
           enabled={settings.notifyOnUnauthorizedAccess}
           onChange={value => updateSetting('notifyOnUnauthorizedAccess', value)}
         />
 
         <ToggleSetting
-          label="Notify on Key Rotation"
-          description="Send notifications when keys are rotated"
+          label={t('console.settings.notify_rot_l', 'Notify on Key Rotation')}
+          description={t('console.settings.notify_rot_d', 'Send notifications when keys are rotated')}
           enabled={settings.notifyOnKeyRotation}
           onChange={value => updateSetting('notifyOnKeyRotation', value)}
         />
 
         <ToggleSetting
-          label="Notify on Key Expiry"
-          description="Alert when keys are expiring soon"
+          label={t('console.settings.notify_exp_l', 'Notify on Key Expiry')}
+          description={t('console.settings.notify_exp_d', 'Alert when keys are expiring soon')}
           enabled={settings.notifyOnKeyExpiry}
           onChange={value => updateSetting('notifyOnKeyExpiry', value)}
         />
@@ -227,17 +221,17 @@ export function SettingsPage() {
 
       {/* Advanced */}
       <div style={{ ...cardStyle }}>
-        <h3 style={{ ...labelStyle, marginBottom: '1.5rem' }}>⚡ Advanced</h3>
+        <h3 style={{ ...labelStyle, marginBottom: '1.5rem' }}>{'⚡ ' + t('console.settings.sec_advanced', 'Advanced')}</h3>
 
         <ToggleSetting
-          label="Allow Public URLs"
-          description="Permit deployment to public URLs"
+          label={t('console.settings.pub_l', 'Allow Public URLs')}
+          description={t('console.settings.pub_d', 'Permit deployment to public URLs')}
           enabled={settings.allowPublicURLs}
           onChange={value => updateSetting('allowPublicURLs', value)}
         />
 
         <div style={{ marginTop: '1.5rem', padding: '1rem', background: '#1a1a2e', borderRadius: '4px', fontSize: '0.85rem' }}>
-          <div style={{ color: '#888', marginBottom: '0.5rem' }}>Last Updated</div>
+          <div style={{ color: '#888', marginBottom: '0.5rem' }}>{t('console.settings.last_updated', 'Last Updated')}</div>
           <div style={{ color: '#1af0ff' }}>
             {new Date(settings.updatedAt).toLocaleString()}
           </div>

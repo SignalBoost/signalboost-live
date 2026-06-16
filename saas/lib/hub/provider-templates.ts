@@ -49,6 +49,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
   // === AWS ===
   'aws.create_s3_bucket': {
     id: 'aws.create_s3_bucket',
+    policyActionId: 'create_aws_bucket',
     label: 'Create S3 Bucket',
     description: 'Create a new globally unique S3 bucket container.',
     icon: '🪣',
@@ -57,6 +58,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
   },
   'aws.list_iam_users': {
     id: 'aws.list_iam_users',
+    policyActionId: 'read_provider_status',
     label: 'List IAM Users',
     description: 'Fetch all current identity directory users.',
     icon: '👥',
@@ -65,6 +67,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
   },
   'aws.disable_iam_user': {
     id: 'aws.disable_iam_user',
+    policyActionId: 'disable_aws_iam_user',
     label: 'Disable IAM User',
     description: 'Deactivate user keys and credentials immediately.',
     icon: '🚫',
@@ -76,6 +79,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
   // === GCP ===
   'gcp.list_service_accounts': {
     id: 'gcp.list_service_accounts',
+    policyActionId: 'read_provider_status',
     label: 'List Service Accounts',
     description: 'Fetch all system identity service accounts.',
     icon: '🔑',
@@ -410,6 +414,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
   // === GOVERNANCE ===
   'gov.assign_role': {
     id: 'gov.assign_role',
+    policyActionId: 'change_role_permissions',
     label: 'Role Assignment',
     description: 'Provision platform access parameters across specific organizational personnel tracks.',
     icon: '🛡️',
@@ -425,6 +430,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
   },
   'gov.deactivate_member': {
     id: 'gov.deactivate_member',
+    policyActionId: 'auth_management',
     label: 'Archive Member',
     description: 'Suspend org permissions and turn off account access parameters globally.',
     icon: '🚫',
@@ -434,6 +440,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
   },
   'gov.view_timeline': {
     id: 'gov.view_timeline',
+    policyActionId: 'audit_log',
     label: 'Activity Timeline',
     description: 'Audit trace lines tracking all recent cluster execution contexts.',
     icon: '📊',
@@ -442,6 +449,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
   },
   'gov.clear_stale_sessions': {
     id: 'gov.clear_stale_sessions',
+    policyActionId: 'auth_management',
     label: 'Clear Sessions',
     description: 'Force log out inactive tokens and refresh authorization parameters.',
     icon: '🧹',

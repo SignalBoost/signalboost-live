@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js'
 import { HubUser, Permission } from './rbac-types'
 import { hasPermission, hasAllPermissions, hasAnyPermission } from './rbac-service'
 import { getAccess } from './access'
+import { recordAuditEvent } from '@/lib/hub/audit'
 
 /**
  * Resolve the current hub user from the VERIFIED Supabase session.
@@ -158,28 +159,15 @@ export async function requireAnyPermission(
  * Log permission denial for audit trail
  */
 async function logPermissionDenial(user: HubUser, permission: Permission, req: NextRequest) {
-  try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!supabaseUrl || !supabaseKey) return
-
-    const supabase = createClient(supabaseUrl, supabaseKey)
-
-    await supabase.from('hub_vault_audit_log').insert([
-      {
-        secret_id: 'permission-denial',
-        action: 'accessed',
-        user_email: user.email,
-        timestamp: new Date().toISOString(),
-        status: 'failed',
-        message: `Unauthorized access attempt: ${permission} on ${req.nextUrl.pathname}`,
-        ip_address: req.headers.get('x-forwarded-for') || 'unknown',
-      },
-    ])
-  } catch (err) {
-    // Non-fatal - logging failure shouldn't break the request
-  }
+  // Routed through the unified audit adapter — no longer misuses the vault table.
+  await recordAuditEvent({
+    actor: user.email,
+    action: String(permission),
+    status: 'denied',
+    target: req.nextUrl.pathname,
+    message: `Unauthorized access attempt: ${permission} on ${req.nextUrl.pathname}`,
+    ip: req.headers.get('x-forwarded-for') || 'unknown',
+  })
 }
 
 /**

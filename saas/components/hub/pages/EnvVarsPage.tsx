@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from 'react'
 import { cardStyle, labelStyle, bodyStyle, rowStyle, monoStyle } from '../shared'
+import { useTranslation } from '@/components/i18n/useTranslation'
 
 type EnvTarget = 'production' | 'preview' | 'development'
 
@@ -74,6 +75,7 @@ function TargetChips({
 }
 
 export default function EnvVarsPage() {
+  const { t } = useTranslation()
   const [vars, setVars] = useState<EnvVar[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -106,9 +108,9 @@ export default function EnvVarsPage() {
       const res = await fetch('/api/hub/env?t=' + Date.now(), { cache: 'no-store' })
       const data = await res.json()
       if (data.ok) setVars(data.vars || [])
-      else setError(data.error || 'Failed to load variables')
+      else setError(data.error || t('console.env.err_load', 'Failed to load variables'))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error loading variables')
+      setError(err instanceof Error ? err.message : t('console.env.err_load2', 'Error loading variables'))
     } finally {
       setLoading(false)
     }
@@ -116,7 +118,7 @@ export default function EnvVarsPage() {
 
   async function addVar() {
     if (!newKey.trim() || newValue === '') {
-      setError('Key and value are required')
+      setError(t('console.env.err_required', 'Key and value are required'))
       return
     }
     setBusy('add')
@@ -130,13 +132,13 @@ export default function EnvVarsPage() {
       const data = await res.json()
       if (data.ok) {
         setNewKey(''); setNewValue(''); setNewType('encrypted'); setNewTargets(['production'])
-        flash(`Added ${newKey.trim()}`)
+        flash(t('console.env.added', 'Added {key}').replace('{key}', newKey.trim()))
         await load()
       } else {
-        setError(data.error || 'Failed to add variable')
+        setError(data.error || t('console.env.err_add', 'Failed to add variable'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error adding variable')
+      setError(err instanceof Error ? err.message : t('console.env.err_add2', 'Error adding variable'))
     } finally {
       setBusy(null)
     }
@@ -155,7 +157,7 @@ export default function EnvVarsPage() {
 
   async function saveEdit(id: string) {
     if (editValue === '' && editTargets.length === 0) {
-      setError('Set a new value or change the targets')
+      setError(t('console.env.err_edit_required', 'Set a new value or change the targets'))
       return
     }
     setBusy(id)
@@ -170,34 +172,34 @@ export default function EnvVarsPage() {
       })
       const data = await res.json()
       if (data.ok) {
-        flash('Variable updated')
+        flash(t('console.env.updated', 'Variable updated'))
         cancelEdit()
         await load()
       } else {
-        setError(data.error || 'Failed to update variable')
+        setError(data.error || t('console.env.err_update', 'Failed to update variable'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error updating variable')
+      setError(err instanceof Error ? err.message : t('console.env.err_update2', 'Error updating variable'))
     } finally {
       setBusy(null)
     }
   }
 
   async function deleteVar(v: EnvVar) {
-    if (!window.confirm(`Delete ${v.key}? This removes it from the build pipeline and cannot be undone.`)) return
+    if (!window.confirm(t('console.env.confirm_delete', 'Delete {key}? This removes it from the build pipeline and cannot be undone.').replace('{key}', v.key))) return
     setBusy(v.id)
     setError(null)
     try {
       const res = await fetch('/api/hub/env?id=' + encodeURIComponent(v.id), { method: 'DELETE' })
       const data = await res.json()
       if (data.ok) {
-        flash(`Deleted ${v.key}`)
+        flash(t('console.env.deleted', 'Deleted {key}').replace('{key}', v.key))
         await load()
       } else {
-        setError(data.error || 'Failed to delete variable')
+        setError(data.error || t('console.env.err_delete', 'Failed to delete variable'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error deleting variable')
+      setError(err instanceof Error ? err.message : t('console.env.err_delete2', 'Error deleting variable'))
     } finally {
       setBusy(null)
     }
@@ -225,28 +227,28 @@ export default function EnvVarsPage() {
       <section style={{ ...cardStyle }}>
         <div style={{ ...bodyStyle, gap: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-            <h3 style={{ ...labelStyle, margin: 0 }}>Add environment variable</h3>
-            <span style={{ ...monoStyle, color: 'rgba(255,255,255,.4)' }}>{vars.length} live</span>
+            <h3 style={{ ...labelStyle, margin: 0 }}>{t('console.env.title', 'Add environment variable')}</h3>
+            <span style={{ ...monoStyle, color: 'rgba(255,255,255,.4)' }}>{t('console.env.count_live', '{n} live').replace('{n}', String(vars.length))}</span>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.4fr)', gap: 10 }}>
             <input style={inputStyle} placeholder="KEY_NAME" value={newKey} onChange={(e) => setNewKey(e.target.value)} />
-            <input style={inputStyle} placeholder="value" value={newValue} onChange={(e) => setNewValue(e.target.value)} />
+            <input style={inputStyle} placeholder={t('console.env.ph_value', 'value')} value={newValue} onChange={(e) => setNewValue(e.target.value)} />
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ ...labelStyle }}>Type</span>
+              <span style={{ ...labelStyle }}>{t('console.env.type', 'Type')}</span>
               <select value={newType} onChange={(e) => setNewType(e.target.value)} style={{ ...inputStyle, width: 'auto', padding: '8px 10px' }}>
                 {TYPES.map((t) => <option key={t} value={t} style={{ color: '#000' }}>{t}</option>)}
               </select>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ ...labelStyle }}>Targets</span>
+              <span style={{ ...labelStyle }}>{t('console.env.targets', 'Targets')}</span>
               <TargetChips selected={newTargets} onToggle={(t) => toggle(newTargets, setNewTargets, t)} />
             </div>
             <button onClick={addVar} disabled={busy === 'add'} style={{ ...btn('cyan'), marginLeft: 'auto', opacity: busy === 'add' ? 0.6 : 1 }}>
-              {busy === 'add' ? 'Adding…' : '➕ Add variable'}
+              {busy === 'add' ? t('console.env.adding', 'Adding…') : '➕ ' + t('console.env.add', 'Add variable')}
             </button>
           </div>
         </div>
@@ -256,14 +258,14 @@ export default function EnvVarsPage() {
       <section style={{ ...cardStyle }}>
         <div style={{ ...bodyStyle }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
-            <h3 style={{ ...labelStyle, margin: 0 }}>Variables</h3>
-            <button onClick={load} style={btn('ghost')}>{loading ? '…' : '↻ Refresh'}</button>
+            <h3 style={{ ...labelStyle, margin: 0 }}>{t('console.env.list_title', 'Variables')}</h3>
+            <button onClick={load} style={btn('ghost')}>{loading ? '…' : '↻ ' + t('console.env.refresh', 'Refresh')}</button>
           </div>
 
           {loading ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,.45)', fontSize: 13 }}>Loading variables…</div>
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,.45)', fontSize: 13 }}>{t('console.env.loading', 'Loading variables…')}</div>
           ) : vars.length === 0 ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,.45)', fontSize: 13 }}>No variables yet. Add one above.</div>
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'rgba(255,255,255,.45)', fontSize: 13 }}>{t('console.env.empty', 'No variables yet. Add one above.')}</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {vars.map((v) => {
@@ -283,14 +285,14 @@ export default function EnvVarsPage() {
                       </div>
                       <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                         {isSystem ? (
-                          <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,.35)', alignSelf: 'center' }}>🔒 system</span>
+                          <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,.35)', alignSelf: 'center' }}>🔒 {t('console.env.system', 'system')}</span>
                         ) : (
                           <>
                             <button onClick={() => (editing ? cancelEdit() : startEdit(v))} style={btn('gold')}>
-                              {editing ? 'Close' : '✎ Edit'}
+                              {editing ? t('console.env.close', 'Close') : '✎ ' + t('console.env.edit', 'Edit')}
                             </button>
                             <button onClick={() => deleteVar(v)} disabled={busy === v.id} style={{ ...btn('danger'), opacity: busy === v.id ? 0.6 : 1 }}>
-                              {busy === v.id ? '…' : '🗑 Delete'}
+                              {busy === v.id ? '…' : '🗑 ' + t('console.env.delete', 'Delete')}
                             </button>
                           </>
                         )}
@@ -301,17 +303,17 @@ export default function EnvVarsPage() {
                       <div style={{ margin: '8px 2px 2px', padding: 13, borderRadius: 11, border: '1px solid rgba(255,195,0,.25)', background: 'rgba(255,195,0,.04)', display: 'flex', flexDirection: 'column', gap: 11 }}>
                         <input
                           style={inputStyle}
-                          placeholder="new value (leave blank to keep current)"
+                          placeholder={t('console.env.ph_new_value', 'new value (leave blank to keep current)')}
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
                         />
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                          <span style={labelStyle}>Targets</span>
+                          <span style={labelStyle}>{t('console.env.targets', 'Targets')}</span>
                           <TargetChips selected={editTargets} onToggle={(t) => toggle(editTargets, setEditTargets, t)} />
                           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-                            <button onClick={cancelEdit} style={btn('ghost')}>Cancel</button>
+                            <button onClick={cancelEdit} style={btn('ghost')}>{t('console.env.cancel', 'Cancel')}</button>
                             <button onClick={() => saveEdit(v.id)} disabled={busy === v.id} style={{ ...btn('cyan'), opacity: busy === v.id ? 0.6 : 1 }}>
-                              {busy === v.id ? 'Saving…' : 'Save changes'}
+                              {busy === v.id ? t('console.env.saving', 'Saving…') : t('console.env.save', 'Save changes')}
                             </button>
                           </div>
                         </div>

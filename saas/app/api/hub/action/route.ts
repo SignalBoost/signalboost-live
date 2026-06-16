@@ -987,7 +987,9 @@ async function executeSupabaseAction(template: any, payload: Record<string, unkn
 
   // SQL Editor — runs read-style SQL via the gated hub_exec_sql RPC.
   if (template.id === 'supabase.sql_editor') {
-    const query = String(payload.query || '').trim()
+    // Strip any trailing semicolon: hub_exec_sql wraps the query as a subquery,
+    // so a trailing ';' lands inside the wrapper → "syntax error at or near ';'".
+    const query = String(payload.query || '').trim().replace(/;+\s*$/, '').trim()
     if (!query) return { ok: false, error: 'SQL query is required' }
     const res = await fetch(`${url}/rest/v1/rpc/hub_exec_sql`, {
       method: 'POST',
@@ -1077,7 +1079,9 @@ async function executeSupabaseAction(template: any, payload: Record<string, unkn
 
   // Run a migration / arbitrary SQL via the gated RPC
   if (template.id === 'supabase.run_migration') {
-    const migration = String(payload.migration || '').trim()
+    // Same RPC as the SQL editor — strip a trailing ';' so it doesn't break the
+    // wrapper. Internal ';' between statements is preserved for multi-statement SQL.
+    const migration = String(payload.migration || '').trim().replace(/;+\s*$/, '').trim()
     if (!migration) return { ok: false, error: 'Migration SQL is required' }
     const res = await fetch(`${url}/rest/v1/rpc/hub_exec_sql`, {
       method: 'POST',

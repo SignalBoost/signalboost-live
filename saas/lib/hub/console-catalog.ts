@@ -329,3 +329,14 @@ export const LIVE_PROVIDER_IDS = new Set<string>([
 export function isProviderLive(id: string): boolean {
   return LIVE_PROVIDER_IDS.has(id)
 }
+
+// Individual actions that aren't fully implemented, even though their provider is
+// live. They render disabled with a "Soon" badge so a user never triggers a stub.
+export const INCOMPLETE_ACTION_IDS = new Set<string>([
+  'github.rotate_token',    // PATs cannot be rotated via API — regenerate manually.
+  'github.manage_secrets',  // needs libsodium sealed-box encryption (not yet wired).
+])
+
+export function isActionLive(templateId: string): boolean {
+  return !INCOMPLETE_ACTION_IDS.has(templateId)
+}

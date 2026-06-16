@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireOwner } from '@/lib/auth/access'
 import { operatorStore } from '@/lib/operator/store'
 
 export async function GET(req: NextRequest) {
+  const guard = await requireOwner()
+  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
+
   const jobId = req.nextUrl.searchParams.get('jobId')
 
   if (!jobId) {

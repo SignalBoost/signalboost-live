@@ -14,12 +14,16 @@ provider means adding an executor.
 | File | Role |
 |---|---|
 | `types.ts` | Portable contracts: `ActionSchema`, `ActionField`, `AuthAdapter`, `LogAdapter`. No app imports — this is the whole point. |
-| `defaultHost.ts` | `registerExecutor()` (executors self-register here), `resolveExecutor()`, `listRegistered()`, and `createDefaultHost(req)` which wires the default auth/log/resolve adapters. |
+| `defaultHost.ts` | The portable registry + host assembler: `registerExecutor()` (executors self-register here), `resolveExecutor()`, `listRegistered()`, `consoleLogAdapter` (default `LogAdapter`), and `createHost(auth, log?)`, which assembles an `EngineHost` from an injected `AuthAdapter` (and optional `LogAdapter`). No app imports — auth/policy are injected by the host layer, never imported here. |
 | `actionEngine.ts` | `runAction(host, { providerId, actionId, input })` — the validate → permission → execute → log pipeline, plus `validateInput()`. |
 | `executors/` | One file per provider (`openai.ts`, `github.ts`, `resend.ts`, …). Each calls `registerExecutor(...)` for its actions. |
 
+The host-specific glue (this app's auth bridge and UI config) lives **outside**
+`console-core/`, in `../console-host/` — see [Host layer](#host-layer) below.
+
 The engine is consumed by `../app/api/hub/action/engine/route.ts`, which
-side-effect-imports each executor file (registering it) and calls `runAction`.
+side-effect-imports each executor file (registering it), builds the host via
+`createSignalBoostHost(req)`, and calls `runAction`.
 
 ## Add a provider
 
@@ -52,21 +56,27 @@ interface AuthAdapter {
 }
 ```
 
-Build an `EngineHost` with your adapter (`{ auth, log, resolveExecutor }`) and
-pass it to `runAction`, instead of `createDefaultHost(req)`. Permission checks go
-through this adapter — nothing calls the host auth system directly.
+Assemble an `EngineHost` with `createHost(yourAuthAdapter, yourLogAdapter?)` and
+pass it to `runAction`. In this app, the bridge lives in
+`../console-host/signalboostHost.ts` (`createSignalBoostHost(req)`): it builds the
+`AuthAdapter` from the app's auth + policy layers and calls `createHost`.
+Permission checks go through this adapter — nothing calls the host auth system
+directly.
 
 ## Swap logging
 
 Implement `LogAdapter` (`logAction(event)`) for Datadog / Logflare / CloudWatch
-and supply it on the `EngineHost`. (Within this app, audit events are also routed
-through `lib/hub/audit.ts`, which has its own single swap point.)
+and pass it as the second argument to `createHost(auth, log)`. The default,
+`consoleLogAdapter`, writes a structured server log. (Within this app, audit
+events are also routed through `lib/hub/audit.ts`, which has its own single swap
+point.)
 
 ## Embed in another Next.js app
 
 1. Copy `console-core/` and the `app/api/hub/action/engine` route.
-2. Provide an `EngineHost` — your `AuthAdapter`, `LogAdapter`, and the
-   `resolveExecutor` from `defaultHost` (or your own).
+2. Provide an `EngineHost` via `createHost(yourAuthAdapter, yourLogAdapter?)`
+   (`resolveExecutor` is wired in for you), or assemble
+   `{ auth, log, resolveExecutor }` yourself.
 3. Add the executor side-effect imports you want enabled.
 4. Render provider cards from your catalog (`lib/hub/console-catalog.ts` here is
    the reference implementation).
@@ -74,15 +84,20 @@ through `lib/hub/audit.ts`, which has its own single swap point.)
 ## Verify wiring
 
 `GET /api/hub/action/engine` lists every registered executor, so you can confirm
-registration without clicking through the UI.
+registration without clicking through the UI. The endpoint is restricted to an
+authenticated owner/admin.
 
 ---
 
-### Note on legacy files
+### Host layer
 
-An earlier design discovered providers from a static `config/provider-map.json`
-via `providerRegistry.ts` / `console.config.ts`, rendered by
-`components/hub/ProviderMapGrid.tsx`. That path is **superseded** by the
-executor-based engine described above and is **not mounted by any page**. If
-those files are still present, they are safe to remove — the live console
-(`console-catalog.ts` + executors) does not use them.
+Everything app-specific lives in `../console-host/`, never in `console-core/`:
+
+- `signalboostHost.ts` — the `AuthAdapter` bridge to this app's auth + policy
+  layers, exposed as `createSignalBoostHost(req)`.
+- `consoleHostConfig.tsx` — the UI extension (`ConsoleHostUI`): branding, the
+  action→panel router, utility pages, and the provider catalog the console shell
+  renders.
+
+Another company swaps `console-host/` (its own auth bridge and `ConsoleHostUI`)
+and `console-core` is unchanged.

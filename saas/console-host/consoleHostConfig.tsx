@@ -15,6 +15,13 @@ import EnvVarsPage from '@/components/hub/pages/EnvVarsPage'
 import { DeploymentsPage } from '@/components/hub/pages/DeploymentsPage'
 import { LogsPage } from '@/components/hub/pages/LogsPage'
 import { SettingsPage } from '@/components/hub/pages/SettingsPage'
+import {
+  CONSOLE_TIERS,
+  CONSOLE_UTILITY_PAGES,
+  getConsoleTier,
+  getConsoleProvider,
+  getTierProviders,
+} from '@/lib/hub/console-catalog'
 
 /** A workspace panel that a provider action opens instead of a single-action form. */
 export interface ConsolePanel {
@@ -40,6 +47,14 @@ export interface ConsoleHostUI {
   panelRouter: Record<string, ConsolePanel>
   /** Utility page id → renderer (domains / env / logs / deployments / settings). */
   utilityPages: Record<string, () => ReactNode>
+  /** Provider catalog: tiers, sidebar nav, and lookups. A host supplies its own. */
+  catalog: {
+    tiers: typeof CONSOLE_TIERS
+    utilityNav: typeof CONSOLE_UTILITY_PAGES
+    getTier: typeof getConsoleTier
+    getTierProviders: typeof getTierProviders
+    getProvider: typeof getConsoleProvider
+  }
 }
 
 // ── SignalBoost's implementation ────────────────────────────────────────────
@@ -95,5 +110,12 @@ export const signalboostConsoleUI: ConsoleHostUI = {
     logs: () => <LogsPage />,
     deployments: () => <DeploymentsPage />,
     settings: () => <SettingsPage />,
+  },
+  catalog: {
+    tiers: CONSOLE_TIERS,
+    utilityNav: CONSOLE_UTILITY_PAGES,
+    getTier: getConsoleTier,
+    getTierProviders: getTierProviders,
+    getProvider: getConsoleProvider,
   },
 }

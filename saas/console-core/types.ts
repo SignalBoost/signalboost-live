@@ -80,7 +80,7 @@ export interface ProviderMeta {
 }
 
 /**
- * The adapter a host implements (or that we synthesize from provider-map.json).
+ * The adapter a host implements to expose a provider's status and actions.
  * Status is async so a host can do live credential probes if it wants; the
  * default registry resolves it from env-var presence alone.
  */

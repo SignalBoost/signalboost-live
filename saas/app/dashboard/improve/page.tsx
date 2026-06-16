@@ -52,32 +52,44 @@ function scoreColor(s: number) {
 
 // Render light markdown from AI summaries: **bold** + line breaks. Avoids raw ** bleeding into the UI.
 function renderRichText(text: string) {
-  // The AI sometimes breaks "1.", the **heading**, and ": description" onto separate
-  // lines. Pull them back together so each item reads as one line, then render inline
-  // bold at the inherited size (a global <strong> rule otherwise inflates it).
-  const normalized = String(text || '')
-    .replace(/^(\s*\d+\.)\s*\n+/gm, '$1 ')
-    .replace(/\n+(\s*:)/g, '$1')
-  const parts = normalized.split(/(\*\*[^*]+\*\*)/g)
-  return parts.map((part, pi) =>
-    /^\*\*[^*]+\*\*$/.test(part)
-      ? <strong key={pi} style={{ color: '#fff', fontWeight: 800, fontSize: 'inherit' }}>{part.slice(2, -2)}</strong>
-      : <span key={pi}>{part}</span>
-  )
-}
+  // The AI's formatting is unreliable run to run — sometimes newlines + **bold**,
+  // sometimes everything jammed onto one line with no markup at all. So we parse the
+  // numbered recommendations ourselves and render a consistent, readable list.
+  let raw = String(text || '').replace(/\*\*/g, '').replace(/\s+/g, ' ').trim()
+  // Force each "N." item marker onto its own line, then split.
+  raw = raw.replace(/\s*(\d{1,2})\.\s*(?=[A-Za-z])/g, '\n$1. ').trim()
+  const lines = raw.split('\n').map(s => s.trim()).filter(Boolean)
 
-function buildBrief(audit: Audit): string {
-  let host = audit.finalUrl
-  try { host = new URL(audit.finalUrl).hostname.replace(/^www\./, '') } catch {}
-  const issues = audit.checks.filter(ch => ch.status !== 'pass' && ch.recommendation)
-  const fixes = issues.map(ch => `- ${ch.label}: ${ch.recommendation}`).join('\n')
-  return [
-    `Rebuild an improved, modern version of the website ${host}.`,
-    `Keep the same business, brand, and core offering, but fix the issues found in the audit and make it fast, mobile-first, accessible, and conversion-focused with a clear primary call-to-action.`,
-    issues.length ? `\nAddress these specific improvements:\n${fixes}` : '',
-  ].join('\n').trim()
+  return lines.map((line, i) => {
+    const m = line.match(/^(\d{1,2})\.\s*(.*)$/)
+    if (!m) {
+      // Intro / verdict line — bold a short leading label like "Verdict:".
+      const ci = line.indexOf(':')
+      if (ci > -1 && ci < 24) {
+        return (
+          <p key={i} style={{ margin: '0 0 14px', lineHeight: 1.6 }}>
+            <strong style={{ color: '#fff', fontWeight: 800, fontSize: 'inherit' }}>{line.slice(0, ci + 1)}</strong>{' ' + line.slice(ci + 1).trim()}
+          </p>
+        )
+      }
+      return <p key={i} style={{ margin: '0 0 14px', lineHeight: 1.6 }}>{line}</p>
+    }
+    const num = m[1]
+    const rest = m[2]
+    const ci = rest.indexOf(':')
+    const heading = ci > -1 ? rest.slice(0, ci).trim() : rest.trim()
+    const desc = ci > -1 ? rest.slice(ci + 1).trim() : ''
+    return (
+      <div key={i} style={{ margin: '0 0 11px', lineHeight: 1.6, display: 'flex', gap: 8 }}>
+        <span style={{ color: '#ffc300', fontWeight: 800, flex: '0 0 auto' }}>{num}.</span>
+        <span style={{ minWidth: 0 }}>
+          <strong style={{ color: '#fff', fontWeight: 800, fontSize: 'inherit' }}>{heading}</strong>
+          {desc ? <span style={{ color: 'rgba(255,255,255,.72)' }}>{' — ' + desc}</span> : null}
+        </span>
+      </div>
+    )
+  })
 }
-
 export default function ImproveWebsitePage() {
   const { lang } = useI18n()
   const l = ['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en'
@@ -265,7 +277,7 @@ export default function ImproveWebsitePage() {
               </div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,.4)', marginBottom: 8, wordBreak: 'break-all' }}>{audit.finalUrl}</div>
-                <div style={{ margin: 0, lineHeight: 1.7, color: 'rgba(255,255,255,.85)', fontSize: 14, whiteSpace: 'pre-wrap' }}>{renderRichText(audit.summary)}</div>
+                <div style={{ margin: 0, color: 'rgba(255,255,255,.85)', fontSize: 14 }}>{renderRichText(audit.summary)}</div>
               </div>
             </div>
 

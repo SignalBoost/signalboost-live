@@ -5,87 +5,65 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { HubUser, Permission } from './rbac-types'
 import { hasPermission, hasAllPermissions, hasAnyPermission } from './rbac-service'
+import { getAccess } from './access'
 
 /**
- * Get current user from request context
+ * Resolve the current hub user from the VERIFIED Supabase session.
  *
- * Resolution order:
- * 1. JWT/Bearer token in Authorization header (production)
- * 2. x-user-email header (set by frontend auth middleware)
- * 3. Workspace owner fallback (single-tenant default)
+ * Authentication is delegated to getAccess(), which validates the Supabase auth
+ * cookie server-side (the session JWT is verified by Supabase). This cannot be
+ * spoofed by a request header. The hub role is then read from hub_workspace_users
+ * keyed on the verified email, preserving operator/viewer/custom granularity.
  *
- * The owner fallback exists so the console works out-of-the-box for
- * single-tenant deployments where the workspace owner is the only user.
- * For multi-tenant production, wire up JWT verification above.
+ * There is intentionally NO header-trust path and NO owner/synthetic-owner
+ * fallback: an unauthenticated request resolves to null (denied); an authenticated
+ * user with no hub role resolves to null unless they are a workspace owner/admin
+ * per getAccess (OWNER_EMAILS / team_members). On any error we deny, never elevate.
  */
-export async function getCurrentUser(req: NextRequest): Promise<HubUser | null> {
+export async function getCurrentUser(_req: NextRequest): Promise<HubUser | null> {
   try {
+    // 1. Verify the real session. 'guest' => not authenticated => no access.
+    const access = await getAccess()
+    if (access.role === 'guest' || !access.email) return null
+
+    const email = access.email
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-    if (!supabaseUrl || !supabaseKey) {
-      return null
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseKey)
-
-    // Step 1: Try Authorization Bearer token (JWT)
-    // TODO: Wire up JWT verification when production auth is ready
-    const authHeader = req.headers.get('authorization')
-    if (authHeader?.startsWith('Bearer ')) {
-      // Placeholder - extract user from JWT and lookup in hub_workspace_users
-    }
-
-    // Step 2: Try x-user-email header (set by frontend after auth)
-    const userEmail = req.headers.get('x-user-email')
-    if (userEmail) {
-      const { data: user } = await supabase
+    // 2. Read the hub role for this VERIFIED email.
+    if (supabaseUrl && supabaseKey) {
+      const supabase = createClient(supabaseUrl, supabaseKey)
+      const { data: hubUser } = await supabase
         .from('hub_workspace_users')
         .select('*')
-        .eq('email', userEmail)
+        .eq('email', email)
         .single()
-
-      if (user) {
-        return user as HubUser
+      if (hubUser && (hubUser as HubUser).active !== false) {
+        return hubUser as HubUser
       }
     }
 
-    // Step 3: Fallback to workspace owner (single-tenant default)
-    const { data: owner } = await supabase
-      .from('hub_workspace_users')
-      .select('*')
-      .eq('role', 'owner')
-      .limit(1)
-      .single()
-
-    if (owner) {
-      return owner as HubUser
+    // 3. Trusted owner/admin from getAccess (OWNER_EMAILS / team_members), even
+    //    without an explicit hub_workspace_users row.
+    if (access.role === 'owner' || access.role === 'admin') {
+      const now = new Date().toISOString()
+      return {
+        id: access.userId || email,
+        email,
+        role: access.role as HubUser['role'],
+        mfaEnabled: false,
+        createdAt: now,
+        updatedAt: now,
+        lastLogin: now,
+        active: true,
+      } as HubUser
     }
 
-    // Step 4: If no users exist yet (fresh install), allow as synthetic owner
-    // This prevents the console from being inaccessible before first user setup
-    return {
-      id: 'synthetic-owner',
-      email: 'owner@signalboost.local',
-      role: 'owner',
-      mfaEnabled: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      lastLogin: new Date().toISOString(),
-      active: true,
-    } as HubUser
-  } catch (err) {
-    // On error, return synthetic owner so console remains accessible
-    return {
-      id: 'synthetic-owner',
-      email: 'owner@signalboost.local',
-      role: 'owner',
-      mfaEnabled: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      lastLogin: new Date().toISOString(),
-      active: true,
-    } as HubUser
+    // 4. Authenticated but no hub role => deny. No owner fallback.
+    return null
+  } catch {
+    // Deny on error — never elevate to owner.
+    return null
   }
 }
 

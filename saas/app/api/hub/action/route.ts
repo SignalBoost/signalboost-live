@@ -20,7 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getTemplate, validateTemplatePayload } from '@/lib/hub/provider-templates'
-import { isActionBlocked, requiresOwnerApproval } from '@/lib/hub/action-policy'
+import { getHubActionPolicy, isActionBlocked, requiresOwnerApproval } from '@/lib/hub/action-policy'
 import { recordAuditEvent, normalizeStatus } from '@/lib/hub/audit'
 import { getCurrentUser as resolveHubUser } from '@/lib/auth/permission-middleware'
 import { vaultEncrypt, vaultDecrypt } from '@/lib/vault/crypto'
@@ -201,6 +201,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ActionRespons
       )
     }
     const actorId = user.id
+    const policy = getHubActionPolicy(template.policyActionId)
 
     // 5. Enforce action policy
     if (isActionBlocked(template.policyActionId)) {

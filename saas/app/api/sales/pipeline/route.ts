@@ -1,68 +1,49 @@
-name: SaaS CI
+import { NextResponse } from 'next/server'
 
-# Runs on every push to main (the working branch) and on pull requests.
-# The typecheck job alone catches the class of error that has reached production
-# before (e.g. a referenced-but-undefined function), without needing any secrets.
+export async function GET() {
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key =
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY)
 
-on:
-  push:
-    branches: [main]
-    paths:
-      - 'saas/**'
-      - '.github/workflows/saas-ci.yml'
-  pull_request:
-    paths:
-      - 'saas/**'
-      - '.github/workflows/saas-ci.yml'
+    if (!url || !key) {
+      return NextResponse.json({
+        leads: [],
+        error: 'Supabase server credentials are missing.',
+      })
+    }
 
-permissions:
-  contents: read
+    const res = await fetch(
+      `${url}/rest/v1/sales_prospects?select=*&order=created_at.desc&limit=200`,
+      {
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+        },
+        cache: 'no-store',
+      }
+    )
 
-defaults:
-  run:
-    working-directory: saas
+    if (!res.ok) {
+      const body = await res.text()
+      console.error('Pipeline load failed:', body)
 
-jobs:
-  typecheck:
-    name: Typecheck (tsc --noEmit)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
-      - name: Typecheck
-        run: npx tsc --noEmit
+      return NextResponse.json({
+        leads: [],
+        error: 'Could not load pipeline.',
+      })
+    }
 
-  build:
-    name: Production build (next build)
-    runs-on: ubuntu-latest
-    # Build can compile without real secrets; placeholders satisfy module-load client init.
-    env:
-      NEXT_TELEMETRY_DISABLED: '1'
-      NEXT_PUBLIC_SUPABASE_URL: 'https://placeholder.supabase.co'
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'placeholder-anon-key'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
-      - name: Build
-        run: npm run build
+    const leads = await res.json()
 
-  test:
-    name: Unit tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
-      - name: Run tests
-        run: npm test
+    return NextResponse.json({ leads })
+  } catch (error) {
+    console.error('Pipeline route error:', error)
+
+    return NextResponse.json({
+      leads: [],
+      error: 'Something went wrong.',
+    })
+  }
+}

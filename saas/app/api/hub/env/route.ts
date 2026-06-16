@@ -1,19 +1,17 @@
 // saas/app/api/hub/env/route.ts
 // Hub Console — Vercel Environment Variables CRUD route.
 //
-//   GET    -> list env vars (masked metadata: key/target/type/id — NO values)
+//   GET    -> list env vars (masked metadata)   (gated: deployments:read)
 //   POST   -> add an env var            (gated: deployments:deploy)
 //   PATCH  -> edit value and/or target  (gated: deployments:deploy)
 //   DELETE -> remove an env var by id   (gated: deployments:deploy)
 //
-// Why GET is not auth-gated:
-//   The list returns only masked metadata (variable NAMES, targets, types, ids —
-//   Vercel never returns secret values here). It needs only a Vercel token + a
-//   project id. The old permission gate routed through getCurrentUser(), which
-//   hard-fails to null when SUPABASE_SERVICE_ROLE_KEY is absent in Vercel — that
-//   401'd the list before it ever reached Vercel, leaving the panel empty on a
-//   green build. Decoupling the read-only display from the Supabase auth layer
-//   makes it work whenever the Vercel credentials exist. Writes remain fully gated.
+// GET is gated at read level (deployments:read), like the mutating handlers.
+//   It returns only masked metadata (variable NAMES, targets, types, ids — Vercel
+//   never returns secret values here). The read gate was previously removed
+//   because the Supabase auth layer 401'd the panel whenever SUPABASE_SERVICE_ROLE_KEY
+//   was absent at runtime; that env fragility is resolved (env is read lazily), so
+//   the gate is safe to enforce. Unauthenticated callers no longer see env metadata.
 //
 // Project-id self-resolution (this is the fix for the empty list):
 //   The old code read ONLY process.env.VERCEL_HUB_PROJECT. If that single var was
@@ -130,8 +128,12 @@ function cleanTargets(t: unknown): EnvTarget[] {
   return t.filter((x) => allowed.includes(String(x))) as EnvTarget[]
 }
 
-// ---- GET: list (read-only, masked metadata only, no auth gate) ----
-export async function GET(_req: NextRequest) {
+// ---- GET: list (read-only, masked metadata only — gated: deployments:read) ----
+export async function GET(req: NextRequest) {
+  const perm = await requirePermission(req, 'deployments:read')
+  if (!perm.ok) {
+    return NextResponse.json({ ok: false, error: (perm as any).error }, { status: (perm as any).status })
+  }
   const tok = token()
   if (!tok) return noToken()
   const team = teamId()

@@ -1,4 +1,5 @@
 import { localizeProvider, cHub } from '@/lib/i18n/consoleCopy'
+import type { Dict } from '@/lib/i18n/loadLanguage'
 // saas/lib/hub/console-catalog.ts
 // Hub Command Console — Complete Tier and Provider Orchestration Register.
 //
@@ -292,23 +293,23 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
   }
 ]
 
-export function getConsoleTier(id: ConsoleTierId, lang?: string) {
+export function getConsoleTier(id: ConsoleTierId, dict?: Dict | null) {
   const tier = CONSOLE_TIERS.find(t => t.id === id) || CONSOLE_TIERS[0]
-  if (!lang || lang === 'en') return tier
-  return { ...tier, label: cHub(lang, `hub.tier.${tier.id}`, tier.label), sidebarTitle: cHub(lang, `hub.tier.sidebar.${tier.id}`, tier.sidebarTitle), blurb: cHub(lang, `hub.tier.blurb.${tier.id}`, (tier as any).blurb || '') }
+  if (!dict) return tier
+  return { ...tier, label: cHub(dict, `console.tier.${tier.id}`, tier.label), sidebarTitle: cHub(dict, `console.tier.sidebar.${tier.id}`, tier.sidebarTitle), blurb: cHub(dict, `console.tier.blurb.${tier.id}`, (tier as any).blurb || '') }
 }
 
-export function getConsoleProvider(id: string, lang?: string) {
+export function getConsoleProvider(id: string, dict?: Dict | null) {
   const p = CONSOLE_PROVIDERS.find(p => p.id === id) || null
-  return p && lang && lang !== 'en' ? localizeProvider(p, lang) : p
+  return p && dict ? localizeProvider(p, dict) : p
 }
 
-export function getTierProviders(tierId: ConsoleTierId, lang?: string) {
+export function getTierProviders(tierId: ConsoleTierId, dict?: Dict | null) {
   const known = CONSOLE_TIERS.some(t => t.id === tierId)
   // Unknown/legacy tier ids fall back to Core so nothing ever renders empty.
   const target = known ? tierId : 'core'
   const list = CONSOLE_PROVIDERS.filter(p => p.tier === target)
-  return (lang && lang !== 'en') ? list.map(p => localizeProvider(p, lang)) : list
+  return dict ? list.map(p => localizeProvider(p, dict)) : list
 }
 
 export function isDestructiveTemplate(id: string): boolean {

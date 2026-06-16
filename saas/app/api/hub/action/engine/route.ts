@@ -65,6 +65,14 @@ export async function POST(req: NextRequest) {
 }
 
 // GET → which executors are wired (handy while migrating providers).
-export async function GET() {
+// The executor list reveals the full action surface, so it is restricted to an
+// authenticated owner/admin — never exposed to anonymous or member callers.
+export async function GET(req: NextRequest) {
+  const host = createSignalBoostHost(req)
+  const user = await host.auth.getCurrentUser()
+  const roles = user?.roles || []
+  if (!user || !(roles.includes('owner') || roles.includes('admin'))) {
+    return NextResponse.json({ ok: false, error: 'Not authorized' }, { status: 403 })
+  }
   return NextResponse.json({ registered: listRegistered() }, { status: 200 })
 }

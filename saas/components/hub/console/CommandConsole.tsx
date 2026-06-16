@@ -1,282 +1,153 @@
 'use client'
 
-// saas/components/hub/console/CommandConsole.tsx
-// Hub Command Console — provider-centric, tiered orchestrator.
+// Hub Command Console — Child layout representations.
+// High-density compact grid layouts with explicit edge width safety.
 
-import { useState, ReactNode } from 'react'
-import {
-  CONSOLE_TIERS,
-  CONSOLE_UTILITY_PAGES,
-  ConsoleTierId,
-  getConsoleTier,
-  getConsoleProvider,
-  getTierProviders,
-} from '@/lib/hub/console-catalog'
-import { Lang } from '../shared'
-import ProviderActionForm from '../ProviderActionForm'
+import { type ConsoleProvider, isDestructiveTemplate } from '@/lib/hub/console-catalog'
 import { getTemplate } from '@/lib/hub/provider-templates'
-import { cHub } from '@/lib/i18n/consoleCopy'
-import { ProviderConsoleCard, ProviderWorkspace } from './ProviderConsoleCard'
-import { DomainsPage } from '../pages/DomainsPage'
-import EnvVarsPage from '../pages/EnvVarsPage'
-import { DeploymentsPage } from '../pages/DeploymentsPage'
-import { LogsPage } from '../pages/LogsPage'
-import { SettingsPage } from '../pages/SettingsPage'
+import { useTranslation } from '@/components/i18n/useTranslation'
+import { type Lang } from '../shared'
 
-const PER_PAGE = 2
-
-// Vercel workspace buttons that should open a real, live workspace panel inside
-// the modal instead of the single-action template form. This is what keeps every
-// Vercel button leading to a working surface — no dead links, no fake endpoints.
-type VercelPanel = { title: string; subtitle: string; render: () => ReactNode }
-
-const VERCEL_PANEL_ROUTER: Record<string, VercelPanel> = {
-  // Environment Variables — full view / add / edit / delete CRUD
-  'vercel.add_env_var': {
-    title: 'Environment Variables',
-    subtitle: 'View, add, edit, and delete variables across Production, Preview, and Development.',
-    render: () => <EnvVarsPage />,
-  },
-  'vercel.list_env_vars': {
-    title: 'Environment Variables',
-    subtitle: 'View, add, edit, and delete variables across Production, Preview, and Development.',
-    render: () => <EnvVarsPage />,
-  },
-  'vercel.view_env': {
-    title: 'Environment Variables',
-    subtitle: 'View, add, edit, and delete variables across Production, Preview, and Development.',
-    render: () => <EnvVarsPage />,
-  },
-  'vercel.delete_env_var': {
-    title: 'Environment Variables',
-    subtitle: 'View, add, edit, and delete variables across Production, Preview, and Development.',
-    render: () => <EnvVarsPage />,
-  },
-  // Edit / delete env open the same full CRUD panel (handles all operations inline).
-  'vercel.edit_env': {
-    title: 'Environment Variables',
-    subtitle: 'View, add, edit, and delete variables across Production, Preview, and Development.',
-    render: () => <EnvVarsPage />,
-  },
-  'vercel.delete_env': {
-    title: 'Environment Variables',
-    subtitle: 'View, add, edit, and delete variables across Production, Preview, and Development.',
-    render: () => <EnvVarsPage />,
-  },
-  // Logs Viewer — live platform / build / runtime logs
-  'vercel.logs': {
-    title: 'Logs Viewer',
-    subtitle: 'Recent platform, build, and runtime log events.',
-    render: () => <LogsPage />,
-  },
-  // Deployments — read-only history
-  'vercel.list_deployments': {
-    title: 'Deployments Panel',
-    subtitle: 'Inspect running build tracks, commit records, and production targets.',
-    render: () => <DeploymentsPage mode="view" />,
-  },
-  // Rollback — promote a previous deployment back to production
-  'vercel.trigger_rollback': {
-    title: 'Rollback Deploy',
-    subtitle: 'Promote a previous READY deployment back to production.',
-    render: () => <DeploymentsPage mode="rollback" />,
-  },
-  // Cancel — abort an in-progress build
-  'vercel.cancel_build': {
-    title: 'Cancel Build',
-    subtitle: 'Abort an in-progress build (BUILDING, QUEUED, or INITIALIZING).',
-    render: () => <DeploymentsPage mode="cancel" />,
-  },
-  // Domains / DNS — full domains workspace
-  'vercel.sync_dns_domain': {
-    title: 'Domains / DNS',
-    subtitle: 'Configure domains, alias paths, verification, and SSL.',
-    render: () => <DomainsPage />,
-  },
+type CardProps = {
+  provider: ConsoleProvider
+  lang: Lang
+  onExpand: () => void
+  onRun: (templateId: string) => void
 }
 
-export default function CommandConsole({
-  lang = 'en',
-  initialTier = 'core',
-}: {
-  lang?: Lang
-  initialTier?: ConsoleTierId
-}) {
-  const [tierId, setTierId] = useState<ConsoleTierId>(initialTier)
-  const [page, setPage] = useState(0)
-  const [focusProviderId, setFocusProviderId] = useState<string | null>(null)
-  const [utilityId, setUtilityId] = useState<string | null>(null)
-  const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null)
-
-  const tier = getConsoleTier(tierId, lang)
-  const providers = getTierProviders(tierId, lang)
-  const pageCount = Math.max(1, Math.ceil(providers.length / PER_PAGE))
-  const safePage = Math.min(page, pageCount - 1)
-  const visible = providers.slice(safePage * PER_PAGE, safePage * PER_PAGE + PER_PAGE)
-
-  const selectTier = (id: ConsoleTierId) => {
-    setTierId(id)
-    setPage(0)
-    setFocusProviderId(null)
-    setUtilityId(null)
-  }
-  const openProvider = (id: string) => {
-    setFocusProviderId(id)
-    setUtilityId(null)
-  }
-  const openUtility = (id: string) => {
-    setUtilityId(id)
-    setFocusProviderId(null)
-  }
-  const resetToHome = () => {
-    setFocusProviderId(null)
-    setUtilityId(null)
-    setPage(0)
-  }
-  const run = (templateId: string) => setActiveTemplateId(templateId)
-
-  const focusProvider = focusProviderId ? getConsoleProvider(focusProviderId, lang) : null
-
+export function ProviderConsoleCard({ provider, lang, onExpand, onRun }: CardProps) {
+  const { dict } = useTranslation()
   return (
-    <div style={{ display: 'flex', minHeight: 'calc(100vh - 80px)', background: '#070b14', color: '#fff', position: 'relative', boxSizing: 'border-box' }}>
-      {/* Sidebar */}
-      <aside style={{ width: 248, flex: '0 0 248px', background: 'linear-gradient(180deg, rgba(13,18,32,.9), rgba(8,11,20,.9))', borderRight: '1px solid rgba(255,255,255,.07)', display: 'flex', flexDirection: 'column', padding: '16px 12px', overflowY: 'auto', boxSizing: 'border-box' }}>
-        <div style={{ padding: '4px 8px 12px' }}>
-          <button onClick={resetToHome} style={{ background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: 9, color: 'rgba(255,255,255,.92)', fontWeight: 800, fontSize: 14, cursor: 'pointer', padding: 0, textAlign: 'left' }}>
-            <span style={{ color: '#1af0ff' }}>≡</span>
-            {tier?.sidebarTitle}
-          </button>
-          <div style={{ display: 'flex', gap: 6, marginTop: 11 }}>
-            {CONSOLE_TIERS.map(t => {
-              const active = t.id === tierId
-              return (
-                <button key={t.id} onClick={() => selectTier(t.id)} style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: active ? '1px solid rgba(26,240,255,.5)' : '1px solid rgba(255,255,255,.1)', background: active ? 'rgba(26,240,255,.14)' : 'rgba(255,255,255,.03)', color: active ? '#1af0ff' : 'rgba(255,255,255,.6)', fontSize: 12, fontWeight: 900, cursor: 'pointer' }}>
-                  {t.index}
-                </button>
-              )
-            })}
+    <div style={{ background: 'rgba(13, 18, 32, 0.45)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: 12, overflow: 'hidden', boxSizing: 'border-box' }}>
+      {/* Card Header Band */}
+      <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxSizing: 'border-box' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: provider.accent, boxShadow: `0 0 8px ${provider.accent}` }} />
+          <div>
+            <div style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>{provider.name}</div>
+            <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.45)', fontWeight: 700 }}>{provider.subtitle}</div>
           </div>
         </div>
+        <button onClick={onExpand} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: 6, color: '#1af0ff', fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}>
+          Workspace →
+        </button>
+      </div>
 
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 4 }}>
-          {providers.map(p => {
-            const active = focusProviderId === p.id
-            return (
-              <button key={p.id} onClick={() => openProvider(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 11px', borderRadius: 10, border: '1px solid transparent', background: active ? 'rgba(26,240,255,.14)' : 'transparent', color: active ? '#1af0ff' : 'rgba(255,255,255,.78)', fontSize: 13.5, fontWeight: active ? 800 : 600, cursor: 'pointer', textAlign: 'left' }}>
-                <span style={{ width: 9, height: 9, borderRadius: 3, background: p.accent, flex: '0 0 auto', boxShadow: `0 0 8px ${p.accent}66` }} />
-                {p.name}
-              </button>
-            )
-          })}
-        </nav>
-
-        <div style={{ height: 1, background: 'rgba(255,255,255,.08)', margin: '14px 6px' }} />
-
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {CONSOLE_UTILITY_PAGES.map(u => {
-            const active = utilityId === u.id
-            return (
-              <button key={u.id} onClick={() => openUtility(u.id)} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 11px', borderRadius: 10, border: '1px solid transparent', background: active ? 'rgba(255,195,0,.12)' : 'transparent', color: active ? '#ffc300' : 'rgba(255,255,255,.7)', fontSize: 13.5, fontWeight: active ? 800 : 600, cursor: 'pointer', textAlign: 'left' }}>
-                <span style={{ fontSize: 15, flex: '0 0 auto' }}>{u.icon}</span>
-                {cHub(lang, `hub.util.${u.id}`, u.label)}
-              </button>
-            )
-          })}
-        </nav>
-      </aside>
-
-      {/* Content Area */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, boxSizing: 'border-box' }}>
-        <div style={{ flex: 1, overflow: 'auto', padding: '24px 24px', boxSizing: 'border-box' }}>
-          {utilityId ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>
-                <button onClick={resetToHome} style={{ background: 'none', border: 'none', color: '#1af0ff', cursor: 'pointer', padding: 0, fontSize: 11, fontWeight: 700 }}>🎛️ {cHub(lang, 'hub.ui.hub_home', 'Hub Home')}</button> / {cHub(lang, 'hub.ui.utility_views', 'Utility Views')}
-              </div>
-              <UtilityFrame id={utilityId} lang={lang} />
+      {/* Render Actions Layout */}
+      <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10, boxSizing: 'border-box' }}>
+        {provider.sections.map((section, idx) => (
+          <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 4, boxSizing: 'border-box' }}>
+            <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255, 255, 255, 0.35)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              {section.title}
             </div>
-          ) : focusProvider ? (
-            <ProviderWorkspace
-              provider={focusProvider}
-              tierLabel={tier?.label ? `${cHub(lang, 'hub.ui.tier', 'Tier')} ${tier.index} · ${tier.label}` : cHub(lang, 'hub.ui.tier', 'Tier')}
-              lang={lang}
-              onBack={() => setFocusProviderId(null)}
-              onHome={resetToHome}
-              onRun={run}
-            />
-          ) : (
-            <>
-              <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ fontSize: 20, fontWeight: 900, color: '#fff' }}>{cHub(lang, 'hub.ui.tier', 'Tier')} {tier?.index} · {tier?.label} {cHub(lang, 'hub.ui.providers', 'Providers')}</div>
-                  <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.5)', marginTop: 4, maxWidth: 560 }}>{tier?.blurb}</div>
-                </div>
-                {pageCount > 1 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <PagerButton label="←" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={safePage === 0} />
-                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', fontWeight: 700, minWidth: 86, textAlign: 'center' }}>Page {safePage + 1} of {pageCount}</span>
-                    <PagerButton label="→" onClick={() => setPage(p => Math.min(pageCount - 1, p + 1))} disabled={safePage >= pageCount - 1} />
-                  </div>
-                )}
-              </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, width: '100%', boxSizing: 'border-box' }}>
+              {section.templateIds.map(id => {
+                const template = getTemplate(id, dict)
+                if (!template) return null
+                const isDestructive = isDestructiveTemplate(id)
+                const isArchive = id.includes('archive')
 
-              <div className="sb-console-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start', boxSizing: 'border-box' }}>
-                {visible.map(p => (
-                  <ProviderConsoleCard key={p.id} provider={p} lang={lang} onExpand={() => openProvider(p.id)} onRun={run} />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Audit footer */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,.07)', padding: '14px 24px', textAlign: 'center', fontSize: 12.5, color: 'rgba(255,255,255,.55)', background: 'rgba(8,11,20,.6)' }}>
-          <strong style={{ color: 'rgba(255,255,255,.8)' }}>Audit Log:</strong> All actions are recorded for compliance.{' '}
-          <button onClick={() => openUtility('logs')} style={{ background: 'none', border: 'none', color: '#1af0ff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}>View log →</button>
-        </div>
-      </main>
-
-      {/* Action modal overlay */}
-      {activeTemplateId && (() => {
-        const panel = VERCEL_PANEL_ROUTER[activeTemplateId]
-        const isPanel = Boolean(panel)
-        return (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setActiveTemplateId(null)}>
-            <div style={{ width: '100%', maxWidth: isPanel ? 1040 : 520, maxHeight: '88vh', overflow: 'auto', borderRadius: 18 }} onClick={e => e.stopPropagation()}>
-              {isPanel ? (
-                <div style={{ background: 'linear-gradient(160deg, rgba(15,23,42,.96), rgba(3,7,18,.98))', border: '1px solid rgba(255,255,255,.1)', borderRadius: 18, padding: '18px 18px 22px', boxShadow: '0 24px 70px rgba(0,0,0,.6)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
-                    <div>
-                      <div style={{ fontSize: 16, fontWeight: 900, color: '#fff' }}>{panel.title}</div>
-                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginTop: 2 }}>{panel.subtitle}</div>
-                    </div>
-                    <button onClick={() => setActiveTemplateId(null)} style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 9, color: 'rgba(255,255,255,.7)', fontSize: 13, fontWeight: 800, cursor: 'pointer', padding: '7px 12px' }}>✕ Close</button>
-                  </div>
-                  {panel.render()}
-                </div>
-              ) : (
-                <ProviderActionForm templateId={activeTemplateId} lang={lang} onClose={() => setActiveTemplateId(null)} onSuccess={() => setActiveTemplateId(null)} onError={() => {}} />
-              )}
+                return (
+                  <button 
+                    key={id} 
+                    onClick={() => onRun(id)} 
+                    style={{ 
+                      padding: '5px 8px', 
+                      borderRadius: 6, 
+                      textAlign: 'left', 
+                      fontSize: 11, 
+                      fontWeight: 600, 
+                      cursor: 'pointer', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 6, 
+                      border: isDestructive ? '1px solid rgba(239, 68, 68, 0.2)' : isArchive ? '1px solid rgba(255, 195, 0, 0.2)' : '1px solid rgba(255, 255, 255, 0.06)', 
+                      background: isDestructive ? 'rgba(239, 68, 68, 0.05)' : isArchive ? 'rgba(255, 195, 0, 0.05)' : 'rgba(255, 255, 255, 0.02)', 
+                      color: isDestructive ? '#ef4444' : isArchive ? '#ffc300' : 'rgba(255, 255, 255, 0.8)' 
+                    }}
+                  >
+                    <span style={{ fontSize: 11 }}>{template.icon}</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{template.label}</span>
+                  </button>
+                )
+              })}
             </div>
           </div>
-        )
-      })()}
+        ))}
+      </div>
     </div>
   )
 }
 
-function PagerButton({ label, onClick, disabled }: { label: string; onClick: () => void; disabled?: boolean }) {
-  return (
-    <button onClick={onClick} disabled={disabled} style={{ padding: '6px 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,.14)', background: disabled ? 'rgba(255,255,255,.02)' : 'rgba(255,255,255,.05)', color: disabled ? 'rgba(255,255,255,.25)' : '#1af0ff', fontSize: 14, fontWeight: 900, cursor: disabled ? 'default' : 'pointer' }}>
-      {label}
-    </button>
-  )
+type WorkspaceProps = {
+  provider: ConsoleProvider
+  tierLabel: string
+  lang: Lang
+  onBack: () => void
+  onHome: () => void // Explicitly registers type parameter safety bounds
+  onRun: (templateId: string) => void
 }
 
-function UtilityFrame({ id, lang }: { id: string; lang: Lang }) {
-  if (id === 'domains') return <DomainsPage />
-  if (id === 'deployments') return <DeploymentsPage />
-  if (id === 'logs') return <LogsPage />
-  if (id === 'settings') return <SettingsPage />
-  return <div style={{ color: 'rgba(255,255,255,.6)' }}>Unknown page.</div>
+export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onHome, onRun }: WorkspaceProps) {
+  const { dict } = useTranslation()
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', maxWidth: '100%', boxSizing: 'border-box', paddingRight: '4px' }}>
+      {/* Dynamic Breadcrumb Track Navigation */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>
+        <button onClick={onHome} style={{ background: 'none', border: 'none', color: '#1af0ff', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}>🎛️ Hub Home</button>
+        <span>/</span>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}>{tierLabel}</button>
+        <span>/</span>
+        <span style={{ color: '#fff', fontWeight: 800 }}>{provider.name} Workspace</span>
+      </div>
+
+      {/* Grid layout with strict multi-column spacing rules */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+        {provider.sections.map((section, idx) => (
+          <div key={idx} style={{ background: 'rgba(13, 18, 32, 0.3)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: 10, padding: 12, boxSizing: 'border-box', overflow: 'hidden' }}>
+            <h3 style={{ fontSize: 11, fontWeight: 800, color: '#1af0ff', textTransform: 'uppercase', margin: '0 0 10px 0', letterSpacing: '0.04em' }}>{section.title}</h3>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, width: '100%', boxSizing: 'border-box' }}>
+              {section.templateIds.map(id => {
+                const template = getTemplate(id, dict)
+                if (!template) return null
+                const isDestructive = isDestructiveTemplate(id)
+                const isArchive = id.includes('archive')
+
+                return (
+                  <div 
+                    key={id} 
+                    onClick={() => onRun(id)} 
+                    style={{ 
+                      padding: '8px 10px', 
+                      borderRadius: 8, 
+                      background: 'rgba(255,255,255,0.01)', 
+                      border: isDestructive ? '1px solid rgba(239, 68, 68, 0.2)' : isArchive ? '1px solid rgba(255, 195, 0, 0.2)' : '1px solid rgba(255,255,255,0.05)', 
+                      cursor: 'pointer', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      minHeight: '44px',
+                      boxSizing: 'border-box',
+                      minWidth: 0
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, width: '100%' }}>
+                      <span style={{ fontSize: 14, flexShrink: 0 }}>{template.icon}</span>
+                      <div style={{ minWidth: 0, overflow: 'hidden', flex: 1 }}>
+                        <div style={{ fontSize: 11.5, fontWeight: 700, color: isDestructive ? '#ef4444' : isArchive ? '#ffc300' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{template.label}</div>
+                        <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{template.description}</div>
+                      </div>
+                    </div>
+                    <span style={{ color: isDestructive ? '#ef4444' : isArchive ? '#ffc300' : 'rgba(255,255,255,0.25)', fontSize: 11, fontWeight: 800, paddingLeft: 4, flexShrink: 0 }}>→</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }

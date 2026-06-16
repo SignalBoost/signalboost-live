@@ -7,7 +7,7 @@
 
 import type { NextRequest } from 'next/server'
 import { getCurrentUser as resolveHubUser } from '@/lib/auth/permission-middleware'
-import { isActionBlocked, requiresOwnerApproval } from '@/lib/hub/action-policy'
+import { isActionBlocked, requiresOwnerApproval, requiresAdminApproval } from '@/lib/hub/action-policy'
 import type { AuthAdapter } from '@/console-core/types'
 import type { EngineHost } from '@/console-core/actionEngine'
 import { createHost } from '@/console-core/defaultHost'
@@ -23,7 +23,10 @@ function signalboostAuth(req: NextRequest): AuthAdapter {
       // Authentication is required for EVERY action — no read-only bypass.
       if (!user) return false
       if (isActionBlocked(policyActionId)) return false
-      if (requiresOwnerApproval(policyActionId) && !(user.roles || []).includes('owner')) return false
+      const roles = user.roles || []
+      if (requiresOwnerApproval(policyActionId) && !roles.includes('owner')) return false
+      // Admin-level actions require an admin or owner (owner ⊃ admin).
+      if (requiresAdminApproval(policyActionId) && !roles.includes('admin') && !roles.includes('owner')) return false
       return true
     },
   }

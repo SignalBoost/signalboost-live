@@ -4,8 +4,10 @@
 import { useState, useEffect } from 'react'
 import { VercelDomain, SSLCertificate, Domain } from '@/lib/hub/domains-types'
 import { cardStyle, labelStyle, bodyStyle, TONES } from '../shared'
+import { useTranslation } from '@/components/i18n/useTranslation'
 
 export function DomainsPage() {
+  const { t } = useTranslation()
   const [domains, setDomains] = useState<VercelDomain[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -25,10 +27,10 @@ export function DomainsPage() {
       if (data.ok) {
         setDomains(data.domains || [])
       } else {
-        setError(data.error || 'Failed to load domains')
+        setError(data.error || t('console.domains.err_load', 'Failed to load domains'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error loading domains')
+      setError(err instanceof Error ? err.message : t('console.domains.err_load2', 'Error loading domains'))
     } finally {
       setLoading(false)
     }
@@ -50,10 +52,10 @@ export function DomainsPage() {
         setNewDomain('')
         fetchDomains()
       } else {
-        setError(data.error || 'Failed to add domain')
+        setError(data.error || t('console.domains.err_add', 'Failed to add domain'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error adding domain')
+      setError(err instanceof Error ? err.message : t('console.domains.err_add2', 'Error adding domain'))
     }
   }
 
@@ -70,27 +72,23 @@ export function DomainsPage() {
       if (data.ok) {
         fetchDomains()
       } else {
-        setError(data.error || 'Verification failed')
+        setError(data.error || t('console.domains.err_verify', 'Verification failed'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error verifying domain')
+      setError(err instanceof Error ? err.message : t('console.domains.err_verify2', 'Error verifying domain'))
     }
   }
 
   return (
     <div style={{ padding: '2rem', maxWidth: '1200px' }}>
       <div style={{ marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#1af0ff' }}>
-          Domains & DNS
-        </h2>
-        <p style={{ color: '#888', fontSize: '0.9rem' }}>
-          Manage domains, DNS records, and SSL certificates
-        </p>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#1af0ff' }}>{t('console.domains.title', 'Domains & DNS')}</h2>
+        <p style={{ color: '#888', fontSize: '0.9rem' }}>{t('console.domains.subtitle', 'Manage domains, DNS records, and SSL certificates')}</p>
       </div>
 
       {/* Add Domain Form */}
       <div style={{ ...cardStyle, marginBottom: '2rem' }}>
-        <h3 style={{ ...labelStyle, marginBottom: '1rem' }}>Add Domain</h3>
+        <h3 style={{ ...labelStyle, marginBottom: '1rem' }}>{t('console.domains.add_domain', 'Add Domain')}</h3>
 
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
           <input
@@ -123,9 +121,7 @@ export function DomainsPage() {
               fontSize: '0.9rem',
               opacity: !newDomain.trim() || loading ? 0.5 : 1,
             }}
-          >
-            Add
-          </button>
+          >{t('console.domains.add', 'Add')}</button>
         </div>
 
         {error && (
@@ -137,13 +133,9 @@ export function DomainsPage() {
 
       {/* Domains List */}
       {loading ? (
-        <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>
-          Loading domains...
-        </div>
+        <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>{t('console.domains.loading', 'Loading domains...')}</div>
       ) : domains.length === 0 ? (
-        <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>
-          No domains configured yet
-        </div>
+        <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>{t('console.domains.empty', 'No domains configured yet')}</div>
       ) : (
         <div style={{ display: 'grid', gap: '1rem' }}>
           {domains.map(domain => (
@@ -172,8 +164,9 @@ function DomainCard({
   onToggle: () => void
   onVerify: () => void
 }) {
+  const { t } = useTranslation()
   const statusColor = domain.verified ? '#22c55e' : '#fbbf24'
-  const statusText = domain.verified ? 'Verified' : 'Pending Verification'
+  const statusText = domain.verified ? t('console.domains.verified', 'Verified') : t('console.domains.pending', 'Pending Verification')
 
   return (
     <div style={cardStyle}>
@@ -206,7 +199,7 @@ function DomainCard({
           {/* Verification */}
           {!domain.verified && domain.verification && (
             <div style={{ background: '#1a1a2e', padding: '1rem', borderRadius: '4px', borderLeft: `3px solid #fbbf24` }}>
-              <div style={{ ...labelStyle, marginBottom: '0.5rem' }}>Verification Required</div>
+              <div style={{ ...labelStyle, marginBottom: '0.5rem' }}>{t('console.domains.verification_required', 'Verification Required')}</div>
               {domain.verification.map((v, i) => (
                 <div key={i} style={{ fontSize: '0.85rem', marginBottom: '0.5rem', fontFamily: 'monospace' }}>
                   <div style={{ color: '#888' }}>{v.type.toUpperCase()}</div>
@@ -226,25 +219,23 @@ function DomainCard({
                   fontSize: '0.85rem',
                   fontWeight: 'bold',
                 }}
-              >
-                Check Verification
-              </button>
+              >{t('console.domains.check_verification', 'Check Verification')}</button>
             </div>
           )}
 
           {/* SSL Certificate */}
           {domain.ssl && (
             <div style={{ background: '#1a1a2e', padding: '1rem', borderRadius: '4px' }}>
-              <div style={{ ...labelStyle, marginBottom: '0.5rem' }}>SSL Certificate</div>
+              <div style={{ ...labelStyle, marginBottom: '0.5rem' }}>{t('console.domains.ssl_cert', 'SSL Certificate')}</div>
               <div style={{ display: 'grid', gap: '0.5rem', fontSize: '0.85rem' }}>
                 <div>
-                  <span style={{ color: '#888' }}>Status: </span>
+                  <span style={{ color: '#888' }}>{t('console.domains.status', 'Status')}: </span>
                   <span style={{ color: domain.ssl.status === 'issued' ? '#22c55e' : '#fbbf24' }}>
                     {domain.ssl.status}
                   </span>
                 </div>
                 <div>
-                  <span style={{ color: '#888' }}>Expires: </span>
+                  <span style={{ color: '#888' }}>{t('console.domains.expires', 'Expires')}: </span>
                   <span style={{ color: '#1af0ff' }}>
                     {new Date(domain.ssl.expiresAt).toLocaleDateString()}
                   </span>
@@ -256,7 +247,7 @@ function DomainCard({
           {/* Nameservers */}
           {domain.verified && (
             <div style={{ background: '#1a1a2e', padding: '1rem', borderRadius: '4px' }}>
-              <div style={{ ...labelStyle, marginBottom: '0.5rem' }}>Nameservers</div>
+              <div style={{ ...labelStyle, marginBottom: '0.5rem' }}>{t('console.domains.nameservers', 'Nameservers')}</div>
               <div style={{ display: 'grid', gap: '0.25rem', fontSize: '0.8rem', fontFamily: 'monospace' }}>
                 <div>ns1.vercel-dns.com</div>
                 <div>ns2.vercel-dns.com</div>
@@ -267,11 +258,11 @@ function DomainCard({
           {/* Quick Stats */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.85rem' }}>
             <div style={{ background: '#1a1a2e', padding: '0.75rem', borderRadius: '4px' }}>
-              <div style={{ color: '#888', marginBottom: '0.25rem' }}>Created</div>
+              <div style={{ color: '#888', marginBottom: '0.25rem' }}>{t('console.domains.created', 'Created')}</div>
               <div style={{ color: '#1af0ff' }}>{new Date(domain.createdAt).toLocaleDateString()}</div>
             </div>
             <div style={{ background: '#1a1a2e', padding: '0.75rem', borderRadius: '4px' }}>
-              <div style={{ color: '#888', marginBottom: '0.25rem' }}>Updated</div>
+              <div style={{ color: '#888', marginBottom: '0.25rem' }}>{t('console.domains.updated', 'Updated')}</div>
               <div style={{ color: '#1af0ff' }}>{new Date(domain.updatedAt).toLocaleDateString()}</div>
             </div>
           </div>

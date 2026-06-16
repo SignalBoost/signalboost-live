@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react'
 import { AuditLog } from '@/lib/hub/logs-service'
 import { cardStyle, labelStyle, bodyStyle, TONES } from '../shared'
+import { useTranslation } from '@/components/i18n/useTranslation'
 
 interface LogStats {
   totalActions: number
@@ -14,6 +15,7 @@ interface LogStats {
 }
 
 export function LogsPage() {
+  const { t } = useTranslation()
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [stats, setStats] = useState<LogStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -54,10 +56,10 @@ export function LogsPage() {
       if (data.ok) {
         setLogs(data.logs || [])
       } else {
-        setError(data.error || 'Failed to load logs')
+        setError(data.error || t('console.logs.err_load', 'Failed to load logs'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error loading logs')
+      setError(err instanceof Error ? err.message : t('console.logs.err_load2', 'Error loading logs'))
     } finally {
       setLoading(false)
     }
@@ -100,7 +102,7 @@ export function LogsPage() {
         URL.revokeObjectURL(url)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Export failed')
+      setError(err instanceof Error ? err.message : t('console.logs.err_export', 'Export failed'))
     }
   }
 
@@ -108,33 +110,27 @@ export function LogsPage() {
     <div style={{ padding: '2rem', maxWidth: '1400px' }}>
       {/* Header */}
       <div style={{ marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#1af0ff' }}>
-          Audit Logs
-        </h2>
-        <p style={{ color: '#888', fontSize: '0.9rem' }}>
-          Real-time activity log of all vault operations
-        </p>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#1af0ff' }}>{t('console.logs.title', 'Audit Logs')}</h2>
+        <p style={{ color: '#888', fontSize: '0.9rem' }}>{t('console.logs.subtitle', 'Real-time activity log of all vault operations')}</p>
       </div>
 
       {/* Stats Cards */}
       {stats && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-          <StatCard label="Actions (24h)" value={stats.actionsBy24h} color="#1af0ff" />
-          <StatCard label="Success Rate" value={`${stats.successRate}%`} color="#22c55e" />
-          <StatCard label="Failed Actions" value={stats.failedActions} color="#ef4444" />
-          <StatCard label="Unique Users" value={stats.uniqueUsers} color="#fbbf24" />
+          <StatCard label={t('console.logs.stat_actions_24h', 'Actions (24h)')} value={stats.actionsBy24h} color="#1af0ff" />
+          <StatCard label={t('console.logs.stat_success_rate', 'Success Rate')} value={`${stats.successRate}%`} color="#22c55e" />
+          <StatCard label={t('console.logs.stat_failed', 'Failed Actions')} value={stats.failedActions} color="#ef4444" />
+          <StatCard label={t('console.logs.stat_unique_users', 'Unique Users')} value={stats.uniqueUsers} color="#fbbf24" />
         </div>
       )}
 
       {/* Filters */}
       <div style={{ ...cardStyle, marginBottom: '2rem' }}>
-        <h3 style={{ ...labelStyle, marginBottom: '1rem' }}>Filters</h3>
+        <h3 style={{ ...labelStyle, marginBottom: '1rem' }}>{t('console.logs.filters', 'Filters')}</h3>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
           <div>
-            <label style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem', display: 'block' }}>
-              Action
-            </label>
+            <label style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem', display: 'block' }}>{t('console.logs.action', 'Action')}</label>
             <select
               value={filterAction}
               onChange={e => {
@@ -151,21 +147,19 @@ export function LogsPage() {
                 fontSize: '0.85rem',
               }}
             >
-              <option value="">All Actions</option>
-              <option value="accessed">Accessed</option>
-              <option value="rotated">Rotated</option>
-              <option value="verified">Verified</option>
-              <option value="created">Created</option>
-              <option value="deleted">Deleted</option>
-              <option value="revoked">Revoked</option>
-              <option value="exported">Exported</option>
+              <option value="">{t('console.logs.all_actions', 'All Actions')}</option>
+              <option value="accessed">{t('console.logs.accessed', 'Accessed')}</option>
+              <option value="rotated">{t('console.logs.rotated', 'Rotated')}</option>
+              <option value="verified">{t('console.logs.verified', 'Verified')}</option>
+              <option value="created">{t('console.logs.created', 'Created')}</option>
+              <option value="deleted">{t('console.logs.deleted', 'Deleted')}</option>
+              <option value="revoked">{t('console.logs.revoked', 'Revoked')}</option>
+              <option value="exported">{t('console.logs.exported', 'Exported')}</option>
             </select>
           </div>
 
           <div>
-            <label style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem', display: 'block' }}>
-              Status
-            </label>
+            <label style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem', display: 'block' }}>{t('console.logs.status', 'Status')}</label>
             <select
               value={filterStatus}
               onChange={e => {
@@ -182,20 +176,18 @@ export function LogsPage() {
                 fontSize: '0.85rem',
               }}
             >
-              <option value="">All Statuses</option>
-              <option value="success">Success</option>
-              <option value="failed">Failed</option>
-              <option value="pending">Pending</option>
+              <option value="">{t('console.logs.all_statuses', 'All Statuses')}</option>
+              <option value="success">{t('console.logs.success', 'Success')}</option>
+              <option value="failed">{t('console.logs.failed', 'Failed')}</option>
+              <option value="pending">{t('console.logs.pending', 'Pending')}</option>
             </select>
           </div>
 
           <div>
-            <label style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem', display: 'block' }}>
-              Secret ID
-            </label>
+            <label style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem', display: 'block' }}>{t('console.logs.secret_id', 'Secret ID')}</label>
             <input
               type="text"
-              placeholder="Filter by secret"
+              placeholder={t('console.logs.ph_secret', 'Filter by secret')}
               value={filterSecretId}
               onChange={e => {
                 setFilterSecretId(e.target.value)
@@ -214,12 +206,10 @@ export function LogsPage() {
           </div>
 
           <div>
-            <label style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem', display: 'block' }}>
-              User Email
-            </label>
+            <label style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem', display: 'block' }}>{t('console.logs.user_email', 'User Email')}</label>
             <input
               type="text"
-              placeholder="Filter by user"
+              placeholder={t('console.logs.ph_user', 'Filter by user')}
               value={filterUserEmail}
               onChange={e => {
                 setFilterUserEmail(e.target.value)
@@ -250,24 +240,18 @@ export function LogsPage() {
             fontSize: '0.85rem',
             fontWeight: 'bold',
           }}
-        >
-          📥 Export as CSV
-        </button>
+        >{'📥 ' + t('console.logs.export_csv', 'Export as CSV')}</button>
       </div>
 
       {/* Logs Table */}
       {loading ? (
-        <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>
-          Loading logs...
-        </div>
+        <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>{t('console.logs.loading', 'Loading logs...')}</div>
       ) : error ? (
         <div style={{ ...cardStyle, padding: '1rem', background: '#1a0000', color: '#ff6b6b', borderRadius: '4px' }}>
           {error}
         </div>
       ) : logs.length === 0 ? (
-        <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>
-          No logs found
-        </div>
+        <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>{t('console.logs.no_logs', 'No logs found')}</div>
       ) : (
         <>
           <div style={{ ...cardStyle, overflowX: 'auto' }}>
@@ -280,12 +264,12 @@ export function LogsPage() {
             >
               <thead>
                 <tr style={{ borderBottom: '1px solid #333' }}>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', color: '#888' }}>Timestamp</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', color: '#888' }}>Action</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', color: '#888' }}>Secret ID</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', color: '#888' }}>User</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', color: '#888' }}>Status</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', color: '#888' }}>Message</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', color: '#888' }}>{t('console.logs.timestamp', 'Timestamp')}</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', color: '#888' }}>{t('console.logs.action', 'Action')}</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', color: '#888' }}>{t('console.logs.secret_id', 'Secret ID')}</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', color: '#888' }}>{t('console.logs.col_user', 'User')}</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', color: '#888' }}>{t('console.logs.status', 'Status')}</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', color: '#888' }}>{t('console.logs.message', 'Message')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -340,12 +324,8 @@ export function LogsPage() {
                 cursor: page === 0 ? 'default' : 'pointer',
                 fontWeight: 'bold',
               }}
-            >
-              ← Previous
-            </button>
-            <div style={{ display: 'flex', alignItems: 'center', color: '#888' }}>
-              Page {page + 1}
-            </div>
+            >{'← ' + t('console.logs.previous', 'Previous')}</button>
+            <div style={{ display: 'flex', alignItems: 'center', color: '#888' }}>{t('console.logs.page_n', 'Page {n}').replace('{n}', String(page + 1))}</div>
             <button
               onClick={() => setPage(page + 1)}
               disabled={logs.length < 50}
@@ -358,9 +338,7 @@ export function LogsPage() {
                 cursor: logs.length < 50 ? 'default' : 'pointer',
                 fontWeight: 'bold',
               }}
-            >
-              Next →
-            </button>
+            >{t('console.logs.next', 'Next') + ' →'}</button>
           </div>
         </>
       )}

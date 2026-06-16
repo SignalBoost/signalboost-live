@@ -1,3 +1,8 @@
+// Console namespace lives in ONE JSON file next to this loader (no alias, no
+// per-language files) so it builds reliably and a buyer translates the console
+// by editing string values in that single JSON.
+import consoleLocales from './consoleLocales.json'
+
 export type DictValue = string | string[] | Dict
 export type Dict = { [key: string]: DictValue }
 
@@ -14,19 +19,9 @@ const dictionaries: Record<string, () => Promise<Dict>> = {
     import('@/locales/ru.json').then(m => m.default as Dict),
 }
 
-// Console namespace lives in dedicated files so the main locale files stay lean
-// and a buyer can translate the console by editing one small JSON per language.
-const consoleDictionaries: Record<string, () => Promise<Dict>> = {
-  en: () => import('@/locales/console.en.json').then(m => m.default as Dict),
-  pt: () => import('@/locales/console.pt.json').then(m => m.default as Dict),
-  es: () => import('@/locales/console.es.json').then(m => m.default as Dict),
-  pl: () => import('@/locales/console.pl.json').then(m => m.default as Dict),
-  ru: () => import('@/locales/console.ru.json').then(m => m.default as Dict),
-}
-
-async function loadConsole(lang: string): Promise<Dict> {
-  try { return await (consoleDictionaries[lang] || consoleDictionaries.en)() }
-  catch { return {} }
+function loadConsole(lang: string): Dict {
+  const table = consoleLocales as unknown as Record<string, Dict>
+  return table[lang] || table.en || {}
 }
 
 function isDict(value: DictValue | undefined): value is Dict {
@@ -50,7 +45,7 @@ function mergeWithEnglishFallback(english: Dict, localized: Dict): Dict {
 
 export async function loadLanguage(lang: string): Promise<Dict> {
   const english = await dictionaries.en()
-  const enConsole = await loadConsole('en')
+  const enConsole = loadConsole('en')
   if (lang === 'en' || !dictionaries[lang]) {
     // Stamp the active language so suite copy (lib/i18n/suiteCopy.ts) can resolve correctly.
     return { ...english, console: enConsole, __lang: 'en' }
@@ -59,9 +54,8 @@ export async function loadLanguage(lang: string): Promise<Dict> {
   try {
     const localized = await dictionaries[lang]()
     const merged = mergeWithEnglishFallback(english, localized)
-    const locConsole = await loadConsole(lang)
     // English fallback for any console key missing in the target language.
-    merged.console = mergeWithEnglishFallback(enConsole, locConsole)
+    merged.console = mergeWithEnglishFallback(enConsole, loadConsole(lang))
     merged.__lang = lang
     return merged
   } catch {

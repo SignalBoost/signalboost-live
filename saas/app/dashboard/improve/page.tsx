@@ -50,6 +50,23 @@ function scoreColor(s: number) {
   return '#fca5a5'
 }
 
+// Render light markdown from AI summaries: **bold** + line breaks. Avoids raw ** bleeding into the UI.
+function renderRichText(text: string) {
+  return String(text || '').split('\n').map((line, li) => {
+    if (!line.trim()) return <span key={li} style={{ display: 'block', height: '0.6em' }} />
+    const parts = line.split(/(\*\*[^*]+\*\*)/g)
+    return (
+      <span key={li} style={{ display: 'block' }}>
+        {parts.map((part, pi) =>
+          /^\*\*[^*]+\*\*$/.test(part)
+            ? <strong key={pi} style={{ color: '#fff', fontWeight: 800 }}>{part.slice(2, -2)}</strong>
+            : part
+        )}
+      </span>
+    )
+  })
+}
+
 function buildBrief(audit: Audit): string {
   let host = audit.finalUrl
   try { host = new URL(audit.finalUrl).hostname.replace(/^www\./, '') } catch {}
@@ -249,7 +266,7 @@ export default function ImproveWebsitePage() {
               </div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,.4)', marginBottom: 8, wordBreak: 'break-all' }}>{audit.finalUrl}</div>
-                <p style={{ margin: 0, lineHeight: 1.7, color: 'rgba(255,255,255,.85)', fontSize: 14, whiteSpace: 'pre-wrap' }}>{audit.summary}</p>
+                <div style={{ margin: 0, lineHeight: 1.7, color: 'rgba(255,255,255,.85)', fontSize: 14 }}>{renderRichText(audit.summary)}</div>
               </div>
             </div>
 

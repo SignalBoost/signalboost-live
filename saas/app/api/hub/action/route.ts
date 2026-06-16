@@ -20,7 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getTemplate, validateTemplatePayload } from '@/lib/hub/provider-templates'
-import { getHubActionPolicy, isActionBlocked, requiresOwnerApproval } from '@/lib/hub/action-policy'
+import { getHubActionPolicy, isActionBlocked, requiresOwnerApproval, requiresAdminApproval } from '@/lib/hub/action-policy'
 import { recordAuditEvent, normalizeStatus } from '@/lib/hub/audit'
 import { getCurrentUser as resolveHubUser } from '@/lib/auth/permission-middleware'
 import { vaultEncrypt, vaultDecrypt } from '@/lib/vault/crypto'
@@ -217,6 +217,15 @@ export async function POST(req: NextRequest): Promise<NextResponse<ActionRespons
       await logAuditEvent(actorId, templateId, 'DENIED', 'Requires owner approval', null)
       return NextResponse.json(
         { ok: false, error: 'This action requires owner approval' },
+        { status: 403 },
+      )
+    }
+
+    // 6b. Admin-level actions require an admin or owner (owner ⊃ admin).
+    if (requiresAdminApproval(template.policyActionId) && !['admin', 'owner'].includes(user.role)) {
+      await logAuditEvent(actorId, templateId, 'DENIED', 'Requires admin approval', null)
+      return NextResponse.json(
+        { ok: false, error: 'This action requires admin approval' },
         { status: 403 },
       )
     }

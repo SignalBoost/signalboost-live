@@ -4,14 +4,16 @@
 import { createClient } from '@supabase/supabase-js'
 import { VaultSecret, VaultAuditLog, VaultStats } from './vault-types'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase env vars')
+// Lazy init: read env at request time, not module load, so `next build`
+// page-data collection never fails when build-time env is absent.
+function getSupabase() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Missing Supabase env vars')
+  }
+  return createClient(supabaseUrl, supabaseKey)
 }
-
-const supabase = createClient(supabaseUrl, supabaseKey)
 
 /**
  * Fetch all vault secrets for current user
@@ -22,6 +24,7 @@ export async function getVaultSecrets(): Promise<{
   error?: string
 }> {
   try {
+    const supabase = getSupabase()
     const { data, error } = await supabase
       .from('hub_vault_secrets')
       .select('*')
@@ -64,6 +67,7 @@ export async function getVaultAuditLog(limit = 50): Promise<{
   error?: string
 }> {
   try {
+    const supabase = getSupabase()
     const { data, error } = await supabase
       .from('hub_vault_audit_log')
       .select('*')
@@ -102,6 +106,7 @@ export async function getVaultStats(): Promise<{
   error?: string
 }> {
   try {
+    const supabase = getSupabase()
     const { data, error } = await supabase
       .from('hub_vault_secrets')
       .select('id, status, last_rotated_at')
@@ -142,6 +147,7 @@ export async function createTestSecret(secret: Omit<VaultSecret, 'id' | 'created
   error?: string
 }> {
   try {
+    const supabase = getSupabase()
     const { data, error } = await supabase
       .from('hub_vault_secrets')
       .insert([

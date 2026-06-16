@@ -50,7 +50,8 @@ type ActionResponse = {
 }
 
 // Get the current user from the request via the Phase 2 RBAC middleware.
-// Returns real user data from hub_workspace_users (or synthetic owner fallback).
+// Returns real user data from hub_workspace_users, or null. No synthetic/owner
+// fallback — unauthenticated or non-hub users resolve to null and are denied.
 async function getCurrentUser(req: NextRequest) {
   const user = await resolveHubUser(req)
   if (!user) return null

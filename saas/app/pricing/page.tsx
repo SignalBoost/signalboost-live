@@ -32,6 +32,7 @@ type PlatformModule = {
 export default function PricingPage() {
   const { dict } = useI18n()
   const [loading, setLoading] = useState<string | null>(null)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
   const [expandedPlan, setExpandedPlan] = useState<string | null>(null)
 
   const plans: Plan[] = [
@@ -260,6 +261,7 @@ export default function PricingPage() {
     }
 
     try {
+      setCheckoutError(null)
       setLoading(plan)
 
       const { createClient } = await import('@supabase/supabase-js')
@@ -286,10 +288,10 @@ export default function PricingPage() {
       if (data.url) {
         window.location.href = data.url
       } else {
-        alert(data.error || t(dict, 'pricing_v2.errorGeneric', 'Something went wrong.'))
+        setCheckoutError(data.error || t(dict, 'pricing_v2.errorGeneric', 'Something went wrong.'))
       }
     } catch {
-      alert(t(dict, 'pricing_v2.errorNetwork', `Unable to start checkout. Please contact ${CONTACT_EMAIL}`))
+      setCheckoutError(t(dict, 'pricing_v2.errorNetwork', `Unable to start checkout. Please contact ${CONTACT_EMAIL}`))
     } finally {
       setLoading(null)
     }
@@ -297,6 +299,12 @@ export default function PricingPage() {
 
   return (
     <main className="sb-page-shell sb-pricing-cockpit" style={{ padding: '18px 0 56px' }}>
+      {checkoutError && (
+        <div role="alert" style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 1000, maxWidth: 480, width: 'calc(100% - 32px)', padding: '12px 16px', borderRadius: 12, background: 'rgba(255,59,48,.12)', border: '1px solid rgba(255,107,107,.45)', color: '#ffb3b3', fontSize: 13, display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 8px 30px rgba(0,0,0,.45)', backdropFilter: 'blur(6px)' }}>
+          <span style={{ flex: 1 }}>{checkoutError}</span>
+          <button onClick={() => setCheckoutError(null)} aria-label="Dismiss" style={{ background: 'transparent', border: 'none', color: '#ffb3b3', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0 }}>×</button>
+        </div>
+      )}
       <div style={{ minHeight: 'calc(100vh - 150px)', display: 'grid', alignContent: 'start' }}>
       <section style={{ textAlign: 'center', marginBottom: 14 }}>
         <span className="sb-eyebrow">

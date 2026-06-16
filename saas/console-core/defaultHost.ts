@@ -1,13 +1,10 @@
 // saas/console-core/defaultHost.ts
 //
-// The default ConsoleHost for THIS app. This is the ONE place coupling lives:
-// it bridges the portable AuthAdapter / LogAdapter / executor registry to the
-// existing auth + policy modules. Another company replaces this file with their
-// own bridges (Auth0, Clerk, Datadog, …) and the engine is unchanged.
+// Portable engine wiring: the executor registry, a default log adapter, and a
+// host assembler. This file has NO host-specific imports — authentication and
+// policy live in the host layer (see ../console-host/) and are injected via
+// createHost(). console-core stays provider- and company-agnostic.
 
-import type { NextRequest } from 'next/server'
-import { getCurrentUser as resolveHubUser } from '@/lib/auth/permission-middleware'
-import { getHubActionPolicy, isActionBlocked, requiresOwnerApproval } from '@/lib/hub/action-policy'
 import type { AuthAdapter, LogAdapter } from './types'
 import type { EngineHost, RegisteredExecutor } from './actionEngine'
 
@@ -25,37 +22,18 @@ export function listRegistered(): string[] {
   return Array.from(REGISTRY.keys())
 }
 
-// ---- Default auth adapter (bridges to the existing auth + policy layers) ----
-function defaultAuth(req: NextRequest): AuthAdapter {
-  return {
-    async getCurrentUser() {
-      const u = await resolveHubUser(req)
-      if (!u) return null
-      return { id: u.id, email: (u as any).email, roles: [(u as any).role].filter(Boolean) }
-    },
-    hasPermission(user, _providerId, policyActionId) {
-      const policy = getHubActionPolicy(policyActionId)
-      // Read-only actions (approval 'none') are ungated — pickers/lists populate
-      // even when the auth layer is unavailable. Mutations require a user.
-      if (policy.approval === 'none') return true
-      if (!user) return false
-      if (isActionBlocked(policyActionId)) return false
-      if (requiresOwnerApproval(policyActionId) && !(user.roles || []).includes('owner')) return false
-      return true
-    },
-  }
-}
-
-// ---- Default log adapter (safe, swappable) ----
-// Structured server log by default. Hosts point this at Datadog / Logflare /
-// CloudWatch or their audit table by replacing this object.
-const defaultLog: LogAdapter = {
+// ---- Default log adapter (portable; hosts can replace) ----
+// Structured server log by default. A host points this at Datadog / Logflare /
+// CloudWatch or its audit table by passing its own LogAdapter to createHost().
+export const consoleLogAdapter: LogAdapter = {
   async logAction(event) {
     console.log('[hub.engine]', JSON.stringify(event))
   },
 }
 
-/** Assemble the default host for one request. */
-export function createDefaultHost(req: NextRequest): EngineHost {
-  return { auth: defaultAuth(req), log: defaultLog, resolveExecutor }
+// ---- Host assembler ----
+// The host supplies an AuthAdapter (and optionally a LogAdapter). The engine
+// never imports a specific auth/policy system — that is the portability seam.
+export function createHost(auth: AuthAdapter, log: LogAdapter = consoleLogAdapter): EngineHost {
+  return { auth, log, resolveExecutor }
 }

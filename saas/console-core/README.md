@@ -1,64 +1,88 @@
 # Portable Console Core
 
-A provider-agnostic, host-agnostic command console. It discovers providers from
-config, renders forms from schemas, and routes every action through swappable
-auth / logging / execution adapters — so it can be detached from this app and
-dropped into another company's stack.
+A provider-agnostic, host-agnostic command engine. It runs every console action
+through a fixed pipeline — **validate → permission → execute → log** — behind
+swappable adapters, so the engine can be detached from this app and dropped into
+another company's stack with only thin glue.
 
-## What's here (Phase 1)
+Providers and their actions are defined by **executors** that register themselves
+at module load. There is no central provider data file to keep in sync — adding a
+provider means adding an executor.
+
+## What's here
 
 | File | Role |
 |---|---|
-| `types.ts` | All portable contracts: `ProviderAdapter`, `AuthAdapter`, `LogAdapter`, `ActionSchema`, `ActionExecutor`, `ConsoleHost`. No app imports. |
-| `console.config.ts` | The ONE file a host edits: enabled providers, env remapping, adapter selection. |
-| `providerRegistry.ts` | Builds the live registry from `config/provider-map.json` + config. The UI discovers providers here, never from hard-coded imports. |
-| `../components/hub/ProviderMapGrid.tsx` | Schema-driven sidebar/grid. Renders every provider by tier, paints Connected / Not Connected from the status endpoint. |
-| `../app/api/hub/providers/status/route.ts` | Computes status from env-var presence. Returns booleans only — never values. |
-| `../config/provider-map.json` | The provider data model (28 providers, 4 tiers). |
+| `types.ts` | Portable contracts: `ActionSchema`, `ActionField`, `AuthAdapter`, `LogAdapter`. No app imports — this is the whole point. |
+| `defaultHost.ts` | `registerExecutor()` (executors self-register here), `resolveExecutor()`, `listRegistered()`, and `createDefaultHost(req)` which wires the default auth/log/resolve adapters. |
+| `actionEngine.ts` | `runAction(host, { providerId, actionId, input })` — the validate → permission → execute → log pipeline, plus `validateInput()`. |
+| `executors/` | One file per provider (`openai.ts`, `github.ts`, `resend.ts`, …). Each calls `registerExecutor(...)` for its actions. |
+
+The engine is consumed by `../app/api/hub/action/engine/route.ts`, which
+side-effect-imports each executor file (registering it) and calls `runAction`.
 
 ## Add a provider
 
-Edit `config/provider-map.json` — add an entry with `tier`, `displayName`,
-`accent`, `icon`, `envVars`, `actions`, `remoteSelect`, `remoteList`. It appears
-in the grid automatically and self-greys until its required env vars are set.
-No code change.
+1. Create `executors/<provider>.ts` and call `registerExecutor({ providerId,
+   actionId, policyActionId, schema, run })` for each action. `run()` returns
+   `{ ok: true, message?, data? }` or `{ ok: false, error }`, reading credentials
+   from `process.env`.
+2. Add a side-effect import to `app/api/hub/action/engine/route.ts`:
+   `import '@/console-core/executors/<provider>'`.
+3. Register the card in `lib/hub/console-catalog.ts` and add the provider id to
+   `LIVE_PROVIDER_IDS`.
+
+See `../docs/developer-guide.md` for the full, worked example.
 
 ## Add an action
 
-Add it under the provider's `actions` (or as a template id the action engine
-resolves). Declare its fields as an `ActionSchema`; `remote_select` / `remote_list`
-fields reference a list-action via `remoteSource`. The renderer draws it; no
-bespoke UI.
+Add another `registerExecutor({ … })` block in the provider's executor file and a
+matching template/section in the catalog. Declare inputs as the executor's
+`schema.fields` (`ActionField[]`); `remote_select` / `remote_list` fields
+reference a list-action via `remoteSource`. No engine-route change is needed.
 
 ## Swap auth
 
-Implement `AuthAdapter` (`getCurrentUser`, `hasPermission`) for Auth0 / Clerk /
-custom JWT and set `authAdapter` in `console.config.ts`. All permission checks go
+Implement `AuthAdapter`:
+
+```ts
+interface AuthAdapter {
+  getCurrentUser(): Promise<{ id: string; email?: string; roles?: string[] } | null>
+  hasPermission(user, providerId: string, actionId: string): boolean | Promise<boolean>
+}
+```
+
+Build an `EngineHost` with your adapter (`{ auth, log, resolveExecutor }`) and
+pass it to `runAction`, instead of `createDefaultHost(req)`. Permission checks go
 through this adapter — nothing calls the host auth system directly.
 
 ## Swap logging
 
-Implement `LogAdapter` (`logAction`) for Datadog / Logflare / CloudWatch and set
-`logAdapter` in `console.config.ts`.
+Implement `LogAdapter` (`logAction(event)`) for Datadog / Logflare / CloudWatch
+and supply it on the `EngineHost`. (Within this app, audit events are also routed
+through `lib/hub/audit.ts`, which has its own single swap point.)
 
 ## Embed in another Next.js app
 
-1. Copy `console-core/`, `components/hub/`, `config/provider-map.json`, and the
-   `app/api/hub/*` routes.
-2. Provide a `ConsoleHost` (auth + log + `resolveExecutor`).
-3. Edit `console.config.ts`.
-4. Mount `<ProviderMapGrid onSelect={openWorkspace} />`.
+1. Copy `console-core/` and the `app/api/hub/action/engine` route.
+2. Provide an `EngineHost` — your `AuthAdapter`, `LogAdapter`, and the
+   `resolveExecutor` from `defaultHost` (or your own).
+3. Add the executor side-effect imports you want enabled.
+4. Render provider cards from your catalog (`lib/hub/console-catalog.ts` here is
+   the reference implementation).
 
-## Migration plan (don't big-bang)
+## Verify wiring
 
-Phase 1 (this drop): portable contracts + registry + config + schema-driven grid
-+ status engine — all additive, zero changes to working handlers.
+`GET /api/hub/action/engine` lists every registered executor, so you can confirm
+registration without clicking through the UI.
 
-Phase 2: introduce the `actionEngine` that validates input against `ActionSchema`,
-checks `AuthAdapter`, calls the resolved `ActionExecutor`, logs via `LogAdapter`.
-Wire the EXISTING `/api/hub/action` route to call it — behavior preserved.
+---
 
-Phase 3: wrap current provider handlers as `ActionExecutor`s, one provider at a
-time, behind `resolveExecutor`. Each move is independently testable.
+### Note on legacy files
 
-Phase 4: extract `console-core` to its own package; the host keeps only glue.
+An earlier design discovered providers from a static `config/provider-map.json`
+via `providerRegistry.ts` / `console.config.ts`, rendered by
+`components/hub/ProviderMapGrid.tsx`. That path is **superseded** by the
+executor-based engine described above and is **not mounted by any page**. If
+those files are still present, they are safe to remove — the live console
+(`console-catalog.ts` + executors) does not use them.

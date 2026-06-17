@@ -1,13 +1,17 @@
 // lib/infra-pr/merge.ts
-// The merge / approve execution. Loads the PR, runs it through the live
-// engine, optionally fires a production redeploy, records result + audit.
-import { getInfraPr, updateInfraPr, auditInfraPr, InfraPr } from './store';
+// Merge / approve execution with RBAC enforcement at the gate. The host app
+// injects the merging user's role; the module rejects merges below the
+// required clearance for the action's risk tier.
+import { getInfraPr, updateInfraPr, auditInfraPr } from './store';
 import { executeViaEngine } from './execute';
 import { triggerProductionRedeploy } from './redeploy';
+import { canMerge } from './action-policy';
+import { InfraPr } from './types';
 
 interface MergeOpts {
   id: string;
   userId: string | null;
+  role: string | null; // injected by host app (auth-agnostic)
   origin: string;
   cookie: string;
 }
@@ -15,20 +19,26 @@ interface MergeOpts {
 type MergeResult = { ok: boolean; data?: InfraPr; error?: string };
 
 export async function mergeInfraPr(opts: MergeOpts): Promise<MergeResult> {
-  const { id, userId, origin, cookie } = opts;
+  const { id, userId, role, origin, cookie } = opts;
 
   const loaded = await getInfraPr(id);
-  if (!loaded.ok) return loaded;
-  const pr = loaded.data;
+  if (!loaded.ok) return { ok: false, error: loaded.error };
+  const pr = loaded.data as InfraPr;
 
   if (pr.status === 'merged') return { ok: false, error: 'PR already merged' };
   if (pr.status === 'merging') return { ok: false, error: 'Merge already in progress' };
   if (pr.status === 'closed') return { ok: false, error: 'PR is closed' };
 
-  // claim it
-  await updateInfraPr(id, { status: 'merging' });
+  // ── RBAC gate ──
+  const gate = canMerge(role, pr.risk);
+  if (!gate.ok) {
+    await auditInfraPr(id, userId, 'rejected', { reason: gate.error, have: gate.have, required: gate.required });
+    return { ok: false, error: gate.error };
+  }
 
-  // 1) fire the live provider action through the existing engine
+  await updateInfraPr(id, { status: 'merging' });
+  await auditInfraPr(id, userId, 'approved', { role: gate.have, risk: pr.risk });
+
   const exec = await executeViaEngine(pr, origin, cookie);
   if (!exec.ok) {
     await updateInfraPr(id, { status: 'failed', error: exec.error });
@@ -36,7 +46,6 @@ export async function mergeInfraPr(opts: MergeOpts): Promise<MergeResult> {
     return { ok: false, error: exec.error };
   }
 
-  // 2) optional production redeploy (env/config changes usually need this)
   let redeploy: any = null;
   if (pr.triggers_redeploy) {
     const rd = await triggerProductionRedeploy();
@@ -44,7 +53,6 @@ export async function mergeInfraPr(opts: MergeOpts): Promise<MergeResult> {
     await auditInfraPr(id, userId, 'redeploy_triggered', redeploy);
   }
 
-  // 3) finalize
   const merged = await updateInfraPr(id, {
     status: 'merged',
     result: { engine: exec.data, redeploy },
@@ -52,8 +60,8 @@ export async function mergeInfraPr(opts: MergeOpts): Promise<MergeResult> {
     merged_at: new Date().toISOString(),
     merged_by: userId,
   });
+  if (!merged.ok) return { ok: false, error: merged.error };
 
-  if (!merged.ok) return merged;
-  await auditInfraPr(id, userId, 'merged', { redeploy });
-  return { ok: true, data: merged.data };
+  await auditInfraPr(id, userId, 'executed', { redeploy });
+  return { ok: true, data: merged.data as InfraPr };
 }

@@ -17,7 +17,7 @@ import {
   type InfraRisk,
 } from '@/lib/hub/pr-engine'
 
-export type StageResult = { ok: boolean; pr?: InfraPR; error?: string }
+export type StageResult = { ok: boolean; pr?: InfraPR; error?: string; duplicate?: boolean }
 
 /** Stage a PR from raw tool arguments (already JSON-parsed). */
 export async function proposeInfrastructurePR(
@@ -62,6 +62,13 @@ export async function proposeInfrastructurePR(
 // ── Formatters: turn results into text the model reads back to the owner ─────
 
 export function formatStageResultForAI(r: StageResult): string {
+  if (r.duplicate && r.pr) {
+    return [
+      `ALREADY STAGED — an identical change is already open and waiting for approval.`,
+      `Existing PR: "${r.pr.title}" (id ${r.pr.id}).`,
+      `Did NOT create a duplicate. Tell the owner this exact change is already in the queue on the Infrastructure PRs page — nothing new was added.`,
+    ].join('\n')
+  }
   if (!r.ok || !r.pr) {
     return `INFRA PR NOT STAGED: ${r.error || 'unknown error'}. Fix the issue and try again — do NOT claim anything is queued.`
   }

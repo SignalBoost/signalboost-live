@@ -1,9 +1,9 @@
 'use client';
 
-// app/dashboard/infrastructure/page.tsx
-// Open Pull Requests — the approval cockpit for AI-drafted infrastructure
-// changes. Lists pending PRs, shows the payload/diff, and gates live
-// execution behind an explicit [Merge / Approve] click.
+// saas/app/dashboard/infrastructure/page.tsx
+// Provider-agnostic approval cockpit. Renders every PR by mapping its
+// `service` (provider) + `action` (actionId) strings dynamically — no
+// hardcoded provider objects. High-risk PRs require a second confirm click.
 import { useCallback, useEffect, useState } from 'react';
 
 type Risk = 'low' | 'medium' | 'high';
@@ -13,8 +13,8 @@ interface InfraPr {
   id: string;
   title: string;
   description: string | null;
-  service: string;
-  action: string;
+  service: string; // provider
+  action: string; // actionId
   payload: any;
   diff: any;
   risk: Risk;
@@ -43,7 +43,6 @@ function fmt(ts: string) {
     return ts;
   }
 }
-
 function json(v: any) {
   try {
     return JSON.stringify(v, null, 2);
@@ -58,6 +57,7 @@ export default function InfrastructurePrPage() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [confirming, setConfirming] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
     setErr(null);
@@ -77,8 +77,9 @@ export default function InfrastructurePrPage() {
     load();
   }, [load]);
 
-  async function merge(id: string) {
+  async function runMerge(id: string) {
     setBusy((b) => ({ ...b, [id]: true }));
+    setConfirming((c) => ({ ...c, [id]: false }));
     setErr(null);
     try {
       const res = await fetch(`/api/infra-pr/${id}/merge`, { method: 'POST' });
@@ -91,6 +92,15 @@ export default function InfrastructurePrPage() {
     } finally {
       setBusy((b) => ({ ...b, [id]: false }));
     }
+  }
+
+  // High-risk needs an explicit second click; low/medium merge on first click.
+  function onMergeClick(pr: InfraPr) {
+    if (pr.risk === 'high' && !confirming[pr.id]) {
+      setConfirming((c) => ({ ...c, [pr.id]: true }));
+      return;
+    }
+    runMerge(pr.id);
   }
 
   async function close(id: string) {
@@ -126,12 +136,10 @@ export default function InfrastructurePrPage() {
           </button>
         </div>
         <p style={{ color: 'rgba(232,238,252,0.55)', fontSize: 13, marginTop: 6 }}>
-          AI-drafted infrastructure changes. Nothing fires until you merge.
+          AI-drafted infrastructure changes across all providers. Nothing fires until you merge.
         </p>
 
-        {err && (
-          <div style={{ ...banner, borderColor: RED, color: RED }}>{err}</div>
-        )}
+        {err && <div style={{ ...banner, borderColor: RED, color: RED }}>{err}</div>}
 
         {loading && <div style={{ color: 'rgba(232,238,252,0.5)', marginTop: 24 }}>Loading…</div>}
 
@@ -141,68 +149,110 @@ export default function InfrastructurePrPage() {
           </div>
         )}
 
-        {openPrs.map((pr) => (
-          <div key={pr.id} style={card}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <span style={badge(CYAN)}>{pr.service}</span>
-                  <span style={badge(riskColor[pr.risk])}>{pr.risk} risk</span>
-                  {pr.triggers_redeploy && <span style={badge(GOLD)}>redeploys</span>}
-                  <span style={{ ...badge('rgba(255,255,255,0.35)'), textTransform: 'none' }}>
-                    {pr.source}
-                  </span>
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 600, marginTop: 10 }}>{pr.title}</div>
-                {pr.description && (
-                  <div style={{ fontSize: 13, color: 'rgba(232,238,252,0.7)', marginTop: 4 }}>
-                    {pr.description}
-                  </div>
-                )}
-                <div style={{ fontSize: 11, color: 'rgba(232,238,252,0.4)', marginTop: 8, fontFamily: 'ui-monospace, monospace' }}>
-                  {pr.action} · {fmt(pr.created_at)}
-                </div>
+        {openPrs.map((pr) => {
+          const isHigh = pr.risk === 'high';
+          const awaiting = !!confirming[pr.id];
+          return (
+            <div key={pr.id} style={{ ...card, borderColor: awaiting ? RED : HAIR }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={badge(CYAN)}>{pr.service}</span>
+                <span style={{ ...badge('rgba(255,255,255,0.4)'), textTransform: 'none' }}>
+                  {pr.action}
+                </span>
+                <span style={badge(riskColor[pr.risk])}>{pr.risk} risk</span>
+                {pr.triggers_redeploy && <span style={badge(GOLD)}>redeploys</span>}
+                <span style={{ ...badge('rgba(255,255,255,0.3)'), textTransform: 'none' }}>
+                  {pr.source}
+                </span>
               </div>
-            </div>
 
-            <button
-              onClick={() => setOpen((o) => ({ ...o, [pr.id]: !o[pr.id] }))}
-              style={{ ...ghostBtn, marginTop: 12 }}
-            >
-              {open[pr.id] ? 'Hide payload' : 'Inspect payload'}
-            </button>
-
-            {open[pr.id] && (
-              <div style={{ marginTop: 10 }}>
-                {pr.diff && (
-                  <>
-                    <div style={codeLabel}>diff</div>
-                    <pre style={codeBlock}>{json(pr.diff)}</pre>
-                  </>
-                )}
-                <div style={codeLabel}>payload → /api/hub/action</div>
-                <pre style={codeBlock}>{json(pr.payload)}</pre>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-              <button
-                onClick={() => merge(pr.id)}
-                disabled={busy[pr.id] || pr.status === 'merging'}
-                style={mergeBtn(busy[pr.id] || pr.status === 'merging')}
+              <div style={{ fontSize: 16, fontWeight: 600, marginTop: 10 }}>{pr.title}</div>
+              {pr.description && (
+                <div style={{ fontSize: 13, color: 'rgba(232,238,252,0.7)', marginTop: 4 }}>
+                  {pr.description}
+                </div>
+              )}
+              <div
+                style={{
+                  fontSize: 11,
+                  color: 'rgba(232,238,252,0.4)',
+                  marginTop: 8,
+                  fontFamily: 'ui-monospace, monospace',
+                }}
               >
-                {busy[pr.id] || pr.status === 'merging' ? 'Merging…' : 'Merge / Approve'}
+                {fmt(pr.created_at)}
+              </div>
+
+              <button
+                onClick={() => setOpen((o) => ({ ...o, [pr.id]: !o[pr.id] }))}
+                style={{ ...ghostBtn, marginTop: 12 }}
+              >
+                {open[pr.id] ? 'Hide payload' : 'Inspect payload'}
               </button>
-              <button onClick={() => close(pr.id)} disabled={busy[pr.id]} style={ghostBtn}>
-                Close
-              </button>
+
+              {open[pr.id] && (
+                <div style={{ marginTop: 10 }}>
+                  {pr.diff && (
+                    <>
+                      <div style={codeLabel}>diff</div>
+                      <pre style={codeBlock}>{json(pr.diff)}</pre>
+                    </>
+                  )}
+                  <div style={codeLabel}>payload → /api/hub/action</div>
+                  <pre style={codeBlock}>{json(pr.payload)}</pre>
+                </div>
+              )}
+
+              {awaiting && (
+                <div style={{ ...banner, borderColor: RED, color: RED, marginTop: 14 }}>
+                  High-risk action. This runs live on <b>{pr.service}</b> and cannot be undone.
+                  Confirm to proceed.
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                <button
+                  onClick={() => onMergeClick(pr)}
+                  disabled={busy[pr.id] || pr.status === 'merging'}
+                  style={mergeBtn(busy[pr.id] || pr.status === 'merging', awaiting)}
+                >
+                  {busy[pr.id] || pr.status === 'merging'
+                    ? 'Merging…'
+                    : awaiting
+                    ? 'Confirm — run live'
+                    : isHigh
+                    ? 'Merge / Approve (high risk)'
+                    : 'Merge / Approve'}
+                </button>
+
+                {awaiting ? (
+                  <button
+                    onClick={() => setConfirming((c) => ({ ...c, [pr.id]: false }))}
+                    disabled={busy[pr.id]}
+                    style={ghostBtn}
+                  >
+                    Cancel
+                  </button>
+                ) : (
+                  <button onClick={() => close(pr.id)} disabled={busy[pr.id]} style={ghostBtn}>
+                    Close
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {history.length > 0 && (
           <>
-            <h2 style={{ fontSize: 14, fontWeight: 600, marginTop: 36, color: 'rgba(232,238,252,0.6)' }}>
+            <h2
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                marginTop: 36,
+                color: 'rgba(232,238,252,0.6)',
+              }}
+            >
               History
             </h2>
             {history.map((pr) => (
@@ -210,6 +260,9 @@ export default function InfrastructurePrPage() {
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <span style={badge(statusColor(pr.status))}>{pr.status}</span>
                   <span style={badge('rgba(255,255,255,0.3)')}>{pr.service}</span>
+                  <span style={{ ...badge('rgba(255,255,255,0.3)'), textTransform: 'none' }}>
+                    {pr.action}
+                  </span>
                   <span style={{ fontSize: 14, fontWeight: 600 }}>{pr.title}</span>
                 </div>
                 {pr.error && <div style={{ color: RED, fontSize: 12, marginTop: 8 }}>{pr.error}</div>}
@@ -275,10 +328,11 @@ const ghostBtn: React.CSSProperties = {
   cursor: 'pointer',
 };
 
-function mergeBtn(disabled: boolean): React.CSSProperties {
+function mergeBtn(disabled: boolean, danger: boolean): React.CSSProperties {
+  const base = danger ? RED : GOLD;
   return {
-    background: disabled ? 'rgba(255,195,0,0.35)' : GOLD,
-    color: INK,
+    background: disabled ? 'rgba(255,195,0,0.35)' : base,
+    color: danger ? '#fff' : INK,
     border: 'none',
     borderRadius: 8,
     padding: '9px 18px',

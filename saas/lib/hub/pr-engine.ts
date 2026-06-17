@@ -21,6 +21,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { createHash } from 'crypto'
 import { recordAuditEvent, normalizeStatus } from '@/lib/hub/audit'
+import { getTemplate, PROVIDER_TEMPLATES } from '@/lib/hub/provider-templates'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -144,6 +145,18 @@ export async function stageInfrastructurePR(input: {
 
   const norm = normalizeSteps(input.steps)
   if (!norm.ok || !norm.steps) return { ok: false, error: norm.error || 'invalid steps' }
+
+  // Fail fast: every step must target a REAL template id. Returning the valid
+  // ids for that provider lets the assistant self-correct in the same turn
+  // instead of staging a PR that can only die at merge ("Unknown template: …").
+  for (const step of norm.steps) {
+    if (!getTemplate(step.templateId)) {
+      const provider = String(step.templateId || '').split('.')[0]
+      const valid = Object.keys(PROVIDER_TEMPLATES).filter(id => id.startsWith(provider + '.')).sort()
+      const hint = valid.length ? ` Valid ${provider} templates: ${valid.join(', ')}.` : ' No templates exist for that provider.'
+      return { ok: false, error: `Unknown template "${step.templateId}".${hint}` }
+    }
+  }
 
   const risk: InfraRisk = (['low', 'medium', 'high'] as const).includes(input.risk as InfraRisk)
     ? (input.risk as InfraRisk)

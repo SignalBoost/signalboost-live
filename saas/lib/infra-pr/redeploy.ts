@@ -1,7 +1,6 @@
 // lib/infra-pr/redeploy.ts
-// Fires a Vercel production redeploy. Preferred path: a Deploy Hook URL
-// (VERCEL_DEPLOY_HOOK_URL) — a single POST, no token handling. Fallback:
-// the Deployments API, which redeploys the latest production deployment.
+// Production redeploy. Preferred: VERCEL_DEPLOY_HOOK_URL (one POST).
+// Fallback: Deployments API via VERCEL_TOKEN + VERCEL_PROJECT_ID.
 type R = { ok: boolean; data?: any; error?: string };
 
 export async function triggerProductionRedeploy(): Promise<R> {
@@ -17,16 +16,13 @@ export async function triggerProductionRedeploy(): Promise<R> {
     }
   }
 
-  // Fallback: Deployments API. Needs a token + project. Re-deploys the
-  // most recent production deployment using its captured gitSource.
   const token = process.env.VERCEL_TOKEN;
   const projectId = process.env.VERCEL_PROJECT_ID;
-  const teamId = process.env.VERCEL_TEAM_ID; // optional
+  const teamId = process.env.VERCEL_TEAM_ID;
   if (!token || !projectId) {
     return {
       ok: false,
-      error:
-        'No VERCEL_DEPLOY_HOOK_URL set, and VERCEL_TOKEN / VERCEL_PROJECT_ID missing for API fallback',
+      error: 'No VERCEL_DEPLOY_HOOK_URL, and VERCEL_TOKEN / VERCEL_PROJECT_ID missing for fallback',
     };
   }
 

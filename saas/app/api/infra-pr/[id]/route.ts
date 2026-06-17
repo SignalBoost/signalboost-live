@@ -1,4 +1,4 @@
-// app/api/infra-pr/[id]/route.ts
+// app/api/infra-pr/[id]/route.ts  — thin framework binding
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
@@ -17,9 +17,7 @@ async function requireUser() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll() {
-          /* read-only in route handler */
-        },
+        setAll() {},
       },
     },
   );
@@ -42,7 +40,7 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
   if (!user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
 
   const { id } = await ctx.params;
-  const closed = await closeInfraPr(id, user.id ?? null);
+  const closed = await closeInfraPr(id, (user as any).id ?? null);
   if (!closed.ok) return NextResponse.json({ ok: false, error: closed.error }, { status: 500 });
   return NextResponse.json({ ok: true, pr: closed.data });
 }

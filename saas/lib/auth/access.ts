@@ -31,6 +31,20 @@ function envList(name: string): string[] {
     .filter(Boolean)
 }
 
+const RANK: Record<Role, number> = { guest: 0, member: 1, admin: 2, owner: 3 }
+function maxRole(a: Role, b: Role): Role {
+  return RANK[a] >= RANK[b] ? a : b
+}
+
+// Role implied purely by environment allow-lists. DB-independent, so it can never
+// be stripped by a transient database error — an owner listed in OWNER_EMAILS stays
+// an owner even if team_members is briefly unreachable.
+function envRole(email: string): Role {
+  if (email && envList('OWNER_EMAILS').includes(email)) return 'owner'
+  if (email && envList('ADMIN_EMAILS').includes(email)) return 'admin'
+  return 'member' // authenticated floor
+}
+
 async function getServerSupabase() {
   const cookieStore = await cookies()
   return createServerClient(
@@ -67,6 +81,50 @@ function buildContext(userId: string | null, email: string | null, role: Role): 
   }
 }
 
+// Resolve the role granted by the team_members table.
+//   { role, degraded:false } — query succeeded (role may be 'member' if no rows)
+//   { role:'member', degraded:true } — query FAILED after a retry; caller must NOT
+//      treat this as authoritative "you are only a member". It means "could not
+//      verify", and is logged so the cause is diagnosable instead of a silent 403.
+async function teamRole(
+  supabase: Awaited<ReturnType<typeof getServerSupabase>>,
+  userId: string,
+  email: string,
+): Promise<{ role: Role; degraded: boolean }> {
+  const rank: Record<string, number> = { owner: 3, admin: 2, member: 1 }
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { data, error } = await supabase
+      .from('team_members')
+      .select('role, status')
+      .or(`member_id.eq.${userId},member_email.eq.${email}`)
+
+    if (!error) {
+      if (Array.isArray(data) && data.length > 0) {
+        const active = data.filter(r => r.status === 'active' || r.status === 'pending')
+        const best = active.reduce<string | null>((acc, r) => {
+          const cur = String(r.role || 'member')
+          if (!acc) return cur
+          return (rank[cur] || 0) > (rank[acc] || 0) ? cur : acc
+        }, null)
+        if (best === 'owner') return { role: 'owner', degraded: false }
+        if (best === 'admin') return { role: 'admin', degraded: false }
+        if (best === 'member') return { role: 'member', degraded: false }
+      }
+      return { role: 'member', degraded: false } // queried fine, no elevating row
+    }
+
+    // Transient error — one quick retry before giving up.
+    if (attempt === 0) {
+      await new Promise(r => setTimeout(r, 150))
+      continue
+    }
+    // Loud, not silent: a DB blip must be diagnosable, never a mystery downgrade.
+    console.error('getAccess: team_members lookup failed after retry —', error?.message || 'unknown error')
+    return { role: 'member', degraded: true }
+  }
+  return { role: 'member', degraded: true }
+}
+
 export async function getAccess(): Promise<AccessContext> {
   const supabase = await getServerSupabase()
   const { data: { user } } = await supabase.auth.getUser()
@@ -75,36 +133,20 @@ export async function getAccess(): Promise<AccessContext> {
 
   const email = (user.email || '').toLowerCase()
 
-  if (email && envList('OWNER_EMAILS').includes(email)) {
-    return buildContext(user.id, email, 'owner')
-  }
+  // Env-defined role is computed first and is immune to DB state.
+  const fromEnv = envRole(email)
 
-  try {
-    const { data } = await supabase
-      .from('team_members')
-      .select('role, status')
-      .or(`member_id.eq.${user.id},member_email.eq.${email}`)
-    if (Array.isArray(data) && data.length > 0) {
-      const active = data.filter(r => r.status === 'active' || r.status === 'pending')
-      const rank: Record<string, number> = { owner: 3, admin: 2, member: 1 }
-      const best = active.reduce<string | null>((acc, r) => {
-        const cur = String(r.role || 'member')
-        if (!acc) return cur
-        return (rank[cur] || 0) > (rank[acc] || 0) ? cur : acc
-      }, null)
-      if (best === 'owner') return buildContext(user.id, email, 'owner')
-      if (best === 'admin') return buildContext(user.id, email, 'admin')
-      if (best === 'member') return buildContext(user.id, email, 'member')
-    }
-  } catch {
-    // never crash auth
-  }
+  // If the env list already grants the highest role, skip the DB entirely.
+  if (fromEnv === 'owner') return buildContext(user.id, email, 'owner')
 
-  if (email && envList('ADMIN_EMAILS').includes(email)) {
-    return buildContext(user.id, email, 'admin')
-  }
+  // Otherwise consult team_members (with retry). The final role is the strongest
+  // of the two sources. On a degraded (failed) DB lookup we fall back to the env
+  // role rather than silently demoting — env owners/admins keep their access, and
+  // anyone whose elevation lives ONLY in team_members fails closed BUT is logged.
+  const fromDb = await teamRole(supabase, user.id, email)
+  const role = maxRole(fromEnv, fromDb.role)
 
-  return buildContext(user.id, email, 'member')
+  return buildContext(user.id, email, role)
 }
 
 export async function requireAdmin(): Promise<GuardResult> {

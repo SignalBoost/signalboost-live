@@ -66,13 +66,13 @@ export async function GET() {
 
   const failures: string[] = []
 
-  const url = process.env.MARKETING_SUPABASE_URL
-  const key = process.env.MARKETING_SUPABASE_SERVICE_ROLE_KEY
+  const url = process.env.SECONDARY_SUPABASE_URL || process.env.MARKETING_SUPABASE_URL
+  const key = process.env.SECONDARY_SUPABASE_SERVICE_ROLE_KEY || process.env.MARKETING_SUPABASE_SERVICE_ROLE_KEY
   const urlPresent = present(url)
   const keyPresent = present(key)
 
-  if (!urlPresent) failures.push('MARKETING_SUPABASE_URL is missing')
-  if (!keyPresent) failures.push('MARKETING_SUPABASE_SERVICE_ROLE_KEY is missing')
+  if (!urlPresent) failures.push('SECONDARY_SUPABASE_URL is missing (MARKETING_SUPABASE_URL also accepted)')
+  if (!keyPresent) failures.push('SECONDARY_SUPABASE_SERVICE_ROLE_KEY is missing (MARKETING_SUPABASE_SERVICE_ROLE_KEY also accepted)')
 
   const keyInfo = inspectKey(key)
   if (keyPresent && keyInfo.looks_wrong && keyInfo.reason) {

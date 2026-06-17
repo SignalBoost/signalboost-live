@@ -1,12 +1,14 @@
 // saas/lib/ai/tools/getAffiliateCount.ts
 // Live affiliate/partner count for the AI personas.
-// Queries the MARKETING-site Supabase project (separate from the SaaS project).
+// Queries a SECOND Supabase project (separate from the SaaS project).
 // The affiliate catalog lives in the `affiliate_partners` table (140+ rows);
 // the older `partners` table exists but is empty.
 //
 // Required env vars (Vercel > signalboost-live > Settings > Environment Variables):
-//   MARKETING_SUPABASE_URL                e.g. https://vdtxulrusfvyxdtatryx.supabase.co
-//   MARKETING_SUPABASE_SERVICE_ROLE_KEY   secret key of the marketing project
+//   SECONDARY_SUPABASE_URL                 e.g. https://<ref>.supabase.co
+//   SECONDARY_SUPABASE_SERVICE_ROLE_KEY    the project's service_role (secret) key
+// Backward compatible: the older MARKETING_SUPABASE_URL / _SERVICE_ROLE_KEY names
+// are still honoured as a fallback so existing installs keep working.
 
 import { createClient } from '@supabase/supabase-js'
 
@@ -25,8 +27,8 @@ export type AffiliateResult = {
 }
 
 function marketingSupabase() {
-  const url = process.env.MARKETING_SUPABASE_URL
-  const key = process.env.MARKETING_SUPABASE_SERVICE_ROLE_KEY
+  const url = process.env.SECONDARY_SUPABASE_URL || process.env.MARKETING_SUPABASE_URL
+  const key = process.env.SECONDARY_SUPABASE_SERVICE_ROLE_KEY || process.env.MARKETING_SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) return null
   return createClient(url.replace(/\/rest\/v1\/?$/, ''), key)
 }
@@ -37,7 +39,7 @@ export async function getAffiliateCount(): Promise<AffiliateResult> {
     if (!db) {
       return {
         ok: false,
-        error: 'Marketing Supabase is not configured (MARKETING_SUPABASE_URL / MARKETING_SUPABASE_SERVICE_ROLE_KEY missing).',
+        error: 'Secondary Supabase is not configured (SECONDARY_SUPABASE_URL / SECONDARY_SUPABASE_SERVICE_ROLE_KEY missing).',
       }
     }
 

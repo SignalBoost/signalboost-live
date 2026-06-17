@@ -149,6 +149,10 @@ const PROVIDER_CREDENTIALS: Record<
 // Core Logic
 // ============================================================================
 
+export const runtime = 'nodejs'
+export const maxDuration = 60
+export const dynamic = 'force-dynamic'
+
 export async function POST(req: NextRequest): Promise<NextResponse<ActionResponse>> {
   try {
     // 1. Parse and validate request

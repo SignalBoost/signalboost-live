@@ -172,17 +172,22 @@ export default function ProviderActionForm({
     >
       <div
         style={{
-          padding: '14px 16px 12px',
-          background: 'linear-gradient(135deg, rgba(26,240,255,.10), rgba(3,7,18,.0))',
-          borderBottom: '1px solid rgba(26,240,255,.2)',
+          padding: '16px 18px 14px',
+          background: 'linear-gradient(135deg, rgba(26,240,255,.08), rgba(255,195,0,.04) 60%, rgba(3,7,18,0))',
+          borderBottom: '1px solid rgba(255,255,255,.08)',
+          position: 'relative',
           flex: '0 0 auto',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 24 }}>{template.icon}</span>
+        <span aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, background: 'linear-gradient(90deg, #ffc300, #1af0ff)' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
+          <span style={{ width: 44, height: 44, borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0, background: 'rgba(26,240,255,.10)', border: '1px solid rgba(26,240,255,.28)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)' }}>{template.icon}</span>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>{template.label}</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.55)' }}>{template.description}</div>
+            <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(26,240,255,.75)', marginBottom: 3 }}>
+              Provider Action · {String(template.api?.service || '').toUpperCase()}
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: '#fff', letterSpacing: '-.01em', lineHeight: 1.15 }}>{template.label}</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.55)', marginTop: 2 }}>{template.description}</div>
           </div>
         </div>
       </div>
@@ -306,14 +311,16 @@ type FormFieldProps = {
 function FormField({ templateId, field, value, allValues, error, onChange }: FormFieldProps) {
   const baseStyle: CSSProperties = {
     width: '100%',
-    padding: '10px 12px',
-    borderRadius: 8,
-    border: error ? '1px solid rgba(239,68,68,.5)' : '1px solid rgba(255,255,255,.15)',
-    background: 'rgba(255,255,255,.04)',
+    padding: '11px 13px',
+    borderRadius: 10,
+    border: error ? '1px solid rgba(239,68,68,.55)' : '1px solid rgba(255,255,255,.13)',
+    background: 'rgba(3,7,18,.45)',
     color: '#fff',
     fontSize: 13,
     fontFamily: 'inherit',
     outline: 'none',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,.04)',
+    transition: 'border-color .15s ease, box-shadow .15s ease',
   }
 
   const useStripeProductPicker = isStripeProductPickerField(templateId, field.id)
@@ -421,9 +428,10 @@ function FormField({ templateId, field, value, allValues, error, onChange }: For
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
       {field.type !== 'toggle' && (
-        <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 800, letterSpacing: '.1em', color: 'rgba(255,255,255,.62)' }}>
+          <span aria-hidden="true" style={{ width: 4, height: 4, borderRadius: 999, background: '#1af0ff', flexShrink: 0 }} />
           {useVercelEnvPicker ? 'Environment Variable Target Key' : useStripeProductPicker ? 'Product' : field.label}
-          {field.required && <span style={{ color: '#ef4444' }}>*</span>}
+          {field.required && <span style={{ color: '#ffc300' }}>*</span>}
         </label>
       )}
 

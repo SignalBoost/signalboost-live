@@ -109,7 +109,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     api: { service: 'supabase', method: 'POST', endpoint: '/v1/rpc/execute_sql' },
     fields: [
       { id: 'project', label: 'Project', type: 'remote_select', required: true, source: { action: 'supabase.list_projects', dataPath: 'projects', valueKey: 'ref', labelTemplate: '{name}' } },
-      { id: 'query', label: 'SQL Raw Statement', type: 'textarea', required: true, defaultValue: 'SELECT * FROM users LIMIT 10;' }
+      { id: 'query', label: 'SQL Raw Statement', type: 'textarea', required: true, placeholder: 'SELECT current_database(), now();' }
     ]
   },
   'supabase.list_rows': {

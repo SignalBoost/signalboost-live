@@ -1,8 +1,10 @@
-// app/api/infra-pr/route.ts  — thin framework binding for the infra-pr module
+// app/api/infra-pr/route.ts — repointed to the shared pr-engine (System A).
+// The Chief of Staff stages PRs into the same `infrastructure_prs` table this
+// reads from, so AI-drafted changes appear here for approval.
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
-import { createInfraPr, listInfraPrs } from '@/lib/infra-pr/store';
+import { listInfrastructurePRs, stageInfrastructurePR } from '@/lib/hub/pr-engine';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,9 +31,9 @@ export async function GET() {
   const user = await requireUser();
   if (!user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
 
-  const list = await listInfraPrs(['open', 'merging', 'merged', 'failed', 'closed']);
+  const list = await listInfrastructurePRs(undefined, 50);
   if (!list.ok) return NextResponse.json({ ok: false, error: list.error }, { status: 500 });
-  return NextResponse.json({ ok: true, prs: list.data });
+  return NextResponse.json({ ok: true, prs: list.prs });
 }
 
 export async function POST(req: Request) {
@@ -39,23 +41,19 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json().catch(() => null);
-  if (!body || !body.title || !body.service || !body.action || body.payload === undefined) {
-    return NextResponse.json({ ok: false, error: 'title, service, action and payload are required' }, { status: 400 });
+  if (!body || !body.title || !Array.isArray(body.steps) || body.steps.length === 0) {
+    return NextResponse.json({ ok: false, error: 'title and at least one step are required' }, { status: 400 });
   }
 
-  const created = await createInfraPr({
+  const created = await stageInfrastructurePR({
     title: String(body.title),
-    description: body.description ?? null,
-    service: String(body.service),
-    action: String(body.action),
-    payload: body.payload,
-    diff: body.diff ?? null,
+    summary: String(body.summary || ''),
     risk: body.risk,
-    triggers_redeploy: !!body.triggers_redeploy,
-    source: body.source === 'assistant' ? 'assistant' : 'manual',
-    created_by: (user as any).id ?? null,
+    steps: body.steps,
+    createdBy: (user as any).id ?? null,
+    createdByEmail: (user as any).email ?? null,
   });
 
   if (!created.ok) return NextResponse.json({ ok: false, error: created.error }, { status: 500 });
-  return NextResponse.json({ ok: true, pr: created.data });
+  return NextResponse.json({ ok: true, pr: created.pr });
 }

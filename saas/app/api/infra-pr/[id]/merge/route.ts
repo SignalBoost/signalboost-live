@@ -1,10 +1,11 @@
-// app/api/infra-pr/[id]/merge/route.ts  — thin framework binding (approval gate)
-// Resolves the user's RBAC role from the app layer and INJECTS it into the
-// module (which stays auth-agnostic). Swap resolveRole() for your auth source.
+// app/api/infra-pr/[id]/merge/route.ts — approval gate, repointed to pr-engine.
+// On merge, pr-engine runs each step in order through the live hub action engine,
+// forwarding the owner's cookie so every call carries the owner's session and
+// passes the existing permission + policy + audit checks. Nothing fires until here.
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
-import { mergeInfraPr } from '@/lib/infra-pr/merge';
+import { mergeInfrastructurePR } from '@/lib/hub/pr-engine';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -28,20 +29,6 @@ async function requireUser() {
   return data?.user ?? null;
 }
 
-// ── ROLE INJECTION POINT ──
-// The module is auth-agnostic; the host app decides the role. By default we
-// read Supabase JWT claims (app_metadata.role / user_metadata.role). Point
-// this at your own roles table/claim if different. Accepts: cto|admin|owner,
-// lead_dev|developer, ai_operator|operator (normalized inside the module).
-function resolveRole(user: any): string {
-  return (
-    user?.app_metadata?.role ||
-    user?.user_metadata?.role ||
-    user?.app_metadata?.claims_admin && 'admin' ||
-    'NONE'
-  );
-}
-
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (!user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
@@ -50,10 +37,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const origin = new URL(req.url).origin;
   const cookie = req.headers.get('cookie') || '';
 
-  const out = await mergeInfraPr({
+  const out = await mergeInfrastructurePR({
     id,
-    userId: (user as any).id ?? null,
-    role: resolveRole(user),
+    approvedBy: (user as any).id ?? null,
     origin,
     cookie,
   });

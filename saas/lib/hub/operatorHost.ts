@@ -11,6 +11,7 @@
 //  • audit — persists to admin_audit_log (not console).
 
 import { createHash } from 'crypto'
+import '@/console-core/executors' // side-effect: registers all provider executors
 import {
   type ExecutorHost,
   type GovernedTemplate,

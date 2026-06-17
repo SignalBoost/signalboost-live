@@ -1,4 +1,4 @@
-// app/api/infra-pr/route.ts
+// app/api/infra-pr/route.ts  — thin framework binding for the infra-pr module
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
@@ -17,9 +17,7 @@ async function requireUser() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll() {
-          /* read-only in route handler */
-        },
+        setAll() {},
       },
     },
   );
@@ -42,10 +40,7 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => null);
   if (!body || !body.title || !body.service || !body.action || body.payload === undefined) {
-    return NextResponse.json(
-      { ok: false, error: 'title, service, action and payload are required' },
-      { status: 400 },
-    );
+    return NextResponse.json({ ok: false, error: 'title, service, action and payload are required' }, { status: 400 });
   }
 
   const created = await createInfraPr({
@@ -58,7 +53,7 @@ export async function POST(req: Request) {
     risk: body.risk,
     triggers_redeploy: !!body.triggers_redeploy,
     source: body.source === 'assistant' ? 'assistant' : 'manual',
-    created_by: user.id ?? null,
+    created_by: (user as any).id ?? null,
   });
 
   if (!created.ok) return NextResponse.json({ ok: false, error: created.error }, { status: 500 });

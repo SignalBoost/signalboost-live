@@ -1,18 +1,75 @@
 // saas/console-core/executors/supabase-marketing.ts
 //
-// Second Supabase project (the MARKETING database) as its own console provider.
-// Read-only. Mirrors the main Supabase read handlers but points at the marketing
-// project env vars. Importing this module registers the executors.
+// Secondary Supabase project as its own console provider (read-only).
+// This card lets an operator browse a SECOND Supabase project — useful when a
+// deployment runs more than one platform/database. It is OPTIONAL: when no second
+// project is configured the card reports a clean "not connected" state instead of
+// an error, so a single-database install never looks broken.
+//
+// Configuration (Vercel > Settings > Environment Variables, Production scope):
+//   SECONDARY_SUPABASE_URL                 e.g. https://<ref>.supabase.co
+//   SECONDARY_SUPABASE_SERVICE_ROLE_KEY    the project's SERVICE_ROLE key (secret)
+//
+// Backward compatibility: the older MARKETING_SUPABASE_URL / _SERVICE_ROLE_KEY
+// names are still honoured as a fallback, so existing installs keep working.
+//
+// Importing this module registers the executors.
 
 import { registerExecutor } from '../defaultHost'
 import type { ActionField, ActionSchema } from '../types'
 
-function creds(): { ok: true; url: string; key: string; restBase: string } | { ok: false; error: string } {
-  const url = process.env.MARKETING_SUPABASE_URL
-  const key = process.env.MARKETING_SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) return { ok: false, error: 'Marketing Supabase not configured — set MARKETING_SUPABASE_URL and MARKETING_SUPABASE_SERVICE_ROLE_KEY' }
-  return { ok: true, url, key, restBase: `${url}/rest/v1` }
+// ─── Key inspection (never exposes the key itself) ────────────────────────────
+// Supabase keys come in two shapes:
+//   • legacy JWT — base64url payload carrying a `role` claim. 'service_role' is
+//     correct (full access); 'anon' is the WRONG key (limited / RLS-bound) and is
+//     the single most common setup mistake, since the two JWTs look near-identical.
+//   • new format — 'sb_secret_…' (correct) / 'sb_publishable_…' (wrong, public).
+function inspectKey(key: string): { role: string | null; wrong: boolean; reason: string | null } {
+  if (key.startsWith('sb_secret_')) return { role: 'service', wrong: false, reason: null }
+  if (key.startsWith('sb_publishable_')) {
+    return { role: 'publishable', wrong: true, reason: 'a PUBLISHABLE key was provided — the SERVICE_ROLE (secret) key is required' }
+  }
+  const parts = key.split('.')
+  if (parts.length === 3) {
+    try {
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'))
+      const role = typeof payload?.role === 'string' ? payload.role : null
+      if (role === 'anon') {
+        return { role, wrong: true, reason: 'an ANON key was provided — the SERVICE_ROLE (secret) key is required' }
+      }
+      return { role, wrong: false, reason: null }
+    } catch {
+      return { role: null, wrong: false, reason: null }
+    }
+  }
+  return { role: null, wrong: false, reason: null }
 }
+
+const NOT_CONFIGURED =
+  'Secondary Supabase is not connected (optional). To enable, set SECONDARY_SUPABASE_URL and SECONDARY_SUPABASE_SERVICE_ROLE_KEY (the project\u2019s service_role key) in your environment.'
+
+type Creds =
+  | { ok: true; url: string; key: string; restBase: string }
+  | { ok: false; error: string }
+
+function creds(): Creds {
+  const url = process.env.SECONDARY_SUPABASE_URL || process.env.MARKETING_SUPABASE_URL
+  const key = process.env.SECONDARY_SUPABASE_SERVICE_ROLE_KEY || process.env.MARKETING_SUPABASE_SERVICE_ROLE_KEY
+
+  // Optional provider: absent config is a clean "not connected" state, not a fault.
+  if (!url || !key) return { ok: false, error: NOT_CONFIGURED }
+
+  // Guard the most common mistake before any request goes out, so the card shows
+  // an actionable reason instead of a raw "Invalid API key" from PostgREST.
+  const info = inspectKey(key)
+  if (info.wrong && info.reason) {
+    return { ok: false, error: `Secondary Supabase key is the wrong type — ${info.reason}.` }
+  }
+
+  const base = url.replace(/\/+$/, '')
+  return { ok: true, url: base, key, restBase: `${base}/rest/v1` }
+}
+
 const schema = (id: string, label: string, verb: string, fields: ActionField[]): ActionSchema => ({ id, label, verb, fields })
 
 const TABLE: ActionField = {

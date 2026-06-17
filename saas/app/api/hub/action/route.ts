@@ -33,6 +33,7 @@ import { executeDigitalOceanAction } from '@/lib/hub/providers/digitalocean'
 import { executeDatadogAction } from '@/lib/hub/providers/datadog'
 import { executeSentryAction } from '@/lib/hub/providers/sentry'
 import { executePagerDutyAction } from '@/lib/hub/providers/pagerduty'
+import { listSupabaseProjects, runProjectSql } from '@/lib/hub/supabase-projects'
 
 // ============================================================================
 // Types & Setup
@@ -775,6 +776,15 @@ async function executeSupabaseAction(template: any, payload: Record<string, unkn
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) return { ok: false, error: 'Supabase not configured' }
 
+  // Project picker source — lists the owner's Supabase projects (Management API,
+  // falls back to the primary connection when no SUPABASE_ACCESS_TOKEN is set).
+  if (template.id === 'supabase.list_projects') {
+    const r = await listSupabaseProjects()
+    if (!r.ok) return { ok: false, error: r.error || 'Failed to list projects' }
+    const projects = r.projects || []
+    return { ok: true, message: `${projects.length} project${projects.length === 1 ? '' : 's'}`, data: { count: projects.length, projects } }
+  }
+
   // Key rotation: generate new service key
   if (template.id === 'supabase.rotate_key' || template.id === 'supabase.rotate_service_key') {
     try {
@@ -995,6 +1005,15 @@ async function executeSupabaseAction(template: any, payload: Record<string, unkn
     // so a trailing ';' lands inside the wrapper → "syntax error at or near ';'".
     const query = String(payload.query || '').trim().replace(/;+\s*$/, '').trim()
     if (!query) return { ok: false, error: 'SQL query is required' }
+    // If a real project was selected, run it against that project via the
+    // Management API. 'primary' (or no token) falls through to the path below.
+    const project = String((payload as any).project || '').trim()
+    const viaMgmt = await runProjectSql(project, query)
+    if (viaMgmt.handled) {
+      if (!viaMgmt.ok) return { ok: false, error: viaMgmt.error || 'Query failed' }
+      const mrows = Array.isArray(viaMgmt.rows) ? viaMgmt.rows : []
+      return { ok: true, message: `Query returned ${mrows.length} row${mrows.length === 1 ? '' : 's'}`, data: { rowCount: mrows.length, rows: mrows.slice(0, 50) } }
+    }
     const res = await fetch(`${url}/rest/v1/rpc/hub_exec_sql`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key, apikey: key },

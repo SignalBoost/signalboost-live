@@ -1,5 +1,6 @@
-// app/api/infra-pr/[id]/merge/route.ts
-// THE APPROVAL GATE. A POST here = the owner's explicit authorization.
+// app/api/infra-pr/[id]/merge/route.ts  — thin framework binding (approval gate)
+// Resolves the user's RBAC role from the app layer and INJECTS it into the
+// module (which stays auth-agnostic). Swap resolveRole() for your auth source.
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
@@ -19,14 +20,26 @@ async function requireUser() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll() {
-          /* read-only in route handler */
-        },
+        setAll() {},
       },
     },
   );
   const { data } = await supabase.auth.getUser();
   return data?.user ?? null;
+}
+
+// ── ROLE INJECTION POINT ──
+// The module is auth-agnostic; the host app decides the role. By default we
+// read Supabase JWT claims (app_metadata.role / user_metadata.role). Point
+// this at your own roles table/claim if different. Accepts: cto|admin|owner,
+// lead_dev|developer, ai_operator|operator (normalized inside the module).
+function resolveRole(user: any): string {
+  return (
+    user?.app_metadata?.role ||
+    user?.user_metadata?.role ||
+    user?.app_metadata?.claims_admin && 'admin' ||
+    'NONE'
+  );
 }
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -39,11 +52,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   const out = await mergeInfraPr({
     id,
-    userId: user.id ?? null,
+    userId: (user as any).id ?? null,
+    role: resolveRole(user),
     origin,
     cookie,
   });
-
   if (!out.ok) return NextResponse.json(out, { status: 400 });
   return NextResponse.json(out);
 }

@@ -3,7 +3,7 @@
 // write intent. It packages the call into a generic InfrastructurePR and
 // persists it to the pending queue. It NEVER executes — merge does that.
 import { createInfraPr } from '@/lib/infra-pr/store';
-import { classifyAction, ActionVerb, RiskTier, ApprovalTier } from '@/lib/hub/action-policy';
+import { classifyAction, ActionVerb, RiskTier, ApprovalTier } from '@/lib/hub/infra-action-policy';
 
 // The one shape all four providers flow through. `payload` is opaque.
 export interface InfrastructurePR {
@@ -48,6 +48,13 @@ export async function routeInfrastructureWrite(input: RouteInput): Promise<Route
     verb: input.verb,
     elevated: input.elevated,
   });
+
+  if (cls.blocked) {
+    return {
+      ok: false,
+      error: `Action ${input.actionId} is blocked by Hub policy and cannot be queued.`,
+    };
+  }
 
   const created = await createInfraPr({
     title: input.title,

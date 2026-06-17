@@ -284,7 +284,7 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     ]
   },
   {
-    id: 'supabase_mkt', name: 'Supabase — Marketing', subtitle: 'MARKETING DB', accent: '#3ecf8e', tier: 'core',
+    id: 'supabase_mkt', name: 'Secondary Supabase', subtitle: 'SECOND DATABASE', accent: '#3ecf8e', tier: 'core',
     sections: [
       { title: 'Data', templateIds: ['supabase_mkt.list_tables', 'supabase_mkt.list_rows'] },
       { title: 'Auth', templateIds: ['supabase_mkt.list_users'] },

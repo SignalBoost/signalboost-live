@@ -90,13 +90,13 @@ export const HUB_TEMPLATE_STRINGS: Record<string, Five> = {
   'hub.tpl.assemblyai.transcript_details.label': { en: 'Transcript Details', es: 'Detalles de la Transcripción', pt: 'Detalhes da Transcrição', pl: 'Szczegóły Transkrypcji', ru: 'Сведения о транскрипции' },
   'hub.tpl.assemblyai.transcript_details.desc': { en: 'Inspect a transcription job.', es: 'Inspecciona un trabajo de transcripción.', pt: 'Inspeciona um trabalho de transcrição.', pl: 'Sprawdź zadanie transkrypcji.', ru: 'Просмотр задания транскрипции.' },
 
-  // ---- Supabase — Marketing ----
+  // ---- Secondary Supabase ----
   'hub.tpl.supabase_mkt.list_tables.label': { en: 'List Tables', es: 'Listar Tablas', pt: 'Listar Tabelas', pl: 'Lista Tabel', ru: 'Список таблиц' },
-  'hub.tpl.supabase_mkt.list_tables.desc': { en: 'Public tables in the marketing project.', es: 'Tablas públicas del proyecto de marketing.', pt: 'Tabelas públicas do projeto de marketing.', pl: 'Tabele publiczne w projekcie marketingowym.', ru: 'Публичные таблицы маркетингового проекта.' },
+  'hub.tpl.supabase_mkt.list_tables.desc': { en: 'Public tables in the secondary project.', es: 'Tablas públicas del proyecto secundario.', pt: 'Tabelas públicas do projeto secundário.', pl: 'Tabele publiczne w drugim projekcie.', ru: 'Публичные таблицы вторичного проекта.' },
   'hub.tpl.supabase_mkt.list_rows.label': { en: 'List Rows', es: 'Listar Filas', pt: 'Listar Linhas', pl: 'Lista Wierszy', ru: 'Список строк' },
   'hub.tpl.supabase_mkt.list_rows.desc': { en: 'Rows from a chosen table.', es: 'Filas de una tabla elegida.', pt: 'Linhas de uma tabela escolhida.', pl: 'Wiersze z wybranej tabeli.', ru: 'Строки из выбранной таблицы.' },
   'hub.tpl.supabase_mkt.list_users.label': { en: 'List Users', es: 'Listar Usuarios', pt: 'Listar Usuários', pl: 'Lista Użytkowników', ru: 'Список пользователей' },
-  'hub.tpl.supabase_mkt.list_users.desc': { en: 'Auth users in the marketing project.', es: 'Usuarios de autenticación del proyecto de marketing.', pt: 'Usuários de autenticação do projeto de marketing.', pl: 'Użytkownicy uwierzytelniania w projekcie marketingowym.', ru: 'Пользователи аутентификации маркетингового проекта.' },
+  'hub.tpl.supabase_mkt.list_users.desc': { en: 'Auth users in the secondary project.', es: 'Usuarios de autenticación del proyecto secundario.', pt: 'Usuários de autenticação do projeto secundário.', pl: 'Użytkownicy uwierzytelniania w drugim projekcie.', ru: 'Пользователи аутентификации вторичного проекта.' },
   'hub.tpl.supabase_mkt.list_buckets.label': { en: 'List Buckets', es: 'Listar Buckets', pt: 'Listar Buckets', pl: 'Lista Bucketów', ru: 'Список бакетов' },
-  'hub.tpl.supabase_mkt.list_buckets.desc': { en: 'Storage buckets in the marketing project.', es: 'Buckets de almacenamiento del proyecto de marketing.', pt: 'Buckets de armazenamento do projeto de marketing.', pl: 'Buckety pamięci w projekcie marketingowym.', ru: 'Бакеты хранилища маркетингового проекта.' },
+  'hub.tpl.supabase_mkt.list_buckets.desc': { en: 'Storage buckets in the secondary project.', es: 'Buckets de almacenamiento del proyecto secundario.', pt: 'Buckets de armazenamento do projeto secundário.', pl: 'Buckety pamięci w drugim projekcie.', ru: 'Бакеты хранилища вторичного проекта.' },
 }

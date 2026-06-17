@@ -95,6 +95,23 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     id: 'supabase.list_tables', label: 'List Tables', description: 'List public tables (picker source).', icon: '🗃️',
     policyActionId: 'read_provider_status', api: { service: 'supabase', method: 'GET', endpoint: '/rest/v1/' }, fields: []
   },
+
+  // ---- Project picker source + SQL Editor override (adds a searchable project dropdown) ----
+  'supabase.list_projects': {
+    id: 'supabase.list_projects', label: 'List Projects', description: 'Your Supabase projects (picker source).', icon: '🗂️',
+    policyActionId: 'read_provider_status', api: { service: 'supabase', method: 'GET', endpoint: '/v1/projects' }, fields: []
+  },
+  // Overrides the base SQL Editor: adds a live project selector before the query.
+  'supabase.sql_editor': {
+    id: 'supabase.sql_editor', label: 'SQL Editor',
+    description: 'Pick a project, then run raw SQL against it.', icon: '\u26a1',
+    previewBeforeSubmit: true, policyActionId: 'sql_editor',
+    api: { service: 'supabase', method: 'POST', endpoint: '/v1/rpc/execute_sql' },
+    fields: [
+      { id: 'project', label: 'Project', type: 'remote_select', required: true, source: { action: 'supabase.list_projects', dataPath: 'projects', valueKey: 'ref', labelTemplate: '{name}' } },
+      { id: 'query', label: 'SQL Raw Statement', type: 'textarea', required: true, defaultValue: 'SELECT * FROM users LIMIT 10;' }
+    ]
+  },
   'supabase.list_rows': {
     id: 'supabase.list_rows', label: 'List Rows', description: 'List rows for a table (picker source).', icon: '📋',
     policyActionId: 'read_provider_status', api: { service: 'supabase', method: 'GET', endpoint: '/rest/v1' },

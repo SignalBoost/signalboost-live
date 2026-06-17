@@ -19,6 +19,7 @@
 // client (same posture as the rest of the hub).
 
 import { createClient } from '@supabase/supabase-js'
+import { createHash } from 'crypto'
 import { recordAuditEvent, normalizeStatus } from '@/lib/hub/audit'
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -109,6 +110,24 @@ function normalizeSteps(raw: unknown): { ok: boolean; steps?: InfraPRStep[]; err
 
 // ── Stage (create) ──────────────────────────────────────────────────────────
 
+// Stable content fingerprint of a PR's meaningful operation: the ordered steps
+// (templateId + canonically-keyed payload), ignoring title/summary wording, so
+// two requests that perform the SAME operation hash identically.
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical)
+  if (value && typeof value === 'object') {
+    const src = value as Record<string, unknown>
+    const out: Record<string, unknown> = {}
+    for (const k of Object.keys(src).sort()) out[k] = canonical(src[k])
+    return out
+  }
+  return value
+}
+function fingerprintSteps(steps: InfraPRStep[]): string {
+  const basis = steps.map(s => ({ templateId: s.templateId, payload: canonical(s.payload || {}) }))
+  return createHash('sha256').update(JSON.stringify(basis)).digest('hex')
+}
+
 export async function stageInfrastructurePR(input: {
   title: string
   summary?: string
@@ -116,7 +135,7 @@ export async function stageInfrastructurePR(input: {
   risk?: InfraRisk
   createdBy?: string | null
   createdByEmail?: string | null
-}): Promise<{ ok: boolean; pr?: InfraPR; error?: string }> {
+}): Promise<{ ok: boolean; pr?: InfraPR; error?: string; duplicate?: boolean }> {
   const db = admin()
   if (!db) return { ok: false, error: 'Supabase service role is not configured (SUPABASE_SERVICE_ROLE_KEY).' }
 
@@ -130,6 +149,21 @@ export async function stageInfrastructurePR(input: {
     ? (input.risk as InfraRisk)
     : 'medium'
 
+  const fingerprint = fingerprintSteps(norm.steps)
+
+  // Dedup: refuse a second identical change while one is still OPEN. A matching
+  // merged/closed PR does NOT block — the same operation may be re-run later.
+  const existing = await db
+    .from(TABLE)
+    .select('*')
+    .eq('status', 'open')
+    .eq('fingerprint', fingerprint)
+    .limit(1)
+    .maybeSingle()
+  if (existing.data) {
+    return { ok: true, pr: existing.data as InfraPR, duplicate: true }
+  }
+
   const { data, error } = await db
     .from(TABLE)
     .insert({
@@ -137,6 +171,7 @@ export async function stageInfrastructurePR(input: {
       summary: String(input.summary || '').slice(0, 4000),
       status: 'open',
       risk,
+      fingerprint,
       steps: norm.steps,
       results: [],
       created_by: input.createdBy || null,
@@ -145,7 +180,20 @@ export async function stageInfrastructurePR(input: {
     .select('*')
     .single()
 
-  if (error) return { ok: false, error: error.message }
+  if (error) {
+    // Race guarantee: the partial unique index rejected a simultaneous duplicate.
+    if ((error as any).code === '23505') {
+      const dup = await db
+        .from(TABLE)
+        .select('*')
+        .eq('status', 'open')
+        .eq('fingerprint', fingerprint)
+        .limit(1)
+        .maybeSingle()
+      if (dup.data) return { ok: true, pr: dup.data as InfraPR, duplicate: true }
+    }
+    return { ok: false, error: error.message }
+  }
 
   await recordAuditEvent({
     actor: input.createdBy || 'console',

@@ -32,6 +32,7 @@ export interface NormalizedResponse {
   rollbackPossible: boolean
   rollbackNotes?: string
   providerMetadata?: Record<string, unknown>
+  data?: unknown            // live provider payload (read actions); omitted in simulation
 }
 
 export interface ExecuteRequest {
@@ -240,6 +241,7 @@ export async function execute(host: ExecutorHost, req: ExecuteRequest): Promise<
       ok: true, status: 'success',
       rollbackPossible: cap.rollbackPossible, rollbackNotes: template.rollbackNotes,
       providerMetadata: providerResult.metadata || {},
+      data: providerResult.data ?? null,
     },
     failure: null,
   }

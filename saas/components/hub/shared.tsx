@@ -82,38 +82,184 @@ export function c(key: string, lang: Lang): string {
   return entry[lang] || entry.en
 }
 
-export type Tone = { strong: string; soft: string; border: string }
-export const TONES: Record<string, Tone> = {
-  green:  { strong: '#10b981', soft: 'rgba(16,185,129,.16)',  border: 'rgba(16,185,129,.45)' },
-  blue:   { strong: '#3b82f6', soft: 'rgba(59,130,246,.16)',  border: 'rgba(59,130,246,.45)' },
-  purple: { strong: '#8b5cf6', soft: 'rgba(139,92,246,.16)',  border: 'rgba(139,92,246,.45)' },
-  gray:   { strong: '#94a3b8', soft: 'rgba(148,163,184,.14)', border: 'rgba(148,163,184,.4)' },
-  gold:   { strong: '#ffc300', soft: 'rgba(255,195,0,.14)',   border: 'rgba(255,195,0,.45)' },
-  cyan:   { strong: '#1af0ff', soft: 'rgba(26,240,255,.14)',  border: 'rgba(26,240,255,.4)' },
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DESIGN SYSTEM — one source of truth for the entire Hub Console.
+// Principles: calm deep-navy surfaces, hairline structure, a restrained
+// gold/cyan accent pair used in small deliberate doses, and a consistent
+// type + spacing + radius scale. Refine values here and every provider,
+// card, and page updates in lockstep.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Surfaces
+export const SURFACE = {
+  page:   '#080c16',
+  raised: 'linear-gradient(165deg, rgba(22,31,54,.55), rgba(8,12,22,.86))',
+  sunken: 'rgba(4,8,16,.55)',
+  inset:  'rgba(255,255,255,.03)',
+  insetStrong: 'rgba(255,255,255,.05)',
 }
 
-export const cardStyle: React.CSSProperties = { background: 'linear-gradient(160deg, rgba(15,23,42,.72), rgba(3,7,18,.86))', border: '1px solid rgba(255,255,255,.1)', borderRadius: 18, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', boxShadow: '0 18px 48px rgba(0,0,0,.42)', display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }
-export const bodyStyle: React.CSSProperties = { padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10, flex: 1, minHeight: 0 }
-export const labelStyle: React.CSSProperties = { fontSize: 10.5, letterSpacing: '.13em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)' }
-export const rowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 11px', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 10, fontSize: 13 }
-export const monoStyle: React.CSSProperties = { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 11.5, color: 'rgba(255,255,255,.78)' }
+// Hairline borders
+export const LINE = {
+  faint:  'rgba(255,255,255,.06)',
+  soft:   'rgba(255,255,255,.10)',
+  medium: 'rgba(255,255,255,.16)',
+}
 
+// Text levels (a clear ramp, not a rainbow)
+export const TEXT = {
+  primary:   'rgba(255,255,255,.95)',
+  secondary: 'rgba(255,255,255,.66)',
+  muted:     'rgba(255,255,255,.44)',
+  faint:     'rgba(255,255,255,.30)',
+}
+
+// Brand accents — used sparingly for emphasis and interactivity
+export const ACCENT = { gold: '#ffc300', cyan: '#1af0ff' }
+
+// Semantic status colors (softened, less neon)
+export const SEMANTIC = { green: '#34d399', amber: '#fbbf24', red: '#f87171' }
+
+// Geometry — one consistent family
+export const RADIUS = { sm: 8, md: 12, lg: 16, pill: 999 }
+export const SPACE  = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24 }
+
+// Elevation — restrained, no glow
+export const SHADOW = {
+  sm: '0 1px 2px rgba(0,0,0,.28)',
+  md: '0 10px 30px rgba(0,0,0,.34)',
+  lg: '0 24px 64px rgba(0,0,0,.46)',
+}
+
+// Type
+export const FONT = {
+  sans: 'inherit',
+  mono: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+}
+export const TYPE = {
+  display: { fontSize: 20, fontWeight: 800, letterSpacing: '-.01em', lineHeight: 1.2 },
+  title:   { fontSize: 16, fontWeight: 700, letterSpacing: '-.005em', lineHeight: 1.25 },
+  body:    { fontSize: 13, fontWeight: 500, lineHeight: 1.5 },
+  small:   { fontSize: 12, fontWeight: 500, lineHeight: 1.45 },
+  eyebrow: { fontSize: 10, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase' as const },
+}
+
+// Tone palette (refined: calmer fills, hairline borders). Same shape + keys.
+export type Tone = { strong: string; soft: string; border: string }
+export const TONES: Record<string, Tone> = {
+  green:  { strong: '#34d399', soft: 'rgba(52,211,153,.12)',  border: 'rgba(52,211,153,.30)' },
+  blue:   { strong: '#60a5fa', soft: 'rgba(96,165,250,.12)',  border: 'rgba(96,165,250,.30)' },
+  purple: { strong: '#a78bfa', soft: 'rgba(167,139,250,.12)', border: 'rgba(167,139,250,.30)' },
+  gray:   { strong: '#94a3b8', soft: 'rgba(148,163,184,.10)', border: 'rgba(148,163,184,.26)' },
+  gold:   { strong: '#ffc300', soft: 'rgba(255,195,0,.10)',   border: 'rgba(255,195,0,.30)' },
+  cyan:   { strong: '#1af0ff', soft: 'rgba(26,240,255,.10)',  border: 'rgba(26,240,255,.30)' },
+}
+
+// ── Core style tokens (same export names — used across every Hub page) ──────
+export const cardStyle: React.CSSProperties = {
+  background: SURFACE.raised,
+  border: `1px solid ${LINE.soft}`,
+  borderRadius: RADIUS.lg,
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
+  boxShadow: SHADOW.md,
+  display: 'flex',
+  flexDirection: 'column',
+  minWidth: 0,
+  overflow: 'hidden',
+}
+
+export const bodyStyle: React.CSSProperties = {
+  padding: `${SPACE.lg}px ${SPACE.lg}px ${SPACE.xl}px`,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: SPACE.md,
+  flex: 1,
+  minHeight: 0,
+}
+
+export const labelStyle: React.CSSProperties = {
+  fontSize: 10,
+  fontWeight: 800,
+  letterSpacing: '.14em',
+  textTransform: 'uppercase',
+  color: TEXT.muted,
+}
+
+export const rowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: SPACE.md,
+  padding: `${SPACE.sm + 2}px ${SPACE.md}px`,
+  background: SURFACE.inset,
+  border: `1px solid ${LINE.faint}`,
+  borderRadius: RADIUS.md,
+  fontSize: 13,
+}
+
+export const monoStyle: React.CSSProperties = {
+  fontFamily: FONT.mono,
+  fontSize: 12,
+  color: TEXT.secondary,
+}
+
+// Shared interactive surfaces (exported for forms/inputs across the Hub)
+export const inputStyle: React.CSSProperties = {
+  width: '100%',
+  padding: `${SPACE.sm + 3}px ${SPACE.md}px`,
+  borderRadius: RADIUS.md,
+  border: `1px solid ${LINE.medium}`,
+  background: SURFACE.sunken,
+  color: TEXT.primary,
+  fontSize: 13,
+  fontFamily: FONT.sans,
+  outline: 'none',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,.04)',
+}
+
+export const primaryBtnStyle: React.CSSProperties = {
+  padding: `${SPACE.sm + 2}px ${SPACE.lg}px`,
+  borderRadius: RADIUS.md,
+  border: `1px solid ${ACCENT.cyan}`,
+  background: 'rgba(26,240,255,.12)',
+  color: ACCENT.cyan,
+  fontSize: 12.5,
+  fontWeight: 700,
+  letterSpacing: '.01em',
+  cursor: 'pointer',
+}
+
+export const ghostBtnStyle: React.CSSProperties = {
+  padding: `${SPACE.sm + 2}px ${SPACE.lg}px`,
+  borderRadius: RADIUS.md,
+  border: `1px solid ${LINE.medium}`,
+  background: SURFACE.inset,
+  color: TEXT.secondary,
+  fontSize: 12.5,
+  fontWeight: 600,
+  cursor: 'pointer',
+}
+
+// ── Component primitives (same signatures, refined visuals) ────────────────
 export function Dot({ tone }: { tone: 'green' | 'yellow' | 'red' }) {
-  const color = tone === 'green' ? '#22c55e' : tone === 'yellow' ? '#ffc300' : '#ef4444'
-  return <span style={{ width: 9, height: 9, borderRadius: '50%', background: color, boxShadow: `0 0 10px ${color}`, display: 'inline-block', flexShrink: 0 }} />
+  const color = tone === 'green' ? SEMANTIC.green : tone === 'yellow' ? ACCENT.gold : SEMANTIC.red
+  return <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, boxShadow: `0 0 0 3px ${color}22`, display: 'inline-block', flexShrink: 0 }} />
 }
 
 export function Band({ tone, icon, title, plain, sub }: { tone: Tone; icon: string; title: string; plain: string; sub: string }) {
   return (
-    <div style={{ padding: '14px 16px 12px', background: `linear-gradient(135deg, ${tone.soft}, rgba(3,7,18,.0))`, borderBottom: `1px solid ${tone.border}` }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span style={{ width: 42, height: 42, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, background: tone.soft, border: `1px solid ${tone.border}`, flexShrink: 0 }}>{icon}</span>
+    <div style={{ padding: `${SPACE.lg}px ${SPACE.lg}px ${SPACE.md}px`, background: `linear-gradient(135deg, ${tone.soft}, rgba(8,12,22,0) 72%)`, borderBottom: `1px solid ${LINE.soft}`, position: 'relative' }}>
+      <span aria-hidden="true" style={{ position: 'absolute', left: 0, bottom: 0, height: 2, width: 56, background: tone.strong, opacity: .85 }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: SPACE.md }}>
+        <span style={{ width: 42, height: 42, borderRadius: RADIUS.md, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 21, background: tone.soft, border: `1px solid ${tone.border}`, flexShrink: 0, boxShadow: 'inset 0 1px 0 rgba(255,255,255,.06)' }}>{icon}</span>
         <div style={{ minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 19, fontWeight: 800, color: '#fff' }}>{title}</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: SPACE.sm, flexWrap: 'wrap' }}>
+            <span style={{ ...TYPE.display, color: TEXT.primary }}>{title}</span>
             <span style={{ fontSize: 12, fontWeight: 700, color: tone.strong }}>{plain}</span>
           </div>
-          <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.55)' }}>{sub}</div>
+          <div style={{ ...TYPE.small, color: TEXT.secondary, marginTop: 2 }}>{sub}</div>
         </div>
       </div>
     </div>
@@ -121,13 +267,23 @@ export function Band({ tone, icon, title, plain, sub }: { tone: Tone; icon: stri
 }
 
 export function Status({ ok, text }: { ok: boolean; text: string }) {
-  return <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 600, color: ok ? '#22c55e' : '#ffc300' }}><span>{ok ? '✅' : '⚠️'}</span>{text}</div>
+  const color = ok ? SEMANTIC.green : ACCENT.gold
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: SPACE.sm, fontSize: 13, fontWeight: 600, color }}>
+      <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, boxShadow: `0 0 0 3px ${color}22`, flexShrink: 0 }} />
+      {text}
+    </div>
+  )
 }
 
 export function ActionButton({ tone, label, href }: { tone: Tone; label: string; href: string }) {
-  return <a href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noreferrer" className="hub-btn" style={{ marginTop: 'auto', display: 'block', textAlign: 'center', padding: '10px 14px', borderRadius: 11, border: `1px solid ${tone.border}`, background: tone.soft, color: '#fff', fontSize: 13.5, fontWeight: 700, textDecoration: 'none' }}>{label}</a>
+  return (
+    <a href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noreferrer" className="hub-btn" style={{ marginTop: 'auto', display: 'block', textAlign: 'center', padding: `${SPACE.sm + 3}px ${SPACE.lg}px`, borderRadius: RADIUS.md, border: `1px solid ${tone.border}`, background: tone.soft, color: TEXT.primary, fontSize: 13, fontWeight: 700, letterSpacing: '.01em', textDecoration: 'none', transition: 'background .15s ease, border-color .15s ease' }}>{label}</a>
+  )
 }
 
 export function DetailsToggle({ open, onClick, lang }: { open: boolean; onClick: () => void; lang: Lang }) {
-  return <button onClick={onClick} className="hub-chip" style={{ alignSelf: 'flex-start', padding: '5px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.15)', color: 'rgba(255,255,255,.7)' }}>{open ? '▴ ' + c('hideDetails', lang) : '▾ ' + c('showDetails', lang)}</button>
+  return (
+    <button onClick={onClick} className="hub-chip" style={{ alignSelf: 'flex-start', padding: `${SPACE.xs + 2}px ${SPACE.md + 1}px`, borderRadius: RADIUS.pill, fontSize: 12, fontWeight: 600, background: SURFACE.inset, border: `1px solid ${LINE.medium}`, color: TEXT.secondary, cursor: 'pointer' }}>{open ? '▴ ' + c('hideDetails', lang) : '▾ ' + c('showDetails', lang)}</button>
+  )
 }

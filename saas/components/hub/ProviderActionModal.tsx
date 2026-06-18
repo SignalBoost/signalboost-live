@@ -7,6 +7,7 @@
 // provider, renders the form (ProviderActionForm.tsx) inside the modal, and
 // handles success/error/close states.
 
+import { useTranslation } from '@/components/i18n/useTranslation'
 import { useState } from 'react'
 import { getProviderTemplates } from '@/lib/hub/provider-templates'
 import { getHubProvider } from '@/lib/hub/provider-registry'
@@ -54,6 +55,7 @@ const closeButtonStyle: React.CSSProperties = {
 }
 
 export default function ProviderActionModal({ providerId, lang, onClose, onSuccess }: ProviderActionModalProps) {
+  const { t } = useTranslation()
   const provider = getHubProvider(providerId)
   const templates = getProviderTemplates(providerId)
 
@@ -64,10 +66,10 @@ export default function ProviderActionModal({ providerId, lang, onClose, onSucce
     return (
       <div style={modalShellStyle}>
         <div style={{ ...bodyStyle, overflowY: 'auto' }}>
-          <div style={{ color: 'rgba(255,255,255,.5)' }}>Provider not found: {providerId}</div>
+          <div style={{ color: 'rgba(255,255,255,.5)' }}>{t('console.cui.provider_not_found', 'Provider not found: {id}').replace('{id}', providerId)}</div>
         </div>
         <div style={footerStyle}>
-          <button onClick={onClose} style={closeButtonStyle}>Close</button>
+          <button onClick={onClose} style={closeButtonStyle}>{t('console.ui.close', 'Close')}</button>
         </div>
       </div>
     )
@@ -77,10 +79,10 @@ export default function ProviderActionModal({ providerId, lang, onClose, onSucce
     return (
       <div style={modalShellStyle}>
         <div style={{ ...bodyStyle, overflowY: 'auto' }}>
-          <div style={{ color: 'rgba(255,255,255,.5)' }}>No actions available for {provider.name}</div>
+          <div style={{ color: 'rgba(255,255,255,.5)' }}>{t('console.cui.no_actions', 'No actions available for {name}').replace('{name}', provider.name)}</div>
         </div>
         <div style={footerStyle}>
-          <button onClick={onClose} style={closeButtonStyle}>Close</button>
+          <button onClick={onClose} style={closeButtonStyle}>{t('console.ui.close', 'Close')}</button>
         </div>
       </div>
     )
@@ -115,8 +117,8 @@ export default function ProviderActionModal({ providerId, lang, onClose, onSucce
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 24 }}>🎯</span>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>Actions for {provider.name}</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.55)' }}>{templates.length} available action{templates.length === 1 ? '' : 's'}</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>{t('console.cui.actions_for', 'Actions for {name}').replace('{name}', provider.name)}</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.55)' }}>{(templates.length === 1 ? t('console.cui.available_one', '{n} available action') : t('console.cui.available_many', '{n} available actions')).replace('{n}', String(templates.length))}</div>
           </div>
         </div>
       </div>
@@ -168,7 +170,7 @@ export default function ProviderActionModal({ providerId, lang, onClose, onSucce
       </div>
 
       <div style={footerStyle}>
-        <button onClick={onClose} style={closeButtonStyle}>Close</button>
+        <button onClick={onClose} style={closeButtonStyle}>{t('console.ui.close', 'Close')}</button>
       </div>
     </div>
   )

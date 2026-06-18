@@ -14,6 +14,7 @@ import { isOutreachEligible, createCustomerDraft, listCustomerDrafts, formatCust
 import { listRepoFiles, readRepoFile, formatFileListForAI, formatFileForAI } from '@/lib/ai/tools/repoReader'
 import { commitFileToBranch, listAiBranches, formatCommitResultForAI, formatBranchListForAI, listDeletableBranches, deleteBranches, formatDeletableForAI, formatDeleteResultForAI } from '@/lib/ai/tools/repoWriter'
 import { proposeInfrastructurePR, formatStageResultForAI, listInfraPRsForAI } from '@/lib/ai/tools/infraPRWriter'
+import { OWNER_ONLY_TOOLS, adminReadOnlyBlock } from '@/lib/ai/accessTier'
 
 export const maxDuration = 300
 
@@ -365,7 +366,6 @@ const TOOL_PROPOSE_PLAN: ChatTool = {
     },
   },
 }
-
 const TOOL_UPDATE_PLAN_STATUS: ChatTool = {
   type: 'function',
   function: {
@@ -572,7 +572,12 @@ async function verifyCommittedFile(params: { branch: string; path: string; expec
   }
 }
 
-async function runTool(name: string, rawArgs: string, userId: string | null, conversationId: string | null, isPrivileged: boolean): Promise<string> {
+async function runTool(name: string, rawArgs: string, userId: string | null, conversationId: string | null, isPrivileged: boolean, isOwner: boolean): Promise<string> {
+  // Owner-only execution guard (defense in depth — these tools are also filtered
+  // out of an admin's tool list). Admins get read/diagnose access only.
+  if (OWNER_ONLY_TOOLS.has(name) && !isOwner) {
+    return 'PERMISSION DENIED: this action is owner-only. Admins have read/diagnose access only — produce a precise diagnosis and the exact fix for an owner to execute. Do not retry.'
+  }
   if (name === 'getPricing') {
     const result = await getLivePricing()
     if (!result.ok || !result.pricing) {
@@ -713,8 +718,7 @@ async function runTool(name: string, rawArgs: string, userId: string | null, con
     const result = await proposeInfrastructurePR(args, { userId, userEmail: null })
     return formatStageResultForAI(result)
   }
-
-  if (name === 'listInfrastructurePRs') {
+if (name === 'listInfrastructurePRs') {
     if (!isPrivileged) {
       return 'PERMISSION DENIED: infrastructure PRs are owner/admin only. Do not retry.'
     }
@@ -887,13 +891,16 @@ export async function POST(req: NextRequest) {
       .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content as string }))
 
     let isPrivileged = false
+    let isOwner = false
     let userId: string | null = null
     try {
       const access = await getAccess()
-      isPrivileged = access.isAdmin
+      isPrivileged = access.isAdmin   // owner OR admin
+      isOwner = access.isOwner        // owner only
       userId = access.userId
     } catch {
       isPrivileged = false
+      isOwner = false
     }
 
     if (!sanitized.length) {
@@ -915,7 +922,11 @@ export async function POST(req: NextRequest) {
 
     const model       = isPrivileged ? 'claude-sonnet-4-6' : 'claude-haiku-4-5'
     const temperature = isPrivileged ? 0.5 : 0.4
-    const baseTools   = isPrivileged ? CHIEF_OF_STAFF_TOOLS : CONCIERGE_TOOLS
+    const baseTools   = isOwner
+      ? CHIEF_OF_STAFF_TOOLS
+      : isPrivileged
+        ? CHIEF_OF_STAFF_TOOLS.filter(t => !OWNER_ONLY_TOOLS.has(t.function.name)) // admin: read/diagnose only
+        : CONCIERGE_TOOLS
     const customerTools = userId && !isPrivileged ? [TOOL_CREATE_MY_OUTREACH, TOOL_LIST_MY_OUTREACH] : []
     const tools       = userId
       ? [...baseTools, ...customerTools, TOOL_REMEMBER_FACT, TOOL_FORGET_FACT, TOOL_SEARCH_HISTORY, TOOL_DELETE_HISTORY]
@@ -951,6 +962,13 @@ export async function POST(req: NextRequest) {
     let systemContent = isPrivileged
       ? chiefOfStaffPrompt(language, liveMetrics, pendingPlans)
       : conciergePrompt(language)
+
+    // Access tiering: the owner keeps full execution authority; an admin (privileged
+    // but not owner) is held to read/diagnose only. The owner-only tools are already
+    // removed from the admin's tool list above; this is the prompt-level layer.
+    if (isPrivileged && !isOwner) {
+      systemContent += `\n\n${adminReadOnlyBlock()}`
+    }
 
     // ── Long-term user memory (logged-in users only) ──────────────────────
     if (userId) {
@@ -1024,7 +1042,7 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
       for (const block of (msg as any).content) {
         if (!block || block.type !== 'tool_use') continue
         // runTool expects a JSON string; Anthropic gives input as an object.
-        const result = await runTool(block.name || '', JSON.stringify(block.input ?? {}), userId, conversationId, isPrivileged)
+        const result = await runTool(block.name || '', JSON.stringify(block.input ?? {}), userId, conversationId, isPrivileged, isOwner)
         toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
       }
       convo.push({ role: 'user', content: toolResults })

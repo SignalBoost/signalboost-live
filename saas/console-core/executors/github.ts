@@ -27,12 +27,16 @@ function gh(input: Record<string, unknown>):
   const token = process.env.GITHUB_WRITE_TOKEN
   if (!token) return { ok: false, error: 'GitHub not configured — set GITHUB_WRITE_TOKEN' }
   const raw = String(input.repo || '').trim()
-  let owner = String(process.env.GITHUB_DEFAULT_OWNER || 'SignalBoost')
-  let name = raw || String(process.env.GITHUB_DEFAULT_REPO || 'signalboost-live')
+  // Portable defaults: no hardcoded repository. A host may set
+  // GITHUB_DEFAULT_OWNER / GITHUB_DEFAULT_REPO to provide a fallback; otherwise
+  // owner/name come solely from the selected "owner/name" input, so the engine
+  // never silently targets another tenant's repo.
+  let owner = String(process.env.GITHUB_DEFAULT_OWNER || '').trim()
+  let name = raw || String(process.env.GITHUB_DEFAULT_REPO || '').trim()
   if (raw.includes('/')) {
     const parts = raw.split('/')
-    owner = parts[0]
-    name = parts[1]
+    owner = (parts[0] || '').trim() || owner
+    name = (parts[1] || '').trim()
   }
   return { ok: true, token, headers: ghHeaders(token), owner, name }
 }

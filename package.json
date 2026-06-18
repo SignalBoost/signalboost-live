@@ -16,6 +16,7 @@
     "@supabase/supabase-js": "^2.106.2",
     "autoprefixer": "^10.4.16",
     "next": "16.2.6",
+    "@anthropic-ai/sdk": "^0.104.2",
     "openai": "^4.24.1",
     "postcss": "^8.4.31",
     "react": "19.2.6",

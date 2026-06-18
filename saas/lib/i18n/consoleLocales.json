@@ -947,6 +947,27 @@
       "querying_vars": "Querying cluster variables ledger...",
       "no_config_keys": "No active configuration keys found.",
       "nothing_to_select": "Nothing to select here yet."
+    },
+    "vault": {
+      "cred_mgmt": "Credential Management",
+      "rotate_title": "Rotate {name}",
+      "rotate_sub": "Generate a new credential for {provider}.",
+      "cannot_undo": "This action cannot be undone",
+      "current_secret": "Current Secret",
+      "after_rotation": "After rotation",
+      "after_desc": "A new credential will be generated. The old one is revoked automatically and synced to your Vercel environment variables.",
+      "rotate_key": "Rotate Key",
+      "generating": "Generating new credential...",
+      "may_take": "This may take a moment.",
+      "rotation_success": "Rotation successful",
+      "new_secret_masked": "New Secret (Masked)",
+      "chk_generated": "New credential generated",
+      "chk_synced": "Synced to Vercel env vars",
+      "chk_revoked": "Old credential revoked",
+      "chk_audited": "Audit logged",
+      "done": "Done",
+      "rotation_failed": "Rotation failed",
+      "retry": "Retry"
     }
   },
   "es": {
@@ -1897,6 +1918,27 @@
       "querying_vars": "Consultando el registro de variables del clúster...",
       "no_config_keys": "No se encontraron claves de configuración activas.",
       "nothing_to_select": "Nada que seleccionar todavía."
+    },
+    "vault": {
+      "cred_mgmt": "Gestión de credenciales",
+      "rotate_title": "Rotar {name}",
+      "rotate_sub": "Genera una nueva credencial para {provider}.",
+      "cannot_undo": "Esta acción no se puede deshacer",
+      "current_secret": "Secreto actual",
+      "after_rotation": "Tras la rotación",
+      "after_desc": "Se generará una nueva credencial. La anterior se revoca automáticamente y se sincroniza con tus variables de entorno de Vercel.",
+      "rotate_key": "Rotar clave",
+      "generating": "Generando nueva credencial...",
+      "may_take": "Esto puede tardar un momento.",
+      "rotation_success": "Rotación exitosa",
+      "new_secret_masked": "Nuevo secreto (enmascarado)",
+      "chk_generated": "Nueva credencial generada",
+      "chk_synced": "Sincronizado con las variables de Vercel",
+      "chk_revoked": "Credencial anterior revocada",
+      "chk_audited": "Registrado en auditoría",
+      "done": "Listo",
+      "rotation_failed": "La rotación falló",
+      "retry": "Reintentar"
     }
   },
   "pt": {
@@ -2847,6 +2889,27 @@
       "querying_vars": "A consultar o registo de variáveis do cluster...",
       "no_config_keys": "Nenhuma chave de configuração ativa encontrada.",
       "nothing_to_select": "Nada para selecionar ainda."
+    },
+    "vault": {
+      "cred_mgmt": "Gestão de credenciais",
+      "rotate_title": "Rotacionar {name}",
+      "rotate_sub": "Gerar uma nova credencial para {provider}.",
+      "cannot_undo": "Esta ação não pode ser desfeita",
+      "current_secret": "Segredo atual",
+      "after_rotation": "Após a rotação",
+      "after_desc": "Será gerada uma nova credencial. A anterior é revogada automaticamente e sincronizada com as suas variáveis de ambiente do Vercel.",
+      "rotate_key": "Rotacionar chave",
+      "generating": "A gerar nova credencial...",
+      "may_take": "Isto pode demorar um momento.",
+      "rotation_success": "Rotação bem-sucedida",
+      "new_secret_masked": "Novo segredo (mascarado)",
+      "chk_generated": "Nova credencial gerada",
+      "chk_synced": "Sincronizado com as variáveis do Vercel",
+      "chk_revoked": "Credencial anterior revogada",
+      "chk_audited": "Registado na auditoria",
+      "done": "Concluído",
+      "rotation_failed": "A rotação falhou",
+      "retry": "Tentar novamente"
     }
   },
   "pl": {
@@ -3797,6 +3860,27 @@
       "querying_vars": "Odpytywanie rejestru zmiennych klastra...",
       "no_config_keys": "Nie znaleziono aktywnych kluczy konfiguracji.",
       "nothing_to_select": "Nie ma jeszcze nic do wyboru."
+    },
+    "vault": {
+      "cred_mgmt": "Zarządzanie poświadczeniami",
+      "rotate_title": "Rotuj {name}",
+      "rotate_sub": "Wygeneruj nowe poświadczenie dla {provider}.",
+      "cannot_undo": "Tej akcji nie można cofnąć",
+      "current_secret": "Bieżący sekret",
+      "after_rotation": "Po rotacji",
+      "after_desc": "Zostanie wygenerowane nowe poświadczenie. Poprzednie jest automatycznie unieważniane i synchronizowane ze zmiennymi środowiskowymi Vercel.",
+      "rotate_key": "Rotuj klucz",
+      "generating": "Generowanie nowego poświadczenia...",
+      "may_take": "To może chwilę potrwać.",
+      "rotation_success": "Rotacja zakończona sukcesem",
+      "new_secret_masked": "Nowy sekret (zamaskowany)",
+      "chk_generated": "Wygenerowano nowe poświadczenie",
+      "chk_synced": "Zsynchronizowano ze zmiennymi Vercel",
+      "chk_revoked": "Unieważniono poprzednie poświadczenie",
+      "chk_audited": "Zapisano w dzienniku audytu",
+      "done": "Gotowe",
+      "rotation_failed": "Rotacja nie powiodła się",
+      "retry": "Ponów"
     }
   },
   "ru": {
@@ -4747,6 +4831,27 @@
       "querying_vars": "Запрос реестра переменных кластера...",
       "no_config_keys": "Активные ключи конфигурации не найдены.",
       "nothing_to_select": "Пока нечего выбирать."
+    },
+    "vault": {
+      "cred_mgmt": "Управление учётными данными",
+      "rotate_title": "Ротация {name}",
+      "rotate_sub": "Создать новые учётные данные для {provider}.",
+      "cannot_undo": "Это действие нельзя отменить",
+      "current_secret": "Текущий секрет",
+      "after_rotation": "После ротации",
+      "after_desc": "Будут созданы новые учётные данные. Прежние автоматически отзываются и синхронизируются с переменными окружения Vercel.",
+      "rotate_key": "Ротировать ключ",
+      "generating": "Создание новых учётных данных...",
+      "may_take": "Это может занять некоторое время.",
+      "rotation_success": "Ротация выполнена",
+      "new_secret_masked": "Новый секрет (замаскирован)",
+      "chk_generated": "Новые учётные данные созданы",
+      "chk_synced": "Синхронизировано с переменными Vercel",
+      "chk_revoked": "Прежние учётные данные отозваны",
+      "chk_audited": "Записано в журнал аудита",
+      "done": "Готово",
+      "rotation_failed": "Ошибка ротации",
+      "retry": "Повторить"
     }
   }
 }

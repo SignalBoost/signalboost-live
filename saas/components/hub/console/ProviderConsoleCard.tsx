@@ -39,14 +39,21 @@ export function ProviderConsoleCard({ provider, lang, onExpand, onRun }: CardPro
 
       {/* Render Actions Layout */}
       <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10, boxSizing: 'border-box' }}>
-        {provider.sections.map((section, idx) => (
+        {provider.sections.map((section, idx) => {
+          // Hide actions that are not yet implemented on a LIVE provider
+          // (e.g. github.rotate_token / github.manage_secrets) so a buyer never
+          // sees a stub. Preview ("Soon") providers keep their full action list
+          // as a visible roadmap, so the filter only applies when `live`.
+          const visibleIds = section.templateIds.filter(id => !(live && !isActionLive(id)))
+          if (visibleIds.length === 0) return null
+          return (
           <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 4, boxSizing: 'border-box' }}>
             <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255, 255, 255, 0.35)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               {section.title}
             </div>
             
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, width: '100%', boxSizing: 'border-box' }}>
-              {section.templateIds.map(id => {
+              {visibleIds.map(id => {
                 const template = getTemplate(id, dict)
                 if (!template) return null
                 const isDestructive = isDestructiveTemplate(id)
@@ -84,7 +91,8 @@ export function ProviderConsoleCard({ provider, lang, onExpand, onRun }: CardPro
               })}
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
@@ -121,12 +129,17 @@ export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onHome, o
 
       {/* Grid layout with strict multi-column spacing rules */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
-        {provider.sections.map((section, idx) => (
+        {provider.sections.map((section, idx) => {
+          // Same buyer-facing rule as the card: hide unimplemented actions on a
+          // live provider; keep full lists for preview ("Soon") providers.
+          const visibleIds = section.templateIds.filter(id => !(live && !isActionLive(id)))
+          if (visibleIds.length === 0) return null
+          return (
           <div key={idx} style={{ background: 'rgba(13, 18, 32, 0.3)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: 10, padding: 12, boxSizing: 'border-box', overflow: 'hidden' }}>
             <h3 style={{ fontSize: 11, fontWeight: 800, color: '#1af0ff', textTransform: 'uppercase', margin: '0 0 10px 0', letterSpacing: '0.04em' }}>{section.title}</h3>
             
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, width: '100%', boxSizing: 'border-box' }}>
-              {section.templateIds.map(id => {
+              {visibleIds.map(id => {
                 const template = getTemplate(id, dict)
                 if (!template) return null
                 const isDestructive = isDestructiveTemplate(id)
@@ -167,7 +180,8 @@ export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onHome, o
               })}
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

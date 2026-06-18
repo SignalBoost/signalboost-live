@@ -238,12 +238,12 @@ export default function ProviderActionForm({
         )}
 
         {state === 'confirm' && (
-          <CenteredState icon="⚠️" title="Confirm action">
+          <CenteredState icon="⚠️" title={t('console.cui.confirm_action', 'Confirm action')}>
             {t('console.ui.about_to_execute', 'You are about to execute')} <strong>{template.label}</strong> {t('console.ui.on', 'on')} {template.api.service}.
           </CenteredState>
         )}
 
-        {state === 'submitting' && <CenteredState icon="⏳" title="Executing action…" spin />}
+        {state === 'submitting' && <CenteredState icon="⏳" title={t('console.cui.executing_action', 'Executing action…')} spin />}
 
         {state === 'success' && result?.ok && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0, overflow: 'hidden' }}>
@@ -274,7 +274,7 @@ export default function ProviderActionForm({
 
         {state === 'preview' && (
           <>
-            <button onClick={() => setState('idle')} className="hub-chip" style={secondaryButtonStyle}>Back</button>
+            <button onClick={() => setState('idle')} className="hub-chip" style={secondaryButtonStyle}>{t('console.cui.back', 'Back')}</button>
             <button onClick={() => (template.requiresConfirm ? setState('confirm') : executeAction())} className="hub-btn" style={warningButtonStyle}>
               {template.requiresConfirm ? t('console.ui.confirm', 'Confirm') : t('console.ui.execute', 'Execute')}
             </button>
@@ -283,8 +283,8 @@ export default function ProviderActionForm({
 
         {state === 'confirm' && (
           <>
-            <button onClick={() => setState(template.previewBeforeSubmit ? 'preview' : 'idle')} className="hub-chip" style={secondaryButtonStyle}>Cancel</button>
-            <button onClick={executeAction} className="hub-btn" style={dangerButtonStyle}>Execute Now</button>
+            <button onClick={() => setState(template.previewBeforeSubmit ? 'preview' : 'idle')} className="hub-chip" style={secondaryButtonStyle}>{t('console.ui.cancel', 'Cancel')}</button>
+            <button onClick={executeAction} className="hub-btn" style={dangerButtonStyle}>{t('console.cui.execute_now', 'Execute Now')}</button>
           </>
         )}
 
@@ -574,6 +574,7 @@ function VercelEnvVarPicker({
   onChange: (value: unknown) => void
   error?: string
 }) {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [envs, setEnvs] = useState<VercelEnvOption[]>([])
@@ -634,7 +635,7 @@ function VercelEnvVarPicker({
       <input
         value={value}
         onChange={e => onChange(e.target.value)}
-        placeholder="Select key ID..."
+        placeholder={t('console.cui.select_key_id', 'Select key ID...')}
         style={{
           ...pickerInputStyle,
           border: error ? '1px solid rgba(239,68,68,.5)' : '1px solid rgba(255,255,255,.15)',
@@ -666,6 +667,7 @@ function VercelEnvVarPicker({
 }
 
 function EmbeddedVercelEnvList() {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [envs, setEnvs] = useState<VercelEnvOption[]>([])
@@ -694,9 +696,9 @@ function EmbeddedVercelEnvList() {
     return () => { cancelled = true }
   }, [])
 
-  if (loading) return <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', padding: '4px 0' }}>Querying cluster variables ledger...</div>
+  if (loading) return <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', padding: '4px 0' }}>{t('console.cui.querying_vars', 'Querying cluster variables ledger...')}</div>
   if (error) return <div style={{ fontSize: 11, color: '#ef4444' }}>⚠️ Inventory Error: {error}</div>
-  if (envs.length === 0) return <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', padding: '4px 0' }}>No active configuration keys found.</div>
+  if (envs.length === 0) return <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', padding: '4px 0' }}>{t('console.cui.no_config_keys', 'No active configuration keys found.')}</div>
 
   return (
     <div style={{ maxHeight: '160px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, background: 'rgba(0,0,0,0.2)', padding: '6px 10px' }}>
@@ -732,6 +734,7 @@ function RemoteSelect({
   error?: string
   allValues: Record<string, unknown>
 }) {
+  const { t } = useTranslation()
   const source = field.source!
   const deps = source.dependsOn || []
   const depValues = deps.map(d => String(allValues?.[d] ?? ''))
@@ -843,7 +846,7 @@ function RemoteSelect({
         <div style={{ fontSize: 11, color: 'rgba(239,68,68,.85)', marginTop: 4 }}>{loadError}</div>
       )}
       {!loading && !loadError && options.length === 0 && (
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 4 }}>Nothing to select here yet.</div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 4 }}>{t('console.cui.nothing_to_select', 'Nothing to select here yet.')}</div>
       )}
     </div>
   )

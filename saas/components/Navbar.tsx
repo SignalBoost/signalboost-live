@@ -55,7 +55,12 @@ const LAUNCHPAD: Item[] = [
 ]
 
 const GROW: Item[] = [
-  { icon: '🛸', key: 'grow.myOutreach', href: '/dashboard/my-outreach' },
+  { icon: '🛸', key: 'grow.hub', href: '/dashboard/outreach' },
+  { icon: '🚀', key: 'grow.myOutreach', href: '/dashboard/my-outreach' },
+  { icon: '🔎', key: 'grow.discovery', href: '/dashboard/outreach/discovery' },
+  { icon: '📇', key: 'grow.contacts', href: '/dashboard/outreach/contacts' },
+  { icon: '📊', key: 'grow.pipeline', href: '/dashboard/outreach/pipeline' },
+  { icon: '📡', key: 'adm.radar', href: '/dashboard/opportunities' },
   { icon: '📣', key: 'grow.campaigns', href: '/dashboard/campaigns' },
   { icon: '📢', key: 'grow.promote', href: '/dashboard/promote' },
   { icon: '💼', key: 'grow.sales', href: '/dashboard/sales' },
@@ -86,11 +91,6 @@ const ADMIN: Item[] = [
   { icon: '🛰️', key: 'adm.mission', href: '/admin' },
   { icon: '🌌', key: 'adm.overview', href: '/admin/overview' },
   { icon: '💰', key: 'adm.revenue', href: '/admin/revenue' },
-  { icon: '📡', key: 'adm.radar', href: '/dashboard/opportunities' },
-  { icon: '🛸', key: 'grow.hub', href: '/dashboard/outreach' },
-  { icon: '🔎', key: 'grow.discovery', href: '/dashboard/outreach/discovery' },
-  { icon: '📇', key: 'grow.contacts', href: '/dashboard/outreach/contacts' },
-  { icon: '📊', key: 'grow.pipeline', href: '/dashboard/outreach/pipeline' },
   { icon: '🔌', key: 'adm.data', href: '/dashboard/data' },
   { icon: '⚡', key: 'adm.metrics', href: '/dashboard/metrics' },
   { icon: '🎛️', key: 'adm.console', href: '/dashboard/wireframes' },
@@ -375,7 +375,6 @@ const COPY: Record<Lang, Record<string, string>> = {
     'help.faq.l': 'Частые вопросы', 'help.contact.l': 'Связаться с поддержкой', 'help.docs.l': 'Документация',
   },
 }
-
 function tr(lang: string, key: string): string {
   const l = (['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as Lang
   return COPY[l]?.[key] ?? COPY.en[key] ?? ''
@@ -620,7 +619,9 @@ export default function Navbar() {
     border: '1px solid var(--border-medium)',
     borderRadius: 18,
     boxShadow: '0 30px 80px rgba(0,0,0,.55)',
-    overflow: 'hidden',
+    maxHeight: 'calc(100vh - 120px)',
+    overflowY: 'auto',
+    overflowX: 'hidden',
     backdropFilter: 'blur(14px)',
   }
 
@@ -731,8 +732,7 @@ export default function Navbar() {
       </div>
     )
   }
-
-  return (
+return (
     <>
       <style>{`
         .sbnav-desktop { display: flex; align-items: center; gap: 10px; }

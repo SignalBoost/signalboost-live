@@ -29,6 +29,11 @@ type TeamCopy = {
   thatsYou: string
   remove: string
   removeTitle: string
+  edit: string
+  save: string
+  cancel: string
+  deleteConfirm: string
+  confirmDelete: string
   loadError: string
   genericLoadError: string
   addError: string
@@ -58,6 +63,11 @@ const COPY: Record<string, TeamCopy> = {
     thatsYou: "That's you",
     remove: 'Remove',
     removeTitle: 'Remove',
+    edit: 'Edit',
+    save: 'Save',
+    cancel: 'Cancel',
+    deleteConfirm: 'Delete permanently?',
+    confirmDelete: 'Confirm',
     loadError: 'Could not load your team.',
     genericLoadError: 'Something went wrong loading your team.',
     addError: 'Could not add member.',
@@ -94,6 +104,11 @@ const COPY: Record<string, TeamCopy> = {
     thatsYou: 'Esse é você',
     remove: 'Remover',
     removeTitle: 'Remover',
+    edit: 'Editar',
+    save: 'Salvar',
+    cancel: 'Cancelar',
+    deleteConfirm: 'Excluir permanentemente?',
+    confirmDelete: 'Confirmar',
     loadError: 'Não foi possível carregar sua equipe.',
     genericLoadError: 'Algo deu errado ao carregar sua equipe.',
     addError: 'Não foi possível adicionar o membro.',
@@ -130,6 +145,11 @@ const COPY: Record<string, TeamCopy> = {
     thatsYou: 'Ese eres tú',
     remove: 'Eliminar',
     removeTitle: 'Eliminar',
+    edit: 'Editar',
+    save: 'Guardar',
+    cancel: 'Cancelar',
+    deleteConfirm: '¿Eliminar permanentemente?',
+    confirmDelete: 'Confirmar',
     loadError: 'No se pudo cargar tu equipo.',
     genericLoadError: 'Algo salió mal al cargar tu equipo.',
     addError: 'No se pudo agregar el miembro.',
@@ -166,6 +186,11 @@ const COPY: Record<string, TeamCopy> = {
     thatsYou: 'To Ty',
     remove: 'Usuń',
     removeTitle: 'Usuń',
+    edit: 'Edytuj',
+    save: 'Zapisz',
+    cancel: 'Anuluj',
+    deleteConfirm: 'Usunąć trwale?',
+    confirmDelete: 'Potwierdź',
     loadError: 'Nie można załadować zespołu.',
     genericLoadError: 'Coś poszło nie tak podczas ładowania zespołu.',
     addError: 'Nie można dodać członka.',
@@ -202,6 +227,11 @@ const COPY: Record<string, TeamCopy> = {
     thatsYou: 'Это вы',
     remove: 'Удалить',
     removeTitle: 'Удалить',
+    edit: 'Изменить',
+    save: 'Сохранить',
+    cancel: 'Отмена',
+    deleteConfirm: 'Удалить навсегда?',
+    confirmDelete: 'Подтвердить',
     loadError: 'Не удалось загрузить команду.',
     genericLoadError: 'Что-то пошло не так при загрузке команды.',
     addError: 'Не удалось добавить участника.',
@@ -243,8 +273,7 @@ function copyFor(lang: string): TeamCopy {
 export default function TeamPage() {
   const { lang } = useI18n()
   const copy = copyFor(lang)
-
-  const [members, setMembers] = useState<Member[]>([])
+const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notAllowed, setNotAllowed] = useState(false)
@@ -252,6 +281,13 @@ export default function TeamPage() {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<'admin' | 'member'>('member')
   const [adding, setAdding] = useState(false)
+
+  // Inline row editing + fast delete confirmation.
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [draftRole, setDraftRole] = useState<'admin' | 'member'>('member')
+  const [draftStatus, setDraftStatus] = useState<'active' | 'removed'>('active')
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -313,19 +349,54 @@ export default function TeamPage() {
     }
   }
 
-  async function changeRole(id: string, newRole: 'admin' | 'member') {
-    setMembers((previous) => previous.map((member) => (member.id === id ? { ...member, role: newRole } : member)))
-
-    await fetch('/api/team', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, role: newRole }),
-    })
+  function startEdit(member: Member) {
+    setConfirmingId(null)
+    setEditingId(member.id)
+    setDraftRole(member.role === 'admin' ? 'admin' : 'member')
+    setDraftStatus(member.status === 'active' ? 'active' : 'removed')
   }
 
-  async function remove(id: string) {
-    setMembers((previous) => previous.filter((member) => member.id !== id))
-    await fetch(`/api/team?id=${id}`, { method: 'DELETE' })
+  function cancelEdit() {
+    setEditingId(null)
+  }
+
+  async function saveEdit(id: string) {
+    setBusyId(id)
+    setError('')
+    const res = await fetch('/api/team', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, role: draftRole, status: draftStatus }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => null)
+      setError(data?.error || copy.loadError)
+    }
+    setEditingId(null)
+    setBusyId(null)
+    await load()
+  }
+
+  function askDelete(id: string) {
+    setEditingId(null)
+    setConfirmingId(id)
+  }
+
+  function cancelDelete() {
+    setConfirmingId(null)
+  }
+
+  async function confirmDeleteMember(id: string) {
+    setBusyId(id)
+    setError('')
+    const res = await fetch(`/api/team?id=${id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const data = await res.json().catch(() => null)
+      setError(data?.error || copy.loadError)
+    }
+    setConfirmingId(null)
+    setBusyId(null)
+    await load()
   }
 
   if (notAllowed) {
@@ -404,6 +475,13 @@ export default function TeamPage() {
             const roleCopy = copy.roles[member.role] || copy.roles.member
             const statusLabel = copy.statuses[member.status] || member.status
             const isOwnerRow = member.role === 'owner'
+            const isEditing = editingId === member.id
+            const isConfirming = confirmingId === member.id
+            const isBusy = busyId === member.id
+
+            const editSelect = { fontSize: 12, fontWeight: 700, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,.06)', color: '#fff', border: '1px solid rgba(255,255,255,.14)', cursor: 'pointer' } as const
+            const opt = { background: '#0f1117' } as const
+            const ghost = { background: 'transparent', border: '1px solid rgba(255,255,255,.18)', color: 'rgba(255,255,255,.8)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontWeight: 700 } as const
 
             return (
               <article
@@ -414,36 +492,45 @@ export default function TeamPage() {
                 <div style={{ minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <strong style={{ color: '#fff' }}>{member.member_email}</strong>
-                    <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 10px', borderRadius: 999, background: roleStyle.bg, color: roleStyle.color }}>
-                      {roleCopy.label}
-                    </span>
+                    {!isEditing && (
+                      <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 10px', borderRadius: 999, background: roleStyle.bg, color: roleStyle.color }}>
+                        {roleCopy.label}
+                      </span>
+                    )}
                   </div>
 
-                  <div className="sb-caption" style={{ marginTop: 4, color: statusStyle.color }}>
-                    {statusLabel}
-                  </div>
+                  {!isEditing && (
+                    <div className="sb-caption" style={{ marginTop: 4, color: statusStyle.color }}>
+                      {statusLabel}
+                    </div>
+                  )}
                 </div>
 
                 {isOwnerRow ? (
                   <span className="sb-caption" style={{ opacity: 0.6 }}>{copy.thatsYou}</span>
+                ) : isEditing ? (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <select value={draftRole} onChange={(e) => setDraftRole(e.target.value as 'admin' | 'member')} style={editSelect}>
+                      <option value="member" style={opt}>{copy.roles.member.label}</option>
+                      <option value="admin" style={opt}>{copy.roles.admin.label}</option>
+                    </select>
+                    <select value={draftStatus} onChange={(e) => setDraftStatus(e.target.value as 'active' | 'removed')} style={editSelect}>
+                      <option value="active" style={opt}>{copy.statuses.active}</option>
+                      <option value="removed" style={opt}>{copy.statuses.removed}</option>
+                    </select>
+                    <button onClick={() => saveEdit(member.id)} disabled={isBusy} className="sb-button-primary" style={{ padding: '6px 14px', opacity: isBusy ? 0.6 : 1, whiteSpace: 'nowrap' }}>{copy.save}</button>
+                    <button onClick={cancelEdit} disabled={isBusy} style={ghost}>{copy.cancel}</button>
+                  </div>
+                ) : isConfirming ? (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span className="sb-caption" style={{ color: '#fca5a5', whiteSpace: 'nowrap' }}>{copy.deleteConfirm}</span>
+                    <button onClick={() => confirmDeleteMember(member.id)} disabled={isBusy} style={{ background: 'rgba(252,165,165,.16)', border: '1px solid rgba(252,165,165,.45)', color: '#fca5a5', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontWeight: 800, opacity: isBusy ? 0.6 : 1, whiteSpace: 'nowrap' }}>{copy.confirmDelete}</button>
+                    <button onClick={cancelDelete} disabled={isBusy} style={ghost}>{copy.cancel}</button>
+                  </div>
                 ) : (
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <select
-                      value={member.role}
-                      onChange={(event) => changeRole(member.id, event.target.value as 'admin' | 'member')}
-                      style={{ fontSize: 12, fontWeight: 700, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,.06)', color: '#fff', border: '1px solid rgba(255,255,255,.14)', cursor: 'pointer' }}
-                    >
-                      <option value="member" style={{ background: '#0f1117' }}>{copy.roles.member.label}</option>
-                      <option value="admin" style={{ background: '#0f1117' }}>{copy.roles.admin.label}</option>
-                    </select>
-
-                    <button
-                      onClick={() => remove(member.id)}
-                      title={copy.removeTitle}
-                      style={{ background: 'transparent', border: '1px solid rgba(252,165,165,.3)', color: '#fca5a5', borderRadius: 8, padding: '6px 10px', cursor: 'pointer' }}
-                    >
-                      {copy.remove}
-                    </button>
+                    <button onClick={() => startEdit(member)} style={{ background: 'transparent', border: '1px solid rgba(26,240,255,.35)', color: '#1af0ff', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 700 }}>{copy.edit}</button>
+                    <button onClick={() => askDelete(member.id)} title={copy.removeTitle} style={{ background: 'transparent', border: '1px solid rgba(252,165,165,.3)', color: '#fca5a5', borderRadius: 8, padding: '6px 10px', cursor: 'pointer' }}>{copy.remove}</button>
                   </div>
                 )}
               </article>

@@ -6,6 +6,7 @@
 // ordered provider steps that will run on merge; nothing fires until the owner
 // clicks Merge. High-risk merges are gated behind a second confirm.
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from '@/components/i18n/useTranslation';
 
 type Risk = 'low' | 'medium' | 'high';
 type Status = 'open' | 'merging' | 'merged' | 'failed' | 'closed';
@@ -67,16 +68,17 @@ export default function InfrastructurePage() {
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [confirming, setConfirming] = useState<Record<string, boolean>>({});
+  const { t } = useTranslation();
 
   const load = useCallback(async () => {
     setErr(null);
     try {
       const res = await fetch('/api/infra-pr', { cache: 'no-store' });
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error || 'Failed to load');
+      if (!data.ok) throw new Error(data.error || t('console.pr.load_failed', 'Failed to load'));
       setPrs(data.prs || []);
     } catch (e: any) {
-      setErr(e?.message || 'Failed to load');
+      setErr(e?.message || t('console.pr.load_failed', 'Failed to load'));
     } finally {
       setLoading(false);
     }
@@ -91,10 +93,10 @@ export default function InfrastructurePage() {
     try {
       const res = await fetch(`/api/infra-pr/${id}/merge`, { method: 'POST' });
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error || 'Merge failed');
+      if (!data.ok) throw new Error(data.error || t('console.pr.merge_failed', 'Merge failed'));
       await load();
     } catch (e: any) {
-      setErr(e?.message || 'Merge failed');
+      setErr(e?.message || t('console.pr.merge_failed', 'Merge failed'));
       await load();
     } finally {
       setBusy((b) => ({ ...b, [id]: false }));
@@ -127,10 +129,10 @@ export default function InfrastructurePage() {
     const showPayloads = !!open[pr.id];
     return (
       <div style={{ marginTop: 10 }}>
-        <div style={codeLabel}>planned steps (run in order on merge — nothing has fired yet)</div>
+        <div style={codeLabel}>{t('console.pr.planned_steps', 'planned steps (run in order on merge — nothing has fired yet)')}</div>
         <div style={diffBlock}>
           {steps.length === 0 ? (
-            <div style={{ color: 'rgba(232,238,252,0.4)' }}>No steps.</div>
+            <div style={{ color: 'rgba(232,238,252,0.4)' }}>{t('console.pr.no_steps', 'No steps.')}</div>
           ) : (
             steps.map((s, i) => (
               <div key={i} style={{ padding: '4px 0', borderBottom: i < steps.length - 1 ? `1px solid ${HAIR}` : 'none' }}>
@@ -138,7 +140,7 @@ export default function InfrastructurePage() {
                   <span style={{ color: 'rgba(232,238,252,0.4)', width: 16, flexShrink: 0 }}>{i + 1}.</span>
                   <span style={{ color: CYAN, fontWeight: 700 }}>{s.templateId}</span>
                   <span style={{ color: 'rgba(232,238,252,0.75)' }}>{s.label}</span>
-                  {isRedeployStep(s) && <span style={{ color: GOLD, fontSize: 10.5, fontWeight: 700 }}>↻ redeploy</span>}
+                  {isRedeployStep(s) && <span style={{ color: GOLD, fontSize: 10.5, fontWeight: 700 }}>{t('console.pr.redeploy_tag', '↻ redeploy')}</span>}
                 </div>
                 {showPayloads && (
                   <pre style={{ ...codeBlock, marginLeft: 24 }}>{(() => { try { return JSON.stringify(s.payload, null, 2); } catch { return String(s.payload); } })()}</pre>
@@ -155,19 +157,19 @@ export default function InfrastructurePage() {
     <div style={{ minHeight: '100vh', background: INK, color: '#e8eefc', padding: '28px 22px 80px', fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>
       <div style={{ maxWidth: 920, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: 0.3, margin: 0 }}>Open Pull Requests</h1>
-          <button onClick={load} style={ghostBtn}>Refresh</button>
+          <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: 0.3, margin: 0 }}>{t('console.pr.title', 'Open Pull Requests')}</h1>
+          <button onClick={load} style={ghostBtn}>{t('console.pr.refresh', 'Refresh')}</button>
         </div>
         <p style={{ color: 'rgba(232,238,252,0.55)', fontSize: 13, marginTop: 6 }}>
-          AI-drafted infrastructure changes. Inspect the planned steps, then merge. Nothing fires until you do.
+          {t('console.pr.subtitle', 'AI-drafted infrastructure changes. Inspect the planned steps, then merge. Nothing fires until you do.')}
         </p>
 
         {err && <div style={{ ...banner, borderColor: RED, color: RED }}>{err}</div>}
-        {loading && <div style={{ color: 'rgba(232,238,252,0.5)', marginTop: 24 }}>Loading…</div>}
+        {loading && <div style={{ color: 'rgba(232,238,252,0.5)', marginTop: 24 }}>{t('console.pr.loading', 'Loading…')}</div>}
 
         {!loading && openPrs.length === 0 && (
           <div style={{ ...banner, borderColor: HAIR, color: 'rgba(232,238,252,0.6)' }}>
-            No open PRs. The Chief of Staff will queue changes here for approval.
+            {t('console.pr.empty', 'No open PRs. The Chief of Staff will queue changes here for approval.')}
           </div>
         )}
 
@@ -179,10 +181,10 @@ export default function InfrastructurePage() {
           return (
             <div key={pr.id} style={{ ...card, borderColor: awaiting ? RED : HAIR }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={badge(riskColor[pr.risk])}>{pr.risk} risk</span>
-                <span style={badge('rgba(255,255,255,0.5)')}>needs {REQUIRED_ROLE[pr.risk]}</span>
-                <span style={badge(CYAN)}>{stepCount} step{stepCount === 1 ? '' : 's'}</span>
-                {redeploys && <span style={badge(GOLD)}>redeploys</span>}
+                <span style={badge(riskColor[pr.risk])}>{t('console.pr.level_' + pr.risk, pr.risk)} {t('console.pr.risk_word', 'risk')}</span>
+                <span style={badge('rgba(255,255,255,0.5)')}>{t('console.pr.needs', 'needs {role}').replace('{role}', REQUIRED_ROLE[pr.risk])}</span>
+                <span style={badge(CYAN)}>{(stepCount === 1 ? t('console.pr.steps_one', '{n} step') : t('console.pr.steps_many', '{n} steps')).replace('{n}', String(stepCount))}</span>
+                {redeploys && <span style={badge(GOLD)}>{t('console.pr.redeploys', 'redeploys')}</span>}
                 {pr.created_by_email && <span style={{ ...badge('rgba(255,255,255,0.3)'), textTransform: 'none' }}>{pr.created_by_email}</span>}
               </div>
 
@@ -193,23 +195,23 @@ export default function InfrastructurePage() {
               <StepsView pr={pr} />
 
               <button onClick={() => setOpen((o) => ({ ...o, [pr.id]: !o[pr.id] }))} style={{ ...ghostBtn, marginTop: 12 }}>
-                {open[pr.id] ? 'Hide payloads' : 'Inspect payloads'}
+                {open[pr.id] ? t('console.pr.hide_payloads', 'Hide payloads') : t('console.pr.inspect_payloads', 'Inspect payloads')}
               </button>
 
               {awaiting && (
                 <div style={{ ...banner, borderColor: RED, color: RED, marginTop: 14 }}>
-                  High-risk change. Runs live and cannot be undone. Requires <b>{REQUIRED_ROLE[pr.risk]}</b> clearance. Confirm to proceed.
+                  {t('console.pr.high_risk_a', 'High-risk change. Runs live and cannot be undone. Requires ')}<b>{REQUIRED_ROLE[pr.risk]}</b>{t('console.pr.high_risk_b', ' clearance. Confirm to proceed.')}
                 </div>
               )}
 
               <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
                 <button onClick={() => onMergeClick(pr)} disabled={busy[pr.id] || pr.status === 'merging'} style={mergeBtn(busy[pr.id] || pr.status === 'merging', awaiting)}>
-                  {busy[pr.id] || pr.status === 'merging' ? 'Merging…' : awaiting ? 'Confirm — run live' : isHigh ? 'Merge / Approve (high risk)' : 'Merge / Approve'}
+                  {busy[pr.id] || pr.status === 'merging' ? t('console.pr.merging', 'Merging…') : awaiting ? t('console.pr.confirm_run', 'Confirm — run live') : isHigh ? t('console.pr.merge_high', 'Merge / Approve (high risk)') : t('console.pr.merge', 'Merge / Approve')}
                 </button>
                 {awaiting ? (
-                  <button onClick={() => setConfirming((c) => ({ ...c, [pr.id]: false }))} disabled={busy[pr.id]} style={ghostBtn}>Cancel</button>
+                  <button onClick={() => setConfirming((c) => ({ ...c, [pr.id]: false }))} disabled={busy[pr.id]} style={ghostBtn}>{t('console.pr.cancel', 'Cancel')}</button>
                 ) : (
-                  <button onClick={() => close(pr.id)} disabled={busy[pr.id]} style={ghostBtn}>Close</button>
+                  <button onClick={() => close(pr.id)} disabled={busy[pr.id]} style={ghostBtn}>{t('console.pr.close', 'Close')}</button>
                 )}
               </div>
             </div>
@@ -218,7 +220,7 @@ export default function InfrastructurePage() {
 
         {history.length > 0 && (
           <>
-            <h2 style={{ fontSize: 14, fontWeight: 600, marginTop: 36, color: 'rgba(232,238,252,0.6)' }}>History</h2>
+            <h2 style={{ fontSize: 14, fontWeight: 600, marginTop: 36, color: 'rgba(232,238,252,0.6)' }}>{t('console.pr.history', 'History')}</h2>
             {history.map((pr) => {
               const results = Array.isArray(pr.results) ? pr.results : [];
               const okCount = results.filter((r) => r.ok).length;
@@ -226,20 +228,20 @@ export default function InfrastructurePage() {
                 <div key={pr.id} style={{ ...card, opacity: 0.82 }}>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                     <span style={badge(statusColor(pr.status))}>{pr.status}</span>
-                    <span style={badge('rgba(255,255,255,0.3)')}>{Array.isArray(pr.steps) ? pr.steps.length : 0} steps</span>
+                    <span style={badge('rgba(255,255,255,0.3)')}>{(() => { const n = Array.isArray(pr.steps) ? pr.steps.length : 0; return (n === 1 ? t('console.pr.steps_one', '{n} step') : t('console.pr.steps_many', '{n} steps')).replace('{n}', String(n)); })()}</span>
                     <span style={{ fontSize: 14, fontWeight: 600 }}>{pr.title}</span>
                   </div>
                   {results.length > 0 && (
                     <div style={{ fontSize: 12, color: 'rgba(232,238,252,0.6)', marginTop: 8 }}>
-                      {okCount}/{results.length} step{results.length === 1 ? '' : 's'} succeeded.
+                      {(results.length === 1 ? t('console.pr.succeeded_one', '{ok}/{total} step succeeded.') : t('console.pr.succeeded_many', '{ok}/{total} steps succeeded.')).replace('{ok}', String(okCount)).replace('{total}', String(results.length))}
                     </div>
                   )}
                   {pr.error && <div style={{ color: RED, fontSize: 12, marginTop: 8 }}>{pr.error}</div>}
                   {pr.status === 'merged' && Array.isArray(pr.steps) && pr.steps.some(isRedeployStep) && (
-                    <div style={{ color: GOLD, fontSize: 12, marginTop: 8 }}>Production redeploy step included.</div>
+                    <div style={{ color: GOLD, fontSize: 12, marginTop: 8 }}>{t('console.pr.redeploy_included', 'Production redeploy step included.')}</div>
                   )}
                   <div style={{ fontSize: 11, color: 'rgba(232,238,252,0.4)', marginTop: 8 }}>
-                    {pr.merged_at ? `merged ${fmt(pr.merged_at)}` : fmt(pr.created_at)}
+                    {pr.merged_at ? t('console.pr.merged_at', 'merged {date}').replace('{date}', fmt(pr.merged_at)) : fmt(pr.created_at)}
                   </div>
                 </div>
               );

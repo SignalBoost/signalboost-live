@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { getInfrastructurePR, closeInfrastructurePR } from '@/lib/hub/pr-engine';
+import { redactPrForDisplay } from '@/lib/hub/pr-redact';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,7 +33,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const { id } = await ctx.params;
   const pr = await getInfrastructurePR(id);
   if (!pr.ok) return NextResponse.json({ ok: false, error: pr.error }, { status: 404 });
-  return NextResponse.json({ ok: true, pr: pr.pr });
+  // Mask secrets in staged payloads before they reach the browser.
+  return NextResponse.json({ ok: true, pr: redactPrForDisplay(pr.pr) });
 }
 
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {

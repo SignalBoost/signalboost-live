@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { runAction } from '@/console-core/actionEngine'
 import { listRegistered } from '@/console-core/defaultHost'
 import { createSignalBoostHost } from '@/console-host/signalboostHost'
+import { isActionLive } from '@/lib/hub/console-catalog'
 
 // Side-effect imports: each registers its provider's executors at module load.
 import '@/console-core/executors/openai'
@@ -48,6 +49,16 @@ export async function POST(req: NextRequest) {
 
     if (typeof providerId !== 'string' || typeof actionId !== 'string') {
       return NextResponse.json({ ok: false, error: 'providerId and actionId (or templateId) are required' }, { status: 400 })
+    }
+
+    // Defense in depth: actions flagged incomplete in the catalog (e.g.
+    // github.rotate_token, github.manage_secrets) are hidden in the UI, but a
+    // direct API call must also be refused cleanly — never reach a stub executor.
+    if (!isActionLive(`${providerId}.${actionId}`)) {
+      return NextResponse.json(
+        { ok: false, error: 'This action is not available yet.' },
+        { status: 501 },
+      )
     }
 
     const host = createSignalBoostHost(req)

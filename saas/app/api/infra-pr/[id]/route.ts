@@ -1,34 +1,33 @@
 // app/api/infra-pr/[id]/route.ts — repointed to the shared pr-engine (System A).
+//
+// RBAC (added for productization):
+//   • View one PR : owner, admin, operator
+//   • Close a PR  : owner, admin   (state-changing — operator cannot dismiss)
+// Resolved by the proven hub resolver (verified session → hub role).
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createServerClient } from '@supabase/ssr';
+import { getCurrentUser } from '@/lib/auth/permission-middleware';
 import { getInfrastructurePR, closeInfrastructurePR } from '@/lib/hub/pr-engine';
 import { redactPrForDisplay } from '@/lib/hub/pr-redact';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-async function requireUser() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll() {},
-      },
-    },
-  );
-  const { data } = await supabase.auth.getUser();
-  return data?.user ?? null;
+type Allowed = ('owner' | 'admin' | 'operator')[];
+
+async function requireRole(req: Request, allowed: Allowed) {
+  const user = await getCurrentUser(req as any);
+  if (!user) {
+    return { ok: false as const, res: NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 }) };
+  }
+  if (!allowed.includes(user.role as any)) {
+    return { ok: false as const, res: NextResponse.json({ ok: false, error: 'Forbidden — insufficient role' }, { status: 403 }) };
+  }
+  return { ok: true as const, user };
 }
 
-export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const gate = await requireRole(req, ['owner', 'admin', 'operator']);
+  if (!gate.ok) return gate.res;
 
   const { id } = await ctx.params;
   const pr = await getInfrastructurePR(id);
@@ -37,12 +36,12 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   return NextResponse.json({ ok: true, pr: redactPrForDisplay(pr.pr) });
 }
 
-export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const gate = await requireRole(req, ['owner', 'admin']);
+  if (!gate.ok) return gate.res;
 
   const { id } = await ctx.params;
-  const closed = await closeInfrastructurePR({ id, approvedBy: (user as any).id ?? null });
+  const closed = await closeInfrastructurePR({ id, approvedBy: (gate.user as any).id ?? null });
   if (!closed.ok) return NextResponse.json({ ok: false, error: closed.error }, { status: 500 });
   return NextResponse.json({ ok: true, pr: closed.pr });
 }

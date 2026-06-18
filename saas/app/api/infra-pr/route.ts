@@ -1,36 +1,40 @@
 // app/api/infra-pr/route.ts — repointed to the shared pr-engine (System A).
 // The Chief of Staff stages PRs into the same `infrastructure_prs` table this
 // reads from, so AI-drafted changes appear here for approval.
+//
+// RBAC (added for productization): the PR Cockpit is an infrastructure-control
+// surface, so it is gated at the route layer — not merely "authenticated".
+//   • View / list PRs : owner, admin, operator
+//   • Stage a PR      : owner, admin, operator
+// Authentication + role are resolved by the proven hub resolver
+// (getCurrentUser → verified Supabase session → hub_workspace_users role),
+// the same one /api/hub/action uses. No header-trust, no owner fallback.
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createServerClient } from '@supabase/ssr';
+import { getCurrentUser } from '@/lib/auth/permission-middleware';
 import { listInfrastructurePRs, stageInfrastructurePR } from '@/lib/hub/pr-engine';
 import { redactPrsForDisplay } from '@/lib/hub/pr-redact';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-async function requireUser() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll() {},
-      },
-    },
-  );
-  const { data } = await supabase.auth.getUser();
-  return data?.user ?? null;
+type Allowed = ('owner' | 'admin' | 'operator')[];
+
+// Resolve the verified hub user and check role. Returns the user on success or
+// a ready-to-return NextResponse on failure (401 unauthenticated / 403 role).
+async function requireRole(req: Request, allowed: Allowed) {
+  const user = await getCurrentUser(req as any);
+  if (!user) {
+    return { ok: false as const, res: NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 }) };
+  }
+  if (!allowed.includes(user.role as any)) {
+    return { ok: false as const, res: NextResponse.json({ ok: false, error: 'Forbidden — insufficient role' }, { status: 403 }) };
+  }
+  return { ok: true as const, user };
 }
 
-export async function GET() {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+export async function GET(req: Request) {
+  const gate = await requireRole(req, ['owner', 'admin', 'operator']);
+  if (!gate.ok) return gate.res;
 
   const list = await listInfrastructurePRs(undefined, 50);
   if (!list.ok) return NextResponse.json({ ok: false, error: list.error }, { status: 500 });
@@ -39,8 +43,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  const gate = await requireRole(req, ['owner', 'admin', 'operator']);
+  if (!gate.ok) return gate.res;
+  const user = gate.user;
 
   const body = await req.json().catch(() => null);
   if (!body || !body.title || !Array.isArray(body.steps) || body.steps.length === 0) {

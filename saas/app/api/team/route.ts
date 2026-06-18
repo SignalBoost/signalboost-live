@@ -1,116 +1,555 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
-import { cookies } from 'next/headers'
-import { requireOwner } from '@/lib/auth/access'
+'use client'
 
-export const dynamic = 'force-dynamic'
+import { useCallback, useEffect, useState } from 'react'
+import { useI18n } from '@/components/i18n/I18nProvider'
 
-const VALID_ROLES = ['admin', 'member']
+const GOLD = '#ffc300'
 
-async function getClient() {
-  const cookieStore = await cookies()
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookieOptions: saasSupabaseCookieOptions,
-      cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll(cookiesToSet) {
-          try { cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) } catch {}
-        },
-      },
+type Member = {
+  id: string
+  member_email: string
+  member_id: string | null
+  role: 'owner' | 'admin' | 'member'
+  status: 'pending' | 'active' | 'removed'
+  created_at: string
+}
+
+type TeamCopy = {
+  account: string
+  title: string
+  subtitle: string
+  notAllowedTitle: string
+  notAllowedBody: string
+  addTitle: string
+  emailPlaceholder: string
+  add: string
+  adding: string
+  loading: string
+  empty: string
+  thatsYou: string
+  remove: string
+  removeTitle: string
+  edit: string
+  save: string
+  cancel: string
+  deleteConfirm: string
+  confirmDelete: string
+  loadError: string
+  genericLoadError: string
+  addError: string
+  addGenericError: string
+  howRolesWork: string
+  ownerRule: string
+  adminRule: string
+  memberRule: string
+  pendingNote: string
+  roles: Record<string, { label: string; desc: string }>
+  statuses: Record<string, string>
+}
+
+const COPY: Record<string, TeamCopy> = {
+  en: {
+    account: 'Account',
+    title: 'Team & roles',
+    subtitle: 'Add people and choose what they can access. Each person signs up with the email you add here to activate.',
+    notAllowedTitle: 'Team management',
+    notAllowedBody: 'Only the account owner can manage the team.',
+    addTitle: 'Add a team member',
+    emailPlaceholder: 'name@email.com',
+    add: 'Add',
+    adding: 'Adding…',
+    loading: 'Loading your team…',
+    empty: 'No team members yet. Add someone above.',
+    thatsYou: "That's you",
+    remove: 'Remove',
+    removeTitle: 'Remove',
+    edit: 'Edit',
+    save: 'Save',
+    cancel: 'Cancel',
+    deleteConfirm: 'Delete permanently?',
+    confirmDelete: 'Confirm',
+    loadError: 'Could not load your team.',
+    genericLoadError: 'Something went wrong loading your team.',
+    addError: 'Could not add member.',
+    addGenericError: 'Could not add the member.',
+    howRolesWork: 'How roles work',
+    ownerRule: 'everything: all tools, IT/admin pages, billing, and team management.',
+    adminRule: 'system/IT pages and team management, plus the daily-work tools.',
+    memberRule: 'daily-work tools only. No admin pages, no billing, no team management.',
+    pendingNote: 'Adding someone reserves their seat as Pending. They become Active when they sign up with that email.',
+    roles: {
+      owner: { label: 'Owner', desc: 'Full access, including billing and team management.' },
+      admin: { label: 'Admin (IT)', desc: 'System/IT pages and team management.' },
+      member: { label: 'Member', desc: 'Daily work tools only. No admin or billing.' },
     },
-  )
+    statuses: {
+      pending: 'Pending — awaiting sign-up',
+      active: 'Active',
+      removed: 'Removed',
+    },
+  },
+
+  pt: {
+    account: 'Conta',
+    title: 'Equipe e funções',
+    subtitle: 'Adicione pessoas e escolha o que elas podem acessar. Cada pessoa se cadastra com o email adicionado aqui para ativar.',
+    notAllowedTitle: 'Gerenciamento da equipe',
+    notAllowedBody: 'Somente o proprietário da conta pode gerenciar a equipe.',
+    addTitle: 'Adicionar membro da equipe',
+    emailPlaceholder: 'nome@email.com',
+    add: 'Adicionar',
+    adding: 'Adicionando…',
+    loading: 'Carregando sua equipe…',
+    empty: 'Ainda não há membros na equipe. Adicione alguém acima.',
+    thatsYou: 'Esse é você',
+    remove: 'Remover',
+    removeTitle: 'Remover',
+    edit: 'Editar',
+    save: 'Salvar',
+    cancel: 'Cancelar',
+    deleteConfirm: 'Excluir permanentemente?',
+    confirmDelete: 'Confirmar',
+    loadError: 'Não foi possível carregar sua equipe.',
+    genericLoadError: 'Algo deu errado ao carregar sua equipe.',
+    addError: 'Não foi possível adicionar o membro.',
+    addGenericError: 'Não foi possível adicionar o membro.',
+    howRolesWork: 'Como as funções funcionam',
+    ownerRule: 'tudo: todas as ferramentas, páginas de TI/admin, cobrança e gerenciamento da equipe.',
+    adminRule: 'páginas de sistema/TI e gerenciamento da equipe, além das ferramentas de trabalho diário.',
+    memberRule: 'apenas ferramentas de trabalho diário. Sem páginas admin, cobrança ou gerenciamento da equipe.',
+    pendingNote: 'Adicionar alguém reserva o assento como Pendente. A pessoa se torna Ativa quando se cadastra com esse email.',
+    roles: {
+      owner: { label: 'Proprietário', desc: 'Acesso total, incluindo cobrança e gerenciamento da equipe.' },
+      admin: { label: 'Admin (TI)', desc: 'Páginas de sistema/TI e gerenciamento da equipe.' },
+      member: { label: 'Membro', desc: 'Apenas ferramentas de trabalho diário. Sem admin ou cobrança.' },
+    },
+    statuses: {
+      pending: 'Pendente — aguardando cadastro',
+      active: 'Ativo',
+      removed: 'Removido',
+    },
+  },
+
+  es: {
+    account: 'Cuenta',
+    title: 'Equipo y roles',
+    subtitle: 'Agrega personas y elige a qué pueden acceder. Cada persona se registra con el correo que agregas aquí para activarse.',
+    notAllowedTitle: 'Gestión del equipo',
+    notAllowedBody: 'Solo el propietario de la cuenta puede gestionar el equipo.',
+    addTitle: 'Agregar miembro del equipo',
+    emailPlaceholder: 'nombre@email.com',
+    add: 'Agregar',
+    adding: 'Agregando…',
+    loading: 'Cargando tu equipo…',
+    empty: 'Aún no hay miembros del equipo. Agrega a alguien arriba.',
+    thatsYou: 'Ese eres tú',
+    remove: 'Eliminar',
+    removeTitle: 'Eliminar',
+    edit: 'Editar',
+    save: 'Guardar',
+    cancel: 'Cancelar',
+    deleteConfirm: '¿Eliminar permanentemente?',
+    confirmDelete: 'Confirmar',
+    loadError: 'No se pudo cargar tu equipo.',
+    genericLoadError: 'Algo salió mal al cargar tu equipo.',
+    addError: 'No se pudo agregar el miembro.',
+    addGenericError: 'No se pudo agregar el miembro.',
+    howRolesWork: 'Cómo funcionan los roles',
+    ownerRule: 'todo: todas las herramientas, páginas de TI/admin, facturación y gestión del equipo.',
+    adminRule: 'páginas de sistema/TI y gestión del equipo, además de las herramientas de trabajo diario.',
+    memberRule: 'solo herramientas de trabajo diario. Sin páginas admin, facturación ni gestión del equipo.',
+    pendingNote: 'Agregar a alguien reserva su asiento como Pendiente. Se vuelve Activo cuando se registra con ese correo.',
+    roles: {
+      owner: { label: 'Propietario', desc: 'Acceso completo, incluida facturación y gestión del equipo.' },
+      admin: { label: 'Admin (TI)', desc: 'Páginas de sistema/TI y gestión del equipo.' },
+      member: { label: 'Miembro', desc: 'Solo herramientas de trabajo diario. Sin admin ni facturación.' },
+    },
+    statuses: {
+      pending: 'Pendiente — esperando registro',
+      active: 'Activo',
+      removed: 'Eliminado',
+    },
+  },
+
+  pl: {
+    account: 'Konto',
+    title: 'Zespół i role',
+    subtitle: 'Dodaj osoby i wybierz, do czego mają dostęp. Każda osoba aktywuje dostęp, rejestrując się pod dodanym adresem email.',
+    notAllowedTitle: 'Zarządzanie zespołem',
+    notAllowedBody: 'Tylko właściciel konta może zarządzać zespołem.',
+    addTitle: 'Dodaj członka zespołu',
+    emailPlaceholder: 'nazwa@email.com',
+    add: 'Dodaj',
+    adding: 'Dodawanie…',
+    loading: 'Ładowanie zespołu…',
+    empty: 'Brak członków zespołu. Dodaj kogoś powyżej.',
+    thatsYou: 'To Ty',
+    remove: 'Usuń',
+    removeTitle: 'Usuń',
+    edit: 'Edytuj',
+    save: 'Zapisz',
+    cancel: 'Anuluj',
+    deleteConfirm: 'Usunąć trwale?',
+    confirmDelete: 'Potwierdź',
+    loadError: 'Nie można załadować zespołu.',
+    genericLoadError: 'Coś poszło nie tak podczas ładowania zespołu.',
+    addError: 'Nie można dodać członka.',
+    addGenericError: 'Nie można dodać członka.',
+    howRolesWork: 'Jak działają role',
+    ownerRule: 'wszystko: wszystkie narzędzia, strony IT/admin, rozliczenia i zarządzanie zespołem.',
+    adminRule: 'strony systemowe/IT i zarządzanie zespołem oraz narzędzia codziennej pracy.',
+    memberRule: 'tylko narzędzia codziennej pracy. Bez stron admin, rozliczeń i zarządzania zespołem.',
+    pendingNote: 'Dodanie osoby rezerwuje jej miejsce jako Oczekujące. Staje się Aktywna po rejestracji tym adresem email.',
+    roles: {
+      owner: { label: 'Właściciel', desc: 'Pełny dostęp, w tym rozliczenia i zarządzanie zespołem.' },
+      admin: { label: 'Admin (IT)', desc: 'Strony systemowe/IT i zarządzanie zespołem.' },
+      member: { label: 'Członek', desc: 'Tylko narzędzia codziennej pracy. Bez admina i rozliczeń.' },
+    },
+    statuses: {
+      pending: 'Oczekujące — czeka na rejestrację',
+      active: 'Aktywny',
+      removed: 'Usunięty',
+    },
+  },
+
+  ru: {
+    account: 'Аккаунт',
+    title: 'Команда и роли',
+    subtitle: 'Добавьте людей и выберите, к чему у них будет доступ. Каждый активирует доступ, зарегистрировавшись с указанным email.',
+    notAllowedTitle: 'Управление командой',
+    notAllowedBody: 'Только владелец аккаунта может управлять командой.',
+    addTitle: 'Добавить участника команды',
+    emailPlaceholder: 'name@email.com',
+    add: 'Добавить',
+    adding: 'Добавление…',
+    loading: 'Загрузка команды…',
+    empty: 'Участников команды пока нет. Добавьте кого-нибудь выше.',
+    thatsYou: 'Это вы',
+    remove: 'Удалить',
+    removeTitle: 'Удалить',
+    edit: 'Изменить',
+    save: 'Сохранить',
+    cancel: 'Отмена',
+    deleteConfirm: 'Удалить навсегда?',
+    confirmDelete: 'Подтвердить',
+    loadError: 'Не удалось загрузить команду.',
+    genericLoadError: 'Что-то пошло не так при загрузке команды.',
+    addError: 'Не удалось добавить участника.',
+    addGenericError: 'Не удалось добавить участника.',
+    howRolesWork: 'Как работают роли',
+    ownerRule: 'всё: все инструменты, страницы IT/admin, биллинг и управление командой.',
+    adminRule: 'системные/IT страницы и управление командой, плюс ежедневные рабочие инструменты.',
+    memberRule: 'только ежедневные рабочие инструменты. Без admin-страниц, биллинга и управления командой.',
+    pendingNote: 'Добавление человека резервирует место как Ожидающее. Он станет Активным после регистрации с этим email.',
+    roles: {
+      owner: { label: 'Владелец', desc: 'Полный доступ, включая биллинг и управление командой.' },
+      admin: { label: 'Admin (IT)', desc: 'Системные/IT страницы и управление командой.' },
+      member: { label: 'Участник', desc: 'Только ежедневные рабочие инструменты. Без admin и биллинга.' },
+    },
+    statuses: {
+      pending: 'Ожидает — нужна регистрация',
+      active: 'Активен',
+      removed: 'Удален',
+    },
+  },
 }
 
-export async function GET() {
-  const guard = await requireOwner()
-  if (!guard.ok) return NextResponse.json({ members: [], error: guard.error }, { status: guard.status })
-
-  const supabase = await getClient()
-  const { data, error } = await supabase
-    .from('team_members')
-    .select('id, member_email, member_id, role, status, created_at')
-    .eq('owner_id', guard.ctx.userId)
-    .order('created_at', { ascending: true })
-
-  if (error) return NextResponse.json({ members: [], error: error.message }, { status: 500 })
-  return NextResponse.json({ members: data || [] })
+const ROLE_STYLE: Record<string, { color: string; bg: string }> = {
+  owner: { color: '#ffc300', bg: 'rgba(255,195,0,.14)' },
+  admin: { color: '#7dd3fc', bg: 'rgba(125,211,252,.14)' },
+  member: { color: '#86efac', bg: 'rgba(134,239,172,.14)' },
 }
 
-export async function POST(req: NextRequest) {
-  const guard = await requireOwner()
-  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
+const STATUS_STYLE: Record<string, { color: string }> = {
+  pending: { color: '#fde68a' },
+  active: { color: '#86efac' },
+  removed: { color: 'rgba(255,255,255,.4)' },
+}
 
-  let body: any
-  try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+function copyFor(lang: string): TeamCopy {
+  return COPY[lang] || COPY.en
+}
 
-  const email = String(body?.email || '').trim().toLowerCase()
-  const role = VALID_ROLES.includes(body?.role) ? body.role : 'member'
+export default function TeamPage() {
+  const { lang } = useI18n()
+  const copy = copyFor(lang)
+const [members, setMembers] = useState<Member[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [notAllowed, setNotAllowed] = useState(false)
 
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-    return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 })
+  const [email, setEmail] = useState('')
+  const [role, setRole] = useState<'admin' | 'member'>('member')
+  const [adding, setAdding] = useState(false)
+
+  // Inline row editing + fast delete confirmation.
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [draftRole, setDraftRole] = useState<'admin' | 'member'>('member')
+  const [draftStatus, setDraftStatus] = useState<'active' | 'removed'>('active')
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError('')
+
+    try {
+      const res = await fetch('/api/team', { cache: 'no-store' })
+
+      if (res.status === 403 || res.status === 401) {
+        setNotAllowed(true)
+        setLoading(false)
+        return
+      }
+
+      const data = await res.json()
+
+      if (!res.ok) setError(data?.error || copy.loadError)
+
+      setMembers(Array.isArray(data.members) ? data.members : [])
+    } catch {
+      setError(copy.genericLoadError)
+    } finally {
+      setLoading(false)
+    }
+  }, [copy.genericLoadError, copy.loadError])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  async function addMember() {
+    if (!email.trim() || adding) return
+
+    setAdding(true)
+    setError('')
+
+    try {
+      const res = await fetch('/api/team', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), role }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data?.error || copy.addError)
+        setAdding(false)
+        return
+      }
+
+      setEmail('')
+      setRole('member')
+      await load()
+    } catch {
+      setError(copy.addGenericError)
+    } finally {
+      setAdding(false)
+    }
   }
-  if (email === (guard.ctx.email || '')) {
-    return NextResponse.json({ error: 'You are the owner — you are already on the team.' }, { status: 400 })
+
+  function startEdit(member: Member) {
+    setConfirmingId(null)
+    setEditingId(member.id)
+    setDraftRole(member.role === 'admin' ? 'admin' : 'member')
+    setDraftStatus(member.status === 'active' ? 'active' : 'removed')
   }
 
-  const supabase = await getClient()
-  const { data, error } = await supabase
-    .from('team_members')
-    .upsert(
-      { owner_id: guard.ctx.userId, member_email: email, role, status: 'pending' },
-      { onConflict: 'owner_id,member_email' },
+  function cancelEdit() {
+    setEditingId(null)
+  }
+
+  async function saveEdit(id: string) {
+    setBusyId(id)
+    setError('')
+    const res = await fetch('/api/team', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, role: draftRole, status: draftStatus }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => null)
+      setError(data?.error || copy.loadError)
+    }
+    setEditingId(null)
+    setBusyId(null)
+    await load()
+  }
+
+  function askDelete(id: string) {
+    setEditingId(null)
+    setConfirmingId(id)
+  }
+
+  function cancelDelete() {
+    setConfirmingId(null)
+  }
+
+  async function confirmDeleteMember(id: string) {
+    setBusyId(id)
+    setError('')
+    const res = await fetch(`/api/team?id=${id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const data = await res.json().catch(() => null)
+      setError(data?.error || copy.loadError)
+    }
+    setConfirmingId(null)
+    setBusyId(null)
+    await load()
+  }
+
+  if (notAllowed) {
+    return (
+      <main style={{ padding: 24, color: '#fff', maxWidth: 720, margin: '0 auto' }}>
+        <div className="sb-card" style={{ padding: 28, textAlign: 'center' }}>
+          <h1 className="sb-h3" style={{ marginTop: 0 }}>{copy.notAllowedTitle}</h1>
+          <p className="sb-body" style={{ margin: 0 }}>{copy.notAllowedBody}</p>
+        </div>
+      </main>
     )
-    .select('id, member_email, member_id, role, status, created_at')
-    .single()
+  }
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ member: data })
-}
+  return (
+    <main style={{ padding: 24, color: '#fff', maxWidth: 820, margin: '0 auto' }}>
+      <div style={{ marginBottom: 20 }}>
+        <span className="sb-eyebrow">{copy.account}</span>
+        <h1 className="sb-h2" style={{ marginTop: 8, marginBottom: 2 }}>{copy.title}</h1>
+        <p className="sb-body" style={{ margin: 0 }}>{copy.subtitle}</p>
+      </div>
 
-export async function PATCH(req: NextRequest) {
-  const guard = await requireOwner()
-  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
+      {error && <p className="sb-caption" style={{ color: '#fca5a5', marginBottom: 12 }}>{error}</p>}
 
-  let body: any
-  try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+      <section className="sb-card" style={{ padding: 20, marginBottom: 22 }}>
+        <h2 className="sb-h3" style={{ marginTop: 0 }}>{copy.addTitle}</h2>
 
-  const id = String(body?.id || '').trim()
-  if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
-  if (!VALID_ROLES.includes(body?.role)) return NextResponse.json({ error: 'Invalid role.' }, { status: 400 })
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto auto', gap: 10, alignItems: 'center' }}>
+          <input
+            className="sb-input"
+            style={{ padding: 12 }}
+            type="email"
+            placeholder={copy.emailPlaceholder}
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') addMember()
+            }}
+          />
 
-  const supabase = await getClient()
-  const { data, error } = await supabase
-    .from('team_members')
-    .update({ role: body.role })
-    .eq('id', id)
-    .eq('owner_id', guard.ctx.userId)
-    .neq('role', 'owner')
-    .select('id, member_email, member_id, role, status, created_at')
-    .single()
+          <select
+            className="sb-input"
+            style={{ padding: 12 }}
+            value={role}
+            onChange={(event) => setRole(event.target.value as 'admin' | 'member')}
+          >
+            <option value="member">{copy.roles.member.label}</option>
+            <option value="admin">{copy.roles.admin.label}</option>
+          </select>
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ member: data })
-}
+          <button
+            onClick={addMember}
+            disabled={adding || !email.trim()}
+            className="sb-button-primary"
+            style={{ opacity: adding || !email.trim() ? 0.6 : 1, whiteSpace: 'nowrap' }}
+          >
+            {adding ? copy.adding : copy.add}
+          </button>
+        </div>
 
-export async function DELETE(req: NextRequest) {
-  const guard = await requireOwner()
-  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
+        <p className="sb-caption" style={{ marginTop: 10 }}>{copy.roles[role]?.desc}</p>
+      </section>
 
-  const id = req.nextUrl.searchParams.get('id')
-  if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
+      {loading && <p className="sb-body">{copy.loading}</p>}
 
-  const supabase = await getClient()
-  const { error } = await supabase
-    .from('team_members')
-    .delete()
-    .eq('id', id)
-    .eq('owner_id', guard.ctx.userId)
-    .neq('role', 'owner')
+      {!loading && (
+        <div style={{ display: 'grid', gap: 12 }}>
+          {members.length === 0 && (
+            <div className="sb-card" style={{ padding: 24, textAlign: 'center' }}>
+              <p className="sb-body" style={{ margin: 0 }}>{copy.empty}</p>
+            </div>
+          )}
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true })
+          {members.map((member) => {
+            const roleStyle = ROLE_STYLE[member.role] || ROLE_STYLE.member
+            const statusStyle = STATUS_STYLE[member.status] || STATUS_STYLE.pending
+            const roleCopy = copy.roles[member.role] || copy.roles.member
+            const statusLabel = copy.statuses[member.status] || member.status
+            const isOwnerRow = member.role === 'owner'
+            const isEditing = editingId === member.id
+            const isConfirming = confirmingId === member.id
+            const isBusy = busyId === member.id
+
+            const editSelect = { fontSize: 12, fontWeight: 700, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,.06)', color: '#fff', border: '1px solid rgba(255,255,255,.14)', cursor: 'pointer' } as const
+            const opt = { background: '#0f1117' } as const
+            const ghost = { background: 'transparent', border: '1px solid rgba(255,255,255,.18)', color: 'rgba(255,255,255,.8)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontWeight: 700 } as const
+
+            return (
+              <article
+                key={member.id}
+                className="sb-card"
+                style={{ padding: 16, display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <strong style={{ color: '#fff' }}>{member.member_email}</strong>
+                    {!isEditing && (
+                      <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 10px', borderRadius: 999, background: roleStyle.bg, color: roleStyle.color }}>
+                        {roleCopy.label}
+                      </span>
+                    )}
+                  </div>
+
+                  {!isEditing && (
+                    <div className="sb-caption" style={{ marginTop: 4, color: statusStyle.color }}>
+                      {statusLabel}
+                    </div>
+                  )}
+                </div>
+
+                {isOwnerRow ? (
+                  <span className="sb-caption" style={{ opacity: 0.6 }}>{copy.thatsYou}</span>
+                ) : isEditing ? (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <select value={draftRole} onChange={(e) => setDraftRole(e.target.value as 'admin' | 'member')} style={editSelect}>
+                      <option value="member" style={opt}>{copy.roles.member.label}</option>
+                      <option value="admin" style={opt}>{copy.roles.admin.label}</option>
+                    </select>
+                    <select value={draftStatus} onChange={(e) => setDraftStatus(e.target.value as 'active' | 'removed')} style={editSelect}>
+                      <option value="active" style={opt}>{copy.statuses.active}</option>
+                      <option value="removed" style={opt}>{copy.statuses.removed}</option>
+                    </select>
+                    <button onClick={() => saveEdit(member.id)} disabled={isBusy} className="sb-button-primary" style={{ padding: '6px 14px', opacity: isBusy ? 0.6 : 1, whiteSpace: 'nowrap' }}>{copy.save}</button>
+                    <button onClick={cancelEdit} disabled={isBusy} style={ghost}>{copy.cancel}</button>
+                  </div>
+                ) : isConfirming ? (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span className="sb-caption" style={{ color: '#fca5a5', whiteSpace: 'nowrap' }}>{copy.deleteConfirm}</span>
+                    <button onClick={() => confirmDeleteMember(member.id)} disabled={isBusy} style={{ background: 'rgba(252,165,165,.16)', border: '1px solid rgba(252,165,165,.45)', color: '#fca5a5', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontWeight: 800, opacity: isBusy ? 0.6 : 1, whiteSpace: 'nowrap' }}>{copy.confirmDelete}</button>
+                    <button onClick={cancelDelete} disabled={isBusy} style={ghost}>{copy.cancel}</button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <button onClick={() => startEdit(member)} style={{ background: 'transparent', border: '1px solid rgba(26,240,255,.35)', color: '#1af0ff', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 700 }}>{copy.edit}</button>
+                    <button onClick={() => askDelete(member.id)} title={copy.removeTitle} style={{ background: 'transparent', border: '1px solid rgba(252,165,165,.3)', color: '#fca5a5', borderRadius: 8, padding: '6px 10px', cursor: 'pointer' }}>{copy.remove}</button>
+                  </div>
+                )}
+              </article>
+            )
+          })}
+        </div>
+      )}
+
+      <section className="sb-card" style={{ padding: 18, marginTop: 22 }}>
+        <h3 className="sb-h3" style={{ marginTop: 0, fontSize: 15 }}>{copy.howRolesWork}</h3>
+
+        <ul style={{ margin: '8px 0 0', paddingLeft: 18, color: 'rgba(255,255,255,.75)', fontSize: 13, lineHeight: 1.7 }}>
+          <li><strong style={{ color: ROLE_STYLE.owner.color }}>{copy.roles.owner.label}</strong> — {copy.ownerRule}</li>
+          <li><strong style={{ color: ROLE_STYLE.admin.color }}>{copy.roles.admin.label}</strong> — {copy.adminRule}</li>
+          <li><strong style={{ color: ROLE_STYLE.member.color }}>{copy.roles.member.label}</strong> — {copy.memberRule}</li>
+        </ul>
+
+        <p className="sb-caption" style={{ marginTop: 12 }}>{copy.pendingNote}</p>
+      </section>
+    </main>
+  )
 }

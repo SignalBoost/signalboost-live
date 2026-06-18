@@ -1,4 +1,4 @@
-import OpenAI from 'openai'
+import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, NextResponse } from 'next/server'
 import { getConciergeAnswer } from '@/lib/platform/unifiedPlatform'
 import { getAccess } from '@/lib/auth/access'
@@ -17,12 +17,23 @@ import { proposeInfrastructurePR, formatStageResultForAI, listInfraPRsForAI } fr
 
 export const maxDuration = 300
 
+// Tool definitions below are authored in this OpenAI-style shape and converted
+// to Anthropic's tool shape at call time (see toAnthropicTools), so the ~25
+// tool definitions did not need to be rewritten during the SDK migration.
+type ChatTool = { type: 'function'; function: { name: string; description: string; parameters: any } }
+type ChatMessage = { role: 'user' | 'assistant'; content: any }
+
 type SupportMessage = { role?: 'user' | 'assistant' | 'system'; content?: string }
 
-function getOpenAIClient() {
-  const apiKey = process.env.OPENAI_API_KEY
+function getAnthropicClient() {
+  const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) return null
-  return new OpenAI({ apiKey })
+  return new Anthropic({ apiKey })
+}
+
+// Convert OpenAI-shaped tool defs to the Anthropic tool shape.
+function toAnthropicTools(tools: ChatTool[]) {
+  return tools.map(t => ({ name: t.function.name, description: t.function.description, input_schema: t.function.parameters }))
 }
 
 const LANGUAGE_LABELS: Record<string, string> = {
@@ -173,7 +184,7 @@ Tone: professional, direct, kind, efficient — like an excellent chief of staff
 }
 // ── Tool definitions ──────────────────────────────────────────────────────────
 
-const TOOL_GET_PRICING: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_GET_PRICING: ChatTool = {
   type: 'function',
   function: {
     name: 'getPricing',
@@ -182,7 +193,7 @@ const TOOL_GET_PRICING: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
-const TOOL_GET_BUSINESS_METRICS: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_GET_BUSINESS_METRICS: ChatTool = {
   type: 'function',
   function: {
     name: 'getBusinessMetrics',
@@ -191,7 +202,7 @@ const TOOL_GET_BUSINESS_METRICS: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
-const TOOL_GET_EXTERNAL_INFO: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_GET_EXTERNAL_INFO: ChatTool = {
   type: 'function',
   function: {
     name: 'getExternalInfo',
@@ -206,7 +217,7 @@ const TOOL_GET_EXTERNAL_INFO: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
-const TOOL_GET_AFFILIATE_COUNT: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_GET_AFFILIATE_COUNT: ChatTool = {
   type: 'function',
   function: {
     name: 'getAffiliateCount',
@@ -215,7 +226,7 @@ const TOOL_GET_AFFILIATE_COUNT: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
-const TOOL_REMEMBER_FACT: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_REMEMBER_FACT: ChatTool = {
   type: 'function',
   function: {
     name: 'rememberFact',
@@ -231,7 +242,7 @@ const TOOL_REMEMBER_FACT: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
-const TOOL_FORGET_FACT: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_FORGET_FACT: ChatTool = {
   type: 'function',
   function: {
     name: 'forgetFact',
@@ -245,7 +256,7 @@ const TOOL_FORGET_FACT: OpenAI.Chat.Completions.ChatCompletionTool = {
     },
   },
 }
-const TOOL_GET_OPPORTUNITY_ALERTS: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_GET_OPPORTUNITY_ALERTS: ChatTool = {
   type: 'function',
   function: {
     name: 'getOpportunityAlerts',
@@ -254,7 +265,7 @@ const TOOL_GET_OPPORTUNITY_ALERTS: OpenAI.Chat.Completions.ChatCompletionTool = 
   },
 }
 
-const TOOL_LIST_REPO_FILES: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_LIST_REPO_FILES: ChatTool = {
   type: 'function',
   function: {
     name: 'listRepoFiles',
@@ -269,7 +280,7 @@ const TOOL_LIST_REPO_FILES: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
-const TOOL_READ_REPO_FILE: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_READ_REPO_FILE: ChatTool = {
   type: 'function',
   function: {
     name: 'readRepoFile',
@@ -284,7 +295,7 @@ const TOOL_READ_REPO_FILE: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
-const TOOL_COMMIT_CODE: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_COMMIT_CODE: ChatTool = {
   type: 'function',
   function: {
     name: 'proposeCodeCommit',
@@ -304,7 +315,7 @@ const TOOL_COMMIT_CODE: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
-const TOOL_LIST_AI_BRANCHES: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_LIST_AI_BRANCHES: ChatTool = {
   type: 'function',
   function: {
     name: 'listAiBranches',
@@ -313,7 +324,7 @@ const TOOL_LIST_AI_BRANCHES: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
-const TOOL_LIST_CLEANUP_BRANCHES: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_LIST_CLEANUP_BRANCHES: ChatTool = {
   type: 'function',
   function: {
     name: 'listCleanupBranches',
@@ -322,7 +333,7 @@ const TOOL_LIST_CLEANUP_BRANCHES: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
-const TOOL_DELETE_BRANCHES: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_DELETE_BRANCHES: ChatTool = {
   type: 'function',
   function: {
     name: 'deleteBranches',
@@ -337,7 +348,7 @@ const TOOL_DELETE_BRANCHES: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
-const TOOL_PROPOSE_PLAN: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_PROPOSE_PLAN: ChatTool = {
   type: 'function',
   function: {
     name: 'proposeGrowthPlan',
@@ -355,7 +366,7 @@ const TOOL_PROPOSE_PLAN: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
-const TOOL_UPDATE_PLAN_STATUS: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_UPDATE_PLAN_STATUS: ChatTool = {
   type: 'function',
   function: {
     name: 'updateGrowthPlanStatus',
@@ -371,7 +382,7 @@ const TOOL_UPDATE_PLAN_STATUS: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
-const TOOL_LIST_PLANS: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_LIST_PLANS: ChatTool = {
   type: 'function',
   function: {
     name: 'listGrowthPlans',
@@ -380,7 +391,7 @@ const TOOL_LIST_PLANS: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
-const TOOL_CREATE_OUTREACH_DRAFT: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_CREATE_OUTREACH_DRAFT: ChatTool = {
   type: 'function',
   function: {
     name: 'createOutreachDraft',
@@ -397,7 +408,7 @@ const TOOL_CREATE_OUTREACH_DRAFT: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
-const TOOL_CREATE_MY_OUTREACH: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_CREATE_MY_OUTREACH: ChatTool = {
   type: 'function',
   function: {
     name: 'createMyOutreachDraft',
@@ -414,7 +425,7 @@ const TOOL_CREATE_MY_OUTREACH: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
-const TOOL_LIST_MY_OUTREACH: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_LIST_MY_OUTREACH: ChatTool = {
   type: 'function',
   function: {
     name: 'listMyOutreachDrafts',
@@ -423,7 +434,7 @@ const TOOL_LIST_MY_OUTREACH: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
-const TOOL_SEARCH_HISTORY: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_SEARCH_HISTORY: ChatTool = {
   type: 'function',
   function: {
     name: 'searchPastConversations',
@@ -438,7 +449,7 @@ const TOOL_SEARCH_HISTORY: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
-const TOOL_DELETE_HISTORY: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_DELETE_HISTORY: ChatTool = {
   type: 'function',
   function: {
     name: 'deleteConversationHistory',
@@ -453,7 +464,7 @@ const TOOL_DELETE_HISTORY: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
-const TOOL_PROPOSE_INFRA_PR: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_PROPOSE_INFRA_PR: ChatTool = {
   type: 'function',
   function: {
     name: 'proposeInfrastructurePR',
@@ -484,7 +495,7 @@ const TOOL_PROPOSE_INFRA_PR: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
-const TOOL_LIST_INFRA_PRS: OpenAI.Chat.Completions.ChatCompletionTool = {
+const TOOL_LIST_INFRA_PRS: ChatTool = {
   type: 'function',
   function: {
     name: 'listInfrastructurePRs',
@@ -493,12 +504,12 @@ const TOOL_LIST_INFRA_PRS: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 }
 
-const CONCIERGE_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+const CONCIERGE_TOOLS: ChatTool[] = [
   TOOL_GET_PRICING,
   TOOL_GET_AFFILIATE_COUNT,
 ]
 
-const CHIEF_OF_STAFF_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+const CHIEF_OF_STAFF_TOOLS: ChatTool[] = [
   TOOL_GET_PRICING,
   TOOL_GET_BUSINESS_METRICS,
   TOOL_GET_EXTERNAL_INFO,
@@ -893,16 +904,16 @@ export async function POST(req: NextRequest) {
     const latestUserMessage = [...sanitized].reverse().find(m => m.role === 'user')?.content || ''
     const local = getConciergeAnswer(latestUserMessage, languageCode, currentPage)
 
-    if (!process.env.OPENAI_API_KEY) {
+    if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json({ reply: local.reply, telemetry: local, source: 'deterministic-concierge' })
     }
 
-    const openai = getOpenAIClient()
-    if (!openai) {
+    const anthropic = getAnthropicClient()
+    if (!anthropic) {
       return NextResponse.json({ error: 'AI backend is not configured.' }, { status: 500 })
     }
 
-    const model       = isPrivileged ? 'gpt-4o' : 'gpt-4o-mini'
+    const model       = isPrivileged ? 'claude-sonnet-4-6' : 'claude-haiku-4-5'
     const temperature = isPrivileged ? 0.5 : 0.4
     const baseTools   = isPrivileged ? CHIEF_OF_STAFF_TOOLS : CONCIERGE_TOOLS
     const customerTools = userId && !isPrivileged ? [TOOL_CREATE_MY_OUTREACH, TOOL_LIST_MY_OUTREACH] : []
@@ -958,10 +969,8 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
       }
     }
 
-    const convo: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-      { role: 'system', content: systemContent },
-      ...sanitized,
-    ]
+    const anthropicTools = toAnthropicTools(tools)
+    const convo: ChatMessage[] = [...sanitized]
 
     const startedAt = Date.now()
     const BUDGET_MS = 240_000
@@ -976,16 +985,18 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
     // so a long task degrades into a graceful "say continue" reply, never a 500.
     const callModel = async (choiceMode: 'auto' | 'required') => {
       try {
-        const r = await withTimeout(
-          openai.chat.completions.create({
+        const msg = await withTimeout(
+          anthropic.messages.create({
             model,
+            max_tokens: 16000,
             temperature,
-            messages: convo,
-            tools,
-            tool_choice: choiceMode,
+            system: systemContent,
+            messages: convo as any,
+            tools: anthropicTools as any,
+            tool_choice: choiceMode === 'required' ? { type: 'any' } : { type: 'auto' },
           })
         )
-        return r.choices[0] ?? null
+        return msg
       } catch (err) {
         if (err instanceof Error && err.message === 'AI request timeout') return null
         throw err
@@ -995,41 +1006,43 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
     const ACTION_TRIGGER = /^(ok(ay)?|yes|si|sí|sure|proceed|continue|go(\s*ahead)?|do it|start|let'?s\s*(start|go)|next(\s*page)?|approved?|confirmed?|dale|adelante|sigue|empieza)[.!\s]*$/i
     const forceAction = isPrivileged && ACTION_TRIGGER.test(latestUserMessage.trim())
     if (forceAction) {
-      convo.push({
-        role: 'system',
-        content: 'OWNER COMMAND: an affirmation ("continue"/"go"/"yes" or similar) was received. Immediately perform the next pending action — for multi-page tasks, read the next queued page file and COMMIT it within this reply. Do not output a plan, do not ask anything, do not repeat instructions to say continue.',
-      })
+      systemContent += '\n\nOWNER COMMAND: an affirmation ("continue"/"go"/"yes" or similar) was received. Immediately perform the next pending action — for multi-page tasks, read the next queued page file and COMMIT it within this reply. Do not output a plan, do not ask anything, do not repeat instructions to say continue.'
     }
 
-    let choice     = await callModel(forceAction ? 'required' : 'auto')
+    let msg        = await callModel(forceAction ? 'required' : 'auto')
     let toolRounds = 0
-    let timedOut   = choice === null
+    let timedOut   = msg === null
 
-    while (!timedOut && choice?.message?.tool_calls && choice.message.tool_calls.length > 0 && toolRounds < 6 && remainingMs() > 12_000) {
+    while (!timedOut && msg && (msg as any).stop_reason === 'tool_use' && toolRounds < 6 && remainingMs() > 12_000) {
       toolRounds++
 
-      convo.push(choice.message as OpenAI.Chat.Completions.ChatCompletionMessageParam)
+      // Record the assistant turn (its full content blocks, including tool_use).
+      convo.push({ role: 'assistant', content: (msg as any).content })
 
-      for (const call of choice.message.tool_calls) {
-        const toolName = call.function?.name || ''
-        const toolArgs = call.function?.arguments || '{}'
-        const result   = await runTool(toolName, toolArgs, userId, conversationId, isPrivileged)
-        convo.push({
-          role:         'tool',
-          tool_call_id: call.id,
-          content:      result,
-        })
+      // Run each requested tool; collect all results into ONE user message.
+      const toolResults: any[] = []
+      for (const block of (msg as any).content) {
+        if (!block || block.type !== 'tool_use') continue
+        // runTool expects a JSON string; Anthropic gives input as an object.
+        const result = await runTool(block.name || '', JSON.stringify(block.input ?? {}), userId, conversationId, isPrivileged)
+        toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
       }
+      convo.push({ role: 'user', content: toolResults })
 
       const next = await callModel('auto')
       if (next === null) { timedOut = true; break }
-      choice = next
+      msg = next
     }
 
-    let reply = choice && choice.message && choice.message.content ? choice.message.content.trim() : ''
+    const extractText = (m: any) =>
+      m && Array.isArray(m.content)
+        ? m.content.filter((b: any) => b && b.type === 'text').map((b: any) => b.text).join('').trim()
+        : ''
+    let reply = extractText(msg)
     if (!reply) {
       const committedSomething = convo.some(
-        (m: any) => m && m.role === 'tool' && typeof m.content === 'string' && m.content.includes('COMMIT SUCCEEDED')
+        (m: any) => m && m.role === 'user' && Array.isArray(m.content) &&
+          m.content.some((b: any) => b && b.type === 'tool_result' && typeof b.content === 'string' && b.content.includes('COMMIT SUCCEEDED'))
       )
       if (timedOut || remainingMs() <= 12_000) {
         reply = committedSomething
@@ -1054,7 +1067,7 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
     return NextResponse.json({
       reply,
       telemetry: local,
-      source: isPrivileged ? 'openai-chief' : 'openai-concierge',
+      source: isPrivileged ? 'anthropic-chief' : 'anthropic-concierge',
     })
   } catch (error) {
     console.error('Support API error', error)

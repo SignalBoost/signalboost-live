@@ -150,8 +150,8 @@ export default function CommandConsole({
 
         {/* Audit footer */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,.07)', padding: '14px 24px', textAlign: 'center', fontSize: 12.5, color: 'rgba(255,255,255,.55)', background: 'rgba(8,11,20,.6)' }}>
-          <strong style={{ color: 'rgba(255,255,255,.8)' }}>Audit Log:</strong> All actions are recorded for compliance.{' '}
-          <button onClick={() => openUtility('logs')} style={{ background: 'none', border: 'none', color: '#1af0ff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}>View log →</button>
+          <strong style={{ color: 'rgba(255,255,255,.8)' }}>{t('console.cui.audit_log', 'Audit Log:')}</strong> {t('console.cui.audit_note', 'All actions are recorded for compliance.')}{' '}
+          <button onClick={() => openUtility('logs')} style={{ background: 'none', border: 'none', color: '#1af0ff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}>{t('console.cui.view_log', 'View log →')}</button>
         </div>
       </main>
 
@@ -193,7 +193,8 @@ function PagerButton({ label, onClick, disabled }: { label: string; onClick: () 
 }
 
 function UtilityFrame({ id, lang }: { id: string; lang: Lang }) {
+  const { t } = useTranslation()
   const renderPage = signalboostConsoleUI.utilityPages[id]
   if (renderPage) return <>{renderPage()}</>
-  return <div style={{ color: 'rgba(255,255,255,.6)' }}>Unknown page.</div>
+  return <div style={{ color: 'rgba(255,255,255,.6)' }}>{t('console.cui.unknown_page', 'Unknown page.')}</div>
 }

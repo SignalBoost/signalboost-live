@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { listInfrastructurePRs, stageInfrastructurePR } from '@/lib/hub/pr-engine';
+import { redactPrsForDisplay } from '@/lib/hub/pr-redact';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -33,7 +34,8 @@ export async function GET() {
 
   const list = await listInfrastructurePRs(undefined, 50);
   if (!list.ok) return NextResponse.json({ ok: false, error: list.error }, { status: 500 });
-  return NextResponse.json({ ok: true, prs: list.prs });
+  // Mask secrets in staged payloads before they reach the browser.
+  return NextResponse.json({ ok: true, prs: redactPrsForDisplay(list.prs) });
 }
 
 export async function POST(req: Request) {

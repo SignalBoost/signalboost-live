@@ -1,0 +1,971 @@
+{
+  "tier": {
+    "core": "Essencial",
+    "tier2": "Escala",
+    "tier3": "Empresarial",
+    "tier4": "Interno",
+    "sidebar": {
+      "core": "Provedores Nível 1",
+      "tier2": "Provedores Nível 2",
+      "tier3": "Provedores Nível 3",
+      "tier4": "Ferramentas Nível 4"
+    },
+    "blurb": {
+      "core": "Infraestrutura principal: nuvem, pagamentos, dados, hospedagem e controle de código.",
+      "tier2": "Mensagens, e-mail, rede edge e integrações de computação.",
+      "tier3": "Plataforma de apps, observabilidade, rastreamento de erros e resposta a incidentes.",
+      "tier4": "Cofre de segredos criptografado e governança de equipe."
+    }
+  },
+  "util": {
+    "domains": "Domínios/DNS",
+    "deployments": "Implantações",
+    "logs": "Registros",
+    "settings": "Configurações"
+  },
+  "sub": {
+    "ai_and_models": "IA E MODELOS",
+    "email": "E-MAIL",
+    "transcription": "TRANSCRIÇÃO",
+    "cloud_infrastructure": "INFRAESTRUTURA CLOUD",
+    "cloud_platform": "PLATAFORMA CLOUD",
+    "microsoft_cloud": "NUVEM MICROSOFT",
+    "payments_and_billing": "PAGAMENTOS E COBRANÇA",
+    "database_and_authentication": "BANCO DE DADOS E AUTENTICAÇÃO",
+    "deployments_and_networking": "IMPLANTAÇÕES E REDE",
+    "source_control": "CONTROLE DE CÓDIGO",
+    "messaging_and_sms": "MENSAGENS E SMS",
+    "transactional_email": "E-MAIL TRANSACIONAL",
+    "dns_cdn_and_edge": "DNS, CDN E EDGE",
+    "cloud_compute": "COMPUTAÇÃO CLOUD",
+    "app_platform": "PLATAFORMA DE APPS",
+    "observability": "OBSERVABILIDADE",
+    "error_monitoring": "MONITORAMENTO DE ERROS",
+    "incident_response": "RESPOSTA A INCIDENTES",
+    "encrypted_secret_vault": "COFRE DE SEGREDOS CRIPTOGRAFADO",
+    "team_access_and_compliance": "ACESSO DA EQUIPE E CONFORMIDADE",
+    "voice_and_audio": "VOZ E ÁUDIO"
+  },
+  "sec": {
+    "repositories": "Repositórios",
+    "pull_requests": "Pull Requests",
+    "branches": "Ramificações",
+    "issues": "Issues",
+    "activity": "Atividade",
+    "secrets_and_tokens": "Segredos e Tokens",
+    "models": "Modelos",
+    "files": "Arquivos",
+    "jobs": "Trabalhos",
+    "voices": "Vozes",
+    "account": "Conta",
+    "history": "Histórico",
+    "domains": "Domínios",
+    "audiences": "Públicos",
+    "broadcasts": "Transmissões",
+    "api_keys": "Chaves de API",
+    "transcripts": "Transcrições",
+    "data": "Dados",
+    "auth": "Autenticação",
+    "storage": "Armazenamento",
+    "customers": "Clientes",
+    "prices_and_tiers": "Preços e Planos",
+    "catalog": "Catálogo",
+    "table_crud": "CRUD de Tabelas",
+    "sql_engine": "Motor SQL",
+    "users_and_access": "Usuários e Acesso",
+    "credentials": "Credenciais",
+    "environment_variables": "Variáveis de Ambiente",
+    "deployments": "Implantações",
+    "networking_and_logs": "Rede e Registros",
+    "email": "E-mail",
+    "messaging": "Mensagens",
+    "dns": "DNS",
+    "cache": "Cache",
+    "compute": "Computação",
+    "iam": "IAM",
+    "security": "Segurança",
+    "security_rules": "Regras de Segurança",
+    "secrets_storage": "Armazém de Segredos",
+    "monitoring": "Monitoramento",
+    "incidents": "Incidentes",
+    "team_access": "Acesso da Equipe",
+    "compliance_and_audit": "Conformidade e Auditoria",
+    "audit": "Auditoria"
+  },
+  "fld": {
+    "repository": "Repositório",
+    "pull_request": "Pull Request",
+    "issue": "Issue",
+    "branch": "Ramificação",
+    "model": "Modelo",
+    "voice": "Voz",
+    "table": "Tabela",
+    "transcript": "Transcrição",
+    "title": "Título",
+    "new_title": "Novo Título",
+    "description": "Descrição",
+    "body": "Corpo",
+    "content": "Conteúdo",
+    "name": "Nome",
+    "message": "Mensagem",
+    "email": "E-mail",
+    "new_email": "Novo E-mail",
+    "merge_method": "Método de Merge",
+    "region": "Região",
+    "domain": "Domínio",
+    "bucket": "Bucket",
+    "product": "Produto",
+    "price": "Preço",
+    "query": "Consulta",
+    "operation": "Operação",
+    "phone_number": "Número de Telefone",
+    "bucket_name": "Nome do bucket",
+    "username": "Nome de usuário",
+    "iam_username": "Usuário IAM",
+    "product_name": "Nome do produto",
+    "new_product_name": "Novo nome do produto",
+    "amount_usd": "Valor (USD)",
+    "price_id": "ID do preço",
+    "subscription_tier": "Nível de assinatura",
+    "customer": "Cliente",
+    "amount_cents": "Valor (centavos)",
+    "charge": "Cobrança",
+    "amount_in_cents": "Valor (em centavos)",
+    "sql_raw_statement": "Instrução SQL bruta",
+    "migration_payload": "Payload de migração",
+    "json_row_object": "Objeto de linha JSON",
+    "match_column_value": "Correspondência (coluna=valor)",
+    "new_values_json": "Novos valores (JSON)",
+    "row": "Linha",
+    "user_email": "E-mail do usuário",
+    "user": "Usuário",
+    "object_path": "Caminho do objeto",
+    "bucket_identifier": "Identificador do bucket",
+    "deployment_id": "ID da implantação",
+    "build_id": "ID do build",
+    "env_variable_id": "ID da variável de ambiente",
+    "new_value": "Novo valor",
+    "target": "Destino",
+    "env_variable_key_reference": "Referência da chave da variável de ambiente",
+    "domain_address_string": "Endereço de domínio",
+    "to": "Para",
+    "subject": "Assunto",
+    "type": "Tipo",
+    "ttl_sec": "TTL (s)",
+    "proxied": "Com proxy",
+    "record_id": "ID do registro",
+    "droplet_name": "Nome do droplet",
+    "size": "Tamanho",
+    "image": "Imagem",
+    "rules_source": "Origem das regras",
+    "monitor_name": "Nome do monitor",
+    "alert_message": "Mensagem de alerta",
+    "metric_query": "Consulta de métrica",
+    "project_slug": "Slug do projeto",
+    "issue_id": "ID da issue",
+    "service_id": "ID do serviço",
+    "urgency": "Urgência",
+    "master_passphrase": "Frase mestra",
+    "secret_key_reference": "Referência da chave secreta",
+    "encrypted_value": "Valor criptografado",
+    "key_name": "Nome da chave",
+    "team_member_id": "ID do membro da equipe",
+    "target_privilege_domain_access_tier": "Nível de acesso de privilégio alvo",
+    "member_id": "ID do membro",
+    "permissions_comma_separated": "Permissões (separadas por vírgula)",
+    "scope": "Escopo"
+  },
+  "opt": {
+    "open": "Aberto",
+    "closed": "Fechado",
+    "merge_commit": "Commit de merge",
+    "squash": "Squash",
+    "rebase": "Rebase",
+    "production": "Produção",
+    "preview": "Pré-visualização",
+    "development": "Desenvolvimento",
+    "indie_tier_9_mo": "Nível Indie ($9/mês)",
+    "pro_tier_29_mo": "Nível Pro ($29/mês)",
+    "growth_tier_79_mo": "Nível Growth ($79/mês)",
+    "list_objects": "Listar objetos",
+    "upload": "Enviar",
+    "download": "Baixar",
+    "high": "Alta",
+    "low": "Baixa",
+    "billing_administrator": "Administrador de faturamento",
+    "platform_core_developer": "Desenvolvedor principal da plataforma",
+    "standard_team_member": "Membro padrão da equipe",
+    "everything": "Tudo",
+    "access_and_roles": "Acesso e funções",
+    "billing": "Faturamento",
+    "data": "Dados"
+  },
+  "ui": {
+    "execute": "Executar",
+    "confirm": "Confirmar",
+    "cancel": "Cancelar",
+    "preview": "Pré-visualizar",
+    "close": "Fechar",
+    "error": "Erro",
+    "success": "Sucesso",
+    "running": "Executando…",
+    "no_inputs": "Esta ação não requer dados.",
+    "workspace": "Espaço de trabalho",
+    "hub_home": "Início do Hub",
+    "back": "Voltar",
+    "tier": "Nível",
+    "providers": "Provedores",
+    "utility_views": "Vistas Utilitárias",
+    "review_action": "Revise a ação que será enviada para",
+    "cannot_undo": "Após confirmar, não pode ser desfeito.",
+    "about_to_execute": "Você está prestes a executar",
+    "on": "em"
+  },
+  "tpl": {
+    "github": {
+      "list_repos": {
+        "label": "Ver Repositórios",
+        "desc": "Lista os repositórios visíveis para o token de acesso configurado."
+      },
+      "list_prs": {
+        "label": "Listar Pull Requests",
+        "desc": "Mostra os pull requests abertos (mais recentes primeiro) de um repositório."
+      },
+      "view_pr_files": {
+        "label": "Ver Arquivos do PR",
+        "desc": "Lista os arquivos alterados em um pull request."
+      },
+      "merge_pr": {
+        "label": "Fazer Merge do PR",
+        "desc": "Faz o merge de um pull request na sua ramificação base."
+      },
+      "close_pr": {
+        "label": "Fechar PR",
+        "desc": "Fecha um pull request sem fazer merge."
+      },
+      "list_branches": {
+        "label": "Listar Ramificações",
+        "desc": "Lista as ramificações de um repositório (útil para limpeza de ai/*)."
+      },
+      "delete_branch": {
+        "label": "Excluir Ramificação",
+        "desc": "Exclui uma ramificação por nome (main é protegida)."
+      },
+      "list_commits": {
+        "label": "Commits Recentes",
+        "desc": "Mostra os commits mais recentes de um repositório."
+      },
+      "list_issues": {
+        "label": "Listar Issues",
+        "desc": "Mostra as issues abertas de um repositório."
+      },
+      "open_issue": {
+        "label": "Abrir Issue",
+        "desc": "Cria uma nova issue em um repositório."
+      },
+      "edit_issue": {
+        "label": "Editar Issue",
+        "desc": "Atualiza o título ou o estado (aberto/fechado) de uma issue."
+      },
+      "close_issue": {
+        "label": "Fechar Issue",
+        "desc": "Fecha uma issue aberta."
+      },
+      "rotate_token": {
+        "label": "Rotacionar Token",
+        "desc": "Rotaciona o token de acesso do GitHub armazenado (revogar + reemitir)."
+      },
+      "manage_secrets": {
+        "label": "Gerenciar Segredos",
+        "desc": "Cria ou atualiza um segredo do Actions em um repositório."
+      }
+    },
+    "openai": {
+      "list_models": {
+        "label": "Ver Modelos",
+        "desc": "Lista os modelos disponíveis para a chave de API configurada."
+      },
+      "retrieve_model": {
+        "label": "Detalhes do Modelo",
+        "desc": "Mostra os detalhes de um modelo específico."
+      },
+      "list_files": {
+        "label": "Listar Arquivos",
+        "desc": "Arquivos enviados para a conta da OpenAI."
+      },
+      "list_fine_tunes": {
+        "label": "Trabalhos de Fine-tuning",
+        "desc": "Trabalhos de fine-tuning recentes e seu status."
+      },
+      "list_batches": {
+        "label": "Trabalhos em Lote",
+        "desc": "Trabalhos em lote recentes e seu status."
+      }
+    },
+    "elevenlabs": {
+      "list_voices": {
+        "label": "Listar Vozes",
+        "desc": "Vozes disponíveis para a conta."
+      },
+      "voice_details": {
+        "label": "Detalhes da Voz",
+        "desc": "Inspeciona uma voz específica."
+      },
+      "list_models": {
+        "label": "Listar Modelos",
+        "desc": "Modelos de fala disponíveis para a conta."
+      },
+      "subscription": {
+        "label": "Assinatura e Uso",
+        "desc": "Nível do plano e uso da cota de caracteres."
+      },
+      "list_history": {
+        "label": "Histórico de Geração",
+        "desc": "Gerações recentes de texto para fala."
+      }
+    },
+    "anthropic": {
+      "list_models": {
+        "label": "Ver Modelos",
+        "desc": "Modelos disponíveis para a chave de API."
+      },
+      "retrieve_model": {
+        "label": "Detalhes do Modelo",
+        "desc": "Detalhes de um modelo específico."
+      }
+    },
+    "gemini": {
+      "list_models": {
+        "label": "Ver Modelos",
+        "desc": "Modelos disponíveis para a chave do Gemini."
+      },
+      "model_details": {
+        "label": "Detalhes do Modelo",
+        "desc": "Detalhes de um modelo específico."
+      }
+    },
+    "resend": {
+      "list_domains": {
+        "label": "Listar Domínios",
+        "desc": "Domínios de envio e status de verificação."
+      },
+      "list_audiences": {
+        "label": "Listar Públicos",
+        "desc": "Públicos de contatos."
+      },
+      "list_broadcasts": {
+        "label": "Listar Transmissões",
+        "desc": "Transmissões recentes."
+      },
+      "list_api_keys": {
+        "label": "Listar Chaves de API",
+        "desc": "Chaves de API da conta."
+      }
+    },
+    "assemblyai": {
+      "list_transcripts": {
+        "label": "Transcrições Recentes",
+        "desc": "Trabalhos de transcrição mais recentes."
+      },
+      "transcript_details": {
+        "label": "Detalhes da Transcrição",
+        "desc": "Inspeciona um trabalho de transcrição."
+      }
+    },
+    "supabase_mkt": {
+      "list_tables": {
+        "label": "Listar Tabelas",
+        "desc": "Tabelas públicas do projeto de marketing."
+      },
+      "list_rows": {
+        "label": "Listar Linhas",
+        "desc": "Linhas de uma tabela escolhida."
+      },
+      "list_users": {
+        "label": "Listar Usuários",
+        "desc": "Usuários de autenticação do projeto de marketing."
+      },
+      "list_buckets": {
+        "label": "Listar Buckets",
+        "desc": "Buckets de armazenamento do projeto de marketing."
+      }
+    },
+    "aws": {
+      "create_s3_bucket": {
+        "label": "Criar bucket S3",
+        "desc": "Crie um novo contêiner de bucket S3 com nome único global."
+      },
+      "list_iam_users": {
+        "label": "Listar usuários IAM",
+        "desc": "Obtenha todos os usuários atuais do diretório de identidades."
+      },
+      "disable_iam_user": {
+        "label": "Desativar usuário IAM",
+        "desc": "Desative imediatamente as chaves e credenciais do usuário."
+      },
+      "rotate_credential": {
+        "label": "Rotacionar credencial",
+        "desc": "Rotacione um par de chaves de acesso IAM de um usuário."
+      }
+    },
+    "gcp": {
+      "list_service_accounts": {
+        "label": "Listar contas de serviço",
+        "desc": "Obtenha todas as contas de serviço de identidade do sistema."
+      }
+    },
+    "stripe": {
+      "create_product": {
+        "label": "Criar produto",
+        "desc": "Crie um novo produto da Stripe e seu primeiro preço recorrente."
+      },
+      "edit_product": {
+        "label": "Editar produto",
+        "desc": "Atualize o nome, a descrição ou o estado ativo de um produto da Stripe."
+      },
+      "view_products": {
+        "label": "Ver produtos",
+        "desc": "Liste os produtos ativos da Stripe e seus identificadores."
+      },
+      "archive_product": {
+        "label": "Arquivar produto",
+        "desc": "Arquive um produto da Stripe (deixa inativo; recuperável ao reativá-lo)."
+      },
+      "delete_product": {
+        "label": "Excluir produto",
+        "desc": "Exclua permanentemente um produto da Stripe. Apenas produtos sem preços ativos podem ser excluídos."
+      },
+      "create_price": {
+        "label": "Criar preço",
+        "desc": "Anexe um novo preço recorrente ou único a um produto existente da Stripe."
+      },
+      "view_prices": {
+        "label": "Ver preços",
+        "desc": "Liste os preços da Stripe, opcionalmente filtrados por produto."
+      },
+      "edit_price": {
+        "label": "Editar preço",
+        "desc": "Atualize o apelido de um preço ou ative/desative-o (os valores são imutáveis na Stripe)."
+      },
+      "archive_price": {
+        "label": "Arquivar preço",
+        "desc": "Desative um preço para que não possa mais ser comprado (recuperável)."
+      },
+      "apply_tier_template": {
+        "label": "Modelos de plano",
+        "desc": "Crie instantaneamente trilhas de checkout padronizadas Indie, Pro ou Growth."
+      },
+      "list_customers": {
+        "label": "Visão de clientes",
+        "desc": "Liste clientes, faturas e métricas de pagamentos recorrentes ativos."
+      },
+      "adjust_balance": {
+        "label": "Ajustar saldo",
+        "desc": "Aplique modificações manuais no livro de saldo do cliente ou ajustes de transação."
+      },
+      "issue_refund": {
+        "label": "Reembolso/Ajustes",
+        "desc": "Reverta o saldo de uma transação processada ou aplique um crédito de serviço manual."
+      }
+    },
+    "supabase": {
+      "sql_editor": {
+        "label": "Editor SQL",
+        "desc": "Execute consultas brutas arbitrárias diretamente nas suas tabelas de dados."
+      },
+      "run_migration": {
+        "label": "Executar migração",
+        "desc": "Execute migrações de esquema de definição de dados compiladas pela ponte de consultas."
+      },
+      "insert_row": {
+        "label": "Inserir linha",
+        "desc": "Injete diretamente registros estruturados de linha em um esquema existente."
+      },
+      "edit_row": {
+        "label": "Editar linha",
+        "desc": "Atualize uma linha de tabela existente que corresponda a uma expressão de filtro."
+      },
+      "archive_row": {
+        "label": "Arquivar linhas",
+        "desc": "Altere os indicadores de visibilidade ativa em um registro de item de banco de dados específico."
+      },
+      "delete_row": {
+        "label": "Excluir linha",
+        "desc": "Purgue completamente os registros de linha da camada de armazenamento."
+      },
+      "invite_user": {
+        "label": "Convidar usuário",
+        "desc": "Envie um convite por e-mail para provisionar um novo usuário autenticado."
+      },
+      "edit_user": {
+        "label": "Editar usuário",
+        "desc": "Atualize o e-mail, os metadados ou o estado de confirmação de um usuário."
+      },
+      "delete_user": {
+        "label": "Excluir usuário",
+        "desc": "Remova permanentemente um usuário autenticado e sua identidade."
+      },
+      "reset_password": {
+        "label": "Redefinir senha",
+        "desc": "Envie um e-mail de recuperação de senha para uma conta de usuário."
+      },
+      "rotate_service_key": {
+        "label": "Rotacionar chaves",
+        "desc": "Invalide os tokens JSON service_role atuais e emita novas credenciais."
+      },
+      "storage_panel": {
+        "label": "Painel de armazenamento",
+        "desc": "Envie, baixe ou liste objetos dentro de um bucket de armazenamento."
+      },
+      "create_bucket": {
+        "label": "Criar bucket",
+        "desc": "Crie um novo contêiner de armazenamento de objetos de mídia ou binários."
+      },
+      "empty_bucket": {
+        "label": "Esvaziar bucket",
+        "desc": "Purgue todos os objetos aninhados sem remover o contêiner de ativos principal."
+      }
+    },
+    "vercel": {
+      "list_deployments": {
+        "label": "Painel de implantações",
+        "desc": "Inspecione builds em execução, registros de commit e atribuições de destino de produção."
+      },
+      "trigger_rollback": {
+        "label": "Reverter implantação",
+        "desc": "Aponte instantaneamente os destinos de domínio de produção para um hash de implantação anterior."
+      },
+      "cancel_build": {
+        "label": "Cancelar build",
+        "desc": "Aborte um elemento da fila de compilação ativa diretamente no gateway."
+      },
+      "view_env": {
+        "label": "Ver variáveis de ambiente",
+        "desc": "Liste todas as configurações de variáveis de ambiente ativas neste projeto."
+      },
+      "edit_env": {
+        "label": "Editar variável de ambiente",
+        "desc": "Atualize o valor ou os ambientes de destino de uma variável."
+      },
+      "delete_env": {
+        "label": "Excluir variável de ambiente",
+        "desc": "Apague completamente as chaves de variáveis de ambiente do pipeline de build ativo."
+      },
+      "sync_dns_domain": {
+        "label": "Domínios/DNS",
+        "desc": "Configure ajustes canônicos, caminhos de alias ou regras de certificação SSL no edge."
+      },
+      "logs": {
+        "label": "Visualizador de registros",
+        "desc": "Transmita eventos recentes de registro de plataforma, build e runtime."
+      }
+    },
+    "twilio": {
+      "send_sms": {
+        "label": "Enviar SMS",
+        "desc": "Envie uma mensagem SMS de saída do seu número Twilio."
+      },
+      "verify_number": {
+        "label": "Verificar número",
+        "desc": "Inicie a verificação do número de telefone (envia um código de uso único)."
+      }
+    },
+    "sendgrid": {
+      "send_email": {
+        "label": "Enviar e-mail",
+        "desc": "Envie um e-mail transacional pela SendGrid."
+      },
+      "check_domain_auth": {
+        "label": "Verificar autenticação de domínio",
+        "desc": "Inspecione o status de autenticação do domínio remetente (SPF/DKIM)."
+      }
+    },
+    "cloudflare": {
+      "add_dns_record": {
+        "label": "Adicionar registro DNS",
+        "desc": "Crie um registro DNS na zona Cloudflare configurada."
+      },
+      "toggle_proxy": {
+        "label": "Alternar proxy",
+        "desc": "Ative ou desative o proxy de nuvem laranja para um registro."
+      },
+      "purge_cache": {
+        "label": "Limpar cache",
+        "desc": "Limpe todo o cache de edge da Cloudflare para a zona."
+      }
+    },
+    "digitalocean": {
+      "create_droplet": {
+        "label": "Criar droplet",
+        "desc": "Provisione um novo droplet de computação da DigitalOcean."
+      },
+      "view_droplets": {
+        "label": "Ver droplets",
+        "desc": "Liste os droplets ativos e seu status."
+      }
+    },
+    "firebase": {
+      "upload_rules": {
+        "label": "Enviar regras",
+        "desc": "Publique um novo conjunto de regras de segurança do Firestore/Storage."
+      },
+      "view_rules": {
+        "label": "Ver regras",
+        "desc": "Mostre o conjunto de regras de segurança publicado atualmente."
+      }
+    },
+    "datadog": {
+      "create_monitor": {
+        "label": "Criar monitor",
+        "desc": "Crie um monitor de métrica/alerta."
+      },
+      "check_metrics": {
+        "label": "Verificar métricas",
+        "desc": "Execute uma consulta de métrica e veja a série mais recente."
+      }
+    },
+    "sentry": {
+      "list_issues": {
+        "label": "Listar issues",
+        "desc": "Liste as issues não resolvidas de um projeto."
+      },
+      "resolve_issue": {
+        "label": "Resolver issue",
+        "desc": "Marque uma issue como resolvida."
+      }
+    },
+    "pagerduty": {
+      "list_incidents": {
+        "label": "Listar incidentes",
+        "desc": "Liste os incidentes recentes e ativos."
+      },
+      "trigger_incident": {
+        "label": "Disparar incidente",
+        "desc": "Dispare manualmente um novo incidente em um serviço."
+      }
+    },
+    "vault": {
+      "unlock_vault": {
+        "label": "Desbloquear cofre",
+        "desc": "Forneça sua frase mestra do sistema para carregar os vetores de chave sensíveis."
+      },
+      "seal_vault": {
+        "label": "Selar cofre",
+        "desc": "Purgue instantaneamente as camadas de memória descriptografadas e bloqueie novamente as operações principais."
+      },
+      "add_secret": {
+        "label": "Adicionar segredo",
+        "desc": "Injete strings de armazenamento de variáveis criptografadas altamente seguras."
+      },
+      "edit_secret": {
+        "label": "Editar chave",
+        "desc": "Atualize o valor de um segredo existente no cofre."
+      },
+      "reveal_secret": {
+        "label": "Revelar chave",
+        "desc": "Descriptografe e revele o valor de um segredo (registrado na auditoria)."
+      },
+      "archive_secret": {
+        "label": "Arquivar chave",
+        "desc": "Arquive um segredo (oculto, mas recuperável)."
+      },
+      "delete_secret": {
+        "label": "Excluir segredo",
+        "desc": "Apague permanentemente os objetos de referência de chave dos blocos de armazenamento."
+      },
+      "view_keys": {
+        "label": "Chaves do registro de auditoria",
+        "desc": "Inspecione os caminhos da trilha de conformidade que mapeiam eventos de descriptografia recentes."
+      },
+      "audit_log": {
+        "label": "Registro de auditoria",
+        "desc": "Veja a trilha de auditoria de acesso e mutação do cofre."
+      }
+    },
+    "gov": {
+      "assign_role": {
+        "label": "Atribuição de função",
+        "desc": "Provisione parâmetros de acesso à plataforma para pessoal organizacional específico."
+      },
+      "change_permissions": {
+        "label": "Alterar permissões de função",
+        "desc": "Ajuste o conjunto de permissões associado a um membro ou função."
+      },
+      "deactivate_member": {
+        "label": "Arquivar membro",
+        "desc": "Suspenda as permissões da organização e desative o acesso à conta globalmente."
+      },
+      "view_timeline": {
+        "label": "Linha do tempo de atividade",
+        "desc": "Linhas de trilha de auditoria que registram os contextos de execução recentes do cluster."
+      },
+      "run_compliance_audit": {
+        "label": "Executar auditoria de conformidade",
+        "desc": "Execute uma varredura de conformidade no escopo selecionado."
+      },
+      "clear_stale_sessions": {
+        "label": "Limpar sessões",
+        "desc": "Force o logout de tokens inativos e atualize os parâmetros de autorização."
+      }
+    }
+  },
+  "domains": {
+    "err_load": "Falha ao carregar os domínios",
+    "err_load2": "Erro ao carregar os domínios",
+    "err_add": "Falha ao adicionar o domínio",
+    "err_add2": "Erro ao adicionar o domínio",
+    "err_verify": "A verificação falhou",
+    "err_verify2": "Erro ao verificar o domínio",
+    "title": "Domínios e DNS",
+    "subtitle": "Gerencie domínios, registros DNS e certificados SSL",
+    "add_domain": "Adicionar domínio",
+    "add": "Adicionar",
+    "loading": "Carregando domínios…",
+    "empty": "Nenhum domínio configurado ainda",
+    "verified": "Verificado",
+    "pending": "Verificação pendente",
+    "verification_required": "Verificação necessária",
+    "check_verification": "Verificar",
+    "ssl_cert": "Certificado SSL",
+    "status": "Status",
+    "expires": "Expira",
+    "nameservers": "Servidores de nomes",
+    "created": "Criado",
+    "updated": "Atualizado"
+  },
+  "env": {
+    "title": "Adicionar variável de ambiente",
+    "count_live": "{n} ativas",
+    "type": "Tipo",
+    "targets": "Destinos",
+    "add": "Adicionar variável",
+    "adding": "Adicionando…",
+    "list_title": "Variáveis",
+    "refresh": "Atualizar",
+    "loading": "Carregando variáveis…",
+    "empty": "Ainda não há variáveis. Adicione uma acima.",
+    "system": "sistema",
+    "edit": "Editar",
+    "close": "Fechar",
+    "delete": "Excluir",
+    "cancel": "Cancelar",
+    "save": "Salvar alterações",
+    "saving": "Salvando…",
+    "ph_value": "valor",
+    "ph_new_value": "novo valor (deixe em branco para manter o atual)",
+    "err_load": "Falha ao carregar as variáveis",
+    "err_load2": "Erro ao carregar as variáveis",
+    "err_required": "A chave e o valor são obrigatórios",
+    "added": "{key} adicionada",
+    "err_add": "Falha ao adicionar a variável",
+    "err_add2": "Erro ao adicionar a variável",
+    "err_edit_required": "Defina um novo valor ou altere os destinos",
+    "updated": "Variável atualizada",
+    "err_update": "Falha ao atualizar a variável",
+    "err_update2": "Erro ao atualizar a variável",
+    "confirm_delete": "Excluir {key}? Isso a remove do pipeline de build e não pode ser desfeito.",
+    "deleted": "{key} excluída",
+    "err_delete": "Falha ao excluir a variável",
+    "err_delete2": "Erro ao excluir a variável"
+  },
+  "logs": {
+    "title": "Registros de auditoria",
+    "subtitle": "Registro de atividade em tempo real de todas as operações do cofre",
+    "stat_actions_24h": "Ações (24 h)",
+    "stat_success_rate": "Taxa de sucesso",
+    "stat_failed": "Ações com falha",
+    "stat_unique_users": "Usuários únicos",
+    "filters": "Filtros",
+    "action": "Ação",
+    "all_actions": "Todas as ações",
+    "accessed": "Acessado",
+    "rotated": "Rotacionado",
+    "verified": "Verificado",
+    "created": "Criado",
+    "deleted": "Excluído",
+    "revoked": "Revogado",
+    "exported": "Exportado",
+    "status": "Status",
+    "all_statuses": "Todos os status",
+    "success": "Sucesso",
+    "failed": "Falhou",
+    "pending": "Pendente",
+    "secret_id": "ID do segredo",
+    "ph_secret": "Filtrar por segredo",
+    "user_email": "E-mail do usuário",
+    "ph_user": "Filtrar por usuário",
+    "export_csv": "Exportar como CSV",
+    "loading": "Carregando registros…",
+    "no_logs": "Nenhum registro encontrado",
+    "timestamp": "Data/hora",
+    "col_user": "Usuário",
+    "message": "Mensagem",
+    "previous": "Anterior",
+    "page_n": "Página {n}",
+    "next": "Próximo",
+    "err_load": "Falha ao carregar os registros",
+    "err_load2": "Erro ao carregar os registros",
+    "err_export": "Falha na exportação"
+  },
+  "deploy": {
+    "err_load": "Falha ao carregar as implantações",
+    "err_load2": "Erro ao carregar as implantações",
+    "confirm_rollback": "Reverter para {target}? Isso o promove de volta para produção.",
+    "confirm_cancel": "Cancelar a compilação {target}? Isso aborta a compilação em andamento.",
+    "done_rollback": "Reversão concluída",
+    "done_cancel": "Compilação cancelada",
+    "err_rollback": "Falha ao reverter",
+    "err_cancel": "Falha ao cancelar",
+    "err_during_rollback": "Erro durante a reversão",
+    "err_during_cancel": "Erro durante o cancelamento",
+    "head_rollback": "Reverter implantação",
+    "head_cancel": "Cancelar compilação",
+    "head_view": "Implantações",
+    "sub_rollback": "Escolha uma implantação READY anterior para promover de volta para produção.",
+    "sub_cancel": "Aborta uma compilação em andamento (BUILDING, QUEUED ou INITIALIZING).",
+    "sub_view": "Histórico e status recentes das implantações da Vercel.",
+    "refresh": "Atualizar",
+    "loading": "Carregando implantações…",
+    "empty": "Nenhuma implantação encontrada",
+    "deployment": "Implantação",
+    "current": "ATUAL",
+    "by": "por {name}",
+    "promoting": "Promovendo…",
+    "roll_back_this": "Reverter para esta",
+    "current_target": "alvo de produção atual",
+    "only_ready": "Apenas implantações READY podem ser promovidas",
+    "canceling": "Cancelando…",
+    "cancel_build": "Cancelar compilação",
+    "not_in_progress": "Não está em andamento — nada para cancelar",
+    "live_url": "URL ativa",
+    "git_commit": "Commit do Git",
+    "deployment_id": "ID da implantação",
+    "created": "Criado",
+    "aliases": "Aliases",
+    "view_inspector": "Ver detalhes da implantação no Inspector",
+    "just_now": "agora mesmo",
+    "m_ago": "há {n} min",
+    "h_ago": "há {n} h",
+    "d_ago": "há {n} d"
+  },
+  "settings": {
+    "err_load": "Falha ao carregar as configurações",
+    "err_load2": "Erro ao carregar as configurações",
+    "err_update": "Falha ao atualizar a configuração",
+    "err_update2": "Erro ao atualizar a configuração",
+    "loading": "Carregando configurações…",
+    "title": "Configurações do console",
+    "subtitle": "Configure políticas de segurança, aprovações e auditoria",
+    "saved": "Configurações salvas",
+    "sec_security": "Segurança",
+    "sec_automation": "Automação",
+    "sec_audit": "Auditoria e retenção",
+    "sec_notifications": "Notificações",
+    "sec_advanced": "Avançado",
+    "mfa_l": "Exigir MFA para desbloquear",
+    "mfa_d": "Os usuários devem se autenticar com TOTP antes de acessar o cofre",
+    "rot_approval_l": "Exigir aprovação para rotação de chaves",
+    "rot_approval_d": "As rotações de chaves devem ser aprovadas antes da execução",
+    "exp_approval_l": "Exigir aprovação para exportação",
+    "exp_approval_d": "Exportar segredos exige aprovação explícita",
+    "enc_l": "Criptografia ativada",
+    "enc_d": "Todos os segredos criptografados em repouso",
+    "autorot_l": "Rotação automática de chaves",
+    "autorot_d": "Rotacionar as chaves automaticamente em um cronograma",
+    "autorot_int_l": "Intervalo de rotação automática (dias)",
+    "audit_ret_l": "Retenção do registro de auditoria (dias)",
+    "audit_ret_d": "Por quanto tempo manter os registros de auditoria",
+    "session_l": "Tempo limite de sessão (minutos)",
+    "session_d": "Tempo de inatividade antes de exigir nova autenticação",
+    "notify_unauth_l": "Notificar acesso não autorizado",
+    "notify_unauth_d": "Enviar alertas quando acesso não autorizado for detectado",
+    "notify_rot_l": "Notificar rotação de chaves",
+    "notify_rot_d": "Enviar notificações quando as chaves forem rotacionadas",
+    "notify_exp_l": "Notificar expiração de chaves",
+    "notify_exp_d": "Alertar quando as chaves estiverem prestes a expirar",
+    "pub_l": "Permitir URLs públicas",
+    "pub_d": "Permitir implantação em URLs públicas",
+    "last_updated": "Última atualização"
+  },
+  "pr": {
+    "title": "Pull Requests abertas",
+    "refresh": "Atualizar",
+    "subtitle": "Alterações de infraestrutura redigidas pela IA. Inspecione os passos planeados e depois faça o merge. Nada é executado até que o faça.",
+    "loading": "A carregar…",
+    "empty": "Não há PRs abertas. O Chefe de Gabinete vai enfileirar aqui as alterações para aprovação.",
+    "planned_steps": "passos planeados (executados em ordem no merge — nada foi executado ainda)",
+    "no_steps": "Sem passos.",
+    "risk_word": "risco",
+    "level_low": "baixo",
+    "level_medium": "médio",
+    "level_high": "alto",
+    "needs": "requer {role}",
+    "steps_one": "{n} passo",
+    "steps_many": "{n} passos",
+    "redeploys": "redeploys",
+    "redeploy_tag": "↻ redeploy",
+    "hide_payloads": "Ocultar payloads",
+    "inspect_payloads": "Inspecionar payloads",
+    "high_risk_a": "Alteração de alto risco. Executa ao vivo e não pode ser desfeita. Requer autorização de ",
+    "high_risk_b": ". Confirme para prosseguir.",
+    "merging": "A fazer merge…",
+    "confirm_run": "Confirmar — executar ao vivo",
+    "merge_high": "Merge / Aprovar (alto risco)",
+    "merge": "Merge / Aprovar",
+    "cancel": "Cancelar",
+    "close": "Fechar",
+    "history": "Histórico",
+    "succeeded_one": "{ok}/{total} passo bem-sucedido.",
+    "succeeded_many": "{ok}/{total} passos bem-sucedidos.",
+    "redeploy_included": "Inclui um passo de redeploy em produção.",
+    "merged_at": "merge feito {date}",
+    "load_failed": "Falha ao carregar",
+    "merge_failed": "Falha no merge"
+  },
+  "cui": {
+    "audit_log": "Registo de auditoria:",
+    "audit_note": "Todas as ações são registadas para conformidade.",
+    "view_log": "Ver registo →",
+    "unknown_page": "Página desconhecida.",
+    "soon": "Em breve",
+    "soon_short": "EM BREVE",
+    "not_available": "Ainda não disponível",
+    "coming_soon": "Brevemente",
+    "workspace_title": "Espaço de {name}",
+    "coming_soon_banner": "⏳ As ações de {name} chegam em breve — esta é uma pré-visualização do que estará disponível.",
+    "provider_not_found": "Fornecedor não encontrado: {id}",
+    "no_actions": "Sem ações disponíveis para {name}",
+    "actions_for": "Ações de {name}",
+    "available_one": "{n} ação disponível",
+    "available_many": "{n} ações disponíveis",
+    "confirm_action": "Confirmar ação",
+    "executing_action": "A executar ação…",
+    "back": "Voltar",
+    "execute_now": "Executar agora",
+    "select_key_id": "Selecione um ID de chave...",
+    "querying_vars": "A consultar o registo de variáveis do cluster...",
+    "no_config_keys": "Nenhuma chave de configuração ativa encontrada.",
+    "nothing_to_select": "Nada para selecionar ainda."
+  },
+  "vault": {
+    "cred_mgmt": "Gestão de credenciais",
+    "rotate_title": "Rotacionar {name}",
+    "rotate_sub": "Gerar uma nova credencial para {provider}.",
+    "cannot_undo": "Esta ação não pode ser desfeita",
+    "current_secret": "Segredo atual",
+    "after_rotation": "Após a rotação",
+    "after_desc": "Será gerada uma nova credencial. A anterior é revogada automaticamente e sincronizada com as suas variáveis de ambiente do Vercel.",
+    "rotate_key": "Rotacionar chave",
+    "generating": "A gerar nova credencial...",
+    "may_take": "Isto pode demorar um momento.",
+    "rotation_success": "Rotação bem-sucedida",
+    "new_secret_masked": "Novo segredo (mascarado)",
+    "chk_generated": "Nova credencial gerada",
+    "chk_synced": "Sincronizado com as variáveis do Vercel",
+    "chk_revoked": "Credencial anterior revogada",
+    "chk_audited": "Registado na auditoria",
+    "done": "Concluído",
+    "rotation_failed": "A rotação falhou",
+    "retry": "Tentar novamente"
+  }
+}

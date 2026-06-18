@@ -16,7 +16,7 @@ type CardProps = {
 }
 
 export function ProviderConsoleCard({ provider, lang, onExpand, onRun }: CardProps) {
-  const { dict } = useTranslation()
+  const { t, dict } = useTranslation()
   const live = isProviderLive(provider.id)
   return (
     <div style={{ background: 'rgba(13, 18, 32, 0.45)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: 12, overflow: 'hidden', boxSizing: 'border-box' }}>
@@ -30,7 +30,7 @@ export function ProviderConsoleCard({ provider, lang, onExpand, onRun }: CardPro
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {!live && <span style={{ fontSize: 8.5, fontWeight: 800, color: '#ffc300', background: 'rgba(255,195,0,0.12)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 4, padding: '2px 5px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Soon</span>}
+          {!live && <span style={{ fontSize: 8.5, fontWeight: 800, color: '#ffc300', background: 'rgba(255,195,0,0.12)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 4, padding: '2px 5px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{t('console.cui.soon', 'Soon')}</span>}
           <button onClick={onExpand} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: 6, color: '#1af0ff', fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}>
             Workspace →
           </button>
@@ -59,7 +59,7 @@ export function ProviderConsoleCard({ provider, lang, onExpand, onRun }: CardPro
                     key={id} 
                     onClick={runnable ? () => onRun(id) : undefined}
                     disabled={!runnable}
-                    title={runnable ? template.label : (incomplete ? 'Not available yet' : 'Coming soon')}
+                    title={runnable ? template.label : (incomplete ? t('console.cui.not_available', 'Not available yet') : t('console.cui.coming_soon', 'Coming soon'))}
                     style={{ 
                       padding: '5px 8px', 
                       borderRadius: 6, 
@@ -78,7 +78,7 @@ export function ProviderConsoleCard({ provider, lang, onExpand, onRun }: CardPro
                   >
                     <span style={{ fontSize: 11 }}>{template.icon}</span>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{template.label}</span>
-                    {incomplete && <span style={{ marginLeft: 'auto', fontSize: 7.5, fontWeight: 800, color: '#ffc300', letterSpacing: '0.04em' }}>SOON</span>}
+                    {incomplete && <span style={{ marginLeft: 'auto', fontSize: 7.5, fontWeight: 800, color: '#ffc300', letterSpacing: '0.04em' }}>{t('console.cui.soon_short', 'SOON')}</span>}
                   </button>
                 )
               })}
@@ -100,7 +100,7 @@ type WorkspaceProps = {
 }
 
 export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onHome, onRun }: WorkspaceProps) {
-  const { dict } = useTranslation()
+  const { t, dict } = useTranslation()
   const live = isProviderLive(provider.id)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', maxWidth: '100%', boxSizing: 'border-box', paddingRight: '4px' }}>
@@ -110,12 +110,12 @@ export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onHome, o
         <span>/</span>
         <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}>{tierLabel}</button>
         <span>/</span>
-        <span style={{ color: '#fff', fontWeight: 800 }}>{provider.name} Workspace</span>
+        <span style={{ color: '#fff', fontWeight: 800 }}>{t('console.cui.workspace_title', '{name} Workspace').replace('{name}', provider.name)}</span>
       </div>
 
       {!live && (
         <div style={{ fontSize: 11.5, fontWeight: 700, color: '#ffc300', background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 8, padding: '8px 12px' }}>
-          ⏳ {provider.name} actions are coming soon — this is a preview of what will be available.
+          {t('console.cui.coming_soon_banner', '⏳ {name} actions are coming soon — this is a preview of what will be available.').replace('{name}', provider.name)}
         </div>
       )}
 
@@ -138,7 +138,7 @@ export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onHome, o
                   <div 
                     key={id} 
                     onClick={runnable ? () => onRun(id) : undefined}
-                    title={runnable ? template.label : (incomplete ? 'Not available yet' : 'Coming soon')}
+                    title={runnable ? template.label : (incomplete ? t('console.cui.not_available', 'Not available yet') : t('console.cui.coming_soon', 'Coming soon'))}
                     style={{ 
                       padding: '8px 10px', 
                       borderRadius: 8, 

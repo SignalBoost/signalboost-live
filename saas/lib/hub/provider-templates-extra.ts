@@ -17,6 +17,13 @@
 
 import type { ProviderTemplate } from './provider-templates'
 
+// Buyer-portable default for the GitHub "Repository" picker. Set
+// NEXT_PUBLIC_CONSOLE_DEFAULT_REPO (e.g. "acme/widgets") to pre-select a repo
+// in the console UI. Left unset, the picker opens with no pre-selection, so a
+// buyer never sees another tenant's repository as the default. NEXT_PUBLIC_ so
+// the value is available in the browser, where these templates render.
+const DEFAULT_GITHUB_SLUG = process.env.NEXT_PUBLIC_CONSOLE_DEFAULT_REPO || undefined
+
 export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
   // ---- Supabase (Marketing project) read actions — portable engine ----
   'supabase_mkt.list_tables': { id: 'supabase_mkt.list_tables', label: 'List Tables', description: 'Public tables in the marketing project.', icon: '🗃️', policyActionId: 'read_provider_status', api: { service: 'supabase_mkt', method: 'GET', endpoint: '/rest/v1/' }, fields: [] },
@@ -258,7 +265,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'read_provider_status',
     api: { service: 'GitHub', method: 'GET', endpoint: '/v1/pulls' },
     fields: [
-      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: DEFAULT_GITHUB_SLUG, source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
     ],
   },
   'github.view_pr_files': {
@@ -269,7 +276,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'read_provider_status',
     api: { service: 'GitHub', method: 'GET', endpoint: '/v1/pulls/files' },
     fields: [
-      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: DEFAULT_GITHUB_SLUG, source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
       { id: 'number', label: 'Pull Request', type: 'remote_select', required: true, source: { action: 'github.list_prs', dataPath: 'pulls', valueKey: 'number', labelTemplate: '#{number} — {title} ({branch})', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
     ],
   },
@@ -282,7 +289,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'crud_actions',
     api: { service: 'GitHub', method: 'PUT', endpoint: '/v1/pulls/merge' },
     fields: [
-      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: DEFAULT_GITHUB_SLUG, source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
       { id: 'number', label: 'Pull Request', type: 'remote_select', required: true, source: { action: 'github.list_prs', dataPath: 'pulls', valueKey: 'number', labelTemplate: '#{number} — {title} ({branch})', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
       { id: 'method', label: 'Merge Method', type: 'select', defaultValue: 'merge', options: [
         { label: 'Merge commit', value: 'merge' },
@@ -300,7 +307,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'crud_actions',
     api: { service: 'GitHub', method: 'PATCH', endpoint: '/v1/pulls/close' },
     fields: [
-      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: DEFAULT_GITHUB_SLUG, source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
       { id: 'number', label: 'Pull Request', type: 'remote_select', required: true, source: { action: 'github.list_prs', dataPath: 'pulls', valueKey: 'number', labelTemplate: '#{number} — {title} ({branch})', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
     ],
   },
@@ -312,7 +319,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'read_provider_status',
     api: { service: 'GitHub', method: 'GET', endpoint: '/v1/branches' },
     fields: [
-      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: DEFAULT_GITHUB_SLUG, source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
     ],
   },
   'github.delete_branch': {
@@ -324,7 +331,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'crud_actions',
     api: { service: 'GitHub', method: 'DELETE', endpoint: '/v1/branches' },
     fields: [
-      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: DEFAULT_GITHUB_SLUG, source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
       { id: 'branch', label: 'Branch', type: 'remote_select', required: true, source: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
     ],
   },
@@ -336,7 +343,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'read_provider_status',
     api: { service: 'GitHub', method: 'GET', endpoint: '/v1/commits' },
     fields: [
-      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: DEFAULT_GITHUB_SLUG, source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
     ],
   },
   'github.list_issues': {
@@ -347,7 +354,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'read_provider_status',
     api: { service: 'GitHub', method: 'GET', endpoint: '/v1/issues' },
     fields: [
-      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: DEFAULT_GITHUB_SLUG, source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
     ],
   },
   'github.open_issue': {
@@ -358,7 +365,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'crud_actions',
     api: { service: 'GitHub', method: 'POST', endpoint: '/v1/issues' },
     fields: [
-      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: DEFAULT_GITHUB_SLUG, source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
       { id: 'title', label: 'Title', type: 'text', required: true },
       { id: 'body', label: 'Description', type: 'textarea' },
     ],
@@ -371,7 +378,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'crud_actions',
     api: { service: 'GitHub', method: 'POST', endpoint: '/v1/issues/update' },
     fields: [
-      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: DEFAULT_GITHUB_SLUG, source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
       { id: 'number', label: 'Issue', type: 'remote_select', required: true, source: { action: 'github.list_issues', dataPath: 'issues', valueKey: 'number', labelTemplate: '#{number} — {title}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
       { id: 'title', label: 'New Title', type: 'text' },
       { id: 'state', label: 'State', type: 'select', options: [
@@ -388,7 +395,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'crud_actions',
     api: { service: 'GitHub', method: 'PATCH', endpoint: '/v1/issues/close' },
     fields: [
-      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: DEFAULT_GITHUB_SLUG, source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
       { id: 'number', label: 'Issue', type: 'remote_select', required: true, source: { action: 'github.list_issues', dataPath: 'issues', valueKey: 'number', labelTemplate: '#{number} — {title}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
     ],
   },
@@ -410,7 +417,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'crud_actions',
     api: { service: 'GitHub', method: 'POST', endpoint: '/v1/secrets' },
     fields: [
-      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: DEFAULT_GITHUB_SLUG, source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
       { id: 'name', label: 'Secret Name', type: 'text', required: true, placeholder: 'API_KEY' },
       { id: 'value', label: 'Secret Value', type: 'secret', required: true },
     ],
@@ -600,7 +607,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     icon: '🐞',
     policyActionId: 'read_provider_status',
     api: { service: 'Sentry', method: 'GET', endpoint: '/api/0/issues' },
-    fields: [{ id: 'project', label: 'Project Slug', type: 'text', required: true, placeholder: 'signalboost' }],
+    fields: [{ id: 'project', label: 'Project Slug', type: 'text', required: true, placeholder: 'my-project' }],
   },
   'sentry.resolve_issue': {
     id: 'sentry.resolve_issue',

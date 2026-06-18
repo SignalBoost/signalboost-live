@@ -3,6 +3,7 @@
 // saas/components/hub/vault/VaultAuditLog.tsx
 // Read-only audit trail of all vault access and actions.
 
+import { useTranslation } from '@/components/i18n/useTranslation'
 import { VaultAuditLog as VaultAuditLogType } from '@/lib/hub/vault-types'
 import { labelStyle } from '../shared'
 
@@ -20,6 +21,8 @@ const actionIcon: Record<string, string> = {
 }
 
 export default function VaultAuditLog({ logs, isLoading = false }: VaultAuditLogProps) {
+  const { t } = useTranslation()
+
   if (isLoading) {
     return (
       <div style={{ padding: 24, textAlign: 'center', color: 'rgba(255,255,255,.5)' }}>
@@ -34,7 +37,7 @@ export default function VaultAuditLog({ logs, isLoading = false }: VaultAuditLog
             margin: '0 auto 12px',
           }}
         />
-        <p style={{ margin: 0, fontSize: 12 }}>Loading audit log...</p>
+        <p style={{ margin: 0, fontSize: 12 }}>{t('console.vault.loading_audit_log', 'Loading audit log...')}</p>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     )
@@ -43,14 +46,14 @@ export default function VaultAuditLog({ logs, isLoading = false }: VaultAuditLog
   if (logs.length === 0) {
     return (
       <div style={{ padding: 24, textAlign: 'center', color: 'rgba(255,255,255,.5)' }}>
-        <p style={{ margin: 0, fontSize: 12 }}>No audit log entries</p>
+        <p style={{ margin: 0, fontSize: 12 }}>{t('console.vault.no_audit_entries', 'No audit log entries')}</p>
       </div>
     )
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={labelStyle}>Audit Trail</div>
+      <div style={labelStyle}>{t('console.vault.audit_trail', 'Audit Trail')}</div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {logs.slice(0, 50).map(log => {
@@ -91,7 +94,9 @@ export default function VaultAuditLog({ logs, isLoading = false }: VaultAuditLog
                     {log.action.replace('_', ' ')}
                   </span>
                   <span style={{ fontSize: 10, color: statusColor, fontWeight: 700 }}>
-                    {log.status === 'success' ? '✓ Success' : '✗ Failed'}
+                    {log.status === 'success'
+                      ? t('console.vault.status_success', '✓ Success')
+                      : t('console.vault.status_failed', '✗ Failed')}
                   </span>
                 </div>
 
@@ -108,7 +113,7 @@ export default function VaultAuditLog({ logs, isLoading = false }: VaultAuditLog
                   }}
                 >
                   {log.user_email && <span>{log.user_email}</span>}
-                  {log.ip_address && <span>IP: {log.ip_address}</span>}
+                  {log.ip_address && <span>{t('console.vault.ip_prefix', 'IP:')} {log.ip_address}</span>}
                   <span>
                     {dateStr} {timeStr}
                   </span>
@@ -121,7 +126,7 @@ export default function VaultAuditLog({ logs, isLoading = false }: VaultAuditLog
 
       {logs.length > 50 && (
         <div style={{ textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,.45)', padding: '8px 0' }}>
-          Showing latest 50 of {logs.length} entries
+          {t('console.vault.showing_latest', 'Showing latest 50 of {total} entries').replace('{total}', String(logs.length))}
         </div>
       )}
     </div>

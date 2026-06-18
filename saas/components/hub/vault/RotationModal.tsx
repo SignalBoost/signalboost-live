@@ -8,6 +8,7 @@ import { VaultSecret } from '@/lib/hub/vault-types'
 import { notifyBoth } from '@/lib/hub/vault-notifications'
 import { MFAVerification } from './index'
 import { cardStyle, labelStyle } from '../shared'
+import { useTranslation } from '@/components/i18n/useTranslation'
 
 export type RotationModalProps = {
   secret: VaultSecret
@@ -19,6 +20,7 @@ export type RotationModalProps = {
 type RotationStep = 'confirm' | 'mfa' | 'rotating' | 'success' | 'error'
 
 export default function RotationModal({ secret, onClose, onRotate, requiresMFA = true }: RotationModalProps) {
+  const { t } = useTranslation()
   const [step, setStep] = useState<RotationStep>('confirm')
   const [newValue, setNewValue] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -125,12 +127,12 @@ export default function RotationModal({ secret, onClose, onRotate, requiresMFA =
       >
         {/* Header */}
         <div>
-          <div style={labelStyle}>Credential Management</div>
+          <div style={labelStyle}>{t('console.vault.cred_mgmt', 'Credential Management')}</div>
           <h2 style={{ margin: '6px 0 2px', fontSize: 18, fontWeight: 900, letterSpacing: '-.02em' }}>
-            Rotate {secret.secret_name}
+            {t('console.vault.rotate_title', 'Rotate {name}').replace('{name}', secret.secret_name)}
           </h2>
           <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,.55)' }}>
-            Generate a new credential for {secret.provider_name}.
+            {t('console.vault.rotate_sub', 'Generate a new credential for {provider}.').replace('{provider}', secret.provider_name)}
           </p>
         </div>
 
@@ -140,14 +142,14 @@ export default function RotationModal({ secret, onClose, onRotate, requiresMFA =
             <div style={{ padding: 12, borderRadius: 10, background: 'rgba(255,193,0,.1)', border: '1px solid rgba(255,193,0,.2)' }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: '#fcd34d', display: 'flex', gap: 6, alignItems: 'center' }}>
                 <span>⚠️</span>
-                <span>This action cannot be undone</span>
+                <span>{t('console.vault.cannot_undo', 'This action cannot be undone')}</span>
               </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', marginBottom: 4 }}>
-                  Current Secret
+                  {t('console.vault.current_secret', 'Current Secret')}
                 </div>
                 <div
                   style={{
@@ -166,11 +168,10 @@ export default function RotationModal({ secret, onClose, onRotate, requiresMFA =
 
               <div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', marginBottom: 4 }}>
-                  After rotation
+                  {t('console.vault.after_rotation', 'After rotation')}
                 </div>
                 <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,.55)' }}>
-                  A new credential will be generated. The old one will be revoked automatically. This sync to Vercel environment
-                  variables.
+                  {t('console.vault.after_desc', 'A new credential will be generated. The old one is revoked automatically and synced to your Vercel environment variables.')}
                 </p>
               </div>
             </div>
@@ -190,7 +191,7 @@ export default function RotationModal({ secret, onClose, onRotate, requiresMFA =
                   cursor: 'pointer',
                 }}
               >
-                Cancel
+                {t('console.ui.cancel', 'Cancel')}
               </button>
               <button
                 onClick={handleStartRotation}
@@ -206,7 +207,7 @@ export default function RotationModal({ secret, onClose, onRotate, requiresMFA =
                   cursor: 'pointer',
                 }}
               >
-                Rotate Key
+                {t('console.vault.rotate_key', 'Rotate Key')}
               </button>
             </div>
           </div>
@@ -235,10 +236,10 @@ export default function RotationModal({ secret, onClose, onRotate, requiresMFA =
             />
             <div style={{ textAlign: 'center' }}>
               <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#fff', marginBottom: 4 }}>
-                Generating new credential...
+                {t('console.vault.generating', 'Generating new credential...')}
               </p>
               <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,.55)' }}>
-                This may take a moment.
+                {t('console.vault.may_take', 'This may take a moment.')}
               </p>
             </div>
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -249,13 +250,13 @@ export default function RotationModal({ secret, onClose, onRotate, requiresMFA =
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ padding: 12, borderRadius: 10, background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.2)', textAlign: 'center' }}>
               <div style={{ fontSize: 24, marginBottom: 6 }}>✓</div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#86efac' }}>Rotation successful</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#86efac' }}>{t('console.vault.rotation_success', 'Rotation successful')}</div>
             </div>
 
             {newValue && (
               <div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', marginBottom: 4 }}>
-                  New Secret (Masked)
+                  {t('console.vault.new_secret_masked', 'New Secret (Masked)')}
                 </div>
                 <div
                   style={{
@@ -275,10 +276,10 @@ export default function RotationModal({ secret, onClose, onRotate, requiresMFA =
 
             <div style={{ padding: 10, borderRadius: 8, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
               <p style={{ margin: 0, fontSize: 10, color: 'rgba(255,255,255,.55)' }}>
-                ✓ New credential generated<br />
-                ✓ Synced to Vercel env vars<br />
-                ✓ Old credential revoked<br />
-                ✓ Audit logged
+                ✓ {t('console.vault.chk_generated', 'New credential generated')}<br />
+                ✓ {t('console.vault.chk_synced', 'Synced to Vercel env vars')}<br />
+                ✓ {t('console.vault.chk_revoked', 'Old credential revoked')}<br />
+                ✓ {t('console.vault.chk_audited', 'Audit logged')}
               </p>
             </div>
 
@@ -295,7 +296,7 @@ export default function RotationModal({ secret, onClose, onRotate, requiresMFA =
                 cursor: 'pointer',
               }}
             >
-              Done
+              {t('console.vault.done', 'Done')}
             </button>
           </div>
         )}
@@ -305,7 +306,7 @@ export default function RotationModal({ secret, onClose, onRotate, requiresMFA =
             <div style={{ padding: 12, borderRadius: 10, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)' }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: '#fca5a5', display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
                 <span>❌</span>
-                <span>Rotation failed</span>
+                <span>{t('console.vault.rotation_failed', 'Rotation failed')}</span>
               </div>
               <div style={{ fontSize: 11, color: '#fecaca' }}>{error}</div>
             </div>
@@ -325,7 +326,7 @@ export default function RotationModal({ secret, onClose, onRotate, requiresMFA =
                   cursor: 'pointer',
                 }}
               >
-                Close
+                {t('console.ui.close', 'Close')}
               </button>
               <button
                 onClick={() => {
@@ -344,7 +345,7 @@ export default function RotationModal({ secret, onClose, onRotate, requiresMFA =
                   cursor: 'pointer',
                 }}
               >
-                Retry
+                {t('console.vault.retry', 'Retry')}
               </button>
             </div>
           </div>

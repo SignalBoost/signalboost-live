@@ -966,6 +966,13 @@
     "chk_audited": "Audit logged",
     "done": "Done",
     "rotation_failed": "Rotation failed",
-    "retry": "Retry"
+    "retry": "Retry",
+    "audit_trail": "Audit Trail",
+    "loading_audit_log": "Loading audit log...",
+    "no_audit_entries": "No audit log entries",
+    "status_success": "✓ Success",
+    "status_failed": "✗ Failed",
+    "ip_prefix": "IP:",
+    "showing_latest": "Showing latest 50 of {total} entries"
   }
 }

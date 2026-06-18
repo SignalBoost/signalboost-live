@@ -1,7 +1,17 @@
-// Console namespace lives in ONE JSON file next to this loader (no alias, no
-// per-language files) so it builds reliably and a buyer translates the console
-// by editing string values in that single JSON.
-import consoleLocales from './consoleLocales.json'
+// Console strings live in per-language files next to this loader
+// (console.en.json, console.es.json, ...). A buyer translates the console by
+// editing the string values in the file for their language — no code changes.
+import consoleEn from './console.en.json'
+import consoleEs from './console.es.json'
+import consolePt from './console.pt.json'
+import consolePl from './console.pl.json'
+import consoleRu from './console.ru.json'
+
+// Per-language console dictionaries (split out of the former single console
+// locale file so each stays small enough to read and edit cleanly).
+const CONSOLE_TABLE: Record<string, unknown> = {
+  en: consoleEn, es: consoleEs, pt: consolePt, pl: consolePl, ru: consoleRu,
+}
 import onboardingLocales from './onboardingLocales.json'
 
 export type DictValue = string | string[] | Dict
@@ -21,7 +31,7 @@ const dictionaries: Record<string, () => Promise<Dict>> = {
 }
 
 function loadConsole(lang: string): Dict {
-  const table = consoleLocales as unknown as Record<string, Dict>
+  const table = CONSOLE_TABLE as Record<string, Dict>
   return table[lang] || table.en || {}
 }
 

@@ -517,6 +517,50 @@ const CHIEF_OF_STAFF_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   TOOL_PROPOSE_INFRA_PR,
   TOOL_LIST_INFRA_PRS,
 ]
+// ── Post-commit verification ─────────────────────────────────────────────────
+// After a commit, read the file back FROM THE SAME ai/* BRANCH (never main) and
+// confirm it actually landed: line count + full content. This is what stops a
+// silent partial/failed write from being reported as success (the 1780-vs-1817
+// class of error). Reads via the GitHub contents API, scoped to the branch.
+async function verifyCommittedFile(params: { branch: string; path: string; expectedContent: string }): Promise<{ ok: boolean; match: boolean; expectedLines: number; actualLines: number; reason: string }> {
+  const repo = 'SignalBoost/signalboost-live'
+  const expectedLines = params.expectedContent.split('\n').length
+  const ghToken = process.env.GITHUB_WRITE_TOKEN
+  if (!ghToken) {
+    return { ok: false, match: false, expectedLines, actualLines: 0, reason: 'GITHUB_WRITE_TOKEN not set — commit could not be verified.' }
+  }
+  if (!params.branch || !params.path) {
+    return { ok: false, match: false, expectedLines, actualLines: 0, reason: 'Missing branch or path — nothing to verify against.' }
+  }
+  const encodedPath = encodeURIComponent(params.path).replace(/%2F/g, '/')
+  try {
+    const res = await fetch(`https://api.github.com/repos/${repo}/contents/${encodedPath}?ref=${encodeURIComponent(params.branch)}&t=${Date.now()}`, {
+      headers: { Authorization: `Bearer ${ghToken}`, Accept: 'application/vnd.github+json', 'User-Agent': 'signalboost-cos-verify' },
+    })
+    if (!res.ok) {
+      const body = await res.text()
+      return { ok: false, match: false, expectedLines, actualLines: 0, reason: `Could not read ${params.path} back from ${params.branch} (HTTP ${res.status}): ${body.slice(0, 160)}` }
+    }
+    const data = await res.json()
+    if (!data || data.encoding !== 'base64' || typeof data.content !== 'string') {
+      return { ok: false, match: false, expectedLines, actualLines: 0, reason: `Unexpected GitHub response while reading back ${params.path}.` }
+    }
+    const actual = Buffer.from(data.content, 'base64').toString('utf8')
+    const actualLines = actual.split('\n').length
+    const norm = (str: string) => str.replace(/\r\n/g, '\n').replace(/\n+$/, '\n')
+    const match = norm(actual) === norm(params.expectedContent)
+    if (!match) {
+      const reason = actualLines !== expectedLines
+        ? `LINE COUNT MISMATCH — intended ${expectedLines} lines, the branch has ${actualLines}.`
+        : `CONTENT MISMATCH — line count matches (${actualLines}) but the file bytes on the branch differ from what was sent.`
+      return { ok: true, match: false, expectedLines, actualLines, reason }
+    }
+    return { ok: true, match: true, expectedLines, actualLines, reason: `Verified ${actualLines} lines on ${params.branch} match the committed content.` }
+  } catch (err) {
+    return { ok: false, match: false, expectedLines, actualLines: 0, reason: err instanceof Error ? err.message : 'Verification request failed.' }
+  }
+}
+
 async function runTool(name: string, rawArgs: string, userId: string | null, conversationId: string | null, isPrivileged: boolean): Promise<string> {
   if (name === 'getPricing') {
     const result = await getLivePricing()
@@ -621,15 +665,32 @@ async function runTool(name: string, rawArgs: string, userId: string | null, con
     }
     let args: any = {}
     try { args = JSON.parse(rawArgs || '{}') } catch {}
+    const intendedContent = String(args?.content || '')
     const result = await commitFileToBranch({
       branch: String(args?.branch || ''),
       path: String(args?.path || ''),
-      content: String(args?.content || ''),
+      content: intendedContent,
       message: String(args?.message || ''),
       createNewFile: args?.createNewFile === true,
       allowRewrite: args?.allowRewrite === true,
     })
-    return formatCommitResultForAI(result)
+    const formatted = formatCommitResultForAI(result)
+    // Post-commit verification — only when the commit itself reported success.
+    if (result && result.ok) {
+      const v = await verifyCommittedFile({
+        branch: String(result.branch || ''),
+        path: String(result.path || args?.path || ''),
+        expectedContent: intendedContent,
+      })
+      if (!v.ok) {
+        return `${formatted}\n\n⚠️ VERIFICATION INCONCLUSIVE: ${v.reason} Treat this commit as UNCONFIRMED — do not tell the owner it is done until you re-read the file on the branch and confirm it.`
+      }
+      if (!v.match) {
+        return `❌ COMMIT VERIFICATION FAILED — the file on branch ${result.branch} does NOT match what you sent. ${v.reason}\nThe write did not land correctly. DO NOT report success. Re-read the target file with readRepoFile, rebuild the COMPLETE file, and call proposeCodeCommit again.\n\n(Original commit report, for reference: ${formatted})`
+      }
+      return `${formatted}\n\n✅ ${v.reason}`
+    }
+    return formatted
   }
 
   if (name === 'proposeInfrastructurePR') {

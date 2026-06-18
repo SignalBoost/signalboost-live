@@ -1224,6 +1224,19 @@ async function executeVercelAction(template: any, payload: Record<string, unknow
   const endpoint = template.api.endpoint.replace('{projectId}', projectId)
   const url = 'https://api.vercel.com' + endpoint
 
+  // Optional team scoping: projects under a Vercel team/scope are invisible to
+  // unscoped API calls (Vercel returns 404). Set VERCEL_TEAM_ID to scope them.
+  // Unset → behaves exactly as before (personal projects need nothing).
+  const teamId = process.env.VERCEL_TEAM_ID
+  const withTeam = (u: string) =>
+    teamId ? u + (u.includes('?') ? '&' : '?') + 'teamId=' + encodeURIComponent(teamId) : u
+  // Vercel wants target as an array of real env names; 'all' (or unknown) → every env.
+  const vercelTargets = (t: unknown): string[] => {
+    const v = String(t ?? '').toLowerCase()
+    if (v === 'production' || v === 'preview' || v === 'development') return [v]
+    return ['production', 'preview', 'development']
+  }
+
   // Token rotation: generate new Vercel deploy token
   if (template.id === 'vercel.rotate_token') {
     try {
@@ -1282,7 +1295,7 @@ async function executeVercelAction(template: any, payload: Record<string, unknow
 
   // View environment variables (names + targets; values masked by Vercel)
   if (template.id === 'vercel.view_env') {
-    const res = await fetch(`https://api.vercel.com/v9/projects/${projectId}/env`, {
+    const res = await fetch(withTeam(`https://api.vercel.com/v9/projects/${projectId}/env`), {
       method: 'GET',
       headers: { 'Authorization': 'Bearer ' + token },
     })
@@ -1303,7 +1316,7 @@ async function executeVercelAction(template: any, payload: Record<string, unknow
   if (template.id === 'vercel.delete_env') {
     const id = String(payload.id || '')
     if (!id) return { ok: false, error: 'Env Variable ID is required' }
-    const res = await fetch(`https://api.vercel.com/v9/projects/${projectId}/env/${encodeURIComponent(id)}`, {
+    const res = await fetch(withTeam(`https://api.vercel.com/v9/projects/${projectId}/env/${encodeURIComponent(id)}`), {
       method: 'DELETE',
       headers: { 'Authorization': 'Bearer ' + token },
     })
@@ -1322,7 +1335,7 @@ async function executeVercelAction(template: any, payload: Record<string, unknow
     if (payload.value !== undefined && payload.value !== '') patch.value = String(payload.value)
     if (payload.target) patch.target = [String(payload.target)]
     if (Object.keys(patch).length === 0) return { ok: false, error: 'No fields to update' }
-    const res = await fetch(`https://api.vercel.com/v9/projects/${projectId}/env/${encodeURIComponent(id)}`, {
+    const res = await fetch(withTeam(`https://api.vercel.com/v9/projects/${projectId}/env/${encodeURIComponent(id)}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       body: JSON.stringify(patch),
@@ -1337,7 +1350,7 @@ async function executeVercelAction(template: any, payload: Record<string, unknow
 
   // Health check: read-only deployments list
   if (template.api.method === 'GET') {
-    const res = await fetch(url, {
+    const res = await fetch(withTeam(url), {
       method: 'GET',
       headers: {
         'Authorization': 'Bearer ' + token,
@@ -1367,8 +1380,32 @@ async function executeVercelAction(template: any, payload: Record<string, unknow
     }
   }
 
+  // Create an environment variable — correct endpoint + Vercel payload shape.
+  if (template.id === 'vercel.add_env_var') {
+    const key = String(payload.key ?? payload.envKey ?? '').trim()
+    const value = String(payload.value ?? payload.envValue ?? '')
+    if (!key) return { ok: false, error: 'Variable key is required' }
+    const body = {
+      key,
+      value,
+      type: String(payload.type || 'encrypted'),
+      target: vercelTargets(payload.target ?? payload.environment),
+    }
+    const res = await fetch(withTeam(`https://api.vercel.com/v9/projects/${projectId}/env`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      const e = await res.text()
+      return { ok: false, error: e }
+    }
+    const data = await res.json()
+    return { ok: true, message: `Environment variable ${key} created`, data: { key, target: body.target } }
+  }
+
   // Write action: set environment variable
-  const res = await fetch(url, {
+  const res = await fetch(withTeam(url), {
     method: template.api.method,
     headers: {
       'Authorization': 'Bearer ' + token,

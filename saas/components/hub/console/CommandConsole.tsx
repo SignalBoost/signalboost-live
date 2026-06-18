@@ -160,8 +160,8 @@ export default function CommandConsole({
         const panel = signalboostConsoleUI.panelRouter[activeTemplateId]
         const isPanel = Boolean(panel)
         return (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(3,7,18,.72)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setActiveTemplateId(null)}>
-            <div style={{ width: '100%', maxWidth: isPanel ? 1040 : 1000, height: isPanel ? 'auto' : '94vh', maxHeight: '94vh', overflow: 'auto', borderRadius: 18 }} onClick={e => e.stopPropagation()}>
+          <div style={{ position: 'fixed', top: 80, left: 0, right: 0, bottom: 0, zIndex: 1000, background: 'rgba(3,7,18,.72)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setActiveTemplateId(null)}>
+            <div style={{ width: '100%', maxWidth: isPanel ? 1040 : 1000, height: isPanel ? 'auto' : 'calc(100vh - 120px)', maxHeight: 'calc(100vh - 120px)', overflow: 'auto', borderRadius: 18 }} onClick={e => e.stopPropagation()}>
               {isPanel ? (
                 <div style={{ background: 'linear-gradient(160deg, rgba(15,23,42,.92), rgba(3,7,18,.96))', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 18, padding: '0 18px 22px', boxShadow: '0 24px 70px rgba(0,0,0,.6)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, position: 'sticky', top: 0, zIndex: 3, margin: '0 -18px 14px', padding: '14px 18px', background: 'rgba(8,12,22,.98)', borderBottom: '1px solid rgba(255,255,255,.08)', borderRadius: '18px 18px 0 0' }}>

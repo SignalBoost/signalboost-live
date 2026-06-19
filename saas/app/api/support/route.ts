@@ -88,7 +88,7 @@ Reply strictly in ${language}.
 
 ${PLATFORM_FACTS}
 
-You are a knowledgeable GENERALIST about SignalBoost and general topics — thorough on the platform's real features above, with broad general knowledge, but not a specialist financial/legal/strategic advisor.
+You are a generative platform engine. Your core expertise is SignalBoost's platform, features, and architecture (above) — but you actively help users gather ANY content, historical data, media links, facts, or sector-specific information they need to seed, conceptualize, build, or populate their projects. Answer general-knowledge questions on any subject directly, and use your getExternalInfo web-search tool to fetch real-world, up-to-date data whenever the user requests it. You are a thorough generalist, not a specialist financial/legal/strategic advisor.
 
 Operating rules (apply to every answer):
 1. Logical and precise — base every answer on reasoning, not emotion.
@@ -97,7 +97,7 @@ Operating rules (apply to every answer):
 4. Professional and kind, like excellent customer support.
 5. Neutral, factual tone — no personal opinions, no emotional language, no fluff, and stay out of partisan politics to protect the brand.
 6. Complete answers — the full solution, not partial hints.
-7. Context-aware — tailor to the user's request without drifting off topic.
+7. Context-aware and helpful — follow the user's actual need wherever it leads, including general-knowledge, research, and content-gathering requests for their projects; never refuse a reasonable request as "off topic" or redirect the user to a general web search when you can answer or search yourself.
 8. When asked for code, provide clean, production-ready snippets.
 9. Customer-support manner: polite, clear, helpful, strictly logical and technical.
 10. Consistency — apply these rules across all subjects.
@@ -126,9 +126,9 @@ ${pendingPlans}
 
 When answering questions about users, revenue, MRR, ARR, growth, leads, or credits — use the live metrics above. They are current as of this session. Call getBusinessMetrics only if you need a refresh mid-conversation.
 
-You also have a getExternalInfo tool that performs a LIVE WEB SEARCH. Use it whenever the owner asks about market conditions, competitors, industry trends, current prices of external services, news, regulations, or anything outside SignalBoost's internal data. Always cite source URLs from the results when making claims based on them. The competitor guardrail does NOT apply in this private channel — competitor analysis for the owner is part of your job.
+You also have a getExternalInfo tool that performs a LIVE WEB SEARCH. Use it whenever the owner asks about market conditions, competitors, industry trends, current prices, news, regulations, OR any topic, fact, dataset, historical detail, or media reference they need for their work or projects — business or not. Always cite source URLs from the results when making claims based on them. The competitor guardrail does NOT apply in this private channel — competitor analysis for the owner is part of your job.
 
-Your role: act as a seasoned, multi-domain expert and right hand — Chief of Staff AND Chief Marketing & Sales Strategist, operating at the level of a top-tier MBA hire. You have working command of marketing, sales, finance, accounting, IT and software architecture, economics, business strategy, and global/geopolitical matters as they affect the business.
+Your role: act as a seasoned, multi-domain expert and right hand — Chief of Staff AND Chief Marketing & Sales Strategist, operating at the level of a top-tier MBA hire. You have working command of marketing, sales, finance, accounting, IT and software architecture, economics, business strategy, and global/geopolitical matters as they affect the business. Beyond business, you are also a generative platform engine and a full general assistant: help the owner gather ANY content, historical data, media links, facts, or sector-specific information needed to seed, conceptualize, build, or populate their projects, and answer general-knowledge questions on ANY subject (history, sports, science, culture, etc.) directly. NEVER refuse a request as "outside the business" or redirect the owner to a general web search — you ARE that resource.
 
 STRATEGIST PROTOCOL:
 - When the owner asks to scan for opportunities, research competitors, or analyze the market, run getExternalInfo searches FIRST (multiple searches for broad requests), then interpret the live signals with strategic frameworks (SWOT, STP/positioning, funnel design, pricing strategy).
@@ -209,7 +209,7 @@ const TOOL_GET_EXTERNAL_INFO: ChatTool = {
   type: 'function',
   function: {
     name: 'getExternalInfo',
-    description: 'Perform a live web search for current external information: market data, competitor analysis, industry trends, news, regulations, prices of external services. Returns top results with titles, URLs, and snippets. Use for anything outside SignalBoost internal data that requires up-to-date facts.',
+    description: 'Perform a live web search for any real-world information the user needs: facts, historical data, media links, market/industry data, news, prices, or any sector-specific content to seed or populate their projects. Not limited to business topics. Returns top results with titles, URLs, and snippets.',
     parameters: {
       type: 'object',
       properties: {
@@ -350,7 +350,6 @@ const TOOL_DELETE_BRANCHES: ChatTool = {
     },
   },
 }
-
 const TOOL_PROPOSE_PLAN: ChatTool = {
   type: 'function',
   function: {
@@ -598,13 +597,13 @@ async function runTool(name: string, rawArgs: string, userId: string | null, con
     let query = ''
     try { query = String(JSON.parse(rawArgs || '{}')?.query || '') } catch {}
     if (!query.trim()) {
-      return 'No search query was provided. Ask the owner what they want to search for.'
+      return 'No search query was provided. Ask the user what they want to search for.'
     }
     const result = await getExternalInfo(query)
     if (result.ok && result.results.length) {
       return formatExternalInfoForAI(query, result.results)
     }
-    return `Web search failed: ${result.error ?? 'unknown error'}. Tell the owner live external data is unavailable right now and answer from your own knowledge, clearly flagging that it may be outdated.`
+    return `Web search failed: ${result.error ?? 'unknown error'}. Tell the user live external data is unavailable right now and answer from your own knowledge, clearly flagging that it may be outdated.`
   }
 
   if (name === 'getAffiliateCount') {
@@ -738,8 +737,7 @@ if (name === 'listCleanupBranches') {
     const result = await listDeletableBranches()
     return formatDeletableForAI(result)
   }
-
-  if (name === 'deleteBranches') {
+if (name === 'deleteBranches') {
     if (!isPrivileged) {
       return 'PERMISSION DENIED: branch deletion is restricted to the owner/admin channel. Do not retry.'
     }
@@ -926,7 +924,7 @@ export async function POST(req: NextRequest) {
       : isPrivileged
         ? CHIEF_OF_STAFF_TOOLS.filter(t => !OWNER_ONLY_TOOLS.has(t.function.name)) // admin: read/diagnose only
         : CONCIERGE_TOOLS
-    const customerTools = userId && !isPrivileged ? [TOOL_CREATE_MY_OUTREACH, TOOL_LIST_MY_OUTREACH] : []
+    const customerTools = userId && !isPrivileged ? [TOOL_CREATE_MY_OUTREACH, TOOL_LIST_MY_OUTREACH, TOOL_GET_EXTERNAL_INFO] : []
     const tools       = userId
       ? [...baseTools, ...customerTools, TOOL_REMEMBER_FACT, TOOL_FORGET_FACT, TOOL_SEARCH_HISTORY, TOOL_DELETE_HISTORY]
       : baseTools

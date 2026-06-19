@@ -7,6 +7,7 @@ import OrchestrationPanel from '@/components/orchestration/OrchestrationPanel'
 import AuthModal from '@/components/AuthModal'
 import { supabase } from '@/utils/supabase/client'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import AssistantMessage from '@/components/AssistantMessage'
 import { t } from '@/lib/i18n/t'
 import {
   getProjects,
@@ -309,8 +310,7 @@ export default function DashboardOverviewPage() {
     feedback: t(dict, 'dash.feedback', 'Share feedback — every message helps improve SignalBoost'),
     headlineFallback: t(dict, 'dash.sketch.headlineFallback', 'Your headline here'),
   }
-
-  return (
+return (
     <div style={{ color: '#fff', fontFamily: 'system-ui, -apple-system, sans-serif', maxWidth: 1200, margin: '0 auto', padding: '0 20px' }}>
       <style>{`
         body {
@@ -431,8 +431,8 @@ export default function DashboardOverviewPage() {
               <div ref={promptRef} style={{ maxHeight: 320, overflowY: 'auto', padding: 14, borderRadius: 12, background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(255,255,255,0.08)', marginTop: 14 }}>
                 {promptMessages.map((m, idx) => (
                   <div key={`${m.role}-${idx}`} style={{ marginBottom: 12, display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                    <div style={{ maxWidth: '82%', whiteSpace: 'pre-wrap', lineHeight: 1.6, padding: '10px 12px', borderRadius: 12, background: m.role === 'user' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13 }}>
-                      {m.content}
+                    <div style={{ maxWidth: m.role === 'user' ? '82%' : '100%', width: m.role === 'assistant' ? '100%' : 'auto', whiteSpace: m.role === 'user' ? 'pre-wrap' : 'normal', lineHeight: 1.6, padding: '10px 12px', borderRadius: 12, background: m.role === 'user' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13 }}>
+                      {m.role === 'assistant' ? <AssistantMessage content={m.content} /> : m.content}
                     </div>
                   </div>
                 ))}

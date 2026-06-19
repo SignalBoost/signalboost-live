@@ -88,6 +88,7 @@ const WORKSPACE: Item[] = [
 
 const ADMIN: Item[] = [
   { icon: '🎛️', key: 'adm.hub', href: '/hub' },
+  { icon: '🔍', key: 'adm.audit', href: '/dashboard/audit' },
   { icon: '🛰️', key: 'adm.mission', href: '/admin' },
   { icon: '🌌', key: 'adm.overview', href: '/admin/overview' },
   { icon: '💰', key: 'adm.revenue', href: '/admin/revenue' },
@@ -150,6 +151,7 @@ const COPY: Record<Lang, Record<string, string>> = {
     'ws.feedback.l': 'Feedback', 'ws.feedback.d': 'Send us your feedback.',
     'adm.mission.l': 'Mission Control', 'adm.mission.d': 'Unified executive admin cockpit.', 'adm.overview.l': 'Overview', 'adm.overview.d': 'Real counts from live data.',
     'adm.hub.l': 'Hub Console', 'adm.hub.d': 'Infrastructure command — keys, providers, deployments, team.',
+    'adm.audit.l': 'Audit Console', 'adm.audit.d': 'Security & quality scans on GPT‑5.5, isolated from live traffic.',
     'adm.revenue.l': 'Revenue', 'adm.revenue.d': 'Live MRR from active subscriptions.',
     'adm.radar.l': 'Opportunity Radar', 'adm.radar.d': 'Daily AI market scan: competitors, gaps, partnerships.',
     'adm.data.l': 'Data Connectors', 'adm.data.d': 'Import and manage connected data sources.',
@@ -203,6 +205,7 @@ const COPY: Record<Lang, Record<string, string>> = {
     'ws.feedback.l': 'Comentarios', 'ws.feedback.d': 'Envíanos tus comentarios.',
     'adm.mission.l': 'Control de misión', 'adm.mission.d': 'Cabina ejecutiva unificada de administración.', 'adm.overview.l': 'Resumen', 'adm.overview.d': 'Conteos reales de datos en vivo.',
     'adm.hub.l': 'Consola Hub', 'adm.hub.d': 'Comando de infraestructura — claves, proveedores, despliegues, equipo.',
+    'adm.audit.l': 'Consola de Auditoría', 'adm.audit.d': 'Análisis de seguridad y calidad con GPT‑5.5, aislados del tráfico en vivo.',
     'adm.revenue.l': 'Ingresos', 'adm.revenue.d': 'MRR en vivo de suscripciones activas.',
     'adm.radar.l': 'Radar de oportunidades', 'adm.radar.d': 'Escaneo diario IA del mercado: competidores, brechas, alianzas.',
     'adm.data.l': 'Conectores de datos', 'adm.data.d': 'Importa y gestiona fuentes de datos conectadas.',
@@ -256,6 +259,7 @@ const COPY: Record<Lang, Record<string, string>> = {
     'ws.feedback.l': 'Feedback', 'ws.feedback.d': 'Envie seu feedback.',
     'adm.mission.l': 'Controle de missão', 'adm.mission.d': 'Cockpit executivo unificado de administração.', 'adm.overview.l': 'Visão geral', 'adm.overview.d': 'Contagens reais de dados ao vivo.',
     'adm.hub.l': 'Console Hub', 'adm.hub.d': 'Comando de infraestrutura — chaves, provedores, implantações, equipe.',
+    'adm.audit.l': 'Console de Auditoria', 'adm.audit.d': 'Análises de segurança e qualidade com GPT‑5.5, isoladas do tráfego ao vivo.',
     'adm.revenue.l': 'Receita', 'adm.revenue.d': 'MRR ao vivo de assinaturas ativas.',
     'adm.radar.l': 'Radar de oportunidades', 'adm.radar.d': 'Varredura diária de mercado por IA: concorrentes, lacunas, parcerias.',
     'adm.data.l': 'Conectores de dados', 'adm.data.d': 'Importe e gerencie fontes de dados conectadas.',
@@ -309,6 +313,7 @@ const COPY: Record<Lang, Record<string, string>> = {
     'ws.feedback.l': 'Opinie', 'ws.feedback.d': 'Wyślij nam swoją opinię.',
     'adm.mission.l': 'Centrum dowodzenia', 'adm.mission.d': 'Zunifikowany kokpit administracyjny.', 'adm.overview.l': 'Przegląd', 'adm.overview.d': 'Rzeczywiste dane na żywo.',
     'adm.hub.l': 'Konsola Hub', 'adm.hub.d': 'Dowodzenie infrastrukturą — klucze, dostawcy, wdrożenia, zespół.',
+    'adm.audit.l': 'Konsola Audytu', 'adm.audit.d': 'Skany bezpieczeństwa i jakości na GPT‑5.5, odizolowane od ruchu na żywo.',
     'adm.revenue.l': 'Przychód', 'adm.revenue.d': 'Bieżący MRR z aktywnych subskrypcji.',
     'adm.radar.l': 'Radar okazji', 'adm.radar.d': 'Codzienny skan rynku AI: konkurencja, luki, partnerstwa.',
     'adm.data.l': 'Łączniki danych', 'adm.data.d': 'Importuj i zarządzaj połączonymi źródłami danych.',
@@ -362,6 +367,7 @@ const COPY: Record<Lang, Record<string, string>> = {
     'ws.feedback.l': 'Отзывы', 'ws.feedback.d': 'Отправьте нам свой отзыв.',
     'adm.mission.l': 'Центр управления', 'adm.mission.d': 'Единый административный кокпит.', 'adm.overview.l': 'Обзор', 'adm.overview.d': 'Реальные данные в реальном времени.',
     'adm.hub.l': 'Консоль Hub', 'adm.hub.d': 'Управление инфраструктурой — ключи, провайдеры, развёртывания, команда.',
+    'adm.audit.l': 'Консоль аудита', 'adm.audit.d': 'Проверки безопасности и качества на GPT‑5.5, изолированные от живого трафика.',
     'adm.revenue.l': 'Доход', 'adm.revenue.d': 'Текущий MRR от активных подписок.',
     'adm.radar.l': 'Радар возможностей', 'adm.radar.d': 'Ежедневный ИИ-скан рынка: конкуренты, ниши, партнёрства.',
     'adm.data.l': 'Коннекторы данных', 'adm.data.d': 'Импортируйте и управляйте подключёнными источниками данных.',
@@ -379,7 +385,6 @@ function tr(lang: string, key: string): string {
   const l = (['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as Lang
   return COPY[l]?.[key] ?? COPY.en[key] ?? ''
 }
-
 function localize(items: Item[], lang: string): LocalizedItem[] {
   return items.map(it => {
     const label = tr(lang, `${it.key}.l`)
@@ -691,8 +696,7 @@ export default function Navbar() {
             ▾
           </span>
         </button>
-
-        <div style={panelWrap(open, align)} onMouseEnter={() => openNow(id)} onMouseLeave={closeSoon}>
+<div style={panelWrap(open, align)} onMouseEnter={() => openNow(id)} onMouseLeave={closeSoon}>
           <div style={panelCard}>
             <span style={accentLine} aria-hidden="true" />
             <div

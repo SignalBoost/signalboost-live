@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from 'react'
 import ResetButton from '@/components/ResetButton'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
+import AssistantMessage from '@/components/AssistantMessage'
 
 type Message = { role: 'user' | 'assistant'; content: string }
 
@@ -219,10 +220,12 @@ export default function Concierge() {
                   lineHeight:  1.6,
                   fontSize:    13,
                   color:       '#fff',
-                  whiteSpace:  'pre-wrap',
+                  whiteSpace:  message.role === 'user' ? 'pre-wrap' : 'normal',
                 }}
               >
-                {message.content}
+                {message.role === 'assistant'
+                  ? <AssistantMessage content={message.content} />
+                  : message.content}
               </div>
             ))}
             {loading && (

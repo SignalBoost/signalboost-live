@@ -24,6 +24,7 @@ const codeBlock: React.CSSProperties = {
   overflowX: 'auto', maxHeight: 320, overflowY: 'auto',
 }
 const linkStyle: React.CSSProperties = { color: '#1af0ff', textDecoration: 'underline', wordBreak: 'break-word' }
+const inlineCode: React.CSSProperties = { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: '0.92em', background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 4, padding: '1px 5px' }
 
 function b64url(s: string): string {
   const b = btoa(unescape(encodeURIComponent(s)))
@@ -211,6 +212,25 @@ function AudioBrief({ script }: { script: string }) {
   )
 }
 
+// ── Inline markdown: **bold**, __bold__, *italic*, `code` ────────────────────
+function formatInlineMd(text: string, keyBase: string): React.ReactNode[] {
+  const out: React.ReactNode[] = []
+  const md = /`([^`]+)`|\*\*([^*]+?)\*\*|__([^_]+?)__|\*([^*\n]+?)\*/g
+  let last = 0, m: RegExpExecArray | null, i = 0
+  while ((m = md.exec(text))) {
+    const before = text.slice(last, m.index)
+    if (before) out.push(<span key={`${keyBase}-s${i}`}>{before}</span>)
+    if (m[1] != null) out.push(<code key={`${keyBase}-c${i}`} style={inlineCode}>{m[1]}</code>)
+    else if (m[2] != null || m[3] != null) out.push(<strong key={`${keyBase}-b${i}`}>{m[2] ?? m[3]}</strong>)
+    else out.push(<em key={`${keyBase}-i${i}`}>{m[4]}</em>)
+    last = m.index + m[0].length
+    i++
+  }
+  const tail = text.slice(last)
+  if (tail) out.push(<span key={`${keyBase}-st`}>{tail}</span>)
+  return out
+}
+
 // ── Inline text: markdown links / bare urls → media, image, or link ──────────
 function renderInline(text: string, keyBase: string): React.ReactNode[] {
   const out: React.ReactNode[] = []
@@ -218,7 +238,7 @@ function renderInline(text: string, keyBase: string): React.ReactNode[] {
   let last = 0, m: RegExpExecArray | null, i = 0
   while ((m = token.exec(text))) {
     const before = text.slice(last, m.index)
-    if (before) out.push(<span key={`${keyBase}-x${i}`}>{before}</span>)
+    if (before) out.push(...formatInlineMd(before, `${keyBase}-x${i}`))
     const label = m[1]
     let link = m[2] || m[3]
     let trailing = ''
@@ -232,7 +252,51 @@ function renderInline(text: string, keyBase: string): React.ReactNode[] {
     i++
   }
   const tail = text.slice(last)
-  if (tail) out.push(<span key={`${keyBase}-xtail`}>{tail}</span>)
+  if (tail) out.push(...formatInlineMd(tail, `${keyBase}-xt`))
+  return out
+}
+
+// ── Block markdown: headers (#…####) and bullet/numbered lists ───────────────
+function renderBlocks(text: string, keyBase: string): React.ReactNode[] {
+  const lines = text.split('\n')
+  const out: React.ReactNode[] = []
+  let para: string[] = []
+  let list: { ordered: boolean; items: string[] } | null = null
+  let k = 0
+  const flushPara = () => {
+    const body = para.join('\n'); para = []
+    if (body.trim()) out.push(<div key={`${keyBase}-p${k++}`} style={{ whiteSpace: 'pre-wrap' }}>{renderInline(body, `${keyBase}-p${k}`)}</div>)
+  }
+  const flushList = () => {
+    if (!list) return
+    const items = list.items
+    const inner = items.map((it, j) => <li key={j} style={{ margin: '2px 0' }}>{renderInline(it, `${keyBase}-li${k}-${j}`)}</li>)
+    const sx: React.CSSProperties = { margin: '4px 0', paddingLeft: 20 }
+    out.push(list.ordered ? <ol key={`${keyBase}-l${k++}`} style={sx}>{inner}</ol> : <ul key={`${keyBase}-l${k++}`} style={sx}>{inner}</ul>)
+    list = null
+  }
+  for (const line of lines) {
+    const h = line.match(/^(#{1,4})\s+(.*)$/)
+    const ul = line.match(/^\s*[-*•]\s+(.*)$/)
+    const ol = line.match(/^\s*\d+\.\s+(.*)$/)
+    if (h) {
+      flushPara(); flushList()
+      const lvl = h[1].length
+      const size = lvl <= 1 ? 16 : lvl === 2 ? 14.5 : 13.5
+      out.push(<div key={`${keyBase}-h${k++}`} style={{ fontWeight: 800, fontSize: size, color: '#fff', margin: '8px 0 4px' }}>{renderInline(h[2], `${keyBase}-hh${k}`)}</div>)
+    } else if (ul) {
+      flushPara()
+      if (!list || list.ordered) { flushList(); list = { ordered: false, items: [] } }
+      list.items.push(ul[1])
+    } else if (ol) {
+      flushPara()
+      if (!list || !list.ordered) { flushList(); list = { ordered: true, items: [] } }
+      list.items.push(ol[1])
+    } else {
+      flushList(); para.push(line)
+    }
+  }
+  flushPara(); flushList()
   return out
 }
 
@@ -243,7 +307,7 @@ function renderText(text: string, keyBase: string): React.ReactNode[] {
   let last = 0, m: RegExpExecArray | null, i = 0
   while ((m = fence.exec(text))) {
     const before = text.slice(last, m.index)
-    if (before.trim()) out.push(<div key={`${keyBase}-t${i}`} style={{ whiteSpace: 'pre-wrap' }}>{renderInline(before, `${keyBase}-t${i}`)}</div>)
+    if (before.trim()) out.push(<div key={`${keyBase}-t${i}`}>{renderBlocks(before, `${keyBase}-t${i}`)}</div>)
     const lang = (m[1] || '').toLowerCase()
     const body = m[2]
     if (lang === 'mermaid') out.push(<Diagram key={`${keyBase}-d${i}`} code={body} />)
@@ -252,7 +316,7 @@ function renderText(text: string, keyBase: string): React.ReactNode[] {
     i++
   }
   const tail = text.slice(last)
-  if (tail.trim()) out.push(<div key={`${keyBase}-tail`} style={{ whiteSpace: 'pre-wrap' }}>{renderInline(tail, `${keyBase}-tail`)}</div>)
+  if (tail.trim()) out.push(<div key={`${keyBase}-tail`}>{renderBlocks(tail, `${keyBase}-tail`)}</div>)
   return out
 }
 

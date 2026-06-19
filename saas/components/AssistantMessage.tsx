@@ -43,32 +43,40 @@ function vimeoId(u: string): string | null {
   const m = u.match(/vimeo\.com\/(?:video\/)?(\d+)/)
   return m ? m[1] : null
 }
+function archiveId(u: string): string | null {
+  const m = u.match(/archive\.org\/(?:details|embed)\/([^/?#]+)/)
+  return m ? m[1] : null
+}
 function isImageUrl(u: string): boolean {
   return /\.(png|jpe?g|gif|webp|svg|avif)(\?.*)?$/i.test(u)
 }
 
-type MediaRef = { kind: 'youtube' | 'vimeo' | 'playlist'; id: string }
+type MediaRef = { kind: 'youtube' | 'vimeo' | 'playlist' | 'archive'; id: string }
 
 // Resolve a URL (or bare id) to a playable media reference.
 function mediaRefFromUrl(url: string): MediaRef | null {
   const pl = playlistId(url); if (pl) return { kind: 'playlist', id: pl }
   const yt = ytId(url); if (yt) return { kind: 'youtube', id: yt }
   const vm = vimeoId(url); if (vm) return { kind: 'vimeo', id: vm }
+  const ar = archiveId(url); if (ar) return { kind: 'archive', id: ar }
   return null
 }
 
 function embedSrc(ref: MediaRef): string {
   if (ref.kind === 'playlist') return `https://www.youtube.com/embed/videoseries?list=${ref.id}&autoplay=1`
   if (ref.kind === 'vimeo') return `https://player.vimeo.com/video/${ref.id}?autoplay=1`
+  if (ref.kind === 'archive') return `https://archive.org/embed/${ref.id}`
   return `https://www.youtube.com/embed/${ref.id}?autoplay=1`
 }
 function watchUrl(ref: MediaRef): string {
   if (ref.kind === 'playlist') return `https://www.youtube.com/playlist?list=${ref.id}`
   if (ref.kind === 'vimeo') return `https://vimeo.com/${ref.id}`
+  if (ref.kind === 'archive') return `https://archive.org/details/${ref.id}`
   return `https://www.youtube.com/watch?v=${ref.id}`
 }
 function thumbFor(ref: MediaRef): string | null {
   if (ref.kind === 'youtube') return `https://img.youtube.com/vi/${ref.id}/hqdefault.jpg`
+  if (ref.kind === 'archive') return `https://archive.org/services/img/${ref.id}`
   return null // vimeo/playlist thumbnails need an API; show a placeholder instead
 }
 
@@ -222,7 +230,7 @@ function findVideoArray(content: string): { before: string; items: { refr: Media
   const items: { refr: MediaRef; title?: string }[] = []
   for (const o of arr as VidObj[]) {
     if (!o || typeof o !== 'object' || typeof o.id !== 'string') return null
-    const kind: MediaRef['kind'] = o.type === 'playlist' ? 'playlist' : 'youtube'
+    const kind: MediaRef['kind'] = o.type === 'playlist' ? 'playlist' : o.type === 'archive' ? 'archive' : 'youtube'
     // accept a bare id or a full url in id
     const refr = mediaRefFromUrl(o.id) || { kind, id: o.id }
     items.push({ refr, title: o.title })

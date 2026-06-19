@@ -106,6 +106,72 @@ function AudioBrief({ script }: { script: string }) {
   )
 }
 
+// ── Inline media: turn URLs into players / images / clickable links ──────
+const linkStyle: React.CSSProperties = { color: '#1af0ff', textDecoration: 'underline', wordBreak: 'break-word' }
+
+function ytId(u: string): string | null {
+  const m = u.match(/[?&]v=([A-Za-z0-9_-]{11})/) || u.match(/youtu\.be\/([A-Za-z0-9_-]{11})/) || u.match(/youtube\.com\/(?:embed|shorts)\/([A-Za-z0-9_-]{11})/)
+  return m ? m[1] : null
+}
+function vimeoId(u: string): string | null {
+  const m = u.match(/vimeo\.com\/(?:video\/)?(\d+)/)
+  return m ? m[1] : null
+}
+function isImageUrl(u: string): boolean {
+  return /\.(png|jpe?g|gif|webp|svg|avif)(\?.*)?$/i.test(u)
+}
+
+function VideoEmbed({ src }: { src: string }) {
+  return (
+    <Card accent="#1af0ff" label="Video">
+      <div style={{ position: 'relative', width: '100%', paddingBottom: '56.25%', borderRadius: 8, overflow: 'hidden', background: '#000' }}>
+        <iframe
+          src={src}
+          title="Embedded video"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
+        />
+      </div>
+    </Card>
+  )
+}
+
+function ImageEmbed({ src }: { src: string }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) return <a href={src} target="_blank" rel="noopener noreferrer" style={linkStyle}>{src}</a>
+  return (
+    <img src={src} alt="" onError={() => setFailed(true)}
+      style={{ maxWidth: '100%', maxHeight: 420, borderRadius: 10, display: 'block', margin: '6px 0', border: '1px solid rgba(255,255,255,.12)' }} />
+  )
+}
+
+// Tokenize a run of text, turning URLs into video players, images, or clickable links.
+function renderInline(text: string, keyBase: string): React.ReactNode[] {
+  const out: React.ReactNode[] = []
+  const url = /(https?:\/\/[^\s<>]+)/g
+  let last = 0, m: RegExpExecArray | null, i = 0
+  while ((m = url.exec(text))) {
+    const before = text.slice(last, m.index)
+    if (before) out.push(<span key={`${keyBase}-x${i}`}>{before}</span>)
+    let link = m[0]
+    let trailing = ''
+    const tm = link.match(/[.,;:!?)\]]+$/)
+    if (tm) { trailing = tm[0]; link = link.slice(0, link.length - trailing.length) }
+    const yt = ytId(link), vm = vimeoId(link)
+    if (yt) out.push(<VideoEmbed key={`${keyBase}-v${i}`} src={`https://www.youtube.com/embed/${yt}`} />)
+    else if (vm) out.push(<VideoEmbed key={`${keyBase}-v${i}`} src={`https://player.vimeo.com/video/${vm}`} />)
+    else if (isImageUrl(link)) out.push(<ImageEmbed key={`${keyBase}-i${i}`} src={link} />)
+    else out.push(<a key={`${keyBase}-l${i}`} href={link} target="_blank" rel="noopener noreferrer" style={linkStyle}>{link}</a>)
+    if (trailing) out.push(<span key={`${keyBase}-tr${i}`}>{trailing}</span>)
+    last = m.index + m[0].length
+    i++
+  }
+  const tail = text.slice(last)
+  if (tail) out.push(<span key={`${keyBase}-xtail`}>{tail}</span>)
+  return out
+}
+
 // Render ordinary text, lifting ```mermaid blocks into diagrams and ``` blocks into code.
 function renderText(text: string, keyBase: string): React.ReactNode[] {
   const out: React.ReactNode[] = []
@@ -113,7 +179,7 @@ function renderText(text: string, keyBase: string): React.ReactNode[] {
   let last = 0, m: RegExpExecArray | null, i = 0
   while ((m = fence.exec(text))) {
     const before = text.slice(last, m.index)
-    if (before.trim()) out.push(<span key={`${keyBase}-t${i}`} style={{ whiteSpace: 'pre-wrap' }}>{before}</span>)
+    if (before.trim()) out.push(<div key={`${keyBase}-t${i}`} style={{ whiteSpace: 'pre-wrap' }}>{renderInline(before, `${keyBase}-t${i}`)}</div>)
     const lang = (m[1] || '').toLowerCase()
     const body = m[2]
     if (lang === 'mermaid') out.push(<Diagram key={`${keyBase}-d${i}`} code={body} />)
@@ -122,7 +188,7 @@ function renderText(text: string, keyBase: string): React.ReactNode[] {
     i++
   }
   const tail = text.slice(last)
-  if (tail.trim()) out.push(<span key={`${keyBase}-tail`} style={{ whiteSpace: 'pre-wrap' }}>{tail}</span>)
+  if (tail.trim()) out.push(<div key={`${keyBase}-tail`} style={{ whiteSpace: 'pre-wrap' }}>{renderInline(tail, `${keyBase}-tail`)}</div>)
   return out
 }
 

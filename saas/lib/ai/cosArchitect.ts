@@ -44,8 +44,11 @@ Open your reply with these, in this exact order:
 
 <ARCHITECTURE_DIAGRAM>
 A diagram in valid Mermaid inside a \`\`\`mermaid fenced block — flowchart (graph TD),
-database/ER map (erDiagram), or sequence/architecture diagram. Short node labels,
-valid syntax only.
+database/ER map (erDiagram), or sequence diagram (sequenceDiagram). Pick EXACTLY ONE
+diagram type per block and NEVER mix types — never put erDiagram and graph in the same
+block. If you need both a data model and a flow, choose whichever communicates best.
+Keep node labels short and plain: avoid slashes, parentheses, and quotes inside a label
+(use <br/> for a line break). The block must be valid on its own so it renders as an image.
 </ARCHITECTURE_DIAGRAM>
 
 <STRATEGIC_PITCH>

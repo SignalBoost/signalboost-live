@@ -9,6 +9,7 @@ import { t } from '@/lib/i18n/t'
 import AssistantMessage from '@/components/AssistantMessage'
 
 type Message = { role: 'user' | 'assistant'; content: string }
+type VideoItem = { title: string; type: string; id: string }
 
 const QUICK_KEYS = [
   { label: 'concierge.quick.marketplace.label', prompt: 'concierge.quick.marketplace.prompt', fallbackLabel: '🛰️ Marketplace', fallbackPrompt: 'Guide me through marketplace partners, categories, and bookings.' },
@@ -16,6 +17,67 @@ const QUICK_KEYS = [
   { label: 'concierge.quick.executive.label', prompt: 'concierge.quick.executive.prompt', fallbackLabel: '📊 Executive insights', fallbackPrompt: 'Show financial, KPI, CRM, outreach, and forecasting recommendations.' },
   { label: 'concierge.quick.support.label', prompt: 'concierge.quick.support.prompt', fallbackLabel: '💬 Support', fallbackPrompt: 'I need step-by-step help using SignalBoost.' },
 ]
+
+function extractVideoJson(content: string): { before: string; videos: VideoItem[]; after: string } | null {
+  const startMatch = content.match(/\[\s*\{/)
+  if (!startMatch || startMatch.index === undefined) return null
+
+  const start = startMatch.index
+  const end = content.lastIndexOf(']')
+  if (end <= start) return null
+
+  const before = content.slice(0, start).trim()
+  const raw = content.slice(start, end + 1)
+  const after = content.slice(end + 1).trim()
+
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return null
+
+    const videos = parsed
+      .map((v: any) => ({
+        title: typeof v?.title === 'string' ? v.title : 'Video',
+        type: typeof v?.type === 'string' ? v.type : 'video',
+        id: typeof v?.id === 'string' ? v.id : '',
+      }))
+      .filter((v: VideoItem) => /^(video|youtube)$/i.test(v.type) && /^[A-Za-z0-9_-]{11}$/.test(v.id))
+
+    return videos.length ? { before, videos, after } : null
+  } catch {
+    return null
+  }
+}
+
+function ConciergeVideoMessage({ content }: { content: string }) {
+  const block = extractVideoJson(content)
+  if (!block) return <AssistantMessage content={content} />
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {block.before ? <AssistantMessage content={block.before} /> : null}
+      {block.videos.map((video, i) => (
+        <div key={`${video.id}-${i}`} style={{ border: '1px solid rgba(26,240,255,.25)', borderRadius: 12, overflow: 'hidden', background: 'rgba(3,7,18,.85)' }}>
+          <div style={{ position: 'relative', width: '100%', paddingBottom: '56.25%', background: '#000' }}>
+            <iframe
+              src={`https://www.youtube.com/embed/${encodeURIComponent(video.id)}`}
+              title={video.title}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
+            />
+          </div>
+          <div style={{ padding: 9 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', lineHeight: 1.35 }}>{video.title}</div>
+            <a href={`https://www.youtube.com/watch?v=${encodeURIComponent(video.id)}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 7, color: '#1af0ff', fontSize: 11, textDecoration: 'underline' }}>
+              Open on YouTube ↗
+            </a>
+          </div>
+        </div>
+      ))}
+      {block.after ? <AssistantMessage content={block.after} /> : null}
+    </div>
+  )
+}
 
 export default function Concierge() {
   const pathname  = usePathname()
@@ -29,7 +91,6 @@ export default function Concierge() {
   const logRef = useRef<HTMLDivElement>(null)
   const conversationIdRef = useRef<string>('')
 
-  // Scroll to bottom on new message
   useEffect(() => {
     if (logRef.current) {
       logRef.current.scrollTop = logRef.current.scrollHeight
@@ -44,7 +105,7 @@ export default function Concierge() {
     setInput('')
     setLoading(false)
     setMessages([])
-    conversationIdRef.current = '' // next message starts a new stored conversation
+    conversationIdRef.current = ''
   }
 
   async function ask(text: string) {
@@ -80,7 +141,6 @@ export default function Concierge() {
 
   return (
     <>
-      {/* Toggle button — stays above everything */}
       <button
         type="button"
         aria-expanded={open}
@@ -109,7 +169,6 @@ export default function Concierge() {
         {t(dict, 'concierge.button', 'Concierge')}
       </button>
 
-      {/* Panel — below navbar (navbar is typically z ~100-200) but above page content */}
       {open && (
         <div
           id="signalboost-concierge-panel"
@@ -127,14 +186,12 @@ export default function Concierge() {
             flexDirection:'column',
             borderRadius: 20,
             overflow:     'hidden',
-            // Solid opaque background — no bleed-through
             background:   '#0f1117',
             border:       '1px solid rgba(255,255,255,.12)',
             boxShadow:    '0 24px 64px rgba(0,0,0,.7)',
             color:        '#fff',
           }}
         >
-          {/* Header */}
           <div style={{
             display:        'flex',
             justifyContent: 'space-between',
@@ -173,7 +230,6 @@ export default function Concierge() {
             </div>
           </div>
 
-          {/* Quick links */}
           <div style={{
             display:       'flex',
             gap:           8,
@@ -188,7 +244,6 @@ export default function Concierge() {
             <Link href="/docs"    className="sb-button-ghost" style={{ textDecoration: 'none', fontSize: 12, padding: '6px 10px' }}>📖 {t(dict, 'support.documentation', 'Docs')}</Link>
           </div>
 
-          {/* Message log */}
           <div
             ref={logRef}
             role="log"
@@ -224,7 +279,7 @@ export default function Concierge() {
                 }}
               >
                 {message.role === 'assistant'
-                  ? <AssistantMessage content={message.content} />
+                  ? <ConciergeVideoMessage content={message.content} />
                   : message.content}
               </div>
             ))}
@@ -235,7 +290,6 @@ export default function Concierge() {
             )}
           </div>
 
-          {/* Quick prompt buttons */}
           <div style={{
             display:             'grid',
             gridTemplateColumns: '1fr 1fr',
@@ -258,7 +312,6 @@ export default function Concierge() {
             ))}
           </div>
 
-          {/* Input */}
           <div style={{
             display:    'flex',
             gap:        8,

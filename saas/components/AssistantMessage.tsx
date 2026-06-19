@@ -1,17 +1,21 @@
 'use client'
 
 // saas/components/AssistantMessage.tsx
-// Renders an assistant message with awareness of the COS "visual brain" output:
-//   <ARCHITECTURE_DIAGRAM> → rendered Mermaid diagram (with graceful fallback)
-//   <STRATEGIC_PITCH>      → gold pitch card
-//   <AUDIO_BRIEF_SOURCE>   → audio card with a Play button (ElevenLabs /api/tts)
-//   <COMPILED_SPEC>        → cyan spec card
-//   ```mermaid / ``` code  → diagram / code blocks inside ordinary text
-// Anything else renders as normal pre-wrapped text, so plain chat is unaffected.
+// Renders an assistant message with awareness of rich blocks produced by the COS:
+//   <ARCHITECTURE_DIAGRAM> → rendered Mermaid diagram
+//   <STRATEGIC_PITCH>      → pitch card
+//   <AUDIO_BRIEF_SOURCE>   → playable audio brief (ElevenLabs /api/tts)
+//   <COMPILED_SPEC>        → spec card
+//   <VIDEO> / <PLAYLIST> / <IMAGE> → lazy media blocks
+//   a JSON array of {title,type,id} → lazy video/playlist thumbnails (play on click)
+//   markdown links, bare URLs, image URLs, ```mermaid / ``` code, plain text
+//
+// Security: embeds are built here from the id + type. Model-supplied iframe/embed
+// HTML is never injected.
 
 import { useState } from 'react'
 
-const TTS_VOICE = 'EXAVITQu4vr4xnSDxMaL' // a curated ElevenLabs voice (allow-listed)
+const TTS_VOICE = 'EXAVITQu4vr4xnSDxMaL'
 
 const codeBlock: React.CSSProperties = {
   margin: 0, padding: '10px 12px', borderRadius: 8, background: 'rgba(3,7,18,.6)',
@@ -19,25 +23,102 @@ const codeBlock: React.CSSProperties = {
   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', whiteSpace: 'pre-wrap',
   overflowX: 'auto', maxHeight: 320, overflowY: 'auto',
 }
+const linkStyle: React.CSSProperties = { color: '#1af0ff', textDecoration: 'underline', wordBreak: 'break-word' }
 
-// Unicode-safe base64url for the mermaid.ink renderer.
 function b64url(s: string): string {
   const b = btoa(unescape(encodeURIComponent(s)))
   return b.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
+// ── ID extractors ────────────────────────────────────────────────────────────
+function ytId(u: string): string | null {
+  const m = u.match(/[?&]v=([A-Za-z0-9_-]{11})/) || u.match(/youtu\.be\/([A-Za-z0-9_-]{11})/) || u.match(/youtube\.com\/(?:embed|shorts)\/([A-Za-z0-9_-]{11})/)
+  return m ? m[1] : null
+}
+function playlistId(u: string): string | null {
+  const m = u.match(/[?&]list=([A-Za-z0-9_-]+)/)
+  return m ? m[1] : null
+}
+function vimeoId(u: string): string | null {
+  const m = u.match(/vimeo\.com\/(?:video\/)?(\d+)/)
+  return m ? m[1] : null
+}
+function isImageUrl(u: string): boolean {
+  return /\.(png|jpe?g|gif|webp|svg|avif)(\?.*)?$/i.test(u)
+}
+
+type MediaRef = { kind: 'youtube' | 'vimeo' | 'playlist'; id: string }
+
+// Resolve a URL (or bare id) to a playable media reference.
+function mediaRefFromUrl(url: string): MediaRef | null {
+  const pl = playlistId(url); if (pl) return { kind: 'playlist', id: pl }
+  const yt = ytId(url); if (yt) return { kind: 'youtube', id: yt }
+  const vm = vimeoId(url); if (vm) return { kind: 'vimeo', id: vm }
+  return null
+}
+
+function embedSrc(ref: MediaRef): string {
+  if (ref.kind === 'playlist') return `https://www.youtube.com/embed/videoseries?list=${ref.id}&autoplay=1`
+  if (ref.kind === 'vimeo') return `https://player.vimeo.com/video/${ref.id}?autoplay=1`
+  return `https://www.youtube.com/embed/${ref.id}?autoplay=1`
+}
+function watchUrl(ref: MediaRef): string {
+  if (ref.kind === 'playlist') return `https://www.youtube.com/playlist?list=${ref.id}`
+  if (ref.kind === 'vimeo') return `https://vimeo.com/${ref.id}`
+  return `https://www.youtube.com/watch?v=${ref.id}`
+}
+function thumbFor(ref: MediaRef): string | null {
+  if (ref.kind === 'youtube') return `https://img.youtube.com/vi/${ref.id}/hqdefault.jpg`
+  return null // vimeo/playlist thumbnails need an API; show a placeholder instead
+}
+
+// ── Building blocks ──────────────────────────────────────────────────────────
 function Card({ accent, label, children }: { accent: string; label: string; children: React.ReactNode }) {
   return (
-    <div style={{
-      border: `1px solid ${accent}55`, borderRadius: 12, overflow: 'hidden',
-      background: 'linear-gradient(160deg, rgba(15,23,42,.55), rgba(3,7,18,.65))',
-    }}>
-      <div style={{
-        fontSize: 9.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase',
-        color: accent, padding: '7px 12px', borderBottom: `1px solid ${accent}33`,
-      }}>{label}</div>
+    <div style={{ border: `1px solid ${accent}55`, borderRadius: 12, overflow: 'hidden', background: 'linear-gradient(160deg, rgba(15,23,42,.55), rgba(3,7,18,.65))' }}>
+      <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: accent, padding: '7px 12px', borderBottom: `1px solid ${accent}33` }}>{label}</div>
       <div style={{ padding: 12 }}>{children}</div>
     </div>
+  )
+}
+
+// Lazy media: shows a thumbnail with a play button; loads the iframe only on click.
+function LazyMedia({ refr, title }: { refr: MediaRef; title?: string }) {
+  const [play, setPlay] = useState(false)
+  const thumb = thumbFor(refr)
+  const label = refr.kind === 'playlist' ? 'Playlist' : 'Video'
+  return (
+    <Card accent="#1af0ff" label={label}>
+      {title ? <div style={{ fontSize: 12.5, fontWeight: 700, color: '#fff', marginBottom: 8 }}>{title}</div> : null}
+      <div
+        onClick={() => !play && setPlay(true)}
+        style={{ position: 'relative', width: '100%', paddingBottom: '56.25%', borderRadius: 8, overflow: 'hidden', background: '#000', cursor: play ? 'default' : 'pointer' }}
+      >
+        {play ? (
+          <iframe
+            src={embedSrc(refr)}
+            title={title || label}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
+          />
+        ) : (
+          <>
+            {thumb ? (
+              <img src={thumb} alt={title || label} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1af0ff', fontSize: 12, fontWeight: 700 }}>{label}</div>
+            )}
+            <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(0,0,0,.55)', border: '2px solid rgba(255,255,255,.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 20, paddingLeft: 4 }}>▶</div>
+            </div>
+          </>
+        )}
+      </div>
+      <a href={watchUrl(refr)} target="_blank" rel="noopener noreferrer" style={{ ...linkStyle, display: 'inline-block', marginTop: 8, fontSize: 11.5 }}>
+        Watch on source ↗
+      </a>
+    </Card>
   )
 }
 
@@ -49,121 +130,45 @@ function Diagram({ code }: { code: string }) {
       {failed ? (
         <pre style={codeBlock}>{clean}</pre>
       ) : (
-        <img
-          src={`https://mermaid.ink/img/${b64url(clean)}?type=png&theme=dark`}
-          alt="Architecture diagram"
-          onError={() => setFailed(true)}
-          style={{ maxWidth: '100%', display: 'block', borderRadius: 8, background: '#fff' }}
-        />
+        <img src={`https://mermaid.ink/img/${b64url(clean)}?type=png&theme=dark`} alt="Architecture diagram" onError={() => setFailed(true)} style={{ maxWidth: '100%', display: 'block', borderRadius: 8, background: '#fff' }} />
       )}
     </Card>
   )
-}
-
-function AudioBrief({ script }: { script: string }) {
-  const [state, setState] = useState<'idle' | 'loading' | 'playing' | 'error'>('idle')
-  const clean = script.trim()
-
-  async function play() {
-    setState('loading')
-    try {
-      const res = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ text: clean.slice(0, 1800), voiceId: TTS_VOICE }),
-      })
-      const data = await res.json().catch(() => null)
-      if (!res.ok || !data?.audioUrl) { setState('error'); return }
-      const audio = new Audio(data.audioUrl)
-      audio.onended = () => setState('idle')
-      audio.onerror = () => setState('error')
-      await audio.play()
-      setState('playing')
-    } catch {
-      setState('error')
-    }
-  }
-
-  const label = state === 'loading' ? 'Synthesizing…' : state === 'playing' ? '▶ Playing' : state === 'error' ? 'Retry ▶' : '▶ Play brief'
-  return (
-    <Card accent="#ffc300" label="Audio brief">
-      <p style={{ margin: '0 0 10px 0', fontSize: 12.5, lineHeight: 1.6, color: 'rgba(255,255,255,.85)' }}>{clean}</p>
-      <button
-        onClick={play}
-        disabled={state === 'loading' || state === 'playing'}
-        style={{
-          background: 'rgba(255,195,0,.14)', border: '1px solid rgba(255,195,0,.45)', color: '#ffc300',
-          borderRadius: 8, padding: '6px 14px', fontWeight: 800, fontSize: 12,
-          cursor: state === 'loading' || state === 'playing' ? 'default' : 'pointer',
-          opacity: state === 'loading' ? 0.7 : 1,
-        }}
-      >{label}</button>
-      {state === 'error' && (
-        <span style={{ marginLeft: 10, fontSize: 11, color: '#fca5a5' }}>Couldn’t synthesize audio.</span>
-      )}
-    </Card>
-  )
-}
-
-// ── Inline media: turn URLs into players / images / clickable links ──────
-const linkStyle: React.CSSProperties = { color: '#1af0ff', textDecoration: 'underline', wordBreak: 'break-word' }
-
-function ytId(u: string): string | null {
-  const m = u.match(/[?&]v=([A-Za-z0-9_-]{11})/) || u.match(/youtu\.be\/([A-Za-z0-9_-]{11})/) || u.match(/youtube\.com\/(?:embed|shorts)\/([A-Za-z0-9_-]{11})/)
-  return m ? m[1] : null
-}
-function vimeoId(u: string): string | null {
-  const m = u.match(/vimeo\.com\/(?:video\/)?(\d+)/)
-  return m ? m[1] : null
-}
-function isImageUrl(u: string): boolean {
-  return /\.(png|jpe?g|gif|webp|svg|avif)(\?.*)?$/i.test(u)
-}
-
-function VideoEmbed({ src, watch }: { src: string; watch?: string }) {
-  return (
-    <Card accent="#1af0ff" label="Video">
-      <div style={{ position: 'relative', width: '100%', paddingBottom: '56.25%', borderRadius: 8, overflow: 'hidden', background: '#000' }}>
-        <iframe
-          src={src}
-          title="Embedded video"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowFullScreen
-          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
-        />
-      </div>
-      {watch && (
-        <a href={watch} target="_blank" rel="noopener noreferrer" style={{ ...linkStyle, display: 'inline-block', marginTop: 8, fontSize: 11.5 }}>
-          Watch on source ↗
-        </a>
-      )}
-    </Card>
-  )
-}
-
-// Resolve a URL to its embeddable player + the original watch link.
-function videoEmbedFor(url: string): { src: string; watch: string } | null {
-  const yt = ytId(url)
-  if (yt) return { src: `https://www.youtube.com/embed/${yt}`, watch: `https://www.youtube.com/watch?v=${yt}` }
-  const vm = vimeoId(url)
-  if (vm) return { src: `https://player.vimeo.com/video/${vm}`, watch: `https://vimeo.com/${vm}` }
-  return null
 }
 
 function ImageEmbed({ src }: { src: string }) {
   const [failed, setFailed] = useState(false)
   if (failed) return <a href={src} target="_blank" rel="noopener noreferrer" style={linkStyle}>{src}</a>
+  return <img src={src} alt="" onError={() => setFailed(true)} style={{ maxWidth: '100%', maxHeight: 420, borderRadius: 10, display: 'block', margin: '6px 0', border: '1px solid rgba(255,255,255,.12)' }} />
+}
+
+function AudioBrief({ script }: { script: string }) {
+  const [state, setState] = useState<'idle' | 'loading' | 'playing' | 'error'>('idle')
+  const clean = script.trim()
+  async function play() {
+    setState('loading')
+    try {
+      const res = await fetch('/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ text: clean.slice(0, 1800), voiceId: TTS_VOICE }) })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.audioUrl) { setState('error'); return }
+      const audio = new Audio(data.audioUrl)
+      audio.onended = () => setState('idle'); audio.onerror = () => setState('error')
+      await audio.play(); setState('playing')
+    } catch { setState('error') }
+  }
+  const label = state === 'loading' ? 'Synthesizing…' : state === 'playing' ? '▶ Playing' : state === 'error' ? 'Retry ▶' : '▶ Play brief'
   return (
-    <img src={src} alt="" onError={() => setFailed(true)}
-      style={{ maxWidth: '100%', maxHeight: 420, borderRadius: 10, display: 'block', margin: '6px 0', border: '1px solid rgba(255,255,255,.12)' }} />
+    <Card accent="#ffc300" label="Audio brief">
+      <p style={{ margin: '0 0 10px 0', fontSize: 12.5, lineHeight: 1.6, color: 'rgba(255,255,255,.85)' }}>{clean}</p>
+      <button onClick={play} disabled={state === 'loading' || state === 'playing'} style={{ background: 'rgba(255,195,0,.14)', border: '1px solid rgba(255,195,0,.45)', color: '#ffc300', borderRadius: 8, padding: '6px 14px', fontWeight: 800, fontSize: 12, cursor: state === 'loading' || state === 'playing' ? 'default' : 'pointer', opacity: state === 'loading' ? 0.7 : 1 }}>{label}</button>
+      {state === 'error' && <span style={{ marginLeft: 10, fontSize: 11, color: '#fca5a5' }}>Couldn’t synthesize audio.</span>}
+    </Card>
   )
 }
 
-// Tokenize a run of text, turning URLs into video players, images, or clickable links.
+// ── Inline text: markdown links / bare urls → media, image, or link ──────────
 function renderInline(text: string, keyBase: string): React.ReactNode[] {
   const out: React.ReactNode[] = []
-  // Match a markdown link [label](url) OR a bare url.
   const token = /\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>]+)/g
   let last = 0, m: RegExpExecArray | null, i = 0
   while ((m = token.exec(text))) {
@@ -173,8 +178,8 @@ function renderInline(text: string, keyBase: string): React.ReactNode[] {
     let link = m[2] || m[3]
     let trailing = ''
     if (m[3]) { const tm = link.match(/[.,;:!?)\]]+$/); if (tm) { trailing = tm[0]; link = link.slice(0, link.length - trailing.length) } }
-    const vid = videoEmbedFor(link)
-    if (vid) out.push(<VideoEmbed key={`${keyBase}-v${i}`} src={vid.src} watch={vid.watch} />)
+    const refr = mediaRefFromUrl(link)
+    if (refr) out.push(<LazyMedia key={`${keyBase}-v${i}`} refr={refr} />)
     else if (isImageUrl(link)) out.push(<ImageEmbed key={`${keyBase}-i${i}`} src={link} />)
     else out.push(<a key={`${keyBase}-l${i}`} href={link} target="_blank" rel="noopener noreferrer" style={linkStyle}>{label || link}</a>)
     if (trailing) out.push(<span key={`${keyBase}-tr${i}`}>{trailing}</span>)
@@ -186,7 +191,7 @@ function renderInline(text: string, keyBase: string): React.ReactNode[] {
   return out
 }
 
-// Render ordinary text, lifting ```mermaid blocks into diagrams and ``` blocks into code.
+// Render ordinary text, lifting ```mermaid into diagrams and ``` into code.
 function renderText(text: string, keyBase: string): React.ReactNode[] {
   const out: React.ReactNode[] = []
   const fence = /```(\w*)\n([\s\S]*?)```/g
@@ -206,47 +211,63 @@ function renderText(text: string, keyBase: string): React.ReactNode[] {
   return out
 }
 
+// ── Structured video-array support (the COS structured-output format) ────────
+type VidObj = { title?: string; type?: string; id?: string }
+function findVideoArray(content: string): { before: string; items: { refr: MediaRef; title?: string }[]; after: string } | null {
+  const m = content.match(/\[\s*\{[\s\S]*?\}\s*\]/)
+  if (!m) return null
+  let arr: any
+  try { arr = JSON.parse(m[0]) } catch { return null }
+  if (!Array.isArray(arr) || !arr.length) return null
+  const items: { refr: MediaRef; title?: string }[] = []
+  for (const o of arr as VidObj[]) {
+    if (!o || typeof o !== 'object' || typeof o.id !== 'string') return null
+    const kind: MediaRef['kind'] = o.type === 'playlist' ? 'playlist' : 'youtube'
+    // accept a bare id or a full url in id
+    const refr = mediaRefFromUrl(o.id) || { kind, id: o.id }
+    items.push({ refr, title: o.title })
+  }
+  return { before: content.slice(0, m.index), items, after: content.slice(m.index! + m[0].length) }
+}
+
 export default function AssistantMessage({ content }: { content: string }) {
+  // Structured video array first (lazy thumbnails that play on click).
+  const va = findVideoArray(content)
+  if (va) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {va.before.trim() ? <div>{renderText(va.before, 'vb')}</div> : null}
+        {va.items.map((v, i) => <LazyMedia key={`va${i}`} refr={v.refr} title={v.title} />)}
+        {va.after.trim() ? <div>{renderText(va.after, 'va')}</div> : null}
+      </div>
+    )
+  }
+
   const blocks: React.ReactNode[] = []
-  const slot = /<(ARCHITECTURE_DIAGRAM|STRATEGIC_PITCH|AUDIO_BRIEF_SOURCE|COMPILED_SPEC|VIDEO|IMAGE)>([\s\S]*?)<\/\1>/g
+  const slot = /<(ARCHITECTURE_DIAGRAM|STRATEGIC_PITCH|AUDIO_BRIEF_SOURCE|COMPILED_SPEC|VIDEO|PLAYLIST|IMAGE)>([\s\S]*?)<\/\1>/g
   let last = 0, m: RegExpExecArray | null, i = 0
 
   while ((m = slot.exec(content))) {
     const before = content.slice(last, m.index)
     if (before.trim()) blocks.push(<div key={`pre${i}`}>{renderText(before, `pre${i}`)}</div>)
-
     const tag = m[1]
     const body = m[2].trim()
     if (tag === 'ARCHITECTURE_DIAGRAM') {
       const mer = /```mermaid\n([\s\S]*?)```/.exec(body)
       blocks.push(<Diagram key={`slot${i}`} code={mer ? mer[1] : body} />)
     } else if (tag === 'STRATEGIC_PITCH') {
-      blocks.push(
-        <Card key={`slot${i}`} accent="#ffc300" label="Strategic pitch">
-          <div style={{ fontSize: 12.5, lineHeight: 1.6, color: 'rgba(255,255,255,.9)', whiteSpace: 'pre-wrap' }}>{body}</div>
-        </Card>,
-      )
+      blocks.push(<Card key={`slot${i}`} accent="#ffc300" label="Strategic pitch"><div style={{ fontSize: 12.5, lineHeight: 1.6, color: 'rgba(255,255,255,.9)', whiteSpace: 'pre-wrap' }}>{body}</div></Card>)
     } else if (tag === 'AUDIO_BRIEF_SOURCE') {
       blocks.push(<AudioBrief key={`slot${i}`} script={body} />)
-    } else if (tag === 'VIDEO') {
+    } else if (tag === 'VIDEO' || tag === 'PLAYLIST') {
       const u = (body.match(/https?:\/\/[^\s<>]+/) || [body])[0]
-      const vid = videoEmbedFor(u)
-      if (vid) blocks.push(<VideoEmbed key={`slot${i}`} src={vid.src} watch={vid.watch} />)
-      else blocks.push(
-        <Card key={`slot${i}`} accent="#1af0ff" label="Video">
-          <a href={u} target="_blank" rel="noopener noreferrer" style={linkStyle}>{u}</a>
-        </Card>,
-      )
+      const refr = mediaRefFromUrl(u) || (tag === 'PLAYLIST' ? { kind: 'playlist' as const, id: body } : { kind: 'youtube' as const, id: body })
+      blocks.push(<LazyMedia key={`slot${i}`} refr={refr} />)
     } else if (tag === 'IMAGE') {
       const u = (body.match(/https?:\/\/[^\s<>]+/) || [body])[0]
       blocks.push(<ImageEmbed key={`slot${i}`} src={u} />)
     } else {
-      // COMPILED_SPEC
-      blocks.push(
-        <Card key={`slot${i}`} accent="#1af0ff" label="Compiled spec">
-          <pre style={codeBlock}>{body}</pre>
-        </Card>,
-      )
+      blocks.push(<Card key={`slot${i}`} accent="#1af0ff" label="Compiled spec"><pre style={codeBlock}>{body}</pre></Card>)
     }
     last = m.index + m[0].length
     i++

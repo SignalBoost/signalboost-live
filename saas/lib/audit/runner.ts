@@ -1,11 +1,8 @@
 // saas/lib/audit/runner.ts
 // The independent analyzer runner the audit endpoint triggers.
-// It reads a bounded set of source files from the repo, sends each to the
-// audit router (OpenAI flagship), and parses structured findings.
-//
-// v1 scans a bounded slice (default 6 files under a prefix). The frontend
-// roadmap deepens this to recursive directory walking, batching, and
-// scheduled full-repo sweeps — without changing this contract.
+// v2: recursive/full-repo capable — listRepoFiles already returns the full
+// recursive tree; this raises the file cap and scans with a bounded concurrency
+// pool so larger sweeps finish inside the route's duration budget.
 
 import { listRepoFiles, readRepoFile } from '@/lib/ai/tools/repoReader'
 import { callAuditModel } from '@/lib/audit/modelRouter'
@@ -31,6 +28,8 @@ export interface AuditRunResult {
 
 const SCANNABLE = /\.(ts|tsx|js|jsx|sql)$/i
 const SEVERITIES: Severity[] = ['critical', 'high', 'medium', 'low', 'info']
+const MAX_CAP     = 60   // raised from 25 — full-repo sweeps
+const CONCURRENCY = 4    // parallel model calls; conservative re: OpenAI rate limits
 
 function buildPrompt(path: string, content: string): string {
   return [
@@ -51,7 +50,6 @@ function buildPrompt(path: string, content: string): string {
 
 function parseFindings(raw: string | null, file: string): AuditFinding[] {
   if (!raw) return []
-  // Tolerate stray prose / fences: extract the first JSON array.
   const m = raw.match(/\[[\s\S]*\]/)
   if (!m) return []
   let arr: unknown
@@ -76,9 +74,35 @@ function parseFindings(raw: string | null, file: string): AuditFinding[] {
   return out
 }
 
+// Bounded-concurrency map: at most `limit` in flight at once.
+async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length)
+  let idx = 0
+  async function worker(): Promise<void> {
+    while (true) {
+      const i = idx++
+      if (i >= items.length) return
+      results[i] = await fn(items[i])
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()))
+  return results
+}
+
+async function scanOne(path: string): Promise<{ path: string; scanned: boolean; findings: AuditFinding[] }> {
+  const file = await readRepoFile(path)
+  if (!file.ok || !file.content) return { path, scanned: false, findings: [] }
+  const raw = await callAuditModel({
+    modelPreference: 'openai',
+    prompt:          buildPrompt(path, file.content),
+    maxTokens:       4096,
+  })
+  return { path, scanned: true, findings: parseFindings(raw, path) }
+}
+
 export async function runAudit(opts?: { prefix?: string; maxFiles?: number }): Promise<AuditRunResult> {
   const prefix   = (opts?.prefix || 'saas/app/api').trim()
-  const maxFiles = Math.max(1, Math.min(opts?.maxFiles ?? 6, 25))
+  const maxFiles = Math.max(1, Math.min(opts?.maxFiles ?? 6, MAX_CAP))
 
   const list = await listRepoFiles(prefix)
   if (!list.ok) return { ok: false, findings: [], filesScanned: [], error: list.error || 'Failed to list repo files.' }
@@ -88,22 +112,15 @@ export async function runAudit(opts?: { prefix?: string; maxFiles?: number }): P
     return { ok: true, findings: [], filesScanned: [], error: `No scannable files under "${prefix}".` }
   }
 
+  const per = await mapPool(targets, CONCURRENCY, scanOne)
+
   const findings: AuditFinding[] = []
   const scanned: string[] = []
-
-  for (const path of targets) {
-    const file = await readRepoFile(path)
-    if (!file.ok || !file.content) continue
-    scanned.push(path)
-    const raw = await callAuditModel({
-      modelPreference: 'openai',
-      prompt:          buildPrompt(path, file.content),
-      maxTokens:       4096,
-    })
-    findings.push(...parseFindings(raw, path))
+  for (const r of per) {
+    if (r.scanned) scanned.push(r.path)
+    findings.push(...r.findings)
   }
 
-  // Most severe first.
   findings.sort((a, b) => SEVERITIES.indexOf(a.severity) - SEVERITIES.indexOf(b.severity))
   return { ok: true, findings, filesScanned: scanned }
 }

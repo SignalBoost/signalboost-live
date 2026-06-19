@@ -220,22 +220,91 @@ function renderText(text: string, keyBase: string): React.ReactNode[] {
 }
 
 // ── Structured video-array support (the COS structured-output format) ────────
-type VidObj = { title?: string; type?: string; id?: string }
+// Models routinely "prettify" their JSON: curly quotes (“ ” ‘ ’), trailing
+// commas, code fences, stray whitespace. Strict JSON.parse fails on all of
+// those, which would drop the player back to raw text — the exact symptom we
+// are fixing. So this is deliberately tolerant: normalize the candidate, try a
+// strict parse, and if that still fails, regex-extract the {type,id,title}
+// triples directly. A non-media JSON array (no usable media id) returns null
+// and falls through to normal text rendering.
+type VidTriple = { id: string; type?: string; title?: string }
+
+function mediaKindFor(type: string | undefined): MediaRef['kind'] {
+  return type === 'playlist' ? 'playlist' : type === 'archive' ? 'archive' : 'youtube'
+}
+
+// Does this id/type pair actually look like playable media? Guards against
+// rendering an unrelated array that merely happens to contain an "id" field.
+function isMediaItem(t: VidTriple): boolean {
+  if (t.type === 'video' || t.type === 'playlist' || t.type === 'archive' || t.type === 'youtube' || t.type === 'vimeo') return true
+  if (mediaRefFromUrl(t.id)) return true
+  if (/^[A-Za-z0-9_-]{11}$/.test(t.id)) return true // bare YouTube id
+  return false
+}
+
+function normalizeJsonish(raw: string): string {
+  return raw
+    .replace(/[\u201C\u201D\u2033\uFF02]/g, '"') // “ ” ″ ＂ → "
+    .replace(/[\u2018\u2019\u2032\uFF07]/g, "'") // ‘ ’ ′ ＇ → '
+    .replace(/,\s*([}\]])/g, '$1')               // trailing commas
+}
+
 function findVideoArray(content: string): { before: string; items: { refr: MediaRef; title?: string }[]; after: string } | null {
-  const m = content.match(/\[\s*\{[\s\S]*?\}\s*\]/)
-  if (!m) return null
-  let arr: any
-  try { arr = JSON.parse(m[0]) } catch { return null }
-  if (!Array.isArray(arr) || !arr.length) return null
-  const items: { refr: MediaRef; title?: string }[] = []
-  for (const o of arr as VidObj[]) {
-    if (!o || typeof o !== 'object' || typeof o.id !== 'string') return null
-    const kind: MediaRef['kind'] = o.type === 'playlist' ? 'playlist' : o.type === 'archive' ? 'archive' : 'youtube'
-    // accept a bare id or a full url in id
-    const refr = mediaRefFromUrl(o.id) || { kind, id: o.id }
-    items.push({ refr, title: o.title })
+  // 1) Locate a candidate array span. Prefer a fenced ```json [ ... ] ``` block;
+  //    otherwise span from the first "[{" to the last "]" (tolerates trailing
+  //    commas and pretty-printing that the simple non-greedy regex would miss).
+  let start = -1
+  let end = -1
+  let raw = ''
+  const fence = /```(?:json)?\s*(\[\s*\{[\s\S]*?\}\s*\])\s*```/.exec(content)
+  if (fence) {
+    raw = fence[1]
+    start = fence.index
+    end = fence.index + fence[0].length
+  } else {
+    const open = /\[\s*\{/.exec(content)
+    if (open) {
+      start = open.index
+      end = content.lastIndexOf(']') + 1
+      if (end > start) raw = content.slice(start, end)
+    }
   }
-  return { before: content.slice(0, m.index), items, after: content.slice(m.index! + m[0].length) }
+  if (!raw || start < 0 || end <= start) return null
+
+  const normalized = normalizeJsonish(raw)
+
+  // 2) Strict parse first; if it fails, regex-extract the triples.
+  let triples: VidTriple[] = []
+  let parsed: any = null
+  try { parsed = JSON.parse(normalized) } catch { parsed = null }
+  if (Array.isArray(parsed) && parsed.length && parsed.every(o => o && typeof o === 'object')) {
+    triples = parsed
+      .map((o: any): VidTriple => ({
+        id: typeof o.id === 'string' ? o.id : typeof o.url === 'string' ? o.url : typeof o.embed === 'string' ? o.embed : '',
+        type: typeof o.type === 'string' ? o.type : undefined,
+        title: typeof o.title === 'string' ? o.title : undefined,
+      }))
+      .filter((t: VidTriple) => t.id)
+  } else {
+    const objRe = /\{[^{}]*?["']id["']\s*:\s*["']([^"']+)["'][^{}]*?\}/g
+    let mm: RegExpExecArray | null
+    while ((mm = objRe.exec(normalized))) {
+      const obj = mm[0]
+      const typeM = /["']type["']\s*:\s*["']([^"']+)["']/.exec(obj)
+      const titleM = /["']title["']\s*:\s*["']([^"']+)["']/.exec(obj)
+      triples.push({ id: mm[1], type: typeM ? typeM[1] : undefined, title: titleM ? titleM[1] : undefined })
+    }
+  }
+
+  // 3) Require every parsed item to be real media — otherwise this was an
+  //    ordinary JSON array, not a video block. Don't hijack it.
+  if (!triples.length || !triples.every(isMediaItem)) return null
+
+  const items = triples.map((t: VidTriple) => {
+    const refr = mediaRefFromUrl(t.id) || { kind: mediaKindFor(t.type), id: t.id }
+    return { refr, title: t.title }
+  })
+  return { before: content.slice(0, start), items, after: content.slice(end) }
 }
 
 export default function AssistantMessage({ content }: { content: string }) {

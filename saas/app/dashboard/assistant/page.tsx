@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import AssistantMessage from '@/components/AssistantMessage'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 const COPY = {
@@ -152,7 +153,7 @@ export default function AssistantPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 165px)', minHeight: 480, maxWidth: 900, margin: '0 auto', padding: '24px 0', width: '100%', boxSizing: 'border-box', color: 'var(--text-primary)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 165px)', minHeight: 480, maxWidth: 1280, margin: '0 auto', padding: '24px 28px', width: '100%', boxSizing: 'border-box', color: 'var(--text-primary)' }}>
 
       {/* Header */}
       <div style={{ background: 'radial-gradient(circle at 20% 10%, rgba(26,240,255,.16), transparent 22rem), linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02))', border: '1px solid rgba(26,240,255,.18)', borderRadius: 24, padding: '20px 24px', marginBottom: 16, flexShrink: 0 }}>
@@ -189,8 +190,8 @@ export default function AssistantPage() {
 
           {messages.map((msg, i) => (
             <div key={`${msg.role}-${i}`} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-              <div style={{ maxWidth: '80%', padding: '12px 16px', borderRadius: 16, borderTopRightRadius: msg.role === 'user' ? 4 : 16, borderTopLeftRadius: msg.role === 'user' ? 16 : 4, background: msg.role === 'user' ? 'rgba(255,195,0,.12)' : 'rgba(26,240,255,.07)', border: `1px solid ${msg.role === 'user' ? 'rgba(255,195,0,.28)' : 'rgba(26,240,255,.2)'}`, color: '#fff', fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
-                {msg.content}
+              <div style={{ maxWidth: msg.role === 'user' ? '80%' : '100%', width: msg.role === 'assistant' ? '100%' : 'auto', padding: '12px 16px', borderRadius: 16, borderTopRightRadius: msg.role === 'user' ? 4 : 16, borderTopLeftRadius: msg.role === 'user' ? 16 : 4, background: msg.role === 'user' ? 'rgba(255,195,0,.12)' : 'rgba(26,240,255,.07)', border: `1px solid ${msg.role === 'user' ? 'rgba(255,195,0,.28)' : 'rgba(26,240,255,.2)'}`, color: '#fff', fontSize: 14, lineHeight: 1.7, whiteSpace: msg.role === 'user' ? 'pre-wrap' : 'normal' }}>
+                {msg.role === 'assistant' ? <AssistantMessage content={msg.content} /> : msg.content}
               </div>
             </div>
           ))}

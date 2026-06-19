@@ -43,6 +43,7 @@ type AuditCopy = {
   history: string; noRuns: string; refresh: string
   statusRunning: string; statusComplete: string; statusFailed: string
   detail: string; close: string; viewSource: string
+  generateFix: string; patching: string; patchReady: string; reviewMerge: string; patchFailed: string
   sev: Record<Sev, string>
 }
 
@@ -57,6 +58,7 @@ const COPY: Record<string, AuditCopy> = {
     history: 'Run history', noRuns: 'No runs yet.', refresh: 'Refresh',
     statusRunning: 'Running', statusComplete: 'Complete', statusFailed: 'Failed',
     detail: 'Detail', close: 'Close', viewSource: 'View on GitHub',
+    generateFix: 'Generate fix', patching: 'Generating fix…', patchReady: 'Fix proposed on a branch', reviewMerge: 'Review & merge', patchFailed: 'Could not generate fix',
     sev: { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', info: 'Info' },
   },
   es: {
@@ -69,6 +71,7 @@ const COPY: Record<string, AuditCopy> = {
     history: 'Historial', noRuns: 'Aún no hay ejecuciones.', refresh: 'Actualizar',
     statusRunning: 'En curso', statusComplete: 'Completado', statusFailed: 'Falló',
     detail: 'Detalle', close: 'Cerrar', viewSource: 'Ver en GitHub',
+    generateFix: 'Generar corrección', patching: 'Generando corrección…', patchReady: 'Corrección propuesta en una rama', reviewMerge: 'Revisar y combinar', patchFailed: 'No se pudo generar la corrección',
     sev: { critical: 'Crítico', high: 'Alto', medium: 'Medio', low: 'Bajo', info: 'Info' },
   },
   pt: {
@@ -81,6 +84,7 @@ const COPY: Record<string, AuditCopy> = {
     history: 'Histórico', noRuns: 'Ainda não há execuções.', refresh: 'Atualizar',
     statusRunning: 'Em execução', statusComplete: 'Concluído', statusFailed: 'Falhou',
     detail: 'Detalhe', close: 'Fechar', viewSource: 'Ver no GitHub',
+    generateFix: 'Gerar correção', patching: 'Gerando correção…', patchReady: 'Correção proposta em um branch', reviewMerge: 'Revisar e mesclar', patchFailed: 'Não foi possível gerar a correção',
     sev: { critical: 'Crítico', high: 'Alto', medium: 'Médio', low: 'Baixo', info: 'Info' },
   },
   pl: {
@@ -93,6 +97,7 @@ const COPY: Record<string, AuditCopy> = {
     history: 'Historia', noRuns: 'Brak uruchomień.', refresh: 'Odśwież',
     statusRunning: 'W toku', statusComplete: 'Zakończono', statusFailed: 'Niepowodzenie',
     detail: 'Szczegóły', close: 'Zamknij', viewSource: 'Zobacz na GitHub',
+    generateFix: 'Wygeneruj poprawkę', patching: 'Generowanie poprawki…', patchReady: 'Poprawka zaproponowana w gałęzi', reviewMerge: 'Przejrzyj i scal', patchFailed: 'Nie udało się wygenerować poprawki',
     sev: { critical: 'Krytyczny', high: 'Wysoki', medium: 'Średni', low: 'Niski', info: 'Info' },
   },
   ru: {
@@ -105,6 +110,7 @@ const COPY: Record<string, AuditCopy> = {
     history: 'История запусков', noRuns: 'Запусков пока нет.', refresh: 'Обновить',
     statusRunning: 'Выполняется', statusComplete: 'Завершено', statusFailed: 'Ошибка',
     detail: 'Подробности', close: 'Закрыть', viewSource: 'Открыть на GitHub',
+    generateFix: 'Сгенерировать исправление', patching: 'Создание исправления…', patchReady: 'Исправление предложено в ветке', reviewMerge: 'Просмотреть и слить', patchFailed: 'Не удалось создать исправление',
     sev: { critical: 'Критический', high: 'Высокий', medium: 'Средний', low: 'Низкий', info: 'Инфо' },
   },
 }
@@ -152,10 +158,29 @@ export default function AuditConsolePage() {
 
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null)
   const [entered, setEntered] = useState(false)
+  const [patchState, setPatchState] = useState<'idle' | 'working' | 'done' | 'error'>('idle')
+  const [patchResult, setPatchResult] = useState<{ branch: string; compareUrl: string } | null>(null)
+  const [patchError, setPatchError] = useState<string | null>(null)
   useEffect(() => {
+    setPatchState('idle'); setPatchResult(null); setPatchError(null)
     if (selectedFinding) { const id = requestAnimationFrame(() => setEntered(true)); return () => cancelAnimationFrame(id) }
     setEntered(false)
   }, [selectedFinding])
+
+  async function generateFix(f: Finding) {
+    setPatchState('working'); setPatchError(null); setPatchResult(null)
+    try {
+      const res = await fetch('/api/hub/operator/audit/patch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ file: f.file, line: typeof f.line === 'number' ? f.line : undefined, title: f.title, detail: f.detail, recommendation: f.recommendation }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.ok) { setPatchError(data?.error || copy.patchFailed); setPatchState('error'); return }
+      setPatchResult({ branch: data.branch, compareUrl: data.compareUrl }); setPatchState('done')
+    } catch {
+      setPatchError(copy.patchFailed); setPatchState('error')
+    }
+  }
 
   const loadHistory = useCallback(async () => {
     try {
@@ -357,6 +382,39 @@ export default function AuditConsolePage() {
               <a href={ghUrl(selectedFinding.file, selectedFinding.line)} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 18, fontSize: 12.5, fontWeight: 700, color: CYAN, textDecoration: 'none', border: '1px solid rgba(26,240,255,.35)', borderRadius: 10, padding: '8px 14px' }}>
                 {copy.viewSource} ↗
               </a>
+
+              {selectedFinding.recommendation && (
+                <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid rgba(255,255,255,.1)' }}>
+                  <button
+                    onClick={() => selectedFinding && generateFix(selectedFinding)}
+                    disabled={patchState === 'working' || patchState === 'done'}
+                    style={{
+                      background: patchState === 'working' ? 'rgba(255,195,0,.14)' : patchState === 'done' ? 'rgba(52,211,153,.12)' : 'linear-gradient(135deg, #ffc300, #ffb000)',
+                      color: patchState === 'working' ? GOLD : patchState === 'done' ? GREEN : '#0a0e17',
+                      border: `1px solid ${patchState === 'done' ? 'rgba(52,211,153,.5)' : 'rgba(255,195,0,.5)'}`,
+                      borderRadius: 10, padding: '10px 18px', fontSize: 13, fontWeight: 800,
+                      cursor: patchState === 'working' || patchState === 'done' ? 'default' : 'pointer', width: '100%',
+                    }}
+                  >
+                    {patchState === 'working' ? copy.patching : patchState === 'done' ? `✓ ${copy.patchReady}` : copy.generateFix}
+                  </button>
+
+                  {patchState === 'done' && patchResult && (
+                    <div style={{ marginTop: 12, padding: '12px 14px', borderRadius: 10, background: 'rgba(52,211,153,.06)', border: '1px solid rgba(52,211,153,.25)' }}>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,.6)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', wordBreak: 'break-all' }}>{patchResult.branch}</div>
+                      <a href={patchResult.compareUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 8, fontSize: 12.5, fontWeight: 800, color: GREEN, textDecoration: 'none' }}>
+                        {copy.reviewMerge} ↗
+                      </a>
+                    </div>
+                  )}
+
+                  {patchState === 'error' && patchError && (
+                    <div style={{ marginTop: 12, padding: '11px 13px', borderRadius: 10, background: 'rgba(252,165,165,.08)', border: '1px solid rgba(252,165,165,.3)', color: RED, fontSize: 12.5, lineHeight: 1.5 }}>
+                      {patchError}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )

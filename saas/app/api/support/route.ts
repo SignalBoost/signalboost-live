@@ -15,6 +15,7 @@ import { listRepoFiles, readRepoFile, formatFileListForAI, formatFileForAI } fro
 import { commitFileToBranch, listAiBranches, formatCommitResultForAI, formatBranchListForAI, listDeletableBranches, deleteBranches, formatDeletableForAI, formatDeleteResultForAI } from '@/lib/ai/tools/repoWriter'
 import { proposeInfrastructurePR, formatStageResultForAI, listInfraPRsForAI } from '@/lib/ai/tools/infraPRWriter'
 import { OWNER_ONLY_TOOLS, adminReadOnlyBlock } from '@/lib/ai/accessTier'
+import { promptCompilerModule } from '@/lib/ai/promptCompiler'
 
 export const maxDuration = 300
 
@@ -381,7 +382,6 @@ const TOOL_UPDATE_PLAN_STATUS: ChatTool = {
     },
   },
 }
-
 const TOOL_LIST_PLANS: ChatTool = {
   type: 'function',
   function: {
@@ -724,8 +724,7 @@ if (name === 'listInfrastructurePRs') {
     }
     return await listInfraPRsForAI()
   }
-
-  if (name === 'listAiBranches') {
+if (name === 'listAiBranches') {
     if (!isPrivileged) {
       return 'PERMISSION DENIED: branch review is restricted to the owner/admin channel. Do not retry.'
     }
@@ -968,6 +967,13 @@ export async function POST(req: NextRequest) {
     // removed from the admin's tool list above; this is the prompt-level layer.
     if (isPrivileged && !isOwner) {
       systemContent += `\n\n${adminReadOnlyBlock()}`
+    }
+
+    // Prompt compiler: privileged operators (owner/admin) get the compiler module,
+    // which translates messy requests into COS-ready specs. Non-privileged traffic
+    // (customers / anonymous) keeps the standard conversational Concierge text.
+    if (isPrivileged) {
+      systemContent += `\n\n${promptCompilerModule()}`
     }
 
     // ── Long-term user memory (logged-in users only) ──────────────────────

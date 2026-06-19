@@ -121,7 +121,7 @@ function isImageUrl(u: string): boolean {
   return /\.(png|jpe?g|gif|webp|svg|avif)(\?.*)?$/i.test(u)
 }
 
-function VideoEmbed({ src }: { src: string }) {
+function VideoEmbed({ src, watch }: { src: string; watch?: string }) {
   return (
     <Card accent="#1af0ff" label="Video">
       <div style={{ position: 'relative', width: '100%', paddingBottom: '56.25%', borderRadius: 8, overflow: 'hidden', background: '#000' }}>
@@ -133,8 +133,22 @@ function VideoEmbed({ src }: { src: string }) {
           style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
         />
       </div>
+      {watch && (
+        <a href={watch} target="_blank" rel="noopener noreferrer" style={{ ...linkStyle, display: 'inline-block', marginTop: 8, fontSize: 11.5 }}>
+          Watch on source ↗
+        </a>
+      )}
     </Card>
   )
+}
+
+// Resolve a URL to its embeddable player + the original watch link.
+function videoEmbedFor(url: string): { src: string; watch: string } | null {
+  const yt = ytId(url)
+  if (yt) return { src: `https://www.youtube.com/embed/${yt}`, watch: `https://www.youtube.com/watch?v=${yt}` }
+  const vm = vimeoId(url)
+  if (vm) return { src: `https://player.vimeo.com/video/${vm}`, watch: `https://vimeo.com/${vm}` }
+  return null
 }
 
 function ImageEmbed({ src }: { src: string }) {
@@ -149,20 +163,20 @@ function ImageEmbed({ src }: { src: string }) {
 // Tokenize a run of text, turning URLs into video players, images, or clickable links.
 function renderInline(text: string, keyBase: string): React.ReactNode[] {
   const out: React.ReactNode[] = []
-  const url = /(https?:\/\/[^\s<>]+)/g
+  // Match a markdown link [label](url) OR a bare url.
+  const token = /\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>]+)/g
   let last = 0, m: RegExpExecArray | null, i = 0
-  while ((m = url.exec(text))) {
+  while ((m = token.exec(text))) {
     const before = text.slice(last, m.index)
     if (before) out.push(<span key={`${keyBase}-x${i}`}>{before}</span>)
-    let link = m[0]
+    const label = m[1]
+    let link = m[2] || m[3]
     let trailing = ''
-    const tm = link.match(/[.,;:!?)\]]+$/)
-    if (tm) { trailing = tm[0]; link = link.slice(0, link.length - trailing.length) }
-    const yt = ytId(link), vm = vimeoId(link)
-    if (yt) out.push(<VideoEmbed key={`${keyBase}-v${i}`} src={`https://www.youtube.com/embed/${yt}`} />)
-    else if (vm) out.push(<VideoEmbed key={`${keyBase}-v${i}`} src={`https://player.vimeo.com/video/${vm}`} />)
+    if (m[3]) { const tm = link.match(/[.,;:!?)\]]+$/); if (tm) { trailing = tm[0]; link = link.slice(0, link.length - trailing.length) } }
+    const vid = videoEmbedFor(link)
+    if (vid) out.push(<VideoEmbed key={`${keyBase}-v${i}`} src={vid.src} watch={vid.watch} />)
     else if (isImageUrl(link)) out.push(<ImageEmbed key={`${keyBase}-i${i}`} src={link} />)
-    else out.push(<a key={`${keyBase}-l${i}`} href={link} target="_blank" rel="noopener noreferrer" style={linkStyle}>{link}</a>)
+    else out.push(<a key={`${keyBase}-l${i}`} href={link} target="_blank" rel="noopener noreferrer" style={linkStyle}>{label || link}</a>)
     if (trailing) out.push(<span key={`${keyBase}-tr${i}`}>{trailing}</span>)
     last = m.index + m[0].length
     i++
@@ -194,7 +208,7 @@ function renderText(text: string, keyBase: string): React.ReactNode[] {
 
 export default function AssistantMessage({ content }: { content: string }) {
   const blocks: React.ReactNode[] = []
-  const slot = /<(ARCHITECTURE_DIAGRAM|STRATEGIC_PITCH|AUDIO_BRIEF_SOURCE|COMPILED_SPEC)>([\s\S]*?)<\/\1>/g
+  const slot = /<(ARCHITECTURE_DIAGRAM|STRATEGIC_PITCH|AUDIO_BRIEF_SOURCE|COMPILED_SPEC|VIDEO|IMAGE)>([\s\S]*?)<\/\1>/g
   let last = 0, m: RegExpExecArray | null, i = 0
 
   while ((m = slot.exec(content))) {
@@ -214,6 +228,18 @@ export default function AssistantMessage({ content }: { content: string }) {
       )
     } else if (tag === 'AUDIO_BRIEF_SOURCE') {
       blocks.push(<AudioBrief key={`slot${i}`} script={body} />)
+    } else if (tag === 'VIDEO') {
+      const u = (body.match(/https?:\/\/[^\s<>]+/) || [body])[0]
+      const vid = videoEmbedFor(u)
+      if (vid) blocks.push(<VideoEmbed key={`slot${i}`} src={vid.src} watch={vid.watch} />)
+      else blocks.push(
+        <Card key={`slot${i}`} accent="#1af0ff" label="Video">
+          <a href={u} target="_blank" rel="noopener noreferrer" style={linkStyle}>{u}</a>
+        </Card>,
+      )
+    } else if (tag === 'IMAGE') {
+      const u = (body.match(/https?:\/\/[^\s<>]+/) || [body])[0]
+      blocks.push(<ImageEmbed key={`slot${i}`} src={u} />)
     } else {
       // COMPILED_SPEC
       blocks.push(

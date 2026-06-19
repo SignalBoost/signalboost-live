@@ -16,6 +16,7 @@ import { commitFileToBranch, listAiBranches, formatCommitResultForAI, formatBran
 import { proposeInfrastructurePR, formatStageResultForAI, listInfraPRsForAI } from '@/lib/ai/tools/infraPRWriter'
 import { OWNER_ONLY_TOOLS, adminReadOnlyBlock } from '@/lib/ai/accessTier'
 import { promptCompilerModule } from '@/lib/ai/promptCompiler'
+import { cosArchitectModule, cosExecuteDirective } from '@/lib/ai/cosArchitect'
 
 export const maxDuration = 300
 
@@ -390,7 +391,6 @@ const TOOL_LIST_PLANS: ChatTool = {
     parameters: { type: 'object', properties: {}, required: [] },
   },
 }
-
 const TOOL_CREATE_OUTREACH_DRAFT: ChatTool = {
   type: 'function',
   function: {
@@ -731,8 +731,7 @@ if (name === 'listAiBranches') {
     const result = await listAiBranches()
     return formatBranchListForAI(result)
   }
-
-  if (name === 'listCleanupBranches') {
+if (name === 'listCleanupBranches') {
     if (!isPrivileged) {
       return 'PERMISSION DENIED: branch management is restricted to the owner/admin channel. Do not retry.'
     }
@@ -883,6 +882,7 @@ export async function POST(req: NextRequest) {
     const currentPage  = String(body?.context?.currentPage || '/')
     const rawConvId    = String(body?.context?.conversationId || '')
     const conversationId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawConvId) ? rawConvId : null
+    const executeMode  = body?.executeMode === true   // hands-free spec handoff from /api/cos/run (owner-gated downstream)
 
     const sanitized = messages
       .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
@@ -969,10 +969,14 @@ export async function POST(req: NextRequest) {
       systemContent += `\n\n${adminReadOnlyBlock()}`
     }
 
-    // Prompt compiler: privileged operators (owner/admin) get the compiler module,
-    // which translates messy requests into COS-ready specs. Non-privileged traffic
-    // (customers / anonymous) keeps the standard conversational Concierge text.
-    if (isPrivileged) {
+    // COS persona. EXECUTE MODE (owner only): an approved compiled spec is run
+    // straight through — no compiler, no Product-Architect theatre. Otherwise,
+    // privileged operators get the Product Architect visual brain plus the prompt
+    // compiler. Non-privileged traffic keeps the standard conversational Concierge.
+    if (isOwner && executeMode) {
+      systemContent += `\n\n${cosExecuteDirective()}`
+    } else if (isPrivileged) {
+      systemContent += `\n\n${cosArchitectModule()}`
       systemContent += `\n\n${promptCompilerModule()}`
     }
 

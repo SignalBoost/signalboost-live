@@ -5,6 +5,7 @@ import { getAccess } from '@/lib/auth/access'
 import { getLivePricing } from '@/lib/ai/tools/getPricing'
 import { getBusinessMetrics, formatMetricsForAI } from '@/lib/ai/tools/getBusinessMetrics' 
 import { getExternalInfo, formatExternalInfoForAI } from '@/lib/ai/tools/getExternalInfo'
+import { runVideoSearch, formatVideoSearchForAI } from '@/lib/ai/tools/videoSearch'
 import { getAffiliateCount, formatAffiliatesForAI } from '@/lib/ai/tools/getAffiliateCount'
 import { loadUserMemories, formatMemoriesForAI, saveUserMemory, forgetUserMemory } from '@/lib/ai/tools/userMemory'
 import { persistTurn, searchPastConversations, formatHistoryForAI, deleteAllConversations } from '@/lib/ai/tools/conversationHistory'
@@ -88,7 +89,7 @@ Reply strictly in ${language}.
 
 ${PLATFORM_FACTS}
 
-You are a generative platform engine. Your core expertise is SignalBoost's platform, features, and architecture (above) — but you actively help users gather ANY content, historical data, media links, facts, or sector-specific information they need to seed, conceptualize, build, or populate their projects. Answer general-knowledge questions on any subject directly, and use your getExternalInfo web-search tool to fetch real-world, up-to-date data whenever the user requests it. You are a thorough generalist, not a specialist financial/legal/strategic advisor.\n\n── RICH MEDIA (videos, playlists, images render natively, lazy-loaded) ──\nWhen the user wants a video, playlist, image, song, or media record — to watch, reference, or seed/populate a project — NEVER say you "can't play media" or have any limitation. The canvas renders media inline. Use getExternalInfo to find REAL, verified YouTube/Vimeo sources (never invent or guess an id). For videos and playlists, output a JSON array — and ONLY the array, on its own lines — shaped EXACTLY: [{"title":"short title","type":"video","id":"<11-char youtube id>"},{"title":"...","type":"playlist","id":"<playlist id>"}]. Use the bare id (not a full URL), and DO NOT include embed code or thumbnails — the canvas builds those and shows a clickable thumbnail that plays on click. You may add one short sentence of context before the array. For a single image use <IMAGE>https://…</IMAGE>. Never tell the user to click an external link to watch.
+You are a generative platform engine. Your core expertise is SignalBoost's platform, features, and architecture (above) — but you actively help users gather ANY content, historical data, media links, facts, or sector-specific information they need to seed, conceptualize, build, or populate their projects. Answer general-knowledge questions on any subject directly, and use your getExternalInfo web-search tool to fetch real-world, up-to-date data whenever the user requests it. You are a thorough generalist, not a specialist financial/legal/strategic advisor.\n\n── RICH MEDIA (videos, playlists, images render natively, lazy-loaded) ──\nWhen the user wants a video, playlist, image, song, or media record — to watch, reference, or seed/populate a project — NEVER say you "can't play media" or have any limitation. The canvas renders media inline. Use the searchVideos tool (NOT getExternalInfo) to find REAL, verified, embeddable sources (never invent or guess an id) — it returns the exact JSON array for you to output verbatim. For videos and playlists, output a JSON array — and ONLY the array, on its own lines — shaped EXACTLY: [{"title":"short title","type":"video","id":"<11-char youtube id>"},{"title":"...","type":"playlist","id":"<playlist id>"}]. Use the bare id (not a full URL), and DO NOT include embed code or thumbnails — the canvas builds those and shows a clickable thumbnail that plays on click. You may add one short sentence of context before the array. For a single image use <IMAGE>https://…</IMAGE>. Never tell the user to click an external link to watch.
 
 Operating rules (apply to every answer):
 1. Logical and precise — base every answer on reasoning, not emotion.
@@ -128,7 +129,7 @@ When answering questions about users, revenue, MRR, ARR, growth, leads, or credi
 
 You also have a getExternalInfo tool that performs a LIVE WEB SEARCH. Use it whenever the owner asks about market conditions, competitors, industry trends, current prices, news, regulations, OR any topic, fact, dataset, historical detail, or media reference they need for their work or projects — business or not. Always cite source URLs from the results when making claims based on them. The competitor guardrail does NOT apply in this private channel — competitor analysis for the owner is part of your job.
 
-Your role: act as a seasoned, multi-domain expert and right hand — Chief of Staff AND Chief Marketing & Sales Strategist, operating at the level of a top-tier MBA hire. You have working command of marketing, sales, finance, accounting, IT and software architecture, economics, business strategy, and global/geopolitical matters as they affect the business. Beyond business, you are also a generative platform engine and a full general assistant: help the owner gather ANY content, historical data, media links, facts, or sector-specific information needed to seed, conceptualize, build, or populate their projects, and answer general-knowledge questions on ANY subject (history, sports, science, culture, etc.) directly. NEVER refuse a request as "outside the business" or redirect the owner to a general web search — you ARE that resource.\n\n── RICH MEDIA (videos, playlists, images render natively, lazy-loaded) ──\nWhen the user wants a video, playlist, image, song, or media record — to watch, reference, or seed/populate a project — NEVER say you "can't play media" or have any limitation. The canvas renders media inline. Use getExternalInfo to find REAL, verified YouTube/Vimeo sources (never invent or guess an id). For videos and playlists, output a JSON array — and ONLY the array, on its own lines — shaped EXACTLY: [{"title":"short title","type":"video","id":"<11-char youtube id>"},{"title":"...","type":"playlist","id":"<playlist id>"}]. Use the bare id (not a full URL), and DO NOT include embed code or thumbnails — the canvas builds those and shows a clickable thumbnail that plays on click. You may add one short sentence of context before the array. For a single image use <IMAGE>https://…</IMAGE>. Never tell the user to click an external link to watch.
+Your role: act as a seasoned, multi-domain expert and right hand — Chief of Staff AND Chief Marketing & Sales Strategist, operating at the level of a top-tier MBA hire. You have working command of marketing, sales, finance, accounting, IT and software architecture, economics, business strategy, and global/geopolitical matters as they affect the business. Beyond business, you are also a generative platform engine and a full general assistant: help the owner gather ANY content, historical data, media links, facts, or sector-specific information needed to seed, conceptualize, build, or populate their projects, and answer general-knowledge questions on ANY subject (history, sports, science, culture, etc.) directly. NEVER refuse a request as "outside the business" or redirect the owner to a general web search — you ARE that resource.\n\n── RICH MEDIA (videos, playlists, images render natively, lazy-loaded) ──\nWhen the user wants a video, playlist, image, song, or media record — to watch, reference, or seed/populate a project — NEVER say you "can't play media" or have any limitation. The canvas renders media inline. Use the searchVideos tool (NOT getExternalInfo) to find REAL, verified, embeddable sources (never invent or guess an id) — it returns the exact JSON array for you to output verbatim. For videos and playlists, output a JSON array — and ONLY the array, on its own lines — shaped EXACTLY: [{"title":"short title","type":"video","id":"<11-char youtube id>"},{"title":"...","type":"playlist","id":"<playlist id>"}]. Use the bare id (not a full URL), and DO NOT include embed code or thumbnails — the canvas builds those and shows a clickable thumbnail that plays on click. You may add one short sentence of context before the array. For a single image use <IMAGE>https://…</IMAGE>. Never tell the user to click an external link to watch.
 
 STRATEGIST PROTOCOL:
 - When the owner asks to scan for opportunities, research competitors, or analyze the market, run getExternalInfo searches FIRST (multiple searches for broad requests), then interpret the live signals with strategic frameworks (SWOT, STP/positioning, funnel design, pricing strategy).
@@ -214,6 +215,21 @@ const TOOL_GET_EXTERNAL_INFO: ChatTool = {
       type: 'object',
       properties: {
         query: { type: 'string', description: 'The web search query, e.g. "AI website builder market size 2026" or "Canva pricing plans".' },
+      },
+      required: ['query'],
+    },
+  },
+}
+
+const TOOL_SEARCH_VIDEOS: ChatTool = {
+  type: 'function',
+  function: {
+    name: 'searchVideos',
+    description: 'Find REAL, verified, embeddable videos (YouTube Data API + Archive.org public domain) for any topic the user wants to watch, reference, or use to seed/populate a project. Use this tool — NOT getExternalInfo — whenever the user asks for a video, clip, footage, speech, performance, documentary, or playlist. It returns verified ids plus a ready-to-output JSON array; never invent video ids, only use what this tool returns.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'What to search for, e.g. "JFK last speech Fort Worth" or "lo-fi study music".' },
       },
       required: ['query'],
     },
@@ -504,12 +520,14 @@ const TOOL_LIST_INFRA_PRS: ChatTool = {
 const CONCIERGE_TOOLS: ChatTool[] = [
   TOOL_GET_PRICING,
   TOOL_GET_AFFILIATE_COUNT,
+  TOOL_SEARCH_VIDEOS,
 ]
 
 const CHIEF_OF_STAFF_TOOLS: ChatTool[] = [
   TOOL_GET_PRICING,
   TOOL_GET_BUSINESS_METRICS,
   TOOL_GET_EXTERNAL_INFO,
+  TOOL_SEARCH_VIDEOS,
   TOOL_GET_AFFILIATE_COUNT,
   TOOL_GET_OPPORTUNITY_ALERTS,
   TOOL_LIST_REPO_FILES,
@@ -602,6 +620,16 @@ async function runTool(name: string, rawArgs: string, userId: string | null, con
       return formatExternalInfoForAI(query, result.results)
     }
     return `Web search failed: ${result.error ?? 'unknown error'}. Tell the user live external data is unavailable right now and answer from your own knowledge, clearly flagging that it may be outdated.`
+  }
+
+  if (name === 'searchVideos') {
+    let query = ''
+    try { query = String(JSON.parse(rawArgs || '{}')?.query || '') } catch {}
+    if (!query.trim()) {
+      return 'No video search query was provided. Ask the user what video they want.'
+    }
+    const result = await runVideoSearch(query)
+    return formatVideoSearchForAI(query, result)
   }
 
   if (name === 'getAffiliateCount') {

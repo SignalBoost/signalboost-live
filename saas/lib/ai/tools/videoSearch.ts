@@ -16,9 +16,12 @@ export type AiVideoItem = {
   license: string
 }
 
-export type VideoSearchResult =
-  | { ok: true; items: AiVideoItem[]; array: string }
-  | { ok: false; items: AiVideoItem[]; array: string; error: string }
+export type VideoSearchResult = {
+  ok: boolean
+  items: AiVideoItem[]
+  array: string
+  error?: string
+}
 
 // The Lab search prefixes ids ("yt-<id>" / "arc-<identifier>"); strip down to the
 // bare id the canvas embeds from, and reject anything malformed.

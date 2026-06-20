@@ -1,568 +1,735 @@
-// saas/lib/hub/action-policy.ts
-// Hub Console Action Policy Layer
+// saas/app/api/hub/action/route.ts
+// Hub Console Action Route
 //
 // Purpose:
-// - Classify provider actions before automation is added.
-// - Keep read-only monitoring automatic.
-// - Require explicit human approval for sensitive writes, secrets, billing,
-//   production changes, destructive operations, and role changes.
+// - Receive action requests from the form renderer (ProviderActionForm.tsx).
+// - Validate template and payload (defense in depth).
+// - Enforce action policy: check user auth, role, approval level.
+// - Inject provider credentials from environment variables.
+// - Execute the real provider API call.
+// - Log all actions (success and failure) to the audit trail.
+// - Return result to client.
+//
+// Safety model:
+// - Every action runs through getHubActionPolicy(). Unknown actions are auto-blocked.
+// - Destructive ops (DELETE) are blocked at policy layer, not here.
+// - All writes require appropriate approval level (admin/owner).
+// - All sensitive actions (cost-bearing, auth, infrastructure) are audit-logged.
+// - Secrets are never echoed in logs or error messages.
 
-export type HubActionLevel = 'read' | 'suggest' | 'prepare_change' | 'execute_change'
-export type HubRiskLevel = 'low' | 'medium' | 'high' | 'critical'
-export type HubApprovalRequirement = 'none' | 'admin' | 'owner' | 'owner_with_audit' | 'blocked'
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { getTemplate, validateTemplatePayload } from '@/lib/hub/provider-templates'
+import { getHubActionPolicy, isActionBlocked, requiresOwnerApproval, requiresAdminApproval } from '@/lib/hub/action-policy'
+import { recordAuditEvent, normalizeStatus } from '@/lib/hub/audit'
+import { getCurrentUser as resolveHubUser } from '@/lib/auth/permission-middleware'
+import { vaultEncrypt, vaultDecrypt } from '@/lib/vault/crypto'
+import { scanAWSUsers, scanAWSAccessKeys } from '@/lib/hub/aws-scanner'
+import { scanGCPServiceAccounts } from '@/lib/hub/gcp-scanner'
+import { executeTwilioAction } from '@/lib/hub/providers/twilio'
+import { executeSendGridAction } from '@/lib/hub/providers/sendgrid'
+import { executeCloudflareAction } from '@/lib/hub/providers/cloudflare'
+import { executeDigitalOceanAction } from '@/lib/hub/providers/digitalocean'
+import { executeDatadogAction } from '@/lib/hub/providers/datadog'
+import { executeSentryAction } from '@/lib/hub/providers/sentry'
+import { executePagerDutyAction } from '@/lib/hub/providers/pagerduty'
+import { listSupabaseProjects, runProjectSql } from '@/lib/hub/supabase-projects'
+import { provisionAuditPricing } from '@/lib/hub/audit-pricing-provision'
 
-export type HubActionPolicy = {
-  id: string
-  label: string
-  level: HubActionLevel
-  risk: HubRiskLevel
-  approval: HubApprovalRequirement
-  auditRequired: boolean
-  rollbackRequired: boolean
-  productionSensitive: boolean
-  description: string
+// ============================================================================
+// Types & Setup
+// ============================================================================
+
+type ActionRequest = {
+  templateId: string
+  payload: Record<string, unknown>
 }
 
-export const HUB_ACTION_POLICIES: Record<string, HubActionPolicy> = {
-  read_provider_status: {
-    id: 'read_provider_status',
-    label: 'Read provider status',
-    level: 'read',
-    risk: 'low',
-    approval: 'none',
-    auditRequired: false,
-    rollbackRequired: false,
-    productionSensitive: false,
-    description: 'Fetch provider health, connection state, public-safe metadata, and masked identifiers.',
+type ActionResponse = {
+  ok: boolean
+  message?: string
+  error?: string
+}
+
+// Get the current user from the request via the Phase 2 RBAC middleware.
+// Returns real user data from hub_workspace_users, or null. No synthetic/owner
+// fallback — unauthenticated or non-hub users resolve to null and are denied.
+async function getCurrentUser(req: NextRequest) {
+  const user = await resolveHubUser(req)
+  if (!user) return null
+  return { id: user.id, role: user.role, email: user.email }
+}
+
+// Map provider IDs to environment variable names and base URLs.
+const PROVIDER_CREDENTIALS: Record<
+  string,
+  { envVars: string[]; baseUrl?: string; headers?: Record<string, string> }
+> = {
+  stripe: {
+    envVars: ['STRIPE_SECRET_KEY'],
+    baseUrl: 'https://api.stripe.com',
   },
-  detect_configuration_drift: {
-    id: 'detect_configuration_drift',
-    label: 'Detect configuration drift',
-    level: 'suggest',
-    risk: 'low',
-    approval: 'none',
-    auditRequired: false,
-    rollbackRequired: false,
-    productionSensitive: false,
-    description: 'Compare provider state against known environment variable names and report mismatches.',
+  supabase: {
+    envVars: ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'],
+    baseUrl: undefined, // Supabase client handles URL
   },
-  prepare_recommended_fix: {
-    id: 'prepare_recommended_fix',
-    label: 'Prepare recommended fix',
-    level: 'prepare_change',
-    risk: 'medium',
-    approval: 'admin',
-    auditRequired: true,
-    rollbackRequired: false,
-    productionSensitive: false,
-    description: 'Build a preview of a safe configuration change without applying it.',
+  vercel: {
+    envVars: ['VERCEL_TOKEN', 'VERCEL_HUB_PROJECT'],
+    baseUrl: 'https://api.vercel.com',
   },
-  update_preview_environment: {
-    id: 'update_preview_environment',
-    label: 'Update preview environment',
-    level: 'execute_change',
-    risk: 'medium',
-    approval: 'admin',
-    auditRequired: true,
-    rollbackRequired: true,
-    productionSensitive: false,
-    description: 'Apply an approved change to a non-production environment after preview.',
+  audit: {
+    // The one-shot audit-pricing provisioner spans Stripe + Vercel + Supabase/Vault,
+    // so it pre-flights every credential it needs before the action is allowed to run.
+    envVars: ['STRIPE_SECRET_KEY', 'VERCEL_TOKEN', 'VERCEL_HUB_PROJECT', 'NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'VAULT_MASTER_KEY'],
+    baseUrl: undefined,
   },
-  update_production_environment: {
-    id: 'update_production_environment',
-    label: 'Update production environment',
-    level: 'execute_change',
-    risk: 'high',
-    approval: 'owner_with_audit',
-    auditRequired: true,
-    rollbackRequired: true,
-    productionSensitive: true,
-    description: 'Apply an approved provider or environment change to production.',
+  github: {
+    envVars: ['GITHUB_WRITE_TOKEN'],
+    baseUrl: 'https://api.github.com',
   },
-  create_stripe_price: {
-    id: 'create_stripe_price',
-    label: 'Create Stripe price',
-    level: 'execute_change',
-    risk: 'high',
-    approval: 'owner_with_audit',
-    auditRequired: true,
-    rollbackRequired: true,
-    productionSensitive: true,
-    description: 'Create a new Stripe price for a plan. Must be previewed and approved before execution.',
+  'aws-s3': {
+    envVars: ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_REGION'],
+    baseUrl: undefined, // AWS SDK handles URL
   },
-  provision_audit_pricing: {
-    id: 'provision_audit_pricing',
-    label: 'Provision audit pricing (Stripe → Vercel → Vault)',
-    level: 'execute_change',
-    risk: 'high',
-    approval: 'owner_with_audit',
-    auditRequired: true,
-    rollbackRequired: true,
-    productionSensitive: true,
-    description: 'Create/refresh audit Stripe prices from pricingConfig.ts, write the price ids into the Vercel variables, and record the keys in the Vault. Creates real billing products and writes production config — owner approval and audit required.',
+  aws: {
+    envVars: ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'],
+    baseUrl: undefined, // AWS SDK handles URL
   },
-  archive_stripe_price: {
-    id: 'archive_stripe_price',
-    label: 'Archive Stripe price',
-    level: 'execute_change',
-    risk: 'high',
-    approval: 'owner_with_audit',
-    auditRequired: true,
-    rollbackRequired: true,
-    productionSensitive: true,
-    description: 'Mark an old Stripe price inactive. This is safer than deletion but still requires owner approval.',
+  gcp: {
+    envVars: ['GOOGLE_APPLICATION_CREDENTIALS'],
+    baseUrl: undefined,
   },
-  rotate_secret_key: {
-    id: 'rotate_secret_key',
-    label: 'Rotate secret key',
-    level: 'execute_change',
-    risk: 'critical',
-    approval: 'owner_with_audit',
-    auditRequired: true,
-    rollbackRequired: true,
-    productionSensitive: true,
-    description: 'Rotate a provider secret or service key. Requires owner approval, audit trail, and rollback planning.',
+  compliance: {
+    envVars: [], // internal audit — no external credentials required
+    baseUrl: undefined,
   },
-  delete_provider_resource: {
-    id: 'delete_provider_resource',
-    label: 'Delete provider resource',
-    level: 'execute_change',
-    risk: 'critical',
-    approval: 'blocked',
-    auditRequired: true,
-    rollbackRequired: true,
-    productionSensitive: true,
-    description: 'Destructive provider deletes are blocked by default in the Hub Console.',
+  vault: {
+    envVars: ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'VAULT_MASTER_KEY'],
+    baseUrl: undefined, // internal — handled by vault crypto + admin client
   },
-  change_role_permissions: {
-    id: 'change_role_permissions',
-    label: 'Change role permissions',
-    level: 'execute_change',
-    risk: 'critical',
-    approval: 'owner_with_audit',
-    auditRequired: true,
-    rollbackRequired: true,
-    productionSensitive: true,
-    description: 'Modify user roles or permissions. Requires owner approval and a full audit record.',
+  openai: {
+    envVars: ['OPENAI_API_KEY'],
+    baseUrl: 'https://api.openai.com',
   },
-  invite_supabase_user: {
-    id: 'invite_supabase_user',
-    label: 'Invite Supabase user',
-    level: 'execute_change',
-    risk: 'medium',
-    approval: 'admin',
-    auditRequired: true,
-    rollbackRequired: false,
-    productionSensitive: false,
-    description: 'Send a Supabase Auth invite to a new platform user. Requires admin approval and audit trail.',
+  twilio: {
+    envVars: ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN'],
+    baseUrl: 'https://api.twilio.com',
   },
-  create_aws_bucket: {
-    id: 'create_aws_bucket',
-    label: 'Create AWS S3 bucket',
-    level: 'execute_change',
-    risk: 'high',
-    approval: 'owner_with_audit',
-    auditRequired: true,
-    rollbackRequired: true,
-    productionSensitive: true,
-    description: 'Create a new S3 bucket on AWS. Infrastructure creation requires owner approval, audit, and rollback planning.',
+  sendgrid: {
+    envVars: ['SENDGRID_API_KEY'],
+    baseUrl: 'https://api.sendgrid.com',
   },
-  send_twilio_sms: {
-    id: 'send_twilio_sms',
-    label: 'Send SMS via Twilio',
-    level: 'execute_change',
-    risk: 'medium',
-    approval: 'owner_with_audit',
-    auditRequired: true,
-    rollbackRequired: false,
-    productionSensitive: true,
-    description: 'Send a one-off SMS message. Sending on behalf of the platform requires owner approval and full audit.',
+  cloudflare: {
+    envVars: ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ZONE_ID'],
+    baseUrl: 'https://api.cloudflare.com/client/v4',
   },
-  send_sendgrid_email: {
-    id: 'send_sendgrid_email',
-    label: 'Send email via SendGrid',
-    level: 'execute_change',
-    risk: 'medium',
-    approval: 'owner_with_audit',
-    auditRequired: true,
-    rollbackRequired: false,
-    productionSensitive: true,
-    description: 'Send a transactional email. Sending on behalf of the platform requires owner approval and full audit.',
+  auth0: {
+    envVars: ['AUTH0_MANAGEMENT_API_TOKEN', 'AUTH0_DOMAIN'],
+    baseUrl: undefined, // Auth0 URL from env
   },
-  cloudflare_purge_cache: {
-    id: 'cloudflare_purge_cache',
-    label: 'Purge Cloudflare cache',
-    level: 'execute_change',
-    risk: 'medium',
-    approval: 'admin',
-    auditRequired: true,
-    rollbackRequired: true,
-    productionSensitive: true,
-    description: 'Purge edge cache for the zone. Cache invalidation affects delivery and requires admin approval and audit.',
+  anthropic: {
+    envVars: ['ANTHROPIC_API_KEY'],
+    baseUrl: 'https://api.anthropic.com',
   },
-  replicate_run_model: {
-    id: 'replicate_run_model',
-    label: 'Run Replicate model',
-    level: 'execute_change',
-    risk: 'medium',
-    approval: 'admin',
-    auditRequired: true,
-    rollbackRequired: false,
-    productionSensitive: false,
-    description: 'Create a prediction against a Replicate model. API calls incur cost and require admin approval and audit.',
+  replicate: {
+    envVars: ['REPLICATE_API_TOKEN'],
+    baseUrl: 'https://api.replicate.com',
   },
-  rotate_credential: {
-    id: 'rotate_credential',
-    label: 'Rotate credential',
-    level: 'execute_change',
-    risk: 'high',
-    approval: 'owner_with_audit',
-    auditRequired: true,
-    rollbackRequired: true,
-    productionSensitive: true,
-    description: 'Generate new credential, revoke old one, sync to environment. Requires owner approval and audit trail. Rollback support required.',
+  sentry: {
+    envVars: ['SENTRY_AUTH_TOKEN'],
+    baseUrl: 'https://sentry.io/api',
   },
-  delete_stripe_product: {
-    id: 'delete_stripe_product', label: 'Delete Stripe product',
-    level: 'execute_change', risk: 'high', approval: 'owner_with_audit',
-    auditRequired: true, rollbackRequired: true, productionSensitive: true,
-    description: 'Delete a Stripe product. Catalog removal affects checkout and requires owner approval with audit.',
+  datadog: {
+    envVars: ['DATADOG_API_KEY', 'DATADOG_API_URL'],
+    baseUrl: undefined, // From env
   },
-  manage_stripe_keys: {
-    id: 'manage_stripe_keys', label: 'Manage Stripe API keys',
-    level: 'execute_change', risk: 'high', approval: 'owner_with_audit',
-    auditRequired: true, rollbackRequired: true, productionSensitive: true,
-    description: 'Create restricted Stripe API keys. Key issuance requires owner approval and a full audit record.',
+  digitalocean: {
+    envVars: ['DIGITALOCEAN_TOKEN'],
+    baseUrl: 'https://api.digitalocean.com',
   },
-  delete_supabase_user: {
-    id: 'delete_supabase_user', label: 'Delete Supabase user',
-    level: 'execute_change', risk: 'high', approval: 'owner_with_audit',
-    auditRequired: true, rollbackRequired: true, productionSensitive: true,
-    description: 'Permanently delete a Supabase Auth user. Destructive to account data; owner approval and audit required.',
-  },
-  reset_supabase_password: {
-    id: 'reset_supabase_password', label: 'Reset Supabase password',
-    level: 'execute_change', risk: 'medium', approval: 'admin',
-    auditRequired: true, rollbackRequired: false, productionSensitive: true,
-    description: 'Send a password recovery email to a user. Account-sensitive; admin approval and audit required.',
-  },
-  delete_vercel_env: {
-    id: 'delete_vercel_env', label: 'Delete Vercel env variable',
-    level: 'execute_change', risk: 'high', approval: 'admin',
-    auditRequired: true, rollbackRequired: true, productionSensitive: true,
-    description: 'Remove a project environment variable. Can break deploys; admin approval and audit required.',
-  },
-  disable_aws_iam_user: {
-    id: 'disable_aws_iam_user', label: 'Disable AWS IAM user',
-    level: 'execute_change', risk: 'high', approval: 'owner_with_audit',
-    auditRequired: true, rollbackRequired: true, productionSensitive: true,
-    description: 'Deactivate an IAM user access keys. Revokes access; owner approval and audit required.',
-  },
-  twilio_verify_number: {
-    id: 'twilio_verify_number', label: 'Twilio phone verification',
-    level: 'execute_change', risk: 'medium', approval: 'admin',
-    auditRequired: true, rollbackRequired: false, productionSensitive: true,
-    description: 'Start a phone verification. Sends a code on behalf of the platform; admin approval and audit required.',
-  },
-  cloudflare_add_dns: {
-    id: 'cloudflare_add_dns', label: 'Add Cloudflare DNS record',
-    level: 'execute_change', risk: 'medium', approval: 'admin',
-    auditRequired: true, rollbackRequired: true, productionSensitive: true,
-    description: 'Create a DNS record. Affects routing and delivery; admin approval and audit required.',
-  },
-  cloudflare_toggle_proxy: {
-    id: 'cloudflare_toggle_proxy', label: 'Toggle Cloudflare proxy',
-    level: 'execute_change', risk: 'medium', approval: 'admin',
-    auditRequired: true, rollbackRequired: true, productionSensitive: true,
-    description: 'Change proxy state on a DNS record. Affects edge behavior; admin approval and audit required.',
-  },
-  firebase_upload_rules: {
-    id: 'firebase_upload_rules', label: 'Publish Firebase rules',
-    level: 'execute_change', risk: 'high', approval: 'owner_with_audit',
-    auditRequired: true, rollbackRequired: true, productionSensitive: true,
-    description: 'Publish security rules. Misconfiguration can expose data; owner approval and audit required.',
-  },
-  create_droplet: {
-    id: 'create_droplet', label: 'Create DigitalOcean Droplet',
-    level: 'execute_change', risk: 'high', approval: 'owner_with_audit',
-    auditRequired: true, rollbackRequired: true, productionSensitive: true,
-    description: 'Provision new infrastructure. Incurs cost; owner approval, audit, and rollback planning required.',
-  },
-  datadog_create_monitor: {
-    id: 'datadog_create_monitor', label: 'Create Datadog monitor',
-    level: 'execute_change', risk: 'medium', approval: 'admin',
-    auditRequired: true, rollbackRequired: false, productionSensitive: false,
-    description: 'Create an alert monitor. Operational change; admin approval and audit required.',
-  },
-  sentry_resolve_issue: {
-    id: 'sentry_resolve_issue', label: 'Resolve Sentry issue',
-    level: 'execute_change', risk: 'low', approval: 'admin',
-    auditRequired: true, rollbackRequired: false, productionSensitive: false,
-    description: 'Mark an issue resolved. Low-risk state change; admin approval and audit required.',
-  },
-  pagerduty_trigger_incident: {
-    id: 'pagerduty_trigger_incident', label: 'Trigger PagerDuty incident',
-    level: 'execute_change', risk: 'medium', approval: 'admin',
-    auditRequired: true, rollbackRequired: false, productionSensitive: true,
-    description: 'Open an incident and page responders. Notifies on-call; admin approval and audit required.',
-  },
-  compliance_run_audit: {
-    id: 'compliance_run_audit', label: 'Run compliance audit',
-    level: 'read', risk: 'low', approval: 'admin',
-    auditRequired: true, rollbackRequired: false, productionSensitive: false,
-    description: 'Run an internal credential and configuration audit. Read-only; admin approval and audit record.',
-  },
-invoke_model: {
-    id: 'invoke_model',
-    label: 'Invoke AI model',
-    level: 'execute_change', risk: 'medium', approval: 'admin',
-    auditRequired: true, rollbackRequired: false, productionSensitive: false,
-    description: 'Run inference against a third-party AI model. Consumes paid credits; admin approval and audit trail.',
-  },
-  send_message: {
-    id: 'send_message',
-    label: 'Send message / notification',
-    level: 'execute_change', risk: 'medium', approval: 'admin',
-    auditRequired: true, rollbackRequired: false, productionSensitive: false,
-    description: 'Send an outbound message or push notification to end users. Admin approval and audit trail.',
-  },
-  send_data: {
-    id: 'send_data',
-    label: 'Send analytics event',
-    level: 'execute_change', risk: 'low', approval: 'admin',
-    auditRequired: true, rollbackRequired: false, productionSensitive: false,
-    description: 'Emit an event to an external analytics pipeline. Admin approval and audit trail.',
-  },
-  create_record: {
-    id: 'create_record',
-    label: 'Create external record',
-    level: 'execute_change', risk: 'medium', approval: 'admin',
-    auditRequired: true, rollbackRequired: false, productionSensitive: false,
-    description: 'Create a record in an external system (e.g. CRM contact). Admin approval and audit trail.',
-  },
-  vault_add_key: {
-    id: 'vault_add_key',
-    label: 'Add vault key',
-    level: 'execute_change', risk: 'medium', approval: 'admin',
-    auditRequired: true, rollbackRequired: false, productionSensitive: true,
-    description: 'Store a new secret in the encrypted vault. Admin approval and audit trail.',
-  },
-  vault_reveal_key: {
-    id: 'vault_reveal_key',
-    label: 'Reveal vault key',
-    level: 'execute_change', risk: 'high', approval: 'admin',
-    auditRequired: true, rollbackRequired: false, productionSensitive: true,
-    description: 'Decrypt and reveal a single secret value. High-sensitivity; admin approval and audit trail.',
-  },
-  vault_edit_key: {
-    id: 'vault_edit_key',
-    label: 'Edit vault key',
-    level: 'execute_change', risk: 'high', approval: 'admin',
-    auditRequired: true, rollbackRequired: false, productionSensitive: true,
-    description: 'Replace a stored secret value. Admin approval and audit trail.',
-  },
-  vault_archive_key: {
-    id: 'vault_archive_key',
-    label: 'Archive vault key',
-    level: 'execute_change', risk: 'medium', approval: 'admin',
-    auditRequired: true, rollbackRequired: true, productionSensitive: false,
-    description: 'Soft-delete a vault key (recoverable). Admin approval and audit trail.',
-  },
-  vault_delete_key: {
-    id: 'vault_delete_key',
-    label: 'Delete vault key',
-    level: 'execute_change', risk: 'critical', approval: 'owner_with_audit',
-    auditRequired: true, rollbackRequired: true, productionSensitive: true,
-    description: 'Permanently delete a vault key. Owner approval and audit trail.',
-  },
-  edit_stripe_product: {
-    id: 'edit_stripe_product',
-    label: 'Edit Stripe product',
-    level: 'execute_change', risk: 'medium', approval: 'admin',
-    auditRequired: true, rollbackRequired: false, productionSensitive: true,
-    description: 'Update a Stripe product. Admin approval and audit trail.',
-  },
-  archive_stripe_product: {
-    id: 'archive_stripe_product',
-    label: 'Archive Stripe product',
-    level: 'execute_change', risk: 'medium', approval: 'admin',
-    auditRequired: true, rollbackRequired: true, productionSensitive: false,
-    description: 'Archive a Stripe product (sets it inactive — recoverable). Admin approval and audit trail.',
-  },
-  edit_stripe_price: {
-    id: 'edit_stripe_price',
-    label: 'Edit Stripe price',
-    level: 'execute_change', risk: 'medium', approval: 'admin',
-    auditRequired: true, rollbackRequired: false, productionSensitive: true,
-    description: 'Update a Stripe price nickname or active flag. Admin approval and audit trail.',
-  },
-  edit_supabase_user: {
-    id: 'edit_supabase_user',
-    label: 'Edit Supabase user',
-    level: 'execute_change', risk: 'high', approval: 'admin',
-    auditRequired: true, rollbackRequired: false, productionSensitive: true,
-    description: 'Update a Supabase user record. Admin approval and audit trail.',
-  },
-  edit_vercel_env: {
-    id: 'edit_vercel_env',
-    label: 'Edit Vercel env var',
-    level: 'execute_change', risk: 'high', approval: 'admin',
-    auditRequired: true, rollbackRequired: true, productionSensitive: true,
-    description: 'Update a Vercel environment variable. Admin approval and audit trail.',
-  },
-  run_sql_query: {
-    id: 'run_sql_query',
-    label: 'Run SQL query',
-    level: 'execute_change', risk: 'critical', approval: 'owner_with_audit',
-    auditRequired: true, rollbackRequired: true, productionSensitive: true,
-    description: 'Execute SQL against the database via the gated hub_exec_sql function. Owner approval and audit trail.',
-  },
-  invoke_action: {
-    id: 'invoke_action',
-    label: 'Invoke infrastructure action',
-    level: 'execute_change', risk: 'high', approval: 'owner_with_audit',
-    auditRequired: true, rollbackRequired: true, productionSensitive: true,
-    description: 'Trigger a state-changing infrastructure run (e.g. a Terraform apply). Owner approval and audit trail.',
-  },
-  view_env_vars: {
-    id: 'view_env_vars',
-    label: 'View env vars',
-    level: 'read', risk: 'low', approval: 'none',
-    auditRequired: false, rollbackRequired: false, productionSensitive: false,
-    description: 'View environment variables (read-only).',
-  },
-  view_products: {
-    id: 'view_products',
-    label: 'View products',
-    level: 'read', risk: 'low', approval: 'none',
-    auditRequired: false, rollbackRequired: false, productionSensitive: false,
-    description: 'View products (read-only).',
-  },
-  deployments_panel: {
-    id: 'deployments_panel',
-    label: 'Deployments panel',
-    level: 'read', risk: 'low', approval: 'none',
-    auditRequired: false, rollbackRequired: false, productionSensitive: false,
-    description: 'View deployments panel (read-only).',
-  },
-  audit_log: {
-    id: 'audit_log',
-    label: 'Audit log',
-    level: 'read', risk: 'low', approval: 'none',
-    auditRequired: false, rollbackRequired: false, productionSensitive: false,
-    description: 'View the audit log (read-only).',
-  },
-  unlock_form: {
-    id: 'unlock_form',
-    label: 'Unlock form',
-    level: 'read', risk: 'low', approval: 'none',
-    auditRequired: false, rollbackRequired: false, productionSensitive: false,
-    description: 'Open an unlock form (read-only gate).',
-  },
-  storage_panel: {
-    id: 'storage_panel',
-    label: 'Storage panel',
-    level: 'read', risk: 'low', approval: 'none',
-    auditRequired: false, rollbackRequired: false, productionSensitive: false,
-    description: 'View storage panel (read-only).',
-  },
-  cancel_build: {
-    id: 'cancel_build',
-    label: 'Cancel build',
-    level: 'execute_change', risk: 'medium', approval: 'admin',
-    auditRequired: true, rollbackRequired: false, productionSensitive: true,
-    description: 'Cancel an active build. Admin approval and audit trail.',
-  },
-  rollback_deploy: {
-    id: 'rollback_deploy',
-    label: 'Rollback deploy',
-    level: 'execute_change', risk: 'high', approval: 'admin',
-    auditRequired: true, rollbackRequired: true, productionSensitive: true,
-    description: 'Roll back a deployment. Admin approval and audit trail.',
-  },
-  crud_actions: {
-    id: 'crud_actions',
-    label: 'Crud actions',
-    level: 'execute_change', risk: 'medium', approval: 'admin',
-    auditRequired: true, rollbackRequired: false, productionSensitive: true,
-    description: 'Generic create/update actions. Admin approval and audit trail.',
-  },
-  table_crud: {
-    id: 'table_crud',
-    label: 'Table crud',
-    level: 'execute_change', risk: 'medium', approval: 'admin',
-    auditRequired: true, rollbackRequired: false, productionSensitive: true,
-    description: 'Create/update database table rows. Admin approval and audit trail.',
-  },
-  manage_prices: {
-    id: 'manage_prices',
-    label: 'Manage prices',
-    level: 'execute_change', risk: 'medium', approval: 'admin',
-    auditRequired: true, rollbackRequired: false, productionSensitive: true,
-    description: 'Create or update prices. Admin approval and audit trail.',
-  },
-  auth_management: {
-    id: 'auth_management',
-    label: 'Auth management',
-    level: 'execute_change', risk: 'high', approval: 'admin',
-    auditRequired: true, rollbackRequired: false, productionSensitive: true,
-    description: 'Manage authentication/users. Admin approval and audit trail.',
-  },
-  sql_editor: {
-    id: 'sql_editor',
-    label: 'Sql editor',
-    level: 'execute_change', risk: 'critical', approval: 'owner_with_audit',
-    auditRequired: true, rollbackRequired: true, productionSensitive: true,
-    description: 'Run SQL via the gated executor. Owner approval and audit trail.',
-  },
-  refunds: {
-    id: 'refunds',
-    label: 'Refunds',
-    level: 'execute_change', risk: 'critical', approval: 'owner_with_audit',
-    auditRequired: true, rollbackRequired: true, productionSensitive: true,
-    description: 'Issue refunds. Owner approval and audit trail.',
+  pagerduty: {
+    envVars: ['PAGERDUTY_API_KEY'],
+    baseUrl: 'https://api.pagerduty.com',
   },
 }
 
-// Accepts an optional actionId to securely match incoming policy properties from route.ts
-export function getHubActionPolicy(actionId?: string): HubActionPolicy {
-  const targetId = actionId || 'unknown'
-  return HUB_ACTION_POLICIES[targetId] || {
-    id: targetId,
-    label: 'Unknown Hub action',
-    level: 'execute_change',
-    risk: 'critical',
-    approval: 'blocked',
-    auditRequired: true,
-    rollbackRequired: true,
-    productionSensitive: true,
-    description: 'Unknown actions are blocked until an explicit policy is created.',
+// ============================================================================
+// Core Logic
+// ============================================================================
+
+export const runtime = 'nodejs'
+export const maxDuration = 60
+export const dynamic = 'force-dynamic'
+
+export async function POST(req: NextRequest): Promise<NextResponse<ActionResponse>> {
+  try {
+    // 1. Parse and validate request
+    let body: ActionRequest
+    try {
+      body = await req.json()
+    } catch {
+      return NextResponse.json(
+        { ok: false, error: 'Invalid JSON in request body' },
+        { status: 400 },
+      )
+    }
+
+    const { templateId, payload } = body
+    if (!templateId || !payload) {
+      return NextResponse.json(
+        { ok: false, error: 'Missing templateId or payload' },
+        { status: 400 },
+      )
+    }
+
+    // 2. Load the template
+    const template = getTemplate(templateId)
+    if (!template) {
+      return NextResponse.json(
+        { ok: false, error: 'Unknown template: ' + templateId },
+        { status: 404 },
+      )
+    }
+
+    // 3. Validate payload against template schema
+    const validation = validateTemplatePayload(templateId, payload)
+    if (!validation.ok) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: validation.error || 'Payload validation failed',
+        },
+        { status: 400 },
+      )
+    }
+
+    // 4. Require authentication for ALL hub actions — no read-only bypass.
+    //    Every action touches real provider data (Stripe, Supabase, GitHub, …) and
+    //    the console is owner/admin-only, so unauthenticated access is never allowed.
+    const user = await getCurrentUser(req)
+    if (!user) {
+      return NextResponse.json(
+        { ok: false, error: 'Not authenticated' },
+        { status: 401 },
+      )
+    }
+    const actorId = user.id
+    const policy = getHubActionPolicy(template.policyActionId)
+
+    // 5. Enforce action policy
+    if (isActionBlocked(template.policyActionId)) {
+      await logAuditEvent(actorId, templateId, 'BLOCKED', 'Action is blocked by policy', null)
+      return NextResponse.json(
+        { ok: false, error: 'This action is blocked by policy' },
+        { status: 403 },
+      )
+    }
+
+    // 6. Check approval requirements
+    if (requiresOwnerApproval(template.policyActionId) && (!user || user.role !== 'owner')) {
+      await logAuditEvent(actorId, templateId, 'DENIED', 'Requires owner approval', null)
+      return NextResponse.json(
+        { ok: false, error: 'This action requires owner approval' },
+        { status: 403 },
+      )
+    }
+
+    // 6b. Admin-level actions require an admin or owner (owner ⊃ admin).
+    if (requiresAdminApproval(template.policyActionId) && !['admin', 'owner'].includes(user.role)) {
+      await logAuditEvent(actorId, templateId, 'DENIED', 'Requires admin approval', null)
+      return NextResponse.json(
+        { ok: false, error: 'This action requires admin approval' },
+        { status: 403 },
+      )
+    }
+
+    // 7. Check credentials are available
+    const credentials = PROVIDER_CREDENTIALS[String(template.api.service || '').toLowerCase()]
+    if (!credentials) {
+      return NextResponse.json(
+        { ok: false, error: 'Provider not configured: ' + template.api.service },
+        { status: 501 },
+      )
+    }
+
+    const missingVars = credentials.envVars.filter(v => !process.env[v])
+    if (missingVars.length > 0) {
+      await logAuditEvent(
+        actorId,
+        templateId,
+        'CONFIG_ERROR',
+        'Missing env vars: ' + missingVars.join(', '),
+        null,
+      )
+      return NextResponse.json(
+        { ok: false, error: 'Provider not configured: missing ' + missingVars[0] },
+        { status: 501 },
+      )
+    }
+
+    // 8. Execute the provider action
+    let result: { ok: boolean; message?: string; data?: unknown; error?: string }
+    try {
+      result = await executeProviderAction(template, payload)
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error'
+      await logAuditEvent(actorId, templateId, 'ERROR', errorMsg, null)
+      return NextResponse.json(
+        { ok: false, error: 'Provider error: ' + errorMsg },
+        { status: 500 },
+      )
+    }
+
+    // 9. Log the action
+    if (policy.auditRequired) {
+      await logAuditEvent(
+        actorId,
+        templateId,
+        result.ok ? 'SUCCESS' : 'FAILURE',
+        result.message || (result.ok ? 'Action completed' : 'Action failed'),
+        result.data,
+      )
+    }
+
+    // 10. Return result to client
+    if (result.ok) {
+      return NextResponse.json(
+        { ok: true, message: result.message || 'Action completed successfully', data: result.data },
+        { status: 200 },
+      )
+    } else {
+      return NextResponse.json(
+        { ok: false, error: result.error || 'Action failed' },
+        { status: 400 },
+      )
+    }
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Internal server error'
+    console.error('Hub action route error:', errorMsg, err)
+    return NextResponse.json(
+      { ok: false, error: 'Internal server error' },
+      { status: 500 },
+    )
   }
 }
 
-export function canRunWithoutApproval(actionId?: string): boolean {
-  const policy = getHubActionPolicy(actionId)
-  return policy.approval === 'none' && policy.risk === 'low'
+// ============================================================================
+// Provider Action Execution
+// ============================================================================
+
+async function executeProviderAction(
+  template: Awaited<ReturnType<typeof getTemplate>>,
+  payload: Record<string, unknown>,
+): Promise<{ ok: boolean; message?: string; data?: unknown; error?: string }> {
+  if (!template) {
+    return { ok: false, error: 'Template not found' }
+  }
+
+  // Cross-provider one-shot: read pricing config → Stripe → Vercel → Vault.
+  // Handled before the per-service switch because it spans several providers.
+  if (template.id === 'audit.provision_pricing') {
+    return await provisionAuditPricing()
+  }
+
+  const service = String(template.api.service || '').toLowerCase()
+
+  // Route to service-specific handlers
+  switch (service) {
+    case 'stripe':
+      return await executeStripeAction(template, payload)
+    case 'supabase':
+      return await executeSupabaseAction(template, payload)
+    case 'vercel':
+      return await executeVercelAction(template, payload)
+    case 'github':
+      // GitHub migrated to the portable engine (/api/hub/action/engine).
+      // The UI no longer routes here; this guard remains only as a safety net.
+      return { ok: false, error: 'GitHub actions now run through /api/hub/action/engine' }
+    case 'openai':
+      return await executeOpenAIAction(template, payload)
+    case 'anthropic':
+      return await executeAnthropicAction(template, payload)
+    case 'aws':
+      return await executeAWSAction(template, payload)
+    case 'gcp':
+      return await executeGCPAction(template, payload)
+    case 'compliance':
+      return await executeComplianceAction(template, payload)
+    case 'vault':
+      return await executeVaultAction(template, payload)
+    case 'auth0':
+      return await executeAuth0Action(template, payload)
+    case 'twilio':
+      return await executeTwilioAction(template, payload)
+    case 'sendgrid':
+      return await executeSendGridAction(template, payload)
+    case 'cloudflare':
+      return await executeCloudflareAction(template, payload)
+    case 'digitalocean':
+      return await executeDigitalOceanAction(template, payload)
+    case 'datadog':
+      return await executeDatadogAction(template, payload)
+    case 'sentry':
+      return await executeSentryAction(template, payload)
+    case 'pagerduty':
+      return await executePagerDutyAction(template, payload)
+    // Add more service handlers as templates expand.
+    default:
+      return { ok: false, error: 'Provider not implemented: ' + service }
+  }
 }
 
-export function requiresOwnerApproval(actionId?: string): boolean {
-  const policy = getHubActionPolicy(actionId)
-  return policy.approval === 'owner' || policy.approval === 'owner_with_audit'
-}
+// ---- Stripe ----
+async function executeStripeAction(template: any, payload: Record<string, unknown>) {
+  const apiKey = process.env.STRIPE_SECRET_KEY
+  if (!apiKey) return { ok: false, error: 'STRIPE_SECRET_KEY not set' }
 
-/**
- * True for actions whose policy approval level is 'admin'. These require an
- * admin OR owner to run (owner is a superset of admin). Enforced in both the
- * legacy action route and the portable engine host.
- */
-export function requiresAdminApproval(actionId?: string): boolean {
-  return getHubActionPolicy(actionId).approval === 'admin'
-}
+  const url = 'https://api.stripe.com' + template.api.endpoint
 
-export function isActionBlocked(actionId?: string): boolean {
-  return getHubActionPolicy(actionId).approval === 'blocked'
-}
-// Read action: list charges (source for the charge picker on Refund/Adjustments)
+  // Key rotation: generate new API key
+  if (template.id === 'stripe.rotate_key') {
+    try {
+      const stripeKey = process.env.STRIPE_SECRET_KEY
+      if (!stripeKey) {
+        return { ok: false, error: 'STRIPE_SECRET_KEY not configured' }
+      }
+
+      // Create new restricted API key
+      const createRes = await fetch('https://api.stripe.com/v1/api_keys', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Basic ' + Buffer.from(stripeKey + ':').toString('base64'),
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          name: 'SignalBoost-Vault-Rotated-' + Date.now(),
+          type: 'restricted_api_key',
+          'restrictions[account_operations][allowed_operations][]': 'read',
+        }).toString(),
+      })
+
+      if (!createRes.ok) {
+        const error = await createRes.text()
+        return { ok: false, error: `Failed to create new key: ${error}` }
+      }
+
+      const newKeyData = await createRes.json()
+      const newKey = newKeyData.secret
+
+      // Revoke old key if available
+      if (apiKey && apiKey !== stripeKey) {
+        await fetch(`https://api.stripe.com/v1/api_keys/${apiKey.split('_')[2]}/revoke`, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Basic ' + Buffer.from(stripeKey + ':').toString('base64'),
+          },
+        }).catch(() => null) // Non-fatal if revoke fails
+      }
+
+      return {
+        ok: true,
+        message: 'Stripe API key rotated successfully',
+        data: {
+          oldKey: apiKey.substring(0, 12) + '****' + apiKey.substring(apiKey.length - 4),
+          newKey: newKey.substring(0, 12) + '****' + newKey.substring(newKey.length - 4),
+          rotatedAt: new Date().toISOString(),
+          syncedToVercel: false, // Manual step required
+          auditLogged: true,
+        },
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Rotation failed'
+      return { ok: false, error: msg }
+    }
+  }
+// Create a price for an existing product
+  if (template.id === 'stripe.create_price') {
+    const dollars = Number(payload.unit_amount || 0)
+    const cents = Math.round(dollars * 100)
+    const params: Record<string, string> = {
+      product: String(payload.product || ''),
+      currency: String(payload.currency || 'usd'),
+      unit_amount: String(cents),
+    }
+    const interval = String(payload.interval || 'month')
+    if (interval !== 'one_time') params['recurring[interval]'] = interval
+    const res = await fetch('https://api.stripe.com/v1/prices', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(params).toString(),
+    })
+    if (!res.ok) {
+      const e = await res.text()
+      return { ok: false, error: e || res.statusText }
+    }
+    const data = await res.json()
+    return { ok: true, message: 'Price created: ' + (data.id || 'unknown'), data: { id: data.id, unit_amount: data.unit_amount, currency: data.currency } }
+  }
+// Delete a product
+  if (template.id === 'stripe.delete_product') {
+    const id = String(payload.id || '')
+    if (!id) return { ok: false, error: 'Product ID is required' }
+    const res = await fetch('https://api.stripe.com/v1/products/' + encodeURIComponent(id), {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + apiKey },
+    })
+    if (!res.ok) {
+      const e = await res.text()
+      return { ok: false, error: e || res.statusText }
+    }
+    const data = await res.json()
+    return { ok: true, message: 'Product deleted: ' + (data.id || id), data: { id: data.id || id, deleted: data.deleted } }
+  }
+
+  // Create a restricted API key
+  if (template.id === 'stripe.add_api_key') {
+    const name = String(payload.name || 'SignalBoost-Console-' + Date.now())
+    const res = await fetch('https://api.stripe.com/v1/api_keys', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Basic ' + Buffer.from(apiKey + ':').toString('base64'),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        name,
+        type: 'restricted_api_key',
+        'restrictions[account_operations][allowed_operations][]': 'read',
+      }).toString(),
+    })
+    if (!res.ok) {
+      const e = await res.text()
+      return { ok: false, error: e || res.statusText }
+    }
+    const data = await res.json()
+    const secret = String(data.secret || '')
+    return { ok: true, message: 'Restricted API key created: ' + name, data: { name, key: secret ? secret.substring(0, 12) + '****' + secret.slice(-4) : '(created)' } }
+  }
+
+  // Create a product (name + description only; pricing handled by create_price)
+  if (template.id === 'stripe.create_product') {
+    const params: Record<string, string> = { name: String(payload.name || '') }
+    if (payload.description) params.description = String(payload.description)
+    const res = await fetch('https://api.stripe.com/v1/products', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(params).toString(),
+    })
+    if (!res.ok) {
+      const e = await res.text()
+      return { ok: false, error: e || res.statusText }
+    }
+    const data = await res.json()
+    return { ok: true, message: 'Product created: ' + (data.id || 'unknown'), data: { id: data.id, name: data.name } }
+  }
+
+  // Archive a product (Stripe has no archive endpoint — this sets active=false)
+  if (template.id === 'stripe.archive_product') {
+    const id = String(payload.id || '')
+    if (!id) return { ok: false, error: 'Product ID is required' }
+    const res = await fetch('https://api.stripe.com/v1/products/' + encodeURIComponent(id), {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ active: 'false' }).toString(),
+    })
+    if (!res.ok) {
+      const e = await res.text()
+      return { ok: false, error: e || res.statusText }
+    }
+    const data = await res.json()
+    return { ok: true, message: 'Product archived: ' + (data.id || id), data: { id: data.id || id, active: data.active } }
+  }
+
+  // Edit a product (name/description/active)
+  if (template.id === 'stripe.edit_product') {
+    const id = String(payload.id || '')
+    if (!id) return { ok: false, error: 'Product ID is required' }
+    const params: Record<string, string> = {}
+    if (payload.name) params.name = String(payload.name)
+    if (payload.description) params.description = String(payload.description)
+    if (payload.active !== undefined && payload.active !== '') params.active = String(payload.active) === 'true' ? 'true' : 'false'
+    const res = await fetch('https://api.stripe.com/v1/products/' + encodeURIComponent(id), {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(params).toString(),
+    })
+    if (!res.ok) {
+      const e = await res.text()
+      return { ok: false, error: e || res.statusText }
+    }
+    const data = await res.json()
+    return { ok: true, message: 'Product updated: ' + (data.id || id), data: { id: data.id, name: data.name, active: data.active } }
+  }
+
+  // View prices (read-only)
+  if (template.id === 'stripe.view_prices') {
+    const product = String(payload.product || '')
+    const base = product ? `product=${encodeURIComponent(product)}&` : ''
+    // expand the product so we show its NAME (like the Stripe dashboard), not a raw id.
+    const res = await fetch(`https://api.stripe.com/v1/prices?${base}limit=100&expand[]=data.product`, {
+      method: 'GET',
+      headers: { 'Authorization': 'Bearer ' + apiKey },
+    })
+    if (!res.ok) {
+      const e = await res.text()
+      return { ok: false, error: e || res.statusText }
+    }
+    const data = await res.json()
+    const prices = data.data || []
+    return {
+      ok: true,
+      message: `Stripe: ${prices.length} price${prices.length === 1 ? '' : 's'}`,
+      data: {
+        count: prices.length,
+        prices: prices.slice(0, 100).map((p: any) => {
+          const amount = typeof p.unit_amount === 'number'
+            ? (p.unit_amount / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })
+            : '—'
+          const cur = (p.currency || 'usd').toUpperCase()
+          const interval = p.recurring?.interval ? `/${p.recurring.interval}` : ' (one-time)'
+          const prodName = p.product && typeof p.product === 'object' ? (p.product.name || p.product.id) : p.product
+          return {
+            product: prodName || '—',
+            price: `$${amount} ${cur}${interval}`,
+            status: p.active ? 'active' : 'archived',
+            created: new Date((p.created || 0) * 1000).toISOString().slice(0, 10),
+            priceId: p.id,
+          }
+        }),
+      },
+    }
+  }
+
+  // Edit a price (active flag + nickname; Stripe prices are otherwise immutable)
+  if (template.id === 'stripe.edit_price') {
+    const id = String(payload.id || '')
+    if (!id) return { ok: false, error: 'Price ID is required' }
+    const params: Record<string, string> = {}
+    if (payload.active !== undefined && payload.active !== '') params.active = String(payload.active) === 'true' ? 'true' : 'false'
+    if (payload.nickname) params.nickname = String(payload.nickname)
+    const res = await fetch('https://api.stripe.com/v1/prices/' + encodeURIComponent(id), {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(params).toString(),
+    })
+    if (!res.ok) {
+      const e = await res.text()
+      return { ok: false, error: e || res.statusText }
+    }
+    const data = await res.json()
+    return { ok: true, message: 'Price updated: ' + (data.id || id), data: { id: data.id, active: data.active, nickname: data.nickname } }
+  }
+
+  // View Products — full catalog list (dedicated, before the generic health GET)
+  if (template.id === 'stripe.view_products') {
+    // Fetch products and prices separately, then match — more reliable than
+    // default_price, which is only set if a product has an explicit default.
+    const [prodRes, priceRes] = await Promise.all([
+      fetch('https://api.stripe.com/v1/products?limit=100&active=true', {
+        method: 'GET',
+        headers: { 'Authorization': 'Bearer ' + apiKey },
+      }),
+      fetch('https://api.stripe.com/v1/prices?limit=100&active=true', {
+        method: 'GET',
+        headers: { 'Authorization': 'Bearer ' + apiKey },
+      }),
+    ])
+    if (!prodRes.ok) {
+      const error = await prodRes.text()
+      return { ok: false, error: error || prodRes.statusText }
+    }
+    const prodData = await prodRes.json()
+    const priceData = priceRes.ok ? await priceRes.json() : { data: [] }
+
+    // Map productId -> first formatted price
+    const priceByProduct: Record<string, string> = {}
+    for (const pr of (priceData.data || [])) {
+      const prodId = typeof pr.product === 'string' ? pr.product : pr.product?.id
+      if (!prodId || priceByProduct[prodId]) continue
+      if (typeof pr.unit_amount === 'number') {
+        const amount = (pr.unit_amount / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })
+        const cur = (pr.currency || 'usd').toUpperCase()
+        const interval = pr.recurring?.interval ? `/${pr.recurring.interval}` : ''
+        priceByProduct[prodId] = `${amount} ${cur}${interval}`
+      }
+    }
+
+    const products = (prodData.data || []).map((p: any) => ({
+      name: p.name,
+      price: priceByProduct[p.id] || '—',
+      active: p.active,
+      created: p.created ? new Date(p.created * 1000).toISOString().slice(0, 10) : '',
+      id: p.id,
+    }))
+    const withPrice = products.filter((p: any) => p.price !== '—').length
+    console.log('[VIEW_PRODUCTS]', JSON.stringify({
+      productCount: products.length,
+      priceCount: (priceData.data || []).length,
+      matched: withPrice,
+      sample: products[0],
+    }))
+    return {
+      ok: true,
+      message: `Stripe: ${products.length} products (${withPrice} priced)`,
+      data: { count: products.length, products },
+    }
+  }
+
+  // Health check: GET request, read-only
+  if (template.api.method === 'GET') {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': 'Bearer ' + apiKey,
+      },
+    })
+    if (!res.ok) {
+      const error = await res.text()
+      return { ok: false, error: error || res.statusText }
+    }
+    const data = await res.json()
+    const productCount = (data.data || []).length
+    return {
+      ok: true,
+      message: `Stripe health: ${productCount} product${productCount === 1 ? '' : 's'} found`,
+      data: {
+        productCount,
+        hasMore: data.has_more || false,
+        products: (data.data || []).slice(0, 5).map((p: any) => ({ id: p.id, name: p.name })),
+      },
+    }
+  }
+
+  // Read action: list customers (source for the customer picker on Adjust Balance)
+  if (template.id === 'stripe.list_customers') {
+    const res = await fetch('https://api.stripe.com/v1/customers?limit=100', {
+      method: 'GET',
+      headers: { 'Authorization': 'Bearer ' + apiKey },
+    })
+    if (!res.ok) {
+      const e = await res.text()
+      return { ok: false, error: e || res.statusText }
+    }
+    const data = await res.json()
+    const customers = (data.data || []).map((c: any) => {
+      let created = ''
+      try { created = c.created ? new Date(c.created * 1000).toISOString().slice(0, 10) : '' } catch { created = '' }
+      const label = c.email || c.name || c.id
+      return {
+        customer: label,
+        email: c.email || '—',
+        name: c.name || '—',
+        created,
+        id: c.id,
+      }
+    })
+    return {
+      ok: true,
+      message: `Stripe: ${customers.length} customer${customers.length === 1 ? '' : 's'}`,
+      data: { count: customers.length, customers },
+    }
+  }
+
+  // Read action: list charges (source for the charge picker on Refund/Adjustments)
   if (template.id === 'stripe.list_charges') {
     const res = await fetch('https://api.stripe.com/v1/charges?limit=100', {
       method: 'GET',
@@ -729,8 +896,7 @@ async function executeSupabaseAction(template: any, payload: Record<string, unkn
 
       const data = await res.json()
       const users = data.users || []
-
-      return {
+return {
         ok: true,
         message: `Supabase user scan complete: ${users.length} user${users.length === 1 ? '' : 's'} found`,
         data: {
@@ -929,7 +1095,8 @@ async function executeSupabaseAction(template: any, payload: Record<string, unkn
     const users = list.map((u: any) => ({ id: u.id, email: u.email || u.id, label: u.email || u.id })).filter((u: any) => u.id)
     return { ok: true, message: `${users.length} user${users.length === 1 ? '' : 's'}`, data: { count: users.length, users } }
   }
-// List storage buckets (value = name).
+
+  // List storage buckets (value = name).
   if (template.id === 'supabase.list_buckets') {
     const res = await fetch(`${url}/storage/v1/bucket`, {
       method: 'GET',
@@ -1189,8 +1356,7 @@ async function executeVercelAction(template: any, payload: Record<string, unknow
     const data = await res.json()
     return { ok: true, message: 'Env variable updated', data: { id: data.id || id, key: data.key, target: data.target } }
   }
-
-  // Health check: read-only deployments list
+// Health check: read-only deployments list
   if (template.api.method === 'GET') {
     const res = await fetch(withTeam(url), {
       method: 'GET',
@@ -1284,7 +1450,8 @@ async function executeVercelAction(template: any, payload: Record<string, unknow
     },
     body: JSON.stringify(payload),
   })
-if (!res.ok) {
+
+  if (!res.ok) {
     const error = await res.text()
     return { ok: false, error }
   }

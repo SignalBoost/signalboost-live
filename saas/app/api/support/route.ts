@@ -420,7 +420,6 @@ const TOOL_CREATE_OUTREACH_DRAFT: ChatTool = {
     },
   },
 }
-
 const TOOL_CREATE_MY_OUTREACH: ChatTool = {
   type: 'function',
   function: {
@@ -790,8 +789,7 @@ if (name === 'proposeGrowthPlan') {
       ? `Growth plan stored as PROPOSED on ${new Date().toUTCString().slice(0, 16)} with id ${result.id}. Tell the owner it awaits their explicit approval before any execution.`
       : `Plan could not be stored: ${result.error ?? 'unknown error'}.`
   }
-
-  if (name === 'updateGrowthPlanStatus') {
+if (name === 'updateGrowthPlanStatus') {
     let planId = ''
     let status = ''
     try {
@@ -896,11 +894,15 @@ if (name === 'proposeGrowthPlan') {
 }
 
 export async function POST(req: NextRequest) {
+  // Hoisted so the outer catch can localize + tier the degraded reply.
+  let errLangCode = 'en'
+  let errIsPrivileged = false
   try {
     const body         = await req.json()
     const messages     = (Array.isArray(body?.messages) ? body.messages : []) as SupportMessage[]
     const languageCode = String(body?.context?.language || 'en').toLowerCase()
     const language     = LANGUAGE_LABELS[languageCode] || 'English'
+    errLangCode = languageCode
     const currentPage  = String(body?.context?.currentPage || '/')
     const rawConvId    = String(body?.context?.conversationId || '')
     const conversationId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawConvId) ? rawConvId : null
@@ -923,6 +925,7 @@ export async function POST(req: NextRequest) {
       isPrivileged = false
       isOwner = false
     }
+    errIsPrivileged = isPrivileged
 
     if (!sanitized.length) {
       const local = getConciergeAnswer('', languageCode, currentPage)
@@ -1031,26 +1034,47 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
         new Promise<T>((_, reject) => setTimeout(() => reject(new Error('AI request timeout')), Math.max(5_000, remainingMs()))),
       ])
 
+    // A model error is "transient" if retrying might succeed: rate limits,
+    // overloads, and 5xx. Context-length / 400s are NOT retried (they'd just
+    // fail again) — they fall through to the graceful catch, which tells the
+    // owner exactly what happened.
+    const isTransient = (err: any): boolean => {
+      const status = err && (err.status || err.statusCode)
+      if (status === 429 || status === 500 || status === 502 || status === 503 || status === 529) return true
+      const m = err && err.message ? String(err.message).toLowerCase() : ''
+      return /overloaded|rate.?limit|econnreset|etimedout|temporar|\b(502|503|529)\b/.test(m)
+    }
+    const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, Math.max(0, ms)))
+
     // Calls the model; returns null on time-budget expiry instead of throwing,
     // so a long task degrades into a graceful "say continue" reply, never a 500.
+    // Transient errors (overloaded / rate-limited / 5xx) are retried with backoff
+    // while time remains, so a recoverable blip never hard-freezes the assistant.
     const callModel = async (choiceMode: 'auto' | 'required') => {
-      try {
-        const msg = await withTimeout(
-          anthropic.messages.create({
-            model,
-            max_tokens: 16000,
-            temperature,
-            system: systemContent,
-            messages: convo as any,
-            tools: anthropicTools as any,
-            tool_choice: choiceMode === 'required' ? { type: 'any' } : { type: 'auto' },
-          })
-        )
-        return msg
-      } catch (err) {
-        if (err instanceof Error && err.message === 'AI request timeout') return null
-        throw err
+      let lastErr: any = null
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const msg = await withTimeout(
+            anthropic.messages.create({
+              model,
+              max_tokens: 16000,
+              temperature,
+              system: systemContent,
+              messages: convo as any,
+              tools: anthropicTools as any,
+              tool_choice: choiceMode === 'required' ? { type: 'any' } : { type: 'auto' },
+            })
+          )
+          return msg
+        } catch (err) {
+          if (err instanceof Error && err.message === 'AI request timeout') return null
+          lastErr = err
+          // Stop retrying if it isn't recoverable, time is nearly out, or this was the last attempt.
+          if (!isTransient(err) || remainingMs() < 20_000 || attempt === 2) throw err
+          await sleep(Math.min(remainingMs() - 8_000, 1_200 * (attempt + 1)))
+        }
       }
+      throw lastErr
     }
 
     const ACTION_TRIGGER = /^(ok(ay)?|yes|si|sí|sure|proceed|continue|go(\s*ahead)?|do it|start|let'?s\s*(start|go)|next(\s*page)?|approved?|confirmed?|dale|adelante|sigue|empieza)[.!\s]*$/i
@@ -1101,7 +1125,13 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
       }
     }
     if (!reply) {
-      return NextResponse.json({ error: 'AI returned an empty response.' }, { status: 502 })
+      reply = ({
+        en: 'I could not produce a response for that. Please try rephrasing, or break it into smaller steps.',
+        es: 'No pude generar una respuesta para eso. Intenta reformularlo o dividirlo en pasos más pequeños.',
+        pt: 'Não consegui gerar uma resposta para isso. Tente reformular ou dividir em passos menores.',
+        pl: 'Nie udało mi się wygenerować odpowiedzi. Spróbuj przeformułować lub podzielić to na mniejsze kroki.',
+        ru: 'Не удалось сформировать ответ. Попробуйте переформулировать или разбить на меньшие шаги.',
+      } as Record<string, string>)[languageCode] || 'I could not produce a response for that. Please try rephrasing, or break it into smaller steps.'
     }
 
     // ── Persist this exchange to conversation history (logged-in users) ───
@@ -1121,6 +1151,17 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
     })
   } catch (error) {
     console.error('Support API error', error)
-    return NextResponse.json({ ok: false }, { status: 500 })
+    const detail = error instanceof Error ? error.message : 'unknown error'
+    const GENERIC: Record<string, string> = {
+      en: 'I hit a snag handling that and could not finish. It may have been a temporary model overload or a request that was too large — please try again, and split very large tasks into smaller steps.',
+      es: 'Tuve un problema al procesar eso y no pude terminar. Pudo ser una sobrecarga temporal del modelo o una solicitud demasiado grande — inténtalo de nuevo y divide las tareas muy grandes en pasos más pequeños.',
+      pt: 'Tive um problema ao processar isso e não consegui terminar. Pode ter sido uma sobrecarga temporária do modelo ou um pedido grande demais — tente novamente e divida tarefas muito grandes em passos menores.',
+      pl: 'Napotkałem problem i nie udało mi się dokończyć. To mogło być chwilowe przeciążenie modelu lub zbyt duże żądanie — spróbuj ponownie i podziel bardzo duże zadania na mniejsze kroki.',
+      ru: 'Возникла проблема, и я не смог завершить. Возможно, это была временная перегрузка модели или слишком большой запрос — попробуйте снова и разбивайте очень большие задачи на меньшие шаги.',
+    }
+    const base = GENERIC[errLangCode] || GENERIC.en
+    // The owner/admin gets the real error to debug; customers never see internals.
+    const reply = errIsPrivileged ? `${base}\n\n(Diagnostic — owner only: ${detail})` : base
+    return NextResponse.json({ reply, telemetry: { source: 'error-degraded' }, source: 'error-degraded' })
   }
 }

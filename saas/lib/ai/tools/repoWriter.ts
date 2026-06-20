@@ -1,13 +1,18 @@
 // saas/lib/ai/tools/repoWriter.ts
 // Step 2 "Hands": lets the Chief of Staff commit code to the repo — but ONLY
-// to ai/* branches, never main. Vercel builds a preview for every branch push;
-// the owner reviews and merges in GitHub. Production is never touched directly.
+// to ai/* branches, never main. Every commit also OPENS (or reuses) a pull
+// request against main, so the owner always has a concrete PR to approve —
+// not just a branch. Vercel builds a preview for the branch; the owner reviews
+// the PR + preview and merges. Production is never touched directly.
 //
 // Requires env var GITHUB_WRITE_TOKEN: a fine-grained PAT scoped to this repo
-// with Contents read/write only. Deliberately separate from the read-only
-// GITHUB_TOKEN used by repoReader.
+// with BOTH "Contents: read/write" AND "Pull requests: read/write". Without the
+// Pull-requests permission the commit still lands on the branch, but the PR call
+// returns 403 and the COS reports that the token needs the extra scope.
+// Deliberately separate from the read-only GITHUB_TOKEN used by repoReader.
 
 const REPO = 'SignalBoost/signalboost-live'
+const OWNER = REPO.split('/')[0]
 const BASE_BRANCH = 'main'
 const BRANCH_PREFIX = 'ai/'
 const API = 'https://api.github.com'
@@ -44,6 +49,28 @@ async function gh(path: string, init?: RequestInit): Promise<GhResponse> {
   } catch (err) {
     return { ok: false, status: 0, data: null, error: err instanceof Error ? err.message : 'GitHub request failed' }
   }
+}
+
+// ── Open (or reuse) a pull request for an ai/* branch ──────────────────────────
+// Idempotent: if a PR is already open for this branch it is reused, so a
+// multi-file job that commits several times to one branch yields ONE PR.
+async function ensurePullRequest(
+  branch: string,
+  title: string,
+  body: string,
+): Promise<{ ok: boolean; url: string; number: number; created: boolean; error: string }> {
+  const existing = await gh(`/repos/${REPO}/pulls?head=${OWNER}:${encodeURIComponent(branch)}&state=open&per_page=1`)
+  if (existing.ok && Array.isArray(existing.data) && existing.data.length > 0) {
+    const pr = existing.data[0]
+    return { ok: true, url: pr && pr.html_url ? pr.html_url : '', number: pr && pr.number ? pr.number : 0, created: false, error: '' }
+  }
+  const created = await gh(`/repos/${REPO}/pulls`, {
+    method: 'POST',
+    body: JSON.stringify({ title, head: branch, base: BASE_BRANCH, body, maintainer_can_modify: true }),
+  })
+  if (!created.ok) return { ok: false, url: '', number: 0, created: false, error: created.error }
+  const d = created.data || {}
+  return { ok: true, url: d.html_url || '', number: d.number || 0, created: true, error: '' }
 }
 
 // ── Fragment / elision guardrail ────────────────────────────────────────────────
@@ -222,7 +249,6 @@ export function findBadImports(content: string, filePath: string, paths: Set<str
   }
   return bad
 }
-
 export function preservedFraction(original: string, updated: string): number {
   const originalLines = original.split('\n').map(l => l.trim()).filter(l => l.length > 3)
   if (originalLines.length === 0) return 1
@@ -248,6 +274,9 @@ export type CommitResult = {
   path: string
   commitSha: string
   compareUrl: string
+  prUrl: string
+  prNumber: number
+  prError: string
   error: string
 }
 
@@ -259,7 +288,7 @@ export async function commitFileToBranch(params: {
   createNewFile?: boolean
   allowRewrite?: boolean
 }): Promise<CommitResult> {
-  const empty = { branch: '', path: '', commitSha: '', compareUrl: '' }
+  const empty = { branch: '', path: '', commitSha: '', compareUrl: '', prUrl: '', prNumber: 0, prError: '' }
 
   const branchResult = await ensureBranch(params.branch)
   if (!branchResult.ok) return { ok: false, ...empty, error: branchResult.error }
@@ -344,12 +373,33 @@ export async function commitFileToBranch(params: {
   if (!put.ok) return { ok: false, ...empty, branch, path: filePath, error: put.error }
 
   const commitSha = put.data && put.data.commit && put.data.commit.sha ? put.data.commit.sha : 'unknown'
+  const compareUrl = `https://github.com/${REPO}/compare/${BASE_BRANCH}...${encodeURIComponent(branch)}`
+
+  // Open (or reuse) a PR so the owner has something concrete to approve.
+  // Best-effort: a PR failure never discards a successful commit — the branch
+  // still holds the work and prError carries the reason for the report.
+  const prTitle = params.message && params.message.trim()
+    ? params.message.trim().split('\n')[0].slice(0, 120)
+    : `COS proposal: ${branch}`
+  const prBody = [
+    'Automated proposal from the Chief of Staff.',
+    '',
+    `Branch: \`${branch}\``,
+    `File in this commit: \`${filePath}\``,
+    '',
+    'Vercel is building a preview for this branch. Review the diff and the preview, then merge to apply. Production is untouched until you merge.',
+  ].join('\n')
+  const pr = await ensurePullRequest(branch, prTitle, prBody)
+
   return {
     ok: true,
     branch,
     path: filePath,
     commitSha,
-    compareUrl: `https://github.com/${REPO}/compare/${BASE_BRANCH}...${encodeURIComponent(branch)}`,
+    compareUrl,
+    prUrl: pr.ok ? pr.url : '',
+    prNumber: pr.ok ? pr.number : 0,
+    prError: pr.ok ? '' : pr.error,
     error: '',
   }
 }
@@ -444,12 +494,21 @@ export function formatDeleteResultForAI(result: DeleteBranchesResult): string {
 // ── Format results for the AI ───────────────────────────────────────────────────
 export function formatCommitResultForAI(result: CommitResult): string {
   if (!result.ok) return `COMMIT FAILED: ${result.error}`
-  return `COMMIT SUCCEEDED on branch "${result.branch}" (never main).
-File: ${result.path}
-Commit: ${result.commitSha}
-Vercel is building a preview deployment for this branch now.
-Review & merge here: ${result.compareUrl}
-Tell the owner: the change is on a preview branch — merge it in GitHub once the Vercel preview is green. Production is untouched until they merge.`
+  const lines = [
+    `COMMIT SUCCEEDED on branch "${result.branch}" (never main).`,
+    `File: ${result.path}`,
+    `Commit: ${result.commitSha}`,
+    'Vercel is building a preview deployment for this branch now.',
+  ]
+  if (result.prUrl) {
+    lines.push(`Pull request #${result.prNumber} is open for approval: ${result.prUrl}`)
+    lines.push('Tell the owner: review the PR and the Vercel preview, then merge it to apply. Production is untouched until they merge.')
+  } else {
+    lines.push(`NOTE: the branch was pushed, but a pull request could NOT be opened automatically: ${result.prError || 'unknown reason'}`)
+    lines.push(`Open a PR from the branch here: ${result.compareUrl}`)
+    lines.push('Tell the owner: to get PRs opening automatically, the GITHUB_WRITE_TOKEN fine-grained PAT needs "Pull requests: read and write" added (it currently has Contents only).')
+  }
+  return lines.join('\n')
 }
 
 export function formatBranchListForAI(result: BranchListResult): string {

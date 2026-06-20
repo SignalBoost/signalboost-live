@@ -1,100 +1,121 @@
 /**
  * saas/lib/audit/pricingConfig.ts
- * Single source of truth for Audit pricing tiers.
- * Fully self-contained — no imports from platform plan types.
+ * Self-contained audit pricing configuration.
+ * Zero imports from platform plan types or external modules.
  */
 
-export type AuditCount = number | "Unlimited";
+export interface AuditCount {
+  value: number;
+  unlimited: boolean;
+  label: string;
+}
 
 export interface AuditTier {
-  id: "starter" | "growth" | "pro" | "enterprise";
-  stripePriceEnvKey: string;
-  monthlyUsd: number;
-  auditCount: AuditCount;
+  id: string;
+  name: string;
+  price: number;
+  billingPeriod: string;
+  auditsPerMonth: AuditCount;
+  features: string[];
+  ctaLabel: string;
   isPopular: boolean;
   isEnterprise: boolean;
-  features: readonly string[];
+  stripePriceId: string | null;
 }
 
 export interface AuditPricingConfig {
-  tiers: readonly AuditTier[];
+  tiers: AuditTier[];
+  currency: string;
+  currencySymbol: string;
 }
 
 export const AUDIT_PRICING_CONFIG: AuditPricingConfig = {
+  currency: 'USD',
+  currencySymbol: '$',
   tiers: [
     {
-      id: "starter",
-      stripePriceEnvKey: "AUDIT_STRIPE_PRICE_STARTER",
-      monthlyUsd: 29,
-      auditCount: 3,
+      id: 'audit-starter',
+      name: 'Starter',
+      price: 29,
+      billingPeriod: 'month',
+      auditsPerMonth: { value: 3, unlimited: false, label: '3 audits / mo' },
+      features: [
+        'AI-powered site audit',
+        'SEO gap analysis',
+        'Performance score',
+        'PDF export',
+        'Email support',
+      ],
+      ctaLabel: 'Get Started',
       isPopular: false,
       isEnterprise: false,
-      features: [
-        "3 full site audits per month",
-        "SEO & performance scoring",
-        "Branded PDF export",
-        "Email delivery",
-        "5-language reports",
-      ],
+      stripePriceId: null,
     },
     {
-      id: "growth",
-      stripePriceEnvKey: "AUDIT_STRIPE_PRICE_GROWTH",
-      monthlyUsd: 79,
-      auditCount: 20,
+      id: 'audit-growth',
+      name: 'Growth',
+      price: 79,
+      billingPeriod: 'month',
+      auditsPerMonth: { value: 20, unlimited: false, label: '20 audits / mo' },
+      features: [
+        'Everything in Starter',
+        'Competitor benchmarking',
+        'Branded PDF reports',
+        'Priority support',
+        'API access',
+      ],
+      ctaLabel: 'Start Growing',
       isPopular: true,
       isEnterprise: false,
-      features: [
-        "20 full site audits per month",
-        "Competitor benchmarking",
-        "Priority processing",
-        "Branded PDF export",
-        "Email delivery",
-        "5-language reports",
-      ],
+      stripePriceId: null,
     },
     {
-      id: "pro",
-      stripePriceEnvKey: "AUDIT_STRIPE_PRICE_PRO",
-      monthlyUsd: 199,
-      auditCount: 100,
+      id: 'audit-pro',
+      name: 'Pro',
+      price: 199,
+      billingPeriod: 'month',
+      auditsPerMonth: { value: 100, unlimited: false, label: '100 audits / mo' },
+      features: [
+        'Everything in Growth',
+        'White-label reports',
+        'Team seats (up to 5)',
+        'Webhook integrations',
+        'Dedicated account manager',
+      ],
+      ctaLabel: 'Go Pro',
       isPopular: false,
       isEnterprise: false,
-      features: [
-        "100 full site audits per month",
-        "White-label reports",
-        "API access",
-        "Competitor benchmarking",
-        "Priority processing",
-        "5-language reports",
-      ],
+      stripePriceId: null,
     },
     {
-      id: "enterprise",
-      stripePriceEnvKey: "AUDIT_STRIPE_PRICE_ENTERPRISE",
-      monthlyUsd: 599,
-      auditCount: "Unlimited",
+      id: 'audit-enterprise',
+      name: 'Enterprise',
+      price: 599,
+      billingPeriod: 'month',
+      auditsPerMonth: { value: 0, unlimited: true, label: 'Unlimited audits' },
+      features: [
+        'Everything in Pro',
+        'Unlimited team seats',
+        'Custom integrations',
+        'SLA guarantee',
+        'Onboarding & training',
+      ],
+      ctaLabel: 'Contact Sales',
       isPopular: false,
       isEnterprise: true,
-      features: [
-        "Unlimited audits",
-        "Dedicated account manager",
-        "Custom integrations",
-        "White-label reports",
-        "API access",
-        "SLA guarantee",
-        "5-language reports",
-      ],
+      stripePriceId: null,
     },
   ],
-} as const;
+};
 
-export function getStripePriceId(envKey: string): string {
-  const value: string | undefined = process.env[envKey];
-  return value ?? "";
+export function getAuditTierById(id: string): AuditTier | undefined {
+  return AUDIT_PRICING_CONFIG.tiers.find(
+    (tier: AuditTier): boolean => tier.id === id
+  );
 }
 
-export function formatAuditCount(count: AuditCount): string {
-  if (count === "Unlimited") return "Unlimited";
-  return String(count);
+export function getPopularAuditTier(): AuditTier | undefined {
+  return AUDIT_PRICING_CONFIG.tiers.find(
+    (tier: AuditTier): boolean => tier.isPopular === true
+  );
 }

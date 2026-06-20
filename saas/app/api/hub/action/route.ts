@@ -453,8 +453,7 @@ async function executeStripeAction(template: any, payload: Record<string, unknow
     const data = await res.json()
     return { ok: true, message: 'Price created: ' + (data.id || 'unknown'), data: { id: data.id, unit_amount: data.unit_amount, currency: data.currency } }
   }
-
-  // Delete a product
+// Delete a product
   if (template.id === 'stripe.delete_product') {
     const id = String(payload.id || '')
     if (!id) return { ok: false, error: 'Product ID is required' }
@@ -926,8 +925,7 @@ async function executeSupabaseAction(template: any, payload: Record<string, unkn
     const data = await res.json()
     return { ok: true, message: 'Invitation sent to ' + email, data }
   }
-
-  // View users (read-only list)
+// View users (read-only list)
   if (template.id === 'supabase.view_users') {
     const res = await fetch(`${url}/auth/v1/admin/users?per_page=50`, {
       method: 'GET',
@@ -1380,28 +1378,57 @@ async function executeVercelAction(template: any, payload: Record<string, unknow
     }
   }
 
-  // Create an environment variable — correct endpoint + Vercel payload shape.
+  // Create OR update an environment variable (idempotent upsert). A plain POST
+  // fails if the key already exists for that target, which makes re-runs and
+  // value changes error out — so on conflict we look the var up by key and PATCH it.
   if (template.id === 'vercel.add_env_var') {
     const key = String(payload.key ?? payload.envKey ?? '').trim()
     const value = String(payload.value ?? payload.envValue ?? '')
     if (!key) return { ok: false, error: 'Variable key is required' }
+    const targets = vercelTargets(payload.target ?? payload.environment)
     const body = {
       key,
       value,
       type: String(payload.type || 'encrypted'),
-      target: vercelTargets(payload.target ?? payload.environment),
+      target: targets,
     }
     const res = await fetch(withTeam(`https://api.vercel.com/v9/projects/${projectId}/env`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       body: JSON.stringify(body),
     })
-    if (!res.ok) {
-      const e = await res.text()
-      return { ok: false, error: e }
+    if (res.ok) {
+      const data = await res.json().catch(() => ({}))
+      return { ok: true, message: `Environment variable ${key} created`, data: { key, target: targets, id: data?.created?.id || data?.id } }
     }
-    const data = await res.json()
-    return { ok: true, message: `Environment variable ${key} created`, data: { key, target: body.target } }
+
+    // Not OK — if it already exists, fall through to an update so this is idempotent.
+    const errText = await res.text().catch(() => '')
+    const alreadyExists = res.status === 400 || res.status === 409 || /already exists|ENV_ALREADY_EXISTS|exists/i.test(errText)
+    if (!alreadyExists) return { ok: false, error: errText || `Vercel returned ${res.status}` }
+
+    // Look up the existing var's id by key, then PATCH it.
+    const listRes = await fetch(withTeam(`https://api.vercel.com/v9/projects/${projectId}/env`), {
+      method: 'GET', headers: { 'Authorization': 'Bearer ' + token },
+    })
+    if (!listRes.ok) {
+      return { ok: false, error: `"${key}" already exists but its current value could not be read to update it: ${await listRes.text().catch(() => '')}` }
+    }
+    const listData = await listRes.json().catch(() => ({}))
+    const envs = Array.isArray(listData?.envs) ? listData.envs : (Array.isArray(listData) ? listData : [])
+    const existing = envs.find((e: any) => e && e.key === key)
+    if (!existing || !existing.id) {
+      return { ok: false, error: `"${key}" already exists but its id could not be located to update it.` }
+    }
+    const patchRes = await fetch(withTeam(`https://api.vercel.com/v9/projects/${projectId}/env/${encodeURIComponent(existing.id)}`), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ value, target: targets }),
+    })
+    if (!patchRes.ok) {
+      return { ok: false, error: `"${key}" already exists and the update failed: ${await patchRes.text().catch(() => '')}` }
+    }
+    return { ok: true, message: `Environment variable ${key} updated (already existed)`, data: { key, target: targets, id: existing.id } }
   }
 
   // Write action: set environment variable
@@ -1438,8 +1465,7 @@ async function executeOpenAIAction(template: any, payload: Record<string, unknow
     },
     body: template.api.method === 'GET' ? undefined : JSON.stringify(payload),
   })
-
-  if (!res.ok) {
+if (!res.ok) {
     const error = await res.text()
     return { ok: false, error }
   }

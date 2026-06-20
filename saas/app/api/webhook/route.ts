@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import crypto from 'crypto'
 
 // ─── Price-ID → internal plan maps ────────────────────────────────────────────
-// Defect #5 fix: build the maps from ONLY the env vars that are actually set.
-// Previously an unset STRIPE_PRICE_* var became the literal string key
-// "undefined", and two unset vars collided on that same key — silently
-// misrouting plans. We now skip undefined entries and log any that are missing.
-
 function buildPriceMap(
   entries: Array<[string | undefined, string]>,
   label: string,
@@ -47,11 +41,25 @@ const PODCAST_PLAN_MAP: Record<string, string> = buildPriceMap(
   'podcast',
 )
 
+// ─── Audit plan map (populated by audit.provision_pricing provisioner) ─────────
+// Keys are the live Stripe price IDs written to Vercel env vars by the
+// audit.provision_pricing one-shot provisioner. Values are the four valid
+// audit tier slugs that match the CHECK constraint on subscriptions.audit_plan.
+const AUDIT_PLAN_MAP: Record<string, string> = buildPriceMap(
+  [
+    [process.env.NEXT_PUBLIC_STRIPE_PRICE_AUDIT_STARTER,    'starter'],
+    [process.env.NEXT_PUBLIC_STRIPE_PRICE_AUDIT_GROWTH,     'growth'],
+    [process.env.NEXT_PUBLIC_STRIPE_PRICE_AUDIT_PRO,        'pro'],
+    [process.env.NEXT_PUBLIC_STRIPE_PRICE_AUDIT_ENTERPRISE, 'enterprise'],
+  ],
+  'audit',
+)
+
 function resolvePlanAndLine(
   priceId: string | undefined,
   metaProductLine?: string,
   metaPlan?: string,
-): { plan: string; productLine: 'website' | 'podcast' | 'unsupported' } {
+): { plan: string; productLine: 'website' | 'podcast' | 'audit' | 'unsupported' } {
   // 1. Try explicit price ID lookup (most reliable)
   if (priceId) {
     if (WEBSITE_PLAN_MAP[priceId]) {
@@ -60,15 +68,18 @@ function resolvePlanAndLine(
     if (PODCAST_PLAN_MAP[priceId]) {
       return { plan: PODCAST_PLAN_MAP[priceId], productLine: 'podcast' }
     }
+    if (AUDIT_PLAN_MAP[priceId]) {
+      return { plan: AUDIT_PLAN_MAP[priceId], productLine: 'audit' }
+    }
   }
-  // 2. Fall back to metadata. Only 'website' and 'podcast' are real product
-  //    lines today. An unset line is treated as website for backward-compat
-  //    (legacy sessions), but any OTHER explicit value (e.g. 'audit', set by the
-  //    not-yet-real audit checkout) is 'unsupported' — the handler MUST NOT write
-  //    website/podcast columns for it, or it would silently overwrite the buyer's
-  //    real plan with a website 'starter'.
+  // 2. Fall back to metadata.
   if (metaProductLine === 'podcast') {
     return { plan: metaPlan || 'indie', productLine: 'podcast' }
+  }
+  if (metaProductLine === 'audit') {
+    const validAuditPlans = ['starter', 'growth', 'pro', 'enterprise']
+    const plan = metaPlan && validAuditPlans.includes(metaPlan) ? metaPlan : 'starter'
+    return { plan, productLine: 'audit' }
   }
   if (!metaProductLine || metaProductLine === 'website') {
     return { plan: metaPlan || 'starter', productLine: 'website' }
@@ -77,14 +88,6 @@ function resolvePlanAndLine(
 }
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
-// Defect #1 fix: the `subscriptions` CHECK constraint only permits
-// ('active','trialing','cancelled','past_due') — note UK 'cancelled'.
-// Stripe emits US 'canceled' plus other statuses ('unpaid','incomplete',
-// 'incomplete_expired','paused') that are NOT in the constraint, so writing
-// `sub.status` raw causes Postgres to REJECT the update. We map every Stripe
-// status onto the allowed set. Unknown values resolve to 'past_due' (a safe
-// middle that never silently grants access).
-
 type DbStatus = 'active' | 'trialing' | 'cancelled' | 'past_due'
 
 function normalizeStatus(stripeStatus: string | undefined): DbStatus {
@@ -97,10 +100,9 @@ function normalizeStatus(stripeStatus: string | undefined): DbStatus {
       return 'past_due'
     case 'unpaid':
     case 'incomplete':
-      // payment not (yet) good — withhold access without fully cancelling
       return 'past_due'
-    case 'canceled':            // Stripe US spelling
-    case 'cancelled':           // defensive
+    case 'canceled':
+    case 'cancelled':
     case 'incomplete_expired':
     case 'paused':
       return 'cancelled'
@@ -109,27 +111,34 @@ function normalizeStatus(stripeStatus: string | undefined): DbStatus {
   }
 }
 
-// ─── Stripe signature verification ───────────────────────────────────────────
-// Defect #6 (partial) fix: a signature header may carry MULTIPLE v1 signatures
-// (e.g. during webhook-secret rotation). The previous reducer kept only the
-// last one. We now accept the event if ANY v1 signature matches.
+// ─── Stripe signature verification (Web Crypto — edge compatible) ─────────────
+// Uses SubtleCrypto (globalThis.crypto.subtle) instead of Node's crypto module
+// so the route works in both Node.js and Edge runtimes without a native import.
+// Logic is identical: HMAC-SHA256 over "timestamp.payload", compared against
+// every v1 signature in the header using a timing-safe byte comparison.
 
-function safeEqualHex(a: string, b: string): boolean {
-  try {
-    const ab = Buffer.from(a, 'hex')
-    const bb = Buffer.from(b, 'hex')
-    if (ab.length === 0 || ab.length !== bb.length) return false
-    return crypto.timingSafeEqual(ab, bb)
-  } catch {
-    return false
+function hexToUint8(hex: string): Uint8Array {
+  const arr = new Uint8Array(hex.length / 2)
+  for (let i = 0; i < arr.length; i++) {
+    arr[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
   }
+  return arr
 }
 
-function verifyStripeSignature(
+function timingSafeEqualBytes(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) {
+    diff |= a[i] ^ b[i]
+  }
+  return diff === 0
+}
+
+async function verifyStripeSignature(
   payload: string,
   sigHeader: string,
   secret: string,
-): boolean {
+): Promise<boolean> {
   try {
     let timestamp = ''
     const v1Signatures: string[] = []
@@ -143,23 +152,32 @@ function verifyStripeSignature(
     }
     if (!timestamp || v1Signatures.length === 0) return false
 
+    const enc = new TextEncoder()
+    const keyMaterial = await globalThis.crypto.subtle.importKey(
+      'raw',
+      enc.encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign'],
+    )
     const signed = `${timestamp}.${payload}`
-    const expected = crypto
-      .createHmac('sha256', secret)
-      .update(signed)
-      .digest('hex')
+    const sigBuffer = await globalThis.crypto.subtle.sign('HMAC', keyMaterial, enc.encode(signed))
+    const expected = new Uint8Array(sigBuffer)
 
-    return v1Signatures.some((candidate) => safeEqualHex(expected, candidate))
+    return v1Signatures.some((candidate) => {
+      try {
+        const candidateBytes = hexToUint8(candidate)
+        return timingSafeEqualBytes(expected, candidateBytes)
+      } catch {
+        return false
+      }
+    })
   } catch {
     return false
   }
 }
 
 // ─── period-end extraction ────────────────────────────────────────────────────
-// Defect #4 fix: recent Stripe API versions relocated `current_period_end` from
-// the subscription object onto each subscription item. Read both locations so
-// the value is captured regardless of the account's API version.
-
 function extractPeriodEnd(sub: any): string | null {
   const epoch =
     sub?.current_period_end ??
@@ -168,20 +186,14 @@ function extractPeriodEnd(sub: any): string | null {
   return epoch ? new Date(epoch * 1000).toISOString() : null
 }
 
-// ─── Defect #3 fix: look up an auth user by email via the admin API ───────────
-// The previous code queried `.from('auth.users')`, which resolves against the
-// PUBLIC schema and therefore never matches — a silent dead end. The service
-// role can enumerate auth users through the admin API. This fallback only fires
-// when a session has no metadata.userId (sessions created by our own checkout
-// route always include it), so a bounded scan is acceptable.
-
+// ─── Auth user lookup by email ────────────────────────────────────────────────
 async function findUserIdByEmail(
   supabase: any,
   email: string,
 ): Promise<string | null> {
   const target = email.toLowerCase()
   const perPage = 200
-  const maxPages = 20 // hard cap so a large user base can never hang the webhook
+  const maxPages = 20
   for (let page = 1; page <= maxPages; page++) {
     const { data, error } = await supabase.auth.admin.listUsers({ page, perPage })
     if (error) {
@@ -189,36 +201,25 @@ async function findUserIdByEmail(
       return null
     }
     const users = data?.users ?? []
-    const match = users.find((u) => (u.email || '').toLowerCase() === target)
+    const match = users.find((u: any) => (u.email || '').toLowerCase() === target)
     if (match?.id) return match.id
-    if (users.length < perPage) break // last page reached
+    if (users.length < perPage) break
   }
   return null
 }
 
 // ─── Stripe event idempotency ─────────────────────────────────────────────────
-// Balance increments are NOT idempotent, and Stripe may deliver the same event
-// more than once (retries, at-least-once delivery). We claim each event.id in
-// `stripe_processed_events` before crediting. claimStripeEvent returns true only
-// the FIRST time an id is seen; a redelivery hits the primary-key unique
-// violation (23505) and returns false so the handler skips. If the table is
-// missing or the insert fails for any other reason we fail OPEN (return true and
-// proceed) — better to risk a rare double-credit than to block real purchases —
-// but we log loudly so the gap is visible.
-
 async function claimStripeEvent(supabase: any, eventId: string | undefined): Promise<boolean> {
   if (!eventId) return true
   const { error } = await supabase
     .from('stripe_processed_events')
     .insert({ event_id: eventId })
   if (!error) return true
-  if (error.code === '23505') return false // already processed
+  if (error.code === '23505') return false
   console.warn('Webhook: claimStripeEvent insert error (proceeding fail-open)', error.code, error.message)
   return true
 }
 
-// Releases a previously-claimed event so a Stripe retry can re-attempt it. Used
-// only when crediting failed AFTER the claim — so the retry is allowed to run.
 async function releaseStripeEvent(supabase: any, eventId: string | undefined): Promise<void> {
   if (!eventId) return
   await supabase
@@ -229,18 +230,6 @@ async function releaseStripeEvent(supabase: any, eventId: string | undefined): P
 }
 
 // ─── Audit credit top-up (one-time credit-pack purchase) ──────────────────────
-// Distinct from the audit SUBSCRIPTION (productLine: 'audit'). A top-up is a
-// mode:'payment' Checkout Session whose metadata carries:
-//   metadata.type         = 'audit_credit_topup'   (the discriminator)
-//   metadata.userId       = buyer's Supabase auth id (set by our checkout route)
-//   metadata.creditAmount = how many audit credits this pack grants (integer)
-//
-// It must NEVER fall through to the subscription upsert (that would clobber the
-// buyer's real plan). We resolve the buyer, bound-check the quantity, then add
-// the credits ATOMICALLY in Postgres via the increment_audit_credits RPC — we
-// never read-modify-write a balance from JS (lost-update risk). The Stripe event
-// id guards against double-crediting on redelivery.
-
 async function handleAuditCreditTopup(
   supabase: any,
   session: any,
@@ -252,7 +241,6 @@ async function handleAuditCreditTopup(
     return NextResponse.json({ received: true, deduped: true })
   }
 
-  // Resolve the buyer (metadata.userId first, email fallback — same as subs).
   let userId = session.metadata?.userId
   if (!userId && session.customer_email) {
     console.warn('Webhook audit_credit_topup: metadata.userId missing, email fallback', session.customer_email)
@@ -262,12 +250,9 @@ async function handleAuditCreditTopup(
     console.error('Webhook audit_credit_topup: no userId found', {
       sessionId: session.id, metadata: session.metadata, email: session.customer_email,
     })
-    // 200 so Stripe stops retrying a session we can never attribute.
     return NextResponse.json({ received: true, warning: 'no userId' })
   }
 
-  // Bound-check the quantity: positive integer, sane upper cap so a malformed or
-  // tampered metadata value can never mint an absurd balance.
   const raw = session.metadata?.creditAmount
   const credits = Number.parseInt(String(raw ?? ''), 10)
   if (!Number.isInteger(credits) || credits <= 0 || credits > 100000) {
@@ -275,14 +260,12 @@ async function handleAuditCreditTopup(
     return NextResponse.json({ received: true, warning: 'invalid creditAmount' })
   }
 
-  // Atomic increment (creates the subscriptions row if the buyer has none yet).
   const { data, error } = await supabase.rpc('increment_audit_credits', {
     target_user_id: userId,
     add_amount: credits,
   })
   if (error) {
     console.error('Webhook audit_credit_topup: increment_audit_credits failed', error.message)
-    // Roll back the idempotency claim so Stripe's retry can re-attempt crediting.
     await releaseStripeEvent(supabase, eventId)
     return NextResponse.json({ error: 'DB error' }, { status: 500 })
   }
@@ -291,6 +274,49 @@ async function handleAuditCreditTopup(
     userId, credits, newBalance: data, sessionId: session.id,
   })
   return NextResponse.json({ received: true, credited: credits, balance: data ?? null })
+}
+
+// ─── Audit subscription upsert ────────────────────────────────────────────────
+// Handles checkout.session.completed for productLine === 'audit'.
+// Writes audit_plan, audit_status, and the Stripe IDs into the subscriptions
+// row. Does NOT touch website or podcast columns.
+
+async function handleAuditSubscription(
+  supabase: any,
+  session: any,
+  plan: string,
+): Promise<NextResponse> {
+  let userId = session.metadata?.userId
+  if (!userId && session.customer_email) {
+    console.warn('Webhook audit subscription: metadata.userId missing, email fallback', session.customer_email)
+    userId = await findUserIdByEmail(supabase, session.customer_email)
+  }
+  if (!userId) {
+    console.error('Webhook audit subscription: no userId found', {
+      sessionId: session.id, metadata: session.metadata, email: session.customer_email,
+    })
+    return NextResponse.json({ received: true, warning: 'no userId' })
+  }
+
+  const { error } = await supabase.from('subscriptions').upsert(
+    {
+      user_id:                         userId,
+      audit_plan:                      plan,
+      audit_status:                    'active',
+      audit_stripe_customer_id:        session.customer,
+      audit_stripe_subscription_id:    session.subscription,
+      updated_at:                      new Date().toISOString(),
+    },
+    { onConflict: 'user_id' },
+  )
+
+  if (error) {
+    console.error('Webhook audit subscription: supabase upsert error', error)
+    return NextResponse.json({ error: 'DB error' }, { status: 500 })
+  }
+
+  console.log('Webhook: audit subscription upserted', { userId, plan, sessionId: session.id })
+  return NextResponse.json({ received: true })
 }
 
 // ─── Webhook handler ──────────────────────────────────────────────────────────
@@ -305,7 +331,8 @@ export async function POST(req: NextRequest) {
   const sig    = req.headers.get('stripe-signature') || ''
   const secret = process.env.STRIPE_WEBHOOK_SECRET!
 
-  if (!verifyStripeSignature(body, sig, secret)) {
+  const sigValid = await verifyStripeSignature(body, sig, secret)
+  if (!sigValid) {
     console.error('Webhook: signature verification FAILED')
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
@@ -323,31 +350,35 @@ export async function POST(req: NextRequest) {
   try {
     switch (event.type) {
 
-      // ── New subscription purchased ─────────────────────────────────────────
+      // ── New subscription / one-time purchase ───────────────────────────────
       case 'checkout.session.completed': {
         const session = event.data.object
 
-        // Audit credit-pack top-up (one-time payment) — handled and returned
-        // here so it can NEVER fall through to the subscription upsert below.
+        // Audit credit-pack top-up — handled first, never falls through.
         if (session.metadata?.type === 'audit_credit_topup') {
           return await handleAuditCreditTopup(supabase, session, event.id)
         }
 
-        let userId    = session.metadata?.userId
         const priceId      = session.metadata?.priceId
         const metaLine     = session.metadata?.productLine
         const metaPlan     = session.metadata?.plan
         const { plan, productLine } = resolvePlanAndLine(priceId, metaLine, metaPlan)
 
-        // Refuse to write a subscription for a product line we don't support yet
-        // (e.g. 'audit'). Returning 200 stops Stripe retrying; crucially we do NOT
-        // fall through to the website upsert, which would clobber a real plan.
+        // ── Audit subscription (recurring) ─────────────────────────────────
+        if (productLine === 'audit') {
+          return await handleAuditSubscription(supabase, session, plan)
+        }
+
+        // Truly unknown product line — return 200 to stop Stripe retrying.
         if (productLine === 'unsupported') {
           console.warn('Webhook checkout.session.completed: unsupported product line — no subscription written', {
             productLine: metaLine, sessionId: session.id,
           })
           return NextResponse.json({ received: true, warning: 'unsupported product line' })
         }
+
+        // ── Website / Podcast subscription ─────────────────────────────────
+        let userId = session.metadata?.userId
         if (!userId && session.customer_email) {
           console.warn(
             'Webhook: metadata.userId missing, falling back to email lookup',
@@ -362,14 +393,12 @@ export async function POST(req: NextRequest) {
             metadata:  session.metadata,
             email:     session.customer_email,
           })
-          // Return 200 so Stripe does not retry forever
           return NextResponse.json({ received: true, warning: 'no userId' })
         }
 
         console.log('Webhook: upserting subscription', { userId, plan, productLine, priceId })
 
         if (productLine === 'podcast') {
-          // Upsert only podcast columns — website columns are untouched
           const { error } = await supabase.from('subscriptions').upsert(
             {
               user_id:                        userId,
@@ -386,7 +415,6 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'DB error' }, { status: 500 })
           }
         } else {
-          // Upsert only website columns — podcast columns are untouched
           const { error } = await supabase.from('subscriptions').upsert(
             {
               user_id:                userId,
@@ -420,6 +448,21 @@ export async function POST(req: NextRequest) {
 
         if (productLine === 'unsupported') {
           console.warn('Webhook subscription.updated: unsupported product line — skipping', sub.id)
+          break
+        }
+
+        if (productLine === 'audit') {
+          const { error } = await supabase
+            .from('subscriptions')
+            .update({
+              audit_plan:   plan,
+              audit_status: status,
+              updated_at:   new Date().toISOString(),
+            })
+            .eq('audit_stripe_subscription_id', sub.id)
+
+          if (error) console.error('Webhook subscription.updated (audit): supabase error', error)
+          else console.log('Webhook: audit subscription updated', sub.id, '->', plan, status)
           break
         }
 
@@ -457,7 +500,29 @@ export async function POST(req: NextRequest) {
       case 'customer.subscription.deleted': {
         const sub = event.data.object
 
-        // Check if this is a website subscription
+        // Check audit subscription first
+        const { data: auditRow } = await supabase
+          .from('subscriptions')
+          .select('user_id')
+          .eq('audit_stripe_subscription_id', sub.id)
+          .maybeSingle()
+
+        if (auditRow) {
+          const { error } = await supabase
+            .from('subscriptions')
+            .update({
+              audit_plan:   null,
+              audit_status: 'cancelled',
+              updated_at:   new Date().toISOString(),
+            })
+            .eq('audit_stripe_subscription_id', sub.id)
+
+          if (error) console.error('Webhook subscription.deleted (audit): supabase error', error)
+          else console.log('Webhook: audit subscription cancelled', sub.id)
+          break
+        }
+
+        // Check website subscription
         const { data: websiteRow } = await supabase
           .from('subscriptions')
           .select('user_id')
@@ -469,7 +534,7 @@ export async function POST(req: NextRequest) {
             .from('subscriptions')
             .update({
               plan:       'free',
-              status:     'cancelled', // Defect #1: was 'canceled' → constraint violation
+              status:     'cancelled',
               updated_at: new Date().toISOString(),
             })
             .eq('stripe_subscription_id', sub.id)
@@ -477,12 +542,11 @@ export async function POST(req: NextRequest) {
           if (error) console.error('Webhook subscription.deleted (website): supabase error', error)
           else console.log('Webhook: website subscription cancelled', sub.id)
         } else {
-          // Try podcast subscription
           const { error } = await supabase
             .from('subscriptions')
             .update({
               podcast_plan:   null,
-              podcast_status: 'cancelled', // Defect #1: was 'canceled'
+              podcast_status: 'cancelled',
               updated_at:     new Date().toISOString(),
             })
             .eq('podcast_stripe_subscription_id', sub.id)
@@ -498,7 +562,25 @@ export async function POST(req: NextRequest) {
         const invoice        = event.data.object
         const subscriptionId = invoice.subscription
 
-        // Determine which product line's payment failed
+        // Check audit subscription first
+        const { data: auditRow } = await supabase
+          .from('subscriptions')
+          .select('user_id')
+          .eq('audit_stripe_subscription_id', subscriptionId)
+          .maybeSingle()
+
+        if (auditRow) {
+          const { error } = await supabase
+            .from('subscriptions')
+            .update({ audit_status: 'past_due', updated_at: new Date().toISOString() })
+            .eq('audit_stripe_subscription_id', subscriptionId)
+
+          if (error) console.error('Webhook payment_failed (audit): supabase error', error)
+          else console.log('Webhook: audit marked past_due, subscription', subscriptionId)
+          break
+        }
+
+        // Check website subscription
         const { data: websiteRow } = await supabase
           .from('subscriptions')
           .select('user_id')

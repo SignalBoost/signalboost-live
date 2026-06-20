@@ -1,436 +1,407 @@
-'use client';
+"use client";
 
 /**
- * Audit Project — Pricing Page
+ * saas/app/dashboard/audit/pricing/page.tsx
+ * Audit Project — standalone pricing page.
  * Route: /dashboard/audit/pricing
  *
- * Completely self-contained. Imports ONLY from:
- *   - react
- *   - @/lib/audit/pricingConfig  (new file on this branch)
- *   - @/lib/i18n/auditPricingCopy (new file on this branch)
- *
- * Zero imports from core SaaS plan system, infra-pr, prRedact, or any
- * other existing platform file.
+ * Self-contained: imports ONLY from our two new audit modules.
+ * Zero dependency on core SaaS plan types, credits engine, or webhook system.
+ * Defensive TypeScript: every prop, state, and handler is explicitly typed.
+ * Layout: fluid glassmorphic grid — no fixed heights, 80px navbar respected.
  */
 
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
-  AUDIT_PRICING_CONFIG,
-  AuditTier,
+  getAuditPricingConfig,
   formatAuditCount,
-} from '@/lib/audit/pricingConfig';
+  AuditTier,
+  AuditCount,
+} from "@/lib/audit/pricingConfig";
 import {
   getAuditPricingCopy,
+  AuditLocale,
   AuditPageCopy,
   AuditTierCopy,
-} from '@/lib/i18n/auditPricingCopy';
+} from "@/lib/i18n/auditPricingCopy";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-interface NoticeState {
-  tierId: string;
-  message: string;
+interface BadgeProps {
+  label: string;
 }
 
-interface CardProps {
+interface AuditCardProps {
   tier: AuditTier;
   copy: AuditTierCopy;
-  popularBadge: string;
-  onSelect: (tier: AuditTier) => void;
-  notice: NoticeState | null;
-  isLoading: boolean;
-  activeTierId: string | null;
+  perMonth: string;
+  notConfiguredMsg: string;
+  contactSalesLabel: string;
 }
 
-// ---------------------------------------------------------------------------
-// Styles (all inline — no Tailwind utility classes)
-// ---------------------------------------------------------------------------
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-const S: {
-  page: React.CSSProperties;
-  header: React.CSSProperties;
-  eyebrow: React.CSSProperties;
-  title: React.CSSProperties;
-  subtitle: React.CSSProperties;
-  grid: React.CSSProperties;
-  popularBadge: React.CSSProperties;
-  tierName: React.CSSProperties;
-  priceRow: React.CSSProperties;
-  priceAmount: React.CSSProperties;
-  pricePeriod: React.CSSProperties;
-  auditBadge: React.CSSProperties;
-  description: React.CSSProperties;
-  divider: React.CSSProperties;
-  featureList: React.CSSProperties;
-  featureItem: React.CSSProperties;
-  featureDot: React.CSSProperties;
-  noticeBox: React.CSSProperties;
-  enterpriseLink: React.CSSProperties;
-} = {
-  page: {
-    minHeight: 'calc(100vh - 80px)',
-    background: 'linear-gradient(160deg, rgba(15,23,42,1) 0%, rgba(3,7,18,1) 100%)',
-    padding: '60px 24px 80px',
-    fontFamily: 'inherit',
-  },
-  header: {
-    textAlign: 'center',
-    marginBottom: '56px',
-  },
-  eyebrow: {
-    display: 'inline-block',
-    fontSize: '11px',
-    fontWeight: 700,
-    letterSpacing: '0.14em',
-    textTransform: 'uppercase',
-    color: '#1af0ff',
-    marginBottom: '16px',
-  },
-  title: {
-    fontSize: 'clamp(28px, 4vw, 44px)',
-    fontWeight: 800,
-    color: '#ffffff',
-    margin: '0 0 16px',
-    lineHeight: 1.15,
-  },
-  subtitle: {
-    fontSize: '16px',
-    color: 'rgba(255,255,255,0.55)',
-    margin: '0 auto',
-    maxWidth: '520px',
-  },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-    gap: '24px',
-    maxWidth: '1160px',
-    margin: '0 auto',
-  },
-  popularBadge: {
-    position: 'absolute',
-    top: '-14px',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    background: 'linear-gradient(90deg, #ffc300, #1af0ff)',
-    color: 'rgba(3,7,18,1)',
-    fontSize: '11px',
-    fontWeight: 800,
-    letterSpacing: '0.1em',
-    textTransform: 'uppercase',
-    padding: '5px 18px',
-    borderRadius: '999px',
-    whiteSpace: 'nowrap',
-  },
-  tierName: {
-    fontSize: '13px',
-    fontWeight: 700,
-    letterSpacing: '0.1em',
-    textTransform: 'uppercase',
-    color: 'rgba(255,255,255,0.5)',
-    marginBottom: '8px',
-  },
-  priceRow: {
-    display: 'flex',
-    alignItems: 'baseline',
-    gap: '4px',
-    marginBottom: '4px',
-  },
-  priceAmount: {
-    fontSize: '48px',
-    fontWeight: 800,
-    color: '#ffffff',
-    lineHeight: 1,
-  },
-  pricePeriod: {
-    fontSize: '16px',
-    color: 'rgba(255,255,255,0.45)',
-    fontWeight: 400,
-  },
-  auditBadge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '6px',
-    background: 'rgba(26,240,255,0.1)',
-    border: '1px solid rgba(26,240,255,0.2)',
-    borderRadius: '999px',
-    padding: '4px 14px',
-    fontSize: '12px',
-    fontWeight: 700,
-    color: '#1af0ff',
-    marginBottom: '16px',
-    marginTop: '8px',
-    width: 'fit-content',
-  },
-  description: {
-    fontSize: '14px',
-    color: 'rgba(255,255,255,0.55)',
-    lineHeight: 1.6,
-    marginBottom: '24px',
-    marginTop: '0',
-  },
-  divider: {
-    border: 'none',
-    borderTop: '1px solid rgba(255,255,255,0.08)',
-    margin: '0 0 20px',
-  },
-  featureList: {
-    listStyle: 'none',
-    padding: 0,
-    margin: '0 0 28px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px',
-    flexGrow: 1,
-  },
-  featureItem: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: '10px',
-    fontSize: '14px',
-    color: 'rgba(255,255,255,0.8)',
-    lineHeight: 1.5,
-  },
-  featureDot: {
-    width: '6px',
-    height: '6px',
-    borderRadius: '50%',
-    background: '#1af0ff',
-    flexShrink: 0,
-    marginTop: '6px',
-  },
-  noticeBox: {
-    marginTop: '14px',
-    padding: '12px 16px',
-    background: 'rgba(255,195,0,0.08)',
-    border: '1px solid rgba(255,195,0,0.2)',
-    borderRadius: '10px',
-    fontSize: '13px',
-    color: '#ffc300',
-    lineHeight: 1.5,
-  },
-  enterpriseLink: {
-    display: 'block',
-    width: '100%',
-    padding: '14px 24px',
-    borderRadius: '12px',
-    border: '1px solid rgba(255,255,255,0.15)',
-    background: 'rgba(255,255,255,0.06)',
-    color: '#ffffff',
-    fontSize: '15px',
-    fontWeight: 700,
-    textAlign: 'center',
-    textDecoration: 'none',
-    cursor: 'pointer',
-    letterSpacing: '0.02em',
-    boxSizing: 'border-box',
-  },
-};
-
-function cardStyle(isPopular: boolean): React.CSSProperties {
-  return {
-    background: isPopular
-      ? 'linear-gradient(160deg, rgba(26,240,255,0.07) 0%, rgba(255,195,0,0.05) 100%)'
-      : 'linear-gradient(160deg, rgba(15,23,42,0.92) 0%, rgba(3,7,18,0.96) 100%)',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
-    border: isPopular
-      ? '1px solid rgba(26,240,255,0.25)'
-      : '1px solid rgba(255,255,255,0.08)',
-    borderRadius: '20px',
-    padding: '36px 28px 32px',
-    display: 'flex',
-    flexDirection: 'column',
-    position: 'relative',
-    boxShadow: isPopular
-      ? '0 24px 70px rgba(0,0,0,0.6), 0 0 0 1px rgba(26,240,255,0.1)'
-      : '0 24px 70px rgba(0,0,0,0.4)',
-    height: 'auto',
-    minWidth: 0,
-  };
-}
-
-function ctaButtonStyle(isPopular: boolean, disabled: boolean): React.CSSProperties {
-  return {
-    width: '100%',
-    padding: '14px 24px',
-    borderRadius: '12px',
-    border: isPopular ? 'none' : '1px solid rgba(255,255,255,0.15)',
-    background: isPopular
-      ? 'linear-gradient(90deg, #ffc300, #1af0ff)'
-      : 'rgba(255,255,255,0.06)',
-    color: isPopular ? 'rgba(3,7,18,1)' : '#ffffff',
-    fontSize: '15px',
-    fontWeight: 700,
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    opacity: disabled ? 0.6 : 1,
-    transition: 'opacity 0.2s ease',
-    letterSpacing: '0.02em',
-  };
-}
-
-// ---------------------------------------------------------------------------
-// AuditTierCard component
-// ---------------------------------------------------------------------------
-
-function AuditTierCard({
-  tier,
-  copy,
-  popularBadge,
-  onSelect,
-  notice,
-  isLoading,
-  activeTierId,
-}: CardProps): React.ReactElement {
-  const isPopular: boolean = tier.isPopular;
-  const isEnterprise: boolean = tier.isEnterprise;
-  const isThisLoading: boolean = isLoading && activeTierId === tier.id;
-  const showNotice: boolean = notice !== null && notice.tierId === tier.id;
-
-  // formatAuditCount is imported and used here for the audit badge display
-  const auditDisplay: string = formatAuditCount(tier.audits);
-
+function PopularBadge({ label }: BadgeProps): React.ReactElement {
   return (
-    <div style={cardStyle(isPopular)}>
-      {isPopular && (
-        <div style={S.popularBadge}>{popularBadge}</div>
-      )}
+    <span
+      style={{
+        display: "inline-block",
+        padding: "3px 12px",
+        borderRadius: 20,
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase" as const,
+        background: "linear-gradient(90deg, #ffc300, #1af0ff)",
+        color: "#0f172a",
+        marginBottom: 12,
+      }}
+    >
+      {label}
+    </span>
+  );
+}
 
-      <div style={S.tierName}>{copy.name}</div>
-
-      <div style={S.priceRow}>
-        <span style={S.priceAmount}>{copy.priceLabel}</span>
-        <span style={S.pricePeriod}>{copy.perPeriod}</span>
-      </div>
-
-      <div style={S.auditBadge}>
-        <span aria-hidden="true">◈</span>
-        <span>{auditDisplay} {copy.auditLabel.replace(/^[\d\w]+ /, '')}</span>
-      </div>
-
-      <p style={S.description}>{copy.description}</p>
-
-      <hr style={S.divider} />
-
-      <ul style={S.featureList}>
-        {copy.features.map((feature: string, idx: number) => (
-          <li key={idx} style={S.featureItem}>
-            <span style={S.featureDot} aria-hidden="true" />
-            <span>{feature}</span>
-          </li>
-        ))}
-      </ul>
-
-      {isEnterprise ? (
-        <a
-          href="mailto:sales@signalboostapp.com"
-          style={S.enterpriseLink}
-        >
-          {copy.ctaLabel}
-        </a>
-      ) : (
-        <button
-          style={ctaButtonStyle(isPopular, isThisLoading)}
-          disabled={isThisLoading}
-          onClick={(): void => { onSelect(tier); }}
-          type="button"
-        >
-          {isThisLoading ? '...' : copy.ctaLabel}
-        </button>
-      )}
-
-      {showNotice && notice !== null && (
-        <div style={S.noticeBox} role="alert">{notice.message}</div>
-      )}
+function AuditCountBadge({ count }: { count: AuditCount }): React.ReactElement {
+  const label: string = formatAuditCount(count);
+  return (
+    <div
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "6px 14px",
+        borderRadius: 20,
+        background: "rgba(26,240,255,0.10)",
+        border: "1px solid rgba(26,240,255,0.25)",
+        color: "#1af0ff",
+        fontSize: 13,
+        fontWeight: 700,
+        marginBottom: 20,
+      }}
+    >
+      <span style={{ fontSize: 16 }}>✦</span>
+      {label}
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Page component (default export — Next.js App Router compliant)
-// ---------------------------------------------------------------------------
+function AuditCard({
+  tier,
+  copy,
+  perMonth,
+  notConfiguredMsg,
+  contactSalesLabel,
+}: AuditCardProps): React.ReactElement {
+  const [loading, setLoading] = useState<boolean>(false);
+  const [notice, setNotice] = useState<string>("");
 
-export default function AuditPricingPage(): React.ReactElement {
-  const [locale] = useState<string>('en');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [activeTierId, setActiveTierId] = useState<string | null>(null);
-  const [notice, setNotice] = useState<NoticeState | null>(null);
+  const isEnterprise: boolean = tier.id === "audit_enterprise";
+  const isPopular: boolean = tier.isPopular;
 
-  const copy: AuditPageCopy = getAuditPricingCopy(locale);
-
-  async function handleSelectTier(tier: AuditTier): Promise<void> {
-    if (tier.isEnterprise) return;
-
-    setIsLoading(true);
-    setActiveTierId(tier.id);
-    setNotice(null);
-
+  async function handleClick(): Promise<void> {
+    if (isEnterprise) {
+      window.location.href = "mailto:sales@signalboostapp.com";
+      return;
+    }
+    if (!tier.stripePriceId) {
+      setNotice(notConfiguredMsg);
+      return;
+    }
+    setLoading(true);
+    setNotice("");
     try {
-      const res = await fetch('/api/audit/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tierId: tier.id }),
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceId: tier.stripePriceId }),
       });
-
-      if (!res.ok) {
-        const data: { error?: string } = await res.json().catch(
-          (): { error?: string } => ({})
-        );
-        setNotice({
-          tierId: tier.id,
-          message: data.error ?? copy.errorGeneric,
-        });
-        return;
-      }
-
-      const data: { url?: string } = await res.json().catch(
-        (): { url?: string } => ({})
-      );
-
-      if (data.url !== undefined && data.url.length > 0) {
+      const data: { url?: string } = (await res.json()) as { url?: string };
+      if (data.url) {
         window.location.href = data.url;
       } else {
-        setNotice({
-          tierId: tier.id,
-          message: copy.notConfiguredNotice,
-        });
+        setNotice(notConfiguredMsg);
       }
     } catch (_err: unknown) {
-      setNotice({
-        tierId: tier.id,
-        message: copy.errorGeneric,
-      });
+      setNotice(notConfiguredMsg);
     } finally {
-      setIsLoading(false);
-      setActiveTierId(null);
+      setLoading(false);
     }
   }
 
   return (
-    <div style={S.page}>
-      <div style={S.header}>
-        <span style={S.eyebrow}>Audit Project</span>
-        <h1 style={S.title}>{copy.pageTitle}</h1>
-        <p style={S.subtitle}>{copy.pageSubtitle}</p>
+    <div
+      style={{
+        position: "relative",
+        borderRadius: 20,
+        padding: "32px 28px",
+        background: isPopular
+          ? "linear-gradient(160deg, rgba(255,195,0,0.08), rgba(26,240,255,0.06))"
+          : "linear-gradient(160deg, rgba(15,23,42,0.92), rgba(3,7,18,0.96))",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
+        border: isPopular
+          ? "1px solid rgba(255,195,0,0.35)"
+          : "1px solid rgba(255,255,255,0.08)",
+        boxShadow: "0 24px 70px rgba(0,0,0,0.6)",
+        display: "flex",
+        flexDirection: "column" as const,
+        gap: 0,
+        minWidth: 0,
+        height: "auto",
+      }}
+    >
+      {/* Popular badge */}
+      {isPopular && copy.popularBadge ? (
+        <PopularBadge label={copy.popularBadge} />
+      ) : (
+        <div style={{ height: 28 }} />
+      )}
+
+      {/* Tier name */}
+      <h3
+        style={{
+          margin: "0 0 6px",
+          fontSize: 20,
+          fontWeight: 700,
+          color: isPopular ? "#ffc300" : "#ffffff",
+          letterSpacing: "-0.01em",
+        }}
+      >
+        {copy.name}
+      </h3>
+
+      {/* Description */}
+      <p
+        style={{
+          margin: "0 0 20px",
+          fontSize: 14,
+          color: "rgba(255,255,255,0.55)",
+          lineHeight: 1.5,
+          minHeight: 42,
+        }}
+      >
+        {copy.description}
+      </p>
+
+      {/* Price */}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 16 }}>
+        <span
+          style={{
+            fontSize: 42,
+            fontWeight: 800,
+            color: "#ffffff",
+            letterSpacing: "-0.03em",
+            lineHeight: 1,
+          }}
+        >
+          {tier.priceDisplay}
+        </span>
+        <span style={{ fontSize: 14, color: "rgba(255,255,255,0.45)" }}>{perMonth}</span>
       </div>
 
-      <div style={S.grid}>
-        {AUDIT_PRICING_CONFIG.tiers.map((tier: AuditTier) => {
-          const tierCopy: AuditTierCopy = copy.tiers[tier.id];
-          return (
-            <AuditTierCard
+      {/* Audit count badge */}
+      <AuditCountBadge count={tier.auditCount} />
+
+      {/* Feature list */}
+      <ul
+        style={{
+          listStyle: "none",
+          margin: "0 0 28px",
+          padding: 0,
+          display: "flex",
+          flexDirection: "column" as const,
+          gap: 10,
+          flex: 1,
+        }}
+      >
+        {copy.features.map(
+          (feature: string): React.ReactElement => (
+            <li
+              key={feature}
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 10,
+                fontSize: 13,
+                color: "rgba(255,255,255,0.75)",
+                lineHeight: 1.45,
+              }}
+            >
+              <span style={{ color: "#1af0ff", flexShrink: 0, marginTop: 1 }}>✓</span>
+              {feature}
+            </li>
+          )
+        )}
+      </ul>
+
+      {/* CTA */}
+      <button
+        onClick={handleClick}
+        disabled={loading}
+        style={{
+          width: "100%",
+          padding: "13px 0",
+          borderRadius: 12,
+          border: isPopular ? "none" : "1px solid rgba(255,255,255,0.15)",
+          background: isPopular
+            ? "linear-gradient(90deg, #ffc300, #1af0ff)"
+            : "rgba(255,255,255,0.06)",
+          color: isPopular ? "#0f172a" : "#ffffff",
+          fontSize: 15,
+          fontWeight: 700,
+          cursor: loading ? "wait" : "pointer",
+          opacity: loading ? 0.7 : 1,
+          transition: "opacity 0.2s",
+          letterSpacing: "0.01em",
+        }}
+      >
+        {loading ? "…" : isEnterprise ? contactSalesLabel : copy.ctaLabel}
+      </button>
+
+      {/* Notice */}
+      {notice ? (
+        <p
+          style={{
+            marginTop: 10,
+            fontSize: 12,
+            color: "rgba(255,195,0,0.85)",
+            textAlign: "center" as const,
+            lineHeight: 1.4,
+          }}
+        >
+          {notice}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+// ─── Locale selector ──────────────────────────────────────────────────────────
+
+const LOCALES: { code: AuditLocale; label: string }[] = [
+  { code: "en", label: "EN" },
+  { code: "es", label: "ES" },
+  { code: "pt", label: "PT" },
+  { code: "pl", label: "PL" },
+  { code: "ru", label: "RU" },
+];
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function AuditPricingPage(): React.ReactElement {
+  const [locale, setLocale] = useState<AuditLocale>("en");
+
+  const copy: AuditPageCopy = getAuditPricingCopy(locale);
+  const { tiers } = getAuditPricingConfig();
+
+  return (
+    <div
+      style={{
+        minHeight: "calc(100vh - 80px)",
+        background: "linear-gradient(160deg, rgba(15,23,42,1) 0%, rgba(3,7,18,1) 100%)",
+        padding: "48px 24px 80px",
+        boxSizing: "border-box" as const,
+      }}
+    >
+      {/* Locale switcher */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 8,
+          marginBottom: 40,
+          maxWidth: 1100,
+          marginLeft: "auto",
+          marginRight: "auto",
+        }}
+      >
+        {LOCALES.map(
+          (loc: { code: AuditLocale; label: string }): React.ReactElement => (
+            <button
+              key={loc.code}
+              onClick={(): void => setLocale(loc.code)}
+              style={{
+                padding: "5px 14px",
+                borderRadius: 8,
+                border:
+                  locale === loc.code
+                    ? "1px solid #1af0ff"
+                    : "1px solid rgba(255,255,255,0.12)",
+                background:
+                  locale === loc.code ? "rgba(26,240,255,0.12)" : "transparent",
+                color: locale === loc.code ? "#1af0ff" : "rgba(255,255,255,0.5)",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                letterSpacing: "0.06em",
+                transition: "all 0.15s",
+              }}
+            >
+              {loc.label}
+            </button>
+          )
+        )}
+      </div>
+
+      {/* Header */}
+      <div
+        style={{
+          textAlign: "center" as const,
+          marginBottom: 56,
+          maxWidth: 600,
+          marginLeft: "auto",
+          marginRight: "auto",
+        }}
+      >
+        <h1
+          style={{
+            fontSize: 38,
+            fontWeight: 800,
+            color: "#ffffff",
+            letterSpacing: "-0.03em",
+            margin: "0 0 14px",
+            lineHeight: 1.15,
+          }}
+        >
+          {copy.pageTitle}
+        </h1>
+        <p
+          style={{
+            fontSize: 16,
+            color: "rgba(255,255,255,0.55)",
+            margin: 0,
+            lineHeight: 1.6,
+          }}
+        >
+          {copy.pageSubtitle}
+        </p>
+      </div>
+
+      {/* Tier grid */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+          gap: 24,
+          maxWidth: 1100,
+          marginLeft: "auto",
+          marginRight: "auto",
+          alignItems: "start",
+        }}
+      >
+        {tiers.map(
+          (tier: AuditTier): React.ReactElement => (
+            <AuditCard
               key={tier.id}
               tier={tier}
-              copy={tierCopy}
-              popularBadge={copy.popularBadge}
-              onSelect={handleSelectTier}
-              notice={notice}
-              isLoading={isLoading}
-              activeTierId={activeTierId}
+              copy={copy.tiers[tier.id]}
+              perMonth={copy.perMonth}
+              notConfiguredMsg={copy.notConfigured}
+              contactSalesLabel={copy.contactSales}
             />
-          );
-        })}
+          )
+        )}
       </div>
     </div>
   );

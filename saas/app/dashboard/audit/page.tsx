@@ -37,7 +37,7 @@ type View = { findings: Finding[]; filesScanned: number; findingsCount: number; 
 
 type Sev = 'critical' | 'high' | 'medium' | 'low' | 'info'
 type AuditCopy = {
-  title: string; subtitle: string
+  title: string; subtitle: string; viewPlans: string
   pathLabel: string; maxLabel: string; run: string; running: string
   filesScanned: string; findings: string; clean: string; emptyHint: string
   ownerOnly: string; failed: string; category: string; recommendation: string; line: string
@@ -51,7 +51,7 @@ type AuditCopy = {
 
 const COPY: Record<string, AuditCopy> = {
   en: {
-    title: 'Audit Console', subtitle: 'Deep security & quality scans on GPT‑5.5, isolated from live console traffic.',
+    title: 'Audit Console', viewPlans: 'View plans', subtitle: 'Deep security & quality scans on GPT‑5.5, isolated from live console traffic.',
     pathLabel: 'Scan path', maxLabel: 'Max files', run: 'Run audit', running: 'Running deep scan…',
     filesScanned: 'Files scanned', findings: 'Findings', clean: 'No findings — this scan came back clean.',
     emptyHint: 'Set a path and run a scan, or pick a past run.',
@@ -65,7 +65,7 @@ const COPY: Record<string, AuditCopy> = {
     sev: { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', info: 'Info' },
   },
   es: {
-    title: 'Consola de Auditoría', subtitle: 'Análisis profundos de seguridad y calidad con GPT‑5.5, aislados del tráfico de la consola en vivo.',
+    title: 'Consola de Auditoría', viewPlans: 'Ver planes', subtitle: 'Análisis profundos de seguridad y calidad con GPT‑5.5, aislados del tráfico de la consola en vivo.',
     pathLabel: 'Ruta de análisis', maxLabel: 'Archivos máx.', run: 'Ejecutar auditoría', running: 'Ejecutando análisis profundo…',
     filesScanned: 'Archivos analizados', findings: 'Hallazgos', clean: 'Sin hallazgos: este análisis salió limpio.',
     emptyHint: 'Define una ruta y ejecuta un análisis, o elige una ejecución anterior.',
@@ -79,7 +79,7 @@ const COPY: Record<string, AuditCopy> = {
     sev: { critical: 'Crítico', high: 'Alto', medium: 'Medio', low: 'Bajo', info: 'Info' },
   },
   pt: {
-    title: 'Console de Auditoria', subtitle: 'Análises profundas de segurança e qualidade com GPT‑5.5, isoladas do tráfego do console ao vivo.',
+    title: 'Console de Auditoria', viewPlans: 'Ver planos', subtitle: 'Análises profundas de segurança e qualidade com GPT‑5.5, isoladas do tráfego do console ao vivo.',
     pathLabel: 'Caminho de análise', maxLabel: 'Máx. de arquivos', run: 'Executar auditoria', running: 'Executando análise profunda…',
     filesScanned: 'Arquivos analisados', findings: 'Constatações', clean: 'Nenhuma constatação — esta análise voltou limpa.',
     emptyHint: 'Defina um caminho e execute uma análise, ou escolha uma execução anterior.',
@@ -93,7 +93,7 @@ const COPY: Record<string, AuditCopy> = {
     sev: { critical: 'Crítico', high: 'Alto', medium: 'Médio', low: 'Baixo', info: 'Info' },
   },
   pl: {
-    title: 'Konsola Audytu', subtitle: 'Dogłębne skany bezpieczeństwa i jakości na GPT‑5.5, odizolowane od ruchu konsoli na żywo.',
+    title: 'Konsola Audytu', viewPlans: 'Zobacz plany', subtitle: 'Dogłębne skany bezpieczeństwa i jakości na GPT‑5.5, odizolowane od ruchu konsoli na żywo.',
     pathLabel: 'Ścieżka skanowania', maxLabel: 'Maks. plików', run: 'Uruchom audyt', running: 'Trwa dogłębne skanowanie…',
     filesScanned: 'Przeskanowane pliki', findings: 'Wyniki', clean: 'Brak wyników — ten skan jest czysty.',
     emptyHint: 'Ustaw ścieżkę i uruchom skan lub wybierz wcześniejsze uruchomienie.',
@@ -107,7 +107,7 @@ const COPY: Record<string, AuditCopy> = {
     sev: { critical: 'Krytyczny', high: 'Wysoki', medium: 'Średni', low: 'Niski', info: 'Info' },
   },
   ru: {
-    title: 'Консоль аудита', subtitle: 'Глубокие проверки безопасности и качества на GPT‑5.5, изолированные от живого трафика консоли.',
+    title: 'Консоль аудита', viewPlans: 'Посмотреть планы', subtitle: 'Глубокие проверки безопасности и качества на GPT‑5.5, изолированные от живого трафика консоли.',
     pathLabel: 'Путь сканирования', maxLabel: 'Макс. файлов', run: 'Запустить аудит', running: 'Выполняется глубокое сканирование…',
     filesScanned: 'Просканировано файлов', findings: 'Замечания', clean: 'Замечаний нет — сканирование чистое.',
     emptyHint: 'Укажите путь и запустите сканирование или выберите прошлый запуск.',
@@ -314,9 +314,12 @@ if (final) {
     <>
       <AuditDashboard />
       <div style={{ padding: '0 24px 24px', color: '#fff', maxWidth: 1200, margin: '0 auto' }}>
-      <div style={{ marginBottom: 18 }}>
-        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '-0.01em' }}>{copy.title} <span style={{ color: GOLD }}>·</span></h1>
-        <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,.62)', maxWidth: 640, lineHeight: 1.5 }}>{copy.subtitle}</p>
+      <div style={{ marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '-0.01em' }}>{copy.title} <span style={{ color: GOLD }}>·</span></h1>
+          <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,.62)', maxWidth: 640, lineHeight: 1.5 }}>{copy.subtitle}</p>
+        </div>
+        <a href="/dashboard/audit/pricing" style={{ flexShrink: 0, display: 'inline-block', fontSize: 13, fontWeight: 800, color: '#070b14', background: 'linear-gradient(135deg, #ffc300, #ffb000)', textDecoration: 'none', borderRadius: 10, padding: '10px 18px', boxShadow: '0 8px 24px rgba(255,195,0,.25)' }}>{copy.viewPlans}</a>
       </div>
 
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>

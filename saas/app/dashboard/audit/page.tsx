@@ -156,7 +156,7 @@ function PhaseTracker({ phase, progress, copy }: { phase: string; progress: { do
   const labels: Record<string, string> = {
     SCAN_TARGET: copy.trackScan, RUN_ANALYZERS: copy.trackAnalyze, GENERATE_REPORT: copy.trackReport, PREPARE_PRS: copy.trackPrs,
   }
-  const curIdx = PHASE_ORDER.indexOf(phase as typeof PHASE_ORDER[number])
+  const curIdx = phase === 'DONE' ? PHASE_ORDER.length : PHASE_ORDER.indexOf(phase as typeof PHASE_ORDER[number])
   return (
     <div style={{ ...glass, padding: 16, marginTop: 16, height: 'auto' }}>
       {PHASE_ORDER.map((p, i) => {
@@ -242,8 +242,8 @@ export default function AuditConsolePage() {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify({ prefix: prefix.trim() || 'saas/app/api', maxFiles }),
       })
-      if (res.status === 403) { setError(copy.ownerOnly); return }
-      if (!res.body) { setError(copy.failed); return }
+      if (res.status === 403) { setError(copy.ownerOnly); setPhase(null); return }
+      if (!res.body) { setError(copy.failed); setPhase(null); return }
 
       const reader = res.body.getReader()
       const dec = new TextDecoder()
@@ -272,16 +272,16 @@ export default function AuditConsolePage() {
           }
         }
       }
-
-      if (final) {
-        setView(final); setSelectedRunId(finalRunId); loadHistory()
-      } else if (!sawError) {
-        setError(copy.failed)
+if (final) {
+        setView(final); setSelectedRunId(finalRunId); setPhase('DONE'); loadHistory()
+      } else {
+        setPhase(null)
+        if (!sawError) setError(copy.failed)
       }
     } catch {
-      setError(copy.failed)
+      setError(copy.failed); setPhase(null)
     } finally {
-      setLoading(false); setPhase(null)
+      setLoading(false)
     }
   }
 
@@ -292,7 +292,18 @@ export default function AuditConsolePage() {
       const data = await res.json().catch(() => null)
       if (!res.ok || !data?.ok) { setError(data?.error || copy.failed); return }
       const r = data.run
-      setView({ findings: data.findings || [], filesScanned: r?.files_scanned || 0, findingsCount: r?.findings_count || 0, prefix: r?.prefix, status: r?.status })
+      const log = data.log as { findings?: Finding[]; filesScanned?: string[]; findingsCount?: number; prefix?: string } | null
+      // Prefer the full-payload snapshot; fall back to normalized findings for older runs.
+      const findings = (log?.findings as Finding[]) || (data.findings as Finding[]) || []
+      setView({
+        findings,
+        filesScanned: Array.isArray(log?.filesScanned) ? log!.filesScanned!.length : (r?.files_scanned || 0),
+        findingsCount: typeof log?.findingsCount === 'number' ? log!.findingsCount! : (r?.findings_count || 0),
+        prefix: log?.prefix ?? r?.prefix,
+        status: r?.status,
+      })
+      setProgress({ done: 0, total: 0 })
+      setPhase(r?.status === 'complete' ? 'DONE' : null)
     } catch {
       setError(copy.failed)
     }
@@ -362,7 +373,7 @@ export default function AuditConsolePage() {
             }}>{loading ? copy.running : copy.run}</button>
           </div>
 
-          {loading && phase && <PhaseTracker phase={phase} progress={progress} copy={copy} />}
+          {phase && <PhaseTracker phase={phase} progress={progress} copy={copy} />}
 
           {error && (
             <div style={{ ...glass, marginTop: 16, padding: 14, border: '1px solid rgba(252,165,165,.4)', color: RED, fontSize: 13 }}>{copy.failed}: {error}</div>

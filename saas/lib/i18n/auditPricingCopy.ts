@@ -1,304 +1,444 @@
 /**
  * Audit Project — Multi-language Pricing Copy
- * Covers all 5 platform locales: EN, ES, PT, PL, RU.
- * No existing platformCopy.ts or SaaS plan strings are modified here.
+ * Self-contained. No imports from the core SaaS i18n system.
+ * Covers EN, ES, PT, PL, RU.
  */
 
-export type SupportedLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru';
-
-export type AuditTierId = 'starter' | 'growth' | 'pro' | 'enterprise';
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 export interface AuditTierCopy {
   name: string;
   priceLabel: string;
-  billingNote: string;
-  auditBadge: string;
+  perPeriod: string;
+  auditLabel: string;
   description: string;
   features: string[];
   ctaLabel: string;
-  popularBadge: string;
 }
 
 export interface AuditPageCopy {
   pageTitle: string;
   pageSubtitle: string;
-  tiers: Record<AuditTierId, AuditTierCopy>;
+  popularBadge: string;
   enterpriseCtaLabel: string;
   enterpriseCtaHref: string;
-  stripeNotConfigured: string;
-  loadingLabel: string;
-  errorLabel: string;
+  notConfiguredNotice: string;
+  errorGeneric: string;
+  tiers: {
+    audit_starter: AuditTierCopy;
+    audit_growth: AuditTierCopy;
+    audit_pro: AuditTierCopy;
+    audit_enterprise: AuditTierCopy;
+  };
 }
 
-export type AuditPricingI18n = Record<SupportedLocale, AuditPageCopy>;
+// ---------------------------------------------------------------------------
+// English
+// ---------------------------------------------------------------------------
 
 const EN: AuditPageCopy = {
   pageTitle: 'Audit Project Plans',
-  pageSubtitle: 'Choose the audit tier that fits your workflow. No hidden fees.',
+  pageSubtitle: 'Choose the audit volume that fits your business.',
+  popularBadge: 'Most Popular',
   enterpriseCtaLabel: 'Contact Sales',
   enterpriseCtaHref: 'mailto:sales@signalboostapp.com',
-  stripeNotConfigured: 'This plan is not yet available for purchase. Please check back soon.',
-  loadingLabel: 'Processing…',
-  errorLabel: 'Something went wrong. Please try again.',
+  notConfiguredNotice: 'This tier is not yet available for checkout. Please check back soon.',
+  errorGeneric: 'Something went wrong. Please try again.',
   tiers: {
-    starter: {
+    audit_starter: {
       name: 'Audit Starter',
       priceLabel: '$29',
-      billingNote: '/mo',
-      auditBadge: '3 Audits / mo',
-      description: 'Perfect for individuals running a small number of audits each month.',
-      features: ['3 audits per month', 'Core audit reports', 'Email support', 'Export to PDF'],
+      perPeriod: '/mo',
+      auditLabel: '3 Audits / month',
+      description: 'Perfect for freelancers and solo operators.',
+      features: [
+        '3 full site audits per month',
+        'AI-powered recommendations',
+        'PDF export',
+        'Email support',
+      ],
       ctaLabel: 'Get Started',
-      popularBadge: '',
     },
-    growth: {
+    audit_growth: {
       name: 'Audit Growth',
       priceLabel: '$79',
-      billingNote: '/mo',
-      auditBadge: '20 Audits / mo',
-      description: 'Ideal for growing teams that need regular, high-volume audit cycles.',
-      features: ['20 audits per month', 'Advanced audit reports', 'Priority email support', 'Export to PDF & CSV', 'Team sharing'],
+      perPeriod: '/mo',
+      auditLabel: '20 Audits / month',
+      description: 'Built for growing agencies and small teams.',
+      features: [
+        '20 full site audits per month',
+        'AI-powered recommendations',
+        'PDF + CSV export',
+        'Priority email support',
+        'Team sharing',
+      ],
       ctaLabel: 'Get Started',
-      popularBadge: 'Most Popular',
     },
-    pro: {
+    audit_pro: {
       name: 'Audit Pro',
       priceLabel: '$199',
-      billingNote: '/mo',
-      auditBadge: '100 Audits / mo',
-      description: 'Built for agencies and power users running audits at scale.',
-      features: ['100 audits per month', 'Full audit suite', 'Dedicated support', 'API access', 'White-label exports', 'Custom branding'],
+      perPeriod: '/mo',
+      auditLabel: '100 Audits / month',
+      description: 'For professional agencies running high-volume audits.',
+      features: [
+        '100 full site audits per month',
+        'AI-powered recommendations',
+        'PDF + CSV + JSON export',
+        'Dedicated support',
+        'Team sharing',
+        'White-label reports',
+      ],
       ctaLabel: 'Get Started',
-      popularBadge: '',
     },
-    enterprise: {
+    audit_enterprise: {
       name: 'Audit Enterprise',
       priceLabel: '$599',
-      billingNote: '/mo',
-      auditBadge: 'Unlimited Audits',
-      description: 'Unlimited audits, SLA guarantees, and a dedicated account manager.',
-      features: ['Unlimited audits', 'SLA guarantee', 'Dedicated account manager', 'Custom integrations', 'SSO / SAML', 'On-boarding & training'],
+      perPeriod: '/mo',
+      auditLabel: 'Unlimited Audits',
+      description: 'Unlimited capacity for enterprise and large-scale operations.',
+      features: [
+        'Unlimited site audits',
+        'AI-powered recommendations',
+        'All export formats',
+        'Dedicated account manager',
+        'Custom integrations',
+        'SLA guarantee',
+        'White-label reports',
+      ],
       ctaLabel: 'Contact Sales',
-      popularBadge: '',
     },
   },
 };
+
+// ---------------------------------------------------------------------------
+// Spanish
+// ---------------------------------------------------------------------------
 
 const ES: AuditPageCopy = {
   pageTitle: 'Planes del Proyecto de Auditoría',
-  pageSubtitle: 'Elige el nivel de auditoría que se adapta a tu flujo de trabajo. Sin tarifas ocultas.',
+  pageSubtitle: 'Elige el volumen de auditorías que se adapte a tu negocio.',
+  popularBadge: 'Más Popular',
   enterpriseCtaLabel: 'Contactar Ventas',
   enterpriseCtaHref: 'mailto:sales@signalboostapp.com',
-  stripeNotConfigured: 'Este plan aún no está disponible para su compra. Vuelve pronto.',
-  loadingLabel: 'Procesando…',
-  errorLabel: 'Algo salió mal. Por favor, inténtalo de nuevo.',
+  notConfiguredNotice: 'Este nivel aún no está disponible para pago. Vuelve pronto.',
+  errorGeneric: 'Algo salió mal. Por favor intenta de nuevo.',
   tiers: {
-    starter: {
-      name: 'Auditoría Starter',
+    audit_starter: {
+      name: 'Audit Starter',
       priceLabel: '$29',
-      billingNote: '/mes',
-      auditBadge: '3 Auditorías / mes',
-      description: 'Perfecto para personas que realizan un pequeño número de auditorías al mes.',
-      features: ['3 auditorías por mes', 'Informes de auditoría básicos', 'Soporte por correo', 'Exportar a PDF'],
+      perPeriod: '/mes',
+      auditLabel: '3 Auditorías / mes',
+      description: 'Perfecto para freelancers y operadores independientes.',
+      features: [
+        '3 auditorías completas por mes',
+        'Recomendaciones con IA',
+        'Exportación PDF',
+        'Soporte por correo',
+      ],
       ctaLabel: 'Comenzar',
-      popularBadge: '',
     },
-    growth: {
-      name: 'Auditoría Growth',
+    audit_growth: {
+      name: 'Audit Growth',
       priceLabel: '$79',
-      billingNote: '/mes',
-      auditBadge: '20 Auditorías / mes',
-      description: 'Ideal para equipos en crecimiento que necesitan ciclos de auditoría frecuentes.',
-      features: ['20 auditorías por mes', 'Informes avanzados', 'Soporte prioritario', 'Exportar a PDF y CSV', 'Compartir en equipo'],
+      perPeriod: '/mes',
+      auditLabel: '20 Auditorías / mes',
+      description: 'Diseñado para agencias en crecimiento y equipos pequeños.',
+      features: [
+        '20 auditorías completas por mes',
+        'Recomendaciones con IA',
+        'Exportación PDF + CSV',
+        'Soporte prioritario',
+        'Compartir en equipo',
+      ],
       ctaLabel: 'Comenzar',
-      popularBadge: 'Más Popular',
     },
-    pro: {
-      name: 'Auditoría Pro',
+    audit_pro: {
+      name: 'Audit Pro',
       priceLabel: '$199',
-      billingNote: '/mes',
-      auditBadge: '100 Auditorías / mes',
-      description: 'Diseñado para agencias y usuarios avanzados que realizan auditorías a escala.',
-      features: ['100 auditorías por mes', 'Suite completa de auditoría', 'Soporte dedicado', 'Acceso a API', 'Exportaciones con marca blanca', 'Marca personalizada'],
+      perPeriod: '/mes',
+      auditLabel: '100 Auditorías / mes',
+      description: 'Para agencias profesionales con alto volumen de auditorías.',
+      features: [
+        '100 auditorías completas por mes',
+        'Recomendaciones con IA',
+        'Exportación PDF + CSV + JSON',
+        'Soporte dedicado',
+        'Compartir en equipo',
+        'Informes de marca blanca',
+      ],
       ctaLabel: 'Comenzar',
-      popularBadge: '',
     },
-    enterprise: {
-      name: 'Auditoría Enterprise',
+    audit_enterprise: {
+      name: 'Audit Enterprise',
       priceLabel: '$599',
-      billingNote: '/mes',
-      auditBadge: 'Auditorías Ilimitadas',
-      description: 'Auditorías ilimitadas, garantías de SLA y un gestor de cuenta dedicado.',
-      features: ['Auditorías ilimitadas', 'Garantía de SLA', 'Gestor de cuenta dedicado', 'Integraciones personalizadas', 'SSO / SAML', 'Incorporación y formación'],
+      perPeriod: '/mes',
+      auditLabel: 'Auditorías Ilimitadas',
+      description: 'Capacidad ilimitada para empresas y operaciones a gran escala.',
+      features: [
+        'Auditorías ilimitadas',
+        'Recomendaciones con IA',
+        'Todos los formatos de exportación',
+        'Gestor de cuenta dedicado',
+        'Integraciones personalizadas',
+        'Garantía SLA',
+        'Informes de marca blanca',
+      ],
       ctaLabel: 'Contactar Ventas',
-      popularBadge: '',
     },
   },
 };
+
+// ---------------------------------------------------------------------------
+// Portuguese
+// ---------------------------------------------------------------------------
 
 const PT: AuditPageCopy = {
   pageTitle: 'Planos do Projeto de Auditoria',
-  pageSubtitle: 'Escolha o nível de auditoria que se adapta ao seu fluxo de trabalho. Sem taxas ocultas.',
+  pageSubtitle: 'Escolha o volume de auditorias que se adapta ao seu negócio.',
+  popularBadge: 'Mais Popular',
   enterpriseCtaLabel: 'Falar com Vendas',
   enterpriseCtaHref: 'mailto:sales@signalboostapp.com',
-  stripeNotConfigured: 'Este plano ainda não está disponível para compra. Volte em breve.',
-  loadingLabel: 'Processando…',
-  errorLabel: 'Algo deu errado. Por favor, tente novamente.',
+  notConfiguredNotice: 'Este plano ainda não está disponível para pagamento. Volte em breve.',
+  errorGeneric: 'Algo deu errado. Por favor, tente novamente.',
   tiers: {
-    starter: {
-      name: 'Auditoria Starter',
+    audit_starter: {
+      name: 'Audit Starter',
       priceLabel: '$29',
-      billingNote: '/mês',
-      auditBadge: '3 Auditorias / mês',
-      description: 'Perfeito para indivíduos que realizam um pequeno número de auditorias por mês.',
-      features: ['3 auditorias por mês', 'Relatórios de auditoria básicos', 'Suporte por e-mail', 'Exportar para PDF'],
+      perPeriod: '/mês',
+      auditLabel: '3 Auditorias / mês',
+      description: 'Perfeito para freelancers e operadores individuais.',
+      features: [
+        '3 auditorias completas por mês',
+        'Recomendações com IA',
+        'Exportação PDF',
+        'Suporte por e-mail',
+      ],
       ctaLabel: 'Começar',
-      popularBadge: '',
     },
-    growth: {
-      name: 'Auditoria Growth',
+    audit_growth: {
+      name: 'Audit Growth',
       priceLabel: '$79',
-      billingNote: '/mês',
-      auditBadge: '20 Auditorias / mês',
-      description: 'Ideal para equipes em crescimento que precisam de ciclos de auditoria frequentes.',
-      features: ['20 auditorias por mês', 'Relatórios avançados', 'Suporte prioritário', 'Exportar para PDF e CSV', 'Compartilhamento em equipe'],
+      perPeriod: '/mês',
+      auditLabel: '20 Auditorias / mês',
+      description: 'Criado para agências em crescimento e pequenas equipes.',
+      features: [
+        '20 auditorias completas por mês',
+        'Recomendações com IA',
+        'Exportação PDF + CSV',
+        'Suporte prioritário',
+        'Compartilhamento em equipe',
+      ],
       ctaLabel: 'Começar',
-      popularBadge: 'Mais Popular',
     },
-    pro: {
-      name: 'Auditoria Pro',
+    audit_pro: {
+      name: 'Audit Pro',
       priceLabel: '$199',
-      billingNote: '/mês',
-      auditBadge: '100 Auditorias / mês',
-      description: 'Criado para agências e usuários avançados que realizam auditorias em escala.',
-      features: ['100 auditorias por mês', 'Suite completa de auditoria', 'Suporte dedicado', 'Acesso à API', 'Exportações com marca branca', 'Marca personalizada'],
+      perPeriod: '/mês',
+      auditLabel: '100 Auditorias / mês',
+      description: 'Para agências profissionais com alto volume de auditorias.',
+      features: [
+        '100 auditorias completas por mês',
+        'Recomendações com IA',
+        'Exportação PDF + CSV + JSON',
+        'Suporte dedicado',
+        'Compartilhamento em equipe',
+        'Relatórios white-label',
+      ],
       ctaLabel: 'Começar',
-      popularBadge: '',
     },
-    enterprise: {
-      name: 'Auditoria Enterprise',
+    audit_enterprise: {
+      name: 'Audit Enterprise',
       priceLabel: '$599',
-      billingNote: '/mês',
-      auditBadge: 'Auditorias Ilimitadas',
-      description: 'Auditorias ilimitadas, garantias de SLA e um gerente de conta dedicado.',
-      features: ['Auditorias ilimitadas', 'Garantia de SLA', 'Gerente de conta dedicado', 'Integrações personalizadas', 'SSO / SAML', 'Integração e treinamento'],
+      perPeriod: '/mês',
+      auditLabel: 'Auditorias Ilimitadas',
+      description: 'Capacidade ilimitada para empresas e operações em grande escala.',
+      features: [
+        'Auditorias ilimitadas',
+        'Recomendações com IA',
+        'Todos os formatos de exportação',
+        'Gerente de conta dedicado',
+        'Integrações personalizadas',
+        'Garantia de SLA',
+        'Relatórios white-label',
+      ],
       ctaLabel: 'Falar com Vendas',
-      popularBadge: '',
     },
   },
 };
+
+// ---------------------------------------------------------------------------
+// Polish
+// ---------------------------------------------------------------------------
 
 const PL: AuditPageCopy = {
   pageTitle: 'Plany Projektu Audytowego',
-  pageSubtitle: 'Wybierz poziom audytu dopasowany do Twojego przepływu pracy. Bez ukrytych opłat.',
+  pageSubtitle: 'Wybierz wolumen audytów odpowiedni dla Twojej firmy.',
+  popularBadge: 'Najpopularniejszy',
   enterpriseCtaLabel: 'Skontaktuj się z działem sprzedaży',
   enterpriseCtaHref: 'mailto:sales@signalboostapp.com',
-  stripeNotConfigured: 'Ten plan nie jest jeszcze dostępny do zakupu. Wróć wkrótce.',
-  loadingLabel: 'Przetwarzanie…',
-  errorLabel: 'Coś poszło nie tak. Spróbuj ponownie.',
+  notConfiguredNotice: 'Ten poziom nie jest jeszcze dostępny do zakupu. Wróć wkrótce.',
+  errorGeneric: 'Coś poszło nie tak. Spróbuj ponownie.',
   tiers: {
-    starter: {
-      name: 'Audyt Starter',
+    audit_starter: {
+      name: 'Audit Starter',
       priceLabel: '$29',
-      billingNote: '/mies.',
-      auditBadge: '3 Audyty / mies.',
-      description: 'Idealny dla osób przeprowadzających niewielką liczbę audytów miesięcznie.',
-      features: ['3 audyty miesięcznie', 'Podstawowe raporty audytowe', 'Wsparcie e-mail', 'Eksport do PDF'],
+      perPeriod: '/mies.',
+      auditLabel: '3 Audyty / miesiąc',
+      description: 'Idealny dla freelancerów i niezależnych operatorów.',
+      features: [
+        '3 pełne audyty miesięcznie',
+        'Rekomendacje oparte na AI',
+        'Eksport PDF',
+        'Wsparcie e-mail',
+      ],
       ctaLabel: 'Rozpocznij',
-      popularBadge: '',
     },
-    growth: {
-      name: 'Audyt Growth',
+    audit_growth: {
+      name: 'Audit Growth',
       priceLabel: '$79',
-      billingNote: '/mies.',
-      auditBadge: '20 Audytów / mies.',
-      description: 'Idealny dla rozwijających się zespołów potrzebujących regularnych cykli audytowych.',
-      features: ['20 audytów miesięcznie', 'Zaawansowane raporty', 'Priorytetowe wsparcie', 'Eksport do PDF i CSV', 'Udostępnianie zespołowe'],
+      perPeriod: '/mies.',
+      auditLabel: '20 Audytów / miesiąc',
+      description: 'Stworzony dla rozwijających się agencji i małych zespołów.',
+      features: [
+        '20 pełnych audytów miesięcznie',
+        'Rekomendacje oparte na AI',
+        'Eksport PDF + CSV',
+        'Priorytetowe wsparcie',
+        'Udostępnianie zespołowi',
+      ],
       ctaLabel: 'Rozpocznij',
-      popularBadge: 'Najpopularniejszy',
     },
-    pro: {
-      name: 'Audyt Pro',
+    audit_pro: {
+      name: 'Audit Pro',
       priceLabel: '$199',
-      billingNote: '/mies.',
-      auditBadge: '100 Audytów / mies.',
-      description: 'Stworzony dla agencji i zaawansowanych użytkowników przeprowadzających audyty na dużą skalę.',
-      features: ['100 audytów miesięcznie', 'Pełny pakiet audytowy', 'Dedykowane wsparcie', 'Dostęp do API', 'Eksporty white-label', 'Własna marka'],
+      perPeriod: '/mies.',
+      auditLabel: '100 Audytów / miesiąc',
+      description: 'Dla profesjonalnych agencji realizujących dużą liczbę audytów.',
+      features: [
+        '100 pełnych audytów miesięcznie',
+        'Rekomendacje oparte na AI',
+        'Eksport PDF + CSV + JSON',
+        'Dedykowane wsparcie',
+        'Udostępnianie zespołowi',
+        'Raporty white-label',
+      ],
       ctaLabel: 'Rozpocznij',
-      popularBadge: '',
     },
-    enterprise: {
-      name: 'Audyt Enterprise',
+    audit_enterprise: {
+      name: 'Audit Enterprise',
       priceLabel: '$599',
-      billingNote: '/mies.',
-      auditBadge: 'Nieograniczone Audyty',
-      description: 'Nieograniczone audyty, gwarancje SLA i dedykowany opiekun konta.',
-      features: ['Nieograniczone audyty', 'Gwarancja SLA', 'Dedykowany opiekun konta', 'Niestandardowe integracje', 'SSO / SAML', 'Wdrożenie i szkolenie'],
+      perPeriod: '/mies.',
+      auditLabel: 'Nieograniczone Audyty',
+      description: 'Nieograniczona pojemność dla przedsiębiorstw i operacji na dużą skalę.',
+      features: [
+        'Nieograniczone audyty',
+        'Rekomendacje oparte na AI',
+        'Wszystkie formaty eksportu',
+        'Dedykowany opiekun konta',
+        'Niestandardowe integracje',
+        'Gwarancja SLA',
+        'Raporty white-label',
+      ],
       ctaLabel: 'Skontaktuj się z działem sprzedaży',
-      popularBadge: '',
     },
   },
 };
+
+// ---------------------------------------------------------------------------
+// Russian
+// ---------------------------------------------------------------------------
 
 const RU: AuditPageCopy = {
-  pageTitle: 'Тарифы проекта аудита',
-  pageSubtitle: 'Выберите уровень аудита, подходящий для вашего рабочего процесса. Без скрытых платежей.',
+  pageTitle: 'Тарифы Аудиторского Проекта',
+  pageSubtitle: 'Выберите объём аудитов, подходящий для вашего бизнеса.',
+  popularBadge: 'Самый Популярный',
   enterpriseCtaLabel: 'Связаться с отделом продаж',
   enterpriseCtaHref: 'mailto:sales@signalboostapp.com',
-  stripeNotConfigured: 'Этот план пока недоступен для покупки. Загляните позже.',
-  loadingLabel: 'Обработка…',
-  errorLabel: 'Что-то пошло не так. Пожалуйста, попробуйте снова.',
+  notConfiguredNotice: 'Этот тариф пока недоступен для оплаты. Зайдите позже.',
+  errorGeneric: 'Что-то пошло не так. Пожалуйста, попробуйте снова.',
   tiers: {
-    starter: {
-      name: 'Аудит Starter',
+    audit_starter: {
+      name: 'Audit Starter',
       priceLabel: '$29',
-      billingNote: '/мес.',
-      auditBadge: '3 аудита / мес.',
-      description: 'Идеально для частных лиц, выполняющих небольшое количество аудитов в месяц.',
-      features: ['3 аудита в месяц', 'Базовые отчёты аудита', 'Поддержка по электронной почте', 'Экспорт в PDF'],
+      perPeriod: '/мес.',
+      auditLabel: '3 Аудита / месяц',
+      description: 'Идеально для фрилансеров и индивидуальных операторов.',
+      features: [
+        '3 полных аудита в месяц',
+        'Рекомендации на основе ИИ',
+        'Экспорт PDF',
+        'Поддержка по электронной почте',
+      ],
       ctaLabel: 'Начать',
-      popularBadge: '',
     },
-    growth: {
-      name: 'Аудит Growth',
+    audit_growth: {
+      name: 'Audit Growth',
       priceLabel: '$79',
-      billingNote: '/мес.',
-      auditBadge: '20 аудитов / мес.',
-      description: 'Идеально для растущих команд, которым нужны регулярные циклы аудита.',
-      features: ['20 аудитов в месяц', 'Расширенные отчёты', 'Приоритетная поддержка', 'Экспорт в PDF и CSV', 'Совместный доступ для команды'],
+      perPeriod: '/мес.',
+      auditLabel: '20 Аудитов / месяц',
+      description: 'Создан для растущих агентств и небольших команд.',
+      features: [
+        '20 полных аудитов в месяц',
+        'Рекомендации на основе ИИ',
+        'Экспорт PDF + CSV',
+        'Приоритетная поддержка',
+        'Совместный доступ для команды',
+      ],
       ctaLabel: 'Начать',
-      popularBadge: 'Самый популярный',
     },
-    pro: {
-      name: 'Аудит Pro',
+    audit_pro: {
+      name: 'Audit Pro',
       priceLabel: '$199',
-      billingNote: '/мес.',
-      auditBadge: '100 аудитов / мес.',
-      description: 'Создан для агентств и опытных пользователей, проводящих аудиты в большом масштабе.',
-      features: ['100 аудитов в месяц', 'Полный пакет аудита', 'Выделенная поддержка', 'Доступ к API', 'Экспорт white-label', 'Персональный брендинг'],
+      perPeriod: '/мес.',
+      auditLabel: '100 Аудитов / месяц',
+      description: 'Для профессиональных агентств с высоким объёмом аудитов.',
+      features: [
+        '100 полных аудитов в месяц',
+        'Рекомендации на основе ИИ',
+        'Экспорт PDF + CSV + JSON',
+        'Выделенная поддержка',
+        'Совместный доступ для команды',
+        'Отчёты white-label',
+      ],
       ctaLabel: 'Начать',
-      popularBadge: '',
     },
-    enterprise: {
-      name: 'Аудит Enterprise',
+    audit_enterprise: {
+      name: 'Audit Enterprise',
       priceLabel: '$599',
-      billingNote: '/мес.',
-      auditBadge: 'Неограниченные аудиты',
-      description: 'Неограниченные аудиты, гарантии SLA и выделенный менеджер по работе с клиентами.',
-      features: ['Неограниченные аудиты', 'Гарантия SLA', 'Выделенный менеджер', 'Пользовательские интеграции', 'SSO / SAML', 'Онбординг и обучение'],
+      perPeriod: '/мес.',
+      auditLabel: 'Неограниченные Аудиты',
+      description: 'Неограниченные возможности для крупных предприятий.',
+      features: [
+        'Неограниченные аудиты',
+        'Рекомендации на основе ИИ',
+        'Все форматы экспорта',
+        'Персональный менеджер аккаунта',
+        'Индивидуальные интеграции',
+        'Гарантия SLA',
+        'Отчёты white-label',
+      ],
       ctaLabel: 'Связаться с отделом продаж',
-      popularBadge: '',
     },
   },
 };
 
-export const AUDIT_PRICING_COPY: AuditPricingI18n = { en: EN, es: ES, pt: PT, pl: PL, ru: RU };
+// ---------------------------------------------------------------------------
+// Locale map + accessor
+// ---------------------------------------------------------------------------
 
-/**
- * Safely retrieves copy for a given locale, falling back to English
- * if the requested locale is not found.
- */
+type SupportedLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru';
+
+const AUDIT_COPY_MAP: Record<SupportedLocale, AuditPageCopy> = {
+  en: EN,
+  es: ES,
+  pt: PT,
+  pl: PL,
+  ru: RU,
+};
+
 export function getAuditPricingCopy(locale: string): AuditPageCopy {
   const key = locale as SupportedLocale;
-  return AUDIT_PRICING_COPY[key] ?? AUDIT_PRICING_COPY['en'];
+  return AUDIT_COPY_MAP[key] ?? EN;
 }

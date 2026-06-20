@@ -73,7 +73,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     icon: '🚫',
     requiresConfirm: true,
     api: { service: 'AWS', method: 'POST', endpoint: '/v1/iam/users/disable' },
-    fields: [{ id: 'username', label: 'Username', type: 'text', required: true }]
+    fields: [{ id: 'username', label: 'Username', type: 'remote_select', required: true, source: { action: 'aws.list_iam_users', dataPath: 'users', valueKey: 'username', labelTemplate: '{username}' } }]
   },
 
   // === GCP ===
@@ -498,7 +498,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     requiresConfirm: true,
     policyActionId: 'crud_actions',
     api: { service: 'Vault', method: 'DELETE', endpoint: '/v1/vault/secrets' },
-    fields: [{ id: 'key', label: 'Secret Key Reference', type: 'text', required: true }]
+    fields: [{ id: 'key', label: 'Secret Key Reference', type: 'remote_select', required: true, source: { action: 'vault.view_keys', dataPath: 'keys', valueKey: 'label', labelTemplate: '{provider} · {label}' } }]
   },
   'vault.view_keys': {
     id: 'vault.view_keys',

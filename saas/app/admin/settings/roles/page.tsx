@@ -129,21 +129,6 @@ function getLang(): keyof typeof COPY {
   return 'en'
 }
 
-const thStyle: React.CSSProperties = {
-  fontSize: 10,
-  fontWeight: 800,
-  letterSpacing: '.12em',
-  textTransform: 'uppercase',
-  color: 'rgba(255,255,255,.45)',
-  padding: '12px 4px',
-  textAlign: 'left',
-}
-
-const thRightStyle: React.CSSProperties = { ...thStyle, textAlign: 'right' }
-
-const tdStyle: React.CSSProperties = { padding: '12px 4px', fontSize: 14 }
-const tdRightStyle: React.CSSProperties = { ...tdStyle, textAlign: 'right' }
-
 export default function RolesManagementPage() {
   const [users, setUsers] = useState<TeamUser[]>([])
   const [currentUser, setCurrentUser] = useState<{ id: string; email: string; role: Role } | null>(null)
@@ -157,12 +142,10 @@ export default function RolesManagementPage() {
       const { data } = await supabase.auth.getUser()
       const authUser = data.user
       if (!authUser?.id || !authUser.email) return
-
       const role = (authUser.user_metadata?.role || 'user') as Role
       setCurrentUser({ id: authUser.id, email: authUser.email, role })
       setUsers([{ id: authUser.id, email: authUser.email, role }])
     }
-
     bootstrap()
   }, [])
 
@@ -174,14 +157,11 @@ export default function RolesManagementPage() {
 
   async function confirmTransfer() {
     if (!pendingTransfer || !currentUser) return
-
     setLoading(true)
     setMessage('')
-
     try {
       const transferTarget = users.find(u => u.id === pendingTransfer.id)
       const oldRole = transferTarget?.role ?? 'user'
-
       const res = await fetch('/api/admin/roles/transfer-ownership', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -193,10 +173,8 @@ export default function RolesManagementPage() {
           oldRole,
         }),
       })
-
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || c.transferFailed)
-
       setUsers(prev =>
         prev.map(u => {
           if (u.id === currentUser.id) return { ...u, role: 'admin' }
@@ -219,6 +197,16 @@ export default function RolesManagementPage() {
   }
 
   const roleCount = (role: string) => sortedUsers.filter(u => u.role === role).length
+
+  const thBase: React.CSSProperties = {
+    fontSize: 10,
+    fontWeight: 800,
+    letterSpacing: '.12em',
+    textTransform: 'uppercase',
+    color: 'rgba(255,255,255,.45)',
+    padding: '12px 4px',
+    textAlign: 'left',
+  }
 
   return (
     <div>
@@ -248,16 +236,16 @@ export default function RolesManagementPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,.12)' }}>
-              <th style={thStyle}>{c.colEmail}</th>
-              <th style={thStyle}>{c.colRole}</th>
-              <th style={thRightStyle}>{c.colActions}</th>
+              <th style={thBase}>{c.colEmail}</th>
+              <th style={thBase}>{c.colRole}</th>
+              <th style={{ ...thBase, textAlign: 'right' }}>{c.colActions}</th>
             </tr>
           </thead>
           <tbody>
             {sortedUsers.map(user => (
               <tr key={user.id} style={{ borderTop: '1px solid rgba(255,255,255,.07)' }}>
-                <td style={tdStyle}>{user.email}</td>
-                <td style={tdStyle}>
+                <td style={{ padding: '12px 4px', fontSize: 14 }}>{user.email}</td>
+                <td style={{ padding: '12px 4px', fontSize: 14 }}>
                   <span
                     className={user.role === 'owner' ? 'sb-chip sb-chip--gold' : user.role === 'admin' ? 'sb-chip' : ''}
                     style={user.role === 'user' ? { color: 'rgba(255,255,255,.5)', textTransform: 'capitalize' } : { textTransform: 'capitalize' }}
@@ -265,7 +253,7 @@ export default function RolesManagementPage() {
                     {user.role}
                   </span>
                 </td>
-                <td style={tdRightStyle}>
+                <td style={{ padding: '12px 4px', fontSize: 14, textAlign: 'right' }}>
                   {isOwner && user.id !== currentUser?.id && (
                     <button
                       onClick={() => setPendingTransfer(user)}

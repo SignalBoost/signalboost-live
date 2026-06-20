@@ -4,8 +4,11 @@
 // Premium fathom-glass workspace dashboard for the Audit Project.
 // Task 1: layout + 5-language i18n + live credit-usage limits (from /api/credits).
 // Task 2: Stripe upgrade-path triggers (POST /api/checkout → redirect), matching
-// the proven pricing-page flow. Inline styles only (Tailwind does not render here),
-// fully fluid heights with maxHeight scroll caps.
+// the proven pricing-page flow.
+// Task 3: one-time credit-pack top-ups (POST /api/stripe/audit-topup → redirect).
+// Styling: meters + upgrade path use inline styles (original); the Buy-credits
+// section uses Tailwind utilities for the fathom-glass look — Tailwind IS active
+// in this repo. Fully fluid heights with maxHeight scroll caps.
 
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'

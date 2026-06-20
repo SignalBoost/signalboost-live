@@ -13,8 +13,10 @@ export interface AuditTier {
   id: AuditPlanId
   isPopular: boolean
   isEnterprise: boolean
-  auditCount: number          // audits per month; -1 = unlimited
-  stripePriceEnvKey: string   // the NEXT_PUBLIC_* env var holding this tier's price id
+  auditCount: number            // audits per month; -1 = unlimited
+  monthlyCredits: number | null // audit/building credits granted per month; null = custom/high-volume
+  topupAvailable: boolean       // can purchase instant one-time credit top-ups
+  stripePriceEnvKey: string     // the NEXT_PUBLIC_* env var holding this tier's price id
   monthlyPrice: number
 }
 
@@ -24,10 +26,46 @@ export interface AuditPricingConfig {
 
 export const AUDIT_PRICING_CONFIG: AuditPricingConfig = {
   tiers: [
-    { id: 'starter',    isPopular: false, isEnterprise: false, auditCount: 20,  stripePriceEnvKey: 'NEXT_PUBLIC_STRIPE_PRICE_AUDIT_STARTER',    monthlyPrice: 29 },
-    { id: 'growth',     isPopular: true,  isEnterprise: false, auditCount: 100, stripePriceEnvKey: 'NEXT_PUBLIC_STRIPE_PRICE_AUDIT_GROWTH',     monthlyPrice: 79 },
-    { id: 'pro',        isPopular: false, isEnterprise: false, auditCount: 300, stripePriceEnvKey: 'NEXT_PUBLIC_STRIPE_PRICE_AUDIT_PRO',        monthlyPrice: 199 },
-    { id: 'enterprise', isPopular: false, isEnterprise: false, auditCount: -1,  stripePriceEnvKey: 'NEXT_PUBLIC_STRIPE_PRICE_AUDIT_ENTERPRISE', monthlyPrice: 599 },
+    {
+      id: 'starter',
+      isPopular: false,
+      isEnterprise: false,
+      auditCount: 20,
+      monthlyCredits: 1000,
+      topupAvailable: true,
+      stripePriceEnvKey: 'NEXT_PUBLIC_STRIPE_PRICE_AUDIT_STARTER',
+      monthlyPrice: 29,
+    },
+    {
+      id: 'growth',
+      isPopular: true,
+      isEnterprise: false,
+      auditCount: 100,
+      monthlyCredits: 3000,
+      topupAvailable: true,
+      stripePriceEnvKey: 'NEXT_PUBLIC_STRIPE_PRICE_AUDIT_GROWTH',
+      monthlyPrice: 79,
+    },
+    {
+      id: 'pro',
+      isPopular: false,
+      isEnterprise: false,
+      auditCount: 300,
+      monthlyCredits: 10000,
+      topupAvailable: true,
+      stripePriceEnvKey: 'NEXT_PUBLIC_STRIPE_PRICE_AUDIT_PRO',
+      monthlyPrice: 199,
+    },
+    {
+      id: 'enterprise',
+      isPopular: false,
+      isEnterprise: false,
+      auditCount: -1,
+      monthlyCredits: null,
+      topupAvailable: false,
+      stripePriceEnvKey: 'NEXT_PUBLIC_STRIPE_PRICE_AUDIT_ENTERPRISE',
+      monthlyPrice: 599,
+    },
   ],
 }
 
@@ -50,4 +88,9 @@ export function getStripePriceId(envKey: string): string {
 export function formatAuditCount(auditCount: number): string {
   if (auditCount < 0) return 'Unlimited audits / mo'
   return `${auditCount.toLocaleString()} audits / mo`
+}
+
+export function formatCredits(monthlyCredits: number | null): string {
+  if (monthlyCredits === null) return 'Custom high-volume building credits'
+  return `${monthlyCredits.toLocaleString()} monthly audit/building credits`
 }

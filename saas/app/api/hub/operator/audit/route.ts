@@ -93,7 +93,12 @@ export async function POST(req: NextRequest) {
           findings_count: result.findings.length, provider: 'openai', model: 'gpt-5.5',
         }).eq('id', runId)
 
-        send({ phase: 'DONE', ok: true, runId, prefix, filesScanned: result.filesScanned, findingsCount: result.findings.length, findings: result.findings })
+        // Immutable full-payload snapshot for instant rehydration (best-effort:
+        // findings are already persisted normalized in audit_findings).
+        const payload = { runId, prefix, filesScanned: result.filesScanned, findingsCount: result.findings.length, findings: result.findings }
+        await admin.from('audit_logs').insert({ run_id: runId, user_id: ctx.userId, payload })
+
+        send({ phase: 'DONE', ok: true, ...payload })
         controller.close()
       } catch (e: unknown) {
         send({ phase: 'ERROR', error: e instanceof Error ? e.message : 'Audit run failed.' })

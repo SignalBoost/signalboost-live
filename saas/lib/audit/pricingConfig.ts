@@ -1,76 +1,94 @@
 /**
  * Audit Project — Pricing Configuration
- * Single source of truth for all 4 audit tiers.
+ * Self-contained module. No imports from the core SaaS plan system.
  * Stripe price IDs are read from environment variables at runtime.
- * No existing SaaS plan (Launch / Growth / Command) is referenced here.
+ * Until those vars are set the checkout flow shows a "not yet configured" notice.
  */
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 export type AuditCount = number | 'Unlimited';
 
+export type AuditTierId = 'audit_starter' | 'audit_growth' | 'audit_pro' | 'audit_enterprise';
+
 export interface AuditTier {
-  id: 'starter' | 'growth' | 'pro' | 'enterprise';
-  priceMonthly: number;
-  auditsPerMonth: AuditCount;
+  id: AuditTierId;
+  name: string;
+  price: number;
+  audits: AuditCount;
   stripePriceIdEnvKey: string;
-  highlighted: boolean;
+  isPopular: boolean;
+  isEnterprise: boolean;
 }
 
 export interface AuditPricingConfig {
   tiers: AuditTier[];
-  currencySymbol: string;
-  billingPeriod: 'monthly';
 }
 
+// ---------------------------------------------------------------------------
+// Config
+// ---------------------------------------------------------------------------
+
 export const AUDIT_PRICING_CONFIG: AuditPricingConfig = {
-  currencySymbol: '$',
-  billingPeriod: 'monthly',
   tiers: [
     {
-      id: 'starter',
-      priceMonthly: 29,
-      auditsPerMonth: 3,
+      id: 'audit_starter',
+      name: 'Audit Starter',
+      price: 29,
+      audits: 3,
       stripePriceIdEnvKey: 'AUDIT_STRIPE_PRICE_STARTER',
-      highlighted: false,
+      isPopular: false,
+      isEnterprise: false,
     },
     {
-      id: 'growth',
-      priceMonthly: 79,
-      auditsPerMonth: 20,
+      id: 'audit_growth',
+      name: 'Audit Growth',
+      price: 79,
+      audits: 20,
       stripePriceIdEnvKey: 'AUDIT_STRIPE_PRICE_GROWTH',
-      highlighted: true,
+      isPopular: true,
+      isEnterprise: false,
     },
     {
-      id: 'pro',
-      priceMonthly: 199,
-      auditsPerMonth: 100,
+      id: 'audit_pro',
+      name: 'Audit Pro',
+      price: 199,
+      audits: 100,
       stripePriceIdEnvKey: 'AUDIT_STRIPE_PRICE_PRO',
-      highlighted: false,
+      isPopular: false,
+      isEnterprise: false,
     },
     {
-      id: 'enterprise',
-      priceMonthly: 599,
-      auditsPerMonth: 'Unlimited',
+      id: 'audit_enterprise',
+      name: 'Audit Enterprise',
+      price: 599,
+      audits: 'Unlimited',
       stripePriceIdEnvKey: 'AUDIT_STRIPE_PRICE_ENTERPRISE',
-      highlighted: false,
+      isPopular: false,
+      isEnterprise: true,
     },
   ],
 };
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 /**
- * Safely resolves the Stripe price ID for a given tier from process.env.
- * Returns null if the env var is not set — callers must guard against null
- * before initiating checkout.
+ * Returns the Stripe price ID for a given tier from process.env.
+ * Returns null if the env var is not set — callers must handle this case.
  */
-export function resolveStripePriceId(tier: AuditTier): string | null {
+export function getAuditStripePriceId(tier: AuditTier): string | null {
   const value: string | undefined = process.env[tier.stripePriceIdEnvKey];
-  return value ?? null;
+  return value !== undefined && value.length > 0 ? value : null;
 }
 
 /**
  * Formats the audit count for display.
- * Returns the number as a string, or 'Unlimited' as-is.
  */
-export function formatAuditCount(count: AuditCount): string {
-  if (count === 'Unlimited') return 'Unlimited';
-  return String(count);
+export function formatAuditCount(audits: AuditCount): string {
+  if (audits === 'Unlimited') return 'Unlimited';
+  return String(audits);
 }

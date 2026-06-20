@@ -196,6 +196,103 @@ async function findUserIdByEmail(
   return null
 }
 
+// ─── Stripe event idempotency ─────────────────────────────────────────────────
+// Balance increments are NOT idempotent, and Stripe may deliver the same event
+// more than once (retries, at-least-once delivery). We claim each event.id in
+// `stripe_processed_events` before crediting. claimStripeEvent returns true only
+// the FIRST time an id is seen; a redelivery hits the primary-key unique
+// violation (23505) and returns false so the handler skips. If the table is
+// missing or the insert fails for any other reason we fail OPEN (return true and
+// proceed) — better to risk a rare double-credit than to block real purchases —
+// but we log loudly so the gap is visible.
+
+async function claimStripeEvent(supabase: any, eventId: string | undefined): Promise<boolean> {
+  if (!eventId) return true
+  const { error } = await supabase
+    .from('stripe_processed_events')
+    .insert({ event_id: eventId })
+  if (!error) return true
+  if (error.code === '23505') return false // already processed
+  console.warn('Webhook: claimStripeEvent insert error (proceeding fail-open)', error.code, error.message)
+  return true
+}
+
+// Releases a previously-claimed event so a Stripe retry can re-attempt it. Used
+// only when crediting failed AFTER the claim — so the retry is allowed to run.
+async function releaseStripeEvent(supabase: any, eventId: string | undefined): Promise<void> {
+  if (!eventId) return
+  await supabase
+    .from('stripe_processed_events')
+    .delete()
+    .eq('event_id', eventId)
+    .then(() => {}, () => {})
+}
+
+// ─── Audit credit top-up (one-time credit-pack purchase) ──────────────────────
+// Distinct from the audit SUBSCRIPTION (productLine: 'audit'). A top-up is a
+// mode:'payment' Checkout Session whose metadata carries:
+//   metadata.type         = 'audit_credit_topup'   (the discriminator)
+//   metadata.userId       = buyer's Supabase auth id (set by our checkout route)
+//   metadata.creditAmount = how many audit credits this pack grants (integer)
+//
+// It must NEVER fall through to the subscription upsert (that would clobber the
+// buyer's real plan). We resolve the buyer, bound-check the quantity, then add
+// the credits ATOMICALLY in Postgres via the increment_audit_credits RPC — we
+// never read-modify-write a balance from JS (lost-update risk). The Stripe event
+// id guards against double-crediting on redelivery.
+
+async function handleAuditCreditTopup(
+  supabase: any,
+  session: any,
+  eventId: string | undefined,
+): Promise<NextResponse> {
+  const fresh = await claimStripeEvent(supabase, eventId)
+  if (!fresh) {
+    console.log('Webhook audit_credit_topup: event already processed — skipping', eventId)
+    return NextResponse.json({ received: true, deduped: true })
+  }
+
+  // Resolve the buyer (metadata.userId first, email fallback — same as subs).
+  let userId = session.metadata?.userId
+  if (!userId && session.customer_email) {
+    console.warn('Webhook audit_credit_topup: metadata.userId missing, email fallback', session.customer_email)
+    userId = await findUserIdByEmail(supabase, session.customer_email)
+  }
+  if (!userId) {
+    console.error('Webhook audit_credit_topup: no userId found', {
+      sessionId: session.id, metadata: session.metadata, email: session.customer_email,
+    })
+    // 200 so Stripe stops retrying a session we can never attribute.
+    return NextResponse.json({ received: true, warning: 'no userId' })
+  }
+
+  // Bound-check the quantity: positive integer, sane upper cap so a malformed or
+  // tampered metadata value can never mint an absurd balance.
+  const raw = session.metadata?.creditAmount
+  const credits = Number.parseInt(String(raw ?? ''), 10)
+  if (!Number.isInteger(credits) || credits <= 0 || credits > 100000) {
+    console.error('Webhook audit_credit_topup: invalid creditAmount', { raw, sessionId: session.id })
+    return NextResponse.json({ received: true, warning: 'invalid creditAmount' })
+  }
+
+  // Atomic increment (creates the subscriptions row if the buyer has none yet).
+  const { data, error } = await supabase.rpc('increment_audit_credits', {
+    target_user_id: userId,
+    add_amount: credits,
+  })
+  if (error) {
+    console.error('Webhook audit_credit_topup: increment_audit_credits failed', error.message)
+    // Roll back the idempotency claim so Stripe's retry can re-attempt crediting.
+    await releaseStripeEvent(supabase, eventId)
+    return NextResponse.json({ error: 'DB error' }, { status: 500 })
+  }
+
+  console.log('Webhook audit_credit_topup: credited', {
+    userId, credits, newBalance: data, sessionId: session.id,
+  })
+  return NextResponse.json({ received: true, credited: credits, balance: data ?? null })
+}
+
 // ─── Webhook handler ──────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -229,6 +326,13 @@ export async function POST(req: NextRequest) {
       // ── New subscription purchased ─────────────────────────────────────────
       case 'checkout.session.completed': {
         const session = event.data.object
+
+        // Audit credit-pack top-up (one-time payment) — handled and returned
+        // here so it can NEVER fall through to the subscription upsert below.
+        if (session.metadata?.type === 'audit_credit_topup') {
+          return await handleAuditCreditTopup(supabase, session, event.id)
+        }
+
         let userId    = session.metadata?.userId
         const priceId      = session.metadata?.priceId
         const metaLine     = session.metadata?.productLine

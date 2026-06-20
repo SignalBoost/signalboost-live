@@ -11,15 +11,19 @@ import { cookies } from 'next/headers'
 // Session — same mechanics as /api/checkout.
 //
 // Required env (set in Vercel):
-//   STRIPE_SECRET_KEY                       (already set — used by /api/checkout)
-//   NEXT_PUBLIC_APP_URL                     (already set)
-//   NEXT_PUBLIC_STRIPE_PRICE_AUDIT_STARTER  (price_… for the $29 audit plan)
-//   NEXT_PUBLIC_STRIPE_PRICE_AUDIT_PRO      (price_… for the $79 audit plan)
+//   STRIPE_SECRET_KEY                          (already set — used by /api/checkout)
+//   NEXT_PUBLIC_APP_URL                        (already set)
+//   NEXT_PUBLIC_STRIPE_PRICE_AUDIT_STARTER     (price_… for the $29 plan)
+//   NEXT_PUBLIC_STRIPE_PRICE_AUDIT_GROWTH      (price_… for the $79 plan)
+//   NEXT_PUBLIC_STRIPE_PRICE_AUDIT_PRO         (price_… for the $199 plan)
+//   NEXT_PUBLIC_STRIPE_PRICE_AUDIT_ENTERPRISE  (price_… for the $599 plan)
 
 function auditPriceAllowlist(): string[] {
   return [
     process.env.NEXT_PUBLIC_STRIPE_PRICE_AUDIT_STARTER,
+    process.env.NEXT_PUBLIC_STRIPE_PRICE_AUDIT_GROWTH,
     process.env.NEXT_PUBLIC_STRIPE_PRICE_AUDIT_PRO,
+    process.env.NEXT_PUBLIC_STRIPE_PRICE_AUDIT_ENTERPRISE,
   ].filter((v): v is string => typeof v === 'string' && v.length > 0)
 }
 
@@ -34,8 +38,6 @@ export async function POST(req: NextRequest) {
 
     const allowlist = auditPriceAllowlist()
     if (allowlist.length === 0) {
-      // The env vars have not been set yet — the page shows its own
-      // "not configured" notice, but guard the server side too.
       console.error('Audit checkout: no NEXT_PUBLIC_STRIPE_PRICE_AUDIT_* env vars set')
       return NextResponse.json({ error: 'Audit pricing is not configured yet.' }, { status: 503 })
     }

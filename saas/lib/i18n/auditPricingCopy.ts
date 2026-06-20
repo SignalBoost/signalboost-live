@@ -2,6 +2,7 @@
 // Audit pricing page copy — four commercial tiers, all 5 locales, self-contained.
 // Reusable labels are localized; tier proper-names (Starter/Growth/Pro/Enterprise)
 // are kept in English across locales by design (standard SaaS practice).
+// v2: added credit-limit strings, ⚡ icon, and top-up availability notice per tier.
 
 type FlatCopy = Record<string, string>
 
@@ -25,6 +26,13 @@ export const AUDIT_PRICING_COPY: Record<string, FlatCopy> = {
     'auditPricing.support.email': 'Email',
     'auditPricing.support.priority': 'Priority',
     'auditPricing.support.dedicated': 'Dedicated',
+    // ── Credit limit lines (⚡ prefix added at render time) ──────────────────
+    'auditPricing.feat.credits.starter':    '1,000 monthly audit/building credits',
+    'auditPricing.feat.credits.growth':     '3,000 monthly audit/building credits',
+    'auditPricing.feat.credits.pro':        '10,000 monthly audit/building credits',
+    'auditPricing.feat.credits.enterprise': 'Custom high-volume building credits',
+    // ── Top-up availability notice ───────────────────────────────────────────
+    'auditPricing.feat.topup': 'Instant one-time credit top-ups available',
   },
   es: {
     'auditPricing.title': 'Precios de Auditoría',
@@ -45,6 +53,11 @@ export const AUDIT_PRICING_COPY: Record<string, FlatCopy> = {
     'auditPricing.support.email': 'Correo electrónico',
     'auditPricing.support.priority': 'Prioritario',
     'auditPricing.support.dedicated': 'Dedicado',
+    'auditPricing.feat.credits.starter':    '1.000 créditos mensuales de auditoría/construcción',
+    'auditPricing.feat.credits.growth':     '3.000 créditos mensuales de auditoría/construcción',
+    'auditPricing.feat.credits.pro':        '10.000 créditos mensuales de auditoría/construcción',
+    'auditPricing.feat.credits.enterprise': 'Créditos de construcción de alto volumen personalizados',
+    'auditPricing.feat.topup': 'Recargas de créditos únicas disponibles al instante',
   },
   pt: {
     'auditPricing.title': 'Preços de Auditoria',
@@ -65,6 +78,11 @@ export const AUDIT_PRICING_COPY: Record<string, FlatCopy> = {
     'auditPricing.support.email': 'E-mail',
     'auditPricing.support.priority': 'Prioritário',
     'auditPricing.support.dedicated': 'Dedicado',
+    'auditPricing.feat.credits.starter':    '1.000 créditos mensais de auditoria/construção',
+    'auditPricing.feat.credits.growth':     '3.000 créditos mensais de auditoria/construção',
+    'auditPricing.feat.credits.pro':        '10.000 créditos mensais de auditoria/construção',
+    'auditPricing.feat.credits.enterprise': 'Créditos de construção de alto volume personalizados',
+    'auditPricing.feat.topup': 'Recargas avulsas de créditos disponíveis instantaneamente',
   },
   pl: {
     'auditPricing.title': 'Cennik Audytu',
@@ -85,6 +103,11 @@ export const AUDIT_PRICING_COPY: Record<string, FlatCopy> = {
     'auditPricing.support.email': 'E-mail',
     'auditPricing.support.priority': 'Priorytetowe',
     'auditPricing.support.dedicated': 'Dedykowane',
+    'auditPricing.feat.credits.starter':    '1 000 miesięcznych kredytów audytu/budowania',
+    'auditPricing.feat.credits.growth':     '3 000 miesięcznych kredytów audytu/budowania',
+    'auditPricing.feat.credits.pro':        '10 000 miesięcznych kredytów audytu/budowania',
+    'auditPricing.feat.credits.enterprise': 'Niestandardowe kredyty budowania o dużej skali',
+    'auditPricing.feat.topup': 'Jednorazowe doładowania kredytów dostępne natychmiast',
   },
   ru: {
     'auditPricing.title': 'Цены на аудит',
@@ -105,6 +128,11 @@ export const AUDIT_PRICING_COPY: Record<string, FlatCopy> = {
     'auditPricing.support.email': 'Электронная почта',
     'auditPricing.support.priority': 'Приоритетная',
     'auditPricing.support.dedicated': 'Выделенная',
+    'auditPricing.feat.credits.starter':    '1 000 ежемесячных кредитов аудита/сборки',
+    'auditPricing.feat.credits.growth':     '3 000 ежемесячных кредитов аудита/сборки',
+    'auditPricing.feat.credits.pro':        '10 000 ежемесячных кредитов аудита/сборки',
+    'auditPricing.feat.credits.enterprise': 'Индивидуальные кредиты сборки большого объёма',
+    'auditPricing.feat.topup': 'Разовые пополнения кредитов доступны мгновенно',
   },
 }
 
@@ -138,14 +166,16 @@ export interface AuditPageCopy {
 const TIER_FACTS: Record<string, {
   name: string; price: string; files: string; history: number; seats: string; support: string; popular?: boolean
 }> = {
-  starter:    { name: 'Starter',    price: '$29',  files: '20',        history: 30,  seats: '3',       support: 'email' },
-  growth:     { name: 'Growth',     price: '$79',  files: '40',        history: 90,  seats: '10',      support: 'priority', popular: true },
-  pro:        { name: 'Pro',        price: '$199', files: '60',        history: 180, seats: '25',      support: 'priority' },
+  starter:    { name: 'Starter',    price: '$29',  files: '20',        history: 30,  seats: '3',         support: 'email' },
+  growth:     { name: 'Growth',     price: '$79',  files: '40',        history: 90,  seats: '10',        support: 'priority', popular: true },
+  pro:        { name: 'Pro',        price: '$199', files: '60',        history: 180, seats: '25',        support: 'priority' },
   enterprise: { name: 'Enterprise', price: '$599', files: 'Unlimited', history: 365, seats: 'Unlimited', support: 'dedicated' },
 }
 const TIER_IDS = ['starter', 'growth', 'pro', 'enterprise']
 const AUDITS_PER_MONTH: Record<string, string> = { starter: '20', growth: '100', pro: '300', enterprise: '' /* unlimited */ }
 const SEATS_UNLIMITED = new Set(['enterprise'])
+// Tiers that show the instant top-up notice (Enterprise has custom credits — no topup line).
+const TOPUP_TIERS = new Set(['starter', 'growth', 'pro'])
 
 // Strings not present in the flat dictionary, per locale.
 const EXTRA: Record<AuditLocale, { loading: string; error: string; enterpriseHref: string; desc: Record<string, string> }> = {
@@ -173,7 +203,13 @@ export function getAuditPricingCopy(lang: string): AuditPageCopy {
     const seats = SEATS_UNLIMITED.has(id) ? L['auditPricing.feat.seatsUnlimited'] : f.seats
     const files = f.files === 'Unlimited' ? L['auditPricing.feat.auditsUnlimited'] : f.files
     const historyDays = L['auditPricing.feat.historyDays'].replace('{n}', String(f.history))
+
+    // ── Credit limit line — ⚡ prefix makes it scannable at a glance ─────────
+    const creditLine = `⚡ ${L[`auditPricing.feat.credits.${id}`]}`
+
     const features: string[] = [
+      // Credit limit is the FIRST feature — most important buying signal.
+      creditLine,
       `${audits} · ${L['auditPricing.feat.audits']}`,
       `${files} · ${L['auditPricing.feat.maxFiles']}`,
       `${historyDays} · ${L['auditPricing.feat.history']}`,
@@ -181,6 +217,12 @@ export function getAuditPricingCopy(lang: string): AuditPageCopy {
       `${seats} · ${L['auditPricing.feat.seats']}`,
       `${L['auditPricing.support.' + f.support]} · ${L['auditPricing.feat.support']}`,
     ]
+
+    // Append top-up notice for all non-Enterprise tiers.
+    if (TOPUP_TIERS.has(id)) {
+      features.push(`⚡ ${L['auditPricing.feat.topup']}`)
+    }
+
     tiers[id] = {
       popular: f.popular ? L['auditPricing.popular'] : undefined,
       name: f.name, // tier proper-name kept in English by design

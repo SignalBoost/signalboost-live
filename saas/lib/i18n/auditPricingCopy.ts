@@ -3,6 +3,8 @@
 // Reusable labels are localized; tier proper-names (Starter/Growth/Pro/Enterprise)
 // are kept in English across locales by design (standard SaaS practice).
 
+import { AUDIT_PRICING_CONFIG, formatCredits } from '@/lib/audit/pricingConfig'
+
 type FlatCopy = Record<string, string>
 
 export const AUDIT_PRICING_COPY: Record<string, FlatCopy> = {
@@ -119,6 +121,8 @@ export interface AuditTierCopy {
   priceLabel: string
   perMonth: string
   features: string[]
+  creditsLabel: string   // prominent credit allowance line (from pricingConfig)
+  topupLabel?: string    // shown when the tier supports one-time top-ups
   ctaLabel: string
 }
 
@@ -138,9 +142,9 @@ export interface AuditPageCopy {
 const TIER_FACTS: Record<string, {
   name: string; price: string; files: string; history: number; seats: string; support: string; popular?: boolean
 }> = {
-  starter:    { name: 'Starter',    price: '$29',  files: '20',        history: 30,  seats: '3',       support: 'email' },
-  growth:     { name: 'Growth',     price: '$79',  files: '40',        history: 90,  seats: '10',      support: 'priority', popular: true },
-  pro:        { name: 'Pro',        price: '$199', files: '60',        history: 180, seats: '25',      support: 'priority' },
+  starter:    { name: 'Starter',    price: '$29',  files: '20',        history: 30,  seats: '3',         support: 'email' },
+  growth:     { name: 'Growth',     price: '$79',  files: '40',        history: 90,  seats: '10',        support: 'priority', popular: true },
+  pro:        { name: 'Pro',        price: '$199', files: '60',        history: 180, seats: '25',        support: 'priority' },
   enterprise: { name: 'Enterprise', price: '$599', files: 'Unlimited', history: 365, seats: 'Unlimited', support: 'dedicated' },
 }
 const TIER_IDS = ['starter', 'growth', 'pro', 'enterprise']
@@ -148,16 +152,21 @@ const AUDITS_PER_MONTH: Record<string, string> = { starter: '20', growth: '100',
 const SEATS_UNLIMITED = new Set(['enterprise'])
 
 // Strings not present in the flat dictionary, per locale.
-const EXTRA: Record<AuditLocale, { loading: string; error: string; enterpriseHref: string; desc: Record<string, string> }> = {
+const EXTRA: Record<AuditLocale, { loading: string; error: string; enterpriseHref: string; topup: string; desc: Record<string, string> }> = {
   en: { loading: 'Processing…', error: 'Something went wrong. Please try again.', enterpriseHref: 'mailto:sales@signalboostapp.com',
+        topup: 'Instant one-time credit top-ups available',
         desc: { starter: 'For solo builders shipping often.', growth: 'For teams auditing continuously.', pro: 'High-volume scanning for busy teams.', enterprise: 'Unlimited scale with dedicated support.' } },
   es: { loading: 'Procesando…', error: 'Algo salió mal. Inténtalo de nuevo.', enterpriseHref: 'mailto:sales@signalboostapp.com',
+        topup: 'Recargas instantáneas de créditos disponibles',
         desc: { starter: 'Para creadores que publican a menudo.', growth: 'Para equipos que auditan sin parar.', pro: 'Escaneo de alto volumen para equipos ocupados.', enterprise: 'Escala ilimitada con soporte dedicado.' } },
   pt: { loading: 'Processando…', error: 'Algo deu errado. Tente novamente.', enterpriseHref: 'mailto:sales@signalboostapp.com',
+        topup: 'Recargas instantâneas de créditos disponíveis',
         desc: { starter: 'Para criadores que publicam com frequência.', growth: 'Para equipes que auditam continuamente.', pro: 'Varredura de alto volume para equipes ocupadas.', enterprise: 'Escala ilimitada com suporte dedicado.' } },
   pl: { loading: 'Przetwarzanie…', error: 'Coś poszło nie tak. Spróbuj ponownie.', enterpriseHref: 'mailto:sales@signalboostapp.com',
+        topup: 'Dostępne natychmiastowe, jednorazowe doładowania kredytów',
         desc: { starter: 'Dla twórców publikujących często.', growth: 'Dla zespołów audytujących bez przerwy.', pro: 'Skanowanie dużej skali dla zajętych zespołów.', enterprise: 'Nieograniczona skala i dedykowane wsparcie.' } },
   ru: { loading: 'Обработка…', error: 'Что-то пошло не так. Попробуйте снова.', enterpriseHref: 'mailto:sales@signalboostapp.com',
+        topup: 'Доступны мгновенные разовые пополнения кредитов',
         desc: { starter: 'Для авторов, которые часто публикуют.', growth: 'Для команд, аудитирующих постоянно.', pro: 'Высокообъёмное сканирование для занятых команд.', enterprise: 'Безграничный масштаб и выделенная поддержка.' } },
 }
 
@@ -165,6 +174,9 @@ export function getAuditPricingCopy(lang: string): AuditPageCopy {
   const loc: AuditLocale = (['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as AuditLocale
   const L = AUDIT_PRICING_COPY[loc] || AUDIT_PRICING_COPY.en
   const X = EXTRA[loc]
+
+  const creditsById: Record<string, { credits: number | null; topup: boolean }> = {}
+  for (const t of AUDIT_PRICING_CONFIG.tiers) creditsById[t.id] = { credits: t.monthlyCredits, topup: t.topupAvailable }
 
   const tiers: Record<string, AuditTierCopy> = {}
   for (const id of TIER_IDS) {
@@ -188,6 +200,8 @@ export function getAuditPricingCopy(lang: string): AuditPageCopy {
       priceLabel: f.price,
       perMonth: L['auditPricing.perMonth'],
       features,
+      creditsLabel: formatCredits(creditsById[id] ? creditsById[id].credits : null),
+      topupLabel: creditsById[id] && creditsById[id].topup ? X.topup : undefined,
       ctaLabel: L['auditPricing.cta.paid'],
     }
   }

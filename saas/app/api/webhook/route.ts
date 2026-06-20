@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import { AUDIT_PRICING_CONFIG } from '@/lib/audit/pricingConfig'
 
 // ─── Price-ID → internal plan maps ────────────────────────────────────────────
 // Defect #5 fix: build the maps from ONLY the env vars that are actually set.
@@ -47,11 +48,34 @@ const PODCAST_PLAN_MAP: Record<string, string> = buildPriceMap(
   'podcast',
 )
 
+// ─── Audit module maps ────────────────────────────────────────────────────────
+// price-id → tier, built from the NEXT_PUBLIC_* audit price env vars. These are
+// readable server-side via process.env even though they are NEXT_PUBLIC.
+const AUDIT_PLAN_MAP: Record<string, string> = (() => {
+  const m: Record<string, string> = {}
+  for (const t of AUDIT_PRICING_CONFIG.tiers) {
+    const pid = process.env[t.stripePriceEnvKey]
+    if (pid && pid.trim()) m[pid] = t.id
+  }
+  return m
+})()
+
+// Monthly audit/building credits granted per tier on a successful audit
+// subscription. Mirrors saas/lib/audit/pricingConfig.ts (monthlyCredits) — keep
+// in sync; held locally so the webhook does not depend on that field being
+// merged to main yet. enterprise = null (custom/high-volume, not auto-granted).
+const AUDIT_CREDITS_BY_TIER: Record<string, number | null> = {
+  starter: 1000,
+  growth: 3000,
+  pro: 10000,
+  enterprise: null,
+}
+
 function resolvePlanAndLine(
   priceId: string | undefined,
   metaProductLine?: string,
   metaPlan?: string,
-): { plan: string; productLine: 'website' | 'podcast' | 'unsupported' } {
+): { plan: string; productLine: 'website' | 'podcast' | 'audit' | 'unsupported' } {
   // 1. Try explicit price ID lookup (most reliable)
   if (priceId) {
     if (WEBSITE_PLAN_MAP[priceId]) {
@@ -59,6 +83,9 @@ function resolvePlanAndLine(
     }
     if (PODCAST_PLAN_MAP[priceId]) {
       return { plan: PODCAST_PLAN_MAP[priceId], productLine: 'podcast' }
+    }
+    if (AUDIT_PLAN_MAP[priceId]) {
+      return { plan: AUDIT_PLAN_MAP[priceId], productLine: 'audit' }
     }
   }
   // 2. Fall back to metadata. Only 'website' and 'podcast' are real product
@@ -69,6 +96,9 @@ function resolvePlanAndLine(
   //    real plan with a website 'starter'.
   if (metaProductLine === 'podcast') {
     return { plan: metaPlan || 'indie', productLine: 'podcast' }
+  }
+  if (metaProductLine === 'audit') {
+    return { plan: metaPlan || '', productLine: 'audit' }
   }
   if (!metaProductLine || metaProductLine === 'website') {
     return { plan: metaPlan || 'starter', productLine: 'website' }
@@ -265,8 +295,7 @@ async function handleAuditCreditTopup(
     // 200 so Stripe stops retrying a session we can never attribute.
     return NextResponse.json({ received: true, warning: 'no userId' })
   }
-
-  // Bound-check the quantity: positive integer, sane upper cap so a malformed or
+// Bound-check the quantity: positive integer, sane upper cap so a malformed or
   // tampered metadata value can never mint an absurd balance.
   const raw = session.metadata?.creditAmount
   const credits = Number.parseInt(String(raw ?? ''), 10)
@@ -368,7 +397,26 @@ export async function POST(req: NextRequest) {
 
         console.log('Webhook: upserting subscription', { userId, plan, productLine, priceId })
 
-        if (productLine === 'podcast') {
+        if (productLine === 'audit') {
+          // Upsert ONLY the audit columns — website/podcast columns untouched.
+          // Grant the tier's monthly credit allotment on the initial subscription.
+          const credits = AUDIT_CREDITS_BY_TIER[plan]
+          const row: Record<string, unknown> = {
+            user_id:      userId,
+            audit_plan:   plan || null,
+            audit_status: 'active',
+            updated_at:   new Date().toISOString(),
+          }
+          if (typeof credits === 'number' && credits > 0) {
+            row.audit_credits = credits
+          }
+          const { error } = await supabase.from('subscriptions').upsert(row, { onConflict: 'user_id' })
+          if (error) {
+            console.error('Webhook: supabase upsert error (audit)', error)
+            return NextResponse.json({ error: 'DB error' }, { status: 500 })
+          }
+          console.log('Webhook: audit subscription upserted', { userId, plan, credits })
+        } else if (productLine === 'podcast') {
           // Upsert only podcast columns — website columns are untouched
           const { error } = await supabase.from('subscriptions').upsert(
             {
@@ -423,7 +471,21 @@ export async function POST(req: NextRequest) {
           break
         }
 
-        if (productLine === 'podcast') {
+        if (productLine === 'audit') {
+          const uid = sub.metadata?.userId
+          if (!uid) {
+            console.warn('Webhook subscription.updated (audit): no userId in metadata', sub.id)
+            break
+          }
+          const upd: Record<string, unknown> = {
+            audit_status: status,
+            updated_at:   new Date().toISOString(),
+          }
+          if (plan) upd.audit_plan = plan
+          const { error } = await supabase.from('subscriptions').update(upd).eq('user_id', uid)
+          if (error) console.error('Webhook subscription.updated (audit): supabase error', error)
+          else console.log('Webhook: audit subscription updated', sub.id, '->', plan, status)
+        } else if (productLine === 'podcast') {
           const { error } = await supabase
             .from('subscriptions')
             .update({
@@ -456,6 +518,23 @@ export async function POST(req: NextRequest) {
       // ── Cancellation ──────────────────────────────────────────────────────
       case 'customer.subscription.deleted': {
         const sub = event.data.object
+
+        // Audit subscription cancellation — matched by metadata.userId because
+        // there is no audit_stripe_subscription_id column to match on.
+        if (sub.metadata?.productLine === 'audit') {
+          const uid = sub.metadata?.userId
+          if (uid) {
+            const { error } = await supabase
+              .from('subscriptions')
+              .update({ audit_status: 'cancelled', updated_at: new Date().toISOString() })
+              .eq('user_id', uid)
+            if (error) console.error('Webhook subscription.deleted (audit): supabase error', error)
+            else console.log('Webhook: audit subscription cancelled', sub.id, 'user', uid)
+          } else {
+            console.warn('Webhook subscription.deleted (audit): no userId in metadata', sub.id)
+          }
+          break
+        }
 
         // Check if this is a website subscription
         const { data: websiteRow } = await supabase

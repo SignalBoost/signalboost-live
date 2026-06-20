@@ -15,6 +15,7 @@ import { isOutreachEligible, createCustomerDraft, listCustomerDrafts, formatCust
 import { listRepoFiles, readRepoFile, formatFileListForAI, formatFileForAI } from '@/lib/ai/tools/repoReader'
 import { commitFileToBranch, listAiBranches, formatCommitResultForAI, formatBranchListForAI, listDeletableBranches, deleteBranches, formatDeletableForAI, formatDeleteResultForAI } from '@/lib/ai/tools/repoWriter'
 import { proposeInfrastructurePR, formatStageResultForAI, listInfraPRsForAI } from '@/lib/ai/tools/infraPRWriter'
+import { PROVIDER_TEMPLATES } from '@/lib/hub/provider-templates'
 import { OWNER_ONLY_TOOLS, adminReadOnlyBlock } from '@/lib/ai/accessTier'
 import { promptCompilerModule } from '@/lib/ai/promptCompiler'
 import { cosArchitectModule, cosExecuteDirective } from '@/lib/ai/cosArchitect'
@@ -448,7 +449,6 @@ const TOOL_LIST_MY_OUTREACH: ChatTool = {
     parameters: { type: 'object', properties: {}, required: [] },
   },
 }
-
 const TOOL_SEARCH_HISTORY: ChatTool = {
   type: 'function',
   function: {
@@ -484,7 +484,7 @@ const TOOL_PROPOSE_INFRA_PR: ChatTool = {
   function: {
     name: 'proposeInfrastructurePR',
     description:
-      'Stage a real infrastructure change as an OPEN PULL REQUEST for the owner to approve — do NOT ask permission, the PR IS the proposal. Use whenever the owner asks to change live provider state: set/rotate a Vercel env var, sync a key to Vercel, create/edit a Stripe product or price, run a Supabase migration or SQL, manage a GitHub/Resend/ElevenLabs resource, trigger a redeploy, etc. You act as the developer: produce the EXACT ordered steps, each a real hub templateId (e.g. "vercel.set_env", "supabase.run_migration", "stripe.create_price") with a fully-filled payload. Nothing executes now — it fires only when the owner clicks Merge on /hub/prs. Never claim anything was applied; say it is staged for approval.',
+      'Stage a real infrastructure change as an OPEN PULL REQUEST for the owner to approve — do NOT ask permission, the PR IS the proposal. Use whenever the owner asks to change live provider state: set/rotate a Vercel env var, sync a key to Vercel, create/edit a Stripe product or price, run a Supabase migration or SQL, manage a GitHub/Resend/ElevenLabs resource, trigger a redeploy, etc. You act as the developer: produce the EXACT ordered steps, each a real hub templateId (e.g. "vercel.add_env_var", "supabase.run_migration", "stripe.create_price") with a fully-filled payload. ALWAYS call listProviderActions FIRST to get the exact templateId and required field names for each provider — never guess template ids or payload field names. Nothing executes now — it fires only when the owner clicks Merge on /hub/prs. Never claim anything was applied; say it is staged for approval.',
     parameters: {
       type: 'object',
       properties: {
@@ -497,7 +497,7 @@ const TOOL_PROPOSE_INFRA_PR: ChatTool = {
           items: {
             type: 'object',
             properties: {
-              templateId: { type: 'string', description: 'A real hub template id, "provider.action" (e.g. "vercel.set_env").' },
+              templateId: { type: 'string', description: 'A real hub template id, "provider.action" (e.g. "vercel.add_env_var"). Get exact ids from listProviderActions — do not invent them.' },
               label: { type: 'string', description: 'Human one-liner for this step.' },
               payload: { type: 'object', description: 'The exact inputs that template requires. No placeholders — real values.' },
             },
@@ -516,6 +516,22 @@ const TOOL_LIST_INFRA_PRS: ChatTool = {
     name: 'listInfrastructurePRs',
     description: 'List the infrastructure pull requests currently OPEN and awaiting the owner\'s Merge on /hub/prs. Call when the owner asks what infra changes are pending approval.',
     parameters: { type: 'object', properties: {}, required: [] },
+  },
+}
+
+const TOOL_LIST_PROVIDER_ACTIONS: ChatTool = {
+  type: 'function',
+  function: {
+    name: 'listProviderActions',
+    description:
+      'List the REAL hub provider action templates you can stage with proposeInfrastructurePR. Call this BEFORE staging any infrastructure PR so you use the exact templateId (e.g. "stripe.create_price", "vercel.add_env_var") and the exact required field names — never guess. Pass { "provider": "stripe" } (or "vercel", "supabase", "github", etc.) to see that provider\'s templates with their required and optional fields. Omit provider to list every available templateId.',
+    parameters: {
+      type: 'object',
+      properties: {
+        provider: { type: 'string', description: 'Optional provider prefix, e.g. "stripe", "vercel", "supabase". Omit to list all templateIds.' },
+      },
+      required: [],
+    },
   },
 }
 
@@ -544,6 +560,7 @@ const CHIEF_OF_STAFF_TOOLS: ChatTool[] = [
   TOOL_CREATE_OUTREACH_DRAFT,
   TOOL_PROPOSE_INFRA_PR,
   TOOL_LIST_INFRA_PRS,
+  TOOL_LIST_PROVIDER_ACTIONS,
 ]
 // ── Post-commit verification ─────────────────────────────────────────────────
 // After a commit, read the file back FROM THE SAME ai/* BRANCH (never main) and
@@ -750,6 +767,30 @@ if (name === 'listInfrastructurePRs') {
     }
     return await listInfraPRsForAI()
   }
+if (name === 'listProviderActions') {
+    if (!isPrivileged) {
+      return 'PERMISSION DENIED: provider actions are owner/admin only. Do not retry.'
+    }
+    let provider = ''
+    try { provider = String(JSON.parse(rawArgs || '{}')?.provider || '').toLowerCase().trim() } catch {}
+    const entries = Object.entries(PROVIDER_TEMPLATES)
+    if (!provider) {
+      const lines = entries.map(([id, t]: [string, any]) => `• ${id} — ${t.label}`)
+      return `Provider action templateIds (call listProviderActions with { "provider": "stripe" } to see a provider's required fields before staging an infra PR):\n${lines.join('\n')}`
+    }
+    const filtered = entries.filter(([id]) => id.toLowerCase().startsWith(provider + '.'))
+    if (filtered.length === 0) {
+      const providers = Array.from(new Set(entries.map(([id]) => id.split('.')[0]))).sort()
+      return `No templates for "${provider}". Available providers: ${providers.join(', ')}.`
+    }
+    const lines = filtered.map(([id, t]: [string, any]) => {
+      const fields = Array.isArray(t.fields) ? t.fields : []
+      const req = fields.filter((f: any) => f && f.required).map((f: any) => `${f.id}:${f.type}`)
+      const opt = fields.filter((f: any) => f && !f.required).map((f: any) => f.id)
+      return `• ${id} — ${t.label}\n    required: ${req.length ? req.join(', ') : '(none)'}${opt.length ? `\n    optional: ${opt.join(', ')}` : ''}`
+    })
+    return `Templates for "${provider}". Use the exact templateId and fill every required field in your proposeInfrastructurePR payload:\n${lines.join('\n')}`
+  }
 if (name === 'listAiBranches') {
     if (!isPrivileged) {
       return 'PERMISSION DENIED: branch review is restricted to the owner/admin channel. Do not retry.'
@@ -812,8 +853,7 @@ if (name === 'listGrowthPlans') {
     }
     return formatPlansForAI(result.plans)
   }
-
-  if (name === 'createOutreachDraft') {
+if (name === 'createOutreachDraft') {
     let args: any = {}
     try { args = JSON.parse(rawArgs || '{}') } catch {}
     const result = await createOutreachDraft({

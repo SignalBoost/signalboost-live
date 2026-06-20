@@ -16,6 +16,16 @@ const RED = '#fca5a5'
 const ORANGE = '#fb923c'
 const UNLIMITED = 100000 // owner/admin allowances come back as 999999
 
+// Credit packs offered by the "Buy credits" picker. The id is all the client
+// sends to /api/stripe/audit-topup; the server fixes the real credit amount, so
+// these counts are display-only and MUST stay in sync with TOPUP_PACKS in
+// saas/app/api/stripe/audit-topup/route.ts.
+const PACKS: { id: 'small' | 'medium' | 'large'; credits: number; popular?: boolean }[] = [
+  { id: 'small',  credits: 50 },
+  { id: 'medium', credits: 150, popular: true },
+  { id: 'large',  credits: 500 },
+]
+
 type Meter = 'video' | 'image' | 'ai'
 type CreditInfo = {
   plan: string
@@ -33,6 +43,7 @@ type AuditCopy = {
   creditUsage: string; currentPlan: string; unlimited: string
   meterVideo: string; meterImage: string; meterAi: string; usedOf: string
   upgradeTitle: string; upgradeSubtitle: string; upgrade: string; redirecting: string; upgradeError: string
+  buyTitle: string; buySubtitle: string; buyCta: string; creditsWord: string; buyError: string
   loading: string; loadError: string; popular: string
   plan: Record<string, string>
 }
@@ -43,6 +54,7 @@ const COPY: Record<string, AuditCopy> = {
     creditUsage: 'Credit usage', currentPlan: 'Current plan', unlimited: 'Unlimited',
     meterVideo: 'Video', meterImage: 'Image', meterAi: 'AI', usedOf: 'used of',
     upgradeTitle: 'Scale up', upgradeSubtitle: 'More credits, deeper audits, higher limits.', upgrade: 'Upgrade to', redirecting: 'Redirecting…', upgradeError: 'Could not start checkout.',
+    buyTitle: 'Buy audit credits', buySubtitle: 'One-time credit packs — added to your balance right after checkout.', buyCta: 'Buy', creditsWord: 'credits', buyError: 'Could not start checkout.',
     loading: 'Loading usage…', loadError: 'Could not load usage.', popular: 'Most popular',
     plan: { free: 'Free Demo', launch: 'Launch', growth: 'Growth', command: 'Command' },
   },
@@ -51,6 +63,7 @@ const COPY: Record<string, AuditCopy> = {
     creditUsage: 'Uso de créditos', currentPlan: 'Plan actual', unlimited: 'Ilimitado',
     meterVideo: 'Video', meterImage: 'Imagen', meterAi: 'IA', usedOf: 'usados de',
     upgradeTitle: 'Amplía tu plan', upgradeSubtitle: 'Más créditos, auditorías más profundas, límites mayores.', upgrade: 'Mejorar a', redirecting: 'Redirigiendo…', upgradeError: 'No se pudo iniciar el pago.',
+    buyTitle: 'Comprar créditos de auditoría', buySubtitle: 'Paquetes de créditos de pago único — se suman a tu saldo justo después del pago.', buyCta: 'Comprar', creditsWord: 'créditos', buyError: 'No se pudo iniciar el pago.',
     loading: 'Cargando uso…', loadError: 'No se pudo cargar el uso.', popular: 'Más popular',
     plan: { free: 'Demo gratis', launch: 'Launch', growth: 'Growth', command: 'Command' },
   },
@@ -59,6 +72,7 @@ const COPY: Record<string, AuditCopy> = {
     creditUsage: 'Uso de créditos', currentPlan: 'Plano atual', unlimited: 'Ilimitado',
     meterVideo: 'Vídeo', meterImage: 'Imagem', meterAi: 'IA', usedOf: 'usados de',
     upgradeTitle: 'Amplie seu plano', upgradeSubtitle: 'Mais créditos, auditorias mais profundas, limites maiores.', upgrade: 'Atualizar para', redirecting: 'Redirecionando…', upgradeError: 'Não foi possível iniciar o pagamento.',
+    buyTitle: 'Comprar créditos de auditoria', buySubtitle: 'Pacotes de créditos avulsos — adicionados ao seu saldo logo após o pagamento.', buyCta: 'Comprar', creditsWord: 'créditos', buyError: 'Não foi possível iniciar o pagamento.',
     loading: 'Carregando uso…', loadError: 'Não foi possível carregar o uso.', popular: 'Mais popular',
     plan: { free: 'Demo grátis', launch: 'Launch', growth: 'Growth', command: 'Command' },
   },
@@ -67,6 +81,7 @@ const COPY: Record<string, AuditCopy> = {
     creditUsage: 'Zużycie kredytów', currentPlan: 'Bieżący plan', unlimited: 'Bez limitu',
     meterVideo: 'Wideo', meterImage: 'Obraz', meterAi: 'AI', usedOf: 'wykorzystano z',
     upgradeTitle: 'Rozwiń plan', upgradeSubtitle: 'Więcej kredytów, głębsze audyty, wyższe limity.', upgrade: 'Przejdź na', redirecting: 'Przekierowanie…', upgradeError: 'Nie udało się rozpocząć płatności.',
+    buyTitle: 'Kup kredyty audytu', buySubtitle: 'Jednorazowe pakiety kredytów — dodawane do salda zaraz po płatności.', buyCta: 'Kup', creditsWord: 'kredytów', buyError: 'Nie udało się rozpocząć płatności.',
     loading: 'Ładowanie zużycia…', loadError: 'Nie udało się wczytać zużycia.', popular: 'Najpopularniejszy',
     plan: { free: 'Darmowe demo', launch: 'Launch', growth: 'Growth', command: 'Command' },
   },
@@ -75,6 +90,7 @@ const COPY: Record<string, AuditCopy> = {
     creditUsage: 'Использование кредитов', currentPlan: 'Текущий тариф', unlimited: 'Безлимит',
     meterVideo: 'Видео', meterImage: 'Изображения', meterAi: 'ИИ', usedOf: 'использовано из',
     upgradeTitle: 'Расширить тариф', upgradeSubtitle: 'Больше кредитов, глубже аудиты, выше лимиты.', upgrade: 'Перейти на', redirecting: 'Перенаправление…', upgradeError: 'Не удалось начать оплату.',
+    buyTitle: 'Купить кредиты аудита', buySubtitle: 'Разовые пакеты кредитов — зачисляются на баланс сразу после оплаты.', buyCta: 'Купить', creditsWord: 'кредитов', buyError: 'Не удалось начать оплату.',
     loading: 'Загрузка данных…', loadError: 'Не удалось загрузить данные.', popular: 'Популярный',
     plan: { free: 'Бесплатное демо', launch: 'Launch', growth: 'Growth', command: 'Command' },
   },
@@ -117,6 +133,8 @@ export default function AuditDashboard() {
   const [loadError, setLoadError] = useState(false)
   const [upgrading, setUpgrading] = useState<string | null>(null)
   const [upError, setUpError] = useState<string | null>(null)
+  const [buying, setBuying] = useState<string | null>(null)
+  const [buyError, setBuyError] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -151,6 +169,25 @@ export default function AuditDashboard() {
       else { setUpError(data?.error || copy.upgradeError); setUpgrading(null) }
     } catch {
       setUpError(copy.upgradeError); setUpgrading(null)
+    }
+  }
+
+  async function startTopup(pack: string) {
+    setBuying(pack); setBuyError(null)
+    try {
+      const { createClient } = await import('@supabase/supabase-js')
+      const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/stripe/audit-topup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({ pack }),
+      })
+      const data = await res.json().catch(() => null)
+      if (data?.url) { window.location.href = data.url }
+      else { setBuyError(data?.error || copy.buyError); setBuying(null) }
+    } catch {
+      setBuyError(copy.buyError); setBuying(null)
     }
   }
 
@@ -234,6 +271,49 @@ export default function AuditDashboard() {
           </section>
         )}
       </div>
+
+      {/* Buy credits — one-time top-up packs (Tailwind / fathom-glass) */}
+      {!loading && !loadError && !privileged && (
+        <section className="mt-4 rounded-2xl border border-white/10 p-5 backdrop-blur-lg [background:linear-gradient(160deg,rgba(15,23,42,0.55),rgba(7,11,20,0.65))]">
+          <div className="mb-1 text-[10.5px] font-extrabold uppercase tracking-[0.08em] text-white/50">{copy.buyTitle}</div>
+          <p className="mb-3.5 mt-0 max-w-[560px] text-[12.5px] leading-relaxed text-white/60">{copy.buySubtitle}</p>
+
+          <div className="flex flex-wrap gap-3">
+            {PACKS.map(pk => {
+              const busy = buying === pk.id
+              return (
+                <div
+                  key={pk.id}
+                  className={`flex-1 basis-[200px] min-w-[180px] rounded-xl border p-4 ${pk.popular ? 'border-[#ffc300]/45 bg-[#ffc300]/[0.06]' : 'border-white/[0.12] bg-white/[0.03]'}`}
+                >
+                  <div className="mb-3 flex items-baseline gap-2">
+                    <span className="font-mono text-[22px] font-extrabold text-white">{pk.credits}</span>
+                    <span className="text-xs font-bold text-white/60">{copy.creditsWord}</span>
+                    {pk.popular && (
+                      <span className="ml-auto rounded-full border border-[#ffc300]/40 px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-[0.05em] text-[#ffc300]">
+                        {copy.popular}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => startTopup(pk.id)}
+                    disabled={busy}
+                    className={`w-full rounded-[10px] px-4 py-2.5 text-[13px] font-extrabold transition disabled:cursor-default ${
+                      pk.popular
+                        ? `border border-[#ffc300]/50 text-[#0a0e17] ${busy ? 'bg-[#ffc300]/30' : 'bg-gradient-to-br from-[#ffc300] to-[#ffb000]'}`
+                        : 'border border-[#1af0ff]/40 bg-transparent text-[#1af0ff]'
+                    }`}
+                  >
+                    {busy ? copy.redirecting : `${copy.buyCta} ${pk.credits} ${copy.creditsWord}`}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+
+          {buyError && <div className="mt-3 text-xs text-red-300">{buyError}</div>}
+        </section>
+      )}
     </main>
   )
 }

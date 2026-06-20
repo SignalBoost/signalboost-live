@@ -22,6 +22,10 @@ const UI: Record<string, Record<string, string>> = {
     website: 'Website', socialPosts: 'Social posts', email: 'Email',
     video: 'Video', reviewFollowUp: 'Review follow-up', languageIdeas: 'Language ideas',
     copyBtn: 'Copy', copied: 'Copied!',
+    noContent: 'No content for this channel.',
+    fieldTitle: 'Title', fieldBody: 'Body', fieldCta: 'CTA',
+    fieldSubject: 'Subject', fieldHook: 'Hook', fieldScript: 'Script',
+    fieldMessage: 'Message', fieldIdea: 'Idea',
   },
   pt: {
     attach: 'Anexar documento', attached: 'Anexado',
@@ -34,6 +38,10 @@ const UI: Record<string, Record<string, string>> = {
     website: 'Site', socialPosts: 'Posts sociais', email: 'Email',
     video: 'Vídeo', reviewFollowUp: 'Pedido de avaliação', languageIdeas: 'Ideias por idioma',
     copyBtn: 'Copiar', copied: 'Copiado!',
+    noContent: 'Sem conteúdo para este canal.',
+    fieldTitle: 'Título', fieldBody: 'Corpo', fieldCta: 'CTA',
+    fieldSubject: 'Assunto', fieldHook: 'Gancho', fieldScript: 'Roteiro',
+    fieldMessage: 'Mensagem', fieldIdea: 'Ideia',
   },
   es: {
     attach: 'Adjuntar documento', attached: 'Adjunto',
@@ -46,6 +54,10 @@ const UI: Record<string, Record<string, string>> = {
     website: 'Sitio web', socialPosts: 'Publicaciones sociales', email: 'Email',
     video: 'Video', reviewFollowUp: 'Seguimiento de reseñas', languageIdeas: 'Ideas por idioma',
     copyBtn: 'Copiar', copied: '¡Copiado!',
+    noContent: 'Sin contenido para este canal.',
+    fieldTitle: 'Título', fieldBody: 'Cuerpo', fieldCta: 'CTA',
+    fieldSubject: 'Asunto', fieldHook: 'Gancho', fieldScript: 'Guión',
+    fieldMessage: 'Mensaje', fieldIdea: 'Idea',
   },
   pl: {
     attach: 'Załącz dokument', attached: 'Załączono',
@@ -58,6 +70,10 @@ const UI: Record<string, Record<string, string>> = {
     website: 'Strona', socialPosts: 'Posty społecznościowe', email: 'Email',
     video: 'Wideo', reviewFollowUp: 'Prośba o opinię', languageIdeas: 'Pomysły językowe',
     copyBtn: 'Kopiuj', copied: 'Skopiowano!',
+    noContent: 'Brak treści dla tego kanału.',
+    fieldTitle: 'Tytuł', fieldBody: 'Treść', fieldCta: 'CTA',
+    fieldSubject: 'Temat', fieldHook: 'Haczyk', fieldScript: 'Skrypt',
+    fieldMessage: 'Wiadomość', fieldIdea: 'Pomysł',
   },
   ru: {
     attach: 'Прикрепить документ', attached: 'Прикреплено',
@@ -70,6 +86,10 @@ const UI: Record<string, Record<string, string>> = {
     website: 'Сайт', socialPosts: 'Соцсети', email: 'Email',
     video: 'Видео', reviewFollowUp: 'Запрос отзыва', languageIdeas: 'Идеи по языкам',
     copyBtn: 'Копировать', copied: 'Скопировано!',
+    noContent: 'Нет контента для этого канала.',
+    fieldTitle: 'Заголовок', fieldBody: 'Текст', fieldCta: 'CTA',
+    fieldSubject: 'Тема', fieldHook: 'Зацепка', fieldScript: 'Сценарий',
+    fieldMessage: 'Сообщение', fieldIdea: 'Идея',
   },
 }
 
@@ -119,29 +139,29 @@ function ResultPanel({ campaign, ui }: { campaign: Campaign; ui: Record<string, 
 
   const content: Record<string, { label: string; value: string }[]> = {
     website: [
-      { label: 'Title', value: campaign.website?.title || '' },
-      { label: 'Body', value: campaign.website?.body || '' },
-      { label: 'CTA', value: campaign.website?.cta || '' },
+      { label: ui.fieldTitle, value: campaign.website?.title || '' },
+      { label: ui.fieldBody,  value: campaign.website?.body  || '' },
+      { label: ui.fieldCta,   value: campaign.website?.cta   || '' },
     ],
     social: [
-      { label: 'Facebook', value: campaign.social?.facebook || '' },
+      { label: 'Facebook',  value: campaign.social?.facebook  || '' },
       { label: 'Instagram', value: campaign.social?.instagram || '' },
-      { label: 'TikTok', value: campaign.social?.tiktok || '' },
+      { label: 'TikTok',    value: campaign.social?.tiktok    || '' },
     ],
     email: [
-      { label: 'Subject', value: campaign.email?.subject || '' },
-      { label: 'Body', value: campaign.email?.body || '' },
+      { label: ui.fieldSubject, value: campaign.email?.subject || '' },
+      { label: ui.fieldBody,    value: campaign.email?.body    || '' },
     ],
     video: [
-      { label: 'Hook', value: campaign.video?.hook || '' },
-      { label: 'Script', value: campaign.video?.script || '' },
-      { label: 'CTA', value: campaign.video?.cta || '' },
+      { label: ui.fieldHook,   value: campaign.video?.hook   || '' },
+      { label: ui.fieldScript, value: campaign.video?.script || '' },
+      { label: ui.fieldCta,    value: campaign.video?.cta    || '' },
     ],
     reviews: [
-      { label: 'Message', value: campaign.reviewFollowUp || '' },
+      { label: ui.fieldMessage, value: campaign.reviewFollowUp || '' },
     ],
     language: (campaign.languageIdeas || []).map((idea, i) => ({
-      label: `Idea ${i + 1}`,
+      label: `${ui.fieldIdea} ${i + 1}`,
       value: idea,
     })),
   }
@@ -176,7 +196,7 @@ function ResultPanel({ campaign, ui }: { campaign: Campaign; ui: Record<string, 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
         {items.length === 0 && (
           <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, textAlign: 'center', marginTop: 40 }}>
-            No content for this channel.
+            {ui.noContent}
           </div>
         )}
         {items.map((item, i) => (
@@ -260,6 +280,15 @@ export default function PromotePage() {
     setWebsiteUrl(''); setPastedContext(''); setFile(null)
     setCampaign(null); setError('')
   }
+
+  const channelPills = [
+    { icon: '🌐', label: ui.website },
+    { icon: '📱', label: ui.socialPosts },
+    { icon: '✉️', label: ui.email },
+    { icon: '🎬', label: ui.video },
+    { icon: '⭐', label: ui.reviewFollowUp },
+    { icon: '🌍', label: ui.languageIdeas },
+  ]
 
   return (
     <main style={{ maxWidth: 1240, margin: '0 auto' }}>
@@ -400,9 +429,9 @@ export default function PromotePage() {
               </p>
               {/* Channel pills preview */}
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 8 }}>
-                {['🌐 Website', '📱 Social', '✉️ Email', '🎬 Video', '⭐ Reviews', '🌍 Languages'].map(ch => (
-                  <span key={ch} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)' }}>
-                    {ch}
+                {channelPills.map(ch => (
+                  <span key={ch.id} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)' }}>
+                    {ch.icon} {ch.label}
                   </span>
                 ))}
               </div>

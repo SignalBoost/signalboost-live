@@ -14,7 +14,9 @@ export default function OperatorStatus({ job }: { job: OperatorJobView }) {
   return (
     <section className="hero-panel" style={{ marginTop: 16, padding: 20 }}>
       <h3 style={{ color: '#fff' }}>{t(dict, 'operator.publish_status.title', 'Publish status')}</h3>
-      <p style={{ color: 'var(--text-secondary)' }}>{t(dict, 'operator.publish_status.state_label', 'State:')} <strong>{job.state}</strong></p>
+      <p style={{ color: 'var(--text-secondary)' }}>
+        {t(dict, 'operator.publish_status.state_label', 'State:')} <strong>{job.state}</strong>
+      </p>
       <p style={{ color: 'var(--text-secondary)' }}>{job.publishMessage}</p>
     </section>
   )

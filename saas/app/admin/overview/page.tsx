@@ -5,159 +5,20 @@ import { useCallback, useEffect, useState } from 'react'
 const GOLD = '#ffc300'
 
 const COPY = {
-  en: {
-    eyebrow: '🛰️ Admin',
-    title: 'Overview',
-    refresh: '↻ Refresh',
-    refreshing: 'Refreshing…',
-    loading: 'Loading…',
-    accounts: 'Accounts',
-    registeredUsers: 'Registered users',
-    teamMembers: 'Team members',
-    subscriptions: 'Subscriptions',
-    planDist: 'Plan distribution',
-    contentActivity: 'Content & activity',
-    reviews: 'Reviews',
-    approved: 'approved',
-    campaigns: 'Campaigns',
-    active: 'active',
-    sitesBuilt: 'Sites built',
-    published: 'published',
-    outreachLeads: 'Outreach leads',
-    notInstrumented: 'Not yet instrumented',
-    notInstrumentedBody: "Revenue/MRR, AI usage & cost, email performance, and system health aren't tracked yet — they need Stripe data, request logging, and telemetry wired in. Those become real once that instrumentation exists. Everything above is live data counted from your database.",
-    generated: 'Generated',
-    errorDefault: 'Could not load overview.',
-    errorGeneric: 'Something went wrong loading the overview.',
-  },
-  es: {
-    eyebrow: '🛰️ Admin',
-    title: 'Resumen',
-    refresh: '↻ Actualizar',
-    refreshing: 'Actualizando…',
-    loading: 'Cargando…',
-    accounts: 'Cuentas',
-    registeredUsers: 'Usuarios registrados',
-    teamMembers: 'Miembros del equipo',
-    subscriptions: 'Suscripciones',
-    planDist: 'Distribución de planes',
-    contentActivity: 'Contenido y actividad',
-    reviews: 'Reseñas',
-    approved: 'aprobadas',
-    campaigns: 'Campañas',
-    active: 'activas',
-    sitesBuilt: 'Sitios creados',
-    published: 'publicados',
-    outreachLeads: 'Contactos de alcance',
-    notInstrumented: 'Aún no instrumentado',
-    notInstrumentedBody: 'Los ingresos/MRR, el uso de IA, el rendimiento del correo y la salud del sistema aún no se rastrean — requieren datos de Stripe, registro de solicitudes y telemetría. Todo lo anterior son datos en vivo de tu base de datos.',
-    generated: 'Generado',
-    errorDefault: 'No se pudo cargar el resumen.',
-    errorGeneric: 'Algo salió mal al cargar el resumen.',
-  },
-  pt: {
-    eyebrow: '🛰️ Admin',
-    title: 'Visão geral',
-    refresh: '↻ Atualizar',
-    refreshing: 'Atualizando…',
-    loading: 'Carregando…',
-    accounts: 'Contas',
-    registeredUsers: 'Usuários registrados',
-    teamMembers: 'Membros da equipe',
-    subscriptions: 'Assinaturas',
-    planDist: 'Distribuição de planos',
-    contentActivity: 'Conteúdo e atividade',
-    reviews: 'Avaliações',
-    approved: 'aprovadas',
-    campaigns: 'Campanhas',
-    active: 'ativas',
-    sitesBuilt: 'Sites criados',
-    published: 'publicados',
-    outreachLeads: 'Leads de alcance',
-    notInstrumented: 'Ainda não instrumentado',
-    notInstrumentedBody: 'Receita/MRR, uso de IA, desempenho de e-mail e saúde do sistema ainda não são rastreados — precisam de dados do Stripe, registro de requisições e telemetria. Tudo acima são dados ao vivo do seu banco de dados.',
-    generated: 'Gerado',
-    errorDefault: 'Não foi possível carregar a visão geral.',
-    errorGeneric: 'Algo deu errado ao carregar a visão geral.',
-  },
-  pl: {
-    eyebrow: '🛰️ Admin',
-    title: 'Przegląd',
-    refresh: '↻ Odśwież',
-    refreshing: 'Odświeżanie…',
-    loading: 'Ładowanie…',
-    accounts: 'Konta',
-    registeredUsers: 'Zarejestrowani użytkownicy',
-    teamMembers: 'Członkowie zespołu',
-    subscriptions: 'Subskrypcje',
-    planDist: 'Rozkład planów',
-    contentActivity: 'Treści i aktywność',
-    reviews: 'Recenzje',
-    approved: 'zatwierdzone',
-    campaigns: 'Kampanie',
-    active: 'aktywne',
-    sitesBuilt: 'Zbudowane strony',
-    published: 'opublikowane',
-    outreachLeads: 'Leady kontaktowe',
-    notInstrumented: 'Jeszcze nie zainstrumentowane',
-    notInstrumentedBody: 'Przychody/MRR, użycie AI, wydajność e-mail i kondycja systemu nie są jeszcze śledzone — wymagają danych Stripe, logowania żądań i telemetrii. Wszystko powyżej to dane na żywo z Twojej bazy danych.',
-    generated: 'Wygenerowano',
-    errorDefault: 'Nie udało się załadować przeglądu.',
-    errorGeneric: 'Coś poszło nie tak podczas ładowania przeglądu.',
-  },
-  ru: {
-    eyebrow: '🛰️ Admin',
-    title: 'Обзор',
-    refresh: '↻ Обновить',
-    refreshing: 'Обновление…',
-    loading: 'Загрузка…',
-    accounts: 'Аккаунты',
-    registeredUsers: 'Зарегистрированные пользователи',
-    teamMembers: 'Члены команды',
-    subscriptions: 'Подписки',
-    planDist: 'Распределение планов',
-    contentActivity: 'Контент и активность',
-    reviews: 'Отзывы',
-    approved: 'одобрено',
-    campaigns: 'Кампании',
-    active: 'активных',
-    sitesBuilt: 'Созданные сайты',
-    published: 'опубликовано',
-    outreachLeads: 'Лиды для охвата',
-    notInstrumented: 'Ещё не инструментировано',
-    notInstrumentedBody: 'Доходы/MRR, использование ИИ, эффективность email и состояние системы пока не отслеживаются — для этого нужны данные Stripe, логирование запросов и телеметрия. Всё вышеперечисленное — живые данные из вашей базы данных.',
-    generated: 'Сгенерировано',
-    errorDefault: 'Не удалось загрузить обзор.',
-    errorGeneric: 'Что-то пошло не так при загрузке обзора.',
-  },
+  en: { eyebrow: '🛰️ Admin', title: 'Overview', refresh: '↻ Refresh', refreshing: 'Refreshing…', loading: 'Loading…', accounts: 'Accounts', registeredUsers: 'Registered users', teamMembers: 'Team members', subscriptions: 'Subscriptions', planDist: 'Plan distribution', contentActivity: 'Content & activity', reviews: 'Reviews', approved: 'approved', campaigns: 'Campaigns', active: 'active', sitesBuilt: 'Sites built', published: 'published', outreachLeads: 'Outreach leads', notInstrumented: 'Not yet instrumented', notInstrumentedBody: "Revenue/MRR, AI usage & cost, email performance, and system health aren't tracked yet — they need Stripe data, request logging, and telemetry wired in. Those become real once that instrumentation exists. Everything above is live data counted from your database.", generated: 'Generated', errorDefault: 'Could not load overview.', errorGeneric: 'Something went wrong loading the overview.' },
+  es: { eyebrow: '🛰️ Admin', title: 'Resumen', refresh: '↻ Actualizar', refreshing: 'Actualizando…', loading: 'Cargando…', accounts: 'Cuentas', registeredUsers: 'Usuarios registrados', teamMembers: 'Miembros del equipo', subscriptions: 'Suscripciones', planDist: 'Distribución de planes', contentActivity: 'Contenido y actividad', reviews: 'Reseñas', approved: 'aprobadas', campaigns: 'Campañas', active: 'activas', sitesBuilt: 'Sitios creados', published: 'publicados', outreachLeads: 'Contactos de alcance', notInstrumented: 'Aún no instrumentado', notInstrumentedBody: 'Los ingresos/MRR, el uso de IA, el rendimiento del correo y la salud del sistema aún no se rastrean — requieren datos de Stripe, registro de solicitudes y telemetría. Todo lo anterior son datos en vivo de tu base de datos.', generated: 'Generado', errorDefault: 'No se pudo cargar el resumen.', errorGeneric: 'Algo salió mal al cargar el resumen.' },
+  pt: { eyebrow: '🛰️ Admin', title: 'Visão geral', refresh: '↻ Atualizar', refreshing: 'Atualizando…', loading: 'Carregando…', accounts: 'Contas', registeredUsers: 'Usuários registrados', teamMembers: 'Membros da equipe', subscriptions: 'Assinaturas', planDist: 'Distribuição de planos', contentActivity: 'Conteúdo e atividade', reviews: 'Avaliações', approved: 'aprovadas', campaigns: 'Campanhas', active: 'ativas', sitesBuilt: 'Sites criados', published: 'publicados', outreachLeads: 'Leads de alcance', notInstrumented: 'Ainda não instrumentado', notInstrumentedBody: 'Receita/MRR, uso de IA, desempenho de e-mail e saúde do sistema ainda não são rastreados — precisam de dados do Stripe, registro de requisições e telemetria. Tudo acima são dados ao vivo do seu banco de dados.', generated: 'Gerado', errorDefault: 'Não foi possível carregar a visão geral.', errorGeneric: 'Algo deu errado ao carregar a visão geral.' },
+  pl: { eyebrow: '🛰️ Admin', title: 'Przegląd', refresh: '↻ Odśwież', refreshing: 'Odświeżanie…', loading: 'Ładowanie…', accounts: 'Konta', registeredUsers: 'Zarejestrowani użytkownicy', teamMembers: 'Członkowie zespołu', subscriptions: 'Subskrypcje', planDist: 'Rozkład planów', contentActivity: 'Treści i aktywność', reviews: 'Recenzje', approved: 'zatwierdzone', campaigns: 'Kampanie', active: 'aktywne', sitesBuilt: 'Zbudowane strony', published: 'opublikowane', outreachLeads: 'Leady kontaktowe', notInstrumented: 'Jeszcze nie zainstrumentowane', notInstrumentedBody: 'Przychody/MRR, użycie AI, wydajność e-mail i kondycja systemu nie są jeszcze śledzone — wymagają danych Stripe, logowania żądań i telemetrii. Wszystko powyżej to dane na żywo z Twojej bazy danych.', generated: 'Wygenerowano', errorDefault: 'Nie udało się załadować przeglądu.', errorGeneric: 'Coś poszło nie tak podczas ładowania przeglądu.' },
+  ru: { eyebrow: '🛰️ Admin', title: 'Обзор', refresh: '↻ Обновить', refreshing: 'Обновление…', loading: 'Загрузка…', accounts: 'Аккаунты', registeredUsers: 'Зарегистрированные пользователи', teamMembers: 'Члены команды', subscriptions: 'Подписки', planDist: 'Распределение планов', contentActivity: 'Контент и активность', reviews: 'Отзывы', approved: 'одобрено', campaigns: 'Кампании', active: 'активных', sitesBuilt: 'Созданные сайты', published: 'опубликовано', outreachLeads: 'Лиды для охвата', notInstrumented: 'Ещё не инструментировано', notInstrumentedBody: 'Доходы/MRR, использование ИИ, эффективность email и состояние системы пока не отслеживаются — для этого нужны данные Stripe, логирование запросов и телеметрия. Всё вышеперечисленное — живые данные из вашей базы данных.', generated: 'Сгенерировано', errorDefault: 'Не удалось загрузить обзор.', errorGeneric: 'Что-то пошло не так при загрузке обзора.' },
 }
 
 type Lang = keyof typeof COPY
-
-function getLang(): Lang {
-  if (typeof navigator === 'undefined') return 'en'
-  const l = navigator.language?.slice(0, 2)
-  return (l in COPY ? l : 'en') as Lang
-}
+function getLang(): Lang { if (typeof navigator === 'undefined') return 'en'; const l = navigator.language?.slice(0, 2); return (l in COPY ? l : 'en') as Lang }
 
 type Overview = {
   generatedAt: string
-  content: {
-    reviews: number
-    approvedReviews: number
-    campaigns: number
-    activeCampaigns: number
-    projects: number
-    publishedProjects: number
-    leads: number
-    approvedLeads: number
-  }
-  accounts: {
-    totalUsers: number
-    teamMembers: number
-    subscriptions: number
-    plans: Record<string, number>
-  }
+  content: { reviews: number; approvedReviews: number; campaigns: number; activeCampaigns: number; projects: number; publishedProjects: number; leads: number; approvedLeads: number }
+  accounts: { totalUsers: number; teamMembers: number; subscriptions: number; plans: Record<string, number> }
 }
 
 function Stat({ label, value, sub }: { label: string; value: number | string; sub?: string }) {

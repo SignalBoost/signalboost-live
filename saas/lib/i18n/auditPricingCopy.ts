@@ -22,6 +22,8 @@ export const AUDIT_PRICING_COPY: Record<string, FlatCopy> = {
     'auditPricing.feat.seats': 'Team seats',
     'auditPricing.feat.seatsUnlimited': 'Unlimited',
     'auditPricing.feat.support': 'Support',
+    'auditPricing.feat.credits': 'Monthly credits',
+    'auditPricing.feat.creditsCustom': 'Custom',
     'auditPricing.support.email': 'Email',
     'auditPricing.support.priority': 'Priority',
     'auditPricing.support.dedicated': 'Dedicated',
@@ -42,6 +44,8 @@ export const AUDIT_PRICING_COPY: Record<string, FlatCopy> = {
     'auditPricing.feat.seats': 'Puestos del equipo',
     'auditPricing.feat.seatsUnlimited': 'Ilimitados',
     'auditPricing.feat.support': 'Soporte',
+    'auditPricing.feat.credits': 'Créditos mensuales',
+    'auditPricing.feat.creditsCustom': 'Personalizado',
     'auditPricing.support.email': 'Correo electrónico',
     'auditPricing.support.priority': 'Prioritario',
     'auditPricing.support.dedicated': 'Dedicado',
@@ -62,6 +66,8 @@ export const AUDIT_PRICING_COPY: Record<string, FlatCopy> = {
     'auditPricing.feat.seats': 'Assentos da equipe',
     'auditPricing.feat.seatsUnlimited': 'Ilimitados',
     'auditPricing.feat.support': 'Suporte',
+    'auditPricing.feat.credits': 'Créditos mensais',
+    'auditPricing.feat.creditsCustom': 'Personalizado',
     'auditPricing.support.email': 'E-mail',
     'auditPricing.support.priority': 'Prioritário',
     'auditPricing.support.dedicated': 'Dedicado',
@@ -82,6 +88,8 @@ export const AUDIT_PRICING_COPY: Record<string, FlatCopy> = {
     'auditPricing.feat.seats': 'Miejsca w zespole',
     'auditPricing.feat.seatsUnlimited': 'Nieograniczone',
     'auditPricing.feat.support': 'Wsparcie',
+    'auditPricing.feat.credits': 'Miesięczne kredyty',
+    'auditPricing.feat.creditsCustom': 'Niestandardowe',
     'auditPricing.support.email': 'E-mail',
     'auditPricing.support.priority': 'Priorytetowe',
     'auditPricing.support.dedicated': 'Dedykowane',
@@ -102,6 +110,8 @@ export const AUDIT_PRICING_COPY: Record<string, FlatCopy> = {
     'auditPricing.feat.seats': 'Места в команде',
     'auditPricing.feat.seatsUnlimited': 'Неограниченно',
     'auditPricing.feat.support': 'Поддержка',
+    'auditPricing.feat.credits': 'Ежемесячные кредиты',
+    'auditPricing.feat.creditsCustom': 'По запросу',
     'auditPricing.support.email': 'Электронная почта',
     'auditPricing.support.priority': 'Приоритетная',
     'auditPricing.support.dedicated': 'Выделенная',
@@ -132,20 +142,28 @@ export interface AuditPageCopy {
   tiers: Record<string, AuditTierCopy>
 }
 
-// Numeric/structural facts per tier (mirror of pricingConfig, kept local so this
-// module stays self-contained). NOTE: audits/files/history/seats are inferred
-// defaults — adjust to taste; they are display-only here.
+// Numeric/structural facts per tier.
+// prices, credits, files, history, seats are authoritative — update here to
+// propagate to the UI across all 5 locales.
 const TIER_FACTS: Record<string, {
-  name: string; price: string; files: string; history: number; seats: string; support: string; popular?: boolean
+  name: string
+  price: string
+  credits: string
+  files: string
+  history: number
+  seats: string
+  support: string
+  popular?: boolean
 }> = {
-  starter:    { name: 'Starter',    price: '$29',  files: '20',        history: 30,  seats: '3',       support: 'email' },
-  growth:     { name: 'Growth',     price: '$79',  files: '40',        history: 90,  seats: '10',      support: 'priority', popular: true },
-  pro:        { name: 'Pro',        price: '$199', files: '60',        history: 180, seats: '25',      support: 'priority' },
-  enterprise: { name: 'Enterprise', price: '$599', files: 'Unlimited', history: 365, seats: 'Unlimited', support: 'dedicated' },
+  starter:    { name: 'Starter',    price: '$29',  credits: '1,000',  files: '20',        history: 30,  seats: '3',         support: 'email' },
+  growth:     { name: 'Growth',     price: '$79',  credits: '3,000',  files: '40',        history: 90,  seats: '10',        support: 'priority', popular: true },
+  pro:        { name: 'Pro',        price: '$199', credits: '10,000', files: '60',        history: 180, seats: '25',        support: 'priority' },
+  enterprise: { name: 'Enterprise', price: '$599', credits: 'custom', files: 'Unlimited', history: 365, seats: 'Unlimited', support: 'dedicated' },
 }
 const TIER_IDS = ['starter', 'growth', 'pro', 'enterprise']
 const AUDITS_PER_MONTH: Record<string, string> = { starter: '20', growth: '100', pro: '300', enterprise: '' /* unlimited */ }
 const SEATS_UNLIMITED = new Set(['enterprise'])
+const CREDITS_CUSTOM = new Set(['enterprise'])
 
 // Strings not present in the flat dictionary, per locale.
 const EXTRA: Record<AuditLocale, { loading: string; error: string; enterpriseHref: string; desc: Record<string, string> }> = {
@@ -172,8 +190,10 @@ export function getAuditPricingCopy(lang: string): AuditPageCopy {
     const audits = AUDITS_PER_MONTH[id] || L['auditPricing.feat.auditsUnlimited']
     const seats = SEATS_UNLIMITED.has(id) ? L['auditPricing.feat.seatsUnlimited'] : f.seats
     const files = f.files === 'Unlimited' ? L['auditPricing.feat.auditsUnlimited'] : f.files
+    const credits = CREDITS_CUSTOM.has(id) ? L['auditPricing.feat.creditsCustom'] : f.credits
     const historyDays = L['auditPricing.feat.historyDays'].replace('{n}', String(f.history))
     const features: string[] = [
+      `${credits} · ${L['auditPricing.feat.credits']}`,
       `${audits} · ${L['auditPricing.feat.audits']}`,
       `${files} · ${L['auditPricing.feat.maxFiles']}`,
       `${historyDays} · ${L['auditPricing.feat.history']}`,

@@ -33,7 +33,9 @@ export async function GET(req: NextRequest) {
     const findings = (f.data || []).slice().sort(
       (a: any, b: any) => (SEV_RANK[a.severity] ?? 9) - (SEV_RANK[b.severity] ?? 9),
     )
-    return NextResponse.json({ ok: true, run: run.data, findings })
+    // Full-payload snapshot (preferred rehydration source); null for pre-snapshot runs.
+    const logRow = await admin.from('audit_logs').select('payload').eq('run_id', runId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+    return NextResponse.json({ ok: true, run: run.data, findings, log: logRow.data?.payload ?? null })
   }
 
   const runs = await admin

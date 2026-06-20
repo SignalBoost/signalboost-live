@@ -122,7 +122,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
   'supabase.list_rows': {
     id: 'supabase.list_rows', label: 'List Rows', description: 'List rows for a table (picker source).', icon: '📋',
     policyActionId: 'read_provider_status', api: { service: 'supabase', method: 'GET', endpoint: '/rest/v1' },
-    fields: [{ id: 'table', label: 'Table', type: 'text' }]
+    fields: [{ id: 'table', label: 'Table', type: 'remote_select', required: true, source: { action: 'supabase.list_tables', dataPath: 'tables', valueKey: 'name', labelTemplate: '{name}' } }]
   },
   'supabase.list_users': {
     id: 'supabase.list_users', label: 'List Users', description: 'List auth users (picker source).', icon: '👤',
@@ -141,7 +141,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     requiresConfirm: true,
     policyActionId: 'archive_stripe_price',
     api: { service: 'Stripe', method: 'POST', endpoint: '/v1/prices/archive' },
-    fields: [{ id: 'id', label: 'Price ID', type: 'text', required: true, placeholder: 'price_...' }],
+    fields: [{ id: 'id', label: 'Price ID', type: 'remote_select', required: true, source: { action: 'stripe.view_prices', dataPath: 'prices', valueKey: 'priceId', labelTemplate: '{product} — {price}' } }],
   },
 
   // ===================== SUPABASE (gaps) =====================
@@ -225,7 +225,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'edit_vercel_env',
     api: { service: 'Vercel', method: 'PATCH', endpoint: '/v1/projects/env' },
     fields: [
-      { id: 'id', label: 'Env Variable ID', type: 'text', required: true, placeholder: 'env id' },
+      { id: 'id', label: 'Env Variable ID', type: 'remote_select', required: true, source: { action: 'vercel.view_env', dataPath: 'vars', valueKey: 'id', labelTemplate: '{key}' } },
       { id: 'value', label: 'New Value', type: 'secret' },
       { id: 'target', label: 'Target', type: 'select', options: [
         { label: 'Production', value: 'production' },
@@ -431,7 +431,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     requiresConfirm: true,
     policyActionId: 'rotate_credential',
     api: { service: 'AWS', method: 'POST', endpoint: '/v1/iam/credentials/rotate' },
-    fields: [{ id: 'username', label: 'IAM Username', type: 'text', required: true }],
+    fields: [{ id: 'username', label: 'IAM Username', type: 'remote_select', required: true, source: { action: 'aws.list_iam_users', dataPath: 'users', valueKey: 'username', labelTemplate: '{username}' } }],
   },
 
   // ===================== TWILIO =====================
@@ -654,7 +654,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'vault_edit_key',
     api: { service: 'Vault', method: 'POST', endpoint: '/v1/vault/edit' },
     fields: [
-      { id: 'key', label: 'Key Name', type: 'text', required: true },
+      { id: 'key', label: 'Key Name', type: 'remote_select', required: true, source: { action: 'vault.view_keys', dataPath: 'keys', valueKey: 'label', labelTemplate: '{provider} · {label}' } },
       { id: 'value', label: 'New Value', type: 'secret', required: true },
     ],
   },
@@ -666,7 +666,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     requiresConfirm: true,
     policyActionId: 'vault_archive_key',
     api: { service: 'Vault', method: 'POST', endpoint: '/v1/vault/archive' },
-    fields: [{ id: 'key', label: 'Key Name', type: 'text', required: true }],
+    fields: [{ id: 'key', label: 'Key Name', type: 'remote_select', required: true, source: { action: 'vault.view_keys', dataPath: 'keys', valueKey: 'label', labelTemplate: '{provider} · {label}' } }],
   },
   'vault.reveal_secret': {
     id: 'vault.reveal_secret',
@@ -675,7 +675,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     icon: '👁️',
     policyActionId: 'vault_reveal_key',
     api: { service: 'Vault', method: 'POST', endpoint: '/v1/vault/reveal' },
-    fields: [{ id: 'key', label: 'Key Name', type: 'text', required: true }],
+    fields: [{ id: 'key', label: 'Key Name', type: 'remote_select', required: true, source: { action: 'vault.view_keys', dataPath: 'keys', valueKey: 'label', labelTemplate: '{provider} · {label}' } }],
   },
   'vault.audit_log': {
     id: 'vault.audit_log',

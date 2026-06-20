@@ -100,7 +100,7 @@ async function scanOne(path: string): Promise<{ path: string; scanned: boolean; 
   return { path, scanned: true, findings: parseFindings(raw, path) }
 }
 
-export async function runAudit(opts?: { prefix?: string; maxFiles?: number }): Promise<AuditRunResult> {
+export async function runAudit(opts?: { prefix?: string; maxFiles?: number; onProgress?: (done: number, total: number) => void }): Promise<AuditRunResult> {
   const prefix   = (opts?.prefix || 'saas/app/api').trim()
   const maxFiles = Math.max(1, Math.min(opts?.maxFiles ?? 6, MAX_CAP))
 
@@ -112,7 +112,14 @@ export async function runAudit(opts?: { prefix?: string; maxFiles?: number }): P
     return { ok: true, findings: [], filesScanned: [], error: `No scannable files under "${prefix}".` }
   }
 
-  const per = await mapPool(targets, CONCURRENCY, scanOne)
+  opts?.onProgress?.(0, targets.length)
+  let done = 0
+  const per = await mapPool(targets, CONCURRENCY, async (path) => {
+    const r = await scanOne(path)
+    done++
+    opts?.onProgress?.(done, targets.length)
+    return r
+  })
 
   const findings: AuditFinding[] = []
   const scanned: string[] = []

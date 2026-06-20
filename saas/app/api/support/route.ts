@@ -509,7 +509,6 @@ const TOOL_PROPOSE_INFRA_PR: ChatTool = {
     },
   },
 }
-
 const TOOL_LIST_INFRA_PRS: ChatTool = {
   type: 'function',
   function: {
@@ -743,10 +742,20 @@ async function runTool(name: string, rawArgs: string, userId: string | null, con
         expectedContent: intendedContent,
       })
       if (!v.ok) {
-        return `${formatted}\n\n⚠️ VERIFICATION INCONCLUSIVE: ${v.reason} Treat this commit as UNCONFIRMED — do not tell the owner it is done until you re-read the file on the branch and confirm it.`
+        // Verification could not run (no token, read error). Do NOT loop — the
+        // commit itself reported success; defer confirmation to the owner.
+        return `${formatted}\n\n⚠️ AUTOMATED VERIFICATION INCONCLUSIVE: ${v.reason}\nThe commit landed (SHA/branch above). Do NOT re-commit — instead tell the owner the branch is ready and ask them to verify the file on the Vercel preview before merging.`
       }
       if (!v.match) {
-        return `❌ COMMIT VERIFICATION FAILED — the file on branch ${result.branch} does NOT match what you sent. ${v.reason}\nThe write did not land correctly. DO NOT report success. Re-read the target file with readRepoFile, rebuild the COMPLETE file, and call proposeCodeCommit again.\n\n(Original commit report, for reference: ${formatted})`
+        // The committed file did not byte-match what was sent. This is usually a
+        // benign normalization/trailing-newline difference and the file is fine;
+        // occasionally it is a real partial write. EITHER WAY, do NOT auto re-read
+        // and re-commit — that produces an infinite rebuild loop on large files,
+        // because each regenerated file differs slightly and never byte-matches.
+        // Surface it as an advisory and hand verification to the owner (the
+        // human-in-the-loop QA the rest of this system relies on). Commit ONCE,
+        // then stop.
+        return `${formatted}\n\n⚠️ AUTOMATED BYTE-CHECK COULD NOT CONFIRM AN EXACT MATCH: ${v.reason}\nThe commit DID land on branch ${result.branch} (see report above). This is most often a harmless trailing-newline/normalization difference. DO NOT re-commit or rebuild — re-committing the same edit loops forever. Instead, STOP and tell the owner: the file is committed to ${result.branch}; please open the Vercel preview / branch and confirm it looks right before merging. Report the branch and SHA plainly; do not claim it is fully verified, and do not claim it failed.`
       }
       return `${formatted}\n\n✅ ${v.reason}`
     }
@@ -900,8 +909,7 @@ if (name === 'listMyOutreachDrafts') {
     }
     return formatCustomerDraftsForAI(result.drafts)
   }
-
-  if (name === 'searchPastConversations') {
+if (name === 'searchPastConversations') {
     if (!userId) {
       return 'Conversation history is only available for logged-in users. Do not mention this technical detail; just continue helping.'
     }

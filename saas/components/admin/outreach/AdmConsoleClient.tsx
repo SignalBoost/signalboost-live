@@ -27,7 +27,16 @@ type AdmData = {
   hmi: { summary: string; nextActions: string[] }
 }
 
-const COPY: Record<string, Record<string, string>> = {
+type CopyValue = string | ((s: string) => string)
+type CopyDict = Record<string, CopyValue>
+
+/** Resolve a COPY value — call it if it's a function, return it directly if it's a string. */
+function t$(v: CopyValue, arg?: string): string {
+  if (typeof v === 'function') return v(arg ?? '')
+  return v
+}
+
+const COPY: Record<string, CopyDict> = {
   en: {
     eyebrow: 'ADM Console',
     heading: 'Dashboards → Security Logs → Outreach Control → Predictive Insights.',
@@ -352,7 +361,7 @@ export default function AdmConsoleClient() {
       body: JSON.stringify({ id, status }),
     })
     const json = await res.json()
-    setMessage(res.ok ? t.outreachLabel(status) : json.error || t.updateFailed)
+    setMessage(res.ok ? t$(t.outreachLabel, status) : json.error || t$(t.updateFailed))
     setBusy(false)
     await load()
   }
@@ -366,7 +375,7 @@ export default function AdmConsoleClient() {
       body: JSON.stringify({ outreach_id: selected.id, channel: sendEmail ? 'email' : 'manual', to_email: sendEmail || undefined }),
     })
     const json = await res.json()
-    setMessage(res.ok ? t.sendRecorded : json.error || t.sendFailed)
+    setMessage(res.ok ? t$(t.sendRecorded) : json.error || t$(t.sendFailed))
     setBusy(false)
     await load()
   }
@@ -379,7 +388,7 @@ export default function AdmConsoleClient() {
       body: JSON.stringify({ business_url: sourceUrl, business_name: businessName, source_platform: 'manual' }),
     })
     const json = await res.json()
-    setMessage(res.ok ? t.analyzed : json.error || t.analysisFailed)
+    setMessage(res.ok ? t$(t.analyzed) : json.error || t$(t.analysisFailed))
     setBusy(false)
     if (res.ok) { setSourceUrl(''); setBusinessName('') }
     await load()
@@ -393,7 +402,7 @@ export default function AdmConsoleClient() {
       body: JSON.stringify({ limit: 10 }),
     })
     const json = await res.json()
-    setMessage(res.ok ? `${t.digitsSynced} ${json.processed || 0} ${t.partnersLabel}` : json.error || t.digitsFailed)
+    setMessage(res.ok ? `${t$(t.digitsSynced)} ${json.processed || 0} ${t$(t.partnersLabel)}` : json.error || t$(t.digitsFailed))
     setBusy(false)
     await load()
   }
@@ -406,22 +415,22 @@ export default function AdmConsoleClient() {
       body: JSON.stringify({ outreach_sending_disabled: value }),
     })
     const json = await res.json()
-    setMessage(res.ok ? (value ? t.panicEnabled : t.panicDisabled) : json.error || t.settingFailed)
+    setMessage(res.ok ? (value ? t$(t.panicEnabled) : t$(t.panicDisabled)) : json.error || t$(t.settingFailed))
     setBusy(false)
     await load()
   }
 
   if (loading) return (
     <div style={{ background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 24, color: 'rgba(255,255,255,0.6)' }}>
-      {t.loading}
+      {t$(t.loading)}
     </div>
   )
 
   const dashboardMetrics = [
-    [t.pending,  data?.metrics.pending],
-    [t.approved, data?.metrics.approved],
-    [t.sent,     data?.metrics.sent],
-    [t.sends24h, `${data?.metrics.sendLimit?.count || 0}/${data?.metrics.sendLimit?.limit || 50}`],
+    [t$(t.pending),  data?.metrics.pending],
+    [t$(t.approved), data?.metrics.approved],
+    [t$(t.sent),     data?.metrics.sent],
+    [t$(t.sends24h), `${data?.metrics.sendLimit?.count || 0}/${data?.metrics.sendLimit?.limit || 50}`],
   ]
 
   return (
@@ -431,14 +440,14 @@ export default function AdmConsoleClient() {
       <section style={{ background: 'linear-gradient(160deg,rgba(15,23,42,0.92),rgba(3,7,18,0.96))', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: 28, backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', boxShadow: '0 24px 70px rgba(0,0,0,0.6)' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end', justifyContent: 'space-between' }}>
           <div>
-            <span className="sb-eyebrow">{t.eyebrow}</span>
-            <h1 className="sb-h2" style={{ marginTop: 12 }}>{t.heading}</h1>
-            <p className="sb-body" style={{ maxWidth: 680 }}>{data?.hmi.summary || t.defaultSummary}</p>
+            <span className="sb-eyebrow">{t$(t.eyebrow)}</span>
+            <h1 className="sb-h2" style={{ marginTop: 12 }}>{t$(t.heading)}</h1>
+            <p className="sb-body" style={{ maxWidth: 680 }}>{data?.hmi.summary || t$(t.defaultSummary)}</p>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            <button disabled={busy} onClick={syncDigits} className="sb-button-secondary" style={{ opacity: busy ? 0.5 : 1 }}>{t.syncDigits}</button>
+            <button disabled={busy} onClick={syncDigits} className="sb-button-secondary" style={{ opacity: busy ? 0.5 : 1 }}>{t$(t.syncDigits)}</button>
             <button disabled={busy} onClick={() => togglePanic(!data?.metrics.panicSwitch)} className="sb-button-primary" style={{ border: 'none', opacity: busy ? 0.5 : 1 }}>
-              {data?.metrics.panicSwitch ? t.disablePanic : t.enablePanic}
+              {data?.metrics.panicSwitch ? t$(t.disablePanic) : t$(t.enablePanic)}
             </button>
           </div>
         </div>
@@ -465,14 +474,14 @@ export default function AdmConsoleClient() {
       <section aria-label="Security Logs" style={{ background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 20 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <span className="sb-eyebrow">{t.securityEyebrow}</span>
-            <h2 className="sb-h3" style={{ marginTop: 8 }}>{t.securityHeading}</h2>
+            <span className="sb-eyebrow">{t$(t.securityEyebrow)}</span>
+            <h2 className="sb-h3" style={{ marginTop: 8 }}>{t$(t.securityHeading)}</h2>
           </div>
           <span style={{ borderRadius: 999, border: '1px solid rgba(26,240,255,0.3)', padding: '4px 12px', fontSize: 12, color: 'rgba(26,240,255,0.85)' }}>
-            {t.securityEvents}: {data?.metrics.security24h ?? 0}
+            {t$(t.securityEvents)}: {data?.metrics.security24h ?? 0}
           </span>
         </div>
-        <InfoCard title={t.recentSecurityEvents} data={data?.recentSecurityEvents.slice(0, 5)} />
+        <InfoCard title={t$(t.recentSecurityEvents)} data={data?.recentSecurityEvents.slice(0, 5)} />
       </section>
 
       {/* Outreach control */}
@@ -482,19 +491,19 @@ export default function AdmConsoleClient() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Analyze form */}
           <div style={{ background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 20 }}>
-            <span className="sb-eyebrow">{t.outreachEyebrow}</span>
-            <h2 className="sb-h3" style={{ marginTop: 8 }}>{t.analyzeHeading}</h2>
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 8 }}>{t.analyzeHint}</p>
+            <span className="sb-eyebrow">{t$(t.outreachEyebrow)}</span>
+            <h2 className="sb-h3" style={{ marginTop: 8 }}>{t$(t.analyzeHeading)}</h2>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 8 }}>{t$(t.analyzeHint)}</p>
             <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <input value={businessName} onChange={e => setBusinessName(e.target.value)} placeholder={t.businessNamePlaceholder} className="sb-input" style={{ width: '100%', borderRadius: 12, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box' }} />
-              <input value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} placeholder={t.urlPlaceholder} className="sb-input" style={{ width: '100%', borderRadius: 12, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box' }} />
-              <button disabled={busy || !sourceUrl} onClick={runManualAnalysis} className="sb-button-primary" style={{ width: '100%', border: 'none', opacity: busy || !sourceUrl ? 0.5 : 1 }}>{t.generateBtn}</button>
+              <input value={businessName} onChange={e => setBusinessName(e.target.value)} placeholder={t$(t.businessNamePlaceholder)} className="sb-input" style={{ width: '100%', borderRadius: 12, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box' }} />
+              <input value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} placeholder={t$(t.urlPlaceholder)} className="sb-input" style={{ width: '100%', borderRadius: 12, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box' }} />
+              <button disabled={busy || !sourceUrl} onClick={runManualAnalysis} className="sb-button-primary" style={{ width: '100%', border: 'none', opacity: busy || !sourceUrl ? 0.5 : 1 }}>{t$(t.generateBtn)}</button>
             </div>
           </div>
 
           {/* Approval queue */}
           <div style={{ background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 20 }}>
-            <h3 className="sb-h3">{t.approvalQueue}</h3>
+            <h3 className="sb-h3">{t$(t.approvalQueue)}</h3>
             <div style={{ marginTop: 16, maxHeight: 520, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingRight: 4 }}>
               {data?.recentOutreach.map(row => {
                 const isSelected = selected?.id === row.id
@@ -527,45 +536,45 @@ export default function AdmConsoleClient() {
             <div style={{ background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 20 }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start', justifyContent: 'space-between' }}>
                 <div>
-                  <span className="sb-eyebrow">{t.generatedAssets}</span>
+                  <span className="sb-eyebrow">{t$(t.generatedAssets)}</span>
                   <h3 style={{ marginTop: 8, fontSize: 20, fontWeight: 600, color: '#fff' }}>{selected.business_name}</h3>
                   <p style={{ marginTop: 4, fontSize: 14, color: 'rgba(255,255,255,0.45)' }}>{selected.business_url}</p>
                   <p style={{ marginTop: 12, fontSize: 14, color: 'rgba(255,255,255,0.7)' }}>{selected.analyzer_summary?.hmi_summary}</p>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  <button disabled={busy || selected.status === 'approved'} onClick={() => patchOutreach(selected.id, 'approved')} className="sb-button-primary" style={{ border: 'none', opacity: busy || selected.status === 'approved' ? 0.5 : 1 }}>{t.approveBtn}</button>
-                  <button disabled={busy || selected.status === 'rejected'} onClick={() => patchOutreach(selected.id, 'rejected')} style={{ borderRadius: 999, background: '#dc2626', padding: '8px 16px', fontSize: 14, fontWeight: 700, color: '#fff', border: 'none', cursor: 'pointer', opacity: busy || selected.status === 'rejected' ? 0.5 : 1 }}>{t.rejectBtn}</button>
+                  <button disabled={busy || selected.status === 'approved'} onClick={() => patchOutreach(selected.id, 'approved')} className="sb-button-primary" style={{ border: 'none', opacity: busy || selected.status === 'approved' ? 0.5 : 1 }}>{t$(t.approveBtn)}</button>
+                  <button disabled={busy || selected.status === 'rejected'} onClick={() => patchOutreach(selected.id, 'rejected')} style={{ borderRadius: 999, background: '#dc2626', padding: '8px 16px', fontSize: 14, fontWeight: 700, color: '#fff', border: 'none', cursor: 'pointer', opacity: busy || selected.status === 'rejected' ? 0.5 : 1 }}>{t$(t.rejectBtn)}</button>
                 </div>
               </div>
 
               <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 16 }}>
-                <InfoCard title={t.analyzer}       data={selected.analyzer_summary} />
-                <InfoCard title={t.profiler}        data={selected.business_model_profile} />
-                <InfoCard title={t.predictive}      data={selected.predictive_needs} />
-                <InfoCard title={t.reviewStrategy}  data={selected.review_strategy} />
-                <InfoCard title={t.socialPlan}      data={selected.social_plan} />
-                <InfoCard title={t.promoCampaign}   data={selected.promo_plan} />
+                <InfoCard title={t$(t.analyzer)}       data={selected.analyzer_summary} />
+                <InfoCard title={t$(t.profiler)}        data={selected.business_model_profile} />
+                <InfoCard title={t$(t.predictive)}      data={selected.predictive_needs} />
+                <InfoCard title={t$(t.reviewStrategy)}  data={selected.review_strategy} />
+                <InfoCard title={t$(t.socialPlan)}      data={selected.social_plan} />
+                <InfoCard title={t$(t.promoCampaign)}   data={selected.promo_plan} />
               </div>
 
               {/* AI feedback */}
               <div className="sb-ai-feedback" style={{ marginTop: 20 }}>
-                <strong>{t.aiFeedbackTitle}</strong>
-                <p>{t.aiFeedbackBody}</p>
+                <strong>{t$(t.aiFeedbackTitle)}</strong>
+                <p>{t$(t.aiFeedbackBody)}</p>
               </div>
 
               {/* Outreach message + send */}
               <div style={{ marginTop: 20, borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.2)', padding: 16 }}>
-                <h4 style={{ fontWeight: 600, color: '#fff', margin: 0 }}>{t.outreachMessage}</h4>
+                <h4 style={{ fontWeight: 600, color: '#fff', margin: 0 }}>{t$(t.outreachMessage)}</h4>
                 <p style={{ marginTop: 12, whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.6, color: 'rgba(255,255,255,0.7)' }}>{selected.outreach_message}</p>
                 <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  <input value={sendEmail} onChange={e => setSendEmail(e.target.value)} placeholder={t.emailPlaceholder} className="sb-input" style={{ flex: 1, minWidth: 180, borderRadius: 12, padding: '10px 12px', fontSize: 14 }} />
-                  <button disabled={busy || selected.status !== 'approved'} onClick={sendSelected} className="sb-button-secondary" style={{ opacity: busy || selected.status !== 'approved' ? 0.5 : 1 }}>{t.sendNow}</button>
+                  <input value={sendEmail} onChange={e => setSendEmail(e.target.value)} placeholder={t$(t.emailPlaceholder)} className="sb-input" style={{ flex: 1, minWidth: 180, borderRadius: 12, padding: '10px 12px', fontSize: 14 }} />
+                  <button disabled={busy || selected.status !== 'approved'} onClick={sendSelected} className="sb-button-secondary" style={{ opacity: busy || selected.status !== 'approved' ? 0.5 : 1 }}>{t$(t.sendNow)}</button>
                 </div>
               </div>
             </div>
           ) : (
             <div style={{ background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 32, color: 'rgba(255,255,255,0.4)' }}>
-              {t.noRecords}
+              {t$(t.noRecords)}
             </div>
           )}
         </div>
@@ -573,8 +582,8 @@ export default function AdmConsoleClient() {
 
       {/* Predictive insights */}
       <section aria-label="Predictive Insights" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16 }}>
-        <InfoCard title={t.predictiveInsights} data={predictedNeeds} />
-        <InfoCard title={t.aiMonitor}          data={data?.recentAiTasks.slice(0, 5)} />
+        <InfoCard title={t$(t.predictiveInsights)} data={predictedNeeds} />
+        <InfoCard title={t$(t.aiMonitor)}          data={data?.recentAiTasks.slice(0, 5)} />
       </section>
     </div>
   )

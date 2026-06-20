@@ -59,6 +59,11 @@ export async function GET() {
       role: access.role,
       isAdmin: access.isAdmin,
       isOwner: access.isOwner,
+      allowance: state.allowance,
+      video: state.video,
+      image: state.image,
+      ai: state.ai,
+      allowances: state.allowances,
     })
   } catch {
     return NextResponse.json(

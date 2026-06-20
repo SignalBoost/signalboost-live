@@ -36,6 +36,279 @@ type Feedback = {
   timestamp: string | null
 }
 
+const COPY = {
+  en: {
+    pill: 'Live onboarding analytics',
+    title: 'Onboarding Command Center',
+    subtitle: 'Completion, funnel drop-off, consent, tone, QA, feedback, A/B readiness.',
+    eventsAnalyzed: (n: number) => `${n} events analyzed`,
+    loading: 'Loading data…',
+    kpi: {
+      completionRate: 'Completion rate',
+      completionSub: (done: number, total: number) => `${done} completed / ${total} profiled`,
+      consentOptIn: 'Consent opt-in',
+      consentSub: (n: number) => `${n} training consents captured`,
+      skips: 'Skips',
+      skipsSub: 'Skip button events across the flow',
+      errors: 'Errors',
+      errorsSub: 'Recent onboarding client/server errors',
+    },
+    funnel: 'Funnel drop-off by step',
+    views: 'views',
+    toneDistribution: 'Tone distribution',
+    monitoring: 'Monitoring setup',
+    monitoringItems: [
+      'Analytics tracking: onboarding events are sent to the custom Supabase event table, plus Google Analytics, Mixpanel, and LogRocket when browser SDKs are present.',
+      'Error logging: client exceptions are forwarded to Sentry and LogRocket when configured; recent database-backed errors are surfaced here.',
+      'Performance monitoring: QA should validate Lighthouse mobile performance and compare event timestamps for slow step transitions.',
+      'Feedback loop: yes/no feedback distribution appears below for post-onboarding satisfaction checks.',
+      'Compliance & privacy: consent opt-in remains unchecked by default and is timestamped in user profile records.',
+    ],
+    deviceMix: 'Device mix',
+    feedback: 'Feedback',
+    qaScript: 'User-facing QA script',
+    qaItems: [
+      'Verify the skip button appears on every onboarding step and routes to the dashboard.',
+      'Confirm profiling selections persist after reload and re-opening onboarding.',
+      'Confirm consent is unchecked by default and only timestamps when opted in.',
+      'Verify tone persistence appears in the confirmation summary and user profile settings.',
+      'Test responsiveness at mobile, tablet, and desktop widths.',
+      'Run performance and cross-browser checks in Chrome, Safari, Firefox, and Edge.',
+    ],
+    devChecklist: 'Developer verification checklist',
+    devItems: [
+      'Responsive units, fluid grids, touch-friendly 44px controls, and media queries are present.',
+      'Glassmorphism panels and neon accents match SignalBoost visual language.',
+      'Skip logic, profile upsert, consent handling, tone persistence, and analytics insert paths complete without console errors.',
+      'Apprentice Workshop adapts copy and task depth from the stored IT level.',
+      'Keyboard focus, semantic labels, color contrast, and reduced layout shift are verified.',
+    ],
+    recentEvents: 'Recent onboarding events',
+    tableHeaders: ['Step', 'Action', 'Device', 'Browser', 'Timestamp'],
+    noEvents: 'No onboarding events found yet.',
+    abTitle: 'A/B testing layout',
+    abDesc: (n: number) => `Use variant tags in onboarding_analytics.action values such as viewed_variant_a or viewed_variant_b, then compare completion, consent opt-in, and feedback response rates in this dashboard. Confirmation completions tracked: ${n}`,
+  },
+  es: {
+    pill: 'Análisis de incorporación en vivo',
+    title: 'Centro de mando de incorporación',
+    subtitle: 'Finalización, abandono del embudo, consentimiento, tono, QA, retroalimentación, preparación A/B.',
+    eventsAnalyzed: (n: number) => `${n} eventos analizados`,
+    loading: 'Cargando datos…',
+    kpi: {
+      completionRate: 'Tasa de finalización',
+      completionSub: (done: number, total: number) => `${done} completados / ${total} perfilados`,
+      consentOptIn: 'Consentimiento',
+      consentSub: (n: number) => `${n} consentimientos de entrenamiento capturados`,
+      skips: 'Omisiones',
+      skipsSub: 'Eventos del botón omitir en el flujo',
+      errors: 'Errores',
+      errorsSub: 'Errores recientes de cliente/servidor en incorporación',
+    },
+    funnel: 'Abandono del embudo por paso',
+    views: 'vistas',
+    toneDistribution: 'Distribución de tono',
+    monitoring: 'Configuración de monitoreo',
+    monitoringItems: [
+      'Seguimiento de análisis: los eventos de incorporación se envían a la tabla de eventos de Supabase, además de Google Analytics, Mixpanel y LogRocket cuando los SDK del navegador están presentes.',
+      'Registro de errores: las excepciones del cliente se reenvían a Sentry y LogRocket cuando están configurados; los errores recientes respaldados por la base de datos se muestran aquí.',
+      'Monitoreo de rendimiento: el equipo de QA debe validar el rendimiento móvil de Lighthouse y comparar las marcas de tiempo de los eventos para transiciones de pasos lentas.',
+      'Ciclo de retroalimentación: la distribución de retroalimentación sí/no aparece a continuación para verificaciones de satisfacción posteriores a la incorporación.',
+      'Cumplimiento y privacidad: el consentimiento permanece desmarcado por defecto y se registra con marca de tiempo en los registros de perfil de usuario.',
+    ],
+    deviceMix: 'Distribución de dispositivos',
+    feedback: 'Retroalimentación',
+    qaScript: 'Script de QA para el usuario',
+    qaItems: [
+      'Verificar que el botón omitir aparece en cada paso de incorporación y redirige al panel.',
+      'Confirmar que las selecciones de perfil persisten tras recargar y reabrir la incorporación.',
+      'Confirmar que el consentimiento está desmarcado por defecto y solo registra marca de tiempo al aceptar.',
+      'Verificar que la persistencia del tono aparece en el resumen de confirmación y en la configuración del perfil.',
+      'Probar la capacidad de respuesta en anchos móvil, tableta y escritorio.',
+      'Ejecutar comprobaciones de rendimiento y compatibilidad en Chrome, Safari, Firefox y Edge.',
+    ],
+    devChecklist: 'Lista de verificación para desarrolladores',
+    devItems: [
+      'Unidades responsivas, cuadrículas fluidas, controles táctiles de 44px y consultas de medios presentes.',
+      'Los paneles de glassmorfismo y los acentos de neón coinciden con el lenguaje visual de SignalBoost.',
+      'La lógica de omisión, upsert de perfil, manejo de consentimiento, persistencia de tono y rutas de inserción de análisis se completan sin errores de consola.',
+      'El Taller de Aprendiz adapta el texto y la profundidad de la tarea desde el nivel de TI almacenado.',
+      'Se verifican el foco del teclado, las etiquetas semánticas, el contraste de color y el desplazamiento de diseño reducido.',
+    ],
+    recentEvents: 'Eventos de incorporación recientes',
+    tableHeaders: ['Paso', 'Acción', 'Dispositivo', 'Navegador', 'Marca de tiempo'],
+    noEvents: 'Aún no se encontraron eventos de incorporación.',
+    abTitle: 'Diseño de pruebas A/B',
+    abDesc: (n: number) => `Use etiquetas de variante en los valores de onboarding_analytics.action como viewed_variant_a o viewed_variant_b, luego compare las tasas de finalización, consentimiento y retroalimentación en este panel. Confirmaciones completadas: ${n}`,
+  },
+  pt: {
+    pill: 'Análise de integração ao vivo',
+    title: 'Centro de comando de integração',
+    subtitle: 'Conclusão, abandono do funil, consentimento, tom, QA, feedback, prontidão A/B.',
+    eventsAnalyzed: (n: number) => `${n} eventos analisados`,
+    loading: 'Carregando dados…',
+    kpi: {
+      completionRate: 'Taxa de conclusão',
+      completionSub: (done: number, total: number) => `${done} concluídos / ${total} perfilados`,
+      consentOptIn: 'Consentimento',
+      consentSub: (n: number) => `${n} consentimentos de treinamento capturados`,
+      skips: 'Ignorados',
+      skipsSub: 'Eventos do botão ignorar no fluxo',
+      errors: 'Erros',
+      errorsSub: 'Erros recentes de cliente/servidor na integração',
+    },
+    funnel: 'Abandono do funil por etapa',
+    views: 'visualizações',
+    toneDistribution: 'Distribuição de tom',
+    monitoring: 'Configuração de monitoramento',
+    monitoringItems: [
+      'Rastreamento de análises: os eventos de integração são enviados para a tabela de eventos personalizada do Supabase, além do Google Analytics, Mixpanel e LogRocket quando os SDKs do navegador estão presentes.',
+      'Registro de erros: as exceções do cliente são encaminhadas ao Sentry e LogRocket quando configurados; erros recentes respaldados pelo banco de dados são exibidos aqui.',
+      'Monitoramento de desempenho: o QA deve validar o desempenho móvel do Lighthouse e comparar os carimbos de data/hora dos eventos para transições de etapas lentas.',
+      'Ciclo de feedback: a distribuição de feedback sim/não aparece abaixo para verificações de satisfação pós-integração.',
+      'Conformidade e privacidade: o consentimento permanece desmarcado por padrão e é registrado com carimbo de data/hora nos registros de perfil do usuário.',
+    ],
+    deviceMix: 'Distribuição de dispositivos',
+    feedback: 'Feedback',
+    qaScript: 'Script de QA para o usuário',
+    qaItems: [
+      'Verificar se o botão ignorar aparece em cada etapa de integração e redireciona para o painel.',
+      'Confirmar que as seleções de perfil persistem após recarregar e reabrir a integração.',
+      'Confirmar que o consentimento está desmarcado por padrão e só registra carimbo de data/hora ao aceitar.',
+      'Verificar se a persistência do tom aparece no resumo de confirmação e nas configurações do perfil do usuário.',
+      'Testar a responsividade em larguras móvel, tablet e desktop.',
+      'Executar verificações de desempenho e compatibilidade no Chrome, Safari, Firefox e Edge.',
+    ],
+    devChecklist: 'Lista de verificação para desenvolvedores',
+    devItems: [
+      'Unidades responsivas, grades fluidas, controles sensíveis ao toque de 44px e consultas de mídia presentes.',
+      'Os painéis de glassmorfismo e os acentos neon correspondem à linguagem visual do SignalBoost.',
+      'A lógica de ignorar, upsert de perfil, tratamento de consentimento, persistência de tom e caminhos de inserção de análises são concluídos sem erros de console.',
+      'O Ateliê de Aprendiz adapta o texto e a profundidade da tarefa a partir do nível de TI armazenado.',
+      'Foco do teclado, rótulos semânticos, contraste de cores e deslocamento de layout reduzido são verificados.',
+    ],
+    recentEvents: 'Eventos de integração recentes',
+    tableHeaders: ['Etapa', 'Ação', 'Dispositivo', 'Navegador', 'Carimbo de data/hora'],
+    noEvents: 'Nenhum evento de integração encontrado ainda.',
+    abTitle: 'Layout de testes A/B',
+    abDesc: (n: number) => `Use tags de variante nos valores de onboarding_analytics.action como viewed_variant_a ou viewed_variant_b, depois compare as taxas de conclusão, consentimento e feedback neste painel. Confirmações concluídas: ${n}`,
+  },
+  pl: {
+    pill: 'Analityka onboardingu na żywo',
+    title: 'Centrum dowodzenia onboardingiem',
+    subtitle: 'Ukończenie, porzucenie lejka, zgoda, ton, QA, opinie, gotowość A/B.',
+    eventsAnalyzed: (n: number) => `Przeanalizowano ${n} zdarzeń`,
+    loading: 'Ładowanie danych…',
+    kpi: {
+      completionRate: 'Wskaźnik ukończenia',
+      completionSub: (done: number, total: number) => `${done} ukończonych / ${total} profilowanych`,
+      consentOptIn: 'Zgoda',
+      consentSub: (n: number) => `${n} zgód na szkolenie przechwyconych`,
+      skips: 'Pominięcia',
+      skipsSub: 'Zdarzenia przycisku pomiń w przepływie',
+      errors: 'Błędy',
+      errorsSub: 'Ostatnie błędy klienta/serwera w onboardingu',
+    },
+    funnel: 'Porzucenie lejka według kroku',
+    views: 'wyświetleń',
+    toneDistribution: 'Rozkład tonu',
+    monitoring: 'Konfiguracja monitorowania',
+    monitoringItems: [
+      'Śledzenie analityki: zdarzenia onboardingu są wysyłane do niestandardowej tabeli zdarzeń Supabase oraz do Google Analytics, Mixpanel i LogRocket, gdy SDK przeglądarki są obecne.',
+      'Rejestrowanie błędów: wyjątki klienta są przekazywane do Sentry i LogRocket, gdy są skonfigurowane; ostatnie błędy z bazy danych są wyświetlane tutaj.',
+      'Monitorowanie wydajności: QA powinien zweryfikować wydajność mobilną Lighthouse i porównać znaczniki czasu zdarzeń dla wolnych przejść między krokami.',
+      'Pętla opinii: rozkład opinii tak/nie pojawia się poniżej dla sprawdzania satysfakcji po onboardingu.',
+      'Zgodność i prywatność: zgoda pozostaje domyślnie niezaznaczona i jest oznaczana znacznikiem czasu w rekordach profilu użytkownika.',
+    ],
+    deviceMix: 'Rozkład urządzeń',
+    feedback: 'Opinie',
+    qaScript: 'Skrypt QA dla użytkownika',
+    qaItems: [
+      'Sprawdź, czy przycisk pomiń pojawia się na każdym kroku onboardingu i przekierowuje do panelu.',
+      'Potwierdź, że wybory profilowania są zachowane po przeładowaniu i ponownym otwarciu onboardingu.',
+      'Potwierdź, że zgoda jest domyślnie niezaznaczona i oznaczana znacznikiem czasu tylko po wyrażeniu zgody.',
+      'Sprawdź, czy trwałość tonu pojawia się w podsumowaniu potwierdzenia i ustawieniach profilu użytkownika.',
+      'Przetestuj responsywność na szerokościach mobilnych, tabletowych i desktopowych.',
+      'Uruchom testy wydajności i zgodności w Chrome, Safari, Firefox i Edge.',
+    ],
+    devChecklist: 'Lista kontrolna dla deweloperów',
+    devItems: [
+      'Responsywne jednostki, płynne siatki, elementy sterowania przyjazne dla dotyku 44px i zapytania medialne są obecne.',
+      'Panele glassmorfizmu i neonowe akcenty odpowiadają językowi wizualnemu SignalBoost.',
+      'Logika pomijania, upsert profilu, obsługa zgody, trwałość tonu i ścieżki wstawiania analityki są kompletne bez błędów konsoli.',
+      'Warsztat Ucznia dostosowuje tekst i głębokość zadania na podstawie zapisanego poziomu IT.',
+      'Fokus klawiatury, semantyczne etykiety, kontrast kolorów i zmniejszone przesunięcie układu są zweryfikowane.',
+    ],
+    recentEvents: 'Ostatnie zdarzenia onboardingu',
+    tableHeaders: ['Krok', 'Akcja', 'Urządzenie', 'Przeglądarka', 'Znacznik czasu'],
+    noEvents: 'Nie znaleziono jeszcze żadnych zdarzeń onboardingu.',
+    abTitle: 'Układ testów A/B',
+    abDesc: (n: number) => `Użyj tagów wariantów w wartościach onboarding_analytics.action, takich jak viewed_variant_a lub viewed_variant_b, a następnie porównaj wskaźniki ukończenia, zgody i opinii w tym panelu. Potwierdzone ukończenia: ${n}`,
+  },
+  ru: {
+    pill: 'Аналитика онбординга в реальном времени',
+    title: 'Командный центр онбординга',
+    subtitle: 'Завершение, отток воронки, согласие, тон, QA, обратная связь, готовность A/B.',
+    eventsAnalyzed: (n: number) => `Проанализировано ${n} событий`,
+    loading: 'Загрузка данных…',
+    kpi: {
+      completionRate: 'Коэффициент завершения',
+      completionSub: (done: number, total: number) => `${done} завершено / ${total} профилировано`,
+      consentOptIn: 'Согласие',
+      consentSub: (n: number) => `${n} согласий на обучение получено`,
+      skips: 'Пропуски',
+      skipsSub: 'События кнопки пропуска в потоке',
+      errors: 'Ошибки',
+      errorsSub: 'Последние ошибки клиента/сервера в онбординге',
+    },
+    funnel: 'Отток воронки по шагам',
+    views: 'просмотров',
+    toneDistribution: 'Распределение тона',
+    monitoring: 'Настройка мониторинга',
+    monitoringItems: [
+      'Отслеживание аналитики: события онбординга отправляются в пользовательскую таблицу событий Supabase, а также в Google Analytics, Mixpanel и LogRocket при наличии SDK браузера.',
+      'Журналирование ошибок: исключения клиента пересылаются в Sentry и LogRocket при настройке; последние ошибки из базы данных отображаются здесь.',
+      'Мониторинг производительности: QA должен проверить мобильную производительность Lighthouse и сравнить временные метки событий для медленных переходов между шагами.',
+      'Цикл обратной связи: распределение ответов да/нет отображается ниже для проверки удовлетворённости после онбординга.',
+      'Соответствие и конфиденциальность: согласие остаётся по умолчанию снятым и фиксируется с временной меткой в записях профиля пользователя.',
+    ],
+    deviceMix: 'Распределение устройств',
+    feedback: 'Обратная связь',
+    qaScript: 'Скрипт QA для пользователя',
+    qaItems: [
+      'Убедитесь, что кнопка пропуска отображается на каждом шаге онбординга и перенаправляет на панель.',
+      'Подтвердите, что выборки профилирования сохраняются после перезагрузки и повторного открытия онбординга.',
+      'Подтвердите, что согласие по умолчанию снято и фиксируется с временной меткой только при принятии.',
+      'Убедитесь, что сохранение тона отображается в сводке подтверждения и настройках профиля пользователя.',
+      'Протестируйте адаптивность на мобильных, планшетных и десктопных ширинах.',
+      'Выполните проверки производительности и совместимости в Chrome, Safari, Firefox и Edge.',
+    ],
+    devChecklist: 'Контрольный список для разработчиков',
+    devItems: [
+      'Адаптивные единицы, гибкие сетки, сенсорные элементы управления 44px и медиазапросы присутствуют.',
+      'Панели glassmorphism и неоновые акценты соответствуют визуальному языку SignalBoost.',
+      'Логика пропуска, upsert профиля, обработка согласия, сохранение тона и пути вставки аналитики завершены без ошибок консоли.',
+      'Мастерская ученика адаптирует текст и глубину задачи на основе сохранённого уровня IT.',
+      'Проверены фокус клавиатуры, семантические метки, контрастность цветов и уменьшенное смещение макета.',
+    ],
+    recentEvents: 'Последние события онбординга',
+    tableHeaders: ['Шаг', 'Действие', 'Устройство', 'Браузер', 'Временная метка'],
+    noEvents: 'События онбординга пока не найдены.',
+    abTitle: 'Макет A/B тестирования',
+    abDesc: (n: number) => `Используйте теги вариантов в значениях onboarding_analytics.action, таких как viewed_variant_a или viewed_variant_b, затем сравните показатели завершения, согласия и обратной связи на этой панели. Подтверждённые завершения: ${n}`,
+  },
+}
+
+function getLang(): keyof typeof COPY {
+  if (typeof navigator === 'undefined') return 'en'
+  const lang = navigator.language.slice(0, 2)
+  if (lang === 'es') return 'es'
+  if (lang === 'pt') return 'pt'
+  if (lang === 'pl') return 'pl'
+  if (lang === 'ru') return 'ru'
+  return 'en'
+}
+
 const STEP_ORDER = ['welcome', 'profiling', 'consent', 'tone', 'confirmation']
 const COLORS = ['#38bdf8', '#ffc300', '#a78bfa', '#22c55e', '#fb7185']
 
@@ -58,6 +331,7 @@ export default function OnboardingAnalyticsDashboardPage() {
   const [errors, setErrors] = useState<ErrorLog[]>([])
   const [feedback, setFeedback] = useState<Feedback[]>([])
   const [loading, setLoading] = useState(true)
+  const c = COPY[getLang()]
 
   useEffect(() => {
     async function loadDashboard() {
@@ -121,108 +395,127 @@ export default function OnboardingAnalyticsDashboardPage() {
 
       <section className="hero">
         <div>
-          <span className="statusPill">Live onboarding analytics</span>
-          <h1>Onboarding Command Center</h1>
-          <p style={{ fontSize: 13, margin: 0 }}>Completion, funnel drop-off, consent, tone, QA, feedback, A/B readiness.</p>
+          <span className="statusPill">{c.pill}</span>
+          <h1>{c.title}</h1>
+          <p style={{ fontSize: 13, margin: 0 }}>{c.subtitle}</p>
         </div>
-        <p>{loading ? 'Loading data…' : `${events.length} events analyzed`}</p>
+        <p>{loading ? c.loading : c.eventsAnalyzed(events.length)}</p>
       </section>
 
       <section className="grid kpiGrid" aria-label="Onboarding KPIs">
-        <div className="card kpi"><span>Completion rate</span><strong>{percent(completedProfiles.length, profiles.length)}</strong><p>{completedProfiles.length} completed / {profiles.length} profiled</p></div>
-        <div className="card kpi"><span>Consent opt-in</span><strong>{percent(consentedProfiles.length, profiles.length)}</strong><p>{consentedProfiles.length} training consents captured</p></div>
-        <div className="card kpi"><span>Skips</span><strong>{skippedEvents.length}</strong><p>Skip button events across the flow</p></div>
-        <div className="card kpi"><span>Errors</span><strong>{errors.length}</strong><p>Recent onboarding client/server errors</p></div>
+        <div className="card kpi">
+          <span>{c.kpi.completionRate}</span>
+          <strong>{percent(completedProfiles.length, profiles.length)}</strong>
+          <p>{c.kpi.completionSub(completedProfiles.length, profiles.length)}</p>
+        </div>
+        <div className="card kpi">
+          <span>{c.kpi.consentOptIn}</span>
+          <strong>{percent(consentedProfiles.length, profiles.length)}</strong>
+          <p>{c.kpi.consentSub(consentedProfiles.length)}</p>
+        </div>
+        <div className="card kpi">
+          <span>{c.kpi.skips}</span>
+          <strong>{skippedEvents.length}</strong>
+          <p>{c.kpi.skipsSub}</p>
+        </div>
+        <div className="card kpi">
+          <span>{c.kpi.errors}</span>
+          <strong>{errors.length}</strong>
+          <p>{c.kpi.errorsSub}</p>
+        </div>
       </section>
 
       <section className="grid panelGrid">
         <div className="card">
-          <h2>Funnel drop-off by step</h2>
+          <h2>{c.funnel}</h2>
           {STEP_ORDER.map((step, index) => (
             <div className="barRow" key={step}>
               <strong>{index + 1}. {step}</strong>
               <div className="barTrack"><div className="barFill" style={{ width: percent(stepViews[step] || 0, maxStepViews) }} /></div>
-              <span>{stepViews[step] || 0} views</span>
+              <span>{stepViews[step] || 0} {c.views}</span>
             </div>
           ))}
         </div>
 
         <div className="card">
-          <h2>Tone distribution</h2>
+          <h2>{c.toneDistribution}</h2>
           <div className="donutList">
             {Object.entries(toneDistribution).map(([tone, count], index) => (
-              <div className="legend" key={tone}><span><i className="dot" style={{ background: COLORS[index % COLORS.length] }} />{tone}</span><strong>{count}</strong></div>
+              <div className="legend" key={tone}>
+                <span><i className="dot" style={{ background: COLORS[index % COLORS.length] }} />{tone}</span>
+                <strong>{count}</strong>
+              </div>
             ))}
           </div>
         </div>
 
         <div className="card">
-          <h2>Monitoring setup</h2>
+          <h2>{c.monitoring}</h2>
           <ul className="taskList">
-            <li><strong>Analytics tracking:</strong> onboarding events are sent to the custom Supabase event table, plus Google Analytics, Mixpanel, and LogRocket when browser SDKs are present.</li>
-            <li><strong>Error logging:</strong> client exceptions are forwarded to Sentry and LogRocket when configured; recent database-backed errors are surfaced here.</li>
-            <li><strong>Performance monitoring:</strong> QA should validate Lighthouse mobile performance and compare event timestamps for slow step transitions.</li>
-            <li><strong>Feedback loop:</strong> yes/no feedback distribution appears below for post-onboarding satisfaction checks.</li>
-            <li><strong>Compliance & privacy:</strong> consent opt-in remains unchecked by default and is timestamped in user profile records.</li>
+            {c.monitoringItems.map((item, i) => <li key={i}>{item}</li>)}
           </ul>
         </div>
 
         <div className="card">
-          <h2>Device mix</h2>
+          <h2>{c.deviceMix}</h2>
           <div className="donutList">
             {Object.entries(deviceDistribution).map(([device, count], index) => (
-              <div className="legend" key={device}><span><i className="dot" style={{ background: COLORS[index % COLORS.length] }} />{device}</span><strong>{count}</strong></div>
+              <div className="legend" key={device}>
+                <span><i className="dot" style={{ background: COLORS[index % COLORS.length] }} />{device}</span>
+                <strong>{count}</strong>
+              </div>
             ))}
           </div>
-          <h2 style={{ marginTop: '1.25rem' }}>Feedback</h2>
+          <h2 style={{ marginTop: '1.25rem' }}>{c.feedback}</h2>
           <div className="donutList">
             {Object.entries(feedbackDistribution).map(([response, count], index) => (
-              <div className="legend" key={response}><span><i className="dot" style={{ background: COLORS[index % COLORS.length] }} />{response}</span><strong>{count}</strong></div>
+              <div className="legend" key={response}>
+                <span><i className="dot" style={{ background: COLORS[index % COLORS.length] }} />{response}</span>
+                <strong>{count}</strong>
+              </div>
             ))}
           </div>
         </div>
 
         <div className="card">
-          <h2>User-facing QA script</h2>
+          <h2>{c.qaScript}</h2>
           <ul className="taskList">
-            <li>Verify the skip button appears on every onboarding step and routes to the dashboard.</li>
-            <li>Confirm profiling selections persist after reload and re-opening onboarding.</li>
-            <li>Confirm consent is unchecked by default and only timestamps when opted in.</li>
-            <li>Verify tone persistence appears in the confirmation summary and user profile settings.</li>
-            <li>Test responsiveness at mobile, tablet, and desktop widths.</li>
-            <li>Run performance and cross-browser checks in Chrome, Safari, Firefox, and Edge.</li>
+            {c.qaItems.map((item, i) => <li key={i}>{item}</li>)}
           </ul>
         </div>
 
         <div className="card">
-          <h2>Developer verification checklist</h2>
+          <h2>{c.devChecklist}</h2>
           <ul className="taskList">
-            <li>Responsive units, fluid grids, touch-friendly 44px controls, and media queries are present.</li>
-            <li>Glassmorphism panels and neon accents match SignalBoost visual language.</li>
-            <li>Skip logic, profile upsert, consent handling, tone persistence, and analytics insert paths complete without console errors.</li>
-            <li>Apprentice Workshop adapts copy and task depth from the stored IT level.</li>
-            <li>Keyboard focus, semantic labels, color contrast, and reduced layout shift are verified.</li>
+            {c.devItems.map((item, i) => <li key={i}>{item}</li>)}
           </ul>
         </div>
       </section>
 
       <section className="card" style={{ marginTop: '1rem' }}>
-        <h2>Recent onboarding events</h2>
+        <h2>{c.recentEvents}</h2>
         <table className="table">
-          <thead><tr><th>Step</th><th>Action</th><th>Device</th><th>Browser</th><th>Timestamp</th></tr></thead>
+          <thead>
+            <tr>{c.tableHeaders.map((h) => <th key={h}>{h}</th>)}</tr>
+          </thead>
           <tbody>
             {events.slice(0, 10).map((event) => (
-              <tr key={event.event_id}><td>{event.step_name}</td><td>{event.action}</td><td>{event.device_type}</td><td>{event.browser}</td><td>{event.timestamp}</td></tr>
+              <tr key={event.event_id}>
+                <td>{event.step_name}</td>
+                <td>{event.action}</td>
+                <td>{event.device_type}</td>
+                <td>{event.browser}</td>
+                <td>{event.timestamp}</td>
+              </tr>
             ))}
-            {!events.length && <tr><td colSpan={5}>No onboarding events found yet.</td></tr>}
+            {!events.length && <tr><td colSpan={5}>{c.noEvents}</td></tr>}
           </tbody>
         </table>
       </section>
 
       <section className="card" style={{ marginTop: '1rem' }}>
-        <h2>A/B testing layout</h2>
-        <p>Use variant tags in <code>onboarding_analytics.action</code> values such as <code>viewed_variant_a</code> or <code>viewed_variant_b</code>, then compare completion, consent opt-in, and feedback response rates in this dashboard.</p>
-        <p>Confirmation completions tracked: {completedEvents.length}</p>
+        <h2>{c.abTitle}</h2>
+        <p>{c.abDesc(completedEvents.length)}</p>
       </section>
     </main>
   )

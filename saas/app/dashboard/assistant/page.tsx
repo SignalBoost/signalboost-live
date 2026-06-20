@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, DragEvent, ChangeEvent } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import AssistantMessage from '@/components/AssistantMessage'
 
@@ -8,37 +8,53 @@ type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type Msg = { role: 'user' | 'assistant'; content: string }
 type ConvSummary = { id: string; title: string; summary: string; message_count: number; updated_at: string }
 type VideoItem = { title: string; type: string; id: string }
-type StagedFile = { file: File; preview: string | null }
 
+// ── Attachment types ──────────────────────────────────────────────────────────
+type StagedFile = {
+  id: string
+  name: string
+  size: number
+  mimeType: string
+  dataUrl: string   // base64 data-URL for images; plain base64 for others
+  isImage: boolean
+}
+
+const ALLOWED_MIME = [
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+  'application/pdf',
+  'text/plain', 'text/csv', 'text/markdown',
+  'application/json',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]
 const MAX_FILE_BYTES = 10 * 1024 * 1024 // 10 MB
-const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain', 'text/csv']
 
+// ── Copy ─────────────────────────────────────────────────────────────────────
 const COPY = {
-  eyebrow:        { en: 'Assistant',         es: 'Asistente',       pt: 'Assistente',     pl: 'Asystent',       ru: 'Ассистент' },
-  title:          { en: 'Your SignalBoost concierge', es: 'Tu concierge de SignalBoost', pt: 'Seu concierge SignalBoost', pl: 'Twój concierge SignalBoost', ru: 'Ваш консьерж SignalBoost' },
-  subtitle:       { en: 'Ask anything about building, promoting, reviews, audio, video, or your account.', es: 'Pregunta sobre construcción, promoción, reseñas, audio, video o tu cuenta.', pt: 'Pergunte sobre construção, promoção, avaliações, áudio, vídeo ou sua conta.', pl: 'Pytaj o budowanie, promocję, opinie, audio, wideo lub swoje konto.', ru: 'Спрашивайте о создании, продвижении, отзывах, аудио, видео или вашем аккаунте.' },
-  empty:          { en: 'Ask me anything, or start with one of these:', es: 'Pregúntame lo que quieras, o empieza con una de estas:', pt: 'Pergunte-me qualquer coisa, ou comece com uma destas:', pl: 'Zapytaj mnie o cokolwiek lub zacznij od jednego z tych:', ru: 'Спросите меня что угодно или начните с одного из вариантов:' },
-  thinking:       { en: 'Thinking…',         es: 'Pensando…',       pt: 'Pensando…',      pl: 'Myślę…',         ru: 'Думаю…' },
-  placeholder:    { en: 'Ask the concierge…', es: 'Pregunta al concierge…', pt: 'Pergunte ao concierge…', pl: 'Zapytaj concierge…', ru: 'Спросите консьержа…' },
-  send:           { en: 'Send',              es: 'Enviar',          pt: 'Enviar',         pl: 'Wyślij',         ru: 'Отправить' },
-  error:          { en: 'Sorry, I could not answer that right now.', es: 'Lo siento, no pude responder eso ahora mismo.', pt: 'Desculpe, não pude responder isso agora.', pl: 'Przepraszam, nie mogłem teraz odpowiedzieć.', ru: 'Извините, не могу ответить прямо сейчас.' },
-  history:        { en: 'History',           es: 'Historial',       pt: 'Histórico',      pl: 'Historia',       ru: 'История' },
-  newChat:        { en: 'New chat',          es: 'Nuevo chat',      pt: 'Novo chat',      pl: 'Nowy czat',      ru: 'Новый чат' },
-  noHistory:      { en: 'No conversations yet.', es: 'Aún no hay conversaciones.', pt: 'Ainda não há conversas.', pl: 'Brak rozmów.', ru: 'Пока нет разговоров.' },
-  loadingHistory: { en: 'Loading…',          es: 'Cargando…',       pt: 'Carregando…',    pl: 'Ładowanie…',     ru: 'Загрузка…' },
-  historyError:   { en: 'Could not load history.', es: 'No se pudo cargar el historial.', pt: 'Não foi possível carregar o histórico.', pl: 'Nie udało się załadować historii.', ru: 'Не удалось загрузить историю.' },
-  deleteConfirm:  { en: 'Delete this conversation?', es: '¿Eliminar esta conversación?', pt: 'Excluir esta conversa?', pl: 'Usunąć tę rozmowę?', ru: 'Удалить этот разговор?' },
-  untitled:       { en: 'Untitled conversation', es: 'Conversación sin título', pt: 'Conversa sem título', pl: 'Rozmowa bez tytułu', ru: 'Разговор без названия' },
-  close:          { en: 'Close',             es: 'Cerrar',          pt: 'Fechar',         pl: 'Zamknij',        ru: 'Закрыть' },
-  attachTooltip:  { en: 'Attach file',       es: 'Adjuntar archivo', pt: 'Anexar arquivo', pl: 'Załącz plik',   ru: 'Прикрепить файл' },
-  dropHere:       { en: 'Drop files here',   es: 'Suelta los archivos aquí', pt: 'Solte os arquivos aqui', pl: 'Upuść pliki tutaj', ru: 'Перетащите файлы сюда' },
-  fileTooLarge:   { en: 'File too large (max 10 MB)', es: 'Archivo demasiado grande (máx 10 MB)', pt: 'Arquivo muito grande (máx 10 MB)', pl: 'Plik za duży (maks. 10 MB)', ru: 'Файл слишком большой (макс. 10 МБ)' },
-  fileTypeError:  { en: 'Unsupported file type', es: 'Tipo de archivo no admitido', pt: 'Tipo de arquivo não suportado', pl: 'Nieobsługiwany typ pliku', ru: 'Неподдерживаемый тип файла' },
+  eyebrow:      { en: 'Assistant',                              es: 'Asistente',                           pt: 'Assistente',                          pl: 'Asystent',                            ru: 'Ассистент' },
+  title:        { en: 'Your SignalBoost concierge',             es: 'Tu concierge de SignalBoost',         pt: 'Seu concierge SignalBoost',            pl: 'Twój concierge SignalBoost',           ru: 'Ваш консьерж SignalBoost' },
+  subtitle:     { en: 'Ask anything about building, promoting, reviews, audio, video, or your account.', es: 'Pregunta sobre construcción, promoción, reseñas, audio, video o tu cuenta.', pt: 'Pergunte sobre construção, promoção, avaliações, áudio, vídeo ou sua conta.', pl: 'Pytaj o budowanie, promocję, opinie, audio, wideo lub swoje konto.', ru: 'Спрашивайте о создании, продвижении, отзывах, аудио, видео или вашем аккаунте.' },
+  empty:        { en: 'Ask me anything, or start with one of these:',                                     es: 'Pregúntame lo que quieras, o empieza con una de estas:',                          pt: 'Pergunte-me qualquer coisa, ou comece com uma destas:',                        pl: 'Zapytaj mnie o cokolwiek lub zacznij od jednego z tych:',                      ru: 'Спросите меня что угодно или начните с одного из вариантов:' },
+  thinking:     { en: 'Thinking…',                             es: 'Pensando…',                           pt: 'Pensando…',                            pl: 'Myślę…',                               ru: 'Думаю…' },
+  placeholder:  { en: 'Ask the concierge…',                    es: 'Pregunta al concierge…',              pt: 'Pergunte ao concierge…',               pl: 'Zapytaj concierge…',                   ru: 'Спросите консьержа…' },
+  send:         { en: 'Send',                                   es: 'Enviar',                              pt: 'Enviar',                               pl: 'Wyślij',                               ru: 'Отправить' },
+  error:        { en: 'Sorry, I could not answer that right now.', es: 'Lo siento, no pude responder eso ahora mismo.', pt: 'Desculpe, não pude responder isso agora.', pl: 'Przepraszam, nie mogłem teraz odpowiedzieć.', ru: 'Извините, не могу ответить прямо сейчас.' },
+  history:      { en: 'History',                               es: 'Historial',                           pt: 'Histórico',                            pl: 'Historia',                             ru: 'История' },
+  newChat:      { en: 'New chat',                               es: 'Nuevo chat',                          pt: 'Novo chat',                            pl: 'Nowy czat',                            ru: 'Новый чат' },
+  noHistory:    { en: 'No conversations yet.',                  es: 'Aún no hay conversaciones.',          pt: 'Ainda não há conversas.',              pl: 'Brak rozmów.',                         ru: 'Пока нет разговоров.' },
+  loadingHistory: { en: 'Loading…',                            es: 'Cargando…',                           pt: 'Carregando…',                          pl: 'Ładowanie…',                           ru: 'Загрузка…' },
+  historyError: { en: 'Could not load history.',               es: 'No se pudo cargar el historial.',     pt: 'Não foi possível carregar o histórico.', pl: 'Nie udało się załadować historii.',   ru: 'Не удалось загрузить историю.' },
+  deleteConfirm: { en: 'Delete this conversation?',            es: '¿Eliminar esta conversación?',        pt: 'Excluir esta conversa?',               pl: 'Usunąć tę rozmowę?',                   ru: 'Удалить этот разговор?' },
+  untitled:     { en: 'Untitled conversation',                 es: 'Conversación sin título',             pt: 'Conversa sem título',                  pl: 'Rozmowa bez tytułu',                   ru: 'Разговор без названия' },
+  close:        { en: 'Close',                                  es: 'Cerrar',                              pt: 'Fechar',                               pl: 'Zamknij',                              ru: 'Закрыть' },
+  dropHere:     { en: 'Drop files here',                       es: 'Suelta archivos aquí',                pt: 'Solte arquivos aqui',                  pl: 'Upuść pliki tutaj',                    ru: 'Перетащите файлы сюда' },
+  fileTooLarge: { en: 'File too large (max 10 MB)',            es: 'Archivo demasiado grande (máx 10 MB)', pt: 'Arquivo muito grande (máx 10 MB)',    pl: 'Plik za duży (maks. 10 MB)',           ru: 'Файл слишком большой (макс. 10 МБ)' },
+  fileTypeErr:  { en: 'File type not supported',               es: 'Tipo de archivo no admitido',         pt: 'Tipo de arquivo não suportado',        pl: 'Nieobsługiwany typ pliku',             ru: 'Тип файла не поддерживается' },
   suggestions: {
-    s1: { en: 'How do I publish my first website?', es: '¿Cómo publico mi primer sitio web?', pt: 'Como publico meu primeiro site?', pl: 'Jak opublikować moją pierwszą stronę?', ru: 'Как опубликовать первый сайт?' },
-    s2: { en: 'Help me plan an outreach campaign', es: 'Ayúdame a planificar una campaña de prospección', pt: 'Me ajude a planejar uma campanha de prospecção', pl: 'Pomóż mi zaplanować kampanię outreach', ru: 'Помоги спланировать кампанию аутрич' },
-    s3: { en: 'What does my plan include?', es: '¿Qué incluye mi plan?', pt: 'O que inclui meu plano?', pl: 'Co zawiera mój plan?', ru: 'Что включает мой план?' },
-    s4: { en: 'How do I collect customer reviews?', es: '¿Cómo recopilo reseñas de clientes?', pt: 'Como coleo avaliações de clientes?', pl: 'Jak zbierać opinie klientów?', ru: 'Как собирать отзывы клиентów?' },
+    s1: { en: 'How do I publish my first website?',            es: '¿Cómo publico mi primer sitio web?',  pt: 'Como publico meu primeiro site?',      pl: 'Jak opublikować moją pierwszą stronę?', ru: 'Как опубликовать первый сайт?' },
+    s2: { en: 'Help me plan an outreach campaign',             es: 'Ayúdame a planificar una campaña de prospección', pt: 'Me ajude a planejar uma campanha de prospecção', pl: 'Pomóż mi zaplanować kampanię outreach', ru: 'Помоги спланировать кампанию аутрич' },
+    s3: { en: 'What does my plan include?',                    es: '¿Qué incluye mi plan?',               pt: 'O que inclui meu plano?',              pl: 'Co zawiera mój plan?',                 ru: 'Что включает мой план?' },
+    s4: { en: 'How do I collect customer reviews?',            es: '¿Cómo recopilo reseñas de clientes?', pt: 'Como coleo avaliações de clientes?',   pl: 'Jak zbierać opinie klientów?',         ru: 'Как собирать отзывы клиентów?' },
   },
 }
 
@@ -48,6 +64,7 @@ function c(obj: any, lang: string): string {
   return obj?.[lang as Lang] ?? obj?.en ?? ''
 }
 
+// ── Video JSON legacy renderer ────────────────────────────────────────────────
 function extractVideoJson(content: string): { before: string; videos: VideoItem[]; after: string } | null {
   const startMatch = content.match(/\[\s*\{/)
   if (!startMatch || startMatch.index === undefined) return null
@@ -61,11 +78,7 @@ function extractVideoJson(content: string): { before: string; videos: VideoItem[
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return null
     const videos = parsed
-      .map((v: any) => ({
-        title: typeof v?.title === 'string' ? v.title : 'Video',
-        type: typeof v?.type === 'string' ? v.type : 'video',
-        id: typeof v?.id === 'string' ? v.id : '',
-      }))
+      .map((v: any) => ({ title: typeof v?.title === 'string' ? v.title : 'Video', type: typeof v?.type === 'string' ? v.type : 'video', id: typeof v?.id === 'string' ? v.id : '' }))
       .filter((v: VideoItem) => /^(video|youtube)$/i.test(v.type) && /^[A-Za-z0-9_-]{11}$/.test(v.id))
     return videos.length ? { before, videos, after } : null
   } catch {
@@ -83,19 +96,11 @@ function VideoJsonMessage({ content }: { content: string }) {
         {block.videos.map((video, i) => (
           <div key={`${video.id}-${i}`} style={{ border: '1px solid rgba(26,240,255,.25)', borderRadius: 14, overflow: 'hidden', background: 'rgba(3,7,18,.75)' }}>
             <div style={{ position: 'relative', width: '100%', paddingBottom: '56.25%', background: '#000' }}>
-              <iframe
-                src={`https://www.youtube.com/embed/${encodeURIComponent(video.id)}`}
-                title={video.title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
-              />
+              <iframe src={`https://www.youtube.com/embed/${encodeURIComponent(video.id)}`} title={video.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }} />
             </div>
             <div style={{ padding: 10 }}>
               <div style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', lineHeight: 1.35 }}>{video.title}</div>
-              <a href={`https://www.youtube.com/watch?v=${encodeURIComponent(video.id)}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 8, color: '#1af0ff', fontSize: 11.5, textDecoration: 'underline' }}>
-                Open on YouTube ↗
-              </a>
+              <a href={`https://www.youtube.com/watch?v=${encodeURIComponent(video.id)}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 8, color: '#1af0ff', fontSize: 11.5, textDecoration: 'underline' }}>Open on YouTube ↗</a>
             </div>
           </div>
         ))}
@@ -105,30 +110,20 @@ function VideoJsonMessage({ content }: { content: string }) {
   )
 }
 
-// ── File chip component ───────────────────────────────────────────────────────
-function FileChip({ staged, onRemove }: { staged: StagedFile; onRemove: () => void }) {
-  const isImage = staged.file.type.startsWith('image/')
-  return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,195,0,.1)', border: '1px solid rgba(255,195,0,.3)', borderRadius: 10, padding: '5px 8px', maxWidth: 200, flexShrink: 0 }}>
-      {isImage && staged.preview ? (
-        <img src={staged.preview} alt={staged.file.name} style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
-      ) : (
-        <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>
-          {staged.file.type === 'application/pdf' ? '📄' : '📎'}
-        </span>
-      )}
-      <span style={{ fontSize: 11, color: 'rgba(255,255,255,.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
-        {staged.file.name}
-      </span>
-      <button
-        onClick={onRemove}
-        title="Remove"
-        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,.5)', fontSize: 13, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}
-      >
-        ✕
-      </button>
-    </div>
-  )
+// ── File helpers ──────────────────────────────────────────────────────────────
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -139,14 +134,16 @@ export default function AssistantPage() {
   const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([])
-  const [dragOver, setDragOver] = useState(false)
-  const [fileError, setFileError] = useState('')
-
   const threadRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const conversationIdRef = useRef<string>('')
 
+  // Attachment state
+  const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([])
+  const [dragOver, setDragOver] = useState(false)
+  const [fileError, setFileError] = useState<string>('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // History state
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState(false)
@@ -165,76 +162,121 @@ export default function AssistantPage() {
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }, [messages, loading])
 
-  // ── File staging helpers ──────────────────────────────────────────────────
-  function stageFiles(files: FileList | File[]) {
+  // ── File processing ─────────────────────────────────────────────────────────
+  async function processFiles(fileList: FileList | File[]) {
     setFileError('')
-    const arr = Array.from(files)
-    const valid: StagedFile[] = []
-    for (const file of arr) {
-      if (file.size > MAX_FILE_BYTES) { setFileError(c(COPY.fileTooLarge, l)); continue }
-      if (!ACCEPTED_TYPES.includes(file.type)) { setFileError(c(COPY.fileTypeError, l)); continue }
-      const preview = file.type.startsWith('image/') ? URL.createObjectURL(file) : null
-      valid.push({ file, preview })
+    const files = Array.from(fileList)
+    const results: StagedFile[] = []
+
+    for (const file of files) {
+      if (!ALLOWED_MIME.includes(file.type)) {
+        setFileError(c(COPY.fileTypeErr, l))
+        continue
+      }
+      if (file.size > MAX_FILE_BYTES) {
+        setFileError(c(COPY.fileTooLarge, l))
+        continue
+      }
+      try {
+        const dataUrl = await readFileAsDataUrl(file)
+        results.push({
+          id: crypto.randomUUID(),
+          name: file.name,
+          size: file.size,
+          mimeType: file.type,
+          dataUrl,
+          isImage: file.type.startsWith('image/'),
+        })
+      } catch {
+        // skip unreadable files silently
+      }
     }
-    setStagedFiles(prev => [...prev, ...valid])
+
+    if (results.length > 0) {
+      setStagedFiles(prev => [...prev, ...results])
+    }
   }
 
-  function removeFile(index: number) {
-    setStagedFiles(prev => {
-      const next = [...prev]
-      if (next[index]?.preview) URL.revokeObjectURL(next[index].preview!)
-      next.splice(index, 1)
-      return next
-    })
-  }
-
-  // ── Drag-and-drop handlers ────────────────────────────────────────────────
-  function onDragOver(e: React.DragEvent) {
+  // ── Drag-and-drop handlers ──────────────────────────────────────────────────
+  function onDragOver(e: DragEvent<HTMLDivElement>) {
     e.preventDefault()
+    e.stopPropagation()
     setDragOver(true)
   }
-  function onDragLeave(e: React.DragEvent) {
+
+  function onDragLeave(e: DragEvent<HTMLDivElement>) {
     e.preventDefault()
+    e.stopPropagation()
     setDragOver(false)
-  }
-  function onDrop(e: React.DragEvent) {
-    e.preventDefault()
-    setDragOver(false)
-    if (e.dataTransfer.files?.length) stageFiles(e.dataTransfer.files)
   }
 
-  // ── Send ──────────────────────────────────────────────────────────────────
+  function onDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+    if (e.dataTransfer?.files?.length) {
+      processFiles(e.dataTransfer.files)
+    }
+  }
+
+  function onFileInputChange(e: ChangeEvent<HTMLInputElement>) {
+    if (e.target.files?.length) {
+      processFiles(e.target.files)
+      // reset so the same file can be re-selected
+      e.target.value = ''
+    }
+  }
+
+  function removeFile(id: string) {
+    setStagedFiles(prev => prev.filter(f => f.id !== id))
+  }
+
+  // ── Send ────────────────────────────────────────────────────────────────────
   async function send(text: string) {
     const content = text.trim()
     if ((!content && stagedFiles.length === 0) || loading) return
     if (!conversationIdRef.current) conversationIdRef.current = crypto.randomUUID()
 
-    const displayContent = content || `[${stagedFiles.map(f => f.file.name).join(', ')}]`
+    // Build a user-facing label that includes file names
+    const fileLabel = stagedFiles.length
+      ? `\n\n📎 ${stagedFiles.map(f => f.name).join(', ')}`
+      : ''
+    const displayContent = content + fileLabel
+
     const next: Msg[] = [...messages, { role: 'user', content: displayContent }]
     setMessages(next)
     setInput('')
-    const filesToSend = [...stagedFiles]
+    const filesToSend = stagedFiles.slice()
     setStagedFiles([])
+    setFileError('')
     setLoading(true)
 
     try {
-      let res: Response
+      // Build the message history without the file-label suffix for the API
+      const apiMessages = next.map((m, i) => {
+        if (i === next.length - 1 && m.role === 'user' && fileLabel) {
+          return { role: m.role, content: content }
+        }
+        return m
+      })
 
-      if (filesToSend.length > 0) {
-        // Multipart when files are attached
-        const form = new FormData()
-        form.append('messages', JSON.stringify(next))
-        form.append('context', JSON.stringify({ language: lang, currentPage: '/dashboard/assistant', conversationId: conversationIdRef.current }))
-        filesToSend.forEach(sf => form.append('files', sf.file, sf.file.name))
-        res = await fetch('/api/concierge', { method: 'POST', body: form })
-      } else {
-        // Plain JSON when no files
-        res = await fetch('/api/concierge', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: next, context: { language: lang, currentPage: '/dashboard/assistant', conversationId: conversationIdRef.current } }),
-        })
-      }
+      // Serialize attachments as lightweight descriptors + base64 data
+      const attachments = filesToSend.map(f => ({
+        name: f.name,
+        mimeType: f.mimeType,
+        size: f.size,
+        dataUrl: f.dataUrl,
+      }))
+
+      const res = await fetch('/api/concierge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: apiMessages,
+          attachments: attachments.length ? attachments : undefined,
+          context: { language: lang, currentPage: '/dashboard/assistant', conversationId: conversationIdRef.current },
+        }),
+      })
 
       const data = await res.json()
       setMessages([...next, { role: 'assistant', content: data?.reply || data?.error || c(COPY.error, l) }])
@@ -242,12 +284,10 @@ export default function AssistantPage() {
       setMessages([...next, { role: 'assistant', content: c(COPY.error, l) }])
     } finally {
       setLoading(false)
-      // Revoke any remaining object URLs
-      filesToSend.forEach(sf => { if (sf.preview) URL.revokeObjectURL(sf.preview) })
     }
   }
 
-  // ── History helpers ───────────────────────────────────────────────────────
+  // ── History helpers ─────────────────────────────────────────────────────────
   async function openHistory() {
     setHistoryOpen(true)
     setHistoryLoading(true)
@@ -301,6 +341,8 @@ export default function AssistantPage() {
   function startNewChat() {
     conversationIdRef.current = ''
     setMessages([])
+    setStagedFiles([])
+    setFileError('')
     setHistoryOpen(false)
   }
 
@@ -312,25 +354,27 @@ export default function AssistantPage() {
     }
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Render ──────────────────────────────────────────────────────────────────
+  const canSend = !loading && (input.trim().length > 0 || stagedFiles.length > 0)
+
   return (
     <div
-      style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 165px)', minHeight: 480, maxWidth: 1280, margin: '0 auto', padding: '24px 28px', width: '100%', boxSizing: 'border-box', color: 'var(--text-primary)' }}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
+      style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 165px)', minHeight: 480, maxWidth: 1280, margin: '0 auto', padding: '24px 28px', width: '100%', boxSizing: 'border-box', color: 'var(--text-primary)' }}
     >
-      {/* Drag-over overlay */}
+      {/* ── Drag-over overlay ── */}
       {dragOver && (
-        <div style={{ position: 'fixed', top: 80, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(3,7,18,.72)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: '2px dashed rgba(26,240,255,.6)', borderRadius: 0, pointerEvents: 'none' }}>
+        <div style={{ position: 'absolute', inset: 0, zIndex: 20, borderRadius: 24, background: 'rgba(3,7,18,.82)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: '2px dashed rgba(26,240,255,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 48 }}>📎</div>
-            <p style={{ color: '#1af0ff', fontSize: 18, fontWeight: 800, marginTop: 12 }}>{c(COPY.dropHere, l)}</p>
+            <div style={{ fontSize: 40 }}>📎</div>
+            <p style={{ color: '#1af0ff', fontSize: 16, fontWeight: 700, marginTop: 10 }}>{c(COPY.dropHere, l)}</p>
           </div>
         </div>
       )}
 
-      {/* Header card */}
+      {/* ── Header ── */}
       <div style={{ background: 'radial-gradient(circle at 20% 10%, rgba(26,240,255,.16), transparent 22rem), linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02))', border: '1px solid rgba(26,240,255,.18)', borderRadius: 24, padding: '20px 24px', marginBottom: 16, flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ minWidth: 0 }}>
@@ -345,7 +389,7 @@ export default function AssistantPage() {
         </div>
       </div>
 
-      {/* Thread + history panel */}
+      {/* ── Thread ── */}
       <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex' }}>
         <div ref={threadRef} style={{ flex: 1, overflowY: 'auto', minHeight: 0, background: 'linear-gradient(145deg, rgba(15,23,42,.78), rgba(3,7,18,.68))', border: '1px solid rgba(255,255,255,.1)', borderRadius: 22, padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {messages.length === 0 && !loading && (
@@ -377,16 +421,14 @@ export default function AssistantPage() {
           )}
         </div>
 
-        {/* History drawer */}
+        {/* ── History drawer ── */}
         {historyOpen && (
-          <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 'min(320px, 88%)', zIndex: 5, background: 'linear-gradient(160deg, rgba(10,16,32,.97), rgba(3,7,18,.97))', border: '1px solid rgba(26,240,255,.25)', borderRadius: 22, display: 'flex', flexDirection: 'column', boxShadow: '0 18px 50px rgba(0,0,0,.55)' }}>
-            {/* Sticky header */}
-            <div style={{ position: 'sticky', top: 0, zIndex: 3, background: 'linear-gradient(160deg, rgba(10,16,32,.97), rgba(3,7,18,.97))', borderRadius: '22px 22px 0 0', padding: '14px 14px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,.07)' }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 'min(320px, 88%)', zIndex: 5, background: 'linear-gradient(160deg, rgba(10,16,32,.97), rgba(3,7,18,.97))', border: '1px solid rgba(26,240,255,.25)', borderRadius: 22, display: 'flex', flexDirection: 'column', gap: 10, boxShadow: '0 18px 50px rgba(0,0,0,.55)', overflow: 'hidden' }}>
+            <div style={{ position: 'sticky', top: 0, zIndex: 3, background: 'linear-gradient(160deg, rgba(10,16,32,.99), rgba(3,7,18,.99))', padding: '14px 14px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,.07)' }}>
               <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.02em', color: 'rgba(26,240,255,.9)' }}>🕘 {c(COPY.history, l)}</span>
               <button onClick={() => setHistoryOpen(false)} className="sb-button-secondary" style={{ fontSize: 11, padding: '6px 10px' }}>{c(COPY.close, l)}</button>
             </div>
-            {/* Scrollable list */}
-            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '10px 14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               {historyLoading && <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, textAlign: 'center', marginTop: 20 }}>{c(COPY.loadingHistory, l)}</p>}
               {!historyLoading && historyError && <p style={{ color: 'rgba(255,140,140,.8)', fontSize: 13, textAlign: 'center', marginTop: 20 }}>{c(COPY.historyError, l)}</p>}
               {!historyLoading && !historyError && conversations.length === 0 && <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, textAlign: 'center', marginTop: 20 }}>{c(COPY.noHistory, l)}</p>}
@@ -401,69 +443,87 @@ export default function AssistantPage() {
                 </div>
               ))}
             </div>
-            {/* Backdrop click to close */}
-            <div onClick={() => setHistoryOpen(false)} style={{ position: 'fixed', top: 80, left: 0, right: 0, bottom: 0, zIndex: 4, background: 'transparent' }} aria-hidden />
           </div>
         )}
       </div>
 
-      {/* File error banner */}
-      {fileError && (
-        <div style={{ marginTop: 8, padding: '7px 14px', background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.3)', borderRadius: 10, color: 'rgba(255,160,160,.9)', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <span>⚠️ {fileError}</span>
-          <button onClick={() => setFileError('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,160,160,.7)', fontSize: 13 }}>✕</button>
+      {/* ── Input area ── */}
+      <div style={{ marginTop: 12, flexShrink: 0 }}>
+
+        {/* File error banner */}
+        {fileError && (
+          <div style={{ marginBottom: 8, padding: '8px 14px', borderRadius: 10, background: 'rgba(255,80,80,.12)', border: '1px solid rgba(255,80,80,.35)', color: 'rgba(255,180,180,.9)', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <span>⚠️ {fileError}</span>
+            <button onClick={() => setFileError('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,180,180,.7)', fontSize: 14, padding: 0, lineHeight: 1 }}>✕</button>
+          </div>
+        )}
+
+        {/* Staged file preview chips */}
+        {stagedFiles.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8, maxHeight: 120, overflowY: 'auto', padding: '2px 0' }}>
+            {stagedFiles.map(f => (
+              <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(26,240,255,.08)', border: '1px solid rgba(26,240,255,.25)', borderRadius: 10, padding: '5px 10px 5px 6px', maxWidth: 200, minWidth: 0 }}>
+                {f.isImage ? (
+                  <img src={f.dataUrl} alt={f.name} style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
+                ) : (
+                  <span style={{ fontSize: 18, flexShrink: 0 }}>📄</span>
+                )}
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,.45)' }}>{formatBytes(f.size)}</div>
+                </div>
+                <button onClick={() => removeFile(f.id)} title="Remove" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,.5)', fontSize: 13, padding: 0, lineHeight: 1, flexShrink: 0 }}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Text input row */}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+
+          {/* Hidden native file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept={ALLOWED_MIME.join(',')}
+            onChange={onFileInputChange}
+            style={{ display: 'none' }}
+            aria-hidden="true"
+          />
+
+          {/* Paperclip button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={loading}
+            title="Attach files"
+            aria-label="Attach files"
+            style={{ flexShrink: 0, width: 42, height: 42, borderRadius: 12, background: stagedFiles.length > 0 ? 'rgba(26,240,255,.15)' : 'rgba(255,255,255,.06)', border: `1px solid ${stagedFiles.length > 0 ? 'rgba(26,240,255,.45)' : 'rgba(255,255,255,.15)'}`, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, opacity: loading ? 0.5 : 1, transition: 'background .15s, border-color .15s', color: stagedFiles.length > 0 ? '#1af0ff' : 'rgba(255,255,255,.7)' }}
+          >
+            📎
+          </button>
+
+          {/* Text input */}
+          <input
+            className="sb-input"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) send(input) }}
+            placeholder={c(COPY.placeholder, l)}
+            style={{ flex: 1, padding: '13px 16px', borderRadius: 14, fontSize: 14 }}
+            disabled={loading}
+          />
+
+          {/* Send button */}
+          <button
+            onClick={() => send(input)}
+            disabled={!canSend}
+            className="sb-button-primary"
+            style={{ padding: '0 24px', height: 42, borderRadius: 14, opacity: canSend ? 1 : 0.6, cursor: loading ? 'wait' : 'pointer', flexShrink: 0 }}
+          >
+            {c(COPY.send, l)}
+          </button>
         </div>
-      )}
-
-      {/* Staged file chips tray */}
-      {stagedFiles.length > 0 && (
-        <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8, padding: '8px 12px', background: 'rgba(255,195,0,.05)', border: '1px solid rgba(255,195,0,.18)', borderRadius: 14, maxHeight: 120, overflowY: 'auto', flexShrink: 0 }}>
-          {stagedFiles.map((sf, i) => (
-            <FileChip key={`${sf.file.name}-${i}`} staged={sf} onRemove={() => removeFile(i)} />
-          ))}
-        </div>
-      )}
-
-      {/* Hidden native file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        accept={ACCEPTED_TYPES.join(',')}
-        style={{ display: 'none' }}
-        onChange={e => { if (e.target.files?.length) { stageFiles(e.target.files); e.target.value = '' } }}
-      />
-
-      {/* Input bar */}
-      <div style={{ display: 'flex', gap: 8, marginTop: 12, flexShrink: 0, alignItems: 'center' }}>
-        {/* Paperclip button */}
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          title={c(COPY.attachTooltip, l)}
-          disabled={loading}
-          style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, opacity: loading ? 0.5 : 1, transition: 'background .15s' }}
-        >
-          📎
-        </button>
-
-        <input
-          className="sb-input"
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input) } }}
-          placeholder={c(COPY.placeholder, l)}
-          style={{ flex: 1, padding: '13px 16px', borderRadius: 14, fontSize: 14 }}
-          disabled={loading}
-        />
-
-        <button
-          onClick={() => send(input)}
-          disabled={loading || (!input.trim() && stagedFiles.length === 0)}
-          className="sb-button-primary"
-          style={{ padding: '0 24px', height: 44, borderRadius: 14, opacity: loading || (!input.trim() && stagedFiles.length === 0) ? 0.6 : 1, cursor: loading ? 'wait' : 'pointer', flexShrink: 0 }}
-        >
-          {c(COPY.send, l)}
-        </button>
       </div>
     </div>
   )

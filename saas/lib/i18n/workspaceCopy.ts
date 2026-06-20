@@ -2,39 +2,28 @@ type FlatCopy = Record<string, string>
 
 export const WORKSPACE_COPY: Record<string, FlatCopy> = {
   en: {
-    // ── Creative Studio ──────────────────────────────────────────────────
     'services.creativeStudio.title': 'Creative Studio',
     'services.creativeStudio.desc': 'Generate professional promo banners and campaign visuals powered by AI.',
     'services.creativeStudio.cta': 'Open creative studio',
-
-    // ── Workspace general ────────────────────────────────────────────────
     'workspace.title': 'Workspace',
     'workspace.subtitle': 'Your tools, projects, and content — all in one place.',
     'workspace.loading': 'Loading workspace…',
     'workspace.empty': 'No items yet. Start by creating a project.',
-
-    // ── Services ─────────────────────────────────────────────────────────
     'services.websiteBuilder.title': 'Website Builder',
     'services.websiteBuilder.desc': 'Build a multilingual website from a single prompt in minutes.',
     'services.websiteBuilder.cta': 'Open builder',
-
     'services.audioStudio.title': 'Audio Studio',
     'services.audioStudio.desc': 'Generate native-quality audio and podcast content in multiple languages.',
     'services.audioStudio.cta': 'Open audio studio',
-
     'services.videoStudio.title': 'Video Studio',
     'services.videoStudio.desc': 'Turn your content into polished video assets ready to publish.',
     'services.videoStudio.cta': 'Open video studio',
-
     'services.reviewEngine.title': 'Review Engine',
     'services.reviewEngine.desc': 'Collect customer reviews and transform them into branded content.',
     'services.reviewEngine.cta': 'Open review engine',
-
     'services.outreach.title': 'Outreach Engine',
     'services.outreach.desc': 'Analyze businesses and generate tailored outreach messages and pitch decks.',
     'services.outreach.cta': 'Open outreach',
-
-    // ── Actions ──────────────────────────────────────────────────────────
     'workspace.actions.new': 'New project',
     'workspace.actions.open': 'Open',
     'workspace.actions.edit': 'Edit',
@@ -56,8 +45,6 @@ export const WORKSPACE_COPY: Record<string, FlatCopy> = {
     'workspace.actions.share': 'Share',
     'workspace.actions.copy': 'Copy link',
     'workspace.actions.upgrade': 'Upgrade plan',
-
-    // ── Status labels ────────────────────────────────────────────────────
     'workspace.status.draft': 'Draft',
     'workspace.status.live': 'Live',
     'workspace.status.scheduled': 'Scheduled',
@@ -65,8 +52,6 @@ export const WORKSPACE_COPY: Record<string, FlatCopy> = {
     'workspace.status.processing': 'Processing…',
     'workspace.status.error': 'Error',
     'workspace.status.ready': 'Ready',
-
-    // ── Error / feedback messages ────────────────────────────────────────
     'workspace.error.generic': 'Something went wrong. Please try again.',
     'workspace.error.notFound': 'This item could not be found.',
     'workspace.error.unauthorized': 'You do not have permission to do that.',
@@ -79,39 +64,28 @@ export const WORKSPACE_COPY: Record<string, FlatCopy> = {
   },
 
   pt: {
-    // ── Creative Studio ──────────────────────────────────────────────────
     'services.creativeStudio.title': 'Estúdio Criativo',
     'services.creativeStudio.desc': 'Gere banners promocionais e visuais de campanha com IA.',
     'services.creativeStudio.cta': 'Abrir estúdio criativo',
-
-    // ── Workspace general ────────────────────────────────────────────────
     'workspace.title': 'Workspace',
     'workspace.subtitle': 'Suas ferramentas, projetos e conteúdo — tudo em um só lugar.',
     'workspace.loading': 'Carregando workspace…',
     'workspace.empty': 'Nenhum item ainda. Comece criando um projeto.',
-
-    // ── Services ─────────────────────────────────────────────────────────
     'services.websiteBuilder.title': 'Criador de Sites',
     'services.websiteBuilder.desc': 'Crie um site multilíngue a partir de um único prompt em minutos.',
     'services.websiteBuilder.cta': 'Abrir criador',
-
     'services.audioStudio.title': 'Estúdio de Áudio',
     'services.audioStudio.desc': 'Gere áudio de qualidade nativa e conteúdo de podcast em vários idiomas.',
     'services.audioStudio.cta': 'Abrir estúdio de áudio',
-
     'services.videoStudio.title': 'Estúdio de Vídeo',
     'services.videoStudio.desc': 'Transforme seu conteúdo em vídeos prontos para publicar.',
     'services.videoStudio.cta': 'Abrir estúdio de vídeo',
-
     'services.reviewEngine.title': 'Motor de Avaliações',
     'services.reviewEngine.desc': 'Colete avaliações de clientes e transforme-as em conteúdo de marca.',
     'services.reviewEngine.cta': 'Abrir motor de avaliações',
-
     'services.outreach.title': 'Motor de Outreach',
     'services.outreach.desc': 'Analise empresas e gere mensagens de outreach personalizadas e pitch decks.',
     'services.outreach.cta': 'Abrir outreach',
-
-    // ── Actions ──────────────────────────────────────────────────────────
     'workspace.actions.new': 'Novo projeto',
     'workspace.actions.open': 'Abrir',
     'workspace.actions.edit': 'Editar',
@@ -133,8 +107,6 @@ export const WORKSPACE_COPY: Record<string, FlatCopy> = {
     'workspace.actions.share': 'Compartilhar',
     'workspace.actions.copy': 'Copiar link',
     'workspace.actions.upgrade': 'Fazer upgrade',
-
-    // ── Status labels ────────────────────────────────────────────────────
     'workspace.status.draft': 'Rascunho',
     'workspace.status.live': 'Ativo',
     'workspace.status.scheduled': 'Agendado',
@@ -142,8 +114,6 @@ export const WORKSPACE_COPY: Record<string, FlatCopy> = {
     'workspace.status.processing': 'Processando…',
     'workspace.status.error': 'Erro',
     'workspace.status.ready': 'Pronto',
-
-    // ── Error / feedback messages ────────────────────────────────────────
     'workspace.error.generic': 'Algo deu errado. Tente novamente.',
     'workspace.error.notFound': 'Este item não foi encontrado.',
     'workspace.error.unauthorized': 'Você não tem permissão para fazer isso.',
@@ -156,39 +126,28 @@ export const WORKSPACE_COPY: Record<string, FlatCopy> = {
   },
 
   es: {
-    // ── Creative Studio ──────────────────────────────────────────────────
     'services.creativeStudio.title': 'Estudio Creativo',
     'services.creativeStudio.desc': 'Genera banners promocionales y visuales de campaña con IA.',
     'services.creativeStudio.cta': 'Abrir estudio creativo',
-
-    // ── Workspace general ────────────────────────────────────────────────
     'workspace.title': 'Workspace',
     'workspace.subtitle': 'Tus herramientas, proyectos y contenido — todo en un solo lugar.',
     'workspace.loading': 'Cargando workspace…',
     'workspace.empty': 'Aún no hay elementos. Empieza creando un proyecto.',
-
-    // ── Services ─────────────────────────────────────────────────────────
     'services.websiteBuilder.title': 'Constructor de Sitios',
     'services.websiteBuilder.desc': 'Crea un sitio web multilingüe desde un solo prompt en minutos.',
     'services.websiteBuilder.cta': 'Abrir constructor',
-
     'services.audioStudio.title': 'Estudio de Audio',
     'services.audioStudio.desc': 'Genera audio de calidad nativa y contenido de podcast en varios idiomas.',
     'services.audioStudio.cta': 'Abrir estudio de audio',
-
     'services.videoStudio.title': 'Estudio de Video',
     'services.videoStudio.desc': 'Convierte tu contenido en videos listos para publicar.',
     'services.videoStudio.cta': 'Abrir estudio de video',
-
     'services.reviewEngine.title': 'Motor de Reseñas',
     'services.reviewEngine.desc': 'Recopila reseñas de clientes y transfórmalas en contenido de marca.',
     'services.reviewEngine.cta': 'Abrir motor de reseñas',
-
     'services.outreach.title': 'Motor de Outreach',
     'services.outreach.desc': 'Analiza empresas y genera mensajes de outreach personalizados y pitch decks.',
     'services.outreach.cta': 'Abrir outreach',
-
-    // ── Actions ──────────────────────────────────────────────────────────
     'workspace.actions.new': 'Nuevo proyecto',
     'workspace.actions.open': 'Abrir',
     'workspace.actions.edit': 'Editar',
@@ -210,8 +169,6 @@ export const WORKSPACE_COPY: Record<string, FlatCopy> = {
     'workspace.actions.share': 'Compartir',
     'workspace.actions.copy': 'Copiar enlace',
     'workspace.actions.upgrade': 'Actualizar plan',
-
-    // ── Status labels ────────────────────────────────────────────────────
     'workspace.status.draft': 'Borrador',
     'workspace.status.live': 'Activo',
     'workspace.status.scheduled': 'Programado',
@@ -219,8 +176,6 @@ export const WORKSPACE_COPY: Record<string, FlatCopy> = {
     'workspace.status.processing': 'Procesando…',
     'workspace.status.error': 'Error',
     'workspace.status.ready': 'Listo',
-
-    // ── Error / feedback messages ────────────────────────────────────────
     'workspace.error.generic': 'Algo salió mal. Inténtalo de nuevo.',
     'workspace.error.notFound': 'No se encontró este elemento.',
     'workspace.error.unauthorized': 'No tienes permiso para hacer eso.',
@@ -233,39 +188,28 @@ export const WORKSPACE_COPY: Record<string, FlatCopy> = {
   },
 
   pl: {
-    // ── Creative Studio ──────────────────────────────────────────────────
     'services.creativeStudio.title': 'Studio kreatywne',
     'services.creativeStudio.desc': 'Generuj banery promocyjne i wizualizacje kampanii dzięki AI.',
     'services.creativeStudio.cta': 'Otwórz studio kreatywne',
-
-    // ── Workspace general ────────────────────────────────────────────────
     'workspace.title': 'Workspace',
     'workspace.subtitle': 'Twoje narzędzia, projekty i treści — wszystko w jednym miejscu.',
     'workspace.loading': 'Ładowanie workspace…',
     'workspace.empty': 'Brak elementów. Zacznij od utworzenia projektu.',
-
-    // ── Services ─────────────────────────────────────────────────────────
     'services.websiteBuilder.title': 'Kreator stron',
     'services.websiteBuilder.desc': 'Zbuduj wielojęzyczną stronę z jednego promptu w kilka minut.',
     'services.websiteBuilder.cta': 'Otwórz kreator',
-
     'services.audioStudio.title': 'Studio audio',
     'services.audioStudio.desc': 'Generuj audio natywnej jakości i treści podcastów w wielu językach.',
     'services.audioStudio.cta': 'Otwórz studio audio',
-
     'services.videoStudio.title': 'Studio wideo',
     'services.videoStudio.desc': 'Zamień treść w dopracowane materiały wideo gotowe do publikacji.',
     'services.videoStudio.cta': 'Otwórz studio wideo',
-
     'services.reviewEngine.title': 'Silnik opinii',
     'services.reviewEngine.desc': 'Zbieraj opinie klientów i przekształcaj je w treści marki.',
     'services.reviewEngine.cta': 'Otwórz silnik opinii',
-
     'services.outreach.title': 'Silnik outreach',
     'services.outreach.desc': 'Analizuj firmy i generuj spersonalizowane wiadomości outreach oraz pitch decki.',
     'services.outreach.cta': 'Otwórz outreach',
-
-    // ── Actions ──────────────────────────────────────────────────────────
     'workspace.actions.new': 'Nowy projekt',
     'workspace.actions.open': 'Otwórz',
     'workspace.actions.edit': 'Edytuj',
@@ -287,8 +231,6 @@ export const WORKSPACE_COPY: Record<string, FlatCopy> = {
     'workspace.actions.share': 'Udostępnij',
     'workspace.actions.copy': 'Kopiuj link',
     'workspace.actions.upgrade': 'Ulepsz plan',
-
-    // ── Status labels ────────────────────────────────────────────────────
     'workspace.status.draft': 'Szkic',
     'workspace.status.live': 'Aktywny',
     'workspace.status.scheduled': 'Zaplanowany',
@@ -296,8 +238,6 @@ export const WORKSPACE_COPY: Record<string, FlatCopy> = {
     'workspace.status.processing': 'Przetwarzanie…',
     'workspace.status.error': 'Błąd',
     'workspace.status.ready': 'Gotowe',
-
-    // ── Error / feedback messages ────────────────────────────────────────
     'workspace.error.generic': 'Coś poszło nie tak. Spróbuj ponownie.',
     'workspace.error.notFound': 'Nie znaleziono tego elementu.',
     'workspace.error.unauthorized': 'Nie masz uprawnień do wykonania tej czynności.',
@@ -310,39 +250,28 @@ export const WORKSPACE_COPY: Record<string, FlatCopy> = {
   },
 
   ru: {
-    // ── Creative Studio ──────────────────────────────────────────────────
     'services.creativeStudio.title': 'Креативная студия',
     'services.creativeStudio.desc': 'Создавайте промо-баннеры и визуалы кампаний с помощью ИИ.',
     'services.creativeStudio.cta': 'Открыть креативную студию',
-
-    // ── Workspace general ────────────────────────────────────────────────
     'workspace.title': 'Рабочее пространство',
     'workspace.subtitle': 'Ваши инструменты, проекты и контент — всё в одном месте.',
     'workspace.loading': 'Загрузка рабочего пространства…',
     'workspace.empty': 'Пока ничего нет. Начните с создания проекта.',
-
-    // ── Services ─────────────────────────────────────────────────────────
     'services.websiteBuilder.title': 'Конструктор сайтов',
     'services.websiteBuilder.desc': 'Создайте многоязычный сайт из одного промпта за несколько минут.',
     'services.websiteBuilder.cta': 'Открыть конструктор',
-
     'services.audioStudio.title': 'Аудиостудия',
     'services.audioStudio.desc': 'Генерируйте аудио нативного качества и подкасты на нескольких языках.',
     'services.audioStudio.cta': 'Открыть аудиостудию',
-
     'services.videoStudio.title': 'Видеостудия',
     'services.videoStudio.desc': 'Превращайте контент в готовые к публикации видеоматериалы.',
     'services.videoStudio.cta': 'Открыть видеостудию',
-
     'services.reviewEngine.title': 'Движок отзывов',
     'services.reviewEngine.desc': 'Собирайте отзывы клиентов и превращайте их в брендированный контент.',
     'services.reviewEngine.cta': 'Открыть движок отзывов',
-
     'services.outreach.title': 'Движок аутрича',
     'services.outreach.desc': 'Анализируйте компании и генерируйте персонализированные сообщения и питч-деки.',
     'services.outreach.cta': 'Открыть аутрич',
-
-    // ── Actions ──────────────────────────────────────────────────────────
     'workspace.actions.new': 'Новый проект',
     'workspace.actions.open': 'Открыть',
     'workspace.actions.edit': 'Редактировать',
@@ -364,8 +293,6 @@ export const WORKSPACE_COPY: Record<string, FlatCopy> = {
     'workspace.actions.share': 'Поделиться',
     'workspace.actions.copy': 'Копировать ссылку',
     'workspace.actions.upgrade': 'Улучшить план',
-
-    // ── Status labels ────────────────────────────────────────────────────
     'workspace.status.draft': 'Черновик',
     'workspace.status.live': 'Активен',
     'workspace.status.scheduled': 'Запланирован',
@@ -373,8 +300,6 @@ export const WORKSPACE_COPY: Record<string, FlatCopy> = {
     'workspace.status.processing': 'Обработка…',
     'workspace.status.error': 'Ошибка',
     'workspace.status.ready': 'Готово',
-
-    // ── Error / feedback messages ────────────────────────────────────────
     'workspace.error.generic': 'Что-то пошло не так. Попробуйте ещё раз.',
     'workspace.error.notFound': 'Элемент не найден.',
     'workspace.error.unauthorized': 'У вас нет прав для выполнения этого действия.',

@@ -1,232 +1,312 @@
 'use client';
 
-import React, { useState } from 'react';
-import { AUDIT_PRICING_CONFIG, resolveStripePriceId, formatAuditCount } from '@/lib/audit/pricingConfig';
-import { getAuditPricingCopy } from '@/lib/i18n/auditPricingCopy';
-import type { AuditTier } from '@/lib/audit/pricingConfig';
-import type { AuditPageCopy, AuditTierCopy } from '@/lib/i18n/auditPricingCopy';
+/**
+ * Audit Project — Pricing Page
+ * Route: /dashboard/audit/pricing
+ *
+ * Completely self-contained. Imports ONLY from:
+ *   - react
+ *   - @/lib/audit/pricingConfig  (new file on this branch)
+ *   - @/lib/i18n/auditPricingCopy (new file on this branch)
+ *
+ * Zero imports from core SaaS plan system, infra-pr, prRedact, or any
+ * other existing platform file.
+ */
 
-/* ─── Types ─────────────────────────────────────────────────────────────── */
+import React, { useState } from 'react';
+import {
+  AUDIT_PRICING_CONFIG,
+  AuditTier,
+  formatAuditCount,
+} from '@/lib/audit/pricingConfig';
+import {
+  getAuditPricingCopy,
+  AuditPageCopy,
+  AuditTierCopy,
+} from '@/lib/i18n/auditPricingCopy';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface NoticeState {
+  tierId: string;
+  message: string;
+}
 
 interface CardProps {
   tier: AuditTier;
   copy: AuditTierCopy;
-  pageCopy: AuditPageCopy;
+  popularBadge: string;
   onSelect: (tier: AuditTier) => void;
-  loadingId: string | null;
+  notice: NoticeState | null;
+  isLoading: boolean;
+  activeTierId: string | null;
 }
 
-/* ─── Styles ─────────────────────────────────────────────────────────────── */
+// ---------------------------------------------------------------------------
+// Styles (all inline — no Tailwind utility classes)
+// ---------------------------------------------------------------------------
 
-const S = {
+const S: {
+  page: React.CSSProperties;
+  header: React.CSSProperties;
+  eyebrow: React.CSSProperties;
+  title: React.CSSProperties;
+  subtitle: React.CSSProperties;
+  grid: React.CSSProperties;
+  popularBadge: React.CSSProperties;
+  tierName: React.CSSProperties;
+  priceRow: React.CSSProperties;
+  priceAmount: React.CSSProperties;
+  pricePeriod: React.CSSProperties;
+  auditBadge: React.CSSProperties;
+  description: React.CSSProperties;
+  divider: React.CSSProperties;
+  featureList: React.CSSProperties;
+  featureItem: React.CSSProperties;
+  featureDot: React.CSSProperties;
+  noticeBox: React.CSSProperties;
+  enterpriseLink: React.CSSProperties;
+} = {
   page: {
     minHeight: 'calc(100vh - 80px)',
     background: 'linear-gradient(160deg, rgba(15,23,42,1) 0%, rgba(3,7,18,1) 100%)',
-    padding: '48px 24px 80px',
-    boxSizing: 'border-box' as const,
+    padding: '60px 24px 80px',
+    fontFamily: 'inherit',
   },
-  inner: {
-    maxWidth: 1100,
-    margin: '0 auto',
+  header: {
+    textAlign: 'center',
+    marginBottom: '56px',
   },
   eyebrow: {
-    display: 'block',
-    textAlign: 'center' as const,
-    fontSize: 13,
-    fontWeight: 600,
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase' as const,
+    display: 'inline-block',
+    fontSize: '11px',
+    fontWeight: 700,
+    letterSpacing: '0.14em',
+    textTransform: 'uppercase',
     color: '#1af0ff',
-    marginBottom: 12,
+    marginBottom: '16px',
   },
   title: {
-    textAlign: 'center' as const,
-    fontSize: 'clamp(28px, 4vw, 42px)',
+    fontSize: 'clamp(28px, 4vw, 44px)',
     fontWeight: 800,
-    color: '#fff',
-    margin: '0 0 12px',
+    color: '#ffffff',
+    margin: '0 0 16px',
     lineHeight: 1.15,
   },
   subtitle: {
-    textAlign: 'center' as const,
-    fontSize: 16,
+    fontSize: '16px',
     color: 'rgba(255,255,255,0.55)',
-    margin: '0 auto 52px',
-    maxWidth: 560,
-    lineHeight: 1.6,
+    margin: '0 auto',
+    maxWidth: '520px',
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-    gap: 24,
-    alignItems: 'start',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+    gap: '24px',
+    maxWidth: '1160px',
+    margin: '0 auto',
   },
-  card: (highlighted: boolean): React.CSSProperties => ({
-    background: highlighted
-      ? 'linear-gradient(160deg, rgba(26,240,255,0.08), rgba(255,195,0,0.06))'
-      : 'linear-gradient(160deg, rgba(15,23,42,0.92), rgba(3,7,18,0.96))',
-    border: highlighted ? '1px solid rgba(26,240,255,0.35)' : '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 20,
-    padding: '32px 28px 28px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 0,
-    height: 'auto',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
-    boxShadow: highlighted ? '0 24px 70px rgba(26,240,255,0.12)' : '0 24px 70px rgba(0,0,0,0.6)',
-    position: 'relative' as const,
-    overflow: 'visible',
-  }),
   popularBadge: {
-    position: 'absolute' as const,
-    top: -14,
+    position: 'absolute',
+    top: '-14px',
     left: '50%',
     transform: 'translateX(-50%)',
     background: 'linear-gradient(90deg, #ffc300, #1af0ff)',
-    color: '#0f172a',
-    fontSize: 11,
+    color: 'rgba(3,7,18,1)',
+    fontSize: '11px',
     fontWeight: 800,
     letterSpacing: '0.1em',
-    textTransform: 'uppercase' as const,
-    padding: '4px 16px',
-    borderRadius: 99,
-    whiteSpace: 'nowrap' as const,
-  },
-  auditBadge: {
-    display: 'inline-block',
-    background: 'rgba(26,240,255,0.12)',
-    color: '#1af0ff',
-    fontSize: 12,
-    fontWeight: 700,
-    padding: '4px 12px',
-    borderRadius: 99,
-    marginBottom: 16,
-    border: '1px solid rgba(26,240,255,0.2)',
+    textTransform: 'uppercase',
+    padding: '5px 18px',
+    borderRadius: '999px',
+    whiteSpace: 'nowrap',
   },
   tierName: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: 'rgba(255,255,255,0.5)',
-    textTransform: 'uppercase' as const,
+    fontSize: '13px',
+    fontWeight: 700,
     letterSpacing: '0.1em',
-    marginBottom: 6,
+    textTransform: 'uppercase',
+    color: 'rgba(255,255,255,0.5)',
+    marginBottom: '8px',
   },
-  price: {
-    fontSize: 44,
-    fontWeight: 900,
-    color: '#fff',
+  priceRow: {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: '4px',
+    marginBottom: '4px',
+  },
+  priceAmount: {
+    fontSize: '48px',
+    fontWeight: 800,
+    color: '#ffffff',
     lineHeight: 1,
-    marginBottom: 2,
   },
-  billingNote: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.4)',
-    marginBottom: 14,
+  pricePeriod: {
+    fontSize: '16px',
+    color: 'rgba(255,255,255,0.45)',
+    fontWeight: 400,
+  },
+  auditBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    background: 'rgba(26,240,255,0.1)',
+    border: '1px solid rgba(26,240,255,0.2)',
+    borderRadius: '999px',
+    padding: '4px 14px',
+    fontSize: '12px',
+    fontWeight: 700,
+    color: '#1af0ff',
+    marginBottom: '16px',
+    marginTop: '8px',
+    width: 'fit-content',
   },
   description: {
-    fontSize: 14,
+    fontSize: '14px',
     color: 'rgba(255,255,255,0.55)',
     lineHeight: 1.6,
-    marginBottom: 22,
-    minHeight: 44,
+    marginBottom: '24px',
+    marginTop: '0',
   },
   divider: {
-    height: 1,
-    background: 'rgba(255,255,255,0.07)',
-    margin: '0 0 20px',
     border: 'none',
+    borderTop: '1px solid rgba(255,255,255,0.08)',
+    margin: '0 0 20px',
   },
   featureList: {
     listStyle: 'none',
     padding: 0,
     margin: '0 0 28px',
     display: 'flex',
-    flexDirection: 'column' as const,
-    gap: 10,
+    flexDirection: 'column',
+    gap: '10px',
+    flexGrow: 1,
   },
   featureItem: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.75)',
     display: 'flex',
     alignItems: 'flex-start',
-    gap: 8,
-    lineHeight: 1.4,
+    gap: '10px',
+    fontSize: '14px',
+    color: 'rgba(255,255,255,0.8)',
+    lineHeight: 1.5,
   },
-  featureCheck: {
-    color: '#1af0ff',
-    fontSize: 14,
+  featureDot: {
+    width: '6px',
+    height: '6px',
+    borderRadius: '50%',
+    background: '#1af0ff',
     flexShrink: 0,
-    marginTop: 1,
+    marginTop: '6px',
   },
-  ctaButton: (highlighted: boolean, isLoading: boolean): React.CSSProperties => ({
-    width: '100%',
-    padding: '13px 0',
-    borderRadius: 12,
-    border: 'none',
-    fontSize: 15,
-    fontWeight: 700,
-    cursor: isLoading ? 'wait' : 'pointer',
-    background: highlighted
-      ? 'linear-gradient(90deg, #ffc300, #1af0ff)'
-      : 'rgba(255,255,255,0.07)',
-    color: highlighted ? '#0f172a' : '#fff',
-    transition: 'opacity 0.2s',
-    opacity: isLoading ? 0.6 : 1,
-    marginTop: 'auto',
-  }),
-  notice: {
-    marginTop: 16,
+  noticeBox: {
+    marginTop: '14px',
     padding: '12px 16px',
     background: 'rgba(255,195,0,0.08)',
     border: '1px solid rgba(255,195,0,0.2)',
-    borderRadius: 10,
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.6)',
+    borderRadius: '10px',
+    fontSize: '13px',
+    color: '#ffc300',
     lineHeight: 1.5,
-    textAlign: 'center' as const,
   },
   enterpriseLink: {
     display: 'block',
     width: '100%',
-    padding: '13px 0',
-    borderRadius: 12,
+    padding: '14px 24px',
+    borderRadius: '12px',
     border: '1px solid rgba(255,255,255,0.15)',
-    fontSize: 15,
+    background: 'rgba(255,255,255,0.06)',
+    color: '#ffffff',
+    fontSize: '15px',
     fontWeight: 700,
-    cursor: 'pointer',
-    background: 'transparent',
-    color: '#fff',
-    textAlign: 'center' as const,
+    textAlign: 'center',
     textDecoration: 'none',
-    marginTop: 'auto',
-    boxSizing: 'border-box' as const,
+    cursor: 'pointer',
+    letterSpacing: '0.02em',
+    boxSizing: 'border-box',
   },
 };
 
-/* ─── Tier Card ──────────────────────────────────────────────────────────── */
+function cardStyle(isPopular: boolean): React.CSSProperties {
+  return {
+    background: isPopular
+      ? 'linear-gradient(160deg, rgba(26,240,255,0.07) 0%, rgba(255,195,0,0.05) 100%)'
+      : 'linear-gradient(160deg, rgba(15,23,42,0.92) 0%, rgba(3,7,18,0.96) 100%)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    border: isPopular
+      ? '1px solid rgba(26,240,255,0.25)'
+      : '1px solid rgba(255,255,255,0.08)',
+    borderRadius: '20px',
+    padding: '36px 28px 32px',
+    display: 'flex',
+    flexDirection: 'column',
+    position: 'relative',
+    boxShadow: isPopular
+      ? '0 24px 70px rgba(0,0,0,0.6), 0 0 0 1px rgba(26,240,255,0.1)'
+      : '0 24px 70px rgba(0,0,0,0.4)',
+    height: 'auto',
+    minWidth: 0,
+  };
+}
 
-function AuditTierCard({ tier, copy, pageCopy, onSelect, loadingId }: CardProps): React.ReactElement {
-  const isLoading: boolean = loadingId === tier.id;
-  const isEnterprise: boolean = tier.id === 'enterprise';
-  const showPopular: boolean = tier.highlighted && copy.popularBadge.length > 0;
+function ctaButtonStyle(isPopular: boolean, disabled: boolean): React.CSSProperties {
+  return {
+    width: '100%',
+    padding: '14px 24px',
+    borderRadius: '12px',
+    border: isPopular ? 'none' : '1px solid rgba(255,255,255,0.15)',
+    background: isPopular
+      ? 'linear-gradient(90deg, #ffc300, #1af0ff)'
+      : 'rgba(255,255,255,0.06)',
+    color: isPopular ? 'rgba(3,7,18,1)' : '#ffffff',
+    fontSize: '15px',
+    fontWeight: 700,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    opacity: disabled ? 0.6 : 1,
+    transition: 'opacity 0.2s ease',
+    letterSpacing: '0.02em',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// AuditTierCard component
+// ---------------------------------------------------------------------------
+
+function AuditTierCard({
+  tier,
+  copy,
+  popularBadge,
+  onSelect,
+  notice,
+  isLoading,
+  activeTierId,
+}: CardProps): React.ReactElement {
+  const isPopular: boolean = tier.isPopular;
+  const isEnterprise: boolean = tier.isEnterprise;
+  const isThisLoading: boolean = isLoading && activeTierId === tier.id;
+  const showNotice: boolean = notice !== null && notice.tierId === tier.id;
+
+  // formatAuditCount is imported and used here for the audit badge display
+  const auditDisplay: string = formatAuditCount(tier.audits);
 
   return (
-    <div style={S.card(tier.highlighted)}>
-      {showPopular && <span style={S.popularBadge}>{copy.popularBadge}</span>}
+    <div style={cardStyle(isPopular)}>
+      {isPopular && (
+        <div style={S.popularBadge}>{popularBadge}</div>
+      )}
 
-      <span style={S.auditBadge}>{copy.auditBadge}</span>
       <div style={S.tierName}>{copy.name}</div>
 
-      <div style={S.price}>
-        {copy.priceLabel}
-        <span style={{ fontSize: 18, fontWeight: 400, color: 'rgba(255,255,255,0.4)' }}>
-          {copy.billingNote}
-        </span>
+      <div style={S.priceRow}>
+        <span style={S.priceAmount}>{copy.priceLabel}</span>
+        <span style={S.pricePeriod}>{copy.perPeriod}</span>
       </div>
 
-      <div style={S.billingNote}>
-        {formatAuditCount(tier.auditsPerMonth)} audits included
+      <div style={S.auditBadge}>
+        <span aria-hidden="true">◈</span>
+        <span>{auditDisplay} {copy.auditLabel.replace(/^[\d\w]+ /, '')}</span>
       </div>
 
       <p style={S.description}>{copy.description}</p>
@@ -236,7 +316,7 @@ function AuditTierCard({ tier, copy, pageCopy, onSelect, loadingId }: CardProps)
       <ul style={S.featureList}>
         {copy.features.map((feature: string, idx: number) => (
           <li key={idx} style={S.featureItem}>
-            <span style={S.featureCheck}>✓</span>
+            <span style={S.featureDot} aria-hidden="true" />
             <span>{feature}</span>
           </li>
         ))}
@@ -244,96 +324,113 @@ function AuditTierCard({ tier, copy, pageCopy, onSelect, loadingId }: CardProps)
 
       {isEnterprise ? (
         <a
-          href={pageCopy.enterpriseCtaHref}
+          href="mailto:sales@signalboostapp.com"
           style={S.enterpriseLink}
         >
           {copy.ctaLabel}
         </a>
       ) : (
         <button
-          style={S.ctaButton(tier.highlighted, isLoading)}
-          onClick={() => onSelect(tier)}
-          disabled={isLoading}
+          style={ctaButtonStyle(isPopular, isThisLoading)}
+          disabled={isThisLoading}
+          onClick={(): void => { onSelect(tier); }}
           type="button"
         >
-          {isLoading ? pageCopy.loadingLabel : copy.ctaLabel}
+          {isThisLoading ? '...' : copy.ctaLabel}
         </button>
+      )}
+
+      {showNotice && notice !== null && (
+        <div style={S.noticeBox} role="alert">{notice.message}</div>
       )}
     </div>
   );
 }
 
-/* ─── Page ───────────────────────────────────────────────────────────────── */
+// ---------------------------------------------------------------------------
+// Page component (default export — Next.js App Router compliant)
+// ---------------------------------------------------------------------------
 
 export default function AuditPricingPage(): React.ReactElement {
   const [locale] = useState<string>('en');
-  const [loadingId, setLoadingId] = useState<string | null>(null);
-  const [noticeId, setNoticeId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [activeTierId, setActiveTierId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<NoticeState | null>(null);
 
-  const pageCopy: AuditPageCopy = getAuditPricingCopy(locale);
+  const copy: AuditPageCopy = getAuditPricingCopy(locale);
 
-  async function handleSelect(tier: AuditTier): Promise<void> {
-    const priceId: string | null = resolveStripePriceId(tier);
+  async function handleSelectTier(tier: AuditTier): Promise<void> {
+    if (tier.isEnterprise) return;
 
-    if (!priceId) {
-      setNoticeId(tier.id);
-      return;
-    }
-
-    setLoadingId(tier.id);
-    setNoticeId(null);
+    setIsLoading(true);
+    setActiveTierId(tier.id);
+    setNotice(null);
 
     try {
-      const res = await fetch('/api/billing/checkout', {
+      const res = await fetch('/api/audit/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId, tierType: 'audit', tierId: tier.id }),
+        body: JSON.stringify({ tierId: tier.id }),
       });
 
       if (!res.ok) {
-        throw new Error(`Checkout request failed with status ${res.status}`);
+        const data: { error?: string } = await res.json().catch(
+          (): { error?: string } => ({})
+        );
+        setNotice({
+          tierId: tier.id,
+          message: data.error ?? copy.errorGeneric,
+        });
+        return;
       }
 
-      const data: { url?: string } = await res.json();
+      const data: { url?: string } = await res.json().catch(
+        (): { url?: string } => ({})
+      );
 
-      if (data.url) {
+      if (data.url !== undefined && data.url.length > 0) {
         window.location.href = data.url;
       } else {
-        setNoticeId(tier.id);
+        setNotice({
+          tierId: tier.id,
+          message: copy.notConfiguredNotice,
+        });
       }
     } catch (_err: unknown) {
-      setNoticeId(tier.id);
+      setNotice({
+        tierId: tier.id,
+        message: copy.errorGeneric,
+      });
     } finally {
-      setLoadingId(null);
+      setIsLoading(false);
+      setActiveTierId(null);
     }
   }
 
   return (
     <div style={S.page}>
-      <div style={S.inner}>
+      <div style={S.header}>
         <span style={S.eyebrow}>Audit Project</span>
-        <h1 style={S.title}>{pageCopy.pageTitle}</h1>
-        <p style={S.subtitle}>{pageCopy.pageSubtitle}</p>
+        <h1 style={S.title}>{copy.pageTitle}</h1>
+        <p style={S.subtitle}>{copy.pageSubtitle}</p>
+      </div>
 
-        <div style={S.grid}>
-          {AUDIT_PRICING_CONFIG.tiers.map((tier: AuditTier) => {
-            const tierCopy = pageCopy.tiers[tier.id];
-            return (
-              <div key={tier.id}>
-                <AuditTierCard
-                  tier={tier}
-                  copy={tierCopy}
-                  pageCopy={pageCopy}
-                  onSelect={handleSelect}
-                  loadingId={loadingId}
-                />
-                {noticeId === tier.id && (
-                  <div style={S.notice}>{pageCopy.stripeNotConfigured}</div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+      <div style={S.grid}>
+        {AUDIT_PRICING_CONFIG.tiers.map((tier: AuditTier) => {
+          const tierCopy: AuditTierCopy = copy.tiers[tier.id];
+          return (
+            <AuditTierCard
+              key={tier.id}
+              tier={tier}
+              copy={tierCopy}
+              popularBadge={copy.popularBadge}
+              onSelect={handleSelectTier}
+              notice={notice}
+              isLoading={isLoading}
+              activeTierId={activeTierId}
+            />
+          );
+        })}
       </div>
     </div>
   );

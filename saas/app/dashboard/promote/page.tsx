@@ -430,7 +430,7 @@ export default function PromotePage() {
               {/* Channel pills preview */}
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 8 }}>
                 {channelPills.map(ch => (
-                  <span key={ch.id} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)' }}>
+                  <span key={ch.label} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)' }}>
                     {ch.icon} {ch.label}
                   </span>
                 ))}

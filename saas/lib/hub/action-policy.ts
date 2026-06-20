@@ -90,6 +90,17 @@ export const HUB_ACTION_POLICIES: Record<string, HubActionPolicy> = {
     productionSensitive: true,
     description: 'Create a new Stripe price for a plan. Must be previewed and approved before execution.',
   },
+  provision_audit_pricing: {
+    id: 'provision_audit_pricing',
+    label: 'Provision audit pricing (Stripe → Vercel → Vault)',
+    level: 'execute_change',
+    risk: 'high',
+    approval: 'owner_with_audit',
+    auditRequired: true,
+    rollbackRequired: true,
+    productionSensitive: true,
+    description: 'Create/refresh audit Stripe prices from pricingConfig.ts, write the price ids into the Vercel variables, and record the keys in the Vault. Creates real billing products and writes production config — owner approval and audit required.',
+  },
   archive_stripe_price: {
     id: 'archive_stripe_price',
     label: 'Archive Stripe price',
@@ -301,8 +312,7 @@ export const HUB_ACTION_POLICIES: Record<string, HubActionPolicy> = {
     auditRequired: true, rollbackRequired: false, productionSensitive: false,
     description: 'Run an internal credential and configuration audit. Read-only; admin approval and audit record.',
   },
-
-  invoke_model: {
+invoke_model: {
     id: 'invoke_model',
     label: 'Invoke AI model',
     level: 'execute_change', risk: 'medium', approval: 'admin',

@@ -38,7 +38,11 @@ export const AUDIT_PRICING_CONFIG: AuditPricingConfig = {
       name: 'Starter',
       price: 29,
       billingPeriod: 'month',
-      auditsPerMonth: { value: 3, unlimited: false, label: '3 audits / mo' },
+      auditsPerMonth: {
+        value: 3,
+        unlimited: false,
+        label: '3 audits / mo',
+      },
       features: [
         'AI-powered site audit',
         'SEO gap analysis',
@@ -56,7 +60,11 @@ export const AUDIT_PRICING_CONFIG: AuditPricingConfig = {
       name: 'Growth',
       price: 79,
       billingPeriod: 'month',
-      auditsPerMonth: { value: 20, unlimited: false, label: '20 audits / mo' },
+      auditsPerMonth: {
+        value: 20,
+        unlimited: false,
+        label: '20 audits / mo',
+      },
       features: [
         'Everything in Starter',
         'Competitor benchmarking',
@@ -74,7 +82,11 @@ export const AUDIT_PRICING_CONFIG: AuditPricingConfig = {
       name: 'Pro',
       price: 199,
       billingPeriod: 'month',
-      auditsPerMonth: { value: 100, unlimited: false, label: '100 audits / mo' },
+      auditsPerMonth: {
+        value: 100,
+        unlimited: false,
+        label: '100 audits / mo',
+      },
       features: [
         'Everything in Growth',
         'White-label reports',
@@ -92,7 +104,11 @@ export const AUDIT_PRICING_CONFIG: AuditPricingConfig = {
       name: 'Enterprise',
       price: 599,
       billingPeriod: 'month',
-      auditsPerMonth: { value: 0, unlimited: true, label: 'Unlimited audits' },
+      auditsPerMonth: {
+        value: 0,
+        unlimited: true,
+        label: 'Unlimited audits',
+      },
       features: [
         'Everything in Pro',
         'Unlimited team seats',

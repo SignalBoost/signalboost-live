@@ -26,10 +26,46 @@ export interface AuditPricingConfig {
 
 export const AUDIT_PRICING_CONFIG: AuditPricingConfig = {
   tiers: [
-    { id: 'starter',    isPopular: false, isEnterprise: false, auditCount: 20,  monthlyCredits: 1000,  topupAvailable: true,  stripePriceEnvKey: 'NEXT_PUBLIC_STRIPE_PRICE_AUDIT_STARTER',    monthlyPrice: 29 },
-    { id: 'growth',     isPopular: true,  isEnterprise: false, auditCount: 100, monthlyCredits: 3000,  topupAvailable: true,  stripePriceEnvKey: 'NEXT_PUBLIC_STRIPE_PRICE_AUDIT_GROWTH',     monthlyPrice: 79 },
-    { id: 'pro',        isPopular: false, isEnterprise: false, auditCount: 300, monthlyCredits: 10000, topupAvailable: true,  stripePriceEnvKey: 'NEXT_PUBLIC_STRIPE_PRICE_AUDIT_PRO',        monthlyPrice: 199 },
-    { id: 'enterprise', isPopular: false, isEnterprise: false, auditCount: -1,  monthlyCredits: null,  topupAvailable: false, stripePriceEnvKey: 'NEXT_PUBLIC_STRIPE_PRICE_AUDIT_ENTERPRISE', monthlyPrice: 599 },
+    {
+      id: 'starter',
+      isPopular: false,
+      isEnterprise: false,
+      auditCount: 20,
+      monthlyCredits: 1000,
+      topupAvailable: true,
+      stripePriceEnvKey: 'NEXT_PUBLIC_STRIPE_PRICE_AUDIT_STARTER',
+      monthlyPrice: 29,
+    },
+    {
+      id: 'growth',
+      isPopular: true,
+      isEnterprise: false,
+      auditCount: 100,
+      monthlyCredits: 3000,
+      topupAvailable: true,
+      stripePriceEnvKey: 'NEXT_PUBLIC_STRIPE_PRICE_AUDIT_GROWTH',
+      monthlyPrice: 79,
+    },
+    {
+      id: 'pro',
+      isPopular: false,
+      isEnterprise: false,
+      auditCount: 300,
+      monthlyCredits: 10000,
+      topupAvailable: true,
+      stripePriceEnvKey: 'NEXT_PUBLIC_STRIPE_PRICE_AUDIT_PRO',
+      monthlyPrice: 199,
+    },
+    {
+      id: 'enterprise',
+      isPopular: false,
+      isEnterprise: false,
+      auditCount: -1,
+      monthlyCredits: null,
+      topupAvailable: false,
+      stripePriceEnvKey: 'NEXT_PUBLIC_STRIPE_PRICE_AUDIT_ENTERPRISE',
+      monthlyPrice: 599,
+    },
   ],
 }
 

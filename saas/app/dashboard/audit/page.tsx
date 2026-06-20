@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import AuditDashboard from '@/components/audit/AuditDashboard'
 
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
@@ -44,6 +45,7 @@ type AuditCopy = {
   statusRunning: string; statusComplete: string; statusFailed: string
   detail: string; close: string; viewSource: string
   generateFix: string; patching: string; patchReady: string; reviewMerge: string; patchFailed: string
+  trackScan: string; trackAnalyze: string; trackReport: string; trackPrs: string
   sev: Record<Sev, string>
 }
 
@@ -59,6 +61,7 @@ const COPY: Record<string, AuditCopy> = {
     statusRunning: 'Running', statusComplete: 'Complete', statusFailed: 'Failed',
     detail: 'Detail', close: 'Close', viewSource: 'View on GitHub',
     generateFix: 'Generate fix', patching: 'Generating fix…', patchReady: 'Fix proposed on a branch', reviewMerge: 'Review & merge', patchFailed: 'Could not generate fix',
+    trackScan: 'Scanning target', trackAnalyze: 'Running analyzers', trackReport: 'Generating report', trackPrs: 'Preparing patches',
     sev: { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', info: 'Info' },
   },
   es: {
@@ -72,6 +75,7 @@ const COPY: Record<string, AuditCopy> = {
     statusRunning: 'En curso', statusComplete: 'Completado', statusFailed: 'Falló',
     detail: 'Detalle', close: 'Cerrar', viewSource: 'Ver en GitHub',
     generateFix: 'Generar corrección', patching: 'Generando corrección…', patchReady: 'Corrección propuesta en una rama', reviewMerge: 'Revisar y combinar', patchFailed: 'No se pudo generar la corrección',
+    trackScan: 'Escaneando objetivo', trackAnalyze: 'Ejecutando analizadores', trackReport: 'Generando informe', trackPrs: 'Preparando parches',
     sev: { critical: 'Crítico', high: 'Alto', medium: 'Medio', low: 'Bajo', info: 'Info' },
   },
   pt: {
@@ -85,6 +89,7 @@ const COPY: Record<string, AuditCopy> = {
     statusRunning: 'Em execução', statusComplete: 'Concluído', statusFailed: 'Falhou',
     detail: 'Detalhe', close: 'Fechar', viewSource: 'Ver no GitHub',
     generateFix: 'Gerar correção', patching: 'Gerando correção…', patchReady: 'Correção proposta em um branch', reviewMerge: 'Revisar e mesclar', patchFailed: 'Não foi possível gerar a correção',
+    trackScan: 'Verificando alvo', trackAnalyze: 'Executando analisadores', trackReport: 'Gerando relatório', trackPrs: 'Preparando correções',
     sev: { critical: 'Crítico', high: 'Alto', medium: 'Médio', low: 'Baixo', info: 'Info' },
   },
   pl: {
@@ -98,6 +103,7 @@ const COPY: Record<string, AuditCopy> = {
     statusRunning: 'W toku', statusComplete: 'Zakończono', statusFailed: 'Niepowodzenie',
     detail: 'Szczegóły', close: 'Zamknij', viewSource: 'Zobacz na GitHub',
     generateFix: 'Wygeneruj poprawkę', patching: 'Generowanie poprawki…', patchReady: 'Poprawka zaproponowana w gałęzi', reviewMerge: 'Przejrzyj i scal', patchFailed: 'Nie udało się wygenerować poprawki',
+    trackScan: 'Skanowanie celu', trackAnalyze: 'Uruchamianie analizatorów', trackReport: 'Generowanie raportu', trackPrs: 'Przygotowywanie poprawek',
     sev: { critical: 'Krytyczny', high: 'Wysoki', medium: 'Średni', low: 'Niski', info: 'Info' },
   },
   ru: {
@@ -111,6 +117,7 @@ const COPY: Record<string, AuditCopy> = {
     statusRunning: 'Выполняется', statusComplete: 'Завершено', statusFailed: 'Ошибка',
     detail: 'Подробности', close: 'Закрыть', viewSource: 'Открыть на GitHub',
     generateFix: 'Сгенерировать исправление', patching: 'Создание исправления…', patchReady: 'Исправление предложено в ветке', reviewMerge: 'Просмотреть и слить', patchFailed: 'Не удалось создать исправление',
+    trackScan: 'Сканирование цели', trackAnalyze: 'Запуск анализаторов', trackReport: 'Создание отчёта', trackPrs: 'Подготовка исправлений',
     sev: { critical: 'Критический', high: 'Высокий', medium: 'Средний', low: 'Низкий', info: 'Инфо' },
   },
 }
@@ -143,6 +150,39 @@ const input: React.CSSProperties = {
   color: '#fff', borderRadius: 10, padding: '9px 12px', fontSize: 13, outline: 'none',
 }
 
+const PHASE_ORDER = ['SCAN_TARGET', 'RUN_ANALYZERS', 'GENERATE_REPORT', 'PREPARE_PRS'] as const
+
+function PhaseTracker({ phase, progress, copy }: { phase: string; progress: { done: number; total: number }; copy: AuditCopy }) {
+  const labels: Record<string, string> = {
+    SCAN_TARGET: copy.trackScan, RUN_ANALYZERS: copy.trackAnalyze, GENERATE_REPORT: copy.trackReport, PREPARE_PRS: copy.trackPrs,
+  }
+  const curIdx = PHASE_ORDER.indexOf(phase as typeof PHASE_ORDER[number])
+  return (
+    <div style={{ ...glass, padding: 16, marginTop: 16, height: 'auto' }}>
+      {PHASE_ORDER.map((p, i) => {
+        const isDone = curIdx > i
+        const active = curIdx === i
+        const isAnalyze = p === 'RUN_ANALYZERS'
+        const pct = isDone ? 100 : active ? (isAnalyze && progress.total > 0 ? Math.min(Math.round((progress.done / progress.total) * 100), 100) : 45) : 0
+        const color = isDone ? GREEN : active ? GOLD : 'rgba(255,255,255,.18)'
+        return (
+          <div key={p} style={{ marginBottom: i < PHASE_ORDER.length - 1 ? 11 : 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: active ? '#fff' : isDone ? 'rgba(255,255,255,.7)' : 'rgba(255,255,255,.4)' }}>{labels[p]}</span>
+              {isAnalyze && active && progress.total > 0 && (
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,.55)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{progress.done}/{progress.total}</span>
+              )}
+            </div>
+            <div style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,.07)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 999, transition: 'width .3s ease' }} />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function AuditConsolePage() {
   const { lang } = useI18n()
   const copy = copyFor(lang)
@@ -155,6 +195,8 @@ export default function AuditConsolePage() {
   const [runs, setRuns] = useState<RunSummary[]>([])
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
   const [view, setView] = useState<View | null>(null)
+  const [phase, setPhase] = useState<string | null>(null)
+  const [progress, setProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 })
 
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null)
   const [entered, setEntered] = useState(false)
@@ -194,21 +236,52 @@ export default function AuditConsolePage() {
 
   async function runNew() {
     setLoading(true); setError(null); setView(null); setSelectedRunId(null)
+    setPhase('SCAN_TARGET'); setProgress({ done: 0, total: 0 })
     try {
       const res = await fetch('/api/hub/operator/audit', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify({ prefix: prefix.trim() || 'saas/app/api', maxFiles }),
       })
-      const data = await res.json().catch(() => null)
       if (res.status === 403) { setError(copy.ownerOnly); return }
-      if (!res.ok || !data?.ok) { setError(data?.error || copy.failed); return }
-      setView({ findings: data.findings || [], filesScanned: (data.filesScanned || []).length, findingsCount: data.findingsCount || 0, prefix: data.prefix, status: 'complete' })
-      setSelectedRunId(data.runId || null)
-      loadHistory()
+      if (!res.body) { setError(copy.failed); return }
+
+      const reader = res.body.getReader()
+      const dec = new TextDecoder()
+      let buf = ''
+      let final: View | null = null
+      let finalRunId: string | null = null
+      let sawError = false
+// Read NDJSON phase events line by line.
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += dec.decode(value, { stream: true })
+        let nl: number
+        while ((nl = buf.indexOf('\n')) >= 0) {
+          const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1)
+          if (!line) continue
+          let evt: { phase?: string; done?: number; total?: number; error?: string; findings?: Finding[]; filesScanned?: string[]; findingsCount?: number; prefix?: string; runId?: string }
+          try { evt = JSON.parse(line) } catch { continue }
+          if (evt.phase === 'RUN_ANALYZERS') { setPhase('RUN_ANALYZERS'); setProgress({ done: evt.done || 0, total: evt.total || 0 }) }
+          else if (evt.phase === 'SCAN_TARGET' || evt.phase === 'GENERATE_REPORT' || evt.phase === 'PREPARE_PRS') { setPhase(evt.phase) }
+          else if (evt.phase === 'ERROR') { setError(evt.error || copy.failed); sawError = true }
+          else if (evt.phase === 'DONE') {
+            final = { findings: evt.findings || [], filesScanned: (evt.filesScanned || []).length, findingsCount: evt.findingsCount || 0, prefix: evt.prefix, status: 'complete' }
+            finalRunId = evt.runId || null
+          }
+        }
+      }
+
+      if (final) {
+        setView(final); setSelectedRunId(finalRunId); loadHistory()
+      } else if (!sawError) {
+        setError(copy.failed)
+      }
     } catch {
       setError(copy.failed)
     } finally {
-      setLoading(false)
+      setLoading(false); setPhase(null)
     }
   }
 
@@ -228,7 +301,9 @@ export default function AuditConsolePage() {
   const findings = view?.findings || []
 
   return (
-    <main style={{ padding: 24, color: '#fff', maxWidth: 1200, margin: '0 auto' }}>
+    <>
+      <AuditDashboard />
+      <div style={{ padding: '0 24px 24px', color: '#fff', maxWidth: 1200, margin: '0 auto' }}>
       <div style={{ marginBottom: 18 }}>
         <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '-0.01em' }}>{copy.title} <span style={{ color: GOLD }}>·</span></h1>
         <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,.62)', maxWidth: 640, lineHeight: 1.5 }}>{copy.subtitle}</p>
@@ -286,6 +361,8 @@ export default function AuditConsolePage() {
               cursor: loading ? 'default' : 'pointer', whiteSpace: 'nowrap',
             }}>{loading ? copy.running : copy.run}</button>
           </div>
+
+          {loading && phase && <PhaseTracker phase={phase} progress={progress} copy={copy} />}
 
           {error && (
             <div style={{ ...glass, marginTop: 16, padding: 14, border: '1px solid rgba(252,165,165,.4)', color: RED, fontSize: 13 }}>{copy.failed}: {error}</div>
@@ -419,7 +496,8 @@ export default function AuditConsolePage() {
           </div>
         )
       })()}
-    </main>
+      </div>
+    </>
   )
 }
 

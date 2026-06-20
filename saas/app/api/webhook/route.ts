@@ -51,7 +51,7 @@ function resolvePlanAndLine(
   priceId: string | undefined,
   metaProductLine?: string,
   metaPlan?: string,
-): { plan: string; productLine: 'website' | 'podcast' } {
+): { plan: string; productLine: 'website' | 'podcast' | 'unsupported' } {
   // 1. Try explicit price ID lookup (most reliable)
   if (priceId) {
     if (WEBSITE_PLAN_MAP[priceId]) {
@@ -61,14 +61,19 @@ function resolvePlanAndLine(
       return { plan: PODCAST_PLAN_MAP[priceId], productLine: 'podcast' }
     }
   }
-  // 2. Fall back to metadata (set by our /api/checkout route, so reliable for
-  //    sessions we create; also covers unknown/transition prices)
-  const productLine: 'website' | 'podcast' =
-    metaProductLine === 'podcast' ? 'podcast' : 'website'
-  const plan =
-    metaPlan ||
-    (productLine === 'podcast' ? 'indie' : 'starter')
-  return { plan, productLine }
+  // 2. Fall back to metadata. Only 'website' and 'podcast' are real product
+  //    lines today. An unset line is treated as website for backward-compat
+  //    (legacy sessions), but any OTHER explicit value (e.g. 'audit', set by the
+  //    not-yet-real audit checkout) is 'unsupported' — the handler MUST NOT write
+  //    website/podcast columns for it, or it would silently overwrite the buyer's
+  //    real plan with a website 'starter'.
+  if (metaProductLine === 'podcast') {
+    return { plan: metaPlan || 'indie', productLine: 'podcast' }
+  }
+  if (!metaProductLine || metaProductLine === 'website') {
+    return { plan: metaPlan || 'starter', productLine: 'website' }
+  }
+  return { plan: metaPlan || '', productLine: 'unsupported' }
 }
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
@@ -230,7 +235,15 @@ export async function POST(req: NextRequest) {
         const metaPlan     = session.metadata?.plan
         const { plan, productLine } = resolvePlanAndLine(priceId, metaLine, metaPlan)
 
-        // Fallback: find user by email if metadata.userId is missing
+        // Refuse to write a subscription for a product line we don't support yet
+        // (e.g. 'audit'). Returning 200 stops Stripe retrying; crucially we do NOT
+        // fall through to the website upsert, which would clobber a real plan.
+        if (productLine === 'unsupported') {
+          console.warn('Webhook checkout.session.completed: unsupported product line — no subscription written', {
+            productLine: metaLine, sessionId: session.id,
+          })
+          return NextResponse.json({ received: true, warning: 'unsupported product line' })
+        }
         if (!userId && session.customer_email) {
           console.warn(
             'Webhook: metadata.userId missing, falling back to email lookup',
@@ -300,6 +313,11 @@ export async function POST(req: NextRequest) {
         const { plan, productLine } = resolvePlanAndLine(priceId, metaLine, metaPlan)
         const periodEnd = extractPeriodEnd(sub)
         const status    = normalizeStatus(sub.status)
+
+        if (productLine === 'unsupported') {
+          console.warn('Webhook subscription.updated: unsupported product line — skipping', sub.id)
+          break
+        }
 
         if (productLine === 'podcast') {
           const { error } = await supabase

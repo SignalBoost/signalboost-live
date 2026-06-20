@@ -11,12 +11,146 @@ type TeamUser = {
   role: Role
 }
 
+const COPY = {
+  en: {
+    eyebrow: '🛡️ Admin · Roles',
+    title: 'Role Management',
+    ownerLabel: 'Owner',
+    adminsLabel: 'Admins',
+    totalLabel: 'Total',
+    oneOwner: 'Only one owner is allowed at a time.',
+    noAccess: 'You do not have access to Role Management.',
+    colEmail: 'Email',
+    colRole: 'Role',
+    colActions: 'Actions',
+    transferBtn: 'Transfer Ownership',
+    confirmTitle: 'Confirm ownership transfer',
+    confirmBody: (email: string) => `Are you sure you want to transfer ownership to ${email}?`,
+    confirmWarning: 'You will lose owner privileges.',
+    cancel: 'Cancel',
+    confirm: 'Confirm',
+    confirming: 'Confirming...',
+    transferred: 'Ownership transferred',
+    transferFailed: 'Transfer failed',
+  },
+  es: {
+    eyebrow: '🛡️ Admin · Roles',
+    title: 'Gestión de roles',
+    ownerLabel: 'Propietario',
+    adminsLabel: 'Admins',
+    totalLabel: 'Total',
+    oneOwner: 'Solo se permite un propietario a la vez.',
+    noAccess: 'No tiene acceso a la gestión de roles.',
+    colEmail: 'Correo',
+    colRole: 'Rol',
+    colActions: 'Acciones',
+    transferBtn: 'Transferir propiedad',
+    confirmTitle: 'Confirmar transferencia de propiedad',
+    confirmBody: (email: string) => `¿Está seguro de que desea transferir la propiedad a ${email}?`,
+    confirmWarning: 'Perderá los privilegios de propietario.',
+    cancel: 'Cancelar',
+    confirm: 'Confirmar',
+    confirming: 'Confirmando...',
+    transferred: 'Propiedad transferida',
+    transferFailed: 'Transferencia fallida',
+  },
+  pt: {
+    eyebrow: '🛡️ Admin · Funções',
+    title: 'Gestão de funções',
+    ownerLabel: 'Proprietário',
+    adminsLabel: 'Admins',
+    totalLabel: 'Total',
+    oneOwner: 'Apenas um proprietário é permitido por vez.',
+    noAccess: 'Você não tem acesso à gestão de funções.',
+    colEmail: 'E-mail',
+    colRole: 'Função',
+    colActions: 'Ações',
+    transferBtn: 'Transferir propriedade',
+    confirmTitle: 'Confirmar transferência de propriedade',
+    confirmBody: (email: string) => `Tem certeza de que deseja transferir a propriedade para ${email}?`,
+    confirmWarning: 'Você perderá os privilégios de proprietário.',
+    cancel: 'Cancelar',
+    confirm: 'Confirmar',
+    confirming: 'Confirmando...',
+    transferred: 'Propriedade transferida',
+    transferFailed: 'Transferência falhou',
+  },
+  pl: {
+    eyebrow: '🛡️ Admin · Role',
+    title: 'Zarządzanie rolami',
+    ownerLabel: 'Właściciel',
+    adminsLabel: 'Admini',
+    totalLabel: 'Łącznie',
+    oneOwner: 'Dozwolony jest tylko jeden właściciel na raz.',
+    noAccess: 'Nie masz dostępu do zarządzania rolami.',
+    colEmail: 'E-mail',
+    colRole: 'Rola',
+    colActions: 'Akcje',
+    transferBtn: 'Przenieś własność',
+    confirmTitle: 'Potwierdź przeniesienie własności',
+    confirmBody: (email: string) => `Czy na pewno chcesz przenieść własność do ${email}?`,
+    confirmWarning: 'Utracisz uprawnienia właściciela.',
+    cancel: 'Anuluj',
+    confirm: 'Potwierdź',
+    confirming: 'Potwierdzanie...',
+    transferred: 'Własność przeniesiona',
+    transferFailed: 'Przeniesienie nie powiodło się',
+  },
+  ru: {
+    eyebrow: '🛡️ Админ · Роли',
+    title: 'Управление ролями',
+    ownerLabel: 'Владелец',
+    adminsLabel: 'Администраторы',
+    totalLabel: 'Всего',
+    oneOwner: 'Одновременно допускается только один владелец.',
+    noAccess: 'У вас нет доступа к управлению ролями.',
+    colEmail: 'Email',
+    colRole: 'Роль',
+    colActions: 'Действия',
+    transferBtn: 'Передать права',
+    confirmTitle: 'Подтвердить передачу прав',
+    confirmBody: (email: string) => `Вы уверены, что хотите передать права владельца пользователю ${email}?`,
+    confirmWarning: 'Вы потеряете привилегии владельца.',
+    cancel: 'Отмена',
+    confirm: 'Подтвердить',
+    confirming: 'Подтверждение...',
+    transferred: 'Права переданы',
+    transferFailed: 'Передача не удалась',
+  },
+}
+
+function getLang(): keyof typeof COPY {
+  if (typeof navigator === 'undefined') return 'en'
+  const lang = navigator.language?.slice(0, 2)
+  if (lang === 'es') return 'es'
+  if (lang === 'pt') return 'pt'
+  if (lang === 'pl') return 'pl'
+  if (lang === 'ru') return 'ru'
+  return 'en'
+}
+
+const thStyle: React.CSSProperties = {
+  fontSize: 10,
+  fontWeight: 800,
+  letterSpacing: '.12em',
+  textTransform: 'uppercase',
+  color: 'rgba(255,255,255,.45)',
+  padding: '12px 4px',
+  textAlign: 'left',
+}
+
+const thRightStyle: React.CSSProperties = { ...thStyle, textAlign: 'right' }
+
+const tdStyle: React.CSSProperties = { padding: '12px 4px', fontSize: 14 }
+const tdRightStyle: React.CSSProperties = { ...tdStyle, textAlign: 'right' }
+
 export default function RolesManagementPage() {
   const [users, setUsers] = useState<TeamUser[]>([])
   const [currentUser, setCurrentUser] = useState<{ id: string; email: string; role: Role } | null>(null)
   const [pendingTransfer, setPendingTransfer] = useState<TeamUser | null>(null)
   const [message, setMessage] = useState<string>('')
   const [loading, setLoading] = useState(false)
+  const c = COPY[getLang()]
 
   useEffect(() => {
     async function bootstrap() {
@@ -61,7 +195,7 @@ export default function RolesManagementPage() {
       })
 
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to transfer ownership')
+      if (!res.ok) throw new Error(data.error || c.transferFailed)
 
       setUsers(prev =>
         prev.map(u => {
@@ -71,17 +205,17 @@ export default function RolesManagementPage() {
         })
       )
       setCurrentUser(prev => (prev ? { ...prev, role: 'admin' } : prev))
-      setMessage('Ownership transferred')
+      setMessage(c.transferred)
       setPendingTransfer(null)
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Transfer failed')
+      setMessage(error instanceof Error ? error.message : c.transferFailed)
     } finally {
       setLoading(false)
     }
   }
 
   if (currentUser && currentUser.role === 'user') {
-    return <div className="text-slate-300">You do not have access to Role Management.</div>
+    return <div style={{ color: 'rgba(255,255,255,.6)', padding: 16 }}>{c.noAccess}</div>
   }
 
   const roleCount = (role: string) => sortedUsers.filter(u => u.role === role).length
@@ -91,43 +225,62 @@ export default function RolesManagementPage() {
       <header className="sb-console" style={{ paddingBottom: 12 }}>
         <div className="sb-console__row">
           <div style={{ minWidth: 0 }}>
-            <span className="sb-eyebrow">🛡️ Admin · Roles</span>
-            <h1 style={{ fontSize: 22, margin: '4px 0' }}>Role Management</h1>
+            <span className="sb-eyebrow">{c.eyebrow}</span>
+            <h1 style={{ fontSize: 22, margin: '4px 0' }}>{c.title}</h1>
           </div>
           <div className="sb-telemetry" style={{ marginTop: 0, borderTop: 0 }}>
-            <div style={{ paddingTop: 0 }}><b className="gold">{roleCount('owner')}</b><span>Owner</span></div>
-            <div style={{ paddingTop: 0 }}><b>{roleCount('admin')}</b><span>Admins</span></div>
-            <div style={{ paddingTop: 0 }}><b>{sortedUsers.length}</b><span>Total</span></div>
+            <div style={{ paddingTop: 0 }}><b className="gold">{roleCount('owner')}</b><span>{c.ownerLabel}</span></div>
+            <div style={{ paddingTop: 0 }}><b>{roleCount('admin')}</b><span>{c.adminsLabel}</span></div>
+            <div style={{ paddingTop: 0 }}><b>{sortedUsers.length}</b><span>{c.totalLabel}</span></div>
           </div>
         </div>
       </header>
-      <p className="text-sm text-slate-400" style={{ margin: '0 0 14px' }}>Only one owner is allowed at a time.</p>
 
-      {message && <div style={{ borderLeft: '2px solid rgba(26,240,255,.5)', paddingLeft: 14, marginBottom: 14 }} className="text-sm">{message}</div>}
+      <p style={{ margin: '0 0 14px', fontSize: 13, color: 'rgba(255,255,255,.5)' }}>{c.oneOwner}</p>
 
-      <div>
-        <table className="w-full text-sm">
+      {message && (
+        <div style={{ borderLeft: '2px solid rgba(26,240,255,.5)', paddingLeft: 14, marginBottom: 14, fontSize: 13, color: '#fff' }}>
+          {message}
+        </div>
+      )}
+
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,.12)' }}>
-              <th className="px-1 py-3 text-left" style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)' }}>Email</th>
-              <th className="px-1 py-3 text-left" style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)' }}>Role</th>
-              <th className="px-1 py-3 text-right" style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)' }}>Actions</th>
+              <th style={thStyle}>{c.colEmail}</th>
+              <th style={thStyle}>{c.colRole}</th>
+              <th style={thRightStyle}>{c.colActions}</th>
             </tr>
           </thead>
           <tbody>
             {sortedUsers.map(user => (
               <tr key={user.id} style={{ borderTop: '1px solid rgba(255,255,255,.07)' }}>
-                <td className="px-1 py-3">{user.email}</td>
-                <td className="px-1 py-3 capitalize">
-                  <span className={user.role === 'owner' ? 'sb-chip sb-chip--gold' : user.role === 'admin' ? 'sb-chip' : ''} style={user.role === 'user' ? { color: 'rgba(255,255,255,.5)' } : undefined}>{user.role}</span>
+                <td style={tdStyle}>{user.email}</td>
+                <td style={tdStyle}>
+                  <span
+                    className={user.role === 'owner' ? 'sb-chip sb-chip--gold' : user.role === 'admin' ? 'sb-chip' : ''}
+                    style={user.role === 'user' ? { color: 'rgba(255,255,255,.5)', textTransform: 'capitalize' } : { textTransform: 'capitalize' }}
+                  >
+                    {user.role}
+                  </span>
                 </td>
-                <td className="px-1 py-3 text-right">
+                <td style={tdRightStyle}>
                   {isOwner && user.id !== currentUser?.id && (
                     <button
-                      className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-500"
                       onClick={() => setPendingTransfer(user)}
+                      style={{
+                        background: 'rgba(37,99,235,.85)',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 8,
+                        padding: '5px 12px',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
                     >
-                      Transfer Ownership
+                      {c.transferBtn}
                     </button>
                   )}
                 </td>
@@ -138,23 +291,72 @@ export default function RolesManagementPage() {
       </div>
 
       {pendingTransfer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md p-5" style={{ background: 'linear-gradient(160deg, #101827, #060913)', border: '1px solid rgba(26,240,255,.25)', borderRadius: 20, boxShadow: '0 32px 110px rgba(0,0,0,.6)' }}>
-            <h2 className="text-lg font-semibold">Confirm ownership transfer</h2>
-            <p className="mt-3 text-sm text-slate-200">
-              Are you sure you want to transfer ownership to {pendingTransfer.email}?
+        <div
+          onClick={() => setPendingTransfer(null)}
+          style={{
+            position: 'fixed',
+            top: 80,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 50,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,.6)',
+            padding: 16,
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: 440,
+              padding: 24,
+              background: 'linear-gradient(160deg, rgba(15,23,42,.96), rgba(3,7,18,.98))',
+              border: '1px solid rgba(26,240,255,.25)',
+              borderRadius: 20,
+              boxShadow: '0 32px 110px rgba(0,0,0,.6)',
+            }}
+          >
+            <h2 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 12px', color: '#fff' }}>{c.confirmTitle}</h2>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,.85)', margin: '0 0 8px' }}>
+              {c.confirmBody(pendingTransfer.email)}
             </p>
-            <p className="mt-2 text-sm text-amber-300">You will lose owner privileges.</p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button className="rounded border border-slate-700 px-3 py-1.5" onClick={() => setPendingTransfer(null)}>
-                Cancel
+            <p style={{ fontSize: 13, color: '#fbbf24', margin: '0 0 20px' }}>{c.confirmWarning}</p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button
+                onClick={() => setPendingTransfer(null)}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid rgba(255,255,255,.2)',
+                  color: 'rgba(255,255,255,.8)',
+                  borderRadius: 8,
+                  padding: '7px 14px',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                {c.cancel}
               </button>
               <button
-                className="rounded bg-red-600 px-3 py-1.5 text-white disabled:opacity-50"
                 onClick={confirmTransfer}
                 disabled={loading}
+                style={{
+                  background: loading ? 'rgba(220,38,38,.4)' : 'rgba(220,38,38,.85)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '7px 14px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.6 : 1,
+                }}
               >
-                {loading ? 'Confirming...' : 'Confirm'}
+                {loading ? c.confirming : c.confirm}
               </button>
             </div>
           </div>

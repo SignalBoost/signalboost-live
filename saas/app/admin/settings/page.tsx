@@ -6,12 +6,89 @@ const GOLD = '#ffc300'
 
 type Flag = { key: string; label: string; desc: string; on: boolean }
 
+type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+function getLang(): Lang {
+  if (typeof navigator === 'undefined') return 'en'
+  const l = navigator.language?.slice(0, 2).toLowerCase()
+  if (l === 'es') return 'es'
+  if (l === 'pt') return 'pt'
+  if (l === 'pl') return 'pl'
+  if (l === 'ru') return 'ru'
+  return 'en'
+}
+
+const COPY: Record<Lang, {
+  eyebrow: string
+  title: string
+  subtitle: string
+  saving: string
+  loading: string
+  footer: string
+  notAllowedTitle: string
+  notAllowedBody: string
+}> = {
+  en: {
+    eyebrow: 'Admin',
+    title: 'System settings',
+    subtitle: 'Owner-only switches that affect the whole platform.',
+    saving: 'saving…',
+    loading: 'Loading settings…',
+    footer: 'Changes take effect immediately. The outreach kill-switch is already enforced by the sending routes; the others are stored and ready to wire into behavior.',
+    notAllowedTitle: 'Admin settings',
+    notAllowedBody: 'Only the account owner can change system settings.',
+  },
+  es: {
+    eyebrow: 'Admin',
+    title: 'Configuración del sistema',
+    subtitle: 'Interruptores exclusivos del propietario que afectan toda la plataforma.',
+    saving: 'guardando…',
+    loading: 'Cargando configuración…',
+    footer: 'Los cambios surten efecto de inmediato. El interruptor de alcance ya está aplicado por las rutas de envío; los demás están almacenados y listos para conectarse al comportamiento.',
+    notAllowedTitle: 'Configuración de administrador',
+    notAllowedBody: 'Solo el propietario de la cuenta puede cambiar la configuración del sistema.',
+  },
+  pt: {
+    eyebrow: 'Admin',
+    title: 'Configurações do sistema',
+    subtitle: 'Interruptores exclusivos do proprietário que afetam toda a plataforma.',
+    saving: 'salvando…',
+    loading: 'Carregando configurações…',
+    footer: 'As alterações entram em vigor imediatamente. O interruptor de alcance já é aplicado pelas rotas de envio; os demais estão armazenados e prontos para serem conectados ao comportamento.',
+    notAllowedTitle: 'Configurações de administrador',
+    notAllowedBody: 'Apenas o proprietário da conta pode alterar as configurações do sistema.',
+  },
+  pl: {
+    eyebrow: 'Admin',
+    title: 'Ustawienia systemu',
+    subtitle: 'Przełączniki tylko dla właściciela wpływające na całą platformę.',
+    saving: 'zapisywanie…',
+    loading: 'Ładowanie ustawień…',
+    footer: 'Zmiany wchodzą w życie natychmiast. Przełącznik zasięgu jest już wymuszany przez trasy wysyłania; pozostałe są przechowywane i gotowe do podłączenia do zachowania.',
+    notAllowedTitle: 'Ustawienia administratora',
+    notAllowedBody: 'Tylko właściciel konta może zmieniać ustawienia systemowe.',
+  },
+  ru: {
+    eyebrow: 'Админ',
+    title: 'Системные настройки',
+    subtitle: 'Переключатели только для владельца, влияющие на всю платформу.',
+    saving: 'сохранение…',
+    loading: 'Загрузка настроек…',
+    footer: 'Изменения вступают в силу немедленно. Переключатель рассылки уже применяется маршрутами отправки; остальные сохранены и готовы к подключению к поведению.',
+    notAllowedTitle: 'Настройки администратора',
+    notAllowedBody: 'Только владелец аккаунта может изменять системные настройки.',
+  },
+}
+
 export default function AdminSettingsPage() {
   const [flags, setFlags] = useState<Flag[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [savingKey, setSavingKey] = useState<string | null>(null)
   const [notAllowed, setNotAllowed] = useState(false)
+  const [lang, setLang] = useState<Lang>('en')
+
+  useEffect(() => { setLang(getLang()) }, [])
+  const c = COPY[lang]
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -58,8 +135,8 @@ export default function AdminSettingsPage() {
     return (
       <main style={{ padding: 24, color: '#fff', maxWidth: 720, margin: '0 auto' }}>
         <div className="sb-card" style={{ padding: 28, textAlign: 'center' }}>
-          <h1 className="sb-h3" style={{ marginTop: 0 }}>Admin settings</h1>
-          <p className="sb-body" style={{ margin: 0 }}>Only the account owner can change system settings.</p>
+          <h1 className="sb-h3" style={{ marginTop: 0 }}>{c.notAllowedTitle}</h1>
+          <p className="sb-body" style={{ margin: 0 }}>{c.notAllowedBody}</p>
         </div>
       </main>
     )
@@ -68,13 +145,13 @@ export default function AdminSettingsPage() {
   return (
     <main style={{ padding: 24, color: '#fff', maxWidth: 760, margin: '0 auto' }}>
       <div style={{ marginBottom: 20 }}>
-        <span className="sb-eyebrow">Admin</span>
-        <h1 className="sb-h2" style={{ marginTop: 8, marginBottom: 2 }}>System settings</h1>
-        <p className="sb-body" style={{ margin: 0 }}>Owner-only switches that affect the whole platform.</p>
+        <span className="sb-eyebrow">{c.eyebrow}</span>
+        <h1 className="sb-h2" style={{ marginTop: 8, marginBottom: 2 }}>{c.title}</h1>
+        <p className="sb-body" style={{ margin: 0 }}>{c.subtitle}</p>
       </div>
 
       {error && <p className="sb-caption" style={{ color: '#fca5a5', marginBottom: 12 }}>{error}</p>}
-      {loading && <p className="sb-body">Loading settings…</p>}
+      {loading && <p className="sb-body">{c.loading}</p>}
 
       {!loading && (
         <div style={{ display: 'grid', gap: 12 }}>
@@ -83,7 +160,7 @@ export default function AdminSettingsPage() {
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 700, color: '#fff' }}>
                   {f.label}
-                  {savingKey === f.key && <span className="sb-caption" style={{ marginLeft: 8, opacity: 0.6 }}>saving…</span>}
+                  {savingKey === f.key && <span className="sb-caption" style={{ marginLeft: 8, opacity: 0.6 }}>{c.saving}</span>}
                 </div>
                 <div className="sb-caption" style={{ marginTop: 4 }}>{f.desc}</div>
               </div>
@@ -107,7 +184,7 @@ export default function AdminSettingsPage() {
       )}
 
       <p className="sb-caption" style={{ marginTop: 18, opacity: 0.6 }}>
-        Changes take effect immediately. The outreach kill-switch is already enforced by the sending routes; the others are stored and ready to wire into behavior.
+        {c.footer}
       </p>
     </main>
   )

@@ -95,7 +95,6 @@ function AuditCard({
 }: AuditCardProps): React.ReactElement {
   const [loading, setLoading] = useState<boolean>(false);
   const [notice, setNotice] = useState<string>("");
-
   const isEnterprise: boolean = tier.id === "audit_enterprise";
   const isPopular: boolean = tier.isPopular;
 
@@ -151,14 +150,11 @@ function AuditCard({
         height: "auto",
       }}
     >
-      {/* Popular badge */}
       {isPopular && copy.popularBadge ? (
         <PopularBadge label={copy.popularBadge} />
       ) : (
         <div style={{ height: 28 }} />
       )}
-
-      {/* Tier name */}
       <h3
         style={{
           margin: "0 0 6px",
@@ -170,8 +166,6 @@ function AuditCard({
       >
         {copy.name}
       </h3>
-
-      {/* Description */}
       <p
         style={{
           margin: "0 0 20px",
@@ -183,8 +177,6 @@ function AuditCard({
       >
         {copy.description}
       </p>
-
-      {/* Price */}
       <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 16 }}>
         <span
           style={{
@@ -199,11 +191,7 @@ function AuditCard({
         </span>
         <span style={{ fontSize: 14, color: "rgba(255,255,255,0.45)" }}>{perMonth}</span>
       </div>
-
-      {/* Audit count badge */}
       <AuditCountBadge count={tier.auditCount} />
-
-      {/* Feature list */}
       <ul
         style={{
           listStyle: "none",
@@ -234,8 +222,6 @@ function AuditCard({
           )
         )}
       </ul>
-
-      {/* CTA */}
       <button
         onClick={handleClick}
         disabled={loading}
@@ -258,8 +244,6 @@ function AuditCard({
       >
         {loading ? "…" : isEnterprise ? contactSalesLabel : copy.ctaLabel}
       </button>
-
-      {/* Notice */}
       {notice ? (
         <p
           style={{
@@ -291,7 +275,6 @@ const LOCALES: { code: AuditLocale; label: string }[] = [
 
 export default function AuditPricingPage(): React.ReactElement {
   const [locale, setLocale] = useState<AuditLocale>("en");
-
   const copy: AuditPageCopy = getAuditPricingCopy(locale);
   const { tiers } = getAuditPricingConfig();
 
@@ -304,7 +287,6 @@ export default function AuditPricingPage(): React.ReactElement {
         boxSizing: "border-box" as const,
       }}
     >
-      {/* Locale switcher */}
       <div
         style={{
           display: "flex",
@@ -343,8 +325,6 @@ export default function AuditPricingPage(): React.ReactElement {
           )
         )}
       </div>
-
-      {/* Header */}
       <div
         style={{
           textAlign: "center" as const,
@@ -377,8 +357,6 @@ export default function AuditPricingPage(): React.ReactElement {
           {copy.pageSubtitle}
         </p>
       </div>
-
-      {/* Tier grid */}
       <div
         style={{
           display: "grid",

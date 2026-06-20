@@ -1,137 +1,66 @@
-/**
- * saas/lib/audit/pricingConfig.ts
- * Self-contained audit pricing configuration.
- * Zero imports from platform plan types or external modules.
- */
+// saas/lib/audit/pricingConfig.ts
+// Audit-module pricing tiers — fully self-contained, zero external imports.
+// Plan names match the DB values in credits.ts: free | starter | pro | business
 
-export interface AuditCount {
-  value: number;
-  unlimited: boolean;
-  label: string;
+export type AuditPlanId = 'free' | 'starter' | 'pro' | 'business'
+
+export interface AuditPricingTier {
+  id: AuditPlanId
+  monthlyPrice: number
+  annualPrice: number
+  auditsPerMonth: number | null   // null = unlimited
+  maxFilesPerRun: number
+  historyDays: number
+  patchGeneration: boolean
+  teamSeats: number | null        // null = unlimited
+  support: 'community' | 'email' | 'priority' | 'dedicated'
 }
 
-export interface AuditTier {
-  id: string;
-  name: string;
-  price: number;
-  billingPeriod: string;
-  auditsPerMonth: AuditCount;
-  features: string[];
-  ctaLabel: string;
-  isPopular: boolean;
-  isEnterprise: boolean;
-  stripePriceId: string | null;
-}
+export const AUDIT_PRICING_TIERS: AuditPricingTier[] = [
+  {
+    id: 'free',
+    monthlyPrice: 0,
+    annualPrice: 0,
+    auditsPerMonth: 3,
+    maxFilesPerRun: 6,
+    historyDays: 7,
+    patchGeneration: false,
+    teamSeats: 1,
+    support: 'community',
+  },
+  {
+    id: 'starter',
+    monthlyPrice: 29,
+    annualPrice: 24,
+    auditsPerMonth: 20,
+    maxFilesPerRun: 20,
+    historyDays: 30,
+    patchGeneration: true,
+    teamSeats: 3,
+    support: 'email',
+  },
+  {
+    id: 'pro',
+    monthlyPrice: 79,
+    annualPrice: 66,
+    auditsPerMonth: 100,
+    maxFilesPerRun: 40,
+    historyDays: 90,
+    patchGeneration: true,
+    teamSeats: 10,
+    support: 'priority',
+  },
+  {
+    id: 'business',
+    monthlyPrice: 199,
+    annualPrice: 166,
+    auditsPerMonth: null,
+    maxFilesPerRun: 60,
+    historyDays: 365,
+    patchGeneration: true,
+    teamSeats: null,
+    support: 'dedicated',
+  },
+]
 
-export interface AuditPricingConfig {
-  tiers: AuditTier[];
-  currency: string;
-  currencySymbol: string;
-}
-
-export const AUDIT_PRICING_CONFIG: AuditPricingConfig = {
-  currency: 'USD',
-  currencySymbol: '$',
-  tiers: [
-    {
-      id: 'audit-starter',
-      name: 'Starter',
-      price: 29,
-      billingPeriod: 'month',
-      auditsPerMonth: {
-        value: 3,
-        unlimited: false,
-        label: '3 audits / mo',
-      },
-      features: [
-        'AI-powered site audit',
-        'SEO gap analysis',
-        'Performance score',
-        'PDF export',
-        'Email support',
-      ],
-      ctaLabel: 'Get Started',
-      isPopular: false,
-      isEnterprise: false,
-      stripePriceId: null,
-    },
-    {
-      id: 'audit-growth',
-      name: 'Growth',
-      price: 79,
-      billingPeriod: 'month',
-      auditsPerMonth: {
-        value: 20,
-        unlimited: false,
-        label: '20 audits / mo',
-      },
-      features: [
-        'Everything in Starter',
-        'Competitor benchmarking',
-        'Branded PDF reports',
-        'Priority support',
-        'API access',
-      ],
-      ctaLabel: 'Start Growing',
-      isPopular: true,
-      isEnterprise: false,
-      stripePriceId: null,
-    },
-    {
-      id: 'audit-pro',
-      name: 'Pro',
-      price: 199,
-      billingPeriod: 'month',
-      auditsPerMonth: {
-        value: 100,
-        unlimited: false,
-        label: '100 audits / mo',
-      },
-      features: [
-        'Everything in Growth',
-        'White-label reports',
-        'Team seats (up to 5)',
-        'Webhook integrations',
-        'Dedicated account manager',
-      ],
-      ctaLabel: 'Go Pro',
-      isPopular: false,
-      isEnterprise: false,
-      stripePriceId: null,
-    },
-    {
-      id: 'audit-enterprise',
-      name: 'Enterprise',
-      price: 599,
-      billingPeriod: 'month',
-      auditsPerMonth: {
-        value: 0,
-        unlimited: true,
-        label: 'Unlimited audits',
-      },
-      features: [
-        'Everything in Pro',
-        'Unlimited team seats',
-        'Custom integrations',
-        'SLA guarantee',
-        'Onboarding & training',
-      ],
-      ctaLabel: 'Contact Sales',
-      isPopular: false,
-      isEnterprise: true,
-      stripePriceId: null,
-    },
-  ],
-};
-
-export function getAuditTierById(id: string): AuditTier | undefined {
-  return AUDIT_PRICING_CONFIG.tiers.find(
-    (tier: AuditTier): boolean => tier.id === id
-  );
-}
-
-export function getPopularAuditTier(): AuditTier | undefined {
-  return AUDIT_PRICING_CONFIG.tiers.find(
-    (tier: AuditTier): boolean => tier.isPopular === true
-  );
-}
+export const POPULAR_PLAN: AuditPlanId = 'pro'

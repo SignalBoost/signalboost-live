@@ -237,21 +237,48 @@ export default function PricingPage() {
     },
   ]
 
+  // Comparison table headers — translated
+  const compareHeaders = [
+    t(dict, 'pricing_v2.compare.colCapability', 'Capability'),
+    t(dict, 'pricing_v2.compare.colFree',        'Free Demo'),
+    t(dict, 'pricing_v2.compare.colLaunch',      'Launch'),
+    t(dict, 'pricing_v2.compare.colGrowth',      'Growth'),
+    t(dict, 'pricing_v2.compare.colCommand',     'Command'),
+  ]
+
+  // Comparison table rows — first cell is the capability label (translated), rest are plan values (translated)
   const comparisonRows = [
-    ['Platform access', 'Limited demo', 'Ongoing use', 'Ongoing use', 'Ongoing use'],
-    ['5-language platform', 'Preview', 'Included', 'Included', 'Included'],
-    ['Published websites/projects', 'Preview', '1', '5', 'Expanded / custom'],
-    ['Website optimization', 'Preview', 'Included', 'Advanced', 'Advanced + priority'],
-    ['Podcast optimization', 'Preview', 'Included', 'Advanced', 'Advanced + network path'],
-    ['Canvas Video Studio', 'Preview', 'Included', 'Included + templates', 'Advanced workflows'],
-    ['Video credits', '2 one-time', '25 / month', '100 / month', '300 / month'],
-    ['AI captions + MP4 exports', 'Limited demo', 'Included via credits', 'Included via credits', 'Included via credits'],
-    ['Reviews workspace', 'Preview', 'Included', 'Advanced', 'Advanced'],
-    ['Outreach + campaigns', 'Preview', 'Basic', 'Included', 'Advanced'],
-    ['CoWork/team workspace', 'Preview', 'Basic', '3 users', '10+ users'],
-    ['Calendar + spreadsheets', 'Preview', 'Basic', 'Included', 'Team workflows'],
-    ['Brand kit / white label', '—', 'Basic', 'Brand kit', 'Brand kit + white label'],
-    ['Support', 'Community', 'Email', 'Priority', 'Priority + onboarding'],
+    [t(dict,'pricing_v2.compare.row.platformAccess','Platform access'),         t(dict,'pricing_v2.compare.val.limitedDemo','Limited demo'),           t(dict,'pricing_v2.compare.val.ongoingUse','Ongoing use'),           t(dict,'pricing_v2.compare.val.ongoingUse','Ongoing use'),           t(dict,'pricing_v2.compare.val.ongoingUse','Ongoing use')],
+    [t(dict,'pricing_v2.compare.row.fiveLang','5-language platform'),           t(dict,'pricing_v2.compare.val.preview','Preview'),                    t(dict,'pricing_v2.compare.val.included','Included'),               t(dict,'pricing_v2.compare.val.included','Included'),               t(dict,'pricing_v2.compare.val.included','Included')],
+    [t(dict,'pricing_v2.compare.row.websites','Published websites/projects'),   t(dict,'pricing_v2.compare.val.preview','Preview'),                    '1',                                                                 '5',                                                                 t(dict,'pricing_v2.compare.val.expandedCustom','Expanded / custom')],
+    [t(dict,'pricing_v2.compare.row.webOpt','Website optimization'),            t(dict,'pricing_v2.compare.val.preview','Preview'),                    t(dict,'pricing_v2.compare.val.included','Included'),               t(dict,'pricing_v2.compare.val.advanced','Advanced'),               t(dict,'pricing_v2.compare.val.advancedPriority','Advanced + priority')],
+    [t(dict,'pricing_v2.compare.row.podcastOpt','Podcast optimization'),        t(dict,'pricing_v2.compare.val.preview','Preview'),                    t(dict,'pricing_v2.compare.val.included','Included'),               t(dict,'pricing_v2.compare.val.advanced','Advanced'),               t(dict,'pricing_v2.compare.val.advancedNetwork','Advanced + network path')],
+    [t(dict,'pricing_v2.compare.row.videoStudio','Canvas Video Studio'),        t(dict,'pricing_v2.compare.val.preview','Preview'),                    t(dict,'pricing_v2.compare.val.included','Included'),               t(dict,'pricing_v2.compare.val.includedTemplates','Included + templates'), t(dict,'pricing_v2.compare.val.advancedWorkflows','Advanced workflows')],
+    [t(dict,'pricing_v2.compare.row.videoCredits','Video credits'),             t(dict,'pricing_v2.compare.val.twoOneTime','2 one-time'),              t(dict,'pricing_v2.compare.val.credits25','25 / month'),            t(dict,'pricing_v2.compare.val.credits100','100 / month'),          t(dict,'pricing_v2.compare.val.credits300','300 / month')],
+    [t(dict,'pricing_v2.compare.row.captions','AI captions + MP4 exports'),     t(dict,'pricing_v2.compare.val.limitedDemo','Limited demo'),           t(dict,'pricing_v2.compare.val.viaCredits','Included via credits'), t(dict,'pricing_v2.compare.val.viaCredits','Included via credits'), t(dict,'pricing_v2.compare.val.viaCredits','Included via credits')],
+    [t(dict,'pricing_v2.compare.row.reviews','Reviews workspace'),              t(dict,'pricing_v2.compare.val.preview','Preview'),                    t(dict,'pricing_v2.compare.val.included','Included'),               t(dict,'pricing_v2.compare.val.advanced','Advanced'),               t(dict,'pricing_v2.compare.val.advanced','Advanced')],
+    [t(dict,'pricing_v2.compare.row.outreach','Outreach + campaigns'),          t(dict,'pricing_v2.compare.val.preview','Preview'),                    t(dict,'pricing_v2.compare.val.basic','Basic'),                     t(dict,'pricing_v2.compare.val.included','Included'),               t(dict,'pricing_v2.compare.val.advanced','Advanced')],
+    [t(dict,'pricing_v2.compare.row.cowork','CoWork/team workspace'),           t(dict,'pricing_v2.compare.val.preview','Preview'),                    t(dict,'pricing_v2.compare.val.basic','Basic'),                     t(dict,'pricing_v2.compare.val.threeUsers','3 users'),              t(dict,'pricing_v2.compare.val.tenPlusUsers','10+ users')],
+    [t(dict,'pricing_v2.compare.row.calendar','Calendar + spreadsheets'),       t(dict,'pricing_v2.compare.val.preview','Preview'),                    t(dict,'pricing_v2.compare.val.basic','Basic'),                     t(dict,'pricing_v2.compare.val.included','Included'),               t(dict,'pricing_v2.compare.val.teamWorkflows','Team workflows')],
+    [t(dict,'pricing_v2.compare.row.brandKit','Brand kit / white label'),       '—',                                                                   t(dict,'pricing_v2.compare.val.basic','Basic'),                     t(dict,'pricing_v2.compare.val.brandKit','Brand kit'),              t(dict,'pricing_v2.compare.val.brandKitWhiteLabel','Brand kit + white label')],
+    [t(dict,'pricing_v2.compare.row.support','Support'),                        t(dict,'pricing_v2.compare.val.community','Community'),                t(dict,'pricing_v2.compare.val.email','Email'),                     t(dict,'pricing_v2.compare.val.priority','Priority'),               t(dict,'pricing_v2.compare.val.priorityOnboarding','Priority + onboarding')],
+  ]
+
+  // Credit usage cards — translated
+  const creditCards = [
+    { nameKey: 'pricing_v2.free.name',    nameFallback: 'Free Demo', creditsKey: 'pricing_v2.compare.val.twoOneTime', creditsFallback: '2 one-time credits', noteKey: 'pricing_v2.creditCard.noReset',   noteFallback: 'no monthly reset' },
+    { nameKey: 'pricing_v2.launch.name',  nameFallback: 'Launch',    creditsKey: 'pricing_v2.creditCard.credits25',   creditsFallback: '25 credits',          noteKey: 'pricing_v2.creditCard.perMonth',  noteFallback: 'per month' },
+    { nameKey: 'pricing_v2.growth.name',  nameFallback: 'Growth',    creditsKey: 'pricing_v2.creditCard.credits100',  creditsFallback: '100 credits',         noteKey: 'pricing_v2.creditCard.perMonth',  noteFallback: 'per month' },
+    { nameKey: 'pricing_v2.command.name', nameFallback: 'Command',   creditsKey: 'pricing_v2.creditCard.credits300',  creditsFallback: '300 credits',         noteKey: 'pricing_v2.creditCard.perMonth',  noteFallback: 'per month' },
+  ]
+
+  // Language pill labels — translated
+  const languagePills = [
+    t(dict, 'pricing_v2.lang.english',    'English'),
+    t(dict, 'pricing_v2.lang.portuguese', 'Portuguese'),
+    t(dict, 'pricing_v2.lang.spanish',    'Spanish'),
+    t(dict, 'pricing_v2.lang.polish',     'Polish'),
+    t(dict, 'pricing_v2.lang.russian',    'Russian'),
   ]
 
   async function handleCheckout(plan: Plan['key']) {
@@ -324,7 +351,7 @@ export default function PricingPage() {
         </p>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 10 }}>
-          {['English', 'Portuguese', 'Spanish', 'Polish', 'Russian'].map((language) => (
+          {languagePills.map((language) => (
             <span
               key={language}
               className="sb-caption"
@@ -497,7 +524,7 @@ export default function PricingPage() {
         </div>
       </section>
 
-      <section style={{ marginTop: 38 }}>
+      <section style={{ marginTop: 38, overflowX: 'auto' }}>
         <span className="sb-eyebrow">
           {t(dict, 'pricing_v2.videoUsageKicker', 'Video usage')}
         </span>
@@ -516,14 +543,9 @@ export default function PricingPage() {
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 18 }}>
-            {[
-              ['Free Demo', '2 one-time credits', 'no monthly reset'],
-              ['Launch', '25 credits', 'per month'],
-              ['Growth', '100 credits', 'per month'],
-              ['Command', '300 credits', 'per month'],
-            ].map(([name, credits, note]) => (
+            {creditCards.map((card) => (
               <div
-                key={name}
+                key={card.nameKey}
                 style={{
                   border: '1px solid rgba(255,255,255,.12)',
                   borderRadius: 16,
@@ -531,9 +553,9 @@ export default function PricingPage() {
                   background: 'rgba(255,255,255,.04)',
                 }}
               >
-                <span className="sb-caption">{name}</span>
-                <strong style={{ display: 'block', fontSize: 23, color: '#fff', marginTop: 4 }}>{credits}</strong>
-                <span className="sb-caption">{note}</span>
+                <span className="sb-caption">{t(dict, card.nameKey, card.nameFallback)}</span>
+                <strong style={{ display: 'block', fontSize: 23, color: '#fff', marginTop: 4 }}>{t(dict, card.creditsKey, card.creditsFallback)}</strong>
+                <span className="sb-caption">{t(dict, card.noteKey, card.noteFallback)}</span>
               </div>
             ))}
           </div>
@@ -571,7 +593,7 @@ export default function PricingPage() {
         >
           <thead>
             <tr style={{ background: 'rgba(255,255,255,.06)' }}>
-              {['Capability', 'Free Demo', 'Launch', 'Growth', 'Command'].map((heading) => (
+              {compareHeaders.map((heading) => (
                 <th
                   key={heading}
                   style={{

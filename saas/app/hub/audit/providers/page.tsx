@@ -8,6 +8,8 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
 import ProviderInventoryReport, { type ProviderInventoryView } from '@/components/audit/ProviderInventoryReport'
+import ReportExportBar from '@/components/audit/ReportExportBar'
+import { toCsv } from '@/lib/audit/exportCsv'
 
 // Flat result shape — non-strict tsconfig does not narrow discriminated unions.
 type ApiResponse = { ok: boolean; report?: ProviderInventoryView; error?: string }
@@ -61,5 +63,14 @@ export default function ProviderInventoryPage() {
     )
   }
   if (!data) return null
-  return <ProviderInventoryReport data={data} />
+  const csv = toCsv(
+    ['Provider', 'Category', 'Status', 'Risk', 'Findings', 'Last checked'],
+    data.rows.map(r => [r.provider, r.category, r.status, r.risk, r.findingCount, r.lastCheckedAt ?? '']),
+  )
+  return (
+    <>
+      <ReportExportBar filename="provider-inventory" csv={csv} />
+      <ProviderInventoryReport data={data} />
+    </>
+  )
 }

@@ -401,6 +401,10 @@
     "history": {
       "title": "Historial de preparación",
       "desc": "Observa tu puntuación de preparación y los hallazgos con el tiempo."
+    },
+    "github": {
+      "title": "GitHub y cambios de código",
+      "desc": "Protección de ramas, colaboradores y ramas obsoletas."
     }
   },
   "usage": {
@@ -447,5 +451,46 @@
   "scan": {
     "quotaExceeded": "Límite mensual alcanzado: {used}/{cap} análisis usados. Mejora tu plan para ejecutar más.",
     "upgrade": "Mejorar plan"
+  },
+  "github": {
+    "title": "Informe de GitHub y cambios de código",
+    "subtitle": "Protección de ramas, colaboradores, ramas obsoletas y cambios abiertos.",
+    "notConfigured": "GitHub no está conectado o no se pudieron recopilar sus datos.",
+    "summary": {
+      "collaborators": "Colaboradores",
+      "admins": "Administradores",
+      "stale": "Ramas obsoletas",
+      "openPRs": "PR abiertos"
+    },
+    "protection": {
+      "title": "Protección de la rama predeterminada",
+      "enforced": "Aplicada",
+      "missing": "Falta",
+      "unverified": "Sin verificar"
+    },
+    "collab": {
+      "title": "Colaboradores",
+      "empty": "No se recopilaron colaboradores."
+    },
+    "col": {
+      "login": "Usuario",
+      "role": "Rol",
+      "access": "Acceso",
+      "branch": "Rama",
+      "age": "Antigüedad (días)"
+    },
+    "admin": "Administrador",
+    "member": "Miembro",
+    "stale": {
+      "title": "Ramas obsoletas",
+      "empty": "Sin ramas obsoletas: limpio."
+    },
+    "findings": {
+      "title": "Hallazgos ({n})",
+      "empty": "Sin hallazgos de GitHub: nada marcado."
+    },
+    "loadError": "No se pudo cargar el informe de GitHub.",
+    "fetchError": "Error: {msg}",
+    "loading": "Cargando informe de GitHub…"
   }
 }

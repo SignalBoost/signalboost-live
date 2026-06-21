@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useI18n } from '@/components/i18n/I18nProvider'
 
 const GOLD = '#ffc300'
 
@@ -35,7 +36,8 @@ export default function AdminOverviewPage() {
   const [data, setData] = useState<Overview | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const c = COPY[getLang()]
+  const { lang: activeLang } = useI18n()
+  const c = COPY[(activeLang in COPY ? activeLang : 'en') as keyof typeof COPY]
 
   const load = useCallback(async () => {
     setLoading(true); setError('')

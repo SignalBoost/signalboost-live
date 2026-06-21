@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useI18n } from '@/components/i18n/I18nProvider'
 
 const GOLD = '#ffc300'
 
@@ -152,11 +153,12 @@ function money(n: number) {
 }
 
 export default function AdminRevenuePage() {
+  const { lang: activeLang } = useI18n()
   const [data, setData] = useState<Revenue | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notAllowed, setNotAllowed] = useState(false)
-  const c = COPY[getLang()]
+  const c = COPY[(activeLang in COPY ? activeLang : 'en') as keyof typeof COPY]
 
   const load = useCallback(async () => {
     setLoading(true); setError('')

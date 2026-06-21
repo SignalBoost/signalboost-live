@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/utils/supabase/client'
+import { useI18n } from '@/components/i18n/I18nProvider'
 
 type AnalyticsEvent = {
   event_id: string
@@ -337,12 +338,13 @@ function groupCount(items: Array<Record<string, string | null>>, key: string) {
 }
 
 export default function OnboardingAnalyticsDashboardPage() {
+  const { lang: activeLang } = useI18n()
   const [events, setEvents] = useState<AnalyticsEvent[]>([])
   const [profiles, setProfiles] = useState<UserProfile[]>([])
   const [errors, setErrors] = useState<ErrorLog[]>([])
   const [feedback, setFeedback] = useState<Feedback[]>([])
   const [loading, setLoading] = useState(true)
-  const c = COPY[getLang()]
+  const c = COPY[(activeLang in COPY ? activeLang : 'en') as keyof typeof COPY]
 
   useEffect(() => {
     async function loadDashboard() {

@@ -369,5 +369,30 @@
       "next": "Alto — agendar em breve.",
       "later": "Médio e baixo — planejar."
     }
+  },
+  "center": {
+    "title": "Central de auditoria",
+    "subtitle": "Relatórios de prontidão operacional sobre identidade, provedores, segredos e remediação — com pontuação determinística.",
+    "open": "Abrir relatório",
+    "executive": {
+      "title": "Resumo executivo de riscos",
+      "desc": "Pontuação geral, contagem de achados e principais riscos."
+    },
+    "identity": {
+      "title": "Identidade e acesso",
+      "desc": "Quem tem acesso, nível de privilégio, MFA e última atividade."
+    },
+    "providers": {
+      "title": "Inventário de provedores",
+      "desc": "Cada provedor conectado com status, risco e última verificação."
+    },
+    "secrets": {
+      "title": "Segredos e chaves de API",
+      "desc": "Credenciais configuradas por ambiente e postura de rotação."
+    },
+    "remediation": {
+      "title": "Roteiro de remediação",
+      "desc": "Correções priorizadas por urgência."
+    }
   }
 }

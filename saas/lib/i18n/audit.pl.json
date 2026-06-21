@@ -393,6 +393,10 @@
     "remediation": {
       "title": "Plan działań naprawczych",
       "desc": "Priorytetowe poprawki wg pilności."
+    },
+    "usage": {
+      "title": "Użycie i koszt AI",
+      "desc": "Zużycie tokenów i szacowany koszt wg funkcji i użytkownika."
     }
   },
   "usage": {

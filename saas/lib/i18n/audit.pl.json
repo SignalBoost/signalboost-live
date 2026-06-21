@@ -369,5 +369,30 @@
       "next": "Wysokie — zaplanuj wkrótce.",
       "later": "Średnie i niskie — zaplanuj."
     }
+  },
+  "center": {
+    "title": "Centrum audytu",
+    "subtitle": "Raporty gotowości operacyjnej: tożsamość, dostawcy, sekrety i działania naprawcze — z deterministyczną oceną.",
+    "open": "Otwórz raport",
+    "executive": {
+      "title": "Podsumowanie ryzyka dla kierownictwa",
+      "desc": "Ogólny wynik, liczba ustaleń i najważniejsze ryzyka."
+    },
+    "identity": {
+      "title": "Tożsamość i dostęp",
+      "desc": "Kto ma dostęp, poziom uprawnień, MFA i ostatnia aktywność."
+    },
+    "providers": {
+      "title": "Inwentaryzacja dostawców",
+      "desc": "Każdy dostawca ze statusem, ryzykiem i ostatnim sprawdzeniem."
+    },
+    "secrets": {
+      "title": "Sekrety i klucze API",
+      "desc": "Poświadczenia wg środowiska i stanu rotacji."
+    },
+    "remediation": {
+      "title": "Plan działań naprawczych",
+      "desc": "Priorytetowe poprawki wg pilności."
+    }
   }
 }

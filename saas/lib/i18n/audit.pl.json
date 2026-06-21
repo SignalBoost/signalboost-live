@@ -264,5 +264,45 @@
       "privilegedNoMfa": "Bez MFA",
       "mfaUnknown": "MFA?"
     }
+  },
+  "provider": {
+    "title": "Inwentaryzacja dostawców",
+    "subtitle": "Każdy podłączony dostawca ze statusem, ryzykiem i ostatnim sprawdzeniem.",
+    "empty": "Nie znaleziono dostawców.",
+    "evidenceShort": "({n} dowód)",
+    "loading": "Ładowanie inwentaryzacji dostawców…",
+    "loadError": "Nie można załadować inwentaryzacji.",
+    "fetchError": "Błąd: {msg}",
+    "risk": {
+      "unknown": "Nieznane"
+    },
+    "summary": {
+      "total": "Dostawcy",
+      "connected": "Połączeni",
+      "error": "Z błędem",
+      "notConfigured": "Nieskonfigurowani"
+    },
+    "col": {
+      "provider": "Dostawca",
+      "category": "Kategoria",
+      "status": "Status",
+      "risk": "Ryzyko",
+      "findings": "Ustalenia",
+      "lastChecked": "Ostatnie sprawdzenie"
+    },
+    "status": {
+      "connected": "Połączony",
+      "error": "Błąd",
+      "not_configured": "Nieskonfigurowany",
+      "missing": "Brak"
+    },
+    "category": {
+      "billing": "Płatności",
+      "database": "Baza danych",
+      "deployment": "Wdrożenie",
+      "change-management": "Zarządzanie zmianami",
+      "identity": "Tożsamość",
+      "other": "Inne"
+    }
   }
 }

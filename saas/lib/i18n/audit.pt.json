@@ -394,5 +394,27 @@
       "title": "Roteiro de remediação",
       "desc": "Correções priorizadas por urgência."
     }
+  },
+  "usage": {
+    "title": "Uso e custo de IA",
+    "subtitle": "Consumo de tokens e custo estimado por funcionalidades de IA nos últimos {n} dias. O custo é estimado; os tokens são exatos.",
+    "totalCost": "Custo est.",
+    "calls": "Chamadas",
+    "totalTokens": "Tokens totais",
+    "cacheHit": "Entrada do cache",
+    "byFeature": "Por funcionalidade",
+    "byUser": "Maiores consumidores",
+    "byUserHint": "Maior custo estimado primeiro — base para cobrança ou limitação por usuário.",
+    "col": {
+      "feature": "Funcionalidade",
+      "calls": "Chamadas",
+      "tokens": "Tokens",
+      "cost": "Custo est.",
+      "user": "Usuário"
+    },
+    "empty": "Nenhum uso registrado ainda.",
+    "loading": "Carregando uso…",
+    "loadError": "Não foi possível carregar o uso.",
+    "fetchError": "Erro: {msg}"
   }
 }

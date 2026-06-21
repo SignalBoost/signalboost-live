@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { runAudit } from '@/lib/audit/runner'
+import { checkScanQuota, clampScanSize } from '@/lib/audit/scanThrottle'
 
 export const runtime     = 'nodejs'
 export const maxDuration = 300
@@ -34,14 +35,44 @@ async function preflightOpenAI(): Promise<{ ok: boolean; error?: string }> {
 
 export async function POST(req: NextRequest) {
   const ctx = await getAccess()
-  if (!ctx.isOwner) {
+  if (!ctx.userId) {
+    return NextResponse.json({ ok: false, error: 'Not signed in.' }, { status: 401 })
+  }
+
+  // This endpoint scans SignalBoost's OWN repository and is owner-only by
+  // default. Customer-run scans stay OFF until a customer scan target is wired;
+  // flip AUDIT_CUSTOMER_SCANS_ENABLED=true to open it (throttle then enforces).
+  const customerScansEnabled = process.env.AUDIT_CUSTOMER_SCANS_ENABLED === 'true'
+  if (!ctx.isOwner && !customerScansEnabled) {
     return NextResponse.json({ ok: false, error: 'Owner access required.' }, { status: 403 })
+  }
+
+  const admin = getAdminSupabase()
+
+  // Throttle policy — hard block at the monthly cap. Owner is exempt.
+  if (!ctx.isOwner) {
+    const quota = await checkScanQuota(admin, { userId: ctx.userId, isOwner: false })
+    if (!quota.ok) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: 'scan_quota_exceeded',
+          upgrade: true,
+          tier: quota.tier,
+          cap: quota.cap,
+          used: quota.used,
+          error: `Monthly limit reached: ${quota.used}/${quota.cap} audit scans used. Upgrade your plan to run more.`,
+        },
+        { status: 402 },
+      )
+    }
   }
 
   let body: { prefix?: string; maxFiles?: number } = {}
   try { body = await req.json() } catch { /* defaults apply */ }
   const prefix   = typeof body.prefix === 'string' && body.prefix.trim() ? body.prefix.trim() : 'saas/app/api'
-  const maxFiles = typeof body.maxFiles === 'number' ? body.maxFiles : 6
+  // Pre-call size check — clamp into [1, MAX_FILES_PER_SCAN] to bound model cost.
+  const maxFiles = clampScanSize(body.maxFiles)
 
   const enc = new TextEncoder()
   const stream = new ReadableStream<Uint8Array>({
@@ -55,7 +86,6 @@ export async function POST(req: NextRequest) {
 
         send({ phase: 'SCAN_TARGET', prefix })
 
-        const admin = getAdminSupabase()
         const started = await admin.from('audit_runs').insert({ status: 'running', prefix, created_by: ctx.userId }).select('id').single()
         if (started.error || !started.data) {
           send({ phase: 'ERROR', error: `Could not open audit run: ${started.error?.message || 'insert failed'}` }); controller.close(); return

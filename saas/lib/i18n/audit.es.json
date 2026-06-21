@@ -60,7 +60,51 @@
     "overallScore": "Puntuación general de preparación",
     "findings": "Hallazgos",
     "evidenceRequired": "Se requiere evidencia",
-    "topRisks": "Riesgos principales"
+    "topRisks": "Riesgos principales",
+    "recommendation": "Recomendación",
+    "impact": "Impacto"
+  },
+  "identity": {
+    "summary": {
+      "total": "Identidades",
+      "privileged": "Privilegiadas",
+      "stale": "Inactivas",
+      "noMfa": "Priv. sin MFA",
+      "mfaUnknown": "MFA desconocido"
+    },
+    "col": {
+      "principal": "Principal",
+      "provider": "Proveedor",
+      "kind": "Tipo",
+      "role": "Rol",
+      "mfa": "MFA",
+      "lastSeen": "Última vez",
+      "flags": "Indicadores"
+    },
+    "kind": {
+      "user": "Usuario",
+      "service_account": "Cuenta de servicio",
+      "access_key": "Clave de acceso",
+      "collaborator": "Colaborador",
+      "token": "Token"
+    },
+    "mfa": {
+      "enabled": "Habilitado",
+      "disabled": "Deshabilitado",
+      "unknown": "Desconocido"
+    },
+    "flag": {
+      "stale": "Inactiva",
+      "neverUsed": "Nunca usada",
+      "privilegedNoMfa": "Sin MFA",
+      "mfaUnknown": "¿MFA?"
+    },
+    "findingsTitle": "Hallazgos de acceso",
+    "noFindings": "Sin hallazgos de acceso.",
+    "tableTitle": "Todas las identidades",
+    "empty": "No se encontraron identidades.",
+    "never": "Nunca",
+    "daysAgo": "hace {days}d"
   },
   "finding": {
     "staleIdentity": {

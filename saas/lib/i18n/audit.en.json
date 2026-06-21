@@ -394,5 +394,27 @@
       "title": "Remediation Roadmap",
       "desc": "Prioritized fixes sequenced by urgency."
     }
+  },
+  "usage": {
+    "title": "AI Usage & Cost",
+    "subtitle": "Token consumption and estimated cost across AI features over the last {n} days. Cost is an estimate; token counts are exact.",
+    "totalCost": "Est. cost",
+    "calls": "Calls",
+    "totalTokens": "Total tokens",
+    "cacheHit": "Input from cache",
+    "byFeature": "By Feature",
+    "byUser": "Top Consumers",
+    "byUserHint": "Highest estimated cost first — the basis for per-user billing or throttling.",
+    "col": {
+      "feature": "Feature",
+      "calls": "Calls",
+      "tokens": "Tokens",
+      "cost": "Est. cost",
+      "user": "User"
+    },
+    "empty": "No usage recorded yet.",
+    "loading": "Loading usage…",
+    "loadError": "Could not load usage.",
+    "fetchError": "Error: {msg}"
   }
 }

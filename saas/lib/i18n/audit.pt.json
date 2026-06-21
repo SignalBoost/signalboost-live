@@ -1,0 +1,208 @@
+{
+  "report": {
+    "executiveSummary": {
+      "title": "Resumo executivo de riscos",
+      "description": "Pontuação geral de prontidão, contagem de achados e principais riscos."
+    },
+    "providerInventory": {
+      "title": "Relatório de inventário de provedores",
+      "description": "Cada provedor conectado com status, risco e última verificação."
+    },
+    "identityAccess": {
+      "title": "Revisão de identidade e acesso",
+      "description": "Acesso, nível de privilégio, estado de MFA e última atividade."
+    },
+    "secretsKeys": {
+      "title": "Relatório de exposição de segredos e chaves de API",
+      "description": "Credenciais configuradas por ambiente e postura de rotação. Apenas metadados."
+    },
+    "remediationRoadmap": {
+      "title": "Roteiro de remediação",
+      "description": "Correções priorizadas com impacto, responsável e prazo."
+    },
+    "prCockpitTrail": {
+      "title": "Trilha de aprovações do PR Cockpit",
+      "description": "Cada mudança preparada, quem aprovou e o resultado da mesclagem."
+    },
+    "githubChanges": {
+      "title": "Relatório de gestão de mudanças de código",
+      "description": "Proteção de branches, PRs abertos e obsoletos, e revisão."
+    },
+    "supabaseSecurity": {
+      "title": "Relatório de segurança do banco de dados",
+      "description": "Cobertura de RLS, buckets públicos e uso do papel de serviço."
+    },
+    "stripeConfig": {
+      "title": "Relatório de configuração de cobrança",
+      "description": "Produtos, preços, cobertura de webhooks e consistência live/test."
+    },
+    "vercelDeployment": {
+      "title": "Relatório de implantação e variáveis de ambiente",
+      "description": "Variáveis de produção vs. pré-visualização e variáveis públicas expostas."
+    },
+    "auditLog": {
+      "title": "Log de auditoria e linha do tempo de atividade",
+      "description": "Ações, atores e resultados registrados no log de auditoria do Hub."
+    },
+    "complianceReadiness": {
+      "title": "Matriz de prontidão para conformidade",
+      "description": "Prontidão para SOC 2, ISO 27001, NIST CSF e CIS. Apenas prontidão."
+    }
+  },
+  "severity": {
+    "critical": "Crítico",
+    "high": "Alto",
+    "medium": "Médio",
+    "low": "Baixo",
+    "info": "Info"
+  },
+  "common": {
+    "overallScore": "Pontuação geral de prontidão",
+    "findings": "Achados",
+    "evidenceRequired": "Evidência necessária",
+    "topRisks": "Principais riscos"
+  },
+  "finding": {
+    "staleIdentity": {
+      "title": "Identidade inativa: {principal} ({provider})",
+      "detail": "Sem atividade registrada por {days} dias (limite {threshold}).",
+      "recommendation": "Revise se este acesso ainda é necessário; remova ou rotacione se não.",
+      "impact": "Credenciais não usadas ampliam a superfície de ataque sem benefício."
+    },
+    "neverUsedIdentity": {
+      "title": "Identidade nunca usada: {principal} ({provider})",
+      "detail": "Criada há {days} dias sem login ou uso registrados.",
+      "recommendation": "Confirme se este principal é necessário; remova se nunca foi ativado.",
+      "impact": "Contas dormentes são um ponto de entrada comum para atacantes."
+    },
+    "privilegedNoMfa": {
+      "title": "Conta privilegiada sem MFA: {principal} ({provider})",
+      "detail": "O papel \"{role}\" tem acesso de administrador, mas o MFA está desativado.",
+      "recommendation": "Exija e ative o MFA nesta conta imediatamente.",
+      "impact": "Uma única senha roubada concede controle administrativo total."
+    },
+    "mfaStateUnavailable": {
+      "title": "Estado de MFA indisponível para {count} identidade(s) privilegiada(s)",
+      "detail": "Esses provedores não expõem o estado de MFA por conta via API.",
+      "recommendation": "Confirme que o MFA é exigido e anexe evidências dessas contas."
+    },
+    "providerError": {
+      "title": "O provedor \"{provider}\" está em estado de erro",
+      "detail": "O Hub relata {provider} com erro.",
+      "recommendation": "Verifique novamente a conexão e as credenciais de {provider}."
+    },
+    "stripeReadFail": {
+      "title": "Não foi possível ler a configuração do Stripe",
+      "detail": "A chamada à API do Stripe falhou durante a coleta.",
+      "recommendation": "Verifique se STRIPE_SECRET_KEY está definida e pode ler preços e webhooks.",
+      "impact": "A postura de cobrança é desconhecida até o Stripe ficar acessível."
+    },
+    "stripePriceMismatch": {
+      "title": "Incompatibilidade de preço/ambiente do Stripe",
+      "detail": "{name} aponta para um preço que não está ativo no Stripe.",
+      "recommendation": "Aponte a variável para um preço ativo ou ative o preço referenciado.",
+      "impact": "O checkout pode referenciar um preço inexistente, quebrando compras."
+    },
+    "stripeWebhookNone": {
+      "title": "Nenhum endpoint de webhook do Stripe configurado",
+      "detail": "O Stripe não retornou endpoints de webhook.",
+      "recommendation": "Adicione um endpoint de webhook para eventos de pagamento e assinatura.",
+      "impact": "Pagamentos falhos e cancelamentos podem não se propagar ao app."
+    },
+    "stripeWebhookMissingEvent": {
+      "title": "Webhook do Stripe sem \"{event}\"",
+      "detail": "Nenhum endpoint de webhook configurado assina {event}.",
+      "recommendation": "Adicione {event} a um endpoint de webhook para o app reagir.",
+      "impact": "Eventos de cobrança importantes não são entregues à plataforma."
+    },
+    "stripeWebhookUnverified": {
+      "title": "Cobertura de eventos do webhook do Stripe não verificada",
+      "detail": "Existem endpoints de webhook, mas sua lista de eventos não foi coletada.",
+      "recommendation": "Confirme que cada endpoint assina os eventos necessários."
+    },
+    "supabaseHealthFail": {
+      "title": "A verificação de saúde do Supabase falhou",
+      "detail": "A verificação de acessibilidade do Supabase não teve êxito.",
+      "recommendation": "Verifique a URL do projeto, a chave de service-role e se o banco está online.",
+      "impact": "A disponibilidade da camada de dados principal não é confirmada."
+    },
+    "serviceRoleInClient": {
+      "title": "Chave de service-role acessível pelo código cliente",
+      "detail": "A chave de service-role (que ignora RLS) foi detectada em um caminho exposto ao cliente.",
+      "recommendation": "Mova todo uso do service-role para o servidor e rotacione a chave imediatamente.",
+      "impact": "Qualquer visitante poderia extrair acesso total ao banco — risco grave de vazamento."
+    },
+    "rlsDisabled": {
+      "title": "A tabela \"{table}\" está com RLS desativado",
+      "detail": "A segurança em nível de linha não está ativada em {table}.",
+      "recommendation": "Ative o RLS em {table} e adicione políticas de acesso explícitas.",
+      "impact": "Sem RLS, uma chave anônima vazada pode ler ou gravar nesta tabela diretamente."
+    },
+    "rlsUnverified": {
+      "title": "Cobertura de RLS não verificada",
+      "detail": "O estado de RLS por tabela não foi coletado nesta execução.",
+      "recommendation": "Enumere as tabelas e confirme o RLS em cada tabela com dados de usuário."
+    },
+    "publicBucket": {
+      "title": "O bucket de armazenamento \"{bucket}\" é público",
+      "detail": "O bucket \"{bucket}\" permite acesso público.",
+      "recommendation": "Confirme se o acesso público é intencional; senão, torne-o privado com URLs assinadas.",
+      "impact": "Buckets públicos podem expor arquivos enviados por usuários ou internos."
+    },
+    "vercelNotConnected": {
+      "title": "Vercel não conectado",
+      "detail": "Nenhum token do Vercel configurado, então a implantação não pode ser avaliada.",
+      "recommendation": "Conecte o Vercel para incluir verificações de implantação e variáveis na auditoria."
+    },
+    "publicSensitiveEnv": {
+      "title": "Variável pública parece sensível: {name}",
+      "detail": "{name} é exposta ao navegador (NEXT_PUBLIC_), mas o nome sugere um segredo.",
+      "recommendation": "Renomeie como variável apenas de servidor (remova NEXT_PUBLIC_) e rotacione o valor.",
+      "impact": "Valores secretos enviados ao navegador são legíveis por qualquer um."
+    },
+    "envScopeDrift": {
+      "title": "As variáveis de Produção e Pré-visualização diferem",
+      "detail": "Apenas em produção: {onlyProd}. Apenas em pré-visualização: {onlyPreview}.",
+      "recommendation": "Concilie os nomes de variáveis entre escopos para a pré-visualização refletir produção.",
+      "impact": "Implantações de pré-visualização podem se comportar de forma diferente, mascarando bugs."
+    },
+    "githubReadFail": {
+      "title": "Não foi possível ler o GitHub",
+      "detail": "A chamada à API do GitHub falhou durante a coleta.",
+      "recommendation": "Verifique o token do GitHub e seu escopo de repositório."
+    },
+    "branchProtectionUnverified": {
+      "title": "Proteção de branch não verificada",
+      "detail": "O estado de proteção da branch padrão não foi coletado.",
+      "recommendation": "Confirme que a branch padrão exige revisão de PR antes da mesclagem."
+    },
+    "branchProtectionMissing": {
+      "title": "A branch padrão \"{branch}\" não exige revisão de PR",
+      "detail": "Mudanças podem ser mescladas à branch padrão sem revisão de aprovação.",
+      "recommendation": "Ative a proteção de branch e exija ao menos uma revisão de aprovação.",
+      "impact": "O código de produção pode mudar sem uma segunda revisão."
+    },
+    "staleBranches": {
+      "title": "{count} branch(es) obsoleta(s) com mais de {days} dias",
+      "detail": "Branches obsoletas: {names}.",
+      "recommendation": "Revise e exclua branches mescladas ou abandonadas.",
+      "impact": "Branches obsoletas geram confusão e podem ter configuração desatualizada."
+    },
+    "clientExposedSecret": {
+      "title": "Segredo exposto ao cliente: {name}",
+      "detail": "{name} parece ser um segredo, mas está exposto ao cliente.",
+      "recommendation": "Mova para o servidor e rotacione imediatamente.",
+      "impact": "Um segredo de produção vazado pode ser abusado por qualquer um."
+    },
+    "rotationUnknown": {
+      "title": "Idade de rotação desconhecida para {count} segredo(s)",
+      "detail": "As APIs dos provedores não expõem as datas da última rotação dessas credenciais.",
+      "recommendation": "Registre as datas de rotação no Key Vault e defina uma política de rotação."
+    },
+    "backupTestMissing": {
+      "title": "Sem registro de teste de recuperação de backup",
+      "detail": "Nenhuma evidência de teste de backup/restauração do banco foi coletada.",
+      "recommendation": "Realize um teste de restauração e anexe o resultado."
+    }
+  }
+}

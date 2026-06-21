@@ -394,5 +394,27 @@
       "title": "Plan działań naprawczych",
       "desc": "Priorytetowe poprawki wg pilności."
     }
+  },
+  "usage": {
+    "title": "Użycie i koszt AI",
+    "subtitle": "Zużycie tokenów i szacowany koszt funkcji AI w ciągu ostatnich {n} dni. Koszt jest szacunkowy; liczby tokenów są dokładne.",
+    "totalCost": "Szac. koszt",
+    "calls": "Wywołania",
+    "totalTokens": "Łączne tokeny",
+    "cacheHit": "Wejście z pamięci",
+    "byFeature": "Wg funkcji",
+    "byUser": "Najwięksi konsumenci",
+    "byUserHint": "Najwyższy szacowany koszt najpierw — podstawa rozliczeń lub limitów per użytkownik.",
+    "col": {
+      "feature": "Funkcja",
+      "calls": "Wywołania",
+      "tokens": "Tokeny",
+      "cost": "Szac. koszt",
+      "user": "Użytkownik"
+    },
+    "empty": "Brak zarejestrowanego użycia.",
+    "loading": "Ładowanie użycia…",
+    "loadError": "Nie można załadować użycia.",
+    "fetchError": "Błąd: {msg}"
   }
 }

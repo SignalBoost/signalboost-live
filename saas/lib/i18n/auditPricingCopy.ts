@@ -143,8 +143,8 @@ const TIER_FACTS: Record<string, {
   name: string; price: string; files: string; history: number; seats: string; support: string; popular?: boolean
 }> = {
   starter:    { name: 'Starter',    price: '$29',  files: '20',        history: 30,  seats: '3',         support: 'email' },
-  growth:     { name: 'Growth',     price: '$79',  files: '40',        history: 90,  seats: '10',        support: 'priority', popular: true },
-  pro:        { name: 'Pro',        price: '$199', files: '60',        history: 180, seats: '25',        support: 'priority' },
+  growth:     { name: 'Growth',     price: '$79',  files: '40',        history: 90,  seats: '10',        support: 'priority' },
+  pro:        { name: 'Pro',        price: '$199', files: '60',        history: 180, seats: '25',        support: 'priority', popular: true },
   enterprise: { name: 'Enterprise', price: '$599', files: 'Unlimited', history: 365, seats: 'Unlimited', support: 'dedicated' },
 }
 const TIER_IDS = ['starter', 'growth', 'pro', 'enterprise']
@@ -170,6 +170,41 @@ const EXTRA: Record<AuditLocale, { loading: string; error: string; enterpriseHre
         desc: { starter: 'Для авторов, которые часто публикуют.', growth: 'Для команд, аудитирующих постоянно.', pro: 'Высокообъёмное сканирование для занятых команд.', enterprise: 'Безграничный масштаб и выделенная поддержка.' } },
 }
 
+// Per-tier patch-generation line (strictly gated). A leading ✓/❌ is rendered by
+// the pricing page as a coloured mark; Starter is read-only (no patch generation).
+const PATCH_BY_TIER: Record<AuditLocale, Record<string, string>> = {
+  en: {
+    starter:    '❌ Read-Only Reports (No AI patch generation)',
+    growth:     '✓ Throttled AI patch generation (40 max files)',
+    pro:        '✓ High-Volume AI Patch Generation & Automated Remediation (60 max files)',
+    enterprise: '✓ Unlimited AI Patch Generation & Automated Remediation',
+  },
+  es: {
+    starter:    '❌ Informes de solo lectura (sin generación de parches con IA)',
+    growth:     '✓ Generación de parches con IA limitada (40 archivos máx.)',
+    pro:        '✓ Generación de parches con IA de alto volumen y remediación automatizada (60 archivos máx.)',
+    enterprise: '✓ Generación de parches con IA ilimitada y remediación automatizada',
+  },
+  pt: {
+    starter:    '❌ Relatórios somente leitura (sem geração de correções com IA)',
+    growth:     '✓ Geração de correções com IA limitada (40 arquivos máx.)',
+    pro:        '✓ Geração de correções com IA de alto volume e remediação automatizada (60 arquivos máx.)',
+    enterprise: '✓ Geração de correções com IA ilimitada e remediação automatizada',
+  },
+  pl: {
+    starter:    '❌ Raporty tylko do odczytu (bez generowania poprawek AI)',
+    growth:     '✓ Ograniczone generowanie poprawek AI (maks. 40 plików)',
+    pro:        '✓ Wysokowydajne generowanie poprawek AI i automatyczna naprawa (maks. 60 plików)',
+    enterprise: '✓ Nieograniczone generowanie poprawek AI i automatyczna naprawa',
+  },
+  ru: {
+    starter:    '❌ Отчёты только для чтения (без генерации исправлений ИИ)',
+    growth:     '✓ Ограниченная генерация исправлений ИИ (до 40 файлов)',
+    pro:        '✓ Высокообъёмная генерация исправлений ИИ и автоматическое исправление (до 60 файлов)',
+    enterprise: '✓ Неограниченная генерация исправлений ИИ и автоматическое исправление',
+  },
+}
+
 export function getAuditPricingCopy(lang: string): AuditPageCopy {
   const loc: AuditLocale = (['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as AuditLocale
   const L = AUDIT_PRICING_COPY[loc] || AUDIT_PRICING_COPY.en
@@ -189,7 +224,7 @@ export function getAuditPricingCopy(lang: string): AuditPageCopy {
       `${audits} · ${L['auditPricing.feat.audits']}`,
       `${files} · ${L['auditPricing.feat.maxFiles']}`,
       `${historyDays} · ${L['auditPricing.feat.history']}`,
-      L['auditPricing.feat.patch'],
+      (PATCH_BY_TIER[loc] && PATCH_BY_TIER[loc][id]) || L['auditPricing.feat.patch'],
       `${seats} · ${L['auditPricing.feat.seats']}`,
       `${L['auditPricing.support.' + f.support]} · ${L['auditPricing.feat.support']}`,
     ]

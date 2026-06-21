@@ -1,308 +1,308 @@
 {
   "report": {
     "executiveSummary": {
-      "title": "Resumen ejecutivo de riesgos",
-      "description": "Puntuación general de preparación, recuento de hallazgos y riesgos principales."
+      "title": "Resumo executivo de riscos",
+      "description": "Pontuação geral de prontidão, contagem de achados e principais riscos."
     },
     "providerInventory": {
-      "title": "Informe de inventario de proveedores",
-      "description": "Cada proveedor conectado con estado, riesgo y última verificación."
+      "title": "Relatório de inventário de provedores",
+      "description": "Cada provedor conectado com status, risco e última verificação."
     },
     "identityAccess": {
-      "title": "Revisión de identidad y acceso",
-      "description": "Acceso, nivel de privilegio, estado de MFA y última actividad."
+      "title": "Revisão de identidade e acesso",
+      "description": "Acesso, nível de privilégio, estado de MFA e última atividade."
     },
     "secretsKeys": {
-      "title": "Informe de exposición de secretos y claves API",
-      "description": "Credenciales configuradas por entorno y estado de rotación. Solo metadatos."
+      "title": "Relatório de exposição de segredos e chaves de API",
+      "description": "Credenciais configuradas por ambiente e postura de rotação. Apenas metadados."
     },
     "remediationRoadmap": {
-      "title": "Hoja de ruta de remediación",
-      "description": "Correcciones priorizadas con impacto, responsable y fecha límite."
+      "title": "Roteiro de remediação",
+      "description": "Correções priorizadas com impacto, responsável e prazo."
     },
     "prCockpitTrail": {
-      "title": "Registro de aprobaciones de PR Cockpit",
-      "description": "Cada cambio preparado, quién lo aprobó y el resultado de la fusión."
+      "title": "Trilha de aprovações do PR Cockpit",
+      "description": "Cada mudança preparada, quem aprovou e o resultado da mesclagem."
     },
     "githubChanges": {
-      "title": "Informe de gestión de cambios de código",
-      "description": "Protección de ramas, PR abiertos y obsoletos, y revisión."
+      "title": "Relatório de gestão de mudanças de código",
+      "description": "Proteção de branches, PRs abertos e obsoletos, e revisão."
     },
     "supabaseSecurity": {
-      "title": "Informe de seguridad de base de datos",
-      "description": "Cobertura de RLS, buckets públicos y uso del rol de servicio."
+      "title": "Relatório de segurança do banco de dados",
+      "description": "Cobertura de RLS, buckets públicos e uso do papel de serviço."
     },
     "stripeConfig": {
-      "title": "Informe de configuración de facturación",
-      "description": "Productos, precios, cobertura de webhooks y coherencia live/test."
+      "title": "Relatório de configuração de cobrança",
+      "description": "Produtos, preços, cobertura de webhooks e consistência live/test."
     },
     "vercelDeployment": {
-      "title": "Informe de despliegue y variables de entorno",
-      "description": "Variables de producción vs. vista previa y variables públicas expuestas."
+      "title": "Relatório de implantação e variáveis de ambiente",
+      "description": "Variáveis de produção vs. pré-visualização e variáveis públicas expostas."
     },
     "auditLog": {
-      "title": "Registro de auditoría y cronología de actividad",
-      "description": "Acciones, actores y resultados registrados en el log de auditoría del Hub."
+      "title": "Log de auditoria e linha do tempo de atividade",
+      "description": "Ações, atores e resultados registrados no log de auditoria do Hub."
     },
     "complianceReadiness": {
-      "title": "Matriz de preparación para cumplimiento",
-      "description": "Preparación frente a SOC 2, ISO 27001, NIST CSF y CIS. Solo preparación."
+      "title": "Matriz de prontidão para conformidade",
+      "description": "Prontidão para SOC 2, ISO 27001, NIST CSF e CIS. Apenas prontidão."
     }
   },
   "severity": {
     "critical": "Crítico",
     "high": "Alto",
-    "medium": "Medio",
-    "low": "Bajo",
+    "medium": "Médio",
+    "low": "Baixo",
     "info": "Info"
   },
   "common": {
-    "overallScore": "Puntuación general de preparación",
-    "findings": "Hallazgos",
-    "evidenceRequired": "Se requiere evidencia",
-    "topRisks": "Riesgos principales",
-    "recommendation": "Recomendación",
+    "overallScore": "Pontuação geral de prontidão",
+    "findings": "Achados",
+    "evidenceRequired": "Evidência necessária",
+    "topRisks": "Principais riscos",
+    "recommendation": "Recomendação",
     "impact": "Impacto"
   },
   "finding": {
     "staleIdentity": {
-      "title": "Identidad inactiva: {principal} ({provider})",
-      "detail": "Sin actividad registrada durante {days} días (umbral {threshold}).",
-      "recommendation": "Revise si este acceso sigue siendo necesario; elimínelo o rótelo si no.",
-      "impact": "Las credenciales sin uso amplían la superficie de ataque sin beneficio."
+      "title": "Identidade inativa: {principal} ({provider})",
+      "detail": "Sem atividade registrada por {days} dias (limite {threshold}).",
+      "recommendation": "Revise se este acesso ainda é necessário; remova ou rotacione se não.",
+      "impact": "Credenciais não usadas ampliam a superfície de ataque sem benefício."
     },
     "neverUsedIdentity": {
-      "title": "Identidad nunca usada: {principal} ({provider})",
-      "detail": "Creada hace {days} días sin inicio de sesión ni uso registrados.",
-      "recommendation": "Confirme que este principal es necesario; elimínelo si nunca se activó.",
-      "impact": "Las cuentas inactivas son un punto de entrada común para atacantes."
+      "title": "Identidade nunca usada: {principal} ({provider})",
+      "detail": "Criada há {days} dias sem login ou uso registrados.",
+      "recommendation": "Confirme se este principal é necessário; remova se nunca foi ativado.",
+      "impact": "Contas dormentes são um ponto de entrada comum para atacantes."
     },
     "privilegedNoMfa": {
-      "title": "Cuenta privilegiada sin MFA: {principal} ({provider})",
-      "detail": "El rol \"{role}\" tiene acceso de administrador pero MFA está deshabilitado.",
-      "recommendation": "Exija y habilite MFA en esta cuenta de inmediato.",
-      "impact": "Una sola contraseña robada otorga control administrativo total."
+      "title": "Conta privilegiada sem MFA: {principal} ({provider})",
+      "detail": "O papel \"{role}\" tem acesso de administrador, mas o MFA está desativado.",
+      "recommendation": "Exija e ative o MFA nesta conta imediatamente.",
+      "impact": "Uma única senha roubada concede controle administrativo total."
     },
     "mfaStateUnavailable": {
-      "title": "Estado de MFA no disponible para {count} identidad(es) privilegiada(s)",
-      "detail": "Estos proveedores no exponen el estado de MFA por cuenta vía API.",
-      "recommendation": "Confirme que MFA está aplicado y adjunte evidencia de estas cuentas."
+      "title": "Estado de MFA indisponível para {count} identidade(s) privilegiada(s)",
+      "detail": "Esses provedores não expõem o estado de MFA por conta via API.",
+      "recommendation": "Confirme que o MFA é exigido e anexe evidências dessas contas."
     },
     "providerError": {
-      "title": "El proveedor \"{provider}\" está en estado de error",
-      "detail": "El Hub informa que {provider} tiene un error.",
-      "recommendation": "Vuelva a verificar la conexión y las credenciales de {provider}."
+      "title": "O provedor \"{provider}\" está em estado de erro",
+      "detail": "O Hub relata {provider} com erro.",
+      "recommendation": "Verifique novamente a conexão e as credenciais de {provider}."
     },
     "stripeReadFail": {
-      "title": "No se pudo leer la configuración de Stripe",
-      "detail": "La llamada a la API de Stripe falló durante la recopilación.",
-      "recommendation": "Verifique que STRIPE_SECRET_KEY esté configurada y pueda leer precios y webhooks.",
-      "impact": "El estado de facturación es desconocido hasta que Stripe sea accesible."
+      "title": "Não foi possível ler a configuração do Stripe",
+      "detail": "A chamada à API do Stripe falhou durante a coleta.",
+      "recommendation": "Verifique se STRIPE_SECRET_KEY está definida e pode ler preços e webhooks.",
+      "impact": "A postura de cobrança é desconhecida até o Stripe ficar acessível."
     },
     "stripePriceMismatch": {
-      "title": "Discrepancia de precio/entorno de Stripe",
-      "detail": "{name} apunta a un precio que no está activo en Stripe.",
-      "recommendation": "Apunte la variable a un precio activo, o active el precio referenciado.",
-      "impact": "El checkout puede referenciar un precio inexistente, rompiendo las compras."
+      "title": "Incompatibilidade de preço/ambiente do Stripe",
+      "detail": "{name} aponta para um preço que não está ativo no Stripe.",
+      "recommendation": "Aponte a variável para um preço ativo ou ative o preço referenciado.",
+      "impact": "O checkout pode referenciar um preço inexistente, quebrando compras."
     },
     "stripeWebhookNone": {
-      "title": "No hay endpoint de webhook de Stripe configurado",
-      "detail": "Stripe no devolvió endpoints de webhook.",
-      "recommendation": "Agregue un endpoint de webhook para eventos de pago y de suscripción.",
-      "impact": "Los pagos fallidos y cancelaciones pueden no propagarse a la app."
+      "title": "Nenhum endpoint de webhook do Stripe configurado",
+      "detail": "O Stripe não retornou endpoints de webhook.",
+      "recommendation": "Adicione um endpoint de webhook para eventos de pagamento e assinatura.",
+      "impact": "Pagamentos falhos e cancelamentos podem não se propagar ao app."
     },
     "stripeWebhookMissingEvent": {
-      "title": "Falta el evento \"{event}\" en el webhook de Stripe",
-      "detail": "Ningún endpoint de webhook configurado está suscrito a {event}.",
-      "recommendation": "Agregue {event} a un endpoint de webhook para que la app reaccione.",
-      "impact": "Eventos de facturación importantes no se entregan a la plataforma."
+      "title": "Webhook do Stripe sem \"{event}\"",
+      "detail": "Nenhum endpoint de webhook configurado assina {event}.",
+      "recommendation": "Adicione {event} a um endpoint de webhook para o app reagir.",
+      "impact": "Eventos de cobrança importantes não são entregues à plataforma."
     },
     "stripeWebhookUnverified": {
-      "title": "Cobertura de eventos del webhook de Stripe no verificada",
-      "detail": "Existen endpoints de webhook pero no se recopiló su lista de eventos.",
-      "recommendation": "Confirme que cada endpoint se suscribe a los eventos requeridos."
+      "title": "Cobertura de eventos do webhook do Stripe não verificada",
+      "detail": "Existem endpoints de webhook, mas sua lista de eventos não foi coletada.",
+      "recommendation": "Confirme que cada endpoint assina os eventos necessários."
     },
     "supabaseHealthFail": {
-      "title": "La verificación de estado de Supabase falló",
-      "detail": "La verificación de accesibilidad de Supabase no tuvo éxito.",
-      "recommendation": "Verifique la URL del proyecto, la clave de rol de servicio y que la base de datos esté en línea.",
-      "impact": "No se confirma la disponibilidad de la capa de datos central."
+      "title": "A verificação de saúde do Supabase falhou",
+      "detail": "A verificação de acessibilidade do Supabase não teve êxito.",
+      "recommendation": "Verifique a URL do projeto, a chave de service-role e se o banco está online.",
+      "impact": "A disponibilidade da camada de dados principal não é confirmada."
     },
     "serviceRoleInClient": {
-      "title": "Clave de rol de servicio accesible desde el código cliente",
-      "detail": "La clave de rol de servicio (que omite RLS) se detectó en una ruta expuesta al cliente.",
-      "recommendation": "Mueva todo uso del rol de servicio al servidor y rote la clave de inmediato.",
-      "impact": "Cualquier visitante podría extraer acceso total a la base de datos — riesgo grave de filtración."
+      "title": "Chave de service-role acessível pelo código cliente",
+      "detail": "A chave de service-role (que ignora RLS) foi detectada em um caminho exposto ao cliente.",
+      "recommendation": "Mova todo uso do service-role para o servidor e rotacione a chave imediatamente.",
+      "impact": "Qualquer visitante poderia extrair acesso total ao banco — risco grave de vazamento."
     },
     "rlsDisabled": {
-      "title": "La tabla \"{table}\" tiene RLS deshabilitado",
-      "detail": "La seguridad a nivel de fila no está habilitada en {table}.",
-      "recommendation": "Habilite RLS en {table} y agregue políticas de acceso explícitas.",
-      "impact": "Sin RLS, una clave anónima filtrada puede leer o escribir esta tabla directamente."
+      "title": "A tabela \"{table}\" está com RLS desativado",
+      "detail": "A segurança em nível de linha não está ativada em {table}.",
+      "recommendation": "Ative o RLS em {table} e adicione políticas de acesso explícitas.",
+      "impact": "Sem RLS, uma chave anônima vazada pode ler ou gravar nesta tabela diretamente."
     },
     "rlsUnverified": {
-      "title": "Cobertura de RLS no verificada",
-      "detail": "No se recopiló el estado de RLS por tabla en esta ejecución.",
-      "recommendation": "Enumere las tablas y confirme que RLS está habilitado en cada tabla con datos de usuario."
+      "title": "Cobertura de RLS não verificada",
+      "detail": "O estado de RLS por tabela não foi coletado nesta execução.",
+      "recommendation": "Enumere as tabelas e confirme o RLS em cada tabela com dados de usuário."
     },
     "publicBucket": {
-      "title": "El bucket de almacenamiento \"{bucket}\" es público",
-      "detail": "El bucket \"{bucket}\" permite acceso público.",
-      "recommendation": "Confirme que el acceso público es intencional; si no, hágalo privado con URLs firmadas.",
-      "impact": "Los buckets públicos pueden exponer archivos subidos por usuarios o internos."
+      "title": "O bucket de armazenamento \"{bucket}\" é público",
+      "detail": "O bucket \"{bucket}\" permite acesso público.",
+      "recommendation": "Confirme se o acesso público é intencional; senão, torne-o privado com URLs assinadas.",
+      "impact": "Buckets públicos podem expor arquivos enviados por usuários ou internos."
     },
     "vercelNotConnected": {
-      "title": "Vercel no conectado",
-      "detail": "No hay token de Vercel configurado, por lo que no se puede evaluar el despliegue.",
-      "recommendation": "Conecte Vercel para incluir verificaciones de despliegue y variables en la auditoría."
+      "title": "Vercel não conectado",
+      "detail": "Nenhum token do Vercel configurado, então a implantação não pode ser avaliada.",
+      "recommendation": "Conecte o Vercel para incluir verificações de implantação e variáveis na auditoria."
     },
     "publicSensitiveEnv": {
-      "title": "Variable pública parece sensible: {name}",
-      "detail": "{name} está expuesta al navegador (NEXT_PUBLIC_) pero su nombre sugiere un secreto.",
-      "recommendation": "Renómbrela como variable solo de servidor (quite NEXT_PUBLIC_) y rote el valor.",
-      "impact": "Los valores secretos enviados al navegador son legibles por cualquiera."
+      "title": "Variável pública parece sensível: {name}",
+      "detail": "{name} é exposta ao navegador (NEXT_PUBLIC_), mas o nome sugere um segredo.",
+      "recommendation": "Renomeie como variável apenas de servidor (remova NEXT_PUBLIC_) e rotacione o valor.",
+      "impact": "Valores secretos enviados ao navegador são legíveis por qualquer um."
     },
     "envScopeDrift": {
-      "title": "Las variables de Producción y Vista previa difieren",
-      "detail": "Solo en producción: {onlyProd}. Solo en vista previa: {onlyPreview}.",
-      "recommendation": "Concilie los nombres de variables entre entornos para que vista previa refleje producción.",
-      "impact": "Los despliegues de vista previa pueden comportarse distinto a producción, ocultando errores."
+      "title": "As variáveis de Produção e Pré-visualização diferem",
+      "detail": "Apenas em produção: {onlyProd}. Apenas em pré-visualização: {onlyPreview}.",
+      "recommendation": "Concilie os nomes de variáveis entre escopos para a pré-visualização refletir produção.",
+      "impact": "Implantações de pré-visualização podem se comportar de forma diferente, mascarando bugs."
     },
     "githubReadFail": {
-      "title": "No se pudo leer GitHub",
-      "detail": "La llamada a la API de GitHub falló durante la recopilación.",
-      "recommendation": "Verifique el token de GitHub y su alcance de repositorio."
+      "title": "Não foi possível ler o GitHub",
+      "detail": "A chamada à API do GitHub falhou durante a coleta.",
+      "recommendation": "Verifique o token do GitHub e seu escopo de repositório."
     },
     "branchProtectionUnverified": {
-      "title": "Protección de rama no verificada",
-      "detail": "No se recopiló el estado de protección de la rama predeterminada.",
-      "recommendation": "Confirme que la rama predeterminada requiere revisión de PR antes de fusionar."
+      "title": "Proteção de branch não verificada",
+      "detail": "O estado de proteção da branch padrão não foi coletado.",
+      "recommendation": "Confirme que a branch padrão exige revisão de PR antes da mesclagem."
     },
     "branchProtectionMissing": {
-      "title": "La rama predeterminada \"{branch}\" no requiere revisión de PR",
-      "detail": "Los cambios pueden fusionarse a la rama predeterminada sin una revisión de aprobación.",
-      "recommendation": "Habilite la protección de rama y exija al menos una revisión de aprobación.",
-      "impact": "El código de producción puede cambiar sin una segunda revisión."
+      "title": "A branch padrão \"{branch}\" não exige revisão de PR",
+      "detail": "Mudanças podem ser mescladas à branch padrão sem revisão de aprovação.",
+      "recommendation": "Ative a proteção de branch e exija ao menos uma revisão de aprovação.",
+      "impact": "O código de produção pode mudar sem uma segunda revisão."
     },
     "staleBranches": {
-      "title": "{count} rama(s) obsoleta(s) de más de {days} días",
-      "detail": "Ramas obsoletas: {names}.",
-      "recommendation": "Revise y elimine las ramas fusionadas o abandonadas.",
-      "impact": "Las ramas obsoletas generan confusión y pueden tener configuración desactualizada."
+      "title": "{count} branch(es) obsoleta(s) com mais de {days} dias",
+      "detail": "Branches obsoletas: {names}.",
+      "recommendation": "Revise e exclua branches mescladas ou abandonadas.",
+      "impact": "Branches obsoletas geram confusão e podem ter configuração desatualizada."
     },
     "clientExposedSecret": {
-      "title": "Secreto expuesto al cliente: {name}",
-      "detail": "{name} parece ser un secreto pero está expuesto al cliente.",
-      "recommendation": "Muévalo al servidor y rótelo de inmediato.",
-      "impact": "Un secreto de producción filtrado puede ser abusado por cualquiera."
+      "title": "Segredo exposto ao cliente: {name}",
+      "detail": "{name} parece ser um segredo, mas está exposto ao cliente.",
+      "recommendation": "Mova para o servidor e rotacione imediatamente.",
+      "impact": "Um segredo de produção vazado pode ser abusado por qualquer um."
     },
     "rotationUnknown": {
-      "title": "Antigüedad de rotación desconocida para {count} secreto(s)",
-      "detail": "Las APIs de los proveedores no exponen las fechas de última rotación de estas credenciales.",
-      "recommendation": "Registre las fechas de rotación en el Key Vault y defina una política de rotación."
+      "title": "Idade de rotação desconhecida para {count} segredo(s)",
+      "detail": "As APIs dos provedores não expõem as datas da última rotação dessas credenciais.",
+      "recommendation": "Registre as datas de rotação no Key Vault e defina uma política de rotação."
     },
     "backupTestMissing": {
-      "title": "No hay registro de prueba de recuperación de respaldo",
-      "detail": "No se recopiló evidencia de una prueba de respaldo/restauración de la base de datos.",
-      "recommendation": "Realice una prueba de restauración y adjunte el resultado."
+      "title": "Sem registro de teste de recuperação de backup",
+      "detail": "Nenhuma evidência de teste de backup/restauração do banco foi coletada.",
+      "recommendation": "Realize um teste de restauração e anexe o resultado."
     }
   },
-  "exec": {
-    "title": "Resumen ejecutivo de riesgos",
-    "subtitle": "Puntuación general de preparación, recuento de hallazgos y riesgos principales.",
-    "narrativeTitle": "Resumen",
-    "topRisksTitle": "Riesgos principales",
-    "noRisks": "Sin riesgos por encima del umbral de reporte.",
-    "providersTitle": "Proveedores",
-    "status": {
-      "connected": "conectado",
-      "error": "error",
-      "not_configured": "no configurado"
-    },
-    "loading": "Generando el resumen ejecutivo…",
-    "loadError": "No se pudo cargar el resumen.",
-    "fetchError": "Error: {msg}"
-  },
   "identity": {
-    "findingsTitle": "Hallazgos de acceso",
-    "noFindings": "Sin hallazgos de acceso.",
-    "tableTitle": "Todas las identidades",
-    "empty": "No se encontraron identidades.",
+    "findingsTitle": "Achados de acesso",
+    "noFindings": "Sem achados de acesso.",
+    "tableTitle": "Todas as identidades",
+    "empty": "Nenhuma identidade encontrada.",
     "never": "Nunca",
-    "daysAgo": "hace {days}d",
+    "daysAgo": "há {days}d",
     "summary": {
       "total": "Identidades",
       "privileged": "Privilegiadas",
-      "stale": "Inactivas",
-      "noMfa": "Priv. sin MFA",
-      "mfaUnknown": "MFA desconocido"
+      "stale": "Inativas",
+      "noMfa": "Priv. sem MFA",
+      "mfaUnknown": "MFA desconhecido"
     },
     "col": {
-      "principal": "Identidad",
-      "provider": "Proveedor",
+      "principal": "Identidade",
+      "provider": "Provedor",
       "kind": "Tipo",
-      "role": "Rol",
+      "role": "Papel",
       "mfa": "MFA",
-      "lastSeen": "Última actividad",
-      "flags": "Señales"
+      "lastSeen": "Última atividade",
+      "flags": "Sinais"
     },
     "kind": {
-      "user": "Usuario",
-      "service_account": "Cuenta de servicio",
-      "access_key": "Clave de acceso",
+      "user": "Usuário",
+      "service_account": "Conta de serviço",
+      "access_key": "Chave de acesso",
       "collaborator": "Colaborador",
       "token": "Token"
     },
     "mfa": {
-      "enabled": "Activado",
-      "disabled": "Desactivado",
-      "unknown": "Desconocido"
+      "enabled": "Ativado",
+      "disabled": "Desativado",
+      "unknown": "Desconhecido"
     },
     "flag": {
-      "stale": "Inactiva",
+      "stale": "Inativa",
       "neverUsed": "Nunca usada",
-      "privilegedNoMfa": "Sin MFA",
-      "mfaUnknown": "¿MFA?"
+      "privilegedNoMfa": "Sem MFA",
+      "mfaUnknown": "MFA?"
     }
   },
+  "exec": {
+    "title": "Resumo executivo de riscos",
+    "subtitle": "Pontuação geral de prontidão, contagem de achados e principais riscos.",
+    "narrativeTitle": "Resumo",
+    "topRisksTitle": "Principais riscos",
+    "noRisks": "Sem riscos acima do limite de relatório.",
+    "providersTitle": "Provedores",
+    "status": {
+      "connected": "conectado",
+      "error": "erro",
+      "not_configured": "não configurado"
+    },
+    "loading": "Gerando o resumo executivo…",
+    "loadError": "Não foi possível carregar o resumo.",
+    "fetchError": "Erro: {msg}"
+  },
   "provider": {
-    "title": "Inventario de proveedores",
-    "subtitle": "Cada proveedor conectado con estado, riesgo y última verificación.",
-    "empty": "No se encontraron proveedores.",
-    "evidenceShort": "({n} evidencia)",
-    "loading": "Cargando inventario de proveedores…",
-    "loadError": "No se pudo cargar el inventario.",
-    "fetchError": "Error: {msg}",
+    "title": "Inventário de provedores",
+    "subtitle": "Cada provedor conectado com status, risco e última verificação.",
+    "empty": "Nenhum provedor encontrado.",
+    "evidenceShort": "({n} evidência)",
+    "loading": "Carregando inventário de provedores…",
+    "loadError": "Não foi possível carregar o inventário.",
+    "fetchError": "Erro: {msg}",
     "risk": {
-      "unknown": "Desconocido"
+      "unknown": "Desconhecido"
     },
     "summary": {
-      "total": "Proveedores",
+      "total": "Provedores",
       "connected": "Conectados",
-      "error": "Con error",
-      "notConfigured": "No configurados"
+      "error": "Com erro",
+      "notConfigured": "Não configurados"
     },
     "col": {
-      "provider": "Proveedor",
-      "category": "Categoría",
-      "status": "Estado",
-      "risk": "Riesgo",
-      "findings": "Hallazgos",
-      "lastChecked": "Última verificación"
+      "provider": "Provedor",
+      "category": "Categoria",
+      "status": "Status",
+      "risk": "Risco",
+      "findings": "Achados",
+      "lastChecked": "Última verificação"
     },
     "status": {
       "connected": "Conectado",
-      "error": "Error",
-      "not_configured": "No configurado",
-      "missing": "Faltante"
+      "error": "Erro",
+      "not_configured": "Não configurado",
+      "missing": "Ausente"
     },
     "category": {
-      "billing": "Facturación",
-      "database": "Base de datos",
-      "deployment": "Despliegue",
-      "change-management": "Gestión de cambios",
-      "identity": "Identidad",
-      "other": "Otro"
+      "billing": "Cobrança",
+      "database": "Banco de dados",
+      "deployment": "Implantação",
+      "change-management": "Gestão de mudanças",
+      "identity": "Identidade",
+      "other": "Outro"
     }
   }
 }

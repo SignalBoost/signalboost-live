@@ -40,7 +40,7 @@ type AuditCopy = {
   title: string; subtitle: string; viewPlans: string
   pathLabel: string; maxLabel: string; run: string; running: string
   filesScanned: string; findings: string; clean: string; emptyHint: string
-  ownerOnly: string; failed: string; category: string; recommendation: string; line: string
+  ownerOnly: string; failed: string; quotaExceeded: string; category: string; recommendation: string; line: string
   history: string; noRuns: string; refresh: string
   statusRunning: string; statusComplete: string; statusFailed: string
   detail: string; close: string; viewSource: string
@@ -56,7 +56,7 @@ const COPY: Record<string, AuditCopy> = {
     pathLabel: 'Scan path', maxLabel: 'Max files', run: 'Run audit', running: 'Running deep scan…',
     filesScanned: 'Files scanned', findings: 'Findings', clean: 'No findings — this scan came back clean.',
     emptyHint: 'Set a path and run a scan, or pick a past run.',
-    ownerOnly: 'Owner access is required to run audits.', failed: 'Audit failed',
+    ownerOnly: 'Owner access is required to run audits.', failed: 'Audit failed', quotaExceeded: 'Monthly limit reached: {used}/{cap} scans used. Upgrade your plan to run more.',
     category: 'Category', recommendation: 'Recommendation', line: 'Line',
     history: 'Run history', noRuns: 'No runs yet.', refresh: 'Refresh',
     statusRunning: 'Running', statusComplete: 'Complete', statusFailed: 'Failed',
@@ -71,7 +71,7 @@ const COPY: Record<string, AuditCopy> = {
     pathLabel: 'Ruta de análisis', maxLabel: 'Archivos máx.', run: 'Ejecutar auditoría', running: 'Ejecutando análisis profundo…',
     filesScanned: 'Archivos analizados', findings: 'Hallazgos', clean: 'Sin hallazgos: este análisis salió limpio.',
     emptyHint: 'Define una ruta y ejecuta un análisis, o elige una ejecución anterior.',
-    ownerOnly: 'Se requiere acceso de propietario para ejecutar auditorías.', failed: 'La auditoría falló',
+    ownerOnly: 'Se requiere acceso de propietario para ejecutar auditorías.', failed: 'La auditoría falló', quotaExceeded: 'Límite mensual alcanzado: {used}/{cap} análisis usados. Mejora tu plan para ejecutar más.',
     category: 'Categoría', recommendation: 'Recomendación', line: 'Línea',
     history: 'Historial', noRuns: 'Aún no hay ejecuciones.', refresh: 'Actualizar',
     statusRunning: 'En curso', statusComplete: 'Completado', statusFailed: 'Falló',
@@ -86,7 +86,7 @@ const COPY: Record<string, AuditCopy> = {
     pathLabel: 'Caminho de análise', maxLabel: 'Máx. de arquivos', run: 'Executar auditoria', running: 'Executando análise profunda…',
     filesScanned: 'Arquivos analisados', findings: 'Constatações', clean: 'Nenhuma constatação — esta análise voltou limpa.',
     emptyHint: 'Defina um caminho e execute uma análise, ou escolha uma execução anterior.',
-    ownerOnly: 'É necessário acesso de proprietário para executar auditorias.', failed: 'A auditoria falhou',
+    ownerOnly: 'É necessário acesso de proprietário para executar auditorias.', failed: 'A auditoria falhou', quotaExceeded: 'Limite mensal atingido: {used}/{cap} análises usadas. Faça upgrade do seu plano para executar mais.',
     category: 'Categoria', recommendation: 'Recomendação', line: 'Linha',
     history: 'Histórico', noRuns: 'Ainda não há execuções.', refresh: 'Atualizar',
     statusRunning: 'Em execução', statusComplete: 'Concluído', statusFailed: 'Falhou',
@@ -101,7 +101,7 @@ const COPY: Record<string, AuditCopy> = {
     pathLabel: 'Ścieżka skanowania', maxLabel: 'Maks. plików', run: 'Uruchom audyt', running: 'Trwa dogłębne skanowanie…',
     filesScanned: 'Przeskanowane pliki', findings: 'Wyniki', clean: 'Brak wyników — ten skan jest czysty.',
     emptyHint: 'Ustaw ścieżkę i uruchom skan lub wybierz wcześniejsze uruchomienie.',
-    ownerOnly: 'Do uruchamiania audytów wymagany jest dostęp właściciela.', failed: 'Audyt nie powiódł się',
+    ownerOnly: 'Do uruchamiania audytów wymagany jest dostęp właściciela.', failed: 'Audyt nie powiódł się', quotaExceeded: 'Osiągnięto miesięczny limit: wykorzystano {used}/{cap} skanów. Ulepsz plan, aby uruchomić więcej.',
     category: 'Kategoria', recommendation: 'Zalecenie', line: 'Wiersz',
     history: 'Historia', noRuns: 'Brak uruchomień.', refresh: 'Odśwież',
     statusRunning: 'W toku', statusComplete: 'Zakończono', statusFailed: 'Niepowodzenie',
@@ -116,7 +116,7 @@ const COPY: Record<string, AuditCopy> = {
     pathLabel: 'Путь сканирования', maxLabel: 'Макс. файлов', run: 'Запустить аудит', running: 'Выполняется глубокое сканирование…',
     filesScanned: 'Просканировано файлов', findings: 'Замечания', clean: 'Замечаний нет — сканирование чистое.',
     emptyHint: 'Укажите путь и запустите сканирование или выберите прошлый запуск.',
-    ownerOnly: 'Для запуска аудита требуется доступ владельца.', failed: 'Аудит не выполнен',
+    ownerOnly: 'Для запуска аудита требуется доступ владельца.', failed: 'Аудит не выполнен', quotaExceeded: 'Достигнут месячный лимит: использовано {used}/{cap} проверок. Обновите план, чтобы запускать больше.',
     category: 'Категория', recommendation: 'Рекомендация', line: 'Строка',
     history: 'История запусков', noRuns: 'Запусков пока нет.', refresh: 'Обновить',
     statusRunning: 'Выполняется', statusComplete: 'Завершено', statusFailed: 'Ошибка',
@@ -247,6 +247,11 @@ async function runNew() {
         body: JSON.stringify({ prefix: prefix.trim() || 'saas/app/api', maxFiles }),
       })
       if (res.status === 403) { setError(copy.ownerOnly); setPhase(null); return }
+      if (res.status === 402) {
+        const j = (await res.json().catch(() => null)) as { used?: number; cap?: number } | null
+        setError(copy.quotaExceeded.replace('{used}', String(j?.used ?? '')).replace('{cap}', String(j?.cap ?? '')))
+        setPhase(null); return
+      }
       if (!res.body) { setError(copy.failed); setPhase(null); return }
 
       const reader = res.body.getReader()

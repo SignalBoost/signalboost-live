@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useI18n } from '@/components/i18n/I18nProvider'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
@@ -124,13 +125,14 @@ const COPY = {
 }
 
 export default function PartnersPage() {
+  const { lang: activeLang } = useI18n()
   const [lang, setLang] = useState<Lang>('en')
 
   useEffect(() => {
     setLang(getLang())
   }, [])
 
-  const c = COPY[lang]
+  const c = COPY[(activeLang in COPY ? activeLang : 'en') as keyof typeof COPY]
 
   return (
     <main style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>

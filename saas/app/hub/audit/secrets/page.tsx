@@ -5,6 +5,8 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
 import SecretsReport, { type SecretsReportView } from '@/components/audit/SecretsReport'
+import ReportExportBar from '@/components/audit/ReportExportBar'
+import { toCsv } from '@/lib/audit/exportCsv'
 
 type ApiResponse = { ok: boolean; report?: SecretsReportView; error?: string }
 const wrap: CSSProperties = { minHeight: 'calc(100vh - 80px)' }
@@ -47,5 +49,14 @@ export default function SecretsPage() {
     return <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: '#fca5a5', padding: 24 }}>{error}</main>
   }
   if (!data) return null
-  return <SecretsReport data={data} />
+  const csv = toCsv(
+    ['Name', 'Provider', 'Environment', 'Exposure', 'Rotation', 'Risk'],
+    data.rows.map(r => [r.name, r.provider, r.environment, r.publicExposed ? 'client-exposed' : 'server-only', r.rotationKnown ? 'tracked' : 'unknown', r.risk]),
+  )
+  return (
+    <>
+      <ReportExportBar filename="secrets-exposure" csv={csv} />
+      <SecretsReport data={data} />
+    </>
+  )
 }

@@ -369,5 +369,30 @@
       "next": "Alto: programar pronto.",
       "later": "Medio y bajo: planificar."
     }
+  },
+  "center": {
+    "title": "Centro de auditoría",
+    "subtitle": "Informes de preparación operativa sobre identidad, proveedores, secretos y remediación, con puntuación determinista.",
+    "open": "Abrir informe",
+    "executive": {
+      "title": "Resumen ejecutivo de riesgos",
+      "desc": "Puntuación general, recuento de hallazgos y riesgos principales."
+    },
+    "identity": {
+      "title": "Identidad y acceso",
+      "desc": "Quién tiene acceso, nivel de privilegio, MFA y última actividad."
+    },
+    "providers": {
+      "title": "Inventario de proveedores",
+      "desc": "Cada proveedor conectado con estado, riesgo y última verificación."
+    },
+    "secrets": {
+      "title": "Secretos y claves API",
+      "desc": "Credenciales configuradas por entorno y estado de rotación."
+    },
+    "remediation": {
+      "title": "Hoja de ruta de remediación",
+      "desc": "Correcciones priorizadas por urgencia."
+    }
   }
 }

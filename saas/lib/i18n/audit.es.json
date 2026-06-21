@@ -397,6 +397,10 @@
     "usage": {
       "title": "Uso y costo de IA",
       "desc": "Consumo de tokens y costo estimado por función y usuario."
+    },
+    "history": {
+      "title": "Historial de preparación",
+      "desc": "Observa tu puntuación de preparación y los hallazgos con el tiempo."
     }
   },
   "usage": {
@@ -424,5 +428,20 @@
   "export": {
     "csv": "Exportar CSV",
     "pdf": "Imprimir / Guardar PDF"
+  },
+  "history": {
+    "title": "Historial de preparación",
+    "subtitle": "Observa cómo cambia tu puntuación de preparación con el tiempo.",
+    "snapshot": "Capturar ahora",
+    "snapshotting": "Guardando…",
+    "loading": "Cargando historial…",
+    "loadError": "No se pudo cargar el historial.",
+    "fetchError": "Error: {msg}",
+    "snapshotError": "No se pudo capturar.",
+    "empty": "Aún no hay capturas. Toma la primera arriba.",
+    "trendTitle": "Puntuación a lo largo del tiempo",
+    "col": {
+      "date": "Fecha"
+    }
   }
 }

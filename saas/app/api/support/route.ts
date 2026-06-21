@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, NextResponse } from 'next/server'
+import { cachedSystem, recordUsage } from '@/lib/ai/usage'
 import { getConciergeAnswer } from '@/lib/platform/unifiedPlatform'
 import { getAccess } from '@/lib/auth/access'
 import { getLivePricing } from '@/lib/ai/tools/getPricing'
@@ -1285,12 +1286,23 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
               model,
               max_tokens: 16000,
               temperature,
-              system: systemContent,
+              system: cachedSystem(systemContent) as any, // ephemeral prompt cache: caches the tools+system prefix across the multi-turn tool loop
               messages: convo as any,
               tools: anthropicTools as any,
               tool_choice: choiceMode === 'required' ? { type: 'any' } : choiceMode === 'none' ? { type: 'none' } : { type: 'auto' },
             })
           )
+          // Meter every model call (owner Chief of Staff vs external Concierge),
+          // so external-user token cost can be attributed/billed/throttled.
+          // Fire-and-forget + resilient: never blocks or breaks the reply.
+          if (msg && (msg as any).usage) {
+            void recordUsage({
+              userId,
+              feature: isPrivileged ? 'support.chief-of-staff' : 'support.concierge',
+              model,
+              usage: (msg as any).usage,
+            })
+          }
           return msg
         } catch (err) {
           if (err instanceof Error && err.message === 'AI request timeout') return null

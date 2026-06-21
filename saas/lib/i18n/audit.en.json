@@ -264,5 +264,45 @@
       "privilegedNoMfa": "No MFA",
       "mfaUnknown": "MFA?"
     }
+  },
+  "provider": {
+    "title": "Provider Inventory",
+    "subtitle": "Every connected provider with status, risk, and last check.",
+    "empty": "No providers found.",
+    "evidenceShort": "({n} evidence)",
+    "loading": "Loading provider inventory…",
+    "loadError": "Could not load the inventory.",
+    "fetchError": "Error: {msg}",
+    "risk": {
+      "unknown": "Unknown"
+    },
+    "summary": {
+      "total": "Providers",
+      "connected": "Connected",
+      "error": "Errored",
+      "notConfigured": "Not configured"
+    },
+    "col": {
+      "provider": "Provider",
+      "category": "Category",
+      "status": "Status",
+      "risk": "Risk",
+      "findings": "Findings",
+      "lastChecked": "Last checked"
+    },
+    "status": {
+      "connected": "Connected",
+      "error": "Error",
+      "not_configured": "Not configured",
+      "missing": "Missing"
+    },
+    "category": {
+      "billing": "Billing",
+      "database": "Database",
+      "deployment": "Deployment",
+      "change-management": "Change management",
+      "identity": "Identity",
+      "other": "Other"
+    }
   }
 }

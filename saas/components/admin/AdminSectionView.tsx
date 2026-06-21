@@ -1,5 +1,6 @@
 'use client'
 
+import { useI18n } from '@/components/i18n/I18nProvider'
 import { AdminSectionConfig, translateSection } from '@/lib/admin/sections'
 import { COCKPIT_PANELS, CRM_STAGES, EXECUTIVE_RECOMMENDATIONS, FINANCIAL_LEDGER, FORECASTS, KPI_DASHBOARD } from '@/lib/platform/unifiedPlatform'
 
@@ -76,7 +77,7 @@ const COPY: Record<string, Record<string, string>> = {
     conciergeRecs: '\u0420\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u0438 \u043a\u043e\u043d\u0441\u044c\u0435\u0440\u0436\u0430',
     filters: '\u0424\u0438\u043b\u044c\u0442\u0440\u044b: \u0434\u0438\u0430\u043f\u0430\u0437\u043e\u043d \u0434\u0430\u0442 \u2022 \u043f\u0440\u043e\u0434\u0443\u043a\u0442 \u2022 \u0441\u0442\u0440\u0430\u043d\u0430 \u2022 \u043f\u043b\u0430\u043d \u2022 \u0440\u043e\u043b\u044c',
     telemetryReady: '\u0422\u0435\u043b\u0435\u043c\u0435\u0442\u0440\u0438\u044f \u0433\u043e\u0442\u043e\u0432\u0430. \u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0438\u0442\u0435 \u0430\u043d\u0430\u043b\u0438\u0442\u0438\u0447\u0435\u0441\u043a\u0438\u0435 \u0442\u0430\u0431\u043b\u0438\u0446\u044b/\u0441\u043e\u0431\u044b\u0442\u0438\u044f \u0434\u043b\u044f \u0430\u043a\u0442\u0438\u0432\u0430\u0446\u0438\u0438 \u0437\u0430\u043f\u0438\u0441\u0435\u0439 \u0432 \u0440\u0435\u0430\u043b\u044c\u043d\u043e\u043c \u0432\u0440\u0435\u043c\u0435\u043d\u0438.',
-    notTracked: '\u0415\u0449\u0451 \u043d\u0435 \u043e\u0442\u0441\u043b\u0435\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044f',
+    notTracked: '\u0415\u0449\u0451 \u043d\u0435 \u043e\u0442\u0441\u043b\u0435\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044a',
     telemetrySignal: '\u0421\u0438\u0433\u043d\u0430\u043b \u0442\u0435\u043b\u0435\u043c\u0435\u0442\u0440\u0438\u0438 \u0433\u043e\u0442\u043e\u0432',
   },
 }
@@ -89,9 +90,9 @@ function useLang(): string {
 }
 
 export default function AdminSectionView({ section: rawSection }: { section: AdminSectionConfig }) {
-  const lang = useLang()
-  const t = COPY[lang]
-  const section = translateSection(rawSection, lang)
+  const { lang: activeLang } = useI18n()
+  const t = COPY[(activeLang in COPY ? activeLang : 'en') as keyof typeof COPY]
+  const section = translateSection(rawSection, activeLang in COPY ? activeLang : 'en')
 
   return (
     <div className="sb-cockpit-stack" role="region" aria-label={`${section.title} admin console section`}>

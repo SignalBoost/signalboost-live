@@ -60,7 +60,52 @@
     "overallScore": "Ogólny wynik gotowości",
     "findings": "Ustalenia",
     "evidenceRequired": "Wymagany dowód",
-    "topRisks": "Najważniejsze ryzyka"
+    "topRisks": "Najważniejsze ryzyka",
+    "recommendation": "Rekomendacja",
+    "impact": "Wpływ"
+  },
+  "identity": {
+    "title": "Tożsamość i dostęp",
+    "generatedAt": "Wygenerowano: {date}",
+    "summary": {
+      "total": "Łącznie",
+      "privileged": "Uprzywilejowane",
+      "stale": "Nieaktywne",
+      "noMfa": "Uprzywilejowane bez MFA",
+      "mfaUnknown": "MFA nieznane",
+      "score": "Wynik"
+    },
+    "findingsTitle": "Ustalenia dotyczące tożsamości",
+    "noFindings": "Brak ustaleń dotyczących tożsamości.",
+    "tableTitle": "Wszystkie tożsamości",
+    "empty": "Nie znaleziono tożsamości.",
+    "never": "Nigdy",
+    "daysAgo": "{days}d temu",
+    "col": {
+      "principal": "Podmiot",
+      "provider": "Dostawca",
+      "kind": "Typ",
+      "mfa": "MFA",
+      "lastSeen": "Ostatnia aktywność",
+      "flags": "Flagi"
+    },
+    "kind": {
+      "human": "Człowiek",
+      "machine": "Maszyna",
+      "service": "Usługa",
+      "unknown": "Nieznany"
+    },
+    "mfa": {
+      "enabled": "Włączone",
+      "disabled": "Wyłączone",
+      "unknown": "Nieznane"
+    },
+    "flag": {
+      "stale": "Nieaktywna",
+      "neverUsed": "Nigdy nieużyta",
+      "privilegedNoMfa": "Uprzywilejowana bez MFA",
+      "mfaUnknown": "MFA nieznane"
+    }
   },
   "finding": {
     "staleIdentity": {

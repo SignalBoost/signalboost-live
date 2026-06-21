@@ -5,6 +5,7 @@
 // i18n: en, es, pt, pl, ru
 
 import { useEffect, useState } from 'react'
+import { useI18n } from '@/components/i18n/I18nProvider'
 import { ADMIN_SIDEBAR, COCKPIT_PANELS, CRM_STAGES, EXECUTIVE_RECOMMENDATIONS, FINANCIAL_LEDGER, FORECASTS, KPI_DASHBOARD } from '@/lib/platform/unifiedPlatform'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
@@ -151,8 +152,8 @@ const COPY: Record<Lang, {
 
 const LANGS: Lang[] = ['en', 'es', 'pt', 'pl', 'ru']
 
-function detectLang(): Lang {
-  if (typeof window !== 'undefined') { const s = localStorage.getItem('signalboost_language'); if (s && (s in COPY)) return s as any }
+function getLang(): Lang {
+  if (typeof window !== 'undefined') { const s = localStorage.getItem('signalboost_language'); if (s && (s in COPY)) return s as Lang }
   if (typeof navigator === 'undefined') return 'en'
   const code = (navigator.language || '').slice(0, 2).toLowerCase()
   const map: Record<string, Lang> = { en: 'en', es: 'es', pt: 'pt', pl: 'pl', ru: 'ru' }
@@ -160,9 +161,10 @@ function detectLang(): Lang {
 }
 
 export default function AdminOverviewPage() {
+  const { lang: activeLang } = useI18n()
   const [lang, setLang] = useState<Lang>('en')
-  useEffect(() => { setLang(detectLang()) }, [])
-  const t = COPY[lang]
+  useEffect(() => { setLang(getLang()) }, [])
+  const t = COPY[(activeLang in COPY ? activeLang : 'en') as Lang]
 
   return (
     <div className="sb-cockpit-stack">

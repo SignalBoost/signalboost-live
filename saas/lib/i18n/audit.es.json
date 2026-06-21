@@ -443,5 +443,9 @@
     "col": {
       "date": "Fecha"
     }
+  },
+  "scan": {
+    "quotaExceeded": "Límite mensual alcanzado: {used}/{cap} análisis usados. Mejora tu plan para ejecutar más.",
+    "upgrade": "Mejorar plan"
   }
 }

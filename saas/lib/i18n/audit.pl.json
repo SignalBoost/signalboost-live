@@ -1,0 +1,208 @@
+{
+  "report": {
+    "executiveSummary": {
+      "title": "Podsumowanie ryzyka dla kierownictwa",
+      "description": "Ogólny wynik gotowości, liczba ustaleń i najważniejsze ryzyka."
+    },
+    "providerInventory": {
+      "title": "Raport inwentaryzacji dostawców",
+      "description": "Każdy podłączony dostawca ze statusem, ryzykiem i ostatnim sprawdzeniem."
+    },
+    "identityAccess": {
+      "title": "Przegląd tożsamości i dostępu",
+      "description": "Dostęp, poziom uprawnień, stan MFA i ostatnia aktywność."
+    },
+    "secretsKeys": {
+      "title": "Raport ekspozycji sekretów i kluczy API",
+      "description": "Skonfigurowane poświadczenia wg środowiska i stanu rotacji. Tylko metadane."
+    },
+    "remediationRoadmap": {
+      "title": "Plan działań naprawczych",
+      "description": "Priorytetowe poprawki z wpływem, właścicielem i terminem."
+    },
+    "prCockpitTrail": {
+      "title": "Ścieżka zatwierdzeń PR Cockpit",
+      "description": "Każda przygotowana zmiana, kto ją zatwierdził i wynik scalenia."
+    },
+    "githubChanges": {
+      "title": "Raport zarządzania zmianami kodu",
+      "description": "Ochrona gałęzi, otwarte i nieaktualne PR-y oraz przeglądy."
+    },
+    "supabaseSecurity": {
+      "title": "Raport bezpieczeństwa bazy danych",
+      "description": "Pokrycie RLS, publiczne buckety i użycie roli serwisowej."
+    },
+    "stripeConfig": {
+      "title": "Raport konfiguracji płatności",
+      "description": "Produkty, ceny, pokrycie webhooków i spójność live/test."
+    },
+    "vercelDeployment": {
+      "title": "Raport wdrożeń i zmiennych środowiskowych",
+      "description": "Zmienne produkcyjne vs. podglądowe i ujawnione zmienne publiczne."
+    },
+    "auditLog": {
+      "title": "Dziennik audytu i oś czasu aktywności",
+      "description": "Zarejestrowane działania, podmioty i wyniki z dziennika audytu Hub."
+    },
+    "complianceReadiness": {
+      "title": "Macierz gotowości do zgodności",
+      "description": "Gotowość względem SOC 2, ISO 27001, NIST CSF i CIS. Tylko gotowość."
+    }
+  },
+  "severity": {
+    "critical": "Krytyczny",
+    "high": "Wysoki",
+    "medium": "Średni",
+    "low": "Niski",
+    "info": "Info"
+  },
+  "common": {
+    "overallScore": "Ogólny wynik gotowości",
+    "findings": "Ustalenia",
+    "evidenceRequired": "Wymagany dowód",
+    "topRisks": "Najważniejsze ryzyka"
+  },
+  "finding": {
+    "staleIdentity": {
+      "title": "Nieaktywna tożsamość: {principal} ({provider})",
+      "detail": "Brak aktywności od {days} dni (próg {threshold}).",
+      "recommendation": "Sprawdź, czy ten dostęp jest nadal potrzebny; usuń lub zrotuj, jeśli nie.",
+      "impact": "Nieużywane poświadczenia zwiększają powierzchnię ataku bez korzyści."
+    },
+    "neverUsedIdentity": {
+      "title": "Nigdy nieużyta tożsamość: {principal} ({provider})",
+      "detail": "Utworzona {days} dni temu, bez zarejestrowanego logowania ani użycia.",
+      "recommendation": "Potwierdź, że ten podmiot jest potrzebny; usuń, jeśli nigdy nie aktywowany.",
+      "impact": "Uśpione konta to częsty punkt zaczepienia dla atakujących."
+    },
+    "privilegedNoMfa": {
+      "title": "Konto uprzywilejowane bez MFA: {principal} ({provider})",
+      "detail": "Rola \"{role}\" ma dostęp administracyjny, ale MFA jest wyłączone.",
+      "recommendation": "Natychmiast wymagaj i włącz MFA na tym koncie.",
+      "impact": "Jedno wyłudzone hasło daje pełną kontrolę administracyjną."
+    },
+    "mfaStateUnavailable": {
+      "title": "Stan MFA niedostępny dla {count} tożsamości uprzywilejowanej(ych)",
+      "detail": "Ci dostawcy nie udostępniają stanu MFA per konto przez API.",
+      "recommendation": "Potwierdź wymuszanie MFA i dołącz dowód dla tych kont."
+    },
+    "providerError": {
+      "title": "Dostawca \"{provider}\" jest w stanie błędu",
+      "detail": "Hub zgłasza błąd dla {provider}.",
+      "recommendation": "Sprawdź ponownie połączenie i poświadczenia {provider}."
+    },
+    "stripeReadFail": {
+      "title": "Nie można odczytać konfiguracji Stripe",
+      "detail": "Wywołanie API Stripe nie powiodło się podczas zbierania.",
+      "recommendation": "Sprawdź, czy STRIPE_SECRET_KEY jest ustawiony i może czytać ceny i webhooki.",
+      "impact": "Stan płatności jest nieznany, dopóki Stripe nie będzie dostępny."
+    },
+    "stripePriceMismatch": {
+      "title": "Niezgodność ceny/środowiska Stripe",
+      "detail": "{name} wskazuje cenę, która nie jest aktywna w Stripe.",
+      "recommendation": "Ustaw zmienną na aktywną cenę lub aktywuj wskazaną cenę.",
+      "impact": "Płatność może odwoływać się do nieistniejącej ceny, psując zakupy."
+    },
+    "stripeWebhookNone": {
+      "title": "Brak skonfigurowanego endpointu webhooka Stripe",
+      "detail": "Stripe nie zwrócił żadnych endpointów webhooka.",
+      "recommendation": "Dodaj endpoint webhooka dla zdarzeń płatności i cyklu subskrypcji.",
+      "impact": "Nieudane płatności i anulowania mogą nie trafić do aplikacji."
+    },
+    "stripeWebhookMissingEvent": {
+      "title": "Webhook Stripe bez \"{event}\"",
+      "detail": "Żaden skonfigurowany endpoint webhooka nie subskrybuje {event}.",
+      "recommendation": "Dodaj {event} do endpointu webhooka, aby aplikacja reagowała.",
+      "impact": "Ważne zdarzenia płatności nie docierają do platformy."
+    },
+    "stripeWebhookUnverified": {
+      "title": "Pokrycie zdarzeń webhooka Stripe niezweryfikowane",
+      "detail": "Endpointy webhooka istnieją, ale nie zebrano ich listy zdarzeń.",
+      "recommendation": "Potwierdź, że każdy endpoint subskrybuje wymagane zdarzenia."
+    },
+    "supabaseHealthFail": {
+      "title": "Kontrola stanu Supabase nie powiodła się",
+      "detail": "Sprawdzenie dostępności Supabase nie powiodło się.",
+      "recommendation": "Sprawdź URL projektu, klucz service-role oraz czy baza działa.",
+      "impact": "Dostępność głównej warstwy danych jest niepotwierdzona."
+    },
+    "serviceRoleInClient": {
+      "title": "Klucz service-role dostępny z kodu klienta",
+      "detail": "Klucz service-role (omijający RLS) wykryto na ścieżce dostępnej dla klienta.",
+      "recommendation": "Przenieś użycie service-role wyłącznie na serwer i natychmiast zrotuj klucz.",
+      "impact": "Każdy odwiedzający może uzyskać pełny dostęp do bazy — poważne ryzyko wycieku."
+    },
+    "rlsDisabled": {
+      "title": "Tabela \"{table}\" ma wyłączone RLS",
+      "detail": "Zabezpieczenie na poziomie wiersza nie jest włączone dla {table}.",
+      "recommendation": "Włącz RLS dla {table} i dodaj jawne polityki dostępu.",
+      "impact": "Bez RLS wyciekły klucz anon może bezpośrednio czytać lub zapisywać tę tabelę."
+    },
+    "rlsUnverified": {
+      "title": "Pokrycie RLS niezweryfikowane",
+      "detail": "Stan RLS na poziomie tabel nie został zebrany w tym przebiegu.",
+      "recommendation": "Wypisz tabele i potwierdź włączone RLS dla każdej z danymi użytkowników."
+    },
+    "publicBucket": {
+      "title": "Bucket magazynu \"{bucket}\" jest publiczny",
+      "detail": "Bucket \"{bucket}\" zezwala na dostęp publiczny.",
+      "recommendation": "Potwierdź, że dostęp publiczny jest zamierzony; w innym razie ustaw prywatny z podpisanymi URL.",
+      "impact": "Publiczne buckety mogą ujawniać pliki użytkowników lub wewnętrzne."
+    },
+    "vercelNotConnected": {
+      "title": "Vercel nie połączony",
+      "detail": "Brak skonfigurowanego tokenu Vercel, więc nie można ocenić wdrożenia.",
+      "recommendation": "Połącz Vercel, aby uwzględnić kontrole wdrożeń i zmiennych w audycie."
+    },
+    "publicSensitiveEnv": {
+      "title": "Publiczna zmienna wygląda na wrażliwą: {name}",
+      "detail": "{name} jest ujawniona przeglądarce (NEXT_PUBLIC_), ale nazwa sugeruje sekret.",
+      "recommendation": "Zmień na zmienną tylko serwerową (usuń NEXT_PUBLIC_) i zrotuj wartość.",
+      "impact": "Sekretne wartości wysłane do przeglądarki są czytelne dla każdego."
+    },
+    "envScopeDrift": {
+      "title": "Zmienne Produkcji i Podglądu różnią się",
+      "detail": "Tylko w produkcji: {onlyProd}. Tylko w podglądzie: {onlyPreview}.",
+      "recommendation": "Uzgodnij nazwy zmiennych między zakresami, aby podgląd odzwierciedlał produkcję.",
+      "impact": "Wdrożenia podglądowe mogą działać inaczej niż produkcja, ukrywając błędy."
+    },
+    "githubReadFail": {
+      "title": "Nie można odczytać GitHub",
+      "detail": "Wywołanie API GitHub nie powiodło się podczas zbierania.",
+      "recommendation": "Sprawdź token GitHub i jego zakres repozytorium."
+    },
+    "branchProtectionUnverified": {
+      "title": "Ochrona gałęzi niezweryfikowana",
+      "detail": "Nie zebrano stanu ochrony gałęzi domyślnej.",
+      "recommendation": "Potwierdź, że gałąź domyślna wymaga przeglądu PR przed scaleniem."
+    },
+    "branchProtectionMissing": {
+      "title": "Gałąź domyślna \"{branch}\" nie wymaga przeglądu PR",
+      "detail": "Zmiany można scalać do gałęzi domyślnej bez zatwierdzającego przeglądu.",
+      "recommendation": "Włącz ochronę gałęzi i wymagaj co najmniej jednego zatwierdzającego przeglądu.",
+      "impact": "Kod produkcyjny może się zmienić bez drugiej pary oczu."
+    },
+    "staleBranches": {
+      "title": "{count} nieaktualna(e) gałąź(zie) starsza(e) niż {days} dni",
+      "detail": "Nieaktualne gałęzie: {names}.",
+      "recommendation": "Przejrzyj i usuń scalone lub porzucone gałęzie.",
+      "impact": "Nieaktualne gałęzie wprowadzają zamęt i mogą zawierać przestarzałą konfigurację."
+    },
+    "clientExposedSecret": {
+      "title": "Sekret ujawniony klientowi: {name}",
+      "detail": "{name} wygląda na sekret, ale jest ujawniony klientowi.",
+      "recommendation": "Przenieś na serwer i natychmiast zrotuj.",
+      "impact": "Wyciekły sekret produkcyjny może być nadużyty przez każdego."
+    },
+    "rotationUnknown": {
+      "title": "Nieznany wiek rotacji dla {count} sekretu(ów)",
+      "detail": "API dostawców nie udostępniają dat ostatniej rotacji tych poświadczeń.",
+      "recommendation": "Zapisz daty rotacji w Key Vault i ustaw politykę rotacji."
+    },
+    "backupTestMissing": {
+      "title": "Brak zapisu testu odtwarzania kopii zapasowej",
+      "detail": "Nie zebrano dowodu przetestowanej kopii/odtworzenia bazy danych.",
+      "recommendation": "Wykonaj test odtwarzania i dołącz wynik."
+    }
+  }
+}

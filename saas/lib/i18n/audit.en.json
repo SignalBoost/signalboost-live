@@ -60,7 +60,51 @@
     "overallScore": "Overall Readiness Score",
     "findings": "Findings",
     "evidenceRequired": "Evidence required",
-    "topRisks": "Top Risks"
+    "topRisks": "Top Risks",
+    "recommendation": "Recommendation",
+    "impact": "Impact"
+  },
+  "identity": {
+    "summary": {
+      "total": "Identities",
+      "privileged": "Privileged",
+      "stale": "Stale",
+      "noMfa": "Priv. no MFA",
+      "mfaUnknown": "MFA unknown"
+    },
+    "col": {
+      "principal": "Principal",
+      "provider": "Provider",
+      "kind": "Type",
+      "role": "Role",
+      "mfa": "MFA",
+      "lastSeen": "Last seen",
+      "flags": "Flags"
+    },
+    "kind": {
+      "user": "User",
+      "service_account": "Service account",
+      "access_key": "Access key",
+      "collaborator": "Collaborator",
+      "token": "Token"
+    },
+    "mfa": {
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "unknown": "Unknown"
+    },
+    "flag": {
+      "stale": "Stale",
+      "neverUsed": "Never used",
+      "privilegedNoMfa": "No MFA",
+      "mfaUnknown": "MFA?"
+    },
+    "findingsTitle": "Access Findings",
+    "noFindings": "No access findings.",
+    "tableTitle": "All Identities",
+    "empty": "No identities found.",
+    "never": "Never",
+    "daysAgo": "{days}d ago"
   },
   "finding": {
     "staleIdentity": {

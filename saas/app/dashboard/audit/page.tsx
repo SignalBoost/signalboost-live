@@ -51,7 +51,7 @@ type AuditCopy = {
 
 const COPY: Record<string, AuditCopy> = {
   en: {
-    title: 'Audit Console', subtitle: 'Deep security & quality scans on GPT‑5.5, isolated from live console traffic.',
+    title: 'Audit Console', subtitle: 'Deep security & quality scans, isolated from live console traffic.',
     viewPlans: 'View plans',
     pathLabel: 'Scan path', maxLabel: 'Max files', run: 'Run audit', running: 'Running deep scan…',
     filesScanned: 'Files scanned', findings: 'Findings', clean: 'No findings — this scan came back clean.',
@@ -66,7 +66,7 @@ const COPY: Record<string, AuditCopy> = {
     sev: { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', info: 'Info' },
   },
   es: {
-    title: 'Consola de Auditoría', subtitle: 'Análisis profundos de seguridad y calidad con GPT‑5.5, aislados del tráfico de la consola en vivo.',
+    title: 'Consola de Auditoría', subtitle: 'Análisis profundos de seguridad y calidad, aislados del tráfico de la consola en vivo.',
     viewPlans: 'Ver planes',
     pathLabel: 'Ruta de análisis', maxLabel: 'Archivos máx.', run: 'Ejecutar auditoría', running: 'Ejecutando análisis profundo…',
     filesScanned: 'Archivos analizados', findings: 'Hallazgos', clean: 'Sin hallazgos: este análisis salió limpio.',
@@ -81,7 +81,7 @@ const COPY: Record<string, AuditCopy> = {
     sev: { critical: 'Crítico', high: 'Alto', medium: 'Medio', low: 'Bajo', info: 'Info' },
   },
   pt: {
-    title: 'Console de Auditoria', subtitle: 'Análises profundas de segurança e qualidade com GPT‑5.5, isoladas do tráfego do console ao vivo.',
+    title: 'Console de Auditoria', subtitle: 'Análises profundas de segurança e qualidade, isoladas do tráfego do console ao vivo.',
     viewPlans: 'Ver planos',
     pathLabel: 'Caminho de análise', maxLabel: 'Máx. de arquivos', run: 'Executar auditoria', running: 'Executando análise profunda…',
     filesScanned: 'Arquivos analisados', findings: 'Constatações', clean: 'Nenhuma constatação — esta análise voltou limpa.',
@@ -96,7 +96,7 @@ const COPY: Record<string, AuditCopy> = {
     sev: { critical: 'Crítico', high: 'Alto', medium: 'Médio', low: 'Baixo', info: 'Info' },
   },
   pl: {
-    title: 'Konsola Audytu', subtitle: 'Dogłębne skany bezpieczeństwa i jakości na GPT‑5.5, odizolowane od ruchu konsoli na żywo.',
+    title: 'Konsola Audytu', subtitle: 'Dogłębne skany bezpieczeństwa i jakości, odizolowane od ruchu konsoli na żywo.',
     viewPlans: 'Zobacz plany',
     pathLabel: 'Ścieżka skanowania', maxLabel: 'Maks. plików', run: 'Uruchom audyt', running: 'Trwa dogłębne skanowanie…',
     filesScanned: 'Przeskanowane pliki', findings: 'Wyniki', clean: 'Brak wyników — ten skan jest czysty.',
@@ -111,7 +111,7 @@ const COPY: Record<string, AuditCopy> = {
     sev: { critical: 'Krytyczny', high: 'Wysoki', medium: 'Średni', low: 'Niski', info: 'Info' },
   },
   ru: {
-    title: 'Консоль аудита', subtitle: 'Глубокие проверки безопасности и качества на GPT‑5.5, изолированные от живого трафика консоли.',
+    title: 'Консоль аудита', subtitle: 'Глубокие проверки безопасности и качества, изолированные от живого трафика консоли.',
     viewPlans: 'Посмотреть планы',
     pathLabel: 'Путь сканирования', maxLabel: 'Макс. файлов', run: 'Запустить аудит', running: 'Выполняется глубокое сканирование…',
     filesScanned: 'Просканировано файлов', findings: 'Замечания', clean: 'Замечаний нет — сканирование чистое.',

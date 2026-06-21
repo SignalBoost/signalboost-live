@@ -397,6 +397,10 @@
     "usage": {
       "title": "AI Usage & Cost",
       "desc": "Token consumption and estimated cost per feature and user."
+    },
+    "history": {
+      "title": "Readiness History",
+      "desc": "Track your readiness score and finding counts over time."
     }
   },
   "usage": {
@@ -424,5 +428,20 @@
   "export": {
     "csv": "Export CSV",
     "pdf": "Print / Save PDF"
+  },
+  "history": {
+    "title": "Readiness History",
+    "subtitle": "Track how your readiness score moves over time.",
+    "snapshot": "Snapshot now",
+    "snapshotting": "Saving…",
+    "loading": "Loading history…",
+    "loadError": "Could not load history.",
+    "fetchError": "Error: {msg}",
+    "snapshotError": "Could not take snapshot.",
+    "empty": "No snapshots yet. Take your first one above.",
+    "trendTitle": "Score over time",
+    "col": {
+      "date": "Date"
+    }
   }
 }

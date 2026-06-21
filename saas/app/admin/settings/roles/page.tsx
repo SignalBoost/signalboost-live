@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/utils/supabase/client'
+import { useI18n } from '@/components/i18n/I18nProvider'
 
 type Role = 'user' | 'admin' | 'owner'
 
@@ -131,12 +132,13 @@ function getLang(): keyof typeof COPY {
 }
 
 export default function RolesManagementPage() {
+  const { lang: activeLang } = useI18n()
   const [users, setUsers] = useState<TeamUser[]>([])
   const [currentUser, setCurrentUser] = useState<{ id: string; email: string; role: Role } | null>(null)
   const [pendingTransfer, setPendingTransfer] = useState<TeamUser | null>(null)
   const [message, setMessage] = useState<string>('')
   const [loading, setLoading] = useState(false)
-  const c = COPY[getLang()]
+  const c = COPY[(activeLang in COPY ? activeLang : 'en') as keyof typeof COPY]
 
   useEffect(() => {
     async function bootstrap() {

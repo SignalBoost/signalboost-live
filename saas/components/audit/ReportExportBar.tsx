@@ -35,7 +35,7 @@ export default function ReportExportBar({ filename, csv }: { filename: string; c
 
   return (
     <div className="no-print" style={{ maxWidth: 1100, margin: '0 auto', padding: '16px 24px 0', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-      <style>{`@media print { .no-print { display: none !important; } }`}</style>
+      <style>{`@media print { .no-print { display: none !important; } html, body { background: #ffffff !important; } main, main * { color: #1a1a1a !important; } main a { color: #1a1a1a !important; text-decoration: none; } }`}</style>
       {csv ? (
         <button type="button" onClick={downloadCsv} style={btn}>{t('audit.export.csv', 'Export CSV')}</button>
       ) : null}

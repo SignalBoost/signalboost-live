@@ -1,428 +1,428 @@
 {
   "report": {
     "executiveSummary": {
-      "title": "Podsumowanie ryzyka dla kierownictwa",
-      "description": "Ogólny wynik gotowości, liczba ustaleń i najważniejsze ryzyka."
+      "title": "Сводка рисков для руководства",
+      "description": "Общий балл готовности, число находок и основные риски."
     },
     "providerInventory": {
-      "title": "Raport inwentaryzacji dostawców",
-      "description": "Każdy podłączony dostawca ze statusem, ryzykiem i ostatnim sprawdzeniem."
+      "title": "Отчёт по инвентаризации провайдеров",
+      "description": "Каждый подключённый провайдер: статус, риск и последняя проверка."
     },
     "identityAccess": {
-      "title": "Przegląd tożsamości i dostępu",
-      "description": "Dostęp, poziom uprawnień, stan MFA i ostatnia aktywność."
+      "title": "Обзор идентификации и доступа",
+      "description": "Доступ, уровень привилегий, состояние MFA и последняя активность."
     },
     "secretsKeys": {
-      "title": "Raport ekspozycji sekretów i kluczy API",
-      "description": "Skonfigurowane poświadczenia wg środowiska i stanu rotacji. Tylko metadane."
+      "title": "Отчёт о раскрытии секретов и API-ключей",
+      "description": "Учётные данные по средам и состоянию ротации. Только метаданные."
     },
     "remediationRoadmap": {
-      "title": "Plan działań naprawczych",
-      "description": "Priorytetowe poprawki z wpływem, właścicielem i terminem."
+      "title": "План устранения",
+      "description": "Приоритетные исправления: влияние, ответственный и срок."
     },
     "prCockpitTrail": {
-      "title": "Ścieżka zatwierdzeń PR Cockpit",
-      "description": "Każda przygotowana zmiana, kto ją zatwierdził i wynik scalenia."
+      "title": "Журнал утверждений PR Cockpit",
+      "description": "Каждое подготовленное изменение, кто утвердил и результат слияния."
     },
     "githubChanges": {
-      "title": "Raport zarządzania zmianami kodu",
-      "description": "Ochrona gałęzi, otwarte i nieaktualne PR-y oraz przeglądy."
+      "title": "Отчёт по управлению изменениями кода",
+      "description": "Защита веток, открытые и устаревшие PR и ревью."
     },
     "supabaseSecurity": {
-      "title": "Raport bezpieczeństwa bazy danych",
-      "description": "Pokrycie RLS, publiczne buckety i użycie roli serwisowej."
+      "title": "Отчёт о безопасности базы данных",
+      "description": "Покрытие RLS, публичные бакеты и использование service-role."
     },
     "stripeConfig": {
-      "title": "Raport konfiguracji płatności",
-      "description": "Produkty, ceny, pokrycie webhooków i spójność live/test."
+      "title": "Отчёт о настройке биллинга",
+      "description": "Продукты, цены, покрытие вебхуков и согласованность live/test."
     },
     "vercelDeployment": {
-      "title": "Raport wdrożeń i zmiennych środowiskowych",
-      "description": "Zmienne produkcyjne vs. podglądowe i ujawnione zmienne publiczne."
+      "title": "Отчёт о развёртывании и переменных окружения",
+      "description": "Переменные production и preview и раскрытые публичные переменные."
     },
     "auditLog": {
-      "title": "Dziennik audytu i oś czasu aktywności",
-      "description": "Zarejestrowane działania, podmioty i wyniki z dziennika audytu Hub."
+      "title": "Журнал аудита и хронология активности",
+      "description": "Зафиксированные действия, субъекты и результаты из журнала аудита Hub."
     },
     "complianceReadiness": {
-      "title": "Macierz gotowości do zgodności",
-      "description": "Gotowość względem SOC 2, ISO 27001, NIST CSF i CIS. Tylko gotowość."
+      "title": "Матрица готовности к соответствию",
+      "description": "Готовность к SOC 2, ISO 27001, NIST CSF и CIS. Только готовность."
     }
   },
   "severity": {
-    "critical": "Krytyczny",
-    "high": "Wysoki",
-    "medium": "Średni",
-    "low": "Niski",
-    "info": "Info"
+    "critical": "Критический",
+    "high": "Высокий",
+    "medium": "Средний",
+    "low": "Низкий",
+    "info": "Инфо"
   },
   "common": {
-    "overallScore": "Ogólny wynik gotowości",
-    "findings": "Ustalenia",
-    "evidenceRequired": "Wymagany dowód",
-    "topRisks": "Najważniejsze ryzyka",
-    "recommendation": "Zalecenie",
-    "impact": "Wpływ"
+    "overallScore": "Общий балл готовности",
+    "findings": "Находки",
+    "evidenceRequired": "Требуется подтверждение",
+    "topRisks": "Основные риски",
+    "recommendation": "Рекомендация",
+    "impact": "Влияние"
   },
   "finding": {
     "staleIdentity": {
-      "title": "Nieaktywna tożsamość: {principal} ({provider})",
-      "detail": "Brak aktywności od {days} dni (próg {threshold}).",
-      "recommendation": "Sprawdź, czy ten dostęp jest nadal potrzebny; usuń lub zrotuj, jeśli nie.",
-      "impact": "Nieużywane poświadczenia zwiększają powierzchnię ataku bez korzyści."
+      "title": "Неактивная учётная запись: {principal} ({provider})",
+      "detail": "Нет активности {days} дней (порог {threshold}).",
+      "recommendation": "Проверьте, нужен ли этот доступ; удалите или смените, если нет.",
+      "impact": "Неиспользуемые учётные данные расширяют поверхность атаки без пользы."
     },
     "neverUsedIdentity": {
-      "title": "Nigdy nieużyta tożsamość: {principal} ({provider})",
-      "detail": "Utworzona {days} dni temu, bez zarejestrowanego logowania ani użycia.",
-      "recommendation": "Potwierdź, że ten podmiot jest potrzebny; usuń, jeśli nigdy nie aktywowany.",
-      "impact": "Uśpione konta to częsty punkt zaczepienia dla atakujących."
+      "title": "Никогда не использованная учётная запись: {principal} ({provider})",
+      "detail": "Создана {days} дней назад, входов или использования не зафиксировано.",
+      "recommendation": "Подтвердите необходимость; удалите, если никогда не активировалась.",
+      "impact": "Спящие аккаунты — частая точка опоры для злоумышленников."
     },
     "privilegedNoMfa": {
-      "title": "Konto uprzywilejowane bez MFA: {principal} ({provider})",
-      "detail": "Rola \"{role}\" ma dostęp administracyjny, ale MFA jest wyłączone.",
-      "recommendation": "Natychmiast wymagaj i włącz MFA na tym koncie.",
-      "impact": "Jedno wyłudzone hasło daje pełną kontrolę administracyjną."
+      "title": "Привилегированный аккаунт без MFA: {principal} ({provider})",
+      "detail": "Роль «{role}» имеет администраторский доступ, но MFA отключён.",
+      "recommendation": "Немедленно потребуйте и включите MFA для этого аккаунта.",
+      "impact": "Один украденный пароль даёт полный административный контроль."
     },
     "mfaStateUnavailable": {
-      "title": "Stan MFA niedostępny dla {count} tożsamości uprzywilejowanej(ych)",
-      "detail": "Ci dostawcy nie udostępniają stanu MFA per konto przez API.",
-      "recommendation": "Potwierdź wymuszanie MFA i dołącz dowód dla tych kont."
+      "title": "Состояние MFA недоступно для {count} привилегированных учётных записей",
+      "detail": "Эти провайдеры не предоставляют состояние MFA по аккаунтам через API.",
+      "recommendation": "Подтвердите, что MFA обязателен, и приложите подтверждение по этим аккаунтам."
     },
     "providerError": {
-      "title": "Dostawca \"{provider}\" jest w stanie błędu",
-      "detail": "Hub zgłasza błąd dla {provider}.",
-      "recommendation": "Sprawdź ponownie połączenie i poświadczenia {provider}."
+      "title": "Провайдер «{provider}» в состоянии ошибки",
+      "detail": "Hub сообщает об ошибке {provider}.",
+      "recommendation": "Перепроверьте подключение и учётные данные {provider}."
     },
     "stripeReadFail": {
-      "title": "Nie można odczytać konfiguracji Stripe",
-      "detail": "Wywołanie API Stripe nie powiodło się podczas zbierania.",
-      "recommendation": "Sprawdź, czy STRIPE_SECRET_KEY jest ustawiony i może czytać ceny i webhooki.",
-      "impact": "Stan płatności jest nieznany, dopóki Stripe nie będzie dostępny."
+      "title": "Не удалось прочитать конфигурацию Stripe",
+      "detail": "Вызов API Stripe не удался при сборе данных.",
+      "recommendation": "Убедитесь, что STRIPE_SECRET_KEY задан и может читать цены и вебхуки.",
+      "impact": "Состояние биллинга неизвестно, пока Stripe недоступен."
     },
     "stripePriceMismatch": {
-      "title": "Niezgodność ceny/środowiska Stripe",
-      "detail": "{name} wskazuje cenę, która nie jest aktywna w Stripe.",
-      "recommendation": "Ustaw zmienną na aktywną cenę lub aktywuj wskazaną cenę.",
-      "impact": "Płatność może odwoływać się do nieistniejącej ceny, psując zakupy."
+      "title": "Несоответствие цены/окружения Stripe",
+      "detail": "{name} указывает на цену, неактивную в Stripe.",
+      "recommendation": "Укажите в переменной активную цену или активируйте указанную цену.",
+      "impact": "Оформление может ссылаться на несуществующую цену, ломая покупки."
     },
     "stripeWebhookNone": {
-      "title": "Brak skonfigurowanego endpointu webhooka Stripe",
-      "detail": "Stripe nie zwrócił żadnych endpointów webhooka.",
-      "recommendation": "Dodaj endpoint webhooka dla zdarzeń płatności i cyklu subskrypcji.",
-      "impact": "Nieudane płatności i anulowania mogą nie trafić do aplikacji."
+      "title": "Не настроен эндпоинт вебхука Stripe",
+      "detail": "Stripe не вернул эндпоинтов вебхука.",
+      "recommendation": "Добавьте эндпоинт вебхука для событий оплаты и подписки.",
+      "impact": "Неуспешные платежи и отмены могут не дойти до приложения."
     },
     "stripeWebhookMissingEvent": {
-      "title": "Webhook Stripe bez \"{event}\"",
-      "detail": "Żaden skonfigurowany endpoint webhooka nie subskrybuje {event}.",
-      "recommendation": "Dodaj {event} do endpointu webhooka, aby aplikacja reagowała.",
-      "impact": "Ważne zdarzenia płatności nie docierają do platformy."
+      "title": "В вебхуке Stripe нет «{event}»",
+      "detail": "Ни один эндпоинт вебхука не подписан на {event}.",
+      "recommendation": "Добавьте {event} в эндпоинт вебхука, чтобы приложение реагировало.",
+      "impact": "Важные события биллинга не доходят до платформы."
     },
     "stripeWebhookUnverified": {
-      "title": "Pokrycie zdarzeń webhooka Stripe niezweryfikowane",
-      "detail": "Endpointy webhooka istnieją, ale nie zebrano ich listy zdarzeń.",
-      "recommendation": "Potwierdź, że każdy endpoint subskrybuje wymagane zdarzenia."
+      "title": "Покрытие событий вебхука Stripe не проверено",
+      "detail": "Эндпоинты вебхука есть, но список их событий не собран.",
+      "recommendation": "Убедитесь, что каждый эндпоинт подписан на нужные события."
     },
     "supabaseHealthFail": {
-      "title": "Kontrola stanu Supabase nie powiodła się",
-      "detail": "Sprawdzenie dostępności Supabase nie powiodło się.",
-      "recommendation": "Sprawdź URL projektu, klucz service-role oraz czy baza działa.",
-      "impact": "Dostępność głównej warstwy danych jest niepotwierdzona."
+      "title": "Проверка работоспособности Supabase не удалась",
+      "detail": "Проверка доступности Supabase не прошла.",
+      "recommendation": "Проверьте URL проекта, ключ service-role и доступность базы данных.",
+      "impact": "Доступность основного слоя данных не подтверждена."
     },
     "serviceRoleInClient": {
-      "title": "Klucz service-role dostępny z kodu klienta",
-      "detail": "Klucz service-role (omijający RLS) wykryto na ścieżce dostępnej dla klienta.",
-      "recommendation": "Przenieś użycie service-role wyłącznie na serwer i natychmiast zrotuj klucz.",
-      "impact": "Każdy odwiedzający może uzyskać pełny dostęp do bazy — poważne ryzyko wycieku."
+      "title": "Ключ service-role доступен из клиентского кода",
+      "detail": "Ключ service-role (обходящий RLS) обнаружен на пути, доступном клиенту.",
+      "recommendation": "Перенесите всё использование service-role на сервер и немедленно смените ключ.",
+      "impact": "Любой посетитель может получить полный доступ к базе — серьёзный риск утечки."
     },
     "rlsDisabled": {
-      "title": "Tabela \"{table}\" ma wyłączone RLS",
-      "detail": "Zabezpieczenie na poziomie wiersza nie jest włączone dla {table}.",
-      "recommendation": "Włącz RLS dla {table} i dodaj jawne polityki dostępu.",
-      "impact": "Bez RLS wyciekły klucz anon może bezpośrednio czytać lub zapisywać tę tabelę."
+      "title": "У таблицы «{table}» отключён RLS",
+      "detail": "Безопасность на уровне строк не включена для {table}.",
+      "recommendation": "Включите RLS для {table} и добавьте явные политики доступа.",
+      "impact": "Без RLS утёкший anon-ключ может напрямую читать и писать в эту таблицу."
     },
     "rlsUnverified": {
-      "title": "Pokrycie RLS niezweryfikowane",
-      "detail": "Stan RLS na poziomie tabel nie został zebrany w tym przebiegu.",
-      "recommendation": "Wypisz tabele i potwierdź włączone RLS dla każdej z danymi użytkowników."
+      "title": "Покрытие RLS не проверено",
+      "detail": "Состояние RLS по таблицам в этом запуске не собрано.",
+      "recommendation": "Перечислите таблицы и подтвердите RLS на каждой с данными пользователей."
     },
     "publicBucket": {
-      "title": "Bucket magazynu \"{bucket}\" jest publiczny",
-      "detail": "Bucket \"{bucket}\" zezwala na dostęp publiczny.",
-      "recommendation": "Potwierdź, że dostęp publiczny jest zamierzony; w innym razie ustaw prywatny z podpisanymi URL.",
-      "impact": "Publiczne buckety mogą ujawniać pliki użytkowników lub wewnętrzne."
+      "title": "Бакет хранилища «{bucket}» публичный",
+      "detail": "Бакет «{bucket}» разрешает публичный доступ.",
+      "recommendation": "Подтвердите намеренность публичного доступа; иначе сделайте бакет приватным с подписанными URL.",
+      "impact": "Публичные бакеты могут раскрывать пользовательские или внутренние файлы."
     },
     "vercelNotConnected": {
-      "title": "Vercel nie połączony",
-      "detail": "Brak skonfigurowanego tokenu Vercel, więc nie można ocenić wdrożenia.",
-      "recommendation": "Połącz Vercel, aby uwzględnić kontrole wdrożeń i zmiennych w audycie."
+      "title": "Vercel не подключён",
+      "detail": "Токен Vercel не настроен, оценить развёртывание невозможно.",
+      "recommendation": "Подключите Vercel, чтобы включить проверки развёртывания и переменных в аудит."
     },
     "publicSensitiveEnv": {
-      "title": "Publiczna zmienna wygląda na wrażliwą: {name}",
-      "detail": "{name} jest ujawniona przeglądarce (NEXT_PUBLIC_), ale nazwa sugeruje sekret.",
-      "recommendation": "Zmień na zmienną tylko serwerową (usuń NEXT_PUBLIC_) i zrotuj wartość.",
-      "impact": "Sekretne wartości wysłane do przeglądarki są czytelne dla każdego."
+      "title": "Публичная переменная выглядит чувствительной: {name}",
+      "detail": "{name} доступна браузеру (NEXT_PUBLIC_), но имя указывает на секрет.",
+      "recommendation": "Переименуйте в серверную переменную (уберите NEXT_PUBLIC_) и смените значение.",
+      "impact": "Секретные значения, попавшие в браузер, доступны любому."
     },
     "envScopeDrift": {
-      "title": "Zmienne Produkcji i Podglądu różnią się",
-      "detail": "Tylko w produkcji: {onlyProd}. Tylko w podglądzie: {onlyPreview}.",
-      "recommendation": "Uzgodnij nazwy zmiennych między zakresami, aby podgląd odzwierciedlał produkcję.",
-      "impact": "Wdrożenia podglądowe mogą działać inaczej niż produkcja, ukrywając błędy."
+      "title": "Переменные Production и Preview различаются",
+      "detail": "Только в production: {onlyProd}. Только в preview: {onlyPreview}.",
+      "recommendation": "Согласуйте имена переменных между средами, чтобы preview соответствовал production.",
+      "impact": "Preview-развёртывания могут вести себя иначе, скрывая ошибки."
     },
     "githubReadFail": {
-      "title": "Nie można odczytać GitHub",
-      "detail": "Wywołanie API GitHub nie powiodło się podczas zbierania.",
-      "recommendation": "Sprawdź token GitHub i jego zakres repozytorium."
+      "title": "Не удалось прочитать GitHub",
+      "detail": "Вызов API GitHub не удался при сборе данных.",
+      "recommendation": "Проверьте токен GitHub и его область доступа к репозиторию."
     },
     "branchProtectionUnverified": {
-      "title": "Ochrona gałęzi niezweryfikowana",
-      "detail": "Nie zebrano stanu ochrony gałęzi domyślnej.",
-      "recommendation": "Potwierdź, że gałąź domyślna wymaga przeglądu PR przed scaleniem."
+      "title": "Защита ветки не проверена",
+      "detail": "Состояние защиты ветки по умолчанию не собрано.",
+      "recommendation": "Подтвердите, что ветка по умолчанию требует ревью PR перед слиянием."
     },
     "branchProtectionMissing": {
-      "title": "Gałąź domyślna \"{branch}\" nie wymaga przeglądu PR",
-      "detail": "Zmiany można scalać do gałęzi domyślnej bez zatwierdzającego przeglądu.",
-      "recommendation": "Włącz ochronę gałęzi i wymagaj co najmniej jednego zatwierdzającego przeglądu.",
-      "impact": "Kod produkcyjny może się zmienić bez drugiej pary oczu."
+      "title": "Ветка по умолчанию «{branch}» не требует ревью PR",
+      "detail": "Изменения можно сливать в ветку по умолчанию без одобряющего ревью.",
+      "recommendation": "Включите защиту ветки и требуйте хотя бы одно одобряющее ревью.",
+      "impact": "Продакшн-код может меняться без второй проверки."
     },
     "staleBranches": {
-      "title": "{count} nieaktualna(e) gałąź(zie) starsza(e) niż {days} dni",
-      "detail": "Nieaktualne gałęzie: {names}.",
-      "recommendation": "Przejrzyj i usuń scalone lub porzucone gałęzie.",
-      "impact": "Nieaktualne gałęzie wprowadzają zamęt i mogą zawierać przestarzałą konfigurację."
+      "title": "{count} устаревших веток старше {days} дней",
+      "detail": "Устаревшие ветки: {names}.",
+      "recommendation": "Просмотрите и удалите слитые или заброшенные ветки.",
+      "impact": "Устаревшие ветки создают путаницу и могут содержать устаревшую конфигурацию."
     },
     "clientExposedSecret": {
-      "title": "Sekret ujawniony klientowi: {name}",
-      "detail": "{name} wygląda na sekret, ale jest ujawniony klientowi.",
-      "recommendation": "Przenieś na serwer i natychmiast zrotuj.",
-      "impact": "Wyciekły sekret produkcyjny może być nadużyty przez każdego."
+      "title": "Секрет, доступный клиенту: {name}",
+      "detail": "{name} похоже на секрет, но доступно клиенту.",
+      "recommendation": "Перенесите на сервер и немедленно смените.",
+      "impact": "Утёкший продакшн-секрет может использовать кто угодно."
     },
     "rotationUnknown": {
-      "title": "Nieznany wiek rotacji dla {count} sekretu(ów)",
-      "detail": "API dostawców nie udostępniają dat ostatniej rotacji tych poświadczeń.",
-      "recommendation": "Zapisz daty rotacji w Key Vault i ustaw politykę rotacji."
+      "title": "Возраст ротации неизвестен для {count} секрета(ов)",
+      "detail": "API провайдеров не сообщают даты последней ротации этих учётных данных.",
+      "recommendation": "Запишите даты ротации в Key Vault и задайте политику ротации."
     },
     "backupTestMissing": {
-      "title": "Brak zapisu testu odtwarzania kopii zapasowej",
-      "detail": "Nie zebrano dowodu przetestowanej kopii/odtworzenia bazy danych.",
-      "recommendation": "Wykonaj test odtwarzania i dołącz wynik."
+      "title": "Нет записи о тесте восстановления из резервной копии",
+      "detail": "Не собрано подтверждение проверенного резервного копирования/восстановления.",
+      "recommendation": "Проведите тест восстановления и приложите результат."
     }
   },
   "exec": {
-    "title": "Podsumowanie ryzyka dla kierownictwa",
-    "subtitle": "Ogólny wynik gotowości, liczba ustaleń i najważniejsze ryzyka.",
-    "narrativeTitle": "Podsumowanie",
-    "topRisksTitle": "Najważniejsze ryzyka",
-    "noRisks": "Brak ryzyk powyżej progu raportowania.",
-    "providersTitle": "Dostawcy",
+    "title": "Сводка рисков для руководства",
+    "subtitle": "Общий балл готовности, число находок и основные риски.",
+    "narrativeTitle": "Резюме",
+    "topRisksTitle": "Основные риски",
+    "noRisks": "Рисков выше порога отчётности нет.",
+    "providersTitle": "Провайдеры",
     "status": {
-      "connected": "połączony",
-      "error": "błąd",
-      "not_configured": "nieskonfigurowany"
+      "connected": "подключён",
+      "error": "ошибка",
+      "not_configured": "не настроен"
     },
-    "loading": "Tworzenie podsumowania…",
-    "loadError": "Nie można załadować podsumowania.",
-    "fetchError": "Błąd: {msg}"
+    "loading": "Формирование сводки…",
+    "loadError": "Не удалось загрузить сводку.",
+    "fetchError": "Ошибка: {msg}"
   },
   "identity": {
-    "findingsTitle": "Ustalenia dot. dostępu",
-    "noFindings": "Brak ustaleń dot. dostępu.",
-    "tableTitle": "Wszystkie tożsamości",
-    "empty": "Nie znaleziono tożsamości.",
-    "never": "Nigdy",
-    "daysAgo": "{days}d temu",
+    "findingsTitle": "Находки по доступу",
+    "noFindings": "Находок по доступу нет.",
+    "tableTitle": "Все учётные записи",
+    "empty": "Учётные записи не найдены.",
+    "never": "Никогда",
+    "daysAgo": "{days}д назад",
     "summary": {
-      "total": "Tożsamości",
-      "privileged": "Uprzywilejowane",
-      "stale": "Nieaktywne",
-      "noMfa": "Uprz. bez MFA",
-      "mfaUnknown": "MFA nieznane"
+      "total": "Учётные записи",
+      "privileged": "Привилегированные",
+      "stale": "Неактивные",
+      "noMfa": "Привил. без MFA",
+      "mfaUnknown": "MFA неизвестно"
     },
     "col": {
-      "principal": "Podmiot",
-      "provider": "Dostawca",
-      "kind": "Typ",
-      "role": "Rola",
+      "principal": "Субъект",
+      "provider": "Провайдер",
+      "kind": "Тип",
+      "role": "Роль",
       "mfa": "MFA",
-      "lastSeen": "Ostatnia aktywność",
-      "flags": "Flagi"
+      "lastSeen": "Последняя активность",
+      "flags": "Метки"
     },
     "kind": {
-      "user": "Użytkownik",
-      "service_account": "Konto serwisowe",
-      "access_key": "Klucz dostępu",
-      "collaborator": "Współpracownik",
-      "token": "Token"
+      "user": "Пользователь",
+      "service_account": "Сервисный аккаунт",
+      "access_key": "Ключ доступа",
+      "collaborator": "Соавтор",
+      "token": "Токен"
     },
     "mfa": {
-      "enabled": "Włączone",
-      "disabled": "Wyłączone",
-      "unknown": "Nieznane"
+      "enabled": "Включено",
+      "disabled": "Отключено",
+      "unknown": "Неизвестно"
     },
     "flag": {
-      "stale": "Nieaktywna",
-      "neverUsed": "Nieużywana",
-      "privilegedNoMfa": "Bez MFA",
+      "stale": "Неактивна",
+      "neverUsed": "Не использована",
+      "privilegedNoMfa": "Без MFA",
       "mfaUnknown": "MFA?"
     }
   },
   "provider": {
-    "title": "Inwentaryzacja dostawców",
-    "subtitle": "Każdy podłączony dostawca ze statusem, ryzykiem i ostatnim sprawdzeniem.",
-    "empty": "Nie znaleziono dostawców.",
-    "evidenceShort": "({n} dowód)",
-    "loading": "Ładowanie inwentaryzacji dostawców…",
-    "loadError": "Nie można załadować inwentaryzacji.",
-    "fetchError": "Błąd: {msg}",
+    "title": "Инвентаризация провайдеров",
+    "subtitle": "Каждый подключённый провайдер: статус, риск и последняя проверка.",
+    "empty": "Провайдеры не найдены.",
+    "evidenceShort": "({n} подтв.)",
+    "loading": "Загрузка инвентаризации провайдеров…",
+    "loadError": "Не удалось загрузить инвентаризацию.",
+    "fetchError": "Ошибка: {msg}",
     "risk": {
-      "unknown": "Nieznane"
+      "unknown": "Неизвестно"
     },
     "summary": {
-      "total": "Dostawcy",
-      "connected": "Połączeni",
-      "error": "Z błędem",
-      "notConfigured": "Nieskonfigurowani"
+      "total": "Провайдеры",
+      "connected": "Подключено",
+      "error": "С ошибкой",
+      "notConfigured": "Не настроено"
     },
     "col": {
-      "provider": "Dostawca",
-      "category": "Kategoria",
-      "status": "Status",
-      "risk": "Ryzyko",
-      "findings": "Ustalenia",
-      "lastChecked": "Ostatnie sprawdzenie"
+      "provider": "Провайдер",
+      "category": "Категория",
+      "status": "Статус",
+      "risk": "Риск",
+      "findings": "Находки",
+      "lastChecked": "Последняя проверка"
     },
     "status": {
-      "connected": "Połączony",
-      "error": "Błąd",
-      "not_configured": "Nieskonfigurowany",
-      "missing": "Brak"
+      "connected": "Подключён",
+      "error": "Ошибка",
+      "not_configured": "Не настроен",
+      "missing": "Отсутствует"
     },
     "category": {
-      "billing": "Płatności",
-      "database": "Baza danych",
-      "deployment": "Wdrożenie",
-      "change-management": "Zarządzanie zmianami",
-      "identity": "Tożsamość",
-      "other": "Inne"
+      "billing": "Биллинг",
+      "database": "База данных",
+      "deployment": "Развёртывание",
+      "change-management": "Управление изменениями",
+      "identity": "Идентификация",
+      "other": "Прочее"
     }
   },
   "secret": {
-    "title": "Ekspozycja sekretów i kluczy API",
-    "subtitle": "Skonfigurowane poświadczenia wg środowiska i stanu rotacji. Tylko metadane — wartości nie są odczytywane ani pokazywane.",
-    "findingsTitle": "Ustalenia dot. ekspozycji",
-    "noFindings": "Brak ustaleń dot. ekspozycji.",
-    "tableTitle": "Skonfigurowane poświadczenia",
-    "empty": "Nie znaleziono poświadczeń.",
-    "metadataNote": "Tylko metadane — wartości nigdy nie są odczytywane ani wyświetlane.",
-    "loading": "Ładowanie raportu sekretów…",
-    "loadError": "Nie można załadować raportu.",
-    "fetchError": "Błąd: {msg}",
+    "title": "Раскрытие секретов и API-ключей",
+    "subtitle": "Учётные данные по средам и состоянию ротации. Только метаданные — значения не читаются и не показываются.",
+    "findingsTitle": "Находки по раскрытию",
+    "noFindings": "Находок по раскрытию нет.",
+    "tableTitle": "Настроенные учётные данные",
+    "empty": "Учётные данные не найдены.",
+    "metadataNote": "Только метаданные — значения никогда не читаются и не отображаются.",
+    "loading": "Загрузка отчёта о секретах…",
+    "loadError": "Не удалось загрузить отчёт.",
+    "fetchError": "Ошибка: {msg}",
     "summary": {
-      "total": "Poświadczenia",
-      "clientExposed": "Ujawnione klientowi",
-      "rotationUnknown": "Rotacja nieznana"
+      "total": "Учётные данные",
+      "clientExposed": "Доступны клиенту",
+      "rotationUnknown": "Ротация неизвестна"
     },
     "col": {
-      "name": "Nazwa",
-      "provider": "Dostawca",
-      "environment": "Środowisko",
-      "exposure": "Ekspozycja",
-      "rotation": "Rotacja",
-      "risk": "Ryzyko"
+      "name": "Имя",
+      "provider": "Провайдер",
+      "environment": "Среда",
+      "exposure": "Раскрытие",
+      "rotation": "Ротация",
+      "risk": "Риск"
     },
     "env": {
-      "production": "Produkcja",
-      "preview": "Podgląd",
-      "development": "Programowanie",
-      "unknown": "Nieznane"
+      "production": "Продакшн",
+      "preview": "Превью",
+      "development": "Разработка",
+      "unknown": "Неизвестно"
     },
     "exposure": {
-      "client": "Ujawniony klientowi",
-      "server": "Tylko serwer"
+      "client": "Доступен клиенту",
+      "server": "Только сервер"
     },
     "rotation": {
-      "known": "Śledzona",
-      "unknown": "Nieznana"
+      "known": "Отслеживается",
+      "unknown": "Неизвестна"
     }
   },
   "remediation": {
-    "title": "Plan działań naprawczych",
-    "subtitle": "Priorytetowe poprawki uszeregowane wg pilności, a pozycje wymagające dowodu na osobnej ścieżce.",
-    "empty": "Nic do naprawy — brak otwartych ustaleń.",
-    "evidenceTitle": "Wymagany dowód",
-    "evidenceSubtitle": "Luki do potwierdzenia dowodem. Nie obniżają wyniku.",
-    "loading": "Tworzenie planu napraw…",
-    "loadError": "Nie można załadować planu.",
-    "fetchError": "Błąd: {msg}",
+    "title": "План устранения",
+    "subtitle": "Приоритетные исправления по срочности; пункты, требующие подтверждения, — на отдельной дорожке.",
+    "empty": "Нечего устранять — открытых находок нет.",
+    "evidenceTitle": "Требуется подтверждение",
+    "evidenceSubtitle": "Пробелы для подтверждения вручную. Они не снижают балл.",
+    "loading": "Формирование плана устранения…",
+    "loadError": "Не удалось загрузить план.",
+    "fetchError": "Ошибка: {msg}",
     "summary": {
-      "now": "Teraz",
-      "next": "Następne",
-      "later": "Później",
-      "evidence": "Dowód"
+      "now": "Сейчас",
+      "next": "Далее",
+      "later": "Позже",
+      "evidence": "Подтверждение"
     },
     "tier": {
-      "now": "Teraz",
-      "next": "Następne",
-      "later": "Później"
+      "now": "Сейчас",
+      "next": "Далее",
+      "later": "Позже"
     },
     "tierHint": {
-      "now": "Krytyczne — napraw natychmiast.",
-      "next": "Wysokie — zaplanuj wkrótce.",
-      "later": "Średnie i niskie — zaplanuj."
+      "now": "Критично — исправить немедленно.",
+      "next": "Высокий — запланировать скоро.",
+      "later": "Средний и низкий — планировать."
     }
   },
   "center": {
-    "title": "Centrum audytu",
-    "subtitle": "Raporty gotowości operacyjnej: tożsamość, dostawcy, sekrety i działania naprawcze — z deterministyczną oceną.",
-    "open": "Otwórz raport",
+    "title": "Центр аудита",
+    "subtitle": "Отчёты операционной готовности: идентификация, провайдеры, секреты и устранение — с детерминированной оценкой.",
+    "open": "Открыть отчёт",
     "executive": {
-      "title": "Podsumowanie ryzyka dla kierownictwa",
-      "desc": "Ogólny wynik, liczba ustaleń i najważniejsze ryzyka."
+      "title": "Сводка рисков для руководства",
+      "desc": "Общий балл, число находок и основные риски."
     },
     "identity": {
-      "title": "Tożsamość i dostęp",
-      "desc": "Kto ma dostęp, poziom uprawnień, MFA i ostatnia aktywność."
+      "title": "Идентификация и доступ",
+      "desc": "Кто имеет доступ, уровень привилегий, MFA и активность."
     },
     "providers": {
-      "title": "Inwentaryzacja dostawców",
-      "desc": "Każdy dostawca ze statusem, ryzykiem i ostatnim sprawdzeniem."
+      "title": "Инвентаризация провайдеров",
+      "desc": "Каждый провайдер: статус, риск и последняя проверка."
     },
     "secrets": {
-      "title": "Sekrety i klucze API",
-      "desc": "Poświadczenia wg środowiska i stanu rotacji."
+      "title": "Секреты и API-ключи",
+      "desc": "Учётные данные по средам и состоянию ротации."
     },
     "remediation": {
-      "title": "Plan działań naprawczych",
-      "desc": "Priorytetowe poprawki wg pilności."
+      "title": "План устранения",
+      "desc": "Приоритетные исправления по срочности."
     },
     "usage": {
-      "title": "Użycie i koszt AI",
-      "desc": "Zużycie tokenów i szacowany koszt wg funkcji i użytkownika."
+      "title": "Использование и стоимость ИИ",
+      "desc": "Расход токенов и оценочная стоимость по функциям и пользователям."
     }
   },
   "usage": {
-    "title": "Użycie i koszt AI",
-    "subtitle": "Zużycie tokenów i szacowany koszt funkcji AI w ciągu ostatnich {n} dni. Koszt jest szacunkowy; liczby tokenów są dokładne.",
-    "totalCost": "Szac. koszt",
-    "calls": "Wywołania",
-    "totalTokens": "Łączne tokeny",
-    "cacheHit": "Wejście z pamięci",
-    "byFeature": "Wg funkcji",
-    "byUser": "Najwięksi konsumenci",
-    "byUserHint": "Najwyższy szacowany koszt najpierw — podstawa rozliczeń lub limitów per użytkownik.",
+    "title": "Использование и стоимость ИИ",
+    "subtitle": "Расход токенов и оценочная стоимость функций ИИ за последние {n} дней. Стоимость оценочная; число токенов точное.",
+    "totalCost": "Оценка стоимости",
+    "calls": "Вызовы",
+    "totalTokens": "Всего токенов",
+    "cacheHit": "Ввод из кэша",
+    "byFeature": "По функциям",
+    "byUser": "Крупнейшие потребители",
+    "byUserHint": "Сначала наибольшая оценочная стоимость — основа для биллинга или лимитов по пользователю.",
     "col": {
-      "feature": "Funkcja",
-      "calls": "Wywołania",
-      "tokens": "Tokeny",
-      "cost": "Szac. koszt",
-      "user": "Użytkownik"
+      "feature": "Функция",
+      "calls": "Вызовы",
+      "tokens": "Токены",
+      "cost": "Оценка стоимости",
+      "user": "Пользователь"
     },
-    "empty": "Brak zarejestrowanego użycia.",
-    "loading": "Ładowanie użycia…",
-    "loadError": "Nie można załadować użycia.",
-    "fetchError": "Błąd: {msg}"
+    "empty": "Использование пока не зафиксировано.",
+    "loading": "Загрузка использования…",
+    "loadError": "Не удалось загрузить использование.",
+    "fetchError": "Ошибка: {msg}"
   },
   "export": {
-    "csv": "Eksportuj CSV",
-    "pdf": "Drukuj / Zapisz PDF"
+    "csv": "Экспорт CSV",
+    "pdf": "Печать / Сохранить PDF"
   }
 }

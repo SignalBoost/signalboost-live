@@ -137,6 +137,7 @@ const COPY: Record<Lang, {
 }
 
 function getLang(): Lang {
+  if (typeof window !== 'undefined') { const s = localStorage.getItem('signalboost_language'); if (s && (s in COPY)) return s as any }
   if (typeof navigator === 'undefined') return 'en'
   const l = navigator.language?.slice(0, 2).toLowerCase()
   if (l === 'es') return 'es'

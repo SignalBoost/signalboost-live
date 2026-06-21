@@ -152,6 +152,7 @@ const COPY: Record<Lang, {
 const LANGS: Lang[] = ['en', 'es', 'pt', 'pl', 'ru']
 
 function detectLang(): Lang {
+  if (typeof window !== 'undefined') { const s = localStorage.getItem('signalboost_language'); if (s && (s in COPY)) return s as any }
   if (typeof navigator === 'undefined') return 'en'
   const code = (navigator.language || '').slice(0, 2).toLowerCase()
   const map: Record<string, Lang> = { en: 'en', es: 'es', pt: 'pt', pl: 'pl', ru: 'ru' }

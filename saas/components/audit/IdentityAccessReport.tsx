@@ -9,7 +9,7 @@ import { CSSProperties, ReactNode } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
-import { resolveFinding } from '@/lib/audit/reportModel'
+import { resolveFinding, type Finding } from '@/lib/audit/reportModel'
 
 // ── Types (mirror reportModel / reports shapes) ─────────────────────────────
 
@@ -50,7 +50,7 @@ export type IdentityReportSummary = {
 export type IdentityAccessReportData = {
   generatedAt: string
   rows: IdentityRow[]
-  findings: IdentityFinding[]
+  findings: Finding[]
   summary: IdentityReportSummary
   score: number
 }
@@ -261,7 +261,7 @@ export default function IdentityAccessReport({ data }: { data: IdentityAccessRep
                     <span style={{ fontSize: 14, fontWeight: 700 }}>{resolved.title}</span>
                   </div>
                   <p style={{ margin: '0 0 8px', fontSize: 12.5, color: 'rgba(255,255,255,.65)', lineHeight: 1.55 }}>
-                    {resolved.description}
+                    {resolved.detail}
                   </p>
                   {resolved.recommendation && (
                     <div style={{ fontSize: 12, color: CYAN, marginBottom: 4 }}>

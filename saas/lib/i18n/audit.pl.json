@@ -416,5 +416,9 @@
     "loading": "Ładowanie użycia…",
     "loadError": "Nie można załadować użycia.",
     "fetchError": "Błąd: {msg}"
+  },
+  "export": {
+    "csv": "Eksportuj CSV",
+    "pdf": "Drukuj / Zapisz PDF"
   }
 }

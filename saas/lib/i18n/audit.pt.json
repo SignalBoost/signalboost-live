@@ -401,6 +401,10 @@
     "history": {
       "title": "Histórico de prontidão",
       "desc": "Acompanhe sua pontuação de prontidão e as constatações ao longo do tempo."
+    },
+    "github": {
+      "title": "GitHub e mudanças de código",
+      "desc": "Proteção de branches, colaboradores e branches obsoletos."
     }
   },
   "usage": {
@@ -447,5 +451,46 @@
   "scan": {
     "quotaExceeded": "Limite mensal atingido: {used}/{cap} análises usadas. Faça upgrade do seu plano para executar mais.",
     "upgrade": "Fazer upgrade"
+  },
+  "github": {
+    "title": "Relatório de GitHub e mudanças de código",
+    "subtitle": "Proteção de branches, colaboradores, branches obsoletos e mudanças abertas.",
+    "notConfigured": "O GitHub não está conectado ou seus dados não puderam ser coletados.",
+    "summary": {
+      "collaborators": "Colaboradores",
+      "admins": "Administradores",
+      "stale": "Branches obsoletos",
+      "openPRs": "PRs abertos"
+    },
+    "protection": {
+      "title": "Proteção do branch padrão",
+      "enforced": "Aplicada",
+      "missing": "Ausente",
+      "unverified": "Não verificada"
+    },
+    "collab": {
+      "title": "Colaboradores",
+      "empty": "Nenhum colaborador coletado."
+    },
+    "col": {
+      "login": "Usuário",
+      "role": "Função",
+      "access": "Acesso",
+      "branch": "Branch",
+      "age": "Idade (dias)"
+    },
+    "admin": "Administrador",
+    "member": "Membro",
+    "stale": {
+      "title": "Branches obsoletos",
+      "empty": "Sem branches obsoletos — limpo."
+    },
+    "findings": {
+      "title": "Constatações ({n})",
+      "empty": "Nenhuma constatação do GitHub — nada sinalizado."
+    },
+    "loadError": "Não foi possível carregar o relatório do GitHub.",
+    "fetchError": "Erro: {msg}",
+    "loading": "Carregando relatório do GitHub…"
   }
 }

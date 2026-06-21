@@ -443,5 +443,9 @@
     "col": {
       "date": "Date"
     }
+  },
+  "scan": {
+    "quotaExceeded": "Monthly limit reached: {used}/{cap} audit scans used. Upgrade your plan to run more.",
+    "upgrade": "Upgrade plan"
   }
 }

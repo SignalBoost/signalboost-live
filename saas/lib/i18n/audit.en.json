@@ -416,5 +416,9 @@
     "loading": "Loading usage…",
     "loadError": "Could not load usage.",
     "fetchError": "Error: {msg}"
+  },
+  "export": {
+    "csv": "Export CSV",
+    "pdf": "Print / Save PDF"
   }
 }

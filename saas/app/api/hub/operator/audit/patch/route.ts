@@ -8,6 +8,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
+import { getAdminSupabase } from '@/utils/supabase/server'
+import { readAuditTier, patchEnabledForTier } from '@/lib/audit/scanThrottle'
 import { readRepoFile } from '@/lib/ai/tools/repoReader'
 import { commitFileToBranch } from '@/lib/ai/tools/repoWriter'
 import { callAuditModel } from '@/lib/audit/modelRouter'
@@ -35,8 +37,32 @@ function slug(s: string): string {
 
 export async function POST(req: NextRequest) {
   const ctx = await getAccess()
-  if (!ctx.isOwner) {
+  if (!ctx.userId) {
+    return NextResponse.json({ ok: false, error: 'Not signed in.' }, { status: 401 })
+  }
+
+  // Owner-only by default; flip AUDIT_CUSTOMER_SCANS_ENABLED to open to customers.
+  const customerScansEnabled = process.env.AUDIT_CUSTOMER_SCANS_ENABLED === 'true'
+  if (!ctx.isOwner && !customerScansEnabled) {
     return NextResponse.json({ ok: false, error: 'Owner access required.' }, { status: 403 })
+  }
+
+  // AI patch generation is a Pro+ entitlement. Owner is exempt; everyone else is
+  // resolved from their live audit tier.
+  if (!ctx.isOwner) {
+    const tier = await readAuditTier(getAdminSupabase(), ctx.userId)
+    if (!patchEnabledForTier(tier)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: 'patch_not_in_plan',
+          upgrade: true,
+          tier,
+          error: 'AI patch generation is available on the Pro plan and above. Upgrade to enable it.',
+        },
+        { status: 402 },
+      )
+    }
   }
 
   let body: { file?: string; line?: number; title?: string; detail?: string; recommendation?: string } = {}

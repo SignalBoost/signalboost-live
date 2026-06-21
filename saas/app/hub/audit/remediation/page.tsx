@@ -5,6 +5,8 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
 import RemediationRoadmap, { type RemediationRoadmapView } from '@/components/audit/RemediationRoadmap'
+import ReportExportBar from '@/components/audit/ReportExportBar'
+import { toCsv } from '@/lib/audit/exportCsv'
 
 type ApiResponse = { ok: boolean; report?: RemediationRoadmapView; error?: string }
 const wrap: CSSProperties = { minHeight: 'calc(100vh - 80px)' }
@@ -47,5 +49,14 @@ export default function RemediationPage() {
     return <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: '#fca5a5', padding: 24 }}>{error}</main>
   }
   if (!data) return null
-  return <RemediationRoadmap data={data} />
+  const csv = toCsv(
+    ['Tier', 'Severity', 'Provider', 'Title', 'Recommendation'],
+    data.items.map(({ finding, tier }) => [tier, finding.severity, finding.provider, finding.fallback.title, finding.fallback.recommendation]),
+  )
+  return (
+    <>
+      <ReportExportBar filename="remediation-roadmap" csv={csv} />
+      <RemediationRoadmap data={data} />
+    </>
+  )
 }

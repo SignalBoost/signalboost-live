@@ -8,6 +8,7 @@ type Flag = { key: string; label: string; desc: string; on: boolean }
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 function getLang(): Lang {
+  if (typeof window !== 'undefined') { const s = localStorage.getItem('signalboost_language'); if (s && (s in COPY)) return s as any }
   if (typeof navigator === 'undefined') return 'en'
   const l = navigator.language?.slice(0, 2).toLowerCase()
   if (l === 'es') return 'es'

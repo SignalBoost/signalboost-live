@@ -38,7 +38,7 @@ export const AUDIT_PRICING_CONFIG: AuditPricingConfig = {
     },
     {
       id: 'growth',
-      isPopular: true,
+      isPopular: false,
       isEnterprise: false,
       auditCount: 100,
       monthlyCredits: 3000,
@@ -48,7 +48,7 @@ export const AUDIT_PRICING_CONFIG: AuditPricingConfig = {
     },
     {
       id: 'pro',
-      isPopular: false,
+      isPopular: true,
       isEnterprise: false,
       auditCount: 300,
       monthlyCredits: 10000,
@@ -69,7 +69,7 @@ export const AUDIT_PRICING_CONFIG: AuditPricingConfig = {
   ],
 }
 
-export const POPULAR_PLAN: AuditPlanId = 'growth'
+export const POPULAR_PLAN: AuditPlanId = 'pro'
 
 // Static references → Next inlines these into the client bundle. Do NOT convert
 // this to a dynamic process.env[key] lookup; it would resolve to undefined client-side.

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useI18n } from '@/components/i18n/I18nProvider'
 
 type OutreachRow = {
   id: string
@@ -304,13 +305,6 @@ const COPY: Record<string, CopyDict> = {
   },
 }
 
-function useLang(): string {
-  if (typeof window !== 'undefined') { const s = localStorage.getItem('signalboost_language'); if (s && (s in COPY)) return s as any }
-  if (typeof navigator === 'undefined') return 'en'
-  const lang = navigator.language?.slice(0, 2).toLowerCase()
-  return COPY[lang] ? lang : 'en'
-}
-
 const statusColors: Record<string, { border: string; background: string; color: string }> = {
   pending:  { border: 'rgba(245,158,11,0.4)',  background: 'rgba(245,158,11,0.1)',  color: '#fde68a' },
   approved: { border: 'rgba(16,185,129,0.4)',  background: 'rgba(16,185,129,0.1)',  color: '#6ee7b7' },
@@ -319,8 +313,8 @@ const statusColors: Record<string, { border: string; background: string; color: 
 }
 
 export default function AdmConsoleClient() {
-  const lang = useLang()
-  const t = COPY[lang]
+  const { lang: activeLang } = useI18n()
+  const t = COPY[(activeLang in COPY ? activeLang : 'en')]
 
   const [data, setData] = useState<AdmData | null>(null)
   const [selected, setSelected] = useState<OutreachRow | null>(null)

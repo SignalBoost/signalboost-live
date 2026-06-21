@@ -120,6 +120,7 @@ const COPY = {
 }
 
 function getLang(): keyof typeof COPY {
+  if (typeof window !== 'undefined') { const s = localStorage.getItem('signalboost_language'); if (s && (s in COPY)) return s as any }
   if (typeof navigator === 'undefined') return 'en'
   const lang = navigator.language?.slice(0, 2)
   if (lang === 'es') return 'es'

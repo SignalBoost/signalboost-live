@@ -108,7 +108,9 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
   }, [])
 
   const liveValue = (key: string): string | number | undefined => {
-    if (live && typeof live[key] === 'number') return live[key].toLocaleString()
+    const v = live ? (live as any)[key] : undefined
+    if (typeof v === 'number') return v.toLocaleString()
+    if (typeof v === 'string' && v.length) return v
     return undefined
   }
 

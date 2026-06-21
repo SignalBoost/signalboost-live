@@ -51,8 +51,8 @@ export function estimateCostUsd(model: string, usage: TokenUsage): number {
   return Math.round(cost * 1e6) / 1e6
 }
 
-let _db: ReturnType<typeof createClient> | null = null
-function serviceDb() {
+let _db: any = null
+function serviceDb(): any {
   if (_db) return _db
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY

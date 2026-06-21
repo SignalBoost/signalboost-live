@@ -10,7 +10,7 @@ type FlatCopy = Record<string, string>
 export const AUDIT_PRICING_COPY: Record<string, FlatCopy> = {
   en: {
     'auditPricing.title': 'Audit Pricing',
-    'auditPricing.subtitle': 'Deep security scans powered by GPT-5.5. Choose the plan that fits your team.',
+    'auditPricing.subtitle': 'Deep security scans powered by advanced AI. Choose the plan that fits your team.',
     'auditPricing.perMonth': '/ mo',
     'auditPricing.popular': 'Most Popular',
     'auditPricing.cta.paid': 'Upgrade Now',
@@ -30,7 +30,7 @@ export const AUDIT_PRICING_COPY: Record<string, FlatCopy> = {
   },
   es: {
     'auditPricing.title': 'Precios de Auditoría',
-    'auditPricing.subtitle': 'Análisis de seguridad profundos con GPT-5.5. Elige el plan que se adapta a tu equipo.',
+    'auditPricing.subtitle': 'Análisis de seguridad profundos con IA avanzada. Elige el plan que se adapta a tu equipo.',
     'auditPricing.perMonth': '/ mes',
     'auditPricing.popular': 'Más Popular',
     'auditPricing.cta.paid': 'Actualizar Ahora',
@@ -50,7 +50,7 @@ export const AUDIT_PRICING_COPY: Record<string, FlatCopy> = {
   },
   pt: {
     'auditPricing.title': 'Preços de Auditoria',
-    'auditPricing.subtitle': 'Análises de segurança profundas com GPT-5.5. Escolha o plano que se encaixa na sua equipe.',
+    'auditPricing.subtitle': 'Análises de segurança profundas com IA avançada. Escolha o plano que se encaixa na sua equipe.',
     'auditPricing.perMonth': '/ mês',
     'auditPricing.popular': 'Mais Popular',
     'auditPricing.cta.paid': 'Atualizar Agora',
@@ -70,7 +70,7 @@ export const AUDIT_PRICING_COPY: Record<string, FlatCopy> = {
   },
   pl: {
     'auditPricing.title': 'Cennik Audytu',
-    'auditPricing.subtitle': 'Dogłębne skany bezpieczeństwa z GPT-5.5. Wybierz plan dopasowany do Twojego zespołu.',
+    'auditPricing.subtitle': 'Dogłębne skany bezpieczeństwa z zaawansowaną AI. Wybierz plan dopasowany do Twojego zespołu.',
     'auditPricing.perMonth': '/ mies.',
     'auditPricing.popular': 'Najpopularniejszy',
     'auditPricing.cta.paid': 'Ulepsz teraz',
@@ -90,7 +90,7 @@ export const AUDIT_PRICING_COPY: Record<string, FlatCopy> = {
   },
   ru: {
     'auditPricing.title': 'Цены на аудит',
-    'auditPricing.subtitle': 'Глубокие проверки безопасности на GPT-5.5. Выберите план для вашей команды.',
+    'auditPricing.subtitle': 'Глубокие проверки безопасности на передовом ИИ. Выберите план для вашей команды.',
     'auditPricing.perMonth': '/ мес.',
     'auditPricing.popular': 'Самый популярный',
     'auditPricing.cta.paid': 'Обновить сейчас',

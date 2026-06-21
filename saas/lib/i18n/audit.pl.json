@@ -443,5 +443,9 @@
     "col": {
       "date": "Data"
     }
+  },
+  "scan": {
+    "quotaExceeded": "Osiągnięto miesięczny limit: wykorzystano {used}/{cap} skanów. Ulepsz plan, aby uruchomić więcej.",
+    "upgrade": "Ulepsz plan"
   }
 }

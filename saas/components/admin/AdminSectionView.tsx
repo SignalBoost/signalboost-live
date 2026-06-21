@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { AdminSectionConfig, translateSection } from '@/lib/admin/sections'
 import { COCKPIT_PANELS, CRM_STAGES, EXECUTIVE_RECOMMENDATIONS, FINANCIAL_LEDGER, FORECASTS, KPI_DASHBOARD } from '@/lib/platform/unifiedPlatform'
@@ -94,6 +95,23 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
   const t = COPY[(activeLang in COPY ? activeLang : 'en') as keyof typeof COPY]
   const section = translateSection(rawSection, activeLang in COPY ? activeLang : 'en')
 
+  // Live metric values from real tables; keys that have no backing source are
+  // simply absent here and fall back to the honest "Not tracked yet" placeholder.
+  const [live, setLive] = useState<Record<string, number> | null>(null)
+  useEffect(() => {
+    let active = true
+    fetch('/api/admin/section-metrics', { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (active && d && d.values) setLive(d.values) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
+
+  const liveValue = (key: string): string | number | undefined => {
+    if (live && typeof live[key] === 'number') return live[key].toLocaleString()
+    return undefined
+  }
+
   return (
     <div className="sb-cockpit-stack" role="region" aria-label={`${section.title} admin console section`}>
       <header className="sb-cockpit-hero">
@@ -106,7 +124,7 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
         {section.metrics.map(metric => (
           <article key={metric.key} className="sb-neon-panel" tabIndex={0}>
             <p>{metric.label}</p>
-            <strong>{metric.value ?? t.notTracked}</strong>
+            <strong>{liveValue(metric.key) ?? metric.value ?? t.notTracked}</strong>
             <span>{metric.helper ?? t.telemetrySignal}</span>
           </article>
         ))}

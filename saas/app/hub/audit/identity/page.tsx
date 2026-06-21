@@ -32,9 +32,9 @@ type ReportData = {
   score: number
 }
 
-type ApiResponse =
-  | { ok: true;  report: ReportData }
-  | { ok: false; error: string }
+// Flat result shape — the repo's tsconfig is non-strict, so discriminated
+// unions do not narrow on `if (!json.ok)`. Keep ok/report/error on one object.
+type ApiResponse = { ok: boolean; report?: ReportData; error?: string }
 
 // ─── page ────────────────────────────────────────────────────────────────────
 export default function IdentityAccessPage() {

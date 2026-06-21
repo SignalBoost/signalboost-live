@@ -304,5 +304,70 @@
       "identity": "Identity",
       "other": "Other"
     }
+  },
+  "secret": {
+    "title": "Secrets & API Key Exposure",
+    "subtitle": "Configured credentials by environment and rotation posture. Metadata only — no secret values are read or shown.",
+    "findingsTitle": "Exposure Findings",
+    "noFindings": "No exposure findings.",
+    "tableTitle": "Configured Credentials",
+    "empty": "No credentials found.",
+    "metadataNote": "Metadata only — secret values are never read or displayed.",
+    "loading": "Loading secrets report…",
+    "loadError": "Could not load the report.",
+    "fetchError": "Error: {msg}",
+    "summary": {
+      "total": "Credentials",
+      "clientExposed": "Client-exposed",
+      "rotationUnknown": "Rotation unknown"
+    },
+    "col": {
+      "name": "Name",
+      "provider": "Provider",
+      "environment": "Environment",
+      "exposure": "Exposure",
+      "rotation": "Rotation",
+      "risk": "Risk"
+    },
+    "env": {
+      "production": "Production",
+      "preview": "Preview",
+      "development": "Development",
+      "unknown": "Unknown"
+    },
+    "exposure": {
+      "client": "Client-exposed",
+      "server": "Server-only"
+    },
+    "rotation": {
+      "known": "Tracked",
+      "unknown": "Unknown"
+    }
+  },
+  "remediation": {
+    "title": "Remediation Roadmap",
+    "subtitle": "Prioritized fixes sequenced by urgency, with the items that need manual evidence on a separate track.",
+    "empty": "Nothing to remediate — no open findings.",
+    "evidenceTitle": "Evidence Required",
+    "evidenceSubtitle": "Gaps to confirm with manual evidence. These do not lower the score.",
+    "loading": "Building remediation roadmap…",
+    "loadError": "Could not load the roadmap.",
+    "fetchError": "Error: {msg}",
+    "summary": {
+      "now": "Now",
+      "next": "Next",
+      "later": "Later",
+      "evidence": "Evidence"
+    },
+    "tier": {
+      "now": "Now",
+      "next": "Next",
+      "later": "Later"
+    },
+    "tierHint": {
+      "now": "Critical — fix immediately.",
+      "next": "High — schedule soon.",
+      "later": "Medium and low — plan ahead."
+    }
   }
 }

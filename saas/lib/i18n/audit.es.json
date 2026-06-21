@@ -394,5 +394,27 @@
       "title": "Hoja de ruta de remediación",
       "desc": "Correcciones priorizadas por urgencia."
     }
+  },
+  "usage": {
+    "title": "Uso y costo de IA",
+    "subtitle": "Consumo de tokens y costo estimado por funciones de IA en los últimos {n} días. El costo es estimado; los tokens son exactos.",
+    "totalCost": "Costo est.",
+    "calls": "Llamadas",
+    "totalTokens": "Tokens totales",
+    "cacheHit": "Entrada desde caché",
+    "byFeature": "Por función",
+    "byUser": "Mayores consumidores",
+    "byUserHint": "Mayor costo estimado primero: la base para facturar o limitar por usuario.",
+    "col": {
+      "feature": "Función",
+      "calls": "Llamadas",
+      "tokens": "Tokens",
+      "cost": "Costo est.",
+      "user": "Usuario"
+    },
+    "empty": "Aún no hay uso registrado.",
+    "loading": "Cargando uso…",
+    "loadError": "No se pudo cargar el uso.",
+    "fetchError": "Error: {msg}"
   }
 }

@@ -369,5 +369,30 @@
       "next": "High — schedule soon.",
       "later": "Medium and low — plan ahead."
     }
+  },
+  "center": {
+    "title": "Audit Center",
+    "subtitle": "Operational readiness reports across identity, providers, secrets, and remediation — scored deterministically.",
+    "open": "Open report",
+    "executive": {
+      "title": "Executive Risk Summary",
+      "desc": "Overall readiness score, finding counts, and top risks."
+    },
+    "identity": {
+      "title": "Identity & Access",
+      "desc": "Who has access, privilege level, MFA state, and last activity."
+    },
+    "providers": {
+      "title": "Provider Inventory",
+      "desc": "Every connected provider with status, risk, and last check."
+    },
+    "secrets": {
+      "title": "Secrets & API Keys",
+      "desc": "Configured credentials by environment and rotation posture."
+    },
+    "remediation": {
+      "title": "Remediation Roadmap",
+      "desc": "Prioritized fixes sequenced by urgency."
+    }
   }
 }

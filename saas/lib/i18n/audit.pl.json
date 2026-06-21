@@ -401,6 +401,10 @@
     "history": {
       "title": "Historia gotowości",
       "desc": "Śledź wynik gotowości i liczbę ustaleń w czasie."
+    },
+    "github": {
+      "title": "GitHub i zmiany w kodzie",
+      "desc": "Ochrona gałęzi, współpracownicy i nieaktualne gałęzie."
     }
   },
   "usage": {
@@ -447,5 +451,46 @@
   "scan": {
     "quotaExceeded": "Osiągnięto miesięczny limit: wykorzystano {used}/{cap} skanów. Ulepsz plan, aby uruchomić więcej.",
     "upgrade": "Ulepsz plan"
+  },
+  "github": {
+    "title": "Raport GitHub i zmian w kodzie",
+    "subtitle": "Ochrona gałęzi, współpracownicy, nieaktualne gałęzie i otwarte zmiany.",
+    "notConfigured": "GitHub nie jest połączony lub nie udało się zebrać jego danych.",
+    "summary": {
+      "collaborators": "Współpracownicy",
+      "admins": "Administratorzy",
+      "stale": "Nieaktualne gałęzie",
+      "openPRs": "Otwarte PR"
+    },
+    "protection": {
+      "title": "Ochrona domyślnej gałęzi",
+      "enforced": "Egzekwowana",
+      "missing": "Brak",
+      "unverified": "Niezweryfikowana"
+    },
+    "collab": {
+      "title": "Współpracownicy",
+      "empty": "Nie zebrano współpracowników."
+    },
+    "col": {
+      "login": "Użytkownik",
+      "role": "Rola",
+      "access": "Dostęp",
+      "branch": "Gałąź",
+      "age": "Wiek (dni)"
+    },
+    "admin": "Administrator",
+    "member": "Członek",
+    "stale": {
+      "title": "Nieaktualne gałęzie",
+      "empty": "Brak nieaktualnych gałęzi — czysto."
+    },
+    "findings": {
+      "title": "Ustalenia ({n})",
+      "empty": "Brak ustaleń GitHub — nic nie oznaczono."
+    },
+    "loadError": "Nie udało się załadować raportu GitHub.",
+    "fetchError": "Błąd: {msg}",
+    "loading": "Ładowanie raportu GitHub…"
   }
 }

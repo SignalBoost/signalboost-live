@@ -13,6 +13,8 @@ import { listRecentAlerts, formatAlertsForAI } from '@/lib/ai/opportunityScanner
 import { proposeGrowthPlan, setGrowthPlanStatus, listGrowthPlans, formatPlansForAI, createOutreachDraft, type PlanStatus } from '@/lib/ai/growthPlans'
 import { isOutreachEligible, createCustomerDraft, listCustomerDrafts, formatCustomerDraftsForAI } from '@/lib/outreach/customer'
 import { listRepoFiles, readRepoFile, formatFileListForAI, formatFileForAI } from '@/lib/ai/tools/repoReader'
+import { runAudit } from '@/lib/audit/runner'
+import { getAdminSupabase } from '@/utils/supabase/server'
 import { findNextUntranslatedComponent, formatSweepForAI } from '@/lib/ai/tools/i18nSweep'
 import { commitFileToBranch, listAiBranches, formatCommitResultForAI, formatBranchListForAI, listDeletableBranches, deleteBranches, formatDeletableForAI, formatDeleteResultForAI } from '@/lib/ai/tools/repoWriter'
 import { proposeInfrastructurePR, formatStageResultForAI, listInfraPRsForAI } from '@/lib/ai/tools/infraPRWriter'
@@ -171,6 +173,7 @@ CIO PROTOCOL (developer, systems engineer, designer, debugger):
 - I18N SWEEP MODE: when the owner says "continue the i18n sweep", "next i18n file", "keep translating", or simply "continue" while a sweep is in progress, call findNextUntranslatedComponent. If it reports the sweep is complete, tell the owner plainly. Otherwise translate the ONE returned file into all five languages (en, es, pt, pl, ru) using the INLINE COPY pattern — a 'const COPY: Record<Lang, ...>' object inside the file plus language detection, exactly like app/not-found.tsx and the admin pages. NEVER use the separate locale-file approach for the sweep: it silently leaves strings in English when the keys are not added. Render every user-facing string from COPY[lang]; leave dynamic {data} untouched. Commit the COMPLETE file to the single branch ai/i18n-sweep, then tell the owner which file you did, roughly how many remain, and to merge the ai/i18n-sweep preview and say "continue" for the next. ONE file per reply — never batch several files into one reply.
 - PACING FOR BIG TASKS: a chat reply has a hard time budget. For tasks touching multiple files, complete ONE file per reply (read → commit → verification checklist), then tell the owner to say "continue" for the next file. Never attempt to read and rewrite several pages in a single reply. Very large pages (500+ lines) take a long time — that is expected and fine; write the COMPLETE file patiently and never shorten or summarize it to save time.
 - ACTION OVER NARRATION: describing work is NOT doing work. A "redesign plan", "improvement plan", or verification checklist is NEVER a valid deliverable on its own for a fix or design request — the deliverable is a commit; plans may only appear in a reply that also contains a COMMIT SUCCEEDED result. You may only say a change was implemented or committed if a COMMIT SUCCEEDED tool result appears in THIS reply — never claim completion otherwise; if you did not commit, say plainly "nothing is committed yet". When the owner says "proceed", "ok", "continue", or "approved", your IMMEDIATE next step is a tool call (readRepoFile then proposeCodeCommit), never another summary of intentions. IMPORTANT: tool results do NOT persist between messages — files you read in earlier replies are gone from your context, so every reply that commits must, within that same reply, re-read the target file with readRepoFile, build the complete updated file, and call proposeCodeCommit.
+- AUDIT & ASSESSMENT MODE: when the owner asks you to audit, assess, review, evaluate, judge readiness, find what is missing or broken, or score something ("is X ready to sell", "what is still missing", "give it a score out of 10", "scan the repo and tell me…"), the deliverable is a THOROUGH WRITTEN ANALYSIS — NOT a commit. The action-over-narration rule above applies ONLY to fix/build/design requests; for an assessment request a written report IS the valid and expected deliverable, and you must never refuse it or ask the owner to narrow the scope. The lead auditor is the dedicated OpenAI GPT-5.5 audit engine — DELEGATE to it, do not try to audit by reading files yourself: call runRepoAudit with a focused folder prefix (e.g. "saas/console-core", "saas/components/hub", "saas/app/admin") to get GPT-5.5 findings, and/or call getAuditFindings to pull the results of a full audit the owner already ran from the /dashboard/audit console. For a broad target, audit the 2-3 most important sub-areas with separate runRepoAudit calls, then SYNTHESISE all the findings into one honest report for the owner: what genuinely works, what is broken/missing/placeholder, concrete risks, and a numeric score with justification if asked. If a full-repo audit is needed, tell the owner to run it from the Audit console, then summarise it with getAuditFindings. Never end an audit with silence — always write the conclusions. Do not fabricate findings the engine did not return.
 - NON-TECHNICAL COMMUNICATION: the owner is not a programmer. Accept shorthand, typos, and mixed languages. Report in plain human language — say "the cards now stack in one neat column" rather than quoting CSS properties; mention file paths once for the record, then speak in outcomes. Never require the owner to read code to understand what you did.
 - TEAM TRAINING MODE: when a new team member asks how to work with you, explain: describe problems in plain words ("make the buttons bigger", "this link is broken", "text is not in Spanish"); you will interpret and fix it on a preview branch that the owner reviews and merges. Encourage plain language over technical phrasing.
 
@@ -554,6 +557,35 @@ const CONCIERGE_TOOLS: ChatTool[] = [
   TOOL_GET_AFFILIATE_COUNT,
   TOOL_SEARCH_VIDEOS,
 ]
+const TOOL_RUN_AUDIT: ChatTool = {
+  type: 'function',
+  function: {
+    name: 'runRepoAudit',
+    description: 'Run a code audit using the dedicated OpenAI GPT-5.5 Audit engine (the lead auditor for this platform) and return its findings. Use this whenever the owner asks you to audit, review, assess readiness, or find what is broken/missing in the code. The engine scans a TARGETED scope (a folder prefix), so pick a focused prefix like "saas/console-core", "saas/components/hub", or "saas/app/admin" rather than the whole repo. For a comprehensive full-repo audit, tell the owner to use the Audit console at /dashboard/audit, then read the result with getAuditFindings. Owner-only.',
+    parameters: {
+      type: 'object',
+      properties: {
+        prefix: { type: 'string', description: 'Folder prefix to audit, e.g. "saas/console-core" or "saas/components/hub". Keep it focused.' },
+        maxFiles: { type: 'number', description: 'Max files to scan this run (1-15, default 8). Smaller is faster.' },
+      },
+      required: ['prefix'],
+    },
+  },
+}
+const TOOL_GET_AUDIT_FINDINGS: ChatTool = {
+  type: 'function',
+  function: {
+    name: 'getAuditFindings',
+    description: 'Read back the findings of a stored OpenAI GPT-5.5 audit run (e.g. a full-repo run executed from the /dashboard/audit console). With no runId, returns the most recent run. Use this to summarise or report on an audit the owner already ran. Owner-only.',
+    parameters: {
+      type: 'object',
+      properties: {
+        runId: { type: 'string', description: 'Optional audit run id; omit for the latest run.' },
+      },
+      required: [],
+    },
+  },
+}
 
 const CHIEF_OF_STAFF_TOOLS: ChatTool[] = [
   TOOL_GET_PRICING,
@@ -564,6 +596,8 @@ const CHIEF_OF_STAFF_TOOLS: ChatTool[] = [
   TOOL_GET_OPPORTUNITY_ALERTS,
   TOOL_LIST_REPO_FILES,
   TOOL_READ_REPO_FILE,
+  TOOL_RUN_AUDIT,
+  TOOL_GET_AUDIT_FINDINGS,
   TOOL_COMMIT_CODE,
   TOOL_LIST_AI_BRANCHES,
   TOOL_LIST_CLEANUP_BRANCHES,
@@ -803,6 +837,55 @@ async function runTool(name: string, rawArgs: string, userId: string | null, con
     return formatFileForAI(path, result.content, result.truncated)
   }
 
+  if (name === 'runRepoAudit') {
+    if (!isOwner) return 'PERMISSION DENIED: audits are owner-only. Do not retry.'
+    let prefix = 'saas'
+    let maxFiles = 8
+    try {
+      const a = JSON.parse(rawArgs || '{}')
+      if (a.prefix) prefix = String(a.prefix).trim()
+      if (a.maxFiles) maxFiles = Math.max(1, Math.min(Number(a.maxFiles) || 8, 15))
+    } catch {}
+    try {
+      const res = await runAudit({ prefix, maxFiles })
+      if (!res.ok) return `OpenAI GPT-5.5 audit failed: ${res.error ?? 'unknown error'}.`
+      const scanned = res.filesScanned.length
+      if (!res.findings.length) return `OpenAI GPT-5.5 audit scanned ${scanned} file(s) under "${prefix}" and found no issues.`
+      const order: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 }
+      const sorted = res.findings.slice().sort((a: any, b: any) => (order[a.severity] ?? 9) - (order[b.severity] ?? 9))
+      const lines = sorted.map((f: any) => `- [${f.severity}] ${f.title} (${f.file}${f.line ? ':' + f.line : ''})${f.recommendation ? ' — ' + f.recommendation : ''}`).join('\n')
+      return `OpenAI GPT-5.5 audit of "${prefix}" — ${scanned} files scanned, ${res.findings.length} findings:\n${lines}`
+    } catch (e: any) {
+      return `Audit error: ${e?.message ?? 'unknown'}. For a large scope, run it from the /dashboard/audit console and then call getAuditFindings.`
+    }
+  }
+
+  if (name === 'getAuditFindings') {
+    if (!isOwner) return 'PERMISSION DENIED: audit findings are owner-only. Do not retry.'
+    let runId: string | null = null
+    try { runId = JSON.parse(rawArgs || '{}')?.runId || null } catch {}
+    try {
+      const admin = getAdminSupabase()
+      let rid = runId
+      let runInfo = ''
+      if (!rid) {
+        const { data } = await admin.from('audit_runs').select('id,prefix,status,findings_count,created_at').order('created_at', { ascending: false }).limit(1)
+        if (!data || !data.length) return 'No audit runs found yet. Start one with runRepoAudit, or run a full audit from the /dashboard/audit console.'
+        rid = data[0].id
+        runInfo = ` (prefix "${data[0].prefix}", ${data[0].status})`
+      }
+      const { data: findings, error } = await admin.from('audit_findings').select('severity,title,file,line,recommendation').eq('run_id', rid)
+      if (error) return `Could not read audit findings: ${error.message}.`
+      if (!findings || !findings.length) return `Audit run ${rid}${runInfo} has no stored findings.`
+      const order: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 }
+      const sorted = findings.slice().sort((a: any, b: any) => (order[a.severity] ?? 9) - (order[b.severity] ?? 9))
+      const lines = sorted.map((f: any) => `- [${f.severity}] ${f.title} (${f.file}${f.line ? ':' + f.line : ''})${f.recommendation ? ' — ' + f.recommendation : ''}`).join('\n')
+      return `Stored OpenAI GPT-5.5 audit findings (run ${rid}${runInfo}, ${findings.length} findings):\n${lines}`
+    } catch (e: any) {
+      return `Could not read audit findings: ${e?.message ?? 'unknown'}.`
+    }
+  }
+
   if (name === 'proposeCodeCommit') {
     if (!isPrivileged) {
       return 'PERMISSION DENIED: code commits are restricted to the owner/admin channel. Do not retry.'
@@ -1035,7 +1118,6 @@ if (name === 'deleteConversationHistory') {
   }
 return `Unknown tool: ${name}`
 }
-
 export async function POST(req: NextRequest) {
   // Hoisted so the outer catch can localize + tier the degraded reply.
   let errLangCode = 'en'
@@ -1194,7 +1276,7 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
     // so a long task degrades into a graceful "say continue" reply, never a 500.
     // Transient errors (overloaded / rate-limited / 5xx) are retried with backoff
     // while time remains, so a recoverable blip never hard-freezes the assistant.
-    const callModel = async (choiceMode: 'auto' | 'required') => {
+    const callModel = async (choiceMode: 'auto' | 'required' | 'none') => {
       let lastErr: any = null
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
@@ -1206,7 +1288,7 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
               system: systemContent,
               messages: convo as any,
               tools: anthropicTools as any,
-              tool_choice: choiceMode === 'required' ? { type: 'any' } : { type: 'auto' },
+              tool_choice: choiceMode === 'required' ? { type: 'any' } : choiceMode === 'none' ? { type: 'none' } : { type: 'auto' },
             })
           )
           return msg
@@ -1231,7 +1313,7 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
     let toolRounds = 0
     let timedOut   = msg === null
 
-    while (!timedOut && msg && (msg as any).stop_reason === 'tool_use' && toolRounds < 6 && remainingMs() > 12_000) {
+    while (!timedOut && msg && (msg as any).stop_reason === 'tool_use' && toolRounds < 10 && remainingMs() > 12_000) {
       toolRounds++
 
       // Record the assistant turn (its full content blocks, including tool_use).
@@ -1257,6 +1339,24 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
         ? m.content.filter((b: any) => b && b.type === 'text').map((b: any) => b.text).join('').trim()
         : ''
     let reply = extractText(msg)
+    // If the loop ended while still mid-tool-call (round cap reached), the model never
+    // got to write its answer. Force one tools-disabled synthesis so a read-heavy task
+    // (e.g. an audit) returns its findings instead of the empty-response fallback.
+    if (!reply && !timedOut && msg && (msg as any).stop_reason === 'tool_use' && remainingMs() > 8_000) {
+      try {
+        convo.push({ role: 'assistant', content: (msg as any).content })
+        const stopResults = (msg as any).content
+          .filter((b: any) => b && b.type === 'tool_use')
+          .map((b: any) => ({
+            type: 'tool_result',
+            tool_use_id: b.id,
+            content: 'Reading budget reached — do NOT call any more tools. Write your complete final answer for the owner now, in plain text, using everything you have already gathered.',
+          }))
+        convo.push({ role: 'user', content: stopResults })
+        const synth = await callModel('none')
+        if (synth) { msg = synth; reply = extractText(synth) }
+      } catch { /* fall through to the budget/fallback messages below */ }
+    }
     if (!reply) {
       const committedSomething = convo.some(
         (m: any) => m && m.role === 'user' && Array.isArray(m.content) &&

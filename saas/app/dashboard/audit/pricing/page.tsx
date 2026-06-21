@@ -1,7 +1,10 @@
 'use client'
 
 // saas/app/dashboard/audit/pricing/page.tsx
-// Audit pricing storefront — four tier cards, fathom-glass aesthetic, inline styles only.
+// Audit pricing storefront — Linear-style design system (flat surfaces, hairline
+// borders, single gold accent). PRO ($199) is the dominant recommended tier:
+// it carries the MOST POPULAR badge and the solid-accent primary button; every
+// other tier uses the outlined secondary button.
 // Credits pill driven by pricingConfig (single source of truth).
 // Paid tiers POST to /api/stripe/checkout; enterprise renders a mailto CTA.
 
@@ -20,33 +23,11 @@ import {
   AuditTierCopy,
 } from '@/lib/i18n/auditPricingCopy'
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
-const GOLD = '#ffc300'
-const CYAN = '#1af0ff'
-
-const cardBase: React.CSSProperties = {
-  background: 'linear-gradient(160deg, rgba(15,23,42,.92), rgba(3,7,18,.96))',
-  border: '1px solid rgba(255,255,255,.10)',
-  borderRadius: 20,
-  backdropFilter: 'blur(12px)',
-  WebkitBackdropFilter: 'blur(12px)',
-  boxShadow: '0 24px 70px rgba(0,0,0,.6)',
-  padding: '28px 24px 24px',
-  display: 'flex',
-  flexDirection: 'column' as const,
-  gap: 0,
-  position: 'relative' as const,
-  flex: '1 1 260px',
-  minWidth: 240,
-  maxWidth: 320,
-  boxSizing: 'border-box' as const,
-}
-
-const popularCard: React.CSSProperties = {
-  ...cardBase,
-  border: `1px solid ${GOLD}55`,
-  boxShadow: `0 24px 70px rgba(0,0,0,.6), 0 0 0 1px ${GOLD}22`,
-}
+// ─── Design-system class tokens ──────────────────────────────────────────────
+const PRIMARY_BTN =
+  'w-full inline-flex items-center justify-center rounded-md border border-accent bg-accent text-bg px-3 py-2 text-sm font-semibold transition-fast hover:brightness-110 disabled:opacity-60'
+const SECONDARY_BTN =
+  'w-full inline-flex items-center justify-center rounded-md border border-border bg-bg text-text px-3 py-2 text-sm transition-fast hover:bg-surface disabled:opacity-60'
 
 // ─── Tier card ────────────────────────────────────────────────────────────────
 function TierCard({
@@ -63,6 +44,7 @@ function TierCard({
 
   const priceId = getStripePriceId(tier.stripePriceEnvKey)
   const isEnterprise = tier.isEnterprise || tier.id === 'enterprise'
+  const popular = tier.isPopular
 
   async function handleUpgrade() {
     if (!priceId) return
@@ -88,146 +70,78 @@ function TierCard({
     }
   }
 
-  const cardStyle = tier.isPopular ? popularCard : cardBase
+  const cardClass = [
+    'relative flex flex-col rounded-md border bg-surface p-6',
+    'flex-1 min-w-[240px] max-w-[320px] box-border',
+    popular ? 'border-accent ring-1 ring-accent' : 'border-border',
+  ].join(' ')
 
   return (
-    <div style={cardStyle}>
-      {/* Popular badge */}
+    <div className={cardClass}>
+      {/* MOST POPULAR badge */}
       {copy.popular && (
-        <div style={{
-          position: 'absolute',
-          top: -13,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: `linear-gradient(135deg, ${GOLD}, #ffb000)`,
-          color: '#0a0e17',
-          fontSize: 10,
-          fontWeight: 900,
-          letterSpacing: '.08em',
-          textTransform: 'uppercase',
-          borderRadius: 999,
-          padding: '4px 14px',
-          whiteSpace: 'nowrap',
-        }}>
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-accent px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-bg">
           {copy.popular}
         </div>
       )}
 
       {/* Tier name */}
-      <div style={{
-        fontSize: 11,
-        fontWeight: 800,
-        letterSpacing: '.1em',
-        textTransform: 'uppercase',
-        color: tier.isPopular ? GOLD : 'rgba(255,255,255,.5)',
-        marginBottom: 6,
-      }}>
+      <div className={`mb-1.5 text-xs font-semibold uppercase tracking-wider ${popular ? 'text-accent' : 'text-text-muted'}`}>
         {copy.name}
       </div>
 
       {/* Description */}
-      <p style={{
-        margin: '0 0 18px',
-        fontSize: 13,
-        lineHeight: 1.5,
-        color: 'rgba(255,255,255,.6)',
-        minHeight: 38,
-      }}>
+      <p className="mb-4 min-h-[38px] text-sm leading-relaxed text-text-muted">
         {copy.description}
       </p>
 
       {/* Price */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 4 }}>
-        <span style={{ fontSize: 48, fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.03em' }}>
-          {copy.priceLabel}
-        </span>
-        <span style={{ fontSize: 13, color: 'rgba(255,255,255,.45)', fontWeight: 600 }}>
-          {copy.perMonth}
-        </span>
+      <div className="mb-1 flex items-baseline gap-1.5">
+        <span className="text-4xl font-semibold leading-none tracking-tight text-text">{copy.priceLabel}</span>
+        <span className="text-sm font-medium text-text-muted">{copy.perMonth}</span>
       </div>
 
       {/* Audit count sub-label */}
-      <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,.4)', marginBottom: 16 }}>
-        {formatAuditCount(tier.auditCount)}
+      <div className="mb-4 text-xs text-text-muted">{formatAuditCount(tier.auditCount)}</div>
+
+      {/* Credits pill */}
+      <div className={`flex items-center gap-2 rounded-md border border-border bg-bg px-3 py-2 ${copy.topupLabel ? 'mb-2' : 'mb-4'}`}>
+        <span className="text-sm text-accent" aria-hidden>⚡</span>
+        <span className="text-xs font-semibold leading-snug text-accent">{copy.creditsLabel}</span>
       </div>
 
-      {/* Credits pill — prominent, gold-tinted */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 7,
-        background: 'rgba(255,195,0,.08)',
-        border: '1px solid rgba(255,195,0,.22)',
-        borderRadius: 10,
-        padding: '8px 12px',
-        backdropFilter: 'blur(6px)',
-        WebkitBackdropFilter: 'blur(6px)',
-        marginBottom: copy.topupLabel ? 8 : 18,
-      }}>
-        <span style={{ fontSize: 14 }}>⚡</span>
-        <span style={{ fontSize: 12, fontWeight: 700, color: GOLD, lineHeight: 1.35 }}>
-          {copy.creditsLabel}
-        </span>
-      </div>
-
-      {/* Top-up label — cyan, only when tier supports it */}
+      {/* Top-up label */}
       {copy.topupLabel && (
-        <div style={{
-          fontSize: 11.5,
-          fontWeight: 600,
-          color: CYAN,
-          marginBottom: 18,
-          paddingLeft: 2,
-        }}>
-          {copy.topupLabel}
-        </div>
+        <div className="mb-4 pl-0.5 text-xs font-medium text-text-muted">{copy.topupLabel}</div>
       )}
 
-      {/* Feature list */}
-      <ul style={{ margin: '0 0 24px', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 9 }}>
-        {copy.features.map((feat, i) => (
-          <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 13, color: 'rgba(255,255,255,.82)', lineHeight: 1.45 }}>
-            <span style={{ color: CYAN, fontWeight: 900, flexShrink: 0, marginTop: 1 }}>✓</span>
-            {feat}
-          </li>
-        ))}
+      {/* Feature list — mark-aware: a leading ✓/❌ in the string overrides the
+          default check (so "❌ Read-Only Reports…" renders a danger ✕). */}
+      <ul className="mb-6 flex list-none flex-col gap-2.5 p-0">
+        {copy.features.map((feat, i) => {
+          const negative = feat.trimStart().startsWith('❌')
+          const text = feat.replace(/^\s*[✓❌]\s*/, '')
+          return (
+            <li key={i} className="flex items-start gap-2 text-sm leading-snug text-text-muted">
+              <span className={`mt-0.5 flex-shrink-0 font-semibold ${negative ? 'text-danger' : 'text-accent'}`} aria-hidden>
+                {negative ? '✕' : '✓'}
+              </span>
+              <span className={negative ? 'text-text-muted' : 'text-text'}>{text}</span>
+            </li>
+          )
+        })}
       </ul>
 
       {/* Spacer pushes CTA to bottom */}
-      <div style={{ flex: 1 }} />
+      <div className="flex-1" />
 
       {/* CTA */}
       {isEnterprise ? (
-        <a
-          href={pageCopy.enterpriseCtaHref}
-          style={{
-            display: 'block',
-            textAlign: 'center',
-            padding: '12px 20px',
-            borderRadius: 12,
-            border: `1px solid ${GOLD}55`,
-            background: 'rgba(255,195,0,.08)',
-            color: GOLD,
-            fontWeight: 800,
-            fontSize: 14,
-            textDecoration: 'none',
-            letterSpacing: '.02em',
-            transition: 'background .15s',
-          }}
-        >
+        <a href={pageCopy.enterpriseCtaHref} className={SECONDARY_BTN}>
           {copy.ctaLabel}
         </a>
       ) : !priceId ? (
-        <div style={{
-          fontSize: 12,
-          color: 'rgba(255,255,255,.4)',
-          background: 'rgba(255,255,255,.04)',
-          border: '1px solid rgba(255,255,255,.1)',
-          borderRadius: 10,
-          padding: '11px 14px',
-          lineHeight: 1.5,
-          textAlign: 'center',
-        }}>
+        <div className="rounded-md border border-border bg-bg px-3 py-2.5 text-center text-xs leading-relaxed text-text-muted">
           {pageCopy.notConfigured}
         </div>
       ) : (
@@ -235,30 +149,12 @@ function TierCard({
           <button
             onClick={handleUpgrade}
             disabled={loading}
-            style={{
-              width: '100%',
-              padding: '12px 20px',
-              borderRadius: 12,
-              border: tier.isPopular ? 'none' : `1px solid ${GOLD}55`,
-              background: tier.isPopular
-                ? `linear-gradient(135deg, ${GOLD}, #ffb000)`
-                : loading
-                ? 'rgba(255,195,0,.14)'
-                : 'rgba(255,195,0,.10)',
-              color: tier.isPopular ? '#0a0e17' : loading ? GOLD : GOLD,
-              fontWeight: 800,
-              fontSize: 14,
-              cursor: loading ? 'default' : 'pointer',
-              letterSpacing: '.02em',
-              opacity: loading ? 0.7 : 1,
-            }}
+            className={popular ? PRIMARY_BTN : SECONDARY_BTN}
           >
             {loading ? pageCopy.loadingLabel : copy.ctaLabel}
           </button>
           {error && (
-            <div style={{ marginTop: 10, fontSize: 12, color: '#fca5a5', textAlign: 'center', lineHeight: 1.4 }}>
-              {error}
-            </div>
+            <div className="mt-2.5 text-center text-xs leading-snug text-danger">{error}</div>
           )}
         </>
       )}
@@ -272,69 +168,26 @@ export default function AuditPricingPage() {
   const pageCopy: AuditPageCopy = getAuditPricingCopy(lang as AuditLocale)
 
   return (
-    <main style={{
-      minHeight: 'calc(100vh - 80px)',
-      color: '#fff',
-      padding: '40px 24px 60px',
-      boxSizing: 'border-box',
-    }}>
+    <main className="min-h-[calc(100vh-80px)] bg-bg px-6 pb-16 pt-10 font-sans text-text">
       {/* Page header */}
-      <div style={{ textAlign: 'center', marginBottom: 48 }}>
-        <div style={{
-          display: 'inline-block',
-          fontSize: 10,
-          fontWeight: 800,
-          letterSpacing: '.12em',
-          textTransform: 'uppercase',
-          color: GOLD,
-          border: `1px solid ${GOLD}44`,
-          borderRadius: 999,
-          padding: '4px 14px',
-          marginBottom: 14,
-        }}>
+      <div className="mb-12 text-center">
+        <div className="mb-3.5 inline-block rounded-full border border-border px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-accent">
           Audit
         </div>
-        <h1 style={{
-          margin: '0 0 12px',
-          fontSize: 'clamp(28px, 5vw, 44px)',
-          fontWeight: 900,
-          letterSpacing: '-0.02em',
-          lineHeight: 1.1,
-        }}>
+        <h1 className="mb-3 text-[clamp(28px,5vw,44px)] font-semibold leading-tight tracking-tight text-text">
           {pageCopy.pageTitle}
         </h1>
-        <p style={{
-          margin: '0 auto',
-          maxWidth: 560,
-          fontSize: 15,
-          lineHeight: 1.6,
-          color: 'rgba(255,255,255,.55)',
-        }}>
+        <p className="mx-auto max-w-[560px] text-md leading-relaxed text-text-muted">
           {pageCopy.pageSubtitle}
         </p>
       </div>
 
       {/* Tier cards grid */}
-      <div style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: 20,
-        justifyContent: 'center',
-        alignItems: 'stretch',
-        maxWidth: 1200,
-        margin: '0 auto',
-      }}>
+      <div className="mx-auto flex max-w-[1200px] flex-wrap items-stretch justify-center gap-5">
         {AUDIT_PRICING_CONFIG.tiers.map(tier => {
           const copy = pageCopy.tiers[tier.id]
           if (!copy) return null
-          return (
-            <TierCard
-              key={tier.id}
-              tier={tier}
-              copy={copy}
-              pageCopy={pageCopy}
-            />
-          )
+          return <TierCard key={tier.id} tier={tier} copy={copy} pageCopy={pageCopy} />
         })}
       </div>
     </main>

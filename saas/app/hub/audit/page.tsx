@@ -27,6 +27,7 @@ const REPORTS: ReportCard[] = [
   { key: 'remediation', href: '/hub/audit/remediation', accent: GOLD },
   { key: 'usage',       href: '/hub/audit/usage',        accent: CYAN },
   { key: 'history',     href: '/hub/audit/history',     accent: GOLD },
+  { key: 'github',      href: '/hub/audit/github',      accent: CYAN },
 ]
 
 export default function AuditCenterPage() {

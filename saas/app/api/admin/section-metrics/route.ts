@@ -4,8 +4,7 @@ import { requireAdmin } from '@/lib/auth/access'
 
 export const dynamic = 'force-dynamic'
 
-// Safely count rows in a table; returns null if the table doesn't exist or errors,
-// so the UI can keep its honest "Not tracked yet" placeholder rather than a fake 0.
+// Count rows; null if the table/column is absent or errors (UI keeps its honest placeholder).
 async function countRows(admin: any, table: string, filter?: (q: any) => any): Promise<number | null> {
   try {
     let q = admin.from(table).select('id', { count: 'exact', head: true })
@@ -13,53 +12,66 @@ async function countRows(admin: any, table: string, filter?: (q: any) => any): P
     const { count, error } = await q
     if (error) return null
     return count ?? 0
-  } catch {
-    return null
-  }
+  } catch { return null }
 }
 
-// Distinct count helper (best-effort) for "categories present" style metrics.
 async function distinctCount(admin: any, table: string, column: string): Promise<number | null> {
   try {
     const { data, error } = await admin.from(table).select(column)
     if (error || !Array.isArray(data)) return null
     return new Set(data.map((r: any) => r?.[column]).filter((v: any) => v != null)).size
-  } catch {
-    return null
-  }
+  } catch { return null }
 }
 
-// Each metric.key (from lib/admin/sections.ts) -> a real query against the live schema.
-// Metrics with no backing table are intentionally omitted; they stay "Not tracked yet".
-type MetricSpec = (admin: any) => Promise<number | null>
-const METRICS: Record<string, MetricSpec> = {
-  // Concierge Monitor (adm-)
+// Most recent timestamp in a table -> short date string (e.g. "Jun 20, 14:32"); null if none.
+async function latest(admin: any, table: string, col = 'created_at'): Promise<string | null> {
+  try {
+    const { data, error } = await admin.from(table).select(col).order(col, { ascending: false }).limit(1)
+    if (error || !Array.isArray(data) || !data.length || !data[0]?.[col]) return null
+    const d = new Date(data[0][col])
+    if (isNaN(d.getTime())) return null
+    return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  } catch { return null }
+}
+
+// Live connectivity probe -> 'Connected' if a trivial query succeeds, else null.
+async function supabaseHealth(admin: any): Promise<string | null> {
+  try {
+    const { error } = await admin.from('subscriptions').select('id', { count: 'exact', head: true })
+    return error ? null : 'Connected'
+  } catch { return null }
+}
+
+const startOfTodayISO = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString() }
+
+type Spec = (a: any) => Promise<number | string | null>
+const METRICS: Record<string, Spec> = {
+  // Concierge Monitor
   'adm-0': a => countRows(a, 'assistant_conversations'),
   'adm-7': a => countRows(a, 'assistant_messages'),
-
-  // SaaS Monitor (saas-)
+  // SaaS Monitor
   'saas-0': a => countRows(a, 'accounts'),
   'saas-3': a => countRows(a, 'ai_business_sites'),
   'saas-5': a => countRows(a, 'video_jobs'),
   'saas-6': a => countRows(a, 'reviews'),
   'saas-7': a => countRows(a, 'ai_task_log'),
   'saas-9': a => countRows(a, 'subscriptions'),
-
-  // Outreach + CRM (sales-)
+  // Outreach + CRM
   'sales-0': a => countRows(a, 'prospects'),
   'sales-4': a => countRows(a, 'outreach_sends'),
-
-  // Forecasting + KPI (ai-)
+  'sales-8': a => countRows(a, 'outreach_sends', q => q.gte('created_at', startOfTodayISO())),
+  // Forecasting + KPI
   'ai-0': a => countRows(a, 'ai_task_log'),
-
-  // Email / Marketing (email-)
+  // Email / Marketing
   'email-2': a => countRows(a, 'outreach_sends'),
   'email-5': a => countRows(a, 'marketing_campaigns'),
-
-  // System Health (sys-)
+  // System Health
   'sys-0': a => countRows(a, 'error_logs'),
-
-  // Marketplace Monitor (sb-)
+  'sys-2': a => supabaseHealth(a),
+  'sys-5': a => countRows(a, 'outreach_sends', q => q.gte('created_at', startOfTodayISO())),
+  'sys-6': a => latest(a, 'outreach_sends'),
+  'sys-7': a => latest(a, 'prospects'),
+  // Marketplace Monitor
   'sb-4': a => distinctCount(a, 'partner_businesses', 'category'),
 }
 
@@ -71,10 +83,10 @@ export async function GET() {
   const entries = Object.entries(METRICS)
   const results = await Promise.all(entries.map(([, fn]) => fn(admin)))
 
-  const values: Record<string, number> = {}
+  const values: Record<string, number | string> = {}
   entries.forEach(([key], i) => {
     const v = results[i]
-    if (typeof v === 'number') values[key] = v
+    if (typeof v === 'number' || (typeof v === 'string' && v.length)) values[key] = v
   })
 
   return NextResponse.json({ generatedAt: new Date().toISOString(), values })

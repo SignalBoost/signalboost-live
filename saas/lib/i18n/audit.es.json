@@ -60,7 +60,9 @@
     "overallScore": "Puntuación general de preparación",
     "findings": "Hallazgos",
     "evidenceRequired": "Se requiere evidencia",
-    "topRisks": "Riesgos principales"
+    "topRisks": "Riesgos principales",
+    "recommendation": "Recomendación",
+    "impact": "Impacto"
   },
   "finding": {
     "staleIdentity": {
@@ -203,6 +205,64 @@
       "title": "No hay registro de prueba de recuperación de respaldo",
       "detail": "No se recopiló evidencia de una prueba de respaldo/restauración de la base de datos.",
       "recommendation": "Realice una prueba de restauración y adjunte el resultado."
+    }
+  },
+  "exec": {
+    "title": "Resumen ejecutivo de riesgos",
+    "subtitle": "Puntuación general de preparación, recuento de hallazgos y riesgos principales.",
+    "narrativeTitle": "Resumen",
+    "topRisksTitle": "Riesgos principales",
+    "noRisks": "Sin riesgos por encima del umbral de reporte.",
+    "providersTitle": "Proveedores",
+    "status": {
+      "connected": "conectado",
+      "error": "error",
+      "not_configured": "no configurado"
+    },
+    "loading": "Generando el resumen ejecutivo…",
+    "loadError": "No se pudo cargar el resumen.",
+    "fetchError": "Error: {msg}"
+  },
+  "identity": {
+    "findingsTitle": "Hallazgos de acceso",
+    "noFindings": "Sin hallazgos de acceso.",
+    "tableTitle": "Todas las identidades",
+    "empty": "No se encontraron identidades.",
+    "never": "Nunca",
+    "daysAgo": "hace {days}d",
+    "summary": {
+      "total": "Identidades",
+      "privileged": "Privilegiadas",
+      "stale": "Inactivas",
+      "noMfa": "Priv. sin MFA",
+      "mfaUnknown": "MFA desconocido"
+    },
+    "col": {
+      "principal": "Identidad",
+      "provider": "Proveedor",
+      "kind": "Tipo",
+      "role": "Rol",
+      "mfa": "MFA",
+      "lastSeen": "Última actividad",
+      "flags": "Señales"
+    },
+    "kind": {
+      "user": "Usuario",
+      "service_account": "Cuenta de servicio",
+      "access_key": "Clave de acceso",
+      "collaborator": "Colaborador",
+      "token": "Token"
+    },
+    "mfa": {
+      "enabled": "Activado",
+      "disabled": "Desactivado",
+      "unknown": "Desconocido"
+    },
+    "flag": {
+      "stale": "Inactiva",
+      "neverUsed": "Nunca usada",
+      "privilegedNoMfa": "Sin MFA",
+      "mfaUnknown": "¿MFA?"
     }
   }
 }

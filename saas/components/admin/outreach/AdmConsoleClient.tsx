@@ -305,6 +305,7 @@ const COPY: Record<string, CopyDict> = {
 }
 
 function useLang(): string {
+  if (typeof window !== 'undefined') { const s = localStorage.getItem('signalboost_language'); if (s && (s in COPY)) return s as any }
   if (typeof navigator === 'undefined') return 'en'
   const lang = navigator.language?.slice(0, 2).toLowerCase()
   return COPY[lang] ? lang : 'en'

@@ -401,6 +401,10 @@
     "history": {
       "title": "Readiness History",
       "desc": "Track your readiness score and finding counts over time."
+    },
+    "github": {
+      "title": "GitHub & Code Change",
+      "desc": "Branch protection, collaborators, and stale branches."
     }
   },
   "usage": {
@@ -447,5 +451,46 @@
   "scan": {
     "quotaExceeded": "Monthly limit reached: {used}/{cap} audit scans used. Upgrade your plan to run more.",
     "upgrade": "Upgrade plan"
+  },
+  "github": {
+    "title": "GitHub & Code Change Report",
+    "subtitle": "Branch protection, collaborators, stale branches, and open changes.",
+    "notConfigured": "GitHub is not connected, or its data could not be collected.",
+    "summary": {
+      "collaborators": "Collaborators",
+      "admins": "Admins",
+      "stale": "Stale branches",
+      "openPRs": "Open PRs"
+    },
+    "protection": {
+      "title": "Default branch protection",
+      "enforced": "Enforced",
+      "missing": "Missing",
+      "unverified": "Unverified"
+    },
+    "collab": {
+      "title": "Collaborators",
+      "empty": "No collaborators collected."
+    },
+    "col": {
+      "login": "User",
+      "role": "Role",
+      "access": "Access",
+      "branch": "Branch",
+      "age": "Age (days)"
+    },
+    "admin": "Admin",
+    "member": "Member",
+    "stale": {
+      "title": "Stale branches",
+      "empty": "No stale branches — clean."
+    },
+    "findings": {
+      "title": "Findings ({n})",
+      "empty": "No GitHub findings — nothing flagged."
+    },
+    "loadError": "Could not load the GitHub report.",
+    "fetchError": "Error: {msg}",
+    "loading": "Loading GitHub report…"
   }
 }

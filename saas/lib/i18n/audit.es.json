@@ -264,5 +264,45 @@
       "privilegedNoMfa": "Sin MFA",
       "mfaUnknown": "¿MFA?"
     }
+  },
+  "provider": {
+    "title": "Inventario de proveedores",
+    "subtitle": "Cada proveedor conectado con estado, riesgo y última verificación.",
+    "empty": "No se encontraron proveedores.",
+    "evidenceShort": "({n} evidencia)",
+    "loading": "Cargando inventario de proveedores…",
+    "loadError": "No se pudo cargar el inventario.",
+    "fetchError": "Error: {msg}",
+    "risk": {
+      "unknown": "Desconocido"
+    },
+    "summary": {
+      "total": "Proveedores",
+      "connected": "Conectados",
+      "error": "Con error",
+      "notConfigured": "No configurados"
+    },
+    "col": {
+      "provider": "Proveedor",
+      "category": "Categoría",
+      "status": "Estado",
+      "risk": "Riesgo",
+      "findings": "Hallazgos",
+      "lastChecked": "Última verificación"
+    },
+    "status": {
+      "connected": "Conectado",
+      "error": "Error",
+      "not_configured": "No configurado",
+      "missing": "Faltante"
+    },
+    "category": {
+      "billing": "Facturación",
+      "database": "Base de datos",
+      "deployment": "Despliegue",
+      "change-management": "Gestión de cambios",
+      "identity": "Identidad",
+      "other": "Otro"
+    }
   }
 }

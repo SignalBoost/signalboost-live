@@ -397,6 +397,10 @@
     "usage": {
       "title": "Uso e custo de IA",
       "desc": "Consumo de tokens e custo estimado por funcionalidade e usuário."
+    },
+    "history": {
+      "title": "Histórico de prontidão",
+      "desc": "Acompanhe sua pontuação de prontidão e as constatações ao longo do tempo."
     }
   },
   "usage": {
@@ -424,5 +428,20 @@
   "export": {
     "csv": "Exportar CSV",
     "pdf": "Imprimir / Salvar PDF"
+  },
+  "history": {
+    "title": "Histórico de prontidão",
+    "subtitle": "Acompanhe como sua pontuação de prontidão muda ao longo do tempo.",
+    "snapshot": "Capturar agora",
+    "snapshotting": "Salvando…",
+    "loading": "Carregando histórico…",
+    "loadError": "Não foi possível carregar o histórico.",
+    "fetchError": "Erro: {msg}",
+    "snapshotError": "Não foi possível capturar.",
+    "empty": "Ainda não há capturas. Faça a primeira acima.",
+    "trendTitle": "Pontuação ao longo do tempo",
+    "col": {
+      "date": "Data"
+    }
   }
 }

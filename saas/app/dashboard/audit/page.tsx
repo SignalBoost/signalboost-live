@@ -44,7 +44,7 @@ type AuditCopy = {
   history: string; noRuns: string; refresh: string
   statusRunning: string; statusComplete: string; statusFailed: string
   detail: string; close: string; viewSource: string
-  generateFix: string; patching: string; patchReady: string; reviewMerge: string; patchFailed: string
+  generateFix: string; patching: string; patchReady: string; reviewMerge: string; patchFailed: string; patchUpgrade: string
   trackScan: string; trackAnalyze: string; trackReport: string; trackPrs: string
   sev: Record<Sev, string>
 }
@@ -61,7 +61,7 @@ const COPY: Record<string, AuditCopy> = {
     history: 'Run history', noRuns: 'No runs yet.', refresh: 'Refresh',
     statusRunning: 'Running', statusComplete: 'Complete', statusFailed: 'Failed',
     detail: 'Detail', close: 'Close', viewSource: 'View on GitHub',
-    generateFix: 'Generate fix', patching: 'Generating fix…', patchReady: 'Fix proposed on a branch', reviewMerge: 'Review & merge', patchFailed: 'Could not generate fix',
+    generateFix: 'Generate fix', patching: 'Generating fix…', patchReady: 'Fix proposed on a branch', reviewMerge: 'Review & merge', patchFailed: 'Could not generate fix', patchUpgrade: 'AI patch generation is a Pro feature. Upgrade to enable it.',
     trackScan: 'Scanning target', trackAnalyze: 'Running analyzers', trackReport: 'Generating report', trackPrs: 'Preparing patches',
     sev: { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', info: 'Info' },
   },
@@ -76,7 +76,7 @@ const COPY: Record<string, AuditCopy> = {
     history: 'Historial', noRuns: 'Aún no hay ejecuciones.', refresh: 'Actualizar',
     statusRunning: 'En curso', statusComplete: 'Completado', statusFailed: 'Falló',
     detail: 'Detalle', close: 'Cerrar', viewSource: 'Ver en GitHub',
-    generateFix: 'Generar corrección', patching: 'Generando corrección…', patchReady: 'Corrección propuesta en una rama', reviewMerge: 'Revisar y combinar', patchFailed: 'No se pudo generar la corrección',
+    generateFix: 'Generar corrección', patching: 'Generando corrección…', patchReady: 'Corrección propuesta en una rama', reviewMerge: 'Revisar y combinar', patchFailed: 'No se pudo generar la corrección', patchUpgrade: 'La generación de parches con IA es una función Pro. Mejora tu plan para habilitarla.',
     trackScan: 'Escaneando objetivo', trackAnalyze: 'Ejecutando analizadores', trackReport: 'Generando informe', trackPrs: 'Preparando parches',
     sev: { critical: 'Crítico', high: 'Alto', medium: 'Medio', low: 'Bajo', info: 'Info' },
   },
@@ -91,7 +91,7 @@ const COPY: Record<string, AuditCopy> = {
     history: 'Histórico', noRuns: 'Ainda não há execuções.', refresh: 'Atualizar',
     statusRunning: 'Em execução', statusComplete: 'Concluído', statusFailed: 'Falhou',
     detail: 'Detalhe', close: 'Fechar', viewSource: 'Ver no GitHub',
-    generateFix: 'Gerar correção', patching: 'Gerando correção…', patchReady: 'Correção proposta em um branch', reviewMerge: 'Revisar e mesclar', patchFailed: 'Não foi possível gerar a correção',
+    generateFix: 'Gerar correção', patching: 'Gerando correção…', patchReady: 'Correção proposta em um branch', reviewMerge: 'Revisar e mesclar', patchFailed: 'Não foi possível gerar a correção', patchUpgrade: 'A geração de correções com IA é um recurso Pro. Faça upgrade para habilitá-la.',
     trackScan: 'Verificando alvo', trackAnalyze: 'Executando analisadores', trackReport: 'Gerando relatório', trackPrs: 'Preparando correções',
     sev: { critical: 'Crítico', high: 'Alto', medium: 'Médio', low: 'Baixo', info: 'Info' },
   },
@@ -106,7 +106,7 @@ const COPY: Record<string, AuditCopy> = {
     history: 'Historia', noRuns: 'Brak uruchomień.', refresh: 'Odśwież',
     statusRunning: 'W toku', statusComplete: 'Zakończono', statusFailed: 'Niepowodzenie',
     detail: 'Szczegóły', close: 'Zamknij', viewSource: 'Zobacz na GitHub',
-    generateFix: 'Wygeneruj poprawkę', patching: 'Generowanie poprawki…', patchReady: 'Poprawka zaproponowana w gałęzi', reviewMerge: 'Przejrzyj i scal', patchFailed: 'Nie udało się wygenerować poprawki',
+    generateFix: 'Wygeneruj poprawkę', patching: 'Generowanie poprawki…', patchReady: 'Poprawka zaproponowana w gałęzi', reviewMerge: 'Przejrzyj i scal', patchFailed: 'Nie udało się wygenerować poprawki', patchUpgrade: 'Generowanie poprawek AI to funkcja Pro. Ulepsz plan, aby ją włączyć.',
     trackScan: 'Skanowanie celu', trackAnalyze: 'Uruchamianie analizatorów', trackReport: 'Generowanie raportu', trackPrs: 'Przygotowywanie poprawek',
     sev: { critical: 'Krytyczny', high: 'Wysoki', medium: 'Średni', low: 'Niski', info: 'Info' },
   },
@@ -121,7 +121,7 @@ const COPY: Record<string, AuditCopy> = {
     history: 'История запусков', noRuns: 'Запусков пока нет.', refresh: 'Обновить',
     statusRunning: 'Выполняется', statusComplete: 'Завершено', statusFailed: 'Ошибка',
     detail: 'Подробности', close: 'Закрыть', viewSource: 'Открыть на GitHub',
-    generateFix: 'Сгенерировать исправление', patching: 'Создание исправления…', patchReady: 'Исправление предложено в ветке', reviewMerge: 'Просмотреть и слить', patchFailed: 'Не удалось создать исправление',
+    generateFix: 'Сгенерировать исправление', patching: 'Создание исправления…', patchReady: 'Исправление предложено в ветке', reviewMerge: 'Просмотреть и слить', patchFailed: 'Не удалось создать исправление', patchUpgrade: 'Генерация исправлений ИИ — функция Pro. Обновите план, чтобы включить её.',
     trackScan: 'Сканирование цели', trackAnalyze: 'Запуск анализаторов', trackReport: 'Создание отчёта', trackPrs: 'Подготовка исправлений',
     sev: { critical: 'Критический', high: 'Высокий', medium: 'Средний', low: 'Низкий', info: 'Инфо' },
   },
@@ -222,6 +222,7 @@ export default function AuditConsolePage() {
         body: JSON.stringify({ file: f.file, line: typeof f.line === 'number' ? f.line : undefined, title: f.title, detail: f.detail, recommendation: f.recommendation }),
       })
       const data = await res.json().catch(() => null)
+      if (res.status === 402 && data?.code === 'patch_not_in_plan') { setPatchError(copy.patchUpgrade); setPatchState('error'); return }
       if (!res.ok || !data?.ok) { setPatchError(data?.error || copy.patchFailed); setPatchState('error'); return }
       setPatchResult({ branch: data.branch, compareUrl: data.compareUrl }); setPatchState('done')
     } catch {

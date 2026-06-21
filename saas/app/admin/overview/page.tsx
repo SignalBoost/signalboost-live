@@ -13,7 +13,7 @@ const COPY = {
 }
 
 type Lang = keyof typeof COPY
-function getLang(): Lang { if (typeof navigator === 'undefined') return 'en'; const l = navigator.language?.slice(0, 2); return (l in COPY ? l : 'en') as Lang }
+function getLang(): Lang { if (typeof window !== 'undefined') { const s = localStorage.getItem('signalboost_language'); if (s && (s in COPY)) return s as any }; if (typeof navigator === 'undefined') return 'en'; const l = navigator.language?.slice(0, 2); return (l in COPY ? l : 'en') as Lang }
 
 type Overview = {
   generatedAt: string

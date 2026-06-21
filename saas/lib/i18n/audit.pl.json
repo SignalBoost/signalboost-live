@@ -61,8 +61,8 @@
     "findings": "Находки",
     "evidenceRequired": "Требуется подтверждение",
     "topRisks": "Основные риски",
-    "recommendation": "Рекомендация",
-    "impact": "Влияние"
+    "recommendation": "Zalecenie",
+    "impact": "Wpływ"
   },
   "finding": {
     "staleIdentity": {
@@ -208,221 +208,240 @@
     }
   },
   "exec": {
-    "title": "Сводка рисков для руководства",
-    "subtitle": "Общий балл готовности, число находок и основные риски.",
-    "narrativeTitle": "Резюме",
-    "topRisksTitle": "Основные риски",
-    "noRisks": "Рисков выше порога отчётности нет.",
-    "providersTitle": "Провайдеры",
+    "title": "Podsumowanie ryzyka dla kierownictwa",
+    "subtitle": "Ogólny wynik gotowości, liczba ustaleń i najważniejsze ryzyka.",
+    "narrativeTitle": "Podsumowanie",
+    "topRisksTitle": "Najważniejsze ryzyka",
+    "noRisks": "Brak ryzyk powyżej progu raportowania.",
+    "providersTitle": "Dostawcy",
     "status": {
-      "connected": "подключён",
-      "error": "ошибка",
-      "not_configured": "не настроен"
+      "connected": "połączony",
+      "error": "błąd",
+      "not_configured": "nieskonfigurowany"
     },
-    "loading": "Формирование сводки…",
-    "loadError": "Не удалось загрузить сводку.",
-    "fetchError": "Ошибка: {msg}"
+    "loading": "Tworzenie podsumowania…",
+    "loadError": "Nie można załadować podsumowania.",
+    "fetchError": "Błąd: {msg}"
   },
   "identity": {
-    "findingsTitle": "Находки по доступу",
-    "noFindings": "Находок по доступу нет.",
-    "tableTitle": "Все учётные записи",
-    "empty": "Учётные записи не найдены.",
-    "never": "Никогда",
-    "daysAgo": "{days}д назад",
+    "findingsTitle": "Ustalenia dot. dostępu",
+    "noFindings": "Brak ustaleń dot. dostępu.",
+    "tableTitle": "Wszystkie tożsamości",
+    "empty": "Nie znaleziono tożsamości.",
+    "never": "Nigdy",
+    "daysAgo": "{days}d temu",
     "summary": {
-      "total": "Учётные записи",
-      "privileged": "Привилегированные",
-      "stale": "Неактивные",
-      "noMfa": "Привил. без MFA",
-      "mfaUnknown": "MFA неизвестно"
+      "total": "Tożsamości",
+      "privileged": "Uprzywilejowane",
+      "stale": "Nieaktywne",
+      "noMfa": "Uprz. bez MFA",
+      "mfaUnknown": "MFA nieznane"
     },
     "col": {
-      "principal": "Субъект",
-      "provider": "Провайдер",
-      "kind": "Тип",
-      "role": "Роль",
+      "principal": "Podmiot",
+      "provider": "Dostawca",
+      "kind": "Typ",
+      "role": "Rola",
       "mfa": "MFA",
-      "lastSeen": "Последняя активность",
-      "flags": "Метки"
+      "lastSeen": "Ostatnia aktywność",
+      "flags": "Flagi"
     },
     "kind": {
-      "user": "Пользователь",
-      "service_account": "Сервисный аккаунт",
-      "access_key": "Ключ доступа",
-      "collaborator": "Соавтор",
-      "token": "Токен"
+      "user": "Użytkownik",
+      "service_account": "Konto serwisowe",
+      "access_key": "Klucz dostępu",
+      "collaborator": "Współpracownik",
+      "token": "Token"
     },
     "mfa": {
-      "enabled": "Включено",
-      "disabled": "Отключено",
-      "unknown": "Неизвестно"
+      "enabled": "Włączone",
+      "disabled": "Wyłączone",
+      "unknown": "Nieznane"
     },
     "flag": {
-      "stale": "Неактивна",
-      "neverUsed": "Не использована",
-      "privilegedNoMfa": "Без MFA",
+      "stale": "Nieaktywna",
+      "neverUsed": "Nieużywana",
+      "privilegedNoMfa": "Bez MFA",
       "mfaUnknown": "MFA?"
     }
   },
   "provider": {
-    "title": "Инвентаризация провайдеров",
-    "subtitle": "Каждый подключённый провайдер: статус, риск и последняя проверка.",
-    "empty": "Провайдеры не найдены.",
-    "evidenceShort": "({n} подтв.)",
-    "loading": "Загрузка инвентаризации провайдеров…",
-    "loadError": "Не удалось загрузить инвентаризацию.",
-    "fetchError": "Ошибка: {msg}",
+    "title": "Inwentaryzacja dostawców",
+    "subtitle": "Każdy podłączony dostawca ze statusem, ryzykiem i ostatnim sprawdzeniem.",
+    "empty": "Nie znaleziono dostawców.",
+    "evidenceShort": "({n} dowód)",
+    "loading": "Ładowanie inwentaryzacji dostawców…",
+    "loadError": "Nie można załadować inwentaryzacji.",
+    "fetchError": "Błąd: {msg}",
     "risk": {
-      "unknown": "Неизвестно"
+      "unknown": "Nieznane"
     },
     "summary": {
-      "total": "Провайдеры",
-      "connected": "Подключено",
-      "error": "С ошибкой",
-      "notConfigured": "Не настроено"
+      "total": "Dostawcy",
+      "connected": "Połączeni",
+      "error": "Z błędem",
+      "notConfigured": "Nieskonfigurowani"
     },
     "col": {
-      "provider": "Провайдер",
-      "category": "Категория",
-      "status": "Статус",
-      "risk": "Риск",
-      "findings": "Находки",
-      "lastChecked": "Последняя проверка"
+      "provider": "Dostawca",
+      "category": "Kategoria",
+      "status": "Status",
+      "risk": "Ryzyko",
+      "findings": "Ustalenia",
+      "lastChecked": "Ostatnie sprawdzenie"
     },
     "status": {
-      "connected": "Подключён",
-      "error": "Ошибка",
-      "not_configured": "Не настроен",
-      "missing": "Отсутствует"
+      "connected": "Połączony",
+      "error": "Błąd",
+      "not_configured": "Nieskonfigurowany",
+      "missing": "Brak"
     },
     "category": {
-      "billing": "Биллинг",
-      "database": "База данных",
-      "deployment": "Развёртывание",
-      "change-management": "Управление изменениями",
-      "identity": "Идентификация",
-      "other": "Прочее"
+      "billing": "Płatności",
+      "database": "Baza danych",
+      "deployment": "Wdrożenie",
+      "change-management": "Zarządzanie zmianami",
+      "identity": "Tożsamość",
+      "other": "Inne"
     }
   },
   "secret": {
-    "title": "Раскрытие секретов и API-ключей",
-    "subtitle": "Учётные данные по средам и состоянию ротации. Только метаданные — значения не читаются и не показываются.",
-    "findingsTitle": "Находки по раскрытию",
-    "noFindings": "Находок по раскрытию нет.",
-    "tableTitle": "Настроенные учётные данные",
-    "empty": "Учётные данные не найдены.",
-    "metadataNote": "Только метаданные — значения никогда не читаются и не отображаются.",
-    "loading": "Загрузка отчёта о секретах…",
-    "loadError": "Не удалось загрузить отчёт.",
-    "fetchError": "Ошибка: {msg}",
+    "title": "Ekspozycja sekretów i kluczy API",
+    "subtitle": "Skonfigurowane poświadczenia wg środowiska i stanu rotacji. Tylko metadane — wartości nie są odczytywane ani pokazywane.",
+    "findingsTitle": "Ustalenia dot. ekspozycji",
+    "noFindings": "Brak ustaleń dot. ekspozycji.",
+    "tableTitle": "Skonfigurowane poświadczenia",
+    "empty": "Nie znaleziono poświadczeń.",
+    "metadataNote": "Tylko metadane — wartości nigdy nie są odczytywane ani wyświetlane.",
+    "loading": "Ładowanie raportu sekretów…",
+    "loadError": "Nie można załadować raportu.",
+    "fetchError": "Błąd: {msg}",
     "summary": {
-      "total": "Учётные данные",
-      "clientExposed": "Доступны клиенту",
-      "rotationUnknown": "Ротация неизвестна"
+      "total": "Poświadczenia",
+      "clientExposed": "Ujawnione klientowi",
+      "rotationUnknown": "Rotacja nieznana"
     },
     "col": {
-      "name": "Имя",
-      "provider": "Провайдер",
-      "environment": "Среда",
-      "exposure": "Раскрытие",
-      "rotation": "Ротация",
-      "risk": "Риск"
+      "name": "Nazwa",
+      "provider": "Dostawca",
+      "environment": "Środowisko",
+      "exposure": "Ekspozycja",
+      "rotation": "Rotacja",
+      "risk": "Ryzyko"
     },
     "env": {
-      "production": "Продакшн",
-      "preview": "Превью",
-      "development": "Разработка",
-      "unknown": "Неизвестно"
+      "production": "Produkcja",
+      "preview": "Podgląd",
+      "development": "Programowanie",
+      "unknown": "Nieznane"
     },
     "exposure": {
-      "client": "Доступен клиенту",
-      "server": "Только сервер"
+      "client": "Ujawniony klientowi",
+      "server": "Tylko serwer"
     },
     "rotation": {
-      "known": "Отслеживается",
-      "unknown": "Неизвестна"
+      "known": "Śledzona",
+      "unknown": "Nieznana"
     }
   },
   "remediation": {
-    "title": "План устранения",
-    "subtitle": "Приоритетные исправления по срочности; пункты, требующие подтверждения, — на отдельной дорожке.",
-    "empty": "Нечего устранять — открытых находок нет.",
-    "evidenceTitle": "Требуется подтверждение",
-    "evidenceSubtitle": "Пробелы для подтверждения вручную. Они не снижают балл.",
-    "loading": "Формирование плана устранения…",
-    "loadError": "Не удалось загрузить план.",
-    "fetchError": "Ошибка: {msg}",
+    "title": "Plan działań naprawczych",
+    "subtitle": "Priorytetowe poprawki uszeregowane wg pilności, a pozycje wymagające dowodu na osobnej ścieżce.",
+    "empty": "Nic do naprawy — brak otwartych ustaleń.",
+    "evidenceTitle": "Wymagany dowód",
+    "evidenceSubtitle": "Luki do potwierdzenia dowodem. Nie obniżają wyniku.",
+    "loading": "Tworzenie planu napraw…",
+    "loadError": "Nie można załadować planu.",
+    "fetchError": "Błąd: {msg}",
     "summary": {
-      "now": "Сейчас",
-      "next": "Далее",
-      "later": "Позже",
-      "evidence": "Подтверждение"
+      "now": "Teraz",
+      "next": "Następne",
+      "later": "Później",
+      "evidence": "Dowód"
     },
     "tier": {
-      "now": "Сейчас",
-      "next": "Далее",
-      "later": "Позже"
+      "now": "Teraz",
+      "next": "Następne",
+      "later": "Później"
     },
     "tierHint": {
-      "now": "Критично — исправить немедленно.",
-      "next": "Высокий — запланировать скоро.",
-      "later": "Средний и низкий — планировать."
+      "now": "Krytyczne — napraw natychmiast.",
+      "next": "Wysokie — zaplanuj wkrótce.",
+      "later": "Średnie i niskie — zaplanuj."
     }
   },
   "center": {
-    "title": "Центр аудита",
-    "subtitle": "Отчёты операционной готовности: идентификация, провайдеры, секреты и устранение — с детерминированной оценкой.",
-    "open": "Открыть отчёт",
+    "title": "Centrum audytu",
+    "subtitle": "Raporty gotowości operacyjnej: tożsamość, dostawcy, sekrety i działania naprawcze — z deterministyczną oceną.",
+    "open": "Otwórz raport",
     "executive": {
-      "title": "Сводка рисков для руководства",
-      "desc": "Общий балл, число находок и основные риски."
+      "title": "Podsumowanie ryzyka dla kierownictwa",
+      "desc": "Ogólny wynik, liczba ustaleń i najważniejsze ryzyka."
     },
     "identity": {
-      "title": "Идентификация и доступ",
-      "desc": "Кто имеет доступ, уровень привилегий, MFA и активность."
+      "title": "Tożsamość i dostęp",
+      "desc": "Kto ma dostęp, poziom uprawnień, MFA i ostatnia aktywność."
     },
     "providers": {
-      "title": "Инвентаризация провайдеров",
-      "desc": "Каждый провайдер: статус, риск и последняя проверка."
+      "title": "Inwentaryzacja dostawców",
+      "desc": "Każdy dostawca ze statusem, ryzykiem i ostatnim sprawdzeniem."
     },
     "secrets": {
-      "title": "Секреты и API-ключи",
-      "desc": "Учётные данные по средам и состоянию ротации."
+      "title": "Sekrety i klucze API",
+      "desc": "Poświadczenia wg środowiska i stanu rotacji."
     },
     "remediation": {
-      "title": "План устранения",
-      "desc": "Приоритетные исправления по срочности."
+      "title": "Plan działań naprawczych",
+      "desc": "Priorytetowe poprawki wg pilności."
     },
     "usage": {
-      "title": "Использование и стоимость ИИ",
-      "desc": "Расход токенов и оценочная стоимость по функциям и пользователям."
+      "title": "Użycie i koszt AI",
+      "desc": "Zużycie tokenów i szacowany koszt wg funkcji i użytkownika."
+    },
+    "history": {
+      "title": "Historia gotowości",
+      "desc": "Śledź wynik gotowości i liczbę ustaleń w czasie."
     }
   },
   "usage": {
-    "title": "Использование и стоимость ИИ",
-    "subtitle": "Расход токенов и оценочная стоимость функций ИИ за последние {n} дней. Стоимость оценочная; число токенов точное.",
-    "totalCost": "Оценка стоимости",
-    "calls": "Вызовы",
-    "totalTokens": "Всего токенов",
-    "cacheHit": "Ввод из кэша",
-    "byFeature": "По функциям",
-    "byUser": "Крупнейшие потребители",
-    "byUserHint": "Сначала наибольшая оценочная стоимость — основа для биллинга или лимитов по пользователю.",
+    "title": "Użycie i koszt AI",
+    "subtitle": "Zużycie tokenów i szacowany koszt funkcji AI w ciągu ostatnich {n} dni. Koszt jest szacunkowy; liczby tokenów są dokładne.",
+    "totalCost": "Szac. koszt",
+    "calls": "Wywołania",
+    "totalTokens": "Łączne tokeny",
+    "cacheHit": "Wejście z pamięci",
+    "byFeature": "Wg funkcji",
+    "byUser": "Najwięksi konsumenci",
+    "byUserHint": "Najwyższy szacowany koszt najpierw — podstawa rozliczeń lub limitów per użytkownik.",
     "col": {
-      "feature": "Функция",
-      "calls": "Вызовы",
-      "tokens": "Токены",
-      "cost": "Оценка стоимости",
-      "user": "Пользователь"
+      "feature": "Funkcja",
+      "calls": "Wywołania",
+      "tokens": "Tokeny",
+      "cost": "Szac. koszt",
+      "user": "Użytkownik"
     },
-    "empty": "Использование пока не зафиксировано.",
-    "loading": "Загрузка использования…",
-    "loadError": "Не удалось загрузить использование.",
-    "fetchError": "Ошибка: {msg}"
+    "empty": "Brak zarejestrowanego użycia.",
+    "loading": "Ładowanie użycia…",
+    "loadError": "Nie można załadować użycia.",
+    "fetchError": "Błąd: {msg}"
   },
   "export": {
-    "csv": "Экспорт CSV",
-    "pdf": "Печать / Сохранить PDF"
+    "csv": "Eksportuj CSV",
+    "pdf": "Drukuj / Zapisz PDF"
+  },
+  "history": {
+    "title": "Historia gotowości",
+    "subtitle": "Śledź, jak Twój wynik gotowości zmienia się w czasie.",
+    "snapshot": "Zrób migawkę",
+    "snapshotting": "Zapisywanie…",
+    "loading": "Ładowanie historii…",
+    "loadError": "Nie udało się załadować historii.",
+    "fetchError": "Błąd: {msg}",
+    "snapshotError": "Nie udało się zrobić migawki.",
+    "empty": "Brak migawek. Zrób pierwszą powyżej.",
+    "trendTitle": "Wynik w czasie",
+    "col": {
+      "date": "Data"
+    }
   }
 }

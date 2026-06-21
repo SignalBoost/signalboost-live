@@ -1,6 +1,6 @@
 'use client'
 
-import { AdminSectionConfig } from '@/lib/admin/sections'
+import { AdminSectionConfig, translateSection } from '@/lib/admin/sections'
 import { COCKPIT_PANELS, CRM_STAGES, EXECUTIVE_RECOMMENDATIONS, FINANCIAL_LEDGER, FORECASTS, KPI_DASHBOARD } from '@/lib/platform/unifiedPlatform'
 
 const COPY: Record<string, Record<string, string>> = {
@@ -88,9 +88,10 @@ function useLang(): string {
   return COPY[lang] ? lang : 'en'
 }
 
-export default function AdminSectionView({ section }: { section: AdminSectionConfig }) {
+export default function AdminSectionView({ section: rawSection }: { section: AdminSectionConfig }) {
   const lang = useLang()
   const t = COPY[lang]
+  const section = translateSection(rawSection, lang)
 
   return (
     <div className="sb-cockpit-stack" role="region" aria-label={`${section.title} admin console section`}>

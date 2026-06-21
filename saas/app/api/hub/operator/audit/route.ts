@@ -49,30 +49,33 @@ export async function POST(req: NextRequest) {
 
   const admin = getAdminSupabase()
 
-  // Throttle policy — hard block at the monthly cap. Owner is exempt.
-  if (!ctx.isOwner) {
-    const quota = await checkScanQuota(admin, { userId: ctx.userId, isOwner: false })
-    if (!quota.ok) {
-      return NextResponse.json(
-        {
-          ok: false,
-          code: 'scan_quota_exceeded',
-          upgrade: true,
-          tier: quota.tier,
-          cap: quota.cap,
-          used: quota.used,
-          error: `Monthly limit reached: ${quota.used}/${quota.cap} audit scans used. Upgrade your plan to run more.`,
-        },
-        { status: 402 },
-      )
-    }
+  // Throttle policy — resolve the tier for everyone (owner ⇒ exempt enterprise),
+  // and hard-block non-owners at their tier cap. The resolved tier also drives
+  // the pre-call size clamp below.
+  const quota = await checkScanQuota(admin, { userId: ctx.userId, isOwner: ctx.isOwner })
+  if (!quota.ok) {
+    const capLabel = quota.cap == null ? '∞' : String(quota.cap)
+    const windowLabel = quota.window === 'lifetime' ? 'lifetime' : 'this month'
+    return NextResponse.json(
+      {
+        ok: false,
+        code: 'scan_quota_exceeded',
+        upgrade: true,
+        tier: quota.tier,
+        window: quota.window,
+        cap: quota.cap,
+        used: quota.used,
+        error: `Scan limit reached: ${quota.used}/${capLabel} audit scans used ${windowLabel}. Upgrade your plan to run more.`,
+      },
+      { status: 402 },
+    )
   }
 
   let body: { prefix?: string; maxFiles?: number } = {}
   try { body = await req.json() } catch { /* defaults apply */ }
   const prefix   = typeof body.prefix === 'string' && body.prefix.trim() ? body.prefix.trim() : 'saas/app/api'
-  // Pre-call size check — clamp into [1, MAX_FILES_PER_SCAN] to bound model cost.
-  const maxFiles = clampScanSize(body.maxFiles)
+  // Pre-call size check — clamp into [1, tier ceiling] to bound model cost.
+  const maxFiles = clampScanSize(body.maxFiles, quota.tier)
 
   const enc = new TextEncoder()
   const stream = new ReadableStream<Uint8Array>({

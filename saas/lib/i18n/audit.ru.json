@@ -264,5 +264,45 @@
       "privilegedNoMfa": "Без MFA",
       "mfaUnknown": "MFA?"
     }
+  },
+  "provider": {
+    "title": "Инвентаризация провайдеров",
+    "subtitle": "Каждый подключённый провайдер: статус, риск и последняя проверка.",
+    "empty": "Провайдеры не найдены.",
+    "evidenceShort": "({n} подтв.)",
+    "loading": "Загрузка инвентаризации провайдеров…",
+    "loadError": "Не удалось загрузить инвентаризацию.",
+    "fetchError": "Ошибка: {msg}",
+    "risk": {
+      "unknown": "Неизвестно"
+    },
+    "summary": {
+      "total": "Провайдеры",
+      "connected": "Подключено",
+      "error": "С ошибкой",
+      "notConfigured": "Не настроено"
+    },
+    "col": {
+      "provider": "Провайдер",
+      "category": "Категория",
+      "status": "Статус",
+      "risk": "Риск",
+      "findings": "Находки",
+      "lastChecked": "Последняя проверка"
+    },
+    "status": {
+      "connected": "Подключён",
+      "error": "Ошибка",
+      "not_configured": "Не настроен",
+      "missing": "Отсутствует"
+    },
+    "category": {
+      "billing": "Биллинг",
+      "database": "База данных",
+      "deployment": "Развёртывание",
+      "change-management": "Управление изменениями",
+      "identity": "Идентификация",
+      "other": "Прочее"
+    }
   }
 }

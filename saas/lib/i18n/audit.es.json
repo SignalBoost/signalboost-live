@@ -61,7 +61,7 @@
     "findings": "Achados",
     "evidenceRequired": "Evidência necessária",
     "topRisks": "Principais riscos",
-    "recommendation": "Recomendação",
+    "recommendation": "Recomendación",
     "impact": "Impacto"
   },
   "finding": {
@@ -208,101 +208,166 @@
     }
   },
   "identity": {
-    "findingsTitle": "Achados de acesso",
-    "noFindings": "Sem achados de acesso.",
-    "tableTitle": "Todas as identidades",
-    "empty": "Nenhuma identidade encontrada.",
+    "findingsTitle": "Hallazgos de acceso",
+    "noFindings": "Sin hallazgos de acceso.",
+    "tableTitle": "Todas las identidades",
+    "empty": "No se encontraron identidades.",
     "never": "Nunca",
-    "daysAgo": "há {days}d",
+    "daysAgo": "hace {days}d",
     "summary": {
       "total": "Identidades",
       "privileged": "Privilegiadas",
-      "stale": "Inativas",
-      "noMfa": "Priv. sem MFA",
-      "mfaUnknown": "MFA desconhecido"
+      "stale": "Inactivas",
+      "noMfa": "Priv. sin MFA",
+      "mfaUnknown": "MFA desconocido"
     },
     "col": {
-      "principal": "Identidade",
-      "provider": "Provedor",
+      "principal": "Identidad",
+      "provider": "Proveedor",
       "kind": "Tipo",
-      "role": "Papel",
+      "role": "Rol",
       "mfa": "MFA",
-      "lastSeen": "Última atividade",
-      "flags": "Sinais"
+      "lastSeen": "Última actividad",
+      "flags": "Señales"
     },
     "kind": {
-      "user": "Usuário",
-      "service_account": "Conta de serviço",
-      "access_key": "Chave de acesso",
+      "user": "Usuario",
+      "service_account": "Cuenta de servicio",
+      "access_key": "Clave de acceso",
       "collaborator": "Colaborador",
       "token": "Token"
     },
     "mfa": {
-      "enabled": "Ativado",
-      "disabled": "Desativado",
-      "unknown": "Desconhecido"
+      "enabled": "Activado",
+      "disabled": "Desactivado",
+      "unknown": "Desconocido"
     },
     "flag": {
-      "stale": "Inativa",
+      "stale": "Inactiva",
       "neverUsed": "Nunca usada",
-      "privilegedNoMfa": "Sem MFA",
-      "mfaUnknown": "MFA?"
+      "privilegedNoMfa": "Sin MFA",
+      "mfaUnknown": "¿MFA?"
     }
   },
   "exec": {
-    "title": "Resumo executivo de riscos",
-    "subtitle": "Pontuação geral de prontidão, contagem de achados e principais riscos.",
-    "narrativeTitle": "Resumo",
-    "topRisksTitle": "Principais riscos",
-    "noRisks": "Sem riscos acima do limite de relatório.",
-    "providersTitle": "Provedores",
+    "title": "Resumen ejecutivo de riesgos",
+    "subtitle": "Puntuación general de preparación, recuento de hallazgos y riesgos principales.",
+    "narrativeTitle": "Resumen",
+    "topRisksTitle": "Riesgos principales",
+    "noRisks": "Sin riesgos por encima del umbral de reporte.",
+    "providersTitle": "Proveedores",
     "status": {
       "connected": "conectado",
-      "error": "erro",
-      "not_configured": "não configurado"
+      "error": "error",
+      "not_configured": "no configurado"
     },
-    "loading": "Gerando o resumo executivo…",
-    "loadError": "Não foi possível carregar o resumo.",
-    "fetchError": "Erro: {msg}"
+    "loading": "Generando el resumen ejecutivo…",
+    "loadError": "No se pudo cargar el resumen.",
+    "fetchError": "Error: {msg}"
   },
   "provider": {
-    "title": "Inventário de provedores",
-    "subtitle": "Cada provedor conectado com status, risco e última verificação.",
-    "empty": "Nenhum provedor encontrado.",
-    "evidenceShort": "({n} evidência)",
-    "loading": "Carregando inventário de provedores…",
-    "loadError": "Não foi possível carregar o inventário.",
-    "fetchError": "Erro: {msg}",
+    "title": "Inventario de proveedores",
+    "subtitle": "Cada proveedor conectado con estado, riesgo y última verificación.",
+    "empty": "No se encontraron proveedores.",
+    "evidenceShort": "({n} evidencia)",
+    "loading": "Cargando inventario de proveedores…",
+    "loadError": "No se pudo cargar el inventario.",
+    "fetchError": "Error: {msg}",
     "risk": {
-      "unknown": "Desconhecido"
+      "unknown": "Desconocido"
     },
     "summary": {
-      "total": "Provedores",
+      "total": "Proveedores",
       "connected": "Conectados",
-      "error": "Com erro",
-      "notConfigured": "Não configurados"
+      "error": "Con error",
+      "notConfigured": "No configurados"
     },
     "col": {
-      "provider": "Provedor",
-      "category": "Categoria",
-      "status": "Status",
-      "risk": "Risco",
-      "findings": "Achados",
-      "lastChecked": "Última verificação"
+      "provider": "Proveedor",
+      "category": "Categoría",
+      "status": "Estado",
+      "risk": "Riesgo",
+      "findings": "Hallazgos",
+      "lastChecked": "Última verificación"
     },
     "status": {
       "connected": "Conectado",
-      "error": "Erro",
-      "not_configured": "Não configurado",
-      "missing": "Ausente"
+      "error": "Error",
+      "not_configured": "No configurado",
+      "missing": "Faltante"
     },
     "category": {
-      "billing": "Cobrança",
-      "database": "Banco de dados",
-      "deployment": "Implantação",
-      "change-management": "Gestão de mudanças",
-      "identity": "Identidade",
-      "other": "Outro"
+      "billing": "Facturación",
+      "database": "Base de datos",
+      "deployment": "Despliegue",
+      "change-management": "Gestión de cambios",
+      "identity": "Identidad",
+      "other": "Otro"
+    }
+  },
+  "secret": {
+    "title": "Exposición de secretos y claves API",
+    "subtitle": "Credenciales configuradas por entorno y estado de rotación. Solo metadatos: no se leen ni muestran valores.",
+    "findingsTitle": "Hallazgos de exposición",
+    "noFindings": "Sin hallazgos de exposición.",
+    "tableTitle": "Credenciales configuradas",
+    "empty": "No se encontraron credenciales.",
+    "metadataNote": "Solo metadatos: los valores nunca se leen ni se muestran.",
+    "loading": "Cargando informe de secretos…",
+    "loadError": "No se pudo cargar el informe.",
+    "fetchError": "Error: {msg}",
+    "summary": {
+      "total": "Credenciales",
+      "clientExposed": "Expuestos al cliente",
+      "rotationUnknown": "Rotación desconocida"
+    },
+    "col": {
+      "name": "Nombre",
+      "provider": "Proveedor",
+      "environment": "Entorno",
+      "exposure": "Exposición",
+      "rotation": "Rotación",
+      "risk": "Riesgo"
+    },
+    "env": {
+      "production": "Producción",
+      "preview": "Vista previa",
+      "development": "Desarrollo",
+      "unknown": "Desconocido"
+    },
+    "exposure": {
+      "client": "Expuesto al cliente",
+      "server": "Solo servidor"
+    },
+    "rotation": {
+      "known": "Registrada",
+      "unknown": "Desconocida"
+    }
+  },
+  "remediation": {
+    "title": "Hoja de ruta de remediación",
+    "subtitle": "Correcciones priorizadas por urgencia, con los elementos que requieren evidencia manual en una vía aparte.",
+    "empty": "Nada que remediar: sin hallazgos abiertos.",
+    "evidenceTitle": "Se requiere evidencia",
+    "evidenceSubtitle": "Brechas a confirmar con evidencia manual. No reducen la puntuación.",
+    "loading": "Generando la hoja de ruta…",
+    "loadError": "No se pudo cargar la hoja de ruta.",
+    "fetchError": "Error: {msg}",
+    "summary": {
+      "now": "Ahora",
+      "next": "Siguiente",
+      "later": "Después",
+      "evidence": "Evidencia"
+    },
+    "tier": {
+      "now": "Ahora",
+      "next": "Siguiente",
+      "later": "Después"
+    },
+    "tierHint": {
+      "now": "Crítico: corregir de inmediato.",
+      "next": "Alto: programar pronto.",
+      "later": "Medio y bajo: planificar."
     }
   }
 }

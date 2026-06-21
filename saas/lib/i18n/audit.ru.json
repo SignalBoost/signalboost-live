@@ -60,7 +60,51 @@
     "overallScore": "Общий балл готовности",
     "findings": "Находки",
     "evidenceRequired": "Требуется подтверждение",
-    "topRisks": "Основные риски"
+    "topRisks": "Основные риски",
+    "recommendation": "Рекомендация",
+    "impact": "Влияние"
+  },
+  "identity": {
+    "title": "Идентификация и доступ",
+    "generatedAt": "Сформировано: {date}",
+    "findingsTitle": "Находки",
+    "noFindings": "Находок нет — всё в порядке.",
+    "tableTitle": "Все учётные записи",
+    "empty": "Учётные записи не обнаружены.",
+    "never": "Никогда",
+    "daysAgo": "{days}д назад",
+    "summary": {
+      "total": "Всего",
+      "privileged": "Привилегированные",
+      "stale": "Неактивные",
+      "noMfa": "Прив. без MFA",
+      "mfaUnknown": "MFA неизвестен"
+    },
+    "col": {
+      "principal": "Субъект",
+      "provider": "Провайдер",
+      "kind": "Тип",
+      "role": "Роль",
+      "mfa": "MFA",
+      "lastSeen": "Последняя активность",
+      "flags": "Флаги"
+    },
+    "kind": {
+      "human": "Человек",
+      "service": "Сервис",
+      "bot": "Бот",
+      "unknown": "Неизвестно"
+    },
+    "mfa": {
+      "enabled": "Включён",
+      "disabled": "Отключён",
+      "unknown": "Неизвестно"
+    },
+    "flag": {
+      "stale": "Неактивна",
+      "neverUsed": "Не использовалась",
+      "privilegedNoMfa": "Прив. без MFA"
+    }
   },
   "finding": {
     "staleIdentity": {

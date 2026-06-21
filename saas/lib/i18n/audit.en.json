@@ -1,0 +1,208 @@
+{
+  "report": {
+    "executiveSummary": {
+      "title": "Executive Risk Summary",
+      "description": "Overall readiness score, finding counts, and top risks."
+    },
+    "providerInventory": {
+      "title": "Provider Inventory Report",
+      "description": "Every connected provider with status, risk, and last check."
+    },
+    "identityAccess": {
+      "title": "Identity & Access Review",
+      "description": "Access, privilege level, MFA state, and last-seen activity."
+    },
+    "secretsKeys": {
+      "title": "Secrets & API Key Exposure Report",
+      "description": "Configured credentials by environment and rotation posture. Metadata only."
+    },
+    "remediationRoadmap": {
+      "title": "Remediation Roadmap",
+      "description": "Prioritized fixes with business impact, owner, and due date."
+    },
+    "prCockpitTrail": {
+      "title": "PR Cockpit Approval Trail",
+      "description": "Every staged change, who approved it, and the merge result."
+    },
+    "githubChanges": {
+      "title": "Code Change Management Report",
+      "description": "Branch protection, open and stale PRs, and review posture."
+    },
+    "supabaseSecurity": {
+      "title": "Database Security Report",
+      "description": "RLS coverage, public buckets, and service-role usage."
+    },
+    "stripeConfig": {
+      "title": "Billing Configuration Report",
+      "description": "Products, prices, webhook coverage, and live/test consistency."
+    },
+    "vercelDeployment": {
+      "title": "Deployment & Env Var Report",
+      "description": "Production vs preview variables and exposed public vars."
+    },
+    "auditLog": {
+      "title": "Audit Log & Activity Timeline",
+      "description": "Recorded actions, actors, and results from the Hub audit log."
+    },
+    "complianceReadiness": {
+      "title": "Compliance Readiness Matrix",
+      "description": "Readiness against SOC 2, ISO 27001, NIST CSF, and CIS. Readiness only."
+    }
+  },
+  "severity": {
+    "critical": "Critical",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "info": "Info"
+  },
+  "common": {
+    "overallScore": "Overall Readiness Score",
+    "findings": "Findings",
+    "evidenceRequired": "Evidence required",
+    "topRisks": "Top Risks"
+  },
+  "finding": {
+    "staleIdentity": {
+      "title": "Stale identity: {principal} ({provider})",
+      "detail": "No recorded activity for {days} days (threshold {threshold}).",
+      "recommendation": "Review whether this access is still needed; remove or rotate if not.",
+      "impact": "Unused credentials widen the attack surface with no benefit."
+    },
+    "neverUsedIdentity": {
+      "title": "Never-used identity: {principal} ({provider})",
+      "detail": "Created {days} days ago with no recorded login or use.",
+      "recommendation": "Confirm this principal is required; remove if it was never activated.",
+      "impact": "Dormant accounts are a common foothold for attackers."
+    },
+    "privilegedNoMfa": {
+      "title": "Privileged account without MFA: {principal} ({provider})",
+      "detail": "Role \"{role}\" has admin-level access but MFA is disabled.",
+      "recommendation": "Require and enable MFA on this account immediately.",
+      "impact": "A single phished password grants full administrative control."
+    },
+    "mfaStateUnavailable": {
+      "title": "MFA state unavailable for {count} privileged identity(ies)",
+      "detail": "These providers do not expose per-account MFA status via their API.",
+      "recommendation": "Confirm MFA is enforced and attach evidence for these accounts."
+    },
+    "providerError": {
+      "title": "Provider \"{provider}\" is in an error state",
+      "detail": "The Hub reports {provider} as errored.",
+      "recommendation": "Re-check the {provider} connection and credentials."
+    },
+    "stripeReadFail": {
+      "title": "Stripe configuration could not be read",
+      "detail": "The Stripe API call failed during collection.",
+      "recommendation": "Verify STRIPE_SECRET_KEY is set and can read prices and webhooks.",
+      "impact": "Billing posture is unknown until Stripe is reachable."
+    },
+    "stripePriceMismatch": {
+      "title": "Stripe price/env mismatch",
+      "detail": "{name} points to a price that is not active in Stripe.",
+      "recommendation": "Point the env var at an active price, or activate the referenced price.",
+      "impact": "Checkout can reference a price that no longer exists, breaking purchases."
+    },
+    "stripeWebhookNone": {
+      "title": "No Stripe webhook endpoint configured",
+      "detail": "No webhook endpoints were returned by Stripe.",
+      "recommendation": "Add a webhook endpoint covering payment and subscription lifecycle events.",
+      "impact": "Failed payments and cancellations may not propagate to the app."
+    },
+    "stripeWebhookMissingEvent": {
+      "title": "Stripe webhook missing \"{event}\"",
+      "detail": "No configured webhook endpoint subscribes to {event}.",
+      "recommendation": "Add {event} to a webhook endpoint so the app reacts to this event.",
+      "impact": "Important billing events are not delivered to the platform."
+    },
+    "stripeWebhookUnverified": {
+      "title": "Stripe webhook event coverage not verified",
+      "detail": "Webhook endpoints exist but their subscribed event list was not collected.",
+      "recommendation": "Confirm each endpoint subscribes to required payment/subscription events."
+    },
+    "supabaseHealthFail": {
+      "title": "Supabase health check failed",
+      "detail": "The Supabase reachability check did not succeed.",
+      "recommendation": "Verify the project URL and service-role key, and that the database is online.",
+      "impact": "Core data layer availability is unconfirmed."
+    },
+    "serviceRoleInClient": {
+      "title": "Service-role key reachable from client code",
+      "detail": "The service-role key (which bypasses RLS) was detected on a client-exposed path.",
+      "recommendation": "Move all service-role usage strictly server-side and rotate the key immediately.",
+      "impact": "Full database access could be extracted by any visitor — severe data-breach risk."
+    },
+    "rlsDisabled": {
+      "title": "Table \"{table}\" has RLS disabled",
+      "detail": "Row Level Security is not enabled on {table}.",
+      "recommendation": "Enable RLS on {table} and add explicit access policies.",
+      "impact": "Without RLS, a leaked anon key can read or write this table directly."
+    },
+    "rlsUnverified": {
+      "title": "RLS coverage not verified",
+      "detail": "Table-level RLS state was not collected for this run.",
+      "recommendation": "Enumerate tables and confirm RLS is enabled on every table holding user data."
+    },
+    "publicBucket": {
+      "title": "Storage bucket \"{bucket}\" is public",
+      "detail": "The \"{bucket}\" bucket allows public access.",
+      "recommendation": "Confirm public access is intended; otherwise make the bucket private with signed URLs.",
+      "impact": "Public buckets may expose user-uploaded or internal files."
+    },
+    "vercelNotConnected": {
+      "title": "Vercel not connected",
+      "detail": "No Vercel token is configured, so deployment posture cannot be assessed.",
+      "recommendation": "Connect Vercel to include deployment and env-var checks in the audit."
+    },
+    "publicSensitiveEnv": {
+      "title": "Public env var looks sensitive: {name}",
+      "detail": "{name} is exposed to the browser (NEXT_PUBLIC_) but its name suggests a secret.",
+      "recommendation": "Rename to a server-only variable (drop NEXT_PUBLIC_) and rotate the value.",
+      "impact": "Secret values shipped to the browser are readable by anyone."
+    },
+    "envScopeDrift": {
+      "title": "Production and Preview env vars differ",
+      "detail": "Only in production: {onlyProd}. Only in preview: {onlyPreview}.",
+      "recommendation": "Reconcile env var names across scopes so preview reflects production.",
+      "impact": "Preview deploys may behave differently from production, masking bugs."
+    },
+    "githubReadFail": {
+      "title": "GitHub could not be read",
+      "detail": "The GitHub API call failed during collection.",
+      "recommendation": "Verify the GitHub token and its repo scope."
+    },
+    "branchProtectionUnverified": {
+      "title": "Branch protection not verified",
+      "detail": "Branch protection state for the default branch was not collected.",
+      "recommendation": "Confirm the default branch requires pull-request review before merge."
+    },
+    "branchProtectionMissing": {
+      "title": "Default branch \"{branch}\" does not require PR review",
+      "detail": "Changes can be merged to the default branch without an approving review.",
+      "recommendation": "Enable branch protection and require at least one approving review.",
+      "impact": "Production code can change without a second set of eyes."
+    },
+    "staleBranches": {
+      "title": "{count} stale branch(es) older than {days} days",
+      "detail": "Stale branches: {names}.",
+      "recommendation": "Review and delete merged or abandoned branches.",
+      "impact": "Stale branches add confusion and may carry outdated config."
+    },
+    "clientExposedSecret": {
+      "title": "Client-exposed secret: {name}",
+      "detail": "{name} appears to be a secret but is exposed to the client.",
+      "recommendation": "Move server-side and rotate immediately.",
+      "impact": "A leaked production secret can be abused by anyone."
+    },
+    "rotationUnknown": {
+      "title": "Rotation age unknown for {count} secret(s)",
+      "detail": "Provider APIs do not expose last-rotation dates for these credentials.",
+      "recommendation": "Record rotation dates in the Key Vault and set a rotation policy."
+    },
+    "backupTestMissing": {
+      "title": "Backup recovery test not on record",
+      "detail": "No evidence of a tested database backup/restore was collected.",
+      "recommendation": "Perform a restore test and attach the result."
+    }
+  }
+}

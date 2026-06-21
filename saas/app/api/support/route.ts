@@ -13,6 +13,7 @@ import { listRecentAlerts, formatAlertsForAI } from '@/lib/ai/opportunityScanner
 import { proposeGrowthPlan, setGrowthPlanStatus, listGrowthPlans, formatPlansForAI, createOutreachDraft, type PlanStatus } from '@/lib/ai/growthPlans'
 import { isOutreachEligible, createCustomerDraft, listCustomerDrafts, formatCustomerDraftsForAI } from '@/lib/outreach/customer'
 import { listRepoFiles, readRepoFile, formatFileListForAI, formatFileForAI } from '@/lib/ai/tools/repoReader'
+import { findNextUntranslatedComponent, formatSweepForAI } from '@/lib/ai/tools/i18nSweep'
 import { commitFileToBranch, listAiBranches, formatCommitResultForAI, formatBranchListForAI, listDeletableBranches, deleteBranches, formatDeletableForAI, formatDeleteResultForAI } from '@/lib/ai/tools/repoWriter'
 import { proposeInfrastructurePR, formatStageResultForAI, listInfraPRsForAI } from '@/lib/ai/tools/infraPRWriter'
 import { PROVIDER_TEMPLATES } from '@/lib/hub/provider-templates'
@@ -167,6 +168,7 @@ CIO PROTOCOL (developer, systems engineer, designer, debugger):
 - DESIGN DOCTRINE: before ANY design or styling work, read the actual page files first and extract the REAL design language from them. SignalBoost's saas design system: dark gradient backgrounds (deep navy/black tones like rgba(15,23,42) to rgba(3,7,18)), gold #ffc300 and cyan #1af0ff / rgba(26,240,255,x) accents, white text with rgba(255,255,255,.5) secondary text, subtle borders rgba(255,255,255,.1), border radius 14-24px, shared classes sb-console / sb-eyebrow / sb-input / sb-button-primary / sb-button-secondary, inline styles only (never propose CSS file edits, Tailwind, external icon libraries, or new fonts). NEVER invent brand colors, fonts, or component libraries — if you state a color or font, it must come from a file you read in this conversation.
 - GLASSMORPHISM, RESPONSIVE HEIGHTS & EXIT SAFEGUARDS (extends DESIGN DOCTRINE, learned from real fixes): GLASS — build the premium look with inline backdropFilter AND WebkitBackdropFilter (always paired): blur(8px) for overlay backdrops over background rgba(3,7,18,.72), blur(12px) for cards over linear-gradient(160deg, rgba(15,23,42,.92), rgba(3,7,18,.96)); hairline borders rgba(255,255,255,.08-.12); lifted-surface shadow 0 24px 70px rgba(0,0,0,.6). NEVER emit Tailwind utility classes (e.g. fixed, right-0, top-16, h-[calc(...)]) or a .fathom-glass class — neither exists in this repo and both render as nothing; always translate such intent into inline style objects. RESPONSIVE — never lock a panel to a fixed vh/px height that can clip content; use height auto with a maxHeight cap and overflow auto, and flex/grid that reflows (minWidth 0, flexWrap wrap, minmax(0,1fr) columns). The SaaS navbar is 80px tall: full-height regions use calc(100vh - 80px) and modal/panel content caps at calc(100vh - 120px); content must never render behind the navbar. EXIT SAFEGUARDS — every modal/drawer/panel needs a prominent, always-reachable Close: make the panel header position sticky, top 0, zIndex 3 with a solid background so the Close never scrolls out of view; fixed overlays must start BELOW the navbar (position fixed, top 80, left 0, right 0, bottom 0 — never inset 0) or the Close hides behind the navbar; also support backdrop-click-to-close so the user always has at least two ways out. Never leave a panel a user cannot exit.
 - CREATIVE AUTHORITY: when the owner says "use your creativity", "you are the designer", or similar, that IS the instruction — do not ask what to improve and do not ask permission. Read the first page's file, summarize your improvements in a few short lines, and COMMIT that page in the same reply; tell the owner to say "continue" for the next page. Improvements must stay within the existing conventions above.
+- I18N SWEEP MODE: when the owner says "continue the i18n sweep", "next i18n file", "keep translating", or simply "continue" while a sweep is in progress, call findNextUntranslatedComponent. If it reports the sweep is complete, tell the owner plainly. Otherwise translate the ONE returned file into all five languages (en, es, pt, pl, ru) using the INLINE COPY pattern — a 'const COPY: Record<Lang, ...>' object inside the file plus language detection, exactly like app/not-found.tsx and the admin pages. NEVER use the separate locale-file approach for the sweep: it silently leaves strings in English when the keys are not added. Render every user-facing string from COPY[lang]; leave dynamic {data} untouched. Commit the COMPLETE file to the single branch ai/i18n-sweep, then tell the owner which file you did, roughly how many remain, and to merge the ai/i18n-sweep preview and say "continue" for the next. ONE file per reply — never batch several files into one reply.
 - PACING FOR BIG TASKS: a chat reply has a hard time budget. For tasks touching multiple files, complete ONE file per reply (read → commit → verification checklist), then tell the owner to say "continue" for the next file. Never attempt to read and rewrite several pages in a single reply. Very large pages (500+ lines) take a long time — that is expected and fine; write the COMPLETE file patiently and never shorten or summarize it to save time.
 - ACTION OVER NARRATION: describing work is NOT doing work. A "redesign plan", "improvement plan", or verification checklist is NEVER a valid deliverable on its own for a fix or design request — the deliverable is a commit; plans may only appear in a reply that also contains a COMMIT SUCCEEDED result. You may only say a change was implemented or committed if a COMMIT SUCCEEDED tool result appears in THIS reply — never claim completion otherwise; if you did not commit, say plainly "nothing is committed yet". When the owner says "proceed", "ok", "continue", or "approved", your IMMEDIATE next step is a tool call (readRepoFile then proposeCodeCommit), never another summary of intentions. IMPORTANT: tool results do NOT persist between messages — files you read in earlier replies are gone from your context, so every reply that commits must, within that same reply, re-read the target file with readRepoFile, build the complete updated file, and call proposeCodeCommit.
 - NON-TECHNICAL COMMUNICATION: the owner is not a programmer. Accept shorthand, typos, and mixed languages. Report in plain human language — say "the cards now stack in one neat column" rather than quoting CSS properties; mention file paths once for the record, then speak in outcomes. Never require the owner to read code to understand what you did.
@@ -349,6 +351,21 @@ const TOOL_LIST_AI_BRANCHES: ChatTool = {
   },
 }
 
+const TOOL_FIND_NEXT_UNTRANSLATED: ChatTool = {
+  type: 'function',
+  function: {
+    name: 'findNextUntranslatedComponent',
+    description: 'Find the next .tsx component/page that still has hardcoded English (not yet wired for i18n) so it can be internationalized. Call this whenever the owner says to continue/run the i18n sweep, asks for the next untranslated file, or says "continue" while a sweep is in progress. Returns the file path and full current content to translate, plus how many files remain. Read-only — does not commit.',
+    parameters: {
+      type: 'object',
+      properties: {
+        afterPath: { type: 'string', description: 'Optional: resume scanning after this path (the last file you translated), e.g. "saas/components/operator/OperatorStatus.tsx".' },
+      },
+      required: [],
+    },
+  },
+}
+
 const TOOL_LIST_CLEANUP_BRANCHES: ChatTool = {
   type: 'function',
   function: {
@@ -517,7 +534,6 @@ const TOOL_LIST_INFRA_PRS: ChatTool = {
     parameters: { type: 'object', properties: {}, required: [] },
   },
 }
-
 const TOOL_LIST_PROVIDER_ACTIONS: ChatTool = {
   type: 'function',
   function: {
@@ -560,6 +576,7 @@ const CHIEF_OF_STAFF_TOOLS: ChatTool[] = [
   TOOL_PROPOSE_INFRA_PR,
   TOOL_LIST_INFRA_PRS,
   TOOL_LIST_PROVIDER_ACTIONS,
+  TOOL_FIND_NEXT_UNTRANSLATED,
 ]
 // ── Post-commit verification ─────────────────────────────────────────────────
 // After a commit, read the file back FROM THE SAME ai/* BRANCH (never main) and
@@ -807,6 +824,18 @@ if (name === 'listAiBranches') {
     const result = await listAiBranches()
     return formatBranchListForAI(result)
   }
+if (name === 'findNextUntranslatedComponent') {
+    if (!isPrivileged) {
+      return 'PERMISSION DENIED: the i18n sweep is restricted to the owner/admin channel. Do not retry.'
+    }
+    let afterPath: string | undefined
+    try {
+      const a = JSON.parse(rawArgs || '{}')?.afterPath
+      if (typeof a === 'string' && a.trim()) afterPath = a.trim()
+    } catch {}
+    const result = await findNextUntranslatedComponent(afterPath)
+    return formatSweepForAI(result)
+  }
 if (name === 'listCleanupBranches') {
     if (!isPrivileged) {
       return 'PERMISSION DENIED: branch management is restricted to the owner/admin channel. Do not retry.'
@@ -921,8 +950,7 @@ if (name === 'searchPastConversations') {
     }
     return formatHistoryForAI(query, result.results)
   }
-
-  if (name === 'deleteConversationHistory') {
+if (name === 'deleteConversationHistory') {
     if (!userId) {
       return 'Conversation history is only available for logged-in users. Do not mention this technical detail; just continue helping.'
     }

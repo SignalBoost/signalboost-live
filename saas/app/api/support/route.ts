@@ -549,7 +549,6 @@ const TOOL_LIST_PROVIDER_ACTIONS: ChatTool = {
     },
   },
 }
-
 const CONCIERGE_TOOLS: ChatTool[] = [
   TOOL_GET_PRICING,
   TOOL_GET_AFFILIATE_COUNT,
@@ -620,6 +619,75 @@ async function verifyCommittedFile(params: { branch: string; path: string; expec
   } catch (err) {
     return { ok: false, match: false, expectedLines, actualLines: 0, reason: err instanceof Error ? err.message : 'Verification request failed.' }
   }
+}
+
+// ── Concierge file attachments ────────────────────────────────────────────────
+// Users can attach images / PDFs / text files to a message. We convert them into
+// Anthropic content blocks on the LATEST user message so the model can actually
+// see/read them. Anything malformed, oversized, or of an unknown type is SKIPPED,
+// never thrown — a bad upload must never 500 the chat.
+const ATTACH_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'])
+const ATTACH_MAX_BYTES = 10 * 1024 * 1024
+const ATTACH_IMAGE_MAX_BYTES = 5 * 1024 * 1024   // Anthropic per-image limit
+const ATTACH_MAX_FILES = 5
+
+function parseDataUrl(dataUrl: unknown): { mediaType: string; b64: string } | null {
+  const m = /^data:([^;,]+)?(;base64)?,([\s\S]*)$/.exec(String(dataUrl || ''))
+  if (!m || !m[2]) return null   // only accept base64 data URLs
+  return { mediaType: (m[1] || 'application/octet-stream').toLowerCase(), b64: m[3] || '' }
+}
+
+function attachmentBlocks(rawAttachments: any): any[] {
+  if (!Array.isArray(rawAttachments)) return []
+  const blocks: any[] = []
+  let used = 0
+  for (const att of rawAttachments) {
+    if (used >= ATTACH_MAX_FILES) break
+    try {
+      const parsed = parseDataUrl(att?.dataUrl)
+      if (!parsed || !parsed.b64) continue
+      const approxBytes = Math.floor(parsed.b64.length * 0.75)
+      if (approxBytes <= 0 || approxBytes > ATTACH_MAX_BYTES) continue
+      const name = typeof att?.name === 'string' ? att.name.slice(0, 200) : 'file'
+
+      if (ATTACH_IMAGE_TYPES.has(parsed.mediaType)) {
+        if (approxBytes > ATTACH_IMAGE_MAX_BYTES) continue
+        const mt = parsed.mediaType === 'image/jpg' ? 'image/jpeg' : parsed.mediaType
+        blocks.push({ type: 'image', source: { type: 'base64', media_type: mt, data: parsed.b64 } })
+        used++
+      } else if (parsed.mediaType === 'application/pdf') {
+        blocks.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: parsed.b64 } })
+        used++
+      } else if (parsed.mediaType.startsWith('text/')) {
+        let text = ''
+        try { text = Buffer.from(parsed.b64, 'base64').toString('utf8').slice(0, 20000) } catch { text = '' }
+        if (text.trim()) {
+          blocks.push({ type: 'text', text: `Attached file "${name}":\n\n${text}` })
+          used++
+        }
+      }
+      // unknown media types are skipped
+    } catch { /* skip this attachment */ }
+  }
+  return blocks
+}
+
+// Merge attachment blocks into the most recent user message of the conversation.
+function applyAttachments(convo: ChatMessage[], rawAttachments: any): void {
+  try {
+    const blocks = attachmentBlocks(rawAttachments)
+    if (!blocks.length) return
+    for (let i = convo.length - 1; i >= 0; i--) {
+      if (convo[i].role === 'user') {
+        const existing = convo[i].content
+        const head = typeof existing === 'string'
+          ? [{ type: 'text', text: existing }]
+          : Array.isArray(existing) ? existing : [{ type: 'text', text: String(existing || '') }]
+        convo[i] = { role: 'user', content: [...head, ...blocks] }
+        return
+      }
+    }
+  } catch { /* an attachment failure must never break the chat */ }
 }
 
 async function runTool(name: string, rawArgs: string, userId: string | null, conversationId: string | null, isPrivileged: boolean, isOwner: boolean): Promise<string> {
@@ -965,8 +1033,7 @@ if (name === 'deleteConversationHistory') {
     }
     return `Deleted ${result.deletedConversations} conversation(s) permanently. Confirm to the user that their history is gone.`
   }
-
-  return `Unknown tool: ${name}`
+return `Unknown tool: ${name}`
 }
 
 export async function POST(req: NextRequest) {
@@ -1100,6 +1167,7 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
 
     const anthropicTools = toAnthropicTools(tools)
     const convo: ChatMessage[] = [...sanitized]
+    applyAttachments(convo, body?.attachments)
 
     const startedAt = Date.now()
     const BUDGET_MS = 240_000

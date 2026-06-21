@@ -1231,6 +1231,15 @@ export async function POST(req: NextRequest) {
       systemContent += `\n\n${promptCompilerModule()}`
     }
 
+    // Model transparency: this is a private, verified owner/admin channel, so the
+    // assistant may disclose which model powers it (the default identity caution
+    // does not apply here). The actual model name is injected so the answer is correct.
+    if (isPrivileged) {
+      systemContent += `
+
+MODEL TRANSPARENCY: You are running on the model "${model}". This is a private, verified owner/admin channel. If the owner or admin asks which model, LLM, or engine powers you, answer plainly that you are running on "${model}". Do not refuse, deflect, or claim you cannot share this — that restriction does not apply in this internal owner/admin channel.`
+    }
+
     // ── Long-term user memory (logged-in users only) ──────────────────────
     if (userId) {
       try {

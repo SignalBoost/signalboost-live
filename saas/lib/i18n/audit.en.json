@@ -393,6 +393,10 @@
     "remediation": {
       "title": "Remediation Roadmap",
       "desc": "Prioritized fixes sequenced by urgency."
+    },
+    "usage": {
+      "title": "AI Usage & Cost",
+      "desc": "Token consumption and estimated cost per feature and user."
     }
   },
   "usage": {

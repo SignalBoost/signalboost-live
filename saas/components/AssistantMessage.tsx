@@ -14,6 +14,18 @@
 // HTML is never injected.
 
 import { useState } from 'react'
+import { useI18n } from '@/components/i18n/I18nProvider'
+
+// Inline COPY: user-visible strings for the assistant message media cards,
+// co-located across all 5 languages (brand names like "Vimeo" stay as-is).
+const AM_COPY: Record<string, Record<string, string>> = {
+  en: { playlist: 'Playlist', archive: 'Archive', video: 'Video', playing: 'Playing', diagramAlt: 'Architecture diagram', synthesizing: 'Synthesizing…', retry: 'Retry', playBrief: 'Play brief', audioBrief: 'Audio brief', audioError: 'Couldn’t synthesize audio.' },
+  es: { playlist: 'Lista de reproducción', archive: 'Archivo', video: 'Video', playing: 'Reproduciendo', diagramAlt: 'Diagrama de arquitectura', synthesizing: 'Sintetizando…', retry: 'Reintentar', playBrief: 'Reproducir resumen', audioBrief: 'Resumen de audio', audioError: 'No se pudo sintetizar el audio.' },
+  pt: { playlist: 'Lista de reprodução', archive: 'Arquivo', video: 'Vídeo', playing: 'Reproduzindo', diagramAlt: 'Diagrama de arquitetura', synthesizing: 'Sintetizando…', retry: 'Tentar novamente', playBrief: 'Reproduzir resumo', audioBrief: 'Resumo de áudio', audioError: 'Não foi possível sintetizar o áudio.' },
+  pl: { playlist: 'Playlista', archive: 'Archiwum', video: 'Wideo', playing: 'Odtwarzanie', diagramAlt: 'Diagram architektury', synthesizing: 'Syntetyzowanie…', retry: 'Ponów', playBrief: 'Odtwórz streszczenie', audioBrief: 'Streszczenie audio', audioError: 'Nie udało się zsyntetyzować dźwięku.' },
+  ru: { playlist: 'Плейлист', archive: 'Архив', video: 'Видео', playing: 'Воспроизведение', diagramAlt: 'Архитектурная диаграмма', synthesizing: 'Синтез…', retry: 'Повторить', playBrief: 'Воспроизвести сводку', audioBrief: 'Аудиосводка', audioError: 'Не удалось синтезировать аудио.' },
+}
+function amCopy(lang: string) { return AM_COPY[lang] || AM_COPY.en }
 
 const TTS_VOICE = 'EXAVITQu4vr4xnSDxMaL'
 
@@ -97,7 +109,9 @@ function LazyMedia({ refr, title }: { refr: MediaRef; title?: string }) {
   const [play, setPlay] = useState(false)
   const [thumbErr, setThumbErr] = useState(false)
   const thumb = thumbFor(refr)
-  const label = refr.kind === 'playlist' ? 'Playlist' : refr.kind === 'archive' ? 'Archive' : refr.kind === 'vimeo' ? 'Vimeo' : 'Video'
+  const { lang } = useI18n()
+  const c = amCopy(lang)
+  const label = refr.kind === 'playlist' ? c.playlist : refr.kind === 'archive' ? c.archive : refr.kind === 'vimeo' ? 'Vimeo' : c.video
   const showThumb = !!thumb && !thumbErr
   return (
     <div
@@ -149,7 +163,7 @@ function LazyMedia({ refr, title }: { refr: MediaRef; title?: string }) {
         ) : null}
         <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           {play ? (
-            <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.5)' }}>Playing</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.5)' }}>{c.playing}</span>
           ) : (
             <button
               type="button"
@@ -170,13 +184,15 @@ function LazyMedia({ refr, title }: { refr: MediaRef; title?: string }) {
 
 function Diagram({ code }: { code: string }) {
   const [failed, setFailed] = useState(false)
+  const { lang } = useI18n()
+  const c = amCopy(lang)
   const clean = code.trim()
   return (
-    <Card accent="#1af0ff" label="Architecture diagram">
+    <Card accent="#1af0ff" label={c.diagramAlt}>
       {failed ? (
         <pre style={codeBlock}>{clean}</pre>
       ) : (
-        <img src={`https://mermaid.ink/img/${b64url(clean)}?type=png&theme=dark`} alt="Architecture diagram" onError={() => setFailed(true)} style={{ maxWidth: '100%', display: 'block', borderRadius: 8, background: '#fff' }} />
+        <img src={`https://mermaid.ink/img/${b64url(clean)}?type=png&theme=dark`} alt={c.diagramAlt} onError={() => setFailed(true)} style={{ maxWidth: '100%', display: 'block', borderRadius: 8, background: '#fff' }} />
       )}
     </Card>
   )
@@ -190,6 +206,8 @@ function ImageEmbed({ src }: { src: string }) {
 
 function AudioBrief({ script }: { script: string }) {
   const [state, setState] = useState<'idle' | 'loading' | 'playing' | 'error'>('idle')
+  const { lang } = useI18n()
+  const c = amCopy(lang)
   const clean = script.trim()
   async function play() {
     setState('loading')
@@ -202,12 +220,12 @@ function AudioBrief({ script }: { script: string }) {
       await audio.play(); setState('playing')
     } catch { setState('error') }
   }
-  const label = state === 'loading' ? 'Synthesizing…' : state === 'playing' ? '▶ Playing' : state === 'error' ? 'Retry ▶' : '▶ Play brief'
+  const label = state === 'loading' ? c.synthesizing : state === 'playing' ? '▶ ' + c.playing : state === 'error' ? c.retry + ' ▶' : '▶ ' + c.playBrief
   return (
-    <Card accent="#ffc300" label="Audio brief">
+    <Card accent="#ffc300" label={c.audioBrief}>
       <p style={{ margin: '0 0 10px 0', fontSize: 12.5, lineHeight: 1.6, color: 'rgba(255,255,255,.85)' }}>{clean}</p>
       <button onClick={play} disabled={state === 'loading' || state === 'playing'} style={{ background: 'rgba(255,195,0,.14)', border: '1px solid rgba(255,195,0,.45)', color: '#ffc300', borderRadius: 8, padding: '6px 14px', fontWeight: 800, fontSize: 12, cursor: state === 'loading' || state === 'playing' ? 'default' : 'pointer', opacity: state === 'loading' ? 0.7 : 1 }}>{label}</button>
-      {state === 'error' && <span style={{ marginLeft: 10, fontSize: 11, color: '#fca5a5' }}>Couldn’t synthesize audio.</span>}
+      {state === 'error' && <span style={{ marginLeft: 10, fontSize: 11, color: '#fca5a5' }}>{c.audioError}</span>}
     </Card>
   )
 }

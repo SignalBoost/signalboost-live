@@ -60,7 +60,9 @@
     "overallScore": "Overall Readiness Score",
     "findings": "Findings",
     "evidenceRequired": "Evidence required",
-    "topRisks": "Top Risks"
+    "topRisks": "Top Risks",
+    "recommendation": "Recommendation",
+    "impact": "Impact"
   },
   "finding": {
     "staleIdentity": {
@@ -203,6 +205,64 @@
       "title": "Backup recovery test not on record",
       "detail": "No evidence of a tested database backup/restore was collected.",
       "recommendation": "Perform a restore test and attach the result."
+    }
+  },
+  "exec": {
+    "title": "Executive Risk Summary",
+    "subtitle": "Overall readiness score, finding counts, and top risks.",
+    "narrativeTitle": "Summary",
+    "topRisksTitle": "Top Risks",
+    "noRisks": "No risks above the reporting threshold.",
+    "providersTitle": "Providers",
+    "status": {
+      "connected": "connected",
+      "error": "error",
+      "not_configured": "not configured"
+    },
+    "loading": "Building executive summary…",
+    "loadError": "Could not load the summary.",
+    "fetchError": "Error: {msg}"
+  },
+  "identity": {
+    "findingsTitle": "Access Findings",
+    "noFindings": "No access findings.",
+    "tableTitle": "All Identities",
+    "empty": "No identities found.",
+    "never": "Never",
+    "daysAgo": "{days}d ago",
+    "summary": {
+      "total": "Identities",
+      "privileged": "Privileged",
+      "stale": "Stale",
+      "noMfa": "Priv. no MFA",
+      "mfaUnknown": "MFA unknown"
+    },
+    "col": {
+      "principal": "Principal",
+      "provider": "Provider",
+      "kind": "Type",
+      "role": "Role",
+      "mfa": "MFA",
+      "lastSeen": "Last seen",
+      "flags": "Flags"
+    },
+    "kind": {
+      "user": "User",
+      "service_account": "Service account",
+      "access_key": "Access key",
+      "collaborator": "Collaborator",
+      "token": "Token"
+    },
+    "mfa": {
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "unknown": "Unknown"
+    },
+    "flag": {
+      "stale": "Stale",
+      "neverUsed": "Never used",
+      "privilegedNoMfa": "No MFA",
+      "mfaUnknown": "MFA?"
     }
   }
 }

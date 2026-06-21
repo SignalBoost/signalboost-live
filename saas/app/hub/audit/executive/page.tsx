@@ -9,6 +9,8 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
 import ExecutiveSummary, { type ExecutiveSummaryView } from '@/components/audit/ExecutiveSummary'
+import ReportExportBar from '@/components/audit/ReportExportBar'
+import { toCsv } from '@/lib/audit/exportCsv'
 
 // Flat result shape — the repo's tsconfig is non-strict, so discriminated unions
 // do not narrow on `if (!json.ok)`. Keep ok/report/error on one object.
@@ -69,5 +71,14 @@ export default function ExecutiveSummaryPage() {
   }
 
   if (!data) return null
-  return <ExecutiveSummary data={data} />
+  const csv = toCsv(
+    ['Severity', 'Title', 'Detail', 'Recommendation'],
+    data.topRisks.map(f => [f.severity, f.fallback.title, f.fallback.detail, f.fallback.recommendation]),
+  )
+  return (
+    <>
+      <ReportExportBar filename="executive-risk-summary" csv={csv} />
+      <ExecutiveSummary data={data} />
+    </>
+  )
 }

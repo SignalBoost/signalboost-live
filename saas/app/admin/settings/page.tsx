@@ -27,6 +27,7 @@ const COPY: Record<Lang, {
   footer: string
   notAllowedTitle: string
   notAllowedBody: string
+  flags: Record<string, { label: string; desc: string }>
 }> = {
   en: {
     eyebrow: 'Admin',
@@ -37,6 +38,11 @@ const COPY: Record<Lang, {
     footer: 'Changes take effect immediately. The outreach kill-switch is already enforced by the sending routes; the others are stored and ready to wire into behavior.',
     notAllowedTitle: 'Admin settings',
     notAllowedBody: 'Only the account owner can change system settings.',
+    flags: {
+      outreach_sending_disabled: { label: 'Pause outreach sending', desc: 'Master kill-switch: when on, no outreach messages are sent.' },
+      signups_paused: { label: 'Pause new signups', desc: 'When on, new account creation is discouraged in the UI.' },
+      maintenance_mode: { label: 'Maintenance banner', desc: 'When on, you can show a maintenance notice to users.' },
+    },
   },
   es: {
     eyebrow: 'Admin',
@@ -47,6 +53,11 @@ const COPY: Record<Lang, {
     footer: 'Los cambios surten efecto de inmediato. El interruptor de alcance ya está aplicado por las rutas de envío; los demás están almacenados y listos para conectarse al comportamiento.',
     notAllowedTitle: 'Configuración de administrador',
     notAllowedBody: 'Solo el propietario de la cuenta puede cambiar la configuración del sistema.',
+    flags: {
+      outreach_sending_disabled: { label: 'Pausar envío de alcance', desc: 'Interruptor maestro: cuando está activado, no se envían mensajes de alcance.' },
+      signups_paused: { label: 'Pausar nuevos registros', desc: 'Cuando está activado, se desalienta la creación de cuentas en la interfaz.' },
+      maintenance_mode: { label: 'Banner de mantenimiento', desc: 'Cuando está activado, puedes mostrar un aviso de mantenimiento a los usuarios.' },
+    },
   },
   pt: {
     eyebrow: 'Admin',
@@ -57,6 +68,11 @@ const COPY: Record<Lang, {
     footer: 'As alterações entram em vigor imediatamente. O interruptor de alcance já é aplicado pelas rotas de envio; os demais estão armazenados e prontos para serem conectados ao comportamento.',
     notAllowedTitle: 'Configurações de administrador',
     notAllowedBody: 'Apenas o proprietário da conta pode alterar as configurações do sistema.',
+    flags: {
+      outreach_sending_disabled: { label: 'Pausar envio de prospecção', desc: 'Interruptor mestre: quando ativado, nenhuma mensagem de prospecção é enviada.' },
+      signups_paused: { label: 'Pausar novos cadastros', desc: 'Quando ativado, a criação de novas contas é desencorajada na interface.' },
+      maintenance_mode: { label: 'Banner de manutenção', desc: 'Quando ativado, você pode exibir um aviso de manutenção aos usuários.' },
+    },
   },
   pl: {
     eyebrow: 'Admin',
@@ -67,6 +83,11 @@ const COPY: Record<Lang, {
     footer: 'Zmiany wchodzą w życie natychmiast. Przełącznik zasięgu jest już wymuszany przez trasy wysyłania; pozostałe są przechowywane i gotowe do podłączenia do zachowania.',
     notAllowedTitle: 'Ustawienia administratora',
     notAllowedBody: 'Tylko właściciel konta może zmieniać ustawienia systemowe.',
+    flags: {
+      outreach_sending_disabled: { label: 'Wstrzymaj wysyłanie kontaktów', desc: 'Główny wyłącznik: gdy włączony, nie są wysyłane żadne wiadomości.' },
+      signups_paused: { label: 'Wstrzymaj nowe rejestracje', desc: 'Gdy włączone, tworzenie nowych kont jest zniechęcane w interfejsie.' },
+      maintenance_mode: { label: 'Baner konserwacji', desc: 'Gdy włączone, możesz pokazać użytkownikom informację o konserwacji.' },
+    },
   },
   ru: {
     eyebrow: 'Админ',
@@ -77,6 +98,11 @@ const COPY: Record<Lang, {
     footer: 'Изменения вступают в силу немедленно. Переключатель рассылки уже применяется маршрутами отправки; остальные сохранены и готовы к подключению к поведению.',
     notAllowedTitle: 'Настройки администратора',
     notAllowedBody: 'Только владелец аккаунта может изменять системные настройки.',
+    flags: {
+      outreach_sending_disabled: { label: 'Приостановить рассылку', desc: 'Главный выключатель: когда включён, сообщения не отправляются.' },
+      signups_paused: { label: 'Приостановить регистрации', desc: 'Когда включено, создание новых аккаунтов не поощряется в интерфейсе.' },
+      maintenance_mode: { label: 'Баннер обслуживания', desc: 'Когда включено, вы можете показать пользователям уведомление об обслуживании.' },
+    },
   },
 }
 
@@ -160,10 +186,10 @@ export default function AdminSettingsPage() {
             <div key={f.key} className="sb-card" style={{ padding: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 700, color: '#fff' }}>
-                  {f.label}
+                  {c.flags[f.key]?.label || f.label}
                   {savingKey === f.key && <span className="sb-caption" style={{ marginLeft: 8, opacity: 0.6 }}>{c.saving}</span>}
                 </div>
-                <div className="sb-caption" style={{ marginTop: 4 }}>{f.desc}</div>
+                <div className="sb-caption" style={{ marginTop: 4 }}>{c.flags[f.key]?.desc || f.desc}</div>
               </div>
               <button
                 type="button"

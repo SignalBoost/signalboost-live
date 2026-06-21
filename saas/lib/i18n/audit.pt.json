@@ -60,7 +60,53 @@
     "overallScore": "Pontuação geral de prontidão",
     "findings": "Achados",
     "evidenceRequired": "Evidência necessária",
-    "topRisks": "Principais riscos"
+    "topRisks": "Principais riscos",
+    "recommendation": "Recomendação",
+    "impact": "Impacto"
+  },
+  "identity": {
+    "title": "Identidade e Acesso",
+    "generatedAt": "Gerado em {date}",
+    "score": "Pontuação",
+    "findingsTitle": "Achados de identidade",
+    "noFindings": "Nenhum achado de identidade — tudo parece bem.",
+    "tableTitle": "Todas as identidades",
+    "empty": "Nenhuma identidade coletada.",
+    "never": "Nunca",
+    "daysAgo": "há {days}d",
+    "summary": {
+      "total": "Total",
+      "privileged": "Privilegiadas",
+      "stale": "Inativas",
+      "noMfa": "Priv. sem MFA",
+      "mfaUnknown": "MFA desconhecido"
+    },
+    "col": {
+      "principal": "Principal",
+      "provider": "Provedor",
+      "kind": "Tipo",
+      "role": "Papel",
+      "mfa": "MFA",
+      "lastSeen": "Último acesso",
+      "flags": "Alertas"
+    },
+    "kind": {
+      "user": "Usuário",
+      "access_key": "Chave de acesso",
+      "service_account": "Conta de serviço",
+      "unknown": "Desconhecido"
+    },
+    "mfa": {
+      "enabled": "Ativado",
+      "disabled": "Desativado",
+      "unknown": "Desconhecido"
+    },
+    "flag": {
+      "stale": "Inativa",
+      "neverUsed": "Nunca usada",
+      "privilegedNoMfa": "Priv. sem MFA",
+      "mfaUnknown": "MFA desconhecido"
+    }
   },
   "finding": {
     "staleIdentity": {

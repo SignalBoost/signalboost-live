@@ -393,6 +393,10 @@
     "remediation": {
       "title": "Hoja de ruta de remediación",
       "desc": "Correcciones priorizadas por urgencia."
+    },
+    "usage": {
+      "title": "Uso y costo de IA",
+      "desc": "Consumo de tokens y costo estimado por función y usuario."
     }
   },
   "usage": {

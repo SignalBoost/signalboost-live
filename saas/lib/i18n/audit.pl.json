@@ -304,5 +304,70 @@
       "identity": "Tożsamość",
       "other": "Inne"
     }
+  },
+  "secret": {
+    "title": "Ekspozycja sekretów i kluczy API",
+    "subtitle": "Skonfigurowane poświadczenia wg środowiska i stanu rotacji. Tylko metadane — wartości nie są odczytywane ani pokazywane.",
+    "findingsTitle": "Ustalenia dot. ekspozycji",
+    "noFindings": "Brak ustaleń dot. ekspozycji.",
+    "tableTitle": "Skonfigurowane poświadczenia",
+    "empty": "Nie znaleziono poświadczeń.",
+    "metadataNote": "Tylko metadane — wartości nigdy nie są odczytywane ani wyświetlane.",
+    "loading": "Ładowanie raportu sekretów…",
+    "loadError": "Nie można załadować raportu.",
+    "fetchError": "Błąd: {msg}",
+    "summary": {
+      "total": "Poświadczenia",
+      "clientExposed": "Ujawnione klientowi",
+      "rotationUnknown": "Rotacja nieznana"
+    },
+    "col": {
+      "name": "Nazwa",
+      "provider": "Dostawca",
+      "environment": "Środowisko",
+      "exposure": "Ekspozycja",
+      "rotation": "Rotacja",
+      "risk": "Ryzyko"
+    },
+    "env": {
+      "production": "Produkcja",
+      "preview": "Podgląd",
+      "development": "Programowanie",
+      "unknown": "Nieznane"
+    },
+    "exposure": {
+      "client": "Ujawniony klientowi",
+      "server": "Tylko serwer"
+    },
+    "rotation": {
+      "known": "Śledzona",
+      "unknown": "Nieznana"
+    }
+  },
+  "remediation": {
+    "title": "Plan działań naprawczych",
+    "subtitle": "Priorytetowe poprawki uszeregowane wg pilności, a pozycje wymagające dowodu na osobnej ścieżce.",
+    "empty": "Nic do naprawy — brak otwartych ustaleń.",
+    "evidenceTitle": "Wymagany dowód",
+    "evidenceSubtitle": "Luki do potwierdzenia dowodem. Nie obniżają wyniku.",
+    "loading": "Tworzenie planu napraw…",
+    "loadError": "Nie można załadować planu.",
+    "fetchError": "Błąd: {msg}",
+    "summary": {
+      "now": "Teraz",
+      "next": "Następne",
+      "later": "Później",
+      "evidence": "Dowód"
+    },
+    "tier": {
+      "now": "Teraz",
+      "next": "Następne",
+      "later": "Później"
+    },
+    "tierHint": {
+      "now": "Krytyczne — napraw natychmiast.",
+      "next": "Wysokie — zaplanuj wkrótce.",
+      "later": "Średnie i niskie — zaplanuj."
+    }
   }
 }

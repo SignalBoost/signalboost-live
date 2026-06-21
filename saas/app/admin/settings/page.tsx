@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useI18n } from '@/components/i18n/I18nProvider'
 
 const GOLD = '#ffc300'
 
@@ -107,6 +108,7 @@ const COPY: Record<Lang, {
 }
 
 export default function AdminSettingsPage() {
+  const { lang: activeLang } = useI18n()
   const [flags, setFlags] = useState<Flag[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -115,7 +117,7 @@ export default function AdminSettingsPage() {
   const [lang, setLang] = useState<Lang>('en')
 
   useEffect(() => { setLang(getLang()) }, [])
-  const c = COPY[lang]
+  const c = COPY[(activeLang in COPY ? activeLang : 'en') as keyof typeof COPY]
 
   const load = useCallback(async () => {
     setLoading(true); setError('')

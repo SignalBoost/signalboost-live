@@ -10,7 +10,7 @@
 //     the user_audit_usage ledger via lib/ai/usage.ts (resilient; never blocks).
 
 import { NextResponse } from 'next/server'
-import { requireOwner } from '@/lib/auth/access'
+import { requireAdmin } from '@/lib/auth/access'
 import { collectSnapshot } from '@/lib/audit/collectors'
 import { buildExecutiveSummary, execSummaryFacts } from '@/lib/audit/execSummary'
 import { processAuditSnapshot } from '@/lib/audit/processor'
@@ -66,7 +66,7 @@ async function narrate(factBlock: string, sanitizedContext: string, lang: string
 }
 
 export async function GET(req: Request) {
-  const guard = await requireOwner()
+  const guard = await requireAdmin()
   if (!guard.ok) {
     return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status })
   }

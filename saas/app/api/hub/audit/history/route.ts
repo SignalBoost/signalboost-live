@@ -4,7 +4,7 @@
 //   POST → take a fresh readiness snapshot and persist it
 
 import { NextResponse } from 'next/server'
-import { requireOwner } from '@/lib/auth/access'
+import { requireAdmin } from '@/lib/auth/access'
 import { createClient } from '@supabase/supabase-js'
 import { collectSnapshot } from '@/lib/audit/collectors'
 import { buildExecutiveSummary } from '@/lib/audit/execSummary'
@@ -24,7 +24,7 @@ function db() {
 }
 
 export async function GET() {
-  const guard = await requireOwner()
+  const guard = await requireAdmin()
   if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status })
   try {
     const client = db()
@@ -43,7 +43,7 @@ export async function GET() {
 }
 
 export async function POST() {
-  const guard = await requireOwner()
+  const guard = await requireAdmin()
   if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status })
   const userId = (guard as any).ctx?.userId ?? (guard as any).ctx?.user?.id ?? null
   try {

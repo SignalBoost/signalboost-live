@@ -417,6 +417,10 @@
     "vercel": {
       "title": "Deployment & Env",
       "desc": "Env vars by scope, exposure, and prod/preview drift."
+    },
+    "activity": {
+      "title": "Audit Log & Activity",
+      "desc": "Recorded actions, actors, and results over time."
     }
   },
   "usage": {
@@ -619,5 +623,37 @@
     "loadError": "Could not load the deployment report.",
     "fetchError": "Error: {msg}",
     "loading": "Loading deployment report…"
+  },
+  "activity": {
+    "title": "Audit Log & Activity Timeline",
+    "subtitle": "Recorded actions, actors, and results from the Hub audit log.",
+    "summary": {
+      "total": "Events",
+      "success": "Succeeded",
+      "failures": "Failures",
+      "denials": "Blocked / denied",
+      "actors": "Actors"
+    },
+    "window": "Showing {n} most recent events · {since} → {until}",
+    "empty": "No audit events recorded yet.",
+    "col": {
+      "time": "Time (UTC)",
+      "actor": "Actor",
+      "action": "Action",
+      "target": "Target",
+      "status": "Status",
+      "message": "Message"
+    },
+    "status": {
+      "success": "Success",
+      "failure": "Failure",
+      "blocked": "Blocked",
+      "denied": "Denied",
+      "error": "Error",
+      "config_error": "Config error"
+    },
+    "loadError": "Could not load the activity log.",
+    "fetchError": "Error: {msg}",
+    "loading": "Loading activity log…"
   }
 }

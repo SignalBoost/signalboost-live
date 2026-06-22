@@ -409,6 +409,14 @@
     "supabase": {
       "title": "Bezpieczeństwo bazy danych",
       "desc": "Status RLS, publiczne buckety i ekspozycja roli serwisowej."
+    },
+    "vercel": {
+      "title": "Wdrożenie i środowisko",
+      "desc": "Zmienne wg zakresu, ekspozycja i rozbieżności prod/preview."
+    },
+    "stripe": {
+      "title": "Konfiguracja płatności",
+      "desc": "Tryb live, poziomy cen i pokrycie webhooków."
     }
   },
   "usage": {
@@ -534,5 +542,82 @@
     "loadError": "Nie udało się załadować raportu Supabase.",
     "fetchError": "Błąd: {msg}",
     "loading": "Ładowanie raportu Supabase…"
+  },
+  "vercel": {
+    "title": "Raport wdrożeń i zmiennych środowiskowych",
+    "subtitle": "Zmienne środowiskowe wg zakresu, ekspozycja publiczna i rozbieżności prod/preview.",
+    "notConfigured": "Vercel nie jest połączony, więc nie można było ocenić stanu wdrożenia.",
+    "summary": {
+      "scopes": "Zakresy",
+      "vars": "Zmienne",
+      "publicSensitive": "Ujawnione sekrety"
+    },
+    "drift": {
+      "title": "Zgodność produkcja ↔ preview",
+      "drift": "Zakresy różnią się",
+      "aligned": "Zgodne"
+    },
+    "scopes": {
+      "title": "Zmienne środowiskowe wg zakresu",
+      "empty": "Nie zebrano zmiennych środowiskowych."
+    },
+    "metadataNote": "Tylko nazwy — wartości nigdy nie są odczytywane ani pokazywane.",
+    "scope": {
+      "production": "Produkcja",
+      "preview": "Podgląd",
+      "development": "Programowanie",
+      "none": "Brak zmiennych w tym zakresie."
+    },
+    "findings": {
+      "title": "Ustalenia ({n})",
+      "empty": "Brak ustaleń dotyczących wdrożenia — nic nie oznaczono."
+    },
+    "loadError": "Nie udało się załadować raportu wdrożenia.",
+    "fetchError": "Błąd: {msg}",
+    "loading": "Ładowanie raportu wdrożenia…"
+  },
+  "stripe": {
+    "title": "Raport konfiguracji płatności",
+    "subtitle": "Tryb live, poziomy cen, pokrycie webhooków i niezgodności cen.",
+    "notConfigured": "Stripe nie jest połączony lub nie udało się zebrać jego danych.",
+    "summary": {
+      "tiers": "Poziomy cen",
+      "webhooks": "Webhooki",
+      "mismatches": "Niezgodności cen"
+    },
+    "mode": {
+      "title": "Tryb Stripe",
+      "live": "Tryb live",
+      "test": "Tryb testowy"
+    },
+    "tiers": {
+      "title": "Poziomy cen",
+      "empty": "Nie zebrano poziomów cen."
+    },
+    "col": {
+      "name": "Poziom",
+      "price": "Cena",
+      "interval": "Interwał",
+      "priceId": "ID ceny",
+      "status": "Status",
+      "endpoint": "Punkt",
+      "whStatus": "Status",
+      "events": "Zdarzenia"
+    },
+    "status": {
+      "mismatch": "Niezgodność",
+      "ok": "Aktywny"
+    },
+    "webhooks": {
+      "title": "Punkty webhook",
+      "empty": "Nie skonfigurowano punktów webhook."
+    },
+    "findings": {
+      "title": "Ustalenia ({n})",
+      "empty": "Brak ustaleń dotyczących płatności — nic nie oznaczono."
+    },
+    "loadError": "Nie udało się załadować raportu Stripe.",
+    "fetchError": "Błąd: {msg}",
+    "loading": "Ładowanie raportu Stripe…"
   }
 }

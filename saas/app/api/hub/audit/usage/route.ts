@@ -4,7 +4,7 @@
 // aggregates in-process, and returns the dashboard summary.
 
 import { NextResponse } from 'next/server'
-import { requireOwner } from '@/lib/auth/access'
+import { requireAdmin } from '@/lib/auth/access'
 import { createClient } from '@supabase/supabase-js'
 import { aggregateUsage, type UsageRow } from '@/lib/audit/usageReport'
 
@@ -15,7 +15,7 @@ export const maxDuration = 60
 const WINDOW_DAYS = 30
 
 export async function GET() {
-  const guard = await requireOwner()
+  const guard = await requireAdmin()
   if (!guard.ok) {
     return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status })
   }

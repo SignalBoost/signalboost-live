@@ -357,7 +357,8 @@
       "now": "Ahora",
       "next": "Siguiente",
       "later": "Más tarde",
-      "evidence": "Evidencia"
+      "evidence": "Evidencia",
+      "handled": "Gestionados"
     },
     "tier": {
       "now": "Ahora",
@@ -368,6 +369,20 @@
       "now": "Crítico: corregir de inmediato.",
       "next": "Alto: programar pronto.",
       "later": "Medio y bajo: planificar."
+    },
+    "handled": {
+      "title": "Gestionados",
+      "subtitle": "Hallazgos que marcaste como resueltos, aceptados o que no se corregirán."
+    },
+    "state": {
+      "status": "Estado",
+      "owner": "Responsable",
+      "ownerPlaceholder": "Asignar…",
+      "open": "Abierto",
+      "in_progress": "En progreso",
+      "resolved": "Resuelto",
+      "accepted": "Aceptado",
+      "wont_fix": "No se corregirá"
     }
   },
   "center": {

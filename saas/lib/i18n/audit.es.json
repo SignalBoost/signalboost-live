@@ -409,6 +409,10 @@
     "supabase": {
       "title": "Database Security",
       "desc": "RLS status, public buckets, and service-role exposure."
+    },
+    "stripe": {
+      "title": "Configuración de pagos",
+      "desc": "Modo en vivo, niveles de precios y cobertura de webhooks."
     }
   },
   "usage": {
@@ -534,5 +538,49 @@
     "loadError": "Could not load the Supabase report.",
     "fetchError": "Error: {msg}",
     "loading": "Loading Supabase report…"
+  },
+  "stripe": {
+    "title": "Informe de configuración de pagos",
+    "subtitle": "Modo en vivo, niveles de precios, cobertura de webhooks y discrepancias de precios.",
+    "notConfigured": "Stripe no está conectado o no se pudieron recopilar sus datos.",
+    "summary": {
+      "tiers": "Niveles de precios",
+      "webhooks": "Webhooks",
+      "mismatches": "Discrepancias de precios"
+    },
+    "mode": {
+      "title": "Modo de Stripe",
+      "live": "Modo en vivo",
+      "test": "Modo de prueba"
+    },
+    "tiers": {
+      "title": "Niveles de precios",
+      "empty": "No se recopilaron niveles de precios."
+    },
+    "col": {
+      "name": "Nivel",
+      "price": "Precio",
+      "interval": "Intervalo",
+      "priceId": "ID de precio",
+      "status": "Estado",
+      "endpoint": "Endpoint",
+      "whStatus": "Estado",
+      "events": "Eventos"
+    },
+    "status": {
+      "mismatch": "Discrepancia",
+      "ok": "Activo"
+    },
+    "webhooks": {
+      "title": "Endpoints de webhook",
+      "empty": "No hay endpoints de webhook configurados."
+    },
+    "findings": {
+      "title": "Hallazgos ({n})",
+      "empty": "Sin hallazgos de pagos: nada marcado."
+    },
+    "loadError": "No se pudo cargar el informe de Stripe.",
+    "fetchError": "Error: {msg}",
+    "loading": "Cargando informe de Stripe…"
   }
 }

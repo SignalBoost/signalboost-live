@@ -25,6 +25,7 @@ export interface SynthesisInput {
   scope: string
   filesScanned: string[]
   findings: SynthFinding[]
+  repoMap?: string[]   // full repository file tree (macro layout) for cross-file reasoning
 }
 
 const SEV_ORDER = ['critical', 'high', 'medium', 'low', 'info']
@@ -40,7 +41,11 @@ function tally(findings: SynthFinding[]): string {
 }
 
 function buildSynthesisPrompt(input: SynthesisInput): string {
-  const { repo, scope, filesScanned, findings } = input
+  const { repo, scope, filesScanned, findings, repoMap } = input
+
+  const mapBlock = (repoMap && repoMap.length)
+    ? `Repository file tree — the MACRO LAYOUT of the whole codebase (${repoMap.length} paths${repoMap.length >= 500 ? ', truncated' : ''}). Use it to reason about architecture and cross-file structure even for files that were not individually deep-scanned:\n${repoMap.map(p => `- ${p}`).join('\n')}`
+    : ''
 
   const digest = findings.length
     ? findings
@@ -63,7 +68,10 @@ function buildSynthesisPrompt(input: SynthesisInput): string {
     '',
     `Repository: ${repo}`,
     `Scanned scope: ${scope || '(application code)'}`,
-    `Files analyzed (${filesScanned.length}):`,
+    '',
+    mapBlock,
+    '',
+    `Deep-scanned files (${filesScanned.length}):`,
     (filesScanned.length ? filesScanned.map(f => `- ${f}`).join('\n') : '- (none)'),
     '',
     `Findings (${findings.length}; severity mix: ${tally(findings)}):`,
@@ -83,9 +91,10 @@ function buildSynthesisPrompt(input: SynthesisInput): string {
     'handling, input validation, error handling, and code-health signals. Name both strengths and',
     'systemic weaknesses, and point to the files that evidence them.',
     '',
-    '## Key Risks by Theme',
+    '## Threat Themes & Business Risk',
     'Group related findings into themes (not a flat list). For each theme: what it is, where it',
-    'appears, the business impact, and the likelihood. Order by severity.',
+    'appears across the codebase, the SECURITY impact AND the REVENUE / business impact (data',
+    'exposure, downtime, churn, compliance exposure), and the likelihood. Order by severity.',
     '',
     '## Prioritized Remediation Roadmap',
     'A markdown table with columns: | Priority | Fix | Why it matters | Effort (S/M/L) | Suggested owner |.',

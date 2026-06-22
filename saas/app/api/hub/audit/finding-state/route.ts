@@ -4,7 +4,7 @@
 //   POST → upsert one finding's status / owner / note
 
 import { NextResponse } from 'next/server'
-import { requireOwner } from '@/lib/auth/access'
+import { requireAdmin } from '@/lib/auth/access'
 import { createClient } from '@supabase/supabase-js'
 import { normalizeStatus } from '@/lib/audit/findingState'
 
@@ -21,7 +21,7 @@ function db() {
 }
 
 export async function GET() {
-  const guard = await requireOwner()
+  const guard = await requireAdmin()
   if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status })
   try {
     const client = db()
@@ -38,7 +38,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const guard = await requireOwner()
+  const guard = await requireAdmin()
   if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status })
   const userId = (guard as any).ctx?.userId ?? (guard as any).ctx?.user?.id ?? null
 

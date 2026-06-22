@@ -4,7 +4,8 @@
 
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/access'
-import { collectSnapshot } from '@/lib/audit/collectors'
+import { getReportSnapshot } from '@/lib/audit/snapshotCache'
+import { getAdminSupabase } from '@/utils/supabase/server'
 import { buildVercelReport } from '@/lib/audit/vercelReport'
 
 export const dynamic = 'force-dynamic'
@@ -18,7 +19,7 @@ export async function GET() {
   }
 
   try {
-    const snapshot = await collectSnapshot()
+    const snapshot = await getReportSnapshot(getAdminSupabase())
     const report = buildVercelReport(snapshot)
     return NextResponse.json({ ok: true, report })
   } catch (err) {

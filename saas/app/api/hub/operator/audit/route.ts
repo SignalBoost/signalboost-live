@@ -137,6 +137,7 @@ export async function POST(req: NextRequest) {
         // re-collecting live. Best-effort: never fail the run if this step errors.
         try {
           const snapshot = await collectSnapshot()
+          ;(snapshot as any).narrative = result.narrative || ''
           await writeSnapshot(admin, { runId, userId: ctx.userId, snapshot })
         } catch (snapErr) {
           console.error('audit snapshot cache write failed', snapErr instanceof Error ? snapErr.message : snapErr)

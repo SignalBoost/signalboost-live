@@ -405,6 +405,10 @@
     "github": {
       "title": "GitHub i zmiany w kodzie",
       "desc": "Ochrona gałęzi, współpracownicy i nieaktualne gałęzie."
+    },
+    "supabase": {
+      "title": "Bezpieczeństwo bazy danych",
+      "desc": "Status RLS, publiczne buckety i ekspozycja roli serwisowej."
     }
   },
   "usage": {
@@ -492,5 +496,43 @@
     "loadError": "Nie udało się załadować raportu GitHub.",
     "fetchError": "Błąd: {msg}",
     "loading": "Ładowanie raportu GitHub…"
+  },
+  "supabase": {
+    "title": "Raport bezpieczeństwa bazy danych",
+    "subtitle": "Bezpieczeństwo na poziomie wiersza, publiczne buckety i ekspozycja roli serwisowej.",
+    "notConfigured": "Supabase nie jest połączony lub nie udało się zebrać jego danych.",
+    "summary": {
+      "tables": "Tabele",
+      "rlsDisabled": "RLS wyłączony",
+      "publicBuckets": "Publiczne buckety"
+    },
+    "serviceRole": {
+      "title": "Ekspozycja klucza service-role",
+      "exposed": "Widoczna dla klienta",
+      "serverOnly": "Tylko serwer"
+    },
+    "tables": {
+      "title": "Tabele i bezpieczeństwo na poziomie wiersza",
+      "empty": "Nie zebrano tabel."
+    },
+    "col": {
+      "table": "Tabela",
+      "rls": "RLS"
+    },
+    "rls": {
+      "on": "Włączony",
+      "off": "Wyłączony"
+    },
+    "buckets": {
+      "title": "Publiczne buckety pamięci",
+      "empty": "Brak publicznych bucketów — czysto."
+    },
+    "findings": {
+      "title": "Ustalenia ({n})",
+      "empty": "Brak ustaleń bazy danych — nic nie oznaczono."
+    },
+    "loadError": "Nie udało się załadować raportu Supabase.",
+    "fetchError": "Błąd: {msg}",
+    "loading": "Ładowanie raportu Supabase…"
   }
 }

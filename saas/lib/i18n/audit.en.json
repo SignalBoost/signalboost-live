@@ -405,6 +405,10 @@
     "github": {
       "title": "GitHub & Code Change",
       "desc": "Branch protection, collaborators, and stale branches."
+    },
+    "supabase": {
+      "title": "Database Security",
+      "desc": "RLS status, public buckets, and service-role exposure."
     }
   },
   "usage": {
@@ -492,5 +496,43 @@
     "loadError": "Could not load the GitHub report.",
     "fetchError": "Error: {msg}",
     "loading": "Loading GitHub report…"
+  },
+  "supabase": {
+    "title": "Database Security Report",
+    "subtitle": "Row-level security, public buckets, and service-role exposure.",
+    "notConfigured": "Supabase is not connected, or its data could not be collected.",
+    "summary": {
+      "tables": "Tables",
+      "rlsDisabled": "RLS disabled",
+      "publicBuckets": "Public buckets"
+    },
+    "serviceRole": {
+      "title": "Service-role key exposure",
+      "exposed": "Exposed to client",
+      "serverOnly": "Server-only"
+    },
+    "tables": {
+      "title": "Tables & Row-Level Security",
+      "empty": "No tables collected."
+    },
+    "col": {
+      "table": "Table",
+      "rls": "RLS"
+    },
+    "rls": {
+      "on": "Enabled",
+      "off": "Disabled"
+    },
+    "buckets": {
+      "title": "Public storage buckets",
+      "empty": "No public buckets — clean."
+    },
+    "findings": {
+      "title": "Findings ({n})",
+      "empty": "No database findings — nothing flagged."
+    },
+    "loadError": "Could not load the Supabase report.",
+    "fetchError": "Error: {msg}",
+    "loading": "Loading Supabase report…"
   }
 }

@@ -62,7 +62,7 @@ type AuditCopy = {
   detail: string; close: string; viewSource: string
   generateFix: string; patching: string; patchReady: string; reviewMerge: string; patchFailed: string; patchUpgrade: string
   trackScan: string; trackAnalyze: string; trackReport: string; trackPrs: string
-  cmdTitle: string; reportsTitle: string; reportsSubtitle: string; openReport: string; reportOwnerOnly: string; reportSyncHint: string
+  cmdTitle: string; reportsTitle: string; reportsSubtitle: string; openReport: string; reportOwnerOnly: string; reportSyncHint: string; runningHint: string; pathHint: string
   sev: Record<Sev, string>
 }
 
@@ -84,6 +84,7 @@ const COPY: Record<string, AuditCopy> = {
     reportsSubtitle: 'Twelve readiness reports across identity, providers, secrets, code, billing, and remediation.',
     openReport: 'View', reportOwnerOnly: 'These readiness reports are scoped to the workspace owner. Upgrade your plan to generate reports for your own connected stack.',
     reportSyncHint: 'Synced with your latest scan.',
+    runningHint: 'Large scopes can take a few minutes — this stays live, keep the tab open.', pathHint: 'Repo path like saas/app/api — not a full URL.',
     sev: { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', info: 'Info' },
   },
   es: {
@@ -103,6 +104,7 @@ const COPY: Record<string, AuditCopy> = {
     reportsSubtitle: 'Doce informes de preparación sobre identidad, proveedores, secretos, código, facturación y remediación.',
     openReport: 'Ver', reportOwnerOnly: 'Estos informes están limitados al propietario del espacio de trabajo. Mejora tu plan para generar informes de tu propio stack conectado.',
     reportSyncHint: 'Sincronizado con tu último análisis.',
+    runningHint: 'Los análisis amplios pueden tardar unos minutos: sigue activo, deja la pestaña abierta.', pathHint: 'Ruta del repo, p. ej. saas/app/api — no una URL completa.',
     sev: { critical: 'Crítico', high: 'Alto', medium: 'Medio', low: 'Bajo', info: 'Info' },
   },
   pt: {
@@ -122,6 +124,7 @@ const COPY: Record<string, AuditCopy> = {
     reportsSubtitle: 'Doze relatórios de prontidão sobre identidade, provedores, segredos, código, faturamento e remediação.',
     openReport: 'Ver', reportOwnerOnly: 'Estes relatórios são restritos ao proprietário do espaço de trabalho. Faça upgrade do seu plano para gerar relatórios do seu próprio stack conectado.',
     reportSyncHint: 'Sincronizado com sua última análise.',
+    runningHint: 'Escopos grandes podem levar alguns minutos — continua ativo, mantenha a aba aberta.', pathHint: 'Caminho do repo, ex. saas/app/api — não uma URL completa.',
     sev: { critical: 'Crítico', high: 'Alto', medium: 'Médio', low: 'Baixo', info: 'Info' },
   },
   pl: {
@@ -141,6 +144,7 @@ const COPY: Record<string, AuditCopy> = {
     reportsSubtitle: 'Dwanaście raportów gotowości obejmujących tożsamość, dostawców, sekrety, kod, płatności i naprawę.',
     openReport: 'Otwórz', reportOwnerOnly: 'Te raporty są dostępne tylko dla właściciela przestrzeni roboczej. Ulepsz plan, aby generować raporty dla własnego połączonego stosu.',
     reportSyncHint: 'Zsynchronizowano z najnowszym skanem.',
+    runningHint: 'Duże zakresy mogą potrwać kilka minut — działa dalej, zostaw kartę otwartą.', pathHint: 'Ścieżka repo, np. saas/app/api — nie pełny URL.',
     sev: { critical: 'Krytyczny', high: 'Wysoki', medium: 'Średni', low: 'Niski', info: 'Info' },
   },
   ru: {
@@ -160,6 +164,7 @@ const COPY: Record<string, AuditCopy> = {
     reportsSubtitle: 'Двенадцать отчётов о готовности по идентификации, провайдерам, секретам, коду, биллингу и устранению.',
     openReport: 'Открыть', reportOwnerOnly: 'Эти отчёты доступны только владельцу рабочей области. Обновите план, чтобы создавать отчёты для своего подключённого стека.',
     reportSyncHint: 'Синхронизировано с последним сканированием.',
+    runningHint: 'Большие области могут занять несколько минут — процесс активен, не закрывайте вкладку.', pathHint: 'Путь в репозитории, напр. saas/app/api — не полный URL.',
     sev: { critical: 'Критический', high: 'Высокий', medium: 'Средний', low: 'Низкий', info: 'Инфо' },
   },
 }
@@ -215,6 +220,12 @@ function ghUrl(file: string, line?: number | null): string {
 
 const PHASE_ORDER = ['SCAN_TARGET', 'RUN_ANALYZERS', 'GENERATE_REPORT', 'PREPARE_PRS'] as const
 
+function fmtElapsed(sec: number): string {
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
 function PhaseTracker({ phase, progress, copy }: { phase: string; progress: { done: number; total: number }; copy: AuditCopy }) {
   const labels: Record<string, string> = {
     SCAN_TARGET: copy.trackScan, RUN_ANALYZERS: copy.trackAnalyze, GENERATE_REPORT: copy.trackReport, PREPARE_PRS: copy.trackPrs,
@@ -243,16 +254,17 @@ function PhaseTracker({ phase, progress, copy }: { phase: string; progress: { do
         )
       })}
     </div>
-)
+  )
 }
 
 export default function AuditCenterPage() {
-  const { lang } = useI18n()
+const { lang } = useI18n()
   const { t } = useTranslation()
   const copy = copyFor(lang)
 
   const [prefix, setPrefix] = useState('')
   const [maxFiles, setMaxFiles] = useState(8)
+  const [elapsed, setElapsed] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -320,6 +332,14 @@ export default function AuditCenterPage() {
   }, [])
 
   useEffect(() => { loadHistory() }, [loadHistory])
+
+  // Elapsed-time heartbeat so a long run never looks frozen.
+  useEffect(() => {
+    if (!loading) return
+    setElapsed(0)
+    const id = setInterval(() => setElapsed(e => e + 1), 1000)
+    return () => clearInterval(id)
+  }, [loading])
 
   async function runNew() {
     setLoading(true); setError(null); setView(null); setSelectedRunId(null)
@@ -437,6 +457,7 @@ export default function AuditCenterPage() {
                 placeholder="saas/app/api"
                 className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-accent"
               />
+              <span className="text-[10.5px] leading-snug text-text-muted/80">{copy.pathHint}</span>
             </label>
             <label className="flex w-[120px] flex-col gap-1.5">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">{copy.maxLabel}</span>
@@ -455,6 +476,23 @@ export default function AuditCenterPage() {
             </button>
           </div>
         </div>
+
+        {loading && (
+          <div className="mt-4 rounded-md border border-accent/40 bg-surface p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="flex items-center gap-2 text-xs font-semibold text-text">
+                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-accent" />
+                {copy.running}
+              </span>
+              <span className="font-mono text-[11px] tabular-nums text-text-muted">{fmtElapsed(elapsed)}</span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-bg">
+              <div className="h-full w-1/3 rounded-full bg-accent" style={{ animation: 'sbIndet 1.15s ease-in-out infinite' }} />
+            </div>
+            <p className="mt-2 text-[11.5px] leading-relaxed text-text-muted">{copy.runningHint}</p>
+            <style>{`@keyframes sbIndet{0%{transform:translateX(-120%)}100%{transform:translateX(360%)}}`}</style>
+          </div>
+        )}
 
         {phase && <PhaseTracker phase={phase} progress={progress} copy={copy} />}
 
@@ -480,7 +518,7 @@ export default function AuditCenterPage() {
                     <button
                       key={r.id}
                       onClick={() => openRun(r.id)}
-                      className={`rounded-md border px-2.5 py-2 text-left transition-fast ${active ? 'border-accent bg-bg' : 'border-border bg-bg hover:border-accent'}`}
+className={`rounded-md border px-2.5 py-2 text-left transition-fast ${active ? 'border-accent bg-bg' : 'border-border bg-bg hover:border-accent'}`}
                     >
                       <div className="flex items-center gap-2">
                         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDot(r.status)}`} />
@@ -488,7 +526,7 @@ export default function AuditCenterPage() {
                         <span className={`ml-auto text-[11px] font-bold ${r.findings_count > 0 ? 'text-accent' : 'text-text-muted'}`}>{r.findings_count}</span>
                       </div>
                       <div className="mt-1 truncate font-mono text-[10.5px] text-text-muted">{r.prefix || '—'}</div>
-<div className="mt-0.5 text-[10px] text-text-muted/70">{timeShort(r.created_at, lang)}</div>
+                      <div className="mt-0.5 text-[10px] text-text-muted/70">{timeShort(r.created_at, lang)}</div>
                     </button>
                   )
                 })}

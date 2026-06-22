@@ -171,36 +171,37 @@ const EXTRA: Record<AuditLocale, { loading: string; error: string; enterpriseHre
 }
 
 // Per-tier patch-generation line (strictly gated). A leading ✓/❌ is rendered by
-// the pricing page as a coloured mark; Starter is read-only (no patch generation).
+// the pricing page as a coloured mark; Starter & Growth are read-only (Pro is the
+// first tier with AI patch generation / COS remediation).
 const PATCH_BY_TIER: Record<AuditLocale, Record<string, string>> = {
   en: {
     starter:    '❌ Read-Only Reports (No AI patch generation)',
-    growth:     '❌ No AI patch generation (Pro and up)',
-    pro:        '✓ High-Volume AI Patch Generation & Automated Remediation (60 max files)',
+    growth:     '❌ Read-Only Reports (No AI patch generation)',
+    pro:        '✓ Full COS Automated Code Remediation (PR Patches)',
     enterprise: '✓ Unlimited AI Patch Generation & Automated Remediation',
   },
   es: {
     starter:    '❌ Informes de solo lectura (sin generación de parches con IA)',
-    growth:     '❌ Sin generación de parches con IA (Pro o superior)',
-    pro:        '✓ Generación de parches con IA de alto volumen y remediación automatizada (60 archivos máx.)',
+    growth:     '❌ Informes de solo lectura (sin generación de parches con IA)',
+    pro:        '✓ Remediación de código totalmente automatizada por COS (parches PR)',
     enterprise: '✓ Generación de parches con IA ilimitada y remediación automatizada',
   },
   pt: {
     starter:    '❌ Relatórios somente leitura (sem geração de correções com IA)',
-    growth:     '❌ Sem geração de correções com IA (Pro ou superior)',
-    pro:        '✓ Geração de correções com IA de alto volume e remediação automatizada (60 arquivos máx.)',
+    growth:     '❌ Relatórios somente leitura (sem geração de correções com IA)',
+    pro:        '✓ Remediação de código totalmente automatizada pelo COS (correções PR)',
     enterprise: '✓ Geração de correções com IA ilimitada e remediação automatizada',
   },
   pl: {
     starter:    '❌ Raporty tylko do odczytu (bez generowania poprawek AI)',
-    growth:     '❌ Brak generowania poprawek AI (Pro i wyżej)',
-    pro:        '✓ Wysokowydajne generowanie poprawek AI i automatyczna naprawa (maks. 60 plików)',
+    growth:     '❌ Raporty tylko do odczytu (bez generowania poprawek AI)',
+    pro:        '✓ W pełni zautomatyzowana naprawa kodu przez COS (poprawki PR)',
     enterprise: '✓ Nieograniczone generowanie poprawek AI i automatyczna naprawa',
   },
   ru: {
     starter:    '❌ Отчёты только для чтения (без генерации исправлений ИИ)',
-    growth:     '❌ Без генерации исправлений ИИ (Pro и выше)',
-    pro:        '✓ Высокообъёмная генерация исправлений ИИ и автоматическое исправление (до 60 файлов)',
+    growth:     '❌ Отчёты только для чтения (без генерации исправлений ИИ)',
+    pro:        '✓ Полностью автоматическое исправление кода через COS (PR-патчи)',
     enterprise: '✓ Неограниченная генерация исправлений ИИ и автоматическое исправление',
   },
 }

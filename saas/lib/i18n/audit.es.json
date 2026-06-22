@@ -421,6 +421,10 @@
     "activity": {
       "title": "Registro de auditoría y actividad",
       "desc": "Acciones, actores y resultados registrados a lo largo del tiempo."
+    },
+    "compliance": {
+      "title": "Preparación para cumplimiento",
+      "desc": "Preparación frente a SOC 2, ISO 27001, NIST CSF y CIS."
     }
   },
   "usage": {
@@ -655,5 +659,50 @@
     "loadError": "No se pudo cargar el registro de actividad.",
     "fetchError": "Error: {msg}",
     "loading": "Cargando registro de actividad…"
+  },
+  "compliance": {
+    "title": "Matriz de preparación para cumplimiento",
+    "subtitle": "Preparación frente a SOC 2, ISO 27001, NIST CSF y CIS, mapeada a partir de tus hallazgos actuales.",
+    "disclaimer": "Solo indicación de preparación: esto no es una certificación, atestación ni auditoría formal. Los códigos de referencia son indicativos.",
+    "overall": "Preparación general",
+    "summary": {
+      "families": "Familias de controles",
+      "ready": "Listas",
+      "attention": "Requieren atención",
+      "gaps": "Brechas"
+    },
+    "readyOf": "{ready} de {total} listas",
+    "matrix": {
+      "title": "Familias de controles"
+    },
+    "col": {
+      "family": "Familia de controles",
+      "status": "Estado",
+      "findings": "Hallazgos"
+    },
+    "fw": {
+      "soc2": "SOC 2",
+      "iso27001": "ISO 27001",
+      "nist": "NIST CSF",
+      "cis": "Controles CIS"
+    },
+    "family": {
+      "accessControl": "Control de acceso e identidad",
+      "changeManagement": "Gestión de cambios",
+      "dataSecurity": "Seguridad de datos",
+      "secrets": "Gestión de secretos",
+      "configuration": "Configuración y despliegue",
+      "logging": "Registro y monitoreo",
+      "inventory": "Inventario de activos",
+      "payments": "Integridad de procesamiento (pagos)"
+    },
+    "status": {
+      "ready": "Listo",
+      "attention": "Requiere atención",
+      "gap": "Brecha"
+    },
+    "loadError": "No se pudo cargar el informe de cumplimiento.",
+    "fetchError": "Error: {msg}",
+    "loading": "Cargando preparación para cumplimiento…"
   }
 }

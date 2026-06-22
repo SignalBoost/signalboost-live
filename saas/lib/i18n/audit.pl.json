@@ -1,210 +1,210 @@
 {
   "report": {
     "executiveSummary": {
-      "title": "Сводка рисков для руководства",
-      "description": "Общий балл готовности, число находок и основные риски."
+      "title": "Podsumowanie ryzyka dla kierownictwa",
+      "description": "Ogólny wynik gotowości, liczba ustaleń i najważniejsze ryzyka."
     },
     "providerInventory": {
-      "title": "Отчёт по инвентаризации провайдеров",
-      "description": "Каждый подключённый провайдер: статус, риск и последняя проверка."
+      "title": "Raport inwentaryzacji dostawców",
+      "description": "Każdy podłączony dostawca ze statusem, ryzykiem i ostatnim sprawdzeniem."
     },
     "identityAccess": {
-      "title": "Обзор идентификации и доступа",
-      "description": "Доступ, уровень привилегий, состояние MFA и последняя активность."
+      "title": "Przegląd tożsamości i dostępu",
+      "description": "Dostęp, poziom uprawnień, stan MFA i ostatnia aktywność."
     },
     "secretsKeys": {
-      "title": "Отчёт о раскрытии секретов и API-ключей",
-      "description": "Учётные данные по средам и состоянию ротации. Только метаданные."
+      "title": "Raport ekspozycji sekretów i kluczy API",
+      "description": "Skonfigurowane poświadczenia wg środowiska i stanu rotacji. Tylko metadane."
     },
     "remediationRoadmap": {
-      "title": "План устранения",
-      "description": "Приоритетные исправления: влияние, ответственный и срок."
+      "title": "Plan działań naprawczych",
+      "description": "Priorytetowe poprawki z wpływem biznesowym, właścicielem i terminem."
     },
     "prCockpitTrail": {
-      "title": "Журнал утверждений PR Cockpit",
-      "description": "Каждое подготовленное изменение, кто утвердил и результат слияния."
+      "title": "Ścieżka zatwierdzeń PR Cockpit",
+      "description": "Każda przygotowana zmiana, kto ją zatwierdził i wynik scalenia."
     },
     "githubChanges": {
-      "title": "Отчёт по управлению изменениями кода",
-      "description": "Защита веток, открытые и устаревшие PR и ревью."
+      "title": "Raport zarządzania zmianami w kodzie",
+      "description": "Ochrona gałęzi, otwarte i nieaktualne PR oraz stan przeglądów."
     },
     "supabaseSecurity": {
-      "title": "Отчёт о безопасности базы данных",
-      "description": "Покрытие RLS, публичные бакеты и использование service-role."
+      "title": "Raport bezpieczeństwa bazy danych",
+      "description": "Pokrycie RLS, publiczne buckety i użycie roli serwisowej."
     },
     "stripeConfig": {
-      "title": "Отчёт о настройке биллинга",
-      "description": "Продукты, цены, покрытие вебхуков и согласованность live/test."
+      "title": "Raport konfiguracji rozliczeń",
+      "description": "Produkty, ceny, pokrycie webhooków i spójność live/test."
     },
     "vercelDeployment": {
-      "title": "Отчёт о развёртывании и переменных окружения",
-      "description": "Переменные production и preview и раскрытые публичные переменные."
+      "title": "Raport wdrożeń i zmiennych środowiskowych",
+      "description": "Zmienne produkcyjne vs podglądu i ujawnione zmienne publiczne."
     },
     "auditLog": {
-      "title": "Журнал аудита и хронология активности",
-      "description": "Зафиксированные действия, субъекты и результаты из журнала аудита Hub."
+      "title": "Dziennik audytu i oś czasu aktywności",
+      "description": "Zarejestrowane działania, podmioty i wyniki z dziennika audytu Hub."
     },
     "complianceReadiness": {
-      "title": "Матрица готовности к соответствию",
-      "description": "Готовность к SOC 2, ISO 27001, NIST CSF и CIS. Только готовность."
+      "title": "Macierz gotowości do zgodności",
+      "description": "Gotowość względem SOC 2, ISO 27001, NIST CSF i CIS. Tylko gotowość."
     }
   },
   "severity": {
-    "critical": "Критический",
-    "high": "Высокий",
-    "medium": "Средний",
-    "low": "Низкий",
-    "info": "Инфо"
+    "critical": "Krytyczny",
+    "high": "Wysoki",
+    "medium": "Średni",
+    "low": "Niski",
+    "info": "Informacja"
   },
   "common": {
-    "overallScore": "Общий балл готовности",
-    "findings": "Находки",
-    "evidenceRequired": "Требуется подтверждение",
-    "topRisks": "Основные риски",
+    "overallScore": "Ogólny wynik gotowości",
+    "findings": "Ustalenia",
+    "evidenceRequired": "Wymagany dowód",
+    "topRisks": "Najważniejsze ryzyka",
     "recommendation": "Zalecenie",
     "impact": "Wpływ"
   },
   "finding": {
     "staleIdentity": {
-      "title": "Неактивная учётная запись: {principal} ({provider})",
-      "detail": "Нет активности {days} дней (порог {threshold}).",
-      "recommendation": "Проверьте, нужен ли этот доступ; удалите или смените, если нет.",
-      "impact": "Неиспользуемые учётные данные расширяют поверхность атаки без пользы."
+      "title": "Nieaktywna tożsamość: {principal} ({provider})",
+      "detail": "Brak zarejestrowanej aktywności od {days} dni (próg {threshold}).",
+      "recommendation": "Sprawdź, czy ten dostęp jest nadal potrzebny; usuń lub zmień, jeśli nie.",
+      "impact": "Nieużywane poświadczenia zwiększają powierzchnię ataku bez korzyści."
     },
     "neverUsedIdentity": {
-      "title": "Никогда не использованная учётная запись: {principal} ({provider})",
-      "detail": "Создана {days} дней назад, входов или использования не зафиксировано.",
-      "recommendation": "Подтвердите необходимость; удалите, если никогда не активировалась.",
-      "impact": "Спящие аккаунты — частая точка опоры для злоумышленников."
+      "title": "Nigdy nieużywana tożsamość: {principal} ({provider})",
+      "detail": "Utworzona {days} dni temu, bez zarejestrowanego logowania ani użycia.",
+      "recommendation": "Potwierdź, że ten podmiot jest wymagany; usuń, jeśli nigdy nie został aktywowany.",
+      "impact": "Uśpione konta to częsty punkt zaczepienia dla atakujących."
     },
     "privilegedNoMfa": {
-      "title": "Привилегированный аккаунт без MFA: {principal} ({provider})",
-      "detail": "Роль «{role}» имеет администраторский доступ, но MFA отключён.",
-      "recommendation": "Немедленно потребуйте и включите MFA для этого аккаунта.",
-      "impact": "Один украденный пароль даёт полный административный контроль."
+      "title": "Konto uprzywilejowane bez MFA: {principal} ({provider})",
+      "detail": "Rola \"{role}\" ma dostęp administracyjny, ale MFA jest wyłączone.",
+      "recommendation": "Natychmiast wymagaj i włącz MFA na tym koncie.",
+      "impact": "Jedno wyłudzone hasło daje pełną kontrolę administracyjną."
     },
     "mfaStateUnavailable": {
-      "title": "Состояние MFA недоступно для {count} привилегированных учётных записей",
-      "detail": "Эти провайдеры не предоставляют состояние MFA по аккаунтам через API.",
-      "recommendation": "Подтвердите, что MFA обязателен, и приложите подтверждение по этим аккаунтам."
+      "title": "Stan MFA niedostępny dla {count} uprzywilejowanych tożsamości",
+      "detail": "Ci dostawcy nie udostępniają statusu MFA per konto przez swoje API.",
+      "recommendation": "Potwierdź, że MFA jest egzekwowane, i dołącz dowód dla tych kont."
     },
     "providerError": {
-      "title": "Провайдер «{provider}» в состоянии ошибки",
-      "detail": "Hub сообщает об ошибке {provider}.",
-      "recommendation": "Перепроверьте подключение и учётные данные {provider}."
+      "title": "Dostawca \"{provider}\" jest w stanie błędu",
+      "detail": "Hub zgłasza {provider} jako błędny.",
+      "recommendation": "Sprawdź ponownie połączenie i poświadczenia {provider}."
     },
     "stripeReadFail": {
-      "title": "Не удалось прочитать конфигурацию Stripe",
-      "detail": "Вызов API Stripe не удался при сборе данных.",
-      "recommendation": "Убедитесь, что STRIPE_SECRET_KEY задан и может читать цены и вебхуки.",
-      "impact": "Состояние биллинга неизвестно, пока Stripe недоступен."
+      "title": "Nie udało się odczytać konfiguracji Stripe",
+      "detail": "Wywołanie API Stripe nie powiodło się podczas zbierania danych.",
+      "recommendation": "Upewnij się, że STRIPE_SECRET_KEY jest ustawiony i może odczytywać ceny oraz webhooki.",
+      "impact": "Stan rozliczeń jest nieznany, dopóki Stripe nie jest osiągalny."
     },
     "stripePriceMismatch": {
-      "title": "Несоответствие цены/окружения Stripe",
-      "detail": "{name} указывает на цену, неактивную в Stripe.",
-      "recommendation": "Укажите в переменной активную цену или активируйте указанную цену.",
-      "impact": "Оформление может ссылаться на несуществующую цену, ломая покупки."
+      "title": "Niezgodność ceny/środowiska Stripe",
+      "detail": "{name} wskazuje na cenę, która nie jest aktywna w Stripe.",
+      "recommendation": "Wskaż w zmiennej aktywną cenę lub aktywuj wskazaną cenę.",
+      "impact": "Płatność może odwoływać się do nieistniejącej ceny, psując zakupy."
     },
     "stripeWebhookNone": {
-      "title": "Не настроен эндпоинт вебхука Stripe",
-      "detail": "Stripe не вернул эндпоинтов вебхука.",
-      "recommendation": "Добавьте эндпоинт вебхука для событий оплаты и подписки.",
-      "impact": "Неуспешные платежи и отмены могут не дойти до приложения."
+      "title": "Nie skonfigurowano punktu webhook Stripe",
+      "detail": "Stripe nie zwrócił żadnych punktów webhook.",
+      "recommendation": "Dodaj punkt webhook obejmujący zdarzenia cyklu życia płatności i subskrypcji.",
+      "impact": "Nieudane płatności i anulowania mogą nie docierać do aplikacji."
     },
     "stripeWebhookMissingEvent": {
-      "title": "В вебхуке Stripe нет «{event}»",
-      "detail": "Ни один эндпоинт вебхука не подписан на {event}.",
-      "recommendation": "Добавьте {event} в эндпоинт вебхука, чтобы приложение реагировало.",
-      "impact": "Важные события биллинга не доходят до платформы."
+      "title": "W webhooku Stripe brakuje \"{event}\"",
+      "detail": "Żaden skonfigurowany punkt webhook nie subskrybuje {event}.",
+      "recommendation": "Dodaj {event} do punktu webhook, aby aplikacja reagowała na to zdarzenie.",
+      "impact": "Ważne zdarzenia rozliczeniowe nie są dostarczane do platformy."
     },
     "stripeWebhookUnverified": {
-      "title": "Покрытие событий вебхука Stripe не проверено",
-      "detail": "Эндпоинты вебхука есть, но список их событий не собран.",
-      "recommendation": "Убедитесь, что каждый эндпоинт подписан на нужные события."
+      "title": "Pokrycie zdarzeń webhook Stripe nie zostało zweryfikowane",
+      "detail": "Punkty webhook istnieją, ale ich lista subskrybowanych zdarzeń nie została zebrana.",
+      "recommendation": "Potwierdź, że każdy punkt subskrybuje wymagane zdarzenia płatności/subskrypcji."
     },
     "supabaseHealthFail": {
-      "title": "Проверка работоспособности Supabase не удалась",
-      "detail": "Проверка доступности Supabase не прошла.",
-      "recommendation": "Проверьте URL проекта, ключ service-role и доступность базы данных.",
-      "impact": "Доступность основного слоя данных не подтверждена."
+      "title": "Kontrola stanu Supabase nie powiodła się",
+      "detail": "Sprawdzenie dostępności Supabase nie powiodło się.",
+      "recommendation": "Sprawdź URL projektu, klucz service-role oraz to, że baza danych jest online.",
+      "impact": "Dostępność podstawowej warstwy danych jest niepotwierdzona."
     },
     "serviceRoleInClient": {
-      "title": "Ключ service-role доступен из клиентского кода",
-      "detail": "Ключ service-role (обходящий RLS) обнаружен на пути, доступном клиенту.",
-      "recommendation": "Перенесите всё использование service-role на сервер и немедленно смените ключ.",
-      "impact": "Любой посетитель может получить полный доступ к базе — серьёзный риск утечки."
+      "title": "Klucz service-role osiągalny z kodu klienta",
+      "detail": "Klucz service-role (który omija RLS) wykryto na ścieżce dostępnej dla klienta.",
+      "recommendation": "Przenieś całe użycie service-role wyłącznie na serwer i natychmiast zmień klucz.",
+      "impact": "Pełny dostęp do bazy danych może wydobyć dowolny odwiedzający — poważne ryzyko wycieku danych."
     },
     "rlsDisabled": {
-      "title": "У таблицы «{table}» отключён RLS",
-      "detail": "Безопасность на уровне строк не включена для {table}.",
-      "recommendation": "Включите RLS для {table} и добавьте явные политики доступа.",
-      "impact": "Без RLS утёкший anon-ключ может напрямую читать и писать в эту таблицу."
+      "title": "Tabela \"{table}\" ma wyłączony RLS",
+      "detail": "Bezpieczeństwo na poziomie wiersza nie jest włączone dla {table}.",
+      "recommendation": "Włącz RLS dla {table} i dodaj jawne polityki dostępu.",
+      "impact": "Bez RLS wyciekły klucz anon może bezpośrednio czytać lub zapisywać tę tabelę."
     },
     "rlsUnverified": {
-      "title": "Покрытие RLS не проверено",
-      "detail": "Состояние RLS по таблицам в этом запуске не собрано.",
-      "recommendation": "Перечислите таблицы и подтвердите RLS на каждой с данными пользователей."
+      "title": "Pokrycie RLS nie zostało zweryfikowane",
+      "detail": "Stan RLS na poziomie tabel nie został zebrany w tym przebiegu.",
+      "recommendation": "Wymień tabele i potwierdź RLS na każdej tabeli przechowującej dane użytkowników."
     },
     "publicBucket": {
-      "title": "Бакет хранилища «{bucket}» публичный",
-      "detail": "Бакет «{bucket}» разрешает публичный доступ.",
-      "recommendation": "Подтвердите намеренность публичного доступа; иначе сделайте бакет приватным с подписанными URL.",
-      "impact": "Публичные бакеты могут раскрывать пользовательские или внутренние файлы."
+      "title": "Bucket pamięci \"{bucket}\" jest publiczny",
+      "detail": "Bucket \"{bucket}\" zezwala na publiczny dostęp.",
+      "recommendation": "Potwierdź, że publiczny dostęp jest zamierzony; w przeciwnym razie ustaw bucket jako prywatny z podpisanymi URL.",
+      "impact": "Publiczne buckety mogą ujawniać pliki użytkowników lub wewnętrzne."
     },
     "vercelNotConnected": {
-      "title": "Vercel не подключён",
-      "detail": "Токен Vercel не настроен, оценить развёртывание невозможно.",
-      "recommendation": "Подключите Vercel, чтобы включить проверки развёртывания и переменных в аудит."
+      "title": "Vercel nie jest połączony",
+      "detail": "Nie skonfigurowano tokenu Vercel, więc nie można ocenić stanu wdrożeń.",
+      "recommendation": "Połącz Vercel, aby uwzględnić kontrole wdrożeń i zmiennych środowiskowych w audycie."
     },
     "publicSensitiveEnv": {
-      "title": "Публичная переменная выглядит чувствительной: {name}",
-      "detail": "{name} доступна браузеру (NEXT_PUBLIC_), но имя указывает на секрет.",
-      "recommendation": "Переименуйте в серверную переменную (уберите NEXT_PUBLIC_) и смените значение.",
-      "impact": "Секретные значения, попавшие в браузер, доступны любому."
+      "title": "Publiczna zmienna wygląda na wrażliwą: {name}",
+      "detail": "{name} jest dostępna dla przeglądarki (NEXT_PUBLIC_), ale jej nazwa sugeruje sekret.",
+      "recommendation": "Zmień nazwę na zmienną wyłącznie serwerową (usuń NEXT_PUBLIC_) i zmień wartość.",
+      "impact": "Wartości sekretów wysłane do przeglądarki są czytelne dla każdego."
     },
     "envScopeDrift": {
-      "title": "Переменные Production и Preview различаются",
-      "detail": "Только в production: {onlyProd}. Только в preview: {onlyPreview}.",
-      "recommendation": "Согласуйте имена переменных между средами, чтобы preview соответствовал production.",
-      "impact": "Preview-развёртывания могут вести себя иначе, скрывая ошибки."
+      "title": "Zmienne środowiskowe Production i Preview różnią się",
+      "detail": "Tylko w produkcji: {onlyProd}. Tylko w podglądzie: {onlyPreview}.",
+      "recommendation": "Uzgodnij nazwy zmiennych między zakresami, aby podgląd odzwierciedlał produkcję.",
+      "impact": "Wdrożenia podglądu mogą zachowywać się inaczej niż produkcja, maskując błędy."
     },
     "githubReadFail": {
-      "title": "Не удалось прочитать GitHub",
-      "detail": "Вызов API GitHub не удался при сборе данных.",
-      "recommendation": "Проверьте токен GitHub и его область доступа к репозиторию."
+      "title": "Nie udało się odczytać GitHub",
+      "detail": "Wywołanie API GitHub nie powiodło się podczas zbierania danych.",
+      "recommendation": "Sprawdź token GitHub i jego zakres dostępu do repozytorium."
     },
     "branchProtectionUnverified": {
-      "title": "Защита ветки не проверена",
-      "detail": "Состояние защиты ветки по умолчанию не собрано.",
-      "recommendation": "Подтвердите, что ветка по умолчанию требует ревью PR перед слиянием."
+      "title": "Ochrona gałęzi nie została zweryfikowana",
+      "detail": "Stan ochrony domyślnej gałęzi nie został zebrany.",
+      "recommendation": "Potwierdź, że domyślna gałąź wymaga przeglądu PR przed scaleniem."
     },
     "branchProtectionMissing": {
-      "title": "Ветка по умолчанию «{branch}» не требует ревью PR",
-      "detail": "Изменения можно сливать в ветку по умолчанию без одобряющего ревью.",
-      "recommendation": "Включите защиту ветки и требуйте хотя бы одно одобряющее ревью.",
-      "impact": "Продакшн-код может меняться без второй проверки."
+      "title": "Domyślna gałąź \"{branch}\" nie wymaga przeglądu PR",
+      "detail": "Zmiany można scalać do domyślnej gałęzi bez zatwierdzającego przeglądu.",
+      "recommendation": "Włącz ochronę gałęzi i wymagaj co najmniej jednego zatwierdzającego przeglądu.",
+      "impact": "Kod produkcyjny może się zmieniać bez drugiej pary oczu."
     },
     "staleBranches": {
-      "title": "{count} устаревших веток старше {days} дней",
-      "detail": "Устаревшие ветки: {names}.",
-      "recommendation": "Просмотрите и удалите слитые или заброшенные ветки.",
-      "impact": "Устаревшие ветки создают путаницу и могут содержать устаревшую конфигурацию."
+      "title": "{count} nieaktualnych gałęzi starszych niż {days} dni",
+      "detail": "Nieaktualne gałęzie: {names}.",
+      "recommendation": "Przejrzyj i usuń scalone lub porzucone gałęzie.",
+      "impact": "Nieaktualne gałęzie wprowadzają zamieszanie i mogą zawierać przestarzałą konfigurację."
     },
     "clientExposedSecret": {
-      "title": "Секрет, доступный клиенту: {name}",
-      "detail": "{name} похоже на секрет, но доступно клиенту.",
-      "recommendation": "Перенесите на сервер и немедленно смените.",
-      "impact": "Утёкший продакшн-секрет может использовать кто угодно."
+      "title": "Sekret ujawniony klientowi: {name}",
+      "detail": "{name} wygląda na sekret, ale jest ujawniony klientowi.",
+      "recommendation": "Przenieś na serwer i natychmiast zmień.",
+      "impact": "Wyciekły sekret produkcyjny może być nadużyty przez każdego."
     },
     "rotationUnknown": {
-      "title": "Возраст ротации неизвестен для {count} секрета(ов)",
-      "detail": "API провайдеров не сообщают даты последней ротации этих учётных данных.",
-      "recommendation": "Запишите даты ротации в Key Vault и задайте политику ротации."
+      "title": "Wiek rotacji nieznany dla {count} sekretu(ów)",
+      "detail": "API dostawców nie udostępniają dat ostatniej rotacji tych poświadczeń.",
+      "recommendation": "Zapisz daty rotacji w Key Vault i ustaw politykę rotacji."
     },
     "backupTestMissing": {
-      "title": "Нет записи о тесте восстановления из резервной копии",
-      "detail": "Не собрано подтверждение проверенного резервного копирования/восстановления.",
-      "recommendation": "Проведите тест восстановления и приложите результат."
+      "title": "Brak zapisu testu odzyskiwania z kopii zapasowej",
+      "detail": "Nie zebrano dowodu przetestowanej kopii zapasowej/odtworzenia bazy danych.",
+      "recommendation": "Wykonaj test odtworzenia i dołącz wynik."
     }
   },
   "exec": {

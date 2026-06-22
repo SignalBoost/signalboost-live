@@ -1,20 +1,19 @@
 'use client'
 
 // saas/app/dashboard/audit/page.tsx
-// Audit Console — Steps 2+3: run trigger + run-history sidebar + browse past runs
-// + finding-detail drawer (click a finding → right slide-in with detail,
-// recommendation, source line, and a GitHub deep-link). Read-only.
-// POST /api/hub/operator/audit (run), GET /api/hub/operator/audit/runs (history/detail).
-// Fathom-glass aesthetic, 5-locale copy, height:auto + maxHeight scroll (no clipping).
+// Unified Audit Center — single centralized workspace at /dashboard/audit.
+//   • Top: Audit Command Center (scan-path + max-files + Run audit), live tracker,
+//     findings list, and run history.
+//   • Bottom: the 12 compliance report cards in a responsive grid; clicking a card
+//     opens a 520px right-side drawer that renders that report.
+// Linear-style design tokens (bg-surface / border-border / bg-accent / text-text …),
+// 5-locale i18n via useI18n + useTranslation. Owner/admin sees live report data;
+// non-admins get an owner-scoped upgrade panel (reports read the workspace's own
+// infrastructure and are admin-gated server-side).
 
 import { useCallback, useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import AuditDashboard from '@/components/audit/AuditDashboard'
-
-const GOLD = '#ffc300'
-const CYAN = '#1af0ff'
-const GREEN = '#34d399'
-const RED = '#fca5a5'
+import { useTranslation } from '@/components/i18n/useTranslation'
 
 type Finding = {
   file: string
@@ -46,6 +45,7 @@ type AuditCopy = {
   detail: string; close: string; viewSource: string
   generateFix: string; patching: string; patchReady: string; reviewMerge: string; patchFailed: string; patchUpgrade: string
   trackScan: string; trackAnalyze: string; trackReport: string; trackPrs: string
+  cmdTitle: string; reportsTitle: string; reportsSubtitle: string; openReport: string; reportOwnerOnly: string; reportSyncHint: string
   sev: Record<Sev, string>
 }
 
@@ -63,6 +63,10 @@ const COPY: Record<string, AuditCopy> = {
     detail: 'Detail', close: 'Close', viewSource: 'View on GitHub',
     generateFix: 'Generate fix', patching: 'Generating fix…', patchReady: 'Fix proposed on a branch', reviewMerge: 'Review & merge', patchFailed: 'Could not generate fix', patchUpgrade: 'AI patch generation is a Pro feature. Upgrade to enable it.',
     trackScan: 'Scanning target', trackAnalyze: 'Running analyzers', trackReport: 'Generating report', trackPrs: 'Preparing patches',
+    cmdTitle: 'Audit Command Center', reportsTitle: 'Compliance & Readiness Reports',
+    reportsSubtitle: 'Twelve readiness reports across identity, providers, secrets, code, billing, and remediation.',
+    openReport: 'View', reportOwnerOnly: 'These readiness reports are scoped to the workspace owner. Upgrade your plan to generate reports for your own connected stack.',
+    reportSyncHint: 'Synced with your latest scan.',
     sev: { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', info: 'Info' },
   },
   es: {
@@ -78,6 +82,10 @@ const COPY: Record<string, AuditCopy> = {
     detail: 'Detalle', close: 'Cerrar', viewSource: 'Ver en GitHub',
     generateFix: 'Generar corrección', patching: 'Generando corrección…', patchReady: 'Corrección propuesta en una rama', reviewMerge: 'Revisar y combinar', patchFailed: 'No se pudo generar la corrección', patchUpgrade: 'La generación de parches con IA es una función Pro. Mejora tu plan para habilitarla.',
     trackScan: 'Escaneando objetivo', trackAnalyze: 'Ejecutando analizadores', trackReport: 'Generando informe', trackPrs: 'Preparando parches',
+    cmdTitle: 'Centro de Comando de Auditoría', reportsTitle: 'Informes de Cumplimiento y Preparación',
+    reportsSubtitle: 'Doce informes de preparación sobre identidad, proveedores, secretos, código, facturación y remediación.',
+    openReport: 'Ver', reportOwnerOnly: 'Estos informes están limitados al propietario del espacio de trabajo. Mejora tu plan para generar informes de tu propio stack conectado.',
+    reportSyncHint: 'Sincronizado con tu último análisis.',
     sev: { critical: 'Crítico', high: 'Alto', medium: 'Medio', low: 'Bajo', info: 'Info' },
   },
   pt: {
@@ -93,6 +101,10 @@ const COPY: Record<string, AuditCopy> = {
     detail: 'Detalhe', close: 'Fechar', viewSource: 'Ver no GitHub',
     generateFix: 'Gerar correção', patching: 'Gerando correção…', patchReady: 'Correção proposta em um branch', reviewMerge: 'Revisar e mesclar', patchFailed: 'Não foi possível gerar a correção', patchUpgrade: 'A geração de correções com IA é um recurso Pro. Faça upgrade para habilitá-la.',
     trackScan: 'Verificando alvo', trackAnalyze: 'Executando analisadores', trackReport: 'Gerando relatório', trackPrs: 'Preparando correções',
+    cmdTitle: 'Central de Comando de Auditoria', reportsTitle: 'Relatórios de Conformidade e Prontidão',
+    reportsSubtitle: 'Doze relatórios de prontidão sobre identidade, provedores, segredos, código, faturamento e remediação.',
+    openReport: 'Ver', reportOwnerOnly: 'Estes relatórios são restritos ao proprietário do espaço de trabalho. Faça upgrade do seu plano para gerar relatórios do seu próprio stack conectado.',
+    reportSyncHint: 'Sincronizado com sua última análise.',
     sev: { critical: 'Crítico', high: 'Alto', medium: 'Médio', low: 'Baixo', info: 'Info' },
   },
   pl: {
@@ -108,6 +120,10 @@ const COPY: Record<string, AuditCopy> = {
     detail: 'Szczegóły', close: 'Zamknij', viewSource: 'Zobacz na GitHub',
     generateFix: 'Wygeneruj poprawkę', patching: 'Generowanie poprawki…', patchReady: 'Poprawka zaproponowana w gałęzi', reviewMerge: 'Przejrzyj i scal', patchFailed: 'Nie udało się wygenerować poprawki', patchUpgrade: 'Generowanie poprawek AI to funkcja Pro. Ulepsz plan, aby ją włączyć.',
     trackScan: 'Skanowanie celu', trackAnalyze: 'Uruchamianie analizatorów', trackReport: 'Generowanie raportu', trackPrs: 'Przygotowywanie poprawek',
+    cmdTitle: 'Centrum Dowodzenia Audytu', reportsTitle: 'Raporty Zgodności i Gotowości',
+    reportsSubtitle: 'Dwanaście raportów gotowości obejmujących tożsamość, dostawców, sekrety, kod, płatności i naprawę.',
+    openReport: 'Otwórz', reportOwnerOnly: 'Te raporty są dostępne tylko dla właściciela przestrzeni roboczej. Ulepsz plan, aby generować raporty dla własnego połączonego stosu.',
+    reportSyncHint: 'Zsynchronizowano z najnowszym skanem.',
     sev: { critical: 'Krytyczny', high: 'Wysoki', medium: 'Średni', low: 'Niski', info: 'Info' },
   },
   ru: {
@@ -123,18 +139,53 @@ const COPY: Record<string, AuditCopy> = {
     detail: 'Подробности', close: 'Закрыть', viewSource: 'Открыть на GitHub',
     generateFix: 'Сгенерировать исправление', patching: 'Создание исправления…', patchReady: 'Исправление предложено в ветке', reviewMerge: 'Просмотреть и слить', patchFailed: 'Не удалось создать исправление', patchUpgrade: 'Генерация исправлений ИИ — функция Pro. Обновите план, чтобы включить её.',
     trackScan: 'Сканирование цели', trackAnalyze: 'Запуск анализаторов', trackReport: 'Создание отчёта', trackPrs: 'Подготовка исправлений',
+    cmdTitle: 'Командный центр аудита', reportsTitle: 'Отчёты о соответствии и готовности',
+    reportsSubtitle: 'Двенадцать отчётов о готовности по идентификации, провайдерам, секретам, коду, биллингу и устранению.',
+    openReport: 'Открыть', reportOwnerOnly: 'Эти отчёты доступны только владельцу рабочей области. Обновите план, чтобы создавать отчёты для своего подключённого стека.',
+    reportSyncHint: 'Синхронизировано с последним сканированием.',
     sev: { critical: 'Критический', high: 'Высокий', medium: 'Средний', low: 'Низкий', info: 'Инфо' },
   },
 }
 function copyFor(lang: string): AuditCopy { return COPY[lang] || COPY.en }
 
+// The 12 compliance reports. `key` maps to the live report page at /hub/audit/<key>.
+type ReportCard = { key: string; icon: string; title: string; desc: string }
+const REPORTS: ReportCard[] = [
+  { key: 'executive',   icon: '📑', title: 'Executive Summary',    desc: 'Overall posture score with critical, high, and medium findings.' },
+  { key: 'providers',   icon: '📦', title: 'Provider Inventory',   desc: 'Every connected provider with status, risk, and ownership.' },
+  { key: 'secrets',     icon: '🔑', title: 'Secrets & API Keys',   desc: 'Tokens, rotation age, and exposure risk — values always masked.' },
+  { key: 'identity',    icon: '👤', title: 'Identity & Access',    desc: 'Who has access, owner rights, stale accounts, and MFA gaps.' },
+  { key: 'github',      icon: '🐙', title: 'GitHub / Code Change', desc: 'Branch protection, open PRs, stale branches, unreviewed changes.' },
+  { key: 'vercel',      icon: '▲',  title: 'Vercel / Deployment',  desc: 'Env vars, exposed variables, deployment and rollback status.' },
+  { key: 'supabase',    icon: '🗄️', title: 'Supabase / Database',  desc: 'RLS coverage, public tables, storage buckets, service-role use.' },
+  { key: 'stripe',      icon: '💳', title: 'Stripe / Billing',     desc: 'Products, prices, webhooks, live vs test mode consistency.' },
+  { key: 'activity',    icon: '🧾', title: 'Audit Log',            desc: 'Activity timeline of actions, providers, risk, and results.' },
+  { key: 'compliance',  icon: '⚖️', title: 'Compliance Matrix',    desc: 'SOC 2 / ISO 27001 / NIST CSF / CIS readiness crosswalk.' },
+  { key: 'remediation', icon: '🛠️', title: 'Remediation Roadmap',  desc: 'Prioritized fixes with owners, due dates, and evidence.' },
+  { key: 'usage',       icon: '📊', title: 'Usage Tracking',       desc: 'Scan volume, credits, and tier utilization over time.' },
+]
+
 const SEV_ORDER: Sev[] = ['critical', 'high', 'medium', 'low', 'info']
-const SEV_COLOR: Record<Sev, string> = { critical: RED, high: '#fb923c', medium: GOLD, low: CYAN, info: 'rgba(255,255,255,.6)' }
 function asSev(s: string): Sev {
   const k = String(s || 'info').toLowerCase() as Sev
   return SEV_ORDER.includes(k) ? k : 'info'
 }
-function statusColor(s: string): string { return s === 'running' ? CYAN : s === 'failed' ? RED : GREEN }
+// Token-aligned severity colours.
+function sevText(sev: Sev): string {
+  if (sev === 'critical' || sev === 'high') return 'text-danger'
+  if (sev === 'medium') return 'text-accent'
+  return 'text-text-muted'
+}
+function statusText(s: string): string {
+  if (s === 'running') return 'text-accent'
+  if (s === 'failed') return 'text-danger'
+  return 'text-[#34d399]'
+}
+function statusDot(s: string): string {
+  if (s === 'running') return 'bg-accent'
+  if (s === 'failed') return 'bg-danger'
+  return 'bg-[#34d399]'
+}
 function statusLabel(copy: AuditCopy, s: string): string { return s === 'running' ? copy.statusRunning : s === 'failed' ? copy.statusFailed : copy.statusComplete }
 function timeShort(iso: string, lang: string): string {
   try { return new Date(iso).toLocaleString(lang || undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }
@@ -145,16 +196,6 @@ function ghUrl(file: string, line?: number | null): string {
   return `https://github.com/SignalBoost/signalboost-live/blob/main/${path}${typeof line === 'number' ? `#L${line}` : ''}`
 }
 
-const glass: React.CSSProperties = {
-  background: 'linear-gradient(160deg, rgba(15,23,42,.55), rgba(7,11,20,.65))',
-  border: '1px solid rgba(255,255,255,.10)', borderRadius: 16,
-  backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
-}
-const input: React.CSSProperties = {
-  background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.14)',
-  color: '#fff', borderRadius: 10, padding: '9px 12px', fontSize: 13, outline: 'none',
-}
-
 const PHASE_ORDER = ['SCAN_TARGET', 'RUN_ANALYZERS', 'GENERATE_REPORT', 'PREPARE_PRS'] as const
 
 function PhaseTracker({ phase, progress, copy }: { phase: string; progress: { done: number; total: number }; copy: AuditCopy }) {
@@ -163,23 +204,23 @@ function PhaseTracker({ phase, progress, copy }: { phase: string; progress: { do
   }
   const curIdx = phase === 'DONE' ? PHASE_ORDER.length : PHASE_ORDER.indexOf(phase as typeof PHASE_ORDER[number])
   return (
-    <div style={{ ...glass, padding: 16, marginTop: 16, height: 'auto' }}>
+    <div className="mt-4 rounded-md border border-border bg-surface p-4">
       {PHASE_ORDER.map((p, i) => {
         const isDone = curIdx > i
         const active = curIdx === i
         const isAnalyze = p === 'RUN_ANALYZERS'
         const pct = isDone ? 100 : active ? (isAnalyze && progress.total > 0 ? Math.min(Math.round((progress.done / progress.total) * 100), 100) : 45) : 0
-        const color = isDone ? GREEN : active ? GOLD : 'rgba(255,255,255,.18)'
+        const fill = isDone ? 'bg-[#34d399]' : active ? 'bg-accent' : 'bg-border'
         return (
-          <div key={p} style={{ marginBottom: i < PHASE_ORDER.length - 1 ? 11 : 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: active ? '#fff' : isDone ? 'rgba(255,255,255,.7)' : 'rgba(255,255,255,.4)' }}>{labels[p]}</span>
+          <div key={p} className={i < PHASE_ORDER.length - 1 ? 'mb-3' : ''}>
+            <div className="mb-1.5 flex items-baseline justify-between">
+              <span className={`text-xs font-semibold ${active ? 'text-text' : isDone ? 'text-text-muted' : 'text-text-muted/70'}`}>{labels[p]}</span>
               {isAnalyze && active && progress.total > 0 && (
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,.55)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{progress.done}/{progress.total}</span>
+                <span className="font-mono text-[11px] text-text-muted">{progress.done}/{progress.total}</span>
               )}
             </div>
-            <div style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,.07)', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 999, transition: 'width .3s ease' }} />
+            <div className="h-1.5 overflow-hidden rounded-full bg-bg">
+              <div className={`h-full rounded-full transition-all duration-300 ${fill}`} style={{ width: `${pct}%` }} />
             </div>
           </div>
         )
@@ -188,12 +229,13 @@ function PhaseTracker({ phase, progress, copy }: { phase: string; progress: { do
   )
 }
 
-export default function AuditConsolePage() {
+export default function AuditCenterPage() {
   const { lang } = useI18n()
+  const { t } = useTranslation()
   const copy = copyFor(lang)
 
-  const [prefix, setPrefix] = useState('saas/lib/audit')
-  const [maxFiles, setMaxFiles] = useState(6)
+  const [prefix, setPrefix] = useState('saas/app/api')
+  const [maxFiles, setMaxFiles] = useState(8)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -203,16 +245,38 @@ export default function AuditConsolePage() {
   const [phase, setPhase] = useState<string | null>(null)
   const [progress, setProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 })
 
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  // Report drawer
+  const [openReportKey, setOpenReportKey] = useState<string | null>(null)
+  const [reportEntered, setReportEntered] = useState(false)
+  const [refreshTick, setRefreshTick] = useState(0)
+
+  // Finding drawer + patch flow
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null)
   const [entered, setEntered] = useState(false)
   const [patchState, setPatchState] = useState<'idle' | 'working' | 'done' | 'error'>('idle')
   const [patchResult, setPatchResult] = useState<{ branch: string; compareUrl: string } | null>(null)
   const [patchError, setPatchError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    fetch('/api/credits', { cache: 'no-store', credentials: 'include' })
+      .then(r => r.json()).then(d => { if (alive) setIsAdmin(!!d?.isAdmin) })
+      .catch(() => { /* default: not admin */ })
+    return () => { alive = false }
+  }, [])
+
   useEffect(() => {
     setPatchState('idle'); setPatchResult(null); setPatchError(null)
     if (selectedFinding) { const id = requestAnimationFrame(() => setEntered(true)); return () => cancelAnimationFrame(id) }
     setEntered(false)
   }, [selectedFinding])
+
+  useEffect(() => {
+    if (openReportKey) { const id = requestAnimationFrame(() => setReportEntered(true)); return () => cancelAnimationFrame(id) }
+    setReportEntered(false)
+  }, [openReportKey])
 
   async function generateFix(f: Finding) {
     setPatchState('working'); setPatchError(null); setPatchResult(null)
@@ -239,7 +303,8 @@ export default function AuditConsolePage() {
   }, [])
 
   useEffect(() => { loadHistory() }, [loadHistory])
-async function runNew() {
+
+  async function runNew() {
     setLoading(true); setError(null); setView(null); setSelectedRunId(null)
     setPhase('SCAN_TARGET'); setProgress({ done: 0, total: 0 })
     try {
@@ -261,7 +326,7 @@ async function runNew() {
       let final: View | null = null
       let finalRunId: string | null = null
       let sawError = false
-// Read NDJSON phase events line by line.
+      // Read NDJSON phase events line by line.
       // eslint-disable-next-line no-constant-condition
       while (true) {
         const { done, value } = await reader.read()
@@ -282,8 +347,10 @@ async function runNew() {
           }
         }
       }
-if (final) {
+      if (final) {
         setView(final); setSelectedRunId(finalRunId); setPhase('DONE'); loadHistory()
+        // Data sync: bump the refresh token so the 12 report cards/drawers reload fresh.
+        setRefreshTick(x => x + 1)
       } else {
         setPhase(null)
         if (!sawError) setError(copy.failed)
@@ -303,7 +370,6 @@ if (final) {
       if (!res.ok || !data?.ok) { setError(data?.error || copy.failed); return }
       const r = data.run
       const log = data.log as { findings?: Finding[]; filesScanned?: string[]; findingsCount?: number; prefix?: string } | null
-      // Prefer the full-payload snapshot; fall back to normalized findings for older runs.
       const findings = (log?.findings as Finding[]) || (data.findings as Finding[]) || []
       setView({
         findings,
@@ -320,199 +386,292 @@ if (final) {
   }
 
   const findings = view?.findings || []
+  const openReport = openReportKey ? REPORTS.find(r => r.key === openReportKey) || null : null
+  const closeReport = () => setOpenReportKey(null)
+  const hasSynced = refreshTick > 0
 
   return (
-    <>
-      <AuditDashboard />
-      <div style={{ padding: '0 24px 24px', color: '#fff', maxWidth: 1200, margin: '0 auto' }}>
-      <div style={{ marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '-0.01em' }}>{copy.title} <span style={{ color: GOLD }}>·</span></h1>
-          <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,.62)', maxWidth: 640, lineHeight: 1.5 }}>{copy.subtitle}</p>
+    <main className="min-h-[calc(100vh-80px)] bg-bg px-6 pb-16 pt-8 font-sans text-text">
+      <div className="mx-auto max-w-[1200px]">
+
+        {/* Header */}
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-text">{copy.title}</h1>
+            <p className="mt-1.5 max-w-[640px] text-sm leading-relaxed text-text-muted">{copy.subtitle}</p>
+          </div>
+          <a href="/dashboard/audit/pricing" className="inline-flex shrink-0 items-center justify-center rounded-md border border-accent bg-accent px-4 py-2 text-sm font-semibold text-bg transition-fast hover:brightness-110">
+            {copy.viewPlans}
+          </a>
         </div>
-        <a href="/dashboard/audit/pricing" style={{ flexShrink: 0, display: 'inline-block', fontSize: 13, fontWeight: 800, color: '#070b14', background: 'linear-gradient(135deg, #ffc300, #ffb000)', textDecoration: 'none', borderRadius: 10, padding: '10px 18px', boxShadow: '0 8px 24px rgba(255,195,0,.25)' }}>{copy.viewPlans}</a>
-      </div>
 
-      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        {/* History sidebar */}
-        <aside style={{ ...glass, flex: '1 1 260px', maxWidth: 300, minWidth: 240, padding: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)' }}>{copy.history}</span>
-            <button onClick={loadHistory} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,.18)', color: 'rgba(255,255,255,.75)', borderRadius: 8, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>{copy.refresh}</button>
+        {/* ── Audit Command Center (scan controller) ─────────────────────── */}
+        <div className="mb-2 flex items-center gap-2">
+          <span className="text-sm" aria-hidden>⚡</span>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-text-muted">{copy.cmdTitle}</h2>
+        </div>
+        <div className="rounded-md border border-border bg-surface p-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="flex min-w-[200px] flex-[1_1_280px] flex-col gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">{copy.pathLabel}</span>
+              <input
+                value={prefix}
+                onChange={e => setPrefix(e.target.value)}
+                placeholder="saas/app/api"
+                className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-accent"
+              />
+            </label>
+            <label className="flex w-[120px] flex-col gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">{copy.maxLabel}</span>
+              <input
+                type="number" min={1} max={60} value={maxFiles}
+                onChange={e => setMaxFiles(Math.max(1, Math.min(60, Number(e.target.value) || 1)))}
+                className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-accent"
+              />
+            </label>
+            <button
+              onClick={runNew}
+              disabled={loading}
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-md border border-accent bg-accent px-5 py-2 text-sm font-semibold text-bg transition-fast hover:brightness-110 disabled:opacity-60"
+            >
+              {loading ? copy.running : copy.run}
+            </button>
           </div>
-          {runs.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.4)', padding: '8px 2px' }}>{copy.noRuns}</div>
-          ) : (
-            <div style={{ height: 'auto', maxHeight: 'calc(100vh - 280px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {runs.map(r => {
-                const active = r.id === selectedRunId
-                return (
-                  <button key={r.id} onClick={() => openRun(r.id)} style={{
-                    textAlign: 'left', background: active ? 'rgba(26,240,255,.08)' : 'rgba(255,255,255,.03)',
-                    border: `1px solid ${active ? 'rgba(26,240,255,.4)' : 'rgba(255,255,255,.08)'}`,
-                    borderRadius: 10, padding: '9px 11px', cursor: 'pointer', color: '#fff',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor(r.status), flex: '0 0 auto' }} />
-                      <span style={{ fontSize: 11, fontWeight: 700, color: statusColor(r.status) }}>{statusLabel(copy, r.status)}</span>
-                      <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 800, color: r.findings_count > 0 ? GOLD : 'rgba(255,255,255,.45)' }}>{r.findings_count}</span>
-                    </div>
-                    <div style={{ marginTop: 4, fontSize: 10.5, color: 'rgba(255,255,255,.55)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.prefix || '—'}</div>
-                    <div style={{ marginTop: 2, fontSize: 10, color: 'rgba(255,255,255,.35)' }}>{timeShort(r.created_at, lang)}</div>
-                  </button>
-                )
-              })}
+        </div>
+
+        {phase && <PhaseTracker phase={phase} progress={progress} copy={copy} />}
+
+        {error && (
+          <div className="mt-4 rounded-md border border-danger bg-surface p-3 text-sm text-danger">{copy.failed}: {error}</div>
+        )}
+
+        {/* Findings + history */}
+        <div className="mt-4 flex flex-wrap items-start gap-4">
+          {/* History */}
+          <aside className="min-w-[240px] max-w-[300px] flex-[1_1_260px] rounded-md border border-border bg-surface p-3.5">
+            <div className="mb-2.5 flex items-center justify-between">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">{copy.history}</span>
+              <button onClick={loadHistory} className="rounded-md border border-border bg-bg px-2.5 py-1 text-[11px] font-semibold text-text-muted transition-fast hover:bg-surface">{copy.refresh}</button>
             </div>
-          )}
-        </aside>
-
-        {/* Main column */}
-        <section style={{ flex: '999 1 420px', minWidth: 320 }}>
-          {/* Run panel */}
-          <div style={{ ...glass, padding: 18, display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-end' }}>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: '1 1 280px', minWidth: 200 }}>
-              <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)' }}>{copy.pathLabel}</span>
-              <input value={prefix} onChange={e => setPrefix(e.target.value)} placeholder="saas/lib/audit" style={input} />
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, width: 110 }}>
-              <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)' }}>{copy.maxLabel}</span>
-              <input type="number" min={1} max={60} value={maxFiles} onChange={e => setMaxFiles(Math.max(1, Math.min(60, Number(e.target.value) || 1)))} style={input} />
-            </label>
-            <button onClick={runNew} disabled={loading} style={{
-              background: loading ? 'rgba(255,195,0,.14)' : 'linear-gradient(135deg, #ffc300, #ffb000)',
-              color: loading ? GOLD : '#0a0e17', border: '1px solid rgba(255,195,0,.5)',
-              borderRadius: 10, padding: '10px 20px', fontSize: 13, fontWeight: 800,
-              cursor: loading ? 'default' : 'pointer', whiteSpace: 'nowrap',
-            }}>{loading ? copy.running : copy.run}</button>
-          </div>
-
-          {phase && <PhaseTracker phase={phase} progress={progress} copy={copy} />}
-
-          {error && (
-            <div style={{ ...glass, marginTop: 16, padding: 14, border: '1px solid rgba(252,165,165,.4)', color: RED, fontSize: 13 }}>{copy.failed}: {error}</div>
-          )}
-
-          {view && (
-            <div style={{ marginTop: 16 }}>
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-                <Stat label={copy.filesScanned} value={String(view.filesScanned)} accent={CYAN} />
-                <Stat label={copy.findings} value={String(view.findingsCount)} accent={GOLD} />
-              </div>
-
-              {findings.length === 0 ? (
-                <div style={{ ...glass, padding: 18, fontSize: 13, color: 'rgba(255,255,255,.7)' }}>{copy.clean}</div>
-              ) : (
-                <div style={{ ...glass, padding: 6, height: 'auto', maxHeight: 'calc(100vh - 380px)', overflowY: 'auto' }}>
-                  {findings.map((f, i) => {
-                    const sev = asSev(f.severity)
-                    const c = SEV_COLOR[sev]
-                    return (
-                      <div key={i} onClick={() => setSelectedFinding(f)} style={{ padding: 14, borderBottom: i < findings.length - 1 ? '1px solid rgba(255,255,255,.07)' : 'none', cursor: 'pointer' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: c, border: `1px solid ${c}66`, borderRadius: 999, padding: '2px 9px' }}>{copy.sev[sev]}</span>
-                          <span style={{ fontSize: 14, fontWeight: 700 }}>{f.title}</span>
-                        </div>
-                        <div style={{ marginTop: 6, fontSize: 11.5, color: 'rgba(255,255,255,.5)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
-                          {f.file}{typeof f.line === 'number' ? `  ·  ${copy.line} ${f.line}` : ''}  ·  {copy.category}: {f.category}
-                        </div>
-                        {f.detail && <p style={{ margin: '8px 0 0', fontSize: 13, lineHeight: 1.55, color: 'rgba(255,255,255,.85)' }}>{f.detail}</p>}
-                        {f.recommendation && (
-                          <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 8, background: 'rgba(26,240,255,.06)', border: '1px solid rgba(26,240,255,.2)' }}>
-                            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: CYAN }}>{copy.recommendation}</span>
-                            <p style={{ margin: '4px 0 0', fontSize: 12.5, lineHeight: 1.5, color: 'rgba(255,255,255,.8)' }}>{f.recommendation}</p>
-                          </div>
-                        )}
+            {runs.length === 0 ? (
+              <div className="px-0.5 py-2 text-xs text-text-muted">{copy.noRuns}</div>
+            ) : (
+              <div className="flex max-h-[calc(100vh-280px)] flex-col gap-1.5 overflow-y-auto">
+                {runs.map(r => {
+                  const active = r.id === selectedRunId
+                  return (
+                    <button
+                      key={r.id}
+                      onClick={() => openRun(r.id)}
+                      className={`rounded-md border px-2.5 py-2 text-left transition-fast ${active ? 'border-accent bg-bg' : 'border-border bg-bg hover:border-accent'}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDot(r.status)}`} />
+                        <span className={`text-[11px] font-semibold ${statusText(r.status)}`}>{statusLabel(copy, r.status)}</span>
+                        <span className={`ml-auto text-[11px] font-bold ${r.findings_count > 0 ? 'text-accent' : 'text-text-muted'}`}>{r.findings_count}</span>
                       </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+                      <div className="mt-1 truncate font-mono text-[10.5px] text-text-muted">{r.prefix || '—'}</div>
+                      <div className="mt-0.5 text-[10px] text-text-muted/70">{timeShort(r.created_at, lang)}</div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </aside>
 
-          {!view && !error && !loading && (
-            <div style={{ marginTop: 16, fontSize: 12.5, color: 'rgba(255,255,255,.4)' }}>{copy.emptyHint}</div>
+          {/* Findings column */}
+          <section className="min-w-[320px] flex-[999_1_420px]">
+            {view ? (
+              <>
+                <div className="mb-3 flex flex-wrap gap-3">
+                  <Stat label={copy.filesScanned} value={String(view.filesScanned)} accent="text-[#1af0ff]" />
+                  <Stat label={copy.findings} value={String(view.findingsCount)} accent="text-accent" />
+                </div>
+                {findings.length === 0 ? (
+                  <div className="rounded-md border border-border bg-surface p-4 text-sm text-text-muted">{copy.clean}</div>
+                ) : (
+                  <div className="max-h-[calc(100vh-380px)] overflow-y-auto rounded-md border border-border bg-surface p-1.5">
+                    {findings.map((f, i) => {
+                      const sev = asSev(f.severity)
+                      return (
+                        <div
+                          key={i}
+                          onClick={() => setSelectedFinding(f)}
+                          className={`cursor-pointer p-3.5 ${i < findings.length - 1 ? 'border-b border-border' : ''}`}
+                        >
+                          <div className="flex flex-wrap items-center gap-2.5">
+                            <span className={`rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${sevText(sev)}`}>{copy.sev[sev]}</span>
+                            <span className="text-sm font-semibold text-text">{f.title}</span>
+                          </div>
+                          <div className="mt-1.5 font-mono text-[11px] text-text-muted">
+                            {f.file}{typeof f.line === 'number' ? `  ·  ${copy.line} ${f.line}` : ''}  ·  {copy.category}: {f.category}
+                          </div>
+                          {f.detail && <p className="mt-2 text-[13px] leading-relaxed text-text">{f.detail}</p>}
+                          {f.recommendation && (
+                            <div className="mt-2 rounded-md border border-border bg-bg px-3 py-2">
+                              <span className="text-[10px] font-semibold uppercase tracking-wide text-accent">{copy.recommendation}</span>
+                              <p className="mt-1 text-[12.5px] leading-relaxed text-text-muted">{f.recommendation}</p>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </>
+            ) : (
+              !error && !loading && <div className="text-[12.5px] text-text-muted">{copy.emptyHint}</div>
+            )}
+          </section>
+        </div>
+
+        {/* ── Compliance & Readiness Reports (12-card grid) ──────────────── */}
+        <div className="mt-10 mb-3 flex flex-wrap items-end justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm" aria-hidden>📊</span>
+            <div>
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-text-muted">{copy.reportsTitle}</h2>
+              <p className="mt-0.5 max-w-[680px] text-[12.5px] leading-relaxed text-text-muted/80">{copy.reportsSubtitle}</p>
+            </div>
+          </div>
+          {hasSynced && (
+            <span className="rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-medium text-[#34d399]">● {copy.reportSyncHint}</span>
           )}
-        </section>
+        </div>
+
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
+          {REPORTS.map((r, idx) => {
+            const accent = idx % 2 === 0 ? 'text-accent' : 'text-[#1af0ff]'
+            const isExec = r.key === 'executive'
+            return (
+              <button
+                key={r.key}
+                onClick={() => setOpenReportKey(r.key)}
+                className="flex flex-col gap-2 rounded-md border border-border bg-surface p-4 text-left transition-fast hover:border-accent"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-lg" aria-hidden>{r.icon}</span>
+                  {isExec && view && (
+                    <span className="rounded-full border border-border bg-bg px-2 py-0.5 text-[10px] font-bold text-accent">
+                      {view.findingsCount} {copy.findings}
+                    </span>
+                  )}
+                </div>
+                <div className="text-sm font-semibold text-text">{t(`audit.center.${r.key}.title`, r.title)}</div>
+                <div className="flex-1 text-[12px] leading-relaxed text-text-muted">{t(`audit.center.${r.key}.desc`, r.desc)}</div>
+                <div className={`mt-1 text-[12px] font-semibold ${accent}`}>{copy.openReport} →</div>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
-      {/* Finding-detail drawer */}
+      {/* ── Report drawer (520px) ─────────────────────────────────────────── */}
+      {openReport && (
+        <div
+          onClick={closeReport}
+          className="fixed inset-0 z-[1000] flex justify-end transition-[background] duration-200"
+          style={{ background: reportEntered ? 'rgba(2,3,6,.62)' : 'rgba(2,3,6,0)', backdropFilter: reportEntered ? 'blur(4px)' : 'none', WebkitBackdropFilter: reportEntered ? 'blur(4px)' : 'none' }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="fixed right-0 top-0 flex h-full w-[520px] max-w-full flex-col border-l border-border bg-surface p-6 transition-transform duration-300"
+            style={{ transform: reportEntered ? 'translateX(0)' : 'translateX(100%)', boxShadow: '-20px 0 60px rgba(0,0,0,.5)' }}
+          >
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg" aria-hidden>{openReport.icon}</span>
+                <h2 className="text-base font-semibold text-text">{t(`audit.center.${openReport.key}.title`, openReport.title)}</h2>
+              </div>
+              <button onClick={closeReport} aria-label={copy.close} className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-text-muted transition-fast hover:bg-bg">×</button>
+            </div>
+
+            {isAdmin ? (
+              <div className="min-h-0 flex-1 overflow-hidden rounded-md border border-border bg-bg">
+                <iframe
+                  key={refreshTick}
+                  src={`/hub/audit/${openReport.key}?ts=${refreshTick}`}
+                  title={openReport.title}
+                  className="h-full w-full border-0 bg-transparent"
+                />
+              </div>
+            ) : (
+              <div className="flex min-h-0 flex-1 flex-col items-start justify-center gap-4 rounded-md border border-border bg-bg p-6">
+                <span className="text-2xl" aria-hidden>🔒</span>
+                <p className="text-sm leading-relaxed text-text-muted">{copy.reportOwnerOnly}</p>
+                <a href="/dashboard/audit/pricing" className="inline-flex items-center justify-center rounded-md border border-accent bg-accent px-4 py-2 text-sm font-semibold text-bg transition-fast hover:brightness-110">
+                  {copy.viewPlans}
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Finding-detail drawer ─────────────────────────────────────────── */}
       {selectedFinding && (() => {
         const sev = asSev(selectedFinding.severity)
-        const c = SEV_COLOR[sev]
         return (
           <div
             onClick={() => setSelectedFinding(null)}
-            style={{ position: 'fixed', inset: 0, zIndex: 1000, background: entered ? 'rgba(2,3,6,.62)' : 'rgba(2,3,6,0)', backdropFilter: entered ? 'blur(4px)' : 'none', WebkitBackdropFilter: entered ? 'blur(4px)' : 'none', transition: 'background .2s ease', display: 'flex', justifyContent: 'flex-end' }}
+            className="fixed inset-0 z-[1000] flex justify-end transition-[background] duration-200"
+            style={{ background: entered ? 'rgba(2,3,6,.62)' : 'rgba(2,3,6,0)', backdropFilter: entered ? 'blur(4px)' : 'none', WebkitBackdropFilter: entered ? 'blur(4px)' : 'none' }}
           >
             <div
               onClick={e => e.stopPropagation()}
-              style={{
-                width: 'min(480px, 100%)', height: '100vh', overflowY: 'auto',
-                background: 'linear-gradient(160deg, rgba(15,23,42,.92), rgba(7,11,20,.96))',
-                borderLeft: '1px solid rgba(255,255,255,.12)', boxShadow: '-20px 0 60px rgba(0,0,0,.5)',
-                transform: entered ? 'translateX(0)' : 'translateX(100%)', transition: 'transform .25s ease',
-                padding: 22, color: '#fff', boxSizing: 'border-box',
-              }}
+              className="fixed right-0 top-0 h-full w-[480px] max-w-full overflow-y-auto border-l border-border bg-surface p-6 transition-transform duration-300"
+              style={{ transform: entered ? 'translateX(0)' : 'translateX(100%)', boxShadow: '-20px 0 60px rgba(0,0,0,.5)' }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: c, border: `1px solid ${c}66`, borderRadius: 999, padding: '3px 11px' }}>{copy.sev[sev]}</span>
-                <button onClick={() => setSelectedFinding(null)} aria-label={copy.close} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,.18)', color: 'rgba(255,255,255,.8)', borderRadius: 8, width: 30, height: 30, cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>×</button>
+              <div className="flex items-center justify-between gap-3">
+                <span className={`rounded-full border border-border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${sevText(sev)}`}>{copy.sev[sev]}</span>
+                <button onClick={() => setSelectedFinding(null)} aria-label={copy.close} className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-text-muted transition-fast hover:bg-bg">×</button>
               </div>
 
-              <h2 style={{ margin: '14px 0 4px', fontSize: 18, fontWeight: 800, lineHeight: 1.3 }}>{selectedFinding.title}</h2>
-              <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,.5)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', wordBreak: 'break-all' }}>
+              <h2 className="mt-3.5 mb-1 text-lg font-semibold leading-snug text-text">{selectedFinding.title}</h2>
+              <div className="break-all font-mono text-[11.5px] text-text-muted">
                 {selectedFinding.file}{typeof selectedFinding.line === 'number' ? `  ·  ${copy.line} ${selectedFinding.line}` : ''}
               </div>
-              <div style={{ marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,.45)' }}>{copy.category}: {selectedFinding.category}</div>
+              <div className="mt-1.5 text-[11px] text-text-muted">{copy.category}: {selectedFinding.category}</div>
 
               {selectedFinding.detail && (
-                <div style={{ marginTop: 18 }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 6 }}>{copy.detail}</div>
-                  <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: 'rgba(255,255,255,.88)' }}>{selectedFinding.detail}</p>
+                <div className="mt-4">
+                  <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-text-muted">{copy.detail}</div>
+                  <p className="text-[13.5px] leading-relaxed text-text">{selectedFinding.detail}</p>
                 </div>
               )}
 
               {selectedFinding.recommendation && (
-                <div style={{ marginTop: 16, padding: '12px 14px', borderRadius: 10, background: 'rgba(26,240,255,.06)', border: '1px solid rgba(26,240,255,.22)' }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: CYAN, marginBottom: 6 }}>{copy.recommendation}</div>
-                  <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55, color: 'rgba(255,255,255,.85)' }}>{selectedFinding.recommendation}</p>
+                <div className="mt-4 rounded-md border border-border bg-bg px-3.5 py-3">
+                  <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-accent">{copy.recommendation}</div>
+                  <p className="text-[13px] leading-relaxed text-text-muted">{selectedFinding.recommendation}</p>
                 </div>
               )}
 
-              <a href={ghUrl(selectedFinding.file, selectedFinding.line)} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 18, fontSize: 12.5, fontWeight: 700, color: CYAN, textDecoration: 'none', border: '1px solid rgba(26,240,255,.35)', borderRadius: 10, padding: '8px 14px' }}>
+              <a href={ghUrl(selectedFinding.file, selectedFinding.line)} target="_blank" rel="noopener noreferrer" className="mt-4 inline-block rounded-md border border-border px-3.5 py-2 text-[12.5px] font-semibold text-[#1af0ff] transition-fast hover:bg-bg">
                 {copy.viewSource} ↗
               </a>
 
               {selectedFinding.recommendation && (
-                <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid rgba(255,255,255,.1)' }}>
+                <div className="mt-5 border-t border-border pt-4">
                   <button
                     onClick={() => selectedFinding && generateFix(selectedFinding)}
                     disabled={patchState === 'working' || patchState === 'done'}
-                    style={{
-                      background: patchState === 'working' ? 'rgba(255,195,0,.14)' : patchState === 'done' ? 'rgba(52,211,153,.12)' : 'linear-gradient(135deg, #ffc300, #ffb000)',
-                      color: patchState === 'working' ? GOLD : patchState === 'done' ? GREEN : '#0a0e17',
-                      border: `1px solid ${patchState === 'done' ? 'rgba(52,211,153,.5)' : 'rgba(255,195,0,.5)'}`,
-                      borderRadius: 10, padding: '10px 18px', fontSize: 13, fontWeight: 800,
-                      cursor: patchState === 'working' || patchState === 'done' ? 'default' : 'pointer', width: '100%',
-                    }}
+                    className={`w-full rounded-md border px-4 py-2.5 text-sm font-semibold transition-fast ${patchState === 'done' ? 'border-[#34d399] bg-bg text-[#34d399]' : 'border-accent bg-accent text-bg hover:brightness-110'} disabled:opacity-80`}
                   >
                     {patchState === 'working' ? copy.patching : patchState === 'done' ? `✓ ${copy.patchReady}` : copy.generateFix}
                   </button>
 
                   {patchState === 'done' && patchResult && (
-                    <div style={{ marginTop: 12, padding: '12px 14px', borderRadius: 10, background: 'rgba(52,211,153,.06)', border: '1px solid rgba(52,211,153,.25)' }}>
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,.6)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', wordBreak: 'break-all' }}>{patchResult.branch}</div>
-                      <a href={patchResult.compareUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 8, fontSize: 12.5, fontWeight: 800, color: GREEN, textDecoration: 'none' }}>
+                    <div className="mt-3 rounded-md border border-border bg-bg px-3.5 py-3">
+                      <div className="break-all font-mono text-[11px] text-text-muted">{patchResult.branch}</div>
+                      <a href={patchResult.compareUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-[12.5px] font-semibold text-[#34d399]">
                         {copy.reviewMerge} ↗
                       </a>
                     </div>
                   )}
 
                   {patchState === 'error' && patchError && (
-                    <div style={{ marginTop: 12, padding: '11px 13px', borderRadius: 10, background: 'rgba(252,165,165,.08)', border: '1px solid rgba(252,165,165,.3)', color: RED, fontSize: 12.5, lineHeight: 1.5 }}>
-                      {patchError}
-                    </div>
+                    <div className="mt-3 rounded-md border border-danger bg-bg px-3 py-2.5 text-[12.5px] leading-relaxed text-danger">{patchError}</div>
                   )}
                 </div>
               )}
@@ -520,16 +679,15 @@ if (final) {
           </div>
         )
       })()}
-      </div>
-    </>
+    </main>
   )
 }
 
 function Stat({ label, value, accent }: { label: string; value: string; accent: string }) {
   return (
-    <div style={{ ...glass, padding: '12px 18px', minWidth: 130 }}>
-      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)' }}>{label}</div>
-      <div style={{ fontSize: 26, fontWeight: 800, color: accent, lineHeight: 1.1, marginTop: 2 }}>{value}</div>
+    <div className="min-w-[130px] rounded-md border border-border bg-surface px-4 py-3">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">{label}</div>
+      <div className={`mt-0.5 text-2xl font-semibold leading-tight ${accent}`}>{value}</div>
     </div>
   )
 }

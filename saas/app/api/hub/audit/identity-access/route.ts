@@ -5,7 +5,8 @@
 
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/access'
-import { collectSnapshot } from '@/lib/audit/collectors'
+import { getReportSnapshot } from '@/lib/audit/snapshotCache'
+import { getAdminSupabase } from '@/utils/supabase/server'
 import { buildIdentityAccessReport } from '@/lib/audit/reports'
 
 export const dynamic = 'force-dynamic'
@@ -22,8 +23,8 @@ export async function GET() {
   }
 
   try {
-    // collectSnapshot() resolves to an AuditSnapshot directly — no { ok } wrapper.
-    const snapshot = await collectSnapshot()
+    // getReportSnapshot() returns the cached AuditSnapshot (or a live one if the cache is empty).
+    const snapshot = await getReportSnapshot(getAdminSupabase())
 
     // buildIdentityAccessReport() returns the report with `ok` on the object itself.
     const report = buildIdentityAccessReport(snapshot)

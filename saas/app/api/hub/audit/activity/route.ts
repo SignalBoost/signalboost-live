@@ -3,7 +3,7 @@
 // hub_audit_log events and returns a shaped timeline + status summary.
 
 import { NextResponse } from 'next/server'
-import { requireOwner } from '@/lib/auth/access'
+import { requireAdmin } from '@/lib/auth/access'
 import { createClient } from '@supabase/supabase-js'
 import { buildActivityReport, type ActivityRawRow } from '@/lib/audit/activityReport'
 
@@ -22,7 +22,7 @@ function db() {
 }
 
 export async function GET() {
-  const guard = await requireOwner()
+  const guard = await requireAdmin()
   if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status })
   try {
     const client = db()

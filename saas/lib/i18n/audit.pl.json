@@ -357,7 +357,8 @@
       "now": "Teraz",
       "next": "Następne",
       "later": "Później",
-      "evidence": "Dowód"
+      "evidence": "Dowód",
+      "handled": "Obsłużone"
     },
     "tier": {
       "now": "Teraz",
@@ -368,6 +369,20 @@
       "now": "Krytyczne — napraw natychmiast.",
       "next": "Wysokie — zaplanuj wkrótce.",
       "later": "Średnie i niskie — zaplanuj."
+    },
+    "handled": {
+      "title": "Obsłużone",
+      "subtitle": "Ustalenia oznaczone jako rozwiązane, zaakceptowane lub nienaprawiane."
+    },
+    "state": {
+      "status": "Status",
+      "owner": "Właściciel",
+      "ownerPlaceholder": "Przypisz…",
+      "open": "Otwarte",
+      "in_progress": "W toku",
+      "resolved": "Rozwiązane",
+      "accepted": "Zaakceptowane",
+      "wont_fix": "Nie naprawimy"
     }
   },
   "center": {

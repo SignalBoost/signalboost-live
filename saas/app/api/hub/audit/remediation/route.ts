@@ -3,7 +3,8 @@
 
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/access'
-import { collectSnapshot } from '@/lib/audit/collectors'
+import { getReportSnapshot } from '@/lib/audit/snapshotCache'
+import { getAdminSupabase } from '@/utils/supabase/server'
 import { buildRemediationRoadmap } from '@/lib/audit/remediationRoadmap'
 
 export const dynamic = 'force-dynamic'
@@ -16,7 +17,7 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status })
   }
   try {
-    const snapshot = await collectSnapshot()
+    const snapshot = await getReportSnapshot(getAdminSupabase())
     const report = buildRemediationRoadmap(snapshot)
     return NextResponse.json({ ok: true, report })
   } catch (err) {

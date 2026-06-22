@@ -413,6 +413,10 @@
     "stripe": {
       "title": "Payments Config",
       "desc": "Live mode, price tiers, and webhook coverage."
+    },
+    "vercel": {
+      "title": "Deployment & Env",
+      "desc": "Env vars by scope, exposure, and prod/preview drift."
     }
   },
   "usage": {
@@ -582,5 +586,38 @@
     "loadError": "Could not load the Stripe report.",
     "fetchError": "Error: {msg}",
     "loading": "Loading Stripe report…"
+  },
+  "vercel": {
+    "title": "Deployment & Env Var Report",
+    "subtitle": "Environment variables by scope, public exposure, and prod/preview drift.",
+    "notConfigured": "Vercel is not connected, so deployment posture could not be assessed.",
+    "summary": {
+      "scopes": "Env scopes",
+      "vars": "Variables",
+      "publicSensitive": "Exposed secrets"
+    },
+    "drift": {
+      "title": "Production ↔ Preview parity",
+      "drift": "Scopes differ",
+      "aligned": "Aligned"
+    },
+    "scopes": {
+      "title": "Environment variables by scope",
+      "empty": "No environment variables collected."
+    },
+    "metadataNote": "Names only — values are never read or shown.",
+    "scope": {
+      "production": "Production",
+      "preview": "Preview",
+      "development": "Development",
+      "none": "No variables in this scope."
+    },
+    "findings": {
+      "title": "Findings ({n})",
+      "empty": "No deployment findings — nothing flagged."
+    },
+    "loadError": "Could not load the deployment report.",
+    "fetchError": "Error: {msg}",
+    "loading": "Loading deployment report…"
   }
 }

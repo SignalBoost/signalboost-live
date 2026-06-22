@@ -4,7 +4,7 @@
 // report, and returns it for the IdentityAccessReport component.
 
 import { NextResponse } from 'next/server'
-import { requireOwner } from '@/lib/auth/access'
+import { requireAdmin } from '@/lib/auth/access'
 import { collectSnapshot } from '@/lib/audit/collectors'
 import { buildIdentityAccessReport } from '@/lib/audit/reports'
 
@@ -13,7 +13,7 @@ export const runtime = 'nodejs'
 
 export async function GET() {
   // Guard — owner only.
-  const guard = await requireOwner()
+  const guard = await requireAdmin()
   if (!guard.ok) {
     return NextResponse.json(
       { ok: false, error: guard.error },

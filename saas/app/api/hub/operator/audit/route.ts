@@ -74,7 +74,12 @@ export async function POST(req: NextRequest) {
 
   let body: { prefix?: string; maxFiles?: number } = {}
   try { body = await req.json() } catch { /* defaults apply */ }
-  const prefix   = typeof body.prefix === 'string' && body.prefix.trim() ? body.prefix.trim() : 'saas/app/api'
+  // URL-first: a paying customer pastes their full GitHub repository URL. Falls back
+  // to a legacy path prefix, and finally to the platform's own repo (whole-repo audit).
+  const target   = typeof body.url === 'string' && body.url.trim()
+    ? body.url.trim()
+    : (typeof body.prefix === 'string' && body.prefix.trim() ? body.prefix.trim() : '')
+  const prefix   = target || 'https://github.com/SignalBoost/signalboost-live'
   // Pre-call size check — clamp into [1, tier ceiling] to bound model cost.
   const maxFiles = clampScanSize(body.maxFiles, quota.tier)
 
@@ -97,7 +102,7 @@ export async function POST(req: NextRequest) {
         const runId = started.data.id as string
 
         const result = await runAudit({
-          prefix, maxFiles,
+          url: prefix, maxFiles,
           onProgress: (done, total) => send({ phase: 'RUN_ANALYZERS', done, total }),
         })
 

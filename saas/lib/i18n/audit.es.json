@@ -13,15 +13,15 @@
       "description": "Acceso, nivel de privilegio, estado de MFA y última actividad registrada."
     },
     "secretsKeys": {
-      "title": "Informe de exposición de secretos y claves API",
-      "description": "Credenciales configuradas por entorno y estado de rotación. Solo metadatos."
+      "title": "Informe de exposición de secretos y claves de API",
+      "description": "Credenciales configuradas por entorno y postura de rotación. Solo metadatos."
     },
     "remediationRoadmap": {
       "title": "Hoja de ruta de remediación",
       "description": "Correcciones priorizadas con impacto empresarial, responsable y fecha límite."
     },
     "prCockpitTrail": {
-      "title": "Historial de aprobaciones del PR Cockpit",
+      "title": "Registro de aprobaciones del PR Cockpit",
       "description": "Cada cambio preparado, quién lo aprobó y el resultado de la fusión."
     },
     "githubChanges": {
@@ -30,18 +30,18 @@
     },
     "supabaseSecurity": {
       "title": "Informe de seguridad de base de datos",
-      "description": "Cobertura de RLS, buckets públicos y uso de la clave de rol de servicio."
+      "description": "Cobertura de RLS, buckets públicos y uso de la clave de servicio."
     },
     "stripeConfig": {
       "title": "Informe de configuración de facturación",
-      "description": "Productos, precios, cobertura de webhooks y coherencia entre entornos live/test."
+      "description": "Productos, precios, cobertura de webhooks y consistencia live/test."
     },
     "vercelDeployment": {
       "title": "Informe de despliegue y variables de entorno",
-      "description": "Variables de producción frente a preview y variables públicas expuestas."
+      "description": "Variables de producción vs. preview y variables públicas expuestas."
     },
     "auditLog": {
-      "title": "Registro de auditoría y cronología de actividad",
+      "title": "Registro de auditoría y línea de tiempo de actividad",
       "description": "Acciones registradas, actores y resultados del registro de auditoría del Hub."
     },
     "complianceReadiness": {
@@ -68,143 +68,143 @@
     "staleIdentity": {
       "title": "Identidad obsoleta: {principal} ({provider})",
       "detail": "Sin actividad registrada durante {days} días (umbral {threshold}).",
-      "recommendation": "Revisa si este acceso sigue siendo necesario; elimínalo o rótalo si no lo es.",
+      "recommendation": "Revise si este acceso sigue siendo necesario; elimínelo o rótelo si no lo es.",
       "impact": "Las credenciales sin uso amplían la superficie de ataque sin ningún beneficio."
     },
     "neverUsedIdentity": {
       "title": "Identidad nunca utilizada: {principal} ({provider})",
       "detail": "Creada hace {days} días sin ningún inicio de sesión ni uso registrado.",
-      "recommendation": "Confirma si este principal es necesario; elimínalo si nunca fue activado.",
+      "recommendation": "Confirme si este principal es necesario; elimínelo si nunca fue activado.",
       "impact": "Las cuentas inactivas son un punto de apoyo habitual para los atacantes."
     },
     "privilegedNoMfa": {
       "title": "Cuenta privilegiada sin MFA: {principal} ({provider})",
       "detail": "El rol \"{role}\" tiene acceso de nivel administrador pero MFA está desactivado.",
-      "recommendation": "Exige y activa MFA en esta cuenta de inmediato.",
+      "recommendation": "Exija y active MFA en esta cuenta de inmediato.",
       "impact": "Una sola contraseña obtenida por phishing otorga control administrativo total."
     },
     "mfaStateUnavailable": {
       "title": "Estado de MFA no disponible para {count} identidad(es) privilegiada(s)",
       "detail": "Estos proveedores no exponen el estado de MFA por cuenta a través de su API.",
-      "recommendation": "Confirma que MFA está aplicado y adjunta evidencia para estas cuentas."
+      "recommendation": "Confirme que MFA está aplicado y adjunte evidencia para estas cuentas."
     },
     "providerError": {
       "title": "El proveedor \"{provider}\" está en estado de error",
       "detail": "El Hub reporta {provider} como con error.",
-      "recommendation": "Verifica la conexión y las credenciales de {provider}."
+      "recommendation": "Verifique nuevamente la conexión y las credenciales de {provider}."
     },
     "stripeReadFail": {
       "title": "No se pudo leer la configuración de Stripe",
       "detail": "La llamada a la API de Stripe falló durante la recopilación.",
-      "recommendation": "Verifica que STRIPE_SECRET_KEY esté configurada y pueda leer precios y webhooks.",
+      "recommendation": "Verifique que STRIPE_SECRET_KEY esté configurado y pueda leer precios y webhooks.",
       "impact": "La postura de facturación es desconocida hasta que Stripe sea accesible."
     },
     "stripePriceMismatch": {
       "title": "Discrepancia entre precio de Stripe y variable de entorno",
       "detail": "{name} apunta a un precio que no está activo en Stripe.",
-      "recommendation": "Apunta la variable de entorno a un precio activo o activa el precio referenciado.",
+      "recommendation": "Apunte la variable de entorno a un precio activo, o active el precio referenciado.",
       "impact": "El proceso de pago puede referenciar un precio que ya no existe, interrumpiendo las compras."
     },
     "stripeWebhookNone": {
-      "title": "No hay ningún endpoint de webhook de Stripe configurado",
+      "title": "No hay endpoint de webhook de Stripe configurado",
       "detail": "Stripe no devolvió ningún endpoint de webhook.",
-      "recommendation": "Añade un endpoint de webhook que cubra los eventos del ciclo de vida de pagos y suscripciones.",
-      "impact": "Los pagos fallidos y las cancelaciones podrían no propagarse a la aplicación."
+      "recommendation": "Agregue un endpoint de webhook que cubra los eventos de pago y ciclo de vida de suscripciones.",
+      "impact": "Los pagos fallidos y las cancelaciones pueden no propagarse a la aplicación."
     },
     "stripeWebhookMissingEvent": {
       "title": "Webhook de Stripe sin el evento \"{event}\"",
-      "detail": "Ningún endpoint de webhook configurado se suscribe a {event}.",
-      "recommendation": "Añade {event} a un endpoint de webhook para que la aplicación reaccione a este evento.",
+      "detail": "Ningún endpoint de webhook configurado está suscrito a {event}.",
+      "recommendation": "Agregue {event} a un endpoint de webhook para que la aplicación reaccione a este evento.",
       "impact": "Los eventos de facturación importantes no se entregan a la plataforma."
     },
     "stripeWebhookUnverified": {
       "title": "Cobertura de eventos del webhook de Stripe no verificada",
       "detail": "Existen endpoints de webhook pero no se recopiló su lista de eventos suscritos.",
-      "recommendation": "Confirma que cada endpoint se suscribe a los eventos de pago y suscripción requeridos."
+      "recommendation": "Confirme que cada endpoint está suscrito a los eventos de pago y suscripción requeridos."
     },
     "supabaseHealthFail": {
       "title": "Falló la verificación de salud de Supabase",
       "detail": "La verificación de accesibilidad de Supabase no tuvo éxito.",
-      "recommendation": "Verifica la URL del proyecto, la clave de rol de servicio y que la base de datos esté en línea.",
+      "recommendation": "Verifique la URL del proyecto y la clave de servicio, y que la base de datos esté en línea.",
       "impact": "La disponibilidad de la capa de datos principal no está confirmada."
     },
     "serviceRoleInClient": {
-      "title": "Clave de rol de servicio accesible desde el código del cliente",
-      "detail": "La clave de rol de servicio (que omite RLS) fue detectada en una ruta expuesta al cliente.",
-      "recommendation": "Mueve todo el uso de la clave de rol de servicio estrictamente al lado del servidor y rótala de inmediato.",
-      "impact": "Cualquier visitante podría extraer acceso completo a la base de datos — riesgo grave de filtración de datos."
+      "title": "Clave de service-role accesible desde código cliente",
+      "detail": "La clave de service-role (que omite RLS) fue detectada en una ruta expuesta al cliente.",
+      "recommendation": "Mueva todo el uso de service-role estrictamente al lado del servidor y rote la clave de inmediato.",
+      "impact": "Cualquier visitante podría extraer acceso total a la base de datos — riesgo grave de filtración de datos."
     },
     "rlsDisabled": {
       "title": "La tabla \"{table}\" tiene RLS desactivado",
       "detail": "Row Level Security no está habilitado en {table}.",
-      "recommendation": "Habilita RLS en {table} y añade políticas de acceso explícitas.",
+      "recommendation": "Habilite RLS en {table} y agregue políticas de acceso explícitas.",
       "impact": "Sin RLS, una clave anon filtrada puede leer o escribir en esta tabla directamente."
     },
     "rlsUnverified": {
       "title": "Cobertura de RLS no verificada",
-      "detail": "El estado de RLS a nivel de tabla no fue recopilado en esta ejecución.",
-      "recommendation": "Enumera las tablas y confirma que RLS está habilitado en cada tabla que contenga datos de usuarios."
+      "detail": "El estado de RLS a nivel de tabla no se recopiló en esta ejecución.",
+      "recommendation": "Enumere las tablas y confirme que RLS está habilitado en cada tabla que contiene datos de usuario."
     },
     "publicBucket": {
       "title": "El bucket de almacenamiento \"{bucket}\" es público",
       "detail": "El bucket \"{bucket}\" permite acceso público.",
-      "recommendation": "Confirma que el acceso público es intencionado; de lo contrario, haz el bucket privado con URLs firmadas.",
+      "recommendation": "Confirme si el acceso público es intencional; de lo contrario, haga el bucket privado con URLs firmadas.",
       "impact": "Los buckets públicos pueden exponer archivos subidos por usuarios o archivos internos."
     },
     "vercelNotConnected": {
       "title": "Vercel no está conectado",
-      "detail": "No hay ningún token de Vercel configurado, por lo que no se puede evaluar la postura de despliegue.",
-      "recommendation": "Conecta Vercel para incluir verificaciones de despliegue y variables de entorno en la auditoría."
+      "detail": "No hay token de Vercel configurado, por lo que no se puede evaluar la postura de despliegue.",
+      "recommendation": "Conecte Vercel para incluir verificaciones de despliegue y variables de entorno en la auditoría."
     },
     "publicSensitiveEnv": {
-      "title": "La variable de entorno pública parece sensible: {name}",
+      "title": "Variable de entorno pública parece sensible: {name}",
       "detail": "{name} está expuesta al navegador (NEXT_PUBLIC_) pero su nombre sugiere que es un secreto.",
-      "recommendation": "Renómbrala a una variable solo de servidor (elimina NEXT_PUBLIC_) y rota el valor.",
+      "recommendation": "Renómbrela a una variable solo de servidor (elimine NEXT_PUBLIC_) y rote el valor.",
       "impact": "Los valores secretos enviados al navegador son legibles por cualquier persona."
     },
     "envScopeDrift": {
       "title": "Las variables de entorno de producción y preview difieren",
       "detail": "Solo en producción: {onlyProd}. Solo en preview: {onlyPreview}.",
-      "recommendation": "Reconcilia los nombres de variables de entorno entre ámbitos para que preview refleje producción.",
+      "recommendation": "Reconcilie los nombres de variables de entorno entre ámbitos para que preview refleje producción.",
       "impact": "Los despliegues de preview pueden comportarse de forma diferente a producción, ocultando errores."
     },
     "githubReadFail": {
       "title": "No se pudo leer GitHub",
       "detail": "La llamada a la API de GitHub falló durante la recopilación.",
-      "recommendation": "Verifica el token de GitHub y su alcance de repositorio."
+      "recommendation": "Verifique el token de GitHub y su alcance de repositorio."
     },
     "branchProtectionUnverified": {
       "title": "Protección de rama no verificada",
-      "detail": "El estado de protección de la rama predeterminada no fue recopilado.",
-      "recommendation": "Confirma que la rama predeterminada requiere revisión de pull request antes de la fusión."
+      "detail": "El estado de protección de rama para la rama predeterminada no se recopiló.",
+      "recommendation": "Confirme que la rama predeterminada requiere revisión de pull request antes de la fusión."
     },
     "branchProtectionMissing": {
       "title": "La rama predeterminada \"{branch}\" no requiere revisión de PR",
       "detail": "Los cambios pueden fusionarse en la rama predeterminada sin una revisión aprobatoria.",
-      "recommendation": "Habilita la protección de rama y exige al menos una revisión aprobatoria.",
+      "recommendation": "Habilite la protección de rama y requiera al menos una revisión aprobatoria.",
       "impact": "El código de producción puede cambiar sin una segunda revisión."
     },
     "staleBranches": {
       "title": "{count} rama(s) obsoleta(s) con más de {days} días",
       "detail": "Ramas obsoletas: {names}.",
-      "recommendation": "Revisa y elimina las ramas fusionadas o abandonadas.",
+      "recommendation": "Revise y elimine las ramas fusionadas o abandonadas.",
       "impact": "Las ramas obsoletas generan confusión y pueden contener configuración desactualizada."
     },
     "clientExposedSecret": {
       "title": "Secreto expuesto al cliente: {name}",
       "detail": "{name} parece ser un secreto pero está expuesto al cliente.",
-      "recommendation": "Muévelo al lado del servidor y rótalo de inmediato.",
-      "impact": "Un secreto de producción filtrado puede ser explotado por cualquier persona."
+      "recommendation": "Muévalo al lado del servidor y rótelo de inmediato.",
+      "impact": "Un secreto de producción filtrado puede ser utilizado indebidamente por cualquier persona."
     },
     "rotationUnknown": {
       "title": "Antigüedad de rotación desconocida para {count} secreto(s)",
       "detail": "Las APIs de los proveedores no exponen las fechas de última rotación para estas credenciales.",
-      "recommendation": "Registra las fechas de rotación en el Key Vault y establece una política de rotación."
+      "recommendation": "Registre las fechas de rotación en el Key Vault y establezca una política de rotación."
     },
     "backupTestMissing": {
-      "title": "Prueba de recuperación de copia de seguridad no registrada",
+      "title": "Prueba de recuperación de respaldo no registrada",
       "detail": "No se recopiló evidencia de una copia de seguridad/restauración de base de datos probada.",
-      "recommendation": "Realiza una prueba de restauración y adjunta el resultado."
+      "recommendation": "Realice una prueba de restauración y adjunte el resultado."
     }
   },
   "exec": {
@@ -225,7 +225,7 @@
   },
   "identity": {
     "findingsTitle": "Hallazgos de acceso",
-    "noFindings": "Sin hallazgos de acceso.",
+    "noFindings": "No hay hallazgos de acceso.",
     "tableTitle": "Todas las identidades",
     "empty": "No se encontraron identidades.",
     "never": "Nunca",
@@ -244,7 +244,7 @@
       "role": "Rol",
       "mfa": "MFA",
       "lastSeen": "Última vez visto",
-      "flags": "Indicadores"
+      "flags": "Marcadores"
     },
     "kind": {
       "user": "Usuario",
@@ -254,15 +254,15 @@
       "token": "Token"
     },
     "mfa": {
-      "enabled": "Habilitado",
-      "disabled": "Deshabilitado",
+      "enabled": "Activado",
+      "disabled": "Desactivado",
       "unknown": "Desconocido"
     },
     "flag": {
       "stale": "Obsoleta",
       "neverUsed": "Nunca usada",
       "privilegedNoMfa": "Sin MFA",
-      "mfaUnknown": "¿MFA?"
+      "mfaUnknown": "MFA?"
     }
   },
   "provider": {
@@ -306,10 +306,10 @@
     }
   },
   "secret": {
-    "title": "Exposición de secretos y claves API",
-    "subtitle": "Credenciales configuradas por entorno y estado de rotación. Solo metadatos — no se leen ni muestran valores secretos.",
+    "title": "Exposición de secretos y claves de API",
+    "subtitle": "Credenciales configuradas por entorno y postura de rotación. Solo metadatos — no se leen ni muestran valores secretos.",
     "findingsTitle": "Hallazgos de exposición",
-    "noFindings": "Sin hallazgos de exposición.",
+    "noFindings": "No hay hallazgos de exposición.",
     "tableTitle": "Credenciales configuradas",
     "empty": "No se encontraron credenciales.",
     "metadataNote": "Solo metadatos — los valores secretos nunca se leen ni se muestran.",
@@ -336,18 +336,18 @@
       "unknown": "Desconocido"
     },
     "exposure": {
-      "client": "Expuesta al cliente",
+      "client": "Expuesto al cliente",
       "server": "Solo servidor"
     },
     "rotation": {
-      "known": "Registrada",
+      "known": "Rastreada",
       "unknown": "Desconocida"
     }
   },
   "remediation": {
     "title": "Hoja de ruta de remediación",
     "subtitle": "Correcciones priorizadas por urgencia, con los elementos que requieren evidencia manual en una pista separada.",
-    "empty": "Nada que remediar — sin hallazgos abiertos.",
+    "empty": "Nada que remediar — no hay hallazgos abiertos.",
     "evidenceTitle": "Evidencia requerida",
     "evidenceSubtitle": "Brechas a confirmar con evidencia manual. Estas no reducen la puntuación.",
     "loading": "Generando hoja de ruta de remediación…",
@@ -365,9 +365,9 @@
       "later": "Después"
     },
     "tierHint": {
-      "now": "Crítico — corregir de inmediato.",
-      "next": "Alto — programar pronto.",
-      "later": "Medio y bajo — planificar con anticipación."
+      "now": "Crítico — corrija de inmediato.",
+      "next": "Alto — programe pronto.",
+      "later": "Medio y bajo — planifique con anticipación."
     }
   },
   "center": {
@@ -387,28 +387,28 @@
       "desc": "Cada proveedor conectado con su estado, riesgo y última verificación."
     },
     "secrets": {
-      "title": "Secretos y claves API",
-      "desc": "Credenciales configuradas por entorno y estado de rotación."
+      "title": "Secretos y claves de API",
+      "desc": "Credenciales configuradas por entorno y postura de rotación."
     },
     "remediation": {
       "title": "Hoja de ruta de remediación",
       "desc": "Correcciones priorizadas por urgencia."
     },
     "usage": {
-      "title": "Uso y coste de IA",
-      "desc": "Consumo de tokens y coste estimado por función y usuario."
+      "title": "Uso y costo de IA",
+      "desc": "Consumo de tokens y costo estimado por función y usuario."
     },
     "history": {
       "title": "Historial de preparación",
-      "desc": "Sigue la evolución de tu puntuación de preparación y el recuento de hallazgos."
+      "desc": "Siga la evolución de su puntuación de preparación y el recuento de hallazgos a lo largo del tiempo."
     },
     "github": {
-      "title": "GitHub y gestión de cambios",
+      "title": "GitHub y cambios de código",
       "desc": "Protección de ramas, colaboradores y ramas obsoletas."
     },
     "supabase": {
       "title": "Seguridad de base de datos",
-      "desc": "Estado de RLS, buckets públicos y exposición de la clave de rol de servicio."
+      "desc": "Estado de RLS, buckets públicos y exposición de service-role."
     },
     "stripe": {
       "title": "Configuración de pagos",
@@ -420,20 +420,20 @@
     }
   },
   "usage": {
-    "title": "Uso y coste de IA",
-    "subtitle": "Consumo de tokens y coste estimado en las funciones de IA durante los últimos {n} días. El coste es una estimación; los recuentos de tokens son exactos.",
-    "totalCost": "Coste est.",
+    "title": "Uso y costo de IA",
+    "subtitle": "Consumo de tokens y costo estimado en funciones de IA durante los últimos {n} días. El costo es una estimación; los recuentos de tokens son exactos.",
+    "totalCost": "Costo est.",
     "calls": "Llamadas",
-    "totalTokens": "Tokens totales",
+    "totalTokens": "Total de tokens",
     "cacheHit": "Entrada desde caché",
     "byFeature": "Por función",
     "byUser": "Principales consumidores",
-    "byUserHint": "Mayor coste estimado primero — base para facturación o limitación por usuario.",
+    "byUserHint": "Mayor costo estimado primero — base para facturación o limitación por usuario.",
     "col": {
       "feature": "Función",
       "calls": "Llamadas",
       "tokens": "Tokens",
-      "cost": "Coste est.",
+      "cost": "Costo est.",
       "user": "Usuario"
     },
     "empty": "Aún no hay uso registrado.",
@@ -447,25 +447,25 @@
   },
   "history": {
     "title": "Historial de preparación",
-    "subtitle": "Sigue la evolución de tu puntuación de preparación a lo largo del tiempo.",
+    "subtitle": "Siga cómo evoluciona su puntuación de preparación a lo largo del tiempo.",
     "snapshot": "Tomar instantánea ahora",
     "snapshotting": "Guardando…",
     "loading": "Cargando historial…",
     "loadError": "No se pudo cargar el historial.",
     "fetchError": "Error: {msg}",
     "snapshotError": "No se pudo tomar la instantánea.",
-    "empty": "Aún no hay instantáneas. Toma la primera arriba.",
+    "empty": "Aún no hay instantáneas. Tome la primera arriba.",
     "trendTitle": "Puntuación a lo largo del tiempo",
     "col": {
       "date": "Fecha"
     }
   },
   "scan": {
-    "quotaExceeded": "Límite mensual alcanzado: {used}/{cap} análisis de auditoría usados. Actualiza tu plan para ejecutar más.",
+    "quotaExceeded": "Límite mensual alcanzado: {used}/{cap} análisis de auditoría usados. Actualice su plan para ejecutar más.",
     "upgrade": "Actualizar plan"
   },
   "github": {
-    "title": "Informe de GitHub y gestión de cambios de código",
+    "title": "Informe de GitHub y cambios de código",
     "subtitle": "Protección de ramas, colaboradores, ramas obsoletas y cambios abiertos.",
     "notConfigured": "GitHub no está conectado o no se pudieron recopilar sus datos.",
     "summary": {
@@ -495,11 +495,11 @@
     "member": "Miembro",
     "stale": {
       "title": "Ramas obsoletas",
-      "empty": "Sin ramas obsoletas — limpio."
+      "empty": "No hay ramas obsoletas — limpio."
     },
     "findings": {
       "title": "Hallazgos ({n})",
-      "empty": "Sin hallazgos de GitHub — nada marcado."
+      "empty": "No hay hallazgos de GitHub — nada marcado."
     },
     "loadError": "No se pudo cargar el informe de GitHub.",
     "fetchError": "Error: {msg}",
@@ -507,7 +507,7 @@
   },
   "supabase": {
     "title": "Informe de seguridad de base de datos",
-    "subtitle": "Seguridad a nivel de fila, buckets públicos y exposición de la clave de rol de servicio.",
+    "subtitle": "Seguridad a nivel de fila, buckets públicos y exposición de service-role.",
     "notConfigured": "Supabase no está conectado o no se pudieron recopilar sus datos.",
     "summary": {
       "tables": "Tablas",
@@ -515,12 +515,12 @@
       "publicBuckets": "Buckets públicos"
     },
     "serviceRole": {
-      "title": "Exposición de la clave de rol de servicio",
+      "title": "Exposición de la clave de service-role",
       "exposed": "Expuesta al cliente",
       "serverOnly": "Solo servidor"
     },
     "tables": {
-      "title": "Tablas y seguridad a nivel de fila",
+      "title": "Tablas y Row-Level Security",
       "empty": "No se recopilaron tablas."
     },
     "col": {
@@ -528,16 +528,16 @@
       "rls": "RLS"
     },
     "rls": {
-      "on": "Habilitado",
-      "off": "Deshabilitado"
+      "on": "Activado",
+      "off": "Desactivado"
     },
     "buckets": {
       "title": "Buckets de almacenamiento públicos",
-      "empty": "Sin buckets públicos — limpio."
+      "empty": "No hay buckets públicos — limpio."
     },
     "findings": {
       "title": "Hallazgos ({n})",
-      "empty": "Sin hallazgos de base de datos — nada marcado."
+      "empty": "No hay hallazgos de base de datos — nada marcado."
     },
     "loadError": "No se pudo cargar el informe de Supabase.",
     "fetchError": "Error: {msg}",

@@ -405,6 +405,10 @@
     "github": {
       "title": "GitHub e mudanças de código",
       "desc": "Proteção de branches, colaboradores e branches obsoletos."
+    },
+    "supabase": {
+      "title": "Segurança do banco de dados",
+      "desc": "Status do RLS, buckets públicos e exposição do service-role."
     }
   },
   "usage": {
@@ -492,5 +496,43 @@
     "loadError": "Não foi possível carregar o relatório do GitHub.",
     "fetchError": "Erro: {msg}",
     "loading": "Carregando relatório do GitHub…"
+  },
+  "supabase": {
+    "title": "Relatório de segurança do banco de dados",
+    "subtitle": "Segurança em nível de linha, buckets públicos e exposição do service-role.",
+    "notConfigured": "O Supabase não está conectado ou seus dados não puderam ser coletados.",
+    "summary": {
+      "tables": "Tabelas",
+      "rlsDisabled": "RLS desativado",
+      "publicBuckets": "Buckets públicos"
+    },
+    "serviceRole": {
+      "title": "Exposição da chave service-role",
+      "exposed": "Exposta ao cliente",
+      "serverOnly": "Apenas servidor"
+    },
+    "tables": {
+      "title": "Tabelas e segurança em nível de linha",
+      "empty": "Nenhuma tabela coletada."
+    },
+    "col": {
+      "table": "Tabela",
+      "rls": "RLS"
+    },
+    "rls": {
+      "on": "Ativado",
+      "off": "Desativado"
+    },
+    "buckets": {
+      "title": "Buckets de armazenamento públicos",
+      "empty": "Sem buckets públicos — limpo."
+    },
+    "findings": {
+      "title": "Constatações ({n})",
+      "empty": "Nenhuma constatação de banco de dados — nada sinalizado."
+    },
+    "loadError": "Não foi possível carregar o relatório do Supabase.",
+    "fetchError": "Erro: {msg}",
+    "loading": "Carregando relatório do Supabase…"
   }
 }

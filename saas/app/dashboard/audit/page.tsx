@@ -251,7 +251,7 @@ export default function AuditCenterPage() {
   const { t } = useTranslation()
   const copy = copyFor(lang)
 
-  const [prefix, setPrefix] = useState('saas/app/api')
+  const [prefix, setPrefix] = useState('')
   const [maxFiles, setMaxFiles] = useState(8)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)

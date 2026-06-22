@@ -11,7 +11,8 @@
 
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/access'
-import { collectSnapshot } from '@/lib/audit/collectors'
+import { getReportSnapshot } from '@/lib/audit/snapshotCache'
+import { getAdminSupabase } from '@/utils/supabase/server'
 import { buildExecutiveSummary, execSummaryFacts } from '@/lib/audit/execSummary'
 import { processAuditSnapshot } from '@/lib/audit/processor'
 import { cachedSystem, recordUsage, type TokenUsage } from '@/lib/ai/usage'
@@ -75,7 +76,7 @@ export async function GET(req: Request) {
 
   try {
     const lang = normalizeLang(new URL(req.url).searchParams.get('lang'))
-    const snapshot = await collectSnapshot()
+    const snapshot = await getReportSnapshot(getAdminSupabase())
     const summary = buildExecutiveSummary(snapshot)
 
     let sanitizedContext = ''

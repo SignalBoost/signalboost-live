@@ -70,7 +70,7 @@ const COPY: Record<string, AuditCopy> = {
   en: {
     title: 'Audit Console', subtitle: 'Deep security & quality scans, isolated from live console traffic.',
     viewPlans: 'View plans',
-    pathLabel: 'Scan path', maxLabel: 'Max files', run: 'Run audit', running: 'Running deep scan…',
+    pathLabel: 'Repository URL', maxLabel: 'Max files', run: 'Run audit', running: 'Running deep scan…',
     filesScanned: 'Files scanned', findings: 'Findings', clean: 'No findings — this scan came back clean.',
     emptyHint: 'Set a path and run a scan, or pick a past run.',
     ownerOnly: 'Owner access is required to run audits.', failed: 'Audit failed', quotaExceeded: 'Monthly limit reached: {used}/{cap} scans used. Upgrade your plan to run more.',
@@ -84,13 +84,13 @@ const COPY: Record<string, AuditCopy> = {
     reportsSubtitle: 'Twelve readiness reports across identity, providers, secrets, code, billing, and remediation.',
     openReport: 'View', reportOwnerOnly: 'These readiness reports are scoped to the workspace owner. Upgrade your plan to generate reports for your own connected stack.',
     reportSyncHint: 'Synced with your latest scan.',
-    runningHint: 'Large scopes can take a few minutes — this stays live, keep the tab open.', pathHint: 'Repo path like saas/app/api — not a full URL.',
+    runningHint: 'Large scopes can take a few minutes — this stays live, keep the tab open.', pathHint: 'Paste a public GitHub repo URL, e.g. https://github.com/owner/repo',
     sev: { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', info: 'Info' },
   },
   es: {
     title: 'Consola de Auditoría', subtitle: 'Análisis profundos de seguridad y calidad, aislados del tráfico de la consola en vivo.',
     viewPlans: 'Ver planes',
-    pathLabel: 'Ruta de análisis', maxLabel: 'Archivos máx.', run: 'Ejecutar auditoría', running: 'Ejecutando análisis profundo…',
+    pathLabel: 'URL del repositorio', maxLabel: 'Archivos máx.', run: 'Ejecutar auditoría', running: 'Ejecutando análisis profundo…',
     filesScanned: 'Archivos analizados', findings: 'Hallazgos', clean: 'Sin hallazgos: este análisis salió limpio.',
     emptyHint: 'Define una ruta y ejecuta un análisis, o elige una ejecución anterior.',
     ownerOnly: 'Se requiere acceso de propietario para ejecutar auditorías.', failed: 'La auditoría falló', quotaExceeded: 'Límite mensual alcanzado: {used}/{cap} análisis usados. Mejora tu plan para ejecutar más.',
@@ -104,13 +104,13 @@ const COPY: Record<string, AuditCopy> = {
     reportsSubtitle: 'Doce informes de preparación sobre identidad, proveedores, secretos, código, facturación y remediación.',
     openReport: 'Ver', reportOwnerOnly: 'Estos informes están limitados al propietario del espacio de trabajo. Mejora tu plan para generar informes de tu propio stack conectado.',
     reportSyncHint: 'Sincronizado con tu último análisis.',
-    runningHint: 'Los análisis amplios pueden tardar unos minutos: sigue activo, deja la pestaña abierta.', pathHint: 'Ruta del repo, p. ej. saas/app/api — no una URL completa.',
+    runningHint: 'Los análisis amplios pueden tardar unos minutos: sigue activo, deja la pestaña abierta.', pathHint: 'Pega la URL de un repo público de GitHub, p. ej. https://github.com/owner/repo',
     sev: { critical: 'Crítico', high: 'Alto', medium: 'Medio', low: 'Bajo', info: 'Info' },
   },
   pt: {
     title: 'Console de Auditoria', subtitle: 'Análises profundas de segurança e qualidade, isoladas do tráfego do console ao vivo.',
     viewPlans: 'Ver planos',
-    pathLabel: 'Caminho de análise', maxLabel: 'Máx. de arquivos', run: 'Executar auditoria', running: 'Executando análise profunda…',
+    pathLabel: 'URL do repositório', maxLabel: 'Máx. de arquivos', run: 'Executar auditoria', running: 'Executando análise profunda…',
     filesScanned: 'Arquivos analisados', findings: 'Constatações', clean: 'Nenhuma constatação — esta análise voltou limpa.',
     emptyHint: 'Defina um caminho e execute uma análise, ou escolha uma execução anterior.',
     ownerOnly: 'É necessário acesso de proprietário para executar auditorias.', failed: 'A auditoria falhou', quotaExceeded: 'Limite mensal atingido: {used}/{cap} análises usadas. Faça upgrade do seu plano para executar mais.',
@@ -124,13 +124,13 @@ const COPY: Record<string, AuditCopy> = {
     reportsSubtitle: 'Doze relatórios de prontidão sobre identidade, provedores, segredos, código, faturamento e remediação.',
     openReport: 'Ver', reportOwnerOnly: 'Estes relatórios são restritos ao proprietário do espaço de trabalho. Faça upgrade do seu plano para gerar relatórios do seu próprio stack conectado.',
     reportSyncHint: 'Sincronizado com sua última análise.',
-    runningHint: 'Escopos grandes podem levar alguns minutos — continua ativo, mantenha a aba aberta.', pathHint: 'Caminho do repo, ex. saas/app/api — não uma URL completa.',
+    runningHint: 'Escopos grandes podem levar alguns minutos — continua ativo, mantenha a aba aberta.', pathHint: 'Cole a URL de um repo público do GitHub, ex. https://github.com/owner/repo',
     sev: { critical: 'Crítico', high: 'Alto', medium: 'Médio', low: 'Baixo', info: 'Info' },
   },
   pl: {
     title: 'Konsola Audytu', subtitle: 'Dogłębne skany bezpieczeństwa i jakości, odizolowane od ruchu konsoli na żywo.',
     viewPlans: 'Zobacz plany',
-    pathLabel: 'Ścieżka skanowania', maxLabel: 'Maks. plików', run: 'Uruchom audyt', running: 'Trwa dogłębne skanowanie…',
+    pathLabel: 'URL repozytorium', maxLabel: 'Maks. plików', run: 'Uruchom audyt', running: 'Trwa dogłębne skanowanie…',
     filesScanned: 'Przeskanowane pliki', findings: 'Wyniki', clean: 'Brak wyników — ten skan jest czysty.',
     emptyHint: 'Ustaw ścieżkę i uruchom skan lub wybierz wcześniejsze uruchomienie.',
     ownerOnly: 'Do uruchamiania audytów wymagany jest dostęp właściciela.', failed: 'Audyt nie powiódł się', quotaExceeded: 'Osiągnięto miesięczny limit: wykorzystano {used}/{cap} skanów. Ulepsz plan, aby uruchomić więcej.',
@@ -144,13 +144,13 @@ const COPY: Record<string, AuditCopy> = {
     reportsSubtitle: 'Dwanaście raportów gotowości obejmujących tożsamość, dostawców, sekrety, kod, płatności i naprawę.',
     openReport: 'Otwórz', reportOwnerOnly: 'Te raporty są dostępne tylko dla właściciela przestrzeni roboczej. Ulepsz plan, aby generować raporty dla własnego połączonego stosu.',
     reportSyncHint: 'Zsynchronizowano z najnowszym skanem.',
-    runningHint: 'Duże zakresy mogą potrwać kilka minut — działa dalej, zostaw kartę otwartą.', pathHint: 'Ścieżka repo, np. saas/app/api — nie pełny URL.',
+    runningHint: 'Duże zakresy mogą potrwać kilka minut — działa dalej, zostaw kartę otwartą.', pathHint: 'Wklej URL publicznego repozytorium GitHub, np. https://github.com/owner/repo',
     sev: { critical: 'Krytyczny', high: 'Wysoki', medium: 'Średni', low: 'Niski', info: 'Info' },
   },
   ru: {
     title: 'Консоль аудита', subtitle: 'Глубокие проверки безопасности и качества, изолированные от живого трафика консоли.',
     viewPlans: 'Посмотреть планы',
-    pathLabel: 'Путь сканирования', maxLabel: 'Макс. файлов', run: 'Запустить аудит', running: 'Выполняется глубокое сканирование…',
+    pathLabel: 'URL репозитория', maxLabel: 'Макс. файлов', run: 'Запустить аудит', running: 'Выполняется глубокое сканирование…',
     filesScanned: 'Просканировано файлов', findings: 'Замечания', clean: 'Замечаний нет — сканирование чистое.',
     emptyHint: 'Укажите путь и запустите сканирование или выберите прошлый запуск.',
     ownerOnly: 'Для запуска аудита требуется доступ владельца.', failed: 'Аудит не выполнен', quotaExceeded: 'Достигнут месячный лимит: использовано {used}/{cap} проверок. Обновите план, чтобы запускать больше.',
@@ -164,7 +164,7 @@ const COPY: Record<string, AuditCopy> = {
     reportsSubtitle: 'Двенадцать отчётов о готовности по идентификации, провайдерам, секретам, коду, биллингу и устранению.',
     openReport: 'Открыть', reportOwnerOnly: 'Эти отчёты доступны только владельцу рабочей области. Обновите план, чтобы создавать отчёты для своего подключённого стека.',
     reportSyncHint: 'Синхронизировано с последним сканированием.',
-    runningHint: 'Большие области могут занять несколько минут — процесс активен, не закрывайте вкладку.', pathHint: 'Путь в репозитории, напр. saas/app/api — не полный URL.',
+    runningHint: 'Большие области могут занять несколько минут — процесс активен, не закрывайте вкладку.', pathHint: 'Вставьте URL публичного репозитория GitHub, напр. https://github.com/owner/repo',
     sev: { critical: 'Критический', high: 'Высокий', medium: 'Средний', low: 'Низкий', info: 'Инфо' },
   },
 }
@@ -347,7 +347,7 @@ const { lang } = useI18n()
     try {
       const res = await fetch('/api/hub/operator/audit', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ prefix: prefix.trim() || 'saas/app/api', maxFiles }),
+        body: JSON.stringify({ url: prefix.trim(), maxFiles }),
       })
       if (res.status === 403) { setError(copy.ownerOnly); setPhase(null); return }
       if (res.status === 402) {
@@ -454,7 +454,7 @@ const { lang } = useI18n()
               <input
                 value={prefix}
                 onChange={e => setPrefix(e.target.value)}
-                placeholder="saas/app/api"
+                placeholder="https://github.com/owner/repo"
                 className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-accent"
               />
               <span className="text-[10.5px] leading-snug text-text-muted/80">{copy.pathHint}</span>

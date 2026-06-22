@@ -417,6 +417,10 @@
     "vercel": {
       "title": "Implantação e ambiente",
       "desc": "Variáveis por escopo, exposição e divergência prod/preview."
+    },
+    "activity": {
+      "title": "Registro de auditoria e atividade",
+      "desc": "Ações, atores e resultados registrados ao longo do tempo."
     }
   },
   "usage": {
@@ -619,5 +623,37 @@
     "loadError": "Não foi possível carregar o relatório de implantação.",
     "fetchError": "Erro: {msg}",
     "loading": "Carregando relatório de implantação…"
+  },
+  "activity": {
+    "title": "Registro de auditoria e linha do tempo de atividade",
+    "subtitle": "Ações, atores e resultados registrados no log de auditoria do Hub.",
+    "summary": {
+      "total": "Eventos",
+      "success": "Bem-sucedidas",
+      "failures": "Falhas",
+      "denials": "Bloqueadas / negadas",
+      "actors": "Atores"
+    },
+    "window": "Mostrando os {n} eventos mais recentes · {since} → {until}",
+    "empty": "Nenhum evento de auditoria registrado ainda.",
+    "col": {
+      "time": "Hora (UTC)",
+      "actor": "Ator",
+      "action": "Ação",
+      "target": "Alvo",
+      "status": "Status",
+      "message": "Mensagem"
+    },
+    "status": {
+      "success": "Sucesso",
+      "failure": "Falha",
+      "blocked": "Bloqueada",
+      "denied": "Negada",
+      "error": "Erro",
+      "config_error": "Erro de config."
+    },
+    "loadError": "Não foi possível carregar o registro de atividade.",
+    "fetchError": "Erro: {msg}",
+    "loading": "Carregando registro de atividade…"
   }
 }

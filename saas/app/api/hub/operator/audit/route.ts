@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  let body: { prefix?: string; maxFiles?: number } = {}
+  let body: { url?: string; prefix?: string; maxFiles?: number } = {}
   try { body = await req.json() } catch { /* defaults apply */ }
   // URL-first: a paying customer pastes their full GitHub repository URL. Falls back
   // to a legacy path prefix, and finally to the platform's own repo (whole-repo audit).

@@ -357,7 +357,8 @@
       "now": "Agora",
       "next": "Próximo",
       "later": "Depois",
-      "evidence": "Evidência"
+      "evidence": "Evidência",
+      "handled": "Tratados"
     },
     "tier": {
       "now": "Agora",
@@ -368,6 +369,20 @@
       "now": "Crítico — corrija imediatamente.",
       "next": "Alto — agende em breve.",
       "later": "Médio e baixo — planeje."
+    },
+    "handled": {
+      "title": "Tratados",
+      "subtitle": "Constatações que você marcou como resolvidas, aceitas ou que não serão corrigidas."
+    },
+    "state": {
+      "status": "Status",
+      "owner": "Responsável",
+      "ownerPlaceholder": "Atribuir…",
+      "open": "Aberto",
+      "in_progress": "Em andamento",
+      "resolved": "Resolvido",
+      "accepted": "Aceito",
+      "wont_fix": "Não será corrigido"
     }
   },
   "center": {

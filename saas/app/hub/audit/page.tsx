@@ -31,6 +31,7 @@ const REPORTS: ReportCard[] = [
   { key: 'supabase',    href: '/hub/audit/supabase',    accent: GOLD },
   { key: 'stripe',      href: '/hub/audit/stripe',      accent: CYAN },
   { key: 'vercel',      href: '/hub/audit/vercel',      accent: GOLD },
+  { key: 'activity',    href: '/hub/audit/activity',    accent: CYAN },
 ]
 
 export default function AuditCenterPage() {

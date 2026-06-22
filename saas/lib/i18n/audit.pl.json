@@ -417,6 +417,14 @@
     "stripe": {
       "title": "Konfiguracja płatności",
       "desc": "Tryb live, poziomy cen i pokrycie webhooków."
+    },
+    "compliance": {
+      "title": "Gotowość do zgodności",
+      "desc": "Gotowość względem SOC 2, ISO 27001, NIST CSF i CIS."
+    },
+    "activity": {
+      "title": "Dziennik audytu i aktywność",
+      "desc": "Zarejestrowane działania, podmioty i wyniki w czasie."
     }
   },
   "usage": {
@@ -619,5 +627,82 @@
     "loadError": "Nie udało się załadować raportu Stripe.",
     "fetchError": "Błąd: {msg}",
     "loading": "Ładowanie raportu Stripe…"
+  },
+  "compliance": {
+    "title": "Macierz gotowości do zgodności",
+    "subtitle": "Gotowość względem SOC 2, ISO 27001, NIST CSF i CIS — zmapowana z bieżących ustaleń.",
+    "disclaimer": "Tylko wskazanie gotowości — to nie jest certyfikat, atestacja ani formalny audyt. Kody referencyjne mają charakter orientacyjny.",
+    "overall": "Ogólna gotowość",
+    "summary": {
+      "families": "Rodziny kontroli",
+      "ready": "Gotowe",
+      "attention": "Wymagają uwagi",
+      "gaps": "Luki"
+    },
+    "readyOf": "{ready} z {total} gotowych",
+    "matrix": {
+      "title": "Rodziny kontroli"
+    },
+    "col": {
+      "family": "Rodzina kontroli",
+      "status": "Status",
+      "findings": "Ustalenia"
+    },
+    "fw": {
+      "soc2": "SOC 2",
+      "iso27001": "ISO 27001",
+      "nist": "NIST CSF",
+      "cis": "Kontrole CIS"
+    },
+    "family": {
+      "accessControl": "Kontrola dostępu i tożsamość",
+      "changeManagement": "Zarządzanie zmianami",
+      "dataSecurity": "Bezpieczeństwo danych",
+      "secrets": "Zarządzanie sekretami",
+      "configuration": "Konfiguracja i wdrożenie",
+      "logging": "Rejestrowanie i monitorowanie",
+      "inventory": "Inwentaryzacja zasobów",
+      "payments": "Integralność przetwarzania (płatności)"
+    },
+    "status": {
+      "ready": "Gotowe",
+      "attention": "Wymaga uwagi",
+      "gap": "Luka"
+    },
+    "loadError": "Nie udało się załadować raportu zgodności.",
+    "fetchError": "Błąd: {msg}",
+    "loading": "Ładowanie gotowości do zgodności…"
+  },
+  "activity": {
+    "title": "Dziennik audytu i oś czasu aktywności",
+    "subtitle": "Zarejestrowane działania, podmioty i wyniki z dziennika audytu Hub.",
+    "summary": {
+      "total": "Zdarzenia",
+      "success": "Udane",
+      "failures": "Niepowodzenia",
+      "denials": "Zablokowane / odrzucone",
+      "actors": "Podmioty"
+    },
+    "window": "Wyświetlanie {n} najnowszych zdarzeń · {since} → {until}",
+    "empty": "Brak zarejestrowanych zdarzeń audytu.",
+    "col": {
+      "time": "Czas (UTC)",
+      "actor": "Podmiot",
+      "action": "Działanie",
+      "target": "Cel",
+      "status": "Status",
+      "message": "Wiadomość"
+    },
+    "status": {
+      "success": "Sukces",
+      "failure": "Niepowodzenie",
+      "blocked": "Zablokowana",
+      "denied": "Odrzucona",
+      "error": "Błąd",
+      "config_error": "Błąd konfig."
+    },
+    "loadError": "Nie udało się załadować dziennika aktywności.",
+    "fetchError": "Błąd: {msg}",
+    "loading": "Ładowanie dziennika aktywności…"
   }
 }

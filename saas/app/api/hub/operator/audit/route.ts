@@ -17,6 +17,8 @@ import { getAccess } from '@/lib/auth/access'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { runAudit } from '@/lib/audit/runner'
 import { checkScanQuota, clampScanSize } from '@/lib/audit/scanThrottle'
+import { collectSnapshot } from '@/lib/audit/collectors'
+import { writeSnapshot } from '@/lib/audit/snapshotCache'
 
 export const runtime     = 'nodejs'
 export const maxDuration = 300
@@ -129,6 +131,16 @@ export async function POST(req: NextRequest) {
         // findings are already persisted normalized in audit_findings).
         const payload = { runId, prefix, filesScanned: result.filesScanned, findingsCount: result.findings.length, findings: result.findings }
         await admin.from('audit_logs').insert({ run_id: runId, user_id: ctx.userId, payload })
+
+        // Central provider snapshot — collect fresh provider facts ONCE and cache
+        // them so every /api/hub/audit/* report card reads from here instead of
+        // re-collecting live. Best-effort: never fail the run if this step errors.
+        try {
+          const snapshot = await collectSnapshot()
+          await writeSnapshot(admin, { runId, userId: ctx.userId, snapshot })
+        } catch (snapErr) {
+          console.error('audit snapshot cache write failed', snapErr instanceof Error ? snapErr.message : snapErr)
+        }
 
         send({ phase: 'DONE', ok: true, ...payload })
         controller.close()

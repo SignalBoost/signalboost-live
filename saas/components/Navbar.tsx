@@ -79,6 +79,7 @@ const DASHBOARD_MENU: Item[] = [
 
 const WORKSPACE: Item[] = [
   { icon: '🏠', key: 'ws.dashboard', href: '/dashboard' },
+  { icon: '🔍', key: 'adm.audit', href: '/dashboard/audit' },
   { icon: '🤖', key: 'ws.assistant', href: '/dashboard/assistant' },
   { icon: '📅', key: 'ws.calendar', href: '/dashboard/calendar' },
   { icon: '📑', key: 'ws.spreadsheets', href: '/dashboard/spreadsheets' },
@@ -88,7 +89,6 @@ const WORKSPACE: Item[] = [
 
 const ADMIN: Item[] = [
   { icon: '🎛️', key: 'adm.hub', href: '/hub' },
-  { icon: '🔍', key: 'adm.audit', href: '/dashboard/audit' },
   { icon: '🛰️', key: 'adm.mission', href: '/admin' },
   { icon: '🌌', key: 'adm.overview', href: '/admin/overview' },
   { icon: '💰', key: 'adm.revenue', href: '/admin/revenue' },

@@ -3,7 +3,7 @@
 // returns the deterministic readiness crosswalk (families × frameworks).
 
 import { NextResponse } from 'next/server'
-import { requireOwner } from '@/lib/auth/access'
+import { requireAdmin } from '@/lib/auth/access'
 import { collectSnapshot } from '@/lib/audit/collectors'
 import { buildComplianceReport } from '@/lib/audit/complianceReport'
 
@@ -12,7 +12,7 @@ export const runtime = 'nodejs'
 export const maxDuration = 60
 
 export async function GET() {
-  const guard = await requireOwner()
+  const guard = await requireAdmin()
   if (!guard.ok) {
     return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status })
   }

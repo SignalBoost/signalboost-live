@@ -1,158 +1,192 @@
-// saas/app/api/hub/operator/audit/route.ts
-// Primary orchestration endpoint for the Audit Project microservice.
-// Streams NDJSON phase events as the run progresses, so the console can animate
-// a real-time tracker. Phases (one JSON object per line):
-//   {phase:'SCAN_TARGET', prefix}
-//   {phase:'RUN_ANALYZERS', done, total}        (repeated as files complete)
-//   {phase:'GENERATE_REPORT', findings}
-//   {phase:'PREPARE_PRS'}                        (findings stored, ready to patch)
-//   {phase:'DONE', ok, runId, filesScanned, findingsCount, findings}
-//   {phase:'ERROR', error}
-// Owner-gated. Persists to Supabase (audit_runs + audit_findings).
-// Note: a run does NOT create PRs — PREPARE_PRS marks that findings are stored and
-// patchable via the per-finding drawer flow. Load-isolated with its own duration.
+'use client'
 
-import { NextRequest, NextResponse } from 'next/server'
-import { getAccess } from '@/lib/auth/access'
-import { getAdminSupabase } from '@/utils/supabase/server'
-import { runAudit } from '@/lib/audit/runner'
-import { checkScanQuota, clampScanSize } from '@/lib/audit/scanThrottle'
-import { collectSnapshot } from '@/lib/audit/collectors'
-import { writeSnapshot } from '@/lib/audit/snapshotCache'
+// saas/app/hub/audit/executive/page.tsx
+// Executive Risk Summary page — fetches the owner-gated report and renders the
+// ExecutiveSummary component with loading / error states. Passes the active
+// language so the LLM narrative comes back localized.
 
-export const runtime     = 'nodejs'
-export const maxDuration = 300
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { useTranslation } from '@/components/i18n/useTranslation'
+import { interpolate } from '@/lib/i18n/interpolate'
+import ExecutiveSummary, { type ExecutiveSummaryView } from '@/components/audit/ExecutiveSummary'
+import ReportExportBar from '@/components/audit/ReportExportBar'
+import { toCsv } from '@/lib/audit/exportCsv'
 
-async function preflightOpenAI(): Promise<{ ok: boolean; error?: string }> {
-  const key = process.env.OPENAI_API_KEY
-  if (!key) return { ok: false, error: 'OPENAI_API_KEY is not configured.' }
-  try {
-    const res = await fetch('https://api.openai.com/v1/models', { headers: { Authorization: `Bearer ${key}` }, cache: 'no-store' })
-    if (!res.ok) return { ok: false, error: `OpenAI key did not authenticate (HTTP ${res.status}).` }
-    return { ok: true }
-  } catch (e: unknown) {
-    return { ok: false, error: e instanceof Error ? e.message : 'OpenAI preflight request failed.' }
-  }
-}
+// Flat result shape — the repo's tsconfig is non-strict, so discriminated unions
+// do not narrow on `if (!json.ok)`. Keep ok/report/error on one object.
+type ApiResponse = { ok: boolean; report?: ExecutiveSummaryView; error?: string }
 
-export async function POST(req: NextRequest) {
-  const ctx = await getAccess()
-  if (!ctx.userId) {
-    return NextResponse.json({ ok: false, error: 'Not signed in.' }, { status: 401 })
-  }
+const wrap: CSSProperties = { minHeight: 'calc(100vh - 80px)' }
 
-  // Access is governed PURELY by the audit-tier entitlement throttle — no isAdmin
-  // gate. checkScanQuota() reads the live audit tier (subscriptions.audit_plan /
-  // audit_status, NOT subscriptions.plan): owner ⇒ master/exempt, Free ⇒ 1 lifetime
-  // scan, paid tiers ⇒ their monthly cap. Over cap returns 402 (upgrade).
-  // NOTE: every caller's scan still targets AUDIT_GITHUB_REPO (the configured repo)
-  // until a per-customer scan target is wired — keep that in mind before promoting
-  // customer access broadly.
-  const admin = getAdminSupabase()
+export default function ExecutiveSummaryPage() {
+  const { t, lang } = useTranslation()
 
-  // Throttle policy — resolve the tier for everyone (owner ⇒ exempt enterprise),
-  // and hard-block non-owners at their tier cap. The resolved tier also drives
-  // the pre-call size clamp below.
-  const quota = await checkScanQuota(admin, { userId: ctx.userId, isOwner: ctx.isOwner })
-  if (!quota.ok) {
-    const capLabel = quota.cap == null ? '∞' : String(quota.cap)
-    const windowLabel = quota.window === 'lifetime' ? 'lifetime' : 'this month'
-    return NextResponse.json(
-      {
-        ok: false,
-        code: 'scan_quota_exceeded',
-        upgrade: true,
-        tier: quota.tier,
-        window: quota.window,
-        cap: quota.cap,
-        used: quota.used,
-        error: `Scan limit reached: ${quota.used}/${capLabel} audit scans used ${windowLabel}. Upgrade your plan to run more.`,
-      },
-      { status: 402 },
+  const [data, setData] = useState<ExecutiveSummaryView | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      setLoading(true)
+      try {
+        const res = await fetch(`/api/hub/audit/executive-summary?lang=${encodeURIComponent(lang || 'en')}`, { credentials: 'include' })
+        const json = (await res.json().catch(() => null)) as ApiResponse | null
+        if (!alive) return
+        if (!json) {
+          setError(t('audit.exec.loadError', 'Could not load the summary.'))
+          return
+        }
+        if (!json.ok || !json.report) {
+          setError(json.error || t('audit.exec.loadError', 'Could not load the summary.'))
+          return
+        }
+        setData(json.report)
+        setError(null)
+      } catch (err: unknown) {
+        if (!alive) return
+        const msg = err instanceof Error ? err.message : String(err)
+        setError(interpolate(t('audit.exec.fetchError', 'Error: {msg}'), { msg }))
+      } finally {
+        if (alive) setLoading(false)
+      }
+    })()
+    return () => { alive = false }
+  }, [lang, t])
+
+  if (loading) {
+    return (
+      <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,.6)', padding: 24 }}>
+        {t('audit.exec.loading', 'Building executive summary…')}
+      </main>
     )
   }
 
-  let body: { prefix?: string; maxFiles?: number } = {}
-  try { body = await req.json() } catch { /* defaults apply */ }
-  const prefix   = typeof body.prefix === 'string' && body.prefix.trim() ? body.prefix.trim() : 'saas/app/api'
-  // Pre-call size check — clamp into [1, tier ceiling] to bound model cost.
-  const maxFiles = clampScanSize(body.maxFiles, quota.tier)
+  if (error) {
+    return (
+      <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: '#fca5a5', padding: 24 }}>
+        {error}
+      </main>
+    )
+  }
 
-  const enc = new TextEncoder()
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      const send = (obj: Record<string, unknown>) => {
-        try { controller.enqueue(enc.encode(JSON.stringify(obj) + '\n')) } catch { /* client gone */ }
+  if (!data) return null
+  const csv = toCsv(
+    ['Severity', 'Title', 'Detail', 'Recommendation'],
+    data.topRisks.map(f => [f.severity, f.fallback.title, f.fallback.detail, f.fallback.recommendation]),
+  )
+  const deep = ((data as any).deepReport as string) || ''
+  return (
+    <>
+      <ReportExportBar filename="executive-risk-summary" csv={csv} />
+      <ExecutiveSummary data={data} />
+      {deep ? (
+        <main style={{ maxWidth: 980, margin: '0 auto', padding: '4px 24px 56px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0 14px' }}>
+            <span aria-hidden style={{ color: '#ffc300' }}>✍️</span>
+            <h2 style={{ fontSize: 13, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.6)', margin: 0 }}>
+              {t('audit.exec.deepTitle', 'Full Narrative Report')}
+            </h2>
+          </div>
+          <article style={{ border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, background: 'rgba(255,255,255,.02)', padding: '18px 24px' }}>
+            <Markdown source={deep} />
+          </article>
+        </main>
+      ) : null}
+    </>
+  )
+}
+
+// ── Lightweight, dependency-free markdown renderer (headings, paragraphs, bold,
+// inline code, code fences, bullet/ordered lists, blockquotes, and tables). Styled
+// with the audit palette (gold #ffc300, cyan #1af0ff). ──────────────────────────
+const MD_TXT = 'rgba(255,255,255,.82)'
+
+function mdInline(text: string, keyBase: string): ReactNode[] {
+  const nodes: ReactNode[] = []
+  const re = /(\*\*([^*]+)\*\*|`([^`]+)`)/g
+  let last = 0, k = 0
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) nodes.push(text.slice(last, m.index))
+    if (m[2] !== undefined) {
+      nodes.push(<strong key={`${keyBase}-b${k}`} style={{ color: '#fff', fontWeight: 700 }}>{m[2]}</strong>)
+    } else if (m[3] !== undefined) {
+      nodes.push(<code key={`${keyBase}-c${k}`} style={{ fontFamily: 'ui-monospace, SFMono-Regular, monospace', fontSize: '.86em', background: 'rgba(26,240,255,.08)', color: '#1af0ff', padding: '1px 5px', borderRadius: 4 }}>{m[3]}</code>)
+    }
+    last = m.index + m[0].length; k++
+  }
+  if (last < text.length) nodes.push(text.slice(last))
+  return nodes
+}
+
+function Markdown({ source }: { source: string }) {
+  const lines = String(source || '').replace(/\r\n/g, '\n').split('\n')
+  const out: ReactNode[] = []
+  let i = 0, key = 0
+
+  while (i < lines.length) {
+    const line = lines[i]
+
+    if (/^```/.test(line)) {
+      const buf: string[] = []; i++
+      while (i < lines.length && !/^```/.test(lines[i])) { buf.push(lines[i]); i++ }
+      i++
+      out.push(<pre key={key++} style={{ overflowX: 'auto', background: 'rgba(0,0,0,.35)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 8, padding: 12, margin: '10px 0' }}><code style={{ fontFamily: 'ui-monospace, SFMono-Regular, monospace', fontSize: 12.5, color: '#cfe7ff', whiteSpace: 'pre' }}>{buf.join('\n')}</code></pre>)
+      continue
+    }
+
+    if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1])) {
+      const header = line.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim())
+      i += 2
+      const rows: string[][] = []
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) {
+        rows.push(lines[i].trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim())); i++
       }
-      try {
-        const pre = await preflightOpenAI()
-        if (!pre.ok) { send({ phase: 'ERROR', error: `Preflight failed: ${pre.error}` }); controller.close(); return }
+      out.push(
+        <div key={key++} style={{ overflowX: 'auto', margin: '12px 0' }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 13 }}>
+            <thead><tr>{header.map((h, hi) => <th key={hi} style={{ textAlign: 'left', padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,.16)', color: '#ffc300', fontWeight: 700, whiteSpace: 'nowrap' }}>{mdInline(h, `th${key}-${hi}`)}</th>)}</tr></thead>
+            <tbody>{rows.map((r, ri) => <tr key={ri}>{r.map((c, ci) => <td key={ci} style={{ padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,.06)', color: MD_TXT, verticalAlign: 'top' }}>{mdInline(c, `td${key}-${ri}-${ci}`)}</td>)}</tr>)}</tbody>
+          </table>
+        </div>
+      )
+      continue
+    }
 
-        send({ phase: 'SCAN_TARGET', prefix })
+    const h = line.match(/^(#{1,4})\s+(.*)$/)
+    if (h) {
+      const lvl = h[1].length
+      const sizes = [22, 18, 15, 13.5]
+      out.push(<div key={key++} style={{ fontSize: sizes[lvl - 1], fontWeight: 700, color: lvl <= 2 ? '#fff' : '#ffc300', margin: lvl === 1 ? '20px 0 10px' : '16px 0 8px', lineHeight: 1.3 }}>{mdInline(h[2], `h${key}`)}</div>)
+      i++; continue
+    }
 
-        const started = await admin.from('audit_runs').insert({ status: 'running', prefix, created_by: ctx.userId }).select('id').single()
-        if (started.error || !started.data) {
-          send({ phase: 'ERROR', error: `Could not open audit run: ${started.error?.message || 'insert failed'}` }); controller.close(); return
-        }
-        const runId = started.data.id as string
+    if (/^\s*[-*]\s+/.test(line)) {
+      const items: string[] = []
+      while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) { items.push(lines[i].replace(/^\s*[-*]\s+/, '')); i++ }
+      out.push(<ul key={key++} style={{ margin: '8px 0', paddingLeft: 22, color: MD_TXT, lineHeight: 1.65 }}>{items.map((it, ii) => <li key={ii} style={{ margin: '3px 0' }}>{mdInline(it, `ul${key}-${ii}`)}</li>)}</ul>)
+      continue
+    }
 
-        const result = await runAudit({
-          prefix, maxFiles,
-          onProgress: (done, total) => send({ phase: 'RUN_ANALYZERS', done, total }),
-        })
+    if (/^\s*\d+\.\s+/.test(line)) {
+      const items: string[] = []
+      while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) { items.push(lines[i].replace(/^\s*\d+\.\s+/, '')); i++ }
+      out.push(<ol key={key++} style={{ margin: '8px 0', paddingLeft: 24, color: MD_TXT, lineHeight: 1.65 }}>{items.map((it, ii) => <li key={ii} style={{ margin: '3px 0' }}>{mdInline(it, `ol${key}-${ii}`)}</li>)}</ol>)
+      continue
+    }
 
-        if (!result.ok) {
-          await admin.from('audit_runs').update({ status: 'failed', error: result.error || 'runner error', files_scanned: 0, findings_count: 0 }).eq('id', runId)
-          send({ phase: 'ERROR', runId, error: result.error || 'Audit runner failed.' }); controller.close(); return
-        }
+    if (/^\s*>\s?/.test(line)) {
+      out.push(<blockquote key={key++} style={{ borderLeft: '3px solid #ffc300', margin: '10px 0', padding: '4px 14px', color: 'rgba(255,255,255,.72)', background: 'rgba(255,255,255,.02)' }}>{mdInline(line.replace(/^\s*>\s?/, ''), `bq${key}`)}</blockquote>)
+      i++; continue
+    }
 
-        send({ phase: 'GENERATE_REPORT', findings: result.findings.length })
+    if (line.trim() === '') { i++; continue }
 
-        if (result.findings.length > 0) {
-          const rows = result.findings.map(f => ({
-            run_id: runId, file: f.file, severity: f.severity, category: f.category,
-            title: f.title, detail: f.detail, recommendation: f.recommendation, line: f.line ?? null,
-          }))
-          const ins = await admin.from('audit_findings').insert(rows)
-          if (ins.error) {
-            await admin.from('audit_runs').update({ status: 'failed', error: `findings insert: ${ins.error.message}` }).eq('id', runId)
-            send({ phase: 'ERROR', runId, error: `Could not store findings: ${ins.error.message}` }); controller.close(); return
-          }
-        }
+    const buf: string[] = [line]; i++
+    while (i < lines.length && lines[i].trim() !== '' && !/^(#{1,4}\s|```|\s*[-*]\s|\s*\d+\.\s|\s*>\s|\s*\|)/.test(lines[i])) { buf.push(lines[i]); i++ }
+    out.push(<p key={key++} style={{ margin: '9px 0', color: MD_TXT, lineHeight: 1.7, fontSize: 14 }}>{mdInline(buf.join(' '), `p${key}`)}</p>)
+  }
 
-        send({ phase: 'PREPARE_PRS' })
-
-        await admin.from('audit_runs').update({
-          status: 'complete', files_scanned: result.filesScanned.length,
-          findings_count: result.findings.length, provider: 'openai', model: 'gpt-5.5',
-        }).eq('id', runId)
-
-        // Immutable full-payload snapshot for instant rehydration (best-effort:
-        // findings are already persisted normalized in audit_findings).
-        const payload = { runId, prefix, filesScanned: result.filesScanned, findingsCount: result.findings.length, findings: result.findings }
-        await admin.from('audit_logs').insert({ run_id: runId, user_id: ctx.userId, payload })
-
-        // Central provider snapshot — collect fresh provider facts ONCE and cache
-        // them so every /api/hub/audit/* report card reads from here instead of
-        // re-collecting live. Best-effort: never fail the run if this step errors.
-        try {
-          const snapshot = await collectSnapshot()
-          ;(snapshot as any).narrative = result.narrative || ''
-          await writeSnapshot(admin, { runId, userId: ctx.userId, snapshot })
-        } catch (snapErr) {
-          console.error('audit snapshot cache write failed', snapErr instanceof Error ? snapErr.message : snapErr)
-        }
-
-        send({ phase: 'DONE', ok: true, ...payload })
-        controller.close()
-      } catch (e: unknown) {
-        send({ phase: 'ERROR', error: e instanceof Error ? e.message : 'Audit run failed.' })
-        controller.close()
-      }
-    },
-  })
-
-  return new Response(stream, {
-    headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' },
-  })
+  return <div>{out}</div>
 }

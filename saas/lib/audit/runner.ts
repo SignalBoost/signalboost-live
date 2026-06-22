@@ -6,6 +6,7 @@
 
 import { listRepoFiles, readRepoFile } from '@/lib/ai/tools/repoReader'
 import { callAuditModel } from '@/lib/audit/modelRouter'
+import { synthesizeReport } from '@/lib/audit/synthesize'
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info'
 
@@ -23,6 +24,7 @@ export interface AuditRunResult {
   ok:           boolean
   findings:     AuditFinding[]
   filesScanned: string[]
+  narrative?:    string
   error?:       string
 }
 
@@ -30,6 +32,20 @@ const SCANNABLE = /\.(ts|tsx|js|jsx|sql)$/i
 const SEVERITIES: Severity[] = ['critical', 'high', 'medium', 'low', 'info']
 const MAX_CAP     = 60   // raised from 25 — full-repo sweeps
 const CONCURRENCY = 4    // parallel model calls; conservative re: OpenAI rate limits
+const AUDIT_REPO  = process.env.AUDIT_GITHUB_REPO || 'SignalBoost/signalboost-live'
+
+// Accept either a repo path prefix OR a full GitHub URL and reduce it to the
+// in-repo sub-path, so a report is produced whether or not the user pastes a URL:
+//   https://github.com/owner/repo                    -> ''      (falls back to default scope)
+//   https://github.com/owner/repo/tree/main/saas/app -> 'saas/app'
+//   saas/app/api                                     -> 'saas/app/api'
+export function normalizeScanPath(input?: string): string {
+  let p = String(input || '').trim()
+  if (!p) return ''
+  const m = p.match(/github\.com\/[^/]+\/[^/]+(?:\/(?:tree|blob)\/[^/]+)?\/?(.*)$/i)
+  if (m) p = m[1] || ''
+  return p.replace(/^\/+/, '').replace(/\/+$/, '')
+}
 
 function buildPrompt(path: string, content: string): string {
   return [
@@ -101,7 +117,7 @@ async function scanOne(path: string): Promise<{ path: string; scanned: boolean; 
 }
 
 export async function runAudit(opts?: { prefix?: string; maxFiles?: number; onProgress?: (done: number, total: number) => void }): Promise<AuditRunResult> {
-  const prefix   = (opts?.prefix || 'saas/app/api').trim()
+  const prefix   = normalizeScanPath(opts?.prefix) || 'saas/app/api'
   const maxFiles = Math.max(1, Math.min(opts?.maxFiles ?? 6, MAX_CAP))
 
   const list = await listRepoFiles(prefix)
@@ -129,5 +145,18 @@ export async function runAudit(opts?: { prefix?: string; maxFiles?: number; onPr
   }
 
   findings.sort((a, b) => SEVERITIES.indexOf(a.severity) - SEVERITIES.indexOf(b.severity))
-  return { ok: true, findings, filesScanned: scanned }
+
+  // Post-scan synthesis pass — turn the per-file findings into one holistic,
+  // narrative markdown report. Best-effort: never fails the run.
+  const narrative = await synthesizeReport({
+    repo:         AUDIT_REPO,
+    scope:        prefix,
+    filesScanned: scanned,
+    findings:     findings.map(f => ({
+      file: f.file, severity: f.severity, category: f.category,
+      title: f.title, detail: f.detail, recommendation: f.recommendation, line: f.line,
+    })),
+  })
+
+  return { ok: true, findings, filesScanned: scanned, narrative }
 }

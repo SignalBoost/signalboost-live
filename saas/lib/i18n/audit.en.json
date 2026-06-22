@@ -421,6 +421,10 @@
     "activity": {
       "title": "Audit Log & Activity",
       "desc": "Recorded actions, actors, and results over time."
+    },
+    "compliance": {
+      "title": "Compliance Readiness",
+      "desc": "Readiness across SOC 2, ISO 27001, NIST CSF, and CIS."
     }
   },
   "usage": {
@@ -655,5 +659,50 @@
     "loadError": "Could not load the activity log.",
     "fetchError": "Error: {msg}",
     "loading": "Loading activity log…"
+  },
+  "compliance": {
+    "title": "Compliance Readiness Matrix",
+    "subtitle": "Readiness against SOC 2, ISO 27001, NIST CSF, and CIS — mapped from your current findings.",
+    "disclaimer": "Readiness indication only — this is not a certification, attestation, or formal audit. Reference codes are indicative.",
+    "overall": "Overall readiness",
+    "summary": {
+      "families": "Control families",
+      "ready": "Ready",
+      "attention": "Needs attention",
+      "gaps": "Gaps"
+    },
+    "readyOf": "{ready} of {total} ready",
+    "matrix": {
+      "title": "Control families"
+    },
+    "col": {
+      "family": "Control family",
+      "status": "Status",
+      "findings": "Findings"
+    },
+    "fw": {
+      "soc2": "SOC 2",
+      "iso27001": "ISO 27001",
+      "nist": "NIST CSF",
+      "cis": "CIS Controls"
+    },
+    "family": {
+      "accessControl": "Access Control & Identity",
+      "changeManagement": "Change Management",
+      "dataSecurity": "Data Security",
+      "secrets": "Secrets Management",
+      "configuration": "Configuration & Deployment",
+      "logging": "Logging & Monitoring",
+      "inventory": "Asset Inventory",
+      "payments": "Processing Integrity (Payments)"
+    },
+    "status": {
+      "ready": "Ready",
+      "attention": "Needs attention",
+      "gap": "Gap"
+    },
+    "loadError": "Could not load the compliance report.",
+    "fetchError": "Error: {msg}",
+    "loading": "Loading compliance readiness…"
   }
 }

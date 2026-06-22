@@ -11,9 +11,26 @@
 // non-admins get an owner-scoped upgrade panel (reports read the workspace's own
 // infrastructure and are admin-gated server-side).
 
-import { useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { useTranslation } from '@/components/i18n/useTranslation'
+
+// The 12 live report views, mounted directly (NOT iframed) so they render inside
+// the drawer without the global app shell/navbar. Each is code-split via lazy().
+const REPORT_VIEWS: Record<string, ReturnType<typeof lazy>> = {
+  executive:   lazy(() => import('@/app/hub/audit/executive/page')),
+  providers:   lazy(() => import('@/app/hub/audit/providers/page')),
+  secrets:     lazy(() => import('@/app/hub/audit/secrets/page')),
+  identity:    lazy(() => import('@/app/hub/audit/identity/page')),
+  github:      lazy(() => import('@/app/hub/audit/github/page')),
+  vercel:      lazy(() => import('@/app/hub/audit/vercel/page')),
+  supabase:    lazy(() => import('@/app/hub/audit/supabase/page')),
+  stripe:      lazy(() => import('@/app/hub/audit/stripe/page')),
+  activity:    lazy(() => import('@/app/hub/audit/activity/page')),
+  compliance:  lazy(() => import('@/app/hub/audit/compliance/page')),
+  remediation: lazy(() => import('@/app/hub/audit/remediation/page')),
+  usage:       lazy(() => import('@/app/hub/audit/usage/page')),
+}
 
 type Finding = {
   file: string
@@ -413,281 +430,3 @@ export default function AuditCenterPage() {
         <div className="rounded-md border border-border bg-surface p-4">
           <div className="flex flex-wrap items-end gap-3">
             <label className="flex min-w-[200px] flex-[1_1_280px] flex-col gap-1.5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">{copy.pathLabel}</span>
-              <input
-                value={prefix}
-                onChange={e => setPrefix(e.target.value)}
-                placeholder="saas/app/api"
-                className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-accent"
-              />
-            </label>
-            <label className="flex w-[120px] flex-col gap-1.5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">{copy.maxLabel}</span>
-              <input
-                type="number" min={1} max={60} value={maxFiles}
-                onChange={e => setMaxFiles(Math.max(1, Math.min(60, Number(e.target.value) || 1)))}
-                className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-accent"
-              />
-            </label>
-            <button
-              onClick={runNew}
-              disabled={loading}
-              className="inline-flex items-center justify-center whitespace-nowrap rounded-md border border-accent bg-accent px-5 py-2 text-sm font-semibold text-bg transition-fast hover:brightness-110 disabled:opacity-60"
-            >
-              {loading ? copy.running : copy.run}
-            </button>
-          </div>
-        </div>
-
-        {phase && <PhaseTracker phase={phase} progress={progress} copy={copy} />}
-
-        {error && (
-          <div className="mt-4 rounded-md border border-danger bg-surface p-3 text-sm text-danger">{copy.failed}: {error}</div>
-        )}
-
-        {/* Findings + history */}
-        <div className="mt-4 flex flex-wrap items-start gap-4">
-          {/* History */}
-          <aside className="min-w-[240px] max-w-[300px] flex-[1_1_260px] rounded-md border border-border bg-surface p-3.5">
-            <div className="mb-2.5 flex items-center justify-between">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">{copy.history}</span>
-              <button onClick={loadHistory} className="rounded-md border border-border bg-bg px-2.5 py-1 text-[11px] font-semibold text-text-muted transition-fast hover:bg-surface">{copy.refresh}</button>
-            </div>
-            {runs.length === 0 ? (
-              <div className="px-0.5 py-2 text-xs text-text-muted">{copy.noRuns}</div>
-            ) : (
-              <div className="flex max-h-[calc(100vh-280px)] flex-col gap-1.5 overflow-y-auto">
-                {runs.map(r => {
-                  const active = r.id === selectedRunId
-                  return (
-                    <button
-                      key={r.id}
-                      onClick={() => openRun(r.id)}
-                      className={`rounded-md border px-2.5 py-2 text-left transition-fast ${active ? 'border-accent bg-bg' : 'border-border bg-bg hover:border-accent'}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDot(r.status)}`} />
-                        <span className={`text-[11px] font-semibold ${statusText(r.status)}`}>{statusLabel(copy, r.status)}</span>
-                        <span className={`ml-auto text-[11px] font-bold ${r.findings_count > 0 ? 'text-accent' : 'text-text-muted'}`}>{r.findings_count}</span>
-                      </div>
-                      <div className="mt-1 truncate font-mono text-[10.5px] text-text-muted">{r.prefix || '—'}</div>
-                      <div className="mt-0.5 text-[10px] text-text-muted/70">{timeShort(r.created_at, lang)}</div>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </aside>
-
-          {/* Findings column */}
-          <section className="min-w-[320px] flex-[999_1_420px]">
-            {view ? (
-              <>
-                <div className="mb-3 flex flex-wrap gap-3">
-                  <Stat label={copy.filesScanned} value={String(view.filesScanned)} accent="text-[#1af0ff]" />
-                  <Stat label={copy.findings} value={String(view.findingsCount)} accent="text-accent" />
-                </div>
-                {findings.length === 0 ? (
-                  <div className="rounded-md border border-border bg-surface p-4 text-sm text-text-muted">{copy.clean}</div>
-                ) : (
-                  <div className="max-h-[calc(100vh-380px)] overflow-y-auto rounded-md border border-border bg-surface p-1.5">
-                    {findings.map((f, i) => {
-                      const sev = asSev(f.severity)
-                      return (
-                        <div
-                          key={i}
-                          onClick={() => setSelectedFinding(f)}
-                          className={`cursor-pointer p-3.5 ${i < findings.length - 1 ? 'border-b border-border' : ''}`}
-                        >
-                          <div className="flex flex-wrap items-center gap-2.5">
-                            <span className={`rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${sevText(sev)}`}>{copy.sev[sev]}</span>
-                            <span className="text-sm font-semibold text-text">{f.title}</span>
-                          </div>
-                          <div className="mt-1.5 font-mono text-[11px] text-text-muted">
-                            {f.file}{typeof f.line === 'number' ? `  ·  ${copy.line} ${f.line}` : ''}  ·  {copy.category}: {f.category}
-                          </div>
-                          {f.detail && <p className="mt-2 text-[13px] leading-relaxed text-text">{f.detail}</p>}
-                          {f.recommendation && (
-                            <div className="mt-2 rounded-md border border-border bg-bg px-3 py-2">
-                              <span className="text-[10px] font-semibold uppercase tracking-wide text-accent">{copy.recommendation}</span>
-                              <p className="mt-1 text-[12.5px] leading-relaxed text-text-muted">{f.recommendation}</p>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </>
-            ) : (
-              !error && !loading && <div className="text-[12.5px] text-text-muted">{copy.emptyHint}</div>
-            )}
-          </section>
-        </div>
-
-        {/* ── Compliance & Readiness Reports (12-card grid) ──────────────── */}
-        <div className="mt-10 mb-3 flex flex-wrap items-end justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-sm" aria-hidden>📊</span>
-            <div>
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-text-muted">{copy.reportsTitle}</h2>
-              <p className="mt-0.5 max-w-[680px] text-[12.5px] leading-relaxed text-text-muted/80">{copy.reportsSubtitle}</p>
-            </div>
-          </div>
-          {hasSynced && (
-            <span className="rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-medium text-[#34d399]">● {copy.reportSyncHint}</span>
-          )}
-        </div>
-
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
-          {REPORTS.map((r, idx) => {
-            const accent = idx % 2 === 0 ? 'text-accent' : 'text-[#1af0ff]'
-            const isExec = r.key === 'executive'
-            return (
-              <button
-                key={r.key}
-                onClick={() => setOpenReportKey(r.key)}
-                className="flex flex-col gap-2 rounded-md border border-border bg-surface p-4 text-left transition-fast hover:border-accent"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-lg" aria-hidden>{r.icon}</span>
-                  {isExec && view && (
-                    <span className="rounded-full border border-border bg-bg px-2 py-0.5 text-[10px] font-bold text-accent">
-                      {view.findingsCount} {copy.findings}
-                    </span>
-                  )}
-                </div>
-                <div className="text-sm font-semibold text-text">{t(`audit.center.${r.key}.title`, r.title)}</div>
-                <div className="flex-1 text-[12px] leading-relaxed text-text-muted">{t(`audit.center.${r.key}.desc`, r.desc)}</div>
-                <div className={`mt-1 text-[12px] font-semibold ${accent}`}>{copy.openReport} →</div>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* ── Report drawer (520px) ─────────────────────────────────────────── */}
-      {openReport && (
-        <div
-          onClick={closeReport}
-          className="fixed inset-0 z-[1000] flex justify-end transition-[background] duration-200"
-          style={{ background: reportEntered ? 'rgba(2,3,6,.62)' : 'rgba(2,3,6,0)', backdropFilter: reportEntered ? 'blur(4px)' : 'none', WebkitBackdropFilter: reportEntered ? 'blur(4px)' : 'none' }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            className="fixed right-0 top-0 flex h-full w-[520px] max-w-full flex-col border-l border-border bg-surface p-6 transition-transform duration-300"
-            style={{ transform: reportEntered ? 'translateX(0)' : 'translateX(100%)', boxShadow: '-20px 0 60px rgba(0,0,0,.5)' }}
-          >
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-lg" aria-hidden>{openReport.icon}</span>
-                <h2 className="text-base font-semibold text-text">{t(`audit.center.${openReport.key}.title`, openReport.title)}</h2>
-              </div>
-              <button onClick={closeReport} aria-label={copy.close} className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-text-muted transition-fast hover:bg-bg">×</button>
-            </div>
-
-            {isAdmin ? (
-              <div className="min-h-0 flex-1 overflow-hidden rounded-md border border-border bg-bg">
-                <iframe
-                  key={refreshTick}
-                  src={`/hub/audit/${openReport.key}?ts=${refreshTick}`}
-                  title={openReport.title}
-                  className="h-full w-full border-0 bg-transparent"
-                />
-              </div>
-            ) : (
-              <div className="flex min-h-0 flex-1 flex-col items-start justify-center gap-4 rounded-md border border-border bg-bg p-6">
-                <span className="text-2xl" aria-hidden>🔒</span>
-                <p className="text-sm leading-relaxed text-text-muted">{copy.reportOwnerOnly}</p>
-                <a href="/dashboard/audit/pricing" className="inline-flex items-center justify-center rounded-md border border-accent bg-accent px-4 py-2 text-sm font-semibold text-bg transition-fast hover:brightness-110">
-                  {copy.viewPlans}
-                </a>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── Finding-detail drawer ─────────────────────────────────────────── */}
-      {selectedFinding && (() => {
-        const sev = asSev(selectedFinding.severity)
-        return (
-          <div
-            onClick={() => setSelectedFinding(null)}
-            className="fixed inset-0 z-[1000] flex justify-end transition-[background] duration-200"
-            style={{ background: entered ? 'rgba(2,3,6,.62)' : 'rgba(2,3,6,0)', backdropFilter: entered ? 'blur(4px)' : 'none', WebkitBackdropFilter: entered ? 'blur(4px)' : 'none' }}
-          >
-            <div
-              onClick={e => e.stopPropagation()}
-              className="fixed right-0 top-0 h-full w-[480px] max-w-full overflow-y-auto border-l border-border bg-surface p-6 transition-transform duration-300"
-              style={{ transform: entered ? 'translateX(0)' : 'translateX(100%)', boxShadow: '-20px 0 60px rgba(0,0,0,.5)' }}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <span className={`rounded-full border border-border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${sevText(sev)}`}>{copy.sev[sev]}</span>
-                <button onClick={() => setSelectedFinding(null)} aria-label={copy.close} className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-text-muted transition-fast hover:bg-bg">×</button>
-              </div>
-
-              <h2 className="mt-3.5 mb-1 text-lg font-semibold leading-snug text-text">{selectedFinding.title}</h2>
-              <div className="break-all font-mono text-[11.5px] text-text-muted">
-                {selectedFinding.file}{typeof selectedFinding.line === 'number' ? `  ·  ${copy.line} ${selectedFinding.line}` : ''}
-              </div>
-              <div className="mt-1.5 text-[11px] text-text-muted">{copy.category}: {selectedFinding.category}</div>
-
-              {selectedFinding.detail && (
-                <div className="mt-4">
-                  <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-text-muted">{copy.detail}</div>
-                  <p className="text-[13.5px] leading-relaxed text-text">{selectedFinding.detail}</p>
-                </div>
-              )}
-
-              {selectedFinding.recommendation && (
-                <div className="mt-4 rounded-md border border-border bg-bg px-3.5 py-3">
-                  <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-accent">{copy.recommendation}</div>
-                  <p className="text-[13px] leading-relaxed text-text-muted">{selectedFinding.recommendation}</p>
-                </div>
-              )}
-
-              <a href={ghUrl(selectedFinding.file, selectedFinding.line)} target="_blank" rel="noopener noreferrer" className="mt-4 inline-block rounded-md border border-border px-3.5 py-2 text-[12.5px] font-semibold text-[#1af0ff] transition-fast hover:bg-bg">
-                {copy.viewSource} ↗
-              </a>
-
-              {selectedFinding.recommendation && (
-                <div className="mt-5 border-t border-border pt-4">
-                  <button
-                    onClick={() => selectedFinding && generateFix(selectedFinding)}
-                    disabled={patchState === 'working' || patchState === 'done'}
-                    className={`w-full rounded-md border px-4 py-2.5 text-sm font-semibold transition-fast ${patchState === 'done' ? 'border-[#34d399] bg-bg text-[#34d399]' : 'border-accent bg-accent text-bg hover:brightness-110'} disabled:opacity-80`}
-                  >
-                    {patchState === 'working' ? copy.patching : patchState === 'done' ? `✓ ${copy.patchReady}` : copy.generateFix}
-                  </button>
-
-                  {patchState === 'done' && patchResult && (
-                    <div className="mt-3 rounded-md border border-border bg-bg px-3.5 py-3">
-                      <div className="break-all font-mono text-[11px] text-text-muted">{patchResult.branch}</div>
-                      <a href={patchResult.compareUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-[12.5px] font-semibold text-[#34d399]">
-                        {copy.reviewMerge} ↗
-                      </a>
-                    </div>
-                  )}
-
-                  {patchState === 'error' && patchError && (
-                    <div className="mt-3 rounded-md border border-danger bg-bg px-3 py-2.5 text-[12.5px] leading-relaxed text-danger">{patchError}</div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )
-      })()}
-    </main>
-  )
-}
-
-function Stat({ label, value, accent }: { label: string; value: string; accent: string }) {
-  return (
-    <div className="min-w-[130px] rounded-md border border-border bg-surface px-4 py-3">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">{label}</div>
-      <div className={`mt-0.5 text-2xl font-semibold leading-tight ${accent}`}>{value}</div>
-    </div>
-  )
-}

@@ -409,6 +409,10 @@
     "supabase": {
       "title": "Database Security",
       "desc": "RLS status, public buckets, and service-role exposure."
+    },
+    "stripe": {
+      "title": "Payments Config",
+      "desc": "Live mode, price tiers, and webhook coverage."
     }
   },
   "usage": {
@@ -534,5 +538,49 @@
     "loadError": "Could not load the Supabase report.",
     "fetchError": "Error: {msg}",
     "loading": "Loading Supabase report…"
+  },
+  "stripe": {
+    "title": "Payments Configuration Report",
+    "subtitle": "Live mode, price tiers, webhook coverage, and price mismatches.",
+    "notConfigured": "Stripe is not connected, or its data could not be collected.",
+    "summary": {
+      "tiers": "Price tiers",
+      "webhooks": "Webhooks",
+      "mismatches": "Price mismatches"
+    },
+    "mode": {
+      "title": "Stripe mode",
+      "live": "Live mode",
+      "test": "Test mode"
+    },
+    "tiers": {
+      "title": "Price tiers",
+      "empty": "No price tiers collected."
+    },
+    "col": {
+      "name": "Tier",
+      "price": "Price",
+      "interval": "Interval",
+      "priceId": "Price ID",
+      "status": "Status",
+      "endpoint": "Endpoint",
+      "whStatus": "Status",
+      "events": "Events"
+    },
+    "status": {
+      "mismatch": "Mismatch",
+      "ok": "Active"
+    },
+    "webhooks": {
+      "title": "Webhook endpoints",
+      "empty": "No webhook endpoints configured."
+    },
+    "findings": {
+      "title": "Findings ({n})",
+      "empty": "No payments findings — nothing flagged."
+    },
+    "loadError": "Could not load the Stripe report.",
+    "fetchError": "Error: {msg}",
+    "loading": "Loading Stripe report…"
   }
 }

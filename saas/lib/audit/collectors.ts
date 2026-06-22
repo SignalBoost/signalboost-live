@@ -19,6 +19,7 @@ import { listWorkspaceUsers } from '@/lib/auth/rbac-service'
 import { scanAWSUsers, scanAWSAccessKeys } from '@/lib/hub/aws-scanner'
 import { getVaultSecrets } from '@/lib/hub/vault-operations'
 import { listEnv } from '@/lib/hub/vercel-env'
+import { resolveVercelProject } from '@/lib/hub/vercel-project'
 import type {
   AuditSnapshot,
   NormalizedIdentity,
@@ -149,7 +150,7 @@ export async function collectSupabase(): Promise<NormalizedSupabase> {
     const start = Date.now()
     const res = await fetch(`${url}/auth/v1/health`, { headers: { apikey: serviceKey }, cache: 'no-store' })
     const latencyMs = Date.now() - start
-    if (!res.ok) return { ok: false, error: `Supabase health HTTP ${res.status}` }
+if (!res.ok) return { ok: false, error: `Supabase health HTTP ${res.status}` }
     let projectHost: string | undefined
     try { projectHost = new URL(url).host } catch { projectHost = undefined }
     return { ok: true, projectHost, latencyMs }
@@ -163,12 +164,12 @@ export async function collectSupabase(): Promise<NormalizedSupabase> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function collectVercel(): Promise<NormalizedVercel> {
-  const token = process.env.VERCEL_TOKEN
-  const projectId = process.env.VERCEL_PROJECT_ID
-  const teamId = process.env.VERCEL_TEAM_ID
-  if (!token || !projectId) return { ok: true, configured: false }
+  // Resolve creds the SAME robust way the working Hub Env panel does:
+  // VERCEL_HUB_PROJECT → VERCEL_PROJECT_ID → token auto-discovery.
+  const creds = await resolveVercelProject()
+  if (!creds.ok || !creds.token || !creds.projectId) return { ok: true, configured: false }
   try {
-    const res = await listEnv(projectId, token, teamId)
+    const res = await listEnv(creds.projectId, creds.token, creds.teamId)
     if (!res.ok || !Array.isArray(res.vars)) return { ok: false, configured: true, error: res.error || 'env list failed' }
 
     const byScope: Record<string, string[]> = {}
@@ -264,6 +265,14 @@ export interface CollectOptions {
   secrets?: boolean
 }
 
+// Hard cap so one slow/unreachable provider can never stall the whole snapshot.
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>(resolve => setTimeout(() => resolve(fallback), ms)),
+  ])
+}
+
 export async function collectSnapshot(opts: CollectOptions = {}): Promise<AuditSnapshot> {
   const want = {
     identities: opts.identities !== false,
@@ -274,13 +283,14 @@ export async function collectSnapshot(opts: CollectOptions = {}): Promise<AuditS
     secrets: opts.secrets !== false,
   }
 
+  const T = 12000 // ms per-collector ceiling
   const [identities, stripe, supabase, vercel, github, secrets] = await Promise.all([
-    want.identities ? collectIdentities() : Promise.resolve<NormalizedIdentity[]>([]),
-    want.stripe ? collectStripe() : Promise.resolve<NormalizedStripe | undefined>(undefined),
-    want.supabase ? collectSupabase() : Promise.resolve<NormalizedSupabase | undefined>(undefined),
-    want.vercel ? collectVercel() : Promise.resolve<NormalizedVercel | undefined>(undefined),
-    want.github ? collectGithub() : Promise.resolve<NormalizedGithub | undefined>(undefined),
-    want.secrets ? collectSecrets() : Promise.resolve<NormalizedSecret[]>([]),
+    want.identities ? withTimeout(collectIdentities(), T, [] as NormalizedIdentity[]) : Promise.resolve<NormalizedIdentity[]>([]),
+    want.stripe ? withTimeout(collectStripe(), T, { ok: false, error: 'Stripe collection timed out' } as NormalizedStripe) : Promise.resolve<NormalizedStripe | undefined>(undefined),
+    want.supabase ? withTimeout(collectSupabase(), T, { ok: false, error: 'Supabase collection timed out' } as NormalizedSupabase) : Promise.resolve<NormalizedSupabase | undefined>(undefined),
+    want.vercel ? withTimeout(collectVercel(), T, { ok: false, configured: true, error: 'Vercel collection timed out' } as NormalizedVercel) : Promise.resolve<NormalizedVercel | undefined>(undefined),
+    want.github ? withTimeout(collectGithub(), T, { ok: false, error: 'GitHub collection timed out' } as NormalizedGithub) : Promise.resolve<NormalizedGithub | undefined>(undefined),
+    want.secrets ? withTimeout(collectSecrets(), T, [] as NormalizedSecret[]) : Promise.resolve<NormalizedSecret[]>([]),
   ])
 
   const providers: NormalizedProvider[] = []

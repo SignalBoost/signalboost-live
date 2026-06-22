@@ -357,7 +357,8 @@
       "now": "Now",
       "next": "Next",
       "later": "Later",
-      "evidence": "Evidence"
+      "evidence": "Evidence",
+      "handled": "Handled"
     },
     "tier": {
       "now": "Now",
@@ -368,6 +369,20 @@
       "now": "Critical — fix immediately.",
       "next": "High — schedule soon.",
       "later": "Medium and low — plan ahead."
+    },
+    "handled": {
+      "title": "Handled",
+      "subtitle": "Findings you've marked resolved, accepted, or won't-fix."
+    },
+    "state": {
+      "status": "Status",
+      "owner": "Owner",
+      "ownerPlaceholder": "Assign…",
+      "open": "Open",
+      "in_progress": "In progress",
+      "resolved": "Resolved",
+      "accepted": "Accepted",
+      "wont_fix": "Won't fix"
     }
   },
   "center": {

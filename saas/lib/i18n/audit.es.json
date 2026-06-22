@@ -1,496 +1,538 @@
 {
   "report": {
     "executiveSummary": {
-      "title": "Resumo executivo de riscos",
-      "description": "Pontuação geral de prontidão, contagem de achados e principais riscos."
+      "title": "Executive Risk Summary",
+      "description": "Overall readiness score, finding counts, and top risks."
     },
     "providerInventory": {
-      "title": "Relatório de inventário de provedores",
-      "description": "Cada provedor conectado com status, risco e última verificação."
+      "title": "Provider Inventory Report",
+      "description": "Every connected provider with status, risk, and last check."
     },
     "identityAccess": {
-      "title": "Revisão de identidade e acesso",
-      "description": "Acesso, nível de privilégio, estado de MFA e última atividade."
+      "title": "Identity & Access Review",
+      "description": "Access, privilege level, MFA state, and last-seen activity."
     },
     "secretsKeys": {
-      "title": "Relatório de exposição de segredos e chaves de API",
-      "description": "Credenciais configuradas por ambiente e postura de rotação. Apenas metadados."
+      "title": "Secrets & API Key Exposure Report",
+      "description": "Configured credentials by environment and rotation posture. Metadata only."
     },
     "remediationRoadmap": {
-      "title": "Roteiro de remediação",
-      "description": "Correções priorizadas com impacto, responsável e prazo."
+      "title": "Remediation Roadmap",
+      "description": "Prioritized fixes with business impact, owner, and due date."
     },
     "prCockpitTrail": {
-      "title": "Trilha de aprovações do PR Cockpit",
-      "description": "Cada mudança preparada, quem aprovou e o resultado da mesclagem."
+      "title": "PR Cockpit Approval Trail",
+      "description": "Every staged change, who approved it, and the merge result."
     },
     "githubChanges": {
-      "title": "Relatório de gestão de mudanças de código",
-      "description": "Proteção de branches, PRs abertos e obsoletos, e revisão."
+      "title": "Code Change Management Report",
+      "description": "Branch protection, open and stale PRs, and review posture."
     },
     "supabaseSecurity": {
-      "title": "Relatório de segurança do banco de dados",
-      "description": "Cobertura de RLS, buckets públicos e uso do papel de serviço."
+      "title": "Database Security Report",
+      "description": "RLS coverage, public buckets, and service-role usage."
     },
     "stripeConfig": {
-      "title": "Relatório de configuração de cobrança",
-      "description": "Produtos, preços, cobertura de webhooks e consistência live/test."
+      "title": "Billing Configuration Report",
+      "description": "Products, prices, webhook coverage, and live/test consistency."
     },
     "vercelDeployment": {
-      "title": "Relatório de implantação e variáveis de ambiente",
-      "description": "Variáveis de produção vs. pré-visualização e variáveis públicas expostas."
+      "title": "Deployment & Env Var Report",
+      "description": "Production vs preview variables and exposed public vars."
     },
     "auditLog": {
-      "title": "Log de auditoria e linha do tempo de atividade",
-      "description": "Ações, atores e resultados registrados no log de auditoria do Hub."
+      "title": "Audit Log & Activity Timeline",
+      "description": "Recorded actions, actors, and results from the Hub audit log."
     },
     "complianceReadiness": {
-      "title": "Matriz de prontidão para conformidade",
-      "description": "Prontidão para SOC 2, ISO 27001, NIST CSF e CIS. Apenas prontidão."
+      "title": "Compliance Readiness Matrix",
+      "description": "Readiness against SOC 2, ISO 27001, NIST CSF, and CIS. Readiness only."
     }
   },
   "severity": {
-    "critical": "Crítico",
-    "high": "Alto",
-    "medium": "Médio",
-    "low": "Baixo",
+    "critical": "Critical",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
     "info": "Info"
   },
   "common": {
-    "overallScore": "Pontuação geral de prontidão",
-    "findings": "Achados",
-    "evidenceRequired": "Evidência necessária",
-    "topRisks": "Principais riscos",
-    "recommendation": "Recomendación",
-    "impact": "Impacto"
+    "overallScore": "Overall Readiness Score",
+    "findings": "Findings",
+    "evidenceRequired": "Evidence required",
+    "topRisks": "Top Risks",
+    "recommendation": "Recommendation",
+    "impact": "Impact"
   },
   "finding": {
     "staleIdentity": {
-      "title": "Identidade inativa: {principal} ({provider})",
-      "detail": "Sem atividade registrada por {days} dias (limite {threshold}).",
-      "recommendation": "Revise se este acesso ainda é necessário; remova ou rotacione se não.",
-      "impact": "Credenciais não usadas ampliam a superfície de ataque sem benefício."
+      "title": "Stale identity: {principal} ({provider})",
+      "detail": "No recorded activity for {days} days (threshold {threshold}).",
+      "recommendation": "Review whether this access is still needed; remove or rotate if not.",
+      "impact": "Unused credentials widen the attack surface with no benefit."
     },
     "neverUsedIdentity": {
-      "title": "Identidade nunca usada: {principal} ({provider})",
-      "detail": "Criada há {days} dias sem login ou uso registrados.",
-      "recommendation": "Confirme se este principal é necessário; remova se nunca foi ativado.",
-      "impact": "Contas dormentes são um ponto de entrada comum para atacantes."
+      "title": "Never-used identity: {principal} ({provider})",
+      "detail": "Created {days} days ago with no recorded login or use.",
+      "recommendation": "Confirm this principal is required; remove if it was never activated.",
+      "impact": "Dormant accounts are a common foothold for attackers."
     },
     "privilegedNoMfa": {
-      "title": "Conta privilegiada sem MFA: {principal} ({provider})",
-      "detail": "O papel \"{role}\" tem acesso de administrador, mas o MFA está desativado.",
-      "recommendation": "Exija e ative o MFA nesta conta imediatamente.",
-      "impact": "Uma única senha roubada concede controle administrativo total."
+      "title": "Privileged account without MFA: {principal} ({provider})",
+      "detail": "Role \"{role}\" has admin-level access but MFA is disabled.",
+      "recommendation": "Require and enable MFA on this account immediately.",
+      "impact": "A single phished password grants full administrative control."
     },
     "mfaStateUnavailable": {
-      "title": "Estado de MFA indisponível para {count} identidade(s) privilegiada(s)",
-      "detail": "Esses provedores não expõem o estado de MFA por conta via API.",
-      "recommendation": "Confirme que o MFA é exigido e anexe evidências dessas contas."
+      "title": "MFA state unavailable for {count} privileged identity(ies)",
+      "detail": "These providers do not expose per-account MFA status via their API.",
+      "recommendation": "Confirm MFA is enforced and attach evidence for these accounts."
     },
     "providerError": {
-      "title": "O provedor \"{provider}\" está em estado de erro",
-      "detail": "O Hub relata {provider} com erro.",
-      "recommendation": "Verifique novamente a conexão e as credenciais de {provider}."
+      "title": "Provider \"{provider}\" is in an error state",
+      "detail": "The Hub reports {provider} as errored.",
+      "recommendation": "Re-check the {provider} connection and credentials."
     },
     "stripeReadFail": {
-      "title": "Não foi possível ler a configuração do Stripe",
-      "detail": "A chamada à API do Stripe falhou durante a coleta.",
-      "recommendation": "Verifique se STRIPE_SECRET_KEY está definida e pode ler preços e webhooks.",
-      "impact": "A postura de cobrança é desconhecida até o Stripe ficar acessível."
+      "title": "Stripe configuration could not be read",
+      "detail": "The Stripe API call failed during collection.",
+      "recommendation": "Verify STRIPE_SECRET_KEY is set and can read prices and webhooks.",
+      "impact": "Billing posture is unknown until Stripe is reachable."
     },
     "stripePriceMismatch": {
-      "title": "Incompatibilidade de preço/ambiente do Stripe",
-      "detail": "{name} aponta para um preço que não está ativo no Stripe.",
-      "recommendation": "Aponte a variável para um preço ativo ou ative o preço referenciado.",
-      "impact": "O checkout pode referenciar um preço inexistente, quebrando compras."
+      "title": "Stripe price/env mismatch",
+      "detail": "{name} points to a price that is not active in Stripe.",
+      "recommendation": "Point the env var at an active price, or activate the referenced price.",
+      "impact": "Checkout can reference a price that no longer exists, breaking purchases."
     },
     "stripeWebhookNone": {
-      "title": "Nenhum endpoint de webhook do Stripe configurado",
-      "detail": "O Stripe não retornou endpoints de webhook.",
-      "recommendation": "Adicione um endpoint de webhook para eventos de pagamento e assinatura.",
-      "impact": "Pagamentos falhos e cancelamentos podem não se propagar ao app."
+      "title": "No Stripe webhook endpoint configured",
+      "detail": "No webhook endpoints were returned by Stripe.",
+      "recommendation": "Add a webhook endpoint covering payment and subscription lifecycle events.",
+      "impact": "Failed payments and cancellations may not propagate to the app."
     },
     "stripeWebhookMissingEvent": {
-      "title": "Webhook do Stripe sem \"{event}\"",
-      "detail": "Nenhum endpoint de webhook configurado assina {event}.",
-      "recommendation": "Adicione {event} a um endpoint de webhook para o app reagir.",
-      "impact": "Eventos de cobrança importantes não são entregues à plataforma."
+      "title": "Stripe webhook missing \"{event}\"",
+      "detail": "No configured webhook endpoint subscribes to {event}.",
+      "recommendation": "Add {event} to a webhook endpoint so the app reacts to this event.",
+      "impact": "Important billing events are not delivered to the platform."
     },
     "stripeWebhookUnverified": {
-      "title": "Cobertura de eventos do webhook do Stripe não verificada",
-      "detail": "Existem endpoints de webhook, mas sua lista de eventos não foi coletada.",
-      "recommendation": "Confirme que cada endpoint assina os eventos necessários."
+      "title": "Stripe webhook event coverage not verified",
+      "detail": "Webhook endpoints exist but their subscribed event list was not collected.",
+      "recommendation": "Confirm each endpoint subscribes to required payment/subscription events."
     },
     "supabaseHealthFail": {
-      "title": "A verificação de saúde do Supabase falhou",
-      "detail": "A verificação de acessibilidade do Supabase não teve êxito.",
-      "recommendation": "Verifique a URL do projeto, a chave de service-role e se o banco está online.",
-      "impact": "A disponibilidade da camada de dados principal não é confirmada."
+      "title": "Supabase health check failed",
+      "detail": "The Supabase reachability check did not succeed.",
+      "recommendation": "Verify the project URL and service-role key, and that the database is online.",
+      "impact": "Core data layer availability is unconfirmed."
     },
     "serviceRoleInClient": {
-      "title": "Chave de service-role acessível pelo código cliente",
-      "detail": "A chave de service-role (que ignora RLS) foi detectada em um caminho exposto ao cliente.",
-      "recommendation": "Mova todo uso do service-role para o servidor e rotacione a chave imediatamente.",
-      "impact": "Qualquer visitante poderia extrair acesso total ao banco — risco grave de vazamento."
+      "title": "Service-role key reachable from client code",
+      "detail": "The service-role key (which bypasses RLS) was detected on a client-exposed path.",
+      "recommendation": "Move all service-role usage strictly server-side and rotate the key immediately.",
+      "impact": "Full database access could be extracted by any visitor — severe data-breach risk."
     },
     "rlsDisabled": {
-      "title": "A tabela \"{table}\" está com RLS desativado",
-      "detail": "A segurança em nível de linha não está ativada em {table}.",
-      "recommendation": "Ative o RLS em {table} e adicione políticas de acesso explícitas.",
-      "impact": "Sem RLS, uma chave anônima vazada pode ler ou gravar nesta tabela diretamente."
+      "title": "Table \"{table}\" has RLS disabled",
+      "detail": "Row Level Security is not enabled on {table}.",
+      "recommendation": "Enable RLS on {table} and add explicit access policies.",
+      "impact": "Without RLS, a leaked anon key can read or write this table directly."
     },
     "rlsUnverified": {
-      "title": "Cobertura de RLS não verificada",
-      "detail": "O estado de RLS por tabela não foi coletado nesta execução.",
-      "recommendation": "Enumere as tabelas e confirme o RLS em cada tabela com dados de usuário."
+      "title": "RLS coverage not verified",
+      "detail": "Table-level RLS state was not collected for this run.",
+      "recommendation": "Enumerate tables and confirm RLS is enabled on every table holding user data."
     },
     "publicBucket": {
-      "title": "O bucket de armazenamento \"{bucket}\" é público",
-      "detail": "O bucket \"{bucket}\" permite acesso público.",
-      "recommendation": "Confirme se o acesso público é intencional; senão, torne-o privado com URLs assinadas.",
-      "impact": "Buckets públicos podem expor arquivos enviados por usuários ou internos."
+      "title": "Storage bucket \"{bucket}\" is public",
+      "detail": "The \"{bucket}\" bucket allows public access.",
+      "recommendation": "Confirm public access is intended; otherwise make the bucket private with signed URLs.",
+      "impact": "Public buckets may expose user-uploaded or internal files."
     },
     "vercelNotConnected": {
-      "title": "Vercel não conectado",
-      "detail": "Nenhum token do Vercel configurado, então a implantação não pode ser avaliada.",
-      "recommendation": "Conecte o Vercel para incluir verificações de implantação e variáveis na auditoria."
+      "title": "Vercel not connected",
+      "detail": "No Vercel token is configured, so deployment posture cannot be assessed.",
+      "recommendation": "Connect Vercel to include deployment and env-var checks in the audit."
     },
     "publicSensitiveEnv": {
-      "title": "Variável pública parece sensível: {name}",
-      "detail": "{name} é exposta ao navegador (NEXT_PUBLIC_), mas o nome sugere um segredo.",
-      "recommendation": "Renomeie como variável apenas de servidor (remova NEXT_PUBLIC_) e rotacione o valor.",
-      "impact": "Valores secretos enviados ao navegador são legíveis por qualquer um."
+      "title": "Public env var looks sensitive: {name}",
+      "detail": "{name} is exposed to the browser (NEXT_PUBLIC_) but its name suggests a secret.",
+      "recommendation": "Rename to a server-only variable (drop NEXT_PUBLIC_) and rotate the value.",
+      "impact": "Secret values shipped to the browser are readable by anyone."
     },
     "envScopeDrift": {
-      "title": "As variáveis de Produção e Pré-visualização diferem",
-      "detail": "Apenas em produção: {onlyProd}. Apenas em pré-visualização: {onlyPreview}.",
-      "recommendation": "Concilie os nomes de variáveis entre escopos para a pré-visualização refletir produção.",
-      "impact": "Implantações de pré-visualização podem se comportar de forma diferente, mascarando bugs."
+      "title": "Production and Preview env vars differ",
+      "detail": "Only in production: {onlyProd}. Only in preview: {onlyPreview}.",
+      "recommendation": "Reconcile env var names across scopes so preview reflects production.",
+      "impact": "Preview deploys may behave differently from production, masking bugs."
     },
     "githubReadFail": {
-      "title": "Não foi possível ler o GitHub",
-      "detail": "A chamada à API do GitHub falhou durante a coleta.",
-      "recommendation": "Verifique o token do GitHub e seu escopo de repositório."
+      "title": "GitHub could not be read",
+      "detail": "The GitHub API call failed during collection.",
+      "recommendation": "Verify the GitHub token and its repo scope."
     },
     "branchProtectionUnverified": {
-      "title": "Proteção de branch não verificada",
-      "detail": "O estado de proteção da branch padrão não foi coletado.",
-      "recommendation": "Confirme que a branch padrão exige revisão de PR antes da mesclagem."
+      "title": "Branch protection not verified",
+      "detail": "Branch protection state for the default branch was not collected.",
+      "recommendation": "Confirm the default branch requires pull-request review before merge."
     },
     "branchProtectionMissing": {
-      "title": "A branch padrão \"{branch}\" não exige revisão de PR",
-      "detail": "Mudanças podem ser mescladas à branch padrão sem revisão de aprovação.",
-      "recommendation": "Ative a proteção de branch e exija ao menos uma revisão de aprovação.",
-      "impact": "O código de produção pode mudar sem uma segunda revisão."
+      "title": "Default branch \"{branch}\" does not require PR review",
+      "detail": "Changes can be merged to the default branch without an approving review.",
+      "recommendation": "Enable branch protection and require at least one approving review.",
+      "impact": "Production code can change without a second set of eyes."
     },
     "staleBranches": {
-      "title": "{count} branch(es) obsoleta(s) com mais de {days} dias",
-      "detail": "Branches obsoletas: {names}.",
-      "recommendation": "Revise e exclua branches mescladas ou abandonadas.",
-      "impact": "Branches obsoletas geram confusão e podem ter configuração desatualizada."
+      "title": "{count} stale branch(es) older than {days} days",
+      "detail": "Stale branches: {names}.",
+      "recommendation": "Review and delete merged or abandoned branches.",
+      "impact": "Stale branches add confusion and may carry outdated config."
     },
     "clientExposedSecret": {
-      "title": "Segredo exposto ao cliente: {name}",
-      "detail": "{name} parece ser um segredo, mas está exposto ao cliente.",
-      "recommendation": "Mova para o servidor e rotacione imediatamente.",
-      "impact": "Um segredo de produção vazado pode ser abusado por qualquer um."
+      "title": "Client-exposed secret: {name}",
+      "detail": "{name} appears to be a secret but is exposed to the client.",
+      "recommendation": "Move server-side and rotate immediately.",
+      "impact": "A leaked production secret can be abused by anyone."
     },
     "rotationUnknown": {
-      "title": "Idade de rotação desconhecida para {count} segredo(s)",
-      "detail": "As APIs dos provedores não expõem as datas da última rotação dessas credenciais.",
-      "recommendation": "Registre as datas de rotação no Key Vault e defina uma política de rotação."
+      "title": "Rotation age unknown for {count} secret(s)",
+      "detail": "Provider APIs do not expose last-rotation dates for these credentials.",
+      "recommendation": "Record rotation dates in the Key Vault and set a rotation policy."
     },
     "backupTestMissing": {
-      "title": "Sem registro de teste de recuperação de backup",
-      "detail": "Nenhuma evidência de teste de backup/restauração do banco foi coletada.",
-      "recommendation": "Realize um teste de restauração e anexe o resultado."
-    }
-  },
-  "identity": {
-    "findingsTitle": "Hallazgos de acceso",
-    "noFindings": "Sin hallazgos de acceso.",
-    "tableTitle": "Todas las identidades",
-    "empty": "No se encontraron identidades.",
-    "never": "Nunca",
-    "daysAgo": "hace {days}d",
-    "summary": {
-      "total": "Identidades",
-      "privileged": "Privilegiadas",
-      "stale": "Inactivas",
-      "noMfa": "Priv. sin MFA",
-      "mfaUnknown": "MFA desconocido"
-    },
-    "col": {
-      "principal": "Identidad",
-      "provider": "Proveedor",
-      "kind": "Tipo",
-      "role": "Rol",
-      "mfa": "MFA",
-      "lastSeen": "Última actividad",
-      "flags": "Señales"
-    },
-    "kind": {
-      "user": "Usuario",
-      "service_account": "Cuenta de servicio",
-      "access_key": "Clave de acceso",
-      "collaborator": "Colaborador",
-      "token": "Token"
-    },
-    "mfa": {
-      "enabled": "Activado",
-      "disabled": "Desactivado",
-      "unknown": "Desconocido"
-    },
-    "flag": {
-      "stale": "Inactiva",
-      "neverUsed": "Nunca usada",
-      "privilegedNoMfa": "Sin MFA",
-      "mfaUnknown": "¿MFA?"
+      "title": "Backup recovery test not on record",
+      "detail": "No evidence of a tested database backup/restore was collected.",
+      "recommendation": "Perform a restore test and attach the result."
     }
   },
   "exec": {
-    "title": "Resumen ejecutivo de riesgos",
-    "subtitle": "Puntuación general de preparación, recuento de hallazgos y riesgos principales.",
-    "narrativeTitle": "Resumen",
-    "topRisksTitle": "Riesgos principales",
-    "noRisks": "Sin riesgos por encima del umbral de reporte.",
-    "providersTitle": "Proveedores",
+    "title": "Executive Risk Summary",
+    "subtitle": "Overall readiness score, finding counts, and top risks.",
+    "narrativeTitle": "Summary",
+    "topRisksTitle": "Top Risks",
+    "noRisks": "No risks above the reporting threshold.",
+    "providersTitle": "Providers",
     "status": {
-      "connected": "conectado",
+      "connected": "connected",
       "error": "error",
-      "not_configured": "no configurado"
+      "not_configured": "not configured"
     },
-    "loading": "Generando el resumen ejecutivo…",
-    "loadError": "No se pudo cargar el resumen.",
+    "loading": "Building executive summary…",
+    "loadError": "Could not load the summary.",
     "fetchError": "Error: {msg}"
   },
-  "provider": {
-    "title": "Inventario de proveedores",
-    "subtitle": "Cada proveedor conectado con estado, riesgo y última verificación.",
-    "empty": "No se encontraron proveedores.",
-    "evidenceShort": "({n} evidencia)",
-    "loading": "Cargando inventario de proveedores…",
-    "loadError": "No se pudo cargar el inventario.",
-    "fetchError": "Error: {msg}",
-    "risk": {
-      "unknown": "Desconocido"
-    },
+  "identity": {
+    "findingsTitle": "Access Findings",
+    "noFindings": "No access findings.",
+    "tableTitle": "All Identities",
+    "empty": "No identities found.",
+    "never": "Never",
+    "daysAgo": "{days}d ago",
     "summary": {
-      "total": "Proveedores",
-      "connected": "Conectados",
-      "error": "Con error",
-      "notConfigured": "No configurados"
+      "total": "Identities",
+      "privileged": "Privileged",
+      "stale": "Stale",
+      "noMfa": "Priv. no MFA",
+      "mfaUnknown": "MFA unknown"
     },
     "col": {
-      "provider": "Proveedor",
-      "category": "Categoría",
-      "status": "Estado",
-      "risk": "Riesgo",
-      "findings": "Hallazgos",
-      "lastChecked": "Última verificación"
+      "principal": "Principal",
+      "provider": "Provider",
+      "kind": "Type",
+      "role": "Role",
+      "mfa": "MFA",
+      "lastSeen": "Last seen",
+      "flags": "Flags"
+    },
+    "kind": {
+      "user": "User",
+      "service_account": "Service account",
+      "access_key": "Access key",
+      "collaborator": "Collaborator",
+      "token": "Token"
+    },
+    "mfa": {
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "unknown": "Unknown"
+    },
+    "flag": {
+      "stale": "Stale",
+      "neverUsed": "Never used",
+      "privilegedNoMfa": "No MFA",
+      "mfaUnknown": "MFA?"
+    }
+  },
+  "provider": {
+    "title": "Provider Inventory",
+    "subtitle": "Every connected provider with status, risk, and last check.",
+    "empty": "No providers found.",
+    "evidenceShort": "({n} evidence)",
+    "loading": "Loading provider inventory…",
+    "loadError": "Could not load the inventory.",
+    "fetchError": "Error: {msg}",
+    "risk": {
+      "unknown": "Unknown"
+    },
+    "summary": {
+      "total": "Providers",
+      "connected": "Connected",
+      "error": "Errored",
+      "notConfigured": "Not configured"
+    },
+    "col": {
+      "provider": "Provider",
+      "category": "Category",
+      "status": "Status",
+      "risk": "Risk",
+      "findings": "Findings",
+      "lastChecked": "Last checked"
     },
     "status": {
-      "connected": "Conectado",
+      "connected": "Connected",
       "error": "Error",
-      "not_configured": "No configurado",
-      "missing": "Faltante"
+      "not_configured": "Not configured",
+      "missing": "Missing"
     },
     "category": {
-      "billing": "Facturación",
-      "database": "Base de datos",
-      "deployment": "Despliegue",
-      "change-management": "Gestión de cambios",
-      "identity": "Identidad",
-      "other": "Otro"
+      "billing": "Billing",
+      "database": "Database",
+      "deployment": "Deployment",
+      "change-management": "Change management",
+      "identity": "Identity",
+      "other": "Other"
     }
   },
   "secret": {
-    "title": "Exposición de secretos y claves API",
-    "subtitle": "Credenciales configuradas por entorno y estado de rotación. Solo metadatos: no se leen ni muestran valores.",
-    "findingsTitle": "Hallazgos de exposición",
-    "noFindings": "Sin hallazgos de exposición.",
-    "tableTitle": "Credenciales configuradas",
-    "empty": "No se encontraron credenciales.",
-    "metadataNote": "Solo metadatos: los valores nunca se leen ni se muestran.",
-    "loading": "Cargando informe de secretos…",
-    "loadError": "No se pudo cargar el informe.",
+    "title": "Secrets & API Key Exposure",
+    "subtitle": "Configured credentials by environment and rotation posture. Metadata only — no secret values are read or shown.",
+    "findingsTitle": "Exposure Findings",
+    "noFindings": "No exposure findings.",
+    "tableTitle": "Configured Credentials",
+    "empty": "No credentials found.",
+    "metadataNote": "Metadata only — secret values are never read or displayed.",
+    "loading": "Loading secrets report…",
+    "loadError": "Could not load the report.",
     "fetchError": "Error: {msg}",
     "summary": {
-      "total": "Credenciales",
-      "clientExposed": "Expuestos al cliente",
-      "rotationUnknown": "Rotación desconocida"
+      "total": "Credentials",
+      "clientExposed": "Client-exposed",
+      "rotationUnknown": "Rotation unknown"
     },
     "col": {
-      "name": "Nombre",
-      "provider": "Proveedor",
-      "environment": "Entorno",
-      "exposure": "Exposición",
-      "rotation": "Rotación",
-      "risk": "Riesgo"
+      "name": "Name",
+      "provider": "Provider",
+      "environment": "Environment",
+      "exposure": "Exposure",
+      "rotation": "Rotation",
+      "risk": "Risk"
     },
     "env": {
-      "production": "Producción",
-      "preview": "Vista previa",
-      "development": "Desarrollo",
-      "unknown": "Desconocido"
+      "production": "Production",
+      "preview": "Preview",
+      "development": "Development",
+      "unknown": "Unknown"
     },
     "exposure": {
-      "client": "Expuesto al cliente",
-      "server": "Solo servidor"
+      "client": "Client-exposed",
+      "server": "Server-only"
     },
     "rotation": {
-      "known": "Registrada",
-      "unknown": "Desconocida"
+      "known": "Tracked",
+      "unknown": "Unknown"
     }
   },
   "remediation": {
-    "title": "Hoja de ruta de remediación",
-    "subtitle": "Correcciones priorizadas por urgencia, con los elementos que requieren evidencia manual en una vía aparte.",
-    "empty": "Nada que remediar: sin hallazgos abiertos.",
-    "evidenceTitle": "Se requiere evidencia",
-    "evidenceSubtitle": "Brechas a confirmar con evidencia manual. No reducen la puntuación.",
-    "loading": "Generando la hoja de ruta…",
-    "loadError": "No se pudo cargar la hoja de ruta.",
+    "title": "Remediation Roadmap",
+    "subtitle": "Prioritized fixes sequenced by urgency, with the items that need manual evidence on a separate track.",
+    "empty": "Nothing to remediate — no open findings.",
+    "evidenceTitle": "Evidence Required",
+    "evidenceSubtitle": "Gaps to confirm with manual evidence. These do not lower the score.",
+    "loading": "Building remediation roadmap…",
+    "loadError": "Could not load the roadmap.",
     "fetchError": "Error: {msg}",
     "summary": {
-      "now": "Ahora",
-      "next": "Siguiente",
-      "later": "Después",
-      "evidence": "Evidencia"
+      "now": "Now",
+      "next": "Next",
+      "later": "Later",
+      "evidence": "Evidence"
     },
     "tier": {
-      "now": "Ahora",
-      "next": "Siguiente",
-      "later": "Después"
+      "now": "Now",
+      "next": "Next",
+      "later": "Later"
     },
     "tierHint": {
-      "now": "Crítico: corregir de inmediato.",
-      "next": "Alto: programar pronto.",
-      "later": "Medio y bajo: planificar."
+      "now": "Critical — fix immediately.",
+      "next": "High — schedule soon.",
+      "later": "Medium and low — plan ahead."
     }
   },
   "center": {
-    "title": "Centro de auditoría",
-    "subtitle": "Informes de preparación operativa sobre identidad, proveedores, secretos y remediación, con puntuación determinista.",
-    "open": "Abrir informe",
+    "title": "Audit Center",
+    "subtitle": "Operational readiness reports across identity, providers, secrets, and remediation — scored deterministically.",
+    "open": "Open report",
     "executive": {
-      "title": "Resumen ejecutivo de riesgos",
-      "desc": "Puntuación general, recuento de hallazgos y riesgos principales."
+      "title": "Executive Risk Summary",
+      "desc": "Overall readiness score, finding counts, and top risks."
     },
     "identity": {
-      "title": "Identidad y acceso",
-      "desc": "Quién tiene acceso, nivel de privilegio, MFA y última actividad."
+      "title": "Identity & Access",
+      "desc": "Who has access, privilege level, MFA state, and last activity."
     },
     "providers": {
-      "title": "Inventario de proveedores",
-      "desc": "Cada proveedor conectado con estado, riesgo y última verificación."
+      "title": "Provider Inventory",
+      "desc": "Every connected provider with status, risk, and last check."
     },
     "secrets": {
-      "title": "Secretos y claves API",
-      "desc": "Credenciales configuradas por entorno y estado de rotación."
+      "title": "Secrets & API Keys",
+      "desc": "Configured credentials by environment and rotation posture."
     },
     "remediation": {
-      "title": "Hoja de ruta de remediación",
-      "desc": "Correcciones priorizadas por urgencia."
+      "title": "Remediation Roadmap",
+      "desc": "Prioritized fixes sequenced by urgency."
     },
     "usage": {
-      "title": "Uso y costo de IA",
-      "desc": "Consumo de tokens y costo estimado por función y usuario."
+      "title": "AI Usage & Cost",
+      "desc": "Token consumption and estimated cost per feature and user."
     },
     "history": {
-      "title": "Historial de preparación",
-      "desc": "Observa tu puntuación de preparación y los hallazgos con el tiempo."
+      "title": "Readiness History",
+      "desc": "Track your readiness score and finding counts over time."
     },
     "github": {
-      "title": "GitHub y cambios de código",
-      "desc": "Protección de ramas, colaboradores y ramas obsoletas."
+      "title": "GitHub & Code Change",
+      "desc": "Branch protection, collaborators, and stale branches."
+    },
+    "supabase": {
+      "title": "Database Security",
+      "desc": "RLS status, public buckets, and service-role exposure."
     }
   },
   "usage": {
-    "title": "Uso y costo de IA",
-    "subtitle": "Consumo de tokens y costo estimado por funciones de IA en los últimos {n} días. El costo es estimado; los tokens son exactos.",
-    "totalCost": "Costo est.",
-    "calls": "Llamadas",
-    "totalTokens": "Tokens totales",
-    "cacheHit": "Entrada desde caché",
-    "byFeature": "Por función",
-    "byUser": "Mayores consumidores",
-    "byUserHint": "Mayor costo estimado primero: la base para facturar o limitar por usuario.",
+    "title": "AI Usage & Cost",
+    "subtitle": "Token consumption and estimated cost across AI features over the last {n} days. Cost is an estimate; token counts are exact.",
+    "totalCost": "Est. cost",
+    "calls": "Calls",
+    "totalTokens": "Total tokens",
+    "cacheHit": "Input from cache",
+    "byFeature": "By Feature",
+    "byUser": "Top Consumers",
+    "byUserHint": "Highest estimated cost first — the basis for per-user billing or throttling.",
     "col": {
-      "feature": "Función",
-      "calls": "Llamadas",
+      "feature": "Feature",
+      "calls": "Calls",
       "tokens": "Tokens",
-      "cost": "Costo est.",
-      "user": "Usuario"
+      "cost": "Est. cost",
+      "user": "User"
     },
-    "empty": "Aún no hay uso registrado.",
-    "loading": "Cargando uso…",
-    "loadError": "No se pudo cargar el uso.",
+    "empty": "No usage recorded yet.",
+    "loading": "Loading usage…",
+    "loadError": "Could not load usage.",
     "fetchError": "Error: {msg}"
   },
   "export": {
-    "csv": "Exportar CSV",
-    "pdf": "Imprimir / Guardar PDF"
+    "csv": "Export CSV",
+    "pdf": "Print / Save PDF"
   },
   "history": {
-    "title": "Historial de preparación",
-    "subtitle": "Observa cómo cambia tu puntuación de preparación con el tiempo.",
-    "snapshot": "Capturar ahora",
-    "snapshotting": "Guardando…",
-    "loading": "Cargando historial…",
-    "loadError": "No se pudo cargar el historial.",
+    "title": "Readiness History",
+    "subtitle": "Track how your readiness score moves over time.",
+    "snapshot": "Snapshot now",
+    "snapshotting": "Saving…",
+    "loading": "Loading history…",
+    "loadError": "Could not load history.",
     "fetchError": "Error: {msg}",
-    "snapshotError": "No se pudo capturar.",
-    "empty": "Aún no hay capturas. Toma la primera arriba.",
-    "trendTitle": "Puntuación a lo largo del tiempo",
+    "snapshotError": "Could not take snapshot.",
+    "empty": "No snapshots yet. Take your first one above.",
+    "trendTitle": "Score over time",
     "col": {
-      "date": "Fecha"
+      "date": "Date"
     }
   },
   "scan": {
-    "quotaExceeded": "Límite mensual alcanzado: {used}/{cap} análisis usados. Mejora tu plan para ejecutar más.",
-    "upgrade": "Mejorar plan"
+    "quotaExceeded": "Monthly limit reached: {used}/{cap} audit scans used. Upgrade your plan to run more.",
+    "upgrade": "Upgrade plan"
   },
   "github": {
-    "title": "Informe de GitHub y cambios de código",
-    "subtitle": "Protección de ramas, colaboradores, ramas obsoletas y cambios abiertos.",
-    "notConfigured": "GitHub no está conectado o no se pudieron recopilar sus datos.",
+    "title": "GitHub & Code Change Report",
+    "subtitle": "Branch protection, collaborators, stale branches, and open changes.",
+    "notConfigured": "GitHub is not connected, or its data could not be collected.",
     "summary": {
-      "collaborators": "Colaboradores",
-      "admins": "Administradores",
-      "stale": "Ramas obsoletas",
-      "openPRs": "PR abiertos"
+      "collaborators": "Collaborators",
+      "admins": "Admins",
+      "stale": "Stale branches",
+      "openPRs": "Open PRs"
     },
     "protection": {
-      "title": "Protección de la rama predeterminada",
-      "enforced": "Aplicada",
-      "missing": "Falta",
-      "unverified": "Sin verificar"
+      "title": "Default branch protection",
+      "enforced": "Enforced",
+      "missing": "Missing",
+      "unverified": "Unverified"
     },
     "collab": {
-      "title": "Colaboradores",
-      "empty": "No se recopilaron colaboradores."
+      "title": "Collaborators",
+      "empty": "No collaborators collected."
     },
     "col": {
-      "login": "Usuario",
-      "role": "Rol",
-      "access": "Acceso",
-      "branch": "Rama",
-      "age": "Antigüedad (días)"
+      "login": "User",
+      "role": "Role",
+      "access": "Access",
+      "branch": "Branch",
+      "age": "Age (days)"
     },
-    "admin": "Administrador",
-    "member": "Miembro",
+    "admin": "Admin",
+    "member": "Member",
     "stale": {
-      "title": "Ramas obsoletas",
-      "empty": "Sin ramas obsoletas: limpio."
+      "title": "Stale branches",
+      "empty": "No stale branches — clean."
     },
     "findings": {
-      "title": "Hallazgos ({n})",
-      "empty": "Sin hallazgos de GitHub: nada marcado."
+      "title": "Findings ({n})",
+      "empty": "No GitHub findings — nothing flagged."
     },
-    "loadError": "No se pudo cargar el informe de GitHub.",
+    "loadError": "Could not load the GitHub report.",
     "fetchError": "Error: {msg}",
-    "loading": "Cargando informe de GitHub…"
+    "loading": "Loading GitHub report…"
+  },
+  "supabase": {
+    "title": "Database Security Report",
+    "subtitle": "Row-level security, public buckets, and service-role exposure.",
+    "notConfigured": "Supabase is not connected, or its data could not be collected.",
+    "summary": {
+      "tables": "Tables",
+      "rlsDisabled": "RLS disabled",
+      "publicBuckets": "Public buckets"
+    },
+    "serviceRole": {
+      "title": "Service-role key exposure",
+      "exposed": "Exposed to client",
+      "serverOnly": "Server-only"
+    },
+    "tables": {
+      "title": "Tables & Row-Level Security",
+      "empty": "No tables collected."
+    },
+    "col": {
+      "table": "Table",
+      "rls": "RLS"
+    },
+    "rls": {
+      "on": "Enabled",
+      "off": "Disabled"
+    },
+    "buckets": {
+      "title": "Public storage buckets",
+      "empty": "No public buckets — clean."
+    },
+    "findings": {
+      "title": "Findings ({n})",
+      "empty": "No database findings — nothing flagged."
+    },
+    "loadError": "Could not load the Supabase report.",
+    "fetchError": "Error: {msg}",
+    "loading": "Loading Supabase report…"
   }
 }

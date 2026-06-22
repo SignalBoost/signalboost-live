@@ -92,7 +92,10 @@ export async function GET(req: Request) {
       void recordUsage({ userId, feature: 'audit.executive-summary', model: NARRATIVE_MODEL, usage })
     }
 
-    return NextResponse.json({ ok: true, report: { ...summary, narrative } })
+    // Deep, code-aware narrative produced by the post-scan synthesis pass and
+    // cached on the snapshot (best-effort; empty until the first run completes).
+    const deepReport = ((snapshot as any).narrative as string) || ''
+    return NextResponse.json({ ok: true, report: { ...summary, narrative, deepReport } })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to build executive summary.'
     return NextResponse.json({ ok: false, error: message }, { status: 500 })

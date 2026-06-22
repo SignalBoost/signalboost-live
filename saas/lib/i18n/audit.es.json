@@ -417,6 +417,10 @@
     "vercel": {
       "title": "Despliegue y entorno",
       "desc": "Variables por ámbito, exposición y discrepancias prod/preview."
+    },
+    "activity": {
+      "title": "Registro de auditoría y actividad",
+      "desc": "Acciones, actores y resultados registrados a lo largo del tiempo."
     }
   },
   "usage": {
@@ -619,5 +623,37 @@
     "loadError": "No se pudo cargar el informe de despliegue.",
     "fetchError": "Error: {msg}",
     "loading": "Cargando informe de despliegue…"
+  },
+  "activity": {
+    "title": "Registro de auditoría y cronología de actividad",
+    "subtitle": "Acciones, actores y resultados registrados del registro de auditoría del Hub.",
+    "summary": {
+      "total": "Eventos",
+      "success": "Exitosas",
+      "failures": "Fallos",
+      "denials": "Bloqueadas / denegadas",
+      "actors": "Actores"
+    },
+    "window": "Mostrando los {n} eventos más recientes · {since} → {until}",
+    "empty": "Aún no hay eventos de auditoría registrados.",
+    "col": {
+      "time": "Hora (UTC)",
+      "actor": "Actor",
+      "action": "Acción",
+      "target": "Destino",
+      "status": "Estado",
+      "message": "Mensaje"
+    },
+    "status": {
+      "success": "Éxito",
+      "failure": "Fallo",
+      "blocked": "Bloqueada",
+      "denied": "Denegada",
+      "error": "Error",
+      "config_error": "Error de config."
+    },
+    "loadError": "No se pudo cargar el registro de actividad.",
+    "fetchError": "Error: {msg}",
+    "loading": "Cargando registro de actividad…"
   }
 }

@@ -413,6 +413,10 @@
     "stripe": {
       "title": "Configuración de pagos",
       "desc": "Modo en vivo, niveles de precios y cobertura de webhooks."
+    },
+    "vercel": {
+      "title": "Despliegue y entorno",
+      "desc": "Variables por ámbito, exposición y discrepancias prod/preview."
     }
   },
   "usage": {
@@ -582,5 +586,38 @@
     "loadError": "No se pudo cargar el informe de Stripe.",
     "fetchError": "Error: {msg}",
     "loading": "Cargando informe de Stripe…"
+  },
+  "vercel": {
+    "title": "Informe de despliegue y variables de entorno",
+    "subtitle": "Variables de entorno por ámbito, exposición pública y discrepancias prod/preview.",
+    "notConfigured": "Vercel no está conectado, por lo que no se pudo evaluar el estado del despliegue.",
+    "summary": {
+      "scopes": "Ámbitos",
+      "vars": "Variables",
+      "publicSensitive": "Secretos expuestos"
+    },
+    "drift": {
+      "title": "Paridad producción ↔ preview",
+      "drift": "Los ámbitos difieren",
+      "aligned": "Alineados"
+    },
+    "scopes": {
+      "title": "Variables de entorno por ámbito",
+      "empty": "No se recopilaron variables de entorno."
+    },
+    "metadataNote": "Solo nombres: los valores nunca se leen ni se muestran.",
+    "scope": {
+      "production": "Producción",
+      "preview": "Vista previa",
+      "development": "Desarrollo",
+      "none": "No hay variables en este ámbito."
+    },
+    "findings": {
+      "title": "Hallazgos ({n})",
+      "empty": "Sin hallazgos de despliegue: nada marcado."
+    },
+    "loadError": "No se pudo cargar el informe de despliegue.",
+    "fetchError": "Error: {msg}",
+    "loading": "Cargando informe de despliegue…"
   }
 }

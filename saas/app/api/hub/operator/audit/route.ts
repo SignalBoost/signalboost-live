@@ -39,14 +39,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Not signed in.' }, { status: 401 })
   }
 
-  // This endpoint scans SignalBoost's OWN repository and is owner-only by
-  // default. Customer-run scans stay OFF until a customer scan target is wired;
-  // flip AUDIT_CUSTOMER_SCANS_ENABLED=true to open it (throttle then enforces).
-  const customerScansEnabled = process.env.AUDIT_CUSTOMER_SCANS_ENABLED === 'true'
-  if (!ctx.isOwner && !customerScansEnabled) {
-    return NextResponse.json({ ok: false, error: 'Owner access required.' }, { status: 403 })
-  }
-
+  // Access is governed PURELY by the audit-tier entitlement throttle — no isAdmin
+  // gate. checkScanQuota() reads the live audit tier (subscriptions.audit_plan /
+  // audit_status, NOT subscriptions.plan): owner ⇒ master/exempt, Free ⇒ 1 lifetime
+  // scan, paid tiers ⇒ their monthly cap. Over cap returns 402 (upgrade).
+  // NOTE: every caller's scan still targets AUDIT_GITHUB_REPO (the configured repo)
+  // until a per-customer scan target is wired — keep that in mind before promoting
+  // customer access broadly.
   const admin = getAdminSupabase()
 
   // Throttle policy — resolve the tier for everyone (owner ⇒ exempt enterprise),

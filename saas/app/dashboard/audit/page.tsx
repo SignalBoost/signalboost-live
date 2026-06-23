@@ -15,6 +15,7 @@ import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import PatchPreview from '@/components/audit/PatchPreview'
+import RemediationBanner from '@/components/audit/RemediationBanner'
 
 // The 12 live report views, mounted directly (NOT iframed) so they render inside
 // the drawer without the global app shell/navbar. Each is code-split via lazy().
@@ -482,6 +483,11 @@ export default function AuditCenterPage() {
 
         {phase && <PhaseTracker phase={phase} progress={progress} copy={copy} />}
 
+        {/* Ready to Remediate — appears the moment a scan completes with findings. */}
+        {!loading && view && view.findingsCount > 0 && (phase === 'DONE' || view.status === 'complete') && (
+          <RemediationBanner count={view.findingsCount} lang={lang} targetId="audit-findings" />
+        )}
+
         {error && (
           <div className="mt-4 rounded-md border border-danger bg-surface p-3 text-sm text-danger">{copy.failed}: {error}</div>
         )}
@@ -521,7 +527,7 @@ export default function AuditCenterPage() {
           </aside>
 
           {/* Findings column */}
-          <section className="min-w-[320px] flex-[999_1_420px]">
+          <section id="audit-findings" className="min-w-[320px] flex-[999_1_420px] scroll-mt-6">
             {view ? (
               <>
                 <div className="mb-3 flex flex-wrap gap-3">

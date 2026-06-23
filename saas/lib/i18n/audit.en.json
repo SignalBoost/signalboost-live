@@ -1,742 +1,972 @@
 {
-  "report": {
-    "executiveSummary": {
-      "title": "Executive Risk Summary",
-      "description": "Overall readiness score, finding counts, and top risks."
+  "tier": {
+    "core": "Core",
+    "tier2": "Scale",
+    "tier3": "Enterprise",
+    "tier4": "Internal",
+    "sidebar": {
+      "core": "Tier 1 Providers",
+      "tier2": "Tier 2 Providers",
+      "tier3": "Tier 3 Providers",
+      "tier4": "Tier 4 Tools"
     },
-    "providerInventory": {
-      "title": "Provider Inventory Report",
-      "description": "Every connected provider with status, risk, and last check."
-    },
-    "identityAccess": {
-      "title": "Identity & Access Review",
-      "description": "Access, privilege level, MFA state, and last-seen activity."
-    },
-    "secretsKeys": {
-      "title": "Secrets & API Key Exposure Report",
-      "description": "Configured credentials by environment and rotation posture. Metadata only."
-    },
-    "remediationRoadmap": {
-      "title": "Remediation Roadmap",
-      "description": "Prioritized fixes with business impact, owner, and due date."
-    },
-    "prCockpitTrail": {
-      "title": "PR Cockpit Approval Trail",
-      "description": "Every staged change, who approved it, and the merge result."
-    },
-    "githubChanges": {
-      "title": "Code Change Management Report",
-      "description": "Branch protection, open and stale PRs, and review posture."
-    },
-    "supabaseSecurity": {
-      "title": "Database Security Report",
-      "description": "RLS coverage, public buckets, and service-role usage."
-    },
-    "stripeConfig": {
-      "title": "Billing Configuration Report",
-      "description": "Products, prices, webhook coverage, and live/test consistency."
-    },
-    "vercelDeployment": {
-      "title": "Deployment & Env Var Report",
-      "description": "Production vs preview variables and exposed public vars."
-    },
-    "auditLog": {
-      "title": "Audit Log & Activity Timeline",
-      "description": "Recorded actions, actors, and results from the Hub audit log."
-    },
-    "complianceReadiness": {
-      "title": "Compliance Readiness Matrix",
-      "description": "Readiness against SOC 2, ISO 27001, NIST CSF, and CIS. Readiness only."
+    "blurb": {
+      "core": "Primary infrastructure: cloud, payments, data, hosting, and source control.",
+      "tier2": "Messaging, email, edge networking, and compute integrations.",
+      "tier3": "App platform, observability, error tracking, and incident response.",
+      "tier4": "Encrypted secrets vault and team governance."
     }
   },
-  "severity": {
-    "critical": "Critical",
+  "util": {
+    "domains": "Domains/DNS",
+    "deployments": "Deployments",
+    "logs": "Logs",
+    "settings": "Settings"
+  },
+  "sub": {
+    "ai_and_models": "AI & MODELS",
+    "email": "EMAIL",
+    "transcription": "TRANSCRIPTION",
+    "cloud_infrastructure": "CLOUD INFRASTRUCTURE",
+    "cloud_platform": "CLOUD PLATFORM",
+    "microsoft_cloud": "MICROSOFT CLOUD",
+    "payments_and_billing": "PAYMENTS & BILLING",
+    "database_and_authentication": "DATABASE & AUTHENTICATION",
+    "deployments_and_networking": "DEPLOYMENTS & NETWORKING",
+    "source_control": "SOURCE CONTROL",
+    "messaging_and_sms": "MESSAGING & SMS",
+    "transactional_email": "TRANSACTIONAL EMAIL",
+    "dns_cdn_and_edge": "DNS, CDN & EDGE",
+    "cloud_compute": "CLOUD COMPUTE",
+    "app_platform": "APP PLATFORM",
+    "observability": "OBSERVABILITY",
+    "error_monitoring": "ERROR MONITORING",
+    "incident_response": "INCIDENT RESPONSE",
+    "encrypted_secret_vault": "ENCRYPTED SECRET VAULT",
+    "team_access_and_compliance": "TEAM ACCESS & COMPLIANCE",
+    "voice_and_audio": "VOICE & AUDIO"
+  },
+  "sec": {
+    "repositories": "Repositories",
+    "pull_requests": "Pull Requests",
+    "branches": "Branches",
+    "issues": "Issues",
+    "activity": "Activity",
+    "secrets_and_tokens": "Secrets & Tokens",
+    "models": "Models",
+    "files": "Files",
+    "jobs": "Jobs",
+    "voices": "Voices",
+    "account": "Account",
+    "history": "History",
+    "domains": "Domains",
+    "audiences": "Audiences",
+    "broadcasts": "Broadcasts",
+    "api_keys": "API Keys",
+    "transcripts": "Transcripts",
+    "data": "Data",
+    "auth": "Auth",
+    "storage": "Storage",
+    "customers": "Customers",
+    "prices_and_tiers": "Prices & Tiers",
+    "catalog": "Catalog",
+    "table_crud": "Table CRUD",
+    "sql_engine": "SQL Engine",
+    "users_and_access": "Users & Access",
+    "credentials": "Credentials",
+    "environment_variables": "Environment Variables",
+    "deployments": "Deployments",
+    "networking_and_logs": "Networking & Logs",
+    "email": "Email",
+    "messaging": "Messaging",
+    "dns": "DNS",
+    "cache": "Cache",
+    "compute": "Compute",
+    "iam": "IAM",
+    "security": "Security",
+    "security_rules": "Security Rules",
+    "secrets_storage": "Secrets Storage",
+    "monitoring": "Monitoring",
+    "incidents": "Incidents",
+    "team_access": "Team Access",
+    "compliance_and_audit": "Compliance & Audit",
+    "audit": "Audit"
+  },
+  "fld": {
+    "repository": "Repository",
+    "pull_request": "Pull Request",
+    "issue": "Issue",
+    "branch": "Branch",
+    "model": "Model",
+    "voice": "Voice",
+    "table": "Table",
+    "transcript": "Transcript",
+    "title": "Title",
+    "new_title": "New Title",
+    "description": "Description",
+    "body": "Body",
+    "content": "Content",
+    "name": "Name",
+    "message": "Message",
+    "email": "Email",
+    "new_email": "New Email",
+    "merge_method": "Merge Method",
+    "region": "Region",
+    "domain": "Domain",
+    "bucket": "Bucket",
+    "product": "Product",
+    "price": "Price",
+    "query": "Query",
+    "operation": "Operation",
+    "phone_number": "Phone Number",
+    "bucket_name": "Bucket Name",
+    "username": "Username",
+    "iam_username": "IAM Username",
+    "product_name": "Product Name",
+    "new_product_name": "New Product Name",
+    "amount_usd": "Amount (USD)",
+    "price_id": "Price ID",
+    "subscription_tier": "Subscription Tier",
+    "customer": "Customer",
+    "amount_cents": "Amount (Cents)",
+    "charge": "Charge",
+    "amount_in_cents": "Amount (in Cents)",
+    "sql_raw_statement": "SQL Raw Statement",
+    "migration_payload": "Migration Payload",
+    "json_row_object": "JSON Row Object",
+    "match_column_value": "Match (column=value)",
+    "new_values_json": "New Values (JSON)",
+    "row": "Row",
+    "user_email": "User Email",
+    "user": "User",
+    "object_path": "Object Path",
+    "bucket_identifier": "Bucket Identifier",
+    "deployment_id": "Deployment ID",
+    "build_id": "Build ID",
+    "env_variable_id": "Env Variable ID",
+    "new_value": "New Value",
+    "target": "Target",
+    "env_variable_key_reference": "Env Variable Key Reference",
+    "domain_address_string": "Domain Address string",
+    "to": "To",
+    "subject": "Subject",
+    "type": "Type",
+    "ttl_sec": "TTL (sec)",
+    "proxied": "Proxied",
+    "record_id": "Record ID",
+    "droplet_name": "Droplet Name",
+    "size": "Size",
+    "image": "Image",
+    "rules_source": "Rules Source",
+    "monitor_name": "Monitor Name",
+    "alert_message": "Alert Message",
+    "metric_query": "Metric Query",
+    "project_slug": "Project Slug",
+    "issue_id": "Issue ID",
+    "service_id": "Service ID",
+    "urgency": "Urgency",
+    "master_passphrase": "Master Passphrase",
+    "secret_key_reference": "Secret Key Reference",
+    "encrypted_value": "Encrypted Value",
+    "key_name": "Key Name",
+    "team_member_id": "Team Member ID",
+    "target_privilege_domain_access_tier": "Target Privilege Domain Access Tier",
+    "member_id": "Member ID",
+    "permissions_comma_separated": "Permissions (comma-separated)",
+    "scope": "Scope"
+  },
+  "opt": {
+    "open": "Open",
+    "closed": "Closed",
+    "merge_commit": "Merge commit",
+    "squash": "Squash",
+    "rebase": "Rebase",
+    "production": "Production",
+    "preview": "Preview",
+    "development": "Development",
+    "indie_tier_9_mo": "Indie Tier ($9/mo)",
+    "pro_tier_29_mo": "Pro Tier ($29/mo)",
+    "growth_tier_79_mo": "Growth Tier ($79/mo)",
+    "list_objects": "List objects",
+    "upload": "Upload",
+    "download": "Download",
     "high": "High",
-    "medium": "Medium",
     "low": "Low",
-    "info": "Info"
+    "billing_administrator": "Billing Administrator",
+    "platform_core_developer": "Platform Core Developer",
+    "standard_team_member": "Standard Team Member",
+    "everything": "Everything",
+    "access_and_roles": "Access & Roles",
+    "billing": "Billing",
+    "data": "Data"
   },
-  "common": {
-    "overallScore": "Overall Readiness Score",
-    "findings": "Findings",
-    "evidenceRequired": "Evidence required",
-    "topRisks": "Top Risks",
-    "recommendation": "Recommendation",
-    "impact": "Impact"
+  "ui": {
+    "execute": "Execute",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "preview": "Preview",
+    "close": "Close",
+    "error": "Error",
+    "success": "Success",
+    "running": "Running…",
+    "no_inputs": "No inputs required for this action.",
+    "workspace": "Workspace",
+    "hub_home": "Hub Home",
+    "back": "Back",
+    "tier": "Tier",
+    "providers": "Providers",
+    "utility_views": "Utility Views",
+    "review_action": "Review the action that will be sent to",
+    "cannot_undo": "Once confirmed, this cannot be undone.",
+    "about_to_execute": "You are about to execute",
+    "on": "on"
   },
-  "finding": {
-    "staleIdentity": {
-      "title": "Stale identity: {principal} ({provider})",
-      "detail": "No recorded activity for {days} days (threshold {threshold}).",
-      "recommendation": "Review whether this access is still needed; remove or rotate if not.",
-      "impact": "Unused credentials widen the attack surface with no benefit."
-    },
-    "neverUsedIdentity": {
-      "title": "Never-used identity: {principal} ({provider})",
-      "detail": "Created {days} days ago with no recorded login or use.",
-      "recommendation": "Confirm this principal is required; remove if it was never activated.",
-      "impact": "Dormant accounts are a common foothold for attackers."
-    },
-    "privilegedNoMfa": {
-      "title": "Privileged account without MFA: {principal} ({provider})",
-      "detail": "Role \"{role}\" has admin-level access but MFA is disabled.",
-      "recommendation": "Require and enable MFA on this account immediately.",
-      "impact": "A single phished password grants full administrative control."
-    },
-    "mfaStateUnavailable": {
-      "title": "MFA state unavailable for {count} privileged identity(ies)",
-      "detail": "These providers do not expose per-account MFA status via their API.",
-      "recommendation": "Confirm MFA is enforced and attach evidence for these accounts."
-    },
-    "providerError": {
-      "title": "Provider \"{provider}\" is in an error state",
-      "detail": "The Hub reports {provider} as errored.",
-      "recommendation": "Re-check the {provider} connection and credentials."
-    },
-    "stripeReadFail": {
-      "title": "Stripe configuration could not be read",
-      "detail": "The Stripe API call failed during collection.",
-      "recommendation": "Verify STRIPE_SECRET_KEY is set and can read prices and webhooks.",
-      "impact": "Billing posture is unknown until Stripe is reachable."
-    },
-    "stripePriceMismatch": {
-      "title": "Stripe price/env mismatch",
-      "detail": "{name} points to a price that is not active in Stripe.",
-      "recommendation": "Point the env var at an active price, or activate the referenced price.",
-      "impact": "Checkout can reference a price that no longer exists, breaking purchases."
-    },
-    "stripeWebhookNone": {
-      "title": "No Stripe webhook endpoint configured",
-      "detail": "No webhook endpoints were returned by Stripe.",
-      "recommendation": "Add a webhook endpoint covering payment and subscription lifecycle events.",
-      "impact": "Failed payments and cancellations may not propagate to the app."
-    },
-    "stripeWebhookMissingEvent": {
-      "title": "Stripe webhook missing \"{event}\"",
-      "detail": "No configured webhook endpoint subscribes to {event}.",
-      "recommendation": "Add {event} to a webhook endpoint so the app reacts to this event.",
-      "impact": "Important billing events are not delivered to the platform."
-    },
-    "stripeWebhookUnverified": {
-      "title": "Stripe webhook event coverage not verified",
-      "detail": "Webhook endpoints exist but their subscribed event list was not collected.",
-      "recommendation": "Confirm each endpoint subscribes to required payment/subscription events."
-    },
-    "supabaseHealthFail": {
-      "title": "Supabase health check failed",
-      "detail": "The Supabase reachability check did not succeed.",
-      "recommendation": "Verify the project URL and service-role key, and that the database is online.",
-      "impact": "Core data layer availability is unconfirmed."
-    },
-    "serviceRoleInClient": {
-      "title": "Service-role key reachable from client code",
-      "detail": "The service-role key (which bypasses RLS) was detected on a client-exposed path.",
-      "recommendation": "Move all service-role usage strictly server-side and rotate the key immediately.",
-      "impact": "Full database access could be extracted by any visitor — severe data-breach risk."
-    },
-    "rlsDisabled": {
-      "title": "Table \"{table}\" has RLS disabled",
-      "detail": "Row Level Security is not enabled on {table}.",
-      "recommendation": "Enable RLS on {table} and add explicit access policies.",
-      "impact": "Without RLS, a leaked anon key can read or write this table directly."
-    },
-    "rlsUnverified": {
-      "title": "RLS coverage not verified",
-      "detail": "Table-level RLS state was not collected for this run.",
-      "recommendation": "Enumerate tables and confirm RLS is enabled on every table holding user data."
-    },
-    "publicBucket": {
-      "title": "Storage bucket \"{bucket}\" is public",
-      "detail": "The \"{bucket}\" bucket allows public access.",
-      "recommendation": "Confirm public access is intended; otherwise make the bucket private with signed URLs.",
-      "impact": "Public buckets may expose user-uploaded or internal files."
-    },
-    "vercelNotConnected": {
-      "title": "Vercel not connected",
-      "detail": "No Vercel token is configured, so deployment posture cannot be assessed.",
-      "recommendation": "Connect Vercel to include deployment and env-var checks in the audit."
-    },
-    "publicSensitiveEnv": {
-      "title": "Public env var looks sensitive: {name}",
-      "detail": "{name} is exposed to the browser (NEXT_PUBLIC_) but its name suggests a secret.",
-      "recommendation": "Rename to a server-only variable (drop NEXT_PUBLIC_) and rotate the value.",
-      "impact": "Secret values shipped to the browser are readable by anyone."
-    },
-    "envScopeDrift": {
-      "title": "Production and Preview env vars differ",
-      "detail": "Only in production: {onlyProd}. Only in preview: {onlyPreview}.",
-      "recommendation": "Reconcile env var names across scopes so preview reflects production.",
-      "impact": "Preview deploys may behave differently from production, masking bugs."
-    },
-    "githubReadFail": {
-      "title": "GitHub could not be read",
-      "detail": "The GitHub API call failed during collection.",
-      "recommendation": "Verify the GitHub token and its repo scope."
-    },
-    "branchProtectionUnverified": {
-      "title": "Branch protection not verified",
-      "detail": "Branch protection state for the default branch was not collected.",
-      "recommendation": "Confirm the default branch requires pull-request review before merge."
-    },
-    "branchProtectionMissing": {
-      "title": "Default branch \"{branch}\" does not require PR review",
-      "detail": "Changes can be merged to the default branch without an approving review.",
-      "recommendation": "Enable branch protection and require at least one approving review.",
-      "impact": "Production code can change without a second set of eyes."
-    },
-    "staleBranches": {
-      "title": "{count} stale branch(es) older than {days} days",
-      "detail": "Stale branches: {names}.",
-      "recommendation": "Review and delete merged or abandoned branches.",
-      "impact": "Stale branches add confusion and may carry outdated config."
-    },
-    "clientExposedSecret": {
-      "title": "Client-exposed secret: {name}",
-      "detail": "{name} appears to be a secret but is exposed to the client.",
-      "recommendation": "Move server-side and rotate immediately.",
-      "impact": "A leaked production secret can be abused by anyone."
-    },
-    "rotationUnknown": {
-      "title": "Rotation age unknown for {count} secret(s)",
-      "detail": "Provider APIs do not expose last-rotation dates for these credentials.",
-      "recommendation": "Record rotation dates in the Key Vault and set a rotation policy."
-    },
-    "backupTestMissing": {
-      "title": "Backup recovery test not on record",
-      "detail": "No evidence of a tested database backup/restore was collected.",
-      "recommendation": "Perform a restore test and attach the result."
-    }
-  },
-  "exec": {
-    "title": "Executive Risk Summary",
-    "subtitle": "Overall readiness score, finding counts, and top risks.",
-    "narrativeTitle": "Summary",
-    "topRisksTitle": "Top Risks",
-    "noRisks": "No risks above the reporting threshold.",
-    "providersTitle": "Providers",
-    "status": {
-      "connected": "connected",
-      "error": "error",
-      "not_configured": "not configured"
-    },
-    "loading": "Building executive summary…",
-    "loadError": "Could not load the summary.",
-    "fetchError": "Error: {msg}"
-  },
-  "identity": {
-    "findingsTitle": "Access Findings",
-    "noFindings": "No access findings.",
-    "tableTitle": "All Identities",
-    "empty": "No identities found.",
-    "never": "Never",
-    "daysAgo": "{days}d ago",
-    "summary": {
-      "total": "Identities",
-      "privileged": "Privileged",
-      "stale": "Stale",
-      "noMfa": "Priv. no MFA",
-      "mfaUnknown": "MFA unknown"
-    },
-    "col": {
-      "principal": "Principal",
-      "provider": "Provider",
-      "kind": "Type",
-      "role": "Role",
-      "mfa": "MFA",
-      "lastSeen": "Last seen",
-      "flags": "Flags"
-    },
-    "kind": {
-      "user": "User",
-      "service_account": "Service account",
-      "access_key": "Access key",
-      "collaborator": "Collaborator",
-      "token": "Token"
-    },
-    "mfa": {
-      "enabled": "Enabled",
-      "disabled": "Disabled",
-      "unknown": "Unknown"
-    },
-    "flag": {
-      "stale": "Stale",
-      "neverUsed": "Never used",
-      "privilegedNoMfa": "No MFA",
-      "mfaUnknown": "MFA?"
-    }
-  },
-  "provider": {
-    "title": "Provider Inventory",
-    "subtitle": "Every connected provider with status, risk, and last check.",
-    "empty": "No providers found.",
-    "evidenceShort": "({n} evidence)",
-    "loading": "Loading provider inventory…",
-    "loadError": "Could not load the inventory.",
-    "fetchError": "Error: {msg}",
-    "risk": {
-      "unknown": "Unknown"
-    },
-    "summary": {
-      "total": "Providers",
-      "connected": "Connected",
-      "error": "Errored",
-      "notConfigured": "Not configured"
-    },
-    "col": {
-      "provider": "Provider",
-      "category": "Category",
-      "status": "Status",
-      "risk": "Risk",
-      "findings": "Findings",
-      "lastChecked": "Last checked"
-    },
-    "status": {
-      "connected": "Connected",
-      "error": "Error",
-      "not_configured": "Not configured",
-      "missing": "Missing"
-    },
-    "category": {
-      "billing": "Billing",
-      "database": "Database",
-      "deployment": "Deployment",
-      "change-management": "Change management",
-      "identity": "Identity",
-      "other": "Other"
-    }
-  },
-  "secret": {
-    "title": "Secrets & API Key Exposure",
-    "subtitle": "Configured credentials by environment and rotation posture. Metadata only — no secret values are read or shown.",
-    "findingsTitle": "Exposure Findings",
-    "noFindings": "No exposure findings.",
-    "tableTitle": "Configured Credentials",
-    "empty": "No credentials found.",
-    "metadataNote": "Metadata only — secret values are never read or displayed.",
-    "loading": "Loading secrets report…",
-    "loadError": "Could not load the report.",
-    "fetchError": "Error: {msg}",
-    "summary": {
-      "total": "Credentials",
-      "clientExposed": "Client-exposed",
-      "rotationUnknown": "Rotation unknown"
-    },
-    "col": {
-      "name": "Name",
-      "provider": "Provider",
-      "environment": "Environment",
-      "exposure": "Exposure",
-      "rotation": "Rotation",
-      "risk": "Risk"
-    },
-    "env": {
-      "production": "Production",
-      "preview": "Preview",
-      "development": "Development",
-      "unknown": "Unknown"
-    },
-    "exposure": {
-      "client": "Client-exposed",
-      "server": "Server-only"
-    },
-    "rotation": {
-      "known": "Tracked",
-      "unknown": "Unknown"
-    }
-  },
-  "remediation": {
-    "title": "Remediation Roadmap",
-    "subtitle": "Prioritized fixes sequenced by urgency, with the items that need manual evidence on a separate track.",
-    "empty": "Nothing to remediate — no open findings.",
-    "evidenceTitle": "Evidence Required",
-    "evidenceSubtitle": "Gaps to confirm with manual evidence. These do not lower the score.",
-    "loading": "Building remediation roadmap…",
-    "loadError": "Could not load the roadmap.",
-    "fetchError": "Error: {msg}",
-    "summary": {
-      "now": "Now",
-      "next": "Next",
-      "later": "Later",
-      "evidence": "Evidence",
-      "handled": "Handled"
-    },
-    "tier": {
-      "now": "Now",
-      "next": "Next",
-      "later": "Later"
-    },
-    "tierHint": {
-      "now": "Critical — fix immediately.",
-      "next": "High — schedule soon.",
-      "later": "Medium and low — plan ahead."
-    },
-    "handled": {
-      "title": "Handled",
-      "subtitle": "Findings you've marked resolved, accepted, or won't-fix."
-    },
-    "state": {
-      "status": "Status",
-      "owner": "Owner",
-      "ownerPlaceholder": "Assign…",
-      "open": "Open",
-      "in_progress": "In progress",
-      "resolved": "Resolved",
-      "accepted": "Accepted",
-      "wont_fix": "Won't fix"
-    }
-  },
-  "center": {
-    "title": "Audit Center",
-    "subtitle": "Operational readiness reports across identity, providers, secrets, and remediation — scored deterministically.",
-    "open": "Open report",
-    "executive": {
-      "title": "Executive Risk Summary",
-      "desc": "Overall readiness score, finding counts, and top risks."
-    },
-    "identity": {
-      "title": "Identity & Access",
-      "desc": "Who has access, privilege level, MFA state, and last activity."
-    },
-    "providers": {
-      "title": "Provider Inventory",
-      "desc": "Every connected provider with status, risk, and last check."
-    },
-    "secrets": {
-      "title": "Secrets & API Keys",
-      "desc": "Configured credentials by environment and rotation posture."
-    },
-    "remediation": {
-      "title": "Remediation Roadmap",
-      "desc": "Prioritized fixes sequenced by urgency."
-    },
-    "usage": {
-      "title": "AI Usage & Cost",
-      "desc": "Token consumption and estimated cost per feature and user."
-    },
-    "history": {
-      "title": "Readiness History",
-      "desc": "Track your readiness score and finding counts over time."
-    },
+  "tpl": {
     "github": {
-      "title": "GitHub & Code Change",
-      "desc": "Branch protection, collaborators, and stale branches."
+      "list_repos": {
+        "label": "View Repos",
+        "desc": "List repositories visible to the configured access token."
+      },
+      "list_prs": {
+        "label": "List Pull Requests",
+        "desc": "Show open pull requests (newest first) for a repository."
+      },
+      "view_pr_files": {
+        "label": "View PR Files",
+        "desc": "List the files changed in a pull request."
+      },
+      "merge_pr": {
+        "label": "Merge PR",
+        "desc": "Merge a pull request into its base branch."
+      },
+      "close_pr": {
+        "label": "Close PR",
+        "desc": "Close a pull request without merging."
+      },
+      "list_branches": {
+        "label": "List Branches",
+        "desc": "List branches in a repository (useful for ai/* cleanup)."
+      },
+      "delete_branch": {
+        "label": "Delete Branch",
+        "desc": "Delete a branch by name (main is protected)."
+      },
+      "list_commits": {
+        "label": "Recent Commits",
+        "desc": "Show the most recent commits on a repository."
+      },
+      "list_issues": {
+        "label": "List Issues",
+        "desc": "Show open issues for a repository."
+      },
+      "open_issue": {
+        "label": "Open Issue",
+        "desc": "Create a new issue on a repository."
+      },
+      "edit_issue": {
+        "label": "Edit Issue",
+        "desc": "Update an issue title or open/closed state."
+      },
+      "close_issue": {
+        "label": "Close Issue",
+        "desc": "Close an open issue."
+      },
+      "rotate_token": {
+        "label": "Rotate Token",
+        "desc": "Rotate the stored GitHub access token (revoke + reissue)."
+      },
+      "manage_secrets": {
+        "label": "Manage Secrets",
+        "desc": "Create or update an Actions secret on a repository."
+      }
     },
-    "supabase": {
-      "title": "Database Security",
-      "desc": "RLS status, public buckets, and service-role exposure."
+    "openai": {
+      "list_models": {
+        "label": "View Models",
+        "desc": "List models available to the configured API key."
+      },
+      "retrieve_model": {
+        "label": "Model Details",
+        "desc": "Show details for a specific model."
+      },
+      "list_files": {
+        "label": "List Files",
+        "desc": "Files uploaded to the OpenAI account."
+      },
+      "list_fine_tunes": {
+        "label": "Fine-tuning Jobs",
+        "desc": "Recent fine-tuning jobs and their status."
+      },
+      "list_batches": {
+        "label": "Batch Jobs",
+        "desc": "Recent batch jobs and their status."
+      }
+    },
+    "elevenlabs": {
+      "list_voices": {
+        "label": "List Voices",
+        "desc": "Voices available to the account."
+      },
+      "voice_details": {
+        "label": "Voice Details",
+        "desc": "Inspect a specific voice."
+      },
+      "list_models": {
+        "label": "List Models",
+        "desc": "Speech models available to the account."
+      },
+      "subscription": {
+        "label": "Subscription & Usage",
+        "desc": "Plan tier and character quota usage."
+      },
+      "list_history": {
+        "label": "Generation History",
+        "desc": "Recent text-to-speech generations."
+      }
+    },
+    "anthropic": {
+      "list_models": {
+        "label": "View Models",
+        "desc": "Models available to the API key."
+      },
+      "retrieve_model": {
+        "label": "Model Details",
+        "desc": "Details for a specific model."
+      }
+    },
+    "gemini": {
+      "list_models": {
+        "label": "View Models",
+        "desc": "Models available to the Gemini key."
+      },
+      "model_details": {
+        "label": "Model Details",
+        "desc": "Details for a specific model."
+      }
+    },
+    "resend": {
+      "list_domains": {
+        "label": "List Domains",
+        "desc": "Sending domains and verification status."
+      },
+      "list_audiences": {
+        "label": "List Audiences",
+        "desc": "Contact audiences."
+      },
+      "list_broadcasts": {
+        "label": "List Broadcasts",
+        "desc": "Recent broadcasts."
+      },
+      "list_api_keys": {
+        "label": "List API Keys",
+        "desc": "API keys on the account."
+      }
+    },
+    "assemblyai": {
+      "list_transcripts": {
+        "label": "Recent Transcripts",
+        "desc": "Most recent transcription jobs."
+      },
+      "transcript_details": {
+        "label": "Transcript Details",
+        "desc": "Inspect a transcription job."
+      }
+    },
+    "supabase_mkt": {
+      "list_tables": {
+        "label": "List Tables",
+        "desc": "Public tables in the marketing project."
+      },
+      "list_rows": {
+        "label": "List Rows",
+        "desc": "Rows from a chosen table."
+      },
+      "list_users": {
+        "label": "List Users",
+        "desc": "Auth users in the marketing project."
+      },
+      "list_buckets": {
+        "label": "List Buckets",
+        "desc": "Storage buckets in the marketing project."
+      }
+    },
+    "aws": {
+      "create_s3_bucket": {
+        "label": "Create S3 Bucket",
+        "desc": "Create a new globally unique S3 bucket container."
+      },
+      "list_iam_users": {
+        "label": "List IAM Users",
+        "desc": "Fetch all current identity directory users."
+      },
+      "disable_iam_user": {
+        "label": "Disable IAM User",
+        "desc": "Deactivate user keys and credentials immediately."
+      },
+      "rotate_credential": {
+        "label": "Rotate Credential",
+        "desc": "Rotate an IAM access key pair for a user."
+      }
+    },
+    "gcp": {
+      "list_service_accounts": {
+        "label": "List Service Accounts",
+        "desc": "Fetch all system identity service accounts."
+      }
     },
     "stripe": {
-      "title": "Payments Config",
-      "desc": "Live mode, price tiers, and webhook coverage."
+      "create_product": {
+        "label": "Create Product",
+        "desc": "Create a new Stripe product and its first recurring price."
+      },
+      "edit_product": {
+        "label": "Edit Product",
+        "desc": "Update a Stripe product name, description, or active state."
+      },
+      "view_products": {
+        "label": "View Products",
+        "desc": "List live Stripe products and their identifiers."
+      },
+      "archive_product": {
+        "label": "Archive Product",
+        "desc": "Archive a Stripe product (sets it inactive — recoverable by editing it active again)."
+      },
+      "delete_product": {
+        "label": "Delete Product",
+        "desc": "Permanently delete a Stripe product. Only products with no active prices can be deleted."
+      },
+      "create_price": {
+        "label": "Create Price",
+        "desc": "Attach a new recurring or one-time price to an existing Stripe product."
+      },
+      "view_prices": {
+        "label": "View Prices",
+        "desc": "List Stripe prices, optionally filtered by product."
+      },
+      "edit_price": {
+        "label": "Edit Price",
+        "desc": "Update a price nickname or activate/deactivate it (amounts are immutable in Stripe)."
+      },
+      "archive_price": {
+        "label": "Archive Price",
+        "desc": "Deactivate a price so it can no longer be purchased (recoverable)."
+      },
+      "apply_tier_template": {
+        "label": "Plan Templates",
+        "desc": "Instantly build out standardized Indie, Pro, or Growth checkout tracks."
+      },
+      "list_customers": {
+        "label": "Customer View",
+        "desc": "List customers, invoices, and active recurring payment metrics."
+      },
+      "adjust_balance": {
+        "label": "Adjust Balance",
+        "desc": "Apply manual customer balance ledger modifications or transaction adjustments."
+      },
+      "issue_refund": {
+        "label": "Refund/Adjustments",
+        "desc": "Revert a processed transaction balance or apply a manual service credit charge."
+      }
+    },
+    "supabase": {
+      "sql_editor": {
+        "label": "SQL Editor",
+        "desc": "Run arbitrary raw queries directly against your data tables."
+      },
+      "run_migration": {
+        "label": "Run Migration",
+        "desc": "Execute compiled data definition schema migrations over the query bridge."
+      },
+      "insert_row": {
+        "label": "Insert Row",
+        "desc": "Directly inject structured row data records into an existing schema."
+      },
+      "edit_row": {
+        "label": "Edit Row",
+        "desc": "Update an existing table row matched by a filter expression."
+      },
+      "archive_row": {
+        "label": "Archive Rows",
+        "desc": "Flip active visibility flags on a specific database item record."
+      },
+      "delete_row": {
+        "label": "Delete Row",
+        "desc": "Hard purge row records out of the storage layer completely."
+      },
+      "invite_user": {
+        "label": "Invite User",
+        "desc": "Send an email invite to provision a new authenticated user."
+      },
+      "edit_user": {
+        "label": "Edit User",
+        "desc": "Update a user's email, metadata, or confirmation state."
+      },
+      "delete_user": {
+        "label": "Delete User",
+        "desc": "Permanently remove an authenticated user and their identity."
+      },
+      "reset_password": {
+        "label": "Reset Password",
+        "desc": "Trigger a password-recovery email for a user account."
+      },
+      "rotate_service_key": {
+        "label": "Rotate Keys",
+        "desc": "Invalidate current service_role JSON tokens and issue fresh credentials."
+      },
+      "storage_panel": {
+        "label": "Storage Panel",
+        "desc": "Upload, download, or list objects inside a storage bucket."
+      },
+      "create_bucket": {
+        "label": "Create Bucket",
+        "desc": "Instantiate a fresh media or binary object storage file container."
+      },
+      "empty_bucket": {
+        "label": "Empty Bucket",
+        "desc": "Purge all nested objects and binary layout leaves without dropping the core asset container."
+      }
     },
     "vercel": {
-      "title": "Deployment & Env",
-      "desc": "Env vars by scope, exposure, and prod/preview drift."
+      "list_deployments": {
+        "label": "Deployments Panel",
+        "desc": "Inspect running build tracks, commit records, and production target assignments."
+      },
+      "trigger_rollback": {
+        "label": "Rollback Deploy",
+        "desc": "Instantly point production edge domain targets back to a historical deployment hash."
+      },
+      "cancel_build": {
+        "label": "Cancel Build",
+        "desc": "Abort an active compiling orchestration queue element directly at the gateway."
+      },
+      "view_env": {
+        "label": "View Env Vars",
+        "desc": "List all active environment variable configurations on this project tracking ring."
+      },
+      "edit_env": {
+        "label": "Edit Env Var",
+        "desc": "Update the value and/or target environments of a variable."
+      },
+      "delete_env": {
+        "label": "Delete Env Var",
+        "desc": "Wipe environment variable keys completely off the active build pipeline."
+      },
+      "sync_dns_domain": {
+        "label": "Domains/DNS",
+        "desc": "Configure canonical configurations, alias paths, or trigger edge SSL certification rules."
+      },
+      "logs": {
+        "label": "Logs Viewer",
+        "desc": "Stream recent platform, build, and runtime log events."
+      }
     },
-    "activity": {
-      "title": "Audit Log & Activity",
-      "desc": "Recorded actions, actors, and results over time."
+    "twilio": {
+      "send_sms": {
+        "label": "Send SMS",
+        "desc": "Send an outbound SMS message from your Twilio number."
+      },
+      "verify_number": {
+        "label": "Verify Number",
+        "desc": "Start phone-number verification (sends a one-time code)."
+      }
     },
-    "compliance": {
-      "title": "Compliance Readiness",
-      "desc": "Readiness across SOC 2, ISO 27001, NIST CSF, and CIS."
+    "sendgrid": {
+      "send_email": {
+        "label": "Send Email",
+        "desc": "Send a transactional email through SendGrid."
+      },
+      "check_domain_auth": {
+        "label": "Check Domain Auth",
+        "desc": "Inspect sender-domain authentication (SPF/DKIM) status."
+      }
+    },
+    "cloudflare": {
+      "add_dns_record": {
+        "label": "Add DNS Record",
+        "desc": "Create a DNS record in the configured Cloudflare zone."
+      },
+      "toggle_proxy": {
+        "label": "Toggle Proxy",
+        "desc": "Turn the orange-cloud proxy on or off for a record."
+      },
+      "purge_cache": {
+        "label": "Purge Cache",
+        "desc": "Purge the entire Cloudflare edge cache for the zone."
+      }
+    },
+    "digitalocean": {
+      "create_droplet": {
+        "label": "Create Droplet",
+        "desc": "Provision a new DigitalOcean compute droplet."
+      },
+      "view_droplets": {
+        "label": "View Droplets",
+        "desc": "List active droplets and their status."
+      }
+    },
+    "firebase": {
+      "upload_rules": {
+        "label": "Upload Rules",
+        "desc": "Publish a new Firestore/Storage security ruleset."
+      },
+      "view_rules": {
+        "label": "View Rules",
+        "desc": "Show the currently published security ruleset."
+      }
+    },
+    "datadog": {
+      "create_monitor": {
+        "label": "Create Monitor",
+        "desc": "Create a metric/alert monitor."
+      },
+      "check_metrics": {
+        "label": "Check Metrics",
+        "desc": "Run a metric query and view the latest series."
+      }
+    },
+    "sentry": {
+      "list_issues": {
+        "label": "List Issues",
+        "desc": "List unresolved issues for a project."
+      },
+      "resolve_issue": {
+        "label": "Resolve Issue",
+        "desc": "Mark an issue as resolved."
+      }
+    },
+    "pagerduty": {
+      "list_incidents": {
+        "label": "List Incidents",
+        "desc": "List recent and active incidents."
+      },
+      "trigger_incident": {
+        "label": "Trigger Incident",
+        "desc": "Manually trigger a new incident on a service."
+      }
+    },
+    "vault": {
+      "unlock_vault": {
+        "label": "Unlock Vault",
+        "desc": "Supply your system-wide Master Passphrase to load sensitive key vectors."
+      },
+      "seal_vault": {
+        "label": "Seal Vault",
+        "desc": "Instantly purge decrypted memory layers and lock all core operations back down."
+      },
+      "add_secret": {
+        "label": "Add Secret",
+        "desc": "Inject highly secure, encrypted variable storage strings."
+      },
+      "edit_secret": {
+        "label": "Edit Key",
+        "desc": "Update the value of an existing vault secret."
+      },
+      "reveal_secret": {
+        "label": "Reveal Key",
+        "desc": "Decrypt and reveal a secret value (audit-logged)."
+      },
+      "archive_secret": {
+        "label": "Archive Key",
+        "desc": "Archive a secret (hidden but recoverable)."
+      },
+      "delete_secret": {
+        "label": "Delete Secret",
+        "desc": "Permanently scrub key reference objects from storage blocks."
+      },
+      "view_keys": {
+        "label": "Audit Log Keys",
+        "desc": "Inspect compliance trail paths mapping recent decryption events."
+      },
+      "audit_log": {
+        "label": "Audit Log",
+        "desc": "View the vault access and mutation audit trail."
+      }
+    },
+    "gov": {
+      "assign_role": {
+        "label": "Role Assignment",
+        "desc": "Provision platform access parameters across specific organizational personnel tracks."
+      },
+      "change_permissions": {
+        "label": "Change Role Permissions",
+        "desc": "Adjust the permission set attached to a member or role."
+      },
+      "deactivate_member": {
+        "label": "Archive Member",
+        "desc": "Suspend org permissions and turn off account access parameters globally."
+      },
+      "view_timeline": {
+        "label": "Activity Timeline",
+        "desc": "Audit trace lines tracking all recent cluster execution contexts."
+      },
+      "run_compliance_audit": {
+        "label": "Run Compliance Audit",
+        "desc": "Run a compliance sweep across the selected scope."
+      },
+      "clear_stale_sessions": {
+        "label": "Clear Sessions",
+        "desc": "Force log out inactive tokens and refresh authorization parameters."
+      }
     }
   },
-  "usage": {
-    "title": "AI Usage & Cost",
-    "subtitle": "Token consumption and estimated cost across AI features over the last {n} days. Cost is an estimate; token counts are exact.",
-    "totalCost": "Est. cost",
-    "calls": "Calls",
-    "totalTokens": "Total tokens",
-    "cacheHit": "Input from cache",
-    "byFeature": "By Feature",
-    "byUser": "Top Consumers",
-    "byUserHint": "Highest estimated cost first — the basis for per-user billing or throttling.",
-    "col": {
-      "feature": "Feature",
-      "calls": "Calls",
-      "tokens": "Tokens",
-      "cost": "Est. cost",
-      "user": "User"
-    },
-    "empty": "No usage recorded yet.",
-    "loading": "Loading usage…",
-    "loadError": "Could not load usage.",
-    "fetchError": "Error: {msg}"
+  "domains": {
+    "err_load": "Failed to load domains",
+    "err_load2": "Error loading domains",
+    "err_add": "Failed to add domain",
+    "err_add2": "Error adding domain",
+    "err_verify": "Verification failed",
+    "err_verify2": "Error verifying domain",
+    "title": "Domains & DNS",
+    "subtitle": "Manage domains, DNS records, and SSL certificates",
+    "add_domain": "Add Domain",
+    "add": "Add",
+    "loading": "Loading domains...",
+    "empty": "No domains configured yet",
+    "verified": "Verified",
+    "pending": "Pending Verification",
+    "verification_required": "Verification Required",
+    "check_verification": "Check Verification",
+    "ssl_cert": "SSL Certificate",
+    "status": "Status",
+    "expires": "Expires",
+    "nameservers": "Nameservers",
+    "created": "Created",
+    "updated": "Updated"
   },
-  "export": {
-    "csv": "Export CSV",
-    "pdf": "Print / Save PDF"
+  "env": {
+    "title": "Add environment variable",
+    "count_live": "{n} live",
+    "type": "Type",
+    "targets": "Targets",
+    "add": "Add variable",
+    "adding": "Adding…",
+    "list_title": "Variables",
+    "refresh": "Refresh",
+    "loading": "Loading variables…",
+    "empty": "No variables yet. Add one above.",
+    "system": "system",
+    "edit": "Edit",
+    "close": "Close",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "save": "Save changes",
+    "saving": "Saving…",
+    "ph_value": "value",
+    "ph_new_value": "new value (leave blank to keep current)",
+    "err_load": "Failed to load variables",
+    "err_load2": "Error loading variables",
+    "err_required": "Key and value are required",
+    "added": "Added {key}",
+    "err_add": "Failed to add variable",
+    "err_add2": "Error adding variable",
+    "err_edit_required": "Set a new value or change the targets",
+    "updated": "Variable updated",
+    "err_update": "Failed to update variable",
+    "err_update2": "Error updating variable",
+    "confirm_delete": "Delete {key}? This removes it from the build pipeline and cannot be undone.",
+    "deleted": "Deleted {key}",
+    "err_delete": "Failed to delete variable",
+    "err_delete2": "Error deleting variable"
   },
-  "history": {
-    "title": "Readiness History",
-    "subtitle": "Track how your readiness score moves over time.",
-    "snapshot": "Snapshot now",
-    "snapshotting": "Saving…",
-    "loading": "Loading history…",
-    "loadError": "Could not load history.",
-    "fetchError": "Error: {msg}",
-    "snapshotError": "Could not take snapshot.",
-    "empty": "No snapshots yet. Take your first one above.",
-    "trendTitle": "Score over time",
-    "col": {
-      "date": "Date"
-    }
+  "logs": {
+    "title": "Audit Logs",
+    "subtitle": "Real-time activity log of all vault operations",
+    "stat_actions_24h": "Actions (24h)",
+    "stat_success_rate": "Success Rate",
+    "stat_failed": "Failed Actions",
+    "stat_unique_users": "Unique Users",
+    "filters": "Filters",
+    "action": "Action",
+    "all_actions": "All Actions",
+    "accessed": "Accessed",
+    "rotated": "Rotated",
+    "verified": "Verified",
+    "created": "Created",
+    "deleted": "Deleted",
+    "revoked": "Revoked",
+    "exported": "Exported",
+    "status": "Status",
+    "all_statuses": "All Statuses",
+    "success": "Success",
+    "failed": "Failed",
+    "pending": "Pending",
+    "secret_id": "Secret ID",
+    "ph_secret": "Filter by secret",
+    "user_email": "User Email",
+    "ph_user": "Filter by user",
+    "export_csv": "Export as CSV",
+    "loading": "Loading logs...",
+    "no_logs": "No logs found",
+    "timestamp": "Timestamp",
+    "col_user": "User",
+    "message": "Message",
+    "previous": "Previous",
+    "page_n": "Page {n}",
+    "next": "Next",
+    "err_load": "Failed to load logs",
+    "err_load2": "Error loading logs",
+    "err_export": "Export failed"
   },
-  "scan": {
-    "quotaExceeded": "Monthly limit reached: {used}/{cap} audit scans used. Upgrade your plan to run more.",
-    "upgrade": "Upgrade plan"
+  "deploy": {
+    "err_load": "Failed to load deployments",
+    "err_load2": "Error loading deployments",
+    "confirm_rollback": "Roll back to {target}? This promotes it back to production.",
+    "confirm_cancel": "Cancel build {target}? This aborts the running build.",
+    "done_rollback": "Rollback complete",
+    "done_cancel": "Build canceled",
+    "err_rollback": "Failed to rollback",
+    "err_cancel": "Failed to cancel",
+    "err_during_rollback": "Error during rollback",
+    "err_during_cancel": "Error during cancel",
+    "head_rollback": "Rollback Deploy",
+    "head_cancel": "Cancel Build",
+    "head_view": "Deployments",
+    "sub_rollback": "Pick a previous READY deployment to promote back to production.",
+    "sub_cancel": "Abort an in-progress build (BUILDING, QUEUED, or INITIALIZING).",
+    "sub_view": "Recent Vercel deployment history and status.",
+    "refresh": "Refresh",
+    "loading": "Loading deployments...",
+    "empty": "No deployments found",
+    "deployment": "Deployment",
+    "current": "CURRENT",
+    "by": "by {name}",
+    "promoting": "Promoting…",
+    "roll_back_this": "Roll back to this",
+    "current_target": "current production target",
+    "only_ready": "Only READY deployments can be promoted",
+    "canceling": "Canceling…",
+    "cancel_build": "Cancel build",
+    "not_in_progress": "Not in progress — nothing to cancel",
+    "live_url": "Live URL",
+    "git_commit": "Git Commit",
+    "deployment_id": "Deployment ID",
+    "created": "Created",
+    "aliases": "Aliases",
+    "view_inspector": "View Deployment Details in Inspector",
+    "just_now": "just now",
+    "m_ago": "{n}m ago",
+    "h_ago": "{n}h ago",
+    "d_ago": "{n}d ago"
   },
-  "github": {
-    "title": "GitHub & Code Change Report",
-    "subtitle": "Branch protection, collaborators, stale branches, and open changes.",
-    "notConfigured": "GitHub is not connected, or its data could not be collected.",
-    "summary": {
-      "collaborators": "Collaborators",
-      "admins": "Admins",
-      "stale": "Stale branches",
-      "openPRs": "Open PRs"
-    },
-    "protection": {
-      "title": "Default branch protection",
-      "enforced": "Enforced",
-      "missing": "Missing",
-      "unverified": "Unverified"
-    },
-    "collab": {
-      "title": "Collaborators",
-      "empty": "No collaborators collected."
-    },
-    "col": {
-      "login": "User",
-      "role": "Role",
-      "access": "Access",
-      "branch": "Branch",
-      "age": "Age (days)"
-    },
-    "admin": "Admin",
-    "member": "Member",
-    "stale": {
-      "title": "Stale branches",
-      "empty": "No stale branches — clean."
-    },
-    "findings": {
-      "title": "Findings ({n})",
-      "empty": "No GitHub findings — nothing flagged."
-    },
-    "loadError": "Could not load the GitHub report.",
-    "fetchError": "Error: {msg}",
-    "loading": "Loading GitHub report…"
+  "settings": {
+    "err_load": "Failed to load settings",
+    "err_load2": "Error loading settings",
+    "err_update": "Failed to update setting",
+    "err_update2": "Error updating setting",
+    "loading": "Loading settings...",
+    "title": "Console Settings",
+    "subtitle": "Configure security policies, approvals, and audit settings",
+    "saved": "Settings saved",
+    "sec_security": "Security",
+    "sec_automation": "Automation",
+    "sec_audit": "Audit & Retention",
+    "sec_notifications": "Notifications",
+    "sec_advanced": "Advanced",
+    "mfa_l": "Require MFA for Unlock",
+    "mfa_d": "Users must authenticate with TOTP before accessing the vault",
+    "rot_approval_l": "Require Approval for Key Rotation",
+    "rot_approval_d": "Key rotations must be approved before execution",
+    "exp_approval_l": "Require Approval for Export",
+    "exp_approval_d": "Exporting secrets requires explicit approval",
+    "enc_l": "Encryption Enabled",
+    "enc_d": "All secrets encrypted at rest",
+    "autorot_l": "Auto-Rotate Keys",
+    "autorot_d": "Automatically rotate keys on a schedule",
+    "autorot_int_l": "Auto-Rotate Interval (Days)",
+    "audit_ret_l": "Audit Log Retention (Days)",
+    "audit_ret_d": "How long to keep audit logs",
+    "session_l": "Session Timeout (Minutes)",
+    "session_d": "Idle timeout before re-authentication required",
+    "notify_unauth_l": "Notify on Unauthorized Access",
+    "notify_unauth_d": "Send alerts when unauthorized access is detected",
+    "notify_rot_l": "Notify on Key Rotation",
+    "notify_rot_d": "Send notifications when keys are rotated",
+    "notify_exp_l": "Notify on Key Expiry",
+    "notify_exp_d": "Alert when keys are expiring soon",
+    "pub_l": "Allow Public URLs",
+    "pub_d": "Permit deployment to public URLs",
+    "last_updated": "Last Updated"
   },
-  "supabase": {
-    "title": "Database Security Report",
-    "subtitle": "Row-level security, public buckets, and service-role exposure.",
-    "notConfigured": "Supabase is not connected, or its data could not be collected.",
-    "summary": {
-      "tables": "Tables",
-      "rlsDisabled": "RLS disabled",
-      "publicBuckets": "Public buckets"
-    },
-    "serviceRole": {
-      "title": "Service-role key exposure",
-      "exposed": "Exposed to client",
-      "serverOnly": "Server-only"
-    },
-    "tables": {
-      "title": "Tables & Row-Level Security",
-      "empty": "No tables collected."
-    },
-    "col": {
-      "table": "Table",
-      "rls": "RLS"
-    },
-    "rls": {
-      "on": "Enabled",
-      "off": "Disabled"
-    },
-    "buckets": {
-      "title": "Public storage buckets",
-      "empty": "No public buckets — clean."
-    },
-    "findings": {
-      "title": "Findings ({n})",
-      "empty": "No database findings — nothing flagged."
-    },
-    "loadError": "Could not load the Supabase report.",
-    "fetchError": "Error: {msg}",
-    "loading": "Loading Supabase report…"
+  "pr": {
+    "title": "Open Pull Requests",
+    "refresh": "Refresh",
+    "subtitle": "AI-drafted infrastructure changes. Inspect the planned steps, then merge. Nothing fires until you do.",
+    "loading": "Loading…",
+    "empty": "No open PRs. The Chief of Staff will queue changes here for approval.",
+    "planned_steps": "planned steps (run in order on merge — nothing has fired yet)",
+    "no_steps": "No steps.",
+    "risk_word": "risk",
+    "level_low": "low",
+    "level_medium": "medium",
+    "level_high": "high",
+    "needs": "needs {role}",
+    "steps_one": "{n} step",
+    "steps_many": "{n} steps",
+    "redeploys": "redeploys",
+    "redeploy_tag": "↻ redeploy",
+    "hide_payloads": "Hide payloads",
+    "inspect_payloads": "Inspect payloads",
+    "high_risk_a": "High-risk change. Runs live and cannot be undone. Requires ",
+    "high_risk_b": " clearance. Confirm to proceed.",
+    "merging": "Merging…",
+    "confirm_run": "Confirm — run live",
+    "merge_high": "Merge / Approve (high risk)",
+    "merge": "Merge / Approve",
+    "cancel": "Cancel",
+    "close": "Close",
+    "history": "History",
+    "succeeded_one": "{ok}/{total} step succeeded.",
+    "succeeded_many": "{ok}/{total} steps succeeded.",
+    "redeploy_included": "Production redeploy step included.",
+    "merged_at": "merged {date}",
+    "load_failed": "Failed to load",
+    "merge_failed": "Merge failed"
   },
-  "stripe": {
-    "title": "Payments Configuration Report",
-    "subtitle": "Live mode, price tiers, webhook coverage, and price mismatches.",
-    "notConfigured": "Stripe is not connected, or its data could not be collected.",
-    "summary": {
-      "tiers": "Price tiers",
-      "webhooks": "Webhooks",
-      "mismatches": "Price mismatches"
-    },
-    "mode": {
-      "title": "Stripe mode",
-      "live": "Live mode",
-      "test": "Test mode"
-    },
-    "tiers": {
-      "title": "Price tiers",
-      "empty": "No price tiers collected."
-    },
-    "col": {
-      "name": "Tier",
-      "price": "Price",
-      "interval": "Interval",
-      "priceId": "Price ID",
-      "status": "Status",
-      "endpoint": "Endpoint",
-      "whStatus": "Status",
-      "events": "Events"
-    },
-    "status": {
-      "mismatch": "Mismatch",
-      "ok": "Active"
-    },
-    "webhooks": {
-      "title": "Webhook endpoints",
-      "empty": "No webhook endpoints configured."
-    },
-    "findings": {
-      "title": "Findings ({n})",
-      "empty": "No payments findings — nothing flagged."
-    },
-    "loadError": "Could not load the Stripe report.",
-    "fetchError": "Error: {msg}",
-    "loading": "Loading Stripe report…"
+  "cui": {
+    "audit_log": "Audit Log:",
+    "audit_note": "All actions are recorded for compliance.",
+    "view_log": "View log →",
+    "unknown_page": "Unknown page.",
+    "soon": "Soon",
+    "soon_short": "SOON",
+    "not_available": "Not available yet",
+    "coming_soon": "Coming soon",
+    "workspace_title": "{name} Workspace",
+    "coming_soon_banner": "⏳ {name} actions are coming soon — this is a preview of what will be available.",
+    "provider_not_found": "Provider not found: {id}",
+    "no_actions": "No actions available for {name}",
+    "actions_for": "Actions for {name}",
+    "available_one": "{n} available action",
+    "available_many": "{n} available actions",
+    "confirm_action": "Confirm action",
+    "executing_action": "Executing action…",
+    "back": "Back",
+    "execute_now": "Execute Now",
+    "select_key_id": "Select key ID...",
+    "querying_vars": "Querying cluster variables ledger...",
+    "no_config_keys": "No active configuration keys found.",
+    "nothing_to_select": "Nothing to select here yet."
   },
-  "vercel": {
-    "title": "Deployment & Env Var Report",
-    "subtitle": "Environment variables by scope, public exposure, and prod/preview drift.",
-    "notConfigured": "Vercel is not connected, so deployment posture could not be assessed.",
-    "summary": {
-      "scopes": "Env scopes",
-      "vars": "Variables",
-      "publicSensitive": "Exposed secrets"
-    },
-    "drift": {
-      "title": "Production ↔ Preview parity",
-      "drift": "Scopes differ",
-      "aligned": "Aligned"
-    },
-    "scopes": {
-      "title": "Environment variables by scope",
-      "empty": "No environment variables collected."
-    },
-    "metadataNote": "Names only — values are never read or shown.",
-    "scope": {
-      "production": "Production",
-      "preview": "Preview",
-      "development": "Development",
-      "none": "No variables in this scope."
-    },
-    "findings": {
-      "title": "Findings ({n})",
-      "empty": "No deployment findings — nothing flagged."
-    },
-    "loadError": "Could not load the deployment report.",
-    "fetchError": "Error: {msg}",
-    "loading": "Loading deployment report…"
+  "vault": {
+    "cred_mgmt": "Credential Management",
+    "rotate_title": "Rotate {name}",
+    "rotate_sub": "Generate a new credential for {provider}.",
+    "cannot_undo": "This action cannot be undone",
+    "current_secret": "Current Secret",
+    "after_rotation": "After rotation",
+    "after_desc": "A new credential will be generated. The old one is revoked automatically and synced to your Vercel environment variables.",
+    "rotate_key": "Rotate Key",
+    "generating": "Generating new credential...",
+    "may_take": "This may take a moment.",
+    "rotation_success": "Rotation successful",
+    "new_secret_masked": "New Secret (Masked)",
+    "chk_generated": "New credential generated",
+    "chk_synced": "Synced to Vercel env vars",
+    "chk_revoked": "Old credential revoked",
+    "chk_audited": "Audit logged",
+    "done": "Done",
+    "rotation_failed": "Rotation failed",
+    "retry": "Retry"
   },
-  "activity": {
-    "title": "Audit Log & Activity Timeline",
-    "subtitle": "Recorded actions, actors, and results from the Hub audit log.",
-    "summary": {
-      "total": "Events",
-      "success": "Succeeded",
-      "failures": "Failures",
-      "denials": "Blocked / denied",
-      "actors": "Actors"
-    },
-    "window": "Showing {n} most recent events · {since} → {until}",
-    "empty": "No audit events recorded yet.",
-    "col": {
-      "time": "Time (UTC)",
-      "actor": "Actor",
-      "action": "Action",
-      "target": "Target",
-      "status": "Status",
-      "message": "Message"
-    },
-    "status": {
-      "success": "Success",
-      "failure": "Failure",
-      "blocked": "Blocked",
-      "denied": "Denied",
-      "error": "Error",
-      "config_error": "Config error"
-    },
-    "loadError": "Could not load the activity log.",
-    "fetchError": "Error: {msg}",
-    "loading": "Loading activity log…"
-  },
-  "compliance": {
-    "title": "Compliance Readiness Matrix",
-    "subtitle": "Readiness against SOC 2, ISO 27001, NIST CSF, and CIS — mapped from your current findings.",
-    "disclaimer": "Readiness indication only — this is not a certification, attestation, or formal audit. Reference codes are indicative.",
-    "overall": "Overall readiness",
-    "summary": {
-      "families": "Control families",
-      "ready": "Ready",
-      "attention": "Needs attention",
-      "gaps": "Gaps"
-    },
-    "readyOf": "{ready} of {total} ready",
-    "matrix": {
-      "title": "Control families"
-    },
-    "col": {
-      "family": "Control family",
-      "status": "Status",
-      "findings": "Findings"
-    },
-    "fw": {
-      "soc2": "SOC 2",
-      "iso27001": "ISO 27001",
-      "nist": "NIST CSF",
-      "cis": "CIS Controls"
-    },
-    "family": {
-      "accessControl": "Access Control & Identity",
-      "changeManagement": "Change Management",
-      "dataSecurity": "Data Security",
-      "secrets": "Secrets Management",
-      "configuration": "Configuration & Deployment",
-      "logging": "Logging & Monitoring",
-      "inventory": "Asset Inventory",
-      "payments": "Processing Integrity (Payments)"
-    },
-    "status": {
-      "ready": "Ready",
-      "attention": "Needs attention",
-      "gap": "Gap"
-    },
-    "loadError": "Could not load the compliance report.",
-    "fetchError": "Error: {msg}",
-    "loading": "Loading compliance readiness…"
-  },
-  "admin": {
-    "eyebrow": "NASA-style admin console",
-    "forecasting": "Forecasting",
-    "financialLedger": "Financial ledger",
-    "kpiCockpit": "KPI cockpit",
-    "marketplace": "Marketplace",
-    "saas": "SaaS",
-    "unifiedEngagement": "Unified engagement index",
-    "crmPipeline": "CRM pipeline",
-    "conciergeRecs": "Concierge recommendations",
-    "filters": "Filters: date range • product • country • plan • role",
-    "telemetryReady": "Telemetry-ready. Connect analytics tables/events to activate live records for this cockpit panel.",
-    "telemetrySignal": "Telemetry-ready signal",
-    "notTracked": "Not tracked yet",
-    "comingSoon": "Coming soon",
-    "readyToRemediate": "Ready to remediate",
-    "viewCodeDiff": "View code diff",
-    "approvePullRequest": "Approve pull request"
-  }
+  "vaultx": {"audit":{"loading":"Loading audit log...","empty":"No audit log entries","trail":"Audit Trail","success":"Success","failed":"Failed","ip":"IP:","showing":"Showing latest 50 of","entries":"entries"},"grid":{"empty":"No secrets in vault","emptyHint":"Secrets from connected providers will appear here.","statusActive":"Active","statusExpiringSoon":"Expiring Soon","statusExpired":"Expired","statusRotated":"Recently Rotated","statusRevoked":"Revoked","expiresIn":"Expires in","day":"day","days":"days","lastRotated":"Last rotated:","expires":"Expires:","created":"Created:"},"page":{"ops":"Operations & Production","keysSecrets":"Keys & Secrets","inventory":"Credential inventory, expiration alerts, and rotation status.","secretWord":"secret","secretsWord":"secrets","stored":"stored.","active":"Active","expiring":"Expiring","lockVault":"Lock Vault","browseSecrets":"Browse Secrets","providerPlaceholder":"Search and select a provider...","selected":"Selected:","statusActive":"Active Secrets","statusExpiringSoon":"Expiring Soon","statusExpired":"Expired","statusRotated":"Recently Rotated","statusRevoked":"Revoked","maskedValue":"Masked Value","encryptedNote":"Full value is encrypted and not displayed in the UI.","expiration":"Expiration","lastRotated":"Last Rotated","typeEnv":"Type & Environment"},"unlock":{"refresh":"Refresh","secureAccess":"Secure Access Required","unlockVault":"Unlock Vault","enable2fa":"Enable 2FA","enter2faCode":"Enter 2FA Code","enterPassword":"Enter your password","scanQr":"Scan QR code with Google Authenticator","sessionExpire":"This session will expire in 30 minutes for security.","password":"Password","verifying":"Verifying...","continue":"Continue","scanAuthApps":"Scan with Google Authenticator, Microsoft Authenticator, or Authy","enter6digit":"Enter 6-digit code to confirm","saveBackup":"Save these backup codes:","back":"Back","unlock":"Unlock","twofaCode":"2FA Code","errPasswordRequired":"Password is required","errInvalidCode":"Enter a valid 6-digit code"}}
 }

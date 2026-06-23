@@ -2,6 +2,8 @@
 
 import type { CSSProperties } from 'react'
 import type { CommandPageKey, CommandRailSection } from './types'
+import { useI18n } from '@/components/i18n/I18nProvider'
+import { t } from '@/lib/i18n/t'
 
 type CommandRailProps = {
   sections: CommandRailSection[]
@@ -68,6 +70,7 @@ function handleRailClick(itemKey: string, pageKey: CommandPageKey | undefined, o
 }
 
 export default function CommandRail({ sections, activePage, onNavigate }: CommandRailProps) {
+  const { dict } = useI18n()
   return (
     <aside className="command-rail" style={railStyle}>
       <div style={{ padding: '5px 6px 2px' }}>
@@ -75,10 +78,10 @@ export default function CommandRail({ sections, activePage, onNavigate }: Comman
           <div style={{ width: 34, height: 34, borderRadius: 14, border: '1px solid rgba(26,240,255,.45)', background: 'radial-gradient(circle at 50% 50%, rgba(26,240,255,.24), rgba(26,240,255,.04))', display: 'grid', placeItems: 'center', color: '#1af0ff', fontWeight: 950 }}>⌁</div>
           <div>
             <div style={{ fontSize: 15, fontWeight: 950, letterSpacing: '-.01em' }}>SignalBoost</div>
-            <div style={{ color: 'rgba(255,255,255,.46)', fontSize: 11.5, fontWeight: 750 }}>Command Control</div>
+            <div style={{ color: 'rgba(255,255,255,.46)', fontSize: 11.5, fontWeight: 750 }}>{t(dict, 'console.rail.tagline', 'Command Control')}</div>
           </div>
         </div>
-        <div style={{ marginTop: 12, padding: '8px 10px', borderRadius: 14, border: '1px solid rgba(255,195,0,.22)', background: 'rgba(255,195,0,.07)', color: '#ffc300', fontSize: 11.5, fontWeight: 850 }}>Know what is broken. Know what to fix next.</div>
+        <div style={{ marginTop: 12, padding: '8px 10px', borderRadius: 14, border: '1px solid rgba(255,195,0,.22)', background: 'rgba(255,195,0,.07)', color: '#ffc300', fontSize: 11.5, fontWeight: 850 }}>{t(dict, 'console.rail.subtitle', 'Know what is broken. Know what to fix next.')}</div>
       </div>
 
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -96,7 +99,7 @@ export default function CommandRail({ sections, activePage, onNavigate }: Comman
                     disabled={disabled}
                     onClick={() => handleRailClick(item.key, item.pageKey, onNavigate)}
                     style={itemStyle(active, disabled)}
-                    title={disabled ? 'Planned workspace' : item.label}
+                    title={disabled ? t(dict, 'console.rail.planned', 'Planned workspace') : item.label}
                   >
                     <span style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}><span>{item.icon}</span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span></span>
                     {item.badge && <span style={{ borderRadius: 999, border: '1px solid rgba(255,255,255,.12)', padding: '2px 6px', color: 'rgba(255,255,255,.5)', fontSize: 10.5 }}>{item.badge}</span>}

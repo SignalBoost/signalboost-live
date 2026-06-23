@@ -14,6 +14,7 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { useTranslation } from '@/components/i18n/useTranslation'
+import PatchPreview from '@/components/audit/PatchPreview'
 
 // The 12 live report views, mounted directly (NOT iframed) so they render inside
 // the drawer without the global app shell/navbar. Each is code-split via lazy().
@@ -268,7 +269,7 @@ export default function AuditCenterPage() {
   const copy = copyFor(lang)
 
   const [prefix, setPrefix] = useState('')
-const [maxFiles, setMaxFiles] = useState(8)
+  const [maxFiles, setMaxFiles] = useState(8)
   const [elapsed, setElapsed] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -289,9 +290,6 @@ const [maxFiles, setMaxFiles] = useState(8)
   // Finding drawer + patch flow
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null)
   const [entered, setEntered] = useState(false)
-  const [patchState, setPatchState] = useState<'idle' | 'working' | 'done' | 'error'>('idle')
-  const [patchResult, setPatchResult] = useState<{ branch: string; compareUrl: string } | null>(null)
-  const [patchError, setPatchError] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -302,7 +300,6 @@ const [maxFiles, setMaxFiles] = useState(8)
   }, [])
 
   useEffect(() => {
-    setPatchState('idle'); setPatchResult(null); setPatchError(null)
     if (selectedFinding) { const id = requestAnimationFrame(() => setEntered(true)); return () => cancelAnimationFrame(id) }
     setEntered(false)
   }, [selectedFinding])
@@ -311,22 +308,6 @@ const [maxFiles, setMaxFiles] = useState(8)
     if (openReportKey) { const id = requestAnimationFrame(() => setReportEntered(true)); return () => cancelAnimationFrame(id) }
     setReportEntered(false)
   }, [openReportKey])
-
-  async function generateFix(f: Finding) {
-    setPatchState('working'); setPatchError(null); setPatchResult(null)
-    try {
-      const res = await fetch('/api/hub/operator/audit/patch', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ file: f.file, line: typeof f.line === 'number' ? f.line : undefined, title: f.title, detail: f.detail, recommendation: f.recommendation }),
-      })
-      const data = await res.json().catch(() => null)
-      if (res.status === 402 && data?.code === 'patch_not_in_plan') { setPatchError(copy.patchUpgrade); setPatchState('error'); return }
-      if (!res.ok || !data?.ok) { setPatchError(data?.error || copy.patchFailed); setPatchState('error'); return }
-      setPatchResult({ branch: data.branch, compareUrl: data.compareUrl }); setPatchState('done')
-    } catch {
-      setPatchError(copy.patchFailed); setPatchState('error')
-    }
-  }
 
   const loadHistory = useCallback(async () => {
     try {
@@ -517,7 +498,7 @@ const [maxFiles, setMaxFiles] = useState(8)
               <div className="px-0.5 py-2 text-xs text-text-muted">{copy.noRuns}</div>
             ) : (
               <div className="flex max-h-[calc(100vh-280px)] flex-col gap-1.5 overflow-y-auto">
-                {runs.map(r => {
+{runs.map(r => {
                   const active = r.id === selectedRunId
                   return (
                     <button
@@ -538,7 +519,8 @@ const [maxFiles, setMaxFiles] = useState(8)
               </div>
             )}
           </aside>
-{/* Findings column */}
+
+          {/* Findings column */}
           <section className="min-w-[320px] flex-[999_1_420px]">
             {view ? (
               <>
@@ -733,26 +715,7 @@ const [maxFiles, setMaxFiles] = useState(8)
 
               {selectedFinding.recommendation && (
                 <div className="mt-5 border-t border-border pt-4">
-                  <button
-                    onClick={() => selectedFinding && generateFix(selectedFinding)}
-                    disabled={patchState === 'working' || patchState === 'done'}
-                    className={`w-full rounded-md border px-4 py-2.5 text-sm font-semibold transition-fast ${patchState === 'done' ? 'border-[#34d399] bg-bg text-[#34d399]' : 'border-accent bg-accent text-bg hover:brightness-110'} disabled:opacity-80`}
-                  >
-                    {patchState === 'working' ? copy.patching : patchState === 'done' ? `✓ ${copy.patchReady}` : copy.generateFix}
-                  </button>
-
-                  {patchState === 'done' && patchResult && (
-                    <div className="mt-3 rounded-md border border-border bg-bg px-3.5 py-3">
-                      <div className="break-all font-mono text-[11px] text-text-muted">{patchResult.branch}</div>
-                      <a href={patchResult.compareUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-[12.5px] font-semibold text-[#34d399]">
-                        {copy.reviewMerge} ↗
-                      </a>
-                    </div>
-                  )}
-
-                  {patchState === 'error' && patchError && (
-                    <div className="mt-3 rounded-md border border-danger bg-bg px-3 py-2.5 text-[12.5px] leading-relaxed text-danger">{patchError}</div>
-                  )}
+                  <PatchPreview finding={selectedFinding} />
                 </div>
               )}
             </div>

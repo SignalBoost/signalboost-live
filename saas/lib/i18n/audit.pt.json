@@ -719,5 +719,24 @@
     "loadError": "Não foi possível carregar o relatório de conformidade.",
     "fetchError": "Erro: {msg}",
     "loading": "Carregando prontidão para conformidade…"
+  },
+  "admin": {
+    "eyebrow": "Console admin estilo NASA",
+    "forecasting": "Previsões",
+    "financialLedger": "Livro financeiro",
+    "kpiCockpit": "Cabine KPI",
+    "marketplace": "Marketplace",
+    "saas": "SaaS",
+    "unifiedEngagement": "Índice de engajamento unificado",
+    "crmPipeline": "Pipeline CRM",
+    "conciergeRecs": "Recomendações do concierge",
+    "filters": "Filtros: intervalo de datas • produto • país • plano • função",
+    "telemetryReady": "Telemetria pronta. Conecte tabelas/eventos de análise para ativar registros ao vivo neste painel.",
+    "telemetrySignal": "Sinal de telemetria pronto",
+    "notTracked": "Ainda não rastreado",
+    "comingSoon": "Em breve",
+    "readyToRemediate": "Pronto para remediar",
+    "viewCodeDiff": "Ver diff de código",
+    "approvePullRequest": "Aprovar pull request"
   }
 }

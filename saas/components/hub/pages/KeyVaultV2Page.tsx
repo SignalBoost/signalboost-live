@@ -3,81 +3,159 @@
 // saas/components/hub/pages/KeyVaultV2Page.tsx
 // Vault v2 Wave 1 (W1) — Read-only unlocked view with secrets grid and audit log.
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { UnlockScreen, VaultSecretsGrid, VaultAuditLog, ProviderSelect } from '../vault'
 import { VaultSecret, VaultExpirationAlert, VaultAuditLog as VaultAuditLogType, VaultStats } from '@/lib/hub/vault-types'
-import { getVaultSecrets, getVaultAuditLog, getVaultStats } from '@/lib/hub/vault-operations'
 import { notifyBoth } from '@/lib/hub/vault-notifications'
 import { PageProps, cardStyle, labelStyle } from '../shared'
-import { useI18n } from '@/components/i18n/I18nProvider'
-import { t } from '@/lib/i18n/t'
+import { useTranslation } from '@/components/i18n/useTranslation'
 
-// Mock data for W1 (read-only demo) — REMOVE AFTER TESTING
-// For now, use empty defaults and fetch from Supabase
+// Mock data for W1 (read-only demo)
+const MOCK_SECRETS: VaultSecret[] = [
+  {
+    id: '1',
+    provider_id: 'stripe',
+    provider_name: 'Stripe',
+    secret_type: 'api_key',
+    secret_name: 'sk_live_prod',
+    masked_value: 'sk_live_4J3****Xx2',
+    created_at: '2024-01-15T10:00:00Z',
+    updated_at: '2024-06-10T14:30:00Z',
+    expires_at: undefined,
+    last_rotated_at: '2024-05-01T09:00:00Z',
+    last_accessed_at: '2024-06-13T08:45:00Z',
+    status: 'active',
+    tags: ['production', 'billing'],
+    environment: 'production',
+  },
+  {
+    id: '2',
+    provider_id: 'supabase',
+    provider_name: 'Supabase',
+    secret_type: 'api_key',
+    secret_name: 'service_key',
+    masked_value: 'eyJhbGciOiJI****YXJ0aWZhY3Q',
+    created_at: '2024-02-20T10:00:00Z',
+    updated_at: '2024-06-05T12:00:00Z',
+    expires_at: '2025-02-20T10:00:00Z',
+    last_rotated_at: '2024-02-20T10:00:00Z',
+    last_accessed_at: '2024-06-13T09:30:00Z',
+    status: 'active',
+    tags: ['database', 'production'],
+    environment: 'production',
+  },
+  {
+    id: '3',
+    provider_id: 'vercel',
+    provider_name: 'Vercel',
+    secret_type: 'token',
+    secret_name: 'vc_deploy_token',
+    masked_value: 'vercel_****mK2t',
+    created_at: '2024-03-10T10:00:00Z',
+    updated_at: '2024-06-01T11:00:00Z',
+    expires_at: '2024-09-10T10:00:00Z',
+    last_rotated_at: null,
+    last_accessed_at: '2024-06-13T06:00:00Z',
+    status: 'expiring_soon',
+    tags: ['deployments', 'production'],
+    environment: 'production',
+  },
+  {
+    id: '4',
+    provider_id: 'github',
+    provider_name: 'GitHub',
+    secret_type: 'token',
+    secret_name: 'github_pat',
+    masked_value: 'ghp_****KqL9',
+    created_at: '2024-04-05T10:00:00Z',
+    updated_at: '2024-06-01T10:00:00Z',
+    expires_at: '2025-04-05T10:00:00Z',
+    last_rotated_at: '2024-06-01T10:00:00Z',
+    last_accessed_at: '2024-06-13T07:15:00Z',
+    status: 'active',
+    tags: ['ci-cd', 'repos'],
+    environment: 'production',
+  },
+]
 
-const MOCK_ALERTS: VaultExpirationAlert[] = []
-const MOCK_AUDIT_LOGS: VaultAuditLogType[] = []
+const MOCK_ALERTS: VaultExpirationAlert[] = [
+  {
+    id: '1',
+    secret_id: '3',
+    days_until_expiry: 88,
+    severity: 'warning',
+    notified_at: '2024-06-01T10:00:00Z',
+    dismissed_at: null,
+  },
+]
+
+const MOCK_AUDIT_LOGS: VaultAuditLogType[] = [
+  {
+    id: '1',
+    secret_id: '1',
+    action: 'accessed',
+    user_id: 'user-1',
+    user_email: 'luis@signalboost.com',
+    timestamp: '2024-06-13T08:45:00Z',
+    ip_address: '192.168.1.1',
+    status: 'success',
+    message: 'Stripe API key accessed',
+  },
+  {
+    id: '2',
+    secret_id: '4',
+    action: 'rotated',
+    user_id: 'user-1',
+    user_email: 'luis@signalboost.com',
+    timestamp: '2024-06-01T10:00:00Z',
+    ip_address: '192.168.1.1',
+    status: 'success',
+    message: 'GitHub PAT rotated',
+  },
+  {
+    id: '3',
+    secret_id: '2',
+    action: 'accessed',
+    user_id: 'user-1',
+    user_email: 'luis@signalboost.com',
+    timestamp: '2024-06-13T09:30:00Z',
+    ip_address: '192.168.1.1',
+    status: 'success',
+    message: 'Supabase service key accessed',
+  },
+  {
+    id: '4',
+    secret_id: '3',
+    action: 'created',
+    user_id: 'user-1',
+    user_email: 'luis@signalboost.com',
+    timestamp: '2024-03-10T10:00:00Z',
+    ip_address: '192.168.1.1',
+    status: 'success',
+    message: 'Vercel deploy token created',
+  },
+]
+
 const MOCK_STATS: VaultStats = {
-  total_secrets: 0,
-  active_secrets: 0,
-  expiring_soon: 0,
+  total_secrets: 4,
+  active_secrets: 3,
+  expiring_soon: 1,
   expired: 0,
-  last_rotation: new Date().toISOString(),
-  next_rotation: new Date().toISOString(),
+  last_rotation: '2024-06-01T10:00:00Z',
+  next_rotation: '2024-07-01T10:00:00Z',
 }
 
 export default function KeyVaultV2Page({ lang }: PageProps) {
-  const { dict } = useI18n()
+  const { t } = useTranslation()
   const [isUnlocked, setIsUnlocked] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [selectedSecret, setSelectedSecret] = useState<VaultSecret | null>(null)
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null)
   const [selectedProviderName, setSelectedProviderName] = useState<string | null>(null)
-  
-  // Real data from Supabase
-  const [secrets, setSecrets] = useState<VaultSecret[]>([])
-  const [auditLogs, setAuditLogs] = useState<VaultAuditLogType[]>([])
-  const [stats, setStats] = useState<VaultStats>(MOCK_STATS)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const handleUnlock = (sid: string) => {
     setSessionId(sid)
     setIsUnlocked(true)
-    // Fetch real data when unlocked
-    fetchVaultData()
-  }
-
-  const fetchVaultData = async () => {
-    setIsLoading(true)
-    setError(null)
-    
-    try {
-      // Fetch secrets
-      const secretsResult = await getVaultSecrets()
-      if (secretsResult.ok && secretsResult.secrets) {
-        setSecrets(secretsResult.secrets)
-      } else {
-        setError(secretsResult.error || t(dict, 'console.vault.err.fetch', 'Failed to fetch secrets'))
-      }
-      
-      // Fetch audit log
-      const logsResult = await getVaultAuditLog()
-      if (logsResult.ok && logsResult.logs) {
-        setAuditLogs(logsResult.logs)
-      }
-      
-      // Fetch stats
-      const statsResult = await getVaultStats()
-      if (statsResult.ok && statsResult.stats) {
-        setStats(statsResult.stats)
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : t(dict, 'console.vault.err.unknown', 'Unknown error')
-      setError(msg)
-    } finally {
-      setIsLoading(false)
-    }
   }
 
   const handleProviderSelect = (providerId: string, providerName: string) => {
@@ -93,17 +171,11 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
       rotated: [],
       revoked: [],
     }
-    
-    // Filter by selected provider if one is chosen
-    const filteredSecrets = selectedProviderId 
-      ? secrets.filter(s => s.provider_id === selectedProviderId)
-      : secrets
-    
-    filteredSecrets.forEach(s => {
+    MOCK_SECRETS.forEach(s => {
       groups[s.status].push(s)
     })
     return groups
-  }, [selectedProviderId, secrets])
+  }, [])
 
   if (!isUnlocked) {
     return <UnlockScreen onUnlock={handleUnlock} />
@@ -114,18 +186,18 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
       {/* Header */}
       <section style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', flexShrink: 0 }}>
         <div>
-          <div style={labelStyle}>{t(dict, 'console.vault.eyebrow', 'Operations & Production')}</div>
-          <h2 style={{ margin: '3px 0 4px', fontSize: 24, letterSpacing: '-.02em' }}>{t(dict, 'console.vault.title', 'Keys & Secrets')}</h2>
+          <div style={labelStyle}>{t('console.vaultx.page.ops', 'Operations & Production')}</div>
+          <h2 style={{ margin: '3px 0 4px', fontSize: 24, letterSpacing: '-.02em' }}>{t('console.vaultx.page.keysSecrets', 'Keys & Secrets')}</h2>
           <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5, maxWidth: 840 }}>
-            {t(dict, 'console.vault.subtitle', 'Credential inventory, expiration alerts, and rotation status.')} {MOCK_STATS.total_secrets} {MOCK_STATS.total_secrets === 1 ? t(dict, 'console.vault.secret', 'secret') : t(dict, 'console.vault.secrets', 'secrets')} {t(dict, 'console.vault.stored', 'stored.')}
+            {t('console.vaultx.page.inventory', 'Credential inventory, expiration alerts, and rotation status.')} {MOCK_STATS.total_secrets} {MOCK_STATS.total_secrets === 1 ? t('console.vaultx.page.secretWord', 'secret') : t('console.vaultx.page.secretsWord', 'secrets')} {t('console.vaultx.page.stored', 'stored.')}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, fontSize: 11.5, fontWeight: 600, flexWrap: 'wrap' }}>
           <span style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(34,197,94,.35)', background: 'rgba(34,197,94,.08)', color: '#86efac' }}>
-            {MOCK_STATS.active_secrets} {t(dict, 'console.vault.active', 'Active')}
+            {MOCK_STATS.active_secrets} {t('console.vaultx.page.active', 'Active')}
           </span>
           <span style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,195,0,.35)', background: 'rgba(255,195,0,.08)', color: '#ffc300' }}>
-            {MOCK_STATS.expiring_soon} {t(dict, 'console.vault.expiring', 'Expiring')}
+            {MOCK_STATS.expiring_soon} {t('console.vaultx.page.expiring', 'Expiring')}
           </span>
           <button
             onClick={() => setIsUnlocked(false)}
@@ -140,65 +212,50 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
               cursor: 'pointer',
             }}
           >
-            {t(dict, 'console.vault.lock', 'Lock Vault')}
+            {t('console.vaultx.page.lockVault', 'Lock Vault')}
           </button>
         </div>
       </section>
-
-      {/* Main content */}
+{/* Main content */}
       <main style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 28, paddingRight: 8 }}>
         {/* Provider selector */}
         <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ ...labelStyle }}>{t(dict, 'console.vault.browse', 'Browse Secrets')}</div>
+          <div style={{ ...labelStyle }}>{t('console.vaultx.page.browseSecrets', 'Browse Secrets')}</div>
           <div style={{ ...cardStyle, padding: 14 }}>
-            <ProviderSelect onSelect={handleProviderSelect} selectedId={selectedProviderId} placeholder={t(dict, 'console.vault.searchProvider', 'Search and select a provider...')} />
+            <ProviderSelect onSelect={handleProviderSelect} selectedId={selectedProviderId} placeholder={t('console.vaultx.page.providerPlaceholder', 'Search and select a provider...')} />
             {selectedProviderName && (
               <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(26,240,255,.8)' }}>
-                {t(dict, 'console.vault.selected', 'Selected:')} <strong>{selectedProviderName}</strong>
+                {t('console.vaultx.page.selected', 'Selected:')} <strong>{selectedProviderName}</strong>
               </div>
             )}
           </div>
         </section>
 
         {/* Secrets by status */}
-        {!selectedProviderId ? (
-          <div style={{ padding: '24px 14px', borderRadius: 10, border: '1px dashed rgba(26,240,255,.2)', background: 'rgba(26,240,255,.04)', textAlign: 'center' }}>
-            <p style={{ margin: 0, fontSize: 13, color: 'rgba(26,240,255,.7)' }}>
-              {t(dict, 'console.vault.selectPrompt', '👆 Select a provider above to view its secrets')}
-            </p>
-          </div>
-        ) : Object.values(secretsByStatus).every(s => s.length === 0) ? (
-          <div style={{ padding: '24px 14px', borderRadius: 10, border: '1px dashed rgba(255,195,0,.2)', background: 'rgba(255,195,0,.04)', textAlign: 'center' }}>
-            <p style={{ margin: 0, fontSize: 13, color: 'rgba(255,195,0,.7)' }}>
-              {t(dict, 'console.vault.noSecretsFor', 'No secrets found for')} <strong>{selectedProviderName}</strong>
-            </p>
-          </div>
-        ) : (
-          Object.entries(secretsByStatus).map(([status, secrets]) => {
-            if (secrets.length === 0) return null
+        {Object.entries(secretsByStatus).map(([status, secrets]) => {
+          if (secrets.length === 0) return null
 
           const statusLabels: Record<string, string> = {
-            active: t(dict, 'console.vault.status.active', 'Active Secrets'),
-            expiring_soon: t(dict, 'console.vault.status.expiringSoon', 'Expiring Soon'),
-            expired: t(dict, 'console.vault.status.expired', 'Expired'),
-            rotated: t(dict, 'console.vault.status.rotated', 'Recently Rotated'),
-            revoked: t(dict, 'console.vault.status.revoked', 'Revoked'),
+            active: t('console.vaultx.page.statusActive', 'Active Secrets'),
+            expiring_soon: t('console.vaultx.page.statusExpiringSoon', 'Expiring Soon'),
+            expired: t('console.vaultx.page.statusExpired', 'Expired'),
+            rotated: t('console.vaultx.page.statusRotated', 'Recently Rotated'),
+            revoked: t('console.vaultx.page.statusRevoked', 'Revoked'),
           }
 
           return (
             <section key={status}>
               <div style={{ ...labelStyle, marginBottom: 12 }}>
-                {statusLabels[status]} — {secrets.length} {secrets.length === 1 ? t(dict, 'console.vault.secret', 'secret') : t(dict, 'console.vault.secrets', 'secrets')}
+                {statusLabels[status]} — {secrets.length} {secrets.length === 1 ? t('console.vaultx.page.secretWord', 'secret') : t('console.vaultx.page.secretsWord', 'secrets')}
               </div>
-              <VaultSecretsGrid secrets={secrets} alerts={[]} onSelectSecret={setSelectedSecret} />
+              <VaultSecretsGrid secrets={secrets} alerts={MOCK_ALERTS} onSelectSecret={setSelectedSecret} />
             </section>
           )
-        })
-        )}
+        })}
 
         {/* Audit log */}
         <section style={{ minHeight: '54vh' }}>
-          <VaultAuditLog logs={auditLogs} />
+          <VaultAuditLog logs={MOCK_AUDIT_LOGS} />
         </section>
       </main>
 
@@ -254,7 +311,7 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', marginBottom: 6 }}>
-                  {t(dict, 'console.vault.maskedValue', 'Masked Value')}
+                  {t('console.vaultx.page.maskedValue', 'Masked Value')}
                 </div>
                 <div
                   style={{
@@ -270,14 +327,14 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
                   {selectedSecret.masked_value}
                 </div>
                 <p style={{ margin: '8px 0 0', fontSize: 10, color: 'rgba(255,255,255,.4)' }}>
-                  {t(dict, 'console.vault.encryptedNote', 'Full value is encrypted and not displayed in the UI.')}
+                  {t('console.vaultx.page.encryptedNote', 'Full value is encrypted and not displayed in the UI.')}
                 </p>
               </div>
 
               {selectedSecret.expires_at && (
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', marginBottom: 6 }}>
-                    {t(dict, 'console.vault.expiration', 'Expiration')}
+                    {t('console.vaultx.page.expiration', 'Expiration')}
                   </div>
                   <div style={{ fontSize: 13, color: '#fff' }}>
                     {new Date(selectedSecret.expires_at).toLocaleDateString('en-US', {
@@ -292,7 +349,7 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
               {selectedSecret.last_rotated_at && (
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', marginBottom: 6 }}>
-                    {t(dict, 'console.vault.lastRotated', 'Last Rotated')}
+                    {t('console.vaultx.page.lastRotated', 'Last Rotated')}
                   </div>
                   <div style={{ fontSize: 13, color: '#fff' }}>
                     {new Date(selectedSecret.last_rotated_at).toLocaleDateString('en-US', {
@@ -306,7 +363,7 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
 
               <div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', marginBottom: 6 }}>
-                  {t(dict, 'console.vault.typeEnv', 'Type & Environment')}
+                  {t('console.vaultx.page.typeEnv', 'Type & Environment')}
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <span

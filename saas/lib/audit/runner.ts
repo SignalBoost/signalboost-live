@@ -8,6 +8,7 @@
 
 import { callAuditModel } from '@/lib/audit/modelRouter'
 import { synthesizeReport } from '@/lib/audit/synthesize'
+import { runUxDetector } from '@/lib/audit/uxDetector'
 import { parseRepoUrl, listRepoTree, readRepoFileFrom, type RepoTarget } from '@/lib/audit/repoTarget'
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info'
@@ -176,6 +177,14 @@ export async function runAudit(opts?: {
     if (r.scanned) scanned.push(r.path)
     findings.push(...r.findings)
   }
+  // UX Integrity pass — cheap static scan (no model calls) over the app/components
+  // source for placeholders, dead links, no-op handlers, and TODO/FIXME markers.
+  // Best-effort: a failure here never fails the run.
+  try {
+    const uxFindings = await runUxDetector(target, allFiles)
+    findings.push(...uxFindings)
+  } catch { /* UX pass is best-effort */ }
+
   findings.sort((a, b) => SEVERITIES.indexOf(a.severity) - SEVERITIES.indexOf(b.severity))
 
   // Holistic synthesis — gets the WHOLE repo tree (macro map) plus the findings, so

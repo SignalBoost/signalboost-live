@@ -96,7 +96,7 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
   const section = translateSection(rawSection, activeLang in COPY ? activeLang : 'en')
 
   // Live metric values from real tables; keys that have no backing source are
-  // simply absent here and fall back to the honest "Not tracked yet" placeholder.
+  // simply absent here and fall back to the honest empty-state label.
   const [live, setLive] = useState<Record<string, number> | null>(null)
   useEffect(() => {
     let active = true

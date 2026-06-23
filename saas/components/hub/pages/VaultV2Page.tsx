@@ -8,6 +8,7 @@ import { UnlockScreen, VaultSecretsGrid, VaultAuditLog, ProviderSelect } from '.
 import { VaultSecret, VaultExpirationAlert, VaultAuditLog as VaultAuditLogType, VaultStats } from '@/lib/hub/vault-types'
 import { notifyBoth } from '@/lib/hub/vault-notifications'
 import { PageProps, cardStyle, labelStyle } from '../shared'
+import { useTranslation } from '@/components/i18n/useTranslation'
 
 // Mock data for W1 (read-only demo)
 const MOCK_SECRETS: VaultSecret[] = [
@@ -145,6 +146,7 @@ const MOCK_STATS: VaultStats = {
 }
 
 export default function KeyVaultV2Page({ lang }: PageProps) {
+  const { t } = useTranslation()
   const [isUnlocked, setIsUnlocked] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [selectedSecret, setSelectedSecret] = useState<VaultSecret | null>(null)
@@ -184,18 +186,18 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
       {/* Header */}
       <section style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', flexShrink: 0 }}>
         <div>
-          <div style={labelStyle}>Operations & Production</div>
-          <h2 style={{ margin: '3px 0 4px', fontSize: 24, letterSpacing: '-.02em' }}>Keys & Secrets</h2>
+          <div style={labelStyle}>{t('console.vaultx.page.ops', 'Operations & Production')}</div>
+          <h2 style={{ margin: '3px 0 4px', fontSize: 24, letterSpacing: '-.02em' }}>{t('console.vaultx.page.keysSecrets', 'Keys & Secrets')}</h2>
           <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5, maxWidth: 840 }}>
-            Credential inventory, expiration alerts, and rotation status. {MOCK_STATS.total_secrets} secret{MOCK_STATS.total_secrets === 1 ? '' : 's'} stored.
+            {t('console.vaultx.page.inventory', 'Credential inventory, expiration alerts, and rotation status.')} {MOCK_STATS.total_secrets} {MOCK_STATS.total_secrets === 1 ? t('console.vaultx.page.secretWord', 'secret') : t('console.vaultx.page.secretsWord', 'secrets')} {t('console.vaultx.page.stored', 'stored.')}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, fontSize: 11.5, fontWeight: 600, flexWrap: 'wrap' }}>
           <span style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(34,197,94,.35)', background: 'rgba(34,197,94,.08)', color: '#86efac' }}>
-            {MOCK_STATS.active_secrets} Active
+            {MOCK_STATS.active_secrets} {t('console.vaultx.page.active', 'Active')}
           </span>
           <span style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,195,0,.35)', background: 'rgba(255,195,0,.08)', color: '#ffc300' }}>
-            {MOCK_STATS.expiring_soon} Expiring
+            {MOCK_STATS.expiring_soon} {t('console.vaultx.page.expiring', 'Expiring')}
           </span>
           <button
             onClick={() => setIsUnlocked(false)}
@@ -210,21 +212,20 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
               cursor: 'pointer',
             }}
           >
-            Lock Vault
+            {t('console.vaultx.page.lockVault', 'Lock Vault')}
           </button>
         </div>
       </section>
-
-      {/* Main content */}
+{/* Main content */}
       <main style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 28, paddingRight: 8 }}>
         {/* Provider selector */}
         <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ ...labelStyle }}>Browse Secrets</div>
+          <div style={{ ...labelStyle }}>{t('console.vaultx.page.browseSecrets', 'Browse Secrets')}</div>
           <div style={{ ...cardStyle, padding: 14 }}>
-            <ProviderSelect onSelect={handleProviderSelect} selectedId={selectedProviderId} placeholder="Search and select a provider..." />
+            <ProviderSelect onSelect={handleProviderSelect} selectedId={selectedProviderId} placeholder={t('console.vaultx.page.providerPlaceholder', 'Search and select a provider...')} />
             {selectedProviderName && (
               <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(26,240,255,.8)' }}>
-                Selected: <strong>{selectedProviderName}</strong>
+                {t('console.vaultx.page.selected', 'Selected:')} <strong>{selectedProviderName}</strong>
               </div>
             )}
           </div>
@@ -235,17 +236,17 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
           if (secrets.length === 0) return null
 
           const statusLabels: Record<string, string> = {
-            active: 'Active Secrets',
-            expiring_soon: 'Expiring Soon',
-            expired: 'Expired',
-            rotated: 'Recently Rotated',
-            revoked: 'Revoked',
+            active: t('console.vaultx.page.statusActive', 'Active Secrets'),
+            expiring_soon: t('console.vaultx.page.statusExpiringSoon', 'Expiring Soon'),
+            expired: t('console.vaultx.page.statusExpired', 'Expired'),
+            rotated: t('console.vaultx.page.statusRotated', 'Recently Rotated'),
+            revoked: t('console.vaultx.page.statusRevoked', 'Revoked'),
           }
 
           return (
             <section key={status}>
               <div style={{ ...labelStyle, marginBottom: 12 }}>
-                {statusLabels[status]} — {secrets.length} secret{secrets.length === 1 ? '' : 's'}
+                {statusLabels[status]} — {secrets.length} {secrets.length === 1 ? t('console.vaultx.page.secretWord', 'secret') : t('console.vaultx.page.secretsWord', 'secrets')}
               </div>
               <VaultSecretsGrid secrets={secrets} alerts={MOCK_ALERTS} onSelectSecret={setSelectedSecret} />
             </section>
@@ -310,7 +311,7 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', marginBottom: 6 }}>
-                  Masked Value
+                  {t('console.vaultx.page.maskedValue', 'Masked Value')}
                 </div>
                 <div
                   style={{
@@ -326,14 +327,14 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
                   {selectedSecret.masked_value}
                 </div>
                 <p style={{ margin: '8px 0 0', fontSize: 10, color: 'rgba(255,255,255,.4)' }}>
-                  Full value is encrypted and not displayed in the UI.
+                  {t('console.vaultx.page.encryptedNote', 'Full value is encrypted and not displayed in the UI.')}
                 </p>
               </div>
 
               {selectedSecret.expires_at && (
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', marginBottom: 6 }}>
-                    Expiration
+                    {t('console.vaultx.page.expiration', 'Expiration')}
                   </div>
                   <div style={{ fontSize: 13, color: '#fff' }}>
                     {new Date(selectedSecret.expires_at).toLocaleDateString('en-US', {
@@ -348,7 +349,7 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
               {selectedSecret.last_rotated_at && (
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', marginBottom: 6 }}>
-                    Last Rotated
+                    {t('console.vaultx.page.lastRotated', 'Last Rotated')}
                   </div>
                   <div style={{ fontSize: 13, color: '#fff' }}>
                     {new Date(selectedSecret.last_rotated_at).toLocaleDateString('en-US', {
@@ -362,7 +363,7 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
 
               <div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', marginBottom: 6 }}>
-                  Type & Environment
+                  {t('console.vaultx.page.typeEnv', 'Type & Environment')}
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <span

@@ -52,13 +52,17 @@ export default function MFAVerification({
         return
       }
 
-      // TODO: Verify code against Supabase (TOTP) or send email/SMS
-      // For now: simulate verification
-      await new Promise(resolve => setTimeout(resolve, 1200))
+      // Real server-side TOTP verification against the stored secret.
+      const response = await fetch('/api/vault/totp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ code }),
+      })
+      const data = await response.json().catch(() => null)
 
-      // Simulate 90% success rate (sometimes fail for testing)
-      if (Math.random() > 0.9) {
-        setError('Invalid code. Please try again.')
+      if (!response.ok || !data?.ok) {
+        setError(data?.error || 'Invalid code. Please try again.')
         setCode('')
         setIsVerifying(false)
         return
@@ -138,7 +142,7 @@ export default function MFAVerification({
                 onMouseLeave={e => {
                   (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,.15)'
                   ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,.04)'
-                }}
+}}
               >
                 <span style={{ fontSize: 16 }}>
                   {m === 'totp' && '📱'}

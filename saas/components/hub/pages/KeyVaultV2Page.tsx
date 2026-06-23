@@ -9,6 +9,8 @@ import { VaultSecret, VaultExpirationAlert, VaultAuditLog as VaultAuditLogType, 
 import { getVaultSecrets, getVaultAuditLog, getVaultStats } from '@/lib/hub/vault-operations'
 import { notifyBoth } from '@/lib/hub/vault-notifications'
 import { PageProps, cardStyle, labelStyle } from '../shared'
+import { useI18n } from '@/components/i18n/I18nProvider'
+import { t } from '@/lib/i18n/t'
 
 // Mock data for W1 (read-only demo) — REMOVE AFTER TESTING
 // For now, use empty defaults and fetch from Supabase
@@ -25,6 +27,7 @@ const MOCK_STATS: VaultStats = {
 }
 
 export default function KeyVaultV2Page({ lang }: PageProps) {
+  const { dict } = useI18n()
   const [isUnlocked, setIsUnlocked] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [selectedSecret, setSelectedSecret] = useState<VaultSecret | null>(null)
@@ -55,7 +58,7 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
       if (secretsResult.ok && secretsResult.secrets) {
         setSecrets(secretsResult.secrets)
       } else {
-        setError(secretsResult.error || 'Failed to fetch secrets')
+        setError(secretsResult.error || t(dict, 'console.vault.err.fetch', 'Failed to fetch secrets'))
       }
       
       // Fetch audit log
@@ -70,7 +73,7 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
         setStats(statsResult.stats)
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error'
+      const msg = err instanceof Error ? err.message : t(dict, 'console.vault.err.unknown', 'Unknown error')
       setError(msg)
     } finally {
       setIsLoading(false)
@@ -111,18 +114,18 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
       {/* Header */}
       <section style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', flexShrink: 0 }}>
         <div>
-          <div style={labelStyle}>Operations & Production</div>
-          <h2 style={{ margin: '3px 0 4px', fontSize: 24, letterSpacing: '-.02em' }}>Keys & Secrets</h2>
+          <div style={labelStyle}>{t(dict, 'console.vault.eyebrow', 'Operations & Production')}</div>
+          <h2 style={{ margin: '3px 0 4px', fontSize: 24, letterSpacing: '-.02em' }}>{t(dict, 'console.vault.title', 'Keys & Secrets')}</h2>
           <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5, maxWidth: 840 }}>
-            Credential inventory, expiration alerts, and rotation status. {MOCK_STATS.total_secrets} secret{MOCK_STATS.total_secrets === 1 ? '' : 's'} stored.
+            {t(dict, 'console.vault.subtitle', 'Credential inventory, expiration alerts, and rotation status.')} {MOCK_STATS.total_secrets} {MOCK_STATS.total_secrets === 1 ? t(dict, 'console.vault.secret', 'secret') : t(dict, 'console.vault.secrets', 'secrets')} {t(dict, 'console.vault.stored', 'stored.')}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, fontSize: 11.5, fontWeight: 600, flexWrap: 'wrap' }}>
           <span style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(34,197,94,.35)', background: 'rgba(34,197,94,.08)', color: '#86efac' }}>
-            {MOCK_STATS.active_secrets} Active
+            {MOCK_STATS.active_secrets} {t(dict, 'console.vault.active', 'Active')}
           </span>
           <span style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,195,0,.35)', background: 'rgba(255,195,0,.08)', color: '#ffc300' }}>
-            {MOCK_STATS.expiring_soon} Expiring
+            {MOCK_STATS.expiring_soon} {t(dict, 'console.vault.expiring', 'Expiring')}
           </span>
           <button
             onClick={() => setIsUnlocked(false)}
@@ -137,7 +140,7 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
               cursor: 'pointer',
             }}
           >
-            Lock Vault
+            {t(dict, 'console.vault.lock', 'Lock Vault')}
           </button>
         </div>
       </section>
@@ -146,12 +149,12 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
       <main style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 28, paddingRight: 8 }}>
         {/* Provider selector */}
         <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ ...labelStyle }}>Browse Secrets</div>
+          <div style={{ ...labelStyle }}>{t(dict, 'console.vault.browse', 'Browse Secrets')}</div>
           <div style={{ ...cardStyle, padding: 14 }}>
-            <ProviderSelect onSelect={handleProviderSelect} selectedId={selectedProviderId} placeholder="Search and select a provider..." />
+            <ProviderSelect onSelect={handleProviderSelect} selectedId={selectedProviderId} placeholder={t(dict, 'console.vault.searchProvider', 'Search and select a provider...')} />
             {selectedProviderName && (
               <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(26,240,255,.8)' }}>
-                Selected: <strong>{selectedProviderName}</strong>
+                {t(dict, 'console.vault.selected', 'Selected:')} <strong>{selectedProviderName}</strong>
               </div>
             )}
           </div>
@@ -161,13 +164,13 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
         {!selectedProviderId ? (
           <div style={{ padding: '24px 14px', borderRadius: 10, border: '1px dashed rgba(26,240,255,.2)', background: 'rgba(26,240,255,.04)', textAlign: 'center' }}>
             <p style={{ margin: 0, fontSize: 13, color: 'rgba(26,240,255,.7)' }}>
-              👆 Select a provider above to view its secrets
+              {t(dict, 'console.vault.selectPrompt', '👆 Select a provider above to view its secrets')}
             </p>
           </div>
         ) : Object.values(secretsByStatus).every(s => s.length === 0) ? (
           <div style={{ padding: '24px 14px', borderRadius: 10, border: '1px dashed rgba(255,195,0,.2)', background: 'rgba(255,195,0,.04)', textAlign: 'center' }}>
             <p style={{ margin: 0, fontSize: 13, color: 'rgba(255,195,0,.7)' }}>
-              No secrets found for <strong>{selectedProviderName}</strong>
+              {t(dict, 'console.vault.noSecretsFor', 'No secrets found for')} <strong>{selectedProviderName}</strong>
             </p>
           </div>
         ) : (
@@ -175,17 +178,17 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
             if (secrets.length === 0) return null
 
           const statusLabels: Record<string, string> = {
-            active: 'Active Secrets',
-            expiring_soon: 'Expiring Soon',
-            expired: 'Expired',
-            rotated: 'Recently Rotated',
-            revoked: 'Revoked',
+            active: t(dict, 'console.vault.status.active', 'Active Secrets'),
+            expiring_soon: t(dict, 'console.vault.status.expiringSoon', 'Expiring Soon'),
+            expired: t(dict, 'console.vault.status.expired', 'Expired'),
+            rotated: t(dict, 'console.vault.status.rotated', 'Recently Rotated'),
+            revoked: t(dict, 'console.vault.status.revoked', 'Revoked'),
           }
 
           return (
             <section key={status}>
               <div style={{ ...labelStyle, marginBottom: 12 }}>
-                {statusLabels[status]} — {secrets.length} secret{secrets.length === 1 ? '' : 's'}
+                {statusLabels[status]} — {secrets.length} {secrets.length === 1 ? t(dict, 'console.vault.secret', 'secret') : t(dict, 'console.vault.secrets', 'secrets')}
               </div>
               <VaultSecretsGrid secrets={secrets} alerts={[]} onSelectSecret={setSelectedSecret} />
             </section>
@@ -251,7 +254,7 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', marginBottom: 6 }}>
-                  Masked Value
+                  {t(dict, 'console.vault.maskedValue', 'Masked Value')}
                 </div>
                 <div
                   style={{
@@ -267,14 +270,14 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
                   {selectedSecret.masked_value}
                 </div>
                 <p style={{ margin: '8px 0 0', fontSize: 10, color: 'rgba(255,255,255,.4)' }}>
-                  Full value is encrypted and not displayed in the UI.
+                  {t(dict, 'console.vault.encryptedNote', 'Full value is encrypted and not displayed in the UI.')}
                 </p>
               </div>
 
               {selectedSecret.expires_at && (
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', marginBottom: 6 }}>
-                    Expiration
+                    {t(dict, 'console.vault.expiration', 'Expiration')}
                   </div>
                   <div style={{ fontSize: 13, color: '#fff' }}>
                     {new Date(selectedSecret.expires_at).toLocaleDateString('en-US', {
@@ -289,7 +292,7 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
               {selectedSecret.last_rotated_at && (
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', marginBottom: 6 }}>
-                    Last Rotated
+                    {t(dict, 'console.vault.lastRotated', 'Last Rotated')}
                   </div>
                   <div style={{ fontSize: 13, color: '#fff' }}>
                     {new Date(selectedSecret.last_rotated_at).toLocaleDateString('en-US', {
@@ -303,7 +306,7 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
 
               <div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', marginBottom: 6 }}>
-                  Type & Environment
+                  {t(dict, 'console.vault.typeEnv', 'Type & Environment')}
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <span

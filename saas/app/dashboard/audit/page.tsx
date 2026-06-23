@@ -1,23 +1,273 @@
-CRITICAL PRODUCT DIRECTIVE: Deploy Advanced UX Dead-End & Placeholder Detector
+'use client'
 
-Our application still has static placeholders, dead clicks, and unimplemented UI endpoints scattered across the Admin panel and Workspace views. We are building a comprehensive UX Integrity tool directly into our Audit framework to permanently wipe these out.
+// saas/app/dashboard/audit/page.tsx
+// Unified Audit Center — single centralized workspace at /dashboard/audit.
+//   • Top: Audit Command Center (scan-path + max-files + Run audit), live tracker,
+//     findings list, and run history.
+//   • Bottom: the 12 compliance report cards in a responsive grid; clicking a card
+//     opens a 520px right-side drawer that renders that report.
+// Linear-style design tokens (bg-surface / border-border / bg-accent / text-text …),
+// 5-locale i18n via useI18n + useTranslation. Owner/admin sees live report data;
+// non-admins get an owner-scoped upgrade panel (reports read the workspace's own
+// infrastructure and are admin-gated server-side).
 
-Please implement the full tool architecture as follows:
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { useI18n } from '@/components/i18n/I18nProvider'
+import { useTranslation } from '@/components/i18n/useTranslation'
 
-1. **The Crawling & Detection Engine (`lib/audit/uxDetector.ts`):**
-   - **String Matcher:** Scan all source components (`/app`, `/components`) for standard placeholder content, including: `"Lorem ipsum"`, `"TODO"`, `"Coming soon"`, `href="#"`, and `href="javascript:void(0)"`.
-   - **Click/Route Validator:** Create a script that traces our application map, validating that every route listed in our workspace nav blocks returns a valid server status and doesn't load a blank or un-hydrated screen.
+// The 12 live report views, mounted directly (NOT iframed) so they render inside
+// the drawer without the global app shell/navbar. Each is code-split via lazy().
+const REPORT_VIEWS: Record<string, ReturnType<typeof lazy>> = {
+  executive:   lazy(() => import('@/app/hub/audit/executive/page')),
+  providers:   lazy(() => import('@/app/hub/audit/providers/page')),
+  secrets:     lazy(() => import('@/app/hub/audit/secrets/page')),
+  identity:    lazy(() => import('@/app/hub/audit/identity/page')),
+  github:      lazy(() => import('@/app/hub/audit/github/page')),
+  vercel:      lazy(() => import('@/app/hub/audit/vercel/page')),
+  supabase:    lazy(() => import('@/app/hub/audit/supabase/page')),
+  stripe:      lazy(() => import('@/app/hub/audit/stripe/page')),
+  activity:    lazy(() => import('@/app/hub/audit/activity/page')),
+  compliance:  lazy(() => import('@/app/hub/audit/compliance/page')),
+  remediation: lazy(() => import('@/app/hub/audit/remediation/page')),
+  usage:       lazy(() => import('@/app/hub/audit/usage/page')),
+}
 
-2. **Map to Audit Console Severity Tiers:**
-   - **Critical:** Dead links or 404/500 API paths inside active Admin or Workspace routes.
-   - **High:** Primary action buttons that lack a bound handler or functional backend pipeline (dead clicks).
-   - **Medium:** Raw placeholder text strings visible to a logged-in user.
+type Finding = {
+  file: string
+  severity: string
+  category: string
+  title: string
+  detail: string
+  recommendation: string
+  line?: number | null
+}
+type RunSummary = {
+  id: string
+  created_at: string
+  status: string
+  prefix: string | null
+  files_scanned: number
+  findings_count: number
+}
+type View = { findings: Finding[]; filesScanned: number; findingsCount: number; prefix?: string; status?: string }
 
-3. **Enforce Absolute Automation Rules:**
-   - If the tool finds a placeholder string or a dead button, it must hook straight into our remediation roadmap. 
-   - A user must be able to click `[Create PR Fix]` on a UX finding to have the COS automatically clean up the component file or replace placeholder text with valid localized i18n keys.
+type Sev = 'critical' | 'high' | 'medium' | 'low' | 'info'
+type AuditCopy = {
+  title: string; subtitle: string; viewPlans: string
+  pathLabel: string; maxLabel: string; run: string; running: string
+  filesScanned: string; findings: string; clean: string; emptyHint: string
+  ownerOnly: string; failed: string; quotaExceeded: string; category: string; recommendation: string; line: string
+  history: string; noRuns: string; refresh: string
+  statusRunning: string; statusComplete: string; statusFailed: string
+  detail: string; close: string; viewSource: string
+  generateFix: string; patching: string; patchReady: string; reviewMerge: string; patchFailed: string; patchUpgrade: string
+  trackScan: string; trackAnalyze: string; trackReport: string; trackPrs: string
+  cmdTitle: string; reportsTitle: string; reportsSubtitle: string; openReport: string; reportOwnerOnly: string; reportSyncHint: string; runningHint: string; pathHint: string; mvpBadge: string; viewOnline: string
+  sev: Record<Sev, string>
+}
 
-Run this UX audit script against our entire repository immediately, expose the findings in our dashboard grid, and let's clean up our own Admin and Workspace panels first!
+const COPY: Record<string, AuditCopy> = {
+  en: {
+    title: 'Audit Console', subtitle: 'Deep security & quality scans, isolated from live console traffic.',
+    viewPlans: 'View plans',
+    pathLabel: 'Repository URL', maxLabel: 'Max files', run: 'Run audit', running: 'Running deep scan…',
+    filesScanned: 'Files scanned', findings: 'Findings', clean: 'No findings — this scan came back clean.',
+    emptyHint: 'Set a path and run a scan, or pick a past run.',
+    ownerOnly: 'Owner access is required to run audits.', failed: 'Audit failed', quotaExceeded: 'Monthly limit reached: {used}/{cap} scans used. Upgrade your plan to run more.',
+    category: 'Category', recommendation: 'Recommendation', line: 'Line',
+    history: 'Run history', noRuns: 'No runs yet.', refresh: 'Refresh',
+    statusRunning: 'Running', statusComplete: 'Complete', statusFailed: 'Failed',
+    detail: 'Detail', close: 'Close', viewSource: 'View on GitHub',
+    generateFix: 'Generate fix', patching: 'Generating fix…', patchReady: 'Fix proposed on a branch', reviewMerge: 'Review & merge', patchFailed: 'Could not generate fix', patchUpgrade: 'AI patch generation is a Pro feature. Upgrade to enable it.',
+    trackScan: 'Scanning target', trackAnalyze: 'Running analyzers', trackReport: 'Generating report', trackPrs: 'Preparing patches',
+    cmdTitle: 'Audit Command Center', reportsTitle: 'Compliance & Readiness Reports',
+    reportsSubtitle: 'Twelve readiness reports across identity, providers, secrets, code, billing, and remediation.',
+    openReport: 'View', reportOwnerOnly: 'These readiness reports are scoped to the workspace owner. Upgrade your plan to generate reports for your own connected stack.',
+    reportSyncHint: 'Synced with your latest scan.',
+    mvpBadge: 'MVP', viewOnline: 'View online',
+    runningHint: 'Large scopes can take a few minutes — this stays live, keep the tab open.', pathHint: 'Paste a public GitHub repo URL, e.g. https://github.com/owner/repo',
+    sev: { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', info: 'Info' },
+  },
+  es: {
+    title: 'Consola de Auditoría', subtitle: 'Análisis profundos de seguridad y calidad, aislados del tráfico de la consola en vivo.',
+    viewPlans: 'Ver planes',
+    pathLabel: 'URL del repositorio', maxLabel: 'Archivos máx.', run: 'Ejecutar auditoría', running: 'Ejecutando análisis profundo…',
+    filesScanned: 'Archivos analizados', findings: 'Hallazgos', clean: 'Sin hallazgos: este análisis salió limpio.',
+    emptyHint: 'Define una ruta y ejecuta un análisis, o elige una ejecución anterior.',
+    ownerOnly: 'Se requiere acceso de propietario para ejecutar auditorías.', failed: 'La auditoría falló', quotaExceeded: 'Límite mensual alcanzado: {used}/{cap} análisis usados. Mejora tu plan para ejecutar más.',
+    category: 'Categoría', recommendation: 'Recomendación', line: 'Línea',
+    history: 'Historial', noRuns: 'Aún no hay ejecuciones.', refresh: 'Actualizar',
+    statusRunning: 'En curso', statusComplete: 'Completado', statusFailed: 'Falló',
+    detail: 'Detalle', close: 'Cerrar', viewSource: 'Ver en GitHub',
+    generateFix: 'Generar corrección', patching: 'Generando corrección…', patchReady: 'Corrección propuesta en una rama', reviewMerge: 'Revisar y combinar', patchFailed: 'No se pudo generar la corrección', patchUpgrade: 'La generación de parches con IA es una función Pro. Mejora tu plan para habilitarla.',
+    trackScan: 'Escaneando objetivo', trackAnalyze: 'Ejecutando analizadores', trackReport: 'Generando informe', trackPrs: 'Preparando parches',
+    cmdTitle: 'Centro de Comando de Auditoría', reportsTitle: 'Informes de Cumplimiento y Preparación',
+    reportsSubtitle: 'Doce informes de preparación sobre identidad, proveedores, secretos, código, facturación y remediación.',
+    openReport: 'Ver', reportOwnerOnly: 'Estos informes están limitados al propietario del espacio de trabajo. Mejora tu plan para generar informes de tu propio stack conectado.',
+    reportSyncHint: 'Sincronizado con tu último análisis.',
+    mvpBadge: 'MVP', viewOnline: 'Ver en línea',
+    runningHint: 'Los análisis amplios pueden tardar unos minutos: sigue activo, deja la pestaña abierta.', pathHint: 'Pega la URL de un repo público de GitHub, p. ej. https://github.com/owner/repo',
+    sev: { critical: 'Crítico', high: 'Alto', medium: 'Medio', low: 'Bajo', info: 'Info' },
+  },
+  pt: {
+    title: 'Console de Auditoria', subtitle: 'Análises profundas de segurança e qualidade, isoladas do tráfego do console ao vivo.',
+    viewPlans: 'Ver planos',
+    pathLabel: 'URL do repositório', maxLabel: 'Máx. de arquivos', run: 'Executar auditoria', running: 'Executando análise profunda…',
+    filesScanned: 'Arquivos analisados', findings: 'Constatações', clean: 'Nenhuma constatação — esta análise voltou limpa.',
+    emptyHint: 'Defina um caminho e execute uma análise, ou escolha uma execução anterior.',
+    ownerOnly: 'É necessário acesso de proprietário para executar auditorias.', failed: 'A auditoria falhou', quotaExceeded: 'Limite mensal atingido: {used}/{cap} análises usadas. Faça upgrade do seu plano para executar mais.',
+    category: 'Categoria', recommendation: 'Recomendação', line: 'Linha',
+    history: 'Histórico', noRuns: 'Ainda não há execuções.', refresh: 'Atualizar',
+    statusRunning: 'Em execução', statusComplete: 'Concluído', statusFailed: 'Falhou',
+    detail: 'Detalhe', close: 'Fechar', viewSource: 'Ver no GitHub',
+    generateFix: 'Gerar correção', patching: 'Gerando correção…', patchReady: 'Correção proposta em um branch', reviewMerge: 'Revisar e mesclar', patchFailed: 'Não foi possível gerar a correção', patchUpgrade: 'A geração de correções com IA é um recurso Pro. Faça upgrade para habilitá-la.',
+    trackScan: 'Verificando alvo', trackAnalyze: 'Executando analisadores', trackReport: 'Gerando relatório', trackPrs: 'Preparando correções',
+    cmdTitle: 'Central de Comando de Auditoria', reportsTitle: 'Relatórios de Conformidade e Prontidão',
+    reportsSubtitle: 'Doze relatórios de prontidão sobre identidade, provedores, segredos, código, faturamento e remediação.',
+    openReport: 'Ver', reportOwnerOnly: 'Estes relatórios são restritos ao proprietário do espaço de trabalho. Faça upgrade do seu plano para gerar relatórios do seu próprio stack conectado.',
+    reportSyncHint: 'Sincronizado com sua última análise.',
+    mvpBadge: 'MVP', viewOnline: 'Ver online',
+    runningHint: 'Escopos grandes podem levar alguns minutos — continua ativo, mantenha a aba aberta.', pathHint: 'Cole a URL de um repo público do GitHub, ex. https://github.com/owner/repo',
+    sev: { critical: 'Crítico', high: 'Alto', medium: 'Médio', low: 'Baixo', info: 'Info' },
+  },
+  pl: {
+    title: 'Konsola Audytu', subtitle: 'Dogłębne skany bezpieczeństwa i jakości, odizolowane od ruchu konsoli na żywo.',
+    viewPlans: 'Zobacz plany',
+    pathLabel: 'URL repozytorium', maxLabel: 'Maks. plików', run: 'Uruchom audyt', running: 'Trwa dogłębne skanowanie…',
+    filesScanned: 'Przeskanowane pliki', findings: 'Wyniki', clean: 'Brak wyników — ten skan jest czysty.',
+    emptyHint: 'Ustaw ścieżkę i uruchom skan lub wybierz wcześniejsze uruchomienie.',
+    ownerOnly: 'Do uruchamiania audytów wymagany jest dostęp właściciela.', failed: 'Audyt nie powiódł się', quotaExceeded: 'Osiągnięto miesięczny limit: wykorzystano {used}/{cap} skanów. Ulepsz plan, aby uruchomić więcej.',
+    category: 'Kategoria', recommendation: 'Zalecenie', line: 'Wiersz',
+    history: 'Historia', noRuns: 'Brak uruchomień.', refresh: 'Odśwież',
+    statusRunning: 'W toku', statusComplete: 'Zakończono', statusFailed: 'Niepowodzenie',
+    detail: 'Szczegóły', close: 'Zamknij', viewSource: 'Zobacz na GitHub',
+    generateFix: 'Wygeneruj poprawkę', patching: 'Generowanie poprawki…', patchReady: 'Poprawka zaproponowana w gałęzi', reviewMerge: 'Przejrzyj i scal', patchFailed: 'Nie udało się wygenerować poprawki', patchUpgrade: 'Generowanie poprawek AI to funkcja Pro. Ulepsz plan, aby ją włączyć.',
+    trackScan: 'Skanowanie celu', trackAnalyze: 'Uruchamianie analizatorów', trackReport: 'Generowanie raportu', trackPrs: 'Przygotowywanie poprawek',
+    cmdTitle: 'Centrum Dowodzenia Audytu', reportsTitle: 'Raporty Zgodności i Gotowości',
+    reportsSubtitle: 'Dwanaście raportów gotowości obejmujących tożsamość, dostawców, sekrety, kod, płatności i naprawę.',
+    openReport: 'Otwórz', reportOwnerOnly: 'Te raporty są dostępne tylko dla właściciela przestrzeni roboczej. Ulepsz plan, aby generować raporty dla własnego połączonego stosu.',
+    reportSyncHint: 'Zsynchronizowano z najnowszym skanem.',
+    mvpBadge: 'MVP', viewOnline: 'Zobacz online',
+    runningHint: 'Duże zakresy mogą potrwać kilka minut — działa dalej, zostaw kartę otwartą.', pathHint: 'Wklej URL publicznego repozytorium GitHub, np. https://github.com/owner/repo',
+    sev: { critical: 'Krytyczny', high: 'Wysoki', medium: 'Średni', low: 'Niski', info: 'Info' },
+  },
+  ru: {
+    title: 'Консоль аудита', subtitle: 'Глубокие проверки безопасности и качества, изолированные от живого трафика консоли.',
+    viewPlans: 'Посмотреть планы',
+    pathLabel: 'URL репозитория', maxLabel: 'Макс. файлов', run: 'Запустить аудит', running: 'Выполняется глубокое сканирование…',
+    filesScanned: 'Просканировано файлов', findings: 'Замечания', clean: 'Замечаний нет — сканирование чистое.',
+    emptyHint: 'Укажите путь и запустите сканирование или выберите прошлый запуск.',
+    ownerOnly: 'Для запуска аудита требуется доступ владельца.', failed: 'Аудит не выполнен', quotaExceeded: 'Достигнут месячный лимит: использовано {used}/{cap} проверок. Обновите план, чтобы запускать больше.',
+    category: 'Категория', recommendation: 'Рекомендация', line: 'Строка',
+    history: 'История запусков', noRuns: 'Запусков пока нет.', refresh: 'Обновить',
+    statusRunning: 'Выполняется', statusComplete: 'Завершено', statusFailed: 'Ошибка',
+    detail: 'Подробности', close: 'Закрыть', viewSource: 'Открыть на GitHub',
+    generateFix: 'Сгенерировать исправление', patching: 'Создание исправления…', patchReady: 'Исправление предложено в ветке', reviewMerge: 'Просмотреть и слить', patchFailed: 'Не удалось создать исправление', patchUpgrade: 'Генерация исправлений ИИ — функция Pro. Обновите план, чтобы включить её.',
+    trackScan: 'Сканирование цели', trackAnalyze: 'Запуск анализаторов', trackReport: 'Создание отчёта', trackPrs: 'Подготовка исправлений',
+    cmdTitle: 'Командный центр аудита', reportsTitle: 'Отчёты о соответствии и готовности',
+    reportsSubtitle: 'Двенадцать отчётов о готовности по идентификации, провайдерам, секретам, коду, биллингу и устранению.',
+    openReport: 'Открыть', reportOwnerOnly: 'Эти отчёты доступны только владельцу рабочей области. Обновите план, чтобы создавать отчёты для своего подключённого стека.',
+    reportSyncHint: 'Синхронизировано с последним сканированием.',
+    mvpBadge: 'MVP', viewOnline: 'Открыть онлайн',
+    runningHint: 'Большие области могут занять несколько минут — процесс активен, не закрывайте вкладку.', pathHint: 'Вставьте URL публичного репозитория GitHub, напр. https://github.com/owner/repo',
+    sev: { critical: 'Критический', high: 'Высокий', medium: 'Средний', low: 'Низкий', info: 'Инфо' },
+  },
+}
+function copyFor(lang: string): AuditCopy { return COPY[lang] || COPY.en }
+
+// The 12 compliance reports. `key` maps to the live report page at /hub/audit/<key>.
+type ReportCard = { key: string; icon: string; title: string; desc: string; mvp?: boolean }
+const REPORTS: ReportCard[] = [
+  { key: 'executive',   icon: '📑', title: 'Executive Risk Summary',      desc: 'Synthesized markdown brief: posture, top risks, and the bottom line.', mvp: true },
+  { key: 'providers',   icon: '📦', title: 'Provider Inventory',          desc: 'Stripe, Vercel, Supabase, and GitHub connection status & risk.', mvp: true },
+  { key: 'identity',    icon: '👤', title: 'Identity & Access Review',     desc: 'User access controls, owner rights, stale accounts, and MFA gaps.', mvp: true },
+  { key: 'secrets',     icon: '🔑', title: 'Secrets & API Key Exposure',   desc: 'Hardcoded credentials, token rotation age, and exposure risk.', mvp: true },
+  { key: 'remediation', icon: '🛠️', title: 'Remediation Roadmap',         desc: 'The actionable fix engine: prioritized fixes, owners, due dates.', mvp: true },
+  { key: 'github',      icon: '🐙', title: 'GitHub / Code Change Report',  desc: 'Branch protection, open PRs, stale branches, unreviewed changes.' },
+  { key: 'vercel',      icon: '▲',  title: 'Vercel / Env Var Report',      desc: 'Env vars, exposed variables, deployment and rollback status.' },
+  { key: 'supabase',    icon: '🗄️', title: 'Supabase / Database Security', desc: 'RLS coverage, public tables, storage buckets, service-role use.' },
+  { key: 'stripe',      icon: '💳', title: 'Stripe / Billing Configuration', desc: 'Products, prices, webhooks, and live vs test mode consistency.' },
+  { key: 'pr-cockpit',  icon: '🔀', title: 'PR Cockpit Approval Trail',    desc: 'Infrastructure change requests, approvals, and merge results.' },
+  { key: 'compliance',  icon: '⚖️', title: 'Compliance Readiness Matrix',  desc: 'SOC 2 / ISO 27001 / NIST CSF / CIS readiness — no certification claims.' },
+  { key: 'activity',    icon: '🧾', title: 'Audit Log Export',            desc: 'Activity timeline of actions, providers, risk, and results.' },
+]
+
+const SEV_ORDER: Sev[] = ['critical', 'high', 'medium', 'low', 'info']
+function asSev(s: string): Sev {
+  const k = String(s || 'info').toLowerCase() as Sev
+  return SEV_ORDER.includes(k) ? k : 'info'
+}
+// Token-aligned severity colours.
+function sevText(sev: Sev): string {
+  if (sev === 'critical' || sev === 'high') return 'text-danger'
+  if (sev === 'medium') return 'text-accent'
+  return 'text-text-muted'
+}
+function statusText(s: string): string {
+  if (s === 'running') return 'text-accent'
+  if (s === 'failed') return 'text-danger'
+  return 'text-[#34d399]'
+}
+function statusDot(s: string): string {
+  if (s === 'running') return 'bg-accent'
+  if (s === 'failed') return 'bg-danger'
+  return 'bg-[#34d399]'
+}
+function statusLabel(copy: AuditCopy, s: string): string { return s === 'running' ? copy.statusRunning : s === 'failed' ? copy.statusFailed : copy.statusComplete }
+function timeShort(iso: string, lang: string): string {
+  try { return new Date(iso).toLocaleString(lang || undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }
+  catch { return '' }
+}
+function ghUrl(file: string, line?: number | null): string {
+  const path = String(file || '').split('/').map(encodeURIComponent).join('/')
+  return `https://github.com/SignalBoost/signalboost-live/blob/main/${path}${typeof line === 'number' ? `#L${line}` : ''}`
+}
+
+const PHASE_ORDER = ['SCAN_TARGET', 'RUN_ANALYZERS', 'GENERATE_REPORT', 'PREPARE_PRS'] as const
+
+function fmtElapsed(sec: number): string {
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
+function PhaseTracker({ phase, progress, copy }: { phase: string; progress: { done: number; total: number }; copy: AuditCopy }) {
+  const labels: Record<string, string> = {
+    SCAN_TARGET: copy.trackScan, RUN_ANALYZERS: copy.trackAnalyze, GENERATE_REPORT: copy.trackReport, PREPARE_PRS: copy.trackPrs,
+  }
+  const curIdx = phase === 'DONE' ? PHASE_ORDER.length : PHASE_ORDER.indexOf(phase as typeof PHASE_ORDER[number])
+  return (
+    <div className="mt-4 rounded-md border border-border bg-surface p-4">
+      {PHASE_ORDER.map((p, i) => {
+        const isDone = curIdx > i
+        const active = curIdx === i
+        const isAnalyze = p === 'RUN_ANALYZERS'
+        const pct = isDone ? 100 : active ? (isAnalyze && progress.total > 0 ? Math.min(Math.round((progress.done / progress.total) * 100), 100) : 45) : 0
+        const fill = isDone ? 'bg-[#34d399]' : active ? 'bg-accent' : 'bg-border'
+        return (
+          <div key={p} className={i < PHASE_ORDER.length - 1 ? 'mb-3' : ''}>
+            <div className="mb-1.5 flex items-baseline justify-between">
+              <span className={`text-xs font-semibold ${active ? 'text-text' : isDone ? 'text-text-muted' : 'text-text-muted/70'}`}>{labels[p]}</span>
+              {isAnalyze && active && progress.total > 0 && (
+                <span className="font-mono text-[11px] text-text-muted">{progress.done}/{progress.total}</span>
+              )}
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-bg">
+              <div className={`h-full rounded-full transition-all duration-300 ${fill}`} style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+export default function AuditCenterPage() {
+  const { lang } = useI18n()
+  const { t } = useTranslation()
+  const copy = copyFor(lang)
+
+  const [prefix, setPrefix] = useState('')
 const [maxFiles, setMaxFiles] = useState(8)
   const [elapsed, setElapsed] = useState(0)
   const [loading, setLoading] = useState(false)

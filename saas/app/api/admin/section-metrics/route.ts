@@ -69,6 +69,17 @@ async function topValue(a: any, table: string, column: string): Promise<string |
   } catch { return null }
 }
 
+// Average of a numeric column -> "Nms"; null if column/table absent or empty.
+async function avgMs(a: any, table: string, column: string): Promise<string | null> {
+  try {
+    const { data, error } = await a.from(table).select(column).limit(5000)
+    if (error || !Array.isArray(data) || !data.length) return null
+    const nums = data.map((r: any) => Number(r?.[column])).filter((n: number) => !isNaN(n))
+    if (!nums.length) return null
+    return `${Math.round(nums.reduce((acc: number, n: number) => acc + n, 0) / nums.length)}ms`
+  } catch { return null }
+}
+
 type Spec = (a: any) => Promise<number | string | null>
 const METRICS: Record<string, Spec> = {
   // Concierge Monitor
@@ -102,6 +113,31 @@ const METRICS: Record<string, Spec> = {
   'sys-7': a => latest(a, 'prospects'),
   // Marketplace Monitor
   'sb-4': a => distinctCount(a, 'partner_businesses', 'category'),
+  // ── Defensive wiring for the remaining cards: lights up when the table exists,
+  //    stays an honest empty-state when it doesn't (every helper returns null on error).
+  // Overview totals
+  'overview-0':  a => countRows(a, 'accounts'),
+  'overview-6':  a => countRows(a, 'ai_business_sites'),
+  'overview-8':  a => countRows(a, 'video_jobs'),
+  'overview-9':  a => countRows(a, 'reviews'),
+  'overview-10': a => countRows(a, 'ai_task_log'),
+  'overview-11': a => countRows(a, 'ai_task_log', (q: any) => q.eq('status', 'error')),
+  'overview-12': a => countRows(a, 'outreach_sends'),
+  'overview-13': a => countRows(a, 'prospects'),
+  // Forecasting + KPI (AI routing health from ai_task_log)
+  'ai-1': a => countRows(a, 'ai_task_log', (q: any) => q.eq('provider', 'openai')),
+  'ai-2': a => countRows(a, 'ai_task_log', (q: any) => q.in('provider', ['claude', 'anthropic'])),
+  'ai-3': a => countRows(a, 'ai_task_log', (q: any) => q.eq('status', 'error')),
+  'ai-4': a => avgMs(a, 'ai_task_log', 'duration_ms'),
+  // Revenue (from subscriptions)
+  'revenue-0': a => countRows(a, 'subscriptions', (q: any) => q.eq('plan', 'free')),
+  'revenue-1': a => countRows(a, 'subscriptions', (q: any) => q.in('plan', PAYING_PLANS)),
+  // Marketplace partners
+  'partners-0': a => countRows(a, 'partner_businesses'),
+  'partners-4': a => topValue(a, 'partner_businesses', 'category'),
+  // System health
+  'system-0': a => countRows(a, 'error_logs'),
+  'system-2': a => supabaseHealth(a),
 }
 
 export async function GET() {

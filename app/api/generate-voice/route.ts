@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createMarketingServerSupabase } from "@/lib/auth/supabaseServer";
+import { readJsonLimited } from "@/lib/http/readJsonLimited";
 
 export const dynamic = "force-dynamic";
 
@@ -24,15 +25,6 @@ function rateLimited(key: string): boolean {
 
 export async function POST(req: Request) {
   try {
-    // Reject oversized bodies before parsing.
-    const declaredLen = Number(req.headers.get("content-length") ?? "");
-    if (Number.isFinite(declaredLen) && declaredLen > MAX_BODY_BYTES) {
-      return NextResponse.json(
-        { success: false, error: "Request body too large" },
-        { status: 413 }
-      );
-    }
-
     // Require an authenticated user. This route is cost-bearing once wired to a
     // synthesis provider, so it must never be publicly callable.
     const supabase = await createMarketingServerSupabase();
@@ -51,15 +43,20 @@ export async function POST(req: Request) {
       );
     }
 
-    const contentType = req.headers.get("content-type") || "";
-    if (!contentType.includes("application/json")) {
+    // Hardened read: exact JSON media type + a hard byte ceiling enforced while
+    // the stream is consumed, so a missing/false Content-Length or chunked
+    // encoding cannot smuggle an oversized body past the guard.
+    const parsed = await readJsonLimited<{ text?: unknown }>(req, {
+      maxBytes: MAX_BODY_BYTES,
+    });
+    if (!parsed.ok) {
       return NextResponse.json(
-        { success: false, error: "Content-Type must be application/json" },
-        { status: 415 }
+        { success: false, error: parsed.error },
+        { status: parsed.status }
       );
     }
 
-    const body = await req.json().catch(() => null);
+    const body = parsed.value;
     const text = body && typeof body.text === "string" ? body.text.trim() : "";
     if (!text) {
       return NextResponse.json(

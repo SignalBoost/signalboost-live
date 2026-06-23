@@ -5,6 +5,7 @@
 
 import { useState } from 'react'
 import { cardStyle, labelStyle } from '../shared'
+import { useTranslation } from '@/components/i18n/useTranslation'
 
 export type UnlockScreenProps = {
   onUnlock: (sessionId: string) => void
@@ -19,6 +20,7 @@ interface TOTPSetup {
 }
 
 export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScreenProps) {
+  const { t } = useTranslation()
   const [step, setStep] = useState<UnlockStep>('password')
   const [password, setPassword] = useState('')
   const [totpCode, setTotpCode] = useState('')
@@ -32,7 +34,7 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
     setError('')
 
     if (!password.trim()) {
-      setError('Password is required')
+      setError(t('console.vaultx.unlock.errPasswordRequired', 'Password is required'))
       return
     }
 
@@ -83,7 +85,7 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
     setError('')
 
     if (!totpCode.trim() || totpCode.length !== 6) {
-      setError('Enter a valid 6-digit code')
+      setError(t('console.vaultx.unlock.errInvalidCode', 'Enter a valid 6-digit code'))
       return
     }
 
@@ -120,7 +122,7 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
     setError('')
 
     if (!totpCode.trim() || totpCode.length !== 6) {
-      setError('Enter a valid 6-digit code')
+      setError(t('console.vaultx.unlock.errInvalidCode', 'Enter a valid 6-digit code'))
       return
     }
 
@@ -197,7 +199,7 @@ const handleGoBack = () => {
           gap: 6,
         }}
       >
-        ↻ Refresh
+        ↻ {t('console.vaultx.unlock.refresh', 'Refresh')}
       </button>
 
       <div
@@ -212,25 +214,24 @@ const handleGoBack = () => {
       >
         {/* Header */}
         <div>
-          <div style={labelStyle}>Secure Access Required</div>
+          <div style={labelStyle}>{t('console.vaultx.unlock.secureAccess', 'Secure Access Required')}</div>
           <h2 style={{ margin: '6px 0 2px', fontSize: 18, fontWeight: 900 }}>
-            {step === 'password' && 'Unlock Vault'}
-            {step === 'totp-setup' && 'Enable 2FA'}
-            {step === 'totp-verify' && 'Enter 2FA Code'}
+            {step === 'password' && t('console.vaultx.unlock.unlockVault', 'Unlock Vault')}
+            {step === 'totp-setup' && t('console.vaultx.unlock.enable2fa', 'Enable 2FA')}
+            {step === 'totp-verify' && t('console.vaultx.unlock.enter2faCode', 'Enter 2FA Code')}
           </h2>
           <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,.55)' }}>
-            {step === 'password' && 'Enter your password'}
-            {step === 'totp-setup' && 'Scan QR code with Google Authenticator'}
-            {step === 'totp-verify' && 'This session will expire in 30 minutes for security.'}
+            {step === 'password' && t('console.vaultx.unlock.enterPassword', 'Enter your password')}
+            {step === 'totp-setup' && t('console.vaultx.unlock.scanQr', 'Scan QR code with Google Authenticator')}
+            {step === 'totp-verify' && t('console.vaultx.unlock.sessionExpire', 'This session will expire in 30 minutes for security.')}
           </p>
         </div>
-
-        {/* Password Step */}
+{/* Password Step */}
         {step === 'password' && (
           <form onSubmit={handlePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', display: 'block', marginBottom: 6 }}>
-                Password
+                {t('console.vaultx.unlock.password', 'Password')}
               </label>
               <input
                 type="password"
@@ -272,7 +273,7 @@ const handleGoBack = () => {
                 opacity: isLoading ? 0.6 : 1,
               }}
             >
-              {isLoading ? 'Verifying...' : 'Continue'}
+              {isLoading ? t('console.vaultx.unlock.verifying', 'Verifying...') : t('console.vaultx.unlock.continue', 'Continue')}
             </button>
           </form>
         )}
@@ -287,13 +288,13 @@ const handleGoBack = () => {
                 style={{ width: 200, height: 200, borderRadius: 10, border: '2px solid rgba(26,240,255,.2)' }}
               />
               <p style={{ margin: '12px 0 0', fontSize: 11, color: 'rgba(255,255,255,.6)' }}>
-                Scan with Google Authenticator, Microsoft Authenticator, or Authy
+                {t('console.vaultx.unlock.scanAuthApps', 'Scan with Google Authenticator, Microsoft Authenticator, or Authy')}
               </p>
             </div>
 
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', display: 'block', marginBottom: 6 }}>
-                Enter 6-digit code to confirm
+                {t('console.vaultx.unlock.enter6digit', 'Enter 6-digit code to confirm')}
               </label>
               <input
                 type="text"
@@ -326,7 +327,7 @@ width: '100%',
 
             <div style={{ borderRadius: 8, background: 'rgba(255,193,0,.1)', border: '1px solid rgba(255,193,0,.2)', padding: 10 }}>
               <p style={{ margin: 0, fontSize: 10, color: 'rgba(255,193,0,.8)', lineHeight: 1.5 }}>
-                <strong>Save these backup codes:</strong>
+                <strong>{t('console.vaultx.unlock.saveBackup', 'Save these backup codes:')}</strong>
                 <br />
                 {totpSetup.backupCodes.join(', ')}
               </p>
@@ -350,7 +351,7 @@ width: '100%',
                   opacity: isVerifying ? 0.5 : 1,
                 }}
               >
-                Back
+                {t('console.vaultx.unlock.back', 'Back')}
               </button>
               <button
                 type="submit"
@@ -368,7 +369,7 @@ width: '100%',
                   opacity: isVerifying || totpCode.length !== 6 ? 0.6 : 1,
                 }}
               >
-                {isVerifying ? 'Verifying...' : 'Unlock'}
+                {isVerifying ? t('console.vaultx.unlock.verifying', 'Verifying...') : t('console.vaultx.unlock.unlock', 'Unlock')}
               </button>
             </div>
           </form>
@@ -379,7 +380,7 @@ width: '100%',
           <form onSubmit={handleTOTPVerify} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', display: 'block', marginBottom: 6 }}>
-                2FA Code
+                {t('console.vaultx.unlock.twofaCode', '2FA Code')}
               </label>
               <input
                 type="text"
@@ -428,7 +429,7 @@ width: '100%',
                   opacity: isVerifying ? 0.5 : 1,
                 }}
               >
-                Back
+                {t('console.vaultx.unlock.back', 'Back')}
               </button>
               <button
                 type="submit"
@@ -446,7 +447,7 @@ width: '100%',
                   opacity: isVerifying || totpCode.length !== 6 ? 0.6 : 1,
                 }}
               >
-                {isVerifying ? 'Verifying...' : 'Unlock'}
+                {isVerifying ? t('console.vaultx.unlock.verifying', 'Verifying...') : t('console.vaultx.unlock.unlock', 'Unlock')}
               </button>
             </div>
           </form>

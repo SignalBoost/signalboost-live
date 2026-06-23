@@ -44,6 +44,31 @@ async function supabaseHealth(admin: any): Promise<string | null> {
 
 const startOfTodayISO = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString() }
 
+// Paying = a real (non-free) subscription plan. Covers current + legacy plan names.
+const PAYING_PLANS = ['launch', 'growth', 'command', 'paid', 'pro', 'starter']
+
+// Conversion rate = paying customers / prospects, as a percent string. null if no prospects.
+async function conversionRate(a: any): Promise<string | null> {
+  try {
+    const won = await countRows(a, 'subscriptions', (q: any) => q.in('plan', PAYING_PLANS))
+    const prospects = await countRows(a, 'prospects')
+    if (won == null || prospects == null || prospects === 0) return null
+    return `${Math.round((won / prospects) * 100)}%`
+  } catch { return null }
+}
+
+// Most frequent value of a column (e.g. top industry/country). null if column/table absent.
+async function topValue(a: any, table: string, column: string): Promise<string | null> {
+  try {
+    const { data, error } = await a.from(table).select(column)
+    if (error || !Array.isArray(data) || !data.length) return null
+    const counts: Record<string, number> = {}
+    for (const r of data) { const v = r?.[column]; if (v) counts[String(v)] = (counts[String(v)] || 0) + 1 }
+    const top = Object.entries(counts).sort((x, y) => y[1] - x[1])[0]
+    return top ? top[0] : null
+  } catch { return null }
+}
+
 type Spec = (a: any) => Promise<number | string | null>
 const METRICS: Record<string, Spec> = {
   // Concierge Monitor
@@ -60,6 +85,10 @@ const METRICS: Record<string, Spec> = {
   'sales-0': a => countRows(a, 'prospects'),
   'sales-4': a => countRows(a, 'outreach_sends'),
   'sales-8': a => countRows(a, 'outreach_sends', q => q.gte('created_at', startOfTodayISO())),
+  'sales-7':  a => countRows(a, 'subscriptions', (q: any) => q.in('plan', PAYING_PLANS)), // clients won (paying)
+  'sales-10': a => conversionRate(a),                                                     // conversion rate
+  'sales-11': a => topValue(a, 'prospects', 'industry'),                                  // top industries
+  'sales-12': a => topValue(a, 'prospects', 'country'),                                   // top countries
   // Forecasting + KPI
   'ai-0': a => countRows(a, 'ai_task_log'),
   // Email / Marketing

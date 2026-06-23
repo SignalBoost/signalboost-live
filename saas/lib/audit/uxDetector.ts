@@ -61,12 +61,24 @@ const RULES: Rule[] = [
     recommendation: 'Bind the handler to the intended action, or remove the control.',
   },
   {
-    category: 'ux-dead-click',
+    category: 'i18n-raw-string',
     test: /<button(?![^>]*onClick)(?![^>]*type\s*=\s*["']submit["'])[^>]*>/g,
     severity: () => 'high',
     title: 'Possible dead button (no handler)',
     detail: () => 'A <button> has no onClick handler and is not a submit button — likely a dead click. (Heuristic: a handler passed via spread/variable can be a false positive — verify.)',
     recommendation: 'Bind an onClick to the action, turn it into a link with a real href, set type="submit" inside a form, or remove the control.',
+  },
+  {
+    // i18n enforcement: JSX text content (2+ words, starts with a capital) that is
+    // NOT wrapped in the t() hook. Heuristic — multi-word UI labels written inline
+    // instead of t('namespace.key', '…') trip this. Single words, expressions
+    // ({...}), and punctuation-only nodes are ignored.
+    category: 'i18n-raw-string',
+    test: />\s*([A-Z][A-Za-z']+(?:\s+[A-Za-z'’.,!?:&/()-]+){1,})\s*</g,
+    severity: () => 'high',
+    title: 'Raw text not wired to i18n',
+    detail: m => `User-facing text "${m.replace(/[<>]/g, '').trim()}" is hardcoded in JSX rather than wrapped in the i18n hook.`,
+    recommendation: "Wrap it with t('namespace.key', 'fallback') via useTranslation() and add the key to the locale dictionaries (audit.{lang}.json / console.{lang}.json). Heuristic — verify it is genuinely user-facing copy.",
   },
   {
     category: 'ux-placeholder',

@@ -28,7 +28,7 @@ export async function GET() {
     if (!client) return NextResponse.json({ ok: true, states: [] })
     const { data, error } = await client
       .from('audit_finding_state')
-      .select('finding_id,status,owner,note,updated_at,updated_by')
+      .select('finding_id,status,owner,note,due_date,updated_at,updated_by')
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true, states: data || [] })
   } catch (err) {
@@ -53,6 +53,10 @@ export async function POST(req: Request) {
   if (body.status !== undefined) row.status = normalizeStatus(body.status)
   if (body.owner !== undefined) row.owner = body.owner ? String(body.owner).slice(0, 200) : null
   if (body.note !== undefined) row.note = body.note ? String(body.note).slice(0, 2000) : null
+  if (body.dueDate !== undefined) {
+    const d = String(body.dueDate || '').trim()
+    row.due_date = /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null
+  }
 
   try {
     const client = db()
@@ -60,7 +64,7 @@ export async function POST(req: Request) {
     const { data, error } = await client
       .from('audit_finding_state')
       .upsert(row, { onConflict: 'finding_id' })
-      .select('finding_id,status,owner,note,updated_at,updated_by')
+      .select('finding_id,status,owner,note,due_date,updated_at,updated_by')
       .single()
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true, state: data })

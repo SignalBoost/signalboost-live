@@ -1,11 +1,6 @@
 'use client'
 
-/**
- * Simple hook that returns a translation function.
- * For now, always returns the fallback (English).
- * Later, wire to context for full i18n support with locales/*.json.
- */
-export function useTranslation() {
-  const t = (key: string, fallback: string) => fallback
-  return { t }
-}
+// This module previously shipped a stub that always returned the English
+// fallback. It now re-exports the real context-backed hook so every existing
+// import path (`@/lib/i18n/useTranslation`) resolves to working i18n.
+export { useTranslation } from '@/components/i18n/useTranslation'

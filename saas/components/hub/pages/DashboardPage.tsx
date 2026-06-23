@@ -279,8 +279,7 @@ function DeploymentCard({
         <div style={{ paddingTop: '1rem', display: 'grid', gap: '1rem' }}>
           <div>
             <div style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem' }}>{t(dict, 'console.deploy.liveUrl', 'Live URL')}</div>
-            
-              href={`https://${deployment.url}`}
+            <a href={`https://${deployment.url}`}
               target="_blank"
               rel="noopener noreferrer"
               style={{ color: '#1af0ff', textDecoration: 'none', wordBreak: 'break-all', fontSize: '0.9rem' }}
@@ -330,8 +329,7 @@ function DeploymentCard({
           )}
 
           {deployment.inspectorUrl && (
-            
-              href={deployment.inspectorUrl}
+            <a href={deployment.inspectorUrl}
               target="_blank"
               rel="noopener noreferrer"
               style={{ padding: '0.75rem', background: '#1a1a2e', color: '#1af0ff', textDecoration: 'none', borderRadius: '4px', textAlign: 'center', fontSize: '0.9rem', fontWeight: 'bold' }}

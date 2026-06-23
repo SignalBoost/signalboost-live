@@ -6,6 +6,7 @@
 import { useMemo } from 'react'
 import { VaultSecret, VaultExpirationAlert } from '@/lib/hub/vault-types'
 import { cardStyle, labelStyle } from '../shared'
+import { useTranslation } from '@/components/i18n/useTranslation'
 
 export type VaultSecretsGridProps = {
   secrets: VaultSecret[]
@@ -21,6 +22,15 @@ const statusIcon: Record<string, { icon: string; color: string; label: string }>
   revoked: { icon: '🚫', color: '#9ca3af', label: 'Revoked' },
 }
 
+// Maps a secret status to its localized label key under console.vaultx.grid.
+const statusLabelKey: Record<string, string> = {
+  active: 'statusActive',
+  expiring_soon: 'statusExpiringSoon',
+  expired: 'statusExpired',
+  rotated: 'statusRotated',
+  revoked: 'statusRevoked',
+}
+
 const typeIcon: Record<string, string> = {
   api_key: '🔑',
   token: '🎫',
@@ -31,6 +41,8 @@ const typeIcon: Record<string, string> = {
 }
 
 export default function VaultSecretsGrid({ secrets, alerts, onSelectSecret }: VaultSecretsGridProps) {
+  const { t } = useTranslation()
+
   const alertsBySecretId = useMemo(() => {
     const map: Record<string, VaultExpirationAlert> = {}
     alerts.forEach(a => {
@@ -42,8 +54,8 @@ export default function VaultSecretsGrid({ secrets, alerts, onSelectSecret }: Va
   if (secrets.length === 0) {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: 'rgba(255,255,255,.5)' }}>
-        <div style={{ fontSize: 14, marginBottom: 8 }}>No secrets in vault</div>
-        <p style={{ margin: 0, fontSize: 12 }}>Secrets from connected providers will appear here.</p>
+        <div style={{ fontSize: 14, marginBottom: 8 }}>{t('console.vaultx.grid.empty', 'No secrets in vault')}</div>
+        <p style={{ margin: 0, fontSize: 12 }}>{t('console.vaultx.grid.emptyHint', 'Secrets from connected providers will appear here.')}</p>
       </div>
     )
   }
@@ -60,6 +72,7 @@ export default function VaultSecretsGrid({ secrets, alerts, onSelectSecret }: Va
         const status = statusIcon[secret.status]
         const typeIc = typeIcon[secret.secret_type]
         const alert = alertsBySecretId[secret.id]
+        const statusLabel = t('console.vaultx.grid.' + (statusLabelKey[secret.status] || 'statusActive'), status.label)
 
         return (
           <article
@@ -133,7 +146,7 @@ export default function VaultSecretsGrid({ secrets, alerts, onSelectSecret }: Va
                   textTransform: 'capitalize',
                 }}
               >
-                {status.label}
+                {statusLabel}
               </span>
               {secret.environment && (
                 <span
@@ -173,19 +186,19 @@ export default function VaultSecretsGrid({ secrets, alerts, onSelectSecret }: Va
                 }}
               >
                 <span>{alert.severity === 'critical' ? '🔴' : '⚠️'}</span>
-                <span>Expires in {alert.days_until_expiry} day{alert.days_until_expiry === 1 ? '' : 's'}</span>
+                <span>{t('console.vaultx.grid.expiresIn', 'Expires in')} {alert.days_until_expiry} {alert.days_until_expiry === 1 ? t('console.vaultx.grid.day', 'day') : t('console.vaultx.grid.days', 'days')}</span>
               </div>
             )}
 
             {/* Metadata */}
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,.45)', display: 'flex', flexDirection: 'column', gap: 3 }}>
               {secret.last_rotated_at && (
-                <div>Last rotated: {new Date(secret.last_rotated_at).toLocaleDateString()}</div>
+                <div>{t('console.vaultx.grid.lastRotated', 'Last rotated:')} {new Date(secret.last_rotated_at).toLocaleDateString()}</div>
               )}
               {secret.expires_at && (
-                <div>Expires: {new Date(secret.expires_at).toLocaleDateString()}</div>
+                <div>{t('console.vaultx.grid.expires', 'Expires:')} {new Date(secret.expires_at).toLocaleDateString()}</div>
               )}
-              <div>Created: {new Date(secret.created_at).toLocaleDateString()}</div>
+              <div>{t('console.vaultx.grid.created', 'Created:')} {new Date(secret.created_at).toLocaleDateString()}</div>
             </div>
           </article>
         )

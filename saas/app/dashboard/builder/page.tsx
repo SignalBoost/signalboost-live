@@ -232,98 +232,234 @@ export default function BuilderPage() {
   useEffect(() => {
     if (content) resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [content])
-'console.deploy.onlyReady': ['Only READY deployments can be promoted', 'Solo se pueden promover despliegues READY', 'Apenas implantações READY podem ser promovidas', 'Tylko wdrożenia READY mogą być promowane', 'Продвигать можно только развёртывания READY'],
-  'console.deploy.canceling': ['Canceling…', 'Cancelando…', 'Cancelando…', 'Anulowanie…', 'Отмена…'],
-  'console.deploy.cancelBuild': ['🛑 Cancel build', '🛑 Cancelar compilación', '🛑 Cancelar build', '🛑 Anuluj kompilację', '🛑 Отменить сборку'],
-  'console.deploy.notInProgress': ['Not in progress — nothing to cancel', 'No está en curso — nada que cancelar', 'Não está em andamento — nada a cancelar', 'Nie w toku — nie ma czego anulować', 'Не выполняется — нечего отменять'],
-  'console.deploy.liveUrl': ['Live URL', 'URL en vivo', 'URL ao vivo', 'Adres URL na żywo', 'Активный URL'],
-  'console.deploy.gitCommit': ['Git Commit', 'Commit de Git', 'Commit do Git', 'Commit Git', 'Git-коммит'],
-  'console.deploy.deploymentId': ['Deployment ID', 'ID de despliegue', 'ID da implantação', 'ID wdrożenia', 'ID развёртывания'],
-  'console.deploy.created': ['Created', 'Creado', 'Criado', 'Utworzono', 'Создано'],
-  'console.deploy.aliases': ['Aliases', 'Alias', 'Aliases', 'Aliasy', 'Псевдонимы'],
-  'console.deploy.inspector': ['📊 View Deployment Details in Inspector →', '📊 Ver detalles del despliegue en Inspector →', '📊 Ver detalhes da implantação no Inspector →', '📊 Zobacz szczegóły wdrożenia w Inspektorze →', '📊 Открыть детали развёртывания в Inspector →'],
-  'console.deploy.justNow': ['just now', 'ahora mismo', 'agora mesmo', 'przed chwilą', 'только что'],
-  'console.deploy.minAgo': ['m ago', ' min', 'min atrás', 'min temu', 'мин назад'],
-  'console.deploy.hourAgo': ['h ago', ' h', 'h atrás', 'godz temu', 'ч назад'],
-  'console.deploy.dayAgo': ['d ago', ' d', 'd atrás', 'dni temu', 'дн назад'],
-  'console.deploy.rollbackVerb': ['Roll back to', 'Revertir a', 'Reverter para', 'Wycofaj do', 'Откатить к'],
-  'console.deploy.cancelVerb': ['Cancel build', 'Cancelar compilación', 'Cancelar build', 'Anuluj kompilację', 'Отменить сборку'],
-  'console.deploy.rollbackTail': ['This promotes it back to production.', 'Esto lo promueve de nuevo a producción.', 'Isso o promove de volta à produção.', 'To przywróci je do produkcji.', 'Это вернёт его в продакшн.'],
-  'console.deploy.cancelTail': ['This aborts the running build.', 'Esto aborta la compilación en curso.', 'Isso aborta o build em execução.', 'To przerwie działającą kompilację.', 'Это прервёт выполняемую сборку.'],
-  'console.deploy.rollbackDone': ['Rollback complete', 'Reversión completada', 'Reversão concluída', 'Wycofanie zakończone', 'Откат завершён'],
-  'console.deploy.cancelDone': ['Build canceled', 'Compilación cancelada', 'Build cancelado', 'Kompilacja anulowana', 'Сборка отменена'],
-  'console.deploy.failedAction': ['Failed to', 'No se pudo', 'Falha ao', 'Nie udało się', 'Не удалось'],
-  'console.deploy.errorDuring': ['Error during', 'Error durante', 'Erro durante', 'Błąd podczas', 'Ошибка во время'],
-  'console.deploy.err.load': ['Failed to load deployments', 'No se pudieron cargar los despliegues', 'Falha ao carregar implantações', 'Nie udało się załadować wdrożeń', 'Не удалось загрузить развёртывания'],
-  'console.deploy.err.loading': ['Error loading deployments', 'Error al cargar despliegues', 'Erro ao carregar implantações', 'Błąd ładowania wdrożeń', 'Ошибка загрузки развёртываний'],
-  'console.vault.eyebrow': ['Operations & Production', 'Operaciones y producción', 'Operações e produção', 'Operacje i produkcja', 'Операции и продакшн'],
-  'console.vault.title': ['Keys & Secrets', 'Claves y secretos', 'Chaves e segredos', 'Klucze i sekrety', 'Ключи и секреты'],
-  'console.vault.subtitle': ['Credential inventory, expiration alerts, and rotation status.', 'Inventario de credenciales, alertas de expiración y estado de rotación.', 'Inventário de credenciais, alertas de expiração e status de rotação.', 'Inwentarz poświadczeń, alerty wygaśnięcia i status rotacji.', 'Инвентарь учётных данных, оповещения об истечении и статус ротации.'],
-  'console.vault.secret': ['secret', 'secreto', 'segredo', 'sekret', 'секрет'],
-  'console.vault.secrets': ['secrets', 'secretos', 'segredos', 'sekrety', 'секретов'],
-  'console.vault.stored': ['stored.', 'almacenados.', 'armazenados.', 'przechowywanych.', 'хранится.'],
-  'console.vault.active': ['Active', 'Activos', 'Ativos', 'Aktywne', 'Активные'],
-  'console.vault.expiring': ['Expiring', 'Por expirar', 'Expirando', 'Wygasające', 'Истекающие'],
-  'console.vault.lock': ['Lock Vault', 'Bloquear vault', 'Bloquear cofre', 'Zablokuj sejf', 'Заблокировать хранилище'],
-  'console.vault.browse': ['Browse Secrets', 'Explorar secretos', 'Navegar pelos segredos', 'Przeglądaj sekrety', 'Просмотр секретов'],
-  'console.vault.searchProvider': ['Search and select a provider...', 'Busque y seleccione un proveedor...', 'Pesquise e selecione um provedor...', 'Wyszukaj i wybierz dostawcę...', 'Найдите и выберите провайдера...'],
-  'console.vault.selected': ['Selected:', 'Seleccionado:', 'Selecionado:', 'Wybrano:', 'Выбрано:'],
-  'console.vault.selectPrompt': ['👆 Select a provider above to view its secrets', '👆 Seleccione un proveedor arriba para ver sus secretos', '👆 Selecione um provedor acima para ver seus segredos', '👆 Wybierz dostawcę powyżej, aby zobaczyć jego sekrety', '👆 Выберите провайдера выше, чтобы увидеть его секреты'],
-  'console.vault.noSecretsFor': ['No secrets found for', 'No se encontraron secretos para', 'Nenhum segredo encontrado para', 'Nie znaleziono sekretów dla', 'Секреты не найдены для'],
-  'console.vault.status.active': ['Active Secrets', 'Secretos activos', 'Segredos ativos', 'Aktywne sekrety', 'Активные секреты'],
-  'console.vault.status.expiringSoon': ['Expiring Soon', 'Por expirar pronto', 'Expirando em breve', 'Wkrótce wygasające', 'Скоро истекают'],
-  'console.vault.status.expired': ['Expired', 'Expirados', 'Expirados', 'Wygasłe', 'Истёкшие'],
-  'console.vault.status.rotated': ['Recently Rotated', 'Rotados recientemente', 'Rotacionados recentemente', 'Niedawno rotowane', 'Недавно ротированные'],
-  'console.vault.status.revoked': ['Revoked', 'Revocados', 'Revogados', 'Unieważnione', 'Отозванные'],
-  'console.vault.maskedValue': ['Masked Value', 'Valor enmascarado', 'Valor mascarado', 'Wartość zamaskowana', 'Маскированное значение'],
-  'console.vault.encryptedNote': ['Full value is encrypted and not displayed in the UI.', 'El valor completo está cifrado y no se muestra en la interfaz.', 'O valor completo é criptografado e não é exibido na interface.', 'Pełna wartość jest zaszyfrowana i nie jest wyświetlana w interfejsie.', 'Полное значение зашифровано и не отображается в интерфейсе.'],
-  'console.vault.expiration': ['Expiration', 'Expiración', 'Expiração', 'Wygaśnięcie', 'Истечение'],
-  'console.vault.lastRotated': ['Last Rotated', 'Última rotación', 'Última rotação', 'Ostatnia rotacja', 'Последняя ротация'],
-  'console.vault.typeEnv': ['Type & Environment', 'Tipo y entorno', 'Tipo e ambiente', 'Typ i środowisko', 'Тип и среда'],
-  'console.vault.err.fetch': ['Failed to fetch secrets', 'No se pudieron obtener los secretos', 'Falha ao buscar segredos', 'Nie udało się pobrać sekretów', 'Не удалось получить секреты'],
-  'console.vault.err.unknown': ['Unknown error', 'Error desconocido', 'Erro desconhecido', 'Nieznany błąd', 'Неизвестная ошибка'],
-  'vault.mfa.op.rotation': ['Rotate this credential', 'Rotar esta credencial', 'Rotacionar esta credencial', 'Rotuj to poświadczenie', 'Ротировать это учётное данное'],
-  'vault.mfa.op.revocation': ['Revoke this credential', 'Revocar esta credencial', 'Revogar esta credencial', 'Unieważnij to poświadczenie', 'Отозвать это учётное данное'],
-  'vault.mfa.op.export': ['Export this credential', 'Exportar esta credencial', 'Exportar esta credencial', 'Eksportuj to poświadczenie', 'Экспортировать это учётное данное'],
-  'vault.mfa.invalidLength': ['Enter a valid code', 'Introduzca un código válido', 'Insira um código válido', 'Wprowadź prawidłowy kod', 'Введите действительный код'],
-  'vault.mfa.invalid': ['Invalid code. Please try again.', 'Código inválido. Inténtelo de nuevo.', 'Código inválido. Tente novamente.', 'Nieprawidłowy kod. Spróbuj ponownie.', 'Неверный код. Попробуйте снова.'],
-  'vault.mfa.failed': ['Verification failed', 'La verificación falló', 'Falha na verificação', 'Weryfikacja nie powiodła się', 'Проверка не пройдена'],
-  'vault.mfa.eyebrow': ['Security Verification', 'Verificación de seguridad', 'Verificação de segurança', 'Weryfikacja bezpieczeństwa', 'Проверка безопасности'],
-  'vault.mfa.title': ['Verify Your Identity', 'Verifique su identidad', 'Verifique sua identidade', 'Zweryfikuj swoją tożsamość', 'Подтвердите свою личность'],
-  'vault.mfa.method.totp': ['Authenticator App', 'Aplicación de autenticación', 'Aplicativo autenticador', 'Aplikacja uwierzytelniająca', 'Приложение-аутентификатор'],
-  'vault.mfa.method.email': ['Email', 'Correo electrónico', 'E-mail', 'E-mail', 'Эл. почта'],
-  'vault.mfa.method.sms': ['SMS', 'SMS', 'SMS', 'SMS', 'SMS'],
-  'vault.mfa.method.totpDesc': ['Use your authenticator app', 'Use su aplicación de autenticación', 'Use seu aplicativo autenticador', 'Użyj aplikacji uwierzytelniającej', 'Используйте приложение-аутентификатор'],
-  'vault.mfa.method.emailDesc': ['Code sent to your email', 'Código enviado a su correo', 'Código enviado para seu e-mail', 'Kod wysłany na e-mail', 'Код отправлен на эл. почту'],
-  'vault.mfa.method.smsDesc': ['Code sent to your phone', 'Código enviado a su teléfono', 'Código enviado para seu telefone', 'Kod wysłany na telefon', 'Код отправлен на телефон'],
-  'vault.mfa.enterCode': ['Enter 6-digit code', 'Introduzca el código de 6 dígitos', 'Insira o código de 6 dígitos', 'Wprowadź 6-cyfrowy kod', 'Введите 6-значный код'],
-  'vault.mfa.verifying': ['Verifying...', 'Verificando...', 'Verificando...', 'Weryfikowanie...', 'Проверка...'],
-  'vault.mfa.verify': ['Verify', 'Verificar', 'Verificar', 'Zweryfikuj', 'Проверить'],
-  'vault.mfa.success': ['Verified successfully', 'Verificado correctamente', 'Verificado com sucesso', 'Pomyślnie zweryfikowano', 'Успешно подтверждено'],
-  'vault.mfa.proceeding': ['Proceeding with operation...', 'Procediendo con la operación...', 'Prosseguindo com a operação...', 'Kontynuowanie operacji...', 'Выполнение операции...'],
-  'trust.trustedBy': ['Trusted by', 'Con la confianza de', 'Com a confiança de', 'Zaufali nam', 'Нам доверяют'],
-  'credits.usage.title': ['Credit Usage', 'Uso de créditos', 'Uso de créditos', 'Wykorzystanie kredytów', 'Использование кредитов'],
-  'credits.usage.used': ['credits used', 'créditos usados', 'créditos usados', 'wykorzystanych kredytów', 'кредитов использовано'],
-  'credits.usage.warning': ['Over 80% used. Consider upgrading.', 'Más del 80% usado. Considere mejorar su plan.', 'Mais de 80% usado. Considere fazer upgrade.', 'Wykorzystano ponad 80%. Rozważ ulepszenie planu.', 'Использовано более 80%. Рассмотрите повышение плана.'],
-  'credits.usage.autoTopup': ['Auto top-up will add more credits.', 'La recarga automática añadirá más créditos.', 'A recarga automática adicionará mais créditos.', 'Automatyczne doładowanie doda więcej kredytów.', 'Автопополнение добавит больше кредитов.'],
-  'credits.usage.limitReached': ['Credit limit reached.', 'Límite de créditos alcanzado.', 'Limite de créditos atingido.', 'Osiągnięto limit kredytów.', 'Достигнут лимит кредитов.'],
-  'operator.plan.previewTitle': ['Preview your website', 'Vista previa de su sitio web', 'Pré-visualize seu site', 'Podgląd Twojej strony', 'Предпросмотр вашего сайта'],
-  'operator.plan.previewSubtitle': ['This is the content I generated. Approve it to publish your site live.', 'Este es el contenido que generé. Apruébelo para publicar su sitio.', 'Este é o conteúdo que gerei. Aprove para publicar seu site.', 'To jest treść, którą wygenerowałem. Zatwierdź, aby opublikować stronę.', 'Это сгенерированный мной контент. Одобрите, чтобы опубликовать сайт.'],
-  'operator.status.title': ['Publish status', 'Estado de publicación', 'Status de publicação', 'Status publikacji', 'Статус публикации'],
-  'operator.status.state': ['State:', 'Estado:', 'Estado:', 'Stan:', 'Состояние:'],
-  'operator.approve': ['Approve update', 'Aprobar actualización', 'Aprovar atualização', 'Zatwierdź aktualizację', 'Одобрить обновление'],
-  'operator.rollback': ['Restore previous version', 'Restaurar versión anterior', 'Restaurar versão anterior', 'Przywróć poprzednią wersję', 'Восстановить предыдущую версию'],
-  'footer.brandName': ['SignalBoost AI', 'SignalBoost AI', 'SignalBoost AI', 'SignalBoost AI', 'SignalBoost AI'],
-}
 
-const LANGS = ['en', 'es', 'pt', 'pl', 'ru'] as const
+  async function generate() {
+    const desc = description.trim()
+    if (!desc || generating) return
+    setGenerating(true); setSteps([]); setContent(null); setLiveUrl(null); setMessage(''); setActiveTab('preview')
+    try {
+      const res = await fetch('/api/sites/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: desc, language: l }),
+      })
+      if (!res.ok || !res.body) {
+        const err = await res.json().catch(() => ({}))
+        setMessage(err.error || c('errConnect', l))
+        setGenerating(false)
+        return
+      }
+      const reader  = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed) continue
+          let chunk: any
+          try { chunk = JSON.parse(trimmed) } catch { continue }
+          if (chunk.type === 'status') setSteps(prev => [...prev, { step: chunk.step, message: chunk.message }])
+          else if (chunk.type === 'result') {
+            if (chunk.content) setContent(chunk.content)
+            if (chunk.error && !chunk.content) setMessage(chunk.error)
+          }
+        }
+      }
+    } catch {
+      setMessage(c('errConnect', l))
+    } finally {
+      setGenerating(false)
+    }
+  }
 
-export const AUDIT_FIX_COPY: Record<string, Record<string, string>> = {
-  en: {}, es: {}, pt: {}, pl: {}, ru: {},
-}
+  async function publish() {
+    if (!content || publishing) return
+    setPublishing(true); setMessage('')
+    try {
+      const res = await fetch('/api/sites/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, language: l }),
+      })
+      const data = await res.json()
+      if (!res.ok) setMessage(data.error || c('errConnect', l))
+      else { setLiveUrl(data.url || null); setMessage(data.userMessage || '') }
+    } catch {
+      setMessage(c('errConnect', l))
+    } finally {
+      setPublishing(false)
+    }
+  }
 
-for (const [key, vals] of Object.entries(RAW)) {
-  LANGS.forEach((lang, i) => {
-    AUDIT_FIX_COPY[lang][key] = vals[i]
-  })
+  const fullUrl = liveUrl ? (typeof window !== 'undefined' ? window.location.origin : '') + liveUrl : null
+
+  // Extract raw HTML + CSS from SitePreviewContent for GrapesJS
+  const rawHtml = content
+    ? (typeof content === 'string' ? content : (content as any).html ?? JSON.stringify(content))
+    : ''
+  const rawCss = content ? ((content as any).css ?? '') : ''
+
+  return (
+    <div style={{ color: 'var(--text-primary)' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+
+        {/* ── Header ── */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', borderBottom: '1px solid rgba(255,255,255,.09)', paddingBottom: 12, marginBottom: 18 }}>
+          <div style={{ minWidth: 0 }}>
+            <p className="sb-eyebrow" style={{ margin: 0 }}>🌐 {c('eyebrow', l)}</p>
+            <h1 style={{ fontSize: 22, fontWeight: 950, letterSpacing: '-.04em', lineHeight: 1.15, margin: '4px 0 0' }}>{c('title', l)}</h1>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,.5)', margin: '6px 0 0', maxWidth: 560 }}>{c('subtitle', l)}</p>
+          </div>
+          <span className="sb-chip">{generating ? '...' : content ? 'READY' : 'IDLE'}</span>
+        </div>
+
+        {/* ── Prompt + Tips ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.6fr) minmax(220px, 1fr)', gap: 18, marginBottom: 24, alignItems: 'start' }}>
+          <div>
+            <textarea
+              className="sb-input"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) generate() }}
+              placeholder={c('placeholder', l)}
+              rows={5}
+              maxLength={1200}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '14px 16px', borderRadius: 12, resize: 'vertical', fontSize: 14, lineHeight: 1.7 }}
+              disabled={generating}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, flexWrap: 'wrap', gap: 10 }}>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,.35)' }}>
+                {description.length} / 1200 {c('charCount', l)}
+              </span>
+              <button onClick={generate} disabled={generating || !description.trim()} className="sb-button-primary" style={{ borderRadius: 12, padding: '12px 28px', opacity: generating || !description.trim() ? 0.55 : 1 }}>
+                {generating ? c('generatingBtn', l) : c('generateBtn', l)}
+              </button>
+            </div>
+          </div>
+
+          <div style={{ borderLeft: '1px solid rgba(255,255,255,.08)', paddingLeft: 20 }}>
+            <p className="sb-eyebrow" style={{ marginBottom: 14 }}>💡 {c('hintLabel', l)}</p>
+            {[c('hint1', l), c('hint2', l), c('hint3', l)].map((hint, i) => (
+              <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 14 }}>
+                <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: '50%', background: 'rgba(26,240,255,.15)', border: '1px solid rgba(26,240,255,.3)', color: '#1af0ff', fontSize: 11, fontWeight: 900, display: 'grid', placeItems: 'center' }}>
+                  {i + 1}
+                </span>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,.65)', lineHeight: 1.6 }}>{hint}</span>
+              </div>
+            ))}
+            <div style={{ marginTop: 18, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,195,0,.08)', border: '1px solid rgba(255,195,0,.2)', fontSize: 12, color: 'rgba(255,195,0,.9)', lineHeight: 1.6 }}>
+              ⌘ + Enter {l === 'en' ? 'to generate' : l === 'es' ? 'para generar' : l === 'pt' ? 'para gerar' : l === 'pl' ? 'aby wygenerować' : 'для создания'}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Generation status ── */}
+        {(generating || steps.length > 0) && !content && (
+          <div style={{ borderTop: '1px solid rgba(26,240,255,.25)', borderLeft: '2px solid rgba(26,240,255,.4)', paddingTop: 14, paddingLeft: 14, marginBottom: 20 }}>
+            <p className="sb-eyebrow" style={{ marginBottom: 14 }}>{c('engineTitle', l)}</p>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {steps.map((s, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: i === steps.length - 1 ? '#fff' : 'rgba(255,255,255,.5)' }}>
+                  <span style={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', background: i === steps.length - 1 ? '#1af0ff' : 'rgba(255,255,255,.2)', boxShadow: i === steps.length - 1 ? '0 0 12px #1af0ff' : 'none' }} />
+                  {s.message}
+                </div>
+              ))}
+              {generating && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: '#ffc300' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ffc300', boxShadow: '0 0 12px #ffc300' }} />
+                  {c('generatingBtn', l)}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {message && (
+          <p style={{ color: liveUrl ? '#86efac' : '#fca5a5', fontSize: 13, marginBottom: 16 }}>{message}</p>
+        )}
+
+        {/* ── Result area ── */}
+        {content && (
+          <div ref={resultRef} style={{ scrollMarginTop: 80 }}>
+
+            {/* Action bar */}
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14, borderTop: '1px solid rgba(255,255,255,.09)', paddingTop: 14 }}>
+              <p className="sb-eyebrow" style={{ flex: 1, margin: 0 }}>✦ {activeTab === 'editor' ? c('editTitle', l) : c('previewTitle', l)}</p>
+              <button onClick={publish} disabled={publishing} className="sb-button-primary" style={{ borderRadius: 12, padding: '11px 24px', opacity: publishing ? 0.55 : 1 }}>
+                {publishing ? c('publishingBtn', l) : c('publishBtn', l)}
+              </button>
+              <button onClick={() => { setContent(null); setSteps([]); setMessage(''); setLiveUrl(null); setActiveTab('preview') }} className="sb-button-secondary" style={{ borderRadius: 12 }}>
+                {c('regenerate', l)}
+              </button>
+              {fullUrl && (
+                <a href={fullUrl} target="_blank" rel="noreferrer" className="sb-button-secondary" style={{ display: 'inline-flex', alignItems: 'center', borderRadius: 12 }}>
+                  {c('viewLive', l)}
+                </a>
+              )}
+            </div>
+
+            {/* Tab switcher */}
+            <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+              {(['preview', 'editor'] as Tab[]).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: 10,
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    transition: 'all .15s',
+                    background: activeTab === tab ? 'rgba(26,240,255,.15)' : 'rgba(255,255,255,.06)',
+                    color: activeTab === tab ? '#1af0ff' : 'rgba(255,255,255,.55)',
+                    borderBottom: activeTab === tab ? '2px solid #1af0ff' : '2px solid transparent',
+                  }}
+                >
+                  {tab === 'preview' ? c('tabPreview', l) : c('tabEditor', l)}
+                </button>
+              ))}
+              {activeTab === 'editor' && (
+                <span style={{ marginLeft: 'auto', alignSelf: 'center', fontSize: 11, color: 'rgba(255,255,255,.4)', fontStyle: 'italic' }}>
+                  {c('editorHint', l)}
+                </span>
+              )}
+            </div>
+
+            {/* Panel */}
+            <div style={{ borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(255,255,255,.10)', boxShadow: '0 24px 80px rgba(0,0,0,.5)', height: 'calc(100vh - 320px)', minHeight: 420 }}>
+
+              {/* AI Preview tab */}
+              {activeTab === 'preview' && (
+                <div style={{ height: '100%', overflowY: 'auto' }}>
+                  <SitePreview content={content} />
+                </div>
+              )}
+
+              {/* Visual Editor tab */}
+              {activeTab === 'editor' && (
+                <GrapesEditor html={rawHtml} css={rawCss} lang={l} />
+              )}
+            </div>
+
+            {/* Editor badge */}
+            {activeTab === 'editor' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+                <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'rgba(255,195,0,.12)', border: '1px solid rgba(255,195,0,.25)', color: '#ffc300', fontWeight: 700, letterSpacing: '.04em' }}>
+                  {c('editorBadge', l)}
+                </span>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>Powered by GrapesJS</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }

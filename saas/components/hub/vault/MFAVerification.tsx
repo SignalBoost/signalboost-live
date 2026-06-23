@@ -5,6 +5,8 @@
 
 import { useState } from 'react'
 import { cardStyle, labelStyle } from '../shared'
+import { useI18n } from '@/components/i18n/I18nProvider'
+import { t } from '@/lib/i18n/t'
 
 export type MFAVerificationProps = {
   operation: 'rotation' | 'revocation' | 'export'
@@ -22,6 +24,7 @@ export default function MFAVerification({
   onSuccess,
   onCancel,
 }: MFAVerificationProps) {
+  const { dict } = useI18n()
   const [step, setStep] = useState<VerificationStep>('method-select')
   const [method, setMethod] = useState<MFAMethod>('totp')
   const [code, setCode] = useState('')
@@ -29,9 +32,9 @@ export default function MFAVerification({
   const [error, setError] = useState<string | null>(null)
 
   const operationLabels = {
-    rotation: 'Rotate this credential',
-    revocation: 'Revoke this credential',
-    export: 'Export this credential',
+    rotation: t(dict, 'vault.mfa.op.rotation', 'Rotate this credential'),
+    revocation: t(dict, 'vault.mfa.op.revocation', 'Revoke this credential'),
+    export: t(dict, 'vault.mfa.op.export', 'Export this credential'),
   }
 
   const handleSelectMethod = (m: MFAMethod) => {
@@ -47,7 +50,7 @@ export default function MFAVerification({
 
     try {
       if (!code.trim() || code.length < 6) {
-        setError('Enter a valid code')
+        setError(t(dict, 'vault.mfa.invalidLength', 'Enter a valid code'))
         setIsVerifying(false)
         return
       }
@@ -62,7 +65,7 @@ export default function MFAVerification({
       const data = await response.json().catch(() => null)
 
       if (!response.ok || !data?.ok) {
-        setError(data?.error || 'Invalid code. Please try again.')
+        setError(data?.error || t(dict, 'vault.mfa.invalid', 'Invalid code. Please try again.'))
         setCode('')
         setIsVerifying(false)
         return
@@ -73,7 +76,7 @@ export default function MFAVerification({
         onSuccess()
       }, 1500)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Verification failed'
+      const msg = err instanceof Error ? err.message : t(dict, 'vault.mfa.failed', 'Verification failed')
       setError(msg)
       setIsVerifying(false)
     }
@@ -104,9 +107,9 @@ export default function MFAVerification({
       >
         {/* Header */}
         <div>
-          <div style={labelStyle}>Security Verification</div>
+          <div style={labelStyle}>{t(dict, 'vault.mfa.eyebrow', 'Security Verification')}</div>
           <h2 style={{ margin: '6px 0 2px', fontSize: 18, fontWeight: 900 }}>
-            Verify Your Identity
+            {t(dict, 'vault.mfa.title', 'Verify Your Identity')}
           </h2>
           <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,.55)' }}>
             {operationLabels[operation]}: {secret_name}
@@ -151,14 +154,14 @@ export default function MFAVerification({
                 </span>
                 <div>
                   <div style={{ fontWeight: 700 }}>
-                    {m === 'totp' && 'Authenticator App'}
-                    {m === 'email' && 'Email'}
-                    {m === 'sms' && 'SMS'}
+                    {m === 'totp' && t(dict, 'vault.mfa.method.totp', 'Authenticator App')}
+                    {m === 'email' && t(dict, 'vault.mfa.method.email', 'Email')}
+                    {m === 'sms' && t(dict, 'vault.mfa.method.sms', 'SMS')}
                   </div>
                   <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)', marginTop: 2 }}>
-                    {m === 'totp' && 'Use your authenticator app'}
-                    {m === 'email' && `Code sent to your email`}
-                    {m === 'sms' && `Code sent to your phone`}
+                    {m === 'totp' && t(dict, 'vault.mfa.method.totpDesc', 'Use your authenticator app')}
+                    {m === 'email' && t(dict, 'vault.mfa.method.emailDesc', 'Code sent to your email')}
+                    {m === 'sms' && t(dict, 'vault.mfa.method.smsDesc', 'Code sent to your phone')}
                   </div>
                 </div>
               </button>
@@ -179,7 +182,7 @@ export default function MFAVerification({
                   cursor: 'pointer',
                 }}
               >
-                Cancel
+                {t(dict, 'common.cancel', 'Cancel')}
               </button>
             </div>
           </div>
@@ -190,7 +193,7 @@ export default function MFAVerification({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,.5)', display: 'block', marginBottom: 6 }}>
-                Enter 6-digit code
+                {t(dict, 'vault.mfa.enterCode', 'Enter 6-digit code')}
               </label>
               <input
                 type="text"
@@ -245,7 +248,7 @@ export default function MFAVerification({
                   opacity: isVerifying ? 0.5 : 1,
                 }}
               >
-                Cancel
+                {t(dict, 'common.cancel', 'Cancel')}
               </button>
               <button
                 onClick={handleVerify}
@@ -263,7 +266,7 @@ export default function MFAVerification({
                   opacity: isVerifying || code.length < 6 ? 0.6 : 1,
                 }}
               >
-                {isVerifying ? 'Verifying...' : 'Verify'}
+                {isVerifying ? t(dict, 'vault.mfa.verifying', 'Verifying...') : t(dict, 'vault.mfa.verify', 'Verify')}
               </button>
             </div>
           </div>
@@ -274,10 +277,10 @@ export default function MFAVerification({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', padding: '20px 0' }}>
             <div style={{ fontSize: 32 }}>✓</div>
             <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#86efac' }}>
-              Verified successfully
+              {t(dict, 'vault.mfa.success', 'Verified successfully')}
             </p>
             <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,.55)' }}>
-              Proceeding with operation...
+              {t(dict, 'vault.mfa.proceeding', 'Proceeding with operation...')}
             </p>
           </div>
         )}

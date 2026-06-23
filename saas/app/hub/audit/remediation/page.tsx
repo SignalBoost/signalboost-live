@@ -54,16 +54,17 @@ export default function RemediationPage() {
     return () => { alive = false }
   }, [t])
 
-  const onChange = useCallback((findingId: string, patch: { status?: string; owner?: string }) => {
+  const onChange = useCallback((findingId: string, patch: { status?: string; owner?: string; dueDate?: string }) => {
     // Optimistic update.
     setStates(prev => {
-      const cur = prev[findingId] || { status: 'open' as const, owner: '', note: '' }
+      const cur = prev[findingId] || { status: 'open' as const, owner: '', note: '', dueDate: '' }
       return {
         ...prev,
         [findingId]: {
           status: patch.status !== undefined ? normalizeStatus(patch.status) : cur.status,
           owner: patch.owner !== undefined ? patch.owner : cur.owner,
           note: cur.note,
+          dueDate: patch.dueDate !== undefined ? patch.dueDate : cur.dueDate,
         },
       }
     })

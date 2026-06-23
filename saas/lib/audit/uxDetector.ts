@@ -23,8 +23,8 @@ const UI_DIR   = /(^|\/)(app|components)\//
 // "Active admin / workspace surfaces" — a dead end here is Critical.
 const ADMINISH = /(^|\/)app\/(admin|hub|dashboard)\//
 
-const MAX_UX_FILES = 180
-const CONCURRENCY  = 6
+const MAX_UX_FILES = 2000   // effectively a full-repo sweep of app/ + components/
+const CONCURRENCY  = 8
 
 interface Rule {
   category: string
@@ -59,6 +59,22 @@ const RULES: Rule[] = [
     title: 'Dead click (empty / no-op handler)',
     detail: () => 'An onClick handler is empty or null/undefined — the control looks active but does nothing.',
     recommendation: 'Bind the handler to the intended action, or remove the control.',
+  },
+  {
+    category: 'ux-dead-click',
+    test: /<button(?![^>]*onClick)(?![^>]*type\s*=\s*["']submit["'])[^>]*>/g,
+    severity: () => 'high',
+    title: 'Possible dead button (no handler)',
+    detail: () => 'A <button> has no onClick handler and is not a submit button — likely a dead click. (Heuristic: a handler passed via spread/variable can be a false positive — verify.)',
+    recommendation: 'Bind an onClick to the action, turn it into a link with a real href, set type="submit" inside a form, or remove the control.',
+  },
+  {
+    category: 'ux-placeholder',
+    test: /not\s+tracked\s+yet/gi,
+    severity: () => 'high',
+    title: 'Placeholder text: "Not tracked yet"',
+    detail: m => `User-visible empty-state string "${m.trim()}" — a metric/card that never populates reads as a dead end to the user.`,
+    recommendation: 'Wire this metric to a real data source (e.g. /api/admin/section-metrics). If genuinely pending, gate the panel behind a flag rather than shipping the string. Renaming the string alone does not fix the dead end.',
   },
   {
     category: 'ux-placeholder',

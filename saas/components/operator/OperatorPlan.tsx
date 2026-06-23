@@ -1,5 +1,7 @@
 'use client'
 
+import { useTranslation } from '@/components/i18n/useTranslation'
+
 // Shows a preview of the REAL generated website content before publishing.
 // Backward compatible: still accepts the old plan-style fields if present.
 
@@ -28,6 +30,7 @@ export type OperatorPlanView = {
 }
 
 export default function OperatorPlan({ plan }: { plan: OperatorPlanView }) {
+  const { t } = useTranslation()
   const colors = {
     primary: plan.colors?.primary || '#3b82f6',
     accent: plan.colors?.accent || '#ffc300',
@@ -38,9 +41,9 @@ export default function OperatorPlan({ plan }: { plan: OperatorPlanView }) {
 
   return (
     <section className="hero-panel" style={{ marginTop: 16, padding: 22 }}>
-      <h2 style={{ color: '#fff', marginTop: 0 }}>Preview your website</h2>
+      <h2 style={{ color: '#fff', marginTop: 0 }}>{t('operator.plan.previewTitle', 'Preview your website')}</h2>
       <p style={{ color: 'var(--text-secondary)', marginTop: 4 }}>
-        This is the content I generated. Approve it to publish your site live.
+        {t('operator.plan.previewSubtitle', 'This is the content I generated. Approve it to publish your site live.')}
       </p>
 
       {/* Color swatches */}

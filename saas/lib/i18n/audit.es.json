@@ -719,5 +719,24 @@
     "loadError": "No se pudo cargar el informe de cumplimiento.",
     "fetchError": "Error: {msg}",
     "loading": "Cargando preparación para cumplimiento…"
+  },
+  "admin": {
+    "eyebrow": "Consola admin estilo NASA",
+    "forecasting": "Pronósticos",
+    "financialLedger": "Libro financiero",
+    "kpiCockpit": "Cabina KPI",
+    "marketplace": "Marketplace",
+    "saas": "SaaS",
+    "unifiedEngagement": "Índice de participación unificado",
+    "crmPipeline": "Pipeline CRM",
+    "conciergeRecs": "Recomendaciones del concierge",
+    "filters": "Filtros: rango de fechas • producto • país • plan • rol",
+    "telemetryReady": "Telemetría lista. Conecta tablas/eventos de análisis para activar registros en vivo en este panel.",
+    "telemetrySignal": "Señal de telemetría lista",
+    "notTracked": "Aún no rastreado",
+    "comingSoon": "Próximamente",
+    "readyToRemediate": "Listo para remediar",
+    "viewCodeDiff": "Ver diferencias de código",
+    "approvePullRequest": "Aprobar pull request"
   }
 }

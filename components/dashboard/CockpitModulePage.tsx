@@ -1,5 +1,8 @@
+'use client'
+
 import Link from 'next/link'
 import { signalBoostModules, type SignalBoostModule } from '@/lib/platform/unifiedPlatform'
+import { useTranslation } from '@/lib/i18n/useTranslation'
 
 type Props = {
   module: SignalBoostModule
@@ -9,10 +12,11 @@ type Props = {
 }
 
 export default function CockpitModulePage({ module, primaryAction, checklist, preview }: Props) {
+  const { t } = useTranslation()
   return (
     <main className="min-h-screen bg-[#05070b] text-white">
       <section className="rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,215,0,.18),transparent_35%),linear-gradient(135deg,rgba(13,20,35,.96),rgba(5,7,11,.98))] p-8 shadow-2xl">
-        <p className="text-xs uppercase tracking-[0.35em] text-[#FFD700]">Unified SignalBoost cockpit</p>
+        <p className="text-xs uppercase tracking-[0.35em] text-[#FFD700]">{t('cockpit.kicker', 'Unified SignalBoost cockpit')}</p>
         <div className="mt-4 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-4xl font-black tracking-tight md:text-5xl">
@@ -21,7 +25,7 @@ export default function CockpitModulePage({ module, primaryAction, checklist, pr
             <p className="mt-4 max-w-3xl text-lg text-white/70">{module.description}</p>
           </div>
           <Link href="/dashboard/assistant" className="rounded-full bg-[#FFD700] px-5 py-3 font-bold text-black no-underline shadow-[0_0_30px_rgba(255,215,0,.25)]">
-            Ask Concierge AI
+            {t('cockpit.ask', 'Ask Concierge AI')}
           </Link>
         </div>
       </section>
@@ -30,7 +34,7 @@ export default function CockpitModulePage({ module, primaryAction, checklist, pr
         <div className="rounded-3xl border border-white/10 bg-white/[.04] p-6">
           <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-5">
             <div>
-              <p className="text-sm text-white/50">Mission role</p>
+              <p className="text-sm text-white/50">{t('cockpit.missionRole', 'Mission role')}</p>
               <h2 className="text-2xl font-bold">{module.cockpitRole}</h2>
             </div>
             <span className="rounded-full border border-[#FFD700]/40 bg-[#FFD700]/10 px-4 py-2 text-sm text-[#FFD700]">{primaryAction}</span>
@@ -47,8 +51,8 @@ export default function CockpitModulePage({ module, primaryAction, checklist, pr
         </div>
 
         <aside className="rounded-3xl border border-white/10 bg-black/40 p-6">
-          <h2 className="text-xl font-bold">Telemetry checklist</h2>
-          <p className="mt-2 text-sm text-white/50">Event: {module.telemetryEvent}</p>
+          <h2 className="text-xl font-bold">{t('cockpit.telemetryChecklist', 'Telemetry checklist')}</h2>
+          <p className="mt-2 text-sm text-white/50">{t('cockpit.eventLabel', 'Event:')} {module.telemetryEvent}</p>
           <ul className="mt-5 space-y-3">
             {checklist.map((item) => (
               <li key={item} className="flex gap-3 rounded-2xl border border-white/10 bg-white/[.03] p-3 text-sm text-white/75">
@@ -61,7 +65,7 @@ export default function CockpitModulePage({ module, primaryAction, checklist, pr
       </section>
 
       <section className="mt-8 rounded-3xl border border-white/10 bg-white/[.03] p-6">
-        <h2 className="text-xl font-bold">All cockpit modules</h2>
+        <h2 className="text-xl font-bold">{t('cockpit.allModules', 'All cockpit modules')}</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           {signalBoostModules.map((item) => (
             <Link key={item.key} href={item.href} className="rounded-2xl border border-white/10 bg-black/30 p-4 text-white no-underline transition hover:border-[#FFD700]/50">

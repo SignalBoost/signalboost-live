@@ -719,5 +719,24 @@
     "loadError": "Nie udało się załadować dziennika aktywności.",
     "fetchError": "Błąd: {msg}",
     "loading": "Ładowanie dziennika aktywności…"
+  },
+  "admin": {
+    "eyebrow": "Konsola admin w stylu NASA",
+    "forecasting": "Prognozy",
+    "financialLedger": "Księga finansowa",
+    "kpiCockpit": "Kokpit KPI",
+    "marketplace": "Marketplace",
+    "saas": "SaaS",
+    "unifiedEngagement": "Zunifikowany wskaźnik zaangażowania",
+    "crmPipeline": "Pipeline CRM",
+    "conciergeRecs": "Rekomendacje concierge",
+    "filters": "Filtry: zakres dat • produkt • kraj • plan • rola",
+    "telemetryReady": "Telemetria gotowa. Podłącz tabele/zdarzenia analityczne, aby aktywować rekordy na żywo w tym panelu.",
+    "telemetrySignal": "Sygnał telemetrii gotowy",
+    "notTracked": "Jeszcze nie śledzone",
+    "comingSoon": "Wkrótce",
+    "readyToRemediate": "Gotowe do naprawy",
+    "viewCodeDiff": "Zobacz różnice kodu",
+    "approvePullRequest": "Zatwierdź pull request"
   }
 }

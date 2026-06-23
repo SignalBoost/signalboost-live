@@ -102,7 +102,7 @@ export default function HomePage() {
             {t('landing.hero.title', 'Your growth team, distilled into one calm cockpit.')}
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-8 text-white/64 sm:text-xl">
-            {t('landing.hero.subtitle', 'SignalBoost coordinates promotions, reviews, outreach, content, and analytics so lean businesses can ship polished campaigns without agency overhead.')}
+            {t('landing.heroDescription', "Audit your infrastructure, enforce compliance readiness, and automate security patches across your entire multi-tenant pipeline — with zero-tolerance UX integrity checks built right into your workflow.")}
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link

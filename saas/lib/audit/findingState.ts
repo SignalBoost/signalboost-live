@@ -25,6 +25,7 @@ export interface FindingStateRow {
   status: string
   owner: string | null
   note: string | null
+  due_date?: string | null
   updated_at?: string
   updated_by?: string | null
 }
@@ -33,6 +34,7 @@ export interface FindingState {
   status: FindingStatusValue
   owner: string
   note: string
+  dueDate: string
 }
 
 export type FindingStateMap = Record<string, FindingState>
@@ -41,7 +43,7 @@ export function indexStates(rows: FindingStateRow[]): FindingStateMap {
   const map: FindingStateMap = {}
   for (const r of rows || []) {
     if (!r || !r.finding_id) continue
-    map[r.finding_id] = { status: normalizeStatus(r.status), owner: r.owner || '', note: r.note || '' }
+    map[r.finding_id] = { status: normalizeStatus(r.status), owner: r.owner || '', note: r.note || '', dueDate: r.due_date || '' }
   }
   return map
 }

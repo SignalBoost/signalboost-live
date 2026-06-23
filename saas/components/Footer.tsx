@@ -302,8 +302,8 @@ export default function Footer() {
             }}
           >
             {t(dict, 'footer.poweredBy', 'Powered by')}{' '}
-            <span style={{ color: GOLD }}>
-              SignalBoost AI
+           <span style={{ color: GOLD }}>
+              {t(dict, 'footer.brandName', 'SignalBoost AI')}
             </span>
           </div>
         </div>

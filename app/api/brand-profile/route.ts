@@ -1,29 +1,36 @@
 // app/api/brand-profile/route.ts
 // Per-user brand profile, RLS-scoped — a user can only read/write their own.
 // Hardened:
-//   • POST verifies Origin/Referer against a configured canonical-origin
-//     allowlist (env APP_ALLOWED_ORIGINS), NOT the raw Host header.
-//   • Request body is rejected by Content-Length BEFORE parsing.
+//   • POST verifies Origin/Referer against a configured canonical-ORIGIN
+//     allowlist (env APP_ALLOWED_ORIGINS) — full scheme+host+port, NOT host
+//     alone, so http://… can never satisfy an https://… policy.
+//   • Request body is enforced by a hard byte ceiling while the stream is read
+//     (Content-Length is advisory and not trusted on its own).
 //   • Malformed JSON is rejected with 400 instead of silently overwriting {}.
 //   • Payload must be a plain object within strict size / key limits.
+//   • Per-user responses are marked no-store, private.
 
 import { NextResponse } from 'next/server'
 import { createMarketingServerSupabase } from '@/lib/auth/supabaseServer'
+import { readJsonLimited } from '@/lib/http/readJsonLimited'
 
 const MAX_PROFILE_BYTES = 100_000
 const MAX_PROFILE_KEYS = 200
 
-// Canonical origins this API trusts for state-changing requests. Configure via
+const NO_STORE = { 'Cache-Control': 'no-store, private' } as const
+
+// Canonical ORIGINS this API trusts for state-changing requests. Configure via
 // APP_ALLOWED_ORIGINS (comma-separated) in Vercel; falls back to the known
-// production marketing domains. The raw Host header is never trusted on its own.
-const CANONICAL_ORIGIN_HOSTS = (
+// production marketing domains. Stored as full origins (scheme + host + port)
+// so the scheme is part of the comparison — http and https are distinct.
+const CANONICAL_ORIGINS = (
   process.env.APP_ALLOWED_ORIGINS ||
   'https://signalboostapp.com,https://www.signalboostapp.com'
 )
   .split(',')
   .map((entry) => {
     try {
-      return new URL(entry.trim()).host.toLowerCase()
+      return new URL(entry.trim()).origin.toLowerCase()
     } catch {
       return ''
     }
@@ -34,21 +41,25 @@ function sameOriginOk(req: Request): boolean {
   const candidate = req.headers.get('origin') || req.headers.get('referer')
   if (!candidate) return false // state-changing browser fetches always send Origin
 
-  let candidateHost: string
+  let candidateOrigin: string
   try {
-    candidateHost = new URL(candidate).host.toLowerCase()
+    candidateOrigin = new URL(candidate).origin.toLowerCase()
   } catch {
     return false
   }
 
-  // 1) Primary check: candidate must match a configured canonical origin.
-  if (CANONICAL_ORIGIN_HOSTS.includes(candidateHost)) return true
+  // 1) Primary check: candidate origin (scheme + host + port) must match a
+  //    configured canonical origin exactly.
+  if (CANONICAL_ORIGINS.includes(candidateOrigin)) return true
 
   // 2) Narrow fallback for Vercel preview deployments only, where Origin and
-  //    Host legitimately match a platform-controlled *.vercel.app host. This is
-  //    not "trust the Host header" — it is gated to a single trusted suffix.
+  //    Host legitimately match a platform-controlled *.vercel.app host over
+  //    https. This is not "trust the Host header" — it is gated to a single
+  //    trusted suffix and an https scheme.
   const reqHost = (req.headers.get('host') || '').toLowerCase()
-  if (reqHost && candidateHost === reqHost && reqHost.endsWith('.vercel.app')) return true
+  if (reqHost.endsWith('.vercel.app') && candidateOrigin === `https://${reqHost}`) {
+    return true
+  }
 
   return false
 }
@@ -65,7 +76,7 @@ export async function GET() {
   const supabase = await createMarketingServerSupabase()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ profile: null, error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ profile: null, error: 'Unauthorized' }, { status: 401, headers: NO_STORE })
   }
 
   const { data, error } = await supabase
@@ -76,40 +87,35 @@ export async function GET() {
 
   if (error) {
     console.error('brand-profile GET error:', error.message)
-    return NextResponse.json({ profile: null, error: 'Failed to load profile' }, { status: 500 })
+    return NextResponse.json({ profile: null, error: 'Failed to load profile' }, { status: 500, headers: NO_STORE })
   }
-  return NextResponse.json({ profile: data?.profile ?? null })
+  return NextResponse.json({ profile: data?.profile ?? null }, { headers: NO_STORE })
 }
 
 export async function POST(req: Request) {
   const supabase = await createMarketingServerSupabase()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ profile: null, error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ profile: null, error: 'Unauthorized' }, { status: 401, headers: NO_STORE })
   }
 
   if (!sameOriginOk(req)) {
-    return NextResponse.json({ profile: null, error: 'Cross-origin request rejected' }, { status: 403 })
+    return NextResponse.json({ profile: null, error: 'Cross-origin request rejected' }, { status: 403, headers: NO_STORE })
   }
 
-  // Reject oversized bodies by Content-Length BEFORE parsing, so a giant payload
-  // can't burn memory/CPU in req.json() ahead of the post-parse size check.
-  const declaredLen = Number(req.headers.get('content-length') ?? '')
-  if (Number.isFinite(declaredLen) && declaredLen > MAX_PROFILE_BYTES) {
-    return NextResponse.json({ profile: null, error: 'Profile payload too large' }, { status: 413 })
+  // Hardened read: hard byte ceiling enforced while the stream is consumed, so
+  // a giant payload can't burn memory/CPU in JSON.parse ahead of the key/size
+  // checks — and the limit holds even with a missing/false Content-Length.
+  const parsed = await readJsonLimited<unknown>(req, { maxBytes: MAX_PROFILE_BYTES })
+  if (!parsed.ok) {
+    const error = parsed.status === 413 ? 'Profile payload too large' : parsed.error
+    return NextResponse.json({ profile: null, error }, { status: parsed.status, headers: NO_STORE })
   }
 
-  let parsed: unknown
-  try {
-    parsed = await req.json()
-  } catch {
-    return NextResponse.json({ profile: null, error: 'Invalid JSON body' }, { status: 400 })
+  if (!validProfile(parsed.value)) {
+    return NextResponse.json({ profile: null, error: 'Invalid profile payload' }, { status: 400, headers: NO_STORE })
   }
-
-  if (!validProfile(parsed)) {
-    return NextResponse.json({ profile: null, error: 'Invalid profile payload' }, { status: 400 })
-  }
-  const profile = parsed
+  const profile = parsed.value
 
   const { data, error } = await supabase
     .from('brand_profiles')
@@ -122,7 +128,7 @@ export async function POST(req: Request) {
 
   if (error) {
     console.error('brand-profile POST error:', error.message)
-    return NextResponse.json({ profile: null, error: 'Failed to save profile' }, { status: 500 })
+    return NextResponse.json({ profile: null, error: 'Failed to save profile' }, { status: 500, headers: NO_STORE })
   }
-  return NextResponse.json({ profile: data?.profile ?? profile })
+  return NextResponse.json({ profile: data?.profile ?? profile }, { headers: NO_STORE })
 }

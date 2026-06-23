@@ -1,7 +1,7 @@
 // saas/lib/auth/totp-service.ts
 // TOTP (Time-based One-Time Password) using Node.js built-in crypto
 
-import { createHmac } from 'crypto'
+import { createHmac, randomInt } from 'crypto'
 
 /**
  * Generate TOTP secret (base32 encoded random bytes)
@@ -10,7 +10,7 @@ export function generateTOTPSecret(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
   let secret = ''
   for (let i = 0; i < 32; i++) {
-    secret += chars[Math.floor(Math.random() * chars.length)]
+    secret += chars[randomInt(chars.length)]
   }
   return secret
 }
@@ -91,9 +91,11 @@ function generateTOTPCode(secret: Buffer, timeCounter: number): string {
  * Generate backup codes (10 codes for account recovery)
  */
 export function generateBackupCodes(count = 10): string[] {
+  const alphabet = 'ABCDEFGHIJKLMNPQRSTUVWXYZ23456789'
   const codes: string[] = []
   for (let i = 0; i < count; i++) {
-    const code = Math.random().toString(36).substring(2, 10).toUpperCase()
+    let code = ''
+    for (let j = 0; j < 8; j++) code += alphabet[randomInt(alphabet.length)]
     codes.push(code)
   }
   return codes

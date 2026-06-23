@@ -14,7 +14,6 @@ export type UnlockScreenProps = {
 type UnlockStep = 'password' | 'totp-setup' | 'totp-verify' | 'waiting'
 
 interface TOTPSetup {
-  secret: string
   qrCodeUrl: string
   backupCodes: string[]
 }
@@ -37,41 +36,38 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
       return
     }
 
-    // TODO: Real password verification against auth
-    // For now: any non-empty password works
-    // Extract email from user context (hardcoded for demo)
-    const demoEmail = 'luis@signalboost.com'
-    setUserEmail(demoEmail)
-
-    // Check if user has TOTP enabled
-    const hasTOTP = localStorage.getItem(`totp_enabled_${demoEmail}`)
-    
-    if (!hasTOTP) {
-      // First time: show TOTP setup
-      await generateTOTPSetup(demoEmail)
-    } else {
-      // Already has TOTP: go to verification
-      setStep('totp-verify')
-    }
+    // Identity and TOTP enrollment are resolved SERVER-SIDE from the session — the
+    // client never supplies the email or the TOTP secret. (Password remains a soft
+    // gate; binding security is the server-side TOTP below.)
+    await startTotp()
   }
 
-  const generateTOTPSetup = async (email: string) => {
+  const startTotp = async () => {
     try {
+      // No body — the server derives the user from the authenticated session.
       const response = await fetch('/api/vault/totp/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userEmail: email }),
+        credentials: 'include',
+        body: JSON.stringify({}),
       })
 
       const data = await response.json()
 
       if (!data.ok) {
-        setError(data.error || 'Failed to generate TOTP')
+        setError(data.error || 'Failed to start TOTP')
         return
       }
 
+      if (data.email) setUserEmail(data.email)
+
+      if (data.enrolled) {
+        setStep('totp-verify')
+        return
+      }
+
+      // First-time setup — show the QR + backup codes. The secret stays server-side.
       setTotpSetup({
-        secret: data.secret,
         qrCodeUrl: data.qrCodeUrl,
         backupCodes: data.backupCodes,
       })
@@ -97,11 +93,8 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
       const response = await fetch('/api/vault/totp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code: totpCode,
-          userEmail,
-          totpSecret: totpSetup?.secret,
-        }),
+        credentials: 'include',
+        body: JSON.stringify({ code: totpCode }),
       })
 
       const data = await response.json()
@@ -113,11 +106,7 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
         return
       }
 
-      // Mark TOTP as enabled
-      localStorage.setItem(`totp_enabled_${userEmail}`, 'true')
-      localStorage.setItem(`totp_secret_${userEmail}`, totpSetup?.secret || '')
-
-      // Unlock vault
+      // The server enables TOTP on first successful verify. Unlock the vault.
       onUnlock(data.sessionId)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error'
@@ -138,16 +127,11 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
     setIsVerifying(true)
 
     try {
-      const secret = localStorage.getItem(`totp_secret_${userEmail}`)
-      
       const response = await fetch('/api/vault/totp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code: totpCode,
-          userEmail,
-          totpSecret: secret,
-        }),
+        credentials: 'include',
+        body: JSON.stringify({ code: totpCode }),
       })
 
       const data = await response.json()
@@ -167,8 +151,7 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
       setIsVerifying(false)
     }
   }
-
-  const handleGoBack = () => {
+const handleGoBack = () => {
     setPassword('')
     setTotpCode('')
     setError('')
@@ -320,7 +303,7 @@ export default function UnlockScreen({ onUnlock, isLoading = false }: UnlockScre
                 maxLength={6}
                 autoFocus
                 style={{
-                  width: '100%',
+width: '100%',
                   padding: '11px 12px',
                   borderRadius: 10,
                   border: error ? '1px solid #ef4444' : '1px solid rgba(255,255,255,.15)',

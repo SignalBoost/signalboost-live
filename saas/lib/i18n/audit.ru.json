@@ -719,5 +719,24 @@
     "loadError": "Не удалось загрузить отчёт о соответствии.",
     "fetchError": "Ошибка: {msg}",
     "loading": "Загрузка готовности к соответствию…"
+  },
+  "admin": {
+    "eyebrow": "Консоль администратора в стиле NASA",
+    "forecasting": "Прогнозы",
+    "financialLedger": "Финансовая книга",
+    "kpiCockpit": "Кабина KPI",
+    "marketplace": "Маркетплейс",
+    "saas": "SaaS",
+    "unifiedEngagement": "Единый индекс вовлечённости",
+    "crmPipeline": "Pipeline CRM",
+    "conciergeRecs": "Рекомендации консьержа",
+    "filters": "Фильтры: диапазон дат • продукт • страна • план • роль",
+    "telemetryReady": "Телеметрия готова. Подключите аналитические таблицы/события для активации записей в реальном времени.",
+    "telemetrySignal": "Сигнал телеметрии готов",
+    "notTracked": "Ещё не отслеживается",
+    "comingSoon": "Скоро",
+    "readyToRemediate": "Готово к устранению",
+    "viewCodeDiff": "Показать различия кода",
+    "approvePullRequest": "Утвердить pull request"
   }
 }

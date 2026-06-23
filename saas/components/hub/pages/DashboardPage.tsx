@@ -168,6 +168,7 @@ export function DeploymentsPage({ mode = 'view' }: { mode?: DeployMode }) {
     </div>
   )
 }
+
 function actionBtn(tone: 'gold' | 'danger', disabled?: boolean): React.CSSProperties {
   const map = {
     gold: { border: '1px solid rgba(255,195,0,.45)', background: 'rgba(255,195,0,.12)', color: '#ffc300' },
@@ -252,7 +253,7 @@ function DeploymentCard({
           {mode === 'rollback' && (
             canRollback ? (
               <button onClick={(e) => { e.stopPropagation(); onRollback() }} disabled={busy} style={actionBtn('gold', busy)}>
-                {busy ? t(dict, 'console.deploy.promoting', 'Promoting…') : t(dict, 'console.deploy.rollbackThis', '↩ Roll back to this')}
+                {busy ? t(dict, 'console.deploy.promoting', 'Promoting…') : t(dict, 'console.deploy.rollbackThis', '↩️ Roll back to this')}
               </button>
             ) : (
               <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,.35)', alignSelf: 'center' }}>
@@ -302,3 +303,53 @@ function DeploymentCard({
                 )}
               </div>
             </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div style={{ background: '#1a1a2e', padding: '0.75rem', borderRadius: '4px' }}>
+              <div style={{ color: '#888', fontSize: '0.8rem', marginBottom: '0.25rem' }}>{t(dict, 'console.deploy.deploymentId', 'Deployment ID')}</div>
+              <div style={{ color: '#1af0ff', fontFamily: 'monospace', fontSize: '0.75rem', wordBreak: 'break-all' }}>
+                {deployment.id.substring(0, 12)}...
+              </div>
+            </div>
+            <div style={{ background: '#1a1a2e', padding: '0.75rem', borderRadius: '4px' }}>
+              <div style={{ color: '#888', fontSize: '0.8rem', marginBottom: '0.25rem' }}>{t(dict, 'console.deploy.created', 'Created')}</div>
+              <div style={{ color: '#1af0ff', fontSize: '0.85rem' }}>{date.toLocaleString()}</div>
+            </div>
+          </div>
+
+          {deployment.alias && deployment.alias.length > 0 && (
+            <div>
+              <div style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem' }}>{t(dict, 'console.deploy.aliases', 'Aliases')}</div>
+              <div style={{ display: 'grid', gap: '0.25rem' }}>
+                {deployment.alias.map((alias, i) => (
+                  <div key={i} style={{ color: '#1af0ff', fontSize: '0.85rem' }}>{alias}</div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {deployment.inspectorUrl && (
+            
+              href={deployment.inspectorUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ padding: '0.75rem', background: '#1a1a2e', color: '#1af0ff', textDecoration: 'none', borderRadius: '4px', textAlign: 'center', fontSize: '0.9rem', fontWeight: 'bold' }}
+            >
+              {t(dict, 'console.deploy.inspector', '📊 View Deployment Details in Inspector →')}
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function getTimeAgo(date: Date, dict: any): string {
+  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000)
+  if (seconds < 60) return t(dict, 'console.deploy.justNow', 'just now')
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}${t(dict, 'console.deploy.minAgo', 'm ago')}`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}${t(dict, 'console.deploy.hourAgo', 'h ago')}`
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}${t(dict, 'console.deploy.dayAgo', 'd ago')}`
+  return date.toLocaleDateString()
+}

@@ -5,6 +5,8 @@
 
 import { useMemo, useState } from 'react'
 import { PageProps, TONES, cardStyle, labelStyle, rowStyle } from '../shared'
+import { useI18n } from '@/components/i18n/I18nProvider'
+import { t } from '@/lib/i18n/t'
 
 type Env = 'Production' | 'Staging' | 'Dev'
 type HealthStatus = 'healthy' | 'degraded' | 'issues'
@@ -55,6 +57,7 @@ const severityStyle: Record<Severity, { color: string; bg: string; border: strin
 }
 
 export default function ProviderHealthPage(_props: PageProps) {
+  const { dict } = useI18n()
   const [environment, setEnvironment] = useState<Env>('Production')
   const [monitorIndex, setMonitorIndex] = useState(0)
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(issueRows[0]?.id || null)
@@ -67,33 +70,115 @@ export default function ProviderHealthPage(_props: PageProps) {
   const criticalCount = filteredIssues.filter(issue => issue.severity === 'Critical').length
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: 14 }}>
+<div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: 14 }}>
       <section style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexShrink: 0 }}>
-        <div><div style={labelStyle}>Monitor 3</div><h2 style={{ margin: '3px 0 4px', fontSize: 24, letterSpacing: '-.02em' }}>Provider Health</h2><p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5, maxWidth: 780 }}>Provider Health is now split into smaller health monitors so cards stay visible and calm.</p></div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span style={{ padding: '7px 11px', borderRadius: 999, border: '1px solid rgba(239,68,68,.45)', background: 'rgba(239,68,68,.12)', color: '#fca5a5', fontSize: 12.5, fontWeight: 900 }}>{criticalCount} Critical</span><span style={{ padding: '7px 11px', borderRadius: 999, border: `1px solid ${TONES.gold.border}`, background: TONES.gold.soft, color: '#ffc300', fontSize: 12.5, fontWeight: 900 }}>{openCount} Open</span></div>
+        <div>
+          <div style={labelStyle}>{t(dict, 'console.providerHealth.monitor', 'Monitor 3')}</div>
+          <h2 style={{ margin: '3px 0 4px', fontSize: 24, letterSpacing: '-.02em' }}>{t(dict, 'console.providerHealth.title', 'Provider Health')}</h2>
+          <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5, maxWidth: 780 }}>{t(dict, 'console.providerHealth.subtitle', 'Provider Health is now split into smaller health monitors so cards stay visible and calm.')}</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ padding: '7px 11px', borderRadius: 999, border: '1px solid rgba(239,68,68,.45)', background: 'rgba(239,68,68,.12)', color: '#fca5a5', fontSize: 12.5, fontWeight: 900 }}>{criticalCount} {t(dict, 'console.providerHealth.critical', 'Critical')}</span>
+          <span style={{ padding: '7px 11px', borderRadius: 999, border: `1px solid ${TONES.gold.border}`, background: TONES.gold.soft, color: '#ffc300', fontSize: 12.5, fontWeight: 900 }}>{openCount} {t(dict, 'console.providerHealth.open', 'Open')}</span>
+        </div>
       </section>
 
       <section style={{ ...cardStyle, padding: 14, flexShrink: 0 }}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={labelStyle}>Environment</span>
+          <span style={labelStyle}>{t(dict, 'console.providerHealth.environment', 'Environment')}</span>
           {environments.map(env => <button key={env} onClick={() => setEnvironment(env)} className="hub-chip" style={{ padding: '7px 12px', borderRadius: 10, border: environment === env ? `1px solid ${TONES.gold.border}` : '1px solid rgba(255,255,255,.12)', background: environment === env ? TONES.gold.soft : 'rgba(255,255,255,.04)', color: environment === env ? '#ffc300' : 'rgba(255,255,255,.68)', fontSize: 12.5, fontWeight: 800 }}>{env}</button>)}
-          <span style={{ ...labelStyle, marginLeft: 8 }}>Health Monitor</span>
+          <span style={{ ...labelStyle, marginLeft: 8 }}>{t(dict, 'console.providerHealth.monitor', 'Health Monitor')}</span>
           {monitors.map((item, index) => <button key={item.id} onClick={() => setMonitorIndex(index)} className="hub-chip" style={{ padding: '7px 12px', borderRadius: 10, border: monitorIndex === index ? `1px solid ${TONES.blue.border}` : '1px solid rgba(255,255,255,.12)', background: monitorIndex === index ? TONES.blue.soft : 'rgba(255,255,255,.04)', color: monitorIndex === index ? '#1af0ff' : 'rgba(255,255,255,.68)', fontSize: 12.5, fontWeight: 800 }}>{item.icon} {index + 1}</button>)}
         </div>
       </section>
 
       <main className="hub-panel" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 8 }}>
-        <section style={{ ...cardStyle, padding: 16, marginBottom: 14 }}><div style={{ fontSize: 21, fontWeight: 950 }}>{monitor.icon} {monitor.title}</div><div style={{ color: 'rgba(255,255,255,.56)', fontSize: 13, marginTop: 4 }}>{monitor.subtitle}</div></section>
+        <section style={{ ...cardStyle, padding: 16, marginBottom: 14 }}>
+          <div style={{ fontSize: 21, fontWeight: 950 }}>{monitor.icon} {monitor.title}</div>
+          <div style={{ color: 'rgba(255,255,255,.56)', fontSize: 13, marginTop: 4 }}>{monitor.subtitle}</div>
+        </section>
+
         <section style={{ marginBottom: 18 }}>
-          <div style={{ ...labelStyle, marginBottom: 10 }}>Provider Status Cards</div>
+          <div style={{ ...labelStyle, marginBottom: 10 }}>{t(dict, 'console.providerHealth.statusCards', 'Provider Status Cards')}</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
-            {filteredHealth.map(row => { const tone = statusStyle[row.status]; return <article key={`${row.provider}-${row.environment}`} className="hub-card" style={{ ...cardStyle, minHeight: 178 }}><div style={{ padding: '14px 15px 11px', borderBottom: `1px solid ${tone.border}`, background: `linear-gradient(135deg, ${tone.bg}, rgba(3,7,18,0))` }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}><div><div style={{ fontSize: 20, fontWeight: 950 }}>{row.icon} {row.provider}</div><div style={{ color: 'rgba(255,255,255,.52)', fontSize: 12.5 }}>{row.environment}</div></div><span style={{ padding: '5px 9px', borderRadius: 999, border: `1px solid ${tone.border}`, background: tone.bg, color: tone.color, fontSize: 11.5, fontWeight: 900 }}>{tone.label}</span></div></div><div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>{row.signals.slice(0, 3).map(signal => <div key={signal} style={rowStyle}><span>{signal}</span></div>)}<div style={{ color: 'rgba(255,255,255,.44)', fontSize: 12, marginTop: 4 }}>Last checked: {row.lastChecked}</div></div></article> })}
+            {filteredHealth.map(row => {
+              const tone = statusStyle[row.status]
+              return (
+                <article key={`${row.provider}-${row.environment}`} className="hub-card" style={{ ...cardStyle, minHeight: 178 }}>
+                  <div style={{ padding: '14px 15px 11px', borderBottom: `1px solid ${tone.border}`, background: `linear-gradient(135deg, ${tone.bg}, rgba(3,7,18,0))` }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                      <div>
+                        <div style={{ fontSize: 20, fontWeight: 950 }}>{row.icon} {row.provider}</div>
+                        <div style={{ color: 'rgba(255,255,255,.52)', fontSize: 12.5 }}>{row.environment}</div>
+                      </div>
+                      <span style={{ padding: '5px 9px', borderRadius: 999, border: `1px solid ${tone.border}`, background: tone.bg, color: tone.color, fontSize: 11.5, fontWeight: 900 }}>{tone.label}</span>
+                    </div>
+                  </div>
+                  <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {row.signals.slice(0, 3).map(signal => <div key={signal} style={rowStyle}><span>{signal}</span></div>)}
+                    <div style={{ color: 'rgba(255,255,255,.44)', fontSize: 12, marginTop: 4 }}>{t(dict, 'console.providerHealth.lastChecked', 'Last checked:')} {row.lastChecked}</div>
+                  </div>
+                </article>
+              )
+            })}
           </div>
         </section>
 
         <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(295px, .48fr)', gap: 14, alignItems: 'start' }}>
-          <div style={{ ...cardStyle, overflow: 'hidden' }}><div style={{ padding: '13px 15px', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.035)' }}><div style={{ fontSize: 17, fontWeight: 950 }}>Issues & Alerts</div><div style={{ color: 'rgba(255,255,255,.5)', fontSize: 12.5, marginTop: 3 }}>Only alerts for this smaller monitor page.</div></div><div style={{ display: 'flex', flexDirection: 'column' }}>{filteredIssues.map(issue => { const severity = severityStyle[issue.severity]; const active = selectedIssue?.id === issue.id; return <button key={issue.id} onClick={() => setSelectedIssueId(issue.id)} style={{ display: 'grid', gridTemplateColumns: '90px 90px minmax(180px,1fr) 92px', gap: 10, alignItems: 'center', padding: '11px 13px', border: active ? '1px solid rgba(255,195,0,.38)' : '1px solid rgba(255,255,255,.06)', borderLeft: 'none', borderRight: 'none', background: active ? 'rgba(255,195,0,.08)' : 'rgba(255,255,255,.02)', color: '#fff', textAlign: 'left', cursor: 'pointer' }}><span style={{ padding: '4px 7px', borderRadius: 999, border: `1px solid ${severity.border}`, background: severity.bg, color: severity.color, fontSize: 11, fontWeight: 900 }}>{issue.severity}</span><span style={{ color: 'rgba(255,255,255,.76)', fontWeight: 800, fontSize: 12.5 }}>{issue.provider}</span><span style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', fontSize: 12.5 }}>{issue.summary}</span><span style={{ color: issue.status === 'Open' ? '#ffc300' : issue.status === 'Resolved' ? '#86efac' : '#1af0ff', fontSize: 12, fontWeight: 800 }}>{issue.status}</span></button> })}{filteredIssues.length === 0 && <div style={{ padding: 18, color: 'rgba(255,255,255,.55)' }}>No essential alerts for this health monitor.</div>}</div></div>
-          <aside style={{ ...cardStyle, padding: 16, position: 'sticky', top: 0 }}>{selectedIssue ? <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}><div><div style={labelStyle}>Alert detail</div><h3 style={{ margin: '4px 0 0', fontSize: 18 }}>{selectedIssue.summary}</h3></div><div style={rowStyle}><strong>Provider</strong><span>{selectedIssue.provider}</span></div><div style={rowStyle}><strong>Severity</strong><span>{selectedIssue.severity}</span></div><div><div style={labelStyle}>Impact</div><p style={{ margin: '5px 0 0', color: 'rgba(255,255,255,.72)', lineHeight: 1.5 }}>{selectedIssue.impact}</p></div><div><div style={labelStyle}>Recommended fix</div><p style={{ margin: '5px 0 0', color: 'rgba(255,255,255,.72)', lineHeight: 1.5 }}>{selectedIssue.fix}</p></div></div> : <div style={{ color: 'rgba(255,255,255,.55)' }}>Select an alert to inspect details.</div>}</aside>
+          <div style={{ ...cardStyle, overflow: 'hidden' }}>
+            <div style={{ padding: '13px 15px', borderBottom: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.035)' }}>
+              <div style={{ fontSize: 17, fontWeight: 950 }}>{t(dict, 'console.providerHealth.issues', 'Issues & Alerts')}</div>
+              <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 12.5, marginTop: 3 }}>{t(dict, 'console.providerHealth.issuesDesc', 'Only alerts for this smaller monitor page.')}</div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {filteredIssues.map(issue => {
+                const severity = severityStyle[issue.severity]
+                const active = selectedIssue?.id === issue.id
+                return (
+                  <button
+                    key={issue.id}
+                    onClick={() => setSelectedIssueId(issue.id)}
+                    style={{ display: 'grid', gridTemplateColumns: '90px 90px minmax(180px,1fr) 92px', gap: 10, alignItems: 'center', padding: '11px 13px', border: active ? '1px solid rgba(255,195,0,.38)' : '1px solid rgba(255,255,255,.06)', borderLeft: 'none', borderRight: 'none', background: active ? 'rgba(255,195,0,.08)' : 'rgba(255,255,255,.02)', color: '#fff', textAlign: 'left', cursor: 'pointer' }}
+                  >
+                    <span style={{ padding: '4px 7px', borderRadius: 999, border: `1px solid ${severity.border}`, background: severity.bg, color: severity.color, fontSize: 11, fontWeight: 900 }}>{issue.severity}</span>
+                    <span style={{ color: 'rgba(255,255,255,.76)', fontWeight: 800, fontSize: 12.5 }}>{issue.provider}</span>
+                    <span style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', fontSize: 12.5 }}>{issue.summary}</span>
+                    <span style={{ color: issue.status === 'Open' ? '#ffc300' : issue.status === 'Resolved' ? '#86efac' : '#1af0ff', fontSize: 12, fontWeight: 800 }}>{issue.status}</span>
+                  </button>
+                )
+              })}
+              {filteredIssues.length === 0 && <div style={{ padding: 18, color: 'rgba(255,255,255,.55)' }}>{t(dict, 'console.providerHealth.noAlerts', 'No essential alerts for this health monitor.')}</div>}
+            </div>
+          </div>
+
+          <aside style={{ ...cardStyle, padding: 16, position: 'sticky', top: 0 }}>
+            {selectedIssue ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div>
+                  <div style={labelStyle}>{t(dict, 'console.providerHealth.alertDetail', 'Alert detail')}</div>
+                  <h3 style={{ margin: '4px 0 0', fontSize: 18 }}>{selectedIssue.summary}</h3>
+                </div>
+                <div style={rowStyle}>
+                  <strong>{t(dict, 'console.providerHealth.provider', 'Provider')}</strong>
+                  <span>{selectedIssue.provider}</span>
+                </div>
+                <div style={rowStyle}>
+                  <strong>{t(dict, 'console.providerHealth.severity', 'Severity')}</strong>
+                  <span>{selectedIssue.severity}</span>
+                </div>
+                <div>
+                  <div style={labelStyle}>{t(dict, 'console.providerHealth.impact', 'Impact')}</div>
+                  <p style={{ margin: '5px 0 0', color: 'rgba(255,255,255,.72)', lineHeight: 1.5 }}>{selectedIssue.impact}</p>
+                </div>
+                <div>
+                  <div style={labelStyle}>{t(dict, 'console.providerHealth.fix', 'Recommended fix')}</div>
+                  <p style={{ margin: '5px 0 0', color: 'rgba(255,255,255,.72)', lineHeight: 1.5 }}>{selectedIssue.fix}</p>
+                </div>
+              </div>
+            ) : (
+              <div style={{ color: 'rgba(255,255,255,.55)' }}>{t(dict, 'console.providerHealth.selectAlert', 'Select an alert to inspect details.')}</div>
+            )}
+          </aside>
         </section>
       </main>
     </div>

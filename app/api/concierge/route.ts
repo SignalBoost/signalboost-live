@@ -2,13 +2,15 @@ import { NextResponse } from 'next/server'
 import { answerSignalBoostConcierge } from '@/lib/concierge/unifiedConcierge'
 import { createMarketingServerSupabase } from '@/lib/auth/supabaseServer'
 import { normalizeTier } from '@/lib/video/subscription'
+import { readJsonLimited } from '@/lib/http/readJsonLimited'
 
 export const dynamic = 'force-dynamic'
 
 const MAX_QUERY = 2000
-// Hard cap on the raw request body, enforced BEFORE parsing. The largest
-// legitimate payload is a 2000-char query plus a short locale, so 16 KB is
-// generous headroom while still rejecting multi-megabyte bodies up front.
+// Hard cap on the raw request body. The largest legitimate payload is a
+// 2000-char query plus a short locale, so 16 KB is generous headroom while
+// still rejecting multi-megabyte bodies. Enforced by readJsonLimited while the
+// stream is consumed, so it holds even when Content-Length is missing/false.
 const MAX_BODY_BYTES = 16_000
 const ALLOWED_LOCALES = new Set(['en', 'es', 'pt', 'pl', 'ru'])
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -35,11 +37,6 @@ function rateLimited(key: string): boolean {
   return recent.length > RATE_MAX
 }
 
-function bodyTooLarge(req: Request): boolean {
-  const len = Number(req.headers.get('content-length') ?? '')
-  return Number.isFinite(len) && len > MAX_BODY_BYTES
-}
-
 // Resolve entitlement context from SERVER state only. The client no longer
 // supplies tier / usedMinutes / billingProvider — those are spoofable. Defaults
 // to least privilege ('free') if no account/plan row is found.
@@ -60,7 +57,11 @@ async function resolveEntitlements(
       .from('accounts')
       .select('plan, tier, billing_provider') // data minimization — only what we need
       .or(`user_id.eq.${userId},owner_id.eq.${userId}`)
-      .order('created_at', { ascending: true })
+      // Prefer the MOST RECENT account row. The oldest row can be a stale or
+      // superseded plan; the newest reflects the current account state. We
+      // still normalize the tier below, so a worst case maps down to 'free'
+      // rather than over-reporting an allowance.
+      .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
 
@@ -78,10 +79,6 @@ async function resolveEntitlements(
 }
 
 export async function POST(req: Request) {
-  if (bodyTooLarge(req)) {
-    return NextResponse.json({ error: 'Request body too large' }, { status: 413 })
-  }
-
   const supabase = await createMarketingServerSupabase()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -92,12 +89,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
-  const body = await req.json().catch(() => null)
+  // Hardened read: exact JSON media type + a hard byte ceiling enforced while
+  // the stream is consumed (Content-Length is advisory, not trusted).
+  const parsed = await readJsonLimited<Record<string, unknown>>(req, {
+    maxBytes: MAX_BODY_BYTES,
+  })
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: parsed.status })
+  }
+  const body = parsed.value
   if (!body || typeof body !== 'object') {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const rawQuery = (body as any).query
+  const rawQuery = (body as Record<string, unknown>).query
   if (typeof rawQuery !== 'string') {
     return NextResponse.json({ error: 'query must be a string' }, { status: 400 })
   }
@@ -106,8 +111,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `query must be 1–${MAX_QUERY} characters` }, { status: 400 })
   }
 
+  const rawLocaleValue = (body as Record<string, unknown>).locale
   const rawLocale =
-    typeof (body as any).locale === 'string' ? (body as any).locale.toLowerCase().slice(0, 2) : 'en'
+    typeof rawLocaleValue === 'string' ? rawLocaleValue.toLowerCase().slice(0, 2) : 'en'
   const locale = ALLOWED_LOCALES.has(rawLocale) ? rawLocale : 'en'
 
   // Entitlements derived server-side. usedMinutes is advisory here (the real

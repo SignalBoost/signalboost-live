@@ -4,6 +4,8 @@
 import { useState, useEffect } from 'react'
 import { Webhook, WebhookEvent } from '@/lib/hub/webhooks-service'
 import { cardStyle, labelStyle } from '../shared'
+import { useI18n } from '@/components/i18n/I18nProvider'
+import { t } from '@/lib/i18n/t'
 
 const AVAILABLE_EVENTS = [
   { id: 'rotation_success', label: 'Key Rotation Success' },
@@ -15,6 +17,7 @@ const AVAILABLE_EVENTS = [
 ]
 
 export function WebhooksPage() {
+  const { dict } = useI18n()
   const [webhooks, setWebhooks] = useState<Webhook[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -39,10 +42,10 @@ export function WebhooksPage() {
       if (data.ok) {
         setWebhooks(data.webhooks || [])
       } else {
-        setError(data.error || 'Failed to load webhooks')
+        setError(data.error || t(dict, 'console.webhooks.err.load', 'Failed to load webhooks'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error loading webhooks')
+      setError(err instanceof Error ? err.message : t(dict, 'console.webhooks.err.loading', 'Error loading webhooks'))
     } finally {
       setLoading(false)
     }
@@ -50,7 +53,7 @@ export function WebhooksPage() {
 
   async function addWebhook() {
     if (!formUrl.trim() || formEvents.length === 0) {
-      setError('URL and at least one event required')
+      setError(t(dict, 'console.webhooks.err.required', 'URL and at least one event required'))
       return
     }
 
@@ -79,15 +82,15 @@ export function WebhooksPage() {
         fetchWebhooks()
         setError(null)
       } else {
-        setError(data.error || 'Failed to create webhook')
+        setError(data.error || t(dict, 'console.webhooks.err.create', 'Failed to create webhook'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error creating webhook')
+      setError(err instanceof Error ? err.message : t(dict, 'console.webhooks.err.creating', 'Error creating webhook'))
     }
   }
 
   async function deleteWebhook(id: string) {
-    if (!confirm('Delete this webhook?')) return
+    if (!confirm(t(dict, 'console.webhooks.confirmDelete', 'Delete this webhook?'))) return
 
     try {
       const res = await fetch(`/api/hub/webhooks?id=${id}`, {
@@ -99,10 +102,10 @@ export function WebhooksPage() {
       if (data.ok) {
         fetchWebhooks()
       } else {
-        setError(data.error || 'Failed to delete webhook')
+        setError(data.error || t(dict, 'console.webhooks.err.delete', 'Failed to delete webhook'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error deleting webhook')
+      setError(err instanceof Error ? err.message : t(dict, 'console.webhooks.err.deleting', 'Error deleting webhook'))
     }
   }
 
@@ -116,12 +119,12 @@ export function WebhooksPage() {
 
       if (data.ok) {
         setError(null)
-        alert(`✓ Test successful (${data.statusCode}) - ${data.responseTime}ms`)
+        alert(`✓ ${t(dict, 'console.webhooks.testSuccess', 'Test successful')} (${data.statusCode}) - ${data.responseTime}ms`)
       } else {
-        setError(`Test failed: ${data.error}`)
+        setError(`${t(dict, 'console.webhooks.testFailed', 'Test failed')}: ${data.error}`)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error testing webhook')
+      setError(err instanceof Error ? err.message : t(dict, 'console.webhooks.err.testing', 'Error testing webhook'))
     }
   }
 
@@ -129,10 +132,10 @@ export function WebhooksPage() {
     <div style={{ padding: '2rem', maxWidth: '1200px' }}>
       <div style={{ marginBottom: '2rem' }}>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#1af0ff' }}>
-          Webhooks
+          {t(dict, 'console.webhooks.title', 'Webhooks')}
         </h2>
         <p style={{ color: '#888', fontSize: '0.9rem' }}>
-          Route vault events to external systems via HTTP webhooks
+          {t(dict, 'console.webhooks.subtitle', 'Route vault events to external systems via HTTP webhooks')}
         </p>
       </div>
 
@@ -154,11 +157,11 @@ export function WebhooksPage() {
       {/* Add Webhook Form */}
       {showAddForm && (
         <div style={{ ...cardStyle, marginBottom: '2rem' }}>
-          <h3 style={{ ...labelStyle, marginBottom: '1rem' }}>New Webhook</h3>
+          <h3 style={{ ...labelStyle, marginBottom: '1rem' }}>{t(dict, 'console.webhooks.newWebhook', 'New Webhook')}</h3>
 
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ ...labelStyle, fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>
-              Webhook URL
+              {t(dict, 'console.webhooks.urlLabel', 'Webhook URL')}
             </label>
             <input
               type="url"
@@ -179,7 +182,7 @@ export function WebhooksPage() {
 
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem', display: 'block' }}>
-              Events to Subscribe
+              {t(dict, 'console.webhooks.eventsLabel', 'Events to Subscribe')}
             </label>
             <div style={{ display: 'grid', gap: '0.5rem' }}>
               {AVAILABLE_EVENTS.map(event => (
@@ -206,7 +209,7 @@ export function WebhooksPage() {
                     style={{ cursor: 'pointer' }}
                   />
                   <span style={{ fontSize: '0.9rem', color: '#aaa' }}>
-                    {event.label}
+                    {t(dict, 'console.webhooks.event.' + event.id, event.label)}
                   </span>
                 </label>
               ))}
@@ -227,7 +230,7 @@ export function WebhooksPage() {
                 fontSize: '0.9rem',
               }}
             >
-              Create Webhook
+              {t(dict, 'console.webhooks.create', 'Create Webhook')}
             </button>
             <button
               onClick={() => setShowAddForm(false)}
@@ -241,7 +244,7 @@ export function WebhooksPage() {
                 fontSize: '0.9rem',
               }}
             >
-              Cancel
+              {t(dict, 'common.cancel', 'Cancel')}
             </button>
           </div>
         </div>
@@ -261,18 +264,17 @@ export function WebhooksPage() {
             marginBottom: '1.5rem',
           }}
         >
-          + Add Webhook
+          {t(dict, 'console.webhooks.add', '+ Add Webhook')}
         </button>
       )}
-
-      {/* Webhooks List */}
+{/* Webhooks List */}
       {loading ? (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>
-          Loading webhooks...
+          {t(dict, 'console.webhooks.loading', 'Loading webhooks...')}
         </div>
       ) : webhooks.length === 0 ? (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>
-          No webhooks configured
+          {t(dict, 'console.webhooks.empty', 'No webhooks configured')}
         </div>
       ) : (
         <div style={{ display: 'grid', gap: '1rem' }}>
@@ -305,6 +307,7 @@ function WebhookCard({
   onTest: () => void
   onDelete: () => void
 }) {
+  const { dict } = useI18n()
   return (
     <div style={cardStyle}>
       <div
@@ -333,7 +336,7 @@ function WebhookCard({
             </div>
           </div>
           <div style={{ fontSize: '0.85rem', color: '#888' }}>
-            {webhook.events.length} event{webhook.events.length !== 1 ? 's' : ''} • Failures: {webhook.failureCount}
+            {webhook.events.length} {webhook.events.length === 1 ? t(dict, 'console.webhooks.eventSingular', 'event') : t(dict, 'console.webhooks.eventPlural', 'events')} • {t(dict, 'console.webhooks.failures', 'Failures:')} {webhook.failureCount}
           </div>
         </div>
         <div style={{ fontSize: '1.5rem', color: '#666' }}>
@@ -346,7 +349,7 @@ function WebhookCard({
           {/* Events */}
           <div>
             <div style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-              Subscribed Events
+              {t(dict, 'console.webhooks.subscribedEvents', 'Subscribed Events')}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
               {webhook.events.map(event => {
@@ -362,7 +365,7 @@ function WebhookCard({
                       color: '#1af0ff',
                     }}
                   >
-                    {eventLabel}
+                    {t(dict, 'console.webhooks.event.' + event, eventLabel)}
                   </div>
                 )
               })}
@@ -373,7 +376,7 @@ function WebhookCard({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
             <div style={{ background: '#1a1a2e', padding: '0.75rem', borderRadius: '4px' }}>
               <div style={{ color: '#888', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
-                Created
+                {t(dict, 'console.webhooks.created', 'Created')}
               </div>
               <div style={{ color: '#1af0ff', fontSize: '0.85rem' }}>
                 {new Date(webhook.createdAt).toLocaleDateString()}
@@ -382,10 +385,10 @@ function WebhookCard({
 
             <div style={{ background: '#1a1a2e', padding: '0.75rem', borderRadius: '4px' }}>
               <div style={{ color: '#888', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
-                Last Fired
+                {t(dict, 'console.webhooks.lastFired', 'Last Fired')}
               </div>
               <div style={{ color: '#1af0ff', fontSize: '0.85rem' }}>
-                {webhook.lastFiredAt ? new Date(webhook.lastFiredAt).toLocaleString() : 'Never'}
+                {webhook.lastFiredAt ? new Date(webhook.lastFiredAt).toLocaleString() : t(dict, 'console.webhooks.never', 'Never')}
               </div>
             </div>
           </div>
@@ -406,7 +409,7 @@ function WebhookCard({
                 fontSize: '0.9rem',
               }}
             >
-              🧪 Test
+              🧪 {t(dict, 'console.webhooks.test', 'Test')}
             </button>
             <button
               onClick={onDelete}
@@ -422,7 +425,7 @@ function WebhookCard({
                 fontSize: '0.9rem',
               }}
             >
-              🗑️ Delete
+              🗑️ {t(dict, 'console.webhooks.delete', 'Delete')}
             </button>
           </div>
         </div>

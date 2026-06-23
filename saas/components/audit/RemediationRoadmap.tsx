@@ -38,7 +38,7 @@ export type RemediationRoadmapView = {
   summary: { now: number; next: number; later: number; evidence: number; total: number }
 }
 
-type StatePatch = { status?: string; owner?: string }
+type StatePatch = { status?: string; owner?: string; dueDate?: string }
 
 export default function RemediationRoadmap({
   data,
@@ -54,6 +54,7 @@ export default function RemediationRoadmap({
 
   const statusOf = (f: Finding) => normalizeStatus(states[f.id]?.status || f.status)
   const ownerOf = (f: Finding) => states[f.id]?.owner || ''
+  const dueDateOf = (f: Finding) => states[f.id]?.dueDate || ''
 
   // Active (unhandled) vs handled split across both the fix queue and evidence.
   const allFindings: Finding[] = [...data.items.map(i => i.finding), ...data.evidence]
@@ -101,7 +102,7 @@ export default function RemediationRoadmap({
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {entries.map(({ finding }) => (
-                <FixCard key={finding.id} finding={finding} t={t} status={statusOf(finding)} owner={ownerOf(finding)} onChange={onChange} />
+                <FixCard key={finding.id} finding={finding} t={t} status={statusOf(finding)} owner={ownerOf(finding)} dueDate={dueDateOf(finding)} onChange={onChange} />
               ))}
             </div>
           </section>
@@ -118,7 +119,7 @@ export default function RemediationRoadmap({
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {evidenceActive.map(finding => (
-              <FixCard key={finding.id} finding={finding} t={t} status={statusOf(finding)} owner={ownerOf(finding)} onChange={onChange} evidence />
+              <FixCard key={finding.id} finding={finding} t={t} status={statusOf(finding)} owner={ownerOf(finding)} dueDate={dueDateOf(finding)} onChange={onChange} evidence />
             ))}
           </div>
         </section>
@@ -134,7 +135,7 @@ export default function RemediationRoadmap({
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {handled.map(finding => (
-              <FixCard key={finding.id} finding={finding} t={t} status={statusOf(finding)} owner={ownerOf(finding)} onChange={onChange} muted />
+              <FixCard key={finding.id} finding={finding} t={t} status={statusOf(finding)} owner={ownerOf(finding)} dueDate={dueDateOf(finding)} onChange={onChange} muted />
             ))}
           </div>
         </section>
@@ -154,10 +155,17 @@ function Stat({ label, value, color }: { label: string; value: number; color?: s
 
 type TFn = (key: string, fallback: string) => string
 
+function daysUntil(dateStr: string): number {
+  const d = new Date(`${dateStr}T00:00:00`)
+  if (isNaN(d.getTime())) return 0
+  const now = new Date(); now.setHours(0, 0, 0, 0)
+  return Math.round((d.getTime() - now.getTime()) / 86400000)
+}
+
 function FixCard({
-  finding, t, status, owner, onChange, evidence, muted,
+  finding, t, status, owner, dueDate, onChange, evidence, muted,
 }: {
-  finding: Finding; t: TFn; status: string; owner: string
+  finding: Finding; t: TFn; status: string; owner: string; dueDate: string
   onChange?: (findingId: string, patch: StatePatch) => void
   evidence?: boolean; muted?: boolean
 }) {
@@ -211,6 +219,24 @@ function FixCard({
           style={{ ...selectStyle, width: 150 }}
           disabled={!onChange}
         />
+        <label style={{ fontSize: 11, color: 'rgba(255,255,255,.5)', marginLeft: 4 }}>{t('audit.remediation.state.due', 'Due')}</label>
+        <input
+          type="date"
+          value={dueDate}
+          onChange={e => onChange && onChange(finding.id, { dueDate: e.target.value })}
+          style={{ ...selectStyle, width: 150 }}
+          disabled={!onChange}
+        />
+        {dueDate && (() => {
+          const days = daysUntil(dueDate)
+          const c = days < 0 ? '#fca5a5' : days <= 3 ? '#fbbf24' : 'rgba(255,255,255,.6)'
+          const label = days < 0
+            ? interpolate(t('audit.remediation.state.overdue', '{n}d overdue'), { n: Math.abs(days) })
+            : days === 0
+              ? t('audit.remediation.state.dueToday', 'due today')
+              : interpolate(t('audit.remediation.state.daysLeft', '{n}d left'), { n: days })
+          return <span style={{ fontSize: 11, fontWeight: 700, color: c }}>{label}</span>
+        })()}
       </div>
     </div>
   )

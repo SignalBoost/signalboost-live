@@ -1,198 +1,742 @@
-'use client'
-
-import { useEffect, useState } from 'react'
-import { useI18n } from '@/components/i18n/I18nProvider'
-import { AdminSectionConfig, translateSection } from '@/lib/admin/sections'
-import { COCKPIT_PANELS, CRM_STAGES, EXECUTIVE_RECOMMENDATIONS, FINANCIAL_LEDGER, FORECASTS, KPI_DASHBOARD } from '@/lib/platform/unifiedPlatform'
-
-const COPY: Record<string, Record<string, string>> = {
-  en: {
-    eyebrow: 'NASA-style admin console',
-    forecasting: 'Forecasting',
-    financialLedger: 'Financial ledger',
-    kpiCockpit: 'KPI cockpit',
-    marketplace: 'Marketplace',
-    saas: 'SaaS',
-    unifiedEngagement: 'Unified engagement index',
-    crmPipeline: 'CRM pipeline',
-    conciergeRecs: 'Concierge recommendations',
-    filters: 'Filters: date range \u2022 product \u2022 country \u2022 plan \u2022 role',
-    telemetryReady: 'Telemetry-ready. Connect analytics tables/events to activate live records for this cockpit panel.',
-    notTracked: 'Not tracked yet',
-    telemetrySignal: 'Telemetry-ready signal',
+{
+  "report": {
+    "executiveSummary": {
+      "title": "Executive Risk Summary",
+      "description": "Overall readiness score, finding counts, and top risks."
+    },
+    "providerInventory": {
+      "title": "Provider Inventory Report",
+      "description": "Every connected provider with status, risk, and last check."
+    },
+    "identityAccess": {
+      "title": "Identity & Access Review",
+      "description": "Access, privilege level, MFA state, and last-seen activity."
+    },
+    "secretsKeys": {
+      "title": "Secrets & API Key Exposure Report",
+      "description": "Configured credentials by environment and rotation posture. Metadata only."
+    },
+    "remediationRoadmap": {
+      "title": "Remediation Roadmap",
+      "description": "Prioritized fixes with business impact, owner, and due date."
+    },
+    "prCockpitTrail": {
+      "title": "PR Cockpit Approval Trail",
+      "description": "Every staged change, who approved it, and the merge result."
+    },
+    "githubChanges": {
+      "title": "Code Change Management Report",
+      "description": "Branch protection, open and stale PRs, and review posture."
+    },
+    "supabaseSecurity": {
+      "title": "Database Security Report",
+      "description": "RLS coverage, public buckets, and service-role usage."
+    },
+    "stripeConfig": {
+      "title": "Billing Configuration Report",
+      "description": "Products, prices, webhook coverage, and live/test consistency."
+    },
+    "vercelDeployment": {
+      "title": "Deployment & Env Var Report",
+      "description": "Production vs preview variables and exposed public vars."
+    },
+    "auditLog": {
+      "title": "Audit Log & Activity Timeline",
+      "description": "Recorded actions, actors, and results from the Hub audit log."
+    },
+    "complianceReadiness": {
+      "title": "Compliance Readiness Matrix",
+      "description": "Readiness against SOC 2, ISO 27001, NIST CSF, and CIS. Readiness only."
+    }
   },
-  es: {
-    eyebrow: 'Consola admin estilo NASA',
-    forecasting: 'Pron\u00f3sticos',
-    financialLedger: 'Libro financiero',
-    kpiCockpit: 'Cabina KPI',
-    marketplace: 'Marketplace',
-    saas: 'SaaS',
-    unifiedEngagement: '\u00cdndice de participaci\u00f3n unificado',
-    crmPipeline: 'Pipeline CRM',
-    conciergeRecs: 'Recomendaciones del concierge',
-    filters: 'Filtros: rango de fechas \u2022 producto \u2022 pa\u00eds \u2022 plan \u2022 rol',
-    telemetryReady: 'Telemetr\u00eda lista. Conecta tablas/eventos de an\u00e1lisis para activar registros en vivo en este panel.',
-    notTracked: 'A\u00fan no rastreado',
-    telemetrySignal: 'Se\u00f1al de telemetr\u00eda lista',
+  "severity": {
+    "critical": "Critical",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "info": "Info"
   },
-  pt: {
-    eyebrow: 'Console admin estilo NASA',
-    forecasting: 'Previs\u00f5es',
-    financialLedger: 'Livro financeiro',
-    kpiCockpit: 'Cabine KPI',
-    marketplace: 'Marketplace',
-    saas: 'SaaS',
-    unifiedEngagement: '\u00cdndice de engajamento unificado',
-    crmPipeline: 'Pipeline CRM',
-    conciergeRecs: 'Recomenda\u00e7\u00f5es do concierge',
-    filters: 'Filtros: intervalo de datas \u2022 produto \u2022 pa\u00eds \u2022 plano \u2022 fun\u00e7\u00e3o',
-    telemetryReady: 'Telemetria pronta. Conecte tabelas/eventos de an\u00e1lise para ativar registros ao vivo neste painel.',
-    notTracked: 'Ainda n\u00e3o rastreado',
-    telemetrySignal: 'Sinal de telemetria pronto',
+  "common": {
+    "overallScore": "Overall Readiness Score",
+    "findings": "Findings",
+    "evidenceRequired": "Evidence required",
+    "topRisks": "Top Risks",
+    "recommendation": "Recommendation",
+    "impact": "Impact"
   },
-  pl: {
-    eyebrow: 'Konsola admin w stylu NASA',
-    forecasting: 'Prognozy',
-    financialLedger: 'Ksi\u0119ga finansowa',
-    kpiCockpit: 'Kokpit KPI',
-    marketplace: 'Marketplace',
-    saas: 'SaaS',
-    unifiedEngagement: 'Zunifikowany wska\u017anik zaanga\u017cowania',
-    crmPipeline: 'Pipeline CRM',
-    conciergeRecs: 'Rekomendacje concierge',
-    filters: 'Filtry: zakres dat \u2022 produkt \u2022 kraj \u2022 plan \u2022 rola',
-    telemetryReady: 'Telemetria gotowa. Pod\u0142\u0105cz tabele/zdarzenia analityczne, aby aktywowa\u0107 rekordy na \u017cywo w tym panelu.',
-    notTracked: 'Jeszcze nie \u015bledzone',
-    telemetrySignal: 'Sygna\u0142 telemetrii gotowy',
+  "finding": {
+    "staleIdentity": {
+      "title": "Stale identity: {principal} ({provider})",
+      "detail": "No recorded activity for {days} days (threshold {threshold}).",
+      "recommendation": "Review whether this access is still needed; remove or rotate if not.",
+      "impact": "Unused credentials widen the attack surface with no benefit."
+    },
+    "neverUsedIdentity": {
+      "title": "Never-used identity: {principal} ({provider})",
+      "detail": "Created {days} days ago with no recorded login or use.",
+      "recommendation": "Confirm this principal is required; remove if it was never activated.",
+      "impact": "Dormant accounts are a common foothold for attackers."
+    },
+    "privilegedNoMfa": {
+      "title": "Privileged account without MFA: {principal} ({provider})",
+      "detail": "Role \"{role}\" has admin-level access but MFA is disabled.",
+      "recommendation": "Require and enable MFA on this account immediately.",
+      "impact": "A single phished password grants full administrative control."
+    },
+    "mfaStateUnavailable": {
+      "title": "MFA state unavailable for {count} privileged identity(ies)",
+      "detail": "These providers do not expose per-account MFA status via their API.",
+      "recommendation": "Confirm MFA is enforced and attach evidence for these accounts."
+    },
+    "providerError": {
+      "title": "Provider \"{provider}\" is in an error state",
+      "detail": "The Hub reports {provider} as errored.",
+      "recommendation": "Re-check the {provider} connection and credentials."
+    },
+    "stripeReadFail": {
+      "title": "Stripe configuration could not be read",
+      "detail": "The Stripe API call failed during collection.",
+      "recommendation": "Verify STRIPE_SECRET_KEY is set and can read prices and webhooks.",
+      "impact": "Billing posture is unknown until Stripe is reachable."
+    },
+    "stripePriceMismatch": {
+      "title": "Stripe price/env mismatch",
+      "detail": "{name} points to a price that is not active in Stripe.",
+      "recommendation": "Point the env var at an active price, or activate the referenced price.",
+      "impact": "Checkout can reference a price that no longer exists, breaking purchases."
+    },
+    "stripeWebhookNone": {
+      "title": "No Stripe webhook endpoint configured",
+      "detail": "No webhook endpoints were returned by Stripe.",
+      "recommendation": "Add a webhook endpoint covering payment and subscription lifecycle events.",
+      "impact": "Failed payments and cancellations may not propagate to the app."
+    },
+    "stripeWebhookMissingEvent": {
+      "title": "Stripe webhook missing \"{event}\"",
+      "detail": "No configured webhook endpoint subscribes to {event}.",
+      "recommendation": "Add {event} to a webhook endpoint so the app reacts to this event.",
+      "impact": "Important billing events are not delivered to the platform."
+    },
+    "stripeWebhookUnverified": {
+      "title": "Stripe webhook event coverage not verified",
+      "detail": "Webhook endpoints exist but their subscribed event list was not collected.",
+      "recommendation": "Confirm each endpoint subscribes to required payment/subscription events."
+    },
+    "supabaseHealthFail": {
+      "title": "Supabase health check failed",
+      "detail": "The Supabase reachability check did not succeed.",
+      "recommendation": "Verify the project URL and service-role key, and that the database is online.",
+      "impact": "Core data layer availability is unconfirmed."
+    },
+    "serviceRoleInClient": {
+      "title": "Service-role key reachable from client code",
+      "detail": "The service-role key (which bypasses RLS) was detected on a client-exposed path.",
+      "recommendation": "Move all service-role usage strictly server-side and rotate the key immediately.",
+      "impact": "Full database access could be extracted by any visitor — severe data-breach risk."
+    },
+    "rlsDisabled": {
+      "title": "Table \"{table}\" has RLS disabled",
+      "detail": "Row Level Security is not enabled on {table}.",
+      "recommendation": "Enable RLS on {table} and add explicit access policies.",
+      "impact": "Without RLS, a leaked anon key can read or write this table directly."
+    },
+    "rlsUnverified": {
+      "title": "RLS coverage not verified",
+      "detail": "Table-level RLS state was not collected for this run.",
+      "recommendation": "Enumerate tables and confirm RLS is enabled on every table holding user data."
+    },
+    "publicBucket": {
+      "title": "Storage bucket \"{bucket}\" is public",
+      "detail": "The \"{bucket}\" bucket allows public access.",
+      "recommendation": "Confirm public access is intended; otherwise make the bucket private with signed URLs.",
+      "impact": "Public buckets may expose user-uploaded or internal files."
+    },
+    "vercelNotConnected": {
+      "title": "Vercel not connected",
+      "detail": "No Vercel token is configured, so deployment posture cannot be assessed.",
+      "recommendation": "Connect Vercel to include deployment and env-var checks in the audit."
+    },
+    "publicSensitiveEnv": {
+      "title": "Public env var looks sensitive: {name}",
+      "detail": "{name} is exposed to the browser (NEXT_PUBLIC_) but its name suggests a secret.",
+      "recommendation": "Rename to a server-only variable (drop NEXT_PUBLIC_) and rotate the value.",
+      "impact": "Secret values shipped to the browser are readable by anyone."
+    },
+    "envScopeDrift": {
+      "title": "Production and Preview env vars differ",
+      "detail": "Only in production: {onlyProd}. Only in preview: {onlyPreview}.",
+      "recommendation": "Reconcile env var names across scopes so preview reflects production.",
+      "impact": "Preview deploys may behave differently from production, masking bugs."
+    },
+    "githubReadFail": {
+      "title": "GitHub could not be read",
+      "detail": "The GitHub API call failed during collection.",
+      "recommendation": "Verify the GitHub token and its repo scope."
+    },
+    "branchProtectionUnverified": {
+      "title": "Branch protection not verified",
+      "detail": "Branch protection state for the default branch was not collected.",
+      "recommendation": "Confirm the default branch requires pull-request review before merge."
+    },
+    "branchProtectionMissing": {
+      "title": "Default branch \"{branch}\" does not require PR review",
+      "detail": "Changes can be merged to the default branch without an approving review.",
+      "recommendation": "Enable branch protection and require at least one approving review.",
+      "impact": "Production code can change without a second set of eyes."
+    },
+    "staleBranches": {
+      "title": "{count} stale branch(es) older than {days} days",
+      "detail": "Stale branches: {names}.",
+      "recommendation": "Review and delete merged or abandoned branches.",
+      "impact": "Stale branches add confusion and may carry outdated config."
+    },
+    "clientExposedSecret": {
+      "title": "Client-exposed secret: {name}",
+      "detail": "{name} appears to be a secret but is exposed to the client.",
+      "recommendation": "Move server-side and rotate immediately.",
+      "impact": "A leaked production secret can be abused by anyone."
+    },
+    "rotationUnknown": {
+      "title": "Rotation age unknown for {count} secret(s)",
+      "detail": "Provider APIs do not expose last-rotation dates for these credentials.",
+      "recommendation": "Record rotation dates in the Key Vault and set a rotation policy."
+    },
+    "backupTestMissing": {
+      "title": "Backup recovery test not on record",
+      "detail": "No evidence of a tested database backup/restore was collected.",
+      "recommendation": "Perform a restore test and attach the result."
+    }
   },
-  ru: {
-    eyebrow: '\u041a\u043e\u043d\u0441\u043e\u043b\u044c \u0430\u0434\u043c\u0438\u043d\u0438\u0441\u0442\u0440\u0430\u0442\u043e\u0440\u0430 \u0432 \u0441\u0442\u0438\u043b\u0435 NASA',
-    forecasting: '\u041f\u0440\u043e\u0433\u043d\u043e\u0437\u044b',
-    financialLedger: '\u0424\u0438\u043d\u0430\u043d\u0441\u043e\u0432\u0430\u044f \u043a\u043d\u0438\u0433\u0430',
-    kpiCockpit: '\u041a\u0430\u0431\u0438\u043d\u0430 KPI',
-    marketplace: '\u041c\u0430\u0440\u043a\u0435\u0442\u043f\u043b\u0435\u0439\u0441',
-    saas: 'SaaS',
-    unifiedEngagement: '\u0415\u0434\u0438\u043d\u044b\u0439 \u0438\u043d\u0434\u0435\u043a\u0441 \u0432\u043e\u0432\u043b\u0435\u0447\u0451\u043d\u043d\u043e\u0441\u0442\u0438',
-    crmPipeline: 'Pipeline CRM',
-    conciergeRecs: '\u0420\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u0438 \u043a\u043e\u043d\u0441\u044c\u0435\u0440\u0436\u0430',
-    filters: '\u0424\u0438\u043b\u044c\u0442\u0440\u044b: \u0434\u0438\u0430\u043f\u0430\u0437\u043e\u043d \u0434\u0430\u0442 \u2022 \u043f\u0440\u043e\u0434\u0443\u043a\u0442 \u2022 \u0441\u0442\u0440\u0430\u043d\u0430 \u2022 \u043f\u043b\u0430\u043d \u2022 \u0440\u043e\u043b\u044c',
-    telemetryReady: '\u0422\u0435\u043b\u0435\u043c\u0435\u0442\u0440\u0438\u044f \u0433\u043e\u0442\u043e\u0432\u0430. \u041f\u043e\u0434\u043a\u043b\u044e\u0447\u0438\u0442\u0435 \u0430\u043d\u0430\u043b\u0438\u0442\u0438\u0447\u0435\u0441\u043a\u0438\u0435 \u0442\u0430\u0431\u043b\u0438\u0446\u044b/\u0441\u043e\u0431\u044b\u0442\u0438\u044f \u0434\u043b\u044f \u0430\u043a\u0442\u0438\u0432\u0430\u0446\u0438\u0438 \u0437\u0430\u043f\u0438\u0441\u0435\u0439 \u0432 \u0440\u0435\u0430\u043b\u044c\u043d\u043e\u043c \u0432\u0440\u0435\u043c\u0435\u043d\u0438.',
-    notTracked: '\u0415\u0449\u0451 \u043d\u0435 \u043e\u0442\u0441\u043b\u0435\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044a',
-    telemetrySignal: '\u0421\u0438\u0433\u043d\u0430\u043b \u0442\u0435\u043b\u0435\u043c\u0435\u0442\u0440\u0438\u0438 \u0433\u043e\u0442\u043e\u0432',
+  "exec": {
+    "title": "Executive Risk Summary",
+    "subtitle": "Overall readiness score, finding counts, and top risks.",
+    "narrativeTitle": "Summary",
+    "topRisksTitle": "Top Risks",
+    "noRisks": "No risks above the reporting threshold.",
+    "providersTitle": "Providers",
+    "status": {
+      "connected": "connected",
+      "error": "error",
+      "not_configured": "not configured"
+    },
+    "loading": "Building executive summary…",
+    "loadError": "Could not load the summary.",
+    "fetchError": "Error: {msg}"
   },
-}
-
-function useLang(): string {
-  if (typeof window !== 'undefined') { const s = localStorage.getItem('signalboost_language'); if (s && (s in COPY)) return s as any }
-  if (typeof navigator === 'undefined') return 'en'
-  const lang = navigator.language?.slice(0, 2).toLowerCase()
-  return COPY[lang] ? lang : 'en'
-}
-
-export default function AdminSectionView({ section: rawSection }: { section: AdminSectionConfig }) {
-  const { lang: activeLang } = useI18n()
-  const t = COPY[(activeLang in COPY ? activeLang : 'en') as keyof typeof COPY]
-  const section = translateSection(rawSection, activeLang in COPY ? activeLang : 'en')
-
-  // Live metric values from real tables; keys that have no backing source are
-  // simply absent here and fall back to the honest empty-state label.
-  const [live, setLive] = useState<Record<string, number> | null>(null)
-  useEffect(() => {
-    let active = true
-    fetch('/api/admin/section-metrics', { cache: 'no-store' })
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => { if (active && d && d.values) setLive(d.values) })
-      .catch(() => {})
-    return () => { active = false }
-  }, [])
-
-  const liveValue = (key: string): string | number | undefined => {
-    const v = live ? (live as any)[key] : undefined
-    if (typeof v === 'number') return v.toLocaleString()
-    if (typeof v === 'string' && v.length) return v
-    return undefined
+  "identity": {
+    "findingsTitle": "Access Findings",
+    "noFindings": "No access findings.",
+    "tableTitle": "All Identities",
+    "empty": "No identities found.",
+    "never": "Never",
+    "daysAgo": "{days}d ago",
+    "summary": {
+      "total": "Identities",
+      "privileged": "Privileged",
+      "stale": "Stale",
+      "noMfa": "Priv. no MFA",
+      "mfaUnknown": "MFA unknown"
+    },
+    "col": {
+      "principal": "Principal",
+      "provider": "Provider",
+      "kind": "Type",
+      "role": "Role",
+      "mfa": "MFA",
+      "lastSeen": "Last seen",
+      "flags": "Flags"
+    },
+    "kind": {
+      "user": "User",
+      "service_account": "Service account",
+      "access_key": "Access key",
+      "collaborator": "Collaborator",
+      "token": "Token"
+    },
+    "mfa": {
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "unknown": "Unknown"
+    },
+    "flag": {
+      "stale": "Stale",
+      "neverUsed": "Never used",
+      "privilegedNoMfa": "No MFA",
+      "mfaUnknown": "MFA?"
+    }
+  },
+  "provider": {
+    "title": "Provider Inventory",
+    "subtitle": "Every connected provider with status, risk, and last check.",
+    "empty": "No providers found.",
+    "evidenceShort": "({n} evidence)",
+    "loading": "Loading provider inventory…",
+    "loadError": "Could not load the inventory.",
+    "fetchError": "Error: {msg}",
+    "risk": {
+      "unknown": "Unknown"
+    },
+    "summary": {
+      "total": "Providers",
+      "connected": "Connected",
+      "error": "Errored",
+      "notConfigured": "Not configured"
+    },
+    "col": {
+      "provider": "Provider",
+      "category": "Category",
+      "status": "Status",
+      "risk": "Risk",
+      "findings": "Findings",
+      "lastChecked": "Last checked"
+    },
+    "status": {
+      "connected": "Connected",
+      "error": "Error",
+      "not_configured": "Not configured",
+      "missing": "Missing"
+    },
+    "category": {
+      "billing": "Billing",
+      "database": "Database",
+      "deployment": "Deployment",
+      "change-management": "Change management",
+      "identity": "Identity",
+      "other": "Other"
+    }
+  },
+  "secret": {
+    "title": "Secrets & API Key Exposure",
+    "subtitle": "Configured credentials by environment and rotation posture. Metadata only — no secret values are read or shown.",
+    "findingsTitle": "Exposure Findings",
+    "noFindings": "No exposure findings.",
+    "tableTitle": "Configured Credentials",
+    "empty": "No credentials found.",
+    "metadataNote": "Metadata only — secret values are never read or displayed.",
+    "loading": "Loading secrets report…",
+    "loadError": "Could not load the report.",
+    "fetchError": "Error: {msg}",
+    "summary": {
+      "total": "Credentials",
+      "clientExposed": "Client-exposed",
+      "rotationUnknown": "Rotation unknown"
+    },
+    "col": {
+      "name": "Name",
+      "provider": "Provider",
+      "environment": "Environment",
+      "exposure": "Exposure",
+      "rotation": "Rotation",
+      "risk": "Risk"
+    },
+    "env": {
+      "production": "Production",
+      "preview": "Preview",
+      "development": "Development",
+      "unknown": "Unknown"
+    },
+    "exposure": {
+      "client": "Client-exposed",
+      "server": "Server-only"
+    },
+    "rotation": {
+      "known": "Tracked",
+      "unknown": "Unknown"
+    }
+  },
+  "remediation": {
+    "title": "Remediation Roadmap",
+    "subtitle": "Prioritized fixes sequenced by urgency, with the items that need manual evidence on a separate track.",
+    "empty": "Nothing to remediate — no open findings.",
+    "evidenceTitle": "Evidence Required",
+    "evidenceSubtitle": "Gaps to confirm with manual evidence. These do not lower the score.",
+    "loading": "Building remediation roadmap…",
+    "loadError": "Could not load the roadmap.",
+    "fetchError": "Error: {msg}",
+    "summary": {
+      "now": "Now",
+      "next": "Next",
+      "later": "Later",
+      "evidence": "Evidence",
+      "handled": "Handled"
+    },
+    "tier": {
+      "now": "Now",
+      "next": "Next",
+      "later": "Later"
+    },
+    "tierHint": {
+      "now": "Critical — fix immediately.",
+      "next": "High — schedule soon.",
+      "later": "Medium and low — plan ahead."
+    },
+    "handled": {
+      "title": "Handled",
+      "subtitle": "Findings you've marked resolved, accepted, or won't-fix."
+    },
+    "state": {
+      "status": "Status",
+      "owner": "Owner",
+      "ownerPlaceholder": "Assign…",
+      "open": "Open",
+      "in_progress": "In progress",
+      "resolved": "Resolved",
+      "accepted": "Accepted",
+      "wont_fix": "Won't fix"
+    }
+  },
+  "center": {
+    "title": "Audit Center",
+    "subtitle": "Operational readiness reports across identity, providers, secrets, and remediation — scored deterministically.",
+    "open": "Open report",
+    "executive": {
+      "title": "Executive Risk Summary",
+      "desc": "Overall readiness score, finding counts, and top risks."
+    },
+    "identity": {
+      "title": "Identity & Access",
+      "desc": "Who has access, privilege level, MFA state, and last activity."
+    },
+    "providers": {
+      "title": "Provider Inventory",
+      "desc": "Every connected provider with status, risk, and last check."
+    },
+    "secrets": {
+      "title": "Secrets & API Keys",
+      "desc": "Configured credentials by environment and rotation posture."
+    },
+    "remediation": {
+      "title": "Remediation Roadmap",
+      "desc": "Prioritized fixes sequenced by urgency."
+    },
+    "usage": {
+      "title": "AI Usage & Cost",
+      "desc": "Token consumption and estimated cost per feature and user."
+    },
+    "history": {
+      "title": "Readiness History",
+      "desc": "Track your readiness score and finding counts over time."
+    },
+    "github": {
+      "title": "GitHub & Code Change",
+      "desc": "Branch protection, collaborators, and stale branches."
+    },
+    "supabase": {
+      "title": "Database Security",
+      "desc": "RLS status, public buckets, and service-role exposure."
+    },
+    "stripe": {
+      "title": "Payments Config",
+      "desc": "Live mode, price tiers, and webhook coverage."
+    },
+    "vercel": {
+      "title": "Deployment & Env",
+      "desc": "Env vars by scope, exposure, and prod/preview drift."
+    },
+    "activity": {
+      "title": "Audit Log & Activity",
+      "desc": "Recorded actions, actors, and results over time."
+    },
+    "compliance": {
+      "title": "Compliance Readiness",
+      "desc": "Readiness across SOC 2, ISO 27001, NIST CSF, and CIS."
+    }
+  },
+  "usage": {
+    "title": "AI Usage & Cost",
+    "subtitle": "Token consumption and estimated cost across AI features over the last {n} days. Cost is an estimate; token counts are exact.",
+    "totalCost": "Est. cost",
+    "calls": "Calls",
+    "totalTokens": "Total tokens",
+    "cacheHit": "Input from cache",
+    "byFeature": "By Feature",
+    "byUser": "Top Consumers",
+    "byUserHint": "Highest estimated cost first — the basis for per-user billing or throttling.",
+    "col": {
+      "feature": "Feature",
+      "calls": "Calls",
+      "tokens": "Tokens",
+      "cost": "Est. cost",
+      "user": "User"
+    },
+    "empty": "No usage recorded yet.",
+    "loading": "Loading usage…",
+    "loadError": "Could not load usage.",
+    "fetchError": "Error: {msg}"
+  },
+  "export": {
+    "csv": "Export CSV",
+    "pdf": "Print / Save PDF"
+  },
+  "history": {
+    "title": "Readiness History",
+    "subtitle": "Track how your readiness score moves over time.",
+    "snapshot": "Snapshot now",
+    "snapshotting": "Saving…",
+    "loading": "Loading history…",
+    "loadError": "Could not load history.",
+    "fetchError": "Error: {msg}",
+    "snapshotError": "Could not take snapshot.",
+    "empty": "No snapshots yet. Take your first one above.",
+    "trendTitle": "Score over time",
+    "col": {
+      "date": "Date"
+    }
+  },
+  "scan": {
+    "quotaExceeded": "Monthly limit reached: {used}/{cap} audit scans used. Upgrade your plan to run more.",
+    "upgrade": "Upgrade plan"
+  },
+  "github": {
+    "title": "GitHub & Code Change Report",
+    "subtitle": "Branch protection, collaborators, stale branches, and open changes.",
+    "notConfigured": "GitHub is not connected, or its data could not be collected.",
+    "summary": {
+      "collaborators": "Collaborators",
+      "admins": "Admins",
+      "stale": "Stale branches",
+      "openPRs": "Open PRs"
+    },
+    "protection": {
+      "title": "Default branch protection",
+      "enforced": "Enforced",
+      "missing": "Missing",
+      "unverified": "Unverified"
+    },
+    "collab": {
+      "title": "Collaborators",
+      "empty": "No collaborators collected."
+    },
+    "col": {
+      "login": "User",
+      "role": "Role",
+      "access": "Access",
+      "branch": "Branch",
+      "age": "Age (days)"
+    },
+    "admin": "Admin",
+    "member": "Member",
+    "stale": {
+      "title": "Stale branches",
+      "empty": "No stale branches — clean."
+    },
+    "findings": {
+      "title": "Findings ({n})",
+      "empty": "No GitHub findings — nothing flagged."
+    },
+    "loadError": "Could not load the GitHub report.",
+    "fetchError": "Error: {msg}",
+    "loading": "Loading GitHub report…"
+  },
+  "supabase": {
+    "title": "Database Security Report",
+    "subtitle": "Row-level security, public buckets, and service-role exposure.",
+    "notConfigured": "Supabase is not connected, or its data could not be collected.",
+    "summary": {
+      "tables": "Tables",
+      "rlsDisabled": "RLS disabled",
+      "publicBuckets": "Public buckets"
+    },
+    "serviceRole": {
+      "title": "Service-role key exposure",
+      "exposed": "Exposed to client",
+      "serverOnly": "Server-only"
+    },
+    "tables": {
+      "title": "Tables & Row-Level Security",
+      "empty": "No tables collected."
+    },
+    "col": {
+      "table": "Table",
+      "rls": "RLS"
+    },
+    "rls": {
+      "on": "Enabled",
+      "off": "Disabled"
+    },
+    "buckets": {
+      "title": "Public storage buckets",
+      "empty": "No public buckets — clean."
+    },
+    "findings": {
+      "title": "Findings ({n})",
+      "empty": "No database findings — nothing flagged."
+    },
+    "loadError": "Could not load the Supabase report.",
+    "fetchError": "Error: {msg}",
+    "loading": "Loading Supabase report…"
+  },
+  "stripe": {
+    "title": "Payments Configuration Report",
+    "subtitle": "Live mode, price tiers, webhook coverage, and price mismatches.",
+    "notConfigured": "Stripe is not connected, or its data could not be collected.",
+    "summary": {
+      "tiers": "Price tiers",
+      "webhooks": "Webhooks",
+      "mismatches": "Price mismatches"
+    },
+    "mode": {
+      "title": "Stripe mode",
+      "live": "Live mode",
+      "test": "Test mode"
+    },
+    "tiers": {
+      "title": "Price tiers",
+      "empty": "No price tiers collected."
+    },
+    "col": {
+      "name": "Tier",
+      "price": "Price",
+      "interval": "Interval",
+      "priceId": "Price ID",
+      "status": "Status",
+      "endpoint": "Endpoint",
+      "whStatus": "Status",
+      "events": "Events"
+    },
+    "status": {
+      "mismatch": "Mismatch",
+      "ok": "Active"
+    },
+    "webhooks": {
+      "title": "Webhook endpoints",
+      "empty": "No webhook endpoints configured."
+    },
+    "findings": {
+      "title": "Findings ({n})",
+      "empty": "No payments findings — nothing flagged."
+    },
+    "loadError": "Could not load the Stripe report.",
+    "fetchError": "Error: {msg}",
+    "loading": "Loading Stripe report…"
+  },
+  "vercel": {
+    "title": "Deployment & Env Var Report",
+    "subtitle": "Environment variables by scope, public exposure, and prod/preview drift.",
+    "notConfigured": "Vercel is not connected, so deployment posture could not be assessed.",
+    "summary": {
+      "scopes": "Env scopes",
+      "vars": "Variables",
+      "publicSensitive": "Exposed secrets"
+    },
+    "drift": {
+      "title": "Production ↔ Preview parity",
+      "drift": "Scopes differ",
+      "aligned": "Aligned"
+    },
+    "scopes": {
+      "title": "Environment variables by scope",
+      "empty": "No environment variables collected."
+    },
+    "metadataNote": "Names only — values are never read or shown.",
+    "scope": {
+      "production": "Production",
+      "preview": "Preview",
+      "development": "Development",
+      "none": "No variables in this scope."
+    },
+    "findings": {
+      "title": "Findings ({n})",
+      "empty": "No deployment findings — nothing flagged."
+    },
+    "loadError": "Could not load the deployment report.",
+    "fetchError": "Error: {msg}",
+    "loading": "Loading deployment report…"
+  },
+  "activity": {
+    "title": "Audit Log & Activity Timeline",
+    "subtitle": "Recorded actions, actors, and results from the Hub audit log.",
+    "summary": {
+      "total": "Events",
+      "success": "Succeeded",
+      "failures": "Failures",
+      "denials": "Blocked / denied",
+      "actors": "Actors"
+    },
+    "window": "Showing {n} most recent events · {since} → {until}",
+    "empty": "No audit events recorded yet.",
+    "col": {
+      "time": "Time (UTC)",
+      "actor": "Actor",
+      "action": "Action",
+      "target": "Target",
+      "status": "Status",
+      "message": "Message"
+    },
+    "status": {
+      "success": "Success",
+      "failure": "Failure",
+      "blocked": "Blocked",
+      "denied": "Denied",
+      "error": "Error",
+      "config_error": "Config error"
+    },
+    "loadError": "Could not load the activity log.",
+    "fetchError": "Error: {msg}",
+    "loading": "Loading activity log…"
+  },
+  "compliance": {
+    "title": "Compliance Readiness Matrix",
+    "subtitle": "Readiness against SOC 2, ISO 27001, NIST CSF, and CIS — mapped from your current findings.",
+    "disclaimer": "Readiness indication only — this is not a certification, attestation, or formal audit. Reference codes are indicative.",
+    "overall": "Overall readiness",
+    "summary": {
+      "families": "Control families",
+      "ready": "Ready",
+      "attention": "Needs attention",
+      "gaps": "Gaps"
+    },
+    "readyOf": "{ready} of {total} ready",
+    "matrix": {
+      "title": "Control families"
+    },
+    "col": {
+      "family": "Control family",
+      "status": "Status",
+      "findings": "Findings"
+    },
+    "fw": {
+      "soc2": "SOC 2",
+      "iso27001": "ISO 27001",
+      "nist": "NIST CSF",
+      "cis": "CIS Controls"
+    },
+    "family": {
+      "accessControl": "Access Control & Identity",
+      "changeManagement": "Change Management",
+      "dataSecurity": "Data Security",
+      "secrets": "Secrets Management",
+      "configuration": "Configuration & Deployment",
+      "logging": "Logging & Monitoring",
+      "inventory": "Asset Inventory",
+      "payments": "Processing Integrity (Payments)"
+    },
+    "status": {
+      "ready": "Ready",
+      "attention": "Needs attention",
+      "gap": "Gap"
+    },
+    "loadError": "Could not load the compliance report.",
+    "fetchError": "Error: {msg}",
+    "loading": "Loading compliance readiness…"
+  },
+  "admin": {
+    "eyebrow": "NASA-style admin console",
+    "forecasting": "Forecasting",
+    "financialLedger": "Financial ledger",
+    "kpiCockpit": "KPI cockpit",
+    "marketplace": "Marketplace",
+    "saas": "SaaS",
+    "unifiedEngagement": "Unified engagement index",
+    "crmPipeline": "CRM pipeline",
+    "conciergeRecs": "Concierge recommendations",
+    "filters": "Filters: date range • product • country • plan • role",
+    "telemetryReady": "Telemetry-ready. Connect analytics tables/events to activate live records for this cockpit panel.",
+    "telemetrySignal": "Telemetry-ready signal",
+    "notTracked": "Not tracked yet",
+    "comingSoon": "Coming soon",
+    "readyToRemediate": "Ready to remediate",
+    "viewCodeDiff": "View code diff",
+    "approvePullRequest": "Approve pull request"
   }
-
-  return (
-    <div className="sb-cockpit-stack" role="region" aria-label={`${section.title} admin console section`}>
-      <header className="sb-cockpit-hero">
-        <span className="sb-eyebrow">{t.eyebrow}</span>
-        <h2>{section.title}</h2>
-        <p>{section.description}</p>
-      </header>
-
-      <section className="sb-cockpit-grid" aria-label="Dashboard panels">
-        {section.metrics.map(metric => (
-          <article key={metric.key} className="sb-neon-panel" tabIndex={0}>
-            <p>{metric.label}</p>
-            <strong>{liveValue(metric.key) ?? metric.value ?? t.notTracked}</strong>
-            <span>{metric.helper ?? t.telemetrySignal}</span>
-          </article>
-        ))}
-      </section>
-
-      <section className="sb-mission-grid" aria-label="Unified operational intelligence">
-        <article className="sb-glass-panel">
-          <h3>{t.forecasting}</h3>
-          {FORECASTS.map(item => (
-            <p key={item.horizon}>
-              <strong>{item.horizon}</strong> · {item.revenue} · campaign {item.campaignSuccess} · upsell {item.upsellLikelihood}
-            </p>
-          ))}
-        </article>
-        <article className="sb-glass-panel">
-          <h3>{t.financialLedger}</h3>
-          {Object.entries(FINANCIAL_LEDGER).map(([key, value]) => (
-            <p key={key}><strong>{key.replace(/([A-Z])/g, ' $1')}</strong> · {value}</p>
-          ))}
-        </article>
-        <article className="sb-glass-panel">
-          <h3>{t.kpiCockpit}</h3>
-          <p><strong>{t.marketplace}</strong> · {KPI_DASHBOARD.marketplace.join(' · ')}</p>
-          <p><strong>{t.saas}</strong> · {KPI_DASHBOARD.saas.join(' · ')}</p>
-          <p><strong>{t.unifiedEngagement}</strong> · {KPI_DASHBOARD.unifiedEngagementIndex}</p>
-        </article>
-        <article className="sb-glass-panel">
-          <h3>{t.crmPipeline}</h3>
-          {CRM_STAGES.map(stage => (
-            <p key={stage.stage}>
-              <strong>{stage.stage}</strong> · {Math.round(stage.probability * 100)}% · {stage.automation}
-            </p>
-          ))}
-        </article>
-      </section>
-
-      <section className="sb-orbit-table" aria-label={section.tableTitle}>
-        <div className="sb-orbit-table__header">
-          <h3>{section.tableTitle}</h3>
-          <span>{t.filters}</span>
-        </div>
-        <table>
-          <thead>
-            <tr>{section.tableColumns.map(c => <th key={c}>{c}</th>)}</tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td colSpan={section.tableColumns.length}>{t.telemetryReady}</td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
-
-      <section className="sb-mission-grid" aria-label="Executive recommendations">
-        {COCKPIT_PANELS.slice(0, 3).map(panel => (
-          <article key={panel.title} className="sb-glass-panel">
-            <h3>{panel.title}</h3>
-            <p><strong>{panel.value}</strong></p>
-            <p>{panel.status}</p>
-          </article>
-        ))}
-        <article className="sb-glass-panel">
-          <h3>{t.conciergeRecs}</h3>
-          {EXECUTIVE_RECOMMENDATIONS.map(item => <p key={item}>• {item}</p>)}
-        </article>
-      </section>
-    </div>
-  )
 }

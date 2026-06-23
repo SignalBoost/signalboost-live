@@ -65,12 +65,36 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  let body: { file?: string; line?: number; title?: string; detail?: string; recommendation?: string } = {}
+  let body: { mode?: string; file?: string; path?: string; line?: number; title?: string; detail?: string; recommendation?: string; content?: string } = {}
   try { body = await req.json() } catch { /* validated below */ }
 
-  const file = typeof body.file === 'string' ? body.file.trim() : ''
-  const recommendation = typeof body.recommendation === 'string' ? body.recommendation : ''
+  const mode = body.mode === 'commit' ? 'commit' : 'preview'
+  const file = typeof (body.file ?? body.path) === 'string' ? String(body.file ?? body.path).trim() : ''
   const title = typeof body.title === 'string' && body.title.trim() ? body.title : 'audit finding'
+
+  // ── COMMIT: push the already-previewed content to an ai/* branch (the human
+  //    handshake). Writes exactly what the preview showed; preflights still guard. ──
+  if (mode === 'commit') {
+    const content = typeof body.content === 'string' ? body.content : ''
+    if (!file || !content.trim()) {
+      return NextResponse.json({ ok: false, error: 'A file and previewed content are required to push.' }, { status: 400 })
+    }
+    const branch = `ai/audit-fix-${slug(title)}-${Date.now().toString(36)}`
+    const commit = await commitFileToBranch({
+      branch,
+      path: file,
+      content: content.endsWith('\n') ? content : content + '\n',
+      message: `AI audit fix: ${title}`.slice(0, 200),
+    })
+    if (!commit.ok) {
+      // Surface the preflight refusal verbatim — it's the safety net, not a glitch.
+      return NextResponse.json({ ok: false, error: commit.error || 'Commit refused.' }, { status: 422 })
+    }
+    return NextResponse.json({ ok: true, mode: 'commit', branch: commit.branch, compareUrl: commit.compareUrl, commitSha: commit.commitSha })
+  }
+
+  // ── PREVIEW: generate the corrected file and return a diff. NO write. ──────────
+  const recommendation = typeof body.recommendation === 'string' ? body.recommendation : ''
   const detail = typeof body.detail === 'string' ? body.detail : ''
   const line = typeof body.line === 'number' ? body.line : null
 
@@ -78,7 +102,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'A file and a recommendation are required.' }, { status: 400 })
   }
 
-  // Read the current file. Refuse to patch a truncated read — we'd commit a partial file.
+  // Read the current file. Refuse to patch a truncated read — we'd preview a partial file.
   const f = await readRepoFile(file)
   if (!f.ok || !f.content) {
     return NextResponse.json({ ok: false, error: f.error || 'Could not read the file.' }, { status: 404 })
@@ -105,26 +129,20 @@ export async function POST(req: NextRequest) {
   if (!raw || !raw.trim()) {
     return NextResponse.json({ ok: false, error: 'The model did not return a patch.' }, { status: 502 })
   }
-  const content = stripFences(raw)
+  const newContent = stripFences(raw)
 
-  // Commit to an ai/* branch only. No allowRewrite/createNewFile: preflights guard.
-  const branch = `ai/audit-fix-${slug(title)}-${Date.now().toString(36)}`
-  const commit = await commitFileToBranch({
-    branch,
-    path: file,
-    content,
-    message: `AI audit fix: ${title}`.slice(0, 200),
-  })
-
-  if (!commit.ok) {
-    // Surface the preflight refusal verbatim — it's the safety net, not a glitch.
-    return NextResponse.json({ ok: false, error: commit.error || 'Commit refused.' }, { status: 422 })
-  }
+  // Plain-English impact — derived from the finding (already AI-authored at scan time).
+  const before = (detail || title).slice(0, 400)
+  const after = (recommendation || '').slice(0, 400)
 
   return NextResponse.json({
     ok: true,
-    branch: commit.branch,
-    compareUrl: commit.compareUrl,
-    commitSha: commit.commitSha,
+    mode: 'preview',
+    path: file,
+    title,
+    oldContent: f.content,
+    newContent,
+    before,
+    after,
   })
 }

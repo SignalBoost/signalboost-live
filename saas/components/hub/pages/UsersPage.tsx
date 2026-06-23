@@ -4,8 +4,11 @@
 import { useState, useEffect } from 'react'
 import { HubUser, DEFAULT_ROLES, PERMISSION_GROUPS, Permission, Role } from '@/lib/auth/rbac-types'
 import { cardStyle, labelStyle } from '../shared'
+import { useI18n } from '@/components/i18n/I18nProvider'
+import { t } from '@/lib/i18n/t'
 
 export function UsersPage() {
+  const { dict } = useI18n()
   const [users, setUsers] = useState<HubUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -29,10 +32,10 @@ export function UsersPage() {
       if (data.ok) {
         setUsers(data.users || [])
       } else {
-        setError(data.error || 'Failed to load users')
+        setError(data.error || t(dict, 'console.users.err.load', 'Failed to load users'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error loading users')
+      setError(err instanceof Error ? err.message : t(dict, 'console.users.err.loading', 'Error loading users'))
     } finally {
       setLoading(false)
     }
@@ -40,7 +43,7 @@ export function UsersPage() {
 
   async function inviteUser() {
     if (!inviteEmail.trim()) {
-      setError('Email required')
+      setError(t(dict, 'console.users.err.emailRequired', 'Email required'))
       return
     }
 
@@ -63,10 +66,10 @@ export function UsersPage() {
         fetchUsers()
         setError(null)
       } else {
-        setError(data.error || 'Failed to invite user')
+        setError(data.error || t(dict, 'console.users.err.invite', 'Failed to invite user'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error inviting user')
+      setError(err instanceof Error ? err.message : t(dict, 'console.users.err.inviting', 'Error inviting user'))
     }
   }
 
@@ -84,15 +87,15 @@ export function UsersPage() {
         fetchUsers()
         setError(null)
       } else {
-        setError(data.error || 'Failed to update role')
+        setError(data.error || t(dict, 'console.users.err.role', 'Failed to update role'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error updating role')
+      setError(err instanceof Error ? err.message : t(dict, 'console.users.err.updatingRole', 'Error updating role'))
     }
   }
 
   async function removeUser(userId: string) {
-    if (!confirm('Remove this user from the workspace?')) return
+    if (!confirm(t(dict, 'console.users.confirmRemove', 'Remove this user from the workspace?'))) return
 
     try {
       const res = await fetch(`/api/hub/users?id=${userId}`, {
@@ -105,10 +108,10 @@ export function UsersPage() {
         fetchUsers()
         setError(null)
       } else {
-        setError(data.error || 'Failed to remove user')
+        setError(data.error || t(dict, 'console.users.err.remove', 'Failed to remove user'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error removing user')
+      setError(err instanceof Error ? err.message : t(dict, 'console.users.err.removing', 'Error removing user'))
     }
   }
 
@@ -116,10 +119,10 @@ export function UsersPage() {
     <div style={{ padding: '2rem', maxWidth: '1200px' }}>
       <div style={{ marginBottom: '2rem' }}>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#1af0ff' }}>
-          Team Members
+          {t(dict, 'console.users.title', 'Team Members')}
         </h2>
         <p style={{ color: '#888', fontSize: '0.9rem' }}>
-          Manage workspace access and user roles
+          {t(dict, 'console.users.subtitle', 'Manage workspace access and user roles')}
         </p>
       </div>
 
@@ -141,11 +144,11 @@ export function UsersPage() {
       {/* Invite Form */}
       {showInviteForm && (
         <div style={{ ...cardStyle, marginBottom: '2rem' }}>
-          <h3 style={{ ...labelStyle, marginBottom: '1rem' }}>Invite Team Member</h3>
+          <h3 style={{ ...labelStyle, marginBottom: '1rem' }}>{t(dict, 'console.users.inviteTitle', 'Invite Team Member')}</h3>
 
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ ...labelStyle, fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>
-              Email Address
+              {t(dict, 'console.users.emailLabel', 'Email Address')}
             </label>
             <input
               type="email"
@@ -167,7 +170,7 @@ export function UsersPage() {
 
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ ...labelStyle, fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>
-              Role
+              {t(dict, 'console.users.roleLabel', 'Role')}
             </label>
             <select
               value={inviteRole}
@@ -204,7 +207,7 @@ export function UsersPage() {
                 fontSize: '0.9rem',
               }}
             >
-              Send Invite
+              {t(dict, 'console.users.sendInvite', 'Send Invite')}
             </button>
             <button
               onClick={() => setShowInviteForm(false)}
@@ -218,7 +221,7 @@ export function UsersPage() {
                 fontSize: '0.9rem',
               }}
             >
-              Cancel
+              {t(dict, 'common.cancel', 'Cancel')}
             </button>
           </div>
         </div>
@@ -238,18 +241,17 @@ export function UsersPage() {
             marginBottom: '1.5rem',
           }}
         >
-          + Invite Member
+          {t(dict, 'console.users.inviteMember', '+ Invite Member')}
         </button>
       )}
-
-      {/* Users List */}
+{/* Users List */}
       {loading ? (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>
-          Loading team members...
+          {t(dict, 'console.users.loading', 'Loading team members...')}
         </div>
       ) : users.length === 0 ? (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '2rem', color: '#888' }}>
-          No team members yet
+          {t(dict, 'console.users.empty', 'No team members yet')}
         </div>
       ) : (
         <div style={{ display: 'grid', gap: '1rem' }}>
@@ -282,6 +284,7 @@ function UserCard({
   onRoleChange: (role: Role) => void
   onRemove: () => void
 }) {
+  const { dict } = useI18n()
   const roleInfo = DEFAULT_ROLES.find(r => r.name === user.role)
 
   return (
@@ -319,7 +322,7 @@ function UserCard({
           {/* Role Selection */}
           <div>
             <label style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem', display: 'block' }}>
-              Role
+              {t(dict, 'console.users.roleLabel', 'Role')}
             </label>
             <select
               value={user.role}
@@ -345,7 +348,7 @@ function UserCard({
             </select>
             {user.role === 'owner' && (
               <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
-                Owner role cannot be changed
+                {t(dict, 'console.users.ownerLocked', 'Owner role cannot be changed')}
               </div>
             )}
           </div>
@@ -354,7 +357,7 @@ function UserCard({
           {roleInfo && (
             <div>
               <div style={{ ...labelStyle, fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                Permissions ({roleInfo.permissions.length})
+                {t(dict, 'console.users.permissions', 'Permissions')} ({roleInfo.permissions.length})
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                 {roleInfo.permissions.map(perm => {
@@ -382,7 +385,7 @@ function UserCard({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
             <div style={{ background: '#1a1a2e', padding: '0.75rem', borderRadius: '4px' }}>
               <div style={{ color: '#888', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
-                Joined
+                {t(dict, 'console.users.joined', 'Joined')}
               </div>
               <div style={{ color: '#1af0ff', fontSize: '0.85rem' }}>
                 {new Date(user.createdAt).toLocaleDateString()}
@@ -391,10 +394,10 @@ function UserCard({
 
             <div style={{ background: '#1a1a2e', padding: '0.75rem', borderRadius: '4px' }}>
               <div style={{ color: '#888', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
-                Last Login
+                {t(dict, 'console.users.lastLogin', 'Last Login')}
               </div>
               <div style={{ color: '#1af0ff', fontSize: '0.85rem' }}>
-                {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}
+                {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : t(dict, 'console.users.never', 'Never')}
               </div>
             </div>
           </div>
@@ -414,7 +417,7 @@ function UserCard({
                 fontSize: '0.9rem',
               }}
             >
-              🗑️ Remove User
+              🗑️ {t(dict, 'console.users.removeUser', 'Remove User')}
             </button>
           )}
         </div>

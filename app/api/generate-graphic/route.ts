@@ -10,6 +10,17 @@ const MAX_PROMPT = 4000;
 const RATE_MAX = 20;
 const RATE_WINDOW_MS = 60_000;
 
+// Log a bounded, sanitized error line with a random correlation ref — never the
+// raw exception object, stack, request body, headers, or provider payload, any
+// of which can carry tokens or other sensitive values.
+function logSanitizedError(scope: string, err: unknown): string {
+  const ref = `err_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const name = err instanceof Error ? err.name : typeof err;
+  const message = err instanceof Error ? err.message : "non-error thrown";
+  console.error(`[${scope}] ${ref} ${name}: ${String(message).slice(0, 300)}`);
+  return ref;
+}
+
 
 export async function POST(req: Request) {
   try {
@@ -61,9 +72,9 @@ export async function POST(req: Request) {
     // asset, flagged mock:true so callers don't treat it as real output.
     return NextResponse.json({ success: true, mock: true, image_url: "/demo/sample.png" });
   } catch (err) {
-    console.error("generate-graphic route error:", err);
+    const ref = logSanitizedError("generate-graphic", err);
     return NextResponse.json(
-      { success: false, error: "Internal server error" },
+      { success: false, error: "Internal server error", ref },
       { status: 500 }
     );
   }

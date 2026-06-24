@@ -1,4 +1,12 @@
 {
+  "actionForm": {
+    "noExtraInfo": "This action requires no additional information.",
+    "activeEnvMap": "Active Environment Variables Map",
+    "envHelp": "Select from live environment configurations. The console maps core variable IDs directly.",
+    "stripeHelp": "Select from the live Stripe catalog. The console sends the hidden product ID to Stripe.",
+    "selectStripeProduct": "Select a Stripe product",
+    "selectEnvToDelete": "Select an environment variable to delete"
+  },
   "tier": {
     "core": "Core",
     "tier2": "Scale",
@@ -967,6 +975,5 @@
     "done": "Done",
     "rotation_failed": "Rotation failed",
     "retry": "Retry"
-  },
-  "vaultx": {"audit":{"loading":"Loading audit log...","empty":"No audit log entries","trail":"Audit Trail","success":"Success","failed":"Failed","ip":"IP:","showing":"Showing latest 50 of","entries":"entries"},"grid":{"empty":"No secrets in vault","emptyHint":"Secrets from connected providers will appear here.","statusActive":"Active","statusExpiringSoon":"Expiring Soon","statusExpired":"Expired","statusRotated":"Recently Rotated","statusRevoked":"Revoked","expiresIn":"Expires in","day":"day","days":"days","lastRotated":"Last rotated:","expires":"Expires:","created":"Created:"},"page":{"ops":"Operations & Production","keysSecrets":"Keys & Secrets","inventory":"Credential inventory, expiration alerts, and rotation status.","secretWord":"secret","secretsWord":"secrets","stored":"stored.","active":"Active","expiring":"Expiring","lockVault":"Lock Vault","browseSecrets":"Browse Secrets","providerPlaceholder":"Search and select a provider...","selected":"Selected:","statusActive":"Active Secrets","statusExpiringSoon":"Expiring Soon","statusExpired":"Expired","statusRotated":"Recently Rotated","statusRevoked":"Revoked","maskedValue":"Masked Value","encryptedNote":"Full value is encrypted and not displayed in the UI.","expiration":"Expiration","lastRotated":"Last Rotated","typeEnv":"Type & Environment"},"unlock":{"refresh":"Refresh","secureAccess":"Secure Access Required","unlockVault":"Unlock Vault","enable2fa":"Enable 2FA","enter2faCode":"Enter 2FA Code","enterPassword":"Enter your password","scanQr":"Scan QR code with Google Authenticator","sessionExpire":"This session will expire in 30 minutes for security.","password":"Password","verifying":"Verifying...","continue":"Continue","scanAuthApps":"Scan with Google Authenticator, Microsoft Authenticator, or Authy","enter6digit":"Enter 6-digit code to confirm","saveBackup":"Save these backup codes:","back":"Back","unlock":"Unlock","twofaCode":"2FA Code","errPasswordRequired":"Password is required","errInvalidCode":"Enter a valid 6-digit code"}}
+  }
 }

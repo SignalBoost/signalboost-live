@@ -1,1165 +1,300 @@
 'use client'
 
-// saas/components/hub/ProviderActionForm.tsx
-// Hub Console — Universal form renderer for provider actions with active intercept pickers.
+// saas/components/hub/pages/ProviderExpansionPage.tsx
+// Human-first Business Operating Partner console.
+// Four tall cards per page. Status + actions. Operations first, monitoring second.
 
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
-import {
-  getTemplate,
-  validateTemplatePayload,
-  type ProviderFormField,
-} from '@/lib/hub/provider-templates'
-import { Lang, cardStyle, bodyStyle, labelStyle, monoStyle } from './shared'
-import { useTranslation } from '@/components/i18n/useTranslation'
+import { useEffect, useMemo, useState } from 'react'
+import { PageProps, TONES, cardStyle, labelStyle } from '../shared'
+import ProviderActionLauncher from '../ProviderActionLauncher'
 
-// Providers migrated to the portable action engine. Their actions + pickers
-// target /api/hub/action/engine; everything else stays on the legacy route.
-// The engine accepts the same { templateId, payload } body, so only the URL changes.
-const ENGINE_PROVIDERS = ['github', 'openai', 'elevenlabs', 'anthropic', 'gemini', 'resend', 'assemblyai', 'supabase_mkt']
-function hubActionEndpoint(templateId: string): string {
-  const provider = String(templateId || '').split('.')[0]
-  return ENGINE_PROVIDERS.includes(provider) ? '/api/hub/action/engine' : '/api/hub/action'
+// Native per-language copy for this console page. `lang` arrives via PageProps.
+const COPY: Record<string, Record<string, string>> = {
+  opsProduction: { en: 'Operations & Production', es: 'Operaciones y producción', pt: 'Operações e produção', pl: 'Operacje i produkcja', ru: 'Операции и продакшн' },
+  title: { en: 'Business Operating Partners', es: 'Socios operativos del negocio', pt: 'Parceiros operacionais do negócio', pl: 'Partnerzy operacyjni firmy', ru: 'Операционные бизнес-партнёры' },
+  subtitle: {
+    en: 'Four partners per page. Clear status. Clear actions. The goal is to work from the console whenever possible.',
+    es: 'Cuatro socios por página. Estado claro. Acciones claras. El objetivo es trabajar desde la consola siempre que sea posible.',
+    pt: 'Quatro parceiros por página. Status claro. Ações claras. O objetivo é trabalhar pelo console sempre que possível.',
+    pl: 'Czterech partnerów na stronę. Jasny status. Jasne akcje. Celem jest praca z poziomu konsoli, gdy to możliwe.',
+    ru: 'Четыре партнёра на странице. Понятный статус. Понятные действия. Цель — работать из консоли, когда это возможно.',
+  },
+  keySignals: { en: 'Key Signals', es: 'Señales clave', pt: 'Sinais principais', pl: 'Kluczowe sygnały', ru: 'Ключевые сигналы' },
+  healthy: { en: 'Healthy', es: 'Saludable', pt: 'Saudável', pl: 'Sprawny', ru: 'В норме' },
+}
+function tx(key: string, lang: string): string {
+  return COPY[key]?.[lang] ?? COPY[key]?.en ?? key
 }
 
-type FormState = 'idle' | 'preview' | 'confirm' | 'submitting' | 'success' | 'error'
-
-type StripeProductOption = {
-  id: string
+type PartnerStatus = 'Healthy' | 'Needs Review' | 'Action Needed'
+type PartnerAction = { label: string; kind: 'primary' | 'neutral'; url?: string }
+type Partner = {
   name: string
-  active?: boolean
-  created?: string
+  category: string
+  subtitle: string
+  status: PartnerStatus
+  lastChecked: string
+  region: string
+  signals: string[]
+  actions: PartnerAction[]
 }
 
-type VercelEnvOption = {
+type PartnerPage = {
   id: string
-  key: string
-  target?: string | string[]
-}
-
-export type ProviderActionFormProps = {
-  templateId: string
-  lang: Lang
-  onSuccess?: () => void
-  onError?: (error: string) => void
-  onClose?: () => void
-}
-
-export default function ProviderActionForm({
-  templateId,
-  lang,
-  onSuccess,
-  onError,
-  onClose,
-}: ProviderActionFormProps) {
-  const { t, dict } = useTranslation()
-  const template = getTemplate(templateId, dict)
-
-  const [state, setState] = useState<FormState>('idle')
-  const [values, setValues] = useState<Record<string, unknown>>(() => {
-    const defaults: Record<string, unknown> = {}
-
-    template?.fields.forEach(field => {
-      if (field.defaultValue !== undefined) {
-        defaults[field.id] = field.defaultValue
-      }
-    })
-
-    return defaults
-  })
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [result, setResult] = useState<{ ok: boolean; message?: string; error?: string; data?: any } | null>(null)
-
-  const validate = useCallback((): boolean => {
-    const validation = validateTemplatePayload(templateId, values)
-
-    if (!validation.ok) {
-      const nextErrors: Record<string, string> = {}
-
-      validation.missing?.forEach(fieldId => {
-        nextErrors[fieldId] = 'This field is required'
-      })
-
-      setErrors(nextErrors)
-      return false
-    }
-
-    setErrors({})
-    return true
-  }, [templateId, values])
-
-  if (!template) {
-    return <div style={{ ...cardStyle, ...bodyStyle }}>Template not found: {templateId}</div>
-  }
-
-  const handleFieldChange = (fieldId: string, value: unknown) => {
-    setValues(prev => ({ ...prev, [fieldId]: value }))
-
-    if (errors[fieldId]) {
-      setErrors(prev => {
-        const next = { ...prev }
-        delete next[fieldId]
-        return next
-      })
-    }
-  }
-
-  const handleSubmit = async () => {
-    if (!validate()) {
-      setState('idle')
-      return
-    }
-
-    if (template.previewBeforeSubmit) {
-      setState('preview')
-      return
-    }
-
-    if (template.requiresConfirm) {
-      setState('confirm')
-      return
-    }
-
-    await executeAction()
-  }
-
-  const executeAction = async () => {
-    setState('submitting')
-
-    try {
-      const res = await fetch(hubActionEndpoint(templateId), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateId, payload: values }),
-      })
-
-      const data = await res.json()
-
-      if (res.ok) {
-        setResult({
-          ok: true,
-          message: data.message || 'Action completed successfully.',
-          data: data.data,
-        })
-        setState('success')
-        // Keep the result card open after a successful run. It is dismissed only
-        // by the user (Close/Cancel) — no timer, and no onSuccess auto-close.
-      } else {
-        const error = data.error || 'Action failed.'
-        setResult({ ok: false, error })
-        setState('error')
-        onError?.(error)
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Network error'
-      setResult({ ok: false, error: message })
-      setState('error')
-      onError?.(message)
-    }
-  }
-
-  return (
-    <div
-      style={{
-        ...cardStyle,
-        width: '100%',
-        height: '100%',
-        maxHeight: '85vh',
-        minHeight: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-      }}
-    >
-      <div
-        style={{
-          padding: '16px 18px 14px',
-          background: 'linear-gradient(135deg, rgba(26,240,255,.08), rgba(255,195,0,.04) 60%, rgba(3,7,18,0))',
-          borderBottom: '1px solid rgba(255,255,255,.08)',
-          position: 'relative',
-          flex: '0 0 auto',
-        }}
-      >
-        <span aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, background: 'linear-gradient(90deg, #ffc300, #1af0ff)' }} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
-          <span style={{ width: 44, height: 44, borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0, background: 'rgba(26,240,255,.10)', border: '1px solid rgba(26,240,255,.28)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)' }}>{template.icon}</span>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(26,240,255,.75)', marginBottom: 3 }}>
-              Provider Action · {String(template.api?.service || '').toUpperCase()}
-            </div>
-            <div style={{ fontSize: 17, fontWeight: 800, color: '#fff', letterSpacing: '-.01em', lineHeight: 1.15 }}>{template.label}</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.55)', marginTop: 2 }}>{template.description}</div>
-          </div>
-        </div>
-      </div>
-
-      <div style={{ ...bodyStyle, gap: 16, flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: 16 }}>
-        {state === 'idle' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
-            {template.fields.length === 0 ? (
-              <div style={{ padding: 20, textAlign: 'center', color: 'rgba(255,255,255,.6)', fontSize: 13 }}>
-                {t('console.actionForm.noExtraInfo', 'This action requires no additional information.')}
-              </div>
-            ) : (
-              template.fields.map(field => (
-                <FormField
-                  key={field.id}
-                  templateId={templateId}
-                  field={field}
-                  value={values[field.id]}
-                  allValues={values}
-                  error={errors[field.id]}
-                  onChange={value => handleFieldChange(field.id, value)}
-                  lang={lang}
-                />
-              ))
-            )}
-
-            {/* Embedded Variable Live Checker Track */}
-            {templateId === 'vercel.add_env_var' && (
-              <div style={{ marginTop: 14, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 14 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: '#1af0ff', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
-                  {t('console.actionForm.activeEnvMap', 'Active Environment Variables Map')}
-                </div>
-                <EmbeddedVercelEnvList />
-              </div>
-            )}
-          </div>
-        )}
-
-        {state === 'preview' && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0, overflow: 'hidden' }}>
-            <div style={noticeStyle}>
-              {t('console.ui.review_action', 'Review the action that will be sent to')} {template.api.service}. {t('console.ui.cannot_undo', 'Once confirmed, this cannot be undone.')}
-            </div>
-            <div style={jsonBoxStyle}>
-              {JSON.stringify({ template: templateId, api: `${template.api.method} ${template.api.endpoint}`, payload: values }, null, 2)}
-            </div>
-          </div>
-        )}
-
-        {state === 'confirm' && (
-          <CenteredState icon="⚠️" title={t('console.cui.confirm_action', 'Confirm action')}>
-            {t('console.ui.about_to_execute', 'You are about to execute')} <strong>{template.label}</strong> {t('console.ui.on', 'on')} {template.api.service}.
-          </CenteredState>
-        )}
-
-        {state === 'submitting' && <CenteredState icon="⏳" title={t('console.cui.executing_action', 'Executing action…')} spin />}
-
-        {state === 'success' && result?.ok && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0, overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 auto' }}>
-              <span style={{ fontSize: 18 }}>✅</span>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#22c55e' }}>{result.message}</div>
-            </div>
-            <ResultView data={result.data} />
-          </div>
-        )}
-
-        {state === 'error' && result?.error && (
-          <CenteredState icon="❌" title={t("console.ui.error", "Error")} titleColor="#ef4444">
-            <span style={{ fontFamily: monoStyle.fontFamily }}>{result.error}</span>
-          </CenteredState>
-        )}
-      </div>
-
-      <div style={footerStyle}>
-        {state === 'idle' && (
-          <>
-            {onClose && <button onClick={onClose} className="hub-chip" style={secondaryButtonStyle}>{t('console.ui.cancel', 'Cancel')}</button>}
-            <button onClick={handleSubmit} className="hub-btn" style={primaryButtonStyle}>
-              {template.previewBeforeSubmit ? t('console.ui.preview', 'Preview') : template.requiresConfirm ? t('console.ui.confirm', 'Confirm') : t('console.ui.execute', 'Execute')}
-            </button>
-          </>
-        )}
-
-        {state === 'preview' && (
-          <>
-            <button onClick={() => setState('idle')} className="hub-chip" style={secondaryButtonStyle}>{t('console.cui.back', 'Back')}</button>
-            <button onClick={() => (template.requiresConfirm ? setState('confirm') : executeAction())} className="hub-btn" style={warningButtonStyle}>
-              {template.requiresConfirm ? t('console.ui.confirm', 'Confirm') : t('console.ui.execute', 'Execute')}
-            </button>
-          </>
-        )}
-
-        {state === 'confirm' && (
-          <>
-            <button onClick={() => setState(template.previewBeforeSubmit ? 'preview' : 'idle')} className="hub-chip" style={secondaryButtonStyle}>{t('console.ui.cancel', 'Cancel')}</button>
-            <button onClick={executeAction} className="hub-btn" style={dangerButtonStyle}>{t('console.cui.execute_now', 'Execute Now')}</button>
-          </>
-        )}
-
-        {(state === 'submitting' || state === 'success' || state === 'error') && onClose && (
-          <button onClick={onClose} className="hub-btn" style={closeButtonStyle}>{t('console.ui.close', 'Close')}</button>
-        )}
-      </div>
-
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-    </div>
-  )
-}
-
-type FormFieldProps = {
-  templateId: string
-  field: ProviderFormField
-  value: unknown
-  allValues?: Record<string, unknown>
-  error?: string
-  onChange: (value: unknown) => void
-  lang: Lang
-}
-
-function FormField({ templateId, field, value, allValues, error, onChange }: FormFieldProps) {
-  const { t } = useTranslation()
-  const baseStyle: CSSProperties = {
-    width: '100%',
-    padding: '11px 13px',
-    borderRadius: 10,
-    border: error ? '1px solid rgba(239,68,68,.55)' : '1px solid rgba(255,255,255,.13)',
-    background: 'rgba(3,7,18,.45)',
-    color: '#fff',
-    fontSize: 13,
-    fontFamily: 'inherit',
-    outline: 'none',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,.04)',
-    transition: 'border-color .15s ease, box-shadow .15s ease',
-  }
-
-  const useStripeProductPicker = isStripeProductPickerField(templateId, field.id)
-  const useVercelEnvPicker = templateId === 'vercel.delete_env' && field.id === 'id'
-
-  const renderInput = () => {
-    if (field.type === 'remote_select' && field.source) {
-      return <RemoteSelect field={field} allValues={allValues} value={value} onChange={onChange} error={error} />
-    }
-    if (useStripeProductPicker) {
-      return <StripeProductPicker value={(value as string) || ''} onChange={onChange} error={error} />
-    }
-    if (useVercelEnvPicker) {
-      return <VercelEnvVarPicker value={(value as string) || ''} onChange={onChange} error={error} />
-    }
-
-    switch (field.type) {
-      case 'text':
-      case 'email':
-      case 'phone':
-        return (
-          <input
-            type={field.type === 'email' ? 'email' : field.type === 'phone' ? 'tel' : 'text'}
-            value={(value as string) || ''}
-            onChange={e => onChange(e.target.value)}
-            placeholder={field.placeholder}
-            maxLength={field.maxLength}
-            style={baseStyle}
-          />
-        )
-
-      case 'textarea':
-        return (
-          <textarea
-            value={(value as string) || ''}
-            onChange={e => onChange(e.target.value)}
-            placeholder={field.placeholder}
-            maxLength={field.maxLength}
-            style={{ ...baseStyle, minHeight: 100, resize: 'vertical' }}
-          />
-        )
-
-      case 'number':
-      case 'currency_cents':
-        return (
-          <input
-            type="number"
-            value={(value as number) ?? ''}
-            onChange={e => onChange(e.target.value ? parseFloat(e.target.value) : '')}
-            min={field.min}
-            max={field.max}
-            step={field.type === 'currency_cents' ? 0.01 : 1}
-            placeholder={field.placeholder}
-            style={baseStyle}
-          />
-        )
-
-      case 'secret':
-        return (
-          <input
-            type="password"
-            value={(value as string) || ''}
-            onChange={e => onChange(e.target.value)}
-            placeholder={field.placeholder}
-            maxLength={field.maxLength}
-            style={baseStyle}
-          />
-        )
-
-      case 'select':
-        return (
-          <select
-            value={(value as string) || ''}
-            onChange={e => onChange(e.target.value)}
-            style={{ ...baseStyle, cursor: 'pointer' }}
-          >
-            <option value="" disabled style={{ color: '#111', background: '#fff' }}>
-              {field.placeholder || 'Select an option'}
-            </option>
-            {field.options?.map(opt => (
-              <option key={opt.value} value={opt.value} style={{ color: '#111', background: '#fff' }}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        )
-
-      case 'toggle':
-        return (
-          <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: 'rgba(255,255,255,.7)', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={(value as boolean) || false}
-              onChange={e => onChange(e.target.checked)}
-              style={{ width: 18, height: 18, cursor: 'pointer' }}
-            />
-            {field.label}
-          </label>
-        )
-      default:
-        return null
-    }
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
-      {field.type !== 'toggle' && (
-        <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 800, letterSpacing: '.1em', color: 'rgba(255,255,255,.62)' }}>
-          <span aria-hidden="true" style={{ width: 4, height: 4, borderRadius: 999, background: '#1af0ff', flexShrink: 0 }} />
-          {useVercelEnvPicker ? 'Environment Variable Target Key' : useStripeProductPicker ? 'Product' : field.label}
-          {field.required && <span style={{ color: '#ffc300' }}>*</span>}
-        </label>
-      )}
-
-      {renderInput()}
-
-      {useVercelEnvPicker ? (
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: -2 }}>
-          {t('console.actionForm.envHelp', 'Select from live environment configurations. The console maps core variable IDs directly.')}
-        </div>
-      ) : useStripeProductPicker ? (
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: -2 }}>
-          {t('console.actionForm.stripeHelp', 'Select from the live Stripe catalog. The console sends the hidden product ID to Stripe.')}
-        </div>
-      ) : (
-        field.help && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: -2 }}>{field.help}</div>
-      )}
-
-      {error && <div style={{ fontSize: 11, color: '#ef4444', marginTop: -2 }}>⚠️ {error}</div>}
-    </div>
-  )
-}
-
-function isStripeProductPickerField(templateId: string, fieldId: string) {
-  const normField = fieldId.toLowerCase().replace(/[^a-z0-9]/g, '')
-  return (
-    (templateId === 'stripe.create_price' && fieldId === 'product') ||
-    (templateId === 'stripe.edit_product' && (normField === 'id' || normField === 'productid')) ||
-    (templateId === 'stripe.delete_product' && (normField === 'id' || normField === 'productid')) ||
-    (templateId === 'stripe.archive_product' && (normField === 'id' || normField === 'productid' || normField === 'product'))
-  )
-}
-
-function StripeProductPicker({
-  value,
-  onChange,
-  error,
-}: {
-  value: string
-  onChange: (value: unknown) => void
-  error?: string
-}) {
-  const { t } = useTranslation()
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [products, setProducts] = useState<StripeProductOption[]>([])
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function loadProducts() {
-      setLoading(true)
-      setLoadError(null)
-
-      try {
-        const res = await fetch('/api/hub/action', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ templateId: 'stripe.view_products', payload: {} }),
-        })
-
-        const data = await res.json()
-
-        if (!res.ok) {
-          throw new Error(data.error || 'Unable to load Stripe products')
-        }
-
-        // Deep fallback parsing layout captures data fields whether nested under data.products, data.data.products, or raw roots.
-        const items = data.data?.products || data.products || (Array.isArray(data.data) ? data.data : [])
-
-        if (!cancelled) {
-          setProducts(items)
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setLoadError(err instanceof Error ? err.message : 'Unable to load Stripe products')
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false)
-        }
-      }
-    }
-
-    loadProducts()
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  if (loading) {
-    return (
-      <div style={{ ...pickerBoxStyle, borderColor: error ? 'rgba(239,68,68,.5)' : 'rgba(255,255,255,.15)' }}>
-        Loading Stripe catalog…
-      </div>
-    )
-  }
-
-  if (loadError) {
-    return (
-      <input
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder="prod_..."
-        style={{
-          ...pickerInputStyle,
-          border: error ? '1px solid rgba(239,68,68,.5)' : '1px solid rgba(255,255,255,.15)',
-        }}
-      />
-    )
-  }
-
-  return (
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      style={{
-        ...pickerInputStyle,
-        border: error ? '1px solid rgba(239,68,68,.5)' : '1px solid rgba(255,255,255,.15)',
-      }}
-    >
-      <option value="" disabled style={{ color: '#111', background: '#fff' }}>
-        {t('console.actionForm.selectStripeProduct', 'Select a Stripe product')}
-      </option>
-
-      {products.map(product => (
-        <option key={product.id} value={product.id} style={{ color: '#111', background: '#fff' }}>
-          {product.name || product.id} — {product.id}
-        </option>
-      ))}
-    </select>
-  )
-}
-
-function VercelEnvVarPicker({
-  value,
-  onChange,
-  error,
-}: {
-  value: string
-  onChange: (value: unknown) => void
-  error?: string
-}) {
-  const { t } = useTranslation()
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [envs, setEnvs] = useState<VercelEnvOption[]>([])
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function loadEnvs() {
-      setLoading(true)
-      setLoadError(null)
-
-      try {
-        const res = await fetch('/api/hub/action', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ templateId: 'vercel.view_env', payload: {} }),
-        })
-
-        const data = await res.json()
-
-        if (!res.ok) {
-          throw new Error(data.error || 'Unable to fetch project configurations')
-        }
-
-        const items = data.data?.vars || data.data?.envs || (Array.isArray(data.data) ? data.data : [])
-
-        if (!cancelled) {
-          setEnvs(items)
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setLoadError(err instanceof Error ? err.message : 'Unable to query environment fields')
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false)
-        }
-      }
-    }
-
-    loadEnvs()
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  if (loading) {
-    return (
-      <div style={{ ...pickerBoxStyle, borderColor: error ? 'rgba(239,68,68,.5)' : 'rgba(255,255,255,.15)' }}>
-        Loading active Vercel configurations…
-      </div>
-    )
-  }
-
-  if (loadError) {
-    return (
-      <input
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={t('console.cui.select_key_id', 'Select key ID...')}
-        style={{
-          ...pickerInputStyle,
-          border: error ? '1px solid rgba(239,68,68,.5)' : '1px solid rgba(255,255,255,.15)',
-        }}
-      />
-    )
-  }
-
-  return (
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      style={{
-        ...pickerInputStyle,
-        border: error ? '1px solid rgba(239,68,68,.5)' : '1px solid rgba(255,255,255,.15)',
-      }}
-    >
-      <option value="" disabled style={{ color: '#111', background: '#fff' }}>
-        {t('console.actionForm.selectEnvToDelete', 'Select an environment variable to delete')}
-      </option>
-
-      {envs.map(env => (
-        <option key={env.id || env.key} value={env.id} style={{ color: '#111', background: '#fff' }}>
-          {env.key} {env.target ? `(${Array.isArray(env.target) ? env.target.join(', ') : env.target})` : ''}
-        </option>
-      ))}
-    </select>
-  )
-}
-
-function EmbeddedVercelEnvList() {
-  const { t } = useTranslation()
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [envs, setEnvs] = useState<VercelEnvOption[]>([])
-
-  useEffect(() => {
-    let cancelled = false
-    async function fetchEnvs() {
-      try {
-        const res = await fetch('/api/hub/action', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ templateId: 'vercel.view_env', payload: {} }),
-        })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error || 'Failed to list inventory profiles')
-        
-        const items = data.data?.vars || data.data?.envs || (Array.isArray(data.data) ? data.data : [])
-        if (!cancelled) setEnvs(items)
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Inventory lookup failed')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    fetchEnvs()
-    return () => { cancelled = true }
-  }, [])
-
-  if (loading) return <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', padding: '4px 0' }}>{t('console.cui.querying_vars', 'Querying cluster variables ledger...')}</div>
-  if (error) return <div style={{ fontSize: 11, color: '#ef4444' }}>⚠️ Inventory Error: {error}</div>
-  if (envs.length === 0) return <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', padding: '4px 0' }}>{t('console.cui.no_config_keys', 'No active configuration keys found.')}</div>
-
-  return (
-    <div style={{ maxHeight: '160px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, background: 'rgba(0,0,0,0.2)', padding: '6px 10px' }}>
-      {envs.map(env => (
-        <div key={env.id || env.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 12.5 }}>
-          <span style={{ fontFamily: monoStyle.fontFamily, color: 'rgba(26,240,255,0.9)', fontWeight: 600 }}>{env.key}</span>
-          <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.35)', fontWeight: 700, textTransform: 'uppercase' }}>
-            {env.target ? (Array.isArray(env.target) ? env.target.join(', ') : env.target) : 'all'}
-          </span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function interpolateLabel(tpl: string, item: any): string {
-  return String(tpl).replace(/\{(\w+)\}/g, (_m, k) => {
-    const v = item?.[k]
-    return v === undefined || v === null ? '' : String(v)
-  })
-}
-
-function RemoteSelect({
-  field,
-  value,
-  onChange,
-  error,
-  allValues,
-}: {
-  field: ProviderFormField
-  value: unknown
-  onChange: (v: unknown) => void
-  error?: string
-  allValues: Record<string, unknown>
-}) {
-  const { t } = useTranslation()
-  const source = field.source!
-  const deps = source.dependsOn || []
-  const depValues = deps.map(d => String(allValues?.[d] ?? ''))
-  const depsReady = deps.every((_d, i) => depValues[i] !== '')
-  const depKey = JSON.stringify(depValues)
-
-  const [loading, setLoading] = useState(false)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [options, setOptions] = useState<{ label: string; value: string }[]>([])
-
-  useEffect(() => {
-    if (!depsReady) {
-      setOptions([])
-      return
-    }
-    let active = true
-    setLoading(true)
-    setLoadError(null)
-    const payload: Record<string, unknown> = {}
-    deps.forEach(d => {
-      payload[d] = allValues?.[d]
-    })
-    fetch(hubActionEndpoint(source.action), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ templateId: source.action, payload }),
-    })
-      .then(r => r.json())
-      .then(res => {
-        if (!active) return
-        if (!res?.ok) {
-          setLoadError(res?.error || 'Could not load options')
-          setOptions([])
-          return
-        }
-        const arr = res?.data?.[source.dataPath]
-        const list = Array.isArray(arr) ? arr : []
-        const opts = list.map((it: any) => ({
-          value: String(it?.[source.valueKey] ?? ''),
-          label: interpolateLabel(source.labelTemplate, it),
-        }))
-        setOptions(opts)
-        // If a dependency changed and the previously-selected value no longer
-        // exists in the new list, clear it so a stale id can't be submitted.
-        if (deps.length > 0) {
-          const cur = String(value ?? '')
-          if (cur && !opts.some(o => o.value === cur)) onChange('')
-        }
-      })
-      .catch(() => {
-        if (active) setLoadError('Could not load options')
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
-    return () => {
-      active = false
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [depKey, depsReady, source.action, source.dataPath, source.valueKey, source.labelTemplate])
-
-  const baseStyle: CSSProperties = {
-    width: '100%',
-    padding: '10px 12px',
-    borderRadius: 8,
-    border: error ? '1px solid rgba(239,68,68,.5)' : '1px solid rgba(255,255,255,.15)',
-    background: 'rgba(255,255,255,.04)',
-    color: '#fff',
-    fontSize: 13,
-    fontFamily: 'inherit',
-    outline: 'none',
-    cursor: 'pointer',
-  }
-
-  if (!depsReady) {
-    return (
-      <div style={{ ...baseStyle, color: 'rgba(255,255,255,.45)', cursor: 'default' }}>
-        {source.emptyHint || 'Select a previous field first'}
-      </div>
-    )
-  }
-
-  const current = String(value ?? '')
-  const hasCurrent = options.some(o => o.value === current)
-
-  return (
-    <div>
-      <select
-        value={current}
-        onChange={e => onChange(e.target.value)}
-        style={baseStyle}
-        disabled={loading}
-      >
-        <option value="" disabled style={{ color: '#111', background: '#fff' }}>
-          {loading ? 'Loading…' : options.length ? 'Select…' : 'No options found'}
-        </option>
-        {!hasCurrent && current !== '' && (
-          <option value={current} style={{ color: '#111', background: '#fff' }}>
-            {current}
-          </option>
-        )}
-        {options.map(o => (
-          <option key={o.value} value={o.value} style={{ color: '#111', background: '#fff' }}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      {loadError && (
-        <div style={{ fontSize: 11, color: 'rgba(239,68,68,.85)', marginTop: 4 }}>{loadError}</div>
-      )}
-      {!loading && !loadError && options.length === 0 && (
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 4 }}>{t('console.cui.nothing_to_select', 'Nothing to select here yet.')}</div>
-      )}
-    </div>
-  )
-}
-
-function ResultView({ data }: { data: any }) {
-  if (data === null || data === undefined) return null
-
-  const arrayKey = data && typeof data === 'object'
-    ? Object.keys(data).find(k => Array.isArray(data[k]) && data[k].length > 0)
-    : null
-
-  if (arrayKey) {
-    const rows: any[] = data[arrayKey]
-    const first = rows[0]
-
-    if (first && typeof first === 'object' && !Array.isArray(first)) {
-      return <ObjectArrayTable rows={rows} />
-    }
-
-    return (
-      <div style={scrollBoxStyle}>
-        {rows.slice(0, 100).map((v: any, i: number) => (
-          <div key={i} style={scalarRowStyle}>{formatCell(v)}</div>
-        ))}
-      </div>
-    )
-  }
-
-  if (data && typeof data === 'object' && typeof data.value === 'string') {
-    return <div style={{ ...jsonBoxStyle, color: 'rgba(26,240,255,.85)', fontSize: 12 }}>{data.value}</div>
-  }
-
-  if (data && typeof data === 'object') {
-    const entries = Object.entries(data).filter(([, v]) => v === null || ['string', 'number', 'boolean'].includes(typeof v))
-
-    if (entries.length > 0) {
-      return (
-        <div style={scrollBoxStyle}>
-          {entries.map(([k, v]) => (
-            <div key={k} style={keyValueRowStyle}>
-              <span style={{ color: 'rgba(255,255,255,.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{k}</span>
-              <span style={valueTextStyle} title={formatCell(v)}>{formatCell(v)}</span>
-            </div>
-          ))}
-        </div>
-      )
-    }
-  }
-
-  return <div style={jsonBoxStyle}>{JSON.stringify(data, null, 2)}</div>
-}
-
-function ObjectArrayTable({ rows }: { rows: any[] }) {
-  const columns = getDisplayColumns(rows)
-  const gridColumns = makeColumns(columns)
-
-  return (
-    <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10 }}>
-      <div style={{ height: '100%', overflowY: 'auto', overflowX: 'auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: gridColumns, gap: 8, padding: '8px 10px', position: 'sticky', top: 0, background: 'rgba(8,11,20,.98)', borderBottom: '1px solid rgba(255,255,255,.08)', zIndex: 1 }}>
-          {columns.map(col => <div key={col} style={tableHeadStyle}>{niceLabel(col)}</div>)}
-        </div>
-
-        {rows.slice(0, 100).map((row, i) => (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: gridColumns, gap: 8, padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,.06)', alignItems: 'center' }}>
-            {columns.map(col => (
-              <div
-                key={col}
-                title={formatCell(row[col])}
-                style={col === 'name' || col === 'label' || col === 'key' ? tableMainCellStyle : tableCellStyle}
-              >
-                {formatCell(row[col])}
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function getDisplayColumns(rows: any[]): string[] {
-  const preferred = ['key', 'name', 'label', 'id', 'type', 'target', 'active', 'created', 'createdAt']
-  const existing = new Set<string>()
-
-  rows.forEach(row => Object.keys(row || {}).forEach(k => existing.add(k)))
-
-  const preferredExisting = preferred.filter(k => existing.has(k))
-  const rest = Array.from(existing).filter(k => !preferred.includes(k)).slice(0, Math.max(0, 5 - preferredExisting.length))
-
-  return [...preferredExisting, ...rest].slice(0, 5)
-}
-
-function makeColumns(columns: string[]) {
-  if (columns.length <= 1) return 'minmax(0, 1fr)'
-
-  return columns.map((column, index) => {
-    if (index === 0) return 'minmax(120px, 1.6fr)'
-    if (column === 'active') return '54px'
-    if (column.toLowerCase().includes('created')) return '88px'
-    if (column.toLowerCase().includes('price')) return 'minmax(74px, 1fr)'
-    return 'minmax(70px, 1fr)'
-  }).join(' ')
-}
-
-function niceLabel(key: string): string {
-  return key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim()
-}
-
-function formatCell(v: any): string {
-  if (v === null || v === undefined || v === '') return '—'
-  if (typeof v === 'boolean') return v ? 'yes' : 'no'
-  if (typeof v === 'object') return JSON.stringify(v)
-  return String(v)
-}
-
-function CenteredState({
-  icon,
-  title,
-  titleColor = '#fff',
-  spin = false,
-  children,
-}: {
-  icon: string
   title: string
-  titleColor?: string
-  spin?: boolean
-  children?: React.ReactNode
-}) {
+  subtitle: string
+  partners: Partner[]
+}
+
+const PREF_KEY = 'signalboost:enabledOperatingPartners'
+const oldPrefKey = 'signalboost:enabledProviders'
+
+// Map partner names to provider IDs for ProviderActionLauncher
+const PARTNER_TO_PROVIDER_ID: Record<string, string> = {
+  'Supabase': 'supabase',
+  'Vercel': 'vercel',
+  'Stripe': 'stripe',
+  'GitHub': 'github',
+  'AWS': 'aws',
+  'Google Cloud': 'google-cloud',
+  'Azure': 'azure',
+  'DigitalOcean': 'digitalocean',
+  'OpenAI': 'openai',
+  'Anthropic': 'anthropic',
+  'Hugging Face': 'hugging-face',
+  'Replicate': 'replicate',
+  'Cloudflare': 'cloudflare',
+  'Firebase': 'firebase',
+  'Netlify': 'netlify',
+  'Railway': 'railway',
+  'Twilio': 'twilio',
+  'SendGrid': 'sendgrid',
+  'Postmark': 'postmark',
+  'Auth0': 'auth0',
+  'Datadog': 'datadog',
+  'Sentry': 'sentry',
+  'PagerDuty': 'pagerduty',
+  'Docker Hub': 'docker-hub',
+  'Terraform Cloud': 'terraform-cloud',
+  'Mixpanel': 'mixpanel',
+  'Segment': 'segment',
+  'GA4': 'ga4',
+  'HubSpot': 'hubspot',
+  'Intercom': 'intercom',
+}
+
+const action = (label: string, kind: PartnerAction['kind'] = 'neutral', url?: string): PartnerAction => ({ label, kind, url })
+const partner = (name: string, category: string, subtitle: string, status: PartnerStatus, signals: string[], actions: PartnerAction[], region = 'global'): Partner => ({ name, category, subtitle, status, signals, actions, region, lastChecked: '1 min ago' })
+
+const PAGES: PartnerPage[] = [
+  {
+    id: 'mission-critical',
+    title: 'Mission Critical Partners',
+    subtitle: 'Data, hosting, revenue, and source control. These keep Operations & Production alive.',
+    partners: [
+      partner('Supabase', 'Database', 'Backend, auth, users, storage', 'Healthy', ['Database healthy', 'Auth healthy', 'Storage healthy', 'API healthy'], [action('Open Supabase Dashboard', 'primary', 'https://supabase.com/dashboard'), action('Open Settings'), action('Run SQL'), action('Manage API Keys')], 'us-east-1'),
+      partner('Vercel', 'Hosting', 'Frontend, deployments, domains', 'Healthy', ['Deployments healthy', 'Domains healthy', 'SSL healthy', 'Env vars covered'], [action('Open Vercel Dashboard', 'primary', 'https://vercel.com/dashboard'), action('Open Settings'), action('View Deployments'), action('Sync Project')]),
+      partner('Stripe', 'Revenue', 'Payments, plans, billing', 'Healthy', ['Payments healthy', 'Plans configured', 'Webhooks healthy', 'Billing active'], [action('Open Stripe Dashboard', 'primary', 'https://dashboard.stripe.com/'), action('Open Settings'), action('Open Billing'), action('Check Webhooks')]),
+      partner('GitHub', 'Source Control', 'Repos, releases, pull requests', 'Healthy', ['Repository healthy', 'Actions healthy', 'Issues tracked', 'PRs available'], [action('Open GitHub Dashboard', 'primary', 'https://github.com/SignalBoost/signalboost-live'), action('Open Repo'), action('Open Pull Requests'), action('Check Actions')]),
+    ],
+  },
+  {
+    id: 'growth-ai',
+    title: 'Growth Partners — AI',
+    subtitle: 'AI partners used by the operation for generation, support, automation, and analysis.',
+    partners: [
+      partner('OpenAI', 'AI', 'Models, usage, tokens, keys', 'Needs Review', ['Usage elevated', 'Keys active', 'Rate limits ok', 'Models available'], [action('Open OpenAI Dashboard', 'primary', 'https://platform.openai.com/'), action('View Usage'), action('Manage API Keys'), action('Check Limits')]),
+      partner('Anthropic', 'AI', 'Claude API, usage, keys', 'Healthy', ['Usage normal', 'Keys active', 'Limits ok', 'Models available'], [action('Open Anthropic Console', 'primary', 'https://console.anthropic.com/'), action('View Usage'), action('Manage API Keys'), action('Check Limits')]),
+      partner('Hugging Face', 'AI Models', 'Spaces, endpoints, models', 'Healthy', ['Endpoints healthy', 'Spaces active', 'Tokens active', 'Models available'], [action('Open Hugging Face', 'primary', 'https://huggingface.co/'), action('View Endpoints'), action('Manage Tokens'), action('Check Spaces')]),
+      partner('Replicate', 'AI Models', 'Model runs, spend, keys', 'Healthy', ['Runs healthy', 'Spend normal', 'Keys active', 'Models available'], [action('Open Replicate', 'primary', 'https://replicate.com/'), action('View Runs'), action('Manage API Keys'), action('Check Spend')]),
+    ],
+  },
+  {
+    id: 'cloud',
+    title: 'Infrastructure Partners',
+    subtitle: 'Cloud and infrastructure partners that support production workloads.',
+    partners: [
+      partner('AWS', 'Cloud', 'IAM, S3, compute, alerts', 'Action Needed', ['IAM warning', 'S3 review', 'Compute healthy', 'Keys need review'], [action('Open AWS Console', 'primary', 'https://console.aws.amazon.com/'), action('Review IAM'), action('Check S3'), action('Rotate Keys')], 'us-east-1'),
+      partner('Google Cloud', 'Cloud', 'Projects, IAM, service accounts', 'Needs Review', ['Projects healthy', 'Old keys found', 'Roles need review', 'APIs healthy'], [action('Open GCP Console', 'primary', 'https://console.cloud.google.com/'), action('Review IAM'), action('Service Accounts'), action('Check APIs')]),
+      partner('Azure', 'Cloud', 'Apps, tenant, certificates', 'Healthy', ['Apps healthy', 'Certificates healthy', 'Tenant healthy', 'Roles ok'], [action('Open Azure Portal', 'primary', 'https://portal.azure.com/'), action('Review Apps'), action('Check Certificates'), action('Review Roles')]),
+      partner('DigitalOcean', 'Cloud', 'Droplets, spaces, firewalls', 'Needs Review', ['Droplets healthy', 'Firewall review', 'Spaces healthy', 'Usage normal'], [action('Open DigitalOcean', 'primary', 'https://cloud.digitalocean.com/'), action('Check Droplets'), action('Review Firewalls'), action('View Usage')]),
+    ],
+  },
+  {
+    id: 'edge-app',
+    title: 'Application + Edge Partners',
+    subtitle: 'DNS, edge, application backend, SSL, rules, and edge protection.',
+    partners: [
+      partner('Cloudflare', 'Edge/DNS', 'DNS, SSL, workers, proxy', 'Needs Review', ['DNS warning', 'SSL healthy', 'Proxy review', 'Workers healthy'], [action('Open Cloudflare', 'primary', 'https://dash.cloudflare.com/'), action('Open DNS'), action('Check SSL'), action('Review Proxy')]),
+      partner('Firebase', 'App Backend', 'Auth, rules, storage', 'Healthy', ['Auth healthy', 'Rules healthy', 'Storage healthy', 'Usage normal'], [action('Open Firebase', 'primary', 'https://console.firebase.google.com/'), action('Review Rules'), action('Check Auth'), action('View Usage')]),
+      partner('Netlify', 'Hosting', 'Sites, deploys, domains', 'Healthy', ['Sites healthy', 'Deploys healthy', 'Domains healthy', 'Forms healthy'], [action('Open Netlify', 'primary', 'https://app.netlify.com/'), action('View Deploys'), action('Open Domains'), action('Review Env Vars')]),
+      partner('Railway', 'Runtime', 'Services, databases, deploys', 'Healthy', ['Services healthy', 'Deploys healthy', 'Databases healthy', 'Usage normal'], [action('Open Railway', 'primary', 'https://railway.app/'), action('View Services'), action('Check Deployments'), action('View Usage')]),
+    ],
+  },
+  {
+    id: 'communication',
+    title: 'Communication Partners',
+    subtitle: 'Messaging and transactional communication used by the operation.',
+    partners: [
+      partner('Twilio', 'Messaging', 'SMS, verify, phone', 'Healthy', ['SMS healthy', 'Verify healthy', 'Cost normal', 'Delivery healthy'], [action('Open Twilio', 'primary', 'https://console.twilio.com/'), action('View SMS'), action('Check Verify'), action('View Usage')]),
+      partner('SendGrid', 'Email', 'Transactional email', 'Healthy', ['Delivery healthy', 'Bounces normal', 'Domain healthy', 'API active'], [action('Open SendGrid', 'primary', 'https://app.sendgrid.com/'), action('Check Delivery'), action('Review Bounces'), action('Domain Auth')]),
+      partner('Postmark', 'Email', 'Transactional email', 'Healthy', ['Delivery healthy', 'Bounces normal', 'DKIM healthy', 'SPF healthy'], [action('Open Postmark', 'primary', 'https://account.postmarkapp.com/'), action('Check Delivery'), action('Review Bounces'), action('Domain Auth')]),
+      partner('Mailgun', 'Email', 'Transactional email and routing', 'Healthy', ['Delivery healthy', 'Routes healthy', 'Domain healthy', 'API active'], [action('Open Mailgun', 'primary', 'https://app.mailgun.com/'), action('Check Delivery'), action('Review Routes'), action('Domain Auth')]),
+    ],
+  },
+  {
+    id: 'identity-data',
+    title: 'Identity + Data Partners',
+    subtitle: 'Identity, authentication, database, and cache partners.',
+    partners: [
+      partner('Auth0', 'Identity', 'Clients, MFA, tenant, actions', 'Needs Review', ['Client secret aging', 'MFA healthy', 'Tenant healthy', 'Actions healthy'], [action('Open Auth0', 'primary', 'https://manage.auth0.com/'), action('Review Clients'), action('Check MFA'), action('Rotate Secret')]),
+      partner('MongoDB Atlas', 'Database', 'Clusters, backups, network', 'Healthy', ['Cluster healthy', 'Backups healthy', 'Network healthy', 'Connections normal'], [action('Open MongoDB Atlas', 'primary', 'https://cloud.mongodb.com/'), action('Check Clusters'), action('Review Backups'), action('Network Access')]),
+      partner('Redis', 'Cache', 'Cache, sessions, queues', 'Healthy', ['Cache healthy', 'Memory ok', 'Connections ok', 'Latency normal'], [action('Open Redis Console', 'primary'), action('View Metrics'), action('Check Memory'), action('Review Access')]),
+      partner('Okta', 'Identity', 'SSO, users, apps', 'Healthy', ['SSO healthy', 'Apps healthy', 'Users healthy', 'Policies healthy'], [action('Open Okta', 'primary', 'https://login.okta.com/'), action('Review Apps'), action('Check Users'), action('Review Policies')]),
+    ],
+  },
+  {
+    id: 'ops-visibility',
+    title: 'Operations Visibility Partners',
+    subtitle: 'Errors, logs, incidents, uptime, and escalation visibility.',
+    partners: [
+      partner('Sentry', 'Errors', 'Errors, releases, alerts', 'Healthy', ['Errors normal', 'Releases healthy', 'Alerts healthy', 'Projects active'], [action('Open Sentry', 'primary', 'https://sentry.io/'), action('View Errors'), action('Check Releases'), action('Review Alerts')]),
+      partner('Datadog', 'Observability', 'Metrics, logs, monitors', 'Healthy', ['Monitors healthy', 'Logs normal', 'Metrics healthy', 'Usage normal'], [action('Open Datadog', 'primary', 'https://app.datadoghq.com/'), action('View Monitors'), action('Check Logs'), action('View Usage')]),
+      partner('PagerDuty', 'Incidents', 'Incidents, services, on-call', 'Healthy', ['Incidents clear', 'Services healthy', 'Escalation ok', 'On-call active'], [action('Open PagerDuty', 'primary', 'https://app.pagerduty.com/'), action('View Incidents'), action('Check Services'), action('On-call Schedule')]),
+      partner('New Relic', 'APM', 'APM, logs, uptime', 'Healthy', ['APM healthy', 'Logs normal', 'Alerts healthy', 'Uptime healthy'], [action('Open New Relic', 'primary', 'https://one.newrelic.com/'), action('View APM'), action('Check Uptime'), action('Review Alerts')]),
+    ],
+  },
+]
+
+const RAIL_PAGE_MAP: Record<string, number> = {
+  partners: 0,
+  'mission-critical': 0,
+  'growth-ai': 1,
+  cloud: 2,
+  'edge-app': 3,
+  communication: 4,
+  'identity-data': 5,
+  'ops-visibility': 6,
+}
+
+const allPartnerNames = PAGES.flatMap(page => page.partners.map(partner => partner.name))
+function defaultPreferences(): Record<string, boolean> { return Object.fromEntries(allPartnerNames.map(name => [name, true])) }
+
+const statusStyle: Record<PartnerStatus, { color: string; bg: string; border: string; dot: string }> = {
+  Healthy: { color: '#86efac', bg: 'rgba(34,197,94,.11)', border: 'rgba(34,197,94,.38)', dot: '●' },
+  'Needs Review': { color: '#ffc300', bg: 'rgba(255,195,0,.11)', border: 'rgba(255,195,0,.42)', dot: '●' },
+  'Action Needed': { color: '#fca5a5', bg: 'rgba(239,68,68,.12)', border: 'rgba(239,68,68,.42)', dot: '●' },
+}
+
+function openAction(item: PartnerAction) {
+  if (item.url) window.open(item.url, '_blank', 'noopener,noreferrer')
+}
+
+export default function ProviderExpansionPage({ lang }: PageProps) {
+  const [pageIndex, setPageIndex] = useState(0)
+  const [enabledPartners, setEnabledPartners] = useState<Record<string, boolean>>(defaultPreferences)
+  const page = PAGES[pageIndex]
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PREF_KEY) || localStorage.getItem(oldPrefKey)
+      if (raw) setEnabledPartners({ ...defaultPreferences(), ...JSON.parse(raw) })
+    } catch {}
+  }, [])
+  useEffect(() => { try { localStorage.setItem(PREF_KEY, JSON.stringify(enabledPartners)) } catch {} }, [enabledPartners])
+  useEffect(() => {
+    const onPartnerPage = (event: Event) => {
+      const detail = (event as CustomEvent<string>).detail
+      const next = RAIL_PAGE_MAP[detail]
+      if (typeof next === 'number') setPageIndex(next)
+    }
+    window.addEventListener('signalboost:partner-page', onPartnerPage)
+    return () => window.removeEventListener('signalboost:partner-page', onPartnerPage)
+  }, [])
+
+  const enabledCount = useMemo(() => Object.values(enabledPartners).filter(Boolean).length, [enabledPartners])
+  const togglePartner = (name: string) => setEnabledPartners(prev => ({ ...prev, [name]: prev[name] === false }))
+
   return (
-    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12, justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: 20 }}>
-      <div style={{ fontSize: spin ? 18 : 32, animation: spin ? 'spin 2s linear infinite' : undefined }}>{icon}</div>
-      <div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: titleColor }}>{title}</div>
-        {children && <div style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', marginTop: 4 }}>{children}</div>}
-      </div>
+    <div className="partner-console" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: 12 }}>
+      <style>{`.partner-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.partner-card{min-height:510px}.partner-action{width:100%;display:flex;align-items:center;justify-content:center;gap:8px}.partner-signal{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.07);font-size:12.5px}.partner-page-tab{white-space:nowrap}@media(max-width:1180px){.partner-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.partner-card{min-height:460px}}@media(max-width:760px){.partner-grid{grid-template-columns:1fr}.partner-card{min-height:auto}}`}</style>
+
+      <section style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', flexShrink: 0 }}>
+        <div>
+          <div style={labelStyle}>{tx('opsProduction', lang)}</div>
+          <h2 style={{ margin: '3px 0 4px', fontSize: 24, letterSpacing: '-.02em' }}>{tx('title', lang)}</h2>
+          <p style={{ margin: 0, color: 'rgba(255,255,255,.58)', fontSize: 13.5, maxWidth: 840 }}>{tx('subtitle', lang)}</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ padding: '8px 12px', borderRadius: 999, border: '1px solid rgba(26,240,255,.35)', background: 'rgba(26,240,255,.08)', color: '#1af0ff', fontSize: 12.5, fontWeight: 900 }}>{enabledCount} enabled</span>
+          <span style={{ padding: '8px 12px', borderRadius: 999, border: `1px solid ${TONES.gold.border}`, background: TONES.gold.soft, color: '#ffc300', fontSize: 12.5, fontWeight: 900 }}>{pageIndex + 1} / {PAGES.length}</span>
+        </div>
+      </section>
+
+      <section style={{ ...cardStyle, flexShrink: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 16px', background: 'linear-gradient(135deg, rgba(255,195,0,.12), rgba(26,240,255,.06), rgba(3,7,18,0))', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 950, letterSpacing: '-.02em' }}>{page.title}</div>
+            <div style={{ color: 'rgba(255,255,255,.58)', fontSize: 13.5, marginTop: 5 }}>{page.subtitle}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={() => setPageIndex(Math.max(0, pageIndex - 1))} disabled={pageIndex === 0} className="hub-chip" style={{ padding: '7px 11px', borderRadius: 10, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.045)', color: pageIndex === 0 ? 'rgba(255,255,255,.28)' : 'rgba(255,255,255,.72)', fontSize: 12, fontWeight: 900 }}>Previous</button>
+            <button onClick={() => setPageIndex(Math.min(PAGES.length - 1, pageIndex + 1))} disabled={pageIndex === PAGES.length - 1} className="hub-chip" style={{ padding: '7px 11px', borderRadius: 10, border: `1px solid ${TONES.blue.border}`, background: TONES.blue.soft, color: pageIndex === PAGES.length - 1 ? 'rgba(255,255,255,.32)' : '#1af0ff', fontSize: 12, fontWeight: 900 }}>Next</button>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '11px 13px', borderTop: '1px solid rgba(255,255,255,.08)' }}>
+          {PAGES.map((item, index) => <button key={item.id} onClick={() => setPageIndex(index)} className="hub-chip partner-page-tab" style={{ padding: '7px 9px', borderRadius: 11, border: pageIndex === index ? `1px solid ${TONES.gold.border}` : '1px solid rgba(255,255,255,.12)', background: pageIndex === index ? TONES.gold.soft : 'rgba(255,255,255,.04)', color: pageIndex === index ? '#ffc300' : 'rgba(255,255,255,.68)', fontSize: 11.5, fontWeight: 900 }}>{index + 1}</button>)}
+        </div>
+      </section>
+
+      <main className="hub-panel" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 8 }}>
+        <div className="partner-grid">
+          {page.partners.map(item => {
+            const enabled = enabledPartners[item.name] !== false
+            const tone = statusStyle[item.status]
+            return (
+              <article key={item.name} className="partner-card hub-card" style={{ ...cardStyle, padding: 16, display: 'flex', flexDirection: 'column', gap: 13, opacity: enabled ? 1 : .48 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ ...labelStyle, color: '#1af0ff' }}>{item.category}</div>
+                    <h3 style={{ margin: '5px 0 3px', fontSize: 23, letterSpacing: '-.025em' }}>{item.name}</h3>
+                    <div style={{ color: 'rgba(255,255,255,.55)', fontSize: 13 }}>{item.subtitle}</div>
+                  </div>
+                  <button onClick={() => togglePartner(item.name)} className="hub-chip" style={{ padding: '6px 9px', borderRadius: 999, border: '1px solid rgba(255,255,255,.13)', background: enabled ? 'rgba(34,197,94,.1)' : 'rgba(255,255,255,.045)', color: enabled ? '#86efac' : 'rgba(255,255,255,.55)', fontSize: 11.5, fontWeight: 900 }}>{enabled ? 'On' : 'Off'}</button>
+                </div>
+
+                <div style={{ padding: '11px 12px', borderRadius: 16, border: `1px solid ${tone.border}`, background: tone.bg }}>
+                  <div style={{ ...labelStyle, color: 'rgba(255,255,255,.58)' }}>Status</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, color: tone.color, fontSize: 15, fontWeight: 950 }}><span>{tone.dot}</span>{item.status}</div>
+                  <div style={{ color: 'rgba(255,255,255,.48)', fontSize: 12, marginTop: 5 }}>Last checked: {item.lastChecked}</div>
+                </div>
+
+                <div>
+                  <div style={{ ...labelStyle, marginBottom: 5 }}>{tx('keySignals', lang)}</div>
+                  {item.signals.map(signal => <div key={signal} className="partner-signal"><span>{signal}</span><span style={{ color: '#86efac', fontWeight: 900 }}>{tx('healthy', lang)}</span></div>)}
+                </div>
+
+                <div style={{ marginTop: 'auto' }}>
+                  <div style={{ ...labelStyle, marginBottom: 8 }}>Actions</div>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {PARTNER_TO_PROVIDER_ID[item.name] && (
+                      <ProviderActionLauncher
+                        providerId={PARTNER_TO_PROVIDER_ID[item.name]}
+                        lang={lang}
+                        variant="primary"
+                        label="Hub Actions"
+                      />
+                    )}
+                    {item.actions.map((button, index) => <button key={button.label} onClick={() => openAction(button)} className="hub-chip partner-action" style={{ padding: '9px 10px', borderRadius: 11, border: button.kind === 'primary' ? '1px solid rgba(26,240,255,.42)' : '1px solid rgba(255,255,255,.13)', background: button.kind === 'primary' ? 'rgba(26,240,255,.12)' : 'rgba(255,255,255,.045)', color: button.kind === 'primary' ? '#1af0ff' : 'rgba(255,255,255,.78)', fontSize: 12.5, fontWeight: 900 }}>{index === 0 ? '↗' : '⚙'} {button.label}</button>)}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, color: 'rgba(255,255,255,.46)', fontSize: 11.5, borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 10 }}><span>Region: {item.region}</span><span>Response: 110ms</span></div>
+              </article>
+            )
+          })}
+        </div>
+      </main>
     </div>
   )
-}
-
-const footerStyle: CSSProperties = {
-  padding: '12px 16px',
-  background: 'rgba(255,255,255,.02)',
-  borderTop: '1px solid rgba(255,255,255,.07)',
-  display: 'flex',
-  gap: 10,
-  justifyContent: 'flex-end',
-  flex: '0 0 auto',
-}
-
-const noticeStyle: CSSProperties = {
-  padding: 12,
-  background: 'rgba(26,240,255,.08)',
-  border: '1px solid rgba(26,240,255,.2)',
-  borderRadius: 10,
-  fontSize: 12,
-  color: 'rgba(255,255,255,.7)',
-  flex: '0 0 auto',
-}
-
-const jsonBoxStyle: CSSProperties = {
-  flex: 1,
-  minHeight: 0,
-  padding: 12,
-  background: 'rgba(3,7,18,.5)',
-  border: '1px solid rgba(255,255,255,.08)',
-  borderRadius: 10,
-  fontFamily: monoStyle.fontFamily,
-  fontSize: 11,
-  color: 'rgba(255,255,255,.7)',
-  whiteSpace: 'pre-wrap',
-  overflow: 'auto',
-}
-
-const scrollBoxStyle: CSSProperties = {
-  flex: 1,
-  minHeight: 0,
-  overflowY: 'auto',
-  border: '1px solid rgba(255,255,255,.08)',
-  borderRadius: 10,
-  padding: 10,
-}
-
-const scalarRowStyle: CSSProperties = {
-  fontSize: 12,
-  color: 'rgba(255,255,255,.82)',
-  fontFamily: monoStyle.fontFamily,
-  padding: '5px 0',
-  borderBottom: '1px solid rgba(255,255,255,.05)',
-}
-
-const keyValueRowStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '120px minmax(0, 1fr)',
-  gap: 12,
-  padding: '5px 0',
-  fontSize: 12,
-  borderBottom: '1px solid rgba(255,255,255,.05)',
-}
-
-const valueTextStyle: CSSProperties = {
-  color: 'rgba(255,255,255,.85)',
-  fontFamily: monoStyle.fontFamily,
-  textAlign: 'right',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-}
-
-const pickerBoxStyle: CSSProperties = {
-  width: '100%',
-  padding: '10px 12px',
-  borderRadius: 8,
-  border: '1px solid rgba(255,255,255,.15)',
-  background: 'rgba(255,255,255,.04)',
-  color: 'rgba(255,255,255,.65)',
-  fontSize: 13,
-}
-
-const pickerInputStyle: CSSProperties = {
-  width: '100%',
-  padding: '10px 12px',
-  borderRadius: 8,
-  background: 'rgba(255,255,255,.04)',
-  color: '#fff',
-  fontSize: 13,
-  fontFamily: 'inherit',
-  outline: 'none',
-  cursor: 'pointer',
-}
-
-const tableHeadStyle: CSSProperties = {
-  fontSize: 10,
-  fontWeight: 800,
-  letterSpacing: '.08em',
-  textTransform: 'uppercase',
-  color: 'rgba(255,255,255,.45)',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-}
-
-const tableCellStyle: CSSProperties = {
-  fontSize: 11,
-  color: 'rgba(26,240,255,.82)',
-  fontFamily: monoStyle.fontFamily,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-  minWidth: 0,
-}
-
-const tableMainCellStyle: CSSProperties = {
-  ...tableCellStyle,
-  color: '#fff',
-  fontWeight: 700,
-  fontFamily: 'inherit',
-}
-
-const secondaryButtonStyle: CSSProperties = {
-  padding: '8px 14px',
-  borderRadius: 10,
-  border: '1px solid rgba(255,255,255,.15)',
-  background: 'rgba(255,255,255,.05)',
-  color: 'rgba(255,255,255,.7)',
-  fontSize: 12,
-  fontWeight: 600,
-  cursor: 'pointer',
-}
-
-const primaryButtonStyle: CSSProperties = {
-  padding: '8px 14px',
-  borderRadius: 10,
-  border: '1px solid rgba(26,240,255,.35)',
-  background: 'rgba(26,240,255,.10)',
-  color: '#1af0ff',
-  fontSize: 12,
-  fontWeight: 700,
-  cursor: 'pointer',
-}
-
-const warningButtonStyle: CSSProperties = {
-  padding: '8px 14px',
-  borderRadius: 10,
-  border: '1px solid rgba(255,195,0,.35)',
-  background: 'rgba(255,195,0,.10)',
-  color: '#ffc300',
-  fontSize: 12,
-  fontWeight: 700,
-  cursor: 'pointer',
-}
-
-const dangerButtonStyle: CSSProperties = {
-  padding: '8px 14px',
-  borderRadius: 10,
-  border: '1px solid rgba(239,68,68,.4)',
-  background: 'rgba(239,68,68,.15)',
-  color: '#ef4444',
-  fontSize: 12,
-  fontWeight: 700,
-  cursor: 'pointer',
-}
-
-const closeButtonStyle: CSSProperties = {
-  padding: '8px 14px',
-  borderRadius: 10,
-  border: '1px solid rgba(148,163,184,.35)',
-  background: 'rgba(148,163,184,.10)',
-  color: 'rgba(255,255,255,.7)',
-  fontSize: 12,
-  fontWeight: 700,
-  cursor: 'pointer',
 }

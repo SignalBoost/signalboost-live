@@ -124,6 +124,22 @@ const COPY = {
   },
 }
 
+type PartnerRow = { intent: string; partner: string; clicks: number | null; status: string }
+
+// Localized labels for the known status values the API emits. Unknown values
+// pass through unchanged so a new backend status never renders as a blank.
+const STATUS_COPY: Record<Lang, Record<string, string>> = {
+  en: { Active: 'Active', Paused: 'Paused', Pending: 'Pending' },
+  es: { Active: 'Activo', Paused: 'En pausa', Pending: 'Pendiente' },
+  pt: { Active: 'Ativo', Paused: 'Pausado', Pending: 'Pendente' },
+  pl: { Active: 'Aktywny', Paused: 'Wstrzymany', Pending: 'Oczekujący' },
+  ru: { Active: 'Активен', Paused: 'Приостановлен', Pending: 'Ожидание' },
+}
+
+function statusLabel(status: string, lang: Lang): string {
+  return STATUS_COPY[lang]?.[status] ?? STATUS_COPY.en[status] ?? status
+}
+
 export default function PartnersPage() {
   const { lang: activeLang } = useI18n()
   const [lang, setLang] = useState<Lang>('en')
@@ -133,6 +149,21 @@ export default function PartnersPage() {
   }, [])
 
   const c = COPY[(activeLang in COPY ? activeLang : 'en') as keyof typeof COPY]
+  const tableLang: Lang = (activeLang in COPY ? activeLang : 'en') as Lang
+
+  // Live partner-performance feed (marketing Supabase `affiliate_partners`).
+  // On no-config / error / empty, `rows` stays empty and the honest localized
+  // empty-state is shown — never a fabricated row.
+  const [rows, setRows] = useState<PartnerRow[]>([])
+  useEffect(() => {
+    let active = true
+    fetch('/api/admin/partner-performance', { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (active && d && d.ok && Array.isArray(d.rows)) setRows(d.rows) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
+
 
   return (
     <main style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -203,11 +234,22 @@ export default function PartnersPage() {
               </tr>
             </thead>
             <tbody>
-              <tr style={{ borderTop: '1px solid rgba(255,255,255,.1)' }}>
-                <td style={{ padding: '24px 20px', color: 'rgba(255,255,255,.4)' }} colSpan={4}>
-                  {c.empty}
-                </td>
-              </tr>
+              {rows.length === 0 ? (
+                <tr style={{ borderTop: '1px solid rgba(255,255,255,.1)' }}>
+                  <td style={{ padding: '24px 20px', color: 'rgba(255,255,255,.4)' }} colSpan={4}>
+                    {c.empty}
+                  </td>
+                </tr>
+              ) : (
+                rows.map((row, i) => (
+                  <tr key={`${row.partner}-${i}`} style={{ borderTop: '1px solid rgba(255,255,255,.1)' }}>
+                    <td style={{ padding: '12px 20px', color: 'rgba(255,255,255,.7)' }}>{row.intent}</td>
+                    <td style={{ padding: '12px 20px', color: '#fff', fontWeight: 600 }}>{row.partner}</td>
+                    <td style={{ padding: '12px 20px', color: 'rgba(255,255,255,.7)' }}>{row.clicks == null ? '—' : row.clicks.toLocaleString()}</td>
+                    <td style={{ padding: '12px 20px', color: 'rgba(255,255,255,.7)' }}>{statusLabel(row.status, tableLang)}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

@@ -32,6 +32,7 @@ const COPY: Record<string, Record<Lang, string>> = {
   editorHint:    { en: 'Click any element to edit it. Drag blocks from the right panel to add content.', es: 'Haz clic en cualquier elemento para editarlo. Arrastra bloques del panel derecho para agregar contenido.', pt: 'Clique em qualquer elemento para editá-lo. Arraste blocos do painel direito para adicionar conteúdo.', pl: 'Kliknij dowolny element, aby go edytować. Przeciągnij bloki z prawego panelu, aby dodać treść.', ru: 'Нажмите на любой элемент для редактирования. Перетащите блоки из правой панели для добавления контента.' },
   loadingEditor: { en: 'Loading visual editor…', es: 'Cargando editor visual…', pt: 'Carregando editor visual…', pl: 'Ładowanie edytora wizualnego…', ru: 'Загрузка визуального редактора…' },
   poweredBy:     { en: 'Powered by', es: 'Con tecnología de', pt: 'Desenvolvido com', pl: 'Napędzane przez', ru: 'На базе' },
+  seedTitle:     { en: 'Your site', es: 'Tu sitio', pt: 'Seu site', pl: 'Twoja strona', ru: 'Ваш сайт' },
 }
 
 function c(key: string, lang: string): string {
@@ -120,7 +121,7 @@ function GrapesEditor({ html, css, lang }: { html: string; css: string; lang: st
           storageManager: false,
           plugins: blocksPlugin ? [blocksPlugin] : [],
           pluginsOpts: blocksPlugin ? { [blocksPlugin as any]: {} } : {},
-          components: html || '<section><h1>Your site</h1></section>',
+          components: html || `<section><h1>${c('seedTitle', lang)}</h1></section>`,
           style: css || '',
           deviceManager: {
             devices: [

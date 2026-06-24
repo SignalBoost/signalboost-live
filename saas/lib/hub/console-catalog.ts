@@ -323,6 +323,9 @@ export function isDestructiveTemplate(id: string): boolean {
 export const LIVE_PROVIDER_IDS = new Set<string>([
   'stripe', 'supabase', 'vercel', 'keyvault',
   'github', 'openai', 'anthropic', 'elevenlabs', 'gemini', 'resend', 'assemblyai', 'supabase_mkt',
+  // Executors already wired into /api/hub/action — surfaced live and gated at
+  // run time by the per-provider credential probe (/api/hub/providers/status).
+  'sendgrid', 'twilio', 'cloudflare', 'digitalocean', 'datadog', 'sentry', 'pagerduty',
   'core', 'domains', 'deployments', 'logs', 'settings',
 ])
 

@@ -476,9 +476,9 @@ return (
                     </div>
                     {sketch.tagline && <div style={{ fontSize: 14, marginTop: 8, opacity: 0.8 }}>{sketch.tagline}</div>}
                     {sketch.cta && (
-                      <button style={{ marginTop: 18, background: sketchColors.accent, color: '#fff', border: 'none', borderRadius: 6, padding: '10px 22px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                      <span role="presentation" style={{ display: 'inline-block', marginTop: 18, background: sketchColors.accent, color: '#fff', border: 'none', borderRadius: 6, padding: '10px 22px', fontWeight: 700, fontSize: 14, cursor: 'default' }}>
                         {sketch.cta}
-                      </button>
+                      </span>
                     )}
                   </div>
 

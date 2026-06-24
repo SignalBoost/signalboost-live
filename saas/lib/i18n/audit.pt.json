@@ -1,12 +1,4 @@
 {
-  "actionForm": {
-    "noExtraInfo": "Esta ação não requer informações adicionais.",
-    "activeEnvMap": "Mapa de variáveis de ambiente ativas",
-    "envHelp": "Selecione entre as configurações de ambiente ao vivo. O console mapeia os IDs das variáveis principais diretamente.",
-    "stripeHelp": "Selecione do catálogo ao vivo da Stripe. O console envia o ID de produto oculto para a Stripe.",
-    "selectStripeProduct": "Selecione um produto da Stripe",
-    "selectEnvToDelete": "Selecione uma variável de ambiente para excluir"
-  },
   "tier": {
     "core": "Essencial",
     "tier2": "Escala",

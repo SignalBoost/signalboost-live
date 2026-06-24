@@ -231,160 +231,490 @@
   },
   "tpl": {
     "github": {
-      "list_repos": { "label": "Zobacz repozytoria", "desc": "Wyświetl repozytoria widoczne dla skonfigurowanego tokenu dostępu." },
-      "list_prs": { "label": "Lista pull requestów", "desc": "Pokaż otwarte pull requesty (najnowsze pierwsze) dla repozytorium." },
-      "view_pr_files": { "label": "Zobacz pliki PR", "desc": "Wyświetl pliki zmienione w pull requeście." },
-      "merge_pr": { "label": "Scal PR", "desc": "Scal pull request do jego gałęzi bazowej." },
-      "close_pr": { "label": "Zamknij PR", "desc": "Zamknij pull request bez scalania." },
-      "list_branches": { "label": "Lista gałęzi", "desc": "Wyświetl gałęzie w repozytorium (przydatne do czyszczenia ai/*)." },
-      "delete_branch": { "label": "Usuń gałąź", "desc": "Usuń gałąź po nazwie (main jest chroniony)." },
-      "list_commits": { "label": "Ostatnie commity", "desc": "Pokaż najnowsze commity w repozytorium." },
-      "list_issues": { "label": "Lista zgłoszeń", "desc": "Pokaż otwarte zgłoszenia dla repozytorium." },
-      "open_issue": { "label": "Utwórz zgłoszenie", "desc": "Utwórz nowe zgłoszenie w repozytorium." },
-      "edit_issue": { "label": "Edytuj zgłoszenie", "desc": "Zaktualizuj tytuł zgłoszenia lub stan otwarte/zamknięte." },
-      "close_issue": { "label": "Zamknij zgłoszenie", "desc": "Zamknij otwarte zgłoszenie." },
-      "rotate_token": { "label": "Rotuj token", "desc": "Rotuj zapisany token dostępu GitHub (unieważnij + wydaj ponownie)." },
-      "manage_secrets": { "label": "Zarządzaj sekretami", "desc": "Utwórz lub zaktualizuj sekret Actions w repozytorium." }
+      "list_repos": {
+        "label": "Zobacz repozytoria",
+        "desc": "Wyświetl repozytoria widoczne dla skonfigurowanego tokenu dostępu."
+      },
+      "list_prs": {
+        "label": "Lista pull requestów",
+        "desc": "Pokaż otwarte pull requesty (najnowsze pierwsze) dla repozytorium."
+      },
+      "view_pr_files": {
+        "label": "Zobacz pliki PR",
+        "desc": "Wyświetl pliki zmienione w pull requeście."
+      },
+      "merge_pr": {
+        "label": "Scal PR",
+        "desc": "Scal pull request do jego gałęzi bazowej."
+      },
+      "close_pr": {
+        "label": "Zamknij PR",
+        "desc": "Zamknij pull request bez scalania."
+      },
+      "list_branches": {
+        "label": "Lista gałęzi",
+        "desc": "Wyświetl gałęzie w repozytorium (przydatne do czyszczenia ai/*)."
+      },
+      "delete_branch": {
+        "label": "Usuń gałąź",
+        "desc": "Usuń gałąź po nazwie (main jest chroniony)."
+      },
+      "list_commits": {
+        "label": "Ostatnie commity",
+        "desc": "Pokaż najnowsze commity w repozytorium."
+      },
+      "list_issues": {
+        "label": "Lista zgłoszeń",
+        "desc": "Pokaż otwarte zgłoszenia dla repozytorium."
+      },
+      "open_issue": {
+        "label": "Utwórz zgłoszenie",
+        "desc": "Utwórz nowe zgłoszenie w repozytorium."
+      },
+      "edit_issue": {
+        "label": "Edytuj zgłoszenie",
+        "desc": "Zaktualizuj tytuł zgłoszenia lub stan otwarte/zamknięte."
+      },
+      "close_issue": {
+        "label": "Zamknij zgłoszenie",
+        "desc": "Zamknij otwarte zgłoszenie."
+      },
+      "rotate_token": {
+        "label": "Rotuj token",
+        "desc": "Rotuj zapisany token dostępu GitHub (unieważnij + wydaj ponownie)."
+      },
+      "manage_secrets": {
+        "label": "Zarządzaj sekretami",
+        "desc": "Utwórz lub zaktualizuj sekret Actions w repozytorium."
+      }
     },
     "openai": {
-      "list_models": { "label": "Zobacz modele", "desc": "Wyświetl modele dostępne dla skonfigurowanego klucza API." },
-      "retrieve_model": { "label": "Szczegóły modelu", "desc": "Pokaż szczegóły konkretnego modelu." },
-      "list_files": { "label": "Lista plików", "desc": "Pliki przesłane na konto OpenAI." },
-      "list_fine_tunes": { "label": "Zadania fine-tuningu", "desc": "Ostatnie zadania fine-tuningu i ich status." },
-      "list_batches": { "label": "Zadania wsadowe", "desc": "Ostatnie zadania wsadowe i ich status." }
+      "list_models": {
+        "label": "Zobacz modele",
+        "desc": "Wyświetl modele dostępne dla skonfigurowanego klucza API."
+      },
+      "retrieve_model": {
+        "label": "Szczegóły modelu",
+        "desc": "Pokaż szczegóły konkretnego modelu."
+      },
+      "list_files": {
+        "label": "Lista plików",
+        "desc": "Pliki przesłane na konto OpenAI."
+      },
+      "list_fine_tunes": {
+        "label": "Zadania fine-tuningu",
+        "desc": "Ostatnie zadania fine-tuningu i ich status."
+      },
+      "list_batches": {
+        "label": "Zadania wsadowe",
+        "desc": "Ostatnie zadania wsadowe i ich status."
+      }
     },
     "elevenlabs": {
-      "list_voices": { "label": "Lista głosów", "desc": "Głosy dostępne na koncie." },
-      "voice_details": { "label": "Szczegóły głosu", "desc": "Sprawdź konkretny głos." },
-      "list_models": { "label": "Lista modeli", "desc": "Modele mowy dostępne na koncie." },
-      "subscription": { "label": "Subskrypcja i użycie", "desc": "Poziom planu i wykorzystanie limitu znaków." },
-      "list_history": { "label": "Historia generowania", "desc": "Ostatnie generowania text-to-speech." }
+      "list_voices": {
+        "label": "Lista głosów",
+        "desc": "Głosy dostępne na koncie."
+      },
+      "voice_details": {
+        "label": "Szczegóły głosu",
+        "desc": "Sprawdź konkretny głos."
+      },
+      "list_models": {
+        "label": "Lista modeli",
+        "desc": "Modele mowy dostępne na koncie."
+      },
+      "subscription": {
+        "label": "Subskrypcja i użycie",
+        "desc": "Poziom planu i wykorzystanie limitu znaków."
+      },
+      "list_history": {
+        "label": "Historia generowania",
+        "desc": "Ostatnie generowania text-to-speech."
+      }
     },
     "anthropic": {
-      "list_models": { "label": "Zobacz modele", "desc": "Modele dostępne dla klucza API." },
-      "retrieve_model": { "label": "Szczegóły modelu", "desc": "Szczegóły konkretnego modelu." }
+      "list_models": {
+        "label": "Zobacz modele",
+        "desc": "Modele dostępne dla klucza API."
+      },
+      "retrieve_model": {
+        "label": "Szczegóły modelu",
+        "desc": "Szczegóły konkretnego modelu."
+      }
     },
     "gemini": {
-      "list_models": { "label": "Zobacz modele", "desc": "Modele dostępne dla klucza Gemini." },
-      "model_details": { "label": "Szczegóły modelu", "desc": "Szczegóły konkretnego modelu." }
+      "list_models": {
+        "label": "Zobacz modele",
+        "desc": "Modele dostępne dla klucza Gemini."
+      },
+      "model_details": {
+        "label": "Szczegóły modelu",
+        "desc": "Szczegóły konkretnego modelu."
+      }
     },
     "resend": {
-      "list_domains": { "label": "Lista domen", "desc": "Domeny wysyłkowe i status weryfikacji." },
-      "list_audiences": { "label": "Lista odbiorców", "desc": "Grupy odbiorców kontaktów." },
-      "list_broadcasts": { "label": "Lista wysyłek", "desc": "Ostatnie wysyłki." },
-      "list_api_keys": { "label": "Lista kluczy API", "desc": "Klucze API na koncie." }
+      "list_domains": {
+        "label": "Lista domen",
+        "desc": "Domeny wysyłkowe i status weryfikacji."
+      },
+      "list_audiences": {
+        "label": "Lista odbiorców",
+        "desc": "Grupy odbiorców kontaktów."
+      },
+      "list_broadcasts": {
+        "label": "Lista wysyłek",
+        "desc": "Ostatnie wysyłki."
+      },
+      "list_api_keys": {
+        "label": "Lista kluczy API",
+        "desc": "Klucze API na koncie."
+      }
     },
     "assemblyai": {
-      "list_transcripts": { "label": "Ostatnie transkrypcje", "desc": "Najnowsze zadania transkrypcji." },
-      "transcript_details": { "label": "Szczegóły transkrypcji", "desc": "Sprawdź zadanie transkrypcji." }
+      "list_transcripts": {
+        "label": "Ostatnie transkrypcje",
+        "desc": "Najnowsze zadania transkrypcji."
+      },
+      "transcript_details": {
+        "label": "Szczegóły transkrypcji",
+        "desc": "Sprawdź zadanie transkrypcji."
+      }
     },
     "supabase_mkt": {
-      "list_tables": { "label": "Lista tabel", "desc": "Publiczne tabele w projekcie marketingowym." },
-      "list_rows": { "label": "Lista wierszy", "desc": "Wiersze z wybranej tabeli." },
-      "list_users": { "label": "Lista użytkowników", "desc": "Użytkownicy uwierzytelniania w projekcie marketingowym." },
-      "list_buckets": { "label": "Lista bucketów", "desc": "Buckety magazynu w projekcie marketingowym." }
+      "list_tables": {
+        "label": "Lista tabel",
+        "desc": "Publiczne tabele w projekcie marketingowym."
+      },
+      "list_rows": {
+        "label": "Lista wierszy",
+        "desc": "Wiersze z wybranej tabeli."
+      },
+      "list_users": {
+        "label": "Lista użytkowników",
+        "desc": "Użytkownicy uwierzytelniania w projekcie marketingowym."
+      },
+      "list_buckets": {
+        "label": "Lista bucketów",
+        "desc": "Buckety magazynu w projekcie marketingowym."
+      }
     },
     "aws": {
-      "create_s3_bucket": { "label": "Utwórz bucket S3", "desc": "Utwórz nowy, globalnie unikalny kontener bucketa S3." },
-      "list_iam_users": { "label": "Lista użytkowników IAM", "desc": "Pobierz wszystkich bieżących użytkowników katalogu tożsamości." },
-      "disable_iam_user": { "label": "Wyłącz użytkownika IAM", "desc": "Natychmiast dezaktywuj klucze i poświadczenia użytkownika." },
-      "rotate_credential": { "label": "Rotuj poświadczenie", "desc": "Rotuj parę kluczy dostępu IAM dla użytkownika." }
+      "create_s3_bucket": {
+        "label": "Utwórz bucket S3",
+        "desc": "Utwórz nowy, globalnie unikalny kontener bucketa S3."
+      },
+      "list_iam_users": {
+        "label": "Lista użytkowników IAM",
+        "desc": "Pobierz wszystkich bieżących użytkowników katalogu tożsamości."
+      },
+      "disable_iam_user": {
+        "label": "Wyłącz użytkownika IAM",
+        "desc": "Natychmiast dezaktywuj klucze i poświadczenia użytkownika."
+      },
+      "rotate_credential": {
+        "label": "Rotuj poświadczenie",
+        "desc": "Rotuj parę kluczy dostępu IAM dla użytkownika."
+      }
     },
     "gcp": {
-      "list_service_accounts": { "label": "Lista kont usług", "desc": "Pobierz wszystkie systemowe konta usług tożsamości." }
+      "list_service_accounts": {
+        "label": "Lista kont usług",
+        "desc": "Pobierz wszystkie systemowe konta usług tożsamości."
+      }
     },
     "stripe": {
-      "create_product": { "label": "Utwórz produkt", "desc": "Utwórz nowy produkt Stripe i jego pierwszą cenę cykliczną." },
-      "edit_product": { "label": "Edytuj produkt", "desc": "Zaktualizuj nazwę, opis lub stan aktywności produktu Stripe." },
-      "view_products": { "label": "Zobacz produkty", "desc": "Wyświetl aktywne produkty Stripe i ich identyfikatory." },
-      "archive_product": { "label": "Archiwizuj produkt", "desc": "Zarchiwizuj produkt Stripe (ustawia go jako nieaktywny — można przywrócić, edytując go ponownie jako aktywny)." },
-      "delete_product": { "label": "Usuń produkt", "desc": "Trwale usuń produkt Stripe. Usunąć można tylko produkty bez aktywnych cen." },
-      "create_price": { "label": "Utwórz cenę", "desc": "Dołącz nową cenę cykliczną lub jednorazową do istniejącego produktu Stripe." },
-      "view_prices": { "label": "Zobacz ceny", "desc": "Wyświetl ceny Stripe, opcjonalnie filtrowane według produktu." },
-      "edit_price": { "label": "Edytuj cenę", "desc": "Zaktualizuj nazwę ceny lub aktywuj/dezaktywuj ją (kwoty w Stripe są niezmienne)." },
-      "archive_price": { "label": "Archiwizuj cenę", "desc": "Dezaktywuj cenę, aby nie można jej było już kupić (można przywrócić)." },
-      "apply_tier_template": { "label": "Szablony planów", "desc": "Natychmiast utwórz standardowe ścieżki płatności Indie, Pro lub Growth." },
-      "list_customers": { "label": "Widok klientów", "desc": "Wyświetl klientów, faktury i aktywne metryki płatności cyklicznych." },
-      "adjust_balance": { "label": "Dostosuj saldo", "desc": "Zastosuj ręczne modyfikacje salda klienta lub korekty transakcji." },
-      "issue_refund": { "label": "Zwroty/korekty", "desc": "Cofnij saldo przetworzonej transakcji lub zastosuj ręczne uznanie." }
+      "create_product": {
+        "label": "Utwórz produkt",
+        "desc": "Utwórz nowy produkt Stripe i jego pierwszą cenę cykliczną."
+      },
+      "edit_product": {
+        "label": "Edytuj produkt",
+        "desc": "Zaktualizuj nazwę, opis lub stan aktywności produktu Stripe."
+      },
+      "view_products": {
+        "label": "Zobacz produkty",
+        "desc": "Wyświetl aktywne produkty Stripe i ich identyfikatory."
+      },
+      "archive_product": {
+        "label": "Archiwizuj produkt",
+        "desc": "Zarchiwizuj produkt Stripe (ustawia go jako nieaktywny — można przywrócić, edytując go ponownie jako aktywny)."
+      },
+      "delete_product": {
+        "label": "Usuń produkt",
+        "desc": "Trwale usuń produkt Stripe. Usunąć można tylko produkty bez aktywnych cen."
+      },
+      "create_price": {
+        "label": "Utwórz cenę",
+        "desc": "Dołącz nową cenę cykliczną lub jednorazową do istniejącego produktu Stripe."
+      },
+      "view_prices": {
+        "label": "Zobacz ceny",
+        "desc": "Wyświetl ceny Stripe, opcjonalnie filtrowane według produktu."
+      },
+      "edit_price": {
+        "label": "Edytuj cenę",
+        "desc": "Zaktualizuj nazwę ceny lub aktywuj/dezaktywuj ją (kwoty w Stripe są niezmienne)."
+      },
+      "archive_price": {
+        "label": "Archiwizuj cenę",
+        "desc": "Dezaktywuj cenę, aby nie można jej było już kupić (można przywrócić)."
+      },
+      "apply_tier_template": {
+        "label": "Szablony planów",
+        "desc": "Natychmiast utwórz standardowe ścieżki płatności Indie, Pro lub Growth."
+      },
+      "list_customers": {
+        "label": "Widok klientów",
+        "desc": "Wyświetl klientów, faktury i aktywne metryki płatności cyklicznych."
+      },
+      "adjust_balance": {
+        "label": "Dostosuj saldo",
+        "desc": "Zastosuj ręczne modyfikacje salda klienta lub korekty transakcji."
+      },
+      "issue_refund": {
+        "label": "Zwroty/korekty",
+        "desc": "Cofnij saldo przetworzonej transakcji lub zastosuj ręczne uznanie."
+      }
     },
     "supabase": {
-      "sql_editor": { "label": "Edytor SQL", "desc": "Uruchamiaj dowolne surowe zapytania bezpośrednio na tabelach danych." },
-      "run_migration": { "label": "Uruchom migrację", "desc": "Wykonaj skompilowane migracje schematu DDL przez most zapytań." },
-      "insert_row": { "label": "Wstaw wiersz", "desc": "Bezpośrednio wstaw ustrukturyzowane rekordy danych wiersza do istniejącego schematu." },
-      "edit_row": { "label": "Edytuj wiersz", "desc": "Zaktualizuj istniejący wiersz tabeli dopasowany wyrażeniem filtra." },
-      "archive_row": { "label": "Archiwizuj wiersze", "desc": "Przełącz flagi widoczności na konkretnym rekordzie elementu bazy danych." },
-      "delete_row": { "label": "Usuń wiersz", "desc": "Trwale usuń rekordy wierszy z warstwy magazynu." },
-      "invite_user": { "label": "Zaproś użytkownika", "desc": "Wyślij zaproszenie e-mail, aby utworzyć nowego uwierzytelnionego użytkownika." },
-      "edit_user": { "label": "Edytuj użytkownika", "desc": "Zaktualizuj e-mail, metadane lub stan potwierdzenia użytkownika." },
-      "delete_user": { "label": "Usuń użytkownika", "desc": "Trwale usuń uwierzytelnionego użytkownika i jego tożsamość." },
-      "reset_password": { "label": "Resetuj hasło", "desc": "Wyślij e-mail odzyskiwania hasła dla konta użytkownika." },
-      "rotate_service_key": { "label": "Rotuj klucze", "desc": "Unieważnij bieżące tokeny JSON service_role i wydaj nowe poświadczenia." },
-      "storage_panel": { "label": "Panel magazynu", "desc": "Przesyłaj, pobieraj lub wyświetlaj obiekty w buckecie magazynu." },
-      "create_bucket": { "label": "Utwórz bucket", "desc": "Utwórz nowy kontener plików magazynu obiektów multimedialnych lub binarnych." },
-      "empty_bucket": { "label": "Opróżnij bucket", "desc": "Usuń wszystkie zagnieżdżone obiekty bez usuwania samego kontenera zasobów." }
+      "sql_editor": {
+        "label": "Edytor SQL",
+        "desc": "Uruchamiaj dowolne surowe zapytania bezpośrednio na tabelach danych."
+      },
+      "run_migration": {
+        "label": "Uruchom migrację",
+        "desc": "Wykonaj skompilowane migracje schematu DDL przez most zapytań."
+      },
+      "insert_row": {
+        "label": "Wstaw wiersz",
+        "desc": "Bezpośrednio wstaw ustrukturyzowane rekordy danych wiersza do istniejącego schematu."
+      },
+      "edit_row": {
+        "label": "Edytuj wiersz",
+        "desc": "Zaktualizuj istniejący wiersz tabeli dopasowany wyrażeniem filtra."
+      },
+      "archive_row": {
+        "label": "Archiwizuj wiersze",
+        "desc": "Przełącz flagi widoczności na konkretnym rekordzie elementu bazy danych."
+      },
+      "delete_row": {
+        "label": "Usuń wiersz",
+        "desc": "Trwale usuń rekordy wierszy z warstwy magazynu."
+      },
+      "invite_user": {
+        "label": "Zaproś użytkownika",
+        "desc": "Wyślij zaproszenie e-mail, aby utworzyć nowego uwierzytelnionego użytkownika."
+      },
+      "edit_user": {
+        "label": "Edytuj użytkownika",
+        "desc": "Zaktualizuj e-mail, metadane lub stan potwierdzenia użytkownika."
+      },
+      "delete_user": {
+        "label": "Usuń użytkownika",
+        "desc": "Trwale usuń uwierzytelnionego użytkownika i jego tożsamość."
+      },
+      "reset_password": {
+        "label": "Resetuj hasło",
+        "desc": "Wyślij e-mail odzyskiwania hasła dla konta użytkownika."
+      },
+      "rotate_service_key": {
+        "label": "Rotuj klucze",
+        "desc": "Unieważnij bieżące tokeny JSON service_role i wydaj nowe poświadczenia."
+      },
+      "storage_panel": {
+        "label": "Panel magazynu",
+        "desc": "Przesyłaj, pobieraj lub wyświetlaj obiekty w buckecie magazynu."
+      },
+      "create_bucket": {
+        "label": "Utwórz bucket",
+        "desc": "Utwórz nowy kontener plików magazynu obiektów multimedialnych lub binarnych."
+      },
+      "empty_bucket": {
+        "label": "Opróżnij bucket",
+        "desc": "Usuń wszystkie zagnieżdżone obiekty bez usuwania samego kontenera zasobów."
+      }
     },
     "vercel": {
-      "list_deployments": { "label": "Panel wdrożeń", "desc": "Sprawdź trwające kompilacje, rekordy commitów i przypisania celu produkcyjnego." },
-      "trigger_rollback": { "label": "Wycofaj wdrożenie", "desc": "Natychmiast skieruj cele domeny produkcyjnej z powrotem na historyczny hash wdrożenia." },
-      "cancel_build": { "label": "Anuluj kompilację", "desc": "Przerwij aktywny element kolejki kompilacji bezpośrednio na bramie." },
-      "view_env": { "label": "Zobacz zmienne środ.", "desc": "Wyświetl wszystkie aktywne konfiguracje zmiennych środowiskowych w tym projekcie." },
-      "edit_env": { "label": "Edytuj zmienną środ.", "desc": "Zaktualizuj wartość i/lub środowiska docelowe zmiennej." },
-      "delete_env": { "label": "Usuń zmienną środ.", "desc": "Całkowicie usuń klucze zmiennych środowiskowych z aktywnego potoku kompilacji." },
-      "sync_dns_domain": { "label": "Domeny/DNS", "desc": "Konfiguruj konfiguracje kanoniczne, ścieżki aliasów lub uruchamiaj reguły certyfikacji SSL na edge." },
-      "logs": { "label": "Przeglądarka logów", "desc": "Strumieniuj ostatnie zdarzenia logów platformy, kompilacji i środowiska uruchomieniowego." }
+      "list_deployments": {
+        "label": "Panel wdrożeń",
+        "desc": "Sprawdź trwające kompilacje, rekordy commitów i przypisania celu produkcyjnego."
+      },
+      "trigger_rollback": {
+        "label": "Wycofaj wdrożenie",
+        "desc": "Natychmiast skieruj cele domeny produkcyjnej z powrotem na historyczny hash wdrożenia."
+      },
+      "cancel_build": {
+        "label": "Anuluj kompilację",
+        "desc": "Przerwij aktywny element kolejki kompilacji bezpośrednio na bramie."
+      },
+      "view_env": {
+        "label": "Zobacz zmienne środ.",
+        "desc": "Wyświetl wszystkie aktywne konfiguracje zmiennych środowiskowych w tym projekcie."
+      },
+      "edit_env": {
+        "label": "Edytuj zmienną środ.",
+        "desc": "Zaktualizuj wartość i/lub środowiska docelowe zmiennej."
+      },
+      "delete_env": {
+        "label": "Usuń zmienną środ.",
+        "desc": "Całkowicie usuń klucze zmiennych środowiskowych z aktywnego potoku kompilacji."
+      },
+      "sync_dns_domain": {
+        "label": "Domeny/DNS",
+        "desc": "Konfiguruj konfiguracje kanoniczne, ścieżki aliasów lub uruchamiaj reguły certyfikacji SSL na edge."
+      },
+      "logs": {
+        "label": "Przeglądarka logów",
+        "desc": "Strumieniuj ostatnie zdarzenia logów platformy, kompilacji i środowiska uruchomieniowego."
+      }
     },
     "twilio": {
-      "send_sms": { "label": "Wyślij SMS", "desc": "Wyślij wychodzącą wiadomość SMS z Twojego numeru Twilio." },
-      "verify_number": { "label": "Zweryfikuj numer", "desc": "Rozpocznij weryfikację numeru telefonu (wysyła jednorazowy kod)." }
+      "send_sms": {
+        "label": "Wyślij SMS",
+        "desc": "Wyślij wychodzącą wiadomość SMS z Twojego numeru Twilio."
+      },
+      "verify_number": {
+        "label": "Zweryfikuj numer",
+        "desc": "Rozpocznij weryfikację numeru telefonu (wysyła jednorazowy kod)."
+      }
     },
     "sendgrid": {
-      "send_email": { "label": "Wyślij e-mail", "desc": "Wyślij e-mail transakcyjny przez SendGrid." },
-      "check_domain_auth": { "label": "Sprawdź autoryzację domeny", "desc": "Sprawdź status uwierzytelniania domeny nadawcy (SPF/DKIM)." }
+      "send_email": {
+        "label": "Wyślij e-mail",
+        "desc": "Wyślij e-mail transakcyjny przez SendGrid."
+      },
+      "check_domain_auth": {
+        "label": "Sprawdź autoryzację domeny",
+        "desc": "Sprawdź status uwierzytelniania domeny nadawcy (SPF/DKIM)."
+      }
     },
     "cloudflare": {
-      "add_dns_record": { "label": "Dodaj rekord DNS", "desc": "Utwórz rekord DNS w skonfigurowanej strefie Cloudflare." },
-      "toggle_proxy": { "label": "Przełącz proxy", "desc": "Włącz lub wyłącz proxy (pomarańczowa chmura) dla rekordu." },
-      "purge_cache": { "label": "Wyczyść pamięć podręczną", "desc": "Wyczyść całą pamięć podręczną edge Cloudflare dla strefy." }
+      "add_dns_record": {
+        "label": "Dodaj rekord DNS",
+        "desc": "Utwórz rekord DNS w skonfigurowanej strefie Cloudflare."
+      },
+      "toggle_proxy": {
+        "label": "Przełącz proxy",
+        "desc": "Włącz lub wyłącz proxy (pomarańczowa chmura) dla rekordu."
+      },
+      "purge_cache": {
+        "label": "Wyczyść pamięć podręczną",
+        "desc": "Wyczyść całą pamięć podręczną edge Cloudflare dla strefy."
+      }
     },
     "digitalocean": {
-      "create_droplet": { "label": "Utwórz droplet", "desc": "Udostępnij nowy droplet obliczeniowy DigitalOcean." },
-      "view_droplets": { "label": "Zobacz droplety", "desc": "Wyświetl aktywne droplety i ich status." }
+      "create_droplet": {
+        "label": "Utwórz droplet",
+        "desc": "Udostępnij nowy droplet obliczeniowy DigitalOcean."
+      },
+      "view_droplets": {
+        "label": "Zobacz droplety",
+        "desc": "Wyświetl aktywne droplety i ich status."
+      }
     },
     "firebase": {
-      "upload_rules": { "label": "Prześlij reguły", "desc": "Opublikuj nowy zestaw reguł bezpieczeństwa Firestore/Storage." },
-      "view_rules": { "label": "Zobacz reguły", "desc": "Pokaż obecnie opublikowany zestaw reguł bezpieczeństwa." }
+      "upload_rules": {
+        "label": "Prześlij reguły",
+        "desc": "Opublikuj nowy zestaw reguł bezpieczeństwa Firestore/Storage."
+      },
+      "view_rules": {
+        "label": "Zobacz reguły",
+        "desc": "Pokaż obecnie opublikowany zestaw reguł bezpieczeństwa."
+      }
     },
     "datadog": {
-      "create_monitor": { "label": "Utwórz monitor", "desc": "Utwórz monitor metryki/alertu." },
-      "check_metrics": { "label": "Sprawdź metryki", "desc": "Uruchom zapytanie metryki i wyświetl najnowszą serię." }
+      "create_monitor": {
+        "label": "Utwórz monitor",
+        "desc": "Utwórz monitor metryki/alertu."
+      },
+      "check_metrics": {
+        "label": "Sprawdź metryki",
+        "desc": "Uruchom zapytanie metryki i wyświetl najnowszą serię."
+      }
     },
     "sentry": {
-      "list_issues": { "label": "Lista zgłoszeń", "desc": "Wyświetl nierozwiązane zgłoszenia dla projektu." },
-      "resolve_issue": { "label": "Rozwiąż zgłoszenie", "desc": "Oznacz zgłoszenie jako rozwiązane." }
+      "list_issues": {
+        "label": "Lista zgłoszeń",
+        "desc": "Wyświetl nierozwiązane zgłoszenia dla projektu."
+      },
+      "resolve_issue": {
+        "label": "Rozwiąż zgłoszenie",
+        "desc": "Oznacz zgłoszenie jako rozwiązane."
+      }
     },
     "pagerduty": {
-      "list_incidents": { "label": "Lista incydentów", "desc": "Wyświetl ostatnie i aktywne incydenty." },
-      "trigger_incident": { "label": "Wywołaj incydent", "desc": "Ręcznie wywołaj nowy incydent dla usługi." }
+      "list_incidents": {
+        "label": "Lista incydentów",
+        "desc": "Wyświetl ostatnie i aktywne incydenty."
+      },
+      "trigger_incident": {
+        "label": "Wywołaj incydent",
+        "desc": "Ręcznie wywołaj nowy incydent dla usługi."
+      }
     },
     "vault": {
-      "unlock_vault": { "label": "Odblokuj sejf", "desc": "Podaj swoje główne hasło systemowe, aby załadować wrażliwe wektory kluczy." },
-      "seal_vault": { "label": "Zapieczętuj sejf", "desc": "Natychmiast usuń odszyfrowane warstwy pamięci i zablokuj wszystkie podstawowe operacje." },
-      "add_secret": { "label": "Dodaj sekret", "desc": "Wstaw wysoce bezpieczne, zaszyfrowane ciągi magazynu zmiennych." },
-      "edit_secret": { "label": "Edytuj klucz", "desc": "Zaktualizuj wartość istniejącego sekretu sejfu." },
-      "reveal_secret": { "label": "Pokaż klucz", "desc": "Odszyfruj i pokaż wartość sekretu (rejestrowane w audycie)." },
-      "archive_secret": { "label": "Archiwizuj klucz", "desc": "Zarchiwizuj sekret (ukryty, ale możliwy do przywrócenia)." },
-      "delete_secret": { "label": "Usuń sekret", "desc": "Trwale usuń obiekty odwołań do kluczy z bloków magazynu." },
-      "view_keys": { "label": "Klucze dziennika audytu", "desc": "Sprawdź ścieżki śladu zgodności mapujące ostatnie zdarzenia odszyfrowania." },
-      "audit_log": { "label": "Dziennik audytu", "desc": "Wyświetl ślad audytu dostępu i zmian w sejfie." }
+      "unlock_vault": {
+        "label": "Odblokuj sejf",
+        "desc": "Podaj swoje główne hasło systemowe, aby załadować wrażliwe wektory kluczy."
+      },
+      "seal_vault": {
+        "label": "Zapieczętuj sejf",
+        "desc": "Natychmiast usuń odszyfrowane warstwy pamięci i zablokuj wszystkie podstawowe operacje."
+      },
+      "add_secret": {
+        "label": "Dodaj sekret",
+        "desc": "Wstaw wysoce bezpieczne, zaszyfrowane ciągi magazynu zmiennych."
+      },
+      "edit_secret": {
+        "label": "Edytuj klucz",
+        "desc": "Zaktualizuj wartość istniejącego sekretu sejfu."
+      },
+      "reveal_secret": {
+        "label": "Pokaż klucz",
+        "desc": "Odszyfruj i pokaż wartość sekretu (rejestrowane w audycie)."
+      },
+      "archive_secret": {
+        "label": "Archiwizuj klucz",
+        "desc": "Zarchiwizuj sekret (ukryty, ale możliwy do przywrócenia)."
+      },
+      "delete_secret": {
+        "label": "Usuń sekret",
+        "desc": "Trwale usuń obiekty odwołań do kluczy z bloków magazynu."
+      },
+      "view_keys": {
+        "label": "Klucze dziennika audytu",
+        "desc": "Sprawdź ścieżki śladu zgodności mapujące ostatnie zdarzenia odszyfrowania."
+      },
+      "audit_log": {
+        "label": "Dziennik audytu",
+        "desc": "Wyświetl ślad audytu dostępu i zmian w sejfie."
+      }
     },
     "gov": {
-      "assign_role": { "label": "Przypisanie roli", "desc": "Udostępnij parametry dostępu do platformy dla konkretnych osób w organizacji." },
-      "change_permissions": { "label": "Zmień uprawnienia roli", "desc": "Dostosuj zestaw uprawnień przypisany do członka lub roli." },
-      "deactivate_member": { "label": "Archiwizuj członka", "desc": "Zawieś uprawnienia organizacji i globalnie wyłącz dostęp do konta." },
-      "view_timeline": { "label": "Oś czasu aktywności", "desc": "Linie śladu audytu śledzące wszystkie ostatnie konteksty wykonania klastra." },
-      "run_compliance_audit": { "label": "Uruchom audyt zgodności", "desc": "Uruchom przegląd zgodności w wybranym zakresie." },
-      "clear_stale_sessions": { "label": "Wyczyść sesje", "desc": "Wymuś wylogowanie nieaktywnych tokenów i odśwież parametry autoryzacji." }
+      "assign_role": {
+        "label": "Przypisanie roli",
+        "desc": "Udostępnij parametry dostępu do platformy dla konkretnych osób w organizacji."
+      },
+      "change_permissions": {
+        "label": "Zmień uprawnienia roli",
+        "desc": "Dostosuj zestaw uprawnień przypisany do członka lub roli."
+      },
+      "deactivate_member": {
+        "label": "Archiwizuj członka",
+        "desc": "Zawieś uprawnienia organizacji i globalnie wyłącz dostęp do konta."
+      },
+      "view_timeline": {
+        "label": "Oś czasu aktywności",
+        "desc": "Linie śladu audytu śledzące wszystkie ostatnie konteksty wykonania klastra."
+      },
+      "run_compliance_audit": {
+        "label": "Uruchom audyt zgodności",
+        "desc": "Uruchom przegląd zgodności w wybranym zakresie."
+      },
+      "clear_stale_sessions": {
+        "label": "Wyczyść sesje",
+        "desc": "Wymuś wylogowanie nieaktywnych tokenów i odśwież parametry autoryzacji."
+      }
     }
   },
   "domains": {
@@ -645,5 +975,77 @@
     "done": "Gotowe",
     "rotation_failed": "Rotacja nie powiodła się",
     "retry": "Spróbuj ponownie"
+  },
+  "vaultx": {
+    "audit": {
+      "empty": "Brak wpisów w dzienniku audytu",
+      "entries": "wpisów",
+      "failed": "Niepowodzenie",
+      "ip": "IP:",
+      "loading": "Ładowanie dziennika audytu...",
+      "showing": "Wyświetlanie najnowszych 50 z",
+      "success": "Sukces",
+      "trail": "Dziennik audytu"
+    },
+    "grid": {
+      "created": "Utworzono:",
+      "day": "dzień",
+      "days": "dni",
+      "empty": "Brak sekretów w sejfie",
+      "emptyHint": "Sekrety z połączonych dostawców pojawią się tutaj.",
+      "expires": "Wygasa:",
+      "expiresIn": "Wygasa za",
+      "lastRotated": "Ostatnia rotacja:",
+      "statusActive": "Aktywny",
+      "statusExpiringSoon": "Wkrótce wygasa",
+      "statusExpired": "Wygasł",
+      "statusRotated": "Niedawno zrotowany",
+      "statusRevoked": "Unieważniony"
+    },
+    "page": {
+      "active": "Aktywne",
+      "browseSecrets": "Przeglądaj sekrety",
+      "encryptedNote": "Pełna wartość jest zaszyfrowana i nie jest wyświetlana w interfejsie.",
+      "expiration": "Wygaśnięcie",
+      "expiring": "Wygasające",
+      "inventory": "Inwentarz poświadczeń, alerty wygaśnięcia i status rotacji.",
+      "keysSecrets": "Klucze i sekrety",
+      "lastRotated": "Ostatnia rotacja",
+      "lockVault": "Zablokuj sejf",
+      "maskedValue": "Zamaskowana wartość",
+      "ops": "Operacje i produkcja",
+      "providerPlaceholder": "Wyszukaj i wybierz dostawcę...",
+      "secretWord": "sekret",
+      "secretsWord": "sekretów",
+      "selected": "Wybrano:",
+      "statusActive": "Aktywne sekrety",
+      "statusExpired": "Wygasłe",
+      "statusExpiringSoon": "Wkrótce wygasają",
+      "statusRevoked": "Unieważnione",
+      "statusRotated": "Niedawno zrotowane",
+      "stored": "przechowywanych.",
+      "typeEnv": "Typ i środowisko"
+    },
+    "unlock": {
+      "back": "Wstecz",
+      "continue": "Kontynuuj",
+      "enable2fa": "Włącz 2FA",
+      "enter2faCode": "Wprowadź kod 2FA",
+      "enter6digit": "Wprowadź 6-cyfrowy kod, aby potwierdzić",
+      "enterPassword": "Wprowadź hasło",
+      "errInvalidCode": "Wprowadź prawidłowy 6-cyfrowy kod",
+      "errPasswordRequired": "Hasło jest wymagane",
+      "password": "Hasło",
+      "refresh": "Odśwież",
+      "saveBackup": "Zapisz te kody zapasowe:",
+      "scanAuthApps": "Zeskanuj za pomocą Google Authenticator, Microsoft Authenticator lub Authy",
+      "scanQr": "Zeskanuj kod QR za pomocą Google Authenticator",
+      "secureAccess": "Wymagany bezpieczny dostęp",
+      "sessionExpire": "Ta sesja wygaśnie za 30 minut ze względów bezpieczeństwa.",
+      "twofaCode": "Kod 2FA",
+      "unlock": "Odblokuj",
+      "unlockVault": "Odblokuj sejf",
+      "verifying": "Weryfikacja..."
+    }
   }
 }

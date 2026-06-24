@@ -21,6 +21,8 @@ export const CONSOLE_UTILITY_PAGES = [
   { id: 'domains', label: 'Domains/DNS', icon: '🌐' },
   { id: 'deployments', label: 'Deployments', icon: '🚀' },
   { id: 'logs', label: 'Logs', icon: '📝' },
+  { id: 'webhooks', label: 'Webhooks', icon: '🔗' },
+  { id: 'users', label: 'Team Access', icon: '👥' },
   { id: 'settings', label: 'Settings', icon: '⚙️' }
 ]
 

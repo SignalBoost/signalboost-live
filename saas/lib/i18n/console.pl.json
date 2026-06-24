@@ -1,4 +1,12 @@
 {
+  "actionForm": {
+    "noExtraInfo": "Ta akcja nie wymaga dodatkowych informacji.",
+    "activeEnvMap": "Mapa aktywnych zmiennych środowiskowych",
+    "envHelp": "Wybierz z aktywnych konfiguracji środowiska. Konsola mapuje identyfikatory kluczowych zmiennych bezpośrednio.",
+    "stripeHelp": "Wybierz z aktywnego katalogu Stripe. Konsola wysyła ukryty identyfikator produktu do Stripe.",
+    "selectStripeProduct": "Wybierz produkt Stripe",
+    "selectEnvToDelete": "Wybierz zmienną środowiskową do usunięcia"
+  },
   "tier": {
     "core": "Podstawowy",
     "tier2": "Skala",

@@ -85,7 +85,56 @@ const VID = {
   optionalSrt: { en: 'Optional SRT/VTT', es: 'SRT/VTT opcional', pt: 'SRT/VTT opcional', pl: 'Opcjonalny SRT/VTT', ru: 'SRT/VTT (необязательно)' },
   tier: { en: 'Tier', es: 'Plan', pt: 'Plano', pl: 'Plan', ru: 'Тариф' },
   locale: { en: 'Locale', es: 'Idioma', pt: 'Idioma', pl: 'Język', ru: 'Язык' },
+
+  // Status / toast messages ({n}, {file}, {code} are interpolated at the call site)
+  stUploadBegin: { en: 'Upload a source video to begin.', es: 'Sube un video de origen para empezar.', pt: 'Envie um vídeo de origem para começar.', pl: 'Prześlij wideo źródłowe, aby rozpocząć.', ru: 'Загрузите исходное видео, чтобы начать.' },
+  stCaptionIdle: { en: 'Generate AI captions after uploading a video, or upload SRT/VTT manually.', es: 'Genera subtítulos con IA tras subir un video, o sube un SRT/VTT manualmente.', pt: 'Gere legendas com IA após enviar um vídeo, ou envie um SRT/VTT manualmente.', pl: 'Wygeneruj napisy AI po przesłaniu wideo lub prześlij plik SRT/VTT ręcznie.', ru: 'Создайте субтитры с ИИ после загрузки видео или загрузите SRT/VTT вручную.' },
+  stCaptionsReady: { en: '{n} AI captions ready.', es: '{n} subtítulos con IA listos.', pt: '{n} legendas com IA prontas.', pl: 'Gotowe napisy AI: {n}.', ru: 'Готово субтитров с ИИ: {n}.' },
+  stUploading: { en: 'Uploading {file} to secure storage…', es: 'Subiendo {file} al almacenamiento seguro…', pt: 'Enviando {file} para o armazenamento seguro…', pl: 'Przesyłanie {file} do bezpiecznego magazynu…', ru: 'Загрузка {file} в защищённое хранилище…' },
+  stVideoSelected: { en: 'Video selected. Click Generate Captions after upload completes.', es: 'Video seleccionado. Haz clic en Generar subtítulos cuando termine la subida.', pt: 'Vídeo selecionado. Clique em Gerar legendas após concluir o envio.', pl: 'Wybrano wideo. Kliknij Generuj napisy po zakończeniu przesyłania.', ru: 'Видео выбрано. Нажмите «Создать субтитры» после завершения загрузки.' },
+  stUploadFailed: { en: 'Storage upload failed ({code}). Check Supabase bucket permissions.', es: 'Falló la subida al almacenamiento ({code}). Revisa los permisos del bucket de Supabase.', pt: 'Falha no envio ao armazenamento ({code}). Verifique as permissões do bucket do Supabase.', pl: 'Przesyłanie do magazynu nie powiodło się ({code}). Sprawdź uprawnienia bucketa Supabase.', ru: 'Не удалось загрузить в хранилище ({code}). Проверьте права доступа к бакету Supabase.' },
+  stStored: { en: '{file} stored — ready to generate captions.', es: '{file} almacenado — listo para generar subtítulos.', pt: '{file} armazenado — pronto para gerar legendas.', pl: 'Zapisano {file} — gotowe do generowania napisów.', ru: '{file} сохранён — можно создавать субтитры.' },
+  stWaitUpload: { en: 'Wait for the video upload to finish before generating captions.', es: 'Espera a que termine la subida del video antes de generar subtítulos.', pt: 'Aguarde o envio do vídeo terminar antes de gerar legendas.', pl: 'Poczekaj na zakończenie przesyłania wideo przed wygenerowaniem napisów.', ru: 'Дождитесь окончания загрузки видео перед созданием субтитров.' },
+  stSubmitting: { en: 'Submitting to AI transcription (30–90 seconds)…', es: 'Enviando a transcripción con IA (30–90 segundos)…', pt: 'Enviando para transcrição com IA (30–90 segundos)…', pl: 'Wysyłanie do transkrypcji AI (30–90 sekund)…', ru: 'Отправка на ИИ-расшифровку (30–90 секунд)…' },
+  stTranscribingPoll: { en: 'Transcribing… checking every 3 seconds.', es: 'Transcribiendo… comprobando cada 3 segundos.', pt: 'Transcrevendo… verificando a cada 3 segundos.', pl: 'Transkrypcja… sprawdzanie co 3 sekundy.', ru: 'Расшифровка… проверка каждые 3 секунды.' },
+  stParseFailed: { en: 'Could not parse captions — verify the file is valid SRT or VTT.', es: 'No se pudieron procesar los subtítulos — verifica que el archivo sea SRT o VTT válido.', pt: 'Não foi possível processar as legendas — verifique se o arquivo é SRT ou VTT válido.', pl: 'Nie udało się przetworzyć napisów — sprawdź, czy plik to prawidłowy SRT lub VTT.', ru: 'Не удалось разобрать субтитры — проверьте, что файл — корректный SRT или VTT.' },
+  stImported: { en: '{n} captions imported from {file}.', es: '{n} subtítulos importados de {file}.', pt: '{n} legendas importadas de {file}.', pl: 'Zaimportowano {n} napisów z {file}.', ru: 'Импортировано субтитров: {n} из {file}.' },
+  stReadFailed: { en: 'Could not read captions file.', es: 'No se pudo leer el archivo de subtítulos.', pt: 'Não foi possível ler o arquivo de legendas.', pl: 'Nie udało się odczytać pliku napisów.', ru: 'Не удалось прочитать файл субтитров.' },
+  stRecording: { en: 'Recording — let the video play all the way through. Do not close this tab.', es: 'Grabando — deja que el video se reproduzca por completo. No cierres esta pestaña.', pt: 'Gravando — deixe o vídeo reproduzir até o fim. Não feche esta aba.', pl: 'Nagrywanie — pozwól wideo odtworzyć się do końca. Nie zamykaj tej karty.', ru: 'Запись — дайте видео доиграть до конца. Не закрывайте эту вкладку.' },
+  stExportDone: { en: 'Done! Captions are burned in. Download your video below.', es: '¡Listo! Los subtítulos están incrustados. Descarga tu video abajo.', pt: 'Pronto! As legendas estão embutidas. Baixe seu vídeo abaixo.', pl: 'Gotowe! Napisy są wtopione. Pobierz wideo poniżej.', ru: 'Готово! Субтитры вшиты. Скачайте видео ниже.' },
+
+  // Canvas-drawn prompt + user-facing export errors
+  canvasPrompt: { en: 'Upload a source video to start editing', es: 'Sube un video de origen para empezar a editar', pt: 'Envie um vídeo de origem para começar a editar', pl: 'Prześlij wideo źródłowe, aby rozpocząć edycję', ru: 'Загрузите исходное видео, чтобы начать редактирование' },
+  errCanvasNotReady: { en: 'Canvas or video not ready.', es: 'El lienzo o el video no están listos.', pt: 'A tela ou o vídeo não estão prontos.', pl: 'Kanwa lub wideo nie są gotowe.', ru: 'Холст или видео не готовы.' },
+  errSafari: { en: 'Video export requires Chrome, Edge, or Firefox. Safari is not yet supported.', es: 'La exportación de video requiere Chrome, Edge o Firefox. Safari aún no es compatible.', pt: 'A exportação de vídeo requer Chrome, Edge ou Firefox. O Safari ainda não é compatível.', pl: 'Eksport wideo wymaga Chrome, Edge lub Firefox. Safari nie jest jeszcze obsługiwane.', ru: 'Экспорт видео требует Chrome, Edge или Firefox. Safari пока не поддерживается.' },
+
+  // Quota + billing panels
+  quota: { en: 'Quota', es: 'Cuota', pt: 'Cota', pl: 'Limit', ru: 'Квота' },
+  min: { en: 'min', es: 'min', pt: 'min', pl: 'min', ru: 'мин' },
+  quotaInfo: { en: 'Exports record live in your browser — no server required. Export time equals video duration.', es: 'Las exportaciones se graban en vivo en tu navegador — sin servidor. El tiempo de exportación equivale a la duración del video.', pt: 'As exportações são gravadas ao vivo no seu navegador — sem servidor. O tempo de exportação é igual à duração do vídeo.', pl: 'Eksporty są nagrywane na żywo w przeglądarce — bez serwera. Czas eksportu równa się długości wideo.', ru: 'Экспорт записывается вживую в браузере — без сервера. Время экспорта равно длительности видео.' },
+  demoOnly: { en: 'Free/demo users get preview playback only. Upgrade to export final videos.', es: 'Los usuarios gratuitos/demo solo obtienen reproducción de vista previa. Mejora tu plan para exportar videos finales.', pt: 'Usuários gratuitos/demo têm apenas reprodução de pré-visualização. Faça upgrade para exportar vídeos finais.', pl: 'Użytkownicy darmowi/demo mają tylko podgląd. Przejdź na wyższy plan, aby eksportować gotowe wideo.', ru: 'Бесплатные/демо пользователи получают только предпросмотр. Перейдите на платный план для экспорта финальных видео.' },
+  overage: { en: 'Overage: {n} extra minute(s) at ${rate}/min. SignalBoost will open a {provider} billing session before rendering.', es: 'Excedente: {n} minuto(s) extra a ${rate}/min. SignalBoost abrirá una sesión de pago con {provider} antes de renderizar.', pt: 'Excedente: {n} minuto(s) extra a ${rate}/min. O SignalBoost abrirá uma sessão de pagamento com {provider} antes de renderizar.', pl: 'Przekroczenie: {n} dodatkowych minut po ${rate}/min. SignalBoost otworzy sesję płatności {provider} przed renderowaniem.', ru: 'Превышение: {n} доп. минут(ы) по ${rate}/мин. SignalBoost откроет сессию оплаты {provider} перед рендерингом.' },
+
+  // Preset picker
+  templates: { en: 'Templates', es: 'Plantillas', pt: 'Modelos', pl: 'Szablony', ru: 'Шаблоны' },
+  presetTagline: { en: 'Canva-style starting points', es: 'Puntos de partida estilo Canva', pt: 'Pontos de partida estilo Canva', pl: 'Punkty startowe w stylu Canva', ru: 'Заготовки в стиле Canva' },
+  presetSignal: { en: 'Gold business captions.', es: 'Subtítulos dorados para negocios.', pt: 'Legendas douradas para negócios.', pl: 'Złote napisy biznesowe.', ru: 'Золотые деловые субтитры.' },
+  presetTiktok: { en: 'Large white pop captions.', es: 'Grandes subtítulos blancos pop.', pt: 'Grandes legendas brancas pop.', pl: 'Duże białe napisy pop.', ru: 'Крупные белые поп-субтитры.' },
+  presetHormozi: { en: 'High-contrast yellow captions.', es: 'Subtítulos amarillos de alto contraste.', pt: 'Legendas amarelas de alto contraste.', pl: 'Żółte napisy o wysokim kontraście.', ru: 'Жёлтые субтитры высокой контрастности.' },
+  presetMinimal: { en: 'Clean lower-third captions.', es: 'Subtítulos limpios en el tercio inferior.', pt: 'Legendas limpas no terço inferior.', pl: 'Czyste napisy w dolnej tercji.', ru: 'Аккуратные субтитры в нижней трети.' },
+  footerStatus: {
+    en: 'Canvas time {t}s · duration {d}s · {n} captions · exports record from canvas in real time.',
+    es: 'Tiempo del lienzo {t}s · duración {d}s · {n} subtítulos · las exportaciones se graban del lienzo en tiempo real.',
+    pt: 'Tempo da tela {t}s · duração {d}s · {n} legendas · as exportações são gravadas da tela em tempo real.',
+    pl: 'Czas kanwy {t}s · długość {d}s · {n} napisów · eksporty są nagrywane z kanwy w czasie rzeczywistym.',
+    ru: 'Время холста {t}с · длительность {d}с · субтитров: {n} · экспорт записывается с холста в реальном времени.',
+  },
 } as const
+
+// Preset id → description key in VID (labels stay as brand names).
+const PRESET_DESC: Record<string, keyof typeof VID> = {
+  signal: 'presetSignal', tiktok: 'presetTiktok', hormozi: 'presetHormozi', minimal: 'presetMinimal',
+}
 
 function activeCue(cues: CaptionCue[], time: number) { return cues.find((c) => time >= c.start && time <= c.end) || null }
 function clamp(v: number, min: number, max: number) { return Math.min(max, Math.max(min, v)) }
@@ -125,26 +174,29 @@ function parseCaptionFile(text: string): CaptionCue[] {
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 function QuotaStatusBar({ quota }: { quota: VideoQuota }) {
+  const { lang } = useTranslation()
   const pct = Math.min(100, Math.round((quota.usedMinutes / Math.max(1, quota.includedMinutes)) * 100))
   return <div className="rounded-2xl border border-white/10 bg-white/[.04] p-4">
-    <div className="flex items-center justify-between text-sm"><span>Quota</span><span>{quota.usedMinutes}/{quota.includedMinutes} min</span></div>
+    <div className="flex items-center justify-between text-sm"><span>{vt(VID.quota, lang)}</span><span>{quota.usedMinutes}/{quota.includedMinutes} {vt(VID.min, lang)}</span></div>
     <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[#FFD700]" style={{ width: `${pct}%` }} /></div>
-    <p className="mt-2 text-xs text-white/55">Exports record live in your browser — no server required. Export time equals video duration.</p>
-    {quota.demoOnly ? <p className="mt-2 text-sm text-amber-200">Free/demo users get preview playback only. Upgrade to export final videos.</p> : null}
+    <p className="mt-2 text-xs text-white/55">{vt(VID.quotaInfo, lang)}</p>
+    {quota.demoOnly ? <p className="mt-2 text-sm text-amber-200">{vt(VID.demoOnly, lang)}</p> : null}
   </div>
 }
 
 function BillingBanner({ quota }: { quota: VideoQuota }) {
+  const { lang } = useTranslation()
   if (!quota.requiresOverageCharge) return null
-  return <div className="rounded-2xl border border-amber-300/30 bg-amber-300/10 p-4 text-sm text-amber-100">Overage: {quota.overageMinutes} extra minute(s) at ${quota.overageRateUsd.toFixed(2)}/min. SignalBoost will open a {quota.overageProvider} billing session before rendering.</div>
+  return <div className="rounded-2xl border border-amber-300/30 bg-amber-300/10 p-4 text-sm text-amber-100">{vt(VID.overage, lang).replace('{n}', String(quota.overageMinutes)).replace('{rate}', quota.overageRateUsd.toFixed(2)).replace('{provider}', String(quota.overageProvider))}</div>
 }
 
 function PresetPicker({ activePreset, onPreset }: { activePreset: string; onPreset: (p: CaptionPreset) => void }) {
+  const { lang } = useTranslation()
   return <section className="rounded-3xl border border-white/10 bg-black/40 p-5">
-    <div className="flex items-center justify-between"><h2 className="text-xl font-bold">Templates</h2><span className="text-xs text-white/50">Canva-style starting points</span></div>
+    <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{vt(VID.templates, lang)}</h2><span className="text-xs text-white/50">{vt(VID.presetTagline, lang)}</span></div>
     <div className="mt-4 grid gap-3 sm:grid-cols-2">
       {captionPresets.map((p) => <button key={p.id} type="button" onClick={() => onPreset(p)} className={`rounded-2xl border p-4 text-left transition ${activePreset === p.id ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-white/10 bg-white/[.03] hover:border-white/25'}`}>
-        <span className="font-bold">{p.label}</span><span className="mt-1 block text-xs text-white/55">{p.description}</span>
+        <span className="font-bold">{p.label}</span><span className="mt-1 block text-xs text-white/55">{PRESET_DESC[p.id] ? vt(VID[PRESET_DESC[p.id]], lang) : p.description}</span>
       </button>)}
     </div>
   </section>
@@ -214,7 +266,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
             } else {
               ctx.fillStyle = 'rgba(255,255,255,.08)'; drawRoundRect(ctx, canvas.width * 0.12, canvas.height * 0.42, canvas.width * 0.76, canvas.height * 0.16, 28); ctx.fill()
               ctx.fillStyle = 'rgba(255,255,255,.68)'; ctx.font = `700 ${Math.max(22, canvas.width * 0.035)}px Inter, Arial, sans-serif`; ctx.textAlign = 'center'
-              ctx.fillText('Upload a source video to start editing', canvas.width / 2, canvas.height / 2)
+              ctx.fillText(vt(VID.canvasPrompt, lang), canvas.width / 2, canvas.height / 2)
             }
             if (cue) {
               const ao = style.animation === 'slide' ? Math.max(0, 1 - ((time - cue.start) / 0.2)) * (canvas.height * 0.05) : 0
@@ -253,8 +305,8 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
     useImperativeHandle(ref, () => ({
       async startExport(): Promise<string> {
         const canvas = canvasRef.current; const video = videoRef.current
-        if (!canvas || !video) throw new Error('Canvas or video not ready.')
-        if (!('MediaRecorder' in window)) throw new Error('Video export requires Chrome, Edge, or Firefox. Safari is not yet supported.')
+        if (!canvas || !video) throw new Error(vt(VID.errCanvasNotReady, lang))
+        if (!('MediaRecorder' in window)) throw new Error(vt(VID.errSafari, lang))
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const canvasStream: MediaStream = (canvas as any).captureStream(30)
         const tracks = [...canvasStream.getVideoTracks()]
@@ -341,8 +393,8 @@ export default function VideoEditor() {
   const [activePreset, setActivePreset] = useState('signal')
   const [selectedCueId, setSelectedCueId] = useState<string | null>(starterCaptions[0]?.id || null)
   const [currentTime, setCurrentTime] = useState(0)
-  const [uploadState, setUploadState] = useState<UploadState>({ status: 'idle', message: 'Upload a source video to begin.' })
-  const [captionState, setCaptionState] = useState<CaptionGenerationState>({ status: 'idle', message: 'Generate AI captions after uploading a video, or upload SRT/VTT manually.' })
+  const [uploadState, setUploadState] = useState<UploadState>({ status: 'idle', message: vt(VID.stUploadBegin, lang) })
+  const [captionState, setCaptionState] = useState<CaptionGenerationState>({ status: 'idle', message: vt(VID.stCaptionIdle, lang) })
   const [exportState, setExportState] = useState<ExportState>({ status: 'idle', message: '' })
 
   const quota = useMemo(() => calculateVideoQuota(tier, Math.ceil(Math.max(1, durationSec) / 60)), [tier, durationSec])
@@ -362,7 +414,7 @@ export default function VideoEditor() {
         const { status, cues: newCues, cueCount } = json.data
         if (status === 'completed' && newCues) {
           setCues(newCues); setSelectedCueId(newCues[0]?.id || null); setCurrentTime(newCues[0]?.start || 0)
-          setCaptionState({ status: 'ready', message: `${cueCount} AI captions ready.` }); setTranscriptId(null)
+          setCaptionState({ status: 'ready', message: vt(VID.stCaptionsReady, lang).replace('{n}', String(cueCount)) }); setTranscriptId(null)
         }
         // else still processing — keep polling
       } catch { /* network hiccup — keep polling */ }
@@ -374,8 +426,8 @@ export default function VideoEditor() {
   // ── Upload: get signed URL → PUT file directly to Supabase Storage ─────────
   async function uploadVideo(file: File) {
     setVideoUrl(URL.createObjectURL(file)) // local preview immediately, no wait
-    setUploadState({ status: 'uploading', message: `Uploading ${file.name} to secure storage…` })
-    setCaptionState({ status: 'idle', message: 'Video selected. Click Generate Captions after upload completes.' })
+    setUploadState({ status: 'uploading', message: vt(VID.stUploading, lang).replace('{file}', file.name) })
+    setCaptionState({ status: 'idle', message: vt(VID.stVideoSelected, lang) })
     try {
       const urlRes = await fetch('/api/video/upload-url', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: file.name }) })
       const urlJson = await urlRes.json()
@@ -384,9 +436,9 @@ export default function VideoEditor() {
       // PUT directly to Supabase Storage — bypasses Vercel's 4.5 MB body limit entirely
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
       const putRes = await fetch(`${supabaseUrl}/storage/v1/object/upload/sign/video-uploads/${path}?token=${encodeURIComponent(token)}`, { method: 'PUT', body: file, headers: { 'Content-Type': file.type || 'video/mp4' } })
-      if (!putRes.ok) { setUploadState({ status: 'failed', message: `Storage upload failed (${putRes.status}). Check Supabase bucket permissions.` }); return }
+      if (!putRes.ok) { setUploadState({ status: 'failed', message: vt(VID.stUploadFailed, lang).replace('{code}', String(putRes.status)) }); return }
       setStoragePath(path)
-      setUploadState({ status: 'ready', message: `${file.name} stored — ready to generate captions.` })
+      setUploadState({ status: 'ready', message: vt(VID.stStored, lang).replace('{file}', file.name) })
     } catch (e) {
       setUploadState({ status: 'failed', message: e instanceof Error ? e.message : 'Upload failed.' })
     }
@@ -394,14 +446,14 @@ export default function VideoEditor() {
 
   // ── Submit video to AssemblyAI for transcription ───────────────────────────
   async function generateCaptions() {
-    if (!storagePath) { setCaptionState({ status: 'failed', message: 'Wait for the video upload to finish before generating captions.' }); return }
-    setCaptionState({ status: 'generating', message: 'Submitting to AI transcription (30–90 seconds)…' })
+    if (!storagePath) { setCaptionState({ status: 'failed', message: vt(VID.stWaitUpload, lang) }); return }
+    setCaptionState({ status: 'generating', message: vt(VID.stSubmitting, lang) })
     try {
       const res = await fetch('/api/video/transcribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: storagePath }) })
       const json = await res.json()
       if (!json.ok) { setCaptionState({ status: 'failed', message: json.error || 'Caption generation failed.' }); return }
       setTranscriptId(json.data.transcriptId)
-      setCaptionState({ status: 'generating', message: 'Transcribing… checking every 3 seconds.' })
+      setCaptionState({ status: 'generating', message: vt(VID.stTranscribingPoll, lang) })
     } catch (e) {
       setCaptionState({ status: 'failed', message: e instanceof Error ? e.message : 'Caption generation failed.' })
     }
@@ -411,19 +463,19 @@ export default function VideoEditor() {
   async function uploadCaptions(file: File) {
     try {
       const newCues = parseCaptionFile(await file.text())
-      if (!newCues.length) { setCaptionState({ status: 'failed', message: 'Could not parse captions — verify the file is valid SRT or VTT.' }); return }
+      if (!newCues.length) { setCaptionState({ status: 'failed', message: vt(VID.stParseFailed, lang) }); return }
       setCues(newCues); setSelectedCueId(newCues[0]?.id || null); setCurrentTime(newCues[0]?.start || 0)
-      setCaptionState({ status: 'ready', message: `${newCues.length} captions imported from ${file.name}.` })
-    } catch { setCaptionState({ status: 'failed', message: 'Could not read captions file.' }) }
+      setCaptionState({ status: 'ready', message: vt(VID.stImported, lang).replace('{n}', String(newCues.length)).replace('{file}', file.name) })
+    } catch { setCaptionState({ status: 'failed', message: vt(VID.stReadFailed, lang) }) }
   }
 
   // ── Export: MediaRecorder records the live canvas → downloadable .webm ─────
   async function exportVideo() {
     if (!canvasEditorRef.current) return
-    setExportState({ status: 'recording', message: 'Recording — let the video play all the way through. Do not close this tab.' })
+    setExportState({ status: 'recording', message: vt(VID.stRecording, lang) })
     try {
       const url = await canvasEditorRef.current.startExport()
-      setExportState({ status: 'ready', message: 'Done! Captions are burned in. Download your video below.', url })
+      setExportState({ status: 'ready', message: vt(VID.stExportDone, lang), url })
     } catch (e) {
       setExportState({ status: 'failed', message: e instanceof Error ? e.message : 'Export failed.' })
     }
@@ -457,6 +509,6 @@ export default function VideoEditor() {
         <ExportPanel canExport={quota.exportEnabled} hasSource={Boolean(videoUrl)} exportState={exportState} onExport={exportVideo} />
       </div>
     </div>
-    <footer className="mt-8 rounded-2xl border border-white/10 bg-white/[.03] p-4 text-sm text-white/60">Canvas time {currentTime.toFixed(2)}s · duration {durationSec || 0}s · {cues.length} captions · exports record from canvas in real time.</footer>
+    <footer className="mt-8 rounded-2xl border border-white/10 bg-white/[.03] p-4 text-sm text-white/60">{vt(VID.footerStatus, lang).replace('{t}', currentTime.toFixed(2)).replace('{d}', String(durationSec || 0)).replace('{n}', String(cues.length))}</footer>
   </main>
 }

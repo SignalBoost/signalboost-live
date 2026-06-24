@@ -65,34 +65,48 @@ async function resolveEntitlements(
 // Authoritative used-minutes for the current calendar month, summed server-side
 // from this (marketing) project's own `video_jobs` ledger — the same table the
 // video export route writes. Same project + same auth user id as the concierge,
-// so no cross-project identity mapping is needed. Runs in its own try/catch and
-// returns 0 on any failure, so a usage-query problem can never strip the user's
-// resolved tier and never invents minutes the user hasn't used.
+// so no cross-project identity mapping is needed.
+//
+// Returns the real total when the query succeeds (paginated — no row cap, so a
+// heavy month isn't silently truncated), or null when usage can't be determined
+// (transient DB/RLS error). null is "unknown", deliberately distinct from 0 used:
+// the caller must NOT present a 0-used quota it didn't actually verify, which
+// would understate consumption and suppress an overage warning that's due.
 async function resolveUsedMinutes(
   supabase: Awaited<ReturnType<typeof createMarketingServerSupabase>>,
   userId: string,
-): Promise<number> {
+): Promise<number | null> {
+  // A malformed id maps to no account → genuinely 0 used (not "unknown").
   if (!UUID_RE.test(userId)) return 0
+  const PAGE = 1000
+  const MAX_PAGES = 50 // 50k export rows/month ceiling — far beyond any real use
   try {
     const now = new Date()
     const monthStart = new Date(
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
     ).toISOString()
-    const { data } = await supabase
-      .from('video_jobs')
-      .select('duration_seconds')
-      .eq('user_id', userId)
-      .eq('job_type', 'export')
-      .gte('created_at', monthStart)
-      .limit(5000)
-    if (!Array.isArray(data)) return 0
-    const seconds = data.reduce(
-      (sum, row) => sum + (Number((row as Record<string, unknown>).duration_seconds) || 0),
-      0,
-    )
-    return Math.ceil(seconds / 60)
+    let totalSeconds = 0
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const fromIdx = page * PAGE
+      const { data, error } = await supabase
+        .from('video_jobs')
+        .select('duration_seconds')
+        .eq('user_id', userId)
+        .eq('job_type', 'export')
+        .gte('created_at', monthStart)
+        .order('created_at', { ascending: true })
+        .range(fromIdx, fromIdx + PAGE - 1)
+      if (error) return null // explicit unknown — never fabricate 0 on error
+      if (!Array.isArray(data) || data.length === 0) break
+      totalSeconds += data.reduce(
+        (sum, row) => sum + (Number((row as Record<string, unknown>).duration_seconds) || 0),
+        0,
+      )
+      if (data.length < PAGE) break
+    }
+    return Math.ceil(totalSeconds / 60)
   } catch {
-    return 0
+    return null // explicit unknown
   }
 }
 
@@ -136,14 +150,19 @@ export async function POST(req: Request) {
 
   // Entitlements + real usage derived server-side. usedMinutes is summed from
   // this project's own video_jobs ledger for the current month (unspoofable —
-  // the client never supplies it), so the concierge's quota/overage guidance
-  // matches what the user has actually consumed. Both lookups degrade safely to
-  // least-privilege / zero on failure.
+  // the client never supplies it). When usage can't be determined we flag it
+  // (usageUnavailable) so the concierge gives neutral guidance instead of a
+  // 0-used quota it didn't verify. Tier still degrades safely to least-privilege.
   const { tier, billingProvider } = await resolveEntitlements(supabase, user.id)
   const usedMinutes = await resolveUsedMinutes(supabase, user.id)
 
   return NextResponse.json(
-    answerSignalBoostConcierge(query, locale, { tier, usedMinutes, billingProvider }),
+    answerSignalBoostConcierge(query, locale, {
+      tier,
+      billingProvider,
+      usedMinutes: usedMinutes ?? 0,
+      usageUnavailable: usedMinutes === null,
+    }),
   )
 }
 
@@ -152,6 +171,15 @@ export async function POST(req: Request) {
 // when intermediaries honor them — so we also apply a per-IP rate limit to
 // protect the origin from repeated uncached execution.
 export async function GET(req: Request) {
+  // Coarse GLOBAL cap first. The per-IP key below is derived from forwarded
+  // headers, which a client could rotate/spoof if an upstream proxy doesn't
+  // overwrite them — that would both evade the per-IP limit and exhaust the
+  // limiter keyspace. A single global key can't be bypassed that way and is the
+  // real origin protector; the endpoint is also edge-cached, so legitimate
+  // traffic rarely reaches it. The per-IP limit then gives fair-use granularity.
+  if (await rateLimited('concierge-get:global', { max: 600, windowMs: 60_000 })) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
   const ip =
     (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() ||
     req.headers.get('x-real-ip') ||

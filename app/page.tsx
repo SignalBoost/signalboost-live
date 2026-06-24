@@ -1,304 +1,259 @@
 'use client'
 
-import Link from 'next/link'
-import { useTranslation } from '@/lib/i18n/useTranslation'
+import { useEffect, useState } from 'react'
+import { useI18n } from '@/components/i18n/I18nProvider'
 
-const proofMetrics: { value: string; label: [string, string] }[] = [
-  { value: '2.8x', label: ['landing.proof.metric1', 'faster campaign launches'] },
-  { value: '41%', label: ['landing.proof.metric2', 'more review requests sent'] },
-  { value: '12k+', label: ['landing.proof.metric3', 'local workflows automated'] },
-]
+type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
-const featureStories: {
-  eyebrow: [string, string]
-  title: [string, string]
-  body: [string, string]
-  accent: string
-}[] = [
-  {
-    eyebrow: ['landing.feature1.eyebrow', 'Launch desk'],
-    title: ['landing.feature1.title', 'Turn one idea into a complete promotion system.'],
-    body: ['landing.feature1.body', 'Brief the assistant once, then ship landing copy, social captions, outreach lists, and follow-up tasks without losing the strategy thread.'],
-    accent: 'from-amber-300 to-orange-500',
+function getLang(): Lang {
+  if (typeof window !== 'undefined') { const s = localStorage.getItem('signalboost_language'); if (s && (s in COPY)) return s as any }
+  if (typeof navigator === 'undefined') return 'en'
+  const l = navigator.language.slice(0, 2)
+  if (l === 'es') return 'es'
+  if (l === 'pt') return 'pt'
+  if (l === 'pl') return 'pl'
+  if (l === 'ru') return 'ru'
+  return 'en'
+}
+
+const COPY = {
+  en: {
+    eyebrow: 'Partners',
+    heading: 'Organized by what the traveler needs next.',
+    intro: 'Instead of one flat partner list, this console groups supply by human intent: getting there, staying there, connecting, feeling protected, and doing something memorable.',
+    reviewBtn: 'Review partners',
+    perfTitle: 'Partner performance by intent',
+    perfCaption: 'Filters: date range • country • user intent • partner category',
+    addBtn: 'Add partner',
+    colIntent: 'Intent',
+    colPartner: 'Partner',
+    colClicks: 'Clicks',
+    colStatus: 'Status',
+    empty: 'Not tracked yet. Connect partner click analytics to populate this organized view.',
+    intents: [
+      ['Flights', 'Help travelers get there first.', 'Compare flight offers, regional carriers, and urgency-based travel promos.'],
+      ['Hotels', 'Give them a safe place to land.', 'Surface lodging partners by budget, location, cancellation flexibility, and trust.'],
+      ['SIM Cards', 'Keep customers connected on arrival.', 'Prioritize eSIM/SIM partners with country fit, setup clarity, and support quality.'],
+      ['Insurance', 'Reduce travel anxiety.', 'Group medical, trip, and gear protection around confidence and compliance.'],
+      ['Activities', 'Turn arrival into an experience.', 'Recommend tours, events, dining, and local experiences by intent and region.'],
+    ],
   },
-  {
-    eyebrow: ['landing.feature2.eyebrow', 'Reputation loop'],
-    title: ['landing.feature2.title', 'Ask at the right moment and recover at-risk customers.'],
-    body: ['landing.feature2.body', 'SignalBoost routes happy customers to public reviews and gives your team a private recovery workflow when sentiment drops.'],
-    accent: 'from-cyan-300 to-blue-500',
+  es: {
+    eyebrow: 'Socios',
+    heading: 'Organizado según lo que el viajero necesita a continuación.',
+    intro: 'En lugar de una lista plana de socios, esta consola agrupa la oferta por intención humana: llegar, alojarse, conectarse, sentirse protegido y vivir algo memorable.',
+    reviewBtn: 'Ver socios',
+    perfTitle: 'Rendimiento de socios por intención',
+    perfCaption: 'Filtros: rango de fechas • país • intención del usuario • categoría de socio',
+    addBtn: 'Agregar socio',
+    colIntent: 'Intención',
+    colPartner: 'Socio',
+    colClicks: 'Clics',
+    colStatus: 'Estado',
+    empty: 'Aún sin datos. Conecta el análisis de clics de socios para poblar esta vista.',
+    intents: [
+      ['Vuelos', 'Ayuda a los viajeros a llegar primero.', 'Compara ofertas de vuelos, aerolíneas regionales y promociones de viaje urgentes.'],
+      ['Hoteles', 'Dales un lugar seguro donde aterrizar.', 'Muestra socios de alojamiento por presupuesto, ubicación, flexibilidad de cancelación y confianza.'],
+      ['SIM Cards', 'Mantén a los clientes conectados al llegar.', 'Prioriza socios eSIM/SIM con adecuación al país, claridad de configuración y calidad de soporte.'],
+      ['Seguros', 'Reduce la ansiedad del viaje.', 'Agrupa protección médica, de viaje y de equipaje en torno a la confianza y el cumplimiento.'],
+      ['Actividades', 'Convierte la llegada en una experiencia.', 'Recomienda tours, eventos, gastronomía y experiencias locales por intención y región.'],
+    ],
   },
-  {
-    eyebrow: ['landing.feature3.eyebrow', 'Revenue cockpit'],
-    title: ['landing.feature3.title', 'See what moved the business, not just what posted.'],
-    body: ['landing.feature3.body', 'Connect promotions, replies, booked calls, and revenue signals in one daily operating view built for owners and lean teams.'],
-    accent: 'from-violet-300 to-fuchsia-500',
+  pt: {
+    eyebrow: 'Parceiros',
+    heading: 'Organizado pelo que o viajante precisa a seguir.',
+    intro: 'Em vez de uma lista plana de parceiros, este console agrupa a oferta por intenção humana: chegar lá, ficar lá, conectar-se, sentir-se protegido e fazer algo memorável.',
+    reviewBtn: 'Ver parceiros',
+    perfTitle: 'Desempenho de parceiros por intenção',
+    perfCaption: 'Filtros: intervalo de datas • país • intenção do usuário • categoria de parceiro',
+    addBtn: 'Adicionar parceiro',
+    colIntent: 'Intenção',
+    colPartner: 'Parceiro',
+    colClicks: 'Cliques',
+    colStatus: 'Status',
+    empty: 'Ainda sem dados. Conecte a análise de cliques de parceiros para preencher esta visualização.',
+    intents: [
+      ['Voos', 'Ajude os viajantes a chegar primeiro.', 'Compare ofertas de voos, companhias regionais e promoções de viagem urgentes.'],
+      ['Hotéis', 'Dê a eles um lugar seguro para pousar.', 'Mostre parceiros de hospedagem por orçamento, localização, flexibilidade de cancelamento e confiança.'],
+      ['SIM Cards', 'Mantenha os clientes conectados ao chegar.', 'Priorize parceiros eSIM/SIM com adequação ao país, clareza de configuração e qualidade de suporte.'],
+      ['Seguros', 'Reduza a ansiedade de viagem.', 'Agrupe proteção médica, de viagem e de equipamentos em torno de confiança e conformidade.'],
+      ['Atividades', 'Transforme a chegada em uma experiência.', 'Recomende passeios, eventos, gastronomia e experiências locais por intenção e região.'],
+    ],
   },
-]
+  pl: {
+    eyebrow: 'Partnerzy',
+    heading: 'Zorganizowane według tego, czego podróżnik potrzebuje dalej.',
+    intro: 'Zamiast jednej płaskiej listy partnerów, ta konsola grupuje ofertę według ludzkiej intencji: dotrzeć tam, zostać, połączyć się, poczuć się bezpiecznie i przeżyć coś niezapomnianego.',
+    reviewBtn: 'Przejrzyj partnerów',
+    perfTitle: 'Wyniki partnerów według intencji',
+    perfCaption: 'Filtry: zakres dat • kraj • intencja użytkownika • kategoria partnera',
+    addBtn: 'Dodaj partnera',
+    colIntent: 'Intencja',
+    colPartner: 'Partner',
+    colClicks: 'Kliknięcia',
+    colStatus: 'Status',
+    empty: 'Brak danych. Podłącz analitykę kliknięć partnerów, aby wypełnić ten widok.',
+    intents: [
+      ['Loty', 'Pomóż podróżnikom dotrzeć na miejsce jako pierwsi.', 'Porównaj oferty lotów, regionalnych przewoźników i pilne promocje podróżne.'],
+      ['Hotele', 'Daj im bezpieczne miejsce do lądowania.', 'Pokaż partnerów noclegowych według budżetu, lokalizacji, elastyczności anulowania i zaufania.'],
+      ['Karty SIM', 'Utrzymaj klientów w kontakcie po przylocie.', 'Priorytetyzuj partnerów eSIM/SIM pod kątem dopasowania do kraju, jasności konfiguracji i jakości wsparcia.'],
+      ['Ubezpieczenia', 'Zmniejsz lęk przed podróżą.', 'Grupuj ochronę medyczną, podróżną i sprzętową wokół pewności i zgodności.'],
+      ['Aktywności', 'Zamień przybycie w doświadczenie.', 'Polecaj wycieczki, wydarzenia, restauracje i lokalne doświadczenia według intencji i regionu.'],
+    ],
+  },
+  ru: {
+    eyebrow: 'Партнёры',
+    heading: 'Организовано по тому, что нужно путешественнику дальше.',
+    intro: 'Вместо единого плоского списка партнёров эта консоль группирует предложения по человеческому намерению: добраться туда, остановиться, оставаться на связи, чувствовать себя защищённым и получить незабываемые впечатления.',
+    reviewBtn: 'Просмотр партнёров',
+    perfTitle: 'Эффективность партнёров по намерению',
+    perfCaption: 'Фильтры: диапазон дат • страна • намерение пользователя • категория партнёра',
+    addBtn: 'Добавить партнёра',
+    colIntent: 'Намерение',
+    colPartner: 'Партнёр',
+    colClicks: 'Клики',
+    colStatus: 'Статус',
+    empty: 'Данных пока нет. Подключите аналитику кликов партнёров, чтобы заполнить этот вид.',
+    intents: [
+      ['Авиабилеты', 'Помогите путешественникам добраться первыми.', 'Сравнивайте предложения авиабилетов, региональных перевозчиков и срочные туристические акции.'],
+      ['Отели', 'Дайте им безопасное место для посадки.', 'Показывайте партнёров по размещению по бюджету, местоположению, гибкости отмены и доверию.'],
+      ['SIM-карты', 'Держите клиентов на связи по прибытии.', 'Приоритизируйте партнёров eSIM/SIM по соответствию стране, ясности настройки и качеству поддержки.'],
+      ['Страхование', 'Снизьте тревогу от путешествий.', 'Группируйте медицинскую, туристическую и имущественную защиту вокруг уверенности и соответствия.'],
+      ['Активности', 'Превратите прибытие в впечатление.', 'Рекомендуйте туры, мероприятия, рестораны и местные впечатления по намерению и региону.'],
+    ],
+  },
+}
 
-const workflowSteps: [string, string][] = [
-  ['landing.workflow.step1', 'Plan the campaign'],
-  ['landing.workflow.step2', 'Generate assets'],
-  ['landing.workflow.step3', 'Coordinate outreach'],
-  ['landing.workflow.step4', 'Track conversion'],
-]
+type PartnerRow = { intent: string; partner: string; clicks: number | null; status: string }
 
-const valueItems: [string, string][] = [
-  ['landing.value.item1', 'Prompted by business goals, not blank canvases.'],
-  ['landing.value.item2', 'Designed for owner-led teams, not enterprise admin bloat.'],
-  ['landing.value.item3', 'Every generated asset stays tied to a measurable outcome.'],
-  ['landing.value.item4', 'The assistant remembers context across campaigns and channels.'],
-]
+// Localized labels for the known status values the API emits. Unknown values
+// pass through unchanged so a new backend status never renders as a blank.
+const STATUS_COPY: Record<Lang, Record<string, string>> = {
+  en: { Active: 'Active', Paused: 'Paused', Pending: 'Pending' },
+  es: { Active: 'Activo', Paused: 'En pausa', Pending: 'Pendiente' },
+  pt: { Active: 'Ativo', Paused: 'Pausado', Pending: 'Pendente' },
+  pl: { Active: 'Aktywny', Paused: 'Wstrzymany', Pending: 'Oczekujący' },
+  ru: { Active: 'Активен', Paused: 'Приостановлен', Pending: 'Ожидание' },
+}
 
-const segments: [string, string][] = [
-  ['landing.segment.clinics', 'Independent clinics'],
-  ['landing.segment.hospitality', 'Hospitality groups'],
-  ['landing.segment.fitness', 'Fitness studios'],
-  ['landing.segment.agencies', 'Creative agencies'],
-  ['landing.segment.franchises', 'Local franchises'],
-  ['landing.segment.teams', 'Community teams'],
-]
+function statusLabel(status: string, lang: Lang): string {
+  return STATUS_COPY[lang]?.[status] ?? STATUS_COPY.en[status] ?? status
+}
 
-export default function HomePage() {
-  const { t } = useTranslation()
+export default function PartnersPage() {
+  const { lang: activeLang } = useI18n()
+  const [lang, setLang] = useState<Lang>('en')
+
+  useEffect(() => {
+    setLang(getLang())
+  }, [])
+
+  const c = COPY[(activeLang in COPY ? activeLang : 'en') as keyof typeof COPY]
+  const tableLang: Lang = (activeLang in COPY ? activeLang : 'en') as Lang
+
+  // Live partner-performance feed (marketing Supabase `affiliate_partners`).
+  // On no-config / error / empty, `rows` stays empty and the honest localized
+  // empty-state is shown — never a fabricated row.
+  const [rows, setRows] = useState<PartnerRow[]>([])
+  useEffect(() => {
+    let active = true
+    fetch('/api/admin/partner-performance', { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (active && d && d.ok && Array.isArray(d.rows)) setRows(d.rows) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
+
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#07080c] text-[#f7f3ea] antialiased">
-      <div className="pointer-events-none fixed inset-0 -z-10">
-        <div className="absolute left-1/2 top-[-18rem] h-[38rem] w-[38rem] -translate-x-1/2 rounded-full bg-amber-300/20 blur-3xl" />
-        <div className="absolute right-[-12rem] top-[30rem] h-[34rem] w-[34rem] rounded-full bg-cyan-400/10 blur-3xl" />
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:radial-gradient(circle_at_top,black,transparent_70%)]" />
-      </div>
-
-      <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-10">
-        <Link href="/" className="group flex items-center gap-3" aria-label="SignalBoost home">
-          <span className="grid h-10 w-10 place-items-center rounded-2xl border border-white/10 bg-white/[0.06] shadow-2xl shadow-amber-400/10">
-            <span className="h-4 w-4 rounded-full bg-amber-300 shadow-[0_0_24px_rgba(252,211,77,0.85)]" />
-          </span>
-          <span className="text-sm font-semibold uppercase tracking-[0.28em] text-white/85 transition group-hover:text-white">
-            SignalBoost
-          </span>
-        </Link>
-        <nav className="hidden items-center gap-8 text-sm font-medium text-white/58 md:flex">
-          <a href="#platform" className="transition hover:text-white">{t('landing.nav.platform', 'Platform')}</a>
-          <a href="#proof" className="transition hover:text-white">{t('landing.nav.proof', 'Proof')}</a>
-          <a href="#features" className="transition hover:text-white">{t('landing.nav.features', 'Features')}</a>
-          <a href="#pricing" className="transition hover:text-white">{t('landing.nav.pricing', 'Pricing')}</a>
-        </nav>
-        <Link
-          href="/login"
-          className="rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-sm font-semibold text-white/88 shadow-sm backdrop-blur transition hover:border-white/22 hover:bg-white/[0.1]"
-        >
-          {t('landing.nav.signin', 'Sign in')}
-        </Link>
-      </header>
-
-      <section className="mx-auto grid w-full max-w-7xl items-center gap-10 px-5 pb-16 pt-10 sm:px-8 md:pt-16 lg:grid-cols-[1.02fr_0.98fr] lg:px-10 lg:pb-24">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-amber-200/20 bg-amber-200/10 px-3 py-1.5 text-sm font-medium text-amber-100 shadow-2xl shadow-amber-500/10">
-            <span className="h-2 w-2 rounded-full bg-emerald-300" />
-            {t('landing.hero.badge', 'Built for local operators who need momentum this week')}
-          </div>
-          <h1 className="mt-7 max-w-4xl text-5xl font-semibold leading-[0.96] tracking-[-0.055em] text-white sm:text-6xl md:text-7xl lg:text-[5.65rem]">
-            {t('landing.hero.title', 'Your growth team, distilled into one calm cockpit.')}
-          </h1>
-          <p className="mt-6 max-w-2xl text-lg leading-8 text-white/64 sm:text-xl">
-            {t('landing.heroDescription', "Audit your infrastructure, enforce compliance readiness, and automate security patches across your entire multi-tenant pipeline — with zero-tolerance UX integrity checks built right into your workflow.")}
-          </p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Link
-              href="/signup"
-              className="inline-flex items-center justify-center rounded-full bg-[#f7c948] px-6 py-3.5 text-sm font-bold text-[#151007] shadow-[0_18px_60px_rgba(247,201,72,0.26)] transition hover:-translate-y-0.5 hover:bg-[#ffe083]"
-            >
-              {t('landing.hero.ctaPrimary', 'Start free trial')}
-            </Link>
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center justify-center rounded-full border border-white/12 bg-white/[0.06] px-6 py-3.5 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:bg-white/[0.1]"
-            >
-              {t('landing.hero.ctaSecondary', 'View live cockpit')}
-            </Link>
-          </div>
-          <div className="mt-9 grid max-w-2xl grid-cols-3 gap-3 border-t border-white/10 pt-6">
-            {proofMetrics.map((metric) => (
-              <div key={metric.label[0]}>
-                <div className="text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">{metric.value}</div>
-                <div className="mt-1 text-xs font-medium leading-5 text-white/48 sm:text-sm">{t(metric.label[0], metric.label[1])}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="relative lg:pl-6">
-          <div className="absolute -left-6 top-14 hidden h-24 w-24 rounded-full bg-amber-300/20 blur-2xl lg:block" />
-          <div className="rounded-[2rem] border border-white/12 bg-white/[0.07] p-3 shadow-2xl shadow-black/50 backdrop-blur-xl">
-            <div className="rounded-[1.45rem] border border-white/10 bg-[#0d1018] p-4">
-              <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/38">{t('landing.preview.eyebrow', "Today's command center")}</p>
-                  <h2 className="mt-1 text-xl font-semibold tracking-[-0.03em] text-white">{t('landing.preview.title', 'June promotion sprint')}</h2>
-                </div>
-                <div className="rounded-full bg-emerald-300/12 px-3 py-1 text-xs font-bold text-emerald-200">{t('landing.preview.live', 'Live')}</div>
-              </div>
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_0.72fr]">
-                <div className="rounded-3xl bg-[#f7f3ea] p-4 text-[#17130c]">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-black/40">{t('landing.preview.campaignScore', 'Campaign score')}</p>
-                    <span className="rounded-full bg-black px-2.5 py-1 text-xs font-bold text-white">92%</span>
-                  </div>
-                  <div className="mt-10 flex items-end gap-2">
-                    {[44, 62, 51, 76, 68, 88, 82].map((height, index) => (
-                      <div key={index} className="flex-1 rounded-t-full bg-[#17130c]/10" style={{ height: `${height}px` }}>
-                        <div className="h-1/2 rounded-t-full bg-[#f7c948]" />
-                      </div>
-                    ))}
-                  </div>
-                  <p className="mt-5 text-sm font-medium leading-6 text-black/56">{t('landing.preview.recommendation', 'Recommended next move: send VIP review requests before the lunch traffic peak.')}</p>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/38">{t('landing.preview.revenueSignal', 'Revenue signal')}</p>
-                    <p className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-white">$18.4k</p>
-                    <p className="mt-1 text-sm text-emerald-200">{t('landing.preview.revenueDelta', '+24% from last launch')}</p>
-                  </div>
-                  <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/38">{t('landing.preview.queuedAssets', 'Queued assets')}</p>
-                    <div className="mt-3 flex -space-x-2">
-                      {['Ad', 'SMS', 'IG', 'LP'].map((item) => (
-                        <span key={item} className="grid h-10 w-10 place-items-center rounded-full border border-[#0d1018] bg-white text-xs font-black text-[#17130c]">
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-3 rounded-3xl border border-white/10 bg-white/[0.045] p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-white">{t('landing.preview.planTitle', 'AI operating plan')}</p>
-                    <p className="mt-1 text-sm text-white/45">{t('landing.preview.planSubtitle', 'Four steps generated from your revenue goal.')}</p>
-                  </div>
-                  <span className="rounded-full bg-cyan-300/12 px-3 py-1 text-xs font-bold text-cyan-100">{t('landing.preview.timeSaved', '12 min saved')}</span>
-                </div>
-                <div className="mt-4 grid gap-2 sm:grid-cols-4">
-                  {workflowSteps.map((step, index) => (
-                    <div key={step[0]} className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                      <div className="mb-6 text-xs font-bold text-white/35">0{index + 1}</div>
-                      <div className="text-sm font-semibold leading-5 text-white/84">{t(step[0], step[1])}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+    <main style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* Hero */}
+      <section style={{
+        background: 'linear-gradient(160deg, rgba(15,23,42,.92), rgba(3,7,18,.96))',
+        border: '1px solid rgba(255,255,255,.1)',
+        borderRadius: '16px',
+        padding: '24px',
+      }}>
+        <span className="sb-eyebrow">{c.eyebrow}</span>
+        <h1 className="sb-h2" style={{ marginTop: '12px' }}>{c.heading}</h1>
+        <p className="sb-body" style={{ maxWidth: '720px' }}>{c.intro}</p>
       </section>
 
-      <section id="platform" className="mx-auto max-w-7xl px-5 py-14 sm:px-8 lg:px-10">
-        <div className="grid gap-8 rounded-[2rem] border border-white/10 bg-white/[0.045] p-5 backdrop-blur md:grid-cols-[0.86fr_1.14fr] md:p-8 lg:p-10">
+      {/* Intent cards */}
+      <section style={{
+        display: 'grid',
+        gap: '16px',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+      }}>
+        {c.intents.map(([title, prompt, detail]) => (
+          <article key={title} style={{
+            background: 'linear-gradient(160deg, rgba(15,23,42,.92), rgba(3,7,18,.96))',
+            border: '1px solid rgba(255,255,255,.1)',
+            borderRadius: '14px',
+            padding: '20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}>
+            <span className="sb-eyebrow">{title}</span>
+            <h2 className="sb-h3" style={{ marginTop: '4px' }}>{prompt}</h2>
+            <p className="sb-body" style={{ fontSize: '13px', flex: 1 }}>{detail}</p>
+          </article>
+        ))}
+      </section>
+
+      {/* Performance table */}
+      <section style={{
+        background: 'linear-gradient(160deg, rgba(15,23,42,.92), rgba(3,7,18,.96))',
+        border: '1px solid rgba(255,255,255,.1)',
+        borderRadius: '16px',
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '12px',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: '1px solid rgba(255,255,255,.1)',
+          padding: '20px',
+        }}>
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.24em] text-amber-200/80">{t('landing.value.eyebrow', 'Value proposition')}</p>
-            <h2 className="mt-4 text-3xl font-semibold leading-tight tracking-[-0.045em] text-white sm:text-4xl lg:text-5xl">
-              {t('landing.value.title', 'One workspace where strategy becomes finished work.')}
-            </h2>
+            <h2 className="sb-h3">{c.perfTitle}</h2>
+            <p className="sb-caption">{c.perfCaption}</p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {valueItems.map((item) => (
-              <div key={item[0]} className="rounded-3xl border border-white/10 bg-[#0b0d13] p-5">
-                <div className="mb-6 h-1.5 w-10 rounded-full bg-amber-300" />
-                <p className="text-base font-medium leading-7 text-white/76">{t(item[0], item[1])}</p>
-              </div>
-            ))}
-          </div>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', textAlign: 'left', fontSize: '14px', borderCollapse: 'collapse' }}>
+            <thead style={{ background: 'rgba(255,255,255,.05)', color: 'rgba(255,255,255,.6)' }}>
+              <tr>
+                <th style={{ padding: '12px 20px' }}>{c.colIntent}</th>
+                <th style={{ padding: '12px 20px' }}>{c.colPartner}</th>
+                <th style={{ padding: '12px 20px' }}>{c.colClicks}</th>
+                <th style={{ padding: '12px 20px' }}>{c.colStatus}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr style={{ borderTop: '1px solid rgba(255,255,255,.1)' }}>
+                  <td style={{ padding: '24px 20px', color: 'rgba(255,255,255,.4)' }} colSpan={4}>
+                    {c.empty}
+                  </td>
+                </tr>
+              ) : (
+                rows.map((row, i) => (
+                  <tr key={`${row.partner}-${i}`} style={{ borderTop: '1px solid rgba(255,255,255,.1)' }}>
+                    <td style={{ padding: '12px 20px', color: 'rgba(255,255,255,.7)' }}>{row.intent}</td>
+                    <td style={{ padding: '12px 20px', color: '#fff', fontWeight: 600 }}>{row.partner}</td>
+                    <td style={{ padding: '12px 20px', color: 'rgba(255,255,255,.7)' }}>{row.clicks == null ? '—' : row.clicks.toLocaleString()}</td>
+                    <td style={{ padding: '12px 20px', color: 'rgba(255,255,255,.7)' }}>{statusLabel(row.status, tableLang)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </section>
-
-      <section id="proof" className="mx-auto max-w-7xl px-5 py-14 sm:px-8 lg:px-10">
-        <div className="grid gap-6 lg:grid-cols-[0.78fr_1.22fr]">
-          <div className="rounded-[2rem] border border-white/10 bg-[#f7f3ea] p-6 text-[#17130c] sm:p-8">
-            <p className="text-sm font-black uppercase tracking-[0.24em] text-black/40">{t('landing.social.eyebrow', 'Social proof')}</p>
-            <blockquote className="mt-8 text-3xl font-semibold leading-tight tracking-[-0.045em] sm:text-4xl">
-              {t('landing.social.quote', '“SignalBoost feels like the missing operating layer between our ideas and actual revenue.”')}
-            </blockquote>
-            <div className="mt-8 flex items-center gap-3">
-              <div className="h-12 w-12 rounded-full bg-gradient-to-br from-amber-300 to-orange-500" />
-              <div>
-                <p className="font-bold">Maya Chen</p>
-                <p className="text-sm font-medium text-black/48">{t('landing.social.role', 'Founder, Northline Studios')}</p>
-              </div>
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            {segments.map((segment) => (
-              <div key={segment[0]} className="rounded-3xl border border-white/10 bg-white/[0.045] p-5 min-h-36">
-                <div className="h-9 w-9 rounded-2xl bg-white/10" />
-                <p className="mt-8 text-lg font-semibold tracking-[-0.03em] text-white">{t(segment[0], segment[1])}</p>
-                <p className="mt-2 text-sm leading-6 text-white/45">{t('landing.segment.blurb', 'Use SignalBoost to convert attention into booked demand.')}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section id="features" className="mx-auto max-w-7xl px-5 py-14 sm:px-8 lg:px-10">
-        <div className="max-w-3xl">
-          <p className="text-sm font-bold uppercase tracking-[0.24em] text-cyan-100/70">{t('landing.features.eyebrow', 'Features')}</p>
-          <h2 className="mt-4 text-4xl font-semibold leading-tight tracking-[-0.05em] text-white sm:text-5xl">
-            {t('landing.features.title', 'Built around the real rhythm of growing a business.')}
-          </h2>
-        </div>
-        <div className="mt-8 space-y-4">
-          {featureStories.map((feature, index) => (
-            <article key={feature.title[0]} className="group grid gap-5 rounded-[1.75rem] border border-white/10 bg-white/[0.045] p-5 transition hover:bg-white/[0.07] md:grid-cols-[0.2fr_0.8fr_1.35fr] md:items-center md:p-6">
-              <div className="text-sm font-bold text-white/34">0{index + 1}</div>
-              <div>
-                <div className={`mb-5 h-2 w-20 rounded-full bg-gradient-to-r ${feature.accent}`} />
-                <p className="text-sm font-bold uppercase tracking-[0.2em] text-white/42">{t(feature.eyebrow[0], feature.eyebrow[1])}</p>
-              </div>
-              <div className="grid gap-3 md:grid-cols-[0.85fr_1.15fr] md:items-start">
-                <h3 className="text-2xl font-semibold leading-tight tracking-[-0.04em] text-white sm:text-3xl">{t(feature.title[0], feature.title[1])}</h3>
-                <p className="text-base leading-7 text-white/56">{t(feature.body[0], feature.body[1])}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section id="pricing" className="mx-auto max-w-7xl px-5 py-14 sm:px-8 lg:px-10">
-        <div className="relative overflow-hidden rounded-[2.2rem] border border-white/10 bg-[#f7c948] p-6 text-[#17130c] shadow-2xl shadow-amber-500/20 sm:p-10 lg:p-12">
-          <div className="absolute right-0 top-0 h-48 w-48 translate-x-12 -translate-y-12 rounded-full bg-white/35 blur-3xl" />
-          <div className="relative grid gap-8 lg:grid-cols-[1fr_0.72fr] lg:items-end">
-            <div>
-              <p className="text-sm font-black uppercase tracking-[0.24em] text-black/45">{t('landing.cta.eyebrow', 'Ready when you are')}</p>
-              <h2 className="mt-4 max-w-3xl text-4xl font-semibold leading-[1.02] tracking-[-0.055em] sm:text-5xl lg:text-6xl">
-                {t('landing.cta.title', 'Give your next campaign the polish of a full growth team.')}
-              </h2>
-            </div>
-            <div className="rounded-[1.5rem] bg-[#17130c] p-5 text-white">
-              <p className="text-sm leading-6 text-white/58">{t('landing.cta.body', 'Start with one location, one offer, and one measurable outcome. SignalBoost will assemble the operating plan.')}</p>
-              <Link
-                href="/signup"
-                className="mt-5 inline-flex w-full items-center justify-center rounded-full bg-white px-5 py-3.5 text-sm font-black text-[#17130c] transition hover:-translate-y-0.5 hover:bg-amber-50"
-              >
-                {t('landing.cta.button', 'Create your cockpit')}
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <footer className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-10 text-sm text-white/45 sm:px-8 md:flex-row md:items-center md:justify-between lg:px-10">
-        <div className="font-semibold text-white/70">SignalBoost</div>
-        <div className="flex flex-wrap gap-x-6 gap-y-2">
-          <Link href="/pricing" className="hover:text-white">{t('landing.footer.pricing', 'Pricing')}</Link>
-          <Link href="/docs" className="hover:text-white">{t('landing.footer.docs', 'Docs')}</Link>
-          <Link href="/support" className="hover:text-white">{t('landing.footer.support', 'Support')}</Link>
-          <span>© {new Date().getFullYear()} SignalBoost</span>
-        </div>
-      </footer>
     </main>
   )
 }

@@ -3,6 +3,7 @@ import { answerSignalBoostConcierge } from '@/lib/concierge/unifiedConcierge'
 import { createMarketingServerSupabase } from '@/lib/auth/supabaseServer'
 import { normalizeTier } from '@/lib/video/subscription'
 import { readJsonLimited } from '@/lib/http/readJsonLimited'
+import { rateLimited } from '@/lib/http/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,27 +16,10 @@ const MAX_BODY_BYTES = 16_000
 const ALLOWED_LOCALES = new Set(['en', 'es', 'pt', 'pl', 'ru'])
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-// Best-effort, per-warm-instance rate limit. Serverless instances are ephemeral
-// and not shared, so this is a soft ceiling per instance rather than a
-// distributed guarantee — but it blunts trivial single-instance cost-exhaustion
-// loops with zero external infrastructure. For a hard global limit, lift this
-// into Redis/Upstash keyed the same way.
+// Rate limit via the shared limiter: distributed (Upstash) when configured,
+// otherwise a soft per-instance ceiling. Keyed by authenticated user id.
 const RATE_MAX = 30
 const RATE_WINDOW_MS = 60_000
-const rateHits = new Map<string, number[]>()
-
-function rateLimited(key: string): boolean {
-  const now = Date.now()
-  const recent = (rateHits.get(key) ?? []).filter((t) => now - t < RATE_WINDOW_MS)
-  recent.push(now)
-  rateHits.set(key, recent)
-  if (rateHits.size > 5000) {
-    for (const [k, v] of rateHits) {
-      if (v.every((t) => now - t >= RATE_WINDOW_MS)) rateHits.delete(k)
-    }
-  }
-  return recent.length > RATE_MAX
-}
 
 // Resolve entitlement context from SERVER state only. The client no longer
 // supplies tier / usedMinutes / billingProvider — those are spoofable. Defaults
@@ -85,7 +69,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  if (rateLimited(`concierge:${user.id}`)) {
+  if (await rateLimited(`concierge:${user.id}`, { max: RATE_MAX, windowMs: RATE_WINDOW_MS })) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 

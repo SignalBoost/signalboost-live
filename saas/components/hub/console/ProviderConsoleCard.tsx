@@ -2,22 +2,44 @@
 
 // Hub Command Console — Child layout representations.
 // High-density compact grid layouts with explicit edge width safety.
+//
+// Live status: each provider now reflects REAL connection state from the
+// credential probe (/api/hub/providers/status), passed in as `status`:
+//   • hasBackend + configured  → "Live"  (actions enabled)
+//   • hasBackend + !configured → "Connect keys" (actions disabled, lists missing)
+//   • !hasBackend              → "Soon"  (roadmap preview)
+// While the probe is still loading (`statusLoaded === false`) we stay optimistic
+// for backend-ready providers so established integrations don't flash a state.
 
 import { type ConsoleProvider, isDestructiveTemplate, isProviderLive, isActionLive } from '@/lib/hub/console-catalog'
 import { getTemplate } from '@/lib/hub/provider-templates'
 import { useTranslation } from '@/components/i18n/useTranslation'
+import { type ProviderLiveStatus } from '@/lib/hub/provider-credentials'
 import { type Lang } from '../shared'
+
+// Derive the effective live/credential state for a provider.
+function deriveState(providerId: string, status: ProviderLiveStatus | undefined, statusLoaded: boolean) {
+  const hasBackend = isProviderLive(providerId)
+  // Optimistic until the probe returns, so live integrations don't flicker.
+  const configured = statusLoaded ? (status?.configured ?? false) : hasBackend
+  const missing = status?.missing ?? []
+  return { hasBackend, configured, missing, live: hasBackend && configured }
+}
 
 type CardProps = {
   provider: ConsoleProvider
   lang: Lang
   onExpand: () => void
   onRun: (templateId: string) => void
+  status?: ProviderLiveStatus
+  statusLoaded?: boolean
 }
 
-export function ProviderConsoleCard({ provider, lang, onExpand, onRun }: CardProps) {
+export function ProviderConsoleCard({ provider, lang, onExpand, onRun, status, statusLoaded = false }: CardProps) {
   const { t, dict } = useTranslation()
-  const live = isProviderLive(provider.id)
+  const { hasBackend, configured, missing, live } = deriveState(provider.id, status, statusLoaded)
+  const needsKeys = hasBackend && statusLoaded && !configured
+  const keyHint = t('console.cui.add_keys_hint', 'Add {keys} to enable').replace('{keys}', missing.join(', '))
   return (
     <div style={{ background: 'rgba(13, 18, 32, 0.45)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: 12, overflow: 'hidden', boxSizing: 'border-box' }}>
       {/* Card Header Band */}
@@ -30,7 +52,16 @@ export function ProviderConsoleCard({ provider, lang, onExpand, onRun }: CardPro
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {!live && <span style={{ fontSize: 8.5, fontWeight: 800, color: '#ffc300', background: 'rgba(255,195,0,0.12)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 4, padding: '2px 5px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{t('console.cui.soon', 'Soon')}</span>}
+          {!hasBackend ? (
+            <span style={{ fontSize: 8.5, fontWeight: 800, color: '#ffc300', background: 'rgba(255,195,0,0.12)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 4, padding: '2px 5px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{t('console.cui.soon', 'Soon')}</span>
+          ) : needsKeys ? (
+            <span title={keyHint} style={{ fontSize: 8.5, fontWeight: 800, color: '#1af0ff', background: 'rgba(26,240,255,0.1)', border: '1px solid rgba(26,240,255,0.3)', borderRadius: 4, padding: '2px 5px', letterSpacing: '0.05em', textTransform: 'uppercase', cursor: 'help' }}>{t('console.cui.connect_keys', 'Connect keys')}</span>
+          ) : configured ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 8.5, fontWeight: 800, color: '#22c55e', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 4, padding: '2px 5px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px #22c55e' }} />
+              {t('console.cui.live', 'Live')}
+            </span>
+          ) : null}
           <button onClick={onExpand} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: 6, color: '#1af0ff', fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}>
             Workspace →
           </button>
@@ -42,8 +73,9 @@ export function ProviderConsoleCard({ provider, lang, onExpand, onRun }: CardPro
         {provider.sections.map((section, idx) => {
           // Hide actions that are not yet implemented on a LIVE provider
           // (e.g. github.rotate_token / github.manage_secrets) so a buyer never
-          // sees a stub. Preview ("Soon") providers keep their full action list
-          // as a visible roadmap, so the filter only applies when `live`.
+          // sees a stub. Preview ("Soon") and not-yet-configured providers keep
+          // their full action list as a visible roadmap, so the filter only
+          // applies once the provider is fully live.
           const visibleIds = section.templateIds.filter(id => !(live && !isActionLive(id)))
           if (visibleIds.length === 0) return null
           return (
@@ -60,13 +92,20 @@ export function ProviderConsoleCard({ provider, lang, onExpand, onRun }: CardPro
                 const isArchive = id.includes('archive')
                 const runnable = live && isActionLive(id)
                 const incomplete = live && !isActionLive(id)
+                const title = runnable
+                  ? template.label
+                  : incomplete
+                    ? t('console.cui.not_available', 'Not available yet')
+                    : needsKeys
+                      ? keyHint
+                      : t('console.cui.coming_soon', 'Coming soon')
 
                 return (
                   <button 
                     key={id} 
                     onClick={runnable ? () => onRun(id) : undefined}
                     disabled={!runnable}
-                    title={runnable ? template.label : (incomplete ? t('console.cui.not_available', 'Not available yet') : t('console.cui.coming_soon', 'Coming soon'))}
+                    title={title}
                     style={{ 
                       padding: '5px 8px', 
                       borderRadius: 6, 
@@ -105,11 +144,15 @@ type WorkspaceProps = {
   onBack: () => void
   onHome: () => void // Explicitly registers type parameter safety bounds
   onRun: (templateId: string) => void
+  status?: ProviderLiveStatus
+  statusLoaded?: boolean
 }
 
-export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onHome, onRun }: WorkspaceProps) {
+export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onHome, onRun, status, statusLoaded = false }: WorkspaceProps) {
   const { t, dict } = useTranslation()
-  const live = isProviderLive(provider.id)
+  const { hasBackend, configured, missing, live } = deriveState(provider.id, status, statusLoaded)
+  const needsKeys = hasBackend && statusLoaded && !configured
+  const keyHint = t('console.cui.add_keys_hint', 'Add {keys} to enable').replace('{keys}', missing.join(', '))
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', maxWidth: '100%', boxSizing: 'border-box', paddingRight: '4px' }}>
       {/* Dynamic Breadcrumb Track Navigation */}
@@ -121,9 +164,15 @@ export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onHome, o
         <span style={{ color: '#fff', fontWeight: 800 }}>{t('console.cui.workspace_title', '{name} Workspace').replace('{name}', provider.name)}</span>
       </div>
 
-      {!live && (
+      {!hasBackend && (
         <div style={{ fontSize: 11.5, fontWeight: 700, color: '#ffc300', background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 8, padding: '8px 12px' }}>
           {t('console.cui.coming_soon_banner', '⏳ {name} actions are coming soon — this is a preview of what will be available.').replace('{name}', provider.name)}
+        </div>
+      )}
+
+      {needsKeys && (
+        <div style={{ fontSize: 11.5, fontWeight: 700, color: '#1af0ff', background: 'rgba(26,240,255,0.08)', border: '1px solid rgba(26,240,255,0.28)', borderRadius: 8, padding: '8px 12px' }}>
+          {t('console.cui.connect_keys_banner', '🔑 {name} is ready — add {keys} in Vercel to activate these actions.').replace('{name}', provider.name).replace('{keys}', missing.join(', '))}
         </div>
       )}
 
@@ -131,7 +180,7 @@ export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onHome, o
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
         {provider.sections.map((section, idx) => {
           // Same buyer-facing rule as the card: hide unimplemented actions on a
-          // live provider; keep full lists for preview ("Soon") providers.
+          // live provider; keep full lists for preview/not-configured providers.
           const visibleIds = section.templateIds.filter(id => !(live && !isActionLive(id)))
           if (visibleIds.length === 0) return null
           return (
@@ -146,12 +195,19 @@ export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onHome, o
                 const isArchive = id.includes('archive')
                 const runnable = live && isActionLive(id)
                 const incomplete = live && !isActionLive(id)
+                const title = runnable
+                  ? template.label
+                  : incomplete
+                    ? t('console.cui.not_available', 'Not available yet')
+                    : needsKeys
+                      ? keyHint
+                      : t('console.cui.coming_soon', 'Coming soon')
 
                 return (
                   <div 
                     key={id} 
                     onClick={runnable ? () => onRun(id) : undefined}
-                    title={runnable ? template.label : (incomplete ? t('console.cui.not_available', 'Not available yet') : t('console.cui.coming_soon', 'Coming soon'))}
+                    title={title}
                     style={{ 
                       padding: '8px 10px', 
                       borderRadius: 8, 

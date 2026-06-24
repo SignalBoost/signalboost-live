@@ -129,11 +129,31 @@ const VID = {
     pl: 'Czas kanwy {t}s · długość {d}s · {n} napisów · eksporty są nagrywane z kanwy w czasie rzeczywistym.',
     ru: 'Время холста {t}с · длительность {d}с · субтитров: {n} · экспорт записывается с холста в реальном времени.',
   },
+  seedCue1: {
+    en: 'Upload a video, then click Generate Captions to create synced AI captions.',
+    es: 'Sube un video y haz clic en Generar subtítulos para crear subtítulos sincronizados con IA.',
+    pt: 'Envie um vídeo e clique em Gerar legendas para criar legendas sincronizadas com IA.',
+    pl: 'Prześlij wideo, a następnie kliknij Generuj napisy, aby utworzyć zsynchronizowane napisy AI.',
+    ru: 'Загрузите видео и нажмите «Создать субтитры», чтобы создать синхронизированные ИИ-субтитры.',
+  },
+  seedCue2: {
+    en: 'Drag the caption on the canvas, style it, then export your video.',
+    es: 'Arrastra el subtítulo en el lienzo, dale estilo y luego exporta tu video.',
+    pt: 'Arraste a legenda na tela, estilize-a e depois exporte seu vídeo.',
+    pl: 'Przeciągnij napis na kanwie, nadaj mu styl, a następnie wyeksportuj wideo.',
+    ru: 'Перетащите субтитр на холсте, оформите его и затем экспортируйте видео.',
+  },
 } as const
 
 // Preset id → description key in VID (labels stay as brand names).
 const PRESET_DESC: Record<string, keyof typeof VID> = {
   signal: 'presetSignal', tiktok: 'presetTiktok', hormozi: 'presetHormozi', minimal: 'presetMinimal',
+}
+
+// Starter-caption id → localized seed text key. Applied to the initial timeline
+// state so the on-load example captions match the active language.
+const SEED_TEXT: Record<string, keyof typeof VID> = {
+  'cue-1': 'seedCue1', 'cue-2': 'seedCue2',
 }
 
 function activeCue(cues: CaptionCue[], time: number) { return cues.find((c) => time >= c.start && time <= c.end) || null }
@@ -387,7 +407,11 @@ export default function VideoEditor() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [storagePath, setStoragePath] = useState<string | null>(null)
   const [transcriptId, setTranscriptId] = useState<string | null>(null)
-  const [cues, setCues] = useState(starterCaptions)
+  const [cues, setCues] = useState(() =>
+    starterCaptions.map((cue) =>
+      SEED_TEXT[cue.id] ? { ...cue, text: vt(VID[SEED_TEXT[cue.id]], lang) } : cue,
+    ),
+  )
   const [style, setStyle] = useState(defaultCaptionStyle)
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('9:16')
   const [activePreset, setActivePreset] = useState('signal')

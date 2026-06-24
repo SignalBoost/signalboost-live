@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createMarketingServerSupabase } from "@/lib/auth/supabaseServer";
 import { readJsonLimited } from "@/lib/http/readJsonLimited";
 import { rateLimited } from "@/lib/http/rateLimit";
+import { logSanitizedError } from "@/lib/http/logError";
 
 export const dynamic = "force-dynamic";
 
@@ -63,9 +64,9 @@ export async function POST(req: Request) {
     // asset, flagged mock:true so callers don't treat it as real output.
     return NextResponse.json({ success: true, mock: true, audio_url: "/demo/sample.mp3" });
   } catch (err) {
-    console.error("generate-voice route error:", err);
+    const ref = logSanitizedError("generate-voice", err);
     return NextResponse.json(
-      { success: false, error: "Internal server error" },
+      { success: false, error: "Internal server error", ref },
       { status: 500 }
     );
   }

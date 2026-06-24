@@ -197,7 +197,7 @@ export default function ProviderActionForm({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
             {template.fields.length === 0 ? (
               <div style={{ padding: 20, textAlign: 'center', color: 'rgba(255,255,255,.6)', fontSize: 13 }}>
-                This action requires no additional information.
+                {t('console.actionForm.noExtraInfo', 'This action requires no additional information.')}
               </div>
             ) : (
               template.fields.map(field => (
@@ -218,7 +218,7 @@ export default function ProviderActionForm({
             {templateId === 'vercel.add_env_var' && (
               <div style={{ marginTop: 14, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 14 }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: '#1af0ff', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
-                  Active Environment Variables Map
+                  {t('console.actionForm.activeEnvMap', 'Active Environment Variables Map')}
                 </div>
                 <EmbeddedVercelEnvList />
               </div>
@@ -309,6 +309,7 @@ type FormFieldProps = {
 }
 
 function FormField({ templateId, field, value, allValues, error, onChange }: FormFieldProps) {
+  const { t } = useTranslation()
   const baseStyle: CSSProperties = {
     width: '100%',
     padding: '11px 13px',
@@ -439,11 +440,11 @@ function FormField({ templateId, field, value, allValues, error, onChange }: For
 
       {useVercelEnvPicker ? (
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: -2 }}>
-          Select from live environment configurations. The console maps core variable IDs directly.
+          {t('console.actionForm.envHelp', 'Select from live environment configurations. The console maps core variable IDs directly.')}
         </div>
       ) : useStripeProductPicker ? (
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: -2 }}>
-          Select from the live Stripe catalog. The console sends the hidden product ID to Stripe.
+          {t('console.actionForm.stripeHelp', 'Select from the live Stripe catalog. The console sends the hidden product ID to Stripe.')}
         </div>
       ) : (
         field.help && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: -2 }}>{field.help}</div>
@@ -473,6 +474,7 @@ function StripeProductPicker({
   onChange: (value: unknown) => void
   error?: string
 }) {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [products, setProducts] = useState<StripeProductOption[]>([])
@@ -553,7 +555,7 @@ function StripeProductPicker({
       }}
     >
       <option value="" disabled style={{ color: '#111', background: '#fff' }}>
-        Select a Stripe product
+        {t('console.actionForm.selectStripeProduct', 'Select a Stripe product')}
       </option>
 
       {products.map(product => (
@@ -654,7 +656,7 @@ function VercelEnvVarPicker({
       }}
     >
       <option value="" disabled style={{ color: '#111', background: '#fff' }}>
-        Select an environment variable to delete
+        {t('console.actionForm.selectEnvToDelete', 'Select an environment variable to delete')}
       </option>
 
       {envs.map(env => (

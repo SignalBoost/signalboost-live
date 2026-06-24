@@ -167,9 +167,6 @@ export default function PartnersPage() {
             <span className="sb-eyebrow">{title}</span>
             <h2 className="sb-h3" style={{ marginTop: '4px' }}>{prompt}</h2>
             <p className="sb-body" style={{ fontSize: '13px', flex: 1 }}>{detail}</p>
-            <button className="sb-button-secondary" type="button" style={{ marginTop: '8px', width: '100%' }}>
-              {c.reviewBtn}
-            </button>
           </article>
         ))}
       </section>
@@ -194,7 +191,6 @@ export default function PartnersPage() {
             <h2 className="sb-h3">{c.perfTitle}</h2>
             <p className="sb-caption">{c.perfCaption}</p>
           </div>
-          <button className="sb-button-primary" type="button">{c.addBtn}</button>
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', textAlign: 'left', fontSize: '14px', borderCollapse: 'collapse' }}>

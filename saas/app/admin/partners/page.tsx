@@ -29,7 +29,7 @@ const COPY = {
     colPartner: 'Partner',
     colClicks: 'Clicks',
     colStatus: 'Status',
-    empty: 'Not tracked yet. Connect partner click analytics to populate this organized view.',
+    empty: 'No partner clicks recorded yet — connect partner click analytics to populate this organized view.',
     intents: [
       ['Flights', 'Help travelers get there first.', 'Compare flight offers, regional carriers, and urgency-based travel promos.'],
       ['Hotels', 'Give them a safe place to land.', 'Surface lodging partners by budget, location, cancellation flexibility, and trust.'],
@@ -50,7 +50,7 @@ const COPY = {
     colPartner: 'Socio',
     colClicks: 'Clics',
     colStatus: 'Estado',
-    empty: 'Aún sin datos. Conecta el análisis de clics de socios para poblar esta vista.',
+    empty: 'Aún no hay clics de socios registrados — conecta el análisis de clics de socios para poblar esta vista.',
     intents: [
       ['Vuelos', 'Ayuda a los viajeros a llegar primero.', 'Compara ofertas de vuelos, aerolíneas regionales y promociones de viaje urgentes.'],
       ['Hoteles', 'Dales un lugar seguro donde aterrizar.', 'Muestra socios de alojamiento por presupuesto, ubicación, flexibilidad de cancelación y confianza.'],
@@ -71,7 +71,7 @@ const COPY = {
     colPartner: 'Parceiro',
     colClicks: 'Cliques',
     colStatus: 'Status',
-    empty: 'Ainda sem dados. Conecte a análise de cliques de parceiros para preencher esta visualização.',
+    empty: 'Ainda não há cliques de parceiros registrados — conecte a análise de cliques de parceiros para preencher esta visualização.',
     intents: [
       ['Voos', 'Ajude os viajantes a chegar primeiro.', 'Compare ofertas de voos, companhias regionais e promoções de viagem urgentes.'],
       ['Hotéis', 'Dê a eles um lugar seguro para pousar.', 'Mostre parceiros de hospedagem por orçamento, localização, flexibilidade de cancelamento e confiança.'],
@@ -92,7 +92,7 @@ const COPY = {
     colPartner: 'Partner',
     colClicks: 'Kliknięcia',
     colStatus: 'Status',
-    empty: 'Brak danych. Podłącz analitykę kliknięć partnerów, aby wypełnić ten widok.',
+    empty: 'Brak zarejestrowanych kliknięć partnerów — podłącz analitykę kliknięć partnerów, aby wypełnić ten widok.',
     intents: [
       ['Loty', 'Pomóż podróżnikom dotrzeć na miejsce jako pierwsi.', 'Porównaj oferty lotów, regionalnych przewoźników i pilne promocje podróżne.'],
       ['Hotele', 'Daj im bezpieczne miejsce do lądowania.', 'Pokaż partnerów noclegowych według budżetu, lokalizacji, elastyczności anulowania i zaufania.'],
@@ -113,7 +113,7 @@ const COPY = {
     colPartner: 'Партнёр',
     colClicks: 'Клики',
     colStatus: 'Статус',
-    empty: 'Данных пока нет. Подключите аналитику кликов партнёров, чтобы заполнить этот вид.',
+    empty: 'Кликов партнёров пока нет — подключите аналитику кликов партнёров, чтобы заполнить этот вид.',
     intents: [
       ['Авиабилеты', 'Помогите путешественникам добраться первыми.', 'Сравнивайте предложения авиабилетов, региональных перевозчиков и срочные туристические акции.'],
       ['Отели', 'Дайте им безопасное место для посадки.', 'Показывайте партнёров по размещению по бюджету, местоположению, гибкости отмены и доверию.'],

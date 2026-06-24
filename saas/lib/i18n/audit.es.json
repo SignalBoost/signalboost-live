@@ -1,972 +1,979 @@
 {
+  "actionForm": {
+    "noExtraInfo": "This action requires no additional information.",
+    "activeEnvMap": "Active Environment Variables Map",
+    "envHelp": "Select from live environment configurations. The console maps core variable IDs directly.",
+    "stripeHelp": "Select from the live Stripe catalog. The console sends the hidden product ID to Stripe.",
+    "selectStripeProduct": "Select a Stripe product",
+    "selectEnvToDelete": "Select an environment variable to delete"
+  },
   "tier": {
-    "core": "Esencial",
-    "tier2": "Escala",
-    "tier3": "Empresarial",
-    "tier4": "Interno",
+    "core": "Core",
+    "tier2": "Scale",
+    "tier3": "Enterprise",
+    "tier4": "Internal",
     "sidebar": {
-      "core": "Proveedores Nivel 1",
-      "tier2": "Proveedores Nivel 2",
-      "tier3": "Proveedores Nivel 3",
-      "tier4": "Herramientas Nivel 4"
+      "core": "Tier 1 Providers",
+      "tier2": "Tier 2 Providers",
+      "tier3": "Tier 3 Providers",
+      "tier4": "Tier 4 Tools"
     },
     "blurb": {
-      "core": "Infraestructura principal: nube, pagos, datos, alojamiento y control de código.",
-      "tier2": "Mensajería, correo, red edge e integraciones de cómputo.",
-      "tier3": "Plataforma de apps, observabilidad, seguimiento de errores y respuesta a incidentes.",
-      "tier4": "Bóveda de secretos cifrada y gobernanza de equipo."
+      "core": "Primary infrastructure: cloud, payments, data, hosting, and source control.",
+      "tier2": "Messaging, email, edge networking, and compute integrations.",
+      "tier3": "App platform, observability, error tracking, and incident response.",
+      "tier4": "Encrypted secrets vault and team governance."
     }
   },
   "util": {
-    "domains": "Dominios/DNS",
-    "deployments": "Despliegues",
-    "logs": "Registros",
-    "settings": "Ajustes"
+    "domains": "Domains/DNS",
+    "deployments": "Deployments",
+    "logs": "Logs",
+    "settings": "Settings"
   },
   "sub": {
-    "ai_and_models": "IA Y MODELOS",
-    "email": "CORREO",
-    "transcription": "TRANSCRIPCIÓN",
-    "cloud_infrastructure": "INFRAESTRUCTURA CLOUD",
-    "cloud_platform": "PLATAFORMA CLOUD",
-    "microsoft_cloud": "NUBE MICROSOFT",
-    "payments_and_billing": "PAGOS Y FACTURACIÓN",
-    "database_and_authentication": "BASE DE DATOS Y AUTENTICACIÓN",
-    "deployments_and_networking": "DESPLIEGUES Y RED",
-    "source_control": "CONTROL DE CÓDIGO",
-    "messaging_and_sms": "MENSAJERÍA Y SMS",
-    "transactional_email": "CORREO TRANSACCIONAL",
-    "dns_cdn_and_edge": "DNS, CDN Y EDGE",
-    "cloud_compute": "CÓMPUTO CLOUD",
-    "app_platform": "PLATAFORMA DE APPS",
-    "observability": "OBSERVABILIDAD",
-    "error_monitoring": "MONITOREO DE ERRORES",
-    "incident_response": "RESPUESTA A INCIDENTES",
-    "encrypted_secret_vault": "BÓVEDA DE SECRETOS CIFRADA",
-    "team_access_and_compliance": "ACCESO DE EQUIPO Y CUMPLIMIENTO",
-    "voice_and_audio": "VOZ Y AUDIO"
+    "ai_and_models": "AI & MODELS",
+    "email": "EMAIL",
+    "transcription": "TRANSCRIPTION",
+    "cloud_infrastructure": "CLOUD INFRASTRUCTURE",
+    "cloud_platform": "CLOUD PLATFORM",
+    "microsoft_cloud": "MICROSOFT CLOUD",
+    "payments_and_billing": "PAYMENTS & BILLING",
+    "database_and_authentication": "DATABASE & AUTHENTICATION",
+    "deployments_and_networking": "DEPLOYMENTS & NETWORKING",
+    "source_control": "SOURCE CONTROL",
+    "messaging_and_sms": "MESSAGING & SMS",
+    "transactional_email": "TRANSACTIONAL EMAIL",
+    "dns_cdn_and_edge": "DNS, CDN & EDGE",
+    "cloud_compute": "CLOUD COMPUTE",
+    "app_platform": "APP PLATFORM",
+    "observability": "OBSERVABILITY",
+    "error_monitoring": "ERROR MONITORING",
+    "incident_response": "INCIDENT RESPONSE",
+    "encrypted_secret_vault": "ENCRYPTED SECRET VAULT",
+    "team_access_and_compliance": "TEAM ACCESS & COMPLIANCE",
+    "voice_and_audio": "VOICE & AUDIO"
   },
   "sec": {
-    "repositories": "Repositorios",
+    "repositories": "Repositories",
     "pull_requests": "Pull Requests",
-    "branches": "Ramas",
-    "issues": "Incidencias",
-    "activity": "Actividad",
-    "secrets_and_tokens": "Secretos y Tokens",
-    "models": "Modelos",
-    "files": "Archivos",
-    "jobs": "Trabajos",
-    "voices": "Voces",
-    "account": "Cuenta",
-    "history": "Historial",
-    "domains": "Dominios",
-    "audiences": "Audiencias",
-    "broadcasts": "Difusiones",
-    "api_keys": "Claves API",
-    "transcripts": "Transcripciones",
-    "data": "Datos",
-    "auth": "Autenticación",
-    "storage": "Almacenamiento",
-    "customers": "Clientes",
-    "prices_and_tiers": "Precios y Planes",
-    "catalog": "Catálogo",
-    "table_crud": "CRUD de Tablas",
-    "sql_engine": "Motor SQL",
-    "users_and_access": "Usuarios y Acceso",
-    "credentials": "Credenciales",
-    "environment_variables": "Variables de Entorno",
-    "deployments": "Despliegues",
-    "networking_and_logs": "Red y Registros",
-    "email": "Correo",
-    "messaging": "Mensajería",
+    "branches": "Branches",
+    "issues": "Issues",
+    "activity": "Activity",
+    "secrets_and_tokens": "Secrets & Tokens",
+    "models": "Models",
+    "files": "Files",
+    "jobs": "Jobs",
+    "voices": "Voices",
+    "account": "Account",
+    "history": "History",
+    "domains": "Domains",
+    "audiences": "Audiences",
+    "broadcasts": "Broadcasts",
+    "api_keys": "API Keys",
+    "transcripts": "Transcripts",
+    "data": "Data",
+    "auth": "Auth",
+    "storage": "Storage",
+    "customers": "Customers",
+    "prices_and_tiers": "Prices & Tiers",
+    "catalog": "Catalog",
+    "table_crud": "Table CRUD",
+    "sql_engine": "SQL Engine",
+    "users_and_access": "Users & Access",
+    "credentials": "Credentials",
+    "environment_variables": "Environment Variables",
+    "deployments": "Deployments",
+    "networking_and_logs": "Networking & Logs",
+    "email": "Email",
+    "messaging": "Messaging",
     "dns": "DNS",
-    "cache": "Caché",
-    "compute": "Cómputo",
+    "cache": "Cache",
+    "compute": "Compute",
     "iam": "IAM",
-    "security": "Seguridad",
-    "security_rules": "Reglas de Seguridad",
-    "secrets_storage": "Almacén de Secretos",
-    "monitoring": "Monitoreo",
-    "incidents": "Incidentes",
-    "team_access": "Acceso de Equipo",
-    "compliance_and_audit": "Cumplimiento y Auditoría",
-    "audit": "Auditoría"
+    "security": "Security",
+    "security_rules": "Security Rules",
+    "secrets_storage": "Secrets Storage",
+    "monitoring": "Monitoring",
+    "incidents": "Incidents",
+    "team_access": "Team Access",
+    "compliance_and_audit": "Compliance & Audit",
+    "audit": "Audit"
   },
   "fld": {
-    "repository": "Repositorio",
+    "repository": "Repository",
     "pull_request": "Pull Request",
-    "issue": "Incidencia",
-    "branch": "Rama",
-    "model": "Modelo",
-    "voice": "Voz",
-    "table": "Tabla",
-    "transcript": "Transcripción",
-    "title": "Título",
-    "new_title": "Nuevo Título",
-    "description": "Descripción",
-    "body": "Cuerpo",
-    "content": "Contenido",
-    "name": "Nombre",
-    "message": "Mensaje",
-    "email": "Correo",
-    "new_email": "Nuevo Correo",
-    "merge_method": "Método de Fusión",
-    "region": "Región",
-    "domain": "Dominio",
+    "issue": "Issue",
+    "branch": "Branch",
+    "model": "Model",
+    "voice": "Voice",
+    "table": "Table",
+    "transcript": "Transcript",
+    "title": "Title",
+    "new_title": "New Title",
+    "description": "Description",
+    "body": "Body",
+    "content": "Content",
+    "name": "Name",
+    "message": "Message",
+    "email": "Email",
+    "new_email": "New Email",
+    "merge_method": "Merge Method",
+    "region": "Region",
+    "domain": "Domain",
     "bucket": "Bucket",
-    "product": "Producto",
-    "price": "Precio",
-    "query": "Consulta",
-    "operation": "Operación",
-    "phone_number": "Número de Teléfono",
-    "bucket_name": "Nombre del bucket",
-    "username": "Nombre de usuario",
-    "iam_username": "Usuario IAM",
-    "product_name": "Nombre del producto",
-    "new_product_name": "Nuevo nombre del producto",
-    "amount_usd": "Importe (USD)",
-    "price_id": "ID de precio",
-    "subscription_tier": "Nivel de suscripción",
-    "customer": "Cliente",
-    "amount_cents": "Importe (centavos)",
-    "charge": "Cargo",
-    "amount_in_cents": "Importe (en centavos)",
-    "sql_raw_statement": "Sentencia SQL cruda",
-    "migration_payload": "Carga de migración",
-    "json_row_object": "Objeto de fila JSON",
-    "match_column_value": "Coincidencia (columna=valor)",
-    "new_values_json": "Nuevos valores (JSON)",
-    "row": "Fila",
-    "user_email": "Correo del usuario",
-    "user": "Usuario",
-    "object_path": "Ruta del objeto",
-    "bucket_identifier": "Identificador del bucket",
-    "deployment_id": "ID de despliegue",
-    "build_id": "ID de build",
-    "env_variable_id": "ID de variable de entorno",
-    "new_value": "Nuevo valor",
-    "target": "Destino",
-    "env_variable_key_reference": "Referencia de clave de variable de entorno",
-    "domain_address_string": "Dirección de dominio",
-    "to": "Para",
-    "subject": "Asunto",
-    "type": "Tipo",
-    "ttl_sec": "TTL (s)",
-    "proxied": "Con proxy",
-    "record_id": "ID de registro",
-    "droplet_name": "Nombre del droplet",
-    "size": "Tamaño",
-    "image": "Imagen",
-    "rules_source": "Origen de las reglas",
-    "monitor_name": "Nombre del monitor",
-    "alert_message": "Mensaje de alerta",
-    "metric_query": "Consulta de métrica",
-    "project_slug": "Slug del proyecto",
-    "issue_id": "ID de incidencia",
-    "service_id": "ID de servicio",
-    "urgency": "Urgencia",
-    "master_passphrase": "Frase maestra",
-    "secret_key_reference": "Referencia de clave secreta",
-    "encrypted_value": "Valor cifrado",
-    "key_name": "Nombre de la clave",
-    "team_member_id": "ID del miembro del equipo",
-    "target_privilege_domain_access_tier": "Nivel de acceso de privilegio objetivo",
-    "member_id": "ID del miembro",
-    "permissions_comma_separated": "Permisos (separados por comas)",
-    "scope": "Ámbito"
+    "product": "Product",
+    "price": "Price",
+    "query": "Query",
+    "operation": "Operation",
+    "phone_number": "Phone Number",
+    "bucket_name": "Bucket Name",
+    "username": "Username",
+    "iam_username": "IAM Username",
+    "product_name": "Product Name",
+    "new_product_name": "New Product Name",
+    "amount_usd": "Amount (USD)",
+    "price_id": "Price ID",
+    "subscription_tier": "Subscription Tier",
+    "customer": "Customer",
+    "amount_cents": "Amount (Cents)",
+    "charge": "Charge",
+    "amount_in_cents": "Amount (in Cents)",
+    "sql_raw_statement": "SQL Raw Statement",
+    "migration_payload": "Migration Payload",
+    "json_row_object": "JSON Row Object",
+    "match_column_value": "Match (column=value)",
+    "new_values_json": "New Values (JSON)",
+    "row": "Row",
+    "user_email": "User Email",
+    "user": "User",
+    "object_path": "Object Path",
+    "bucket_identifier": "Bucket Identifier",
+    "deployment_id": "Deployment ID",
+    "build_id": "Build ID",
+    "env_variable_id": "Env Variable ID",
+    "new_value": "New Value",
+    "target": "Target",
+    "env_variable_key_reference": "Env Variable Key Reference",
+    "domain_address_string": "Domain Address string",
+    "to": "To",
+    "subject": "Subject",
+    "type": "Type",
+    "ttl_sec": "TTL (sec)",
+    "proxied": "Proxied",
+    "record_id": "Record ID",
+    "droplet_name": "Droplet Name",
+    "size": "Size",
+    "image": "Image",
+    "rules_source": "Rules Source",
+    "monitor_name": "Monitor Name",
+    "alert_message": "Alert Message",
+    "metric_query": "Metric Query",
+    "project_slug": "Project Slug",
+    "issue_id": "Issue ID",
+    "service_id": "Service ID",
+    "urgency": "Urgency",
+    "master_passphrase": "Master Passphrase",
+    "secret_key_reference": "Secret Key Reference",
+    "encrypted_value": "Encrypted Value",
+    "key_name": "Key Name",
+    "team_member_id": "Team Member ID",
+    "target_privilege_domain_access_tier": "Target Privilege Domain Access Tier",
+    "member_id": "Member ID",
+    "permissions_comma_separated": "Permissions (comma-separated)",
+    "scope": "Scope"
   },
   "opt": {
-    "open": "Abierto",
-    "closed": "Cerrado",
-    "merge_commit": "Commit de fusión",
+    "open": "Open",
+    "closed": "Closed",
+    "merge_commit": "Merge commit",
     "squash": "Squash",
     "rebase": "Rebase",
-    "production": "Producción",
-    "preview": "Vista previa",
-    "development": "Desarrollo",
-    "indie_tier_9_mo": "Nivel Indie ($9/mes)",
-    "pro_tier_29_mo": "Nivel Pro ($29/mes)",
-    "growth_tier_79_mo": "Nivel Growth ($79/mes)",
-    "list_objects": "Listar objetos",
-    "upload": "Subir",
-    "download": "Descargar",
-    "high": "Alta",
-    "low": "Baja",
-    "billing_administrator": "Administrador de facturación",
-    "platform_core_developer": "Desarrollador principal de la plataforma",
-    "standard_team_member": "Miembro estándar del equipo",
-    "everything": "Todo",
-    "access_and_roles": "Acceso y roles",
-    "billing": "Facturación",
-    "data": "Datos"
+    "production": "Production",
+    "preview": "Preview",
+    "development": "Development",
+    "indie_tier_9_mo": "Indie Tier ($9/mo)",
+    "pro_tier_29_mo": "Pro Tier ($29/mo)",
+    "growth_tier_79_mo": "Growth Tier ($79/mo)",
+    "list_objects": "List objects",
+    "upload": "Upload",
+    "download": "Download",
+    "high": "High",
+    "low": "Low",
+    "billing_administrator": "Billing Administrator",
+    "platform_core_developer": "Platform Core Developer",
+    "standard_team_member": "Standard Team Member",
+    "everything": "Everything",
+    "access_and_roles": "Access & Roles",
+    "billing": "Billing",
+    "data": "Data"
   },
   "ui": {
-    "execute": "Ejecutar",
-    "confirm": "Confirmar",
-    "cancel": "Cancelar",
-    "preview": "Vista previa",
-    "close": "Cerrar",
+    "execute": "Execute",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "preview": "Preview",
+    "close": "Close",
     "error": "Error",
-    "success": "Éxito",
-    "running": "Ejecutando…",
-    "no_inputs": "Esta acción no requiere datos.",
-    "workspace": "Espacio de trabajo",
-    "hub_home": "Inicio del Hub",
-    "back": "Volver",
-    "tier": "Nivel",
-    "providers": "Proveedores",
-    "utility_views": "Vistas de Utilidad",
-    "review_action": "Revisa la acción que se enviará a",
-    "cannot_undo": "Una vez confirmado, no se puede deshacer.",
-    "about_to_execute": "Estás a punto de ejecutar",
-    "on": "en"
+    "success": "Success",
+    "running": "Running…",
+    "no_inputs": "No inputs required for this action.",
+    "workspace": "Workspace",
+    "hub_home": "Hub Home",
+    "back": "Back",
+    "tier": "Tier",
+    "providers": "Providers",
+    "utility_views": "Utility Views",
+    "review_action": "Review the action that will be sent to",
+    "cannot_undo": "Once confirmed, this cannot be undone.",
+    "about_to_execute": "You are about to execute",
+    "on": "on"
   },
   "tpl": {
     "github": {
       "list_repos": {
-        "label": "Ver Repositorios",
-        "desc": "Lista los repositorios visibles para el token de acceso configurado."
+        "label": "View Repos",
+        "desc": "List repositories visible to the configured access token."
       },
       "list_prs": {
-        "label": "Listar Pull Requests",
-        "desc": "Muestra los pull requests abiertos (más recientes primero) de un repositorio."
+        "label": "List Pull Requests",
+        "desc": "Show open pull requests (newest first) for a repository."
       },
       "view_pr_files": {
-        "label": "Ver Archivos del PR",
-        "desc": "Lista los archivos modificados en un pull request."
+        "label": "View PR Files",
+        "desc": "List the files changed in a pull request."
       },
       "merge_pr": {
-        "label": "Fusionar PR",
-        "desc": "Fusiona un pull request en su rama base."
+        "label": "Merge PR",
+        "desc": "Merge a pull request into its base branch."
       },
       "close_pr": {
-        "label": "Cerrar PR",
-        "desc": "Cierra un pull request sin fusionarlo."
+        "label": "Close PR",
+        "desc": "Close a pull request without merging."
       },
       "list_branches": {
-        "label": "Listar Ramas",
-        "desc": "Lista las ramas de un repositorio (útil para limpiar ai/*)."
+        "label": "List Branches",
+        "desc": "List branches in a repository (useful for ai/* cleanup)."
       },
       "delete_branch": {
-        "label": "Eliminar Rama",
-        "desc": "Elimina una rama por nombre (main está protegida)."
+        "label": "Delete Branch",
+        "desc": "Delete a branch by name (main is protected)."
       },
       "list_commits": {
-        "label": "Commits Recientes",
-        "desc": "Muestra los commits más recientes de un repositorio."
+        "label": "Recent Commits",
+        "desc": "Show the most recent commits on a repository."
       },
       "list_issues": {
-        "label": "Listar Incidencias",
-        "desc": "Muestra las incidencias abiertas de un repositorio."
+        "label": "List Issues",
+        "desc": "Show open issues for a repository."
       },
       "open_issue": {
-        "label": "Abrir Incidencia",
-        "desc": "Crea una nueva incidencia en un repositorio."
+        "label": "Open Issue",
+        "desc": "Create a new issue on a repository."
       },
       "edit_issue": {
-        "label": "Editar Incidencia",
-        "desc": "Actualiza el título o el estado (abierto/cerrado) de una incidencia."
+        "label": "Edit Issue",
+        "desc": "Update an issue title or open/closed state."
       },
       "close_issue": {
-        "label": "Cerrar Incidencia",
-        "desc": "Cierra una incidencia abierta."
+        "label": "Close Issue",
+        "desc": "Close an open issue."
       },
       "rotate_token": {
-        "label": "Rotar Token",
-        "desc": "Rota el token de acceso de GitHub almacenado (revocar + reemitir)."
+        "label": "Rotate Token",
+        "desc": "Rotate the stored GitHub access token (revoke + reissue)."
       },
       "manage_secrets": {
-        "label": "Gestionar Secretos",
-        "desc": "Crea o actualiza un secreto de Actions en un repositorio."
+        "label": "Manage Secrets",
+        "desc": "Create or update an Actions secret on a repository."
       }
     },
     "openai": {
       "list_models": {
-        "label": "Ver Modelos",
-        "desc": "Lista los modelos disponibles para la clave API configurada."
+        "label": "View Models",
+        "desc": "List models available to the configured API key."
       },
       "retrieve_model": {
-        "label": "Detalles del Modelo",
-        "desc": "Muestra los detalles de un modelo específico."
+        "label": "Model Details",
+        "desc": "Show details for a specific model."
       },
       "list_files": {
-        "label": "Listar Archivos",
-        "desc": "Archivos subidos a la cuenta de OpenAI."
+        "label": "List Files",
+        "desc": "Files uploaded to the OpenAI account."
       },
       "list_fine_tunes": {
-        "label": "Trabajos de Ajuste Fino",
-        "desc": "Trabajos de ajuste fino recientes y su estado."
+        "label": "Fine-tuning Jobs",
+        "desc": "Recent fine-tuning jobs and their status."
       },
       "list_batches": {
-        "label": "Trabajos por Lotes",
-        "desc": "Trabajos por lotes recientes y su estado."
+        "label": "Batch Jobs",
+        "desc": "Recent batch jobs and their status."
       }
     },
     "elevenlabs": {
       "list_voices": {
-        "label": "Listar Voces",
-        "desc": "Voces disponibles para la cuenta."
+        "label": "List Voices",
+        "desc": "Voices available to the account."
       },
       "voice_details": {
-        "label": "Detalles de la Voz",
-        "desc": "Inspecciona una voz específica."
+        "label": "Voice Details",
+        "desc": "Inspect a specific voice."
       },
       "list_models": {
-        "label": "Listar Modelos",
-        "desc": "Modelos de voz disponibles para la cuenta."
+        "label": "List Models",
+        "desc": "Speech models available to the account."
       },
       "subscription": {
-        "label": "Suscripción y Uso",
-        "desc": "Nivel del plan y uso de la cuota de caracteres."
+        "label": "Subscription & Usage",
+        "desc": "Plan tier and character quota usage."
       },
       "list_history": {
-        "label": "Historial de Generación",
-        "desc": "Generaciones de texto a voz recientes."
+        "label": "Generation History",
+        "desc": "Recent text-to-speech generations."
       }
     },
     "anthropic": {
       "list_models": {
-        "label": "Ver Modelos",
-        "desc": "Modelos disponibles para la clave API."
+        "label": "View Models",
+        "desc": "Models available to the API key."
       },
       "retrieve_model": {
-        "label": "Detalles del Modelo",
-        "desc": "Detalles de un modelo específico."
+        "label": "Model Details",
+        "desc": "Details for a specific model."
       }
     },
     "gemini": {
       "list_models": {
-        "label": "Ver Modelos",
-        "desc": "Modelos disponibles para la clave de Gemini."
+        "label": "View Models",
+        "desc": "Models available to the Gemini key."
       },
       "model_details": {
-        "label": "Detalles del Modelo",
-        "desc": "Detalles de un modelo específico."
+        "label": "Model Details",
+        "desc": "Details for a specific model."
       }
     },
     "resend": {
       "list_domains": {
-        "label": "Listar Dominios",
-        "desc": "Dominios de envío y estado de verificación."
+        "label": "List Domains",
+        "desc": "Sending domains and verification status."
       },
       "list_audiences": {
-        "label": "Listar Audiencias",
-        "desc": "Audiencias de contactos."
+        "label": "List Audiences",
+        "desc": "Contact audiences."
       },
       "list_broadcasts": {
-        "label": "Listar Difusiones",
-        "desc": "Difusiones recientes."
+        "label": "List Broadcasts",
+        "desc": "Recent broadcasts."
       },
       "list_api_keys": {
-        "label": "Listar Claves API",
-        "desc": "Claves API de la cuenta."
+        "label": "List API Keys",
+        "desc": "API keys on the account."
       }
     },
     "assemblyai": {
       "list_transcripts": {
-        "label": "Transcripciones Recientes",
-        "desc": "Trabajos de transcripción más recientes."
+        "label": "Recent Transcripts",
+        "desc": "Most recent transcription jobs."
       },
       "transcript_details": {
-        "label": "Detalles de la Transcripción",
-        "desc": "Inspecciona un trabajo de transcripción."
+        "label": "Transcript Details",
+        "desc": "Inspect a transcription job."
       }
     },
     "supabase_mkt": {
       "list_tables": {
-        "label": "Listar Tablas",
-        "desc": "Tablas públicas del proyecto de marketing."
+        "label": "List Tables",
+        "desc": "Public tables in the marketing project."
       },
       "list_rows": {
-        "label": "Listar Filas",
-        "desc": "Filas de una tabla elegida."
+        "label": "List Rows",
+        "desc": "Rows from a chosen table."
       },
       "list_users": {
-        "label": "Listar Usuarios",
-        "desc": "Usuarios de autenticación del proyecto de marketing."
+        "label": "List Users",
+        "desc": "Auth users in the marketing project."
       },
       "list_buckets": {
-        "label": "Listar Buckets",
-        "desc": "Buckets de almacenamiento del proyecto de marketing."
+        "label": "List Buckets",
+        "desc": "Storage buckets in the marketing project."
       }
     },
     "aws": {
       "create_s3_bucket": {
-        "label": "Crear bucket S3",
-        "desc": "Crea un nuevo contenedor de bucket S3 con nombre único global."
+        "label": "Create S3 Bucket",
+        "desc": "Create a new globally unique S3 bucket container."
       },
       "list_iam_users": {
-        "label": "Listar usuarios IAM",
-        "desc": "Obtén todos los usuarios actuales del directorio de identidades."
+        "label": "List IAM Users",
+        "desc": "Fetch all current identity directory users."
       },
       "disable_iam_user": {
-        "label": "Desactivar usuario IAM",
-        "desc": "Desactiva de inmediato las claves y credenciales del usuario."
+        "label": "Disable IAM User",
+        "desc": "Deactivate user keys and credentials immediately."
       },
       "rotate_credential": {
-        "label": "Rotar credencial",
-        "desc": "Rota un par de claves de acceso IAM de un usuario."
+        "label": "Rotate Credential",
+        "desc": "Rotate an IAM access key pair for a user."
       }
     },
     "gcp": {
       "list_service_accounts": {
-        "label": "Listar cuentas de servicio",
-        "desc": "Obtén todas las cuentas de servicio de identidad del sistema."
+        "label": "List Service Accounts",
+        "desc": "Fetch all system identity service accounts."
       }
     },
     "stripe": {
       "create_product": {
-        "label": "Crear producto",
-        "desc": "Crea un nuevo producto de Stripe y su primer precio recurrente."
+        "label": "Create Product",
+        "desc": "Create a new Stripe product and its first recurring price."
       },
       "edit_product": {
-        "label": "Editar producto",
-        "desc": "Actualiza el nombre, la descripción o el estado activo de un producto de Stripe."
+        "label": "Edit Product",
+        "desc": "Update a Stripe product name, description, or active state."
       },
       "view_products": {
-        "label": "Ver productos",
-        "desc": "Lista los productos activos de Stripe y sus identificadores."
+        "label": "View Products",
+        "desc": "List live Stripe products and their identifiers."
       },
       "archive_product": {
-        "label": "Archivar producto",
-        "desc": "Archiva un producto de Stripe (lo deja inactivo; recuperable al reactivarlo)."
+        "label": "Archive Product",
+        "desc": "Archive a Stripe product (sets it inactive — recoverable by editing it active again)."
       },
       "delete_product": {
-        "label": "Eliminar producto",
-        "desc": "Elimina permanentemente un producto de Stripe. Solo se pueden eliminar productos sin precios activos."
+        "label": "Delete Product",
+        "desc": "Permanently delete a Stripe product. Only products with no active prices can be deleted."
       },
       "create_price": {
-        "label": "Crear precio",
-        "desc": "Adjunta un nuevo precio recurrente o único a un producto de Stripe existente."
+        "label": "Create Price",
+        "desc": "Attach a new recurring or one-time price to an existing Stripe product."
       },
       "view_prices": {
-        "label": "Ver precios",
-        "desc": "Lista los precios de Stripe, opcionalmente filtrados por producto."
+        "label": "View Prices",
+        "desc": "List Stripe prices, optionally filtered by product."
       },
       "edit_price": {
-        "label": "Editar precio",
-        "desc": "Actualiza el alias de un precio o actívalo/desactívalo (los importes son inmutables en Stripe)."
+        "label": "Edit Price",
+        "desc": "Update a price nickname or activate/deactivate it (amounts are immutable in Stripe)."
       },
       "archive_price": {
-        "label": "Archivar precio",
-        "desc": "Desactiva un precio para que ya no pueda comprarse (recuperable)."
+        "label": "Archive Price",
+        "desc": "Deactivate a price so it can no longer be purchased (recoverable)."
       },
       "apply_tier_template": {
-        "label": "Plantillas de plan",
-        "desc": "Crea al instante vías de pago estandarizadas Indie, Pro o Growth."
+        "label": "Plan Templates",
+        "desc": "Instantly build out standardized Indie, Pro, or Growth checkout tracks."
       },
       "list_customers": {
-        "label": "Vista de clientes",
-        "desc": "Lista clientes, facturas y métricas de pagos recurrentes activos."
+        "label": "Customer View",
+        "desc": "List customers, invoices, and active recurring payment metrics."
       },
       "adjust_balance": {
-        "label": "Ajustar saldo",
-        "desc": "Aplica modificaciones manuales al libro de saldo del cliente o ajustes de transacción."
+        "label": "Adjust Balance",
+        "desc": "Apply manual customer balance ledger modifications or transaction adjustments."
       },
       "issue_refund": {
-        "label": "Reembolso/Ajustes",
-        "desc": "Revierte el saldo de una transacción procesada o aplica un crédito de servicio manual."
+        "label": "Refund/Adjustments",
+        "desc": "Revert a processed transaction balance or apply a manual service credit charge."
       }
     },
     "supabase": {
       "sql_editor": {
-        "label": "Editor SQL",
-        "desc": "Ejecuta consultas crudas arbitrarias directamente contra tus tablas de datos."
+        "label": "SQL Editor",
+        "desc": "Run arbitrary raw queries directly against your data tables."
       },
       "run_migration": {
-        "label": "Ejecutar migración",
-        "desc": "Ejecuta migraciones de esquema de definición de datos compiladas a través del puente de consultas."
+        "label": "Run Migration",
+        "desc": "Execute compiled data definition schema migrations over the query bridge."
       },
       "insert_row": {
-        "label": "Insertar fila",
-        "desc": "Inyecta directamente registros estructurados de fila en un esquema existente."
+        "label": "Insert Row",
+        "desc": "Directly inject structured row data records into an existing schema."
       },
       "edit_row": {
-        "label": "Editar fila",
-        "desc": "Actualiza una fila de tabla existente que coincida con una expresión de filtro."
+        "label": "Edit Row",
+        "desc": "Update an existing table row matched by a filter expression."
       },
       "archive_row": {
-        "label": "Archivar filas",
-        "desc": "Cambia los indicadores de visibilidad activa en un registro de elemento de base de datos específico."
+        "label": "Archive Rows",
+        "desc": "Flip active visibility flags on a specific database item record."
       },
       "delete_row": {
-        "label": "Eliminar fila",
-        "desc": "Purga por completo los registros de fila de la capa de almacenamiento."
+        "label": "Delete Row",
+        "desc": "Hard purge row records out of the storage layer completely."
       },
       "invite_user": {
-        "label": "Invitar usuario",
-        "desc": "Envía una invitación por correo para aprovisionar un nuevo usuario autenticado."
+        "label": "Invite User",
+        "desc": "Send an email invite to provision a new authenticated user."
       },
       "edit_user": {
-        "label": "Editar usuario",
-        "desc": "Actualiza el correo, los metadatos o el estado de confirmación de un usuario."
+        "label": "Edit User",
+        "desc": "Update a user's email, metadata, or confirmation state."
       },
       "delete_user": {
-        "label": "Eliminar usuario",
-        "desc": "Elimina permanentemente un usuario autenticado y su identidad."
+        "label": "Delete User",
+        "desc": "Permanently remove an authenticated user and their identity."
       },
       "reset_password": {
-        "label": "Restablecer contraseña",
-        "desc": "Envía un correo de recuperación de contraseña para una cuenta de usuario."
+        "label": "Reset Password",
+        "desc": "Trigger a password-recovery email for a user account."
       },
       "rotate_service_key": {
-        "label": "Rotar claves",
-        "desc": "Invalida los tokens JSON service_role actuales y emite credenciales nuevas."
+        "label": "Rotate Keys",
+        "desc": "Invalidate current service_role JSON tokens and issue fresh credentials."
       },
       "storage_panel": {
-        "label": "Panel de almacenamiento",
-        "desc": "Sube, descarga o lista objetos dentro de un bucket de almacenamiento."
+        "label": "Storage Panel",
+        "desc": "Upload, download, or list objects inside a storage bucket."
       },
       "create_bucket": {
-        "label": "Crear bucket",
-        "desc": "Crea un nuevo contenedor de almacenamiento de objetos multimedia o binarios."
+        "label": "Create Bucket",
+        "desc": "Instantiate a fresh media or binary object storage file container."
       },
       "empty_bucket": {
-        "label": "Vaciar bucket",
-        "desc": "Purga todos los objetos anidados sin eliminar el contenedor de activos principal."
+        "label": "Empty Bucket",
+        "desc": "Purge all nested objects and binary layout leaves without dropping the core asset container."
       }
     },
     "vercel": {
       "list_deployments": {
-        "label": "Panel de despliegues",
-        "desc": "Inspecciona builds en ejecución, registros de commit y asignaciones de destino de producción."
+        "label": "Deployments Panel",
+        "desc": "Inspect running build tracks, commit records, and production target assignments."
       },
       "trigger_rollback": {
-        "label": "Revertir despliegue",
-        "desc": "Apunta al instante los destinos de dominio de producción a un hash de despliegue anterior."
+        "label": "Rollback Deploy",
+        "desc": "Instantly point production edge domain targets back to a historical deployment hash."
       },
       "cancel_build": {
-        "label": "Cancelar build",
-        "desc": "Aborta un elemento de la cola de compilación activa directamente en el gateway."
+        "label": "Cancel Build",
+        "desc": "Abort an active compiling orchestration queue element directly at the gateway."
       },
       "view_env": {
-        "label": "Ver variables de entorno",
-        "desc": "Lista todas las configuraciones de variables de entorno activas en este proyecto."
+        "label": "View Env Vars",
+        "desc": "List all active environment variable configurations on this project tracking ring."
       },
       "edit_env": {
-        "label": "Editar variable de entorno",
-        "desc": "Actualiza el valor o los entornos de destino de una variable."
+        "label": "Edit Env Var",
+        "desc": "Update the value and/or target environments of a variable."
       },
       "delete_env": {
-        "label": "Eliminar variable de entorno",
-        "desc": "Borra por completo las claves de variables de entorno del pipeline de build activo."
+        "label": "Delete Env Var",
+        "desc": "Wipe environment variable keys completely off the active build pipeline."
       },
       "sync_dns_domain": {
-        "label": "Dominios/DNS",
-        "desc": "Configura ajustes canónicos, rutas de alias o reglas de certificación SSL en el edge."
+        "label": "Domains/DNS",
+        "desc": "Configure canonical configurations, alias paths, or trigger edge SSL certification rules."
       },
       "logs": {
-        "label": "Visor de registros",
-        "desc": "Transmite eventos recientes de registro de plataforma, build y runtime."
+        "label": "Logs Viewer",
+        "desc": "Stream recent platform, build, and runtime log events."
       }
     },
     "twilio": {
       "send_sms": {
-        "label": "Enviar SMS",
-        "desc": "Envía un mensaje SMS saliente desde tu número de Twilio."
+        "label": "Send SMS",
+        "desc": "Send an outbound SMS message from your Twilio number."
       },
       "verify_number": {
-        "label": "Verificar número",
-        "desc": "Inicia la verificación del número de teléfono (envía un código de un solo uso)."
+        "label": "Verify Number",
+        "desc": "Start phone-number verification (sends a one-time code)."
       }
     },
     "sendgrid": {
       "send_email": {
-        "label": "Enviar correo",
-        "desc": "Envía un correo transaccional a través de SendGrid."
+        "label": "Send Email",
+        "desc": "Send a transactional email through SendGrid."
       },
       "check_domain_auth": {
-        "label": "Verificar autenticación de dominio",
-        "desc": "Inspecciona el estado de autenticación del dominio remitente (SPF/DKIM)."
+        "label": "Check Domain Auth",
+        "desc": "Inspect sender-domain authentication (SPF/DKIM) status."
       }
     },
     "cloudflare": {
       "add_dns_record": {
-        "label": "Agregar registro DNS",
-        "desc": "Crea un registro DNS en la zona de Cloudflare configurada."
+        "label": "Add DNS Record",
+        "desc": "Create a DNS record in the configured Cloudflare zone."
       },
       "toggle_proxy": {
-        "label": "Alternar proxy",
-        "desc": "Activa o desactiva el proxy de nube naranja para un registro."
+        "label": "Toggle Proxy",
+        "desc": "Turn the orange-cloud proxy on or off for a record."
       },
       "purge_cache": {
-        "label": "Purgar caché",
-        "desc": "Purga toda la caché del edge de Cloudflare para la zona."
+        "label": "Purge Cache",
+        "desc": "Purge the entire Cloudflare edge cache for the zone."
       }
     },
     "digitalocean": {
       "create_droplet": {
-        "label": "Crear droplet",
-        "desc": "Aprovisiona un nuevo droplet de cómputo de DigitalOcean."
+        "label": "Create Droplet",
+        "desc": "Provision a new DigitalOcean compute droplet."
       },
       "view_droplets": {
-        "label": "Ver droplets",
-        "desc": "Lista los droplets activos y su estado."
+        "label": "View Droplets",
+        "desc": "List active droplets and their status."
       }
     },
     "firebase": {
       "upload_rules": {
-        "label": "Subir reglas",
-        "desc": "Publica un nuevo conjunto de reglas de seguridad de Firestore/Storage."
+        "label": "Upload Rules",
+        "desc": "Publish a new Firestore/Storage security ruleset."
       },
       "view_rules": {
-        "label": "Ver reglas",
-        "desc": "Muestra el conjunto de reglas de seguridad publicado actualmente."
+        "label": "View Rules",
+        "desc": "Show the currently published security ruleset."
       }
     },
     "datadog": {
       "create_monitor": {
-        "label": "Crear monitor",
-        "desc": "Crea un monitor de métrica/alerta."
+        "label": "Create Monitor",
+        "desc": "Create a metric/alert monitor."
       },
       "check_metrics": {
-        "label": "Consultar métricas",
-        "desc": "Ejecuta una consulta de métrica y ve la serie más reciente."
+        "label": "Check Metrics",
+        "desc": "Run a metric query and view the latest series."
       }
     },
     "sentry": {
       "list_issues": {
-        "label": "Listar incidencias",
-        "desc": "Lista las incidencias sin resolver de un proyecto."
+        "label": "List Issues",
+        "desc": "List unresolved issues for a project."
       },
       "resolve_issue": {
-        "label": "Resolver incidencia",
-        "desc": "Marca una incidencia como resuelta."
+        "label": "Resolve Issue",
+        "desc": "Mark an issue as resolved."
       }
     },
     "pagerduty": {
       "list_incidents": {
-        "label": "Listar incidentes",
-        "desc": "Lista los incidentes recientes y activos."
+        "label": "List Incidents",
+        "desc": "List recent and active incidents."
       },
       "trigger_incident": {
-        "label": "Activar incidente",
-        "desc": "Activa manualmente un nuevo incidente en un servicio."
+        "label": "Trigger Incident",
+        "desc": "Manually trigger a new incident on a service."
       }
     },
     "vault": {
       "unlock_vault": {
-        "label": "Desbloquear bóveda",
-        "desc": "Proporciona tu frase maestra del sistema para cargar los vectores de clave sensibles."
+        "label": "Unlock Vault",
+        "desc": "Supply your system-wide Master Passphrase to load sensitive key vectors."
       },
       "seal_vault": {
-        "label": "Sellar bóveda",
-        "desc": "Purga al instante las capas de memoria descifradas y bloquea de nuevo las operaciones principales."
+        "label": "Seal Vault",
+        "desc": "Instantly purge decrypted memory layers and lock all core operations back down."
       },
       "add_secret": {
-        "label": "Agregar secreto",
-        "desc": "Inyecta cadenas de almacenamiento de variables cifradas altamente seguras."
+        "label": "Add Secret",
+        "desc": "Inject highly secure, encrypted variable storage strings."
       },
       "edit_secret": {
-        "label": "Editar clave",
-        "desc": "Actualiza el valor de un secreto existente en la bóveda."
+        "label": "Edit Key",
+        "desc": "Update the value of an existing vault secret."
       },
       "reveal_secret": {
-        "label": "Revelar clave",
-        "desc": "Descifra y revela el valor de un secreto (queda registrado en la auditoría)."
+        "label": "Reveal Key",
+        "desc": "Decrypt and reveal a secret value (audit-logged)."
       },
       "archive_secret": {
-        "label": "Archivar clave",
-        "desc": "Archiva un secreto (oculto pero recuperable)."
+        "label": "Archive Key",
+        "desc": "Archive a secret (hidden but recoverable)."
       },
       "delete_secret": {
-        "label": "Eliminar secreto",
-        "desc": "Borra permanentemente los objetos de referencia de clave de los bloques de almacenamiento."
+        "label": "Delete Secret",
+        "desc": "Permanently scrub key reference objects from storage blocks."
       },
       "view_keys": {
-        "label": "Claves del registro de auditoría",
-        "desc": "Inspecciona las rutas de la traza de cumplimiento que mapean eventos de descifrado recientes."
+        "label": "Audit Log Keys",
+        "desc": "Inspect compliance trail paths mapping recent decryption events."
       },
       "audit_log": {
-        "label": "Registro de auditoría",
-        "desc": "Ve la traza de auditoría de acceso y mutación de la bóveda."
+        "label": "Audit Log",
+        "desc": "View the vault access and mutation audit trail."
       }
     },
     "gov": {
       "assign_role": {
-        "label": "Asignación de rol",
-        "desc": "Aprovisiona parámetros de acceso a la plataforma para personal organizativo específico."
+        "label": "Role Assignment",
+        "desc": "Provision platform access parameters across specific organizational personnel tracks."
       },
       "change_permissions": {
-        "label": "Cambiar permisos de rol",
-        "desc": "Ajusta el conjunto de permisos asociado a un miembro o rol."
+        "label": "Change Role Permissions",
+        "desc": "Adjust the permission set attached to a member or role."
       },
       "deactivate_member": {
-        "label": "Archivar miembro",
-        "desc": "Suspende los permisos de la organización y desactiva el acceso a la cuenta globalmente."
+        "label": "Archive Member",
+        "desc": "Suspend org permissions and turn off account access parameters globally."
       },
       "view_timeline": {
-        "label": "Línea de tiempo de actividad",
-        "desc": "Líneas de traza de auditoría que registran los contextos de ejecución recientes del clúster."
+        "label": "Activity Timeline",
+        "desc": "Audit trace lines tracking all recent cluster execution contexts."
       },
       "run_compliance_audit": {
-        "label": "Ejecutar auditoría de cumplimiento",
-        "desc": "Ejecuta un barrido de cumplimiento en el ámbito seleccionado."
+        "label": "Run Compliance Audit",
+        "desc": "Run a compliance sweep across the selected scope."
       },
       "clear_stale_sessions": {
-        "label": "Borrar sesiones",
-        "desc": "Fuerza el cierre de sesión de tokens inactivos y actualiza los parámetros de autorización."
+        "label": "Clear Sessions",
+        "desc": "Force log out inactive tokens and refresh authorization parameters."
       }
     }
   },
   "domains": {
-    "err_load": "No se pudieron cargar los dominios",
-    "err_load2": "Error al cargar los dominios",
-    "err_add": "No se pudo agregar el dominio",
-    "err_add2": "Error al agregar el dominio",
-    "err_verify": "La verificación falló",
-    "err_verify2": "Error al verificar el dominio",
-    "title": "Dominios y DNS",
-    "subtitle": "Administra dominios, registros DNS y certificados SSL",
-    "add_domain": "Agregar dominio",
-    "add": "Agregar",
-    "loading": "Cargando dominios…",
-    "empty": "Aún no hay dominios configurados",
-    "verified": "Verificado",
-    "pending": "Verificación pendiente",
-    "verification_required": "Verificación requerida",
-    "check_verification": "Comprobar verificación",
-    "ssl_cert": "Certificado SSL",
-    "status": "Estado",
-    "expires": "Vence",
-    "nameservers": "Servidores de nombres",
-    "created": "Creado",
-    "updated": "Actualizado"
+    "err_load": "Failed to load domains",
+    "err_load2": "Error loading domains",
+    "err_add": "Failed to add domain",
+    "err_add2": "Error adding domain",
+    "err_verify": "Verification failed",
+    "err_verify2": "Error verifying domain",
+    "title": "Domains & DNS",
+    "subtitle": "Manage domains, DNS records, and SSL certificates",
+    "add_domain": "Add Domain",
+    "add": "Add",
+    "loading": "Loading domains...",
+    "empty": "No domains configured yet",
+    "verified": "Verified",
+    "pending": "Pending Verification",
+    "verification_required": "Verification Required",
+    "check_verification": "Check Verification",
+    "ssl_cert": "SSL Certificate",
+    "status": "Status",
+    "expires": "Expires",
+    "nameservers": "Nameservers",
+    "created": "Created",
+    "updated": "Updated"
   },
   "env": {
-    "title": "Agregar variable de entorno",
-    "count_live": "{n} activas",
-    "type": "Tipo",
-    "targets": "Destinos",
-    "add": "Agregar variable",
-    "adding": "Agregando…",
+    "title": "Add environment variable",
+    "count_live": "{n} live",
+    "type": "Type",
+    "targets": "Targets",
+    "add": "Add variable",
+    "adding": "Adding…",
     "list_title": "Variables",
-    "refresh": "Actualizar",
-    "loading": "Cargando variables…",
-    "empty": "Aún no hay variables. Agrega una arriba.",
-    "system": "sistema",
-    "edit": "Editar",
-    "close": "Cerrar",
-    "delete": "Eliminar",
-    "cancel": "Cancelar",
-    "save": "Guardar cambios",
-    "saving": "Guardando…",
-    "ph_value": "valor",
-    "ph_new_value": "nuevo valor (déjalo en blanco para conservar el actual)",
-    "err_load": "No se pudieron cargar las variables",
-    "err_load2": "Error al cargar las variables",
-    "err_required": "La clave y el valor son obligatorios",
-    "added": "Se agregó {key}",
-    "err_add": "No se pudo agregar la variable",
-    "err_add2": "Error al agregar la variable",
-    "err_edit_required": "Define un nuevo valor o cambia los destinos",
-    "updated": "Variable actualizada",
-    "err_update": "No se pudo actualizar la variable",
-    "err_update2": "Error al actualizar la variable",
-    "confirm_delete": "¿Eliminar {key}? Esto la quita del proceso de compilación y no se puede deshacer.",
-    "deleted": "Se eliminó {key}",
-    "err_delete": "No se pudo eliminar la variable",
-    "err_delete2": "Error al eliminar la variable"
+    "refresh": "Refresh",
+    "loading": "Loading variables…",
+    "empty": "No variables yet. Add one above.",
+    "system": "system",
+    "edit": "Edit",
+    "close": "Close",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "save": "Save changes",
+    "saving": "Saving…",
+    "ph_value": "value",
+    "ph_new_value": "new value (leave blank to keep current)",
+    "err_load": "Failed to load variables",
+    "err_load2": "Error loading variables",
+    "err_required": "Key and value are required",
+    "added": "Added {key}",
+    "err_add": "Failed to add variable",
+    "err_add2": "Error adding variable",
+    "err_edit_required": "Set a new value or change the targets",
+    "updated": "Variable updated",
+    "err_update": "Failed to update variable",
+    "err_update2": "Error updating variable",
+    "confirm_delete": "Delete {key}? This removes it from the build pipeline and cannot be undone.",
+    "deleted": "Deleted {key}",
+    "err_delete": "Failed to delete variable",
+    "err_delete2": "Error deleting variable"
   },
   "logs": {
-    "title": "Registros de auditoría",
-    "subtitle": "Registro de actividad en tiempo real de todas las operaciones del baúl",
-    "stat_actions_24h": "Acciones (24 h)",
-    "stat_success_rate": "Tasa de éxito",
-    "stat_failed": "Acciones fallidas",
-    "stat_unique_users": "Usuarios únicos",
-    "filters": "Filtros",
-    "action": "Acción",
-    "all_actions": "Todas las acciones",
-    "accessed": "Accedido",
-    "rotated": "Rotado",
-    "verified": "Verificado",
-    "created": "Creado",
-    "deleted": "Eliminado",
-    "revoked": "Revocado",
-    "exported": "Exportado",
-    "status": "Estado",
-    "all_statuses": "Todos los estados",
-    "success": "Éxito",
-    "failed": "Fallido",
-    "pending": "Pendiente",
-    "secret_id": "ID de secreto",
-    "ph_secret": "Filtrar por secreto",
-    "user_email": "Correo del usuario",
-    "ph_user": "Filtrar por usuario",
-    "export_csv": "Exportar como CSV",
-    "loading": "Cargando registros…",
-    "no_logs": "No se encontraron registros",
-    "timestamp": "Marca de tiempo",
-    "col_user": "Usuario",
-    "message": "Mensaje",
-    "previous": "Anterior",
-    "page_n": "Página {n}",
-    "next": "Siguiente",
-    "err_load": "No se pudieron cargar los registros",
-    "err_load2": "Error al cargar los registros",
-    "err_export": "Error al exportar"
+    "title": "Audit Logs",
+    "subtitle": "Real-time activity log of all vault operations",
+    "stat_actions_24h": "Actions (24h)",
+    "stat_success_rate": "Success Rate",
+    "stat_failed": "Failed Actions",
+    "stat_unique_users": "Unique Users",
+    "filters": "Filters",
+    "action": "Action",
+    "all_actions": "All Actions",
+    "accessed": "Accessed",
+    "rotated": "Rotated",
+    "verified": "Verified",
+    "created": "Created",
+    "deleted": "Deleted",
+    "revoked": "Revoked",
+    "exported": "Exported",
+    "status": "Status",
+    "all_statuses": "All Statuses",
+    "success": "Success",
+    "failed": "Failed",
+    "pending": "Pending",
+    "secret_id": "Secret ID",
+    "ph_secret": "Filter by secret",
+    "user_email": "User Email",
+    "ph_user": "Filter by user",
+    "export_csv": "Export as CSV",
+    "loading": "Loading logs...",
+    "no_logs": "No logs found",
+    "timestamp": "Timestamp",
+    "col_user": "User",
+    "message": "Message",
+    "previous": "Previous",
+    "page_n": "Page {n}",
+    "next": "Next",
+    "err_load": "Failed to load logs",
+    "err_load2": "Error loading logs",
+    "err_export": "Export failed"
   },
   "deploy": {
-    "err_load": "No se pudieron cargar las implementaciones",
-    "err_load2": "Error al cargar las implementaciones",
-    "confirm_rollback": "¿Revertir a {target}? Esto lo promueve de nuevo a producción.",
-    "confirm_cancel": "¿Cancelar la compilación {target}? Esto aborta la compilación en curso.",
-    "done_rollback": "Reversión completada",
-    "done_cancel": "Compilación cancelada",
-    "err_rollback": "No se pudo revertir",
-    "err_cancel": "No se pudo cancelar",
-    "err_during_rollback": "Error durante la reversión",
-    "err_during_cancel": "Error durante la cancelación",
-    "head_rollback": "Revertir implementación",
-    "head_cancel": "Cancelar compilación",
-    "head_view": "Implementaciones",
-    "sub_rollback": "Elige una implementación READY anterior para promoverla de nuevo a producción.",
-    "sub_cancel": "Aborta una compilación en curso (BUILDING, QUEUED o INITIALIZING).",
-    "sub_view": "Historial y estado recientes de implementaciones de Vercel.",
-    "refresh": "Actualizar",
-    "loading": "Cargando implementaciones…",
-    "empty": "No se encontraron implementaciones",
-    "deployment": "Implementación",
-    "current": "ACTUAL",
-    "by": "por {name}",
-    "promoting": "Promoviendo…",
-    "roll_back_this": "Revertir a esta",
-    "current_target": "objetivo de producción actual",
-    "only_ready": "Solo se pueden promover implementaciones READY",
-    "canceling": "Cancelando…",
-    "cancel_build": "Cancelar compilación",
-    "not_in_progress": "No está en curso — nada que cancelar",
-    "live_url": "URL en vivo",
-    "git_commit": "Commit de Git",
-    "deployment_id": "ID de implementación",
-    "created": "Creado",
-    "aliases": "Alias",
-    "view_inspector": "Ver detalles de la implementación en el Inspector",
-    "just_now": "ahora mismo",
-    "m_ago": "hace {n} min",
-    "h_ago": "hace {n} h",
-    "d_ago": "hace {n} d"
+    "err_load": "Failed to load deployments",
+    "err_load2": "Error loading deployments",
+    "confirm_rollback": "Roll back to {target}? This promotes it back to production.",
+    "confirm_cancel": "Cancel build {target}? This aborts the running build.",
+    "done_rollback": "Rollback complete",
+    "done_cancel": "Build canceled",
+    "err_rollback": "Failed to rollback",
+    "err_cancel": "Failed to cancel",
+    "err_during_rollback": "Error during rollback",
+    "err_during_cancel": "Error during cancel",
+    "head_rollback": "Rollback Deploy",
+    "head_cancel": "Cancel Build",
+    "head_view": "Deployments",
+    "sub_rollback": "Pick a previous READY deployment to promote back to production.",
+    "sub_cancel": "Abort an in-progress build (BUILDING, QUEUED, or INITIALIZING).",
+    "sub_view": "Recent Vercel deployment history and status.",
+    "refresh": "Refresh",
+    "loading": "Loading deployments...",
+    "empty": "No deployments found",
+    "deployment": "Deployment",
+    "current": "CURRENT",
+    "by": "by {name}",
+    "promoting": "Promoting…",
+    "roll_back_this": "Roll back to this",
+    "current_target": "current production target",
+    "only_ready": "Only READY deployments can be promoted",
+    "canceling": "Canceling…",
+    "cancel_build": "Cancel build",
+    "not_in_progress": "Not in progress — nothing to cancel",
+    "live_url": "Live URL",
+    "git_commit": "Git Commit",
+    "deployment_id": "Deployment ID",
+    "created": "Created",
+    "aliases": "Aliases",
+    "view_inspector": "View Deployment Details in Inspector",
+    "just_now": "just now",
+    "m_ago": "{n}m ago",
+    "h_ago": "{n}h ago",
+    "d_ago": "{n}d ago"
   },
   "settings": {
-    "err_load": "No se pudo cargar la configuración",
-    "err_load2": "Error al cargar la configuración",
-    "err_update": "No se pudo actualizar la configuración",
-    "err_update2": "Error al actualizar la configuración",
-    "loading": "Cargando configuración…",
-    "title": "Configuración de la consola",
-    "subtitle": "Configura las políticas de seguridad, aprobaciones y auditoría",
-    "saved": "Configuración guardada",
-    "sec_security": "Seguridad",
-    "sec_automation": "Automatización",
-    "sec_audit": "Auditoría y retención",
-    "sec_notifications": "Notificaciones",
-    "sec_advanced": "Avanzado",
-    "mfa_l": "Requerir MFA para desbloquear",
-    "mfa_d": "Los usuarios deben autenticarse con TOTP antes de acceder al baúl",
-    "rot_approval_l": "Requerir aprobación para rotación de claves",
-    "rot_approval_d": "Las rotaciones de claves deben aprobarse antes de ejecutarse",
-    "exp_approval_l": "Requerir aprobación para exportar",
-    "exp_approval_d": "Exportar secretos requiere aprobación explícita",
-    "enc_l": "Cifrado activado",
-    "enc_d": "Todos los secretos cifrados en reposo",
-    "autorot_l": "Rotación automática de claves",
-    "autorot_d": "Rotar las claves automáticamente según un calendario",
-    "autorot_int_l": "Intervalo de rotación automática (días)",
-    "audit_ret_l": "Retención del registro de auditoría (días)",
-    "audit_ret_d": "Cuánto tiempo conservar los registros de auditoría",
-    "session_l": "Tiempo de espera de sesión (minutos)",
-    "session_d": "Tiempo de inactividad antes de requerir reautenticación",
-    "notify_unauth_l": "Notificar acceso no autorizado",
-    "notify_unauth_d": "Enviar alertas cuando se detecte acceso no autorizado",
-    "notify_rot_l": "Notificar rotación de claves",
-    "notify_rot_d": "Enviar notificaciones cuando se roten las claves",
-    "notify_exp_l": "Notificar vencimiento de claves",
-    "notify_exp_d": "Alertar cuando las claves estén por vencer",
-    "pub_l": "Permitir URL públicas",
-    "pub_d": "Permitir el despliegue en URL públicas",
-    "last_updated": "Última actualización"
+    "err_load": "Failed to load settings",
+    "err_load2": "Error loading settings",
+    "err_update": "Failed to update setting",
+    "err_update2": "Error updating setting",
+    "loading": "Loading settings...",
+    "title": "Console Settings",
+    "subtitle": "Configure security policies, approvals, and audit settings",
+    "saved": "Settings saved",
+    "sec_security": "Security",
+    "sec_automation": "Automation",
+    "sec_audit": "Audit & Retention",
+    "sec_notifications": "Notifications",
+    "sec_advanced": "Advanced",
+    "mfa_l": "Require MFA for Unlock",
+    "mfa_d": "Users must authenticate with TOTP before accessing the vault",
+    "rot_approval_l": "Require Approval for Key Rotation",
+    "rot_approval_d": "Key rotations must be approved before execution",
+    "exp_approval_l": "Require Approval for Export",
+    "exp_approval_d": "Exporting secrets requires explicit approval",
+    "enc_l": "Encryption Enabled",
+    "enc_d": "All secrets encrypted at rest",
+    "autorot_l": "Auto-Rotate Keys",
+    "autorot_d": "Automatically rotate keys on a schedule",
+    "autorot_int_l": "Auto-Rotate Interval (Days)",
+    "audit_ret_l": "Audit Log Retention (Days)",
+    "audit_ret_d": "How long to keep audit logs",
+    "session_l": "Session Timeout (Minutes)",
+    "session_d": "Idle timeout before re-authentication required",
+    "notify_unauth_l": "Notify on Unauthorized Access",
+    "notify_unauth_d": "Send alerts when unauthorized access is detected",
+    "notify_rot_l": "Notify on Key Rotation",
+    "notify_rot_d": "Send notifications when keys are rotated",
+    "notify_exp_l": "Notify on Key Expiry",
+    "notify_exp_d": "Alert when keys are expiring soon",
+    "pub_l": "Allow Public URLs",
+    "pub_d": "Permit deployment to public URLs",
+    "last_updated": "Last Updated"
   },
   "pr": {
-    "title": "Pull Requests abiertas",
-    "refresh": "Actualizar",
-    "subtitle": "Cambios de infraestructura redactados por la IA. Revisa los pasos planificados y luego fusiona. Nada se ejecuta hasta que lo hagas.",
-    "loading": "Cargando…",
-    "empty": "No hay PRs abiertas. El Jefe de Gabinete pondrá aquí los cambios para su aprobación.",
-    "planned_steps": "pasos planificados (se ejecutan en orden al fusionar — todavía no se ha ejecutado nada)",
-    "no_steps": "Sin pasos.",
-    "risk_word": "riesgo",
-    "level_low": "bajo",
-    "level_medium": "medio",
-    "level_high": "alto",
-    "needs": "requiere {role}",
-    "steps_one": "{n} paso",
-    "steps_many": "{n} pasos",
-    "redeploys": "redespliega",
-    "redeploy_tag": "↻ redesplegar",
-    "hide_payloads": "Ocultar payloads",
-    "inspect_payloads": "Inspeccionar payloads",
-    "high_risk_a": "Cambio de alto riesgo. Se ejecuta en vivo y no se puede deshacer. Requiere autorización de ",
-    "high_risk_b": ". Confirma para continuar.",
-    "merging": "Fusionando…",
-    "confirm_run": "Confirmar — ejecutar en vivo",
-    "merge_high": "Fusionar / Aprobar (alto riesgo)",
-    "merge": "Fusionar / Aprobar",
-    "cancel": "Cancelar",
-    "close": "Cerrar",
-    "history": "Historial",
-    "succeeded_one": "{ok}/{total} paso completado.",
-    "succeeded_many": "{ok}/{total} pasos completados.",
-    "redeploy_included": "Incluye un paso de redespliegue en producción.",
-    "merged_at": "fusionada {date}",
-    "load_failed": "Error al cargar",
-    "merge_failed": "Error al fusionar"
+    "title": "Open Pull Requests",
+    "refresh": "Refresh",
+    "subtitle": "AI-drafted infrastructure changes. Inspect the planned steps, then merge. Nothing fires until you do.",
+    "loading": "Loading…",
+    "empty": "No open PRs. The Chief of Staff will queue changes here for approval.",
+    "planned_steps": "planned steps (run in order on merge — nothing has fired yet)",
+    "no_steps": "No steps.",
+    "risk_word": "risk",
+    "level_low": "low",
+    "level_medium": "medium",
+    "level_high": "high",
+    "needs": "needs {role}",
+    "steps_one": "{n} step",
+    "steps_many": "{n} steps",
+    "redeploys": "redeploys",
+    "redeploy_tag": "↻ redeploy",
+    "hide_payloads": "Hide payloads",
+    "inspect_payloads": "Inspect payloads",
+    "high_risk_a": "High-risk change. Runs live and cannot be undone. Requires ",
+    "high_risk_b": " clearance. Confirm to proceed.",
+    "merging": "Merging…",
+    "confirm_run": "Confirm — run live",
+    "merge_high": "Merge / Approve (high risk)",
+    "merge": "Merge / Approve",
+    "cancel": "Cancel",
+    "close": "Close",
+    "history": "History",
+    "succeeded_one": "{ok}/{total} step succeeded.",
+    "succeeded_many": "{ok}/{total} steps succeeded.",
+    "redeploy_included": "Production redeploy step included.",
+    "merged_at": "merged {date}",
+    "load_failed": "Failed to load",
+    "merge_failed": "Merge failed"
   },
   "cui": {
-    "audit_log": "Registro de auditoría:",
-    "audit_note": "Todas las acciones se registran para cumplimiento.",
-    "view_log": "Ver registro →",
-    "unknown_page": "Página desconocida.",
-    "soon": "Pronto",
-    "soon_short": "PRONTO",
-    "not_available": "Aún no disponible",
-    "coming_soon": "Próximamente",
-    "workspace_title": "Espacio de {name}",
-    "coming_soon_banner": "⏳ Las acciones de {name} llegarán pronto — esto es una vista previa de lo que estará disponible.",
-    "provider_not_found": "Proveedor no encontrado: {id}",
-    "no_actions": "No hay acciones disponibles para {name}",
-    "actions_for": "Acciones de {name}",
-    "available_one": "{n} acción disponible",
-    "available_many": "{n} acciones disponibles",
-    "confirm_action": "Confirmar acción",
-    "executing_action": "Ejecutando acción…",
-    "back": "Atrás",
-    "execute_now": "Ejecutar ahora",
-    "select_key_id": "Selecciona un ID de clave...",
-    "querying_vars": "Consultando el registro de variables del clúster...",
-    "no_config_keys": "No se encontraron claves de configuración activas.",
-    "nothing_to_select": "Nada que seleccionar todavía."
+    "audit_log": "Audit Log:",
+    "audit_note": "All actions are recorded for compliance.",
+    "view_log": "View log →",
+    "unknown_page": "Unknown page.",
+    "soon": "Soon",
+    "soon_short": "SOON",
+    "not_available": "Not available yet",
+    "coming_soon": "Coming soon",
+    "workspace_title": "{name} Workspace",
+    "coming_soon_banner": "⏳ {name} actions are coming soon — this is a preview of what will be available.",
+    "provider_not_found": "Provider not found: {id}",
+    "no_actions": "No actions available for {name}",
+    "actions_for": "Actions for {name}",
+    "available_one": "{n} available action",
+    "available_many": "{n} available actions",
+    "confirm_action": "Confirm action",
+    "executing_action": "Executing action…",
+    "back": "Back",
+    "execute_now": "Execute Now",
+    "select_key_id": "Select key ID...",
+    "querying_vars": "Querying cluster variables ledger...",
+    "no_config_keys": "No active configuration keys found.",
+    "nothing_to_select": "Nothing to select here yet."
   },
   "vault": {
-    "cred_mgmt": "Gestión de credenciales",
-    "rotate_title": "Rotar {name}",
-    "rotate_sub": "Genera una nueva credencial para {provider}.",
-    "cannot_undo": "Esta acción no se puede deshacer",
-    "current_secret": "Secreto actual",
-    "after_rotation": "Tras la rotación",
-    "after_desc": "Se generará una nueva credencial. La anterior se revoca automáticamente y se sincroniza con tus variables de entorno de Vercel.",
-    "rotate_key": "Rotar clave",
-    "generating": "Generando nueva credencial...",
-    "may_take": "Esto puede tardar un momento.",
-    "rotation_success": "Rotación exitosa",
-    "new_secret_masked": "Nuevo secreto (enmascarado)",
-    "chk_generated": "Nueva credencial generada",
-    "chk_synced": "Sincronizado con las variables de Vercel",
-    "chk_revoked": "Credencial anterior revocada",
-    "chk_audited": "Registrado en auditoría",
-    "done": "Listo",
-    "rotation_failed": "La rotación falló",
-    "retry": "Reintentar"
-  },
-  "vaultx": {"audit":{"loading":"Cargando registro de auditoría...","empty":"Sin entradas en el registro de auditoría","trail":"Registro de auditoría","success":"Correcto","failed":"Fallido","ip":"IP:","showing":"Mostrando los últimos 50 de","entries":"entradas"},"grid":{"empty":"No hay secretos en la bóveda","emptyHint":"Los secretos de los proveedores conectados aparecerán aquí.","statusActive":"Activo","statusExpiringSoon":"Por vencer","statusExpired":"Vencido","statusRotated":"Rotado recientemente","statusRevoked":"Revocado","expiresIn":"Vence en","day":"día","days":"días","lastRotated":"Última rotación:","expires":"Vence:","created":"Creado:"},"page":{"ops":"Operaciones y producción","keysSecrets":"Claves y secretos","inventory":"Inventario de credenciales, alertas de vencimiento y estado de rotación.","secretWord":"secreto","secretsWord":"secretos","stored":"almacenados.","active":"Activos","expiring":"Por vencer","lockVault":"Bloquear bóveda","browseSecrets":"Explorar secretos","providerPlaceholder":"Busca y selecciona un proveedor...","selected":"Seleccionado:","statusActive":"Secretos activos","statusExpiringSoon":"Por vencer","statusExpired":"Vencidos","statusRotated":"Rotados recientemente","statusRevoked":"Revocados","maskedValue":"Valor enmascarado","encryptedNote":"El valor completo está cifrado y no se muestra en la interfaz.","expiration":"Vencimiento","lastRotated":"Última rotación","typeEnv":"Tipo y entorno"},"unlock":{"refresh":"Actualizar","secureAccess":"Acceso seguro requerido","unlockVault":"Desbloquear bóveda","enable2fa":"Activar 2FA","enter2faCode":"Ingresa el código 2FA","enterPassword":"Ingresa tu contraseña","scanQr":"Escanea el código QR con Google Authenticator","sessionExpire":"Esta sesión vencerá en 30 minutos por seguridad.","password":"Contraseña","verifying":"Verificando...","continue":"Continuar","scanAuthApps":"Escanea con Google Authenticator, Microsoft Authenticator o Authy","enter6digit":"Ingresa el código de 6 dígitos para confirmar","saveBackup":"Guarda estos códigos de respaldo:","back":"Atrás","unlock":"Desbloquear","twofaCode":"Código 2FA","errPasswordRequired":"La contraseña es obligatoria","errInvalidCode":"Ingresa un código válido de 6 dígitos"}}
+    "cred_mgmt": "Credential Management",
+    "rotate_title": "Rotate {name}",
+    "rotate_sub": "Generate a new credential for {provider}.",
+    "cannot_undo": "This action cannot be undone",
+    "current_secret": "Current Secret",
+    "after_rotation": "After rotation",
+    "after_desc": "A new credential will be generated. The old one is revoked automatically and synced to your Vercel environment variables.",
+    "rotate_key": "Rotate Key",
+    "generating": "Generating new credential...",
+    "may_take": "This may take a moment.",
+    "rotation_success": "Rotation successful",
+    "new_secret_masked": "New Secret (Masked)",
+    "chk_generated": "New credential generated",
+    "chk_synced": "Synced to Vercel env vars",
+    "chk_revoked": "Old credential revoked",
+    "chk_audited": "Audit logged",
+    "done": "Done",
+    "rotation_failed": "Rotation failed",
+    "retry": "Retry"
+  }
 }

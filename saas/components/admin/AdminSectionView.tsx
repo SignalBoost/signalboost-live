@@ -1,24 +1,35 @@
 'use client'
 
 // saas/components/admin/AdminSectionView.tsx
-// All user-facing strings resolve through the central i18n dictionary
-// (audit.{lang}.json → audit.admin.*) via the useTranslation() hook. No inline
-// COPY table — a translator edits the locale JSON, no code change.
+// Admin cockpit section view. ALL displayed data is real and computed:
+//   • Metric cards    → /api/admin/section-metrics (per-table counts; null-safe)
+//   • Intel panels    → /api/admin/section-intel   (live totals / trailing
+//                       windows / operational health — replaces the former
+//                       hardcoded FORECASTS / FINANCIAL_LEDGER / KPI mock)
+//   • Data table      → real recent rows from /api/admin/section-intel; honest
+//                       "no records yet" when a section has no backing source.
+// Nothing on this page is fabricated: a missing source shows an honest empty
+// state, never an invented number. All copy resolves through useTranslation().
 
 import { useEffect, useState } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { AdminSectionConfig, translateSection } from '@/lib/admin/sections'
-import { COCKPIT_PANELS, CRM_STAGES, EXECUTIVE_RECOMMENDATIONS, FINANCIAL_LEDGER, FORECASTS, KPI_DASHBOARD } from '@/lib/platform/unifiedPlatform'
 
 const SUPPORTED = new Set(['en', 'es', 'pt', 'pl', 'ru'])
+
+type Intel = {
+  totals: Record<string, number | null>
+  windows: { accounts7: number | null; accounts30: number | null; accounts90: number | null }
+  health: { supabase: string | null; errors: number | null; lastOutreach: string | null; lastProspect: string | null }
+  rows: string[][]
+}
 
 export default function AdminSectionView({ section: rawSection }: { section: AdminSectionConfig }) {
   const { t, lang } = useTranslation()
   const activeLang = SUPPORTED.has(lang) ? lang : 'en'
   const section = translateSection(rawSection, activeLang)
 
-  // Live metric values from real tables; keys with no backing source fall back to
-  // the honest empty-state label.
+  // Per-table metric counts (cards).
   const [live, setLive] = useState<Record<string, number> | null>(null)
   useEffect(() => {
     let active = true
@@ -29,12 +40,39 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
     return () => { active = false }
   }, [])
 
+  // Live operational intelligence + section table rows.
+  const [intel, setIntel] = useState<Intel | null>(null)
+  useEffect(() => {
+    let active = true
+    fetch(`/api/admin/section-intel?section=${encodeURIComponent(rawSection.key)}`, { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (active && d && d.ok) setIntel(d as Intel) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [rawSection.key])
+
+  const empty = t('audit.admin.notTracked', 'No data yet')
   const liveValue = (key: string): string | number | undefined => {
     const v = live ? (live as any)[key] : undefined
     if (typeof v === 'number') return v.toLocaleString()
     if (typeof v === 'string' && v.length) return v
     return undefined
   }
+  const fmt = (n: number | null | undefined): string =>
+    typeof n === 'number' ? n.toLocaleString() : empty
+
+  const totals = intel?.totals
+  const totalRows: [string, number | null | undefined][] = [
+    [t('audit.admin.totAccounts', 'Accounts'), totals?.accounts],
+    [t('audit.admin.totPaid', 'Paid subscriptions'), totals?.paidSubs],
+    [t('audit.admin.totFree', 'Free subscriptions'), totals?.freeSubs],
+    [t('audit.admin.totProspects', 'Prospects'), totals?.prospects],
+    [t('audit.admin.totOutreach', 'Outreach sends'), totals?.outreachSends],
+    [t('audit.admin.totAi', 'AI tasks'), totals?.aiTasks],
+    [t('audit.admin.totSites', 'Sites built'), totals?.sites],
+    [t('audit.admin.totVideos', 'Video jobs'), totals?.videos],
+    [t('audit.admin.totReviews', 'Reviews'), totals?.reviews],
+  ]
 
   return (
     <div className="sb-cockpit-stack" role="region" aria-label={`${section.title} admin console section`}>
@@ -48,40 +86,31 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
         {section.metrics.map(metric => (
           <article key={metric.key} className="sb-neon-panel" tabIndex={0}>
             <p>{metric.label}</p>
-            <strong>{liveValue(metric.key) ?? metric.value ?? t('audit.admin.notTracked', 'No data yet')}</strong>
+            <strong>{liveValue(metric.key) ?? metric.value ?? empty}</strong>
             <span>{metric.helper ?? t('audit.admin.telemetrySignal', 'Telemetry-ready signal')}</span>
           </article>
         ))}
       </section>
 
-      <section className="sb-mission-grid" aria-label="Unified operational intelligence">
+      <section className="sb-mission-grid" aria-label="Live operational intelligence">
         <article className="sb-glass-panel">
-          <h3>{t('audit.admin.forecasting', 'Forecasting')}</h3>
-          {FORECASTS.map(item => (
-            <p key={item.horizon}>
-              <strong>{item.horizon}</strong> · {item.revenue} · campaign {item.campaignSuccess} · upsell {item.upsellLikelihood}
-            </p>
+          <h3>{t('audit.admin.platformTotals', 'Platform totals')}</h3>
+          {totalRows.map(([label, value]) => (
+            <p key={label}><strong>{label}</strong> · {fmt(value)}</p>
           ))}
         </article>
         <article className="sb-glass-panel">
-          <h3>{t('audit.admin.financialLedger', 'Financial ledger')}</h3>
-          {Object.entries(FINANCIAL_LEDGER).map(([key, value]) => (
-            <p key={key}><strong>{key.replace(/([A-Z])/g, ' $1')}</strong> · {value}</p>
-          ))}
+          <h3>{t('audit.admin.newAccounts', 'New accounts')}</h3>
+          <p><strong>{t('audit.admin.win7', 'Last 7 days')}</strong> · {fmt(intel?.windows.accounts7)}</p>
+          <p><strong>{t('audit.admin.win30', 'Last 30 days')}</strong> · {fmt(intel?.windows.accounts30)}</p>
+          <p><strong>{t('audit.admin.win90', 'Last 90 days')}</strong> · {fmt(intel?.windows.accounts90)}</p>
         </article>
         <article className="sb-glass-panel">
-          <h3>{t('audit.admin.kpiCockpit', 'KPI cockpit')}</h3>
-          <p><strong>{t('audit.admin.marketplace', 'Marketplace')}</strong> · {KPI_DASHBOARD.marketplace.join(' · ')}</p>
-          <p><strong>{t('audit.admin.saas', 'SaaS')}</strong> · {KPI_DASHBOARD.saas.join(' · ')}</p>
-          <p><strong>{t('audit.admin.unifiedEngagement', 'Unified engagement index')}</strong> · {KPI_DASHBOARD.unifiedEngagementIndex}</p>
-        </article>
-        <article className="sb-glass-panel">
-          <h3>{t('audit.admin.crmPipeline', 'CRM pipeline')}</h3>
-          {CRM_STAGES.map(stage => (
-            <p key={stage.stage}>
-              <strong>{stage.stage}</strong> · {Math.round(stage.probability * 100)}% · {stage.automation}
-            </p>
-          ))}
+          <h3>{t('audit.admin.operationalHealth', 'Operational health')}</h3>
+          <p><strong>{t('audit.admin.supabase', 'Supabase')}</strong> · {intel?.health.supabase ?? empty}</p>
+          <p><strong>{t('audit.admin.errors', 'Logged errors')}</strong> · {fmt(intel?.health.errors)}</p>
+          <p><strong>{t('audit.admin.lastOutreach', 'Last outreach run')}</strong> · {intel?.health.lastOutreach ?? empty}</p>
+          <p><strong>{t('audit.admin.lastProspect', 'Last prospect run')}</strong> · {intel?.health.lastProspect ?? empty}</p>
         </article>
       </section>
 
@@ -95,25 +124,21 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
             <tr>{section.tableColumns.map(c => <th key={c}>{c}</th>)}</tr>
           </thead>
           <tbody>
-            <tr>
-              <td colSpan={section.tableColumns.length}>{t('audit.admin.telemetryReady', 'Telemetry-ready. Connect analytics tables/events to activate live records for this cockpit panel.')}</td>
-            </tr>
+            {intel?.rows && intel.rows.length > 0 ? (
+              intel.rows.map((cells, i) => (
+                <tr key={i}>
+                  {section.tableColumns.map((_, j) => <td key={j}>{cells[j] ?? '—'}</td>)}
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={section.tableColumns.length}>
+                  {t('audit.admin.noRecords', 'No records yet — activity for this view will appear here as it is generated.')}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
-      </section>
-
-      <section className="sb-mission-grid" aria-label="Executive recommendations">
-        {COCKPIT_PANELS.slice(0, 3).map(panel => (
-          <article key={panel.title} className="sb-glass-panel">
-            <h3>{panel.title}</h3>
-            <p><strong>{panel.value}</strong></p>
-            <p>{panel.status}</p>
-          </article>
-        ))}
-        <article className="sb-glass-panel">
-          <h3>{t('audit.admin.conciergeRecs', 'Concierge recommendations')}</h3>
-          {EXECUTIVE_RECOMMENDATIONS.map(item => <p key={item}>• {item}</p>)}
-        </article>
       </section>
     </div>
   )

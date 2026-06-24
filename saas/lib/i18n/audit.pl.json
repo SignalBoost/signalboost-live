@@ -1,4 +1,12 @@
 {
+  "actionForm": {
+    "noExtraInfo": "Ta akcja nie wymaga dodatkowych informacji.",
+    "activeEnvMap": "Mapa aktywnych zmiennych środowiskowych",
+    "envHelp": "Wybierz z aktywnych konfiguracji środowiska. Konsola mapuje identyfikatory kluczowych zmiennych bezpośrednio.",
+    "stripeHelp": "Wybierz z aktywnego katalogu Stripe. Konsola wysyła ukryty identyfikator produktu do Stripe.",
+    "selectStripeProduct": "Wybierz produkt Stripe",
+    "selectEnvToDelete": "Wybierz zmienną środowiskową do usunięcia"
+  },
   "tier": {
     "core": "Podstawowy",
     "tier2": "Skala",
@@ -637,6 +645,5 @@
     "done": "Gotowe",
     "rotation_failed": "Rotacja nie powiodła się",
     "retry": "Spróbuj ponownie"
-  },
-  "vaultx": {"audit":{"loading":"Ładowanie dziennika audytu...","empty":"Brak wpisów w dzienniku audytu","trail":"Ślad audytu","success":"Sukces","failed":"Niepowodzenie","ip":"IP:","showing":"Pokazano ostatnie 50 z","entries":"wpisów"},"grid":{"empty":"Brak sekretów w sejfie","emptyHint":"Sekrety z połączonych dostawców pojawią się tutaj.","statusActive":"Aktywny","statusExpiringSoon":"Wkrótce wygasa","statusExpired":"Wygasły","statusRotated":"Niedawno rotowany","statusRevoked":"Unieważniony","expiresIn":"Wygasa za","day":"dzień","days":"dni","lastRotated":"Ostatnia rotacja:","expires":"Wygasa:","created":"Utworzono:"},"page":{"ops":"Operacje i produkcja","keysSecrets":"Klucze i sekrety","inventory":"Inwentarz poświadczeń, alerty wygaśnięcia i status rotacji.","secretWord":"sekret","secretsWord":"sekretów","stored":"przechowywanych.","active":"Aktywne","expiring":"Wkrótce wygasają","lockVault":"Zablokuj sejf","browseSecrets":"Przeglądaj sekrety","providerPlaceholder":"Wyszukaj i wybierz dostawcę...","selected":"Wybrano:","statusActive":"Aktywne sekrety","statusExpiringSoon":"Wkrótce wygasają","statusExpired":"Wygasłe","statusRotated":"Niedawno rotowane","statusRevoked":"Unieważnione","maskedValue":"Zamaskowana wartość","encryptedNote":"Pełna wartość jest zaszyfrowana i nie jest wyświetlana w interfejsie.","expiration":"Wygaśnięcie","lastRotated":"Ostatnia rotacja","typeEnv":"Typ i środowisko"},"unlock":{"refresh":"Odśwież","secureAccess":"Wymagany bezpieczny dostęp","unlockVault":"Odblokuj sejf","enable2fa":"Włącz 2FA","enter2faCode":"Wprowadź kod 2FA","enterPassword":"Wprowadź hasło","scanQr":"Zeskanuj kod QR za pomocą Google Authenticator","sessionExpire":"Ta sesja wygaśnie za 30 minut ze względów bezpieczeństwa.","password":"Hasło","verifying":"Weryfikacja...","continue":"Kontynuuj","scanAuthApps":"Zeskanuj za pomocą Google Authenticator, Microsoft Authenticator lub Authy","enter6digit":"Wprowadź 6-cyfrowy kod, aby potwierdzić","saveBackup":"Zapisz te kody zapasowe:","back":"Wstecz","unlock":"Odblokuj","twofaCode":"Kod 2FA","errPasswordRequired":"Hasło jest wymagane","errInvalidCode":"Wprowadź prawidłowy 6-cyfrowy kod"}}
+  }
 }

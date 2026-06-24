@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createMarketingServerSupabase } from "@/lib/auth/supabaseServer";
 import { readJsonLimited } from "@/lib/http/readJsonLimited";
+import { rateLimited } from "@/lib/http/rateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -8,20 +9,7 @@ const MAX_BODY_BYTES = 50_000;
 const MAX_TEXT = 5000;
 const RATE_MAX = 20;
 const RATE_WINDOW_MS = 60_000;
-const rateHits = new Map<string, number[]>();
 
-function rateLimited(key: string): boolean {
-  const now = Date.now();
-  const recent = (rateHits.get(key) ?? []).filter((t) => now - t < RATE_WINDOW_MS);
-  recent.push(now);
-  rateHits.set(key, recent);
-  if (rateHits.size > 5000) {
-    for (const [k, v] of rateHits) {
-      if (v.every((t) => now - t >= RATE_WINDOW_MS)) rateHits.delete(k);
-    }
-  }
-  return recent.length > RATE_MAX;
-}
 
 export async function POST(req: Request) {
   try {
@@ -36,7 +24,7 @@ export async function POST(req: Request) {
       );
     }
 
-    if (rateLimited(`voice:${user.id}`)) {
+    if (await rateLimited(`voice:${user.id}`, { max: RATE_MAX, windowMs: RATE_WINDOW_MS })) {
       return NextResponse.json(
         { success: false, error: "Too many requests" },
         { status: 429 }

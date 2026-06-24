@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createMarketingServerSupabase } from "@/lib/auth/supabaseServer";
 import { readJsonLimited } from "@/lib/http/readJsonLimited";
 import { rateLimited } from "@/lib/http/rateLimit";
+import { logSanitizedError } from "@/lib/http/logError";
 
 export const dynamic = "force-dynamic";
 
@@ -9,17 +10,6 @@ const MAX_BODY_BYTES = 50_000;
 const MAX_PROMPT = 4000;
 const RATE_MAX = 20;
 const RATE_WINDOW_MS = 60_000;
-
-// Log a bounded, sanitized error line with a random correlation ref — never the
-// raw exception object, stack, request body, headers, or provider payload, any
-// of which can carry tokens or other sensitive values.
-function logSanitizedError(scope: string, err: unknown): string {
-  const ref = `err_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-  const name = err instanceof Error ? err.name : typeof err;
-  const message = err instanceof Error ? err.message : "non-error thrown";
-  console.error(`[${scope}] ${ref} ${name}: ${String(message).slice(0, 300)}`);
-  return ref;
-}
 
 
 export async function POST(req: Request) {

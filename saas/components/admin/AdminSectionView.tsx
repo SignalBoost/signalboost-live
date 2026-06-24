@@ -48,7 +48,7 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
         {section.metrics.map(metric => (
           <article key={metric.key} className="sb-neon-panel" tabIndex={0}>
             <p>{metric.label}</p>
-            <strong>{liveValue(metric.key) ?? metric.value ?? t('audit.admin.notTracked', 'Not tracked yet')}</strong>
+            <strong>{liveValue(metric.key) ?? metric.value ?? t('audit.admin.notTracked', 'No data yet')}</strong>
             <span>{metric.helper ?? t('audit.admin.telemetrySignal', 'Telemetry-ready signal')}</span>
           </article>
         ))}

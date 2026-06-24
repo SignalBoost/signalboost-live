@@ -31,6 +31,7 @@ const COPY: Record<string, Record<Lang, string>> = {
   editorBadge:   { en: 'Drag & Drop', es: 'Arrastrar y soltar', pt: 'Arrastar e soltar', pl: 'Przeciągnij i upuść', ru: 'Перетаскивание' },
   editorHint:    { en: 'Click any element to edit it. Drag blocks from the right panel to add content.', es: 'Haz clic en cualquier elemento para editarlo. Arrastra bloques del panel derecho para agregar contenido.', pt: 'Clique em qualquer elemento para editá-lo. Arraste blocos do painel direito para adicionar conteúdo.', pl: 'Kliknij dowolny element, aby go edytować. Przeciągnij bloki z prawego panelu, aby dodać treść.', ru: 'Нажмите на любой элемент для редактирования. Перетащите блоки из правой панели для добавления контента.' },
   loadingEditor: { en: 'Loading visual editor…', es: 'Cargando editor visual…', pt: 'Carregando editor visual…', pl: 'Ładowanie edytora wizualnego…', ru: 'Загрузка визуального редактора…' },
+  poweredBy:     { en: 'Powered by', es: 'Con tecnología de', pt: 'Desenvolvido com', pl: 'Napędzane przez', ru: 'На базе' },
 }
 
 function c(key: string, lang: string): string {
@@ -454,7 +455,7 @@ export default function BuilderPage() {
                 <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'rgba(255,195,0,.12)', border: '1px solid rgba(255,195,0,.25)', color: '#ffc300', fontWeight: 700, letterSpacing: '.04em' }}>
                   {c('editorBadge', l)}
                 </span>
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>Powered by GrapesJS</span>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>{c('poweredBy', l)} GrapesJS</span>
               </div>
             )}
           </div>

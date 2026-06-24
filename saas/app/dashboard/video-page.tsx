@@ -34,6 +34,59 @@ const aspectClasses: Record<AspectRatio, string> = { '9:16': 'aspect-[9/16] max-
 const canvasSizes: Record<AspectRatio, { width: number; height: number }> = { '9:16': { width: 720, height: 1280 }, '1:1': { width: 1080, height: 1080 }, '16:9': { width: 1280, height: 720 } }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+// ── i18n ───────────────────────────────────────────────────────────────────────
+// Native per-language copy, consistent with sibling dashboard pages (launchpad,
+// builder). Each sub-component pulls `lang` from useTranslation() and resolves
+// via vt(). No English-fallback gaps — every user-facing label is translated.
+type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+const VID_LANGS: Lang[] = ['en', 'es', 'pt', 'pl', 'ru']
+function vt(map: Record<Lang, string>, lang: string): string {
+  return map[(VID_LANGS as string[]).includes(lang) ? (lang as Lang) : 'en']
+}
+const VID = {
+  captionTimeline: { en: 'Caption timeline', es: 'Línea de subtítulos', pt: 'Linha de legendas', pl: 'Oś czasu napisów', ru: 'Лента субтитров' },
+  cues: { en: 'cues', es: 'subtítulos', pt: 'legendas', pl: 'napisy', ru: 'субтитры' },
+  editSelected: { en: 'Edit selected caption', es: 'Editar subtítulo seleccionado', pt: 'Editar legenda selecionada', pl: 'Edytuj wybrany napis', ru: 'Редактировать выбранный субтитр' },
+  emptyTimeline: { en: 'Generate AI captions or upload SRT/VTT to populate the timeline.', es: 'Genera subtítulos con IA o sube un SRT/VTT para llenar la línea de tiempo.', pt: 'Gere legendas com IA ou envie um SRT/VTT para preencher a linha do tempo.', pl: 'Wygeneruj napisy AI lub prześlij plik SRT/VTT, aby wypełnić oś czasu.', ru: 'Сгенерируйте субтитры с ИИ или загрузите SRT/VTT, чтобы заполнить ленту.' },
+  captionStyle: { en: 'Caption style', es: 'Estilo de subtítulos', pt: 'Estilo das legendas', pl: 'Styl napisów', ru: 'Стиль субтитров' },
+  format: { en: 'Format', es: 'Formato', pt: 'Formato', pl: 'Format', ru: 'Формат' },
+  fontFamily: { en: 'Font family', es: 'Tipografía', pt: 'Fonte', pl: 'Czcionka', ru: 'Шрифт' },
+  size: { en: 'Size', es: 'Tamaño', pt: 'Tamanho', pl: 'Rozmiar', ru: 'Размер' },
+  textColor: { en: 'Text color', es: 'Color del texto', pt: 'Cor do texto', pl: 'Kolor tekstu', ru: 'Цвет текста' },
+  animation: { en: 'Animation', es: 'Animación', pt: 'Animação', pl: 'Animacja', ru: 'Анимация' },
+  animNone: { en: 'None', es: 'Ninguna', pt: 'Nenhuma', pl: 'Brak', ru: 'Нет' },
+  animFade: { en: 'Fade', es: 'Desvanecer', pt: 'Esmaecer', pl: 'Zanikanie', ru: 'Затухание' },
+  animSlide: { en: 'Slide', es: 'Deslizar', pt: 'Deslizar', pl: 'Wsuwanie', ru: 'Слайд' },
+  animPop: { en: 'Pop', es: 'Aparecer', pt: 'Surgir', pl: 'Pop', ru: 'Поп' },
+  background: { en: 'Background', es: 'Fondo', pt: 'Fundo', pl: 'Tło', ru: 'Фон' },
+  canvasEditor: { en: 'Canvas editor', es: 'Editor de lienzo', pt: 'Editor de tela', pl: 'Edytor kanwy', ru: 'Редактор холста' },
+  exportPanel: { en: 'Export panel', es: 'Panel de exportación', pt: 'Painel de exportação', pl: 'Panel eksportu', ru: 'Панель экспорта' },
+  exportHelp: {
+    en: 'Click export then let the video play all the way through. Your browser records the canvas with captions burned in and produces a downloadable .webm file. No server required.',
+    es: 'Haz clic en exportar y deja que el video se reproduzca por completo. Tu navegador graba el lienzo con los subtítulos incrustados y genera un archivo .webm descargable. Sin servidor.',
+    pt: 'Clique em exportar e deixe o vídeo reproduzir até o fim. Seu navegador grava a tela com as legendas embutidas e gera um arquivo .webm para download. Sem servidor.',
+    pl: 'Kliknij eksport i pozwól, aby wideo odtworzyło się do końca. Przeglądarka nagra kanwę z wtopionymi napisami i utworzy plik .webm do pobrania. Bez serwera.',
+    ru: 'Нажмите «Экспорт» и дайте видео доиграть до конца. Браузер запишет холст с вшитыми субтитрами и создаст файл .webm для скачивания. Без сервера.',
+  },
+  recording: { en: '● Recording — let video play through…', es: '● Grabando — deja que el video termine…', pt: '● Gravando — deixe o vídeo terminar…', pl: '● Nagrywanie — pozwól wideo dograć…', ru: '● Запись — дайте видео доиграть…' },
+  exportBtn: { en: 'Export captioned video', es: 'Exportar video con subtítulos', pt: 'Exportar vídeo com legendas', pl: 'Eksportuj wideo z napisami', ru: 'Экспортировать видео с субтитрами' },
+  downloadBtn: { en: '↓ Download captioned video (.webm)', es: '↓ Descargar video con subtítulos (.webm)', pt: '↓ Baixar vídeo com legendas (.webm)', pl: '↓ Pobierz wideo z napisami (.webm)', ru: '↓ Скачать видео с субтитрами (.webm)' },
+  exportNote: {
+    en: '.webm plays in Chrome, Edge, and Firefox. To convert to MP4, use HandBrake (free) or cloudconvert.com.',
+    es: '.webm se reproduce en Chrome, Edge y Firefox. Para convertir a MP4, usa HandBrake (gratis) o cloudconvert.com.',
+    pt: '.webm é reproduzido no Chrome, Edge e Firefox. Para converter para MP4, use o HandBrake (grátis) ou cloudconvert.com.',
+    pl: '.webm działa w Chrome, Edge i Firefox. Aby przekonwertować na MP4, użyj HandBrake (darmowy) lub cloudconvert.com.',
+    ru: '.webm воспроизводится в Chrome, Edge и Firefox. Для конвертации в MP4 используйте HandBrake (бесплатно) или cloudconvert.com.',
+  },
+  video: { en: 'Video', es: 'Video', pt: 'Vídeo', pl: 'Wideo', ru: 'Видео' },
+  aiCaptions: { en: 'AI captions', es: 'Subtítulos con IA', pt: 'Legendas com IA', pl: 'Napisy AI', ru: 'Субтитры с ИИ' },
+  transcribing: { en: 'Transcribing…', es: 'Transcribiendo…', pt: 'Transcrevendo…', pl: 'Transkrypcja…', ru: 'Расшифровка…' },
+  generateCaptions: { en: 'Generate Captions', es: 'Generar subtítulos', pt: 'Gerar legendas', pl: 'Generuj napisy', ru: 'Создать субтитры' },
+  optionalSrt: { en: 'Optional SRT/VTT', es: 'SRT/VTT opcional', pt: 'SRT/VTT opcional', pl: 'Opcjonalny SRT/VTT', ru: 'SRT/VTT (необязательно)' },
+  tier: { en: 'Tier', es: 'Plan', pt: 'Plano', pl: 'Plan', ru: 'Тариф' },
+  locale: { en: 'Locale', es: 'Idioma', pt: 'Idioma', pl: 'Język', ru: 'Язык' },
+} as const
+
 function activeCue(cues: CaptionCue[], time: number) { return cues.find((c) => time >= c.start && time <= c.end) || null }
 function clamp(v: number, min: number, max: number) { return Math.min(max, Math.max(min, v)) }
 function formatTime(s: number) { const safe = Math.max(0, Number(s) || 0); const m = Math.floor(safe / 60); const sec = Math.floor(safe % 60); const t = Math.floor((safe - Math.floor(safe)) * 10); return `${m}:${String(sec).padStart(2, '0')}.${t}` }
@@ -99,32 +152,35 @@ function PresetPicker({ activePreset, onPreset }: { activePreset: string; onPres
 
 function CaptionTimeline({ cues, currentTime, selectedCueId, onSeek, onSelect, onUpdateText }: { cues: CaptionCue[]; currentTime: number; selectedCueId: string | null; onSeek: (s: number) => void; onSelect: (id: string) => void; onUpdateText: (id: string, text: string) => void }) {
   const sel = cues.find((c) => c.id === selectedCueId) || activeCue(cues, currentTime) || cues[0]
+  const { lang } = useTranslation()
   return <section className="rounded-3xl border border-white/10 bg-black/40 p-5">
-    <div className="flex items-center justify-between"><h2 className="text-xl font-bold">Caption timeline</h2><span className="text-xs text-white/50">{cues.length} cues</span></div>
-    {sel ? <label className="mt-4 block text-sm">Edit selected caption<textarea className="mt-2 min-h-24 w-full rounded-2xl border border-white/10 bg-white/10 p-3" value={sel.text} onChange={(e) => onUpdateText(sel.id, e.target.value)} /><span className="mt-1 block font-mono text-xs text-[#FFD700]">{formatTime(sel.start)} → {formatTime(sel.end)}</span></label> : null}
+    <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{vt(VID.captionTimeline, lang)}</h2><span className="text-xs text-white/50">{cues.length} {vt(VID.cues, lang)}</span></div>
+    {sel ? <label className="mt-4 block text-sm">{vt(VID.editSelected, lang)}<textarea className="mt-2 min-h-24 w-full rounded-2xl border border-white/10 bg-white/10 p-3" value={sel.text} onChange={(e) => onUpdateText(sel.id, e.target.value)} /><span className="mt-1 block font-mono text-xs text-[#FFD700]">{formatTime(sel.start)} → {formatTime(sel.end)}</span></label> : null}
     <div className="mt-4 max-h-72 space-y-2 overflow-auto">
-      {cues.length === 0 ? <p className="rounded-2xl border border-dashed border-white/15 p-4 text-sm text-white/55">Generate AI captions or upload SRT/VTT to populate the timeline.</p> : null}
+      {cues.length === 0 ? <p className="rounded-2xl border border-dashed border-white/15 p-4 text-sm text-white/55">{vt(VID.emptyTimeline, lang)}</p> : null}
       {cues.map((c) => <button key={c.id} type="button" onClick={() => { onSelect(c.id); onSeek(c.start) }} className={`w-full rounded-2xl border p-3 text-left text-sm transition ${sel?.id === c.id || (currentTime >= c.start && currentTime <= c.end) ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-white/10 bg-white/[.03] hover:border-white/25'}`}><span className="font-mono text-xs text-[#FFD700]">{formatTime(c.start)} → {formatTime(c.end)}</span><br />{c.text}</button>)}
     </div>
   </section>
 }
 
 function StyleControls({ style, aspectRatio, onChange, onAspectRatio }: { style: CaptionStyle; aspectRatio: AspectRatio; onChange: (s: CaptionStyle) => void; onAspectRatio: (r: AspectRatio) => void }) {
+  const { lang } = useTranslation()
   return <section className="rounded-3xl border border-white/10 bg-black/40 p-5">
-    <div className="flex items-center justify-between"><h2 className="text-xl font-bold">Caption style</h2><span className="text-xs text-white/50">x {style.x}% · y {style.y}%</span></div>
+    <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{vt(VID.captionStyle, lang)}</h2><span className="text-xs text-white/50">x {style.x}% · y {style.y}%</span></div>
     <div className="mt-4 grid gap-3 sm:grid-cols-2">
-      <label className="text-sm">Format<select className="mt-1 w-full rounded-xl border border-white/10 bg-black p-2" value={aspectRatio} onChange={(e) => onAspectRatio(e.target.value as AspectRatio)}><option value="9:16">9:16 Shorts/Reels/TikTok</option><option value="1:1">1:1 Square</option><option value="16:9">16:9 YouTube</option></select></label>
-      <label className="text-sm">Font family<input className="mt-1 w-full rounded-xl border border-white/10 bg-white/10 p-2" value={style.fontFamily} onChange={(e) => onChange({ ...style, fontFamily: e.target.value })} /></label>
-      <label className="text-sm">Size: {style.fontSize}px<input type="range" min="18" max="84" value={style.fontSize} onChange={(e) => onChange({ ...style, fontSize: Number(e.target.value) })} className="mt-3 w-full" /></label>
-      <label className="text-sm">Text color<input type="color" value={style.color} onChange={(e) => onChange({ ...style, color: e.target.value })} className="mt-1 block h-10 w-full rounded-xl" /></label>
-      <label className="text-sm">Animation<select className="mt-1 w-full rounded-xl border border-white/10 bg-black p-2" value={style.animation} onChange={(e) => onChange({ ...style, animation: e.target.value as CaptionStyle['animation'] })}><option value="none">None</option><option value="fade">Fade</option><option value="slide">Slide</option><option value="pop">Pop</option></select></label>
-      <label className="text-sm">Background<input className="mt-1 w-full rounded-xl border border-white/10 bg-white/10 p-2" value={style.backgroundColor} onChange={(e) => onChange({ ...style, backgroundColor: e.target.value })} /></label>
+      <label className="text-sm">{vt(VID.format, lang)}<select className="mt-1 w-full rounded-xl border border-white/10 bg-black p-2" value={aspectRatio} onChange={(e) => onAspectRatio(e.target.value as AspectRatio)}><option value="9:16">9:16 Shorts/Reels/TikTok</option><option value="1:1">1:1 Square</option><option value="16:9">16:9 YouTube</option></select></label>
+      <label className="text-sm">{vt(VID.fontFamily, lang)}<input className="mt-1 w-full rounded-xl border border-white/10 bg-white/10 p-2" value={style.fontFamily} onChange={(e) => onChange({ ...style, fontFamily: e.target.value })} /></label>
+      <label className="text-sm">{vt(VID.size, lang)}: {style.fontSize}px<input type="range" min="18" max="84" value={style.fontSize} onChange={(e) => onChange({ ...style, fontSize: Number(e.target.value) })} className="mt-3 w-full" /></label>
+      <label className="text-sm">{vt(VID.textColor, lang)}<input type="color" value={style.color} onChange={(e) => onChange({ ...style, color: e.target.value })} className="mt-1 block h-10 w-full rounded-xl" /></label>
+      <label className="text-sm">{vt(VID.animation, lang)}<select className="mt-1 w-full rounded-xl border border-white/10 bg-black p-2" value={style.animation} onChange={(e) => onChange({ ...style, animation: e.target.value as CaptionStyle['animation'] })}><option value="none">{vt(VID.animNone, lang)}</option><option value="fade">{vt(VID.animFade, lang)}</option><option value="slide">{vt(VID.animSlide, lang)}</option><option value="pop">{vt(VID.animPop, lang)}</option></select></label>
+      <label className="text-sm">{vt(VID.background, lang)}<input className="mt-1 w-full rounded-xl border border-white/10 bg-white/10 p-2" value={style.backgroundColor} onChange={(e) => onChange({ ...style, backgroundColor: e.target.value })} /></label>
     </div>
   </section>
 }
 
 const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
   ({ videoUrl, cues, style, aspectRatio, seekTime, durationSec, onStyleChange, onTime, onDuration }, ref) => {
+    const { lang } = useTranslation()
     const videoRef = useRef<HTMLVideoElement>(null)
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const [time, setTime] = useState(0)
@@ -230,7 +286,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
     }))
 
     return <section className="rounded-3xl border border-white/10 bg-black/50 p-5">
-      <div className="flex items-center justify-between"><h2 className="text-xl font-bold">Canvas editor</h2><span className="font-mono text-xs text-white/50">{formatTime(time)} · {aspectRatio}</span></div>
+      <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{vt(VID.canvasEditor, lang)}</h2><span className="font-mono text-xs text-white/50">{formatTime(time)} · {aspectRatio}</span></div>
       <div className={`relative mx-auto mt-4 w-full overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 ${aspectClasses[aspectRatio]}`}>
         {videoUrl ? <video ref={videoRef} src={videoUrl} className="hidden" playsInline crossOrigin="anonymous" onLoadedMetadata={(e) => onDuration(Math.round(e.currentTarget.duration || 0))} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onTimeUpdate={(e) => { const n = e.currentTarget.currentTime; setTime(n); onTime(n) }} /> : null}
         <canvas ref={canvasRef} width={size.width} height={size.height} onPointerDown={(e) => { setDragging(true); e.currentTarget.setPointerCapture(e.pointerId); setPos(e) }} onPointerMove={(e) => dragging && setPos(e)} onPointerUp={(e) => { setDragging(false); e.currentTarget.releasePointerCapture(e.pointerId) }} className="h-full w-full cursor-move touch-none" aria-label="Video canvas with draggable caption overlay" />
@@ -253,23 +309,24 @@ CanvasEditor.displayName = 'CanvasEditor'
 
 // ── Export Panel ───────────────────────────────────────────────────────────────
 function ExportPanel({ canExport, hasSource, exportState, onExport }: { canExport: boolean; hasSource: boolean; exportState: ExportState; onExport: () => void }) {
+  const { lang } = useTranslation()
   const isRecording = exportState.status === 'recording'
   const isDone = exportState.status === 'ready'
   return <section className="rounded-3xl border border-white/10 bg-black/40 p-5">
-    <h2 className="text-xl font-bold">Export panel</h2>
-    <p className="mt-2 text-sm text-white/55">Click export then let the video play all the way through. Your browser records the canvas with captions burned in and produces a downloadable .webm file. No server required.</p>
+    <h2 className="text-xl font-bold">{vt(VID.exportPanel, lang)}</h2>
+    <p className="mt-2 text-sm text-white/55">{vt(VID.exportHelp, lang)}</p>
     <button onClick={onExport} disabled={!canExport || !hasSource || isRecording} className="mt-4 w-full rounded-full bg-[#FFD700] px-5 py-3 font-bold text-black disabled:opacity-50">
-      {isRecording ? '● Recording — let video play through…' : 'Export captioned video'}
+      {isRecording ? vt(VID.recording, lang) : vt(VID.exportBtn, lang)}
     </button>
     {exportState.message ? <p className={`mt-3 text-sm ${exportState.status === 'failed' ? 'text-red-300' : 'text-white/70'}`}>{exportState.message}</p> : null}
-    {isDone && exportState.url ? <a href={exportState.url} download="captioned-video.webm" className="mt-3 block rounded-full border border-[#FFD700] px-5 py-2 text-center font-bold text-[#FFD700]">↓ Download captioned video (.webm)</a> : null}
-    <p className="mt-3 text-xs text-white/40">.webm plays in Chrome, Edge, and Firefox. To convert to MP4, use HandBrake (free) or cloudconvert.com.</p>
+    {isDone && exportState.url ? <a href={exportState.url} download="captioned-video.webm" className="mt-3 block rounded-full border border-[#FFD700] px-5 py-2 text-center font-bold text-[#FFD700]">{vt(VID.downloadBtn, lang)}</a> : null}
+    <p className="mt-3 text-xs text-white/40">{vt(VID.exportNote, lang)}</p>
   </section>
 }
 
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function VideoEditor() {
-  const { t } = useTranslation()
+  const { t, lang } = useTranslation()
   const canvasEditorRef = useRef<CanvasEditorHandle>(null)
 
   const [locale, setLocale] = useState<SupportedVideoLocale>('en')
@@ -382,11 +439,11 @@ export default function VideoEditor() {
     </section>
     <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_.35fr]"><QuotaStatusBar quota={quota} /><BillingBanner quota={quota} /></div>
     <section className="mt-6 grid gap-4 rounded-3xl border border-white/10 bg-white/[.03] p-5 md:grid-cols-5">
-      <label className="text-sm">Video<input type="file" accept="video/*" onChange={(e) => e.target.files?.[0] && uploadVideo(e.target.files[0])} className="mt-2 w-full" /></label>
-      <div className="text-sm"><span>AI captions</span><button type="button" onClick={generateCaptions} disabled={!storagePath || captionState.status === 'generating'} className="mt-2 w-full rounded-xl bg-[#FFD700] px-4 py-2 font-bold text-black disabled:opacity-50">{captionState.status === 'generating' ? 'Transcribing…' : 'Generate Captions'}</button></div>
-      <label className="text-sm">Optional SRT/VTT<input type="file" accept=".srt,.vtt,text/vtt" onChange={(e) => e.target.files?.[0] && uploadCaptions(e.target.files[0])} className="mt-2 w-full" /></label>
-      <label className="text-sm">Tier<select className="mt-2 w-full rounded-xl bg-black p-2" value={tier} onChange={(e) => setTier(e.target.value)}><option value="free">Free/demo</option><option value="launch">Launch</option><option value="growth">Growth</option><option value="command">Command</option></select></label>
-      <label className="text-sm">Locale<select className="mt-2 w-full rounded-xl bg-black p-2" value={locale} onChange={(e) => setLocale(e.target.value as SupportedVideoLocale)}><option>en</option><option>es</option><option>pt</option><option>pl</option><option>ru</option></select></label>
+      <label className="text-sm">{vt(VID.video, lang)}<input type="file" accept="video/*" onChange={(e) => e.target.files?.[0] && uploadVideo(e.target.files[0])} className="mt-2 w-full" /></label>
+      <div className="text-sm"><span>{vt(VID.aiCaptions, lang)}</span><button type="button" onClick={generateCaptions} disabled={!storagePath || captionState.status === 'generating'} className="mt-2 w-full rounded-xl bg-[#FFD700] px-4 py-2 font-bold text-black disabled:opacity-50">{captionState.status === 'generating' ? vt(VID.transcribing, lang) : vt(VID.generateCaptions, lang)}</button></div>
+      <label className="text-sm">{vt(VID.optionalSrt, lang)}<input type="file" accept=".srt,.vtt,text/vtt" onChange={(e) => e.target.files?.[0] && uploadCaptions(e.target.files[0])} className="mt-2 w-full" /></label>
+      <label className="text-sm">{vt(VID.tier, lang)}<select className="mt-2 w-full rounded-xl bg-black p-2" value={tier} onChange={(e) => setTier(e.target.value)}><option value="free">Free/demo</option><option value="launch">Launch</option><option value="growth">Growth</option><option value="command">Command</option></select></label>
+      <label className="text-sm">{vt(VID.locale, lang)}<select className="mt-2 w-full rounded-xl bg-black p-2" value={locale} onChange={(e) => setLocale(e.target.value as SupportedVideoLocale)}><option>en</option><option>es</option><option>pt</option><option>pl</option><option>ru</option></select></label>
       <p className="text-xs text-white/55 md:col-span-5">Storage: {uploadState.message}<br />Captions: {captionState.message}</p>
     </section>
     <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_.42fr]">

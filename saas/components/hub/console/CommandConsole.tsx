@@ -1,216 +1,244 @@
 'use client'
 
-// saas/components/hub/console/CommandConsole.tsx
-// Hub Command Console — provider-centric, tiered orchestrator.
+// Hub Command Console — Child layout representations.
+// High-density compact grid layouts with explicit edge width safety.
+//
+// Live status: each provider now reflects REAL connection state from the
+// credential probe (/api/hub/providers/status), passed in as `status`:
+//   • hasBackend + configured  → "Live"  (actions enabled)
+//   • hasBackend + !configured → "Connect keys" (actions disabled, lists missing)
+//   • !hasBackend              → "Soon"  (roadmap preview)
+// While the probe is still loading (`statusLoaded === false`) we stay optimistic
+// for backend-ready providers so established integrations don't flash a state.
 
-import { useEffect, useState } from 'react'
-import { type ConsoleTierId } from '@/lib/hub/console-catalog'
-import { type ProviderLiveStatus } from '@/lib/hub/provider-credentials'
-import { Lang } from '../shared'
-import ProviderActionForm from '../ProviderActionForm'
+import { type ConsoleProvider, isDestructiveTemplate, isProviderLive, isActionLive } from '@/lib/hub/console-catalog'
+import { getTemplate } from '@/lib/hub/provider-templates'
 import { useTranslation } from '@/components/i18n/useTranslation'
-import { ProviderConsoleCard, ProviderWorkspace } from './ProviderConsoleCard'
-import { signalboostConsoleUI } from '@/console-host/consoleHostConfig'
+import { type ProviderLiveStatus } from '@/lib/hub/provider-credentials'
+import { type Lang } from '../shared'
 
-const PER_PAGE = 2
+// Derive the effective live/credential state for a provider.
+function deriveState(providerId: string, status: ProviderLiveStatus | undefined, statusLoaded: boolean) {
+  const hasBackend = isProviderLive(providerId)
+  // Optimistic until the probe returns, so live integrations don't flicker.
+  const configured = statusLoaded ? (status?.configured ?? false) : hasBackend
+  const missing = status?.missing ?? []
+  return { hasBackend, configured, missing, live: hasBackend && configured }
+}
 
-export default function CommandConsole({
-  lang = 'en',
-  initialTier = 'core',
-}: {
-  lang?: Lang
-  initialTier?: ConsoleTierId
-}) {
-  const [tierId, setTierId] = useState<ConsoleTierId>(initialTier)
-  const [page, setPage] = useState(0)
-  const [focusProviderId, setFocusProviderId] = useState<string | null>(null)
-  const [utilityId, setUtilityId] = useState<string | null>(null)
-  const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null)
+type CardProps = {
+  provider: ConsoleProvider
+  lang: Lang
+  onExpand: () => void
+  onRun: (templateId: string) => void
+  status?: ProviderLiveStatus
+  statusLoaded?: boolean
+}
 
-  // Real per-provider connection status (credential presence probe). Lets each
-  // provider card show "Live" vs "Connect keys" instead of a static flag.
-  const [statuses, setStatuses] = useState<Record<string, ProviderLiveStatus> | null>(null)
-  useEffect(() => {
-    let active = true
-    fetch('/api/hub/providers/status', { cache: 'no-store' })
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => { if (active && d && d.ok && d.statuses) setStatuses(d.statuses) })
-      .catch(() => {})
-    return () => { active = false }
-  }, [])
-  const statusLoaded = statuses !== null
-
+export function ProviderConsoleCard({ provider, lang, onExpand, onRun, status, statusLoaded = false }: CardProps) {
   const { t, dict } = useTranslation()
-  const tier = signalboostConsoleUI.catalog.getTier(tierId, dict)
-  const providers = signalboostConsoleUI.catalog.getTierProviders(tierId, dict)
-  const pageCount = Math.max(1, Math.ceil(providers.length / PER_PAGE))
-  const safePage = Math.min(page, pageCount - 1)
-  const visible = providers.slice(safePage * PER_PAGE, safePage * PER_PAGE + PER_PAGE)
-
-  const selectTier = (id: ConsoleTierId) => {
-    setTierId(id)
-    setPage(0)
-    setFocusProviderId(null)
-    setUtilityId(null)
-  }
-  const openProvider = (id: string) => {
-    setFocusProviderId(id)
-    setUtilityId(null)
-  }
-  const openUtility = (id: string) => {
-    setUtilityId(id)
-    setFocusProviderId(null)
-  }
-  const resetToHome = () => {
-    setFocusProviderId(null)
-    setUtilityId(null)
-    setPage(0)
-  }
-  const run = (templateId: string) => setActiveTemplateId(templateId)
-
-  const focusProvider = focusProviderId ? signalboostConsoleUI.catalog.getProvider(focusProviderId, dict) : null
-
+  const { hasBackend, configured, missing, live } = deriveState(provider.id, status, statusLoaded)
+  const needsKeys = hasBackend && statusLoaded && !configured
+  const keyHint = t('console.cui.add_keys_hint', 'Add {keys} to enable').replace('{keys}', missing.join(', '))
   return (
-    <div style={{ display: 'flex', minHeight: 'calc(100vh - 80px)', background: '#070b14', color: '#fff', position: 'relative', boxSizing: 'border-box' }}>
-      {/* Sidebar */}
-      <aside style={{ width: 248, flex: '0 0 248px', background: 'linear-gradient(180deg, rgba(13,18,32,.9), rgba(8,11,20,.9))', borderRight: '1px solid rgba(255,255,255,.07)', display: 'flex', flexDirection: 'column', padding: '16px 12px', overflowY: 'auto', boxSizing: 'border-box' }}>
-        <div style={{ padding: '4px 8px 12px' }}>
-          <button onClick={resetToHome} style={{ background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: 9, color: 'rgba(255,255,255,.92)', fontWeight: 800, fontSize: 14, cursor: 'pointer', padding: 0, textAlign: 'left' }}>
-            <span style={{ color: '#1af0ff' }}>≡</span>
-            {tier?.sidebarTitle}
+    <div style={{ background: 'rgba(13, 18, 32, 0.45)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: 12, overflow: 'hidden', boxSizing: 'border-box' }}>
+      {/* Card Header Band */}
+      <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxSizing: 'border-box' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: provider.accent, boxShadow: `0 0 8px ${provider.accent}` }} />
+          <div>
+            <div style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>{provider.name}</div>
+            <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.45)', fontWeight: 700 }}>{provider.subtitle}</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {!hasBackend ? (
+            <span style={{ fontSize: 8.5, fontWeight: 800, color: '#ffc300', background: 'rgba(255,195,0,0.12)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 4, padding: '2px 5px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{t('console.cui.soon', 'Soon')}</span>
+          ) : needsKeys ? (
+            <span title={keyHint} style={{ fontSize: 8.5, fontWeight: 800, color: '#1af0ff', background: 'rgba(26,240,255,0.1)', border: '1px solid rgba(26,240,255,0.3)', borderRadius: 4, padding: '2px 5px', letterSpacing: '0.05em', textTransform: 'uppercase', cursor: 'help' }}>{t('console.cui.connect_keys', 'Connect keys')}</span>
+          ) : configured ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 8.5, fontWeight: 800, color: '#22c55e', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 4, padding: '2px 5px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px #22c55e' }} />
+              {t('console.cui.live', 'Live')}
+            </span>
+          ) : null}
+          <button onClick={onExpand} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: 6, color: '#1af0ff', fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}>
+            Workspace →
           </button>
-          <div style={{ display: 'flex', gap: 6, marginTop: 11 }}>
-            {signalboostConsoleUI.catalog.tiers.map(t => {
-              const active = t.id === tierId
-              return (
-                <button key={t.id} onClick={() => selectTier(t.id)} style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: active ? '1px solid rgba(26,240,255,.5)' : '1px solid rgba(255,255,255,.1)', background: active ? 'rgba(26,240,255,.14)' : 'rgba(255,255,255,.03)', color: active ? '#1af0ff' : 'rgba(255,255,255,.6)', fontSize: 12, fontWeight: 900, cursor: 'pointer' }}>
-                  {t.index}
-                </button>
-              )
-            })}
-          </div>
         </div>
+      </div>
 
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 4 }}>
-          {providers.map(p => {
-            const active = focusProviderId === p.id
-            return (
-              <button key={p.id} onClick={() => openProvider(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 11px', borderRadius: 10, border: '1px solid transparent', background: active ? 'rgba(26,240,255,.14)' : 'transparent', color: active ? '#1af0ff' : 'rgba(255,255,255,.78)', fontSize: 13.5, fontWeight: active ? 800 : 600, cursor: 'pointer', textAlign: 'left' }}>
-                <span style={{ width: 9, height: 9, borderRadius: 3, background: p.accent, flex: '0 0 auto', boxShadow: `0 0 8px ${p.accent}66` }} />
-                {p.name}
-              </button>
-            )
-          })}
-        </nav>
-
-        <div style={{ height: 1, background: 'rgba(255,255,255,.08)', margin: '14px 6px' }} />
-
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {signalboostConsoleUI.catalog.utilityNav.map(u => {
-            const active = utilityId === u.id
-            return (
-              <button key={u.id} onClick={() => openUtility(u.id)} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 11px', borderRadius: 10, border: '1px solid transparent', background: active ? 'rgba(255,195,0,.12)' : 'transparent', color: active ? '#ffc300' : 'rgba(255,255,255,.7)', fontSize: 13.5, fontWeight: active ? 800 : 600, cursor: 'pointer', textAlign: 'left' }}>
-                <span style={{ fontSize: 15, flex: '0 0 auto' }}>{u.icon}</span>
-                {t(`console.util.${u.id}`, u.label)}
-              </button>
-            )
-          })}
-        </nav>
-      </aside>
-
-      {/* Content Area */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, boxSizing: 'border-box' }}>
-        <div style={{ flex: 1, overflow: 'auto', padding: '24px 24px', boxSizing: 'border-box' }}>
-          {utilityId ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)' }}>
-                <button onClick={resetToHome} style={{ background: 'none', border: 'none', color: '#1af0ff', cursor: 'pointer', padding: 0, fontSize: 11, fontWeight: 700 }}>🎛️ {t('console.ui.hub_home', 'Hub Home')}</button> / {t('console.ui.utility_views', 'Utility Views')}
-              </div>
-              <UtilityFrame id={utilityId} lang={lang} />
+      {/* Render Actions Layout */}
+      <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10, boxSizing: 'border-box' }}>
+        {provider.sections.map((section, idx) => {
+          // Hide actions that are not yet implemented on a LIVE provider
+          // (e.g. github.rotate_token / github.manage_secrets) so a buyer never
+          // sees a stub. Preview ("Soon") and not-yet-configured providers keep
+          // their full action list as a visible roadmap, so the filter only
+          // applies once the provider is fully live.
+          const visibleIds = section.templateIds.filter(id => !(live && !isActionLive(id)))
+          if (visibleIds.length === 0) return null
+          return (
+          <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 4, boxSizing: 'border-box' }}>
+            <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255, 255, 255, 0.35)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              {section.title}
             </div>
-          ) : focusProvider ? (
-            <ProviderWorkspace
-              provider={focusProvider}
-              tierLabel={tier?.label ? `${t('console.ui.tier', 'Tier')} ${tier.index} · ${tier.label}` : t('console.ui.tier', 'Tier')}
-              lang={lang}
-              onBack={() => setFocusProviderId(null)}
-              onHome={resetToHome}
-              onRun={run}
-              status={statuses?.[focusProvider.id]}
-              statusLoaded={statusLoaded}
-            />
-          ) : (
-            <>
-              <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 18, flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ fontSize: 20, fontWeight: 900, color: '#fff' }}>{t('console.ui.tier', 'Tier')} {tier?.index} · {tier?.label} {t('console.ui.providers', 'Providers')}</div>
-                  <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.5)', marginTop: 4, maxWidth: 560 }}>{tier?.blurb}</div>
-                </div>
-                {pageCount > 1 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <PagerButton label="←" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={safePage === 0} />
-                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', fontWeight: 700, minWidth: 86, textAlign: 'center' }}>Page {safePage + 1} of {pageCount}</span>
-                    <PagerButton label="→" onClick={() => setPage(p => Math.min(pageCount - 1, p + 1))} disabled={safePage >= pageCount - 1} />
-                  </div>
-                )}
-              </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, width: '100%', boxSizing: 'border-box' }}>
+              {visibleIds.map(id => {
+                const template = getTemplate(id, dict)
+                if (!template) return null
+                const isDestructive = isDestructiveTemplate(id)
+                const isArchive = id.includes('archive')
+                const runnable = live && isActionLive(id)
+                const incomplete = live && !isActionLive(id)
+                const title = runnable
+                  ? template.label
+                  : incomplete
+                    ? t('console.cui.not_available', 'Not available yet')
+                    : needsKeys
+                      ? keyHint
+                      : t('console.cui.coming_soon')
 
-              <div className="sb-console-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start', boxSizing: 'border-box' }}>
-                {visible.map(p => (
-                  <ProviderConsoleCard key={p.id} provider={p} lang={lang} onExpand={() => openProvider(p.id)} onRun={run} status={statuses?.[p.id]} statusLoaded={statusLoaded} />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Audit footer */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,.07)', padding: '14px 24px', textAlign: 'center', fontSize: 12.5, color: 'rgba(255,255,255,.55)', background: 'rgba(8,11,20,.6)' }}>
-          <strong style={{ color: 'rgba(255,255,255,.8)' }}>{t('console.cui.audit_log', 'Audit Log:')}</strong> {t('console.cui.audit_note', 'All actions are recorded for compliance.')}{' '}
-          <button onClick={() => openUtility('logs')} style={{ background: 'none', border: 'none', color: '#1af0ff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}>{t('console.cui.view_log', 'View log →')}</button>
-        </div>
-      </main>
-
-      {/* Action modal overlay */}
-      {activeTemplateId && (() => {
-        const panel = signalboostConsoleUI.panelRouter[activeTemplateId]
-        const isPanel = Boolean(panel)
-        return (
-          <div style={{ position: 'fixed', top: 80, left: 0, right: 0, bottom: 0, zIndex: 1000, background: 'rgba(3,7,18,.72)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setActiveTemplateId(null)}>
-            <div style={{ width: '100%', maxWidth: isPanel ? 1040 : 1000, height: isPanel ? 'auto' : 'calc(100vh - 120px)', maxHeight: 'calc(100vh - 120px)', overflow: 'auto', borderRadius: 18 }} onClick={e => e.stopPropagation()}>
-              {isPanel ? (
-                <div style={{ background: 'linear-gradient(160deg, rgba(15,23,42,.92), rgba(3,7,18,.96))', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 18, padding: '0 18px 22px', boxShadow: '0 24px 70px rgba(0,0,0,.6)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, position: 'sticky', top: 0, zIndex: 3, margin: '0 -18px 14px', padding: '14px 18px', background: 'rgba(8,12,22,.98)', borderBottom: '1px solid rgba(255,255,255,.08)', borderRadius: '18px 18px 0 0' }}>
-                    <div>
-                      <div style={{ fontSize: 16, fontWeight: 900, color: '#fff' }}>{panel.title}</div>
-                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginTop: 2 }}>{panel.subtitle}</div>
-                    </div>
-                    <button onClick={() => setActiveTemplateId(null)} style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 9, color: 'rgba(255,255,255,.7)', fontSize: 13, fontWeight: 800, cursor: 'pointer', padding: '7px 12px' }}>✕ Close</button>
-                  </div>
-                  {panel.render()}
-                </div>
-              ) : (
-                <ProviderActionForm templateId={activeTemplateId} lang={lang} onClose={() => setActiveTemplateId(null)} onSuccess={() => {}} onError={() => {}} />
-              )}
+                return (
+                  <button 
+                    key={id} 
+                    onClick={runnable ? () => onRun(id) : undefined}
+                    disabled={!runnable}
+                    title={title}
+                    style={{ 
+                      padding: '5px 8px', 
+                      borderRadius: 6, 
+                      textAlign: 'left', 
+                      fontSize: 11, 
+                      fontWeight: 600, 
+                      cursor: runnable ? 'pointer' : 'not-allowed', 
+                      opacity: runnable ? 1 : 0.4, 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 6, 
+                      border: isDestructive ? '1px solid rgba(239, 68, 68, 0.2)' : isArchive ? '1px solid rgba(255, 195, 0, 0.2)' : '1px solid rgba(255, 255, 255, 0.06)', 
+                      background: isDestructive ? 'rgba(239, 68, 68, 0.05)' : isArchive ? 'rgba(255, 195, 0, 0.05)' : 'rgba(255, 255, 255, 0.02)', 
+                      color: isDestructive ? '#ef4444' : isArchive ? '#ffc300' : 'rgba(255, 255, 255, 0.8)' 
+                    }}
+                  >
+                    <span style={{ fontSize: 11 }}>{template.icon}</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{template.label}</span>
+                    {incomplete && <span style={{ marginLeft: 'auto', fontSize: 7.5, fontWeight: 800, color: '#ffc300', letterSpacing: '0.04em' }}>{t('console.cui.soon_short', 'SOON')}</span>}
+                  </button>
+                )
+              })}
             </div>
           </div>
-        )
-      })()}
+          )
+        })}
+      </div>
     </div>
   )
 }
 
-function PagerButton({ label, onClick, disabled }: { label: string; onClick: () => void; disabled?: boolean }) {
-  return (
-    <button onClick={onClick} disabled={disabled} style={{ padding: '6px 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,.14)', background: disabled ? 'rgba(255,255,255,.02)' : 'rgba(255,255,255,.05)', color: disabled ? 'rgba(255,255,255,.25)' : '#1af0ff', fontSize: 14, fontWeight: 900, cursor: disabled ? 'default' : 'pointer' }}>
-      {label}
-    </button>
-  )
+type WorkspaceProps = {
+  provider: ConsoleProvider
+  tierLabel: string
+  lang: Lang
+  onBack: () => void
+  onHome: () => void // Explicitly registers type parameter safety bounds
+  onRun: (templateId: string) => void
+  status?: ProviderLiveStatus
+  statusLoaded?: boolean
 }
 
-function UtilityFrame({ id, lang }: { id: string; lang: Lang }) {
-  const { t } = useTranslation()
-  const renderPage = signalboostConsoleUI.utilityPages[id]
-  if (renderPage) return <>{renderPage()}</>
-  return <div style={{ color: 'rgba(255,255,255,.6)' }}>{t('console.cui.unknown_page', 'Unknown page.')}</div>
+export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onHome, onRun, status, statusLoaded = false }: WorkspaceProps) {
+  const { t, dict } = useTranslation()
+  const { hasBackend, configured, missing, live } = deriveState(provider.id, status, statusLoaded)
+  const needsKeys = hasBackend && statusLoaded && !configured
+  const keyHint = t('console.cui.add_keys_hint', 'Add {keys} to enable').replace('{keys}', missing.join(', '))
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', maxWidth: '100%', boxSizing: 'border-box', paddingRight: '4px' }}>
+      {/* Dynamic Breadcrumb Track Navigation */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>
+        <button onClick={onHome} style={{ background: 'none', border: 'none', color: '#1af0ff', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}>🎛️ Hub Home</button>
+        <span>/</span>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}>{tierLabel}</button>
+        <span>/</span>
+        <span style={{ color: '#fff', fontWeight: 800 }}>{t('console.cui.workspace_title', '{name} Workspace').replace('{name}', provider.name)}</span>
+      </div>
+
+      {!hasBackend && (
+        <div style={{ fontSize: 11.5, fontWeight: 700, color: '#ffc300', background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 8, padding: '8px 12px' }}>
+          {t('console.cui.coming_soon_banner').replace('{name}', provider.name)}
+        </div>
+      )}
+
+      {needsKeys && (
+        <div style={{ fontSize: 11.5, fontWeight: 700, color: '#1af0ff', background: 'rgba(26,240,255,0.08)', border: '1px solid rgba(26,240,255,0.28)', borderRadius: 8, padding: '8px 12px' }}>
+          {t('console.cui.connect_keys_banner', '🔑 {name} is ready — add {keys} in Vercel to activate these actions.').replace('{name}', provider.name).replace('{keys}', missing.join(', '))}
+        </div>
+      )}
+
+      {/* Grid layout with strict multi-column spacing rules */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+        {provider.sections.map((section, idx) => {
+          // Same buyer-facing rule as the card: hide unimplemented actions on a
+          // live provider; keep full lists for preview/not-configured providers.
+          const visibleIds = section.templateIds.filter(id => !(live && !isActionLive(id)))
+          if (visibleIds.length === 0) return null
+          return (
+          <div key={idx} style={{ background: 'rgba(13, 18, 32, 0.3)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: 10, padding: 12, boxSizing: 'border-box', overflow: 'hidden' }}>
+            <h3 style={{ fontSize: 11, fontWeight: 800, color: '#1af0ff', textTransform: 'uppercase', margin: '0 0 10px 0', letterSpacing: '0.04em' }}>{section.title}</h3>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, width: '100%', boxSizing: 'border-box' }}>
+              {visibleIds.map(id => {
+                const template = getTemplate(id, dict)
+                if (!template) return null
+                const isDestructive = isDestructiveTemplate(id)
+                const isArchive = id.includes('archive')
+                const runnable = live && isActionLive(id)
+                const incomplete = live && !isActionLive(id)
+                const title = runnable
+                  ? template.label
+                  : incomplete
+                    ? t('console.cui.not_available', 'Not available yet')
+                    : needsKeys
+                      ? keyHint
+                      : t('console.cui.coming_soon')
+
+                return (
+                  <div 
+                    key={id} 
+                    onClick={runnable ? () => onRun(id) : undefined}
+                    title={title}
+                    style={{ 
+                      padding: '8px 10px', 
+                      borderRadius: 8, 
+                      opacity: runnable ? 1 : 0.4, 
+                      background: 'rgba(255,255,255,0.01)', 
+                      border: isDestructive ? '1px solid rgba(239, 68, 68, 0.2)' : isArchive ? '1px solid rgba(255, 195, 0, 0.2)' : '1px solid rgba(255,255,255,0.05)', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      minHeight: '44px',
+                      boxSizing: 'border-box',
+                      minWidth: 0,
+                      cursor: runnable ? 'pointer' : 'not-allowed'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, width: '100%' }}>
+                      <span style={{ fontSize: 14, flexShrink: 0 }}>{template.icon}</span>
+                      <div style={{ minWidth: 0, overflow: 'hidden', flex: 1 }}>
+                        <div style={{ fontSize: 11.5, fontWeight: 700, color: isDestructive ? '#ef4444' : isArchive ? '#ffc300' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{template.label}</div>
+                        <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{template.description}</div>
+                      </div>
+                    </div>
+                    <span style={{ color: incomplete ? '#ffc300' : isDestructive ? '#ef4444' : isArchive ? '#ffc300' : 'rgba(255,255,255,0.25)', fontSize: incomplete ? 8 : 11, fontWeight: 800, paddingLeft: 4, flexShrink: 0, letterSpacing: incomplete ? '0.04em' : undefined }}>{incomplete ? 'SOON' : '→'}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }

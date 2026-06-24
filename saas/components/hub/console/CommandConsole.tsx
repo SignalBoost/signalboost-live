@@ -3,8 +3,9 @@
 // saas/components/hub/console/CommandConsole.tsx
 // Hub Command Console — provider-centric, tiered orchestrator.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { type ConsoleTierId } from '@/lib/hub/console-catalog'
+import { type ProviderLiveStatus } from '@/lib/hub/provider-credentials'
 import { Lang } from '../shared'
 import ProviderActionForm from '../ProviderActionForm'
 import { useTranslation } from '@/components/i18n/useTranslation'
@@ -25,6 +26,19 @@ export default function CommandConsole({
   const [focusProviderId, setFocusProviderId] = useState<string | null>(null)
   const [utilityId, setUtilityId] = useState<string | null>(null)
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null)
+
+  // Real per-provider connection status (credential presence probe). Lets each
+  // provider card show "Live" vs "Connect keys" instead of a static flag.
+  const [statuses, setStatuses] = useState<Record<string, ProviderLiveStatus> | null>(null)
+  useEffect(() => {
+    let active = true
+    fetch('/api/hub/providers/status', { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (active && d && d.ok && d.statuses) setStatuses(d.statuses) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
+  const statusLoaded = statuses !== null
 
   const { t, dict } = useTranslation()
   const tier = signalboostConsoleUI.catalog.getTier(tierId, dict)
@@ -122,6 +136,8 @@ export default function CommandConsole({
               onBack={() => setFocusProviderId(null)}
               onHome={resetToHome}
               onRun={run}
+              status={statuses?.[focusProvider.id]}
+              statusLoaded={statusLoaded}
             />
           ) : (
             <>
@@ -141,7 +157,7 @@ export default function CommandConsole({
 
               <div className="sb-console-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start', boxSizing: 'border-box' }}>
                 {visible.map(p => (
-                  <ProviderConsoleCard key={p.id} provider={p} lang={lang} onExpand={() => openProvider(p.id)} onRun={run} />
+                  <ProviderConsoleCard key={p.id} provider={p} lang={lang} onExpand={() => openProvider(p.id)} onRun={run} status={statuses?.[p.id]} statusLoaded={statusLoaded} />
                 ))}
               </div>
             </>

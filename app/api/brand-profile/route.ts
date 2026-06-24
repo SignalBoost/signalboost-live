@@ -16,6 +16,8 @@ import { readJsonLimited } from '@/lib/http/readJsonLimited'
 
 const MAX_PROFILE_BYTES = 100_000
 const MAX_PROFILE_KEYS = 200
+const MAX_PROFILE_DEPTH = 32
+const MAX_PROFILE_NODES = 5000
 
 const NO_STORE = { 'Cache-Control': 'no-store, private' } as const
 
@@ -64,11 +66,44 @@ function sameOriginOk(req: Request): boolean {
   return false
 }
 
+// Iterative (non-recursive) structural bound check. Rejects payloads that exceed
+// a maximum nesting depth or total node count BEFORE any JSON.stringify, so a
+// within-byte-limit but pathologically-nested object (e.g. [[[[…]]]]) cannot
+// trigger a stack-overflow RangeError or burn disproportionate CPU during
+// serialization. Uses an explicit stack — no recursion of its own.
+function withinStructuralBounds(root: unknown): boolean {
+  const stack: { node: unknown; depth: number }[] = [{ node: root, depth: 0 }]
+  let nodes = 0
+  while (stack.length) {
+    const { node, depth } = stack.pop() as { node: unknown; depth: number }
+    if (depth > MAX_PROFILE_DEPTH) return false
+    if (node === null || typeof node !== 'object') continue
+    nodes += 1
+    if (nodes > MAX_PROFILE_NODES) return false
+    if (Array.isArray(node)) {
+      for (const child of node) stack.push({ node: child, depth: depth + 1 })
+    } else {
+      for (const child of Object.values(node as Record<string, unknown>)) {
+        stack.push({ node: child, depth: depth + 1 })
+      }
+    }
+  }
+  return true
+}
+
 function validProfile(value: unknown): value is Record<string, unknown> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
   const keys = Object.keys(value as Record<string, unknown>)
   if (keys.length > MAX_PROFILE_KEYS) return false
-  if (Buffer.byteLength(JSON.stringify(value), 'utf8') > MAX_PROFILE_BYTES) return false
+  // Bound the structure before serializing it.
+  if (!withinStructuralBounds(value)) return false
+  // Size check, guarded: treat any serialization failure as an invalid payload
+  // (controlled 400) instead of letting a RangeError bubble up to a 500.
+  try {
+    if (Buffer.byteLength(JSON.stringify(value), 'utf8') > MAX_PROFILE_BYTES) return false
+  } catch {
+    return false
+  }
   return true
 }
 

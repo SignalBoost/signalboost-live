@@ -1,4 +1,12 @@
 {
+  "actionForm": {
+    "noExtraInfo": "This action requires no additional information.",
+    "activeEnvMap": "Active Environment Variables Map",
+    "envHelp": "Select from live environment configurations. The console maps core variable IDs directly.",
+    "stripeHelp": "Select from the live Stripe catalog. The console sends the hidden product ID to Stripe.",
+    "selectStripeProduct": "Select a Stripe product",
+    "selectEnvToDelete": "Select an environment variable to delete"
+  },
   "tier": {
     "core": "Core",
     "tier2": "Scale",

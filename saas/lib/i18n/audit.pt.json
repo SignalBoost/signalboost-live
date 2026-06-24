@@ -975,5 +975,20 @@
     "done": "Concluído",
     "rotation_failed": "A rotação falhou",
     "retry": "Tentar novamente"
+  },
+  "admin": {
+    "eyebrow": "Console de administração estilo NASA",
+    "forecasting": "Previsão",
+    "financialLedger": "Livro-razão financeiro",
+    "kpiCockpit": "Painel de KPIs",
+    "marketplace": "Marketplace",
+    "saas": "SaaS",
+    "unifiedEngagement": "Índice de engajamento unificado",
+    "crmPipeline": "Pipeline de CRM",
+    "filters": "Filtros: intervalo de datas • produto • país • plano • função",
+    "telemetryReady": "Pronto para telemetria. Conecte tabelas/eventos de analítica para ativar registros ao vivo neste painel.",
+    "notTracked": "Sem dados ainda",
+    "telemetrySignal": "Sinal pronto para telemetria",
+    "conciergeRecs": "Recomendações de concierge"
   }
 }

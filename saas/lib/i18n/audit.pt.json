@@ -1,4 +1,12 @@
 {
+  "actionForm": {
+    "noExtraInfo": "Esta ação não requer informações adicionais.",
+    "activeEnvMap": "Mapa de variáveis de ambiente ativas",
+    "envHelp": "Selecione entre as configurações de ambiente ao vivo. O console mapeia os IDs das variáveis principais diretamente.",
+    "stripeHelp": "Selecione do catálogo ao vivo da Stripe. O console envia o ID de produto oculto para a Stripe.",
+    "selectStripeProduct": "Selecione um produto da Stripe",
+    "selectEnvToDelete": "Selecione uma variável de ambiente para excluir"
+  },
   "tier": {
     "core": "Essencial",
     "tier2": "Escala",
@@ -967,6 +975,5 @@
     "done": "Concluído",
     "rotation_failed": "A rotação falhou",
     "retry": "Tentar novamente"
-  },
-  "vaultx": {"audit":{"loading":"Carregando registro de auditoria...","empty":"Sem entradas no registro de auditoria","trail":"Trilha de auditoria","success":"Sucesso","failed":"Falhou","ip":"IP:","showing":"Mostrando os últimos 50 de","entries":"entradas"},"grid":{"empty":"Nenhum segredo no cofre","emptyHint":"Os segredos dos provedores conectados aparecerão aqui.","statusActive":"Ativo","statusExpiringSoon":"A expirar","statusExpired":"Expirado","statusRotated":"Rotacionado recentemente","statusRevoked":"Revogado","expiresIn":"Expira em","day":"dia","days":"dias","lastRotated":"Última rotação:","expires":"Expira:","created":"Criado:"},"page":{"ops":"Operações e produção","keysSecrets":"Chaves e segredos","inventory":"Inventário de credenciais, alertas de expiração e status de rotação.","secretWord":"segredo","secretsWord":"segredos","stored":"armazenados.","active":"Ativos","expiring":"A expirar","lockVault":"Bloquear cofre","browseSecrets":"Explorar segredos","providerPlaceholder":"Pesquise e selecione um provedor...","selected":"Selecionado:","statusActive":"Segredos ativos","statusExpiringSoon":"A expirar","statusExpired":"Expirados","statusRotated":"Rotacionados recentemente","statusRevoked":"Revogados","maskedValue":"Valor mascarado","encryptedNote":"O valor completo é criptografado e não é exibido na interface.","expiration":"Expiração","lastRotated":"Última rotação","typeEnv":"Tipo e ambiente"},"unlock":{"refresh":"Atualizar","secureAccess":"Acesso seguro necessário","unlockVault":"Desbloquear cofre","enable2fa":"Ativar 2FA","enter2faCode":"Insira o código 2FA","enterPassword":"Insira sua senha","scanQr":"Escaneie o código QR com o Google Authenticator","sessionExpire":"Esta sessão expirará em 30 minutos por segurança.","password":"Senha","verifying":"Verificando...","continue":"Continuar","scanAuthApps":"Escaneie com Google Authenticator, Microsoft Authenticator ou Authy","enter6digit":"Insira o código de 6 dígitos para confirmar","saveBackup":"Salve estes códigos de backup:","back":"Voltar","unlock":"Desbloquear","twofaCode":"Código 2FA","errPasswordRequired":"A senha é obrigatória","errInvalidCode":"Insira um código válido de 6 dígitos"}}
+  }
 }

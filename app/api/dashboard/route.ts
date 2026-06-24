@@ -33,9 +33,8 @@ export async function GET() {
       stats: { projects: 12, automations: 5, blogs: 24 },
     });
   } catch {
-    return NextResponse.json(
-      { success: false, error: "Internal server error" },
-      { status: 500 }
-    );
+    // Cloak the catch path too: return the identical 404 so a thrown
+    // Supabase/auth error can't distinguish this route from a non-existent one.
+    return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
 }

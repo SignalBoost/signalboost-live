@@ -15,6 +15,8 @@ import EnvVarsPage from '@/components/hub/pages/EnvVarsPage'
 import { DeploymentsPage } from '@/components/hub/pages/DeploymentsPage'
 import { LogsPage } from '@/components/hub/pages/LogsPage'
 import { SettingsPage } from '@/components/hub/pages/SettingsPage'
+import { UsersPage } from '@/components/hub/pages/UsersPage'
+import { WebhooksPage } from '@/components/hub/pages/WebhooksPage'
 import {
   CONSOLE_TIERS,
   CONSOLE_UTILITY_PAGES,
@@ -109,6 +111,8 @@ export const signalboostConsoleUI: ConsoleHostUI = {
     env: () => <EnvVarsPage />,
     logs: () => <LogsPage />,
     deployments: () => <DeploymentsPage />,
+    webhooks: () => <WebhooksPage />,
+    users: () => <UsersPage />,
     settings: () => <SettingsPage />,
   },
   catalog: {

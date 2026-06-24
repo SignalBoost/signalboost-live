@@ -975,5 +975,20 @@
     "done": "Done",
     "rotation_failed": "Rotation failed",
     "retry": "Retry"
+  },
+  "admin": {
+    "eyebrow": "NASA-style admin console",
+    "forecasting": "Forecasting",
+    "financialLedger": "Financial ledger",
+    "kpiCockpit": "KPI cockpit",
+    "marketplace": "Marketplace",
+    "saas": "SaaS",
+    "unifiedEngagement": "Unified engagement index",
+    "crmPipeline": "CRM pipeline",
+    "filters": "Filters: date range • product • country • plan • role",
+    "telemetryReady": "Telemetry-ready. Connect analytics tables/events to activate live records for this cockpit panel.",
+    "notTracked": "No data yet",
+    "telemetrySignal": "Telemetry-ready signal",
+    "conciergeRecs": "Concierge recommendations"
   }
 }

@@ -118,6 +118,7 @@ export default function CybersecurityCenterPage() {
   const [loading, setLoading] = useState(false)
   const [monitoring, setMonitoring] = useState(false)
   const [remediationLoading, setRemediationLoading] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [remediationMessage, setRemediationMessage] = useState<string | null>(null)
   const [report, setReport] = useState<Report | null>(null)
@@ -208,6 +209,41 @@ export default function CybersecurityCenterPage() {
     } finally {
       setRemediationLoading(false)
     }
+  }
+
+  async function downloadIssuePdf() {
+    if (!report) return
+    setPdfLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/hub/cyber/report-pdf', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ report }),
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => null)
+        setError(json?.error || 'Could not generate PDF report.')
+        return
+      }
+      const blob = await res.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const repoName = String(report.repo || report.target || 'cybersecurity-report').replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'cybersecurity-report'
+      const a = document.createElement('a')
+      a.href = objectUrl
+      a.download = `${repoName}-issue-review-${new Date().toISOString().slice(0, 10)}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(objectUrl)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not generate PDF report.')
+    } finally {
+      setPdfLoading(false)
+    }
+  }
+
+  function printIssueReview() {
+    window.print()
   }
 
   async function updateRemediation(id: string, status: RemediationRequest['status']) {
@@ -309,7 +345,7 @@ export default function CybersecurityCenterPage() {
           </section>
         ) : null}
 
-        {report && report.advisories.length > 0 ? <IssueReviewReport report={report} /> : null}
+        {report && report.advisories.length > 0 ? <IssueReviewReport report={report} onDownloadPdf={downloadIssuePdf} onPrint={printIssueReview} pdfLoading={pdfLoading} /> : null}
 
         {report && report.advisories.length > 0 ? (
           <section className="mt-5 rounded-md border border-accent/40 bg-accent/10 p-4">
@@ -408,7 +444,7 @@ export default function CybersecurityCenterPage() {
   )
 }
 
-function IssueReviewReport({ report }: { report: Report }) {
+function IssueReviewReport({ report, onDownloadPdf, onPrint, pdfLoading }: { report: Report; onDownloadPdf: () => void; onPrint: () => void; pdfLoading: boolean }) {
   return (
     <section className="mt-5 rounded-md border border-border bg-surface p-4">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -419,9 +455,15 @@ function IssueReviewReport({ report }: { report: Report }) {
             SignalBoost reviewed the scan result before offering help. This report explains what was detected, where it was found, why it matters, and the recommended next step. No fix has been requested or approved yet.
           </p>
         </div>
-        <div className="rounded-md border border-border bg-bg px-3 py-2 text-xs text-text-muted">
-          <div>{report.repo || report.target}</div>
-          <div>{report.branch || 'default branch'} · {new Date(report.generatedAt).toLocaleString()}</div>
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          <div className="rounded-md border border-border bg-bg px-3 py-2 text-xs text-text-muted">
+            <div>{report.repo || report.target}</div>
+            <div>{report.branch || 'default branch'} · {new Date(report.generatedAt).toLocaleString()}</div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={onDownloadPdf} disabled={pdfLoading} className="rounded-md border border-accent bg-accent px-3 py-1.5 text-xs font-semibold text-bg hover:brightness-110 disabled:opacity-60">{pdfLoading ? 'Preparing PDF…' : 'Download PDF'}</button>
+            <button onClick={onPrint} className="rounded-md border border-border bg-bg px-3 py-1.5 text-xs font-semibold text-text-muted hover:text-text">Print / Save PDF</button>
+          </div>
         </div>
       </div>
 

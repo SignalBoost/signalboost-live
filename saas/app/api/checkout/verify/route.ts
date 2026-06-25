@@ -113,9 +113,9 @@ export async function GET() {
   // cross-account mismatch that would otherwise only surface as "No such price"
   // mid-checkout.
   const priceEnv: Array<{ envVar: string; id: string | undefined }> = [
-    { envVar: 'STRIPE_PRICE_WEBSITE_STARTER', id: process.env.STRIPE_PRICE_WEBSITE_STARTER },
-    { envVar: 'STRIPE_PRICE_WEBSITE_PRO', id: process.env.STRIPE_PRICE_WEBSITE_PRO },
-    { envVar: 'STRIPE_PRICE_WEBSITE_BUSINESS', id: process.env.STRIPE_PRICE_WEBSITE_BUSINESS },
+    { envVar: 'STRIPE_PRICE_WEBSITE_LAUNCH',  id: process.env.STRIPE_PRICE_WEBSITE_LAUNCH  ?? process.env.STRIPE_PRICE_WEBSITE_STARTER },
+    { envVar: 'STRIPE_PRICE_WEBSITE_GROWTH',  id: process.env.STRIPE_PRICE_WEBSITE_GROWTH  ?? process.env.STRIPE_PRICE_WEBSITE_PRO },
+    { envVar: 'STRIPE_PRICE_WEBSITE_COMMAND', id: process.env.STRIPE_PRICE_WEBSITE_COMMAND ?? process.env.STRIPE_PRICE_WEBSITE_BUSINESS },
     { envVar: 'STRIPE_PRICE_PODCAST_INDIE', id: process.env.STRIPE_PRICE_PODCAST_INDIE },
     { envVar: 'STRIPE_PRICE_PODCAST_PRO', id: process.env.STRIPE_PRICE_PODCAST_PRO },
     { envVar: 'STRIPE_PRICE_PODCAST_NETWORK', id: process.env.STRIPE_PRICE_PODCAST_NETWORK },

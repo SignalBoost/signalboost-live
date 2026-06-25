@@ -2,7 +2,7 @@
 
 // saas/app/dashboard/cybersecurity/page.tsx
 // Cybersecurity Center MVP. Audit = readiness/reports. Cybersecurity = technical
-// monitoring checks, alert inbox, and scheduled dependency advisory scans.
+// monitoring checks, alert inbox, scheduled scans, and human-approved remediation.
 
 import { useEffect, useState } from 'react'
 
@@ -75,12 +75,39 @@ type AlertRow = {
   created_at: string
 }
 
+type RemediationRequest = {
+  id: string
+  source_area: string
+  source_type: string
+  repo?: string | null
+  target?: string | null
+  title: string
+  summary: string
+  severity_summary?: Record<string, number>
+  status: 'awaiting_human_review' | 'approved' | 'rejected' | 'in_progress' | 'completed' | 'cancelled'
+  human_approval_required: boolean
+  human_approved: boolean
+  approved_at?: string | null
+  approval_notes?: string | null
+  created_at: string
+  updated_at?: string
+}
+
 const sevClass: Record<string, string> = {
   critical: 'border-red-500/40 bg-red-500/10 text-red-200',
   high: 'border-orange-400/40 bg-orange-400/10 text-orange-200',
   medium: 'border-yellow-400/40 bg-yellow-400/10 text-yellow-100',
   low: 'border-cyan-400/35 bg-cyan-400/10 text-cyan-100',
   unknown: 'border-white/15 bg-white/5 text-white/60',
+}
+
+const statusClass: Record<string, string> = {
+  awaiting_human_review: 'border-yellow-400/40 bg-yellow-400/10 text-yellow-100',
+  approved: 'border-emerald-400/40 bg-emerald-400/10 text-emerald-100',
+  in_progress: 'border-cyan-400/35 bg-cyan-400/10 text-cyan-100',
+  completed: 'border-emerald-400/40 bg-emerald-400/10 text-emerald-100',
+  rejected: 'border-red-400/35 bg-red-400/10 text-red-100',
+  cancelled: 'border-white/15 bg-white/5 text-white/60',
 }
 
 export default function CybersecurityCenterPage() {
@@ -90,11 +117,15 @@ export default function CybersecurityCenterPage() {
   const [maxPackages, setMaxPackages] = useState(120)
   const [loading, setLoading] = useState(false)
   const [monitoring, setMonitoring] = useState(false)
+  const [remediationLoading, setRemediationLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [remediationMessage, setRemediationMessage] = useState<string | null>(null)
   const [report, setReport] = useState<Report | null>(null)
+  const [scanId, setScanId] = useState<string | null>(null)
   const [history, setHistory] = useState<ScanRow[]>([])
   const [monitors, setMonitors] = useState<MonitorRow[]>([])
   const [alerts, setAlerts] = useState<AlertRow[]>([])
+  const [remediationRequests, setRemediationRequests] = useState<RemediationRequest[]>([])
 
   async function loadDashboard() {
     try {
@@ -104,6 +135,7 @@ export default function CybersecurityCenterPage() {
         setHistory(json.scans || [])
         setMonitors(json.monitors || [])
         setAlerts(json.alerts || [])
+        setRemediationRequests(json.remediationRequests || [])
       }
     } catch { /* optional */ }
   }
@@ -113,7 +145,9 @@ export default function CybersecurityCenterPage() {
   async function runScan() {
     setLoading(true)
     setError(null)
+    setRemediationMessage(null)
     setReport(null)
+    setScanId(null)
     try {
       const res = await fetch('/api/hub/cyber/dependencies', {
         method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
@@ -125,6 +159,7 @@ export default function CybersecurityCenterPage() {
         return
       }
       setReport(json.report)
+      setScanId(json.scanId || null)
       await loadDashboard()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Cybersecurity scan failed.')
@@ -154,6 +189,37 @@ export default function CybersecurityCenterPage() {
     }
   }
 
+  async function requestRemediation() {
+    if (!report || report.advisories.length === 0) return
+    setRemediationLoading(true)
+    setError(null)
+    setRemediationMessage(null)
+    try {
+      const res = await fetch('/api/hub/cyber/dependencies', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'request_remediation', scanId, report }),
+      })
+      const json = await res.json().catch(() => null)
+      if (!res.ok || !json?.ok) { setError(json?.error || 'Could not create remediation request.'); return }
+      setRemediationMessage('Remediation request created. A human/admin must approve it before any fix, PR, or code change happens.')
+      await loadDashboard()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create remediation request.')
+    } finally {
+      setRemediationLoading(false)
+    }
+  }
+
+  async function updateRemediation(id: string, status: RemediationRequest['status']) {
+    try {
+      await fetch('/api/hub/cyber/dependencies', {
+        method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ remediationId: id, status, approvalNotes: status === 'approved' ? 'Approved by human reviewer from Cybersecurity Center.' : undefined }),
+      })
+      await loadDashboard()
+    } catch { /* non-critical */ }
+  }
+
   async function resolveAlert(id: string, status: 'resolved' | 'ignored' = 'resolved') {
     try {
       await fetch('/api/hub/cyber/dependencies', {
@@ -176,6 +242,7 @@ export default function CybersecurityCenterPage() {
 
   const summary = report?.summary
   const openAlerts = alerts.filter(a => a.status === 'open')
+  const pendingRemediation = remediationRequests.filter(r => r.status === 'awaiting_human_review')
 
   return (
     <main className="min-h-[calc(100vh-80px)] bg-bg px-6 pb-16 pt-8 font-sans text-text">
@@ -185,7 +252,7 @@ export default function CybersecurityCenterPage() {
             <div className="mb-2 inline-flex rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-accent">Cybersecurity Center</div>
             <h1 className="text-2xl font-semibold tracking-tight text-text">Dependency Advisory Monitoring</h1>
             <p className="mt-1.5 max-w-[760px] text-sm leading-relaxed text-text-muted">
-              Run manual dependency scans now, add repositories to monitoring, and track critical/high cybersecurity alerts. Audit reports remain in Audit Center.
+              Run scans, monitor repositories, request remediation, and require human approval before SignalBoost performs any fix.
             </p>
           </div>
           <a href="/dashboard/audit" className="rounded-md border border-border bg-surface px-4 py-2 text-sm text-text-muted hover:text-text">Audit Center</a>
@@ -221,12 +288,14 @@ export default function CybersecurityCenterPage() {
         </section>
 
         {error ? <div className="mt-4 rounded-md border border-danger bg-surface p-4 text-sm text-danger">{error}</div> : null}
+        {remediationMessage ? <div className="mt-4 rounded-md border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-100">{remediationMessage}</div> : null}
 
-        <section className="mt-5 grid gap-3 md:grid-cols-4">
+        <section className="mt-5 grid gap-3 md:grid-cols-5">
           <Metric label="Open alerts" value={openAlerts.length} tone={openAlerts.some(a => a.severity === 'critical') ? 'critical' : openAlerts.length ? 'high' : undefined} />
           <Metric label="Monitors" value={monitors.length} />
           <Metric label="Enabled" value={monitors.filter(m => m.is_enabled).length} />
           <Metric label="Recent scans" value={history.length} />
+          <Metric label="Awaiting approval" value={pendingRemediation.length} tone={pendingRemediation.length ? 'medium' : undefined} />
         </section>
 
         {summary ? (
@@ -239,6 +308,46 @@ export default function CybersecurityCenterPage() {
             <Metric label="Low" value={summary.low} tone="low" />
           </section>
         ) : null}
+
+        {report && report.advisories.length > 0 ? (
+          <section className="mt-5 rounded-md border border-accent/40 bg-accent/10 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-text">Problems detected — do you want help fixing them?</h2>
+                <p className="mt-1 max-w-[760px] text-sm leading-relaxed text-text-muted">
+                  SignalBoost can prepare a remediation request for the detected findings. Nothing will be changed automatically. A human/admin must approve the request before any code change, pull request, or assisted fix is performed.
+                </p>
+              </div>
+              <button onClick={requestRemediation} disabled={remediationLoading} className="rounded-md border border-accent bg-accent px-4 py-2 text-sm font-semibold text-bg hover:brightness-110 disabled:opacity-60">
+                {remediationLoading ? 'Creating request…' : 'Request human-approved fix'}
+              </button>
+            </div>
+          </section>
+        ) : null}
+
+        <section className="mt-5 rounded-md border border-border bg-surface p-4">
+          <h2 className="mb-3 text-sm font-semibold text-text">Human approval queue</h2>
+          {remediationRequests.length === 0 ? <p className="text-sm text-text-muted">No remediation requests yet. After a report finds problems, users can request help here.</p> : (
+            <div className="flex flex-col gap-3">
+              {remediationRequests.slice(0, 20).map(r => (
+                <div key={r.id} className="rounded-md border border-border bg-bg p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`rounded-full border px-2 py-1 text-[11px] font-semibold ${statusClass[r.status] || statusClass.cancelled}`}>{r.status.replaceAll('_', ' ')}</span>
+                        <span className="text-sm font-semibold text-text">{r.title}</span>
+                      </div>
+                      <p className="mt-2 text-sm text-text-muted">{r.summary}</p>
+                      <p className="mt-1 text-xs text-text-muted/80">{r.repo || r.target || 'target unknown'} · {new Date(r.created_at).toLocaleString()}</p>
+                      <p className="mt-1 text-xs text-text-muted/80">Human approval required: {r.human_approval_required ? 'yes' : 'no'} · Approved: {r.human_approved ? 'yes' : 'no'}</p>
+                    </div>
+                    {r.status === 'awaiting_human_review' ? <div className="flex gap-2"><button onClick={() => updateRemediation(r.id, 'approved')} className="rounded-md border border-emerald-400/40 px-3 py-1.5 text-xs text-emerald-100 hover:bg-emerald-400/10">Approve</button><button onClick={() => updateRemediation(r.id, 'rejected')} className="rounded-md border border-border px-3 py-1.5 text-xs text-text-muted hover:text-text">Reject</button></div> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         <section className="mt-5 rounded-md border border-border bg-surface p-4">
           <h2 className="mb-3 text-sm font-semibold text-text">Alert inbox</h2>

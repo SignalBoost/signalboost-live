@@ -17,23 +17,32 @@ const RATE_WINDOW_MS = 60_000;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Resolve the caller's plan tier server-side (least-privilege on failure). Voice
-// synthesis is a paid feature, so free/demo are blocked below.
-async function resolveUserTier(
+// Resolve the caller's plan tier from the AUTHORITATIVE subscription state — a
+// `subscriptions` row in a currently-valid billing status — NOT the accounts
+// plan/tier column, which can be stale or updated non-atomically with billing.
+// Only `active` or `trialing` unlock this cost-bearing feature; `past_due`,
+// `cancelled`, an expired/absent trial, or no row at all resolve to
+// least-privilege "free" and therefore fail the paid gate below. Mirrors the
+// table/columns the marketing dashboard reads, narrowed to states that should
+// grant a paid feature (the dashboard also admits `past_due` for billing-repair
+// access; a cost-bearing endpoint must not).
+async function resolveActivePaidTier(
   supabase: Awaited<ReturnType<typeof createMarketingServerSupabase>>,
   userId: string,
 ): Promise<string> {
   if (!UUID_RE.test(userId)) return "free";
   try {
     const { data } = await supabase
-      .from("accounts")
-      .select("plan, tier")
-      .or(`user_id.eq.${userId},owner_id.eq.${userId}`)
+      .from("subscriptions")
+      .select("plan, status")
+      .eq("user_id", userId)
+      .in("status", ["active", "trialing"])
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    const row = (data ?? {}) as Record<string, unknown>;
-    return normalizeTier((row.plan ?? row.tier) as string | null | undefined);
+    if (!data) return "free"; // no valid active/trialing subscription → fail closed
+    const row = data as Record<string, unknown>;
+    return normalizeTier((row.plan ?? null) as string | null | undefined);
   } catch {
     return "free";
   }
@@ -79,15 +88,15 @@ export async function POST(req: Request) {
       );
     }
 
-    // Entitlement gate: voice synthesis is a paid feature. Fail CLOSED — only an
-    // explicit allowlist of active paid tiers may proceed. A denylist (block
-    // free/demo) would silently grant any tier value not on it, including any
-    // future normalized tier. NOTE: this gates on the plan/tier column only;
-    // when a cost-bearing provider is wired, also verify authoritative live
-    // subscription status (active vs canceled/past_due/trial) and record
-    // per-render quota usage atomically, failing closed if entitlement is missing.
+    // Entitlement gate: voice synthesis is a paid feature. Fail CLOSED against
+    // the authoritative subscription state — only an active/trialing subscription
+    // whose normalized plan is an explicit paid tier may proceed. A lapsed,
+    // past_due, cancelled, or missing subscription resolves to "free" and is
+    // rejected here. When a cost-bearing provider is wired, record per-render
+    // quota usage ATOMICALLY with this check and fail closed if it can't be
+    // recorded, so concurrent calls can't exceed entitlement.
     const PAID_TIERS = new Set(["launch", "growth", "command", "paid"]);
-    const tier = await resolveUserTier(supabase, user.id);
+    const tier = await resolveActivePaidTier(supabase, user.id);
     if (!PAID_TIERS.has(tier)) {
       return NextResponse.json(
         { success: false, error: "Voice synthesis requires a paid plan" },

@@ -282,6 +282,14 @@ export default function OutreachContactsPage() {
 
   const countByStatus = (status: string) => leads.filter((l) => (l.status || 'pending') === status).length
 
+  // Pagination flags hoisted out of the JSX. Keeping a `>=` comparison inline in
+  // a <button>'s attributes makes a naive tag-scanning lint read the first `>`
+  // as the tag close — so it never sees the onClick after it and reports a false
+  // "dead button". Hoisting also reads cleaner.
+  const atFirstPage = page === 0
+  const atLastPage = (page + 1) * pageSize >= visible.length
+  const hasMultiplePages = visible.length > pageSize
+
   return (
     <main style={{ color: 'var(--text-primary)' }}>
       <header className="sb-console" style={{ paddingBottom: 12 }}>
@@ -439,11 +447,11 @@ export default function OutreachContactsPage() {
         })}
       </section>
 
-      {visible.length > pageSize ? (
+      {hasMultiplePages ? (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 16, marginTop: 16, borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 12 }}>
-          <button type="button" className="sb-button-secondary" style={{ fontSize: 13, padding: '7px 16px', opacity: page === 0 ? .4 : 1 }} disabled={page === 0} onClick={() => setPage(page - 1)}>‹</button>
+          <button type="button" className="sb-button-secondary" style={{ fontSize: 13, padding: '7px 16px', opacity: atFirstPage ? .4 : 1 }} disabled={atFirstPage} onClick={() => setPage(page - 1)}>‹</button>
           <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 13, color: 'rgba(255,255,255,.7)' }}>{page + 1} / {Math.max(1, Math.ceil(visible.length / pageSize))}</span>
-          <button type="button" className="sb-button-secondary" style={{ fontSize: 13, padding: '7px 16px', opacity: (page + 1) * pageSize >= visible.length ? .4 : 1 }} disabled={(page + 1) * pageSize >= visible.length} onClick={() => setPage(page + 1)}>›</button>
+          <button type="button" className="sb-button-secondary" style={{ fontSize: 13, padding: '7px 16px', opacity: atLastPage ? .4 : 1 }} disabled={atLastPage} onClick={() => setPage(page + 1)}>›</button>
         </div>
       ) : null}
     </main>

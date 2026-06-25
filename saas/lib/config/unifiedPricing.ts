@@ -1,4 +1,4 @@
-// saas/lib/config/unifiedPricingConfig.ts
+// saas/lib/config/unifiedPricing.ts
 //
 // ARCHITECTURAL SINGLE SOURCE OF TRUTH for every commercial pricing lane.
 // All three product lines live here as separate, distinct entries inside one

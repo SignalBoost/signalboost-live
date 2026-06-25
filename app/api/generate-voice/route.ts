@@ -4,6 +4,8 @@ import { readJsonLimited } from "@/lib/http/readJsonLimited";
 import { rateLimited } from "@/lib/http/rateLimit";
 import { logSanitizedError } from "@/lib/http/logError";
 import { clientIpKey } from "@/lib/http/clientIp";
+import { sameOriginOk } from "@/lib/http/sameOrigin";
+import { normalizeTier } from "@/lib/video/subscription";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +14,30 @@ const MAX_TEXT = 5000;
 const RATE_MAX = 20;
 const RATE_WINDOW_MS = 60_000;
 
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Resolve the caller's plan tier server-side (least-privilege on failure). Voice
+// synthesis is a paid feature, so free/demo are blocked below.
+async function resolveUserTier(
+  supabase: Awaited<ReturnType<typeof createMarketingServerSupabase>>,
+  userId: string,
+): Promise<string> {
+  if (!UUID_RE.test(userId)) return "free";
+  try {
+    const { data } = await supabase
+      .from("accounts")
+      .select("plan, tier")
+      .or(`user_id.eq.${userId},owner_id.eq.${userId}`)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const row = (data ?? {}) as Record<string, unknown>;
+    return normalizeTier((row.plan ?? row.tier) as string | null | undefined);
+  } catch {
+    return "free";
+  }
+}
 
 export async function POST(req: Request) {
   try {
@@ -39,6 +65,26 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { success: false, error: "Too many requests" },
         { status: 429 }
+      );
+    }
+
+    // CSRF defense: reject cookie-authenticated POSTs that aren't same-origin.
+    if (!sameOriginOk(req)) {
+      return NextResponse.json(
+        { success: false, error: "Cross-origin request rejected" },
+        { status: 403 }
+      );
+    }
+
+    // Entitlement gate: voice synthesis is a paid feature. Block free/demo now
+    // so the gate is enforced before a cost-bearing provider is wired. When that
+    // provider is connected, record per-render credit/quota usage atomically and
+    // fail closed if quota/entitlement is missing.
+    const tier = await resolveUserTier(supabase, user.id);
+    if (tier === "free" || tier === "demo") {
+      return NextResponse.json(
+        { success: false, error: "Voice synthesis requires a paid plan" },
+        { status: 402 }
       );
     }
 

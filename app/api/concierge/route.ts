@@ -47,16 +47,29 @@ async function resolveEntitlements(
   try {
     const { data } = await supabase
       .from('subscriptions')
-      .select('plan, status')
+      .select('plan, status, current_period_ends_at')
       .eq('user_id', userId)
       .in('status', ['active', 'trialing'])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
     if (data) {
-      // normalizeTier() maps any unknown/mutated plan value down to 'free' — the
-      // same normalizer the export gate uses, so we can't over-report a tier.
-      tier = normalizeTier((data as Record<string, unknown>).plan as string | null | undefined)
+      const row = data as Record<string, unknown>
+      // Temporal validity guard: a row can be stuck at active/trialing past its
+      // period end if a Stripe cancel/expire webhook was missed or delayed.
+      // A non-null period end in the PAST => expired => stay 'free'. A NULL
+      // period end means "not yet stamped" — it's written on renewal, NOT on the
+      // initial checkout upsert — so it must NOT block a brand-new subscriber.
+      // (Stripe sets period_end = trial_end during a trial, so this also bounds
+      // trialing rows; there is no separate trial_end column.)
+      const periodEnd = row.current_period_ends_at as string | null | undefined
+      const parsedEnd = periodEnd ? Date.parse(periodEnd) : NaN
+      const expired = Number.isFinite(parsedEnd) && parsedEnd <= Date.now()
+      if (!expired) {
+        // normalizeTier() maps any unknown/mutated plan value down to 'free' — the
+        // same normalizer the export gate uses, so we can't over-report a tier.
+        tier = normalizeTier(row.plan as string | null | undefined)
+      }
     }
   } catch {
     tier = 'free'
@@ -100,8 +113,11 @@ async function resolveUsedMinutes(
   supabase: Awaited<ReturnType<typeof createMarketingServerSupabase>>,
   userId: string,
 ): Promise<number | null> {
-  // A malformed id maps to no account → genuinely 0 used (not "unknown").
-  if (!UUID_RE.test(userId)) return 0
+  // A malformed (non-UUID) id is "unknown" usage, not a verified 0. Returning
+  // null flags usageUnavailable downstream instead of presenting a false
+  // 0-used state (which would suppress a due overage warning) should non-UUID
+  // identities ever reach this path. UUID-shaped ids proceed to the real sum.
+  if (!UUID_RE.test(userId)) return null
   const PAGE = 1000
   const MAX_PAGES = 50 // 50k export rows/month ceiling — far beyond any real use
   try {

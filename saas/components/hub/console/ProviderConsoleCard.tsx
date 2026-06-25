@@ -98,7 +98,7 @@ export function ProviderConsoleCard({ provider, lang, onExpand, onRun, status, s
                     ? t('console.cui.not_available', 'Not available yet')
                     : needsKeys
                       ? keyHint
-                      : t('console.cui.coming_soon', 'Coming soon')
+                      : t('console.cui.coming_soon')
 
                 return (
                   <button 
@@ -166,7 +166,7 @@ export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onHome, o
 
       {!hasBackend && (
         <div style={{ fontSize: 11.5, fontWeight: 700, color: '#ffc300', background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 8, padding: '8px 12px' }}>
-          {t('console.cui.coming_soon_banner', '⏳ {name} actions are coming soon — this is a preview of what will be available.').replace('{name}', provider.name)}
+          {t('console.cui.coming_soon_banner').replace('{name}', provider.name)}
         </div>
       )}
 
@@ -201,7 +201,7 @@ export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onHome, o
                     ? t('console.cui.not_available', 'Not available yet')
                     : needsKeys
                       ? keyHint
-                      : t('console.cui.coming_soon', 'Coming soon')
+                      : t('console.cui.coming_soon')
 
                 return (
                   <div 

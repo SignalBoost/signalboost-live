@@ -3,6 +3,7 @@ import { createMarketingServerSupabase } from "@/lib/auth/supabaseServer";
 import { readJsonLimited } from "@/lib/http/readJsonLimited";
 import { rateLimited } from "@/lib/http/rateLimit";
 import { logSanitizedError } from "@/lib/http/logError";
+import { clientIpKey } from "@/lib/http/clientIp";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,15 @@ export async function POST(req: Request) {
   try {
     // Require an authenticated user. This route is cost-bearing once wired to a
     // synthesis provider, so it must never be publicly callable.
+    // Pre-auth IP rate limit so unauthenticated floods can't repeatedly invoke
+    // Supabase auth before the per-user limit (below) ever applies.
+    if (await rateLimited(`voice-ip:${clientIpKey(req)}`, { max: 60, windowMs: RATE_WINDOW_MS })) {
+      return NextResponse.json(
+        { success: false, error: "Too many requests" },
+        { status: 429 }
+      );
+    }
+
     const supabase = await createMarketingServerSupabase();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {

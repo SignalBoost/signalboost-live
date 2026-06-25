@@ -193,9 +193,9 @@ export default function LaunchpadPage() {
               {c(COPY.continue, l)}
             </Link>
           ) : (
-            <button disabled style={{ padding: '13px 28px', borderRadius: 999, background: 'rgba(255,255,255,.07)', color: 'rgba(255,255,255,.3)', fontWeight: 900, border: 'none', cursor: 'not-allowed', fontSize: 14 }}>
+            <span aria-disabled="true" style={{ display: 'inline-block', padding: '13px 28px', borderRadius: 999, background: 'rgba(255,255,255,.07)', color: 'rgba(255,255,255,.3)', fontWeight: 900, border: 'none', cursor: 'not-allowed', fontSize: 14 }}>
               {c(COPY.choosePath, l)}
-            </button>
+            </span>
           )}
         </div>
       )}

@@ -1,9 +1,8 @@
 'use client'
 
 // saas/app/hub/audit/page.tsx
-// Audit Center landing — indexes the five readiness reports. Pure navigation,
-// no data fetch. Every label resolves through t('audit.center.*'); links point
-// at the live report pages under /hub/audit/*.
+// Audit Center landing — indexes readiness reports and links to the separate
+// Cybersecurity Center for live technical monitoring.
 
 import type { CSSProperties } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
@@ -17,9 +16,10 @@ const glass: CSSProperties = {
   backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
 }
 
-type ReportCard = { key: string; href: string; accent: string }
+type ReportCard = { key: string; href: string; accent: string; title?: string; desc?: string }
 
 const REPORTS: ReportCard[] = [
+  { key: 'cybersecurity', href: '/dashboard/cybersecurity', accent: CYAN, title: 'Cybersecurity Center', desc: 'Dependency advisory monitoring and technical cybersecurity checks separate from audit readiness reports.' },
   { key: 'executive',   href: '/hub/audit/executive',   accent: GOLD },
   { key: 'identity',    href: '/hub/audit/identity',    accent: CYAN },
   { key: 'providers',   href: '/hub/audit/providers',   accent: GOLD },
@@ -61,10 +61,10 @@ export default function AuditCenterPage() {
             }}
           >
             <div style={{ fontSize: 15, fontWeight: 700 }}>
-              {t(`audit.center.${r.key}.title`, r.key)}
+              {t(`audit.center.${r.key}.title`, r.title || r.key)}
             </div>
             <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.66)', lineHeight: 1.5, flex: 1 }}>
-              {t(`audit.center.${r.key}.desc`, '')}
+              {t(`audit.center.${r.key}.desc`, r.desc || '')}
             </div>
             <div style={{ fontSize: 12, fontWeight: 700, color: r.accent, marginTop: 4 }}>
               {t('audit.center.open', 'Open report')} →

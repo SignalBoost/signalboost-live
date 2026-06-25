@@ -132,6 +132,11 @@ async function resolveUsedMinutes(
 // POST (fan-out / avoidable DB load). With it, usage is recomputed at most once
 // per user per window regardless of request rate.
 const USAGE_TTL_MS = 60_000
+// Hard cap on distinct cached users per instance. Combined with LRU eviction
+// below this bounds memory regardless of how many distinct accounts call in a
+// window — the previous cleanup only ran when oversized AND only deleted
+// already-expired entries, so a large live set could still grow unbounded.
+const USAGE_CACHE_MAX = 5000
 const usageCache = new Map<string, { value: number | null; expires: number }>()
 
 async function resolveUsedMinutesCached(
@@ -140,16 +145,39 @@ async function resolveUsedMinutesCached(
 ): Promise<number | null> {
   const now = Date.now()
   const hit = usageCache.get(userId)
-  if (hit && hit.expires > now) return hit.value
+  if (hit && hit.expires > now) {
+    // Touch: re-insert to mark most-recently-used (Map keeps insertion order).
+    usageCache.delete(userId)
+    usageCache.set(userId, hit)
+    return hit.value
+  }
+  if (hit) usageCache.delete(userId) // stale
   const value = await resolveUsedMinutes(supabase, userId)
   usageCache.set(userId, { value, expires: now + USAGE_TTL_MS })
-  if (usageCache.size > 5000) {
-    for (const [k, v] of usageCache) if (v.expires <= now) usageCache.delete(k)
+  if (usageCache.size > USAGE_CACHE_MAX) {
+    // Purge expired first (cheap), then evict oldest until under the hard cap.
+    for (const [k, v] of usageCache) {
+      if (v.expires <= now) usageCache.delete(k)
+    }
+    while (usageCache.size > USAGE_CACHE_MAX) {
+      const oldest = usageCache.keys().next().value
+      if (oldest === undefined) break
+      usageCache.delete(oldest)
+    }
   }
   return value
 }
 
 export async function POST(req: Request) {
+  // CSRF defense FIRST: reject cookie-authenticated POSTs that aren't
+  // same-origin before any auth lookup or per-user rate-limit mutation. A
+  // cross-origin browser request carries the victim's cookies, so if this ran
+  // after the per-user limiter it would let an attacker page burn the victim's
+  // concierge quota (CSRF-driven DoS) before the request was rejected.
+  if (!sameOriginOk(req)) {
+    return NextResponse.json({ error: 'Cross-origin request rejected' }, { status: 403 })
+  }
+
   const supabase = await createMarketingServerSupabase()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -158,11 +186,6 @@ export async function POST(req: Request) {
 
   if (await rateLimited(`concierge:${user.id}`, { max: RATE_MAX, windowMs: RATE_WINDOW_MS })) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
-  }
-
-  // CSRF defense: reject cookie-authenticated POSTs that aren't same-origin.
-  if (!sameOriginOk(req)) {
-    return NextResponse.json({ error: 'Cross-origin request rejected' }, { status: 403 })
   }
 
   // Hardened read: exact JSON media type + a hard byte ceiling enforced while

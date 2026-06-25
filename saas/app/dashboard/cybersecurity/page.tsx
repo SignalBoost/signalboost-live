@@ -252,7 +252,7 @@ export default function CybersecurityCenterPage() {
             <div className="mb-2 inline-flex rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-accent">Cybersecurity Center</div>
             <h1 className="text-2xl font-semibold tracking-tight text-text">Dependency Advisory Monitoring</h1>
             <p className="mt-1.5 max-w-[760px] text-sm leading-relaxed text-text-muted">
-              Run scans, monitor repositories, request remediation, and require human approval before SignalBoost performs any fix.
+              Run scans, monitor repositories, review detected issues, and require human approval before SignalBoost performs any fix.
             </p>
           </div>
           <a href="/dashboard/audit" className="rounded-md border border-border bg-surface px-4 py-2 text-sm text-text-muted hover:text-text">Audit Center</a>
@@ -309,13 +309,15 @@ export default function CybersecurityCenterPage() {
           </section>
         ) : null}
 
+        {report && report.advisories.length > 0 ? <IssueReviewReport report={report} /> : null}
+
         {report && report.advisories.length > 0 ? (
           <section className="mt-5 rounded-md border border-accent/40 bg-accent/10 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="text-sm font-semibold text-text">Problems detected — do you want help fixing them?</h2>
+                <h2 className="text-sm font-semibold text-text">Would you like SignalBoost to prepare a fix request?</h2>
                 <p className="mt-1 max-w-[760px] text-sm leading-relaxed text-text-muted">
-                  SignalBoost can prepare a remediation request for the detected findings. Nothing will be changed automatically. A human/admin must approve the request before any code change, pull request, or assisted fix is performed.
+                  This comes after the issue review above. Nothing will be changed automatically. A human/admin must approve the request before any code change, pull request, or assisted fix is performed.
                 </p>
               </div>
               <button onClick={requestRemediation} disabled={remediationLoading} className="rounded-md border border-accent bg-accent px-4 py-2 text-sm font-semibold text-bg hover:brightness-110 disabled:opacity-60">
@@ -389,7 +391,7 @@ export default function CybersecurityCenterPage() {
         {report ? (
           <section className="mt-5 rounded-md border border-border bg-surface p-4">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div><h2 className="text-sm font-semibold text-text">Latest manual scan result</h2><p className="text-xs text-text-muted">{report.repo || report.target} · {report.branch || 'default branch'} · {new Date(report.generatedAt).toLocaleString()}</p></div>
+              <div><h2 className="text-sm font-semibold text-text">Technical advisory table</h2><p className="text-xs text-text-muted">{report.repo || report.target} · {report.branch || 'default branch'} · {new Date(report.generatedAt).toLocaleString()}</p></div>
             </div>
             {report.advisories.length === 0 ? <div className="rounded-md border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-100">No dependency advisories found for exact versions collected in this run.</div> : (
               <div className="overflow-x-auto"><table className="w-full border-collapse text-left text-sm"><thead className="text-xs uppercase tracking-wider text-text-muted"><tr><th className="border-b border-border p-3">Severity</th><th className="border-b border-border p-3">Package</th><th className="border-b border-border p-3">Advisory</th><th className="border-b border-border p-3">Source</th></tr></thead><tbody>{report.advisories.map(a => <tr key={`${a.id}:${a.packageName}:${a.version}`} className="border-b border-border/70"><td className="p-3"><span className={`rounded-full border px-2 py-1 text-[11px] font-semibold ${sevClass[a.severity] || sevClass.unknown}`}>{a.severity}</span></td><td className="p-3 text-text"><div className="font-semibold">{a.packageName}</div><div className="text-xs text-text-muted">{a.version}</div></td><td className="p-3 text-text-muted"><div className="font-semibold text-text">{a.id}</div><div>{a.summary}</div>{a.detailsUrl ? <a className="mt-1 inline-block text-accent" href={a.detailsUrl} target="_blank" rel="noreferrer">Details →</a> : null}</td><td className="p-3 text-xs text-text-muted">{a.sourceFile}</td></tr>)}</tbody></table></div>
@@ -404,6 +406,76 @@ export default function CybersecurityCenterPage() {
       </div>
     </main>
   )
+}
+
+function IssueReviewReport({ report }: { report: Report }) {
+  return (
+    <section className="mt-5 rounded-md border border-border bg-surface p-4">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="mb-2 inline-flex rounded-full border border-accent/35 bg-accent/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-accent">Issue review report</div>
+          <h2 className="text-base font-semibold text-text">Review of detected dependency issue{report.advisories.length === 1 ? '' : 's'}</h2>
+          <p className="mt-1 max-w-[820px] text-sm leading-relaxed text-text-muted">
+            SignalBoost reviewed the scan result before offering help. This report explains what was detected, where it was found, why it matters, and the recommended next step. No fix has been requested or approved yet.
+          </p>
+        </div>
+        <div className="rounded-md border border-border bg-bg px-3 py-2 text-xs text-text-muted">
+          <div>{report.repo || report.target}</div>
+          <div>{report.branch || 'default branch'} · {new Date(report.generatedAt).toLocaleString()}</div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <ReviewMetric label="Issues found" value={report.advisories.length} />
+        <ReviewMetric label="Affected packages" value={new Set(report.advisories.map(a => a.packageName)).size} />
+        <ReviewMetric label="Files referenced" value={new Set(report.advisories.map(a => a.sourceFile)).size} />
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3">
+        {report.advisories.map((a, index) => (
+          <div key={`${a.id}:${a.packageName}:${a.version}:${index}`} className="rounded-md border border-border bg-bg p-4">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span className={`rounded-full border px-2 py-1 text-[11px] font-semibold ${sevClass[a.severity] || sevClass.unknown}`}>{a.severity}</span>
+              <span className="text-sm font-semibold text-text">Issue {index + 1}: {a.packageName}@{a.version}</span>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <ReviewItem label="What was found" value={`The package ${a.packageName} at version ${a.version} matched dependency advisory ${a.id}.`} />
+              <ReviewItem label="Where it was found" value={a.sourceFile || 'Source file not provided by scanner.'} />
+              <ReviewItem label="Why it matters" value={issueExplanation(a)} />
+              <ReviewItem label="Recommended next step" value={recommendedAction(a)} />
+            </div>
+            <div className="mt-3 rounded-md border border-border/70 bg-surface p-3 text-sm text-text-muted">
+              <span className="font-semibold text-text">Advisory summary: </span>{a.summary || 'No advisory summary was returned by the source.'}
+              {a.detailsUrl ? <a className="ml-2 text-accent" href={a.detailsUrl} target="_blank" rel="noreferrer">Open advisory →</a> : null}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function issueExplanation(a: Advisory) {
+  if (a.severity === 'critical') return 'This is categorized as critical. It should be reviewed immediately because vulnerable dependency versions can create serious security exposure when they are reachable in production code.'
+  if (a.severity === 'high') return 'This is categorized as high severity. It should be prioritized for remediation and tested carefully before deployment.'
+  if (a.severity === 'medium') return 'This is categorized as medium severity. It should be planned for remediation after confirming whether the affected package is used in a reachable part of the application.'
+  if (a.severity === 'low') return 'This is categorized as low severity. It should be tracked and remediated during normal maintenance unless the package is exposed in a sensitive path.'
+  return 'The advisory source did not provide a clear severity classification. A human should review the advisory details before deciding whether a dependency update is necessary.'
+}
+
+function recommendedAction(a: Advisory) {
+  if (a.severity === 'critical' || a.severity === 'high') return 'Prepare a dependency update plan, test the application, and require human approval before opening or merging any fix.'
+  if (a.severity === 'medium') return 'Review available patched versions, create a safe update plan, and test before deployment.'
+  if (a.severity === 'low') return 'Track the issue and include the dependency update in the next maintenance cycle.'
+  return 'Review the advisory manually, confirm the safe patched version, and only then decide whether SignalBoost should prepare a fix request.'
+}
+
+function ReviewMetric({ label, value }: { label: string; value: number }) {
+  return <div className="rounded-md border border-border bg-bg p-3"><div className="text-[10px] uppercase tracking-wider text-text-muted">{label}</div><div className="mt-1 text-xl font-semibold text-text">{value}</div></div>
+}
+
+function ReviewItem({ label, value }: { label: string; value: string }) {
+  return <div><div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">{label}</div><p className="mt-1 text-sm leading-relaxed text-text-muted">{value}</p></div>
 }
 
 function Metric({ label, value, tone }: { label: string; value: number; tone?: string }) {

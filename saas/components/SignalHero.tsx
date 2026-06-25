@@ -11,12 +11,13 @@ const LANGS = [
   { code: 'ru', name: 'Русский', flag: '🇷🇺' },
 ]
 
-const AUDIT_SIGNALS = [
-  { name: 'GitHub', flag: '🐙' },
-  { name: 'Vercel', flag: '▲' },
-  { name: 'Supabase', flag: '🗄️' },
-  { name: 'Stripe', flag: '💳' },
-  { name: 'Secrets', flag: '🔑' },
+const PLATFORM_SIGNALS = [
+  { name: 'Cybersecurity', flag: '🛡️' },
+  { name: 'Web design', flag: '🌐' },
+  { name: 'Reviews', flag: '⭐' },
+  { name: 'Video', flag: '🎬' },
+  { name: 'Podcast', flag: '🎙️' },
+  { name: 'Outreach', flag: '📡' },
 ]
 
 const POSITIONS = [
@@ -25,11 +26,12 @@ const POSITIONS = [
   { tx: 170, ty: -80 },
   { tx: -170, ty: -80 },
   { tx: 60, ty: -200 },
+  { tx: 0, ty: -105 },
 ]
 
 type Tag = {
   id: number
-  lang: typeof AUDIT_SIGNALS[0]
+  lang: typeof PLATFORM_SIGNALS[0]
   pos: typeof POSITIONS[0]
 }
 
@@ -51,31 +53,32 @@ export default function SignalHero() {
   // ---- text with English fallbacks ----
   const hero = dict?.hero ?? {}
 
-  const badge = hero.badge ?? 'SaaS Audit · Cybersecurity · PR Cockpit'
+  const badge = hero.badge ?? 'Cybersecurity · Web Design · Growth Platform'
   const subhead =
     hero.subhead ??
-    'Audit your SaaS stack, find security and configuration risks, generate clear reports, and approve fixes safely before anything touches production.'
-  const ctaPrimary = hero.ctaPrimary ?? 'Run SaaS audit'
-  const ctaSecondary = hero.ctaSecondary ?? 'View reports'
+    'SignalBoost audits cybersecurity posture, builds professional websites, collects reviews, produces video and podcast content, runs outreach, and lets owners approve fixes through the PR Cockpit.'
+  const ctaPrimary = hero.ctaPrimary ?? 'Run cyber audit'
+  const ctaSecondary = hero.ctaSecondary ?? 'View platform plans'
   const tagHint =
-    hero.tagHint ?? 'Click a provider signal to see what SignalBoost audits'
+    hero.tagHint ?? 'Click a signal to explore cybersecurity, web design, content, and growth tools'
   const scrollLabel = hero.scroll ?? 'Scroll'
 
   const features = [
-    { icon: '🛡️', label: hero?.features?.audit ?? 'SaaS audit' },
-    { icon: '🔑', label: hero?.features?.secrets ?? 'Secrets review' },
-    { icon: '🧭', label: hero?.features?.providers ?? 'Provider inventory' },
+    { icon: '🛡️', label: hero?.features?.cybersecurity ?? 'Cybersecurity' },
+    { icon: '🌐', label: hero?.features?.website ?? 'Website design' },
+    { icon: '⭐', label: hero?.features?.reviews ?? 'Reviews' },
+    { icon: '🎬', label: hero?.features?.content ?? 'Video & podcast' },
     { icon: '✅', label: hero?.features?.approvals ?? 'PR approvals' },
   ]
 
   // ---- region-aware headlines: current language first, then the rest ----
   const headlines: string[] = useMemo(() => {
     const fallback = [
-      'Audit and secure your SaaS platform',
-      'Audite e proteja sua plataforma SaaS',
-      'Audita y protege tu plataforma SaaS',
-      'Audytuj i zabezpieczaj swoją platformę SaaS',
-      'Проверяйте и защищайте вашу SaaS-платформу',
+      'Cybersecurity, web design, and growth tools',
+      'Cibersegurança, sites e crescimento',
+      'Ciberseguridad, sitios web y crecimiento',
+      'Cyberbezpieczeństwo, strony WWW i rozwój',
+      'Кибербезопасность, сайты и рост',
     ]
     const list: string[] =
       Array.isArray(hero.headlines) && hero.headlines.length > 0
@@ -113,13 +116,13 @@ export default function SignalHero() {
   // ---- ticker items (static now, feed-ready later) ----
   const tickerItems: string[] = useMemo(() => {
     const fallback = [
-      'Provider inventory · GitHub / Vercel / Supabase',
-      'Secrets reviewed · masked evidence only',
-      'Critical finding · exposed API route',
-      'PR Cockpit · approval before production',
-      'Executive report · security score ready',
-      'Remediation roadmap · owner assigned',
-      'Audit trail · every action recorded',
+      'Audit & Cybersecurity · repository checks and security posture',
+      'Cybersecurity readiness · provider and dependency review',
+      'Website Platform · web design, optimization, reviews, and assistant',
+      'Video Studio · captions, exports, brand styling, and campaigns',
+      'Podcast Suite · launch, optimize, voiceover, clips, and distribution',
+      'Outreach · discovery, contacts, campaigns, and sales pipeline',
+      'PR Cockpit · approve fixes before production changes',
     ]
     return Array.isArray(hero.ticker) && hero.ticker.length > 0
       ? hero.ticker
@@ -133,7 +136,7 @@ export default function SignalHero() {
   )
 
   const spawnTag = useCallback(() => {
-    const signalItem = AUDIT_SIGNALS[langRef.current % AUDIT_SIGNALS.length]
+    const signalItem = PLATFORM_SIGNALS[langRef.current % PLATFORM_SIGNALS.length]
     const pos = POSITIONS[posRef.current % POSITIONS.length]
 
     langRef.current++
@@ -162,9 +165,7 @@ export default function SignalHero() {
   }
 
   const handleSecondary = () => {
-    if (typeof window !== 'undefined') {
-      window.scrollTo({ top: Math.round(window.innerHeight * 0.9), behavior: 'smooth' })
-    }
+    window.location.href = '/pricing'
   }
 
   return (
@@ -286,7 +287,7 @@ export default function SignalHero() {
             color: 'rgba(255,255,255,0.4)',
             fontSize: 16,
             lineHeight: 1.7,
-            maxWidth: 340,
+            maxWidth: 380,
             margin: 0,
           }}
         >
@@ -382,7 +383,7 @@ export default function SignalHero() {
             </p>
           ) : (
             selected.map(name => {
-              const l = AUDIT_SIGNALS.find(x => x.name === name) ?? { name, flag: '•' }
+              const l = PLATFORM_SIGNALS.find(x => x.name === name) ?? { name, flag: '•' }
 
               return (
                 <div

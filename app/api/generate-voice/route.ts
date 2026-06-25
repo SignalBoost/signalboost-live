@@ -34,7 +34,7 @@ async function resolveActivePaidTier(
   try {
     const { data } = await supabase
       .from("subscriptions")
-      .select("plan, status")
+      .select("plan, status, current_period_ends_at")
       .eq("user_id", userId)
       .in("status", ["active", "trialing"])
       .order("created_at", { ascending: false })
@@ -42,6 +42,15 @@ async function resolveActivePaidTier(
       .maybeSingle();
     if (!data) return "free"; // no valid active/trialing subscription → fail closed
     const row = data as Record<string, unknown>;
+    // Temporal validity: a row can be stuck at active/trialing past its period
+    // end if a Stripe cancel/expire webhook was missed or delayed. A non-null
+    // period end in the PAST => expired => fail closed. A NULL period end means
+    // "not yet stamped" — written on renewal, NOT on the initial checkout upsert
+    // — so it must NOT block a brand-new active subscriber. (Stripe sets
+    // period_end = trial_end during a trial, so this also bounds trialing rows.)
+    const periodEnd = row.current_period_ends_at as string | null | undefined;
+    const parsedEnd = periodEnd ? Date.parse(periodEnd) : NaN;
+    if (Number.isFinite(parsedEnd) && parsedEnd <= Date.now()) return "free";
     return normalizeTier((row.plan ?? null) as string | null | undefined);
   } catch {
     return "free";

@@ -13,6 +13,7 @@
 import { NextResponse } from 'next/server'
 import { createMarketingServerSupabase } from '@/lib/auth/supabaseServer'
 import { readJsonLimited } from '@/lib/http/readJsonLimited'
+import { sameOriginOk } from '@/lib/http/sameOrigin'
 
 const MAX_PROFILE_BYTES = 100_000
 const MAX_PROFILE_KEYS = 200
@@ -21,50 +22,6 @@ const MAX_PROFILE_NODES = 5000
 
 const NO_STORE = { 'Cache-Control': 'no-store, private' } as const
 
-// Canonical ORIGINS this API trusts for state-changing requests. Configure via
-// APP_ALLOWED_ORIGINS (comma-separated) in Vercel; falls back to the known
-// production marketing domains. Stored as full origins (scheme + host + port)
-// so the scheme is part of the comparison — http and https are distinct.
-const CANONICAL_ORIGINS = (
-  process.env.APP_ALLOWED_ORIGINS ||
-  'https://signalboostapp.com,https://www.signalboostapp.com'
-)
-  .split(',')
-  .map((entry) => {
-    try {
-      return new URL(entry.trim()).origin.toLowerCase()
-    } catch {
-      return ''
-    }
-  })
-  .filter(Boolean)
-
-function sameOriginOk(req: Request): boolean {
-  const candidate = req.headers.get('origin') || req.headers.get('referer')
-  if (!candidate) return false // state-changing browser fetches always send Origin
-
-  let candidateOrigin: string
-  try {
-    candidateOrigin = new URL(candidate).origin.toLowerCase()
-  } catch {
-    return false
-  }
-
-  // 1) Primary check: candidate origin (scheme + host + port) must match a
-  //    configured canonical origin exactly.
-  if (CANONICAL_ORIGINS.includes(candidateOrigin)) return true
-
-  // 2) Narrow fallback for Vercel preview deployments only, where Origin and
-  //    Host legitimately match a platform-controlled *.vercel.app host over
-  //    https. This is not "trust the Host header" — it is gated to a single
-  //    trusted suffix and an https scheme.
-  const reqHost = (req.headers.get('host') || '').toLowerCase()
-  if (reqHost.endsWith('.vercel.app') && candidateOrigin === `https://${reqHost}`) {
-    return true
-  }
-
-  return false
-}
 
 // Iterative (non-recursive) structural bound check. Rejects payloads that exceed
 // a maximum nesting depth or total node count BEFORE any JSON.stringify, so a

@@ -2,7 +2,6 @@
 import { useCallback, useState, useEffect, useRef, useMemo } from 'react'
 import SignalCanvas from './SignalCanvas'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { t } from '@/lib/i18n/t'
 
 const LANGS = [
   { code: 'en', name: 'English', flag: '🇺🇸' },
@@ -44,12 +43,10 @@ export default function SignalHero() {
   // ---- text with English fallbacks ----
   const hero = dict?.hero ?? {}
 
-  const badge = t(dict, 'home.hero.marquee', 'Audit · Build · Review · Broadcast')
-  const subhead = t(
-    dict,
-    'home.hero.subtitle',
-    'SignalBoost continuously audits your repositories and infrastructure, traces vulnerabilities to their source, and maps your posture to SOC 2, ISO 27001, NIST, and CIS — automatically.'
-  )
+  const badge = hero.badge ?? 'Build · Review · Broadcast'
+  const subhead =
+    hero.subhead ??
+    'Create your website, collect customer reviews, and produce native audio & video content — in your language, not a translation.'
   const ctaPrimary = hero.ctaPrimary ?? 'Get started'
   const ctaSecondary = hero.ctaSecondary ?? 'Watch a demo'
   const tagHint =
@@ -57,7 +54,6 @@ export default function SignalHero() {
   const scrollLabel = hero.scroll ?? 'Scroll'
 
   const features = [
-    { icon: '🛡️', label: t(dict, 'home.features.audit', 'Repository audits') },
     { icon: '🌐', label: hero?.features?.site ?? 'Site builder' },
     { icon: '⭐', label: hero?.features?.reviews ?? 'Review collector' },
     { icon: '🎙️', label: hero?.features?.audio ?? 'Native audio' },
@@ -67,7 +63,11 @@ export default function SignalHero() {
   // ---- region-aware headlines: current language first, then the rest ----
   const headlines: string[] = useMemo(() => {
     const fallback = [
-      t(dict, 'home.hero.title', 'Audit every repo. Trace every vulnerability. Map every control.'),
+      'Build your brand in English',
+      'Construa sua marca em Português',
+      'Construye tu marca en Español',
+      'Twórz swoją markę po Polsku',
+      'Создайте свой бренд на Русском',
     ]
     const list: string[] =
       Array.isArray(hero.headlines) && hero.headlines.length > 0

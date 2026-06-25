@@ -109,8 +109,10 @@ export async function GET(req: Request) {
     const snapshot = await getReportSnapshot(getAdminSupabase())
     const payload = buildPayload(report, snapshot)
     const pdf = createSimplePdf(buildPdfDoc(report, payload))
+    const pdfBody = new Uint8Array(pdf.length)
+    pdfBody.set(pdf)
     const filename = `${report}-${new Date().toISOString().slice(0, 10)}.pdf`
-    return new Response(pdf, {
+    return new Response(pdfBody, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',

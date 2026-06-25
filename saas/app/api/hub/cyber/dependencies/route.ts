@@ -44,13 +44,35 @@ async function storeScan(report: any, userId: string | null): Promise<StoredScan
   }
 }
 
+async function insertAlert(admin: any, row: Record<string, unknown>): Promise<boolean> {
+  try {
+    // Manual scans may not have a monitor_id. In that case every scan is allowed
+    // to create its own alert row; monitored scans dedupe open alerts per monitor.
+    if (row.monitor_id) {
+      const dup = await admin.from('cyber_alerts')
+        .select('id')
+        .eq('monitor_id', row.monitor_id)
+        .eq('advisory_id', row.advisory_id)
+        .eq('package_name', row.package_name)
+        .eq('package_version', row.package_version)
+        .eq('status', 'open')
+        .limit(1)
+        .maybeSingle()
+      if (dup?.data?.id) return false
+    }
+    const { error } = await admin.from('cyber_alerts').insert(row)
+    return !error
+  } catch { return false }
+}
+
 async function createAlertsForReport(opts: { report: any; userId: string | null; monitorId?: string | null; scanId?: string | null }) {
   const advisories = Array.isArray(opts.report?.advisories) ? opts.report.advisories : []
-  const urgent = advisories.filter((a: any) => a?.severity === 'critical' || a?.severity === 'high')
+  const urgent = advisories.filter((a: any) => a?.severity === 'critical' || a?.severity === 'high').slice(0, 50)
   if (urgent.length === 0) return 0
-  try {
-    const admin = getAdminSupabase()
-    const rows = urgent.slice(0, 50).map((a: any) => ({
+  const admin = getAdminSupabase()
+  let created = 0
+  for (const a of urgent) {
+    const ok = await insertAlert(admin, {
       user_id: opts.userId,
       monitor_id: opts.monitorId || null,
       scan_id: opts.scanId || null,
@@ -63,13 +85,10 @@ async function createAlertsForReport(opts: { report: any; userId: string | null;
       message: a.summary || 'Dependency advisory found.',
       details_url: a.detailsUrl || null,
       status: 'open',
-    }))
-    const { error } = await admin.from('cyber_alerts').upsert(rows, { onConflict: 'monitor_id,advisory_id,package_name,package_version', ignoreDuplicates: true })
-    if (error) return 0
-    return rows.length
-  } catch {
-    return 0
+    })
+    if (ok) created++
   }
+  return created
 }
 
 async function loadDashboardData() {

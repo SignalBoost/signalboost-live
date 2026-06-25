@@ -98,6 +98,33 @@ async function createAlerts(admin: any, opts: { monitor: Monitor; report: any; s
   return created
 }
 
+async function sendAlertEmail(opts: { repo: string; critical: number; high: number; alertsCreated: number }) {
+  const to = process.env.CYBER_ALERT_EMAIL || process.env.ADMIN_ALERT_EMAIL
+  const key = process.env.RESEND_API_KEY
+  if (!to || !key || opts.alertsCreated <= 0) return
+  const from = process.env.RESEND_FROM_EMAIL || 'SignalBoost Alerts <alerts@signalboostapp.com>'
+  try {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from,
+        to,
+        subject: `SignalBoost cybersecurity alert: ${opts.repo}`,
+        text: [
+          `SignalBoost found new cybersecurity dependency advisories for ${opts.repo}.`,
+          '',
+          `New alerts: ${opts.alertsCreated}`,
+          `Critical: ${opts.critical}`,
+          `High: ${opts.high}`,
+          '',
+          'Open the Cybersecurity Center to review and resolve the alerts.',
+        ].join('\n'),
+      }),
+    })
+  } catch { /* email alert is best-effort */ }
+}
+
 export async function GET(req: Request) {
   if (!authorized(req)) {
     return NextResponse.json({ ok: false, error: 'Unauthorized cron request.' }, { status: 401 })
@@ -132,6 +159,8 @@ export async function GET(req: Request) {
         last_high: report.summary?.high || 0,
         updated_at: new Date().toISOString(),
       }).eq('id', monitor.id)
+
+      await sendAlertEmail({ repo: report.repo || monitor.repo_url, critical: report.summary?.critical || 0, high: report.summary?.high || 0, alertsCreated })
 
       results.push({ monitorId: monitor.id, ok: report.ok, scanId, alertsCreated, summary: report.summary, error: report.error })
     }

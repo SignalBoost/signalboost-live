@@ -6,9 +6,9 @@ export const dynamic = 'force-dynamic'
 
 // Maps our plan labels to the Stripe price env vars.
 const WEBSITE_PRICES: Record<string, string | undefined> = {
-  starter:  process.env.STRIPE_PRICE_WEBSITE_STARTER,
-  pro:      process.env.STRIPE_PRICE_WEBSITE_PRO,
-  business: process.env.STRIPE_PRICE_WEBSITE_BUSINESS,
+  starter:  process.env.STRIPE_PRICE_WEBSITE_LAUNCH  ?? process.env.STRIPE_PRICE_WEBSITE_STARTER,
+  pro:      process.env.STRIPE_PRICE_WEBSITE_GROWTH  ?? process.env.STRIPE_PRICE_WEBSITE_PRO,
+  business: process.env.STRIPE_PRICE_WEBSITE_COMMAND ?? process.env.STRIPE_PRICE_WEBSITE_BUSINESS,
 }
 const PODCAST_PRICES: Record<string, string | undefined> = {
   indie:   process.env.STRIPE_PRICE_PODCAST_INDIE,

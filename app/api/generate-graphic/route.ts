@@ -4,6 +4,7 @@ import { readJsonLimited } from "@/lib/http/readJsonLimited";
 import { rateLimited } from "@/lib/http/rateLimit";
 import { logSanitizedError } from "@/lib/http/logError";
 import { clientIpKey } from "@/lib/http/clientIp";
+import { sameOriginOk } from "@/lib/http/sameOrigin";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,14 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
         { status: 401 }
+      );
+    }
+
+    // CSRF defense: reject cookie-authenticated POSTs that aren't same-origin.
+    if (!sameOriginOk(req)) {
+      return NextResponse.json(
+        { success: false, error: "Cross-origin request rejected" },
+        { status: 403 }
       );
     }
 

@@ -1,7 +1,8 @@
 'use client'
-import { useCallback, useState, useEffect, useRef, useMemo } from 'react'
+import { useCallback, useState, useRef, useMemo } from 'react'
 import SignalCanvas from './SignalCanvas'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { t } from '@/lib/i18n/t'
 
 const LANGS = [
   { code: 'en', name: 'English', flag: '🇺🇸' },
@@ -25,93 +26,56 @@ type Tag = {
   pos: typeof POSITIONS[0]
 }
 
-const HEADLINE_INTERVAL = 7000
 const TICKER_DURATION = 40 // seconds for one full loop
 
 export default function SignalHero() {
-  const { dict, lang } = useI18n() as { dict: any; lang?: string }
+  const { dict } = useI18n() as { dict: any }
 
   const [selected, setSelected] = useState<string[]>([])
   const [tags, setTags] = useState<Tag[]>([])
-  const [headlineIndex, setHeadlineIndex] = useState(0)
   const [paused, setPaused] = useState(false)
 
   const langRef = useRef(0)
   const posRef = useRef(0)
   const idRef = useRef(0)
 
-  // ---- text with English fallbacks ----
-  const hero = dict?.hero ?? {}
+  // ---- localized hero copy (security / auditing pivot) ----
+  const heroTitle = t(
+    dict,
+    'home.hero.title',
+    'Audit every repo. Trace every vulnerability. Map every control.'
+  )
+  const heroSubtitle = t(
+    dict,
+    'home.hero.subtitle',
+    'SignalBoost continuously audits your repositories and infrastructure, traces vulnerabilities to their source, and maps your posture to SOC 2, ISO 27001, NIST, and CIS — automatically.'
+  )
 
-  const badge = hero.badge ?? 'Build · Review · Broadcast'
-  const subhead =
-    hero.subhead ??
-    'Create your website, collect customer reviews, and produce native audio & video content — in your language, not a translation.'
-  const ctaPrimary = hero.ctaPrimary ?? 'Get started'
-  const ctaSecondary = hero.ctaSecondary ?? 'Watch a demo'
-  const tagHint =
-    hero.tagHint ?? 'Click a language signal to add it to your project'
+  // ---- supporting chrome (English fallbacks; retuned to the security pivot) ----
+  const hero = dict?.hero ?? {}
+  const badge = hero.badge ?? 'Audit · Trace · Comply'
+  const ctaPrimary = hero.ctaPrimary ?? 'Run an audit'
+  const ctaSecondary = hero.ctaSecondary ?? 'See a sample report'
+  const tagHint = hero.tagHint ?? 'Click a language signal to localize your reports'
   const scrollLabel = hero.scroll ?? 'Scroll'
 
   const features = [
-    { icon: '🌐', label: hero?.features?.site ?? 'Site builder' },
-    { icon: '⭐', label: hero?.features?.reviews ?? 'Review collector' },
-    { icon: '🎙️', label: hero?.features?.audio ?? 'Native audio' },
-    { icon: '🎬', label: hero?.features?.video ?? 'Video editor' },
+    { icon: '🛡️', label: hero?.features?.repos ?? 'Repository audits' },
+    { icon: '🔎', label: hero?.features?.trace ?? 'Vulnerability tracing' },
+    { icon: '🗺️', label: hero?.features?.compliance ?? 'Compliance mapping' },
+    { icon: '🔐', label: hero?.features?.secrets ?? 'Secret detection' },
   ]
 
-  // ---- region-aware headlines: current language first, then the rest ----
-  const headlines: string[] = useMemo(() => {
-    const fallback = [
-      'Build your brand in English',
-      'Construa sua marca em Português',
-      'Construye tu marca en Español',
-      'Twórz swoją markę po Polsku',
-      'Создайте свой бренд на Русском',
-    ]
-    const list: string[] =
-      Array.isArray(hero.headlines) && hero.headlines.length > 0
-        ? hero.headlines
-        : fallback
-
-    // Move the headline matching the user's current language to the front.
-    const currentIdx = LANGS.findIndex(l => l.code === lang)
-    if (currentIdx > 0 && currentIdx < list.length) {
-      const reordered = [...list]
-      const [native] = reordered.splice(currentIdx, 1)
-      reordered.unshift(native)
-      return reordered
-    }
-    return list
-  }, [hero.headlines, lang])
-
-  // Reset to first headline whenever the ordering changes (language switch).
-  useEffect(() => {
-    setHeadlineIndex(0)
-  }, [headlines])
-
-  // Rotate headlines (paused on hover/tap).
-  useEffect(() => {
-    if (paused) return
-    if (headlines.length <= 1) return
-
-    const t = setInterval(() => {
-      setHeadlineIndex(i => (i + 1) % headlines.length)
-    }, HEADLINE_INTERVAL)
-
-    return () => clearInterval(t)
-  }, [paused, headlines.length])
-
-  // ---- ticker items (static now, feed-ready later) ----
+  // ---- ticker items (illustrative activity feed, feed-ready later) ----
   const tickerItems: string[] = useMemo(() => {
     const fallback = [
-      'New review · São Paulo',
-      'Site published · Madrid',
-      'Audio generated · pl-PL',
-      'Video rendered · ru-RU',
-      'Review collected · Lisbon',
-      'Site live · Mexico City',
-      'Broadcast sent · 5 languages',
+      'Repo scanned · signalboost-live',
+      'Vulnerability traced · api/route',
+      'Secret flagged · .env leak',
+      'Control mapped · SOC 2 CC6.1',
+      'Posture checked · ISO 27001',
+      'Finding resolved · CIS 4.1',
+      'Audit complete · 0 criticals',
     ]
     return Array.isArray(hero.ticker) && hero.ticker.length > 0
       ? hero.ticker
@@ -196,38 +160,49 @@ export default function SignalHero() {
           {badge}
         </div>
 
-        {/* Rotating headline — hover/tap to pause */}
+        {/* Title + subtitle frame — Linear-style, border-only, fathom-glass.
+            Hover/tap pauses the activity ticker. */}
         <div
+          className="fathom-glass"
           onMouseEnter={() => setPaused(true)}
           onMouseLeave={() => setPaused(false)}
           onTouchStart={() => setPaused(true)}
           onTouchEnd={() => setPaused(false)}
           style={{
             position: 'relative',
-            minHeight: 'clamp(96px, 12vw, 168px)',
-            cursor: 'default',
+            borderRadius: 20,
+            padding: 'clamp(22px, 3vw, 34px)',
+            maxWidth: 560,
           }}
-          aria-live="polite"
         >
           <h1
-            key={headlineIndex}
             className="font-black leading-none"
             style={{
-              fontSize: 'clamp(40px, 5vw, 68px)',
+              fontSize: 'clamp(34px, 4.4vw, 58px)',
               letterSpacing: '-0.03em',
               animation: 'fadeSlide 0.6s ease-out',
               margin: 0,
               color: '#fff',
             }}
           >
-            {headlines[headlineIndex]}
+            {heroTitle}
           </h1>
 
-          {/* Subtle ticker underneath */}
+          <p
+            style={{
+              color: 'rgba(255,255,255,0.6)',
+              fontSize: 16,
+              lineHeight: 1.7,
+              margin: '16px 0 0',
+            }}
+          >
+            {heroSubtitle}
+          </p>
+
+          {/* Subtle activity ticker */}
           <div
             style={{
-              marginTop: 14,
-              maxWidth: 480,
+              marginTop: 18,
               overflow: 'hidden',
               maskImage:
                 'linear-gradient(to right, transparent, #000 12%, #000 88%, transparent)',
@@ -272,18 +247,6 @@ export default function SignalHero() {
             </div>
           </div>
         </div>
-
-        <p
-          style={{
-            color: 'rgba(255,255,255,0.4)',
-            fontSize: 16,
-            lineHeight: 1.7,
-            maxWidth: 340,
-            margin: 0,
-          }}
-        >
-          {subhead}
-        </p>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <button
@@ -495,6 +458,13 @@ export default function SignalHero() {
       </div>
 
       <style>{`
+        .fathom-glass {
+          background: rgba(6, 9, 19, 0.61);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
         @keyframes tagFloat {
           0% {
             opacity: 0;

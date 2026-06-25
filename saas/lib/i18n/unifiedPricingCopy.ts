@@ -6,7 +6,7 @@
 // is composed from auditPricingCopy (the proven source) rather than re-typed here.
 
 import { getAuditPricingCopy, AuditLocale } from '@/lib/i18n/auditPricingCopy'
-import { ProductLine } from '@/lib/config/unifiedPricing'
+import { ProductLine } from '@/lib/config/unifiedPricingConfig'
 
 export type PricingLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 const LOCALES: PricingLocale[] = ['en', 'es', 'pt', 'pl', 'ru']
@@ -48,7 +48,7 @@ const SHARED: Record<PricingLocale, SharedCopy> = {
     loading: 'Processing…', error: 'Something went wrong. Please try again.',
     notConfigured: 'Upgrade is processed through Stripe. Pricing is not configured yet — check back soon.',
     disclaimer: 'SignalBoost provides automated compliance readiness mapping and cybersecurity posture analysis. It does not issue official compliance certifications.',
-    tabs: { audit: 'Audit & Cybersecurity', website: 'Core Platform', podcast: 'Podcast Suite' },
+    tabs: { audit: 'Audit & Cybersecurity', platform: 'Core Platform', podcast: 'Podcast Suite' },
   },
   es: {
     kicker: 'Precios', pageTitle: 'Planes y precios',
@@ -57,7 +57,7 @@ const SHARED: Record<PricingLocale, SharedCopy> = {
     loading: 'Procesando…', error: 'Algo salió mal. Inténtalo de nuevo.',
     notConfigured: 'La actualización se procesa con Stripe. Los precios aún no están configurados — vuelve pronto.',
     disclaimer: 'SignalBoost ofrece mapeo automatizado de preparación para el cumplimiento y análisis de la postura de ciberseguridad. No emite certificaciones de cumplimiento oficiales.',
-    tabs: { audit: 'Auditoría y ciberseguridad', website: 'Plataforma principal', podcast: 'Suite de podcasts' },
+    tabs: { audit: 'Auditoría y ciberseguridad', platform: 'Plataforma principal', podcast: 'Suite de podcasts' },
   },
   pt: {
     kicker: 'Preços', pageTitle: 'Planos e preços',
@@ -66,7 +66,7 @@ const SHARED: Record<PricingLocale, SharedCopy> = {
     loading: 'Processando…', error: 'Algo deu errado. Tente novamente.',
     notConfigured: 'A atualização é processada pelo Stripe. Os preços ainda não estão configurados — volte em breve.',
     disclaimer: 'A SignalBoost fornece mapeamento automatizado de prontidão para conformidade e análise da postura de cibersegurança. Não emite certificações de conformidade oficiais.',
-    tabs: { audit: 'Auditoria e cibersegurança', website: 'Plataforma principal', podcast: 'Suíte de podcasts' },
+    tabs: { audit: 'Auditoria e cibersegurança', platform: 'Plataforma principal', podcast: 'Suíte de podcasts' },
   },
   pl: {
     kicker: 'Cennik', pageTitle: 'Plany i ceny',
@@ -75,7 +75,7 @@ const SHARED: Record<PricingLocale, SharedCopy> = {
     loading: 'Przetwarzanie…', error: 'Coś poszło nie tak. Spróbuj ponownie.',
     notConfigured: 'Ulepszenie jest przetwarzane przez Stripe. Ceny nie są jeszcze skonfigurowane — sprawdź wkrótce.',
     disclaimer: 'SignalBoost zapewnia zautomatyzowane mapowanie gotowości do zgodności oraz analizę stanu cyberbezpieczeństwa. Nie wydaje oficjalnych certyfikatów zgodności.',
-    tabs: { audit: 'Audyt i cyberbezpieczeństwo', website: 'Platforma podstawowa', podcast: 'Pakiet podcastów' },
+    tabs: { audit: 'Audyt i cyberbezpieczeństwo', platform: 'Platforma podstawowa', podcast: 'Pakiet podcastów' },
   },
   ru: {
     kicker: 'Цены', pageTitle: 'Планы и цены',
@@ -84,7 +84,7 @@ const SHARED: Record<PricingLocale, SharedCopy> = {
     loading: 'Обработка…', error: 'Что-то пошло не так. Попробуйте снова.',
     notConfigured: 'Обновление обрабатывается через Stripe. Цены ещё не настроены — загляните позже.',
     disclaimer: 'SignalBoost предоставляет автоматизированное картирование готовности к соответствию и анализ состояния кибербезопасности. Он не выдаёт официальные сертификаты соответствия.',
-    tabs: { audit: 'Аудит и кибербезопасность', website: 'Основная платформа', podcast: 'Пакет подкастов' },
+    tabs: { audit: 'Аудит и кибербезопасность', platform: 'Основная платформа', podcast: 'Пакет подкастов' },
   },
 }
 
@@ -174,6 +174,6 @@ export function getUnifiedPricingCopy(lang: string): UnifiedPricingCopy {
 
   return {
     shared: SHARED[loc],
-    lanes: { audit: auditLane, website: WEBSITE[loc], podcast: PODCAST[loc] },
+    lanes: { audit: auditLane, platform: WEBSITE[loc], podcast: PODCAST[loc] },
   }
 }

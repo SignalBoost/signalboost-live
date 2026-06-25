@@ -1,6 +1,7 @@
 // saas/app/api/hub/cyber/dependencies/route.ts
 // Cybersecurity Center: manual dependency scans + monitor configuration + alert inbox
-// + human-approved remediation requests and fix plans. No fixes are performed automatically.
+// + remediation requests where the fix plan is prepared before human approval.
+// No fixes, commits, PRs, or merges are performed automatically.
 
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/access'
@@ -82,11 +83,11 @@ function buildFixPlan(row: any) {
       'Review the diff manually before opening or merging a pull request.',
     ],
     safetyControls: [
-      'Human remediation approval was required before this plan was generated.',
-      'This plan does not automatically edit code, commit changes, open a pull request, or merge anything.',
-      'Creating a PR or assisted code change requires a separate human authorization step.',
+      'The fix plan is shown before the first human approval.',
+      'Approving this plan does not automatically edit code, commit changes, open a pull request, or merge anything.',
+      'Creating a PR or assisted code change requires a separate product layer and explicit human authorization.',
     ],
-    nextStep: 'Review this fix plan. If acceptable, authorize SignalBoost to prepare a pull request or guided code-change proposal.',
+    nextStep: 'Review this plan. Approving it only authorizes SignalBoost to move the request toward PR preparation; it does not change code automatically.',
   }
 }
 
@@ -115,8 +116,6 @@ async function storeScan(report: any, userId: string | null): Promise<StoredScan
 
 async function insertAlert(admin: any, row: Record<string, unknown>): Promise<boolean> {
   try {
-    // Manual scans may not have a monitor_id. In that case every scan is allowed
-    // to create its own alert row; monitored scans dedupe open alerts per monitor.
     if (row.monitor_id) {
       const dup = await admin.from('cyber_alerts')
         .select('id')
@@ -195,9 +194,6 @@ async function prepareFixPlan(admin: any, remediationId: string) {
     .eq('id', remediationId)
     .single()
   if (error || !row) return { ok: false, error: error?.message || 'Remediation request not found.' }
-  if (!row.human_approved && row.status !== 'approved') {
-    return { ok: false, error: 'Human approval is required before a fix plan can be prepared.' }
-  }
   const plan = buildFixPlan(row)
   const now = new Date().toISOString()
   const update = await admin.from('remediation_requests').update({
@@ -264,6 +260,9 @@ export async function POST(req: Request) {
     try {
       const summary = summarizeReport(report)
       const repo = report.repo || report.target || null
+      const target = report.target || null
+      const plan = buildFixPlan({ repo, target, findings, severity_summary: summary })
+      const now = new Date().toISOString()
       const admin = getAdminSupabase()
       const { data, error } = await admin.from('remediation_requests').insert({
         user_id: userId,
@@ -271,20 +270,25 @@ export async function POST(req: Request) {
         source_type: 'dependency_scan',
         source_id: body.scanId || null,
         repo,
-        target: report.target || null,
-        title: `Dependency remediation request: ${repo || 'repository'}`,
-        summary: `User requested SignalBoost remediation assistance for ${summary.advisories} dependency advisory finding(s). Human approval is required before any fix, PR, or code change is performed.`,
+        target,
+        title: `Dependency remediation plan: ${repo || 'repository'}`,
+        summary: `SignalBoost prepared a proposed remediation plan for ${summary.advisories} dependency advisory finding(s). Human approval is required before PR preparation or any code change.`,
         severity_summary: summary,
         findings,
         status: 'awaiting_human_review',
         human_approval_required: true,
         human_approved: false,
         approval_notes: String(body.notes || '').trim() || null,
-      }).select('id,title,status,created_at').single()
+        fix_plan: plan,
+        fix_plan_status: 'ready_for_review',
+        fix_plan_created_at: now,
+        fix_plan_approved: false,
+        implementation_status: 'not_started',
+      }).select('id,title,status,fix_plan,fix_plan_status,created_at').single()
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
       return NextResponse.json({ ok: true, remediationRequest: data })
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Could not create remediation request.'
+      const message = err instanceof Error ? err.message : 'Could not create remediation plan.'
       return NextResponse.json({ ok: false, error: message }, { status: 500 })
     }
   }
@@ -316,46 +320,58 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ ok: true })
     }
     if (body.remediationId && body.planAction === 'approve_fix_plan') {
+      const now = new Date().toISOString()
       const { error } = await admin.from('remediation_requests').update({
+        status: 'approved',
+        human_approved: true,
+        approved_by: userId,
+        approved_at: now,
         fix_plan_status: 'approved_for_pr',
         fix_plan_approved: true,
-        fix_plan_approved_at: new Date().toISOString(),
+        fix_plan_approved_at: now,
         implementation_status: 'awaiting_pr_preparation',
-        updated_at: new Date().toISOString(),
+        updated_at: now,
       }).eq('id', body.remediationId)
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
       return NextResponse.json({ ok: true })
     }
     if (body.remediationId) {
       const status = ['awaiting_human_review', 'approved', 'rejected', 'in_progress', 'completed', 'cancelled'].includes(String(body.status)) ? String(body.status) : 'awaiting_human_review'
-      const approved = ['approved', 'in_progress', 'completed'].includes(status)
       const now = new Date().toISOString()
-      let updatePayload: Record<string, unknown> = {
-        status,
-        human_approved: approved,
-        approved_by: approved ? userId : null,
-        approved_at: approved ? now : null,
-        approval_notes: String(body.approvalNotes || '').trim() || null,
-        updated_at: now,
-      }
 
-      if (approved) {
+      if (status === 'approved') {
         const row = await admin.from('remediation_requests')
-          .select('id,repo,target,findings,severity_summary,status,human_approved')
+          .select('id,repo,target,findings,severity_summary,fix_plan')
           .eq('id', body.remediationId)
           .single()
-        if (row.data) {
-          updatePayload = {
-            ...updatePayload,
-            fix_plan: buildFixPlan(row.data),
-            fix_plan_status: 'ready_for_review',
-            fix_plan_created_at: now,
-            implementation_status: 'not_started',
-          }
-        }
+        const existingPlan = row.data?.fix_plan && Object.keys(row.data.fix_plan).length > 0 ? row.data.fix_plan : buildFixPlan(row.data)
+        const { error } = await admin.from('remediation_requests').update({
+          status: 'approved',
+          human_approved: true,
+          approved_by: userId,
+          approved_at: now,
+          approval_notes: String(body.approvalNotes || '').trim() || null,
+          fix_plan: existingPlan,
+          fix_plan_status: 'approved_for_pr',
+          fix_plan_approved: true,
+          fix_plan_approved_at: now,
+          implementation_status: 'awaiting_pr_preparation',
+          updated_at: now,
+        }).eq('id', body.remediationId)
+        if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+        return NextResponse.json({ ok: true })
       }
 
-      const { error } = await admin.from('remediation_requests').update(updatePayload).eq('id', body.remediationId)
+      const { error } = await admin.from('remediation_requests').update({
+        status,
+        human_approved: false,
+        approved_by: null,
+        approved_at: null,
+        approval_notes: String(body.approvalNotes || '').trim() || null,
+        fix_plan_status: status === 'rejected' ? 'rejected' : undefined,
+        fix_plan_approved: false,
+        updated_at: now,
+      }).eq('id', body.remediationId)
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
       return NextResponse.json({ ok: true })
     }

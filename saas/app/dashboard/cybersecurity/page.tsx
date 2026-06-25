@@ -2,8 +2,8 @@
 
 // saas/app/dashboard/cybersecurity/page.tsx
 // Cybersecurity Center MVP. Audit = readiness/reports. Cybersecurity = technical
-// monitoring checks, alert inbox, scheduled scans, human-approved remediation,
-// and fix-plan review before any PR/code change.
+// monitoring checks, alert inbox, scheduled scans, plan-first remediation,
+// and human approval before any PR/code change.
 
 import { useEffect, useState } from 'react'
 
@@ -222,11 +222,11 @@ export default function CybersecurityCenterPage() {
         body: JSON.stringify({ action: 'request_remediation', scanId, report }),
       })
       const json = await res.json().catch(() => null)
-      if (!res.ok || !json?.ok) { setError(json?.error || 'Could not create remediation request.'); return }
-      setRemediationMessage('Remediation request created. A human/admin must approve it before any fix, PR, or code change happens.')
+      if (!res.ok || !json?.ok) { setError(json?.error || 'Could not prepare fix plan.'); return }
+      setRemediationMessage('Fix plan prepared for human review. Review the plan in the approval queue before approving anything.')
       await loadDashboard()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create remediation request.')
+      setError(err instanceof Error ? err.message : 'Could not prepare fix plan.')
     } finally {
       setRemediationLoading(false)
     }
@@ -302,13 +302,15 @@ export default function CybersecurityCenterPage() {
   }
 
   async function updateRemediation(id: string, status: RemediationRequest['status']) {
+    setPlanLoadingId(id)
     try {
       await fetch('/api/hub/cyber/dependencies', {
         method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ remediationId: id, status, approvalNotes: status === 'approved' ? 'Approved by human reviewer from Cybersecurity Center.' : undefined }),
+        body: JSON.stringify({ remediationId: id, status, approvalNotes: status === 'approved' ? 'Approved by human reviewer after reviewing the fix plan.' : undefined }),
       })
       await loadDashboard()
     } catch { /* non-critical */ }
+    finally { setPlanLoadingId(null) }
   }
 
   async function resolveAlert(id: string, status: 'resolved' | 'ignored' = 'resolved') {
@@ -342,7 +344,7 @@ export default function CybersecurityCenterPage() {
           <div>
             <div className="mb-2 inline-flex rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-accent">Cybersecurity Center</div>
             <h1 className="text-2xl font-semibold tracking-tight text-text">Dependency Advisory Monitoring</h1>
-            <p className="mt-1.5 max-w-[760px] text-sm leading-relaxed text-text-muted">Run scans, monitor repositories, review detected issues, and require human approval before SignalBoost performs any fix.</p>
+            <p className="mt-1.5 max-w-[760px] text-sm leading-relaxed text-text-muted">Run scans, monitor repositories, review detected issues, review the fix plan, and then approve or reject.</p>
           </div>
           <a href="/dashboard/audit" className="rounded-md border border-border bg-surface px-4 py-2 text-sm text-text-muted hover:text-text">Audit Center</a>
         </header>
@@ -366,11 +368,11 @@ export default function CybersecurityCenterPage() {
 
         {report && report.advisories.length > 0 ? <IssueReviewReport report={report} onDownloadPdf={downloadIssuePdf} onPrint={printIssueReview} pdfLoading={pdfLoading} /> : null}
 
-        {report && report.advisories.length > 0 ? <section className="mt-5 rounded-md border border-accent/40 bg-accent/10 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-sm font-semibold text-text">Would you like SignalBoost to prepare a fix request?</h2><p className="mt-1 max-w-[760px] text-sm leading-relaxed text-text-muted">This comes after the issue review above. Nothing will be changed automatically. A human/admin must approve the request before any code change, pull request, or assisted fix is performed.</p></div><button onClick={requestRemediation} disabled={remediationLoading} className="rounded-md border border-accent bg-accent px-4 py-2 text-sm font-semibold text-bg hover:brightness-110 disabled:opacity-60">{remediationLoading ? 'Creating request…' : 'Request human-approved fix'}</button></div></section> : null}
+        {report && report.advisories.length > 0 ? <section className="mt-5 rounded-md border border-accent/40 bg-accent/10 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-sm font-semibold text-text">Prepare a fix plan for review?</h2><p className="mt-1 max-w-[760px] text-sm leading-relaxed text-text-muted">This comes after the issue review above. SignalBoost will prepare a proposed fix plan first. Nothing will be changed automatically. A human/admin must review and approve the plan before PR preparation or any code change.</p></div><button onClick={requestRemediation} disabled={remediationLoading} className="rounded-md border border-accent bg-accent px-4 py-2 text-sm font-semibold text-bg hover:brightness-110 disabled:opacity-60">{remediationLoading ? 'Preparing plan…' : 'Prepare fix plan'}</button></div></section> : null}
 
         <section className="mt-5 rounded-md border border-border bg-surface p-4">
           <h2 className="mb-3 text-sm font-semibold text-text">Human approval queue</h2>
-          {remediationRequests.length === 0 ? <p className="text-sm text-text-muted">No remediation requests yet. After a report finds problems, users can request help here.</p> : <div className="flex flex-col gap-3">{remediationRequests.slice(0, 20).map(r => <RemediationCard key={r.id} r={r} loading={planLoadingId === r.id} onApprove={() => updateRemediation(r.id, 'approved')} onReject={() => updateRemediation(r.id, 'rejected')} onPreparePlan={() => prepareFixPlan(r.id)} onApprovePlan={() => approveFixPlan(r.id)} />)}</div>}
+          {remediationRequests.length === 0 ? <p className="text-sm text-text-muted">No remediation plans yet. After a report finds problems, users can ask SignalBoost to prepare a plan for review here.</p> : <div className="flex flex-col gap-3">{remediationRequests.slice(0, 20).map(r => <RemediationCard key={r.id} r={r} loading={planLoadingId === r.id} onApprove={() => updateRemediation(r.id, 'approved')} onReject={() => updateRemediation(r.id, 'rejected')} onPreparePlan={() => prepareFixPlan(r.id)} onApprovePlan={() => approveFixPlan(r.id)} />)}</div>}
         </section>
 
         <section className="mt-5 rounded-md border border-border bg-surface p-4"><h2 className="mb-3 text-sm font-semibold text-text">Alert inbox</h2>{alerts.length === 0 ? <p className="text-sm text-text-muted">No cybersecurity alerts yet.</p> : <div className="flex flex-col gap-3">{alerts.slice(0, 20).map(a => <div key={a.id} className="rounded-md border border-border bg-bg p-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full border px-2 py-1 text-[11px] font-semibold ${sevClass[a.severity] || sevClass.unknown}`}>{a.severity}</span><span className="text-sm font-semibold text-text">{a.title}</span><span className="rounded-full border border-border px-2 py-1 text-[10px] uppercase tracking-wider text-text-muted">{a.status}</span></div><p className="mt-2 text-sm text-text-muted">{a.message}</p><p className="mt-1 text-xs text-text-muted/80">{a.repo || 'repo unknown'} · {a.advisory_id || 'advisory'} · {new Date(a.created_at).toLocaleString()}</p>{a.details_url ? <a className="mt-1 inline-block text-xs font-semibold text-accent" href={a.details_url} target="_blank" rel="noreferrer">Advisory details →</a> : null}</div>{a.status === 'open' ? <div className="flex gap-2"><button onClick={() => resolveAlert(a.id, 'resolved')} className="rounded-md border border-border px-3 py-1.5 text-xs text-text-muted hover:text-text">Resolve</button><button onClick={() => resolveAlert(a.id, 'ignored')} className="rounded-md border border-border px-3 py-1.5 text-xs text-text-muted hover:text-text">Ignore</button></div> : null}</div></div>)}</div>}</section>
@@ -395,28 +397,20 @@ function RemediationCard({ r, loading, onApprove, onReject, onPreparePlan, onApp
           <div className="flex flex-wrap items-center gap-2"><span className={`rounded-full border px-2 py-1 text-[11px] font-semibold ${statusClass[r.status] || statusClass.cancelled}`}>{r.status.replaceAll('_', ' ')}</span><span className="text-sm font-semibold text-text">{r.title}</span></div>
           <p className="mt-2 text-sm text-text-muted">{r.summary}</p>
           <p className="mt-1 text-xs text-text-muted/80">{r.repo || r.target || 'target unknown'} · {new Date(r.created_at).toLocaleString()}</p>
-          <p className="mt-1 text-xs text-text-muted/80">Human approval required: {r.human_approval_required ? 'yes' : 'no'} · Approved: {r.human_approved ? 'yes' : 'no'} · Fix plan: {r.fix_plan_status || 'not started'}</p>
+          <p className="mt-1 text-xs text-text-muted/80">Plan first: {hasPlan ? 'yes' : 'no'} · Human approved: {r.human_approved ? 'yes' : 'no'} · Fix plan: {r.fix_plan_status || 'not started'}</p>
           {hasPlan ? <FixPlanView plan={plan as FixPlan} status={r.fix_plan_status || 'ready_for_review'} approved={!!r.fix_plan_approved} /> : null}
           {r.fix_plan_status === 'approved_for_pr' ? <div className="mt-3 rounded-md border border-cyan-400/35 bg-cyan-400/10 p-3 text-sm text-cyan-100">Fix plan approved. Next product layer is PR preparation. No PR has been opened yet.</div> : null}
         </div>
-        {r.status === 'awaiting_human_review' ? <div className="flex gap-2"><button onClick={onApprove} className="rounded-md border border-emerald-400/40 px-3 py-1.5 text-xs text-emerald-100 hover:bg-emerald-400/10">Approve</button><button onClick={onReject} className="rounded-md border border-border px-3 py-1.5 text-xs text-text-muted hover:text-text">Reject</button></div> : null}
-        {r.status === 'approved' && !hasPlan ? <button onClick={onPreparePlan} disabled={loading} className="rounded-md border border-accent bg-accent px-3 py-1.5 text-xs font-semibold text-bg hover:brightness-110 disabled:opacity-60">{loading ? 'Preparing…' : 'Prepare fix plan'}</button> : null}
-        {r.status === 'approved' && r.fix_plan_status === 'ready_for_review' && !r.fix_plan_approved ? <button onClick={onApprovePlan} disabled={loading} className="rounded-md border border-emerald-400/40 px-3 py-1.5 text-xs text-emerald-100 hover:bg-emerald-400/10 disabled:opacity-60">{loading ? 'Approving…' : 'Approve fix plan'}</button> : null}
+        {r.status === 'awaiting_human_review' ? <div className="flex gap-2">{hasPlan ? <button onClick={onApprove} disabled={loading} className="rounded-md border border-emerald-400/40 px-3 py-1.5 text-xs text-emerald-100 hover:bg-emerald-400/10 disabled:opacity-60">{loading ? 'Approving…' : 'Approve plan'}</button> : <button onClick={onPreparePlan} disabled={loading} className="rounded-md border border-accent bg-accent px-3 py-1.5 text-xs font-semibold text-bg hover:brightness-110 disabled:opacity-60">{loading ? 'Preparing…' : 'Prepare plan'}</button>}<button onClick={onReject} disabled={loading} className="rounded-md border border-border px-3 py-1.5 text-xs text-text-muted hover:text-text disabled:opacity-60">Reject</button></div> : null}
+        {r.status === 'approved' && !hasPlan ? <button onClick={onPreparePlan} disabled={loading} className="rounded-md border border-accent bg-accent px-3 py-1.5 text-xs font-semibold text-bg hover:brightness-110 disabled:opacity-60">{loading ? 'Preparing…' : 'Prepare missing plan'}</button> : null}
+        {r.status === 'approved' && hasPlan && !r.fix_plan_approved ? <button onClick={onApprovePlan} disabled={loading} className="rounded-md border border-emerald-400/40 px-3 py-1.5 text-xs text-emerald-100 hover:bg-emerald-400/10 disabled:opacity-60">{loading ? 'Approving…' : 'Approve plan'}</button> : null}
       </div>
     </div>
   )
 }
 
 function FixPlanView({ plan, status, approved }: { plan: FixPlan; status: string; approved: boolean }) {
-  return (
-    <div className="mt-3 rounded-md border border-accent/30 bg-surface p-3">
-      <div className="flex flex-wrap items-center gap-2"><span className="rounded-full border border-accent/35 bg-accent/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-accent">Fix plan {status.replaceAll('_', ' ')}</span><span className="text-xs text-text-muted">Approved: {approved ? 'yes' : 'no'}</span></div>
-      <p className="mt-2 text-sm text-text-muted">{plan.summary || 'Fix plan prepared for human review.'}</p>
-      {Array.isArray(plan.proposedChanges) && plan.proposedChanges.length ? <div className="mt-3"><div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Proposed changes</div><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-text-muted">{plan.proposedChanges.map((c, i) => <li key={i}><span className="font-semibold text-text">{c.packageName}@{c.currentVersion}</span> — {c.proposedAction}</li>)}</ul></div> : null}
-      {Array.isArray(plan.validationSteps) && plan.validationSteps.length ? <div className="mt-3"><div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Validation steps</div><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-text-muted">{plan.validationSteps.map((s, i) => <li key={i}>{s}</li>)}</ul></div> : null}
-      {Array.isArray(plan.safetyControls) && plan.safetyControls.length ? <div className="mt-3"><div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Safety controls</div><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-text-muted">{plan.safetyControls.map((s, i) => <li key={i}>{s}</li>)}</ul></div> : null}
-    </div>
-  )
+  return <div className="mt-3 rounded-md border border-accent/30 bg-surface p-3"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full border border-accent/35 bg-accent/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-accent">Fix plan {status.replaceAll('_', ' ')}</span><span className="text-xs text-text-muted">Approved: {approved ? 'yes' : 'no'}</span></div><p className="mt-2 text-sm text-text-muted">{plan.summary || 'Fix plan prepared for human review.'}</p>{Array.isArray(plan.proposedChanges) && plan.proposedChanges.length ? <div className="mt-3"><div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Proposed changes</div><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-text-muted">{plan.proposedChanges.map((c, i) => <li key={i}><span className="font-semibold text-text">{c.packageName}@{c.currentVersion}</span> — {c.proposedAction}</li>)}</ul></div> : null}{Array.isArray(plan.validationSteps) && plan.validationSteps.length ? <div className="mt-3"><div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Validation steps</div><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-text-muted">{plan.validationSteps.map((s, i) => <li key={i}>{s}</li>)}</ul></div> : null}{Array.isArray(plan.safetyControls) && plan.safetyControls.length ? <div className="mt-3"><div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Safety controls</div><ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-text-muted">{plan.safetyControls.map((s, i) => <li key={i}>{s}</li>)}</ul></div> : null}</div>
 }
 
 function IssueReviewReport({ report, onDownloadPdf, onPrint, pdfLoading }: { report: Report; onDownloadPdf: () => void; onPrint: () => void; pdfLoading: boolean }) {

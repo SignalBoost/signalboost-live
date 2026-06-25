@@ -32,9 +32,9 @@ function buildPriceMap(
 
 const WEBSITE_PLAN_MAP: Record<string, string> = buildPriceMap(
   [
-    [process.env.STRIPE_PRICE_WEBSITE_STARTER, 'starter'],
-    [process.env.STRIPE_PRICE_WEBSITE_PRO, 'pro'],
-    [process.env.STRIPE_PRICE_WEBSITE_BUSINESS, 'business'],
+    [process.env.STRIPE_PRICE_WEBSITE_LAUNCH  ?? process.env.STRIPE_PRICE_WEBSITE_STARTER,  'starter'],
+    [process.env.STRIPE_PRICE_WEBSITE_GROWTH  ?? process.env.STRIPE_PRICE_WEBSITE_PRO,      'pro'],
+    [process.env.STRIPE_PRICE_WEBSITE_COMMAND ?? process.env.STRIPE_PRICE_WEBSITE_BUSINESS, 'business'],
   ],
   'website',
 )

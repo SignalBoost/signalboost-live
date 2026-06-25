@@ -1,6 +1,6 @@
 // saas/app/api/hub/cyber/dependencies/route.ts
-// Cybersecurity Center: manual dependency scans + monitor configuration + alert inbox.
-// Owner/admin-gated; storage is best-effort so scans still return if tables are missing.
+// Cybersecurity Center: manual dependency scans + monitor configuration + alert inbox
+// + human-approved remediation requests. No fixes are performed automatically.
 
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/access'
@@ -19,6 +19,32 @@ function userIdFromGuard(guard: any): string | null {
 
 function safeFrequency(value: unknown): 'daily' | 'weekly' {
   return String(value || '').toLowerCase() === 'weekly' ? 'weekly' : 'daily'
+}
+
+function summarizeReport(report: any) {
+  const s = report?.summary || {}
+  return {
+    packagesScanned: Number(s.packagesScanned || 0),
+    advisories: Number(s.advisories || 0),
+    critical: Number(s.critical || 0),
+    high: Number(s.high || 0),
+    medium: Number(s.medium || 0),
+    low: Number(s.low || 0),
+    unknown: Number(s.unknown || 0),
+  }
+}
+
+function remediationFindings(report: any) {
+  const advisories = Array.isArray(report?.advisories) ? report.advisories : []
+  return advisories.slice(0, 50).map((a: any) => ({
+    id: a.id,
+    packageName: a.packageName,
+    version: a.version,
+    severity: a.severity,
+    summary: a.summary,
+    detailsUrl: a.detailsUrl || null,
+    sourceFile: a.sourceFile || null,
+  }))
 }
 
 async function storeScan(report: any, userId: string | null): Promise<StoredScan> {
@@ -93,7 +119,7 @@ async function createAlertsForReport(opts: { report: any; userId: string | null;
 
 async function loadDashboardData() {
   const admin = getAdminSupabase()
-  const [scans, monitors, alerts] = await Promise.all([
+  const [scans, monitors, alerts, remediationRequests] = await Promise.all([
     admin.from('cyber_dependency_scans')
       .select('id,target,repo,branch,packages_scanned,advisories_count,critical,high,medium,low,unknown,created_at')
       .order('created_at', { ascending: false })
@@ -106,11 +132,17 @@ async function loadDashboardData() {
       .select('id,monitor_id,scan_id,repo,severity,advisory_id,package_name,package_version,title,message,details_url,status,created_at,resolved_at')
       .order('created_at', { ascending: false })
       .limit(100),
+    admin.from('remediation_requests')
+      .select('id,source_area,source_type,source_id,repo,target,title,summary,severity_summary,status,human_approval_required,human_approved,approved_at,approval_notes,created_at,updated_at')
+      .eq('source_area', 'cybersecurity')
+      .order('created_at', { ascending: false })
+      .limit(50),
   ])
   return {
     scans: scans.error ? [] : (scans.data || []),
     monitors: monitors.error ? [] : (monitors.data || []),
     alerts: alerts.error ? [] : (alerts.data || []),
+    remediationRequests: remediationRequests.error ? [] : (remediationRequests.data || []),
   }
 }
 
@@ -120,7 +152,7 @@ export async function GET() {
   try {
     return NextResponse.json({ ok: true, ...(await loadDashboardData()) })
   } catch {
-    return NextResponse.json({ ok: true, scans: [], monitors: [], alerts: [] })
+    return NextResponse.json({ ok: true, scans: [], monitors: [], alerts: [], remediationRequests: [] })
   }
 }
 
@@ -129,7 +161,7 @@ export async function POST(req: Request) {
   if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status })
   const userId = userIdFromGuard(guard)
 
-  let body: { action?: string; url?: string; label?: string; frequency?: string; maxPackages?: number } = {}
+  let body: { action?: string; url?: string; label?: string; frequency?: string; maxPackages?: number; scanId?: string | null; report?: any; notes?: string } = {}
   try { body = await req.json() } catch { /* defaults */ }
 
   if (body.action === 'create_monitor') {
@@ -152,6 +184,40 @@ export async function POST(req: Request) {
     }
   }
 
+  if (body.action === 'request_remediation') {
+    const report = body.report || {}
+    const findings = remediationFindings(report)
+    if (findings.length === 0) {
+      return NextResponse.json({ ok: false, error: 'No detected findings were supplied for remediation.' }, { status: 400 })
+    }
+    try {
+      const summary = summarizeReport(report)
+      const repo = report.repo || report.target || null
+      const admin = getAdminSupabase()
+      const { data, error } = await admin.from('remediation_requests').insert({
+        user_id: userId,
+        source_area: 'cybersecurity',
+        source_type: 'dependency_scan',
+        source_id: body.scanId || null,
+        repo,
+        target: report.target || null,
+        title: `Dependency remediation request: ${repo || 'repository'}`,
+        summary: `User requested SignalBoost remediation assistance for ${summary.advisories} dependency advisory finding(s). Human approval is required before any fix, PR, or code change is performed.`,
+        severity_summary: summary,
+        findings,
+        status: 'awaiting_human_review',
+        human_approval_required: true,
+        human_approved: false,
+        approval_notes: String(body.notes || '').trim() || null,
+      }).select('id,title,status,created_at').single()
+      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+      return NextResponse.json({ ok: true, remediationRequest: data })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not create remediation request.'
+      return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    }
+  }
+
   const report = await scanDependencyAdvisories({ url: body.url, maxPackages: body.maxPackages })
   const stored = await storeScan(report, userId)
   const alertsCreated = await createAlertsForReport({ report, userId, scanId: stored.id })
@@ -161,7 +227,8 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   const guard = await requireAdmin()
   if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status })
-  let body: { alertId?: string; monitorId?: string; status?: string; isEnabled?: boolean } = {}
+  const userId = userIdFromGuard(guard)
+  let body: { alertId?: string; monitorId?: string; remediationId?: string; status?: string; isEnabled?: boolean; approvalNotes?: string } = {}
   try { body = await req.json() } catch { /* defaults */ }
 
   try {
@@ -177,7 +244,21 @@ export async function PATCH(req: Request) {
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
       return NextResponse.json({ ok: true })
     }
-    return NextResponse.json({ ok: false, error: 'No alertId or monitorId supplied.' }, { status: 400 })
+    if (body.remediationId) {
+      const status = ['awaiting_human_review', 'approved', 'rejected', 'in_progress', 'completed', 'cancelled'].includes(String(body.status)) ? String(body.status) : 'awaiting_human_review'
+      const approved = ['approved', 'in_progress', 'completed'].includes(status)
+      const { error } = await admin.from('remediation_requests').update({
+        status,
+        human_approved: approved,
+        approved_by: approved ? userId : null,
+        approved_at: approved ? new Date().toISOString() : null,
+        approval_notes: String(body.approvalNotes || '').trim() || null,
+        updated_at: new Date().toISOString(),
+      }).eq('id', body.remediationId)
+      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+      return NextResponse.json({ ok: true })
+    }
+    return NextResponse.json({ ok: false, error: 'No alertId, monitorId, or remediationId supplied.' }, { status: 400 })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Update failed.'
     return NextResponse.json({ ok: false, error: message }, { status: 500 })

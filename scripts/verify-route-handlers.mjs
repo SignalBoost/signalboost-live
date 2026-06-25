@@ -16,19 +16,15 @@
 //   3. Every page.tsx under app/ must have a default export.
 //
 // Scans both the root tree and the saas/ tree. Exit non-zero on any violation.
-
 import { readFileSync } from 'node:fs'
 import { readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
-
 const ROOTS = ['app', 'saas/app', 'components', 'saas/components', 'scripts']
 const HTTP = /export\s+(async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b|export\s+const\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*=/
 const USE_CLIENT = /^\s*['"]use client['"]/m
 const DEFAULT_EXPORT = /export\s+default\b|export\s*\{[^}]*\bdefault\b[^}]*\}/
 const JSX_HINT = /return\s*\(?\s*</
-
 const violations = []
-
 function walk(dir) {
   let entries
   try { entries = readdirSync(dir) } catch { return }
@@ -42,45 +38,38 @@ function walk(dir) {
     check(full)
   }
 }
-
 function check(file) {
   const rel = relative(process.cwd(), file)
   const base = file.split('/').pop()
   const inApi = /(^|\/)app\/api\//.test(rel)
   const src = readFileSync(file, 'utf8')
-
   // Rule 0: a plain Node script (scripts/**.mjs|cjs|js) must never contain
   // 'use client' — that's a React component pasted over a script (this is how
   // a guard/CI script itself got clobbered once).
   if (/(^|\/)scripts\//.test(rel) && /\.(mjs|cjs|js)$/.test(base) && USE_CLIENT.test(src)) {
-    violations.push(`${rel}: Node script contains 'use client' (a component was pasted over a script)`)
+    violations.push(${rel}: Node script contains 'use client' (a component was pasted over a script))
     return
   }
-
   // Rule 2: route file outside an app/ dir.
   if (/^route\.(t|j)sx?$/.test(base) && !/(^|\/)app\//.test(rel)) {
-    violations.push(`${rel}: route file lives outside an app/ directory (dead/misfiled route)`)
+    violations.push(${rel}: route file lives outside an app/ directory (dead/misfiled route))
     return
   }
-
   // Rule 1: API route handler integrity.
   if (inApi && /^route\.(t|j)sx?$/.test(base)) {
-    if (USE_CLIENT.test(src)) violations.push(`${rel}: API route contains 'use client' (a component was pasted over a route handler)`)
-    if (!HTTP.test(src)) violations.push(`${rel}: API route exports no HTTP method handler (GET/POST/...)`)
-    if (DEFAULT_EXPORT.test(src) && JSX_HINT.test(src)) violations.push(`${rel}: API route default-exports a component instead of HTTP handlers`)
+    if (USE_CLIENT.test(src)) violations.push(${rel}: API route contains 'use client' (a component was pasted over a route handler))
+    if (!HTTP.test(src)) violations.push(${rel}: API route exports no HTTP method handler (GET/POST/...))
+    if (DEFAULT_EXPORT.test(src) && JSX_HINT.test(src)) violations.push(${rel}: API route default-exports a component instead of HTTP handlers)
     return
   }
-
   // Rule 3: app page must have a default export.
   if (/^page\.(t|j)sx?$/.test(base) && /(^|\/)app\//.test(rel)) {
-    if (!DEFAULT_EXPORT.test(src)) violations.push(`${rel}: app page has no default export (content likely pasted from a non-page file)`)
+    if (!DEFAULT_EXPORT.test(src)) violations.push(${rel}: app page has no default export (content likely pasted from a non-page file))
   }
 }
-
 for (const r of ROOTS) walk(r)
-
 if (violations.length) {
-  console.error(`\n✗ verify-route-handlers: ${violations.length} structural violation(s):\n`)
+  console.error(\n✗ verify-route-handlers: ${violations.length} structural violation(s):\n)
   for (const v of violations) console.error('  - ' + v)
   console.error('\nThis usually means whole-file content was pasted into the wrong path.\n')
   process.exit(1)

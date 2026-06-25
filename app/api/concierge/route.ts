@@ -4,6 +4,7 @@ import { createMarketingServerSupabase } from '@/lib/auth/supabaseServer'
 import { normalizeTier } from '@/lib/video/subscription'
 import { readJsonLimited } from '@/lib/http/readJsonLimited'
 import { rateLimited } from '@/lib/http/rateLimit'
+import { clientIpKey } from '@/lib/http/clientIp'
 
 export const dynamic = 'force-dynamic'
 
@@ -182,20 +183,6 @@ export async function POST(req: Request) {
 // client-controlled options. Cached at the edge, but cache headers only help
 // when intermediaries honor them — so we also apply a per-IP rate limit to
 // protect the origin from repeated uncached execution.
-// Derive a rate-limit bucket from forwarded headers, but only trust a value
-// that actually looks like an IP and is bounded in length — so a spoofed or
-// oversized header can't inject huge/arbitrary key material into the limiter.
-// Anything else buckets together under 'unknown'.
-function clientIpKey(req: Request): string {
-  const raw =
-    (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() ||
-    (req.headers.get('x-real-ip') || '').trim()
-  const IPV4 = /^(?:\d{1,3}\.){3}\d{1,3}$/
-  const IPV6 = /^[0-9a-fA-F:]{2,45}$/
-  if (raw.length <= 45 && (IPV4.test(raw) || IPV6.test(raw))) return raw
-  return 'unknown'
-}
-
 export async function GET(req: Request) {
   // Coarse GLOBAL backstop. This is NOT the primary abuse control — that belongs
   // at the edge/WAF/CDN. It's sized well above aggregate legitimate (mostly

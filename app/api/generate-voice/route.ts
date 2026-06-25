@@ -52,6 +52,17 @@ export async function POST(req: Request) {
       );
     }
 
+    // CSRF defense: reject cookie-authenticated POSTs that aren't same-origin
+    // BEFORE auth or the per-user rate limit, so a cross-origin request (which
+    // still carries the victim's cookies) can't burn the victim's voice quota
+    // before being rejected. The IP pre-auth limit above still guards floods.
+    if (!sameOriginOk(req)) {
+      return NextResponse.json(
+        { success: false, error: "Cross-origin request rejected" },
+        { status: 403 }
+      );
+    }
+
     const supabase = await createMarketingServerSupabase();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -65,14 +76,6 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { success: false, error: "Too many requests" },
         { status: 429 }
-      );
-    }
-
-    // CSRF defense: reject cookie-authenticated POSTs that aren't same-origin.
-    if (!sameOriginOk(req)) {
-      return NextResponse.json(
-        { success: false, error: "Cross-origin request rejected" },
-        { status: 403 }
       );
     }
 

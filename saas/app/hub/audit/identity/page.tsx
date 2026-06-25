@@ -1,25 +1,21 @@
 'use client'
 
-// saas/app/hub/audit/providers/page.tsx
-// Provider Inventory page — fetches the owner-gated report and renders the
-// ProviderInventoryReport component with loading / error states.
+// saas/app/hub/audit/identity/page.tsx
+// Identity & Access page — fetches the owner-gated identity-access report.
 
 import { useEffect, useState, type CSSProperties } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
-import ProviderInventoryReport, { type ProviderInventoryView } from '@/components/audit/ProviderInventoryReport'
+import IdentityAccessReport from '@/components/audit/IdentityAccessReport'
 import ReportExportBar from '@/components/audit/ReportExportBar'
 import { toCsv } from '@/lib/audit/exportCsv'
 
-// Flat result shape — non-strict tsconfig does not narrow discriminated unions.
-type ApiResponse = { ok: boolean; report?: ProviderInventoryView; error?: string }
-
+type ApiResponse = { ok: boolean; report?: any; error?: string }
 const wrap: CSSProperties = { minHeight: 'calc(100vh - 80px)' }
 
-export default function ProviderInventoryPage() {
+export default function IdentityPage() {
   const { t } = useTranslation()
-
-  const [data, setData] = useState<ProviderInventoryView | null>(null)
+  const [data, setData] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -28,19 +24,20 @@ export default function ProviderInventoryPage() {
     ;(async () => {
       setLoading(true)
       try {
-        const res = await fetch('/api/hub/audit/provider-inventory', { credentials: 'include' })
+        const res = await fetch('/api/hub/audit/identity-access', { credentials: 'include' })
         const json = (await res.json().catch(() => null)) as ApiResponse | null
         if (!alive) return
         if (!json || !json.ok || !json.report) {
-          setError((json && json.error) || t('audit.provider.loadError', 'Could not load the inventory.'))
+          setError((json && json.error) || t('audit.identity.loadError', 'Could not load the identity report.'))
           return
         }
-        setData(json.report)
+        const r = json.report
+        setData({ ...r, score: typeof r?.score?.score === 'number' ? r.score.score : (typeof r?.score === 'number' ? r.score : 0) })
         setError(null)
       } catch (err: unknown) {
         if (!alive) return
         const msg = err instanceof Error ? err.message : String(err)
-        setError(interpolate(t('audit.provider.fetchError', 'Error: {msg}'), { msg }))
+        setError(interpolate(t('audit.identity.fetchError', 'Error: {msg}'), { msg }))
       } finally {
         if (alive) setLoading(false)
       }
@@ -49,28 +46,22 @@ export default function ProviderInventoryPage() {
   }, [t])
 
   if (loading) {
-    return (
-      <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,.6)', padding: 24 }}>
-        {t('audit.provider.loading', 'Loading provider inventory…')}
-      </main>
-    )
+    return <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,.6)', padding: 24 }}>{t('audit.identity.loading', 'Loading identity report…')}</main>
   }
   if (error) {
-    return (
-      <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: '#fca5a5', padding: 24 }}>
-        {error}
-      </main>
-    )
+    return <main style={{ ...wrap, display: 'grid', placeItems: 'center', color: '#fca5a5', padding: 24 }}>{error}</main>
   }
   if (!data) return null
+
   const csv = toCsv(
-    ['Provider', 'Category', 'Status', 'Risk', 'Findings', 'Last checked'],
-    data.rows.map(r => [r.provider, r.category, r.status, r.risk, r.findingCount, r.lastCheckedAt ?? '']),
+    ['Provider', 'Principal', 'Kind', 'Role', 'Privileged', 'MFA', 'Last seen days', 'Flags'],
+    (data.rows || []).map((r: any) => [r.provider, r.principal, r.kind, r.role, r.isPrivileged ? 'yes' : 'no', r.mfaState, r.lastSeenDays ?? '', (r.flags || []).join('|')]),
   )
+
   return (
     <>
-      <ReportExportBar filename="provider-inventory" csv={csv} />
-      <ProviderInventoryReport data={data} />
+      <ReportExportBar filename="identity-access" csv={csv} />
+      <IdentityAccessReport data={data} />
     </>
   )
 }

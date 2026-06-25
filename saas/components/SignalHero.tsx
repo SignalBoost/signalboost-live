@@ -1,5 +1,6 @@
 'use client'
-import { useCallback, useState, useEffect, useRef, useMemo } from 'react'
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import SignalCanvas from './SignalCanvas'
 import { useI18n } from '@/components/i18n/I18nProvider'
 
@@ -12,6 +13,7 @@ const LANGS = [
 ]
 
 const PLATFORM_SIGNALS = [
+  { name: 'Audit', flag: '📋' },
   { name: 'Cybersecurity', flag: '🛡️' },
   { name: 'Web design', flag: '🌐' },
   { name: 'Reviews', flag: '⭐' },
@@ -27,6 +29,7 @@ const POSITIONS = [
   { tx: -170, ty: -80 },
   { tx: 60, ty: -200 },
   { tx: 0, ty: -105 },
+  { tx: -30, ty: -215 },
 ]
 
 type Tag = {
@@ -36,7 +39,7 @@ type Tag = {
 }
 
 const HEADLINE_INTERVAL = 7000
-const TICKER_DURATION = 40 // seconds for one full loop
+const TICKER_DURATION = 42
 
 export default function SignalHero() {
   const { dict, lang } = useI18n() as { dict: any; lang?: string }
@@ -46,46 +49,44 @@ export default function SignalHero() {
   const [headlineIndex, setHeadlineIndex] = useState(0)
   const [paused, setPaused] = useState(false)
 
-  const langRef = useRef(0)
+  const signalRef = useRef(0)
   const posRef = useRef(0)
   const idRef = useRef(0)
 
-  // ---- text with English fallbacks ----
   const hero = dict?.hero ?? {}
 
-  const badge = hero.badge ?? 'Cybersecurity · Web Design · Growth Platform'
+  const badge = hero.badge ?? 'Audit · Cybersecurity · Growth Platform'
   const subhead =
     hero.subhead ??
-    'SignalBoost audits cybersecurity posture, builds professional websites, collects reviews, produces video and podcast content, runs outreach, and lets owners approve fixes through the PR Cockpit.'
-  const ctaPrimary = hero.ctaPrimary ?? 'Run cyber audit'
+    'SignalBoost separates audit readiness from cybersecurity monitoring: audit reports, provider evidence, identity and secrets review, dependency checks, websites, reviews, video, podcast, outreach, and human-approved fixes.'
+  const ctaPrimary = hero.ctaPrimary ?? 'Open Audit Center'
   const ctaSecondary = hero.ctaSecondary ?? 'View platform plans'
   const tagHint =
-    hero.tagHint ?? 'Click a signal to explore cybersecurity, web design, content, and growth tools'
+    hero.tagHint ?? 'Click a signal to explore audit, cybersecurity, content, and growth tools'
   const scrollLabel = hero.scroll ?? 'Scroll'
 
   const features = [
+    { icon: '📋', label: hero?.features?.audit ?? 'Audit reports' },
     { icon: '🛡️', label: hero?.features?.cybersecurity ?? 'Cybersecurity' },
     { icon: '🌐', label: hero?.features?.website ?? 'Website design' },
     { icon: '⭐', label: hero?.features?.reviews ?? 'Reviews' },
     { icon: '🎬', label: hero?.features?.content ?? 'Video & podcast' },
-    { icon: '✅', label: hero?.features?.approvals ?? 'PR approvals' },
+    { icon: '✅', label: hero?.features?.approvals ?? 'Human approvals' },
   ]
 
-  // ---- region-aware headlines: current language first, then the rest ----
   const headlines: string[] = useMemo(() => {
     const fallback = [
-      'Cybersecurity, web design, and growth tools',
-      'Cibersegurança, sites e crescimento',
-      'Ciberseguridad, sitios web y crecimiento',
-      'Cyberbezpieczeństwo, strony WWW i rozwój',
-      'Кибербезопасность, сайты и рост',
+      'Audit, cybersecurity, web design, and growth tools',
+      'Auditoria, cibersegurança, sites e crescimento',
+      'Auditoría, ciberseguridad, sitios web y crecimiento',
+      'Audyt, cyberbezpieczeństwo, strony WWW i rozwój',
+      'Аудит, кибербезопасность, сайты и рост',
     ]
     const list: string[] =
       Array.isArray(hero.headlines) && hero.headlines.length > 0
         ? hero.headlines
         : fallback
 
-    // Move the headline matching the user's current language to the front.
     const currentIdx = LANGS.findIndex(l => l.code === lang)
     if (currentIdx > 0 && currentIdx < list.length) {
       const reordered = [...list]
@@ -96,28 +97,22 @@ export default function SignalHero() {
     return list
   }, [hero.headlines, lang])
 
-  // Reset to first headline whenever the ordering changes (language switch).
   useEffect(() => {
     setHeadlineIndex(0)
   }, [headlines])
 
-  // Rotate headlines (paused on hover/tap).
   useEffect(() => {
-    if (paused) return
-    if (headlines.length <= 1) return
-
+    if (paused || headlines.length <= 1) return
     const t = setInterval(() => {
       setHeadlineIndex(i => (i + 1) % headlines.length)
     }, HEADLINE_INTERVAL)
-
     return () => clearInterval(t)
   }, [paused, headlines.length])
 
-  // ---- ticker items (static now, feed-ready later) ----
   const tickerItems: string[] = useMemo(() => {
     const fallback = [
-      'Audit & Cybersecurity · repository checks and security posture',
-      'Cybersecurity readiness · provider and dependency review',
+      'Audit Center · evidence, reports, provider inventory, identity and secrets review',
+      'Cybersecurity Center · dependency monitoring, alerts, remediation plans',
       'Website Platform · web design, optimization, reviews, and assistant',
       'Video Studio · captions, exports, brand styling, and campaigns',
       'Podcast Suite · launch, optimize, voiceover, clips, and distribution',
@@ -129,23 +124,15 @@ export default function SignalHero() {
       : fallback
   }, [hero.ticker])
 
-  // Duplicate for seamless marquee loop.
-  const tickerLoop = useMemo(
-    () => [...tickerItems, ...tickerItems],
-    [tickerItems]
-  )
+  const tickerLoop = useMemo(() => [...tickerItems, ...tickerItems], [tickerItems])
 
   const spawnTag = useCallback(() => {
-    const signalItem = PLATFORM_SIGNALS[langRef.current % PLATFORM_SIGNALS.length]
+    const signalItem = PLATFORM_SIGNALS[signalRef.current % PLATFORM_SIGNALS.length]
     const pos = POSITIONS[posRef.current % POSITIONS.length]
-
-    langRef.current++
+    signalRef.current++
     posRef.current++
-
     const id = idRef.current++
-
     setTags(prev => [...prev, { id, lang: signalItem, pos }])
-
     setTimeout(() => {
       setTags(prev => prev.filter(t => t.id !== id))
     }, 3500)
@@ -153,13 +140,10 @@ export default function SignalHero() {
 
   const toggleLang = (name: string) => {
     setSelected(prev =>
-      prev.includes(name)
-        ? prev.filter(l => l !== name)
-        : [...prev, name]
+      prev.includes(name) ? prev.filter(l => l !== name) : [...prev, name]
     )
   }
 
-  // ---- CTA actions ----
   const handlePrimary = () => {
     window.location.href = '/dashboard/audit'
   }
@@ -178,7 +162,6 @@ export default function SignalHero() {
       }}
       className="grid grid-cols-2 items-center"
     >
-      {/* LEFT */}
       <div className="flex flex-col gap-7 px-16">
         <div
           className="flex items-center gap-2 w-fit rounded-full px-4 py-2"
@@ -205,7 +188,6 @@ export default function SignalHero() {
           {badge}
         </div>
 
-        {/* Rotating headline — hover/tap to pause */}
         <div
           onMouseEnter={() => setPaused(true)}
           onMouseLeave={() => setPaused(false)}
@@ -232,11 +214,10 @@ export default function SignalHero() {
             {headlines[headlineIndex]}
           </h1>
 
-          {/* Subtle ticker underneath */}
           <div
             style={{
               marginTop: 14,
-              maxWidth: 480,
+              maxWidth: 520,
               overflow: 'hidden',
               maskImage:
                 'linear-gradient(to right, transparent, #000 12%, #000 88%, transparent)',
@@ -284,10 +265,10 @@ export default function SignalHero() {
 
         <p
           style={{
-            color: 'rgba(255,255,255,0.4)',
+            color: 'rgba(255,255,255,0.42)',
             fontSize: 16,
             lineHeight: 1.7,
-            maxWidth: 380,
+            maxWidth: 440,
             margin: 0,
           }}
         >
@@ -320,12 +301,8 @@ export default function SignalHero() {
               border: 'none',
               cursor: 'pointer',
             }}
-            onMouseEnter={e => {
-              e.currentTarget.style.color = '#fff'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.color = 'rgba(255,255,255,0.5)'
-            }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#fff' }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.5)' }}
           >
             {ctaSecondary} →
           </button>
@@ -334,57 +311,30 @@ export default function SignalHero() {
         <div
           style={{
             display: 'flex',
-            gap: 28,
+            gap: 22,
             flexWrap: 'wrap',
             borderTop: '1px solid rgba(255,255,255,0.08)',
             paddingTop: 20,
           }}
         >
           {features.map(f => (
-            <div
-              key={f.label}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-              }}
-            >
+            <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 18 }}>{f.icon}</span>
-              <span
-                style={{
-                  fontSize: 13,
-                  color: 'rgba(255,255,255,0.6)',
-                  fontWeight: 500,
-                }}
-              >
+              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>
                 {f.label}
               </span>
             </div>
           ))}
         </div>
 
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 8,
-            minHeight: 36,
-          }}
-        >
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, minHeight: 36 }}>
           {selected.length === 0 ? (
-            <p
-              style={{
-                color: 'rgba(255,255,255,0.2)',
-                fontSize: 13,
-                margin: 0,
-              }}
-            >
+            <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13, margin: 0 }}>
               {tagHint}
             </p>
           ) : (
             selected.map(name => {
-              const l = PLATFORM_SIGNALS.find(x => x.name === name) ?? { name, flag: '•' }
-
+              const item = PLATFORM_SIGNALS.find(x => x.name === name) ?? { name, flag: '•' }
               return (
                 <div
                   key={name}
@@ -401,9 +351,8 @@ export default function SignalHero() {
                     borderRadius: 999,
                   }}
                 >
-                  <span>{l.flag}</span>
-                  <span>{l.name}</span>
-
+                  <span>{item.flag}</span>
+                  <span>{item.name}</span>
                   <button
                     onClick={() => toggleLang(name)}
                     style={{
@@ -416,6 +365,7 @@ export default function SignalHero() {
                       padding: 0,
                       marginLeft: 4,
                     }}
+                    aria-label={`Remove ${name}`}
                   >
                     ×
                   </button>
@@ -426,7 +376,6 @@ export default function SignalHero() {
         </div>
       </div>
 
-      {/* RIGHT — signal */}
       <div
         style={{
           display: 'flex',
@@ -449,14 +398,8 @@ export default function SignalHero() {
                 top: '50%',
                 transform: `translate(calc(-50% + ${t.pos.tx}px), calc(-50% + ${t.pos.ty}px))`,
                 animation: 'tagFloat 3.5s ease-out forwards',
-                background: selected.includes(t.lang.name)
-                  ? '#ffc300'
-                  : 'rgba(255,255,255,0.08)',
-                border: `1px solid ${
-                  selected.includes(t.lang.name)
-                    ? '#ffc300'
-                    : 'rgba(255,255,255,0.3)'
-                }`,
+                background: selected.includes(t.lang.name) ? '#ffc300' : 'rgba(255,255,255,0.08)',
+                border: `1px solid ${selected.includes(t.lang.name) ? '#ffc300' : 'rgba(255,255,255,0.3)'}`,
                 color: selected.includes(t.lang.name) ? '#000' : '#ffffff',
                 borderRadius: 999,
                 padding: '9px 20px',
@@ -473,7 +416,6 @@ export default function SignalHero() {
         </div>
       </div>
 
-      {/* Scroll hint */}
       <div
         style={{
           position: 'absolute',
@@ -499,7 +441,6 @@ export default function SignalHero() {
         >
           {scrollLabel}
         </span>
-
         <span style={{ color: '#ffc300', fontSize: 18 }}>↓</span>
       </div>
 

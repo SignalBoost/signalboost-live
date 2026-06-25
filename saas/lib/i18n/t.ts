@@ -4,7 +4,6 @@ import { DASHBOARD_COPY } from '@/lib/i18n/dashboardCopy'
 import { PLATFORM_COPY } from '@/lib/i18n/platformCopy'
 import { SUITE_COPY } from '@/lib/i18n/suiteCopy'
 import { WORKSPACE_COPY } from '@/lib/i18n/workspaceCopy'
-import { HOME_COPY } from '@/lib/i18n/homeCopy'
 
 export function t(dict: Dict | null | undefined, path: string, fallback: string): string {
   const value = lookup(dict, path)
@@ -33,11 +32,6 @@ export function t(dict: Dict | null | undefined, path: string, fallback: string)
     return suiteForLang[path]
   }
 
-  const homeForLang = HOME_COPY[safeLang]
-  if (homeForLang && typeof homeForLang[path] === 'string') {
-    return homeForLang[path]
-  }
-
   const englishValue = lookup(en as Dict, path)
   if (typeof englishValue === 'string') return englishValue
 
@@ -45,7 +39,6 @@ export function t(dict: Dict | null | undefined, path: string, fallback: string)
   if (typeof WORKSPACE_COPY.en[path] === 'string') return WORKSPACE_COPY.en[path]
   if (typeof PLATFORM_COPY.en[path] === 'string') return PLATFORM_COPY.en[path]
   if (typeof SUITE_COPY.en[path] === 'string') return SUITE_COPY.en[path]
-  if (typeof HOME_COPY.en[path] === 'string') return HOME_COPY.en[path]
 
   return fallback || path
 }

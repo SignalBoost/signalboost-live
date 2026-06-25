@@ -19,6 +19,7 @@ const MAX_PROFILE_BYTES = 100_000
 const MAX_PROFILE_KEYS = 200
 const MAX_PROFILE_DEPTH = 32
 const MAX_PROFILE_NODES = 5000
+const MAX_PROFILE_ARRAY_LEN = 1000
 
 const NO_STORE = { 'Cache-Control': 'no-store, private' } as const
 
@@ -34,10 +35,15 @@ function withinStructuralBounds(root: unknown): boolean {
   while (stack.length) {
     const { node, depth } = stack.pop() as { node: unknown; depth: number }
     if (depth > MAX_PROFILE_DEPTH) return false
-    if (node === null || typeof node !== 'object') continue
+    // Count EVERY visited value toward the budget — primitives included.
+    // Previously only objects/arrays were counted, so a single huge array of
+    // primitives (e.g. [1,1,1,…]) could blow past MAX_PROFILE_NODES bounded only
+    // by the byte limit. A per-array length cap closes that off explicitly too.
     nodes += 1
     if (nodes > MAX_PROFILE_NODES) return false
+    if (node === null || typeof node !== 'object') continue
     if (Array.isArray(node)) {
+      if (node.length > MAX_PROFILE_ARRAY_LEN) return false
       for (const child of node) stack.push({ node: child, depth: depth + 1 })
     } else {
       for (const key of Object.keys(node as Record<string, unknown>)) {

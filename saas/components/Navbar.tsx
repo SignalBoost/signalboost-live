@@ -10,8 +10,27 @@ import { t } from '@/lib/i18n/t'
 
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
+const GREEN = '#4ade80'
+const RED = '#f87171'
 
-type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type NavItem = {
+  icon: string
+  label: string
+  href: string
+  desc?: string
+}
+
+type NavGroup = {
+  id: string
+  label: string
+  eyebrow?: string
+  accent: string
+  items: NavItem[]
+  authOnly?: boolean
+  ownerOnly?: boolean
+  width?: number
+  align?: 'left' | 'right'
+}
 
 const LANGUAGES = [
   { code: 'en', label: 'English' },
@@ -21,384 +40,15 @@ const LANGUAGES = [
   { code: 'ru', label: 'Русский' },
 ]
 
-type Item = { icon: string; key: string; href: string }
-type LocalizedItem = { icon: string; label: string; href: string; desc?: string }
-
-const WEBSITE: Item[] = [
-  { icon: '🌐', key: 'web.build', href: '/dashboard/builder' },
-  { icon: '🧭', key: 'web.optimize', href: '/dashboard/improve' },
-  { icon: '⭐', key: 'web.reviews', href: '/dashboard/reviews' },
-  { icon: '✨', key: 'web.improve', href: '/dashboard/improve' },
-]
-
-const PODCAST: Item[] = [
-  { icon: '🎙️', key: 'pod.build', href: '/dashboard/launchpad/podcast' },
-  { icon: '🎚️', key: 'pod.optimize', href: '/dashboard/podcast/studio' },
-  { icon: '📻', key: 'pod.hub', href: '/dashboard/podcast' },
-  { icon: '🌍', key: 'pod.public', href: '/podcasters' },
-]
-
-const CONTENT: Item[] = [
-  { icon: '🎧', key: 'con.audio', href: '/dashboard/audio' },
-  { icon: '🎬', key: 'con.video', href: '/dashboard/video' },
-  { icon: '🎨', key: 'con.creative', href: '/dashboard/creative' },
-  { icon: '🧪', key: 'con.lab', href: '/dashboard/lab' },
-  { icon: '🛠️', key: 'con.apprentice', href: '/dashboard/apprentice' },
-]
-
-const LAUNCHPAD: Item[] = [
-  { icon: '🚀', key: 'lp.home', href: '/dashboard/launchpad' },
-  { icon: '🏢', key: 'lp.business', href: '/dashboard/launchpad/business' },
-  { icon: '🎬', key: 'lp.creator', href: '/dashboard/launchpad/creator' },
-  { icon: '🛒', key: 'lp.store', href: '/dashboard/launchpad/store' },
-  { icon: '🎙️', key: 'lp.podcast', href: '/dashboard/launchpad/podcast' },
-]
-
-const GROW: Item[] = [
-  { icon: '🛸', key: 'grow.hub', href: '/dashboard/outreach' },
-  { icon: '🚀', key: 'grow.myOutreach', href: '/dashboard/my-outreach' },
-  { icon: '🔎', key: 'grow.discovery', href: '/dashboard/outreach/discovery' },
-  { icon: '📇', key: 'grow.contacts', href: '/dashboard/outreach/contacts' },
-  { icon: '📊', key: 'grow.pipeline', href: '/dashboard/outreach/pipeline' },
-  { icon: '📡', key: 'adm.radar', href: '/dashboard/opportunities' },
-  { icon: '📣', key: 'grow.campaigns', href: '/dashboard/campaigns' },
-  { icon: '📢', key: 'grow.promote', href: '/dashboard/promote' },
-  { icon: '💼', key: 'grow.sales', href: '/dashboard/sales' },
-  { icon: '📈', key: 'grow.salesPipeline', href: '/dashboard/sales/pipeline' },
-]
-
-const DASHBOARD_MENU: Item[] = [
-  { icon: '🏠', key: 'ws.dashboard', href: '/dashboard' },
-  { icon: '📢', key: 'grow.promote', href: '/dashboard/promote' },
-  { icon: '🌐', key: 'web.build', href: '/dashboard/builder' },
-  { icon: '⭐', key: 'web.reviews', href: '/dashboard/reviews' },
-  { icon: '🎬', key: 'con.video', href: '/dashboard/video' },
-  { icon: '🎚️', key: 'pod.optimize', href: '/dashboard/podcast/studio' },
-  { icon: '🛠️', key: 'con.apprentice', href: '/dashboard/apprentice' },
-]
-
-const WORKSPACE: Item[] = [
-  { icon: '🏠', key: 'ws.dashboard', href: '/dashboard' },
-  { icon: '🔍', key: 'adm.audit', href: '/dashboard/audit' },
-  { icon: '🤖', key: 'ws.assistant', href: '/dashboard/assistant' },
-  { icon: '📅', key: 'ws.calendar', href: '/dashboard/calendar' },
-  { icon: '📑', key: 'ws.spreadsheets', href: '/dashboard/spreadsheets' },
-  { icon: '📋', key: 'ws.infraPrs', href: '/dashboard/infrastructure' },
-  { icon: '💬', key: 'ws.feedback', href: '/dashboard/feedback' },
-]
-
-const ADMIN: Item[] = [
-  { icon: '🎛️', key: 'adm.hub', href: '/hub' },
-  { icon: '🛰️', key: 'adm.mission', href: '/admin' },
-  { icon: '🌌', key: 'adm.overview', href: '/admin/overview' },
-  { icon: '💰', key: 'adm.revenue', href: '/admin/revenue' },
-  { icon: '🔌', key: 'adm.data', href: '/dashboard/data' },
-  { icon: '⚡', key: 'adm.metrics', href: '/dashboard/metrics' },
-  { icon: '🎛️', key: 'adm.console', href: '/dashboard/wireframes' },
-  { icon: '👥', key: 'adm.team', href: '/dashboard/team' },
-  { icon: '🛡️', key: 'adm.roles', href: '/admin/settings/roles' },
-  { icon: '🚪', key: 'adm.onboarding', href: '/admin/onboarding' },
-  { icon: '⚙️', key: 'adm.settings', href: '/admin/settings' },
-  { icon: '🧰', key: 'adm.opSettings', href: '/dashboard/settings' },
-]
-
-const HELP: Item[] = [
-  { icon: '❓', key: 'help.faq', href: '/faq' },
-  { icon: '✉️', key: 'help.contact', href: '/support' },
-  { icon: '📖', key: 'help.docs', href: '/docs' },
-]
-
-// ── Inline translations for every menu label + description ──────────────────────
-const COPY: Record<Lang, Record<string, string>> = {
-  en: {
-    'group.website': 'Website', 'group.podcast': 'Podcast', 'group.content': 'Content',
-    'group.launchpad': 'Launchpad', 'group.grow': 'Grow', 'group.workspace': 'Workspace',
-    'group.admin': 'Admin', 'group.help': 'Help',
-    'nav.home': 'Home', 'nav.dashboard': 'Dashboard', 'nav.pricing': 'Pricing', 'nav.more': 'More',
-    'plan.freeDemo': 'Free Demo', 'plan.launch': 'Launch', 'plan.growth': 'Growth', 'plan.command': 'Command',
-    'title.videoCredits': 'Available video credits', 'title.currentPlan': 'Current plan',
-    'web.build.l': 'Build a Website', 'web.build.d': 'Generate a full site from a prompt.',
-    'web.optimize.l': 'Optimize Website', 'web.optimize.d': 'Analyze, optimize, and rebuild an improved site.',
-    'web.reviews.l': 'Reviews', 'web.reviews.d': 'Collect and showcase customer reviews.',
-    'web.improve.l': 'Improve Content', 'web.improve.d': 'Polish pages for SEO and conversion.',
-    'pod.public.l': 'For Podcasters', 'pod.public.d': 'Public page for podcast creators.', 'pod.build.l': 'Build a Podcast', 'pod.build.d': 'Start a podcast from scratch.',
-    'pod.optimize.l': 'Optimize Podcast Studio', 'pod.optimize.d': 'Audit your feed for Apple, Spotify, and growth.',
-    'pod.hub.l': 'Podcast Hub', 'pod.hub.d': 'Your podcast page and tools.',
-    'con.audio.l': 'Audio Studio', 'con.audio.d': 'Native voice and audio content.',
-    'con.video.l': 'Video Studio', 'con.video.d': 'Generate videos, clips, captions, and exports.',
-    'con.creative.l': 'Creative Studio', 'con.creative.d': 'Generate promo banners and campaign visuals with AI.',
-    'con.lab.l': 'Lab', 'con.lab.d': 'Experimental tools and features.',
-    'con.apprentice.l': 'Workshop Apprentice', 'con.apprentice.d': 'Guided, level-aware help.',
-    'lp.home.l': 'Launchpad Home', 'lp.home.d': 'Choose a guided launch path.',
-    'lp.business.l': 'Build a Business', 'lp.business.d': 'Launch a business from scratch.',
-    'lp.creator.l': 'Creator', 'lp.creator.d': 'Build your creator brand.',
-    'lp.store.l': 'Online Store', 'lp.store.d': 'Launch a store from scratch.',
-    'lp.podcast.l': 'Podcast', 'lp.podcast.d': 'Start a podcast from scratch.',
-    'grow.hub.l': 'Outreach Hub', 'grow.hub.d': 'Your outreach command center.',
-    'grow.discovery.l': 'Discovery', 'grow.discovery.d': 'Find and analyze new leads.',
-    'grow.contacts.l': 'Contacts', 'grow.contacts.d': 'Review and approve leads.',
-    'grow.pipeline.l': 'Pipeline', 'grow.pipeline.d': 'Track prospects by stage.',
-    'grow.campaigns.l': 'Campaigns', 'grow.campaigns.d': 'Plan campaigns, A/B tests, and funnel tracking.',
-    'grow.myOutreach.l': 'My Outreach', 'grow.myOutreach.d': 'AI-written outreach for your business — review and send.',
-    'grow.promote.l': 'Promote', 'grow.promote.d': 'Run promotion campaigns.',
-    'grow.sales.l': 'Sales', 'grow.sales.d': 'Sales overview.',
-    'grow.salesPipeline.l': 'Sales Pipeline', 'grow.salesPipeline.d': 'Deals in progress.',
-    'ws.dashboard.l': 'Dashboard', 'ws.dashboard.d': 'Your home base.',
-    'ws.assistant.l': 'Assistant', 'ws.assistant.d': 'Ask the concierge anything.',
-    'ws.calendar.l': 'Calendar', 'ws.calendar.d': 'Events and cultural dates.',
-    'ws.spreadsheets.l': 'Spreadsheets', 'ws.spreadsheets.d': 'Your imported data, in a grid.',
-    'ws.infraPrs.l': 'Infrastructure PRs', 'ws.infraPrs.d': 'Approve AI-drafted infrastructure changes.',
-    'ws.feedback.l': 'Feedback', 'ws.feedback.d': 'Send us your feedback.',
-    'adm.mission.l': 'Mission Control', 'adm.mission.d': 'Unified executive admin cockpit.', 'adm.overview.l': 'Overview', 'adm.overview.d': 'Real counts from live data.',
-    'adm.hub.l': 'Hub Console', 'adm.hub.d': 'Infrastructure command — keys, providers, deployments, team.',
-    'adm.audit.l': 'Audit Console', 'adm.audit.d': 'Security & quality scans on GPT‑5.5, isolated from live traffic.',
-    'adm.revenue.l': 'Revenue', 'adm.revenue.d': 'Live MRR from active subscriptions.',
-    'adm.radar.l': 'Opportunity Radar', 'adm.radar.d': 'Daily AI market scan: competitors, gaps, partnerships.',
-    'adm.data.l': 'Data Connectors', 'adm.data.d': 'Import and manage connected data sources.',
-    'adm.metrics.l': 'Metrics & Credits', 'adm.metrics.d': 'Usage, credits, and operating metrics.',
-    'adm.console.l': 'Console', 'adm.console.d': 'Office utilities and internal console.',
-    'adm.team.l': 'Team & Roles', 'adm.team.d': 'Add people and set access.',
-    'adm.roles.l': 'Role Management', 'adm.roles.d': 'Manage roles and ownership.',
-    'adm.onboarding.l': 'Onboarding', 'adm.onboarding.d': 'Onboarding controls.',
-    'adm.settings.l': 'Admin Settings', 'adm.settings.d': 'System-wide switches.',
-    'adm.opSettings.l': 'Settings', 'adm.opSettings.d': 'Operational settings and account preferences.',
-    'help.faq.l': 'FAQ', 'help.contact.l': 'Contact Support', 'help.docs.l': 'Documentation',
-  },
-  es: {
-    'group.website': 'Sitio web', 'group.podcast': 'Podcast', 'group.content': 'Contenido',
-    'group.launchpad': 'Launchpad', 'group.grow': 'Crecer', 'group.workspace': 'Espacio de trabajo',
-    'group.admin': 'Admin', 'group.help': 'Ayuda',
-    'nav.home': 'Inicio', 'nav.dashboard': 'Panel', 'nav.pricing': 'Precios', 'nav.more': 'Más',
-    'plan.freeDemo': 'Demo gratis', 'plan.launch': 'Launch', 'plan.growth': 'Growth', 'plan.command': 'Command',
-    'title.videoCredits': 'Créditos de video disponibles', 'title.currentPlan': 'Plan actual',
-    'web.build.l': 'Crear un sitio web', 'web.build.d': 'Genera un sitio completo desde una indicación.',
-    'web.optimize.l': 'Optimizar sitio web', 'web.optimize.d': 'Analiza, optimiza y reconstruye un sitio mejorado.',
-    'web.reviews.l': 'Reseñas', 'web.reviews.d': 'Recopila y muestra reseñas de clientes.',
-    'web.improve.l': 'Mejorar contenido', 'web.improve.d': 'Pule páginas para SEO y conversión.',
-    'pod.public.l': 'Para podcasters', 'pod.public.d': 'Página pública para creadores de podcasts.', 'pod.build.l': 'Crear un podcast', 'pod.build.d': 'Inicia un podcast desde cero.',
-    'pod.optimize.l': 'Optimizar estudio de podcast', 'pod.optimize.d': 'Audita tu feed para Apple, Spotify y crecimiento.',
-    'pod.hub.l': 'Centro de podcast', 'pod.hub.d': 'Tu página y herramientas de podcast.',
-    'con.audio.l': 'Estudio de audio', 'con.audio.d': 'Voz y contenido de audio nativos.',
-    'con.video.l': 'Estudio de video', 'con.video.d': 'Genera videos, clips, subtítulos y exportaciones.',
-    'con.creative.l': 'Estudio creativo', 'con.creative.d': 'Genera banners promocionales y visuales de campaña con IA.',
-    'con.lab.l': 'Laboratorio', 'con.lab.d': 'Herramientas y funciones experimentales.',
-    'con.apprentice.l': 'Aprendiz del taller', 'con.apprentice.d': 'Ayuda guiada según tu nivel.',
-    'lp.home.l': 'Inicio de Launchpad', 'lp.home.d': 'Elige una ruta de lanzamiento guiada.',
-    'lp.business.l': 'Crear un negocio', 'lp.business.d': 'Lanza un negocio desde cero.',
-    'lp.creator.l': 'Creador', 'lp.creator.d': 'Construye tu marca de creador.',
-    'lp.store.l': 'Tienda en línea', 'lp.store.d': 'Lanza una tienda desde cero.',
-    'lp.podcast.l': 'Podcast', 'lp.podcast.d': 'Inicia un podcast desde cero.',
-    'grow.hub.l': 'Centro de prospección', 'grow.hub.d': 'Tu centro de mando de prospección.',
-    'grow.discovery.l': 'Descubrimiento', 'grow.discovery.d': 'Encuentra y analiza nuevos prospectos.',
-    'grow.contacts.l': 'Contactos', 'grow.contacts.d': 'Revisa y aprueba prospectos.',
-    'grow.pipeline.l': 'Embudo', 'grow.pipeline.d': 'Sigue prospectos por etapa.',
-    'grow.campaigns.l': 'Campañas', 'grow.campaigns.d': 'Planifica campañas, pruebas A/B y seguimiento de embudo.',
-    'grow.myOutreach.l': 'Mi prospección', 'grow.myOutreach.d': 'Prospección escrita por IA para tu negocio — revisa y envía.',
-    'grow.promote.l': 'Promocionar', 'grow.promote.d': 'Ejecuta campañas de promoción.',
-    'grow.sales.l': 'Ventas', 'grow.sales.d': 'Resumen de ventas.',
-    'grow.salesPipeline.l': 'Embudo de ventas', 'grow.salesPipeline.d': 'Negocios en curso.',
-    'ws.dashboard.l': 'Panel', 'ws.dashboard.d': 'Tu base de operaciones.',
-    'ws.assistant.l': 'Asistente', 'ws.assistant.d': 'Pregunta lo que sea al conserje.',
-    'ws.calendar.l': 'Calendario', 'ws.calendar.d': 'Eventos y fechas culturales.',
-    'ws.spreadsheets.l': 'Hojas de cálculo', 'ws.spreadsheets.d': 'Tus datos importados, en una cuadrícula.',
-    'ws.infraPrs.l': 'PRs de Infraestructura', 'ws.infraPrs.d': 'Aprueba cambios de infraestructura redactados por IA.',
-    'ws.feedback.l': 'Comentarios', 'ws.feedback.d': 'Envíanos tus comentarios.',
-    'adm.mission.l': 'Control de misión', 'adm.mission.d': 'Cabina ejecutiva unificada de administración.', 'adm.overview.l': 'Resumen', 'adm.overview.d': 'Conteos reales de datos en vivo.',
-    'adm.hub.l': 'Consola Hub', 'adm.hub.d': 'Comando de infraestructura — claves, proveedores, despliegues, equipo.',
-    'adm.audit.l': 'Consola de Auditoría', 'adm.audit.d': 'Análisis de seguridad y calidad con GPT‑5.5, aislados del tráfico en vivo.',
-    'adm.revenue.l': 'Ingresos', 'adm.revenue.d': 'MRR en vivo de suscripciones activas.',
-    'adm.radar.l': 'Radar de oportunidades', 'adm.radar.d': 'Escaneo diario IA del mercado: competidores, brechas, alianzas.',
-    'adm.data.l': 'Conectores de datos', 'adm.data.d': 'Importa y gestiona fuentes de datos conectadas.',
-    'adm.metrics.l': 'Métricas y créditos', 'adm.metrics.d': 'Uso, créditos y métricas operativas.',
-    'adm.console.l': 'Consola', 'adm.console.d': 'Utilidades de oficina y consola interna.',
-    'adm.team.l': 'Equipo y roles', 'adm.team.d': 'Agrega personas y define accesos.',
-    'adm.roles.l': 'Gestión de roles', 'adm.roles.d': 'Gestiona roles y propiedad.',
-    'adm.onboarding.l': 'Incorporación', 'adm.onboarding.d': 'Controles de incorporación.',
-    'adm.settings.l': 'Configuración de admin', 'adm.settings.d': 'Interruptores de todo el sistema.',
-    'adm.opSettings.l': 'Configuración', 'adm.opSettings.d': 'Configuración operativa y preferencias de cuenta.',
-    'help.faq.l': 'Preguntas frecuentes', 'help.contact.l': 'Contactar soporte', 'help.docs.l': 'Documentación',
-  },
-  pt: {
-    'group.website': 'Site', 'group.podcast': 'Podcast', 'group.content': 'Conteúdo',
-    'group.launchpad': 'Launchpad', 'group.grow': 'Crescer', 'group.workspace': 'Espaço de trabalho',
-    'group.admin': 'Admin', 'group.help': 'Ajuda',
-    'nav.home': 'Início', 'nav.dashboard': 'Painel', 'nav.pricing': 'Preços', 'nav.more': 'Mais',
-    'plan.freeDemo': 'Demo grátis', 'plan.launch': 'Launch', 'plan.growth': 'Growth', 'plan.command': 'Command',
-    'title.videoCredits': 'Créditos de vídeo disponíveis', 'title.currentPlan': 'Plano atual',
-    'web.build.l': 'Criar um site', 'web.build.d': 'Gere um site completo a partir de um prompt.',
-    'web.optimize.l': 'Otimizar site', 'web.optimize.d': 'Analise, otimize e reconstrua um site melhorado.',
-    'web.reviews.l': 'Avaliações', 'web.reviews.d': 'Colete e exiba avaliações de clientes.',
-    'web.improve.l': 'Melhorar conteúdo', 'web.improve.d': 'Aprimore páginas para SEO e conversão.',
-    'pod.public.l': 'Para podcasters', 'pod.public.d': 'Página pública para criadores de podcasts.', 'pod.build.l': 'Criar um podcast', 'pod.build.d': 'Comece um podcast do zero.',
-    'pod.optimize.l': 'Otimizar estúdio de podcast', 'pod.optimize.d': 'Audite seu feed para Apple, Spotify e crescimento.',
-    'pod.hub.l': 'Central de podcast', 'pod.hub.d': 'Sua página e ferramentas de podcast.',
-    'con.audio.l': 'Estúdio de áudio', 'con.audio.d': 'Voz e conteúdo de áudio nativos.',
-    'con.video.l': 'Estúdio de vídeo', 'con.video.d': 'Gere vídeos, clipes, legendas e exportações.',
-    'con.creative.l': 'Estúdio criativo', 'con.creative.d': 'Gere banners promocionais e visuais de campanha com IA.',
-    'con.lab.l': 'Laboratório', 'con.lab.d': 'Ferramentas e recursos experimentais.',
-    'con.apprentice.l': 'Aprendiz de oficina', 'con.apprentice.d': 'Ajuda guiada conforme seu nível.',
-    'lp.home.l': 'Início do Launchpad', 'lp.home.d': 'Escolha um caminho de lançamento guiado.',
-    'lp.business.l': 'Criar um negócio', 'lp.business.d': 'Lance um negócio do zero.',
-    'lp.creator.l': 'Criador', 'lp.creator.d': 'Construa sua marca de criador.',
-    'lp.store.l': 'Loja online', 'lp.store.d': 'Lance uma loja do zero.',
-    'lp.podcast.l': 'Podcast', 'lp.podcast.d': 'Comece um podcast do zero.',
-    'grow.hub.l': 'Central de prospecção', 'grow.hub.d': 'Sua central de comando de prospecção.',
-    'grow.discovery.l': 'Descoberta', 'grow.discovery.d': 'Encontre e analise novos leads.',
-    'grow.contacts.l': 'Contatos', 'grow.contacts.d': 'Revise e aprove leads.',
-    'grow.pipeline.l': 'Funil', 'grow.pipeline.d': 'Acompanhe prospects por etapa.',
-    'grow.campaigns.l': 'Campanhas', 'grow.campaigns.d': 'Planeje campanhas, testes A/B e acompanhamento de funil.',
-    'grow.myOutreach.l': 'Minha prospecção', 'grow.myOutreach.d': 'Prospecção escrita por IA para o seu negócio — revise e envie.',
-    'grow.promote.l': 'Promover', 'grow.promote.d': 'Realize campanhas de promoção.',
-    'grow.sales.l': 'Vendas', 'grow.sales.d': 'Visão geral de vendas.',
-    'grow.salesPipeline.l': 'Funil de vendas', 'grow.salesPipeline.d': 'Negócios em andamento.',
-    'ws.dashboard.l': 'Painel', 'ws.dashboard.d': 'Sua base principal.',
-    'ws.assistant.l': 'Assistente', 'ws.assistant.d': 'Pergunte qualquer coisa ao concierge.',
-    'ws.calendar.l': 'Calendário', 'ws.calendar.d': 'Eventos e datas culturais.',
-    'ws.spreadsheets.l': 'Planilhas', 'ws.spreadsheets.d': 'Seus dados importados, em uma grade.',
-    'ws.infraPrs.l': 'PRs de Infraestrutura', 'ws.infraPrs.d': 'Aprove mudanças de infraestrutura redigidas por IA.',
-    'ws.feedback.l': 'Feedback', 'ws.feedback.d': 'Envie seu feedback.',
-    'adm.mission.l': 'Controle de missão', 'adm.mission.d': 'Cockpit executivo unificado de administração.', 'adm.overview.l': 'Visão geral', 'adm.overview.d': 'Contagens reais de dados ao vivo.',
-    'adm.hub.l': 'Console Hub', 'adm.hub.d': 'Comando de infraestrutura — chaves, provedores, implantações, equipe.',
-    'adm.audit.l': 'Console de Auditoria', 'adm.audit.d': 'Análises de segurança e qualidade com GPT‑5.5, isoladas do tráfego ao vivo.',
-    'adm.revenue.l': 'Receita', 'adm.revenue.d': 'MRR ao vivo de assinaturas ativas.',
-    'adm.radar.l': 'Radar de oportunidades', 'adm.radar.d': 'Varredura diária de mercado por IA: concorrentes, lacunas, parcerias.',
-    'adm.data.l': 'Conectores de dados', 'adm.data.d': 'Importe e gerencie fontes de dados conectadas.',
-    'adm.metrics.l': 'Métricas e créditos', 'adm.metrics.d': 'Uso, créditos e métricas operacionais.',
-    'adm.console.l': 'Console', 'adm.console.d': 'Utilitários de escritório e console interno.',
-    'adm.team.l': 'Equipe e funções', 'adm.team.d': 'Adicione pessoas e defina acessos.',
-    'adm.roles.l': 'Gestão de funções', 'adm.roles.d': 'Gerencie funções e propriedade.',
-    'adm.onboarding.l': 'Integração', 'adm.onboarding.d': 'Controles de integração.',
-    'adm.settings.l': 'Configurações de admin', 'adm.settings.d': 'Controles de todo o sistema.',
-    'adm.opSettings.l': 'Configurações', 'adm.opSettings.d': 'Configurações operacionais e preferências de conta.',
-    'help.faq.l': 'Perguntas frequentes', 'help.contact.l': 'Falar com o suporte', 'help.docs.l': 'Documentação',
-  },
-  pl: {
-    'group.website': 'Strona', 'group.podcast': 'Podcast', 'group.content': 'Treść',
-    'group.launchpad': 'Launchpad', 'group.grow': 'Rozwój', 'group.workspace': 'Przestrzeń robocza',
-    'group.admin': 'Admin', 'group.help': 'Pomoc',
-    'nav.home': 'Strona główna', 'nav.dashboard': 'Panel', 'nav.pricing': 'Cennik', 'nav.more': 'Więcej',
-    'plan.freeDemo': 'Darmowe demo', 'plan.launch': 'Launch', 'plan.growth': 'Growth', 'plan.command': 'Command',
-    'title.videoCredits': 'Dostępne kredyty wideo', 'title.currentPlan': 'Bieżący plan',
-    'web.build.l': 'Stwórz stronę', 'web.build.d': 'Wygeneruj całą stronę z polecenia.',
-    'web.optimize.l': 'Optymalizuj stronę', 'web.optimize.d': 'Analizuj, optymalizuj i przebuduj ulepszoną stronę.',
-    'web.reviews.l': 'Opinie', 'web.reviews.d': 'Zbieraj i prezentuj opinie klientów.',
-    'web.improve.l': 'Ulepsz treść', 'web.improve.d': 'Dopracuj strony pod SEO i konwersję.',
-    'pod.public.l': 'Dla podcasterów', 'pod.public.d': 'Publiczna strona dla twórców podcastów.', 'pod.build.l': 'Stwórz podcast', 'pod.build.d': 'Załóż podcast od zera.',
-    'pod.optimize.l': 'Optymalizuj studio podcastu', 'pod.optimize.d': 'Sprawdź swój kanał pod Apple, Spotify i rozwój.',
-    'pod.hub.l': 'Centrum podcastu', 'pod.hub.d': 'Twoja strona i narzędzia podcastu.',
-    'con.audio.l': 'Studio audio', 'con.audio.d': 'Natywny głos i treści audio.',
-    'con.video.l': 'Studio wideo', 'con.video.d': 'Twórz filmy, klipy, napisy i eksporty.',
-    'con.creative.l': 'Studio kreatywne', 'con.creative.d': 'Generuj banery promocyjne i wizualizacje kampanii dzięki AI.',
-    'con.lab.l': 'Laboratorium', 'con.lab.d': 'Eksperymentalne narzędzia i funkcje.',
-    'con.apprentice.l': 'Asystent warsztatu', 'con.apprentice.d': 'Pomoc dopasowana do poziomu.',
-    'lp.home.l': 'Launchpad — start', 'lp.home.d': 'Wybierz prowadzoną ścieżkę startu.',
-    'lp.business.l': 'Zbuduj firmę', 'lp.business.d': 'Uruchom firmę od zera.',
-    'lp.creator.l': 'Twórca', 'lp.creator.d': 'Zbuduj swoją markę twórcy.',
-    'lp.store.l': 'Sklep internetowy', 'lp.store.d': 'Uruchom sklep od zera.',
-    'lp.podcast.l': 'Podcast', 'lp.podcast.d': 'Załóż podcast od zera.',
-    'grow.hub.l': 'Centrum kontaktów', 'grow.hub.d': 'Twoje centrum dowodzenia kontaktami.',
-    'grow.discovery.l': 'Odkrywanie', 'grow.discovery.d': 'Znajduj i analizuj nowych klientów.',
-    'grow.contacts.l': 'Kontakty', 'grow.contacts.d': 'Przeglądaj i zatwierdzaj klientów.',
-    'grow.pipeline.l': 'Lejek', 'grow.pipeline.d': 'Śledź klientów według etapu.',
-    'grow.campaigns.l': 'Kampanie', 'grow.campaigns.d': 'Planuj kampanie, testy A/B i śledzenie lejka.',
-    'grow.myOutreach.l': 'Mój outreach', 'grow.myOutreach.d': 'Outreach pisany przez AI dla Twojej firmy — sprawdź i wyślij.',
-    'grow.promote.l': 'Promuj', 'grow.promote.d': 'Prowadź kampanie promocyjne.',
-    'grow.sales.l': 'Sprzedaż', 'grow.sales.d': 'Przegląd sprzedaży.',
-    'grow.salesPipeline.l': 'Lejek sprzedaży', 'grow.salesPipeline.d': 'Transakcje w toku.',
-    'ws.dashboard.l': 'Panel', 'ws.dashboard.d': 'Twoja baza główna.',
-    'ws.assistant.l': 'Asystent', 'ws.assistant.d': "Zapytaj concierge'a o cokolwiek.",
-    'ws.calendar.l': 'Kalendarz', 'ws.calendar.d': 'Wydarzenia i daty kulturalne.',
-    'ws.spreadsheets.l': 'Arkusze', 'ws.spreadsheets.d': 'Twoje zaimportowane dane w tabeli.',
-    'ws.infraPrs.l': 'PR-y Infrastruktury', 'ws.infraPrs.d': 'Zatwierdzaj zmiany infrastruktury przygotowane przez AI.',
-    'ws.feedback.l': 'Opinie', 'ws.feedback.d': 'Wyślij nam swoją opinię.',
-    'adm.mission.l': 'Centrum dowodzenia', 'adm.mission.d': 'Zunifikowany kokpit administracyjny.', 'adm.overview.l': 'Przegląd', 'adm.overview.d': 'Rzeczywiste dane na żywo.',
-    'adm.hub.l': 'Konsola Hub', 'adm.hub.d': 'Dowodzenie infrastrukturą — klucze, dostawcy, wdrożenia, zespół.',
-    'adm.audit.l': 'Konsola Audytu', 'adm.audit.d': 'Skany bezpieczeństwa i jakości na GPT‑5.5, odizolowane od ruchu na żywo.',
-    'adm.revenue.l': 'Przychód', 'adm.revenue.d': 'Bieżący MRR z aktywnych subskrypcji.',
-    'adm.radar.l': 'Radar okazji', 'adm.radar.d': 'Codzienny skan rynku AI: konkurencja, luki, partnerstwa.',
-    'adm.data.l': 'Łączniki danych', 'adm.data.d': 'Importuj i zarządzaj połączonymi źródłami danych.',
-    'adm.metrics.l': 'Metryki i kredyty', 'adm.metrics.d': 'Zużycie, kredyty i metryki operacyjne.',
-    'adm.console.l': 'Konsola', 'adm.console.d': 'Narzędzia biurowe i konsola wewnętrzna.',
-    'adm.team.l': 'Zespół i role', 'adm.team.d': 'Dodawaj osoby i ustaw dostęp.',
-    'adm.roles.l': 'Zarządzanie rolami', 'adm.roles.d': 'Zarządzaj rolami i własnością.',
-    'adm.onboarding.l': 'Wdrożenie', 'adm.onboarding.d': 'Ustawienia wdrożenia.',
-    'adm.settings.l': 'Ustawienia admina', 'adm.settings.d': 'Przełączniki systemowe.',
-    'adm.opSettings.l': 'Ustawienia', 'adm.opSettings.d': 'Ustawienia operacyjne i preferencje konta.',
-    'help.faq.l': 'FAQ', 'help.contact.l': 'Kontakt z pomocą', 'help.docs.l': 'Dokumentacja',
-  },
-  ru: {
-    'group.website': 'Сайт', 'group.podcast': 'Подкаст', 'group.content': 'Контент',
-    'group.launchpad': 'Launchpad', 'group.grow': 'Рост', 'group.workspace': 'Рабочая область',
-    'group.admin': 'Админ', 'group.help': 'Помощь',
-    'nav.home': 'Главная', 'nav.dashboard': 'Панель', 'nav.pricing': 'Цены', 'nav.more': 'Ещё',
-    'plan.freeDemo': 'Бесплатное демо', 'plan.launch': 'Launch', 'plan.growth': 'Growth', 'plan.command': 'Command',
-    'title.videoCredits': 'Доступные видеокредиты', 'title.currentPlan': 'Текущий план',
-    'web.build.l': 'Создать сайт', 'web.build.d': 'Создайте полный сайт из запроса.',
-    'web.optimize.l': 'Оптимизировать сайт', 'web.optimize.d': 'Анализируйте, оптимизируйте и пересоберите улучшенный сайт.',
-    'web.reviews.l': 'Отзывы', 'web.reviews.d': 'Собирайте и показывайте отзывы клиентов.',
-    'web.improve.l': 'Улучшить контент', 'web.improve.d': 'Доработайте страницы для SEO и конверсии.',
-    'pod.public.l': 'Для подкастеров', 'pod.public.d': 'Публичная страница для авторов подкастов.', 'pod.build.l': 'Создать подкаст', 'pod.build.d': 'Создайте подкаст с нуля.',
-    'pod.optimize.l': 'Оптимизировать студию подкаста', 'pod.optimize.d': 'Проверьте свой фид для Apple, Spotify и роста.',
-    'pod.hub.l': 'Центр подкаста', 'pod.hub.d': 'Ваша страница и инструменты подкаста.',
-    'con.audio.l': 'Аудиостудия', 'con.audio.d': 'Естественный голос и аудиоконтент.',
-    'con.video.l': 'Видеостудия', 'con.video.d': 'Создавайте видео, клипы, субтитры и экспорты.',
-    'con.creative.l': 'Креативная студия', 'con.creative.d': 'Создавайте промо-баннеры и визуалы кампаний с помощью ИИ.',
-    'con.lab.l': 'Лаборатория', 'con.lab.d': 'Экспериментальные инструменты и функции.',
-    'con.apprentice.l': 'Помощник мастерской', 'con.apprentice.d': 'Пошаговая помощь с учётом уровня.',
-    'lp.home.l': 'Главная Launchpad', 'lp.home.d': 'Выберите управляемый путь запуска.',
-    'lp.business.l': 'Создать бизнес', 'lp.business.d': 'Запустите бизнес с нуля.',
-    'lp.creator.l': 'Автор', 'lp.creator.d': 'Создайте свой бренд автора.',
-    'lp.store.l': 'Интернет-магазин', 'lp.store.d': 'Запустите магазин с нуля.',
-    'lp.podcast.l': 'Подкаст', 'lp.podcast.d': 'Создайте подкаст с нуля.',
-    'grow.hub.l': 'Центр аутрича', 'grow.hub.d': 'Ваш командный центр аутрича.',
-    'grow.discovery.l': 'Поиск', 'grow.discovery.d': 'Находите и анализируйте новых лидов.',
-    'grow.contacts.l': 'Контакты', 'grow.contacts.d': 'Просматривайте и одобряйте лидов.',
-    'grow.pipeline.l': 'Воронка', 'grow.pipeline.d': 'Отслеживайте лидов по этапам.',
-    'grow.campaigns.l': 'Кампании', 'grow.campaigns.d': 'Планируйте кампании, A/B-тесты и отслеживание воронки.',
-    'grow.myOutreach.l': 'Мой аутрич', 'grow.myOutreach.d': 'Аутрич от ИИ для вашего бизнеса — проверьте и отправьте.',
-    'grow.promote.l': 'Продвигать', 'grow.promote.d': 'Запускайте промо-кампании.',
-    'grow.sales.l': 'Продажи', 'grow.sales.d': 'Обзор продаж.',
-    'grow.salesPipeline.l': 'Воронка продаж', 'grow.salesPipeline.d': 'Сделки в процессе.',
-    'ws.dashboard.l': 'Панель', 'ws.dashboard.d': 'Ваша домашняя база.',
-    'ws.assistant.l': 'Ассистент', 'ws.assistant.d': 'Спросите консьержа о чём угодно.',
-    'ws.calendar.l': 'Календарь', 'ws.calendar.d': 'События и культурные даты.',
-    'ws.spreadsheets.l': 'Таблицы', 'ws.spreadsheets.d': 'Ваши импортированные данные в таблице.',
-    'ws.infraPrs.l': 'PR инфраструктуры', 'ws.infraPrs.d': 'Утверждайте изменения инфраструктуры от ИИ.',
-    'ws.feedback.l': 'Отзывы', 'ws.feedback.d': 'Отправьте нам свой отзыв.',
-    'adm.mission.l': 'Центр управления', 'adm.mission.d': 'Единый административный кокпит.', 'adm.overview.l': 'Обзор', 'adm.overview.d': 'Реальные данные в реальном времени.',
-    'adm.hub.l': 'Консоль Hub', 'adm.hub.d': 'Управление инфраструктурой — ключи, провайдеры, развёртывания, команда.',
-    'adm.audit.l': 'Консоль аудита', 'adm.audit.d': 'Проверки безопасности и качества на GPT‑5.5, изолированные от живого трафика.',
-    'adm.revenue.l': 'Доход', 'adm.revenue.d': 'Текущий MRR от активных подписок.',
-    'adm.radar.l': 'Радар возможностей', 'adm.radar.d': 'Ежедневный ИИ-скан рынка: конкуренты, ниши, партнёрства.',
-    'adm.data.l': 'Коннекторы данных', 'adm.data.d': 'Импортируйте и управляйте подключёнными источниками данных.',
-    'adm.metrics.l': 'Метрики и кредиты', 'adm.metrics.d': 'Использование, кредиты и операционные метрики.',
-    'adm.console.l': 'Консоль', 'adm.console.d': 'Офисные утилиты и внутренняя консоль.',
-    'adm.team.l': 'Команда и роли', 'adm.team.d': 'Добавляйте людей и настраивайте доступ.',
-    'adm.roles.l': 'Управление ролями', 'adm.roles.d': 'Управляйте ролями и владением.',
-    'adm.onboarding.l': 'Онбординг', 'adm.onboarding.d': 'Настройки онбординга.',
-    'adm.settings.l': 'Настройки админа', 'adm.settings.d': 'Системные переключатели.',
-    'adm.opSettings.l': 'Настройки', 'adm.opSettings.d': 'Операционные настройки и параметры аккаунта.',
-    'help.faq.l': 'Частые вопросы', 'help.contact.l': 'Связаться с поддержкой', 'help.docs.l': 'Документация',
-  },
-}
-function tr(lang: string, key: string): string {
-  const l = (['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as Lang
-  return COPY[l]?.[key] ?? COPY.en[key] ?? ''
-}
-function localize(items: Item[], lang: string): LocalizedItem[] {
-  return items.map(it => {
-    const label = tr(lang, `${it.key}.l`)
-    const dKey = `${it.key}.d`
-    const desc = dKey in COPY.en ? tr(lang, dKey) : undefined
-    return { icon: it.icon, href: it.href, label, ...(desc ? { desc } : {}) }
-  })
-}
-
-const PLAN_KEY: Record<string, string> = {
-  free: 'plan.freeDemo', demo: 'plan.freeDemo',
-  starter: 'plan.launch', launch: 'plan.launch',
-  pro: 'plan.growth', growth: 'plan.growth',
-  business: 'plan.command', command: 'plan.command',
+const PLAN_LABEL: Record<string, string> = {
+  free: 'Free Demo',
+  demo: 'Free Demo',
+  starter: 'Launch',
+  launch: 'Launch',
+  pro: 'Growth',
+  growth: 'Growth',
+  business: 'Command',
+  command: 'Command',
 }
 
 const PLAN_STYLES: Record<string, { bg: string; color: string }> = {
@@ -406,78 +56,203 @@ const PLAN_STYLES: Record<string, { bg: string; color: string }> = {
   demo: { bg: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.72)' },
   starter: { bg: 'rgba(59,130,246,0.18)', color: '#7ab8ff' },
   launch: { bg: 'rgba(59,130,246,0.18)', color: '#7ab8ff' },
-  pro: { bg: 'rgba(255,195,0,0.18)', color: '#ffc300' },
-  growth: { bg: 'rgba(255,195,0,0.18)', color: '#ffc300' },
-  business: { bg: 'rgba(74,222,128,0.18)', color: '#4ade80' },
-  command: { bg: 'rgba(74,222,128,0.18)', color: '#4ade80' },
+  pro: { bg: 'rgba(255,195,0,0.18)', color: GOLD },
+  growth: { bg: 'rgba(255,195,0,0.18)', color: GOLD },
+  business: { bg: 'rgba(74,222,128,0.18)', color: GREEN },
+  command: { bg: 'rgba(74,222,128,0.18)', color: GREEN },
 }
 
-function publicPlanLabel(plan: string, lang: string) {
+function planLabel(plan: string) {
   const safe = String(plan || 'free').toLowerCase()
-  const key = PLAN_KEY[safe]
-  if (key) return tr(lang, key)
-  return safe.charAt(0).toUpperCase() + safe.slice(1)
+  return PLAN_LABEL[safe] || safe.charAt(0).toUpperCase() + safe.slice(1)
 }
 
-function publicPlanStyle(plan: string) {
+function planStyle(plan: string) {
   const safe = String(plan || 'free').toLowerCase()
   return PLAN_STYLES[safe] || PLAN_STYLES.free
 }
+
+const CUSTOMER_GROUPS: NavGroup[] = [
+  {
+    id: 'console',
+    label: 'Console Hub',
+    eyebrow: 'Client command',
+    accent: GOLD,
+    authOnly: true,
+    width: 390,
+    items: [
+      { icon: '🏠', label: 'Client Dashboard', href: '/dashboard', desc: 'Customer home base, recent work, credits, and next actions.' },
+      { icon: '🧩', label: 'Console Hub', href: '/dashboard/infrastructure', desc: 'Infrastructure PRs and provider-change approvals.' },
+      { icon: '📋', label: 'Infrastructure PRs', href: '/dashboard/infrastructure', desc: 'Review AI-drafted infrastructure changes before anything is applied.' },
+      { icon: '🤖', label: 'Concierge', href: '/dashboard/assistant', desc: 'Ask the SignalBoost assistant for help inside the workspace.' },
+    ],
+  },
+  {
+    id: 'audit',
+    label: 'Audit Cockpit',
+    eyebrow: 'Readiness reports',
+    accent: '#a78bfa',
+    authOnly: true,
+    width: 410,
+    items: [
+      { icon: '📋', label: 'Audit Console', href: '/dashboard/audit', desc: 'Run readiness checks and open the audit workflow.' },
+      { icon: '🎛️', label: 'Audit Cockpit', href: '/hub/audit', desc: 'Executive audit reports, evidence, provider inventory, and roadmap.' },
+      { icon: '🔑', label: 'Identity & Secrets Review', href: '/hub/audit/identity', desc: 'Review identity, access, secrets, and key exposure reports.' },
+      { icon: '🧾', label: 'Printable Audit Reports', href: '/hub/audit', desc: 'Download PDF reports or print/save audit evidence.' },
+    ],
+  },
+  {
+    id: 'cyber',
+    label: 'Cybersecurity',
+    eyebrow: 'Monitoring & fixes',
+    accent: CYAN,
+    authOnly: true,
+    width: 410,
+    items: [
+      { icon: '🛡️', label: 'Cybersecurity Center', href: '/dashboard/cybersecurity', desc: 'Dependency scans, monitors, alerts, and issue review reports.' },
+      { icon: '🚨', label: 'Alert Inbox', href: '/dashboard/cybersecurity', desc: 'Critical/high advisory alerts and monitor status.' },
+      { icon: '🧭', label: 'Remediation Plans', href: '/dashboard/cybersecurity', desc: 'Plan-first, human-approved fixes before PR preparation.' },
+      { icon: '📄', label: 'Cyber PDF Reports', href: '/dashboard/cybersecurity', desc: 'Download or print issue review reports for customers.' },
+    ],
+  },
+]
+
+const PRODUCT_GROUPS: NavGroup[] = [
+  {
+    id: 'website',
+    label: 'Website',
+    eyebrow: 'Build & improve',
+    accent: '#38bdf8',
+    width: 360,
+    items: [
+      { icon: '🌐', label: 'Build a Website', href: '/dashboard/builder', desc: 'Generate a professional site from a prompt.' },
+      { icon: '🧭', label: 'Optimize Website', href: '/dashboard/improve', desc: 'Analyze and improve an existing website.' },
+      { icon: '⭐', label: 'Reviews', href: '/dashboard/reviews', desc: 'Collect, manage, and display customer reviews.' },
+      { icon: '✨', label: 'Improve Content', href: '/dashboard/improve', desc: 'Polish copy for SEO and conversion.' },
+    ],
+  },
+  {
+    id: 'studio',
+    label: 'Studio',
+    eyebrow: 'Podcast & content',
+    accent: '#f472b6',
+    width: 400,
+    items: [
+      { icon: '🎙️', label: 'Podcast Launchpad', href: '/dashboard/launchpad/podcast', desc: 'Start a podcast from scratch.' },
+      { icon: '🎚️', label: 'Podcast Studio', href: '/dashboard/podcast/studio', desc: 'Optimize feeds for Apple, Spotify, and growth.' },
+      { icon: '🎬', label: 'Video Studio', href: '/dashboard/video', desc: 'Create videos, clips, captions, and exports.' },
+      { icon: '🎧', label: 'Audio Studio', href: '/dashboard/audio', desc: 'Generate voice and audio content.' },
+      { icon: '🎨', label: 'Creative Studio', href: '/dashboard/creative', desc: 'Campaign visuals and promotional assets.' },
+    ],
+  },
+  {
+    id: 'launchpad',
+    label: 'Launchpad',
+    eyebrow: 'Guided starts',
+    accent: '#fb923c',
+    width: 380,
+    items: [
+      { icon: '🚀', label: 'Launchpad Home', href: '/dashboard/launchpad', desc: 'Choose a guided launch path.' },
+      { icon: '🏢', label: 'Build a Business', href: '/dashboard/launchpad/business', desc: 'Launch a business from scratch.' },
+      { icon: '🎬', label: 'Creator', href: '/dashboard/launchpad/creator', desc: 'Build a creator brand.' },
+      { icon: '🛒', label: 'Online Store', href: '/dashboard/launchpad/store', desc: 'Launch a store workflow.' },
+    ],
+  },
+  {
+    id: 'grow',
+    label: 'Grow',
+    eyebrow: 'Outreach & sales',
+    accent: GREEN,
+    width: 410,
+    items: [
+      { icon: '🛸', label: 'Outreach Hub', href: '/dashboard/outreach', desc: 'Customer outreach command center.' },
+      { icon: '🚀', label: 'My Outreach', href: '/dashboard/my-outreach', desc: 'AI-written outreach to review and send.' },
+      { icon: '🔎', label: 'Discovery', href: '/dashboard/outreach/discovery', desc: 'Find and analyze new leads.' },
+      { icon: '📇', label: 'Contacts', href: '/dashboard/outreach/contacts', desc: 'Review and approve leads.' },
+      { icon: '📊', label: 'Pipeline', href: '/dashboard/outreach/pipeline', desc: 'Track prospects by stage.' },
+      { icon: '📣', label: 'Campaigns', href: '/dashboard/campaigns', desc: 'Plan campaigns and tests.' },
+    ],
+  },
+]
+
+const OWNER_GROUP: NavGroup = {
+  id: 'owner',
+  label: 'Owner/Admin',
+  eyebrow: 'Internal control',
+  accent: RED,
+  ownerOnly: true,
+  align: 'right',
+  width: 420,
+  items: [
+    { icon: '🎛️', label: 'Owner Hub', href: '/hub', desc: 'Internal provider keys, health, deployments, and team controls.' },
+    { icon: '🛰️', label: 'Mission Control', href: '/admin', desc: 'Executive admin cockpit.' },
+    { icon: '🌌', label: 'Admin Overview', href: '/admin/overview', desc: 'Live counts and operating status.' },
+    { icon: '💰', label: 'Revenue', href: '/admin/revenue', desc: 'MRR and active subscription reporting.' },
+    { icon: '🔌', label: 'Data Connectors', href: '/dashboard/data', desc: 'Manage connected data sources.' },
+    { icon: '⚡', label: 'Metrics & Credits', href: '/dashboard/metrics', desc: 'Usage, credits, and operating metrics.' },
+    { icon: '👥', label: 'Team & Roles', href: '/dashboard/team', desc: 'Internal team and access management.' },
+    { icon: '⚙️', label: 'Admin Settings', href: '/admin/settings', desc: 'System-wide switches.' },
+  ],
+}
+
+const HELP_GROUP: NavGroup = {
+  id: 'help',
+  label: 'Help',
+  eyebrow: 'Support',
+  accent: '#94a3b8',
+  align: 'right',
+  width: 260,
+  items: [
+    { icon: '❓', label: 'FAQ', href: '/faq' },
+    { icon: '✉️', label: 'Contact Support', href: '/support' },
+    { icon: '📖', label: 'Documentation', href: '/docs' },
+  ],
+}
+
 export default function Navbar() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const navRef = useRef<HTMLDivElement>(null)
+  const navRef = useRef<HTMLElement>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
   const pathname = usePathname()
   const { lang, setLang, dict } = useI18n()
 
   const [showAuth, setShowAuth] = useState(false)
   const [user, setUser] = useState<any>(null)
-  const [credits, setCredits] = useState<number>(0)
-  const [plan, setPlan] = useState<string>('free')
+  const [credits, setCredits] = useState(0)
+  const [plan, setPlan] = useState('free')
   const [userName, setUserName] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [isOwner, setIsOwner] = useState(false)
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  // Localized menu groups (recomputed when language changes)
-  const dashboardItems = localize(DASHBOARD_MENU, lang)
-  const websiteItems   = localize(WEBSITE, lang)
-  const podcastItems   = localize(PODCAST, lang)
-  const contentItems   = localize(CONTENT, lang)
-  const launchpadItems = localize(LAUNCHPAD, lang)
-  const growItems      = localize(GROW, lang)
-  const workspaceItems = localize(WORKSPACE, lang)
-  const adminItems     = localize(ADMIN, lang)
-  const helpItems      = localize(HELP, lang)
+  const currentPlanLabel = planLabel(plan)
+  const currentPlanStyle = planStyle(plan)
+  const displayName = userName || user?.email || ''
+  const ownerAccess = isAdmin || isOwner
+  const groups = [
+    ...(user ? CUSTOMER_GROUPS : []),
+    ...PRODUCT_GROUPS,
+    ...(ownerAccess ? [OWNER_GROUP] : []),
+    HELP_GROUP,
+  ]
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       const currentUser = data?.user ?? null
       setUser(currentUser)
-      if (currentUser) {
-        fetchCredits()
-      } else {
-        setIsAdmin(false)
-        setIsOwner(false)
-      }
+      if (currentUser) fetchCredits()
+      else { setIsAdmin(false); setIsOwner(false) }
     })
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       const currentUser = session?.user ?? null
       setUser(currentUser)
-      if (currentUser) {
-        fetchCredits()
-      } else {
-        setIsAdmin(false)
-        setIsOwner(false)
-      }
+      if (currentUser) fetchCredits()
+      else { setIsAdmin(false); setIsOwner(false) }
     })
 
-    return () => {
-      listener.subscription.unsubscribe()
-    }
+    return () => listener.subscription.unsubscribe()
   }, [])
 
   async function fetchCredits() {
@@ -490,7 +265,7 @@ export default function Navbar() {
       setIsAdmin(!!data.isAdmin)
       setIsOwner(!!data.isOwner)
     } catch {
-      // Navbar should not break the app if credits fail.
+      // Navbar should not break the app if account metadata fails.
     }
   }
 
@@ -501,9 +276,7 @@ export default function Navbar() {
 
   useEffect(() => {
     function onDocClick(event: MouseEvent) {
-      if (navRef.current && !navRef.current.contains(event.target as Node)) {
-        setOpenMenu(null)
-      }
+      if (navRef.current && !navRef.current.contains(event.target as Node)) setOpenMenu(null)
     }
     function onKey(event: KeyboardEvent) {
       if (event.key === 'Escape') setOpenMenu(null)
@@ -521,20 +294,18 @@ export default function Navbar() {
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-
     const width = 40
     const height = 40
     const centerX = width / 2
     const centerY = height - 8
-
     canvas.width = width
     canvas.height = height
-
     let rings: { r: number; alpha: number }[] = []
     let last = 0
     let raf = 0
 
     function draw(timestamp: number) {
+      if (!ctx) return
       ctx.clearRect(0, 0, width, height)
       if (!last || timestamp - last > 2000) {
         rings.push({ r: 0, alpha: 1 })
@@ -560,9 +331,7 @@ export default function Navbar() {
     }
 
     raf = requestAnimationFrame(draw)
-    return () => {
-      cancelAnimationFrame(raf)
-    }
+    return () => cancelAnimationFrame(raf)
   }, [])
 
   async function handleLogout() {
@@ -572,180 +341,121 @@ export default function Navbar() {
   }
 
   function openNow(id: string) {
-    if (closeTimer.current) {
-      clearTimeout(closeTimer.current)
-      closeTimer.current = null
-    }
+    if (closeTimer.current) clearTimeout(closeTimer.current)
+    closeTimer.current = null
     setOpenMenu(id)
   }
 
   function closeSoon() {
     if (closeTimer.current) clearTimeout(closeTimer.current)
-    closeTimer.current = setTimeout(() => {
-      setOpenMenu(null)
-    }, 140)
+    closeTimer.current = setTimeout(() => setOpenMenu(null), 140)
   }
 
-  const groupActive = (items: LocalizedItem[]) =>
+  const groupActive = (items: NavItem[]) =>
     items.some((item) => item.href !== '/' && (pathname === item.href || pathname?.startsWith(`${item.href}/`)))
 
-  const trigger = (active: boolean): CSSProperties => ({
+  const triggerStyle = (active: boolean, accent?: string): CSSProperties => ({
     display: 'inline-flex',
     alignItems: 'center',
-    gap: 6,
-    background: 'transparent',
-    border: 'none',
+    gap: 7,
+    background: active ? 'rgba(255,255,255,.075)' : 'transparent',
+    border: active ? `1px solid ${accent || 'rgba(255,255,255,.18)'}` : '1px solid transparent',
+    borderRadius: 999,
     cursor: 'pointer',
-    color: active ? '#fff' : 'var(--text-secondary)',
-    fontWeight: active ? 700 : 600,
+    color: active ? '#fff' : 'rgba(226,232,240,.76)',
+    fontWeight: active ? 800 : 650,
     fontSize: 13,
     fontFamily: 'inherit',
-    padding: '8px 2px',
+    padding: '8px 11px',
     whiteSpace: 'nowrap',
     textDecoration: 'none',
+    boxShadow: active && accent ? `0 0 18px ${accent}22` : 'none',
   })
 
-  const panelWrap = (open: boolean, align: 'left' | 'right'): CSSProperties => ({
-    position: 'absolute',
-    top: '100%',
-    [align]: 0,
-    paddingTop: 12,
-    opacity: open ? 1 : 0,
-    transform: open ? 'translateY(0)' : 'translateY(8px)',
-    visibility: open ? 'visible' : 'hidden',
-    pointerEvents: open ? 'auto' : 'none',
-    transition: 'opacity .18s ease, transform .18s ease, visibility .18s',
-    zIndex: 200,
-  })
-
-  const panelCard: CSSProperties = {
-    position: 'relative',
-    background: 'linear-gradient(135deg, rgba(20,24,36,.98), rgba(15,23,42,.98))',
-    border: '1px solid var(--border-medium)',
-    borderRadius: 18,
-    boxShadow: '0 30px 80px rgba(0,0,0,.55)',
-    maxHeight: 'calc(100vh - 120px)',
-    overflowY: 'auto',
-    overflowX: 'hidden',
-    backdropFilter: 'blur(14px)',
-  }
-
-  const accentLine: CSSProperties = {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 2,
-    background: `linear-gradient(90deg, ${GOLD}, ${CYAN})`,
-  }
-
-  const planStyle = publicPlanStyle(plan)
-  const planLabel = publicPlanLabel(plan, lang)
-  const displayName = userName || user?.email || ''
-
-  const MENU_ACCENTS: Record<string, string> = {
-    dashboard: '#ffc300',
-    website:   '#1af0ff',
-    podcast:   '#a78bfa',
-    content:   '#f472b6',
-    launchpad: '#fb923c',
-    grow:      '#4ade80',
-    workspace: '#60a5fa',
-    admin:     '#f87171',
-    help:      '#94a3b8',
-  }
-
-  function Group({
-    id,
-    label,
-    items,
-    align = 'left',
-    cols = 1,
-    width = 320,
-  }: {
-    id: string
-    label: string
-    items: LocalizedItem[]
-    align?: 'left' | 'right'
-    cols?: number
-    width?: number
-  }) {
-    const open = openMenu === id
-    const accent = MENU_ACCENTS[id] || 'rgba(255,255,255,.6)'
-    const lit = open || groupActive(items)
-
+  function Group({ group }: { group: NavGroup }) {
+    const open = openMenu === group.id
+    const active = open || groupActive(group.items)
     return (
-      <div style={{ position: 'relative' }} onMouseEnter={() => openNow(id)} onMouseLeave={closeSoon}>
+      <div style={{ position: 'relative' }} onMouseEnter={() => openNow(group.id)} onMouseLeave={closeSoon}>
         <button
           type="button"
           aria-haspopup="true"
           aria-expanded={open}
-          onClick={() => setOpenMenu(open ? null : id)}
-          style={{ ...trigger(lit), ...(lit ? { color: accent } : {}) }}
+          onClick={() => setOpenMenu(open ? null : group.id)}
+          style={triggerStyle(active, group.accent)}
         >
-          <span aria-hidden="true" style={{ display: 'inline-block', width: 5, height: 5, borderRadius: 999, background: accent, marginRight: 5, opacity: lit ? 1 : .65, boxShadow: lit ? `0 0 8px ${accent}` : 'none' }} />
-          {label}
-          <span
+          <span aria-hidden style={{ width: 7, height: 7, borderRadius: 99, background: group.accent, boxShadow: `0 0 12px ${group.accent}`, opacity: active ? 1 : .72 }} />
+          {group.label}
+          <span style={{ fontSize: 10, opacity: .68, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .18s' }}>▾</span>
+        </button>
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            [group.align === 'right' ? 'right' : 'left']: 0,
+            paddingTop: 12,
+            opacity: open ? 1 : 0,
+            visibility: open ? 'visible' : 'hidden',
+            transform: open ? 'translateY(0)' : 'translateY(8px)',
+            pointerEvents: open ? 'auto' : 'none',
+            transition: 'opacity .18s ease, transform .18s ease, visibility .18s',
+            zIndex: 220,
+          }}
+          onMouseEnter={() => openNow(group.id)}
+          onMouseLeave={closeSoon}
+        >
+          <div
             style={{
-              fontSize: 10,
-              opacity: 0.7,
-              transform: open ? 'rotate(180deg)' : 'none',
-              transition: 'transform .18s',
+              width: group.width || 360,
+              maxWidth: '92vw',
+              position: 'relative',
+              overflow: 'hidden',
+              borderRadius: 22,
+              border: `1px solid ${group.accent}33`,
+              background: 'linear-gradient(145deg, rgba(3,7,18,.98), rgba(15,23,42,.96))',
+              boxShadow: `0 28px 90px rgba(0,0,0,.58), 0 0 45px ${group.accent}12`,
+              backdropFilter: 'blur(18px)',
             }}
           >
-            ▾
-          </span>
-        </button>
-<div style={panelWrap(open, align)} onMouseEnter={() => openNow(id)} onMouseLeave={closeSoon}>
-          <div style={panelCard}>
-            <span style={accentLine} aria-hidden="true" />
-            <div
-              style={{
-                padding: 12,
-                width,
-                maxWidth: '92vw',
-                display: 'grid',
-                gridTemplateColumns: `repeat(${cols}, 1fr)`,
-                gap: 2,
-              }}
-            >
-              {items.map((item) => (
-                <Link
-                  key={item.href + item.label}
-                  href={item.href}
-                  onClick={() => setOpenMenu(null)}
-                  className="sbnav-row"
-                  style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 12, textDecoration: 'none' }}
-                >
-                  <span style={{ fontSize: 18, flexShrink: 0 }}>{item.icon}</span>
-                  <span style={{ minWidth: 0 }}>
-                    <span style={{ display: 'block', color: '#fff', fontWeight: 700, fontSize: 13 }}>
-                      {item.label}
+            <span aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${group.accent}, ${CYAN})` }} />
+            <div style={{ padding: '15px 15px 8px' }}>
+              <div style={{ color: group.accent, fontSize: 10, fontWeight: 900, letterSpacing: '.16em', textTransform: 'uppercase', marginBottom: 8 }}>
+                {group.eyebrow || 'SignalBoost'}
+              </div>
+              <div style={{ display: 'grid', gap: 4 }}>
+                {group.items.map((item) => (
+                  <Link
+                    key={`${group.id}:${item.href}:${item.label}`}
+                    href={item.href}
+                    onClick={() => setOpenMenu(null)}
+                    className="sbnav-row"
+                    style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 12, textDecoration: 'none' }}
+                  >
+                    <span style={{ fontSize: 19, flexShrink: 0 }}>{item.icon}</span>
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: 'block', color: '#fff', fontWeight: 800, fontSize: 13 }}>{item.label}</span>
+                      {item.desc ? <span style={{ display: 'block', color: 'rgba(148,163,184,.88)', fontSize: 11, marginTop: 2, lineHeight: 1.35 }}>{item.desc}</span> : null}
                     </span>
-                    {item.desc ? (
-                      <span style={{ display: 'block', color: 'var(--text-muted)', fontSize: 11, marginTop: 1, lineHeight: 1.35 }}>
-                        {item.desc}
-                      </span>
-                    ) : null}
-                  </span>
-                </Link>
-              ))}
+                  </Link>
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </div>
     )
   }
-return (
+
+  return (
     <>
       <style>{`
-        .sbnav-desktop { display: flex; align-items: center; gap: 10px; }
+        .sbnav-desktop { display: flex; align-items: center; gap: 6px; }
         .sbnav-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
         .sbnav-burger { display: none; }
         .sbnav-mobile-auth { display: none; }
-        .sbnav-row { transition: background .15s ease; border-radius: 12px; }
-        .sbnav-row:hover { background: var(--surface-1-hover); }
-        @media (max-width: 1200px) {
+        .sbnav-row { border-radius: 14px; transition: background .15s ease, transform .15s ease; }
+        .sbnav-row:hover { background: rgba(255,255,255,.065); transform: translateX(2px); }
+        @media (max-width: 1260px) {
           .sbnav-desktop, .sbnav-right { display: none !important; }
           .sbnav-burger { display: inline-flex !important; }
           .sbnav-mobile-auth { display: inline-flex !important; }
@@ -758,138 +468,60 @@ return (
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '12px 24px',
-          background: 'linear-gradient(135deg, rgba(8,10,20,.86), rgba(15,23,42,.62))',
-          borderBottom: '1px solid rgba(26,240,255,.16)',
-          boxShadow: '0 18px 60px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.08)',
+          gap: 12,
+          padding: '11px 22px',
+          background: 'linear-gradient(135deg, rgba(4,8,18,.92), rgba(15,23,42,.76))',
+          borderBottom: '1px solid rgba(26,240,255,.18)',
+          boxShadow: '0 18px 60px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.08)',
           position: 'sticky',
           top: 0,
           zIndex: 100,
-          backdropFilter: 'blur(12px)',
+          backdropFilter: 'blur(14px)',
         }}
       >
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0, marginRight: 14 }}>
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0, marginRight: 8 }}>
           <canvas ref={canvasRef} style={{ width: 40, height: 40 }} />
-          <span style={{ color: '#fff', fontWeight: 800, fontSize: 17 }}>
-            signal<span style={{ color: GOLD }}>boost</span>
+          <span style={{ display: 'grid', lineHeight: 1.05 }}>
+            <span style={{ color: '#fff', fontWeight: 900, fontSize: 17 }}>signal<span style={{ color: GOLD }}>boost</span></span>
+            <span style={{ color: 'rgba(148,163,184,.72)', fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase' }}>
+              Client suite
+            </span>
           </span>
         </Link>
 
         <div className="sbnav-desktop">
-          <Link href="/" style={{ ...trigger(pathname === '/'), display: 'inline-flex' }}>
-            {tr(lang, 'nav.home')}
-          </Link>
-
-          {user ? (
-            <Group id="dashboard" label={tr(lang, 'nav.dashboard')} items={dashboardItems} width={340} />
-          ) : null}
-
-          <Group id="website"   label={tr(lang, 'group.website')}   items={websiteItems}   width={340} />
-          <Group id="podcast"   label={tr(lang, 'group.podcast')}   items={podcastItems}   width={340} />
-          <Group id="content"   label={tr(lang, 'group.content')}   items={contentItems}   width={340} />
-          <Group id="launchpad" label={tr(lang, 'group.launchpad')} items={launchpadItems} width={340} />
-          <Group id="grow"      label={tr(lang, 'group.grow')}      items={growItems}      width={340} />
-          <Group id="workspace" label={tr(lang, 'group.workspace')} items={workspaceItems} width={340} />
-
-          {isAdmin ? <Group id="admin" label={tr(lang, 'group.admin')} items={adminItems} width={360} /> : null}
-
-          <Link href="/pricing" style={{ ...trigger(pathname === '/pricing'), display: 'inline-flex' }}>
-            {tr(lang, 'nav.pricing')}
-          </Link>
-
-          <Group id="help" label={tr(lang, 'group.help')} items={helpItems} align="right" width={240} />
+          <Link href="/" style={triggerStyle(pathname === '/', GOLD)}>Home</Link>
+          {groups.map((group) => <Group key={group.id} group={group} />)}
+          <Link href="/pricing" style={triggerStyle(pathname === '/pricing', GOLD)}>Pricing</Link>
         </div>
 
         <div className="sbnav-right">
           <select
-            value={lang}
+            value={String(lang || 'en')}
             onChange={(event) => setLang(event.target.value)}
-            style={{
-              background: 'var(--surface-2)',
-              color: 'var(--text-secondary)',
-              border: '1px solid var(--border-medium)',
-              borderRadius: 999,
-              padding: '8px 12px',
-              fontSize: 12,
-              cursor: 'pointer',
-            }}
+            style={{ background: 'rgba(15,23,42,.82)', color: 'rgba(226,232,240,.78)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 999, padding: '8px 12px', fontSize: 12, cursor: 'pointer' }}
           >
-            {LANGUAGES.map((language) => (
-              <option key={language.code} value={language.code}>
-                {language.label}
-              </option>
-            ))}
+            {LANGUAGES.map((language) => <option key={language.code} value={language.code}>{language.label}</option>)}
           </select>
 
           {user ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-              <span
-                title={`${tr(lang, 'title.videoCredits')}: ${credits.toLocaleString()}`}
-                style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,195,0,0.95)', fontFamily: 'monospace', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 3 }}
-              >
+              <span title={`Available video credits: ${credits.toLocaleString()}`} style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,195,0,0.95)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
                 ⚡{credits >= 100000 ? `${Math.floor(credits / 1000)}K` : credits.toLocaleString()}
               </span>
-              <span
-                title={`${tr(lang, 'title.currentPlan')}: ${planLabel}`}
-                style={{
-                  fontSize: 11,
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  padding: '3px 10px',
-                  borderRadius: 999,
-                  background: planStyle.bg,
-                  color: planStyle.color,
-                  fontFamily: 'monospace',
-                }}
-              >
-                {planLabel}
+              <span title={`Current plan: ${currentPlanLabel}`} style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.06em', padding: '3px 10px', borderRadius: 999, background: currentPlanStyle.bg, color: currentPlanStyle.color, fontFamily: 'monospace' }}>
+                {currentPlanLabel}
               </span>
-              {displayName ? (
-                <span
-                  title={displayName}
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: 'var(--text-secondary)',
-                    maxWidth: 130,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {displayName}
-                </span>
-              ) : null}
+              {displayName ? <span title={displayName} style={{ fontSize: 12, fontWeight: 650, color: 'rgba(226,232,240,.70)', maxWidth: 135, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</span> : null}
             </span>
           ) : null}
 
           {user ? (
-            <button
-              onClick={handleLogout}
-              style={{
-                background: 'transparent',
-                color: 'var(--text-muted)',
-                border: '1px solid var(--border-soft)',
-                borderRadius: 999,
-                padding: '8px 14px',
-                cursor: 'pointer',
-              }}
-            >
+            <button onClick={handleLogout} style={{ background: 'transparent', color: 'rgba(148,163,184,.78)', border: '1px solid rgba(255,255,255,.13)', borderRadius: 999, padding: '8px 14px', cursor: 'pointer' }}>
               {t(dict, 'logout', 'Log out')}
             </button>
           ) : (
-            <button
-              onClick={() => setShowAuth(true)}
-              style={{
-                background: GOLD,
-                color: '#000',
-                border: 'none',
-                borderRadius: 999,
-                padding: '9px 22px',
-                fontWeight: 800,
-                cursor: 'pointer',
-              }}
-            >
+            <button onClick={() => setShowAuth(true)} style={{ background: GOLD, color: '#000', border: 'none', borderRadius: 999, padding: '9px 22px', fontWeight: 900, cursor: 'pointer' }}>
               {t(dict, 'getStarted', 'Get started')}
             </button>
           )}
@@ -898,208 +530,54 @@ return (
         <span className="sbnav-mobile-auth" style={{ alignItems: 'center', gap: 8 }}>
           {user ? (
             <>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,195,0,0.95)', fontFamily: 'monospace' }}>
-                ⚡ {credits}
-              </span>
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  padding: '3px 10px',
-                  borderRadius: 999,
-                  background: planStyle.bg,
-                  color: planStyle.color,
-                  fontFamily: 'monospace',
-                }}
-              >
-                {planLabel}
-              </span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,195,0,0.95)', fontFamily: 'monospace' }}>⚡ {credits}</span>
+              <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.06em', padding: '3px 10px', borderRadius: 999, background: currentPlanStyle.bg, color: currentPlanStyle.color, fontFamily: 'monospace' }}>{currentPlanLabel}</span>
             </>
           ) : (
-            <button
-              onClick={() => setShowAuth(true)}
-              style={{
-                background: GOLD,
-                color: '#000',
-                border: 'none',
-                borderRadius: 999,
-                padding: '8px 16px',
-                fontWeight: 800,
-                fontSize: 13,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
+            <button onClick={() => setShowAuth(true)} style={{ background: GOLD, color: '#000', border: 'none', borderRadius: 999, padding: '8px 16px', fontWeight: 900, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               {t(dict, 'getStarted', 'Get started')}
             </button>
           )}
         </span>
 
-        <button
-          className="sbnav-burger"
-          aria-label="Menu"
-          onClick={() => setMobileOpen((open) => !open)}
-          style={{
-            background: 'transparent',
-            border: '1px solid var(--border-soft)',
-            borderRadius: 10,
-            color: '#fff',
-            padding: '8px 12px',
-            cursor: 'pointer',
-            fontSize: 18,
-          }}
-        >
+        <button className="sbnav-burger" aria-label="Menu" onClick={() => setMobileOpen(open => !open)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,.16)', borderRadius: 12, color: '#fff', padding: '8px 12px', cursor: 'pointer', fontSize: 18 }}>
           {mobileOpen ? '✕' : '☰'}
         </button>
       </nav>
 
       {mobileOpen ? (
-        <div
-          style={{
-            position: 'sticky',
-            top: 65,
-            zIndex: 99,
-            background: 'rgba(8,10,20,.98)',
-            borderBottom: '1px solid var(--border-medium)',
-            padding: 16,
-            maxHeight: '80vh',
-            overflowY: 'auto',
-            backdropFilter: 'blur(12px)',
-          }}
-        >
+        <div style={{ position: 'sticky', top: 65, zIndex: 99, background: 'rgba(4,8,18,.98)', borderBottom: '1px solid rgba(255,255,255,.14)', padding: 16, maxHeight: '80vh', overflowY: 'auto', backdropFilter: 'blur(14px)' }}>
           {user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,195,0,0.95)', fontFamily: 'monospace' }}>
-                ⚡ {credits}
-              </span>
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  padding: '3px 10px',
-                  borderRadius: 999,
-                  background: planStyle.bg,
-                  color: planStyle.color,
-                  fontFamily: 'monospace',
-                }}
-              >
-                {planLabel}
-              </span>
-              {displayName ? (
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
-                  {displayName}
-                </span>
-              ) : null}
+              <span style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,195,0,0.95)', fontFamily: 'monospace' }}>⚡ {credits}</span>
+              <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.06em', padding: '3px 10px', borderRadius: 999, background: currentPlanStyle.bg, color: currentPlanStyle.color, fontFamily: 'monospace' }}>{currentPlanLabel}</span>
+              {displayName ? <span style={{ fontSize: 12, fontWeight: 650, color: 'rgba(226,232,240,.72)' }}>{displayName}</span> : null}
             </div>
           ) : null}
 
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid var(--border-soft)' }}>
-            <select
-              value={lang}
-              onChange={(event) => setLang(event.target.value)}
-              style={{
-                background: 'var(--surface-2)',
-                color: 'var(--text-secondary)',
-                border: '1px solid var(--border-medium)',
-                borderRadius: 999,
-                padding: '8px 12px',
-                fontSize: 12,
-              }}
-            >
-              {LANGUAGES.map((language) => (
-                <option key={language.code} value={language.code}>
-                  {language.label}
-                </option>
-              ))}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid rgba(255,255,255,.10)' }}>
+            <select value={String(lang || 'en')} onChange={(event) => setLang(event.target.value)} style={{ background: 'rgba(15,23,42,.82)', color: 'rgba(226,232,240,.78)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 999, padding: '8px 12px', fontSize: 12 }}>
+              {LANGUAGES.map((language) => <option key={language.code} value={language.code}>{language.label}</option>)}
             </select>
-
-            {user ? (
-              <button
-                onClick={handleLogout}
-                style={{
-                  background: 'transparent',
-                  color: 'var(--text-muted)',
-                  border: '1px solid var(--border-soft)',
-                  borderRadius: 999,
-                  padding: '9px 16px',
-                  cursor: 'pointer',
-                }}
-              >
-                {t(dict, 'logout', 'Log out')}
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  setMobileOpen(false)
-                  setShowAuth(true)
-                }}
-                style={{
-                  background: GOLD,
-                  color: '#000',
-                  border: 'none',
-                  borderRadius: 999,
-                  padding: '9px 22px',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                }}
-              >
-                {t(dict, 'getStarted', 'Get started')}
-              </button>
-            )}
+            {user ? <button onClick={handleLogout} style={{ background: 'transparent', color: 'rgba(148,163,184,.78)', border: '1px solid rgba(255,255,255,.13)', borderRadius: 999, padding: '9px 16px', cursor: 'pointer' }}>{t(dict, 'logout', 'Log out')}</button> : <button onClick={() => { setMobileOpen(false); setShowAuth(true) }} style={{ background: GOLD, color: '#000', border: 'none', borderRadius: 999, padding: '9px 22px', fontWeight: 900, cursor: 'pointer' }}>{t(dict, 'getStarted', 'Get started')}</button>}
           </div>
 
           <div style={{ display: 'grid', gap: 4, marginBottom: 14 }}>
-            <Link href="/" style={{ padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 700, fontSize: 14 }}>
-              🏠 {tr(lang, 'nav.home')}
-            </Link>
+            <Link href="/" style={{ padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 800, fontSize: 14 }}>🏠 Home</Link>
+            <Link href="/pricing" style={{ padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 800, fontSize: 14 }}>💳 Pricing</Link>
           </div>
 
-          {[
-            { title: tr(lang, 'group.website'),   items: websiteItems },
-            { title: tr(lang, 'group.podcast'),   items: podcastItems },
-            { title: tr(lang, 'group.content'),   items: contentItems },
-            { title: tr(lang, 'group.launchpad'), items: launchpadItems },
-            { title: tr(lang, 'group.grow'),      items: growItems },
-            { title: tr(lang, 'group.workspace'), items: workspaceItems },
-            ...(isAdmin ? [{ title: tr(lang, 'group.admin'), items: adminItems }] : []),
-          ].map((section) => (
-            <div key={section.title} style={{ display: 'grid', gap: 4, marginBottom: 14 }}>
-              <span style={{ color: 'var(--text-faint)', fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>
-                {section.title}
-              </span>
-              {section.items.map((item) => (
-                <Link
-                  key={item.href + item.label}
-                  href={item.href}
-                  style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 600, fontSize: 14 }}
-                >
+          {groups.map((group) => (
+            <div key={group.id} style={{ display: 'grid', gap: 4, marginBottom: 15 }}>
+              <span style={{ color: group.accent, fontSize: 11, fontWeight: 900, letterSpacing: '.10em', textTransform: 'uppercase' }}>{group.label}</span>
+              {group.items.map((item) => (
+                <Link key={`${group.id}:${item.href}:${item.label}`} href={item.href} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 650, fontSize: 14, borderRadius: 12, background: 'rgba(255,255,255,.03)' }}>
                   <span>{item.icon}</span>
-                  {item.label}
+                  <span>{item.label}</span>
                 </Link>
               ))}
             </div>
           ))}
-
-          <div style={{ display: 'grid', gap: 4, marginBottom: 14 }}>
-            <span style={{ color: 'var(--text-faint)', fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>
-              {tr(lang, 'nav.more')}
-            </span>
-            <Link href="/pricing" style={{ padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 600, fontSize: 14 }}>
-              {tr(lang, 'nav.pricing')}
-            </Link>
-            {helpItems.map((item) => (
-              <Link
-                key={item.href + item.label}
-                href={item.href}
-                style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 600, fontSize: 14 }}
-              >
-                <span>{item.icon}</span>
-                {item.label}
-              </Link>
-            ))}
-          </div>
         </div>
       ) : null}
 

@@ -1,14 +1,338 @@
-"home": {
-  "hero": {
-    "marquee": "Auditar · Crear · Reseñar · Difundir",
-    "title": "Protege tu código con auditorías automáticas de repositorios, crea sitios web de alto rendimiento, recopila reseñas de clientes y difunde contenido nativo de audio y video",
-    "subtitle": "— en tu idioma, no una traducción. Seguimiento premium de postura de ciberseguridad combinado con un motor global de localización."
+{
+  "tier": {
+    "core": "Esencial",
+    "tier2": "Escala",
+    "tier3": "Empresarial",
+    "tier4": "Interno",
+    "sidebar": {
+      "core": "Proveedores Nivel 1",
+      "tier2": "Proveedores Nivel 2",
+      "tier3": "Proveedores Nivel 3",
+      "tier4": "Herramientas Nivel 4"
+    },
+    "blurb": {
+      "core": "Infraestructura principal: nube, pagos, datos, alojamiento y control de código.",
+      "tier2": "Mensajería, correo, red edge e integraciones de cómputo.",
+      "tier3": "Plataforma de apps, observabilidad, seguimiento de errores y respuesta a incidentes.",
+      "tier4": "Bóveda de secretos cifrada y gobernanza de equipo."
+    }
   },
-  "features": {
-    "audit": "Auditoría y seguridad de código",
-    "site": "Creador de sitios",
-    "reviews": "Recolector de reseñas",
-    "audio": "Audio nativo",
-    "video": "Editor de video"
+  "util": {
+    "domains": "Dominios/DNS",
+    "deployments": "Despliegues",
+    "logs": "Registros",
+    "settings": "Ajustes"
+  },
+  "sub": {
+    "ai_and_models": "IA Y MODELOS",
+    "email": "CORREO",
+    "transcription": "TRANSCRIPCIÓN",
+    "cloud_infrastructure": "INFRAESTRUCTURA CLOUD",
+    "cloud_platform": "PLATAFORMA CLOUD",
+    "microsoft_cloud": "NUBE MICROSOFT",
+    "payments_and_billing": "PAGOS Y FACTURACIÓN",
+    "database_and_authentication": "BASE DE DATOS Y AUTENTICACIÓN",
+    "deployments_and_networking": "DESPLIEGUES Y RED",
+    "source_control": "CONTROL DE CÓDIGO",
+    "messaging_and_sms": "MENSAJERÍA Y SMS",
+    "transactional_email": "CORREO TRANSACCIONAL",
+    "dns_cdn_and_edge": "DNS, CDN Y EDGE",
+    "cloud_compute": "CÓMPUTO CLOUD",
+    "app_platform": "PLATAFORMA DE APPS",
+    "observability": "OBSERVABILIDAD",
+    "error_monitoring": "MONITOREO DE ERRORES",
+    "incident_response": "RESPUESTA A INCIDENTES",
+    "encrypted_secret_vault": "BÓVEDA DE SECRETOS CIFRADA",
+    "team_access_and_compliance": "ACCESO DE EQUIPO Y CUMPLIMIENTO",
+    "voice_and_audio": "VOZ Y AUDIO"
+  },
+  "sec": {
+    "repositories": "Repositorios",
+    "pull_requests": "Pull Requests",
+    "branches": "Ramas",
+    "issues": "Incidencias",
+    "activity": "Actividad",
+    "secrets_and_tokens": "Secretos y Tokens",
+    "models": "Modelos",
+    "files": "Archivos",
+    "jobs": "Trabajos",
+    "voices": "Voces",
+    "account": "Cuenta",
+    "history": "Historial",
+    "domains": "Dominios",
+    "audiences": "Audiencias",
+    "broadcasts": "Difusiones",
+    "api_keys": "Claves API",
+    "transcripts": "Transcripciones",
+    "data": "Datos",
+    "auth": "Autenticación",
+    "storage": "Almacenamiento",
+    "customers": "Clientes",
+    "prices_and_tiers": "Precios y Planes",
+    "catalog": "Catálogo",
+    "table_crud": "CRUD de Tablas",
+    "sql_engine": "Motor SQL",
+    "users_and_access": "Usuarios y Acceso",
+    "credentials": "Credenciales",
+    "environment_variables": "Variables de Entorno",
+    "deployments": "Despliegues",
+    "networking_and_logs": "Red y Registros",
+    "email": "Correo",
+    "messaging": "Mensajería",
+    "dns": "DNS",
+    "cache": "Caché",
+    "compute": "Cómputo",
+    "iam": "IAM",
+    "security": "Seguridad",
+    "security_rules": "Reglas de Seguridad",
+    "secrets_storage": "Almacén de Secretos",
+    "monitoring": "Monitoreo",
+    "incidents": "Incidentes",
+    "team_access": "Acceso de Equipo",
+    "compliance_and_audit": "Cumplimiento y Auditoría",
+    "audit": "Auditoría"
+  },
+  "fld": {
+    "repository": "Repositorio",
+    "pull_request": "Pull Request",
+    "issue": "Incidencia",
+    "branch": "Rama",
+    "model": "Modelo",
+    "voice": "Voz",
+    "table": "Tabla",
+    "transcript": "Transcripción",
+    "title": "Título",
+    "new_title": "Nuevo Título",
+    "description": "Descripción",
+    "body": "Cuerpo",
+    "content": "Contenido",
+    "name": "Nombre",
+    "message": "Mensaje",
+    "email": "Correo",
+    "new_email": "Nuevo Correo",
+    "merge_method": "Método de Fusión",
+    "region": "Región",
+    "domain": "Dominio",
+    "bucket": "Bucket",
+    "product": "Producto",
+    "price": "Precio",
+    "query": "Consulta",
+    "operation": "Operación",
+    "phone_number": "Número de Teléfono"
+  },
+  "opt": {
+    "open": "Abierto",
+    "closed": "Cerrado",
+    "merge_commit": "Commit de fusión",
+    "squash": "Squash",
+    "rebase": "Rebase",
+    "production": "Producción",
+    "preview": "Vista previa",
+    "development": "Desarrollo"
+  },
+  "ui": {
+    "execute": "Ejecutar",
+    "confirm": "Confirmar",
+    "cancel": "Cancelar",
+    "preview": "Vista previa",
+    "close": "Cerrar",
+    "error": "Error",
+    "success": "Éxito",
+    "running": "Ejecutando…",
+    "no_inputs": "Esta acción no requiere datos.",
+    "workspace": "Espacio de trabajo",
+    "hub_home": "Inicio del Hub",
+    "back": "Volver",
+    "tier": "Nivel",
+    "providers": "Proveedores",
+    "utility_views": "Vistas de Utilidad",
+    "review_action": "Revisa la acción que se enviará a",
+    "cannot_undo": "Una vez confirmado, no se puede deshacer.",
+    "about_to_execute": "Estás a punto de ejecutar",
+    "on": "en"
+  },
+  "tpl": {
+    "github": {
+      "list_repos": {
+        "label": "Ver Repositorios",
+        "desc": "Lista los repositorios visibles para el token de acceso configurado."
+      },
+      "list_prs": {
+        "label": "Listar Pull Requests",
+        "desc": "Muestra los pull requests abiertos (más recientes primero) de un repositorio."
+      },
+      "view_pr_files": {
+        "label": "Ver Archivos del PR",
+        "desc": "Lista los archivos modificados en un pull request."
+      },
+      "merge_pr": {
+        "label": "Fusionar PR",
+        "desc": "Fusiona un pull request en su rama base."
+      },
+      "close_pr": {
+        "label": "Cerrar PR",
+        "desc": "Cierra un pull request sin fusionarlo."
+      },
+      "list_branches": {
+        "label": "Listar Ramas",
+        "desc": "Lista las ramas de un repositorio (útil para limpiar ai/*)."
+      },
+      "delete_branch": {
+        "label": "Eliminar Rama",
+        "desc": "Elimina una rama por nombre (main está protegida)."
+      },
+      "list_commits": {
+        "label": "Commits Recientes",
+        "desc": "Muestra los commits más recientes de un repositorio."
+      },
+      "list_issues": {
+        "label": "Listar Incidencias",
+        "desc": "Muestra las incidencias abiertas de un repositorio."
+      },
+      "open_issue": {
+        "label": "Abrir Incidencia",
+        "desc": "Crea una nueva incidencia en un repositorio."
+      },
+      "edit_issue": {
+        "label": "Editar Incidencia",
+        "desc": "Actualiza el título o el estado (abierto/cerrado) de una incidencia."
+      },
+      "close_issue": {
+        "label": "Cerrar Incidencia",
+        "desc": "Cierra una incidencia abierta."
+      },
+      "rotate_token": {
+        "label": "Rotar Token",
+        "desc": "Rota el token de acceso de GitHub almacenado (revocar + reemitir)."
+      },
+      "manage_secrets": {
+        "label": "Gestionar Secretos",
+        "desc": "Crea o actualiza un secreto de Actions en un repositorio."
+      }
+    },
+    "openai": {
+      "list_models": {
+        "label": "Ver Modelos",
+        "desc": "Lista los modelos disponibles para la clave API configurada."
+      },
+      "retrieve_model": {
+        "label": "Detalles del Modelo",
+        "desc": "Muestra los detalles de un modelo específico."
+      },
+      "list_files": {
+        "label": "Listar Archivos",
+        "desc": "Archivos subidos a la cuenta de OpenAI."
+      },
+      "list_fine_tunes": {
+        "label": "Trabajos de Ajuste Fino",
+        "desc": "Trabajos de ajuste fino recientes y su estado."
+      },
+      "list_batches": {
+        "label": "Trabajos por Lotes",
+        "desc": "Trabajos por lotes recientes y su estado."
+      }
+    },
+    "elevenlabs": {
+      "list_voices": {
+        "label": "Listar Voces",
+        "desc": "Voces disponibles para la cuenta."
+      },
+      "voice_details": {
+        "label": "Detalles de la Voz",
+        "desc": "Inspecciona una voz específica."
+      },
+      "list_models": {
+        "label": "Listar Modelos",
+        "desc": "Modelos de voz disponibles para la cuenta."
+      },
+      "subscription": {
+        "label": "Suscripción y Uso",
+        "desc": "Nivel del plan y uso de la cuota de caracteres."
+      },
+      "list_history": {
+        "label": "Historial de Generación",
+        "desc": "Generaciones de texto a voz recientes."
+      }
+    },
+    "anthropic": {
+      "list_models": {
+        "label": "Ver Modelos",
+        "desc": "Modelos disponibles para la clave API."
+      },
+      "retrieve_model": {
+        "label": "Detalles del Modelo",
+        "desc": "Detalles de un modelo específico."
+      }
+    },
+    "gemini": {
+      "list_models": {
+        "label": "Ver Modelos",
+        "desc": "Modelos disponibles para la clave de Gemini."
+      },
+      "model_details": {
+        "label": "Detalles del Modelo",
+        "desc": "Detalles de un modelo específico."
+      }
+    },
+    "resend": {
+      "list_domains": {
+        "label": "Listar Dominios",
+        "desc": "Dominios de envío y estado de verificación."
+      },
+      "list_audiences": {
+        "label": "Listar Audiencias",
+        "desc": "Audiencias de contactos."
+      },
+      "list_broadcasts": {
+        "label": "Listar Difusiones",
+        "desc": "Difusiones recientes."
+      },
+      "list_api_keys": {
+        "label": "Listar Claves API",
+        "desc": "Claves API de la cuenta."
+      }
+    },
+    "assemblyai": {
+      "list_transcripts": {
+        "label": "Transcripciones Recientes",
+        "desc": "Trabajos de transcripción más recientes."
+      },
+      "transcript_details": {
+        "label": "Detalles de la Transcripción",
+        "desc": "Inspecciona un trabajo de transcripción."
+      }
+    },
+    "supabase_mkt": {
+      "list_tables": {
+        "label": "Listar Tablas",
+        "desc": "Tablas públicas del proyecto de marketing."
+      },
+      "list_rows": {
+        "label": "Listar Filas",
+        "desc": "Filas de una tabla elegida."
+      },
+      "list_users": {
+        "label": "Listar Usuarios",
+        "desc": "Usuarios de autenticación del proyecto de marketing."
+      },
+      "list_buckets": {
+        "label": "Listar Buckets",
+        "desc": "Buckets de almacenamiento del proyecto de marketing."
+      }
+    }
+  },
+  "home": {
+    "hero": {
+      "marquee": "Auditar · Crear · Reseñar · Difundir",
+      "title": "Protege tu código con auditorías automáticas de repositorios, crea sitios web de alto rendimiento, recopila reseñas de clientes y difunde contenido nativo de audio y video",
+      "subtitle": "— en tu idioma, no una traducción. Seguimiento premium de postura de ciberseguridad combinado con un motor global de localización."
+    },
+    "features": {
+      "audit": "Auditoría y seguridad de código",
+      "site": "Creador de sitios",
+      "reviews": "Recolector de reseñas",
+      "audio": "Audio nativo",
+      "video": "Editor de video"
+    }
   }
 }

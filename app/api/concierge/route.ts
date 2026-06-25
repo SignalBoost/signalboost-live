@@ -5,6 +5,7 @@ import { normalizeTier } from '@/lib/video/subscription'
 import { readJsonLimited } from '@/lib/http/readJsonLimited'
 import { rateLimited } from '@/lib/http/rateLimit'
 import { clientIpKey } from '@/lib/http/clientIp'
+import { sameOriginOk } from '@/lib/http/sameOrigin'
 
 export const dynamic = 'force-dynamic'
 
@@ -105,7 +106,10 @@ async function resolveUsedMinutes(
         break
       }
       totalSeconds += data.reduce(
-        (sum, row) => sum + (Number((row as Record<string, unknown>).duration_seconds) || 0),
+        (sum, row) => {
+          const n = Number((row as Record<string, unknown>).duration_seconds)
+          return sum + (Number.isFinite(n) && n > 0 ? n : 0)
+        },
         0,
       )
       if (data.length < PAGE) {
@@ -123,6 +127,28 @@ async function resolveUsedMinutes(
   }
 }
 
+// Short-TTL per-user cache for the monthly usage figure. Without it, a high-rate
+// authenticated caller could force resolveUsedMinutes' paginated reads on every
+// POST (fan-out / avoidable DB load). With it, usage is recomputed at most once
+// per user per window regardless of request rate.
+const USAGE_TTL_MS = 60_000
+const usageCache = new Map<string, { value: number | null; expires: number }>()
+
+async function resolveUsedMinutesCached(
+  supabase: Awaited<ReturnType<typeof createMarketingServerSupabase>>,
+  userId: string,
+): Promise<number | null> {
+  const now = Date.now()
+  const hit = usageCache.get(userId)
+  if (hit && hit.expires > now) return hit.value
+  const value = await resolveUsedMinutes(supabase, userId)
+  usageCache.set(userId, { value, expires: now + USAGE_TTL_MS })
+  if (usageCache.size > 5000) {
+    for (const [k, v] of usageCache) if (v.expires <= now) usageCache.delete(k)
+  }
+  return value
+}
+
 export async function POST(req: Request) {
   const supabase = await createMarketingServerSupabase()
   const { data: { user } } = await supabase.auth.getUser()
@@ -132,6 +158,11 @@ export async function POST(req: Request) {
 
   if (await rateLimited(`concierge:${user.id}`, { max: RATE_MAX, windowMs: RATE_WINDOW_MS })) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
+  // CSRF defense: reject cookie-authenticated POSTs that aren't same-origin.
+  if (!sameOriginOk(req)) {
+    return NextResponse.json({ error: 'Cross-origin request rejected' }, { status: 403 })
   }
 
   // Hardened read: exact JSON media type + a hard byte ceiling enforced while
@@ -167,7 +198,7 @@ export async function POST(req: Request) {
   // (usageUnavailable) so the concierge gives neutral guidance instead of a
   // 0-used quota it didn't verify. Tier still degrades safely to least-privilege.
   const { tier, billingProvider } = await resolveEntitlements(supabase, user.id)
-  const usedMinutes = await resolveUsedMinutes(supabase, user.id)
+  const usedMinutes = await resolveUsedMinutesCached(supabase, user.id)
 
   return NextResponse.json(
     answerSignalBoostConcierge(query, locale, {

@@ -79,12 +79,16 @@ export async function POST(req: Request) {
       );
     }
 
-    // Entitlement gate: voice synthesis is a paid feature. Block free/demo now
-    // so the gate is enforced before a cost-bearing provider is wired. When that
-    // provider is connected, record per-render credit/quota usage atomically and
-    // fail closed if quota/entitlement is missing.
+    // Entitlement gate: voice synthesis is a paid feature. Fail CLOSED — only an
+    // explicit allowlist of active paid tiers may proceed. A denylist (block
+    // free/demo) would silently grant any tier value not on it, including any
+    // future normalized tier. NOTE: this gates on the plan/tier column only;
+    // when a cost-bearing provider is wired, also verify authoritative live
+    // subscription status (active vs canceled/past_due/trial) and record
+    // per-render quota usage atomically, failing closed if entitlement is missing.
+    const PAID_TIERS = new Set(["launch", "growth", "command", "paid"]);
     const tier = await resolveUserTier(supabase, user.id);
-    if (tier === "free" || tier === "demo") {
+    if (!PAID_TIERS.has(tier)) {
       return NextResponse.json(
         { success: false, error: "Voice synthesis requires a paid plan" },
         { status: 402 }

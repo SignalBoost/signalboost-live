@@ -33,6 +33,9 @@ jobs:
           name: repo-targeting-qa-report
           path: qa/repo-targeting-report.md
 
+      - name: Verify route handler / page structure
+        run: node scripts/verify-route-handlers.mjs
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:

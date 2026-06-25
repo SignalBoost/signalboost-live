@@ -1,1 +1,1 @@
-export { default } from './PremiumCustomerNavbar'
+export { default } from './PremiumCustomerNavbarV2'

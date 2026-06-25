@@ -67,8 +67,9 @@ async function resolveEntitlements(
 // video export route writes. Same project + same auth user id as the concierge,
 // so no cross-project identity mapping is needed.
 //
-// Returns the real total when the query succeeds (paginated — no row cap, so a
-// heavy month isn't silently truncated), or null when usage can't be determined
+// Returns the real total when the query succeeds (paginated up to a very high
+// page ceiling; if that ceiling is somehow exceeded it returns unknown rather
+// than a truncated undercount), or null when usage can't be determined
 // (transient DB/RLS error). null is "unknown", deliberately distinct from 0 used:
 // the caller must NOT present a 0-used quota it didn't actually verify, which
 // would understate consumption and suppress an overage warning that's due.
@@ -86,6 +87,7 @@ async function resolveUsedMinutes(
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
     ).toISOString()
     let totalSeconds = 0
+    let complete = false
     for (let page = 0; page < MAX_PAGES; page++) {
       const fromIdx = page * PAGE
       const { data, error } = await supabase
@@ -97,13 +99,23 @@ async function resolveUsedMinutes(
         .order('created_at', { ascending: true })
         .range(fromIdx, fromIdx + PAGE - 1)
       if (error) return null // explicit unknown — never fabricate 0 on error
-      if (!Array.isArray(data) || data.length === 0) break
+      if (!Array.isArray(data) || data.length === 0) {
+        complete = true
+        break
+      }
       totalSeconds += data.reduce(
         (sum, row) => sum + (Number((row as Record<string, unknown>).duration_seconds) || 0),
         0,
       )
-      if (data.length < PAGE) break
+      if (data.length < PAGE) {
+        complete = true
+        break
+      }
     }
+    // If the loop exhausted the page ceiling while still returning full pages,
+    // there may be more rows we never summed — report unknown rather than an
+    // understated partial total.
+    if (!complete) return null
     return Math.ceil(totalSeconds / 60)
   } catch {
     return null // explicit unknown
@@ -170,21 +182,31 @@ export async function POST(req: Request) {
 // client-controlled options. Cached at the edge, but cache headers only help
 // when intermediaries honor them — so we also apply a per-IP rate limit to
 // protect the origin from repeated uncached execution.
+// Derive a rate-limit bucket from forwarded headers, but only trust a value
+// that actually looks like an IP and is bounded in length — so a spoofed or
+// oversized header can't inject huge/arbitrary key material into the limiter.
+// Anything else buckets together under 'unknown'.
+function clientIpKey(req: Request): string {
+  const raw =
+    (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() ||
+    (req.headers.get('x-real-ip') || '').trim()
+  const IPV4 = /^(?:\d{1,3}\.){3}\d{1,3}$/
+  const IPV6 = /^[0-9a-fA-F:]{2,45}$/
+  if (raw.length <= 45 && (IPV4.test(raw) || IPV6.test(raw))) return raw
+  return 'unknown'
+}
+
 export async function GET(req: Request) {
-  // Coarse GLOBAL cap first. The per-IP key below is derived from forwarded
-  // headers, which a client could rotate/spoof if an upstream proxy doesn't
-  // overwrite them — that would both evade the per-IP limit and exhaust the
-  // limiter keyspace. A single global key can't be bypassed that way and is the
-  // real origin protector; the endpoint is also edge-cached, so legitimate
-  // traffic rarely reaches it. The per-IP limit then gives fair-use granularity.
-  if (await rateLimited('concierge-get:global', { max: 600, windowMs: 60_000 })) {
+  // Coarse GLOBAL backstop. This is NOT the primary abuse control — that belongs
+  // at the edge/WAF/CDN. It's sized well above aggregate legitimate (mostly
+  // edge-cached) origin traffic so a single misbehaving client — bounded to 60/
+  // min by the per-IP limit below — can't exhaust it and 429 everyone; it only
+  // trips on extreme runaway load as a last-resort origin guard.
+  if (await rateLimited('concierge-get:global', { max: 6000, windowMs: 60_000 })) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
-  const ip =
-    (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() ||
-    req.headers.get('x-real-ip') ||
-    'unknown'
-  if (await rateLimited(`concierge-get:${ip}`, { max: 60, windowMs: 60_000 })) {
+  // Per-IP fair-use limit, keyed on a validated/bounded client IP.
+  if (await rateLimited(`concierge-get:${clientIpKey(req)}`, { max: 60, windowMs: 60_000 })) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
   return NextResponse.json(

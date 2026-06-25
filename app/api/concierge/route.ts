@@ -178,6 +178,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Cross-origin request rejected' }, { status: 403 })
   }
 
+  // Coarse PRE-AUTH throttle, before the Supabase client / getUser() lookup.
+  // sameOriginOk alone is not abuse control: an originless or non-browser client
+  // can pass it, then repeatedly drive auth/session processing and upstream
+  // Supabase calls without ever reaching the per-user limiter (those requests
+  // 401 instead). A global backstop plus a per-IP fair-use limit bound that load
+  // for unauthenticated callers; the per-user limiter below still governs
+  // authenticated fairness.
+  if (await rateLimited('concierge-post:global', { max: 3000, windowMs: 60_000 })) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+  if (await rateLimited(`concierge-post:${clientIpKey(req)}`, { max: 60, windowMs: 60_000 })) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   const supabase = await createMarketingServerSupabase()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {

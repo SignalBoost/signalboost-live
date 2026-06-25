@@ -6,7 +6,7 @@
 // is composed from auditPricingCopy (the proven source) rather than re-typed here.
 
 import { getAuditPricingCopy, AuditLocale } from '@/lib/i18n/auditPricingCopy'
-import { ProductLine } from '@/lib/config/unifiedPricingConfig'
+import { ProductLine } from '@/lib/config/unifiedPricing'
 
 export type PricingLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 const LOCALES: PricingLocale[] = ['en', 'es', 'pt', 'pl', 'ru']

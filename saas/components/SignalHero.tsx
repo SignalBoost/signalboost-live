@@ -11,6 +11,14 @@ const LANGS = [
   { code: 'ru', name: 'Русский', flag: '🇷🇺' },
 ]
 
+const AUDIT_SIGNALS = [
+  { name: 'GitHub', flag: '🐙' },
+  { name: 'Vercel', flag: '▲' },
+  { name: 'Supabase', flag: '🗄️' },
+  { name: 'Stripe', flag: '💳' },
+  { name: 'Secrets', flag: '🔑' },
+]
+
 const POSITIONS = [
   { tx: 140, ty: -160 },
   { tx: -140, ty: -160 },
@@ -21,7 +29,7 @@ const POSITIONS = [
 
 type Tag = {
   id: number
-  lang: typeof LANGS[0]
+  lang: typeof AUDIT_SIGNALS[0]
   pos: typeof POSITIONS[0]
 }
 
@@ -43,31 +51,31 @@ export default function SignalHero() {
   // ---- text with English fallbacks ----
   const hero = dict?.hero ?? {}
 
-  const badge = hero.badge ?? 'Build · Review · Broadcast'
+  const badge = hero.badge ?? 'SaaS Audit · Cybersecurity · PR Cockpit'
   const subhead =
     hero.subhead ??
-    'Create your website, collect customer reviews, and produce native audio & video content — in your language, not a translation.'
-  const ctaPrimary = hero.ctaPrimary ?? 'Get started'
-  const ctaSecondary = hero.ctaSecondary ?? 'Watch a demo'
+    'Audit your SaaS stack, find security and configuration risks, generate clear reports, and approve fixes safely before anything touches production.'
+  const ctaPrimary = hero.ctaPrimary ?? 'Run SaaS audit'
+  const ctaSecondary = hero.ctaSecondary ?? 'View reports'
   const tagHint =
-    hero.tagHint ?? 'Click a language signal to add it to your project'
+    hero.tagHint ?? 'Click a provider signal to see what SignalBoost audits'
   const scrollLabel = hero.scroll ?? 'Scroll'
 
   const features = [
-    { icon: '🌐', label: hero?.features?.site ?? 'Site builder' },
-    { icon: '⭐', label: hero?.features?.reviews ?? 'Review collector' },
-    { icon: '🎙️', label: hero?.features?.audio ?? 'Native audio' },
-    { icon: '🎬', label: hero?.features?.video ?? 'Video editor' },
+    { icon: '🛡️', label: hero?.features?.audit ?? 'SaaS audit' },
+    { icon: '🔑', label: hero?.features?.secrets ?? 'Secrets review' },
+    { icon: '🧭', label: hero?.features?.providers ?? 'Provider inventory' },
+    { icon: '✅', label: hero?.features?.approvals ?? 'PR approvals' },
   ]
 
   // ---- region-aware headlines: current language first, then the rest ----
   const headlines: string[] = useMemo(() => {
     const fallback = [
-      'Build your brand in English',
-      'Construa sua marca em Português',
-      'Construye tu marca en Español',
-      'Twórz swoją markę po Polsku',
-      'Создайте свой бренд на Русском',
+      'Audit and secure your SaaS platform',
+      'Audite e proteja sua plataforma SaaS',
+      'Audita y protege tu plataforma SaaS',
+      'Audytuj i zabezpieczaj swoją platformę SaaS',
+      'Проверяйте и защищайте вашу SaaS-платформу',
     ]
     const list: string[] =
       Array.isArray(hero.headlines) && hero.headlines.length > 0
@@ -105,13 +113,13 @@ export default function SignalHero() {
   // ---- ticker items (static now, feed-ready later) ----
   const tickerItems: string[] = useMemo(() => {
     const fallback = [
-      'New review · São Paulo',
-      'Site published · Madrid',
-      'Audio generated · pl-PL',
-      'Video rendered · ru-RU',
-      'Review collected · Lisbon',
-      'Site live · Mexico City',
-      'Broadcast sent · 5 languages',
+      'Provider inventory · GitHub / Vercel / Supabase',
+      'Secrets reviewed · masked evidence only',
+      'Critical finding · exposed API route',
+      'PR Cockpit · approval before production',
+      'Executive report · security score ready',
+      'Remediation roadmap · owner assigned',
+      'Audit trail · every action recorded',
     ]
     return Array.isArray(hero.ticker) && hero.ticker.length > 0
       ? hero.ticker
@@ -125,7 +133,7 @@ export default function SignalHero() {
   )
 
   const spawnTag = useCallback(() => {
-    const langItem = LANGS[langRef.current % LANGS.length]
+    const signalItem = AUDIT_SIGNALS[langRef.current % AUDIT_SIGNALS.length]
     const pos = POSITIONS[posRef.current % POSITIONS.length]
 
     langRef.current++
@@ -133,7 +141,7 @@ export default function SignalHero() {
 
     const id = idRef.current++
 
-    setTags(prev => [...prev, { id, lang: langItem, pos }])
+    setTags(prev => [...prev, { id, lang: signalItem, pos }])
 
     setTimeout(() => {
       setTags(prev => prev.filter(t => t.id !== id))
@@ -150,7 +158,7 @@ export default function SignalHero() {
 
   // ---- CTA actions ----
   const handlePrimary = () => {
-    window.location.href = '/dashboard'
+    window.location.href = '/dashboard/audit'
   }
 
   const handleSecondary = () => {
@@ -374,7 +382,7 @@ export default function SignalHero() {
             </p>
           ) : (
             selected.map(name => {
-              const l = LANGS.find(x => x.name === name)!
+              const l = AUDIT_SIGNALS.find(x => x.name === name) ?? { name, flag: '•' }
 
               return (
                 <div

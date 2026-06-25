@@ -1,244 +1,173 @@
-'use client'
+// app/api/brand-profile/route.ts
+// Per-user brand profile, RLS-scoped — a user can only read/write their own.
+// Hardened:
+//   • POST verifies Origin/Referer against a configured canonical-ORIGIN
+//     allowlist (env APP_ALLOWED_ORIGINS) — full scheme+host+port, NOT host
+//     alone, so http://… can never satisfy an https://… policy.
+//   • Request body is enforced by a hard byte ceiling while the stream is read
+//     (Content-Length is advisory and not trusted on its own).
+//   • Malformed JSON is rejected with 400 instead of silently overwriting {}.
+//   • Payload must be a plain object within strict size / key limits.
+//   • Per-user responses are marked no-store, private.
 
-// Hub Command Console — Child layout representations.
-// High-density compact grid layouts with explicit edge width safety.
-//
-// Live status: each provider now reflects REAL connection state from the
-// credential probe (/api/hub/providers/status), passed in as `status`:
-//   • hasBackend + configured  → "Live"  (actions enabled)
-//   • hasBackend + !configured → "Connect keys" (actions disabled, lists missing)
-//   • !hasBackend              → "Soon"  (roadmap preview)
-// While the probe is still loading (`statusLoaded === false`) we stay optimistic
-// for backend-ready providers so established integrations don't flash a state.
+import { NextResponse } from 'next/server'
+import { createMarketingServerSupabase } from '@/lib/auth/supabaseServer'
+import { readJsonLimited } from '@/lib/http/readJsonLimited'
 
-import { type ConsoleProvider, isDestructiveTemplate, isProviderLive, isActionLive } from '@/lib/hub/console-catalog'
-import { getTemplate } from '@/lib/hub/provider-templates'
-import { useTranslation } from '@/components/i18n/useTranslation'
-import { type ProviderLiveStatus } from '@/lib/hub/provider-credentials'
-import { type Lang } from '../shared'
+const MAX_PROFILE_BYTES = 100_000
+const MAX_PROFILE_KEYS = 200
+const MAX_PROFILE_DEPTH = 32
+const MAX_PROFILE_NODES = 5000
 
-// Derive the effective live/credential state for a provider.
-function deriveState(providerId: string, status: ProviderLiveStatus | undefined, statusLoaded: boolean) {
-  const hasBackend = isProviderLive(providerId)
-  // Optimistic until the probe returns, so live integrations don't flicker.
-  const configured = statusLoaded ? (status?.configured ?? false) : hasBackend
-  const missing = status?.missing ?? []
-  return { hasBackend, configured, missing, live: hasBackend && configured }
+const NO_STORE = { 'Cache-Control': 'no-store, private' } as const
+
+// Canonical ORIGINS this API trusts for state-changing requests. Configure via
+// APP_ALLOWED_ORIGINS (comma-separated) in Vercel; falls back to the known
+// production marketing domains. Stored as full origins (scheme + host + port)
+// so the scheme is part of the comparison — http and https are distinct.
+const CANONICAL_ORIGINS = (
+  process.env.APP_ALLOWED_ORIGINS ||
+  'https://signalboostapp.com,https://www.signalboostapp.com'
+)
+  .split(',')
+  .map((entry) => {
+    try {
+      return new URL(entry.trim()).origin.toLowerCase()
+    } catch {
+      return ''
+    }
+  })
+  .filter(Boolean)
+
+function sameOriginOk(req: Request): boolean {
+  const candidate = req.headers.get('origin') || req.headers.get('referer')
+  if (!candidate) return false // state-changing browser fetches always send Origin
+
+  let candidateOrigin: string
+  try {
+    candidateOrigin = new URL(candidate).origin.toLowerCase()
+  } catch {
+    return false
+  }
+
+  // 1) Primary check: candidate origin (scheme + host + port) must match a
+  //    configured canonical origin exactly.
+  if (CANONICAL_ORIGINS.includes(candidateOrigin)) return true
+
+  // 2) Narrow fallback for Vercel preview deployments only, where Origin and
+  //    Host legitimately match a platform-controlled *.vercel.app host over
+  //    https. This is not "trust the Host header" — it is gated to a single
+  //    trusted suffix and an https scheme.
+  const reqHost = (req.headers.get('host') || '').toLowerCase()
+  if (reqHost.endsWith('.vercel.app') && candidateOrigin === `https://${reqHost}`) {
+    return true
+  }
+
+  return false
 }
 
-type CardProps = {
-  provider: ConsoleProvider
-  lang: Lang
-  onExpand: () => void
-  onRun: (templateId: string) => void
-  status?: ProviderLiveStatus
-  statusLoaded?: boolean
+// Iterative (non-recursive) structural bound check. Rejects payloads that exceed
+// a maximum nesting depth or total node count BEFORE any JSON.stringify, so a
+// within-byte-limit but pathologically-nested object (e.g. [[[[…]]]]) cannot
+// trigger a stack-overflow RangeError or burn disproportionate CPU during
+// serialization. Uses an explicit stack — no recursion of its own.
+function withinStructuralBounds(root: unknown): boolean {
+  const stack: { node: unknown; depth: number }[] = [{ node: root, depth: 0 }]
+  let nodes = 0
+  while (stack.length) {
+    const { node, depth } = stack.pop() as { node: unknown; depth: number }
+    if (depth > MAX_PROFILE_DEPTH) return false
+    if (node === null || typeof node !== 'object') continue
+    nodes += 1
+    if (nodes > MAX_PROFILE_NODES) return false
+    if (Array.isArray(node)) {
+      for (const child of node) stack.push({ node: child, depth: depth + 1 })
+    } else {
+      for (const key of Object.keys(node as Record<string, unknown>)) {
+        // Reject prototype-pollution-sensitive property names anywhere in the
+        // tree. Harmless to store here, but defends any future code path that
+        // deep-merges / Object.assigns a saved profile into another object.
+        if (key === '__proto__' || key === 'constructor' || key === 'prototype') return false
+        stack.push({ node: (node as Record<string, unknown>)[key], depth: depth + 1 })
+      }
+    }
+  }
+  return true
 }
 
-export function ProviderConsoleCard({ provider, lang, onExpand, onRun, status, statusLoaded = false }: CardProps) {
-  const { t, dict } = useTranslation()
-  const { hasBackend, configured, missing, live } = deriveState(provider.id, status, statusLoaded)
-  const needsKeys = hasBackend && statusLoaded && !configured
-  const keyHint = t('console.cui.add_keys_hint', 'Add {keys} to enable').replace('{keys}', missing.join(', '))
-  return (
-    <div style={{ background: 'rgba(13, 18, 32, 0.45)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: 12, overflow: 'hidden', boxSizing: 'border-box' }}>
-      {/* Card Header Band */}
-      <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxSizing: 'border-box' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: provider.accent, boxShadow: `0 0 8px ${provider.accent}` }} />
-          <div>
-            <div style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>{provider.name}</div>
-            <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.45)', fontWeight: 700 }}>{provider.subtitle}</div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {!hasBackend ? (
-            <span style={{ fontSize: 8.5, fontWeight: 800, color: '#ffc300', background: 'rgba(255,195,0,0.12)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 4, padding: '2px 5px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{t('console.cui.soon', 'Soon')}</span>
-          ) : needsKeys ? (
-            <span title={keyHint} style={{ fontSize: 8.5, fontWeight: 800, color: '#1af0ff', background: 'rgba(26,240,255,0.1)', border: '1px solid rgba(26,240,255,0.3)', borderRadius: 4, padding: '2px 5px', letterSpacing: '0.05em', textTransform: 'uppercase', cursor: 'help' }}>{t('console.cui.connect_keys', 'Connect keys')}</span>
-          ) : configured ? (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 8.5, fontWeight: 800, color: '#22c55e', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 4, padding: '2px 5px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px #22c55e' }} />
-              {t('console.cui.live', 'Live')}
-            </span>
-          ) : null}
-          <button onClick={onExpand} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: 6, color: '#1af0ff', fontSize: 10.5, fontWeight: 700, cursor: 'pointer' }}>
-            Workspace →
-          </button>
-        </div>
-      </div>
-
-      {/* Render Actions Layout */}
-      <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10, boxSizing: 'border-box' }}>
-        {provider.sections.map((section, idx) => {
-          // Hide actions that are not yet implemented on a LIVE provider
-          // (e.g. github.rotate_token / github.manage_secrets) so a buyer never
-          // sees a stub. Preview ("Soon") and not-yet-configured providers keep
-          // their full action list as a visible roadmap, so the filter only
-          // applies once the provider is fully live.
-          const visibleIds = section.templateIds.filter(id => !(live && !isActionLive(id)))
-          if (visibleIds.length === 0) return null
-          return (
-          <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 4, boxSizing: 'border-box' }}>
-            <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255, 255, 255, 0.35)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              {section.title}
-            </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, width: '100%', boxSizing: 'border-box' }}>
-              {visibleIds.map(id => {
-                const template = getTemplate(id, dict)
-                if (!template) return null
-                const isDestructive = isDestructiveTemplate(id)
-                const isArchive = id.includes('archive')
-                const runnable = live && isActionLive(id)
-                const incomplete = live && !isActionLive(id)
-                const title = runnable
-                  ? template.label
-                  : incomplete
-                    ? t('console.cui.not_available', 'Not available yet')
-                    : needsKeys
-                      ? keyHint
-                      : t('console.cui.coming_soon')
-
-                return (
-                  <button 
-                    key={id} 
-                    onClick={runnable ? () => onRun(id) : undefined}
-                    disabled={!runnable}
-                    title={title}
-                    style={{ 
-                      padding: '5px 8px', 
-                      borderRadius: 6, 
-                      textAlign: 'left', 
-                      fontSize: 11, 
-                      fontWeight: 600, 
-                      cursor: runnable ? 'pointer' : 'not-allowed', 
-                      opacity: runnable ? 1 : 0.4, 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 6, 
-                      border: isDestructive ? '1px solid rgba(239, 68, 68, 0.2)' : isArchive ? '1px solid rgba(255, 195, 0, 0.2)' : '1px solid rgba(255, 255, 255, 0.06)', 
-                      background: isDestructive ? 'rgba(239, 68, 68, 0.05)' : isArchive ? 'rgba(255, 195, 0, 0.05)' : 'rgba(255, 255, 255, 0.02)', 
-                      color: isDestructive ? '#ef4444' : isArchive ? '#ffc300' : 'rgba(255, 255, 255, 0.8)' 
-                    }}
-                  >
-                    <span style={{ fontSize: 11 }}>{template.icon}</span>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{template.label}</span>
-                    {incomplete && <span style={{ marginLeft: 'auto', fontSize: 7.5, fontWeight: 800, color: '#ffc300', letterSpacing: '0.04em' }}>{t('console.cui.soon_short', 'SOON')}</span>}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-          )
-        })}
-      </div>
-    </div>
-  )
+function validProfile(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
+  const keys = Object.keys(value as Record<string, unknown>)
+  if (keys.length > MAX_PROFILE_KEYS) return false
+  // Bound the structure before serializing it.
+  if (!withinStructuralBounds(value)) return false
+  // Size check, guarded: treat any serialization failure as an invalid payload
+  // (controlled 400) instead of letting a RangeError bubble up to a 500.
+  try {
+    if (Buffer.byteLength(JSON.stringify(value), 'utf8') > MAX_PROFILE_BYTES) return false
+  } catch {
+    return false
+  }
+  return true
 }
 
-type WorkspaceProps = {
-  provider: ConsoleProvider
-  tierLabel: string
-  lang: Lang
-  onBack: () => void
-  onHome: () => void // Explicitly registers type parameter safety bounds
-  onRun: (templateId: string) => void
-  status?: ProviderLiveStatus
-  statusLoaded?: boolean
+export async function GET() {
+  const supabase = await createMarketingServerSupabase()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ profile: null, error: 'Unauthorized' }, { status: 401, headers: NO_STORE })
+  }
+
+  const { data, error } = await supabase
+    .from('brand_profiles')
+    .select('profile')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (error) {
+    console.error('brand-profile GET error:', error.message)
+    return NextResponse.json({ profile: null, error: 'Failed to load profile' }, { status: 500, headers: NO_STORE })
+  }
+  return NextResponse.json({ profile: data?.profile ?? null }, { headers: NO_STORE })
 }
 
-export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onHome, onRun, status, statusLoaded = false }: WorkspaceProps) {
-  const { t, dict } = useTranslation()
-  const { hasBackend, configured, missing, live } = deriveState(provider.id, status, statusLoaded)
-  const needsKeys = hasBackend && statusLoaded && !configured
-  const keyHint = t('console.cui.add_keys_hint', 'Add {keys} to enable').replace('{keys}', missing.join(', '))
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', maxWidth: '100%', boxSizing: 'border-box', paddingRight: '4px' }}>
-      {/* Dynamic Breadcrumb Track Navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>
-        <button onClick={onHome} style={{ background: 'none', border: 'none', color: '#1af0ff', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}>🎛️ Hub Home</button>
-        <span>/</span>
-        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}>{tierLabel}</button>
-        <span>/</span>
-        <span style={{ color: '#fff', fontWeight: 800 }}>{t('console.cui.workspace_title', '{name} Workspace').replace('{name}', provider.name)}</span>
-      </div>
+export async function POST(req: Request) {
+  const supabase = await createMarketingServerSupabase()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ profile: null, error: 'Unauthorized' }, { status: 401, headers: NO_STORE })
+  }
 
-      {!hasBackend && (
-        <div style={{ fontSize: 11.5, fontWeight: 700, color: '#ffc300', background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.25)', borderRadius: 8, padding: '8px 12px' }}>
-          {t('console.cui.coming_soon_banner').replace('{name}', provider.name)}
-        </div>
-      )}
+  if (!sameOriginOk(req)) {
+    return NextResponse.json({ profile: null, error: 'Cross-origin request rejected' }, { status: 403, headers: NO_STORE })
+  }
 
-      {needsKeys && (
-        <div style={{ fontSize: 11.5, fontWeight: 700, color: '#1af0ff', background: 'rgba(26,240,255,0.08)', border: '1px solid rgba(26,240,255,0.28)', borderRadius: 8, padding: '8px 12px' }}>
-          {t('console.cui.connect_keys_banner', '🔑 {name} is ready — add {keys} in Vercel to activate these actions.').replace('{name}', provider.name).replace('{keys}', missing.join(', '))}
-        </div>
-      )}
+  // Hardened read: hard byte ceiling enforced while the stream is consumed, so
+  // a giant payload can't burn memory/CPU in JSON.parse ahead of the key/size
+  // checks — and the limit holds even with a missing/false Content-Length.
+  const parsed = await readJsonLimited<unknown>(req, { maxBytes: MAX_PROFILE_BYTES })
+  if (!parsed.ok) {
+    const error = parsed.status === 413 ? 'Profile payload too large' : parsed.error
+    return NextResponse.json({ profile: null, error }, { status: parsed.status, headers: NO_STORE })
+  }
 
-      {/* Grid layout with strict multi-column spacing rules */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
-        {provider.sections.map((section, idx) => {
-          // Same buyer-facing rule as the card: hide unimplemented actions on a
-          // live provider; keep full lists for preview/not-configured providers.
-          const visibleIds = section.templateIds.filter(id => !(live && !isActionLive(id)))
-          if (visibleIds.length === 0) return null
-          return (
-          <div key={idx} style={{ background: 'rgba(13, 18, 32, 0.3)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: 10, padding: 12, boxSizing: 'border-box', overflow: 'hidden' }}>
-            <h3 style={{ fontSize: 11, fontWeight: 800, color: '#1af0ff', textTransform: 'uppercase', margin: '0 0 10px 0', letterSpacing: '0.04em' }}>{section.title}</h3>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, width: '100%', boxSizing: 'border-box' }}>
-              {visibleIds.map(id => {
-                const template = getTemplate(id, dict)
-                if (!template) return null
-                const isDestructive = isDestructiveTemplate(id)
-                const isArchive = id.includes('archive')
-                const runnable = live && isActionLive(id)
-                const incomplete = live && !isActionLive(id)
-                const title = runnable
-                  ? template.label
-                  : incomplete
-                    ? t('console.cui.not_available', 'Not available yet')
-                    : needsKeys
-                      ? keyHint
-                      : t('console.cui.coming_soon')
+  if (!validProfile(parsed.value)) {
+    return NextResponse.json({ profile: null, error: 'Invalid profile payload' }, { status: 400, headers: NO_STORE })
+  }
+  const profile = parsed.value
 
-                return (
-                  <div 
-                    key={id} 
-                    onClick={runnable ? () => onRun(id) : undefined}
-                    title={title}
-                    style={{ 
-                      padding: '8px 10px', 
-                      borderRadius: 8, 
-                      opacity: runnable ? 1 : 0.4, 
-                      background: 'rgba(255,255,255,0.01)', 
-                      border: isDestructive ? '1px solid rgba(239, 68, 68, 0.2)' : isArchive ? '1px solid rgba(255, 195, 0, 0.2)' : '1px solid rgba(255,255,255,0.05)', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'space-between',
-                      minHeight: '44px',
-                      boxSizing: 'border-box',
-                      minWidth: 0,
-                      cursor: runnable ? 'pointer' : 'not-allowed'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, width: '100%' }}>
-                      <span style={{ fontSize: 14, flexShrink: 0 }}>{template.icon}</span>
-                      <div style={{ minWidth: 0, overflow: 'hidden', flex: 1 }}>
-                        <div style={{ fontSize: 11.5, fontWeight: 700, color: isDestructive ? '#ef4444' : isArchive ? '#ffc300' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{template.label}</div>
-                        <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{template.description}</div>
-                      </div>
-                    </div>
-                    <span style={{ color: incomplete ? '#ffc300' : isDestructive ? '#ef4444' : isArchive ? '#ffc300' : 'rgba(255,255,255,0.25)', fontSize: incomplete ? 8 : 11, fontWeight: 800, paddingLeft: 4, flexShrink: 0, letterSpacing: incomplete ? '0.04em' : undefined }}>{incomplete ? 'SOON' : '→'}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-          )
-        })}
-      </div>
-    </div>
-  )
+  const { data, error } = await supabase
+    .from('brand_profiles')
+    .upsert(
+      { user_id: user.id, profile, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id' },
+    )
+    .select('profile')
+    .maybeSingle()
+
+  if (error) {
+    console.error('brand-profile POST error:', error.message)
+    return NextResponse.json({ profile: null, error: 'Failed to save profile' }, { status: 500, headers: NO_STORE })
+  }
+  return NextResponse.json({ profile: data?.profile ?? profile }, { headers: NO_STORE })
 }

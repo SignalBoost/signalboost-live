@@ -38,30 +38,51 @@ async function resolveEntitlements(
     return { tier: 'free', billingProvider: 'stripe' as const }
   }
 
+  // AUTHORITATIVE tier: gate on a currently-valid subscription (active/trialing)
+  // — the same table/columns the marketing dashboard and video export gate read
+  // — not a plan column that can persist after cancellation, expiry, or a
+  // lapsed trial. No qualifying row => least-privilege 'free', so the concierge
+  // never advertises a paid allowance the real export gate would refuse.
+  let tier = 'free'
   try {
     const { data } = await supabase
-      .from('accounts')
-      .select('plan, tier, billing_provider') // data minimization — only what we need
-      .or(`user_id.eq.${userId},owner_id.eq.${userId}`)
-      // Prefer the MOST RECENT account row. The oldest row can be a stale or
-      // superseded plan; the newest reflects the current account state. We
-      // still normalize the tier below, so a worst case maps down to 'free'
-      // rather than over-reporting an allowance.
+      .from('subscriptions')
+      .select('plan, status')
+      .eq('user_id', userId)
+      .in('status', ['active', 'trialing'])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-
-    const row = (data ?? {}) as Record<string, unknown>
-    // Allowlist the tier at this trust boundary. normalizeTier() maps any
-    // unknown / mutated plan value down to least-privilege 'free' — the same
-    // normalizer the real video export gate uses, so the concierge can never
-    // report a higher allowance than the gate would actually grant.
-    const tier = normalizeTier((row.plan ?? row.tier) as string | null | undefined)
-    const billingProvider = row.billing_provider === 'paypal' ? 'paypal' : 'stripe'
-    return { tier, billingProvider: billingProvider as 'stripe' | 'paypal' }
+    if (data) {
+      // normalizeTier() maps any unknown/mutated plan value down to 'free' — the
+      // same normalizer the export gate uses, so we can't over-report a tier.
+      tier = normalizeTier((data as Record<string, unknown>).plan as string | null | undefined)
+    }
   } catch {
-    return { tier: 'free', billingProvider: 'stripe' as const }
+    tier = 'free'
   }
+
+  // Billing provider is a display/routing hint for overage copy only — NOT an
+  // access gate — so it's read best-effort from accounts (subscriptions doesn't
+  // carry it) and defaults to 'stripe' when unavailable. userId is UUID-validated
+  // above before being interpolated into the `.or()` filter.
+  let billingProvider: 'stripe' | 'paypal' = 'stripe'
+  try {
+    const { data } = await supabase
+      .from('accounts')
+      .select('billing_provider')
+      .or(`user_id.eq.${userId},owner_id.eq.${userId}`)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (data && (data as Record<string, unknown>).billing_provider === 'paypal') {
+      billingProvider = 'paypal'
+    }
+  } catch {
+    billingProvider = 'stripe'
+  }
+
+  return { tier, billingProvider }
 }
 
 // Authoritative used-minutes for the current calendar month, summed server-side
@@ -182,13 +203,15 @@ export async function POST(req: Request) {
   // sameOriginOk alone is not abuse control: an originless or non-browser client
   // can pass it, then repeatedly drive auth/session processing and upstream
   // Supabase calls without ever reaching the per-user limiter (those requests
-  // 401 instead). A global backstop plus a per-IP fair-use limit bound that load
-  // for unauthenticated callers; the per-user limiter below still governs
-  // authenticated fairness.
-  if (await rateLimited('concierge-post:global', { max: 3000, windowMs: 60_000 })) {
+  // 401 instead). The per-IP fair-use limit runs FIRST so a single abusive
+  // client is rejected by its own bucket and never consumes the shared global
+  // backstop — the global limit then only counts requests that survived per-IP,
+  // protecting other users from one client draining it. (Coarse abuse control
+  // belongs at the CDN/WAF; this is a last-resort origin guard.)
+  if (await rateLimited(`concierge-post:${clientIpKey(req)}`, { max: 60, windowMs: 60_000 })) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
-  if (await rateLimited(`concierge-post:${clientIpKey(req)}`, { max: 60, windowMs: 60_000 })) {
+  if (await rateLimited('concierge-post:global', { max: 3000, windowMs: 60_000 })) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
@@ -241,7 +264,11 @@ export async function POST(req: Request) {
     answerSignalBoostConcierge(query, locale, {
       tier,
       billingProvider,
-      usedMinutes: usedMinutes ?? 0,
+      // Unknown usage is transmitted as undefined (not a fabricated 0) so the
+      // data model never asserts "0 minutes used" for an unverified figure.
+      // usageUnavailable is the explicit signal downstream must honor; the
+      // concierge already gates overage guidance on it rather than on a value.
+      usedMinutes: usedMinutes ?? undefined,
       usageUnavailable: usedMinutes === null,
     }),
   )
@@ -252,16 +279,17 @@ export async function POST(req: Request) {
 // when intermediaries honor them — so we also apply a per-IP rate limit to
 // protect the origin from repeated uncached execution.
 export async function GET(req: Request) {
-  // Coarse GLOBAL backstop. This is NOT the primary abuse control — that belongs
-  // at the edge/WAF/CDN. It's sized well above aggregate legitimate (mostly
-  // edge-cached) origin traffic so a single misbehaving client — bounded to 60/
-  // min by the per-IP limit below — can't exhaust it and 429 everyone; it only
-  // trips on extreme runaway load as a last-resort origin guard.
-  if (await rateLimited('concierge-get:global', { max: 6000, windowMs: 60_000 })) {
+  // Per-IP fair-use limit FIRST, keyed on a validated/bounded client IP, so a
+  // single misbehaving client is rejected by its own 60/min bucket and never
+  // consumes the shared global backstop.
+  if (await rateLimited(`concierge-get:${clientIpKey(req)}`, { max: 60, windowMs: 60_000 })) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
-  // Per-IP fair-use limit, keyed on a validated/bounded client IP.
-  if (await rateLimited(`concierge-get:${clientIpKey(req)}`, { max: 60, windowMs: 60_000 })) {
+  // Coarse GLOBAL backstop, sized well above aggregate legitimate (mostly
+  // edge-cached) origin traffic. It only counts requests that survived the
+  // per-IP limit above, and trips only on extreme runaway/distributed load as a
+  // last-resort origin guard. Primary abuse control belongs at the edge/WAF/CDN.
+  if (await rateLimited('concierge-get:global', { max: 6000, windowMs: 60_000 })) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
   return NextResponse.json(

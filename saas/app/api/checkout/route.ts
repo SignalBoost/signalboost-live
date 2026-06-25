@@ -1,142 +1,211 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
-import { cookies } from 'next/headers'
+import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { requireOwner } from '@/lib/auth/access'
 
-// ─── Website plan price IDs (new prices at correct amounts) ───────────────────
-// Public plan names (pricing page) map onto the internal plan tiers:
-//   launch → starter, growth → pro, command → business.
-// Internal names stay the single dialect in Stripe metadata and the database;
-// a full platform-wide rename is a post-launch cleanup task.
-const PUBLIC_TO_INTERNAL_PLAN: Record<string, string> = {
-  launch:  'starter',
-  growth:  'pro',
-  command: 'business',
+// Reads live env + session + DB; must never be cached.
+export const dynamic = 'force-dynamic'
+export const maxDuration = 20
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+const present = (v: string | undefined | null): boolean => !!(v && v.trim())
+
+function keyMode(key: string | undefined): 'live' | 'test' | 'unknown' {
+  if (!key) return 'unknown'
+  if (key.startsWith('sk_live')) return 'live'
+  if (key.startsWith('sk_test')) return 'test'
+  return 'unknown'
 }
 
-const WEBSITE_PRICE_IDS: Record<string, string> = {
-  starter:  process.env.STRIPE_PRICE_WEBSITE_STARTER  as string,
-  pro:      process.env.STRIPE_PRICE_WEBSITE_PRO      as string,
-  business: process.env.STRIPE_PRICE_WEBSITE_BUSINESS as string,
+// SaaS keys contain "51H8a"; Operations keys contain "51TVXg". The substring
+// lives inside the secret — we derive the family WITHOUT ever returning the key.
+function accountFamily(key: string | undefined): 'SaaS' | 'Operations' | 'unknown' {
+  if (!key) return 'unknown'
+  if (key.includes('51H8a')) return 'SaaS'
+  if (key.includes('51TVXg')) return 'Operations'
+  return 'unknown'
 }
 
-// ─── Podcast plan price IDs ───────────────────────────────────────────────────
-const PODCAST_PRICE_IDS: Record<string, string> = {
-  indie:   process.env.STRIPE_PRICE_PODCAST_INDIE   as string,
-  pro:     process.env.STRIPE_PRICE_PODCAST_PRO     as string,
-  network: process.env.STRIPE_PRICE_PODCAST_NETWORK as string,
-}
+// Canonical Stripe account for SaaS billing. Set to 'Operations' per owner
+// decision (2026-06-16): subscriptions bill into the Operations account. Flip
+// this single constant to 'SaaS' if billing is ever migrated to the 51H8a account.
+const EXPECTED_FAMILY: 'SaaS' | 'Operations' = 'Operations'
 
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json()
-    const requestedPlan: string = String(body.plan || '').toLowerCase()
-    // Translate public names (launch/growth/command) to internal tiers; pass
-    // internal names through unchanged for backward compatibility.
-    const plan: string = PUBLIC_TO_INTERNAL_PLAN[requestedPlan] || requestedPlan
-    // productLine defaults to 'website' so the existing pricing page works unchanged
-    const productLine: 'website' | 'podcast' = body.productLine ?? 'website'
+const EXPECTED_MARKER = EXPECTED_FAMILY === 'Operations' ? '51TVXg' : '51H8a'
+const OTHER_FAMILY = EXPECTED_FAMILY === 'Operations' ? 'SaaS' : 'Operations'
+const OTHER_MARKER = EXPECTED_FAMILY === 'Operations' ? '51H8a' : '51TVXg'
 
-    const priceMap =
-      productLine === 'podcast' ? PODCAST_PRICE_IDS : WEBSITE_PRICE_IDS
-    const priceId = priceMap[plan]
+// ─── route ──────────────────────────────────────────────────────────────────
 
-    if (!priceId) {
-      console.error('Checkout: invalid plan/productLine combo', { plan, productLine })
-      return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
-    }
-
-    // ── Read the logged-in user from Supabase cookies ────────────────────────
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookieOptions: saasSupabaseCookieOptions,
-        cookies: {
-          getAll() {
-            return cookieStore.getAll()
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options),
-              )
-            } catch {
-              // Called from a Server Component — safe to ignore
-            }
-          },
-        },
-      },
-    )
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user?.id) {
-      console.error('Checkout: no authenticated user', authError?.message)
-      return NextResponse.json(
-        { error: 'You must be signed in to subscribe.' },
-        { status: 401 },
-      )
-    }
-
-    const userId    = user.id
-    const userEmail = user.email || ''
-
-    console.log('Checkout: creating session for', { userId, plan, productLine, priceId })
-
-    // ── Build Stripe Checkout Session params ─────────────────────────────────
-    const params: Record<string, string> = {
-      mode:                                       'subscription',
-      'payment_method_types[0]':                  'card',
-      'line_items[0][price]':                     priceId,
-      'line_items[0][quantity]':                  '1',
-      success_url:                                `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?success=true`,
-      cancel_url:                                 `${process.env.NEXT_PUBLIC_APP_URL}/pricing?cancelled=true`,
-      // Session metadata (available on checkout.session.completed)
-      'metadata[userId]':                         userId,
-      'metadata[priceId]':                        priceId,
-      'metadata[plan]':                           plan,
-      'metadata[productLine]':                    productLine,
-      // Subscription metadata (available on all subscription events)
-      'subscription_data[metadata][userId]':      userId,
-      'subscription_data[metadata][priceId]':     priceId,
-      'subscription_data[metadata][plan]':        plan,
-      'subscription_data[metadata][productLine]': productLine,
-    }
-
-    // Pre-fill the email on the Stripe Checkout form for smoother UX
-    if (userEmail) {
-      params['customer_email'] = userEmail
-    }
-
-    const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
-      method:  'POST',
-      headers: {
-        Authorization:  `Bearer ${process.env.STRIPE_SECRET_KEY}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams(params).toString(),
-    })
-
-    const session = await stripeRes.json()
-
-    if (!stripeRes.ok) {
-      console.error('Stripe checkout creation failed', session.error)
-      return NextResponse.json(
-        { error: session.error?.message || 'Stripe error' },
-        { status: 400 },
-      )
-    }
-
-    console.log('Checkout: session created', session.id)
-    return NextResponse.json({ url: session.url })
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
-    console.error('Checkout route error:', message)
-    return NextResponse.json({ error: message }, { status: 500 })
+export async function GET() {
+  // Owner-only. requireOwner verifies the Supabase session server-side and
+  // returns the real auth UUID — not a hub-workspace id — so the row read below
+  // is bound to the correct user.
+  const guard = await requireOwner()
+  if (!guard.ok) {
+    return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status })
   }
+
+  const userId = guard.ctx.userId
+  const email = guard.ctx.email
+  const failures: string[] = []
+
+  // ── Stripe key + account family ────────────────────────────────────────────
+  const secretKey = process.env.STRIPE_SECRET_KEY
+  const family = accountFamily(secretKey)
+  const mode = keyMode(secretKey)
+  const secretPresent = present(secretKey)
+
+  if (!secretPresent) failures.push('STRIPE_SECRET_KEY is missing')
+  if (secretPresent && family !== EXPECTED_FAMILY) {
+    failures.push(
+      family === OTHER_FAMILY
+        ? `STRIPE_SECRET_KEY belongs to the ${OTHER_FAMILY} account (${OTHER_MARKER}) — must be the ${EXPECTED_FAMILY} account (${EXPECTED_MARKER})`
+        : 'STRIPE_SECRET_KEY account family is unrecognised (neither 51H8a nor 51TVXg)',
+    )
+  }
+
+  // ── Ping Stripe to prove the key actually authenticates ─────────────────────
+  let apiReachable = false
+  let accountId: string | null = null
+  let accountName: string | null = null
+  let stripeError: string | null = null
+  if (secretPresent) {
+    try {
+      const res = await fetch('https://api.stripe.com/v1/account', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${secretKey}` },
+      })
+      const acct = await res.json()
+      if (res.ok) {
+        apiReachable = true
+        accountId = acct?.id ?? null
+        accountName =
+          acct?.business_profile?.name ??
+          acct?.settings?.dashboard?.display_name ??
+          null
+      } else {
+        stripeError = acct?.error?.message || `Stripe returned ${res.status}`
+        failures.push(`Stripe key did not authenticate: ${stripeError}`)
+      }
+    } catch (err: any) {
+      stripeError = err?.message || 'Stripe request failed'
+      failures.push(`Stripe ping failed: ${stripeError}`)
+    }
+  }
+
+  // ── Other required env (never echo secret values) ───────────────────────────
+  const webhookSecretPresent = present(process.env.STRIPE_WEBHOOK_SECRET)
+  if (!webhookSecretPresent) failures.push('STRIPE_WEBHOOK_SECRET is missing')
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRolePresent = present(process.env.SUPABASE_SERVICE_ROLE_KEY)
+  if (!present(supabaseUrl)) failures.push('NEXT_PUBLIC_SUPABASE_URL is missing')
+  if (!serviceRolePresent) failures.push('SUPABASE_SERVICE_ROLE_KEY is missing')
+
+  const appUrlPresent = present(process.env.NEXT_PUBLIC_APP_URL)
+  if (!appUrlPresent) failures.push('NEXT_PUBLIC_APP_URL is missing')
+
+  // ── Price IDs (the 6 the checkout + webhook depend on) ──────────────────────
+  // Presence alone is not enough: Stripe price IDs are account-scoped, so a price
+  // set in one account 404s under another account's key. When the key authenticates
+  // we ping each price to prove it lives on the SAME account — catching the
+  // cross-account mismatch that would otherwise only surface as "No such price"
+  // mid-checkout.
+  const priceEnv: Array<{ envVar: string; id: string | undefined }> = [
+    { envVar: 'STRIPE_PRICE_WEBSITE_LAUNCH',  id: process.env.STRIPE_PRICE_WEBSITE_LAUNCH  ?? process.env.STRIPE_PRICE_WEBSITE_STARTER },
+    { envVar: 'STRIPE_PRICE_WEBSITE_GROWTH',  id: process.env.STRIPE_PRICE_WEBSITE_GROWTH  ?? process.env.STRIPE_PRICE_WEBSITE_PRO },
+    { envVar: 'STRIPE_PRICE_WEBSITE_COMMAND', id: process.env.STRIPE_PRICE_WEBSITE_COMMAND ?? process.env.STRIPE_PRICE_WEBSITE_BUSINESS },
+    { envVar: 'STRIPE_PRICE_PODCAST_INDIE', id: process.env.STRIPE_PRICE_PODCAST_INDIE },
+    { envVar: 'STRIPE_PRICE_PODCAST_PRO', id: process.env.STRIPE_PRICE_PODCAST_PRO },
+    { envVar: 'STRIPE_PRICE_PODCAST_NETWORK', id: process.env.STRIPE_PRICE_PODCAST_NETWORK },
+  ]
+
+  async function checkPrice(id: string | undefined): Promise<boolean | null> {
+    // null = could not check (price unset, or key absent/unauthenticated)
+    if (!present(id) || !secretPresent || !apiReachable) return null
+    try {
+      const r = await fetch(`https://api.stripe.com/v1/prices/${id}`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${secretKey}` },
+      })
+      return r.ok
+    } catch {
+      return false
+    }
+  }
+
+  const priceResults = await Promise.all(priceEnv.map((p) => checkPrice(p.id)))
+  const price_ids = priceEnv.map((p, i) => ({
+    env_var: p.envVar,
+    present: present(p.id),
+    valid_on_account: priceResults[i], // true | false | null(not-checked)
+  }))
+
+  const missingPrices = price_ids.filter((p) => !p.present).map((p) => p.env_var)
+  if (missingPrices.length) failures.push(`Missing price env vars: ${missingPrices.join(', ')}`)
+
+  const wrongAccountPrices = price_ids
+    .filter((p) => p.present && p.valid_on_account === false)
+    .map((p) => p.env_var)
+  if (wrongAccountPrices.length) {
+    failures.push(
+      `Price IDs not found on the authenticated Stripe account (cross-account mismatch): ${wrongAccountPrices.join(', ')}`,
+    )
+  }
+
+  // ── Phase D: read back THIS owner's subscription row ────────────────────────
+  // Informational — only populated after a real purchase. Does not gate config_ok.
+  let subscription: Record<string, unknown> = { found: false }
+  if (supabaseUrl && serviceRolePresent && userId) {
+    try {
+      const supabase = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+      const { data: row } = await supabase
+        .from('subscriptions')
+        .select(
+          'plan, status, stripe_customer_id, stripe_subscription_id, current_period_ends_at, podcast_plan, podcast_status',
+        )
+        .eq('user_id', userId)
+        .maybeSingle()
+      if (row) {
+        subscription = {
+          found: true,
+          plan: (row as any).plan ?? null,
+          status: (row as any).status ?? null,
+          stripe_customer_id_present: present((row as any).stripe_customer_id),
+          stripe_subscription_id_present: present((row as any).stripe_subscription_id),
+          current_period_ends_at: (row as any).current_period_ends_at ?? null,
+          podcast_plan: (row as any).podcast_plan ?? null,
+          podcast_status: (row as any).podcast_status ?? null,
+        }
+      }
+    } catch (err: any) {
+      subscription = { found: false, error: err?.message || 'row read failed' }
+    }
+  }
+
+  const configOk = failures.length === 0
+
+  return NextResponse.json({
+    ok: configOk, // overall Phase A config readiness
+    checked_at: new Date().toISOString(),
+    caller: { userId, email },
+    stripe: {
+      secret_key_present: secretPresent,
+      key_mode: mode,
+      account_family: family,
+      expected_account: EXPECTED_FAMILY,
+      account_family_ok: family === EXPECTED_FAMILY,
+      api_reachable: apiReachable,
+      account_id: accountId,
+      account_name: accountName,
+      error: stripeError,
+    },
+    webhook_secret_present: webhookSecretPresent,
+    supabase: { url_present: present(supabaseUrl), service_role_present: serviceRolePresent },
+    app_url_present: appUrlPresent,
+    price_ids,
+    subscription,
+    failures,
+  })
 }

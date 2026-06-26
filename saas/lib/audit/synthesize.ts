@@ -9,6 +9,7 @@
 // because the narrative could not be written.
 
 import { callAuditModel } from '@/lib/audit/modelRouter'
+import { reportLanguageName } from '@/lib/i18n/reportLanguage'
 
 export interface SynthFinding {
   file: string
@@ -26,6 +27,7 @@ export interface SynthesisInput {
   filesScanned: string[]
   findings: SynthFinding[]
   repoMap?: string[]   // full repository file tree (macro layout) for cross-file reasoning
+  lang?: string
 }
 
 const SEV_ORDER = ['critical', 'high', 'medium', 'low', 'info']
@@ -42,6 +44,7 @@ function tally(findings: SynthFinding[]): string {
 
 function buildSynthesisPrompt(input: SynthesisInput): string {
   const { repo, scope, filesScanned, findings, repoMap } = input
+  const language = reportLanguageName(input.lang)
 
   const mapBlock = (repoMap && repoMap.length)
     ? `Repository file tree — the MACRO LAYOUT of the whole codebase (${repoMap.length} paths${repoMap.length >= 500 ? ', truncated' : ''}). Use it to reason about architecture and cross-file structure even for files that were not individually deep-scanned:\n${repoMap.map(p => `- ${p}`).join('\n')}`
@@ -66,6 +69,8 @@ function buildSynthesisPrompt(input: SynthesisInput): string {
     'report for the engineering leadership of a SaaS company. Write with depth, authority, and',
     'specificity — the kind of report a CTO would pay for.',
     '',
+    `IMPORTANT: Write the entire report in ${language}. Keep file paths, package names, code identifiers, route names, and product names unchanged.`,
+    '',
     `Repository: ${repo}`,
     `Scanned scope: ${scope || '(application code)'}`,
     '',
@@ -80,7 +85,7 @@ function buildSynthesisPrompt(input: SynthesisInput): string {
     'Now write a COMPREHENSIVE report in GitHub-flavored Markdown. Do NOT merely restate the',
     'findings — SYNTHESIZE: connect issues across files, infer architectural patterns and systemic',
     'risks, and reason about real-world impact and likelihood. Reference actual file paths. Use',
-    'exactly this section structure:',
+    'exactly this section structure, translated into the requested report language:',
     '',
     '## Executive Summary',
     'Overall posture in prose: the 3–5 things leadership must know, the single headline risk, and',

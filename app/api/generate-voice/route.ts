@@ -25,11 +25,11 @@ function subscriptionIsCurrentlyValid(row: Record<string, unknown>, now: number)
   }
 
   // Missing period-end values are allowed only as a short checkout/write-race
-  // grace period. After that, fail closed so a malformed active/trialing row
-  // cannot grant paid access indefinitely.
+  // grace period. Future-dated rows fail closed as malformed.
   const createdAt = row.created_at as string | null | undefined;
   const parsedCreated = createdAt ? Date.parse(createdAt) : NaN;
-  return Number.isFinite(parsedCreated) && now - parsedCreated <= ENTITLEMENT_NULL_END_GRACE_MS;
+  const ageMs = Number.isFinite(parsedCreated) ? now - parsedCreated : NaN;
+  return Number.isFinite(ageMs) && ageMs >= 0 && ageMs <= ENTITLEMENT_NULL_END_GRACE_MS;
 }
 
 // Resolve the caller's plan tier from the AUTHORITATIVE subscription state — a
@@ -108,11 +108,11 @@ export async function POST(req: Request) {
     // Entitlement gate: voice synthesis is a paid feature. Fail CLOSED against
     // the authoritative subscription state — only an active/trialing subscription
     // whose normalized plan is an explicit paid tier may proceed. A lapsed,
-    // past_due, cancelled, missing, stale, or missing-period subscription resolves
-    // to "free" outside the short checkout-write grace period and is rejected.
-    // When a cost-bearing provider is wired, record per-render quota usage
-    // ATOMICALLY with this check and fail closed if it can't be recorded, so
-    // concurrent calls can't exceed entitlement.
+    // past_due, cancelled, missing, stale, future-dated, or missing-period
+    // subscription resolves to "free" outside the short checkout-write grace
+    // period and is rejected. When a cost-bearing provider is wired, record
+    // per-render quota usage ATOMICALLY with this check and fail closed if it
+    // can't be recorded, so concurrent calls can't exceed entitlement.
     const PAID_TIERS = new Set(["launch", "growth", "command", "paid"]);
     const tier = await resolveActivePaidTier(supabase, user.id);
     if (!PAID_TIERS.has(tier)) {

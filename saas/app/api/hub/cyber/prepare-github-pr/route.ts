@@ -26,6 +26,13 @@ type Change = {
   advisoryId?: string
 }
 
+function authorizedCron(req: Request): boolean {
+  const secret = process.env.CRON_SECRET
+  if (!secret) return false
+  const auth = req.headers.get('authorization') || ''
+  return auth === `Bearer ${secret}`
+}
+
 function branchFor(id: string) {
   return `cyber-${String(id || '').slice(0, 8)}`
 }
@@ -85,15 +92,14 @@ async function loadNextRow(admin: any, remediationId?: string | null) {
   return { ok: true, row: data, error: '' }
 }
 
-export async function POST(req: Request) {
-  const guard = await requireAdmin()
-  if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status })
-
-  let body: { remediationId?: string } = {}
-  try { body = await req.json() } catch { /* optional body */ }
+async function runPreparation(req: Request, remediationId?: string | null) {
+  if (!authorizedCron(req)) {
+    const guard = await requireAdmin()
+    if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status })
+  }
 
   const admin = getAdminSupabase()
-  const loaded = await loadNextRow(admin, body.remediationId || null)
+  const loaded = await loadNextRow(admin, remediationId || null)
   if (!loaded.ok || !loaded.row) return NextResponse.json({ ok: false, error: loaded.error }, { status: 400 })
 
   const row = loaded.row
@@ -164,4 +170,14 @@ export async function POST(req: Request) {
   }).eq('id', row.id)
 
   return NextResponse.json({ ok: true, remediationId: row.id, branch: `ai/${branch}`, prUrl, prNumber, touched, warnings: errors })
+}
+
+export async function GET(req: Request) {
+  return runPreparation(req, null)
+}
+
+export async function POST(req: Request) {
+  let body: { remediationId?: string } = {}
+  try { body = await req.json() } catch { /* optional body */ }
+  return runPreparation(req, body.remediationId || null)
 }

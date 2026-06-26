@@ -329,7 +329,7 @@ export async function PATCH(req: Request) {
         fix_plan_status: 'approved_for_pr',
         fix_plan_approved: true,
         fix_plan_approved_at: now,
-        implementation_status: 'awaiting_pr_preparation',
+        implementation_status: 'awaiting_github_pr_preparation',
         updated_at: now,
       }).eq('id', body.remediationId)
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
@@ -355,7 +355,7 @@ export async function PATCH(req: Request) {
           fix_plan_status: 'approved_for_pr',
           fix_plan_approved: true,
           fix_plan_approved_at: now,
-          implementation_status: 'awaiting_pr_preparation',
+          implementation_status: 'awaiting_github_pr_preparation',
           updated_at: now,
         }).eq('id', body.remediationId)
         if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })

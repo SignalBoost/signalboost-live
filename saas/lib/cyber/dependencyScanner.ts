@@ -23,6 +23,8 @@ export interface DependencyAdvisory {
   summary: string
   detailsUrl?: string
   aliases: string[]
+  fixedVersions?: string[]
+  affectedRanges?: string[]
 }
 
 export interface DependencyScanReport {
@@ -130,6 +132,46 @@ function severityFromVuln(v: any): CyberSeverity {
   return 'unknown'
 }
 
+function unique(values: string[]): string[] {
+  return Array.from(new Set(values.map(v => String(v || '').trim()).filter(Boolean)))
+}
+
+function fixedVersionsFromVuln(v: any): string[] {
+  const fixed: string[] = []
+  const affected = Array.isArray(v?.affected) ? v.affected : []
+  for (const a of affected) {
+    const ranges = Array.isArray(a?.ranges) ? a.ranges : []
+    for (const r of ranges) {
+      const events = Array.isArray(r?.events) ? r.events : []
+      for (const e of events) {
+        const version = cleanVersion(e?.fixed)
+        if (version) fixed.push(version)
+      }
+    }
+  }
+  return unique(fixed)
+}
+
+function affectedRangesFromVuln(v: any): string[] {
+  const rangesOut: string[] = []
+  const affected = Array.isArray(v?.affected) ? v.affected : []
+  for (const a of affected) {
+    const ranges = Array.isArray(a?.ranges) ? a.ranges : []
+    for (const r of ranges) {
+      const events = Array.isArray(r?.events) ? r.events : []
+      const pieces: string[] = []
+      for (const e of events) {
+        if (e?.introduced !== undefined) pieces.push(`introduced ${String(e.introduced)}`)
+        if (e?.fixed !== undefined) pieces.push(`fixed ${String(e.fixed)}`)
+        if (e?.last_affected !== undefined) pieces.push(`last affected ${String(e.last_affected)}`)
+        if (e?.limit !== undefined) pieces.push(`limit ${String(e.limit)}`)
+      }
+      if (pieces.length) rangesOut.push(pieces.join(' → '))
+    }
+  }
+  return unique(rangesOut).slice(0, 12)
+}
+
 async function queryOsv(packages: DependencyPackage[]): Promise<DependencyAdvisory[]> {
   if (packages.length === 0) return []
   const queries = packages.map(p => ({ package: { ecosystem: 'npm', name: p.name }, version: p.version }))
@@ -148,6 +190,7 @@ async function queryOsv(packages: DependencyPackage[]): Promise<DependencyAdviso
     const pkg = packages[idx]
     const vulns = Array.isArray(r?.vulns) ? r.vulns : []
     for (const v of vulns) {
+      const fixedVersions = fixedVersionsFromVuln(v)
       advisories.push({
         id: String(v?.id || 'unknown'),
         packageName: pkg.name,
@@ -157,6 +200,8 @@ async function queryOsv(packages: DependencyPackage[]): Promise<DependencyAdviso
         summary: String(v?.summary || v?.details || 'Dependency advisory found.').slice(0, 500),
         detailsUrl: Array.isArray(v?.references) && v.references[0]?.url ? String(v.references[0].url) : undefined,
         aliases: Array.isArray(v?.aliases) ? v.aliases.map((a: any) => String(a)) : [],
+        fixedVersions,
+        affectedRanges: affectedRangesFromVuln(v),
       })
     }
   })

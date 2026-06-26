@@ -19,6 +19,7 @@ import { runAudit } from '@/lib/audit/runner'
 import { checkScanQuota, clampScanSize } from '@/lib/audit/scanThrottle'
 import { collectProviderTemplateSnapshot } from '@/lib/audit/providerTemplateSnapshot'
 import { writeSnapshot } from '@/lib/audit/snapshotCache'
+import { normalizeReportLang, reportLangFromCookie } from '@/lib/i18n/reportLanguage'
 
 export const runtime     = 'nodejs'
 export const maxDuration = 300
@@ -41,18 +42,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Not signed in.' }, { status: 401 })
   }
 
-  // Access is governed PURELY by the audit-tier entitlement throttle — no isAdmin
-  // gate. checkScanQuota() reads the live audit tier (subscriptions.audit_plan /
-  // audit_status, NOT subscriptions.plan): owner ⇒ master/exempt, Free ⇒ 1 lifetime
-  // scan, paid tiers ⇒ their monthly cap. Over cap returns 402 (upgrade).
-  // NOTE: every caller's scan still targets AUDIT_GITHUB_REPO (the configured repo)
-  // until a per-customer scan target is wired — keep that in mind before promoting
-  // customer access broadly.
   const admin = getAdminSupabase()
-
-  // Throttle policy — resolve the tier for everyone (owner ⇒ exempt enterprise),
-  // and hard-block non-owners at their tier cap. The resolved tier also drives
-  // the pre-call size clamp below.
   const quota = await checkScanQuota(admin, { userId: ctx.userId, isOwner: ctx.isOwner })
   if (!quota.ok) {
     const capLabel = quota.cap == null ? '∞' : String(quota.cap)
@@ -72,15 +62,13 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  let body: { url?: string; prefix?: string; maxFiles?: number } = {}
+  let body: { url?: string; prefix?: string; maxFiles?: number; lang?: string } = {}
   try { body = await req.json() } catch { /* defaults apply */ }
-  // URL-first: a paying customer pastes their full GitHub repository URL. Falls back
-  // to a legacy path prefix, and finally to the platform's own repo (whole-repo audit).
+  const lang = normalizeReportLang(body.lang || reportLangFromCookie(req.headers.get('cookie')))
   const target   = typeof body.url === 'string' && body.url.trim()
     ? body.url.trim()
     : (typeof body.prefix === 'string' && body.prefix.trim() ? body.prefix.trim() : '')
   const prefix   = target || 'https://github.com/SignalBoost/signalboost-live'
-  // Pre-call size check — clamp into [1, tier ceiling] to bound model cost.
   const maxFiles = clampScanSize(body.maxFiles, quota.tier)
 
   const enc = new TextEncoder()
@@ -102,7 +90,9 @@ export async function POST(req: NextRequest) {
         const runId = started.data.id as string
 
         const result = await runAudit({
-          url: prefix, maxFiles,
+          url: prefix,
+          maxFiles,
+          lang,
           onProgress: (done, total) => send({ phase: 'RUN_ANALYZERS', done, total }),
         })
 
@@ -132,19 +122,13 @@ export async function POST(req: NextRequest) {
           findings_count: result.findings.length, provider: 'openai', model: 'gpt-5.5',
         }).eq('id', runId)
 
-        // Immutable full-payload snapshot for instant rehydration (best-effort:
-        // findings are already persisted normalized in audit_findings).
-        const payload = { runId, prefix, filesScanned: result.filesScanned, findingsCount: result.findings.length, findings: result.findings }
+        const payload = { runId, prefix, filesScanned: result.filesScanned, findingsCount: result.findings.length, findings: result.findings, lang }
         await admin.from('audit_logs').insert({ run_id: runId, user_id: ctx.userId, payload })
 
-        // Central provider snapshot — collect fresh provider facts ONCE and cache
-        // them so every /api/hub/audit/* report card reads from here instead of
-        // re-collecting live. The snapshot is tagged with the existing Console Hub
-        // provider-template tunnel so Audit/Cyber/COS/Infrastructure PRs stay aligned.
-        // Best-effort: never fail the run if this step errors.
         try {
           const snapshot = await collectProviderTemplateSnapshot()
           ;(snapshot as any).narrative = result.narrative || ''
+          ;(snapshot as any).lang = lang
           await writeSnapshot(admin, { runId, userId: ctx.userId, snapshot })
         } catch (snapErr) {
           console.error('audit snapshot cache write failed', snapErr instanceof Error ? snapErr.message : snapErr)

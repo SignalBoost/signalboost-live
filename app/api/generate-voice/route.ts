@@ -13,9 +13,24 @@ const MAX_BODY_BYTES = 50_000;
 const MAX_TEXT = 5000;
 const RATE_MAX = 20;
 const RATE_WINDOW_MS = 60_000;
-
+const ENTITLEMENT_NULL_END_GRACE_MS = 30 * 60_000;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function subscriptionIsCurrentlyValid(row: Record<string, unknown>, now: number): boolean {
+  const periodEnd = row.current_period_ends_at as string | null | undefined;
+  if (periodEnd) {
+    const parsedEnd = Date.parse(periodEnd);
+    return Number.isFinite(parsedEnd) && parsedEnd > now;
+  }
+
+  // Missing period-end values are allowed only as a short checkout/write-race
+  // grace period. After that, fail closed so a malformed active/trialing row
+  // cannot grant paid access indefinitely.
+  const createdAt = row.created_at as string | null | undefined;
+  const parsedCreated = createdAt ? Date.parse(createdAt) : NaN;
+  return Number.isFinite(parsedCreated) && now - parsedCreated <= ENTITLEMENT_NULL_END_GRACE_MS;
+}
 
 // Resolve the caller's plan tier from the AUTHORITATIVE subscription state — a
 // `subscriptions` row in a currently-valid billing status — NOT the accounts
@@ -34,24 +49,17 @@ async function resolveActivePaidTier(
   try {
     const { data } = await supabase
       .from("subscriptions")
-      .select("plan, status, current_period_ends_at")
+      .select("plan, status, current_period_ends_at, created_at")
       .eq("user_id", userId)
       .in("status", ["active", "trialing"])
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (!data) return "free"; // no valid active/trialing subscription → fail closed
-    const row = data as Record<string, unknown>;
-    // Temporal validity: a row can be stuck at active/trialing past its period
-    // end if a Stripe cancel/expire webhook was missed or delayed. A non-null
-    // period end in the PAST => expired => fail closed. A NULL period end means
-    // "not yet stamped" — written on renewal, NOT on the initial checkout upsert
-    // — so it must NOT block a brand-new active subscriber. (Stripe sets
-    // period_end = trial_end during a trial, so this also bounds trialing rows.)
-    const periodEnd = row.current_period_ends_at as string | null | undefined;
-    const parsedEnd = periodEnd ? Date.parse(periodEnd) : NaN;
-    if (Number.isFinite(parsedEnd) && parsedEnd <= Date.now()) return "free";
-    return normalizeTier((row.plan ?? null) as string | null | undefined);
+      .limit(5);
+
+    const rows = Array.isArray(data) ? data as Record<string, unknown>[] : [];
+    const now = Date.now();
+    const valid = rows.find(row => subscriptionIsCurrentlyValid(row, now));
+    if (!valid) return "free";
+    return normalizeTier((valid.plan ?? null) as string | null | undefined);
   } catch {
     return "free";
   }
@@ -100,10 +108,11 @@ export async function POST(req: Request) {
     // Entitlement gate: voice synthesis is a paid feature. Fail CLOSED against
     // the authoritative subscription state — only an active/trialing subscription
     // whose normalized plan is an explicit paid tier may proceed. A lapsed,
-    // past_due, cancelled, or missing subscription resolves to "free" and is
-    // rejected here. When a cost-bearing provider is wired, record per-render
-    // quota usage ATOMICALLY with this check and fail closed if it can't be
-    // recorded, so concurrent calls can't exceed entitlement.
+    // past_due, cancelled, missing, stale, or missing-period subscription resolves
+    // to "free" outside the short checkout-write grace period and is rejected.
+    // When a cost-bearing provider is wired, record per-render quota usage
+    // ATOMICALLY with this check and fail closed if it can't be recorded, so
+    // concurrent calls can't exceed entitlement.
     const PAID_TIERS = new Set(["launch", "growth", "command", "paid"]);
     const tier = await resolveActivePaidTier(supabase, user.id);
     if (!PAID_TIERS.has(tier)) {

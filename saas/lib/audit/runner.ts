@@ -10,7 +10,7 @@ import { callAuditModel } from '@/lib/audit/modelRouter'
 import { synthesizeReport } from '@/lib/audit/synthesize'
 import { runUxDetector } from '@/lib/audit/uxDetector'
 import { parseRepoUrl, listRepoTree, readRepoFileFrom, type RepoTarget } from '@/lib/audit/repoTarget'
-import { reportLanguageName } from '@/lib/i18n/reportLanguage'
+import { localizeKnownFindingText, reportLanguageName } from '@/lib/i18n/reportLanguage'
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info'
 
@@ -39,8 +39,6 @@ const MAX_CAP     = 60
 const CONCURRENCY = 4
 const AUDIT_REPO  = process.env.AUDIT_GITHUB_REPO || 'SignalBoost/signalboost-live'
 
-// Reduce a GitHub URL to an in-repo sub-path (used when the input targets the
-// DEFAULT repo rather than a full external URL).
 export function normalizeScanPath(input?: string): string {
   let p = String(input || '').trim()
   if (!p) return ''
@@ -49,8 +47,6 @@ export function normalizeScanPath(input?: string): string {
   return p.replace(/^\/+/, '').replace(/\/+$/, '')
 }
 
-// Security-relevant files first, so a budget-capped scan still covers the riskiest
-// surface even when the repo is far larger than MAX FILES.
 function priority(path: string): number {
   const p = path.toLowerCase()
   if (/(^|\/)(middleware\.|next\.config|package\.json)/.test(p)) return 0
@@ -109,6 +105,17 @@ function parseFindings(raw: string | null, file: string): AuditFinding[] {
   return out
 }
 
+function localizeKnownFinding(finding: AuditFinding, lang?: string): AuditFinding {
+  const localized = localizeKnownFindingText(finding, lang)
+  return {
+    ...finding,
+    category: localized.category || finding.category,
+    title: localized.title || finding.title,
+    detail: localized.detail || finding.detail,
+    recommendation: localized.recommendation || finding.recommendation,
+  }
+}
+
 async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = new Array(items.length)
   let idx = 0
@@ -131,7 +138,7 @@ async function scanOne(target: RepoTarget, path: string, lang?: string): Promise
     prompt:          buildPrompt(path, file.content, lang),
     maxTokens:       4096,
   })
-  return { path, scanned: true, findings: parseFindings(raw, path) }
+  return { path, scanned: true, findings: parseFindings(raw, path).map(f => localizeKnownFinding(f, lang)) }
 }
 
 export async function runAudit(opts?: {
@@ -145,8 +152,6 @@ export async function runAudit(opts?: {
   const maxFiles = Math.max(1, Math.min(opts?.maxFiles ?? 6, MAX_CAP))
   const lang = opts?.lang || 'en'
 
-  // A real GitHub URL / owner-repo targets THAT repo; anything else is treated as
-  // an in-repo sub-path on the default repo.
   const parsed = parseRepoUrl(raw)
   const target: RepoTarget = parsed || { repo: AUDIT_REPO, branch: '', subPath: normalizeScanPath(raw), raw }
 
@@ -183,11 +188,9 @@ export async function runAudit(opts?: {
     if (r.scanned) scanned.push(r.path)
     findings.push(...r.findings)
   }
-  // UX Integrity pass — cheap static scan (no model calls). Best-effort: a failure
-  // here never fails the run.
   try {
-    const uxFindings = await runUxDetector(target, allFiles, { lang })
-    findings.push(...uxFindings)
+    const uxFindings = await runUxDetector(target, allFiles)
+    findings.push(...uxFindings.map(f => localizeKnownFinding(f, lang)))
   } catch { /* UX pass is best-effort */ }
 
   findings.sort((a, b) => SEVERITIES.indexOf(a.severity) - SEVERITIES.indexOf(b.severity))

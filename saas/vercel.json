@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/cyber-dependency-monitor",
       "schedule": "15 8 * * *"
+    },
+    {
+      "path": "/api/hub/cyber/prepare-github-pr",
+      "schedule": "0 * * * *"
     }
   ]
 }

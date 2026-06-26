@@ -32,12 +32,11 @@ function subscriptionIsCurrentlyValid(row: Record<string, unknown>, now: number)
   }
 
   // Missing period ends are tolerated only as a very short checkout/write-race
-  // grace period, never indefinitely. This keeps brand-new checkout rows from
-  // failing immediately while still preventing stale null-period rows from
-  // granting paid access forever.
+  // grace period, never indefinitely. Future-dated rows fail closed as malformed.
   const createdAt = row.created_at as string | null | undefined
   const parsedCreated = createdAt ? Date.parse(createdAt) : NaN
-  return Number.isFinite(parsedCreated) && now - parsedCreated <= ENTITLEMENT_NULL_END_GRACE_MS
+  const ageMs = Number.isFinite(parsedCreated) ? now - parsedCreated : NaN
+  return Number.isFinite(ageMs) && ageMs >= 0 && ageMs <= ENTITLEMENT_NULL_END_GRACE_MS
 }
 
 // Resolve entitlement context from SERVER state only. The client no longer

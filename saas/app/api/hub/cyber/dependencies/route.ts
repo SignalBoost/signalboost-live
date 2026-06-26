@@ -35,6 +35,10 @@ function summarizeReport(report: any) {
   }
 }
 
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(v => String(v || '').trim()).filter(Boolean) : []
+}
+
 function remediationFindings(report: any) {
   const advisories = Array.isArray(report?.advisories) ? report.advisories : []
   return advisories.slice(0, 50).map((a: any) => ({
@@ -45,6 +49,8 @@ function remediationFindings(report: any) {
     summary: a.summary,
     detailsUrl: a.detailsUrl || null,
     sourceFile: a.sourceFile || null,
+    fixedVersions: stringList(a.fixedVersions),
+    affectedRanges: stringList(a.affectedRanges),
   }))
 }
 
@@ -59,15 +65,24 @@ function buildFixPlan(row: any) {
     const key = `${f.packageName || 'package'}@${f.version || 'unknown'}`
     if (!packageMap.has(key)) packageMap.set(key, f)
   }
-  const proposedChanges = Array.from(packageMap.values()).map((f: any) => ({
-    packageName: f.packageName || 'package',
-    currentVersion: f.version || 'unknown',
-    advisoryId: f.id || 'unknown advisory',
-    severity: f.severity || 'unknown',
-    sourceFile: f.sourceFile || 'unknown file',
-    proposedAction: 'Update this dependency to a safe patched compatible version, regenerate the lockfile, and run the build/test suite before deployment.',
-    changeType: 'dependency_update',
-  }))
+  const proposedChanges = Array.from(packageMap.values()).map((f: any) => {
+    const fixedVersions = stringList(f.fixedVersions)
+    const targetVersion = fixedVersions[0] || null
+    return {
+      packageName: f.packageName || 'package',
+      currentVersion: f.version || 'unknown',
+      targetVersion,
+      fixedVersions,
+      affectedRanges: stringList(f.affectedRanges),
+      advisoryId: f.id || 'unknown advisory',
+      severity: f.severity || 'unknown',
+      sourceFile: f.sourceFile || 'unknown file',
+      proposedAction: targetVersion
+        ? `Update this dependency to ${targetVersion}, regenerate the lockfile, and run the build/test suite before deployment.`
+        : 'Confirm the patched compatible version, update this dependency, regenerate the lockfile, and run the build/test suite before deployment.',
+      changeType: 'dependency_update',
+    }
+  })
 
   return {
     planVersion: 1,

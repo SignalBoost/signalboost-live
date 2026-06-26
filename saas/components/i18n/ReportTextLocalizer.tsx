@@ -5,6 +5,8 @@ import { useI18n } from '@/components/i18n/I18nProvider'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
+const ORIGINAL_TEXT = new WeakMap<Text, string>()
+
 const STRINGS: Record<Lang, Record<string, string>> = {
   en: {},
   pt: {
@@ -82,20 +84,28 @@ function replaceText(value: string, map: Record<string, string>) {
   return next
 }
 
+function hasKnownSource(value: string) {
+  return Object.keys(STRINGS.pt).some((source) => value.includes(source))
+}
+
 export default function ReportTextLocalizer() {
   const { lang } = useI18n()
 
   useEffect(() => {
     const safeLang = String(lang || 'en') as Lang
-    if (safeLang === 'en') return
     const map = STRINGS[safeLang] || {}
-    if (!Object.keys(map).length) return
 
     const apply = () => {
       walkTextNodes(document.body, (node) => {
-        const original = node.nodeValue || ''
-        const next = replaceText(original, map)
-        if (next !== original) node.nodeValue = next
+        const current = node.nodeValue || ''
+        const existingOriginal = ORIGINAL_TEXT.get(node)
+        const original = existingOriginal || current
+        if (!existingOriginal && hasKnownSource(current)) {
+          ORIGINAL_TEXT.set(node, current)
+        }
+        const source = ORIGINAL_TEXT.get(node) || original
+        const next = safeLang === 'en' ? source : replaceText(source, map)
+        if (next !== current) node.nodeValue = next
       })
     }
 

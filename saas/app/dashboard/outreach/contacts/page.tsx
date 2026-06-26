@@ -281,14 +281,22 @@ export default function OutreachContactsPage() {
     : leads.filter((lead) => (lead.status || 'pending') === filter)
 
   const countByStatus = (status: string) => leads.filter((l) => (l.status || 'pending') === status).length
-
-  // Pagination flags hoisted out of the JSX. Keeping a `>=` comparison inline in
-  // a <button>'s attributes makes a naive tag-scanning lint read the first `>`
-  // as the tag close — so it never sees the onClick after it and reports a false
-  // "dead button". Hoisting also reads cleaner.
   const atFirstPage = page === 0
   const atLastPage = (page + 1) * pageSize >= visible.length
   const hasMultiplePages = visible.length > pageSize
+
+  function selectFilter(filterKey: Filter) {
+    setFilter(filterKey)
+    setPage(0)
+  }
+
+  function previousPage() {
+    setPage((current) => Math.max(0, current - 1))
+  }
+
+  function nextPage() {
+    setPage((current) => ((current + 1) * pageSize >= visible.length ? current : current + 1))
+  }
 
   return (
     <main style={{ color: 'var(--text-primary)' }}>
@@ -317,7 +325,7 @@ export default function OutreachContactsPage() {
           <button
             key={filterKey}
             type="button"
-            onClick={() => { setFilter(filterKey); setPage(0) }}
+            onClick={() => selectFilter(filterKey)}
             className={filter === filterKey ? 'sb-button-primary' : 'sb-button-secondary'}
             style={{ fontSize: 12, padding: '7px 14px' }}
           >
@@ -449,9 +457,25 @@ export default function OutreachContactsPage() {
 
       {hasMultiplePages ? (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 16, marginTop: 16, borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 12 }}>
-          <button type="button" className="sb-button-secondary" style={{ fontSize: 13, padding: '7px 16px', opacity: atFirstPage ? .4 : 1 }} disabled={atFirstPage} onClick={() => setPage(page - 1)}>‹</button>
+          <button
+            type="button"
+            className="sb-button-secondary"
+            style={{ fontSize: 13, padding: '7px 16px', opacity: atFirstPage ? .4 : 1 }}
+            disabled={atFirstPage}
+            onClick={previousPage}
+          >
+            ‹
+          </button>
           <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 13, color: 'rgba(255,255,255,.7)' }}>{page + 1} / {Math.max(1, Math.ceil(visible.length / pageSize))}</span>
-          <button type="button" className="sb-button-secondary" style={{ fontSize: 13, padding: '7px 16px', opacity: atLastPage ? .4 : 1 }} disabled={atLastPage} onClick={() => setPage(page + 1)}>›</button>
+          <button
+            type="button"
+            className="sb-button-secondary"
+            style={{ fontSize: 13, padding: '7px 16px', opacity: atLastPage ? .4 : 1 }}
+            disabled={atLastPage}
+            onClick={nextPage}
+          >
+            ›
+          </button>
         </div>
       ) : null}
     </main>

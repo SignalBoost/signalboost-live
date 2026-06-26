@@ -13,9 +13,20 @@ const MAX_PROMPT = 4000;
 const RATE_MAX = 20;
 const RATE_WINDOW_MS = 60_000;
 
-
 export async function POST(req: Request) {
   try {
+    // CSRF defense FIRST: reject cookie-authenticated browser POSTs that are not
+    // same-origin before consuming any shared/IP/user rate-limit counter. This
+    // prevents a malicious page from burning the victim IP's graphic quota with
+    // cross-origin requests that will be rejected anyway. Originless/direct
+    // clients can still pass this check and are throttled by the pre-auth limit.
+    if (!sameOriginOk(req)) {
+      return NextResponse.json(
+        { success: false, error: "Cross-origin request rejected" },
+        { status: 403 }
+      );
+    }
+
     // Pre-auth IP rate limit so unauthenticated floods can't repeatedly invoke
     // Supabase auth before the per-user limit (below) ever applies.
     if (await rateLimited(`graphic-ip:${clientIpKey(req)}`, { max: 60, windowMs: RATE_WINDOW_MS })) {
@@ -31,14 +42,6 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
         { status: 401 }
-      );
-    }
-
-    // CSRF defense: reject cookie-authenticated POSTs that aren't same-origin.
-    if (!sameOriginOk(req)) {
-      return NextResponse.json(
-        { success: false, error: "Cross-origin request rejected" },
-        { status: 403 }
       );
     }
 

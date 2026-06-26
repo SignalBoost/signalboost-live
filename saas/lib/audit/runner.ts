@@ -10,6 +10,7 @@ import { callAuditModel } from '@/lib/audit/modelRouter'
 import { synthesizeReport } from '@/lib/audit/synthesize'
 import { runUxDetector } from '@/lib/audit/uxDetector'
 import { parseRepoUrl, listRepoTree, readRepoFileFrom, type RepoTarget } from '@/lib/audit/repoTarget'
+import { reportLanguageName } from '@/lib/i18n/reportLanguage'
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info'
 
@@ -62,9 +63,12 @@ function priority(path: string): number {
   return 6
 }
 
-function buildPrompt(path: string, content: string): string {
+function buildPrompt(path: string, content: string, lang?: string): string {
+  const language = reportLanguageName(lang)
   return [
     `FILE: ${path}`,
+    '',
+    `IMPORTANT: Write every category, title, detail, and recommendation value in ${language}. Keep file paths, package names, code identifiers, route names, and product names unchanged.`,
     '',
     'Audit this source for security vulnerabilities (RLS / authorization bypass,',
     'injection, secret leakage, unsafe input handling), logic flaws, and standards',
@@ -119,12 +123,12 @@ async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise
   return results
 }
 
-async function scanOne(target: RepoTarget, path: string): Promise<{ path: string; scanned: boolean; findings: AuditFinding[] }> {
+async function scanOne(target: RepoTarget, path: string, lang?: string): Promise<{ path: string; scanned: boolean; findings: AuditFinding[] }> {
   const file = await readRepoFileFrom(target.repo, target.branch, path)
   if (!file.ok || !file.content) return { path, scanned: false, findings: [] }
   const raw = await callAuditModel({
     modelPreference: 'openai',
-    prompt:          buildPrompt(path, file.content),
+    prompt:          buildPrompt(path, file.content, lang),
     maxTokens:       4096,
   })
   return { path, scanned: true, findings: parseFindings(raw, path) }
@@ -134,10 +138,12 @@ export async function runAudit(opts?: {
   url?: string
   prefix?: string
   maxFiles?: number
+  lang?: string
   onProgress?: (done: number, total: number) => void
 }): Promise<AuditRunResult> {
   const raw      = String(opts?.url || opts?.prefix || '').trim()
   const maxFiles = Math.max(1, Math.min(opts?.maxFiles ?? 6, MAX_CAP))
+  const lang = opts?.lang || 'en'
 
   // A real GitHub URL / owner-repo targets THAT repo; anything else is treated as
   // an in-repo sub-path on the default repo.
@@ -165,7 +171,7 @@ export async function runAudit(opts?: {
   opts?.onProgress?.(0, targets.length)
   let done = 0
   const per = await mapPool(targets, CONCURRENCY, async (path) => {
-    const r = await scanOne(target, path)
+    const r = await scanOne(target, path, lang)
     done++
     opts?.onProgress?.(done, targets.length)
     return r
@@ -177,24 +183,21 @@ export async function runAudit(opts?: {
     if (r.scanned) scanned.push(r.path)
     findings.push(...r.findings)
   }
-  // UX Integrity pass — cheap static scan (no model calls) over the app/components
-  // source for placeholders, dead links, no-op handlers, and TODO/FIXME markers.
-  // Best-effort: a failure here never fails the run.
+  // UX Integrity pass — cheap static scan (no model calls). Best-effort: a failure
+  // here never fails the run.
   try {
-    const uxFindings = await runUxDetector(target, allFiles)
+    const uxFindings = await runUxDetector(target, allFiles, { lang })
     findings.push(...uxFindings)
   } catch { /* UX pass is best-effort */ }
 
   findings.sort((a, b) => SEVERITIES.indexOf(a.severity) - SEVERITIES.indexOf(b.severity))
 
-  // Holistic synthesis — gets the WHOLE repo tree (macro map) plus the findings, so
-  // it can reason about architecture and cross-file structure even for files that
-  // weren't individually deep-scanned. Best-effort; never fails the run.
   const narrative = await synthesizeReport({
     repo:         target.repo,
     scope:        target.subPath || '(entire repository)',
     repoMap:      allFiles.slice(0, 500),
     filesScanned: scanned,
+    lang,
     findings:     findings.map(f => ({
       file: f.file, severity: f.severity, category: f.category,
       title: f.title, detail: f.detail, recommendation: f.recommendation, line: f.line,

@@ -40,6 +40,14 @@ function normalizeLang(value: string | null) {
   return match ?? 'en'
 }
 
+function persistLanguage(lang: string) {
+  if (typeof window === 'undefined') return
+  const safe = normalizeLang(lang)
+  localStorage.setItem('signalboost_language', safe)
+  localStorage.setItem('site-language', safe)
+  document.cookie = `signalboost_language=${encodeURIComponent(safe)}; Path=/; Max-Age=31536000; SameSite=Lax`
+}
+
 function getInitialLanguage() {
   if (typeof window === 'undefined') {
     return 'en'
@@ -76,6 +84,7 @@ export function I18nProvider({
 
   useEffect(() => {
     const initialLang = getInitialLanguage()
+    persistLanguage(initialLang)
 
     if (initialLang !== lang) {
       setLangState(initialLang)
@@ -90,6 +99,7 @@ export function I18nProvider({
     async function init() {
       setIsReady(false)
       setDict(englishCopy as Dict)
+      persistLanguage(lang)
 
       const loaded =
         await loadLanguage(lang)
@@ -112,16 +122,7 @@ export function I18nProvider({
     const safeLang =
       normalizeLang(newLang)
 
-    localStorage.setItem(
-      'signalboost_language',
-      safeLang
-    )
-
-    localStorage.setItem(
-      'site-language',
-      safeLang
-    )
-
+    persistLanguage(safeLang)
     setLangState(safeLang)
   }
 

@@ -55,22 +55,41 @@ async function resolveEntitlements(
   }
 
   // AUTHORITATIVE tier: gate on a currently-valid subscription (active/trialing)
-  // — the same table/columns the marketing dashboard and video export gate read
-  // — not a plan column that can persist after cancellation, expiry, or a
-  // lapsed trial. Fetch several candidates so a newer stale row cannot mask an
-  // older still-valid entitlement.
+  // using database-side validity filters. This avoids the previous pattern of
+  // looking only at the newest few active/trialing rows, where several newer
+  // stale/malformed rows could hide an older still-valid entitlement.
   let tier = 'free'
   try {
-    const { data } = await supabase
+    const now = Date.now()
+    const nowIso = new Date(now).toISOString()
+    const graceStartIso = new Date(now - ENTITLEMENT_NULL_END_GRACE_MS).toISOString()
+
+    const { data: periodRows } = await supabase
       .from('subscriptions')
       .select('plan, status, current_period_ends_at, created_at')
       .eq('user_id', userId)
       .in('status', ['active', 'trialing'])
+      .gt('current_period_ends_at', nowIso)
+      .order('current_period_ends_at', { ascending: false })
+      .limit(1)
+
+    const { data: graceRows } = await supabase
+      .from('subscriptions')
+      .select('plan, status, current_period_ends_at, created_at')
+      .eq('user_id', userId)
+      .in('status', ['active', 'trialing'])
+      .is('current_period_ends_at', null)
+      .gte('created_at', graceStartIso)
+      .lte('created_at', nowIso)
       .order('created_at', { ascending: false })
-      .limit(5)
-    const rows = Array.isArray(data) ? data as Record<string, unknown>[] : []
-    const now = Date.now()
-    const valid = rows.find(row => subscriptionIsCurrentlyValid(row, now))
+      .limit(1)
+
+    const candidates = [
+      ...(Array.isArray(periodRows) ? periodRows : []),
+      ...(Array.isArray(graceRows) ? graceRows : []),
+    ] as Record<string, unknown>[]
+
+    const valid = candidates.find(row => subscriptionIsCurrentlyValid(row, now))
     if (valid) {
       // normalizeTier() maps any unknown/mutated plan value down to 'free' — the
       // same normalizer the export gate uses, so we can't over-report a tier.
@@ -103,6 +122,20 @@ async function resolveEntitlements(
   return { tier, billingProvider }
 }
 
+function currentUtcMonthStart(nowMs = Date.now()): Date {
+  const now = new Date(nowMs)
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+}
+
+function nextUtcMonthStart(nowMs = Date.now()): Date {
+  const now = new Date(nowMs)
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
+}
+
+function usageCacheKey(userId: string, monthStartIso: string) {
+  return `${userId}:${monthStartIso}`
+}
+
 // Authoritative used-minutes for the current calendar month, summed server-side
 // from this (marketing) project's own `video_jobs` ledger — the same table the
 // video export route writes. Same project + same auth user id as the concierge,
@@ -117,6 +150,8 @@ async function resolveEntitlements(
 async function resolveUsedMinutes(
   supabase: Awaited<ReturnType<typeof createMarketingServerSupabase>>,
   userId: string,
+  monthStartIso: string,
+  signal?: AbortSignal,
 ): Promise<number | null> {
   // A malformed (non-UUID) id is "unknown" usage, not a verified 0. Returning
   // null flags usageUnavailable downstream instead of presenting a false
@@ -126,22 +161,21 @@ async function resolveUsedMinutes(
   const PAGE = 1000
   const MAX_PAGES = 50 // 50k export rows/month ceiling — far beyond any real use
   try {
-    const now = new Date()
-    const monthStart = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
-    ).toISOString()
     let totalSeconds = 0
     let complete = false
     for (let page = 0; page < MAX_PAGES; page++) {
       const fromIdx = page * PAGE
-      const { data, error } = await supabase
+      const builder = supabase
         .from('video_jobs')
         .select('duration_seconds')
         .eq('user_id', userId)
         .eq('job_type', 'export')
-        .gte('created_at', monthStart)
+        .gte('created_at', monthStartIso)
         .order('created_at', { ascending: true })
         .range(fromIdx, fromIdx + PAGE - 1)
+      const { data, error } = signal
+        ? await builder.abortSignal(signal)
+        : await builder
       if (error) return null // explicit unknown — never fabricate 0 on error
       if (!Array.isArray(data) || data.length === 0) {
         complete = true
@@ -165,20 +199,42 @@ async function resolveUsedMinutes(
     if (!complete) return null
     return Math.ceil(totalSeconds / 60)
   } catch {
-    return null // explicit unknown
+    return null // explicit unknown, including abort/timeout
   }
 }
 
-// Short-TTL per-user cache for the monthly usage figure. Without it, a high-rate
-// authenticated caller could force resolveUsedMinutes' paginated reads on every
-// POST (fan-out / avoidable DB load). With it, usage is recomputed at most once
-// per user per window regardless of request rate.
+async function resolveUsedMinutesWithTimeout(
+  supabase: Awaited<ReturnType<typeof createMarketingServerSupabase>>,
+  userId: string,
+  monthStartIso: string,
+): Promise<number | null> {
+  const controller = new AbortController()
+  let timeout: ReturnType<typeof setTimeout> | null = null
+  const timedOut = new Promise<null>((resolve) => {
+    timeout = setTimeout(() => {
+      controller.abort()
+      resolve(null)
+    }, USAGE_LOOKUP_TIMEOUT_MS)
+  })
+  try {
+    return await Promise.race([
+      resolveUsedMinutes(supabase, userId, monthStartIso, controller.signal),
+      timedOut,
+    ])
+  } finally {
+    if (timeout) clearTimeout(timeout)
+  }
+}
+
+// Short-TTL per-user/month cache for the monthly usage figure. Without it, a
+// high-rate authenticated caller could force resolveUsedMinutes' paginated reads
+// on every POST. Cache keys include the UTC month start so values computed just
+// before a month boundary cannot leak into the next month.
 const USAGE_TTL_MS = 60_000
-// Hard cap on distinct cached users per instance. Combined with LRU eviction
-// below this bounds memory regardless of how many distinct accounts call in a
-// window — the previous cleanup only ran when oversized AND only deleted
-// already-expired entries, so a large live set could still grow unbounded.
+const USAGE_LOOKUP_TIMEOUT_MS = 5_000
+// Hard cap on distinct cached users/months per instance.
 const USAGE_CACHE_MAX = 5000
+const USAGE_INFLIGHT_MAX = 500
 const usageCache = new Map<string, { value: number | null; expires: number }>()
 const usageInflight = new Map<string, Promise<number | null>>()
 
@@ -200,30 +256,40 @@ async function resolveUsedMinutesCached(
   userId: string,
 ): Promise<number | null> {
   const now = Date.now()
-  const hit = usageCache.get(userId)
+  const monthStartIso = currentUtcMonthStart(now).toISOString()
+  const monthEndMs = nextUtcMonthStart(now).getTime()
+  const cacheKey = usageCacheKey(userId, monthStartIso)
+  const hit = usageCache.get(cacheKey)
   if (hit && hit.expires > now) {
     // Touch: re-insert to mark most-recently-used (Map keeps insertion order).
-    usageCache.delete(userId)
-    usageCache.set(userId, hit)
+    usageCache.delete(cacheKey)
+    usageCache.set(cacheKey, hit)
     return hit.value
   }
-  if (hit) usageCache.delete(userId) // stale
+  if (hit) usageCache.delete(cacheKey) // stale
 
-  const existing = usageInflight.get(userId)
+  const existing = usageInflight.get(cacheKey)
   if (existing) return existing
 
-  const pending = resolveUsedMinutes(supabase, userId)
+  // Bound retained in-flight work. If many distinct accounts arrive while the DB
+  // is slow, degrade to usageUnavailable rather than retaining unbounded promises.
+  if (usageInflight.size >= USAGE_INFLIGHT_MAX) return null
+
+  const pending = resolveUsedMinutesWithTimeout(supabase, userId, monthStartIso)
     .then(value => {
       const finishedAt = Date.now()
-      usageCache.set(userId, { value, expires: finishedAt + USAGE_TTL_MS })
+      usageCache.set(cacheKey, {
+        value,
+        expires: Math.min(finishedAt + USAGE_TTL_MS, monthEndMs),
+      })
       pruneUsageCache(finishedAt)
       return value
     })
     .finally(() => {
-      usageInflight.delete(userId)
+      usageInflight.delete(cacheKey)
     })
 
-  usageInflight.set(userId, pending)
+  usageInflight.set(cacheKey, pending)
   return pending
 }
 

@@ -21,6 +21,20 @@ export default function Home() {
     <main>
       <SignalHero />
 
+      <section className="sb-page-shell sb-section" aria-label={t(dict, 'home.repoCheckLabel', 'Free public repo check')}>
+        <div className="sb-glass" style={{ padding: 28, display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 22, alignItems: 'center' }}>
+          <div>
+            <span className="sb-eyebrow">{t(dict, 'home.repoCheckKicker', 'Free developer utility')}</span>
+            <h2 className="sb-h2" style={{ marginTop: 10 }}>{t(dict, 'home.repoCheckTitle', 'Run a free public GitHub repo check.')}</h2>
+            <p className="sb-body" style={{ maxWidth: 720 }}>{t(dict, 'home.repoCheckText', 'Paste a public repository URL and get a capped package advisory preview. Audit Pro unlocks the complete report, planning layer, scheduled monitoring, and assisted review workflow.')}</p>
+          </div>
+          <div className="sb-cta-row">
+            <Link className="sb-button-primary" href="/repo-check">{t(dict, 'home.repoCheckCta', 'Run free repo check')}</Link>
+            <Link className="sb-button-secondary" href="/pricing">{t(dict, 'home.repoCheckPricing', 'View Audit Pro')}</Link>
+          </div>
+        </div>
+      </section>
+
       <section className="sb-page-shell sb-section" aria-label={t(dict, 'home.featuresLabel', 'Features')}>
         <div className="sb-cta-row" style={{ justifyContent: 'space-between', alignItems: 'end', marginBottom: 24 }}>
           <div>

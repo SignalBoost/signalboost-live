@@ -70,6 +70,7 @@ export default function Footer() {
               {[
                 { label: t(dict, 'home', 'Home'), href: '/' },
                 { label: t(dict, 'pricing', 'Pricing'), href: '/pricing' },
+                { label: t(dict, 'footer.repoCheck', 'Free Repo Check'), href: '/repo-check' },
                 { label: t(dict, 'dashboard', 'Dashboard'), href: '/dashboard' },
                 { label: t(dict, 'footer.documentation', 'Documentation'), href: '/docs' },
                 { label: t(dict, 'support.faq', 'FAQ'), href: '/faq' },

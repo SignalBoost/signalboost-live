@@ -7,11 +7,15 @@
 // on each click — faster, cheaper, and a single source of truth shared with the
 // Hub-driven operator run.
 //
+// The fallback collector uses the existing Console Hub provider-template tunnel,
+// so Audit evidence stays aligned with Console Hub, COS, Cybersecurity, and
+// Infrastructure PRs.
+//
 // Helpers never throw: report routes fall back to a one-off live collection when
 // the cache is empty. `admin` is the service-role Supabase client (typed `any`,
 // repo convention — strict:false).
 
-import { collectSnapshot } from '@/lib/audit/collectors'
+import { collectProviderTemplateSnapshot } from '@/lib/audit/providerTemplateSnapshot'
 import type { AuditSnapshot } from '@/lib/audit/findingsEngine'
 
 const TABLE = 'audit_snapshots'
@@ -55,5 +59,5 @@ export async function readLatestSnapshot(
 export async function getReportSnapshot(admin: any): Promise<AuditSnapshot> {
   const cached = await readLatestSnapshot(admin)
   if (cached) return cached.snapshot
-  return collectSnapshot()
+  return collectProviderTemplateSnapshot()
 }

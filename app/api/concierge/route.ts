@@ -17,11 +17,28 @@ const MAX_QUERY = 2000
 const MAX_BODY_BYTES = 16_000
 const ALLOWED_LOCALES = new Set(['en', 'es', 'pt', 'pl', 'ru'])
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const ENTITLEMENT_NULL_END_GRACE_MS = 30 * 60_000
 
 // Rate limit via the shared limiter: distributed (Upstash) when configured,
 // otherwise a soft per-instance ceiling. Keyed by authenticated user id.
 const RATE_MAX = 30
 const RATE_WINDOW_MS = 60_000
+
+function subscriptionIsCurrentlyValid(row: Record<string, unknown>, now: number): boolean {
+  const periodEnd = row.current_period_ends_at as string | null | undefined
+  if (periodEnd) {
+    const parsedEnd = Date.parse(periodEnd)
+    return Number.isFinite(parsedEnd) && parsedEnd > now
+  }
+
+  // Missing period ends are tolerated only as a very short checkout/write-race
+  // grace period, never indefinitely. This keeps brand-new checkout rows from
+  // failing immediately while still preventing stale null-period rows from
+  // granting paid access forever.
+  const createdAt = row.created_at as string | null | undefined
+  const parsedCreated = createdAt ? Date.parse(createdAt) : NaN
+  return Number.isFinite(parsedCreated) && now - parsedCreated <= ENTITLEMENT_NULL_END_GRACE_MS
+}
 
 // Resolve entitlement context from SERVER state only. The client no longer
 // supplies tier / usedMinutes / billingProvider — those are spoofable. Defaults
@@ -41,35 +58,24 @@ async function resolveEntitlements(
   // AUTHORITATIVE tier: gate on a currently-valid subscription (active/trialing)
   // — the same table/columns the marketing dashboard and video export gate read
   // — not a plan column that can persist after cancellation, expiry, or a
-  // lapsed trial. No qualifying row => least-privilege 'free', so the concierge
-  // never advertises a paid allowance the real export gate would refuse.
+  // lapsed trial. Fetch several candidates so a newer stale row cannot mask an
+  // older still-valid entitlement.
   let tier = 'free'
   try {
     const { data } = await supabase
       .from('subscriptions')
-      .select('plan, status, current_period_ends_at')
+      .select('plan, status, current_period_ends_at, created_at')
       .eq('user_id', userId)
       .in('status', ['active', 'trialing'])
       .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    if (data) {
-      const row = data as Record<string, unknown>
-      // Temporal validity guard: a row can be stuck at active/trialing past its
-      // period end if a Stripe cancel/expire webhook was missed or delayed.
-      // A non-null period end in the PAST => expired => stay 'free'. A NULL
-      // period end means "not yet stamped" — it's written on renewal, NOT on the
-      // initial checkout upsert — so it must NOT block a brand-new subscriber.
-      // (Stripe sets period_end = trial_end during a trial, so this also bounds
-      // trialing rows; there is no separate trial_end column.)
-      const periodEnd = row.current_period_ends_at as string | null | undefined
-      const parsedEnd = periodEnd ? Date.parse(periodEnd) : NaN
-      const expired = Number.isFinite(parsedEnd) && parsedEnd <= Date.now()
-      if (!expired) {
-        // normalizeTier() maps any unknown/mutated plan value down to 'free' — the
-        // same normalizer the export gate uses, so we can't over-report a tier.
-        tier = normalizeTier(row.plan as string | null | undefined)
-      }
+      .limit(5)
+    const rows = Array.isArray(data) ? data as Record<string, unknown>[] : []
+    const now = Date.now()
+    const valid = rows.find(row => subscriptionIsCurrentlyValid(row, now))
+    if (valid) {
+      // normalizeTier() maps any unknown/mutated plan value down to 'free' — the
+      // same normalizer the export gate uses, so we can't over-report a tier.
+      tier = normalizeTier(valid.plan as string | null | undefined)
     }
   } catch {
     tier = 'free'
@@ -175,6 +181,20 @@ const USAGE_TTL_MS = 60_000
 // already-expired entries, so a large live set could still grow unbounded.
 const USAGE_CACHE_MAX = 5000
 const usageCache = new Map<string, { value: number | null; expires: number }>()
+const usageInflight = new Map<string, Promise<number | null>>()
+
+function pruneUsageCache(now: number) {
+  if (usageCache.size <= USAGE_CACHE_MAX) return
+  // Purge expired first (cheap), then evict oldest until under the hard cap.
+  for (const [k, v] of usageCache) {
+    if (v.expires <= now) usageCache.delete(k)
+  }
+  while (usageCache.size > USAGE_CACHE_MAX) {
+    const oldest = usageCache.keys().next().value
+    if (oldest === undefined) break
+    usageCache.delete(oldest)
+  }
+}
 
 async function resolveUsedMinutesCached(
   supabase: Awaited<ReturnType<typeof createMarketingServerSupabase>>,
@@ -189,20 +209,23 @@ async function resolveUsedMinutesCached(
     return hit.value
   }
   if (hit) usageCache.delete(userId) // stale
-  const value = await resolveUsedMinutes(supabase, userId)
-  usageCache.set(userId, { value, expires: now + USAGE_TTL_MS })
-  if (usageCache.size > USAGE_CACHE_MAX) {
-    // Purge expired first (cheap), then evict oldest until under the hard cap.
-    for (const [k, v] of usageCache) {
-      if (v.expires <= now) usageCache.delete(k)
-    }
-    while (usageCache.size > USAGE_CACHE_MAX) {
-      const oldest = usageCache.keys().next().value
-      if (oldest === undefined) break
-      usageCache.delete(oldest)
-    }
-  }
-  return value
+
+  const existing = usageInflight.get(userId)
+  if (existing) return existing
+
+  const pending = resolveUsedMinutes(supabase, userId)
+    .then(value => {
+      const finishedAt = Date.now()
+      usageCache.set(userId, { value, expires: finishedAt + USAGE_TTL_MS })
+      pruneUsageCache(finishedAt)
+      return value
+    })
+    .finally(() => {
+      usageInflight.delete(userId)
+    })
+
+  usageInflight.set(userId, pending)
+  return pending
 }
 
 export async function POST(req: Request) {

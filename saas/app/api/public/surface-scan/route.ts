@@ -108,7 +108,7 @@ export async function POST(req: Request) {
   }
 
   const parsed = await readJsonLimited(req)
-  if (!parsed.ok) {
+  if (parsed.ok === false) {
     return NextResponse.json({ ok: false, error: parsed.error }, { status: parsed.status })
   }
 

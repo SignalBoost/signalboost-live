@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import ReportTextLocalizer from '@/components/i18n/ReportTextLocalizer'
 
 const MAP: Record<string, string> = {
   en: 'English',
@@ -47,7 +48,7 @@ const STRINGS: Record<string, { title: string; body: string; switch: string; kee
   },
 }
 
-export default function LanguageSuggestion() {
+function LanguageSuggestionBox() {
   const { lang, setLang } = useI18n()
   const [show, setShow] = useState(false)
   const [suggested, setSuggested] = useState('en')
@@ -154,5 +155,14 @@ export default function LanguageSuggestion() {
         </button>
       </div>
     </div>
+  )
+}
+
+export default function LanguageSuggestion() {
+  return (
+    <>
+      <ReportTextLocalizer />
+      <LanguageSuggestionBox />
+    </>
   )
 }

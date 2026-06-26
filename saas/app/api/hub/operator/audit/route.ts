@@ -17,7 +17,7 @@ import { getAccess } from '@/lib/auth/access'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { runAudit } from '@/lib/audit/runner'
 import { checkScanQuota, clampScanSize } from '@/lib/audit/scanThrottle'
-import { collectSnapshot } from '@/lib/audit/collectors'
+import { collectProviderTemplateSnapshot } from '@/lib/audit/providerTemplateSnapshot'
 import { writeSnapshot } from '@/lib/audit/snapshotCache'
 
 export const runtime     = 'nodejs'
@@ -139,9 +139,11 @@ export async function POST(req: NextRequest) {
 
         // Central provider snapshot — collect fresh provider facts ONCE and cache
         // them so every /api/hub/audit/* report card reads from here instead of
-        // re-collecting live. Best-effort: never fail the run if this step errors.
+        // re-collecting live. The snapshot is tagged with the existing Console Hub
+        // provider-template tunnel so Audit/Cyber/COS/Infrastructure PRs stay aligned.
+        // Best-effort: never fail the run if this step errors.
         try {
-          const snapshot = await collectSnapshot()
+          const snapshot = await collectProviderTemplateSnapshot()
           ;(snapshot as any).narrative = result.narrative || ''
           await writeSnapshot(admin, { runId, userId: ctx.userId, snapshot })
         } catch (snapErr) {
@@ -158,6 +160,9 @@ export async function POST(req: NextRequest) {
   })
 
   return new Response(stream, {
-    headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' },
+    headers: {
+      'Content-Type': 'application/x-ndjson',
+      'Cache-Control': 'no-store',
+    },
   })
 }

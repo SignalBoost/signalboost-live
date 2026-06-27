@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import ReportTextLocalizer from '@/components/i18n/ReportTextLocalizer'
+import AssistantHistoryLayoutPatch from '@/components/AssistantHistoryLayoutPatch'
 
 const MAP: Record<string, string> = {
   en: 'English',
@@ -162,6 +163,7 @@ export default function LanguageSuggestion() {
   return (
     <>
       <ReportTextLocalizer />
+      <AssistantHistoryLayoutPatch />
       <LanguageSuggestionBox />
     </>
   )

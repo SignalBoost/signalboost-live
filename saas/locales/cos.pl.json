@@ -1,0 +1,75 @@
+{
+  "cos": {
+    "nav": {
+      "mining": "Eksploracja",
+      "features": "Cechy",
+      "segments": "Segmenty",
+      "rules": "Wzorce",
+      "runs": "Historia"
+    },
+    "mining": {
+      "title": "Eksploracja danych",
+      "subtitle": "Wzorce zachowań i transakcji zasilające prognozy",
+      "run_now": "Uruchom teraz",
+      "last_run": "Ostatnie uruchomienie",
+      "events_scanned": "Przeanalizowane zdarzenia",
+      "users_processed": "Przetworzeni użytkownicy",
+      "features_written": "Wygenerowane cechy",
+      "rules_found": "Znalezione wzorce"
+    },
+    "features": {
+      "title": "Wyodrębnione cechy",
+      "name": "Cecha",
+      "value": "Wartość",
+      "updated": "Zaktualizowano",
+      "names": {
+        "event_frequency_per_day": "Aktywność dziennie",
+        "transaction_count": "Transakcje",
+        "avg_deposit_cents": "Średnia wpłata",
+        "avg_transfer_cents": "Średni przelew",
+        "preferred_txn_hour": "Preferowana godzina",
+        "dominant_device_code": "Główne urządzenie",
+        "campaign_engagement_rate": "Zaangażowanie w kampanie",
+        "recency_days": "Dni od ostatniej aktywności",
+        "amount_trend_slope": "Trend wydatków"
+      }
+    },
+    "segments": {
+      "title": "Segmenty zachowań",
+      "cluster": "Grupa",
+      "members": "Członkowie"
+    },
+    "rules": {
+      "title": "Wykryte wzorce",
+      "if": "Jeśli",
+      "then": "to",
+      "support": "Wsparcie",
+      "confidence": "Pewność",
+      "lift": "Lift"
+    },
+    "status": {
+      "running": "W toku",
+      "success": "Sukces",
+      "error": "Błąd"
+    },
+    "empty": {
+      "no_features": "Brak cech — uruchom eksplorację, aby je wygenerować.",
+      "no_rules": "Nie wykryto jeszcze żadnych wzorców.",
+      "no_runs": "Brak zarejestrowanych uruchomień."
+    },
+    "errors": {
+      "unauthorized": "Zaloguj się, aby kontynuować.",
+      "forbidden": "Nie masz dostępu do tych danych.",
+      "load_failed": "Nie udało się wczytać danych. Spróbuj ponownie."
+    },
+    "tooltips": {
+      "confidence": "Jak często wzorzec się sprawdza, gdy warunek jest spełniony.",
+      "lift": "O ile bardziej prawdopodobny jest wynik względem przypadku.",
+      "segment": "Grupa użytkowników o podobnym zachowaniu."
+    },
+    "meta": {
+      "title": "Eksploracja danych COS — SignalBoost",
+      "description": "Sygnały behawioralne i transakcyjne zasilające prognozy COS."
+    }
+  }
+}

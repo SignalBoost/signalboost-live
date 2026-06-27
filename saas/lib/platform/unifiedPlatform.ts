@@ -26,6 +26,7 @@ export const ADMIN_SIDEBAR = [
   { icon: '🌌', label: 'Overview', href: '/admin' },
   { icon: '🧾', label: 'Logs', href: '/admin/system' },
   { icon: '📡', label: 'Outreach', href: '/admin/sales' },
+  { icon: '📣', label: 'Marketing + Sales', href: '/admin/marketing-sales' },
   { icon: '🧠', label: 'Insights', href: '/admin/ai' },
   { icon: '🛡️', label: 'Role Management', href: '/admin/settings/roles' },
   { icon: '🛰️', label: 'Marketplace Monitor', href: '/admin/partners' },

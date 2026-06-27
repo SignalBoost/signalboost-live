@@ -19,7 +19,10 @@ export async function POST(req: Request) {
   const body = await readBody(req)
 
   if (!body.rawText && !body.securityBrief) {
-    return NextResponse.json({ ok: false, error: 'rawText or securityBrief is required.' }, { status: 400 })
+    return NextResponse.json({
+      ok: false,
+      errorKey: 'cos.error.rawTextOrSecurityBriefRequired',
+    }, { status: 400 })
   }
 
   const sequence = buildPodcastSequence({

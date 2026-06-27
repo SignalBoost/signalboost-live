@@ -5,11 +5,19 @@ import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 
 const GOLD = '#ffc300'
-
 const CONTACT_EMAIL = 'support@signalboostapp.com'
 
+const FOOTER_TOOL_COPY: Record<string, { websiteOptimizer: string }> = {
+  en: { websiteOptimizer: 'Free Website Optimizer' },
+  pt: { websiteOptimizer: 'Otimizador de Site Grátis' },
+  es: { websiteOptimizer: 'Optimizador Web Gratis' },
+  pl: { websiteOptimizer: 'Darmowy Optymalizator Strony' },
+  ru: { websiteOptimizer: 'Бесплатный оптимизатор сайта' },
+}
+
 export default function Footer() {
-  const { dict } = useI18n()
+  const { dict, lang } = useI18n()
+  const footerCopy = FOOTER_TOOL_COPY[lang] || FOOTER_TOOL_COPY.en
   const pathname = usePathname()
   const year = new Date().getFullYear()
 
@@ -71,6 +79,7 @@ export default function Footer() {
                 { label: t(dict, 'home', 'Home'), href: '/' },
                 { label: t(dict, 'pricing', 'Pricing'), href: '/pricing' },
                 { label: t(dict, 'footer.repoCheck', 'Free Repo Check'), href: '/repo-check' },
+                { label: footerCopy.websiteOptimizer, href: '/website-optimizer' },
                 { label: t(dict, 'dashboard', 'Dashboard'), href: '/dashboard' },
                 { label: t(dict, 'footer.documentation', 'Documentation'), href: '/docs' },
                 { label: t(dict, 'support.faq', 'FAQ'), href: '/faq' },
@@ -84,13 +93,8 @@ export default function Footer() {
                     color: 'var(--text-muted)',
                     textDecoration: 'none',
                   }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.color = '#fff'
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.color =
-                      'var(--text-muted)'
-                  }}
+                  onMouseEnter={e => { e.currentTarget.style.color = '#fff' }}
+                  onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)' }}
                 >
                   {item.label}
                 </Link>
@@ -121,22 +125,10 @@ export default function Footer() {
               }}
             >
               {[
-                {
-                  label: t(dict, 'buildWebsite', 'Build a website'),
-                  href: '/dashboard/builder',
-                },
-                {
-                  label: t(dict, 'collectReviews', 'Collect reviews'),
-                  href: '/dashboard/reviews',
-                },
-                {
-                  label: t(dict, 'footer.generateNativeAudio', 'Generate native audio'),
-                  href: '/dashboard/audio',
-                },
-                {
-                  label: t(dict, 'createVideos', 'Create videos'),
-                  href: '/dashboard/video',
-                },
+                { label: t(dict, 'buildWebsite', 'Build a website'), href: '/dashboard/builder' },
+                { label: t(dict, 'collectReviews', 'Collect reviews'), href: '/dashboard/reviews' },
+                { label: t(dict, 'footer.generateNativeAudio', 'Generate native audio'), href: '/dashboard/audio' },
+                { label: t(dict, 'createVideos', 'Create videos'), href: '/dashboard/video' },
               ].map(item => (
                 <Link
                   key={item.href}
@@ -146,13 +138,8 @@ export default function Footer() {
                     color: 'var(--text-muted)',
                     textDecoration: 'none',
                   }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.color = '#fff'
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.color =
-                      'var(--text-muted)'
-                  }}
+                  onMouseEnter={e => { e.currentTarget.style.color = '#fff' }}
+                  onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)' }}
                 >
                   {item.label}
                 </Link>
@@ -183,22 +170,10 @@ export default function Footer() {
               }}
             >
               {[
-                {
-                  label: t(dict, 'footer.about', 'About'),
-                  href: '/docs#how-it-works',
-                },
-                {
-                  label: t(dict, 'footer.partners', 'Partners'),
-                  href: '/docs#partners',
-                },
-                {
-                  label: t(dict, 'footer.privacy', 'Privacy'),
-                  href: '/docs#your-data',
-                },
-                {
-                  label: t(dict, 'footer.contact', 'Contact'),
-                  href: '/support',
-                },
+                { label: t(dict, 'footer.about', 'About'), href: '/docs#how-it-works' },
+                { label: t(dict, 'footer.partners', 'Partners'), href: '/docs#partners' },
+                { label: t(dict, 'footer.privacy', 'Privacy'), href: '/docs#your-data' },
+                { label: t(dict, 'footer.contact', 'Contact'), href: '/support' },
               ].map(item => (
                 <Link
                   key={item.label}
@@ -208,13 +183,8 @@ export default function Footer() {
                     color: 'var(--text-muted)',
                     textDecoration: 'none',
                   }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.color = '#fff'
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.color =
-                      'var(--text-muted)'
-                  }}
+                  onMouseEnter={e => { e.currentTarget.style.color = '#fff' }}
+                  onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)' }}
                 >
                   {item.label}
                 </Link>
@@ -287,25 +257,11 @@ export default function Footer() {
             gap: 12,
           }}
         >
-          <div
-            style={{
-              fontSize: 12,
-              color: 'var(--text-faint)',
-            }}
-          >
-            © {year} SignalBoost
-          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>© {year} SignalBoost</div>
 
-          <div
-            style={{
-              fontSize: 12,
-              color: 'var(--text-faint)',
-            }}
-          >
+          <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>
             {t(dict, 'footer.poweredBy', 'Powered by')}{' '}
-           <span style={{ color: GOLD }}>
-              {t(dict, 'footer.brandName', 'SignalBoost AI')}
-            </span>
+            <span style={{ color: GOLD }}>{t(dict, 'footer.brandName', 'SignalBoost AI')}</span>
           </div>
         </div>
 

@@ -3,6 +3,9 @@
 
 export * from './types'
 export * from './schema'
+export * from './prismaSchema'
+export * from './translationBlocks'
+export * from './telemetry'
 export * from './contactLimiter'
 export * from './salesOutreachManager'
 export * from './leadIntakeEngine'

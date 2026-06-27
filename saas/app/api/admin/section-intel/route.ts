@@ -1,10 +1,8 @@
 // saas/app/api/admin/section-intel/route.ts
 //
-// Real, computed operational intelligence for the admin cockpit pages. Replaces
-// the previously hardcoded FORECASTS / FINANCIAL_LEDGER / KPI_DASHBOARD /
-// COCKPIT_PANELS mock constants with live aggregates from proven Supabase
-// tables. Admin-gated. Every helper is null-safe: a missing table/column yields
-// null, and the UI shows an honest empty-state — it NEVER fabricates a number.
+// Real, computed operational intelligence for the admin cockpit pages.
+// Admin-gated. Every helper is null-safe: a missing table/column yields null,
+// and the UI shows an honest empty-state — it never fabricates hidden activity.
 
 import { NextResponse } from 'next/server'
 import { getAdminSupabase } from '@/utils/supabase/server'
@@ -42,15 +40,39 @@ async function supabaseHealth(a: any): Promise<string | null> {
 }
 
 const sinceISO = (days: number) => { const d = new Date(); d.setDate(d.getDate() - days); return d.toISOString() }
+const startOfTodayISO = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString() }
+const nz = (n: number | null | undefined) => n ?? 0
 
-// Recent rows for a section's table, shaped to that section's columns. Only
-// sections with a clean, proven source return rows; the rest return [] so the
-// UI shows an honest "no records yet" rather than a fabricated row.
+async function prospectCount(a: any): Promise<number> {
+  const queue = await countRows(a, 'outreach_queue')
+  if (queue != null) return queue
+  return nz(await countRows(a, 'prospects'))
+}
+
+async function repliesCount(a: any): Promise<number> {
+  const outreachReplies = await countRows(a, 'outreach_replies')
+  if (outreachReplies != null) return outreachReplies
+  return nz(await countRows(a, 'email_replies'))
+}
+
+async function draftedEmails(a: any): Promise<number> {
+  const [queueDrafts, directDrafts] = await Promise.all([
+    countRows(a, 'outreach_queue'),
+    countRows(a, 'admin_audit_log', (q: any) => q.eq('action', 'sales.email_draft')),
+  ])
+  return nz(queueDrafts) + nz(directDrafts)
+}
+
+function pct(numerator: number, denominator: number): string {
+  if (!denominator) return '0%'
+  return `${Math.round((numerator / denominator) * 100)}%`
+}
+
 async function sectionRows(a: any, section: string): Promise<string[][]> {
   try {
     if (section === 'system') {
       const [health, lastOutreach, lastProspect, errors] = await Promise.all([
-        supabaseHealth(a), latest(a, 'outreach_sends'), latest(a, 'prospects'), countRows(a, 'error_logs'),
+        supabaseHealth(a), latest(a, 'outreach_sends', 'sent_at'), latest(a, 'outreach_queue'), countRows(a, 'error_logs'),
       ])
       const rows: string[][] = []
       rows.push(['Supabase', health ? 'Connected' : 'Unknown', health ? 'just now' : '—', health ? 'Health probe OK' : 'No response'])
@@ -70,11 +92,33 @@ async function sectionRows(a: any, section: string): Promise<string[][]> {
       return rows
     }
     if (section === 'sales') {
-      const [prospects, sends] = await Promise.all([countRows(a, 'prospects'), countRows(a, 'outreach_sends')])
-      const rows: string[][] = []
-      if (prospects != null) rows.push(['Prospects', String(prospects), '—', '—'])
-      if (sends != null) rows.push(['Outreach sent', String(sends), '—', '—'])
-      return rows
+      const [prospects, approved, drafted, sent, today, replies, meetings, won, followups] = await Promise.all([
+        prospectCount(a),
+        countRows(a, 'outreach_queue', (q: any) => q.in('status', ['approved', 'sent'])),
+        draftedEmails(a),
+        countRows(a, 'outreach_sends'),
+        countRows(a, 'outreach_sends', (q: any) => q.gte('sent_at', startOfTodayISO())),
+        repliesCount(a),
+        countRows(a, 'sales_meetings'),
+        countRows(a, 'subscriptions', (q: any) => q.in('plan', PAYING_PLANS)),
+        countRows(a, 'outreach_queue', (q: any) => q.in('status', ['pending', 'approved'])),
+      ])
+
+      const sentCount = nz(sent)
+      const prospectsCount = nz(prospects)
+      const wonCount = nz(won)
+
+      return [
+        ['Prospects discovered', String(prospectsCount), '—', 'Outreach engine'],
+        ['Prospects approved', String(nz(approved)), '—', 'Owner/Admin'],
+        ['Emails drafted', String(nz(drafted)), '—', 'Sales draft engine'],
+        ['Emails sent', String(sentCount), '—', 'Outreach sender'],
+        ['Daily outreach count', String(nz(today)), '—', 'Today'],
+        ['Replies received', String(nz(replies)), pct(nz(replies), sentCount), 'Inbox/reply tracking'],
+        ['Meetings booked', String(nz(meetings)), '—', 'Calendar/CRM'],
+        ['Clients won', String(wonCount), pct(wonCount, prospectsCount), 'Subscriptions'],
+        ['Next follow-ups', String(nz(followups)), '—', 'Pending/approved queue'],
+      ]
     }
     return []
   } catch { return [] }
@@ -94,7 +138,7 @@ export async function GET(req: Request) {
     countRows(a, 'accounts'),
     countRows(a, 'subscriptions', (q: any) => q.in('plan', PAYING_PLANS)),
     countRows(a, 'subscriptions', (q: any) => q.eq('plan', 'free')),
-    countRows(a, 'prospects'),
+    prospectCount(a),
     countRows(a, 'outreach_sends'),
     countRows(a, 'ai_task_log'),
     countRows(a, 'ai_business_sites'),
@@ -105,8 +149,8 @@ export async function GET(req: Request) {
     countRows(a, 'accounts', (q: any) => q.gte('created_at', sinceISO(30))),
     countRows(a, 'accounts', (q: any) => q.gte('created_at', sinceISO(90))),
     supabaseHealth(a),
-    latest(a, 'outreach_sends'),
-    latest(a, 'prospects'),
+    latest(a, 'outreach_sends', 'sent_at'),
+    latest(a, 'outreach_queue'),
     sectionRows(a, section),
   ])
 

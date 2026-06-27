@@ -1,270 +1,188 @@
 'use client'
 
-// saas/app/admin/page.tsx
-// SignalBoost Admin — Executive Dashboard (Owner/Admin only)
-// i18n: en, es, pt, pl, ru
-
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
-import { ADMIN_SIDEBAR, COCKPIT_PANELS, CRM_STAGES, EXECUTIVE_RECOMMENDATIONS, FINANCIAL_LEDGER, FORECASTS, KPI_DASHBOARD } from '@/lib/platform/unifiedPlatform'
+import { ADMIN_SIDEBAR } from '@/lib/platform/unifiedPlatform'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type MetricValues = Record<string, number | string>
 
 const COPY: Record<Lang, {
   eyebrow: string
   title: string
   body: string
   role: string
-  openPanel: string
-  panelNote: string
-  desktop: string
-  mobile: string
-  aria: string
-  financial: string
-  kpi: string
-  forecasting: string
-  crm: string
-  concierge: string
-  marketplace: string
-  saas: string
-  unified: string
-  horizon: string
-  revenue: string
-  campaign: string
-  churn: string
+  open: string
+  loading: string
+  updated: string
+  live: string
+  noActivity: string
+  notConnected: string
+  noneYet: string
+  sectionStatus: string
 }> = {
   en: {
-    eyebrow: 'Executive Dashboard',
-    title: 'Unified SignalBoost mission control',
-    body: 'Financial, KPI, CRM, Outreach, Forecasting, Marketplace, SaaS, and Concierge telemetry consolidated into one owner/admin cockpit.',
+    eyebrow: 'Owner Console',
+    title: 'Live SignalBoost command center',
+    body: 'Owner/admin navigation connected to real platform metrics: accounts, outreach, AI usage, subscriptions, system health, and admin controls.',
     role: 'Restricted: Owner/Admin',
-    openPanel: 'Open panel',
-    panelNote: 'Keyboard-focusable NASA glass navigation with hover glow.',
-    desktop: '▣ Desktop: sidebar + master cockpit',
-    mobile: '▤ Mobile: stacked neon cards',
-    aria: '⌨ ARIA regions + keyboard focus',
-    financial: 'Financial dashboard',
-    kpi: 'KPI dashboard',
-    forecasting: 'Forecasting',
-    crm: 'CRM + Outreach',
-    concierge: 'Concierge executive insights',
-    marketplace: 'Marketplace',
-    saas: 'SaaS',
-    unified: 'Unified engagement index',
-    horizon: 'Horizon',
-    revenue: 'Revenue',
-    campaign: 'Campaign',
-    churn: 'Churn',
+    open: 'Open live console',
+    loading: 'Loading live metrics…',
+    updated: 'Updated',
+    live: 'Live metrics',
+    noActivity: 'No activity yet',
+    notConnected: 'Not connected',
+    noneYet: 'None yet',
+    sectionStatus: 'Live section summary',
   },
   es: {
-    eyebrow: 'Panel Ejecutivo',
-    title: 'Centro de control unificado de SignalBoost',
-    body: 'Telemetría financiera, KPI, CRM, Difusión, Pronósticos, Marketplace, SaaS y Concierge consolidada en un solo panel de propietario/administrador.',
+    eyebrow: 'Consola del propietario',
+    title: 'Centro de mando SignalBoost en vivo',
+    body: 'Navegación owner/admin conectada a métricas reales: cuentas, outreach, uso de IA, suscripciones, salud del sistema y controles administrativos.',
     role: 'Restringido: Propietario/Admin',
-    openPanel: 'Abrir panel',
-    panelNote: 'Navegación de vidrio NASA con foco de teclado y brillo al pasar.',
-    desktop: '▣ Escritorio: barra lateral + cabina principal',
-    mobile: '▤ Móvil: tarjetas neón apiladas',
-    aria: '⌨ Regiones ARIA + foco de teclado',
-    financial: 'Panel financiero',
-    kpi: 'Panel de KPI',
-    forecasting: 'Pronósticos',
-    crm: 'CRM + Difusión',
-    concierge: 'Perspectivas ejecutivas del Concierge',
-    marketplace: 'Mercado',
-    saas: 'SaaS',
-    unified: 'Índice de participación unificado',
-    horizon: 'Horizonte',
-    revenue: 'Ingresos',
-    campaign: 'Campaña',
-    churn: 'Abandono',
+    open: 'Abrir consola en vivo',
+    loading: 'Cargando métricas en vivo…',
+    updated: 'Actualizado',
+    live: 'Métricas en vivo',
+    noActivity: 'Sin actividad todavía',
+    notConnected: 'No conectado',
+    noneYet: 'Nada aún',
+    sectionStatus: 'Resumen de sección en vivo',
   },
   pt: {
-    eyebrow: 'Painel Executivo',
-    title: 'Controle de missão unificado do SignalBoost',
-    body: 'Telemetria financeira, KPI, CRM, Divulgação, Previsões, Marketplace, SaaS e Concierge consolidada em um único painel de proprietário/administrador.',
+    eyebrow: 'Console do proprietário',
+    title: 'Centro de comando SignalBoost ao vivo',
+    body: 'Navegação owner/admin conectada a métricas reais: contas, outreach, uso de IA, assinaturas, saúde do sistema e controles administrativos.',
     role: 'Restrito: Proprietário/Admin',
-    openPanel: 'Abrir painel',
-    panelNote: 'Navegação em vidro NASA com foco de teclado e brilho ao passar.',
-    desktop: '▣ Desktop: barra lateral + cabine principal',
-    mobile: '▤ Mobile: cartões neon empilhados',
-    aria: '⌨ Regiões ARIA + foco de teclado',
-    financial: 'Painel financeiro',
-    kpi: 'Painel de KPI',
-    forecasting: 'Previsões',
-    crm: 'CRM + Divulgação',
-    concierge: 'Perspectivas executivas do Concierge',
-    marketplace: 'Marketplace',
-    saas: 'SaaS',
-    unified: 'Índice de engajamento unificado',
-    horizon: 'Horizonte',
-    revenue: 'Receita',
-    campaign: 'Campanha',
-    churn: 'Cancelamento',
+    open: 'Abrir console ao vivo',
+    loading: 'Carregando métricas ao vivo…',
+    updated: 'Atualizado',
+    live: 'Métricas ao vivo',
+    noActivity: 'Sem atividade ainda',
+    notConnected: 'Não conectado',
+    noneYet: 'Nada ainda',
+    sectionStatus: 'Resumo da seção ao vivo',
   },
   pl: {
-    eyebrow: 'Panel Wykonawczy',
-    title: 'Ujednolicone centrum kontroli SignalBoost',
-    body: 'Telemetria finansowa, KPI, CRM, Outreach, Prognozy, Marketplace, SaaS i Concierge skonsolidowane w jednym panelu właściciela/administratora.',
+    eyebrow: 'Konsola właściciela',
+    title: 'Centrum dowodzenia SignalBoost na żywo',
+    body: 'Nawigacja owner/admin połączona z rzeczywistymi metrykami: konta, outreach, użycie AI, subskrypcje, zdrowie systemu i kontrole administracyjne.',
     role: 'Dostęp ograniczony: Właściciel/Admin',
-    openPanel: 'Otwórz panel',
-    panelNote: 'Nawigacja szklana NASA z fokusem klawiatury i poświatą po najechaniu.',
-    desktop: '▣ Desktop: pasek boczny + główna kabina',
-    mobile: '▤ Mobile: ułożone karty neonowe',
-    aria: '⌨ Regiony ARIA + fokus klawiatury',
-    financial: 'Panel finansowy',
-    kpi: 'Panel KPI',
-    forecasting: 'Prognozy',
-    crm: 'CRM + Outreach',
-    concierge: 'Spostrzeżenia wykonawcze Concierge',
-    marketplace: 'Marketplace',
-    saas: 'SaaS',
-    unified: 'Ujednolicony wskaźnik zaangażowania',
-    horizon: 'Horyzont',
-    revenue: 'Przychód',
-    campaign: 'Kampania',
-    churn: 'Rezygnacje',
+    open: 'Otwórz konsolę live',
+    loading: 'Ładowanie metryk live…',
+    updated: 'Zaktualizowano',
+    live: 'Metryki live',
+    noActivity: 'Brak aktywności',
+    notConnected: 'Nie połączono',
+    noneYet: 'Jeszcze brak',
+    sectionStatus: 'Podsumowanie sekcji live',
   },
   ru: {
-    eyebrow: 'Исполнительная панель',
-    title: 'Единый центр управления SignalBoost',
-    body: 'Финансовая телеметрия, KPI, CRM, Охват, Прогнозы, Маркетплейс, SaaS и Консьерж — всё в одной панели владельца/администратора.',
+    eyebrow: 'Консоль владельца',
+    title: 'Живой командный центр SignalBoost',
+    body: 'Навигация owner/admin подключена к реальным метрикам: аккаунты, outreach, использование ИИ, подписки, здоровье системы и административные элементы.',
     role: 'Доступ ограничен: Владелец/Администратор',
-    openPanel: 'Открыть панель',
-    panelNote: 'Стеклянная навигация NASA с фокусом клавиатуры и свечением при наведении.',
-    desktop: '▣ Рабочий стол: боковая панель + главная кабина',
-    mobile: '▤ Мобильный: стопка неоновых карточек',
-    aria: '⌨ Регионы ARIA + фокус клавиатуры',
-    financial: 'Финансовая панель',
-    kpi: 'Панель KPI',
-    forecasting: 'Прогнозы',
-    crm: 'CRM + Охват',
-    concierge: 'Исполнительные инсайты Консьержа',
-    marketplace: 'Маркетплейс',
-    saas: 'SaaS',
-    unified: 'Единый индекс вовлечённости',
-    horizon: 'Горизонт',
-    revenue: 'Выручка',
-    campaign: 'Кампания',
-    churn: 'Отток',
+    open: 'Открыть live-консоль',
+    loading: 'Загрузка live-метрик…',
+    updated: 'Обновлено',
+    live: 'Live-метрики',
+    noActivity: 'Пока нет активности',
+    notConnected: 'Не подключено',
+    noneYet: 'Пока нет',
+    sectionStatus: 'Live-сводка раздела',
   },
 }
 
-const LANGS: Lang[] = ['en', 'es', 'pt', 'pl', 'ru']
-
-function getLang(): Lang {
-  if (typeof window !== 'undefined') { const s = localStorage.getItem('signalboost_language'); if (s && (s in COPY)) return s as Lang }
-  if (typeof navigator === 'undefined') return 'en'
-  const code = (navigator.language || '').slice(0, 2).toLowerCase()
-  const map: Record<string, Lang> = { en: 'en', es: 'es', pt: 'pt', pl: 'pl', ru: 'ru' }
-  return map[code] || 'en'
+function copyFor(lang: string): typeof COPY.en {
+  return COPY[(['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as Lang]
 }
 
-export default function AdminOverviewPage() {
-  const { lang: activeLang } = useI18n()
-  const [lang, setLang] = useState<Lang>('en')
-  useEffect(() => { setLang(getLang()) }, [])
-  const t = COPY[(activeLang in COPY ? activeLang : 'en') as Lang]
+function value(values: MetricValues, key: string, fallback: string | number = 0): string | number {
+  const v = values[key]
+  if (typeof v === 'number') return v.toLocaleString()
+  if (typeof v === 'string' && v.length) return v
+  return fallback
+}
+
+function sectionSummary(href: string, values: MetricValues, c: typeof COPY.en): [string, string][] {
+  switch (href) {
+    case '/admin':
+      return [['Users', String(value(values, 'overview-0'))], ['Outreach', String(value(values, 'overview-12'))], ['Leads', String(value(values, 'overview-13'))]]
+    case '/admin/system':
+      return [['API errors', String(value(values, 'system-0'))], ['Supabase', String(value(values, 'system-2', c.notConnected))], ['Daily jobs', String(value(values, 'sys-5'))]]
+    case '/admin/sales':
+      return [['Prospects', String(value(values, 'sales-0'))], ['Released', String(value(values, 'sales-4'))], ['Response', String(value(values, 'sales-9', '0%'))]]
+    case '/admin/ai':
+      return [['AI tasks', String(value(values, 'ai-0'))], ['Errors', String(value(values, 'ai-3'))], ['Latency', String(value(values, 'ai-4', c.noActivity))]]
+    case '/admin/settings/roles':
+      return [['Access', 'Owner/Admin'], ['Status', 'Protected'], ['Audit', String(value(values, 'system-0'))]]
+    case '/admin/partners':
+      return [['Partners', String(value(values, 'partners-0'))], ['Top category', String(value(values, 'partners-4', c.noneYet))], ['Monitor', c.live]]
+    case '/admin/saas':
+      return [['Accounts', String(value(values, 'saas-0'))], ['Sites', String(value(values, 'saas-3'))], ['AI usage', String(value(values, 'saas-7'))]]
+    case '/admin/adm':
+      return [['Sessions', String(value(values, 'adm-0'))], ['Messages', String(value(values, 'adm-7'))], ['Monitor', c.live]]
+    default:
+      return [[c.sectionStatus, c.live]]
+  }
+}
+
+export default function AdminLandingPage() {
+  const { lang } = useI18n()
+  const c = copyFor(lang)
+  const [values, setValues] = useState<MetricValues>({})
+  const [generatedAt, setGeneratedAt] = useState('')
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    fetch('/api/admin/section-metrics', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!active) return
+        setValues(data?.values || {})
+        setGeneratedAt(data?.generatedAt || '')
+      })
+      .catch(() => {})
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [])
 
   return (
     <div className="sb-cockpit-stack">
-      {/* lang switcher */}
-      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginBottom: 8 }}>
-        {LANGS.map(l => (
-          <button
-            key={l}
-            onClick={() => setLang(l)}
-            style={{
-              padding: '4px 9px', borderRadius: 7, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', cursor: 'pointer',
-              border: lang === l ? '1px solid rgba(26,240,255,.5)' : '1px solid rgba(255,255,255,.12)',
-              background: lang === l ? 'rgba(26,240,255,.14)' : 'rgba(255,255,255,.04)',
-              color: lang === l ? '#1af0ff' : 'rgba(255,255,255,.55)',
-            }}
-          >{l}</button>
-        ))}
-      </div>
-
-      <section className="sb-admin-topbar" role="banner" aria-label={t.eyebrow}>
+      <section className="sb-admin-topbar" role="banner" aria-label={c.eyebrow}>
         <div>
-          <p className="sb-eyebrow">{t.eyebrow}</p>
-          <h1>{t.title}</h1>
-          <p className="sb-body">{t.body}</p>
+          <p className="sb-eyebrow">{c.eyebrow}</p>
+          <h1>{c.title}</h1>
+          <p className="sb-body">{c.body}</p>
+          {generatedAt ? <p className="sb-caption" style={{ marginTop: 10 }}>{c.updated}: {new Date(generatedAt).toLocaleString()}</p> : null}
         </div>
-        <span className="sb-role-pill">{t.role}</span>
+        <span className="sb-role-pill">{c.role}</span>
       </section>
 
-      <section className="sb-cockpit-grid" aria-label="Admin Console sidebar sections">
-        {ADMIN_SIDEBAR.map(item => (
-          <a key={item.href} className="sb-neon-panel" href={item.href} aria-label={`${t.openPanel} ${item.label}`}>
-            <p><span aria-hidden="true">{item.icon}</span> {item.label}</p>
-            <strong>{t.openPanel}</strong>
-            <span>{t.panelNote}</span>
-          </a>
-        ))}
-      </section>
+      {loading ? <p className="sb-caption">{c.loading}</p> : null}
 
-      <section className="sb-mission-grid" aria-label="Cockpit panels">
-        {COCKPIT_PANELS.map(panel => (
-          <article key={panel.title} className="sb-glass-panel" tabIndex={0}>
-            <h3>{panel.title}</h3>
-            <p><strong>{panel.value}</strong></p>
-            <p>{panel.status}</p>
-          </article>
-        ))}
-      </section>
-
-      <section className="sb-wireframe" aria-label="Wireframe preview for pull request">
-        <div className="sb-wireframe__markers">
-          <span>{t.desktop}</span>
-          <span>{t.mobile}</span>
-          <span>{t.aria}</span>
-        </div>
-        <div className="sb-wireframe__canvas">
-          <aside className="sb-wireframe__sidebar">
-            <span className="sb-wireframe__label">Sidebar</span>
-            {ADMIN_SIDEBAR.slice(0, 5).map(item => <div key={item.label} className="sb-wireframe__box">{item.icon} {item.label}</div>)}
-          </aside>
-          <div className="sb-wireframe__flow" aria-hidden="true"><span>→</span><span>→</span><span>→</span></div>
-          <main className="sb-wireframe__main">
-            <div className="sb-wireframe__topbar">{t.eyebrow} <span>{t.role}</span></div>
-            <div className="sb-wireframe__grid">
-              {[t.financial, t.kpi, t.crm, 'Outreach', t.forecasting, t.concierge].map(card => <div key={card} className="sb-wireframe__box sb-wireframe__box--main">{card}</div>)}
-            </div>
-          </main>
-        </div>
-      </section>
-
-      <section className="sb-mission-grid" aria-label="Executive intelligence">
-        <article className="sb-glass-panel">
-          <h3>{t.financial}</h3>
-          {Object.entries(FINANCIAL_LEDGER).map(([key, value]) => (
-            <p key={key}><strong>{key.replace(/([A-Z])/g, ' $1')}</strong> · {value}</p>
-          ))}
-        </article>
-        <article className="sb-glass-panel">
-          <h3>{t.kpi}</h3>
-          <p><strong>{t.marketplace}</strong> · {KPI_DASHBOARD.marketplace.join(' · ')}</p>
-          <p><strong>{t.saas}</strong> · {KPI_DASHBOARD.saas.join(' · ')}</p>
-          <p><strong>{t.unified}</strong> · {KPI_DASHBOARD.unifiedEngagementIndex}</p>
-        </article>
-        <article className="sb-glass-panel">
-          <h3>{t.forecasting}</h3>
-          {FORECASTS.map(item => (
-            <p key={item.horizon}>
-              <strong>{item.horizon}</strong> · {item.revenue} · {t.campaign.toLowerCase()} {item.campaignSuccess} · {t.churn.toLowerCase()} {item.churnRisk}
-            </p>
-          ))}
-        </article>
-        <article className="sb-glass-panel">
-          <h3>{t.crm}</h3>
-          {CRM_STAGES.map(stage => (
-            <p key={stage.stage}><strong>{stage.stage}</strong> · {stage.automation}</p>
-          ))}
-        </article>
-        <article className="sb-glass-panel sb-glass-panel--wide">
-          <h3>{t.concierge}</h3>
-          {EXECUTIVE_RECOMMENDATIONS.map(item => <p key={item}>• {item}</p>)}
-        </article>
+      <section className="sb-cockpit-grid" aria-label="Admin console live sections">
+        {ADMIN_SIDEBAR.map(item => {
+          const rows = sectionSummary(item.href, values, c)
+          return (
+            <a key={item.href} className="sb-neon-panel" href={item.href} aria-label={`${c.open} ${item.label}`}>
+              <p><span aria-hidden="true">{item.icon}</span> {item.label}</p>
+              <strong>{rows[0]?.[1] ?? c.live}</strong>
+              <span>{rows[0]?.[0] ?? c.sectionStatus}</span>
+              <div style={{ display: 'grid', gap: 6, marginTop: 14 }}>
+                {rows.slice(1).map(([label, rowValue]) => (
+                  <small key={label} style={{ color: 'rgba(226,232,240,.7)', display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                    <span>{label}</span>
+                    <b style={{ color: '#9ff7ff' }}>{rowValue}</b>
+                  </small>
+                ))}
+              </div>
+              <span style={{ marginTop: 14, color: '#ffc300' }}>{c.open} →</span>
+            </a>
+          )
+        })}
       </section>
     </div>
   )

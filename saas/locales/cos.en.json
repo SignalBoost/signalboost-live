@@ -1,0 +1,75 @@
+{
+  "cos": {
+    "nav": {
+      "mining": "Mining",
+      "features": "Features",
+      "segments": "Segments",
+      "rules": "Patterns",
+      "runs": "Run History"
+    },
+    "mining": {
+      "title": "Data Mining",
+      "subtitle": "Behavioral and transactional patterns powering predictions",
+      "run_now": "Run now",
+      "last_run": "Last run",
+      "events_scanned": "Events scanned",
+      "users_processed": "Users processed",
+      "features_written": "Features written",
+      "rules_found": "Patterns found"
+    },
+    "features": {
+      "title": "Mined Features",
+      "name": "Feature",
+      "value": "Value",
+      "updated": "Updated",
+      "names": {
+        "event_frequency_per_day": "Activity per day",
+        "transaction_count": "Transactions",
+        "avg_deposit_cents": "Average deposit",
+        "avg_transfer_cents": "Average transfer",
+        "preferred_txn_hour": "Preferred hour",
+        "dominant_device_code": "Main device",
+        "campaign_engagement_rate": "Campaign engagement",
+        "recency_days": "Days since last activity",
+        "amount_trend_slope": "Spending trend"
+      }
+    },
+    "segments": {
+      "title": "Behavior Segments",
+      "cluster": "Cluster",
+      "members": "Members"
+    },
+    "rules": {
+      "title": "Detected Patterns",
+      "if": "If",
+      "then": "then",
+      "support": "Support",
+      "confidence": "Confidence",
+      "lift": "Lift"
+    },
+    "status": {
+      "running": "Running",
+      "success": "Success",
+      "error": "Error"
+    },
+    "empty": {
+      "no_features": "No features yet — run a mining job to populate them.",
+      "no_rules": "No patterns detected yet.",
+      "no_runs": "No mining runs recorded yet."
+    },
+    "errors": {
+      "unauthorized": "Please sign in to continue.",
+      "forbidden": "You don't have access to this data.",
+      "load_failed": "Could not load data. Please try again."
+    },
+    "tooltips": {
+      "confidence": "How often the pattern holds when the condition is met.",
+      "lift": "How much more likely the result is versus chance.",
+      "segment": "Group of users with similar behavior."
+    },
+    "meta": {
+      "title": "COS Data Mining — SignalBoost",
+      "description": "Mined behavioral and transactional signals that power COS predictions."
+    }
+  }
+}

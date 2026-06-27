@@ -522,6 +522,39 @@ invoke_model: {
     auditRequired: true, rollbackRequired: true, productionSensitive: true,
     description: 'Issue refunds. Owner approval and audit trail.',
   },
+
+  // ── Open Banking (Bank provider) ──────────────────────────────────────────
+  // Banks are providers; these four ids back every bank.* executor. Unknown ids
+  // default to BLOCKED, so registering them here is what makes the Bank actions
+  // runnable. Reads are admin-gated and audited; payments are owner-only.
+  bank_connect: {
+    id: 'bank_connect',
+    label: 'Connect bank (Email-OTP → OAuth2)',
+    level: 'execute_change', risk: 'high', approval: 'admin',
+    auditRequired: true, rollbackRequired: false, productionSensitive: true,
+    description: 'Run Email-OTP enrollment and exchange the passcode for an OAuth2 token. No banking password is ever seen or stored; only the vault-encrypted token is kept. Admin approval and audit trail.',
+  },
+  bank_read: {
+    id: 'bank_read',
+    label: 'Read bank data (balances, transactions, statements)',
+    level: 'read', risk: 'low', approval: 'admin',
+    auditRequired: true, rollbackRequired: false, productionSensitive: false,
+    description: 'Read-only access to connected accounts: balances, transaction history, statement links, and the compliance log. Admin-gated and audited; touches financial data so every read is logged.',
+  },
+  bank_send_payment: {
+    id: 'bank_send_payment',
+    label: 'Send bank payment',
+    level: 'execute_change', risk: 'critical', approval: 'owner_with_audit',
+    auditRequired: true, rollbackRequired: true, productionSensitive: true,
+    description: 'Initiate a payment from a connected account. Moves real money: owner approval, preview-before-submit, idempotency key, and a full audit entry are enforced.',
+  },
+  bank_refresh: {
+    id: 'bank_refresh',
+    label: 'Refresh bank token',
+    level: 'execute_change', risk: 'low', approval: 'admin',
+    auditRequired: true, rollbackRequired: false, productionSensitive: false,
+    description: 'Force an OAuth2 token refresh for an institution (also runs automatically before each call). Admin-gated and audited.',
+  },
 }
 
 // Accepts an optional actionId to securely match incoming policy properties from route.ts

@@ -292,6 +292,25 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
       { title: 'Auth', templateIds: ['supabase_mkt.list_users'] },
       { title: 'Storage', templateIds: ['supabase_mkt.list_buckets'] }
     ]
+  },
+  {
+    // Open Banking — banks are providers like any other. Auth is Email-OTP -> OAuth2;
+    // the console never stores banking credentials, only vault-encrypted tokens that
+    // auto-refresh. Every action writes a banking compliance/audit entry. Per-institution
+    // API keys (State Dept FCU via Plaid, USAA via FDX, Discover via Discover Dev Center)
+    // stay as placeholders until registered; cards render live so enrollment can begin.
+    id: 'bank',
+    name: 'Bank',
+    subtitle: 'OPEN BANKING & PAYMENTS',
+    accent: '#16b364',
+    tier: 'tier2',
+    sections: [
+      { title: 'Connection', templateIds: ['bank.start_enrollment', 'bank.complete_enrollment', 'bank.refresh_token'] },
+      { title: 'Balances & Activity', templateIds: ['bank.list_accounts', 'bank.check_balance', 'bank.transaction_history'] },
+      { title: 'Payments', templateIds: ['bank.send_payment'] },
+      { title: 'Statements', templateIds: ['bank.download_statement'] },
+      { title: 'Compliance', templateIds: ['bank.compliance_log'] }
+    ]
   }
 ]
 
@@ -328,6 +347,9 @@ export const LIVE_PROVIDER_IDS = new Set<string>([
   // Executors already wired into /api/hub/action — surfaced live and gated at
   // run time by the per-provider credential probe (/api/hub/providers/status).
   'sendgrid', 'twilio', 'cloudflare', 'digitalocean', 'datadog', 'sentry', 'pagerduty',
+  // Open Banking provider — live so Email-OTP enrollment can start; individual calls
+  // return a clean "institution not configured" until each aggregator app is registered.
+  'bank',
   'core', 'domains', 'deployments', 'logs', 'settings',
 ])
 

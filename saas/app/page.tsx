@@ -9,8 +9,17 @@ import { t } from '@/lib/i18n/t'
 import { SERVICES } from '@/lib/services/catalog'
 import OrchestrationPanel from '@/components/orchestration/OrchestrationPanel'
 
+const OPTIMIZER_COPY: Record<string, { label: string; kicker: string; title: string; text: string; cta: string }> = {
+  en: { label: 'Free website optimization test', kicker: 'Free business utility', title: 'Test your website optimization for free.', text: 'Paste a public website URL and get a quick preview of speed, SEO, accessibility, security, and conversion opportunities. Then SignalBoost can help prepare the fix plan.', cta: 'Run website test' },
+  pt: { label: 'Teste gratuito de otimização de site', kicker: 'Utilitário gratuito para negócios', title: 'Teste a otimização do seu site gratuitamente.', text: 'Cole uma URL pública de site e receba uma prévia rápida de velocidade, SEO, acessibilidade, segurança e oportunidades de conversão. Depois o SignalBoost pode ajudar a preparar o plano de correção.', cta: 'Executar teste do site' },
+  es: { label: 'Prueba gratuita de optimización web', kicker: 'Utilidad gratuita para negocios', title: 'Prueba gratis la optimización de tu sitio web.', text: 'Pega una URL pública de sitio web y recibe una vista previa rápida de velocidad, SEO, accesibilidad, seguridad y oportunidades de conversión. Luego SignalBoost puede ayudar a preparar el plan de corrección.', cta: 'Ejecutar prueba del sitio' },
+  pl: { label: 'Darmowy test optymalizacji strony', kicker: 'Darmowe narzędzie biznesowe', title: 'Sprawdź za darmo optymalizację swojej strony.', text: 'Wklej publiczny URL strony i otrzymaj szybki podgląd szybkości, SEO, dostępności, bezpieczeństwa i możliwości konwersji. Następnie SignalBoost może pomóc przygotować plan poprawek.', cta: 'Uruchom test strony' },
+  ru: { label: 'Бесплатная проверка оптимизации сайта', kicker: 'Бесплатный бизнес-инструмент', title: 'Бесплатно проверьте оптимизацию своего сайта.', text: 'Вставьте публичный URL сайта и получите быстрый обзор скорости, SEO, доступности, безопасности и возможностей конверсии. Затем SignalBoost может помочь подготовить план исправлений.', cta: 'Запустить тест сайта' },
+}
+
 export default function Home() {
-  const { dict } = useI18n()
+  const { dict, lang } = useI18n()
+  const optimizerCopy = OPTIMIZER_COPY[lang] || OPTIMIZER_COPY.en
   const featureCards = [1, 2, 3].map((item) => ({
     icon: ['🧠', '🌐', '⚡'][item - 1],
     title: t(dict, `home.features.${item}.title`, ['AI proposes the next move', 'One brand, every channel', 'Built for action'][item - 1]),
@@ -31,6 +40,20 @@ export default function Home() {
           <div className="sb-cta-row">
             <Link className="sb-button-primary" href="/repo-check">{t(dict, 'home.repoCheckCta', 'Run free repo check')}</Link>
             <Link className="sb-button-secondary" href="/pricing">{t(dict, 'home.repoCheckPricing', 'View Audit Pro')}</Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="sb-page-shell sb-section" aria-label={optimizerCopy.label}>
+        <div className="sb-glass" style={{ padding: 28, display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 22, alignItems: 'center' }}>
+          <div>
+            <span className="sb-eyebrow">{optimizerCopy.kicker}</span>
+            <h2 className="sb-h2" style={{ marginTop: 10 }}>{optimizerCopy.title}</h2>
+            <p className="sb-body" style={{ maxWidth: 720 }}>{optimizerCopy.text}</p>
+          </div>
+          <div className="sb-cta-row">
+            <Link className="sb-button-primary" href="/website-optimizer">{optimizerCopy.cta}</Link>
+            <Link className="sb-button-secondary" href="/support">SignalBoost</Link>
           </div>
         </div>
       </section>

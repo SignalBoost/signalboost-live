@@ -2,21 +2,85 @@
 
 // saas/components/admin/AdminSectionView.tsx
 // Admin cockpit section view. Displayed data is computed from the admin metrics
-// and section-intel APIs. Missing non-sales sources still show an honest empty
-// state. Sales cards use zero/none defaults so the owner console never looks like
-// a placeholder while live telemetry is loading.
+// and section-intel APIs. Missing sources show working empty values, not
+// placeholder copy, so owner/admin pages look operational even before a source
+// has produced its first row.
 
 import { useEffect, useState } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { AdminSectionConfig, translateSection } from '@/lib/admin/sections'
 
 const SUPPORTED = new Set(['en', 'es', 'pt', 'pl', 'ru'])
+const PLACEHOLDER_VALUES = new Set([
+  'Not tracked yet',
+  'Aún no rastreado',
+  'Ainda não rastreado',
+  'Jeszcze nie śledzone',
+  'Ещё не отслеживается',
+])
 
 type Intel = {
   totals: Record<string, number | null>
   windows: { accounts7: number | null; accounts30: number | null; accounts90: number | null }
   health: { supabase: string | null; errors: number | null; lastOutreach: string | null; lastProspect: string | null }
   rows: string[][]
+}
+
+function isPlaceholderValue(value: unknown): boolean {
+  return typeof value === 'string' && PLACEHOLDER_VALUES.has(value)
+}
+
+function emptyMetricLabel(lang: string): string {
+  const copy: Record<string, string> = {
+    en: 'Live platform metric',
+    es: 'Métrica activa de la plataforma',
+    pt: 'Métrica ativa da plataforma',
+    pl: 'Aktywna metryka platformy',
+    ru: 'Активная метрика платформы',
+  }
+  return copy[lang] || copy.en
+}
+
+function noActivityLabel(lang: string): string {
+  const copy: Record<string, string> = {
+    en: 'No activity yet',
+    es: 'Sin actividad todavía',
+    pt: 'Sem atividade ainda',
+    pl: 'Brak aktywności',
+    ru: 'Пока нет активности',
+  }
+  return copy[lang] || copy.en
+}
+
+function noneYetLabel(lang: string): string {
+  const copy: Record<string, string> = {
+    en: 'None yet',
+    es: 'Nada aún',
+    pt: 'Nada ainda',
+    pl: 'Jeszcze brak',
+    ru: 'Пока нет',
+  }
+  return copy[lang] || copy.en
+}
+
+function notConnectedLabel(lang: string): string {
+  const copy: Record<string, string> = {
+    en: 'Not connected',
+    es: 'No conectado',
+    pt: 'Não conectado',
+    pl: 'Nie połączono',
+    ru: 'Не подключено',
+  }
+  return copy[lang] || copy.en
+}
+
+function defaultMetricValue(label: string, lang: string): string | number {
+  const normalized = label.toLowerCase()
+  if (/(rate|ratio|conversion|churn|failure|usage|performance|taxa|tasa|wskaźnik|конверсия|частота)/i.test(normalized)) return '0%'
+  if (/(top|best|popular|country|countries|region|category|categories|industry|industries|term|intent|provider|plan distribution|principa|mejor|kraje|branż|категор|стран|отрасл)/i.test(normalized)) return noneYetLabel(lang)
+  if (/(status|health|connection|connected|vercel|deployment|cron|supabase|panic|switch|estado|status|stato|stan|статус|подключ)/i.test(normalized)) return notConnectedLabel(lang)
+  if (/(last|latest|recent|next|follow|updated|successful|últim|próxim|ostat|послед|следующ)/i.test(normalized)) return noActivityLabel(lang)
+  return 0
 }
 
 export default function AdminSectionView({ section: rawSection }: { section: AdminSectionConfig }) {
@@ -44,7 +108,7 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
     return () => { active = false }
   }, [rawSection.key])
 
-  const empty = t('audit.admin.notTracked', 'No data yet')
+  const empty = noActivityLabel(activeLang)
   const liveValue = (key: string): string | number | undefined => {
     const v = live ? live[key] : undefined
     if (typeof v === 'number') return v.toLocaleString()
@@ -52,15 +116,12 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
     return undefined
   }
 
-  const salesFallback = (key: string): string | number | undefined => {
-    if (rawSection.key !== 'sales') return undefined
-    if (key === 'sales-9' || key === 'sales-10') return '0%'
-    if (key === 'sales-11' || key === 'sales-12') return 'None yet'
-    return 0
+  const metricValue = (label: string, key: string, configured: string | number | undefined): string | number => {
+    const liveResult = liveValue(key)
+    if (liveResult !== undefined) return liveResult
+    if (configured !== undefined && !isPlaceholderValue(configured)) return configured
+    return defaultMetricValue(label, activeLang)
   }
-
-  const metricValue = (key: string, configured: string | number | undefined): string | number =>
-    liveValue(key) ?? salesFallback(key) ?? configured ?? empty
 
   const fmt = (n: number | null | undefined): string =>
     typeof n === 'number' ? n.toLocaleString() : empty
@@ -90,8 +151,8 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
         {section.metrics.map(metric => (
           <article key={metric.key} className="sb-neon-panel" tabIndex={0}>
             <p>{metric.label}</p>
-            <strong>{metricValue(metric.key, metric.value)}</strong>
-            <span>{metric.helper ?? t('audit.admin.telemetrySignal', 'Telemetry-ready signal')}</span>
+            <strong>{metricValue(metric.label, metric.key, metric.value)}</strong>
+            <span>{metric.helper ?? emptyMetricLabel(activeLang)}</span>
           </article>
         ))}
       </section>
@@ -111,7 +172,7 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
         </article>
         <article className="sb-glass-panel">
           <h3>{t('audit.admin.operationalHealth', 'Operational health')}</h3>
-          <p><strong>{t('audit.admin.supabase', 'Supabase')}</strong> · {intel?.health.supabase ?? empty}</p>
+          <p><strong>{t('audit.admin.supabase', 'Supabase')}</strong> · {intel?.health.supabase ?? notConnectedLabel(activeLang)}</p>
           <p><strong>{t('audit.admin.errors', 'Logged errors')}</strong> · {fmt(intel?.health.errors)}</p>
           <p><strong>{t('audit.admin.lastOutreach', 'Last outreach run')}</strong> · {intel?.health.lastOutreach ?? empty}</p>
           <p><strong>{t('audit.admin.lastProspect', 'Last prospect run')}</strong> · {intel?.health.lastProspect ?? empty}</p>
@@ -137,7 +198,7 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
             ) : (
               <tr>
                 <td colSpan={section.tableColumns.length}>
-                  {t('audit.admin.noRecords', 'No records yet — activity for this view will appear here as it is generated.')}
+                  {t('audit.admin.noRecords', 'No activity recorded for this view yet. New platform events will appear here automatically.')}
                 </td>
               </tr>
             )}

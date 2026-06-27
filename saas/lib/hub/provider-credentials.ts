@@ -37,6 +37,10 @@ export const PROVIDER_REQUIRED_ENV: Record<string, string[]> = {
   datadog: ['DATADOG_API_KEY'],
   sentry: ['SENTRY_AUTH_TOKEN'],
   pagerduty: ['PAGERDUTY_API_KEY'],
+  // ── Open Banking (tokens are vaulted; per-institution API keys are optional
+  //    until each aggregator app is registered, so only the vault key is a hard
+  //    requirement for the provider to be considered "configured") ───────────
+  bank: ['VAULT_MASTER_KEY'],
 }
 
 // Providers whose actions have a real executor wired into /api/hub/action.
@@ -45,4 +49,5 @@ export const PROVIDER_HAS_BACKEND = new Set<string>([
   'stripe', 'supabase', 'supabase_mkt', 'vercel', 'github', 'keyvault',
   'openai', 'anthropic', 'gemini', 'elevenlabs', 'assemblyai', 'resend',
   'sendgrid', 'twilio', 'cloudflare', 'digitalocean', 'datadog', 'sentry', 'pagerduty',
+  'bank',
 ])

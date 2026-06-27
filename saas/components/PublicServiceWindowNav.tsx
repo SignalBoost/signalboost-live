@@ -63,31 +63,31 @@ const COPY: Record<Lang, Copy> = {
   en: {
     intro: 'Explore all SignalBoost products before signing up',
     gated: 'learn more',
-    groups: { free: 'Free tools', audit: 'Audit & Security', operations: 'Operations', growth: 'Growth', office: 'Office & Studio' },
+    groups: { free: 'Free tools', audit: 'Audit & Security', operations: 'Operations', growth: 'Marketing + Sales', office: 'Office & Studio' },
     items: { websiteOptimizer: 'Website Optimizer', cybersecurityCheck: 'Cybersecurity Check', repoAuditCheck: 'Repo / Audit Check', auditCenter: 'Audit Center', cybersecurityCenter: 'Cybersecurity Center', identitySecrets: 'Identity & Secrets', consoleHub: 'Console Hub', prCockpit: 'PR Cockpit', adminCockpit: 'Owner/Admin Cockpit', marketingSales: 'Marketing + Sales', promoteBusiness: 'Promote Business', outreach: 'Outreach', calendar: 'Calendar', spreadsheets: 'Spreadsheets', videoStudio: 'Video Studio' },
   },
   es: {
     intro: 'Explora todos los productos de SignalBoost antes de registrarte',
     gated: 'más información',
-    groups: { free: 'Herramientas gratis', audit: 'Auditoría y Seguridad', operations: 'Operaciones', growth: 'Crecimiento', office: 'Oficina y Studio' },
+    groups: { free: 'Herramientas gratis', audit: 'Auditoría y Seguridad', operations: 'Operaciones', growth: 'Marketing + Ventas', office: 'Oficina y Studio' },
     items: { websiteOptimizer: 'Optimizador Web', cybersecurityCheck: 'Revisión de Ciberseguridad', repoAuditCheck: 'Repo / Auditoría', auditCenter: 'Centro de Auditoría', cybersecurityCenter: 'Centro de Ciberseguridad', identitySecrets: 'Identidad y Secretos', consoleHub: 'Console Hub', prCockpit: 'PR Cockpit', adminCockpit: 'Cockpit Admin', marketingSales: 'Marketing + Ventas', promoteBusiness: 'Promocionar negocio', outreach: 'Outreach', calendar: 'Calendario', spreadsheets: 'Hojas de cálculo', videoStudio: 'Video Studio' },
   },
   pt: {
     intro: 'Explore todos os produtos SignalBoost antes de se cadastrar',
     gated: 'saiba mais',
-    groups: { free: 'Ferramentas grátis', audit: 'Auditoria e Segurança', operations: 'Operações', growth: 'Crescimento', office: 'Office e Studio' },
+    groups: { free: 'Ferramentas grátis', audit: 'Auditoria e Segurança', operations: 'Operações', growth: 'Marketing + Vendas', office: 'Office e Studio' },
     items: { websiteOptimizer: 'Otimizador de Site', cybersecurityCheck: 'Verificação de Cibersegurança', repoAuditCheck: 'Repo / Auditoria', auditCenter: 'Centro de Auditoria', cybersecurityCenter: 'Centro de Cibersegurança', identitySecrets: 'Identidade e Segredos', consoleHub: 'Console Hub', prCockpit: 'PR Cockpit', adminCockpit: 'Cockpit Admin', marketingSales: 'Marketing + Vendas', promoteBusiness: 'Promover negócio', outreach: 'Outreach', calendar: 'Calendário', spreadsheets: 'Planilhas', videoStudio: 'Video Studio' },
   },
   pl: {
     intro: 'Zobacz wszystkie produkty SignalBoost przed rejestracją',
     gated: 'dowiedz się więcej',
-    groups: { free: 'Darmowe narzędzia', audit: 'Audyt i Bezpieczeństwo', operations: 'Operacje', growth: 'Wzrost', office: 'Office i Studio' },
+    groups: { free: 'Darmowe narzędzia', audit: 'Audyt i Bezpieczeństwo', operations: 'Operacje', growth: 'Marketing + Sprzedaż', office: 'Office i Studio' },
     items: { websiteOptimizer: 'Optymalizator Strony', cybersecurityCheck: 'Test Cyberbezpieczeństwa', repoAuditCheck: 'Repo / Audyt', auditCenter: 'Centrum Audytu', cybersecurityCenter: 'Centrum Cyberbezpieczeństwa', identitySecrets: 'Tożsamość i Sekrety', consoleHub: 'Console Hub', prCockpit: 'PR Cockpit', adminCockpit: 'Admin Cockpit', marketingSales: 'Marketing + Sprzedaż', promoteBusiness: 'Promocja firmy', outreach: 'Outreach', calendar: 'Kalendarz', spreadsheets: 'Arkusze', videoStudio: 'Video Studio' },
   },
   ru: {
     intro: 'Посмотрите все продукты SignalBoost перед регистрацией',
     gated: 'подробнее',
-    groups: { free: 'Бесплатные инструменты', audit: 'Аудит и безопасность', operations: 'Операции', growth: 'Рост', office: 'Office и Studio' },
+    groups: { free: 'Бесплатные инструменты', audit: 'Аудит и безопасность', operations: 'Операции', growth: 'Marketing + Sales', office: 'Office и Studio' },
     items: { websiteOptimizer: 'Website Optimizer', cybersecurityCheck: 'Cybersecurity Check', repoAuditCheck: 'Repo / Audit Check', auditCenter: 'Audit Center', cybersecurityCenter: 'Cybersecurity Center', identitySecrets: 'Identity & Secrets', consoleHub: 'Console Hub', prCockpit: 'PR Cockpit', adminCockpit: 'Admin Cockpit', marketingSales: 'Marketing + Sales', promoteBusiness: 'Promote Business', outreach: 'Outreach', calendar: 'Calendar', spreadsheets: 'Spreadsheets', videoStudio: 'Video Studio' },
   },
 }

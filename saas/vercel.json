@@ -11,6 +11,14 @@
     {
       "path": "/api/hub/cyber/prepare-github-pr",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/cos-mining",
+      "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/cron/cos-mining?job=weekly",
+      "schedule": "0 5 * * 0"
     }
   ]
 }

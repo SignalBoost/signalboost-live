@@ -63,6 +63,23 @@ async function draftedEmails(a: any): Promise<number> {
   return (queueDrafts ?? 0) + (directDrafts ?? 0)
 }
 
+async function releasedOutreachCount(a: any): Promise<number> {
+  const [actualSends, approvedOrSent] = await Promise.all([
+    countRows(a, 'outreach_sends'),
+    countRows(a, 'outreach_queue', (q: any) => q.in('status', ['approved', 'sent'])),
+  ])
+  return Math.max(actualSends ?? 0, approvedOrSent ?? 0)
+}
+
+async function releasedOutreachToday(a: any): Promise<number> {
+  const [actualSendsToday, approvedToday, sentToday] = await Promise.all([
+    countRows(a, 'outreach_sends', (q: any) => q.gte('sent_at', startOfTodayISO())),
+    countRows(a, 'outreach_queue', (q: any) => q.gte('approved_at', startOfTodayISO())),
+    countRows(a, 'outreach_queue', (q: any) => q.gte('sent_at', startOfTodayISO())),
+  ])
+  return Math.max(actualSendsToday ?? 0, approvedToday ?? 0, sentToday ?? 0)
+}
+
 async function replyCount(a: any): Promise<number> {
   const replies = await countRows(a, 'outreach_replies')
   if (replies != null) return replies
@@ -78,7 +95,7 @@ async function meetingCount(a: any): Promise<number> {
 
 async function responseRate(a: any): Promise<string> {
   const [sent, replies] = await Promise.all([
-    countRows(a, 'outreach_sends'),
+    releasedOutreachCount(a),
     replyCount(a),
   ])
   if (!sent) return '0%'
@@ -135,16 +152,16 @@ const METRICS: Record<string, Spec> = {
   'saas-6': a => countRows(a, 'reviews'),
   'saas-7': a => countRows(a, 'ai_task_log'),
   'saas-9': a => countRows(a, 'subscriptions'),
-  // Outreach + CRM — fully wired to live outreach/sales tables or honest zeros.
+  // Outreach + CRM — released outreach counts approved/sent queue items when send log rows are absent.
   'sales-0': a => prospectCount(a),
   'sales-1': a => approvedProspects(a),
   'sales-2': a => prospectCount(a),
   'sales-3': a => draftedEmails(a),
-  'sales-4': a => zeroIfMissing(countRows(a, 'outreach_sends')),
+  'sales-4': a => releasedOutreachCount(a),
   'sales-5': a => replyCount(a),
   'sales-6': a => meetingCount(a),
   'sales-7': a => zeroIfMissing(countRows(a, 'subscriptions', (q: any) => q.in('plan', PAYING_PLANS))),
-  'sales-8': a => zeroIfMissing(countRows(a, 'outreach_sends', (q: any) => q.gte('sent_at', startOfTodayISO()))),
+  'sales-8': a => releasedOutreachToday(a),
   'sales-9': a => responseRate(a),
   'sales-10': a => conversionRate(a),
   'sales-11': a => topIndustry(a),
@@ -155,13 +172,13 @@ const METRICS: Record<string, Spec> = {
   // Email / Marketing
   'email-0': a => countRows(a, 'marketing_campaigns'),
   'email-1': a => countRows(a, 'admin_audit_log', (q: any) => q.eq('action', 'sales.email_draft')),
-  'email-2': a => countRows(a, 'outreach_sends'),
+  'email-2': a => releasedOutreachCount(a),
   'email-4': a => replyCount(a),
   'email-5': a => countRows(a, 'marketing_campaigns'),
   // System Health
   'sys-0': a => countRows(a, 'error_logs'),
   'sys-2': a => supabaseHealth(a),
-  'sys-5': a => countRows(a, 'outreach_sends', (q: any) => q.gte('sent_at', startOfTodayISO())),
+  'sys-5': a => releasedOutreachToday(a),
   'sys-6': a => latest(a, 'outreach_sends', 'sent_at'),
   'sys-7': a => latest(a, 'outreach_queue'),
   // Marketplace Monitor
@@ -173,7 +190,7 @@ const METRICS: Record<string, Spec> = {
   'overview-9': a => countRows(a, 'reviews'),
   'overview-10': a => countRows(a, 'ai_task_log'),
   'overview-11': a => countRows(a, 'ai_task_log', (q: any) => q.eq('status', 'error')),
-  'overview-12': a => countRows(a, 'outreach_sends'),
+  'overview-12': a => releasedOutreachCount(a),
   'overview-13': a => prospectCount(a),
   // Forecasting + KPI
   'ai-1': a => countRows(a, 'ai_task_log', (q: any) => q.eq('provider', 'openai')),

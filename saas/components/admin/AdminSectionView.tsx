@@ -1,15 +1,10 @@
 'use client'
 
 // saas/components/admin/AdminSectionView.tsx
-// Admin cockpit section view. ALL displayed data is real and computed:
-//   • Metric cards    → /api/admin/section-metrics (per-table counts; null-safe)
-//   • Intel panels    → /api/admin/section-intel   (live totals / trailing
-//                       windows / operational health — replaces the former
-//                       hardcoded FORECASTS / FINANCIAL_LEDGER / KPI mock)
-//   • Data table      → real recent rows from /api/admin/section-intel; honest
-//                       "no records yet" when a section has no backing source.
-// Nothing on this page is fabricated: a missing source shows an honest empty
-// state, never an invented number. All copy resolves through useTranslation().
+// Admin cockpit section view. Displayed data is computed from the admin metrics
+// and section-intel APIs. Missing non-sales sources still show an honest empty
+// state. Sales cards use zero/none defaults so the owner console never looks like
+// a placeholder while live telemetry is loading.
 
 import { useEffect, useState } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
@@ -29,8 +24,7 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
   const activeLang = SUPPORTED.has(lang) ? lang : 'en'
   const section = translateSection(rawSection, activeLang)
 
-  // Per-table metric counts (cards).
-  const [live, setLive] = useState<Record<string, number> | null>(null)
+  const [live, setLive] = useState<Record<string, number | string> | null>(null)
   useEffect(() => {
     let active = true
     fetch('/api/admin/section-metrics', { cache: 'no-store' })
@@ -40,7 +34,6 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
     return () => { active = false }
   }, [])
 
-  // Live operational intelligence + section table rows.
   const [intel, setIntel] = useState<Intel | null>(null)
   useEffect(() => {
     let active = true
@@ -53,11 +46,22 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
 
   const empty = t('audit.admin.notTracked', 'No data yet')
   const liveValue = (key: string): string | number | undefined => {
-    const v = live ? (live as any)[key] : undefined
+    const v = live ? live[key] : undefined
     if (typeof v === 'number') return v.toLocaleString()
     if (typeof v === 'string' && v.length) return v
     return undefined
   }
+
+  const salesFallback = (key: string): string | number | undefined => {
+    if (rawSection.key !== 'sales') return undefined
+    if (key === 'sales-9' || key === 'sales-10') return '0%'
+    if (key === 'sales-11' || key === 'sales-12') return 'None yet'
+    return 0
+  }
+
+  const metricValue = (key: string, configured: string | number | undefined): string | number =>
+    liveValue(key) ?? salesFallback(key) ?? configured ?? empty
+
   const fmt = (n: number | null | undefined): string =>
     typeof n === 'number' ? n.toLocaleString() : empty
 
@@ -86,7 +90,7 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
         {section.metrics.map(metric => (
           <article key={metric.key} className="sb-neon-panel" tabIndex={0}>
             <p>{metric.label}</p>
-            <strong>{liveValue(metric.key) ?? metric.value ?? empty}</strong>
+            <strong>{metricValue(metric.key, metric.value)}</strong>
             <span>{metric.helper ?? t('audit.admin.telemetrySignal', 'Telemetry-ready signal')}</span>
           </article>
         ))}

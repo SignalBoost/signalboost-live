@@ -2,7 +2,7 @@
 // Mock-safe outreach planning router. It prepares an owner-reviewable cadence;
 // it does not send, publish, or contact anyone directly.
 
-import type { CosLocale, LeadCapture, OutreachDispatchRecord, OutreachPlan, OutreachStep } from './types'
+import type { CosLocale, FollowUpMilestone, LeadCapture, OutreachDispatchRecord, OutreachPlan, OutreachStep } from './types'
 import { checkDomainContactLimit } from './contactLimiter'
 
 const SUBJECTS: Record<CosLocale, string[]> = {
@@ -41,6 +41,12 @@ const BODY: Record<CosLocale, string[]> = {
   ],
 }
 
+const CADENCE: Array<{ dayOffset: number; milestone: FollowUpMilestone }> = [
+  { dayOffset: 0, milestone: 'personalized_audit_link' },
+  { dayOffset: 3, milestone: 'multilingual_brief' },
+  { dayOffset: 7, milestone: 'interactive_demo_offer' },
+]
+
 function normalizeLocale(locale?: string): CosLocale {
   if (locale === 'es' || locale === 'pt-BR' || locale === 'pl' || locale === 'ru') return locale
   return 'en'
@@ -77,15 +83,17 @@ export class SalesOutreachManager {
     const lead = leadWithDefaults(params.lead)
     const locale = normalizeLocale(lead.locale)
     const domainThrottle = checkDomainContactLimit({ recipientEmail: lead.email, history: params.history || [] })
+    const subjects = SUBJECTS[locale] || SUBJECTS.en
+    const bodies = BODY[locale] || BODY.en
 
-    const cadence: OutreachStep[] = [0, 3, 7].map((dayOffset, index) => ({
+    const cadence: OutreachStep[] = CADENCE.map((item, index) => ({
       id: crypto.randomUUID(),
-      milestone: ['personalized_audit_link', 'multilingual_brief', 'interactive_demo_offer'][index] as OutreachStep['milestone'],
+      milestone: item.milestone,
       channel: 'email',
-      dayOffset,
+      dayOffset: item.dayOffset,
       status: domainThrottle.allowed ? 'requires_owner_approval' : 'blocked_by_domain_throttle',
-      subject: SUBJECTS[locale][index],
-      body: BODY[locale][index],
+      subject: subjects[index] || subjects[0] || 'SignalBoost follow-up',
+      body: bodies[index] || bodies[0] || 'Owner approval is required before any external action.',
       reason: domainThrottle.allowed ? 'Owner approval required before any external action.' : domainThrottle.reason,
     }))
 

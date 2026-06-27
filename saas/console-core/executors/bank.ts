@@ -228,7 +228,7 @@ async function getFreshAccessToken(c: BankConnector, ctx: Ctx): Promise<{ ok: bo
 // Preflight that every connected-only action shares. Resolves the connector,
 // validates credentials/base-URL, and returns a fresh bearer token.
 async function authorizedCall(institution: string, ctx: Ctx, action: string): Promise<
-  { ok: true; c: BankConnector; token: string } | { ok: false; result: Result }
+  { ok: boolean; result?: Result; c?: BankConnector; token?: string }
 > {
   const c = getBankConnector(institution)
   if (!c) { return { ok: false, result: { ok: false, error: 'Unknown institution' } } }
@@ -244,7 +244,7 @@ async function authorizedCall(institution: string, ctx: Ctx, action: string): Pr
   return { ok: true, c, token: tok.token! }
 }
 
-async function getJSON(url: string, token: string): Promise<{ ok: true; json: any } | { ok: false; error: string }> {
+async function getJSON(url: string, token: string): Promise<{ ok: boolean; json?: any; error?: string }> {
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } })
   const json = await res.json().catch(() => ({}))
   if (!res.ok) return { ok: false, error: json?.error_description || json?.error || `Provider error (HTTP ${res.status})` }

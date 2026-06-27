@@ -10,6 +10,8 @@ export const COS_LOCALES: CosLocale[] = ['en', 'es', 'pt-BR', 'pl', 'ru']
 export type LeadSource =
   | 'website_optimizer'
   | 'repo_check'
+  | 'cybersecurity_check'
+  | 'audit_preview'
   | 'organic_social'
   | 'print_ad_desk'
   | 'email_outreach'
@@ -93,6 +95,39 @@ export type DomainThrottleDecision = {
   usedDispatches: number
   remainingDispatches: number
   reason?: string
+}
+
+export type LeadIntakeSource = 'website_optimizer' | 'repo_check' | 'cybersecurity_check' | 'audit_preview'
+
+export type LeadIntakePayload = {
+  source: LeadIntakeSource
+  email: string
+  name?: string
+  company?: string
+  targetUrl: string
+  locale: CosLocale
+  country?: string
+  score?: number
+  summary?: Record<string, unknown>
+  findings?: Array<{ code?: string; category?: string; severity?: string; value?: string | number | boolean }>
+  tags?: string[]
+}
+
+export type LeadIntakeResult = {
+  id: string
+  lead: LeadCapture
+  source: LeadIntakeSource
+  targetUrl: string
+  tags: string[]
+  approvalStatus: 'pending_owner_review'
+  outreachPlan: OutreachPlan
+  storage: {
+    attempted: boolean
+    saved: boolean
+    table: string
+    recordId?: string
+    reason?: string
+  }
 }
 
 export type PodcastInput = {

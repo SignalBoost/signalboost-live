@@ -1,21 +1,13 @@
 'use client'
 
 import Link from 'next/link'
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useMemo, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 
-type CheckItem = {
-  id: string
-  packageName: string
-  version: string
-  sourceFile?: string
-  severity?: string
-  summary?: string
-  detailsUrl?: string | null
-  fixedVersionAvailable?: boolean
-}
+type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type CheckItem = { id: string; packageName: string; version: string; sourceFile?: string; severity?: string; summary?: string; fixedVersionAvailable?: boolean }
 
-type PageCopy = {
+type Copy = {
   back: string
   badge: string
   title: string
@@ -28,78 +20,102 @@ type PageCopy = {
   trySample: string
   missingUrl: string
   checkFailed: string
-  liveCheck: string
-  begin: string
   ready: string
+  begin: string
   packages: string
   findings: string
   critical: string
   high: string
+  repoChecked: string
   topFindings: string
-  branch: string
-  defaultBranch: string
   noFindings: string
   patched: string
-  packageAdvisory: string
   source: string
-  unlockTitle: string
-  unlockBody: string
-  unlock1: string
-  unlock2: string
-  unlock3: string
-  unlock4: string
-  unlockCta: string
-  steps: string[]
+  requestTitle: string
+  requestBody: string
+  requestCta: string
+  safeNote: string
+  severities: Record<string, string>
 }
 
-const COPY: Record<string, PageCopy> = {
-  en: {
-    back: 'SignalBoost', badge: 'Free developer utility', title: 'Run a free public GitHub dependency risk preview.', subtitle: 'Paste a public repository URL and get a capped package advisory summary. The free check shows the signal; Audit Pro unlocks the complete report, planning layer, scheduled monitoring, and assisted review workflow.', repoLabel: 'Public GitHub repository', placeholder: 'https://github.com/owner/repo', check: 'Run free check', checking: 'Checking…', hint: 'Public repos only. Free preview is capped and does not access private code.', trySample: 'Try SignalBoost itself', missingUrl: 'Paste a public GitHub repository URL first.', checkFailed: 'Could not check this repository.', liveCheck: 'Live check', begin: 'Paste a repo URL to begin', ready: 'Ready', packages: 'Packages', findings: 'Findings', critical: 'Critical', high: 'High', topFindings: 'Top findings', branch: 'Branch', defaultBranch: 'default', noFindings: 'No known package advisories found in this capped preview. This is not a full audit, but it is a good first signal.', patched: 'patched version available', packageAdvisory: 'Package advisory detected.', source: 'Source', unlockTitle: 'Unlock the complete workflow', unlockBody: 'Audit Pro adds the complete report, planning layer, scheduled monitoring, and assisted review workflow. No code changes happen without human approval.', unlock1: 'Full issue review report', unlock2: 'Remediation planning layer', unlock3: 'Scheduled monitoring and alert inbox', unlock4: 'Human-approved patch workflow', unlockCta: 'Unlock Audit Pro — $199/mo', steps: ['Scanning target', 'Running analyzers', 'Preparing summary'],
-  },
-  es: {
-    back: 'SignalBoost', badge: 'Utilidad gratuita para desarrolladores', title: 'Ejecuta una vista previa gratuita de riesgo de dependencias en GitHub.', subtitle: 'Pega la URL de un repositorio público y recibe un resumen limitado de avisos de paquetes. La revisión gratuita muestra la señal; Audit Pro desbloquea el informe completo, la capa de planificación, el monitoreo programado y el flujo de revisión asistida.', repoLabel: 'Repositorio público de GitHub', placeholder: 'https://github.com/owner/repo', check: 'Ejecutar revisión gratis', checking: 'Revisando…', hint: 'Solo repos públicos. La vista previa está limitada y no accede a código privado.', trySample: 'Probar SignalBoost', missingUrl: 'Pega primero una URL de repositorio público de GitHub.', checkFailed: 'No se pudo revisar este repositorio.', liveCheck: 'Revisión en vivo', begin: 'Pega una URL para comenzar', ready: 'Listo', packages: 'Paquetes', findings: 'Hallazgos', critical: 'Críticos', high: 'Altos', topFindings: 'Principales hallazgos', branch: 'Rama', defaultBranch: 'predeterminada', noFindings: 'No se encontraron avisos conocidos de paquetes en esta vista previa limitada. No es una auditoría completa, pero es una buena primera señal.', patched: 'versión corregida disponible', packageAdvisory: 'Aviso de paquete detectado.', source: 'Fuente', unlockTitle: 'Desbloquear el flujo completo', unlockBody: 'Audit Pro agrega el informe completo, la capa de planificación, el monitoreo programado y el flujo de revisión asistida. No hay cambios de código sin aprobación humana.', unlock1: 'Informe completo de revisión', unlock2: 'Capa de planificación de remediación', unlock3: 'Monitoreo programado y bandeja de alertas', unlock4: 'Flujo de parches con aprobación humana', unlockCta: 'Desbloquear Audit Pro — US$199/mes', steps: ['Escaneando objetivo', 'Ejecutando analizadores', 'Preparando resumen'],
-  },
-  pt: {
-    back: 'SignalBoost', badge: 'Utilitário gratuito para desenvolvedores', title: 'Execute uma prévia gratuita de risco de dependências no GitHub.', subtitle: 'Cole a URL de um repositório público e receba um resumo limitado de avisos de pacotes. A verificação gratuita mostra o sinal; o Audit Pro desbloqueia o relatório completo, a camada de planejamento, o monitoramento agendado e o fluxo de revisão assistida.', repoLabel: 'Repositório público do GitHub', placeholder: 'https://github.com/owner/repo', check: 'Executar verificação grátis', checking: 'Verificando…', hint: 'Apenas repos públicos. A prévia é limitada e não acessa código privado.', trySample: 'Testar o próprio SignalBoost', missingUrl: 'Cole primeiro a URL de um repositório público do GitHub.', checkFailed: 'Não foi possível verificar este repositório.', liveCheck: 'Verificação ao vivo', begin: 'Cole uma URL para começar', ready: 'Pronto', packages: 'Pacotes', findings: 'Constatações', critical: 'Críticas', high: 'Altas', topFindings: 'Principais constatações', branch: 'Branch', defaultBranch: 'padrão', noFindings: 'Nenhum aviso conhecido de pacote foi encontrado nesta prévia limitada. Isto não é uma auditoria completa, mas é um bom primeiro sinal.', patched: 'versão corrigida disponível', packageAdvisory: 'Aviso de pacote detectado.', source: 'Fonte', unlockTitle: 'Desbloquear o fluxo completo', unlockBody: 'O Audit Pro adiciona o relatório completo, a camada de planejamento, o monitoramento agendado e o fluxo de revisão assistida. Nenhuma alteração de código acontece sem aprovação humana.', unlock1: 'Relatório completo de revisão', unlock2: 'Camada de planejamento de remediação', unlock3: 'Monitoramento agendado e caixa de alertas', unlock4: 'Fluxo de correção com aprovação humana', unlockCta: 'Desbloquear Audit Pro — US$199/mês', steps: ['Verificando alvo', 'Executando analisadores', 'Preparando resumo'],
-  },
-  pl: {
-    back: 'SignalBoost', badge: 'Darmowe narzędzie dla deweloperów', title: 'Uruchom darmowy podgląd ryzyka zależności w publicznym repozytorium GitHub.', subtitle: 'Wklej URL publicznego repozytorium i otrzymaj ograniczone podsumowanie ostrzeżeń pakietów. Darmowe sprawdzenie pokazuje sygnał; Audit Pro odblokowuje pełny raport, warstwę planowania, zaplanowane monitorowanie i wspomagany proces przeglądu.', repoLabel: 'Publiczne repozytorium GitHub', placeholder: 'https://github.com/owner/repo', check: 'Uruchom darmowe sprawdzenie', checking: 'Sprawdzanie…', hint: 'Tylko publiczne repozytoria. Podgląd jest ograniczony i nie uzyskuje dostępu do prywatnego kodu.', trySample: 'Sprawdź SignalBoost', missingUrl: 'Najpierw wklej URL publicznego repozytorium GitHub.', checkFailed: 'Nie udało się sprawdzić tego repozytorium.', liveCheck: 'Sprawdzenie na żywo', begin: 'Wklej URL repozytorium, aby zacząć', ready: 'Gotowe', packages: 'Pakiety', findings: 'Wyniki', critical: 'Krytyczne', high: 'Wysokie', topFindings: 'Najważniejsze wyniki', branch: 'Gałąź', defaultBranch: 'domyślna', noFindings: 'W tym ograniczonym podglądzie nie znaleziono znanych ostrzeżeń pakietów. To nie jest pełny audyt, ale dobry pierwszy sygnał.', patched: 'dostępna wersja poprawiona', packageAdvisory: 'Wykryto ostrzeżenie pakietu.', source: 'Źródło', unlockTitle: 'Odblokuj pełny proces', unlockBody: 'Audit Pro dodaje pełny raport, warstwę planowania, zaplanowane monitorowanie i wspomagany proces przeglądu. Żadne zmiany kodu nie następują bez akceptacji człowieka.', unlock1: 'Pełny raport z przeglądu', unlock2: 'Warstwa planowania napraw', unlock3: 'Zaplanowane monitorowanie i skrzynka alertów', unlock4: 'Proces poprawek z akceptacją człowieka', unlockCta: 'Odblokuj Audit Pro — 199 USD/mies.', steps: ['Skanowanie celu', 'Uruchamianie analizatorów', 'Przygotowywanie podsumowania'],
-  },
-  ru: {
-    back: 'SignalBoost', badge: 'Бесплатный инструмент для разработчиков', title: 'Запустите бесплатный предварительный обзор риска зависимостей GitHub.', subtitle: 'Вставьте URL публичного репозитория и получите ограниченное резюме предупреждений по пакетам. Бесплатная проверка показывает сигнал; Audit Pro открывает полный отчёт, слой планирования, мониторинг по расписанию и процесс проверки с участием человека.', repoLabel: 'Публичный репозиторий GitHub', placeholder: 'https://github.com/owner/repo', check: 'Запустить бесплатную проверку', checking: 'Проверка…', hint: 'Только публичные репозитории. Предварительный обзор ограничен и не получает доступ к приватному коду.', trySample: 'Проверить SignalBoost', missingUrl: 'Сначала вставьте URL публичного репозитория GitHub.', checkFailed: 'Не удалось проверить этот репозиторий.', liveCheck: 'Проверка в реальном времени', begin: 'Вставьте URL репозитория, чтобы начать', ready: 'Готово', packages: 'Пакеты', findings: 'Замечания', critical: 'Критические', high: 'Высокие', topFindings: 'Главные замечания', branch: 'Ветка', defaultBranch: 'по умолчанию', noFindings: 'В этом ограниченном обзоре не найдено известных предупреждений по пакетам. Это не полный аудит, но хороший первый сигнал.', patched: 'доступна исправленная версия', packageAdvisory: 'Обнаружено предупреждение пакета.', source: 'Источник', unlockTitle: 'Открыть полный процесс', unlockBody: 'Audit Pro добавляет полный отчёт, слой планирования, мониторинг по расписанию и процесс проверки с участием человека. Изменения кода не выполняются без человеческого утверждения.', unlock1: 'Полный отчёт проверки', unlock2: 'Слой планирования исправлений', unlock3: 'Мониторинг по расписанию и входящие алерты', unlock4: 'Процесс патчей с человеческим утверждением', unlockCta: 'Открыть Audit Pro — 199 $/мес.', steps: ['Сканирование цели', 'Запуск анализаторов', 'Подготовка резюме'],
-  },
+const COPY: Record<Lang, Copy> = {
+  en: { back: 'SignalBoost', badge: 'Free developer utility', title: 'Run a free public GitHub dependency risk preview.', subtitle: 'Paste a public repository URL and get a capped package advisory summary. The free check shows the signal; Audit Pro unlocks the complete review workflow.', repoLabel: 'Public GitHub repository', placeholder: 'https://github.com/owner/repo', check: 'Run free check', checking: 'Checking…', hint: 'Public repos only. Free preview is capped and does not access private code.', trySample: 'Try SignalBoost itself', missingUrl: 'Paste a public GitHub repository URL first.', checkFailed: 'Could not check this repository.', ready: 'Ready', begin: 'Paste a repo URL to begin', packages: 'Packages', findings: 'Findings', critical: 'Critical', high: 'High', repoChecked: 'Repository checked', topFindings: 'Top findings', noFindings: 'No known package advisories found in this capped preview. This is not a full audit, but it is a good first signal.', patched: 'patched version available', source: 'Source', requestTitle: 'Request an audit plan', requestBody: 'Send this result to the COS Marketing + Sales engine. It will create a tagged audit lead and prepare an owner-approved follow-up plan. Nothing sends automatically.', requestCta: 'Request audit plan', safeNote: 'No code changes or follow-up happen without approval.', severities: { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', unknown: 'Unknown' } },
+  es: { back: 'SignalBoost', badge: 'Utilidad gratuita para desarrolladores', title: 'Ejecuta una vista previa gratuita de riesgo de dependencias en GitHub.', subtitle: 'Pega la URL de un repositorio público y recibe un resumen limitado de avisos de paquetes.', repoLabel: 'Repositorio público de GitHub', placeholder: 'https://github.com/owner/repo', check: 'Ejecutar revisión gratis', checking: 'Revisando…', hint: 'Solo repos públicos. La vista previa está limitada y no accede a código privado.', trySample: 'Probar SignalBoost', missingUrl: 'Pega primero una URL de repositorio público.', checkFailed: 'No se pudo revisar este repositorio.', ready: 'Listo', begin: 'Pega una URL para comenzar', packages: 'Paquetes', findings: 'Hallazgos', critical: 'Críticos', high: 'Altos', repoChecked: 'Repositorio revisado', topFindings: 'Principales hallazgos', noFindings: 'No se encontraron avisos conocidos de paquetes en esta vista previa. No es una auditoría completa, pero es una buena primera señal.', patched: 'versión corregida disponible', source: 'Fuente', requestTitle: 'Solicitar plan de auditoría', requestBody: 'Envía este resultado al motor COS Marketing + Ventas. Creará un lead de auditoría y preparará un seguimiento aprobado por el propietario. Nada se envía automáticamente.', requestCta: 'Solicitar plan de auditoría', safeNote: 'No hay cambios de código ni seguimiento sin aprobación.', severities: { critical: 'Crítico', high: 'Alto', medium: 'Medio', low: 'Bajo', unknown: 'Desconocido' } },
+  pt: { back: 'SignalBoost', badge: 'Utilitário gratuito para desenvolvedores', title: 'Execute uma prévia gratuita de risco de dependências no GitHub.', subtitle: 'Cole a URL de um repositório público e receba um resumo limitado de avisos de pacotes.', repoLabel: 'Repositório público do GitHub', placeholder: 'https://github.com/owner/repo', check: 'Executar verificação grátis', checking: 'Verificando…', hint: 'Apenas repos públicos. A prévia é limitada e não acessa código privado.', trySample: 'Testar SignalBoost', missingUrl: 'Cole primeiro a URL de um repositório público.', checkFailed: 'Não foi possível verificar este repositório.', ready: 'Pronto', begin: 'Cole uma URL para começar', packages: 'Pacotes', findings: 'Constatações', critical: 'Críticas', high: 'Altas', repoChecked: 'Repositório verificado', topFindings: 'Principais constatações', noFindings: 'Nenhum aviso conhecido de pacote foi encontrado nesta prévia. Isto não é uma auditoria completa, mas é um bom primeiro sinal.', patched: 'versão corrigida disponível', source: 'Fonte', requestTitle: 'Solicitar plano de auditoria', requestBody: 'Envie este resultado ao motor COS Marketing + Vendas. Ele criará um lead de auditoria e preparará um follow-up aprovado pelo proprietário. Nada é enviado automaticamente.', requestCta: 'Solicitar plano de auditoria', safeNote: 'Nenhuma alteração de código ou follow-up acontece sem aprovação.', severities: { critical: 'Crítica', high: 'Alta', medium: 'Média', low: 'Baixa', unknown: 'Desconhecida' } },
+  pl: { back: 'SignalBoost', badge: 'Darmowe narzędzie dla deweloperów', title: 'Uruchom darmowy podgląd ryzyka zależności w publicznym repozytorium GitHub.', subtitle: 'Wklej URL publicznego repozytorium i otrzymaj ograniczone podsumowanie ostrzeżeń pakietów.', repoLabel: 'Publiczne repozytorium GitHub', placeholder: 'https://github.com/owner/repo', check: 'Uruchom darmowe sprawdzenie', checking: 'Sprawdzanie…', hint: 'Tylko publiczne repozytoria. Podgląd jest ograniczony i nie uzyskuje dostępu do prywatnego kodu.', trySample: 'Sprawdź SignalBoost', missingUrl: 'Najpierw wklej URL publicznego repozytorium.', checkFailed: 'Nie udało się sprawdzić tego repozytorium.', ready: 'Gotowe', begin: 'Wklej URL repozytorium, aby zacząć', packages: 'Pakiety', findings: 'Wyniki', critical: 'Krytyczne', high: 'Wysokie', repoChecked: 'Sprawdzone repozytorium', topFindings: 'Najważniejsze wyniki', noFindings: 'Nie znaleziono znanych ostrzeżeń pakietów w tym podglądzie. To nie jest pełny audyt, ale dobry pierwszy sygnał.', patched: 'dostępna wersja poprawiona', source: 'Źródło', requestTitle: 'Poproś o plan audytu', requestBody: 'Wyślij ten wynik do silnika COS Marketing + Sprzedaż. Utworzy leada audytowego i przygotuje follow-up do akceptacji właściciela. Nic nie wysyła się automatycznie.', requestCta: 'Poproś o plan audytu', safeNote: 'Bez zmian kodu i follow-up bez akceptacji.', severities: { critical: 'Krytyczne', high: 'Wysokie', medium: 'Średnie', low: 'Niskie', unknown: 'Nieznane' } },
+  ru: { back: 'SignalBoost', badge: 'Бесплатный инструмент для разработчиков', title: 'Запустите бесплатный обзор риска зависимостей GitHub.', subtitle: 'Вставьте URL публичного репозитория и получите ограниченное резюме предупреждений по пакетам.', repoLabel: 'Публичный репозиторий GitHub', placeholder: 'https://github.com/owner/repo', check: 'Запустить бесплатную проверку', checking: 'Проверка…', hint: 'Только публичные репозитории. Обзор ограничен и не получает доступ к приватному коду.', trySample: 'Проверить SignalBoost', missingUrl: 'Сначала вставьте URL публичного репозитория.', checkFailed: 'Не удалось проверить этот репозиторий.', ready: 'Готово', begin: 'Вставьте URL репозитория, чтобы начать', packages: 'Пакеты', findings: 'Замечания', critical: 'Критические', high: 'Высокие', repoChecked: 'Проверенный репозиторий', topFindings: 'Главные замечания', noFindings: 'В этом обзоре не найдено известных предупреждений по пакетам. Это не полный аудит, но хороший первый сигнал.', patched: 'доступна исправленная версия', source: 'Источник', requestTitle: 'Запросить план аудита', requestBody: 'Отправьте этот результат в COS Marketing + Sales engine. Он создаст audit lead и подготовит follow-up для утверждения владельцем. Ничего не отправляется автоматически.', requestCta: 'Запросить план аудита', safeNote: 'Без изменений кода и follow-up без утверждения.', severities: { critical: 'Критическая', high: 'Высокая', medium: 'Средняя', low: 'Низкая', unknown: 'Неизвестная' } },
 }
 
 const SEVERITY_STYLES: Record<string, string> = { critical: 'border-red-400/40 bg-red-400/10 text-red-100', high: 'border-orange-300/40 bg-orange-300/10 text-orange-100', medium: 'border-yellow-300/40 bg-yellow-300/10 text-yellow-100', low: 'border-cyan-300/40 bg-cyan-300/10 text-cyan-100', unknown: 'border-white/15 bg-white/5 text-white/70' }
+function activeLang(lang: string): Lang { return (['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as Lang }
+function planHref(target: string) { return `/request-plan?source=repo_check&target=${encodeURIComponent(target)}` }
 
 export default function RepoCheckPage() {
   const { lang } = useI18n()
-  const copy = COPY[lang] || COPY.en
+  const copy = COPY[activeLang(lang)]
   const [url, setUrl] = useState('')
   const [loading, setLoading] = useState(false)
-  const [stage, setStage] = useState(0)
   const [error, setError] = useState('')
   const [data, setData] = useState<any>(null)
-
-  useEffect(() => { if (!loading) return; const timers = [window.setTimeout(() => setStage(1), 500), window.setTimeout(() => setStage(2), 1100)]; return () => timers.forEach(window.clearTimeout) }, [loading])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!url.trim()) { setError(copy.missingUrl); return }
-    setLoading(true); setStage(0); setError(''); setData(null)
+    setLoading(true); setError(''); setData(null)
     try {
       const res = await fetch('/api/public/surface-scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: url.trim(), maxPackages: 75 }) })
       const json = await res.json().catch(() => null)
-      if (!res.ok || !json?.ok) { setError(json?.error || copy.checkFailed); return }
-      setStage(2); setData(json)
+      if (!res.ok || !json?.ok) { setError(copy.checkFailed); return }
+      setData(json)
     } catch { setError(copy.checkFailed) } finally { setLoading(false) }
   }
 
   const summary = data?.summary || null
   const top: CheckItem[] = Array.isArray(data?.topAdvisories) ? data.topAdvisories : []
-  const status = loading ? copy.steps[stage] : data ? copy.ready : copy.begin
+  const target = String(data?.target?.url || url || '')
+  const metricRows = useMemo(() => ([
+    [copy.packages, summary?.packagesScanned ?? summary?.packageCount ?? '—'],
+    [copy.findings, summary?.advisoryCount ?? top.length ?? '—'],
+    [copy.critical, summary?.critical ?? '—'],
+    [copy.high, summary?.high ?? '—'],
+  ]), [copy, summary, top.length])
 
-  return <main className="min-h-screen bg-slate-950 px-5 py-10 text-white"><section className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1fr_.95fr] lg:items-start"><div><Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-cyan-200 hover:text-cyan-100"><span>←</span><span>{copy.back}</span></Link><div className="mt-12 rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-slate-950/50 md:p-10"><div className="mb-4 inline-flex rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-cyan-100">{copy.badge}</div><h1 className="max-w-3xl text-4xl font-semibold tracking-tight md:text-6xl">{copy.title}</h1><p className="mt-5 max-w-2xl text-base leading-8 text-slate-300 md:text-lg">{copy.subtitle}</p><form onSubmit={submit} className="mt-8 rounded-2xl border border-white/10 bg-slate-950 p-3"><label className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-slate-500">{copy.repoLabel}</label><div className="flex flex-col gap-3 md:flex-row"><input value={url} onChange={(event) => setUrl(event.target.value)} placeholder={copy.placeholder} className="min-h-12 flex-1 rounded-xl border border-white/10 bg-slate-900 px-4 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-300/60" /><button type="submit" disabled={loading} className="rounded-xl bg-cyan-300 px-5 py-3 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-60">{loading ? copy.checking : copy.check}</button></div><div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500"><span>{copy.hint}</span><button type="button" onClick={() => setUrl('https://github.com/SignalBoost/signalboost-live')} className="font-semibold text-cyan-200 hover:text-cyan-100">{copy.trySample}</button></div></form>{error ? <div className="mt-5 rounded-xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">{error}</div> : null}</div></div><div className="rounded-3xl border border-white/10 bg-slate-900/75 p-5 shadow-2xl shadow-slate-950/60 md:p-6"><div className="rounded-2xl border border-white/10 bg-slate-950/70 p-4"><div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-semibold text-white">{copy.liveCheck}</h2><p className="mt-1 text-xs text-slate-500">{data?.repo || url || copy.begin}</p></div><span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-100">{status}</span></div><div className="mt-5 grid gap-3">{copy.steps.map((step, index) => { const active = loading ? stage >= index : !!data; return <div key={step} className="flex items-center gap-3"><span className={`grid h-7 w-7 place-items-center rounded-full border text-xs font-bold ${active ? 'border-cyan-300 bg-cyan-300 text-slate-950' : 'border-white/10 text-slate-600'}`}>{index + 1}</span><span className={active ? 'text-sm text-white' : 'text-sm text-slate-500'}>{step}</span></div> })}</div></div><div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4"><Metric label={copy.packages} value={summary?.packagesScanned ?? '—'} /><Metric label={copy.findings} value={summary?.advisories ?? '—'} /><Metric label={copy.critical} value={summary?.critical ?? '—'} /><Metric label={copy.high} value={summary?.high ?? '—'} /></div>{data ? <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.035] p-4"><div className="flex items-center justify-between gap-3"><h2 className="text-sm font-semibold text-white">{copy.topFindings}</h2><span className="text-xs text-slate-500">{copy.branch}: {data.branch || copy.defaultBranch}</span></div>{top.length === 0 ? <p className="mt-3 text-sm leading-6 text-slate-300">{copy.noFindings}</p> : <div className="mt-3 space-y-3">{top.map((item) => { const severity = String(item.severity || 'unknown').toLowerCase(); return <div key={`${item.id}:${item.packageName}:${item.version}`} className="rounded-xl border border-white/10 bg-slate-950/70 p-3"><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full border px-2 py-1 text-[11px] font-bold uppercase ${SEVERITY_STYLES[severity] || SEVERITY_STYLES.unknown}`}>{severity}</span><span className="text-sm font-semibold text-white">{item.packageName}@{item.version}</span>{item.fixedVersionAvailable ? <span className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2 py-1 text-[11px] font-semibold text-emerald-100">{copy.patched}</span> : null}</div><p className="mt-2 text-sm leading-6 text-slate-400">{item.summary || copy.packageAdvisory}</p>{item.sourceFile ? <p className="mt-2 text-xs text-slate-500">{copy.source}: {item.sourceFile}</p> : null}</div> })}</div>}</div> : null}<div className="mt-5 rounded-2xl border border-yellow-300/25 bg-yellow-300/10 p-4"><h2 className="text-sm font-semibold text-yellow-100">{copy.unlockTitle}</h2><p className="mt-2 text-sm leading-6 text-yellow-100/80">{copy.unlockBody}</p><ul className="mt-3 grid gap-2 text-sm text-yellow-50/80"><li>✓ {copy.unlock1}</li><li>✓ {copy.unlock2}</li><li>✓ {copy.unlock3}</li><li>✓ {copy.unlock4}</li></ul><Link href="/pricing" className="mt-4 inline-flex rounded-xl bg-yellow-300 px-4 py-2 text-sm font-black text-slate-950">{copy.unlockCta}</Link></div></div></section></main>
+  return (
+    <main className="min-h-screen bg-slate-950 px-5 py-10 text-white">
+      <section className="mx-auto max-w-6xl">
+        <Link href="/" className="text-sm font-semibold text-cyan-200 hover:text-white">← {copy.back}</Link>
+        <div className="mt-8 grid gap-8 lg:grid-cols-[1.1fr_.9fr]">
+          <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-8 shadow-2xl shadow-cyan-950/30">
+            <span className="inline-flex rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-cyan-100">{copy.badge}</span>
+            <h1 className="mt-5 text-4xl font-black tracking-tight md:text-6xl">{copy.title}</h1>
+            <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">{copy.subtitle}</p>
+            <form onSubmit={submit} className="mt-8 rounded-2xl border border-white/10 bg-slate-900/70 p-4">
+              <label className="text-sm font-bold text-slate-200" htmlFor="repo-url">{copy.repoLabel}</label>
+              <div className="mt-3 flex flex-col gap-3 md:flex-row">
+                <input id="repo-url" value={url} onChange={event => setUrl(event.target.value)} placeholder={copy.placeholder} className="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none ring-cyan-300/20 focus:ring-4" />
+                <button type="submit" disabled={loading} className="rounded-xl bg-cyan-300 px-5 py-3 font-black text-slate-950 hover:bg-white disabled:opacity-60">{loading ? copy.checking : copy.check}</button>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-400"><span>{copy.hint}</span><button type="button" onClick={() => setUrl('https://github.com/SignalBoost/signalboost-live')} className="font-bold text-cyan-200 hover:text-white">{copy.trySample}</button></div>
+            </form>
+            {error && <div className="mt-4 rounded-xl border border-red-300/30 bg-red-400/10 p-4 text-sm font-semibold text-red-100">{error}</div>}
+          </section>
+
+          <aside className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
+            <div className="flex items-center justify-between gap-4"><span className="text-sm font-black uppercase tracking-[0.18em] text-slate-400">{data ? copy.ready : copy.begin}</span></div>
+            <div className="mt-6 grid grid-cols-2 gap-3">{metricRows.map(([label, value]) => <div key={String(label)} className="rounded-2xl border border-white/10 bg-slate-950/60 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-500">{label}</p><strong className="mt-2 block text-3xl text-cyan-100">{String(value)}</strong></div>)}</div>
+          </aside>
+        </div>
+
+        {data && <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_.42fr]">
+          <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-100">{copy.repoChecked}</p>
+            <h2 className="mt-2 break-all text-xl font-black">{target}</h2>
+            <h3 className="mb-4 mt-6 text-sm font-black uppercase tracking-[0.18em] text-slate-400">{copy.topFindings}</h3>
+            {top.length === 0 ? <p className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-5 text-emerald-100">{copy.noFindings}</p> : <div className="grid gap-4">{top.map(item => { const severity = item.severity || 'unknown'; return <article key={item.id} className="rounded-2xl border border-white/10 bg-slate-950/50 p-5"><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full border px-2.5 py-1 text-xs font-black uppercase ${SEVERITY_STYLES[severity] || SEVERITY_STYLES.unknown}`}>{copy.severities[severity] || severity}</span>{item.fixedVersionAvailable && <span className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-2.5 py-1 text-xs font-bold text-emerald-100">{copy.patched}</span>}</div><h4 className="mt-3 text-lg font-black">{item.packageName} <span className="text-slate-400">{item.version}</span></h4><p className="mt-2 text-sm leading-6 text-slate-300">{item.summary}</p><p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{copy.source}: {item.sourceFile}</p></article> })}</div>}
+          </section>
+          <aside className="rounded-3xl border border-cyan-300/20 bg-cyan-300/10 p-6"><h3 className="text-2xl font-black">{copy.requestTitle}</h3><p className="mt-3 text-sm leading-6 text-cyan-50/80">{copy.requestBody}</p><Link href={planHref(target)} className="mt-6 inline-flex w-full justify-center rounded-xl bg-cyan-300 px-5 py-3 text-center font-black text-slate-950 hover:bg-white">{copy.requestCta}</Link><p className="mt-3 text-center text-xs text-cyan-50/70">{copy.safeNote}</p></aside>
+        </div>}
+      </section>
+    </main>
+  )
 }
-
-function Metric({ label, value }: { label: string; value: number | string }) { return <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4"><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">{label}</div><div className="mt-2 text-2xl font-semibold text-white">{value}</div></div> }

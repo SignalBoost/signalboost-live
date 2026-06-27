@@ -92,7 +92,10 @@ function fallbackId() {
 
 function cleanJson(value: unknown, depth = 0): JsonValue {
   if (depth > 6) return null
-  if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value
+  if (value === null) return null
+  if (typeof value === 'string') return value
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  if (typeof value === 'boolean') return value
   if (Array.isArray(value)) return value.slice(0, 100).map(item => cleanJson(item, depth + 1))
   if (typeof value === 'object') {
     const output: JsonObject = {}

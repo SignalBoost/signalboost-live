@@ -63,6 +63,23 @@ async function draftedEmails(a: any): Promise<number> {
   return nz(queueDrafts) + nz(directDrafts)
 }
 
+async function releasedOutreachCount(a: any): Promise<number> {
+  const [actualSends, approvedOrSent] = await Promise.all([
+    countRows(a, 'outreach_sends'),
+    countRows(a, 'outreach_queue', (q: any) => q.in('status', ['approved', 'sent'])),
+  ])
+  return Math.max(nz(actualSends), nz(approvedOrSent))
+}
+
+async function releasedOutreachToday(a: any): Promise<number> {
+  const [actualSendsToday, approvedToday, sentToday] = await Promise.all([
+    countRows(a, 'outreach_sends', (q: any) => q.gte('sent_at', startOfTodayISO())),
+    countRows(a, 'outreach_queue', (q: any) => q.gte('approved_at', startOfTodayISO())),
+    countRows(a, 'outreach_queue', (q: any) => q.gte('sent_at', startOfTodayISO())),
+  ])
+  return Math.max(nz(actualSendsToday), nz(approvedToday), nz(sentToday))
+}
+
 function pct(numerator: number, denominator: number): string {
   if (!denominator) return '0%'
   return `${Math.round((numerator / denominator) * 100)}%`
@@ -96,8 +113,8 @@ async function sectionRows(a: any, section: string): Promise<string[][]> {
         prospectCount(a),
         countRows(a, 'outreach_queue', (q: any) => q.in('status', ['approved', 'sent'])),
         draftedEmails(a),
-        countRows(a, 'outreach_sends'),
-        countRows(a, 'outreach_sends', (q: any) => q.gte('sent_at', startOfTodayISO())),
+        releasedOutreachCount(a),
+        releasedOutreachToday(a),
         repliesCount(a),
         countRows(a, 'sales_meetings'),
         countRows(a, 'subscriptions', (q: any) => q.in('plan', PAYING_PLANS)),
@@ -112,7 +129,7 @@ async function sectionRows(a: any, section: string): Promise<string[][]> {
         ['Prospects discovered', String(prospectsCount), '—', 'Outreach engine'],
         ['Prospects approved', String(nz(approved)), '—', 'Owner/Admin'],
         ['Emails drafted', String(nz(drafted)), '—', 'Sales draft engine'],
-        ['Emails sent', String(sentCount), '—', 'Outreach sender'],
+        ['Emails sent / released', String(sentCount), '—', 'Outreach approval/send workflow'],
         ['Daily outreach count', String(nz(today)), '—', 'Today'],
         ['Replies received', String(nz(replies)), pct(nz(replies), sentCount), 'Inbox/reply tracking'],
         ['Meetings booked', String(nz(meetings)), '—', 'Calendar/CRM'],
@@ -139,7 +156,7 @@ export async function GET(req: Request) {
     countRows(a, 'subscriptions', (q: any) => q.in('plan', PAYING_PLANS)),
     countRows(a, 'subscriptions', (q: any) => q.eq('plan', 'free')),
     prospectCount(a),
-    countRows(a, 'outreach_sends'),
+    releasedOutreachCount(a),
     countRows(a, 'ai_task_log'),
     countRows(a, 'ai_business_sites'),
     countRows(a, 'video_jobs'),

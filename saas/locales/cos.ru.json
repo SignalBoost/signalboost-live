@@ -1,75 +1,75 @@
 {
   "cos": {
     "nav": {
-      "mining": "Eksploracja",
-      "features": "Cechy",
-      "segments": "Segmenty",
-      "rules": "Wzorce",
-      "runs": "Historia"
+      "mining": "Анализ",
+      "features": "Признаки",
+      "segments": "Сегменты",
+      "rules": "Закономерности",
+      "runs": "История"
     },
     "mining": {
-      "title": "Eksploracja danych",
-      "subtitle": "Wzorce zachowań i transakcji zasilające prognozy",
-      "run_now": "Uruchom teraz",
-      "last_run": "Ostatnie uruchomienie",
-      "events_scanned": "Przeanalizowane zdarzenia",
-      "users_processed": "Przetworzeni użytkownicy",
-      "features_written": "Wygenerowane cechy",
-      "rules_found": "Znalezione wzorce"
+      "title": "Интеллектуальный анализ данных",
+      "subtitle": "Поведенческие и транзакционные закономерности для прогнозов",
+      "run_now": "Запустить",
+      "last_run": "Последний запуск",
+      "events_scanned": "Обработано событий",
+      "users_processed": "Обработано пользователей",
+      "features_written": "Сформировано признаков",
+      "rules_found": "Найдено закономерностей"
     },
     "features": {
-      "title": "Wyodrębnione cechy",
-      "name": "Cecha",
-      "value": "Wartość",
-      "updated": "Zaktualizowano",
+      "title": "Извлечённые признаки",
+      "name": "Признак",
+      "value": "Значение",
+      "updated": "Обновлено",
       "names": {
-        "event_frequency_per_day": "Aktywność dziennie",
-        "transaction_count": "Transakcje",
-        "avg_deposit_cents": "Średnia wpłata",
-        "avg_transfer_cents": "Średni przelew",
-        "preferred_txn_hour": "Preferowana godzina",
-        "dominant_device_code": "Główne urządzenie",
-        "campaign_engagement_rate": "Zaangażowanie w kampanie",
-        "recency_days": "Dni od ostatniej aktywności",
-        "amount_trend_slope": "Trend wydatków"
+        "event_frequency_per_day": "Активность в день",
+        "transaction_count": "Транзакции",
+        "avg_deposit_cents": "Средний депозит",
+        "avg_transfer_cents": "Средний перевод",
+        "preferred_txn_hour": "Предпочитаемый час",
+        "dominant_device_code": "Основное устройство",
+        "campaign_engagement_rate": "Вовлечённость в кампании",
+        "recency_days": "Дней с последней активности",
+        "amount_trend_slope": "Тренд расходов"
       }
     },
     "segments": {
-      "title": "Segmenty zachowań",
-      "cluster": "Grupa",
-      "members": "Członkowie"
+      "title": "Поведенческие сегменты",
+      "cluster": "Группа",
+      "members": "Участники"
     },
     "rules": {
-      "title": "Wykryte wzorce",
-      "if": "Jeśli",
-      "then": "to",
-      "support": "Wsparcie",
-      "confidence": "Pewność",
-      "lift": "Lift"
+      "title": "Обнаруженные закономерности",
+      "if": "Если",
+      "then": "то",
+      "support": "Поддержка",
+      "confidence": "Достоверность",
+      "lift": "Лифт"
     },
     "status": {
-      "running": "W toku",
-      "success": "Sukces",
-      "error": "Błąd"
+      "running": "Выполняется",
+      "success": "Успешно",
+      "error": "Ошибка"
     },
     "empty": {
-      "no_features": "Brak cech — uruchom eksplorację, aby je wygenerować.",
-      "no_rules": "Nie wykryto jeszcze żadnych wzorców.",
-      "no_runs": "Brak zarejestrowanych uruchomień."
+      "no_features": "Признаков пока нет — запустите анализ, чтобы их сформировать.",
+      "no_rules": "Закономерности пока не обнаружены.",
+      "no_runs": "Запусков пока нет."
     },
     "errors": {
-      "unauthorized": "Zaloguj się, aby kontynuować.",
-      "forbidden": "Nie masz dostępu do tych danych.",
-      "load_failed": "Nie udało się wczytać danych. Spróbuj ponownie."
+      "unauthorized": "Войдите, чтобы продолжить.",
+      "forbidden": "У вас нет доступа к этим данным.",
+      "load_failed": "Не удалось загрузить данные. Попробуйте ещё раз."
     },
     "tooltips": {
-      "confidence": "Jak często wzorzec się sprawdza, gdy warunek jest spełniony.",
-      "lift": "O ile bardziej prawdopodobny jest wynik względem przypadku.",
-      "segment": "Grupa użytkowników o podobnym zachowaniu."
+      "confidence": "Как часто закономерность подтверждается при выполнении условия.",
+      "lift": "Насколько результат вероятнее по сравнению со случайностью.",
+      "segment": "Группа пользователей со схожим поведением."
     },
     "meta": {
-      "title": "Eksploracja danych COS — SignalBoost",
-      "description": "Sygnały behawioralne i transakcyjne zasilające prognozy COS."
+      "title": "Анализ данных COS — SignalBoost",
+      "description": "Поведенческие и транзакционные сигналы, питающие прогнозы COS."
     }
   }
 }

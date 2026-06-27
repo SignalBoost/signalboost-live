@@ -1,0 +1,75 @@
+{
+  "cos": {
+    "nav": {
+      "mining": "Minería",
+      "features": "Características",
+      "segments": "Segmentos",
+      "rules": "Patrones",
+      "runs": "Historial"
+    },
+    "mining": {
+      "title": "Minería de datos",
+      "subtitle": "Patrones de comportamiento y transacciones que impulsan las predicciones",
+      "run_now": "Ejecutar ahora",
+      "last_run": "Última ejecución",
+      "events_scanned": "Eventos analizados",
+      "users_processed": "Usuarios procesados",
+      "features_written": "Características generadas",
+      "rules_found": "Patrones encontrados"
+    },
+    "features": {
+      "title": "Características extraídas",
+      "name": "Característica",
+      "value": "Valor",
+      "updated": "Actualizado",
+      "names": {
+        "event_frequency_per_day": "Actividad por día",
+        "transaction_count": "Transacciones",
+        "avg_deposit_cents": "Depósito promedio",
+        "avg_transfer_cents": "Transferencia promedio",
+        "preferred_txn_hour": "Hora preferida",
+        "dominant_device_code": "Dispositivo principal",
+        "campaign_engagement_rate": "Interacción con campañas",
+        "recency_days": "Días desde la última actividad",
+        "amount_trend_slope": "Tendencia de gasto"
+      }
+    },
+    "segments": {
+      "title": "Segmentos de comportamiento",
+      "cluster": "Grupo",
+      "members": "Miembros"
+    },
+    "rules": {
+      "title": "Patrones detectados",
+      "if": "Si",
+      "then": "entonces",
+      "support": "Soporte",
+      "confidence": "Confianza",
+      "lift": "Lift"
+    },
+    "status": {
+      "running": "En ejecución",
+      "success": "Correcto",
+      "error": "Error"
+    },
+    "empty": {
+      "no_features": "Aún no hay características; ejecuta una minería para generarlas.",
+      "no_rules": "Aún no se detectaron patrones.",
+      "no_runs": "Aún no hay ejecuciones registradas."
+    },
+    "errors": {
+      "unauthorized": "Inicia sesión para continuar.",
+      "forbidden": "No tienes acceso a estos datos.",
+      "load_failed": "No se pudieron cargar los datos. Inténtalo de nuevo."
+    },
+    "tooltips": {
+      "confidence": "Con qué frecuencia se cumple el patrón cuando se da la condición.",
+      "lift": "Cuánto más probable es el resultado frente al azar.",
+      "segment": "Grupo de usuarios con comportamiento similar."
+    },
+    "meta": {
+      "title": "Minería de datos COS — SignalBoost",
+      "description": "Señales de comportamiento y transacciones que impulsan las predicciones de COS."
+    }
+  }
+}

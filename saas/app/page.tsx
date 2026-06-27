@@ -17,9 +17,18 @@ const OPTIMIZER_COPY: Record<string, { label: string; kicker: string; title: str
   ru: { label: 'Бесплатная проверка оптимизации сайта', kicker: 'Бесплатный бизнес-инструмент', title: 'Бесплатно проверьте оптимизацию своего сайта.', text: 'Вставьте публичный URL сайта и получите быстрый обзор скорости, SEO, доступности, безопасности и возможностей конверсии. Затем SignalBoost может помочь подготовить план исправлений.', cta: 'Запустить тест сайта' },
 }
 
+const CYBER_COPY: Record<string, { label: string; kicker: string; title: string; text: string; cta: string }> = {
+  en: { label: 'Free cybersecurity preview', kicker: 'Free security utility', title: 'Check public website security signals.', text: 'Review HTTPS, security headers, cookie flags, mixed-content signals, and public exposure indicators without private access or intrusive testing.', cta: 'Run security preview' },
+  pt: { label: 'Prévia gratuita de cibersegurança', kicker: 'Utilitário gratuito de segurança', title: 'Verifique sinais públicos de segurança do site.', text: 'Revise HTTPS, cabeçalhos de segurança, flags de cookies, conteúdo misto e indicadores públicos de exposição sem acesso privado ou teste intrusivo.', cta: 'Executar prévia de segurança' },
+  es: { label: 'Vista previa gratuita de ciberseguridad', kicker: 'Utilidad gratuita de seguridad', title: 'Revisa señales públicas de seguridad web.', text: 'Revisa HTTPS, cabeceras de seguridad, cookies, contenido mixto e indicadores públicos de exposición sin acceso privado ni pruebas intrusivas.', cta: 'Ejecutar vista de seguridad' },
+  pl: { label: 'Darmowy podgląd cyberbezpieczeństwa', kicker: 'Darmowe narzędzie bezpieczeństwa', title: 'Sprawdź publiczne sygnały bezpieczeństwa strony.', text: 'Sprawdź HTTPS, nagłówki bezpieczeństwa, flagi cookies, mixed content i publiczne sygnały ekspozycji bez prywatnego dostępu lub testów intruzyjnych.', cta: 'Uruchom podgląd bezpieczeństwa' },
+  ru: { label: 'Бесплатный обзор кибербезопасности', kicker: 'Бесплатный инструмент безопасности', title: 'Проверьте публичные сигналы безопасности сайта.', text: 'Проверьте HTTPS, security headers, cookie flags, mixed content и публичные сигналы экспозиции без приватного доступа или интрузивного тестирования.', cta: 'Запустить обзор безопасности' },
+}
+
 export default function Home() {
   const { dict, lang } = useI18n()
   const optimizerCopy = OPTIMIZER_COPY[lang] || OPTIMIZER_COPY.en
+  const cyberCopy = CYBER_COPY[lang] || CYBER_COPY.en
   const featureCards = [1, 2, 3].map((item) => ({
     icon: ['🧠', '🌐', '⚡'][item - 1],
     title: t(dict, `home.features.${item}.title`, ['AI proposes the next move', 'One brand, every channel', 'Built for action'][item - 1]),
@@ -53,6 +62,20 @@ export default function Home() {
           </div>
           <div className="sb-cta-row">
             <Link className="sb-button-primary" href="/website-optimizer">{optimizerCopy.cta}</Link>
+            <Link className="sb-button-secondary" href="/support">SignalBoost</Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="sb-page-shell sb-section" aria-label={cyberCopy.label}>
+        <div className="sb-glass" style={{ padding: 28, display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 22, alignItems: 'center' }}>
+          <div>
+            <span className="sb-eyebrow">{cyberCopy.kicker}</span>
+            <h2 className="sb-h2" style={{ marginTop: 10 }}>{cyberCopy.title}</h2>
+            <p className="sb-body" style={{ maxWidth: 720 }}>{cyberCopy.text}</p>
+          </div>
+          <div className="sb-cta-row">
+            <Link className="sb-button-primary" href="/cybersecurity-check">{cyberCopy.cta}</Link>
             <Link className="sb-button-secondary" href="/support">SignalBoost</Link>
           </div>
         </div>

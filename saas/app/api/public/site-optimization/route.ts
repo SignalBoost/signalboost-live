@@ -134,7 +134,7 @@ export async function POST(req: Request) {
   }
 
   const parsed = await readJsonLimited(req)
-  if (!parsed.ok) return NextResponse.json({ ok: false, error: parsed.error }, { status: parsed.status })
+  if (parsed.ok === false) return NextResponse.json({ ok: false, error: parsed.error }, { status: parsed.status })
 
   const target = normalizeUrl(parsed.value.url)
   if (!target) return NextResponse.json({ ok: false, error: 'Paste a valid public website URL.' }, { status: 400 })

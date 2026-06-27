@@ -4,7 +4,7 @@ import { requireAdmin } from '@/lib/auth/access'
 
 export const dynamic = 'force-dynamic'
 
-// Count rows; null if the table/column is absent or errors (UI keeps its honest placeholder).
+// Count rows; null if the table/column is absent or errors.
 async function countRows(admin: any, table: string, filter?: (q: any) => any): Promise<number | null> {
   try {
     let q = admin.from(table).select('id', { count: 'exact', head: true })
@@ -23,7 +23,6 @@ async function distinctCount(admin: any, table: string, column: string): Promise
   } catch { return null }
 }
 
-// Most recent timestamp in a table -> short date string (e.g. "Jun 20, 14:32"); null if none.
 async function latest(admin: any, table: string, col = 'created_at'): Promise<string | null> {
   try {
     const { data, error } = await admin.from(table).select(col).order(col, { ascending: false }).limit(1)
@@ -34,7 +33,6 @@ async function latest(admin: any, table: string, col = 'created_at'): Promise<st
   } catch { return null }
 }
 
-// Live connectivity probe -> 'Connected' if a trivial query succeeds, else null.
 async function supabaseHealth(admin: any): Promise<string | null> {
   try {
     const { error } = await admin.from('subscriptions').select('id', { count: 'exact', head: true })
@@ -43,21 +41,59 @@ async function supabaseHealth(admin: any): Promise<string | null> {
 }
 
 const startOfTodayISO = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString() }
-
-// Paying = a real (non-free) subscription plan. Covers current + legacy plan names.
 const PAYING_PLANS = ['launch', 'growth', 'command', 'paid', 'pro', 'starter']
 
-// Conversion rate = paying customers / prospects, as a percent string. null if no prospects.
-async function conversionRate(a: any): Promise<string | null> {
-  try {
-    const won = await countRows(a, 'subscriptions', (q: any) => q.in('plan', PAYING_PLANS))
-    const prospects = await countRows(a, 'prospects')
-    if (won == null || prospects == null || prospects === 0) return null
-    return `${Math.round((won / prospects) * 100)}%`
-  } catch { return null }
+const zeroIfMissing = async (value: Promise<number | null>): Promise<number> => (await value) ?? 0
+
+async function prospectCount(a: any): Promise<number> {
+  const queue = await countRows(a, 'outreach_queue')
+  if (queue != null) return queue
+  return zeroIfMissing(countRows(a, 'prospects'))
 }
 
-// Most frequent value of a column (e.g. top industry/country). null if column/table absent.
+async function approvedProspects(a: any): Promise<number> {
+  return zeroIfMissing(countRows(a, 'outreach_queue', (q: any) => q.in('status', ['approved', 'sent'])))
+}
+
+async function draftedEmails(a: any): Promise<number> {
+  const [queueDrafts, directDrafts] = await Promise.all([
+    countRows(a, 'outreach_queue'),
+    countRows(a, 'admin_audit_log', (q: any) => q.eq('action', 'sales.email_draft')),
+  ])
+  return (queueDrafts ?? 0) + (directDrafts ?? 0)
+}
+
+async function replyCount(a: any): Promise<number> {
+  const replies = await countRows(a, 'outreach_replies')
+  if (replies != null) return replies
+  const emailReplies = await countRows(a, 'email_replies')
+  return emailReplies ?? 0
+}
+
+async function meetingCount(a: any): Promise<number> {
+  const meetings = await countRows(a, 'sales_meetings')
+  if (meetings != null) return meetings
+  return 0
+}
+
+async function responseRate(a: any): Promise<string> {
+  const [sent, replies] = await Promise.all([
+    countRows(a, 'outreach_sends'),
+    replyCount(a),
+  ])
+  if (!sent) return '0%'
+  return `${Math.round(((replies ?? 0) / sent) * 100)}%`
+}
+
+async function conversionRate(a: any): Promise<string> {
+  const [won, prospects] = await Promise.all([
+    countRows(a, 'subscriptions', (q: any) => q.in('plan', PAYING_PLANS)),
+    prospectCount(a),
+  ])
+  if (!won || !prospects) return '0%'
+  return `${Math.round((won / prospects) * 100)}%`
+}
+
 async function topValue(a: any, table: string, column: string): Promise<string | null> {
   try {
     const { data, error } = await a.from(table).select(column)
@@ -69,7 +105,14 @@ async function topValue(a: any, table: string, column: string): Promise<string |
   } catch { return null }
 }
 
-// Average of a numeric column -> "Nms"; null if column/table absent or empty.
+async function topIndustry(a: any): Promise<string> {
+  return (await topValue(a, 'prospects', 'industry')) || 'None yet'
+}
+
+async function topCountry(a: any): Promise<string> {
+  return (await topValue(a, 'prospects', 'country')) || 'None yet'
+}
+
 async function avgMs(a: any, table: string, column: string): Promise<string | null> {
   try {
     const { data, error } = await a.from(table).select(column).limit(5000)
@@ -92,44 +135,52 @@ const METRICS: Record<string, Spec> = {
   'saas-6': a => countRows(a, 'reviews'),
   'saas-7': a => countRows(a, 'ai_task_log'),
   'saas-9': a => countRows(a, 'subscriptions'),
-  // Outreach + CRM
-  'sales-0': a => countRows(a, 'prospects'),
-  'sales-4': a => countRows(a, 'outreach_sends'),
-  'sales-8': a => countRows(a, 'outreach_sends', q => q.gte('created_at', startOfTodayISO())),
-  'sales-7':  a => countRows(a, 'subscriptions', (q: any) => q.in('plan', PAYING_PLANS)), // clients won (paying)
-  'sales-10': a => conversionRate(a),                                                     // conversion rate
-  'sales-11': a => topValue(a, 'prospects', 'industry'),                                  // top industries
-  'sales-12': a => topValue(a, 'prospects', 'country'),                                   // top countries
+  // Outreach + CRM — fully wired to live outreach/sales tables or honest zeros.
+  'sales-0': a => prospectCount(a),
+  'sales-1': a => approvedProspects(a),
+  'sales-2': a => prospectCount(a),
+  'sales-3': a => draftedEmails(a),
+  'sales-4': a => zeroIfMissing(countRows(a, 'outreach_sends')),
+  'sales-5': a => replyCount(a),
+  'sales-6': a => meetingCount(a),
+  'sales-7': a => zeroIfMissing(countRows(a, 'subscriptions', (q: any) => q.in('plan', PAYING_PLANS))),
+  'sales-8': a => zeroIfMissing(countRows(a, 'outreach_sends', (q: any) => q.gte('sent_at', startOfTodayISO()))),
+  'sales-9': a => responseRate(a),
+  'sales-10': a => conversionRate(a),
+  'sales-11': a => topIndustry(a),
+  'sales-12': a => topCountry(a),
+  'sales-13': a => zeroIfMissing(countRows(a, 'outreach_queue', (q: any) => q.in('status', ['pending', 'approved']))),
   // Forecasting + KPI
   'ai-0': a => countRows(a, 'ai_task_log'),
   // Email / Marketing
+  'email-0': a => countRows(a, 'marketing_campaigns'),
+  'email-1': a => countRows(a, 'admin_audit_log', (q: any) => q.eq('action', 'sales.email_draft')),
   'email-2': a => countRows(a, 'outreach_sends'),
+  'email-4': a => replyCount(a),
   'email-5': a => countRows(a, 'marketing_campaigns'),
   // System Health
   'sys-0': a => countRows(a, 'error_logs'),
   'sys-2': a => supabaseHealth(a),
-  'sys-5': a => countRows(a, 'outreach_sends', q => q.gte('created_at', startOfTodayISO())),
-  'sys-6': a => latest(a, 'outreach_sends'),
-  'sys-7': a => latest(a, 'prospects'),
+  'sys-5': a => countRows(a, 'outreach_sends', (q: any) => q.gte('sent_at', startOfTodayISO())),
+  'sys-6': a => latest(a, 'outreach_sends', 'sent_at'),
+  'sys-7': a => latest(a, 'outreach_queue'),
   // Marketplace Monitor
   'sb-4': a => distinctCount(a, 'partner_businesses', 'category'),
-  // ── Defensive wiring for the remaining cards: lights up when the table exists,
-  //    stays an honest empty-state when it doesn't (every helper returns null on error).
   // Overview totals
-  'overview-0':  a => countRows(a, 'accounts'),
-  'overview-6':  a => countRows(a, 'ai_business_sites'),
-  'overview-8':  a => countRows(a, 'video_jobs'),
-  'overview-9':  a => countRows(a, 'reviews'),
+  'overview-0': a => countRows(a, 'accounts'),
+  'overview-6': a => countRows(a, 'ai_business_sites'),
+  'overview-8': a => countRows(a, 'video_jobs'),
+  'overview-9': a => countRows(a, 'reviews'),
   'overview-10': a => countRows(a, 'ai_task_log'),
   'overview-11': a => countRows(a, 'ai_task_log', (q: any) => q.eq('status', 'error')),
   'overview-12': a => countRows(a, 'outreach_sends'),
-  'overview-13': a => countRows(a, 'prospects'),
-  // Forecasting + KPI (AI routing health from ai_task_log)
+  'overview-13': a => prospectCount(a),
+  // Forecasting + KPI
   'ai-1': a => countRows(a, 'ai_task_log', (q: any) => q.eq('provider', 'openai')),
   'ai-2': a => countRows(a, 'ai_task_log', (q: any) => q.in('provider', ['claude', 'anthropic'])),
   'ai-3': a => countRows(a, 'ai_task_log', (q: any) => q.eq('status', 'error')),
   'ai-4': a => avgMs(a, 'ai_task_log', 'duration_ms'),
-  // Revenue (from subscriptions)
+  // Revenue
   'revenue-0': a => countRows(a, 'subscriptions', (q: any) => q.eq('plan', 'free')),
   'revenue-1': a => countRows(a, 'subscriptions', (q: any) => q.in('plan', PAYING_PLANS)),
   // Marketplace partners

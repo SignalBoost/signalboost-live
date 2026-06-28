@@ -115,11 +115,12 @@ export default function CosaVideoPreviewPage() {
         <p className="sb-eyebrow" style={{ margin: 0 }}>COSA Video Studio</p>
         <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}>Campaign video preview renderer</h1>
         <p style={{ color: 'rgba(255,255,255,0.65)', lineHeight: 1.7, maxWidth: 760 }}>
-          This page shows the visible rendering step for COSA video campaigns. It turns approved campaign scenes into a playable 16:9 preview inside the browser. Final MP4 export will require the FFmpeg render worker pipeline.
+          For a simple test, open Instant Draft first. The campaign queue below is the advanced workflow for approved campaigns and future MP4 rendering.
         </p>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <a href="/dashboard/cosa/video/draft" style={{ ...primaryButton, textDecoration: 'none' }}>Open instant draft</a>
           <button onClick={load} disabled={loading || !!busyId} style={secondaryButton}>{loading ? 'Loading...' : 'Refresh'}</button>
-          <button onClick={createCampaign} disabled={!!busyId} style={primaryButton}>Create campaign</button>
+          <button onClick={createCampaign} disabled={!!busyId} style={secondaryButton}>Create campaign</button>
           <a href="/dashboard/cosa" style={{ ...secondaryButton, textDecoration: 'none' }}>Back to COSA</a>
         </div>
       </section>
@@ -130,8 +131,9 @@ export default function CosaVideoPreviewPage() {
 
       {!loading && videoCampaigns.length === 0 && (
         <section style={cardStyle}>
-          <h2 style={{ color: '#fff', margin: 0 }}>No video campaigns yet</h2>
-          <p style={{ color: 'rgba(255,255,255,0.62)', lineHeight: 1.6 }}>Create a campaign, approve it, then generate a preview.</p>
+          <h2 style={{ color: '#fff', margin: 0 }}>No advanced video campaigns yet</h2>
+          <p style={{ color: 'rgba(255,255,255,0.62)', lineHeight: 1.6 }}>Use Instant Draft for quick testing, or create a campaign here for the advanced queue workflow.</p>
+          <a href="/dashboard/cosa/video/draft" style={{ ...primaryButton, display: 'inline-flex', marginTop: 8, textDecoration: 'none' }}>Open instant draft</a>
         </section>
       )}
 

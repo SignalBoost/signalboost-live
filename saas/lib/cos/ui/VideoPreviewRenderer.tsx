@@ -110,27 +110,27 @@ export function VideoPreviewRenderer({ title, scenes = [], callToAction }: Video
         boxShadow: '0 24px 70px rgba(0,0,0,0.38)',
       }}>
         <AnimatedVideoBackdrop sceneIndex={sceneIndex} />
-        <div style={{ position: 'absolute', left: 22, top: 86, zIndex: 5 }}>
+        <div style={{ position: 'absolute', left: 22, top: 52, zIndex: 7 }}>
           <SignalBoostGuide active={hostActive} />
         </div>
         <div style={{ position: 'absolute', right: 18, bottom: 18, zIndex: 4, border: '1px solid rgba(255,195,0,0.44)', background: 'rgba(2,6,23,0.84)', color: GOLD, borderRadius: 999, padding: '8px 13px', fontWeight: 950, fontSize: 13, letterSpacing: '.02em', boxShadow: '0 0 28px rgba(255,195,0,.16)' }}>
           {SIGNALBOOST_URL}
         </div>
         <div style={{ position: 'absolute', inset: 0, padding: 22, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', zIndex: 2 }}>
-          <div style={{ paddingLeft: 178 }}>
+          <div style={{ paddingLeft: 310 }}>
             <p style={{ margin: 0, color: GOLD, fontSize: 11, fontWeight: 950, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
               COSA Social Video Preview · Scene {sceneIndex + 1}/{safeScenes.length} · {audioEnabled ? 'Audio on' : 'Audio off'}
             </p>
-            <h3 style={{ color: '#fff', fontSize: 26, lineHeight: 1.05, letterSpacing: '-0.04em', margin: '10px 0 0', maxWidth: 760 }}>
+            <h3 style={{ color: '#fff', fontSize: 26, lineHeight: 1.05, letterSpacing: '-0.04em', margin: '10px 0 0', maxWidth: 720 }}>
               {title || 'SignalBoost Campaign Preview'}
             </h3>
           </div>
 
-          <div style={{ display: 'grid', gap: 10, maxWidth: 770, marginLeft: 178 }}>
+          <div style={{ display: 'grid', gap: 10, maxWidth: 700, marginLeft: 310 }}>
             <div style={{ display: 'inline-flex', alignSelf: 'flex-start', color: '#020617', background: GOLD, borderRadius: 999, padding: '6px 11px', fontWeight: 950, fontSize: 12 }}>
               {current.label}
             </div>
-            <p style={{ color: '#fff', fontSize: 22, lineHeight: 1.22, fontWeight: 900, margin: 0, textShadow: '0 2px 22px rgba(0,0,0,0.8)' }}>
+            <p style={{ color: '#fff', fontSize: 21, lineHeight: 1.2, fontWeight: 900, margin: 0, textShadow: '0 2px 22px rgba(0,0,0,0.8)' }}>
               {current.narration}
             </p>
             <AudioWave active={speaking} />

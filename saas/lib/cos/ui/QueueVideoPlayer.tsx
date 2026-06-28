@@ -5,6 +5,14 @@ import { useEffect, useState } from 'react'
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
 
+type QueueVideoPlayerLabels = {
+  qualityLabel: string
+  sceneLabel: string
+  playPreview: string
+  pausePreview: string
+  nextScene: string
+}
+
 type QueueVideoPlayerProps = {
   title: string
   aspect: string
@@ -14,9 +22,10 @@ type QueueVideoPlayerProps = {
   funnel: string
   quality: number
   scenes: string[]
+  labels: QueueVideoPlayerLabels
 }
 
-export function QueueVideoPlayer({ title, aspect, duration, hero, hook, funnel, quality, scenes }: QueueVideoPlayerProps) {
+export function QueueVideoPlayer({ title, aspect, duration, hero, hook, funnel, quality, scenes, labels }: QueueVideoPlayerProps) {
   const [playing, setPlaying] = useState(false)
   const [sceneIndex, setSceneIndex] = useState(0)
   const currentScene = scenes[sceneIndex] || hook
@@ -50,7 +59,7 @@ export function QueueVideoPlayer({ title, aspect, duration, hero, hook, funnel, 
 
         <div style={topBar}>
           <span>{aspect} · {duration}</span>
-          <span style={{ color: quality >= 80 ? '#86efac' : GOLD }}>quality {quality}</span>
+          <span style={{ color: quality >= 80 ? '#86efac' : GOLD }}>{labels.qualityLabel} {quality}</span>
         </div>
 
         <div style={{ ...mainContent, top: isVertical ? 72 : 62, left: isVertical ? 18 : 24, right: isVertical ? 18 : 24 }}>
@@ -59,7 +68,7 @@ export function QueueVideoPlayer({ title, aspect, duration, hero, hook, funnel, 
         </div>
 
         <div style={{ ...sceneBox, bottom: isVertical ? 96 : 86 }}>
-          <div style={{ color: GOLD, fontWeight: 950, fontSize: 12, marginBottom: 6 }}>Scene {sceneIndex + 1}</div>
+          <div style={{ color: GOLD, fontWeight: 950, fontSize: 12, marginBottom: 6 }}>{labels.sceneLabel} {sceneIndex + 1}</div>
           <div>{currentScene}</div>
         </div>
 
@@ -71,115 +80,20 @@ export function QueueVideoPlayer({ title, aspect, duration, hero, hook, funnel, 
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
-        <button onClick={() => setPlaying(value => !value)} style={buttonStyle}>{playing ? 'Pause preview' : 'Play preview'}</button>
-        <button onClick={nextScene} style={buttonStyle}>Next scene</button>
+        <button onClick={() => setPlaying(value => !value)} style={buttonStyle}>{playing ? labels.pausePreview : labels.playPreview}</button>
+        <button onClick={nextScene} style={buttonStyle}>{labels.nextScene}</button>
       </div>
     </div>
   )
 }
 
-const frame: React.CSSProperties = {
-  position: 'relative',
-  borderRadius: 18,
-  overflow: 'hidden',
-  marginTop: 14,
-  border: '1px solid rgba(255,195,0,.34)',
-  background: '#020617',
-  boxShadow: '0 22px 70px rgba(0,0,0,.32)',
-}
-
-const background: React.CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  background: 'radial-gradient(circle at 18% 18%, rgba(255,195,0,.18), transparent 30%), radial-gradient(circle at 80% 20%, rgba(26,240,255,.14), transparent 32%), linear-gradient(145deg,#020617,#0f172a)',
-}
-
-const topBar: React.CSSProperties = {
-  position: 'absolute',
-  left: 16,
-  right: 16,
-  top: 14,
-  zIndex: 4,
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: 10,
-  color: GOLD,
-  fontWeight: 950,
-  fontSize: 12,
-}
-
-const mainContent: React.CSSProperties = {
-  position: 'absolute',
-  zIndex: 5,
-  animation: 'cleanIn .35s ease-out',
-}
-
-const badge: React.CSSProperties = {
-  display: 'inline-flex',
-  color: '#020617',
-  background: GOLD,
-  borderRadius: 999,
-  padding: '6px 10px',
-  fontSize: 11,
-  fontWeight: 950,
-  letterSpacing: '.08em',
-  textTransform: 'uppercase',
-}
-
-const headline: React.CSSProperties = {
-  color: '#fff',
-  lineHeight: 1.08,
-  margin: '12px 0 0',
-  maxWidth: 560,
-  textShadow: '0 10px 30px rgba(0,0,0,.72)',
-}
-
-const sceneBox: React.CSSProperties = {
-  position: 'absolute',
-  left: 16,
-  right: 16,
-  zIndex: 5,
-  borderRadius: 14,
-  padding: 12,
-  background: 'rgba(2,6,23,.86)',
-  border: '1px solid rgba(255,195,0,.24)',
-  color: 'rgba(255,255,255,.86)',
-  fontSize: 13,
-  lineHeight: 1.45,
-  animation: 'cleanIn .35s ease-out',
-}
-
-const dots: React.CSSProperties = {
-  position: 'absolute',
-  left: 16,
-  right: 16,
-  zIndex: 6,
-  display: 'flex',
-  gap: 5,
-  justifyContent: 'center',
-}
-
-const cta: React.CSSProperties = {
-  position: 'absolute',
-  left: 16,
-  right: 16,
-  bottom: 16,
-  zIndex: 6,
-  borderRadius: 999,
-  padding: '10px 12px',
-  background: GOLD,
-  color: '#020617',
-  textAlign: 'center',
-  fontWeight: 950,
-  fontSize: 13,
-}
-
-const buttonStyle: React.CSSProperties = {
-  border: '1px solid rgba(255,195,0,.36)',
-  background: 'rgba(255,195,0,.1)',
-  color: GOLD,
-  borderRadius: 12,
-  padding: '9px 12px',
-  fontWeight: 900,
-  cursor: 'pointer',
-}
+const frame: React.CSSProperties = { position: 'relative', borderRadius: 18, overflow: 'hidden', marginTop: 14, border: '1px solid rgba(255,195,0,.34)', background: '#020617', boxShadow: '0 22px 70px rgba(0,0,0,.32)' }
+const background: React.CSSProperties = { position: 'absolute', inset: 0, background: 'radial-gradient(circle at 18% 18%, rgba(255,195,0,.18), transparent 30%), radial-gradient(circle at 80% 20%, rgba(26,240,255,.14), transparent 32%), linear-gradient(145deg,#020617,#0f172a)' }
+const topBar: React.CSSProperties = { position: 'absolute', left: 16, right: 16, top: 14, zIndex: 4, display: 'flex', justifyContent: 'space-between', gap: 10, color: GOLD, fontWeight: 950, fontSize: 12 }
+const mainContent: React.CSSProperties = { position: 'absolute', zIndex: 5, animation: 'cleanIn .35s ease-out' }
+const badge: React.CSSProperties = { display: 'inline-flex', color: '#020617', background: GOLD, borderRadius: 999, padding: '6px 10px', fontSize: 11, fontWeight: 950, letterSpacing: '.08em', textTransform: 'uppercase' }
+const headline: React.CSSProperties = { color: '#fff', lineHeight: 1.08, margin: '12px 0 0', maxWidth: 560, textShadow: '0 10px 30px rgba(0,0,0,.72)' }
+const sceneBox: React.CSSProperties = { position: 'absolute', left: 16, right: 16, zIndex: 5, borderRadius: 14, padding: 12, background: 'rgba(2,6,23,.86)', border: '1px solid rgba(255,195,0,.24)', color: 'rgba(255,255,255,.86)', fontSize: 13, lineHeight: 1.45, animation: 'cleanIn .35s ease-out' }
+const dots: React.CSSProperties = { position: 'absolute', left: 16, right: 16, zIndex: 6, display: 'flex', gap: 5, justifyContent: 'center' }
+const cta: React.CSSProperties = { position: 'absolute', left: 16, right: 16, bottom: 16, zIndex: 6, borderRadius: 999, padding: '10px 12px', background: GOLD, color: '#020617', textAlign: 'center', fontWeight: 950, fontSize: 13 }
+const buttonStyle: React.CSSProperties = { border: '1px solid rgba(255,195,0,.36)', background: 'rgba(255,195,0,.1)', color: GOLD, borderRadius: 12, padding: '9px 12px', fontWeight: 900, cursor: 'pointer' }

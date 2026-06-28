@@ -11,6 +11,7 @@ export default function Sidebar() {
 
   const navItems = [
     { name: t(dict, 'dashboard', 'Dashboard'), path: '/dashboard' },
+    { name: t(dict, 'marketingSalesCosa', 'Marketing & Sales COSA'), path: '/dashboard/cosa' },
     { name: t(dict, 'promoteBusiness', 'Promote business'), path: '/dashboard/promote' },
     { name: t(dict, 'buildWebsite', 'Build a website'), path: '/dashboard/builder' },
     { name: t(dict, 'collectReviews', 'Collect reviews'), path: '/dashboard/reviews' },
@@ -48,9 +49,9 @@ export default function Sidebar() {
       <details className="p-4 border-t border-slate-800 text-sm">
         <summary className="cursor-pointer text-slate-300">{t(dict, 'support.help', 'Help')}</summary>
         <div className="mt-3 flex flex-col gap-2">
-          <Link href="/faq" className="text-slate-400 hover:text-white">❓ {t(dict, 'support.faq', 'FAQ')}</Link>
-          <Link href="/support" className="text-slate-400 hover:text-white">✉️ {t(dict, 'support.contact', 'Contact Support')}</Link>
-          <Link href="/docs" className="text-slate-400 hover:text-white">📖 {t(dict, 'support.documentation', 'Documentation')}</Link>
+          <Link href="/faq" className="text-slate-400 hover:text-white">FAQ</Link>
+          <Link href="/support" className="text-slate-400 hover:text-white">Contact Support</Link>
+          <Link href="/docs" className="text-slate-400 hover:text-white">Documentation</Link>
         </div>
       </details>
     </aside>

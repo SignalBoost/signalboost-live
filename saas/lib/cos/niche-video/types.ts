@@ -2,6 +2,15 @@ import type { CosSignal } from '../recommendation/types'
 
 export type NicheVideoObjective = 'awareness' | 'education' | 'lead_generation' | 'conversion' | 'trust_building'
 
+export type VideoDistributionChannel = 'long_form_video' | 'short_vertical_video' | 'professional_feed' | 'community_feed' | 'website_embed' | 'email_embed'
+
+export type VideoDistributionVariant = {
+  channel: VideoDistributionChannel
+  format: 'long_form' | 'short_form' | 'square' | 'vertical' | 'embed'
+  duration_seconds: number
+  adaptation_note: string
+}
+
 export type NicheVideoStrategyInput = {
   company_name: string
   product_or_service: string
@@ -13,6 +22,7 @@ export type NicheVideoStrategyInput = {
   primary_pain: string
   desired_action: string
   languages: Array<'en' | 'es' | 'pt' | 'pl' | 'ru'>
+  preferred_channels?: VideoDistributionChannel[]
 }
 
 export type NicheVideoConcept = {
@@ -33,7 +43,8 @@ export type NicheVideoConcept = {
     visual_direction: string
   }>
   call_to_action: string
-  recommended_channels: string[]
+  recommended_channels: VideoDistributionChannel[]
+  channel_variants: VideoDistributionVariant[]
   approval_gates: string[]
   signals_used: CosSignal[]
   created_at: string

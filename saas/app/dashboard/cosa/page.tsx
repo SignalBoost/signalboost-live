@@ -1,0 +1,343 @@
+'use client'
+
+import { useEffect, useMemo, useState } from 'react'
+
+const GOLD = '#ffc300'
+
+type OutreachRow = {
+  id: string
+  business_name?: string
+  business_url?: string
+  source_platform?: string
+  status?: string
+  created_at?: string
+  outreach_message?: string
+  analyzer_summary?: any
+  business_model_profile?: any
+  predictive_needs?: any
+  social_plan?: any
+  promo_plan?: any
+  review_strategy?: any
+}
+
+type AdmData = {
+  metrics?: Record<string, any>
+  recentOutreach?: OutreachRow[]
+  recentAiTasks?: any[]
+  recentSecurityEvents?: any[]
+  hmi?: { summary?: string; nextActions?: string[] }
+}
+
+function formatDate(value?: string) {
+  if (!value) return 'Unknown time'
+  try {
+    return new Intl.DateTimeFormat('en', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(value))
+  } catch {
+    return value
+  }
+}
+
+function summarize(value: any, fallback = 'No AI summary attached yet.') {
+  if (!value) return fallback
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) return value.slice(0, 4).map(item => typeof item === 'string' ? item : JSON.stringify(item)).join('\n')
+  if (typeof value === 'object') {
+    const preferred = value.summary || value.description || value.recommendation || value.message || value.objective
+    if (preferred) return String(preferred)
+    return Object.entries(value)
+      .slice(0, 4)
+      .map(([key, item]) => `${key}: ${typeof item === 'string' ? item : JSON.stringify(item)}`)
+      .join('\n')
+  }
+  return String(value)
+}
+
+function riskLabel(row: OutreachRow) {
+  const message = `${row.outreach_message || ''} ${summarize(row.predictive_needs, '')}`.toLowerCase()
+  if (message.includes('budget') || message.includes('send') || message.includes('ad') || message.includes('price')) return 'Needs owner approval'
+  if (row.status === 'pending') return 'Ready for review'
+  return 'Logged'
+}
+
+function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+  return (
+    <section style={{
+      background: 'rgba(15,23,42,0.68)',
+      border: '1px solid rgba(255,255,255,0.09)',
+      borderRadius: 18,
+      padding: 20,
+      boxShadow: '0 20px 60px rgba(0,0,0,0.28)',
+      ...style,
+    }}>
+      {children}
+    </section>
+  )
+}
+
+export default function MarketingSalesCosaPage() {
+  const [data, setData] = useState<AdmData | null>(null)
+  const [selected, setSelected] = useState<OutreachRow | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+
+  async function load() {
+    setLoading(true)
+    setMessage('')
+    try {
+      const res = await fetch('/api/admin/adm', { cache: 'no-store' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || 'Could not load COSA command data.')
+      setData(json)
+      setSelected((current) => {
+        const rows = json.recentOutreach || []
+        if (current) return rows.find((row: OutreachRow) => row.id === current.id) || rows[0] || null
+        return rows.find((row: OutreachRow) => row.status === 'pending') || rows[0] || null
+      })
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Could not load COSA command data.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [])
+
+  const pendingRows = useMemo(() => data?.recentOutreach?.filter(row => row.status === 'pending') || [], [data])
+  const completedRows = useMemo(() => data?.recentOutreach?.filter(row => row.status !== 'pending') || [], [data])
+
+  async function patchSelected(status: 'approved' | 'rejected') {
+    if (!selected) return
+    setBusy(true)
+    try {
+      const res = await fetch('/api/outreach/queue', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: selected.id, status }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || `Could not mark item ${status}.`)
+      setMessage(status === 'approved' ? 'Approved. COSA can move this work to the next guarded step.' : 'Rejected. COSA will not execute this item.')
+      await load()
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : `Could not mark item ${status}.`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const metrics = data?.metrics || {}
+  const metricCards = [
+    ['Pending approvals', metrics.pending ?? 0],
+    ['Approved', metrics.approved ?? 0],
+    ['Sent / executed', metrics.sent ?? 0],
+    ['24h send limit', `${metrics.sendLimit?.count || 0}/${metrics.sendLimit?.limit || 50}`],
+  ]
+
+  return (
+    <main style={{ maxWidth: 1280, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <section style={{
+        background: 'linear-gradient(145deg, rgba(15,23,42,0.94), rgba(2,6,23,0.98))',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: 24,
+        padding: 28,
+        boxShadow: '0 28px 80px rgba(0,0,0,0.38)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap' }}>
+          <div>
+            <p className="sb-eyebrow" style={{ margin: 0 }}>🧠 Marketing & Sales COSA</p>
+            <h1 style={{ color: '#fff', fontSize: 32, lineHeight: 1.05, letterSpacing: '-0.04em', margin: '10px 0 0', fontWeight: 950 }}>
+              AI does the work. Humans approve the decision.
+            </h1>
+            <p style={{ color: 'rgba(255,255,255,0.68)', maxWidth: 760, lineHeight: 1.7, marginTop: 14 }}>
+              This is the first COSA command console for SignalBoost: it collects outreach intelligence, queues finished work, and keeps execution behind approval, guardrails, daily limits, and a panic switch.
+            </p>
+          </div>
+          <button onClick={load} disabled={loading || busy} style={{
+            border: '1px solid rgba(255,195,0,0.4)',
+            background: 'rgba(255,195,0,0.12)',
+            color: GOLD,
+            borderRadius: 12,
+            padding: '11px 16px',
+            fontWeight: 900,
+            cursor: loading || busy ? 'not-allowed' : 'pointer',
+            opacity: loading || busy ? 0.6 : 1,
+          }}>
+            {loading ? 'Loading...' : 'Refresh command data'}
+          </button>
+        </div>
+      </section>
+
+      {message && (
+        <div style={{ border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.75)', color: '#fff', padding: '12px 16px', borderRadius: 14 }}>
+          {message}
+        </div>
+      )}
+
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 14 }}>
+        {metricCards.map(([label, value]) => (
+          <Card key={String(label)}>
+            <p style={{ margin: 0, color: 'rgba(255,255,255,0.45)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 900 }}>{label}</p>
+            <p style={{ margin: '8px 0 0', color: '#fff', fontSize: 30, fontWeight: 950 }}>{String(value)}</p>
+          </Card>
+        ))}
+      </section>
+
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 0.85fr) minmax(360px, 1.4fr)', gap: 18, alignItems: 'start' }} className="cosa-grid">
+        <Card>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+            <div>
+              <p className="sb-eyebrow" style={{ margin: 0 }}>Approval queue</p>
+              <h2 style={{ margin: '8px 0 0', color: '#fff', fontSize: 20, fontWeight: 900 }}>Review finished work</h2>
+            </div>
+            <span style={{ color: GOLD, fontWeight: 950 }}>{pendingRows.length}</span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
+            {loading && <p style={{ color: 'rgba(255,255,255,0.55)' }}>Loading queued decisions...</p>}
+            {!loading && pendingRows.length === 0 && (
+              <p style={{ color: 'rgba(255,255,255,0.55)', lineHeight: 1.6 }}>No pending approvals right now. COSA will show finished campaigns, outreach drafts, or recommended actions here before execution.</p>
+            )}
+            {pendingRows.map(row => {
+              const active = selected?.id === row.id
+              return (
+                <button key={row.id} onClick={() => setSelected(row)} style={{
+                  textAlign: 'left',
+                  border: active ? '1px solid rgba(255,195,0,0.65)' : '1px solid rgba(255,255,255,0.08)',
+                  background: active ? 'rgba(255,195,0,0.09)' : 'rgba(255,255,255,0.04)',
+                  color: '#fff',
+                  borderRadius: 14,
+                  padding: 14,
+                  cursor: 'pointer',
+                }}>
+                  <strong style={{ display: 'block', fontSize: 14 }}>{row.business_name || 'Unnamed opportunity'}</strong>
+                  <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>{row.source_platform || 'COSA'} · {formatDate(row.created_at)}</span>
+                  <p style={{ margin: '8px 0 0', color: GOLD, fontSize: 12, fontWeight: 850 }}>{riskLabel(row)}</p>
+                </button>
+              )
+            })}
+          </div>
+        </Card>
+
+        <Card style={{ minHeight: 520 }}>
+          {!selected && (
+            <div style={{ minHeight: 420, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>
+              <div>
+                <div style={{ fontSize: 48 }}>✅</div>
+                <p>Select a queued COSA recommendation to approve, reject, or inspect.</p>
+              </div>
+            </div>
+          )}
+
+          {selected && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <div>
+                  <p className="sb-eyebrow" style={{ margin: 0 }}>{selected.status || 'pending'} · {selected.source_platform || 'COSA'}</p>
+                  <h2 style={{ color: '#fff', fontSize: 26, margin: '8px 0 0', lineHeight: 1.15 }}>{selected.business_name || 'Unnamed opportunity'}</h2>
+                  {selected.business_url && <p style={{ color: 'rgba(255,255,255,0.55)', margin: '6px 0 0' }}>{selected.business_url}</p>}
+                </div>
+                <span style={{ height: 32, padding: '7px 11px', borderRadius: 999, background: 'rgba(255,195,0,0.1)', border: '1px solid rgba(255,195,0,0.35)', color: GOLD, fontSize: 12, fontWeight: 900 }}>
+                  {riskLabel(selected)}
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                <InfoBlock title="Analyzer" body={summarize(selected.analyzer_summary)} />
+                <InfoBlock title="Predictive needs" body={summarize(selected.predictive_needs)} />
+                <InfoBlock title="Business profile" body={summarize(selected.business_model_profile)} />
+              </div>
+
+              <InfoBlock title="Prepared outreach message" body={selected.outreach_message || 'No outreach draft attached yet.'} large />
+              <InfoBlock title="Social / promo plan" body={[summarize(selected.social_plan, ''), summarize(selected.promo_plan, ''), summarize(selected.review_strategy, '')].filter(Boolean).join('\n\n') || 'No channel plan attached yet.'} large />
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 16 }}>
+                <button disabled={busy || selected.status !== 'pending'} onClick={() => patchSelected('rejected')} style={secondaryButton}>
+                  Reject
+                </button>
+                <button disabled={busy || selected.status !== 'pending'} onClick={() => patchSelected('approved')} style={primaryButton}>
+                  Approve next step
+                </button>
+              </div>
+            </div>
+          )}
+        </Card>
+      </section>
+
+      <Card>
+        <p className="sb-eyebrow" style={{ margin: 0 }}>Operating rule</p>
+        <h2 style={{ color: '#fff', margin: '8px 0 0', fontSize: 20 }}>Less data entry. More governance.</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginTop: 14 }}>
+          {[
+            ['Low risk', 'COSA collects data, analyzes performance, prepares drafts, and updates internal reports automatically.'],
+            ['Medium risk', 'COSA asks for approval before sending outreach, publishing content, or scheduling campaigns.'],
+            ['High risk', 'COSA requires explicit owner approval before spending budget, changing prices, or contacting major partners.'],
+          ].map(([title, body]) => <InfoBlock key={title} title={title} body={body} />)}
+        </div>
+      </Card>
+
+      {completedRows.length > 0 && (
+        <Card>
+          <p className="sb-eyebrow" style={{ margin: 0 }}>Recent decisions</p>
+          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+            {completedRows.slice(0, 8).map(row => (
+              <button key={row.id} onClick={() => setSelected(row)} style={{
+                display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center',
+                border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.035)', color: '#fff', borderRadius: 12, padding: '10px 12px', textAlign: 'left', cursor: 'pointer',
+              }}>
+                <span>{row.business_name || 'Unnamed opportunity'}</span>
+                <span style={{ color: 'rgba(255,255,255,0.48)', fontSize: 12 }}>{row.status} · {formatDate(row.created_at)}</span>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <style>{`
+        @media (max-width: 920px) {
+          .cosa-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
+    </main>
+  )
+}
+
+function InfoBlock({ title, body, large = false }: { title: string; body: string; large?: boolean }) {
+  return (
+    <div style={{
+      background: 'rgba(0,0,0,0.24)',
+      border: '1px solid rgba(255,255,255,0.07)',
+      borderRadius: 14,
+      padding: 14,
+      minHeight: large ? 120 : 96,
+    }}>
+      <p style={{ margin: 0, color: GOLD, fontSize: 11, letterSpacing: '0.09em', textTransform: 'uppercase', fontWeight: 950 }}>{title}</p>
+      <p style={{ margin: '8px 0 0', color: 'rgba(255,255,255,0.78)', fontSize: 13, lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{body}</p>
+    </div>
+  )
+}
+
+const primaryButton: React.CSSProperties = {
+  border: 'none',
+  background: GOLD,
+  color: '#000',
+  borderRadius: 12,
+  padding: '11px 16px',
+  fontWeight: 950,
+  cursor: 'pointer',
+}
+
+const secondaryButton: React.CSSProperties = {
+  border: '1px solid rgba(255,255,255,0.16)',
+  background: 'rgba(255,255,255,0.06)',
+  color: '#fff',
+  borderRadius: 12,
+  padding: '11px 16px',
+  fontWeight: 850,
+  cursor: 'pointer',
+}

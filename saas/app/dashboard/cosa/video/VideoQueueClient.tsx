@@ -52,6 +52,8 @@ export function VideoQueueClient() {
           audience: item.niche,
           production_tier: 'enterprise',
           platforms: ['YouTube', 'Shorts', 'LinkedIn', 'Google Ads'],
+          queue_immediately: true,
+          concept_approved: true,
         }),
       })
     } catch {

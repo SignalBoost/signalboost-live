@@ -9,6 +9,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { assertSafeOutreachMessage } from '@/lib/ai/guardrails'
+import { findContactEmail } from '@/lib/outreach/emailFinder'
 
 const PLANS_TABLE = 'growth_plans'
 const OUTREACH_TABLE = 'outreach_queue'
@@ -26,6 +27,9 @@ export type GrowthPlan = {
 
 const VALID_STATUSES = ['proposed', 'approved', 'rejected', 'executing', 'completed'] as const
 export type PlanStatus = (typeof VALID_STATUSES)[number]
+
+// Configured sender identities COS may choose from (mirrors lib/email.ts SENDERS).
+const VALID_SENDER_KEYS = ['signalSupport', 'saasSupport', 'saasSales', 'saasMarketing', 'saasPartners', 'saasContact']
 
 function supabaseAdmin() {
   return createClient(
@@ -129,11 +133,17 @@ ${blocks.join('\n\n')}`
 // ── Execute: create an outreach draft in the existing pipeline ─────────────────
 // Drafts enter as status 'pending' — they still pass through the outreach
 // system's approval, guardrails, daily limits, and audit before anything sends.
+//
+// HONESTY RULE: a draft is created ONLY if a real, published contact email is
+// found on the target's own website. If none is found, the company is SKIPPED
+// (no draft, ok:false + skipped:true). COS never invents or guesses an address —
+// there is nothing to send to, so nothing is queued.
 export async function createOutreachDraft(params: {
   businessName: string
   businessUrl: string
   message: string
-}): Promise<{ ok: boolean; outreachId?: string; error?: string }> {
+  senderKey?: string
+}): Promise<{ ok: boolean; outreachId?: string; skipped?: boolean; contactEmail?: string; error?: string }> {
   try {
     const businessName = String(params.businessName || '').trim().slice(0, 200)
     const businessUrl = String(params.businessUrl || '').trim().slice(0, 500)
@@ -152,6 +162,19 @@ export async function createOutreachDraft(params: {
       return { ok: false, error: `Message rejected by outreach guardrails: ${safe.reason}` }
     }
 
+    // Find a REAL published email on the target's site. No email => SKIP.
+    const found = await findContactEmail(businessUrl)
+    if (!found.email) {
+      return {
+        ok: false,
+        skipped: true,
+        error: `No published contact email found for ${businessName} (${businessUrl}) — skipped, not queued. COS does not invent addresses.`,
+      }
+    }
+
+    // COS's per-message sender choice (sales vs marketing, etc.), validated.
+    const senderKey = VALID_SENDER_KEYS.includes(String(params.senderKey || '')) ? String(params.senderKey) : null
+
     const db = supabaseAdmin()
     const { data, error } = await db
       .from(OUTREACH_TABLE)
@@ -160,6 +183,8 @@ export async function createOutreachDraft(params: {
         source_platform: 'strategist',
         business_name: businessName,
         business_url: businessUrl,
+        contact_email: found.email,
+        sender_key: senderKey,
         outreach_message: message,
         status: 'pending',
       })
@@ -167,7 +192,7 @@ export async function createOutreachDraft(params: {
       .single()
 
     if (error) return { ok: false, error: error.message }
-    return { ok: true, outreachId: data.id }
+    return { ok: true, outreachId: data.id, contactEmail: found.email }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Unknown error creating outreach draft' }
   }

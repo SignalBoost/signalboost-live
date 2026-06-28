@@ -479,7 +479,7 @@ export default function AssistantPage() {
         )}
 
         {/* Text input row */}
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
 
           {/* Hidden native file input */}
           <input
@@ -504,13 +504,18 @@ export default function AssistantPage() {
           </button>
 
           {/* Text input */}
-          <input
+          <textarea
             className="sb-input"
             value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) send(input) }}
+            onChange={e => {
+              setInput(e.target.value)
+              e.target.style.height = 'auto'
+              e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px'
+            }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input) } }}
             placeholder={c(COPY.placeholder, l)}
-            style={{ flex: 1, padding: '13px 16px', borderRadius: 14, fontSize: 14 }}
+            rows={1}
+            style={{ flex: 1, padding: '13px 16px', borderRadius: 14, fontSize: 14, resize: 'none', lineHeight: 1.4, maxHeight: 200, overflowY: 'auto', fontFamily: 'inherit' }}
             disabled={loading}
           />
 

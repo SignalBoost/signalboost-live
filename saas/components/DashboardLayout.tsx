@@ -28,6 +28,7 @@ const sidebarGroups: { titleKey: keyof typeof COPY['groups']; items: [keyof type
   {
     titleKey: 'outreach',
     items: [
+      ['cosa', '/dashboard/cosa', '🧠'],
       ['engine', '/dashboard/outreach/outreach', '🧠'],
       ['discovery', '/dashboard/outreach/discovery', '🔎'],
       ['pipeline', '/dashboard/outreach/pipeline', '🧭'],
@@ -77,6 +78,7 @@ const COPY = {
     reviews: { en: 'Reviews', es: 'Reseñas', pt: 'Avaliações', pl: 'Opinie', ru: 'Отзывы' },
     audio: { en: 'Audio', es: 'Audio', pt: 'Áudio', pl: 'Audio', ru: 'Аудио' },
     video: { en: 'Video', es: 'Video', pt: 'Vídeo', pl: 'Wideo', ru: 'Видео' },
+    cosa: { en: 'Marketing & Sales COSA', es: 'COSA Marketing y Ventas', pt: 'COSA Marketing e Vendas', pl: 'COSA Marketing i Sprzedaż', ru: 'COSA Маркетинг и продажи' },
     engine: { en: 'Engine', es: 'Motor', pt: 'Motor', pl: 'Silnik', ru: 'Движок' },
     discovery: { en: 'Discovery', es: 'Descubrimiento', pt: 'Descoberta', pl: 'Odkrywanie', ru: 'Поиск' },
     pipeline: { en: 'Pipeline', es: 'Embudo', pt: 'Funil', pl: 'Lejek', ru: 'Воронка' },
@@ -102,7 +104,7 @@ const COPY = {
       en: 'This campaign reads credible and clear — tighten the call to action to lift conversions.',
       es: 'Esta campaña resulta creíble y clara: ajusta la llamada a la acción para aumentar las conversiones.',
       pt: 'Esta campanha parece crível e clara — refine a chamada para ação para aumentar as conversões.',
-      pl: 'Ta kampania jest wiarygodna i klarowna — dopracuj wezwanie do działania, aby zwiększyć konwersje.',
+      pl: 'Ta kampania jest wiarygodna i klarowna — dopracuj wezwanie do działania, aby zwiększyć konwersję.',
       ru: 'Эта кампания выглядит убедительно и ясно — усильте призыв к действию, чтобы повысить конверсию.',
     },
     playful: {

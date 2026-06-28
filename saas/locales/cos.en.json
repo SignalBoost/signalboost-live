@@ -70,6 +70,30 @@
     "meta": {
       "title": "COS Data Mining — SignalBoost",
       "description": "Mined behavioral and transactional signals that power COS predictions."
+    },
+    "dashboard": {
+      "overview": "Overview",
+      "refresh": "Refresh",
+      "run_history": "Run history",
+      "segment_distribution": "Segment distribution",
+      "top_patterns": "Top patterns",
+      "no_access": "Admin access required to view mining intelligence.",
+      "lookup_user": "User feature lookup",
+      "user_id_placeholder": "Enter user ID",
+      "view": "View",
+      "never": "Never",
+      "users": "users"
+    },
+    "predict": {
+      "title": "Predicted next actions",
+      "action": "Action",
+      "score": "Score",
+      "basis": "Why",
+      "none": "Not enough signal to predict yet.",
+      "propensity": "Propensity",
+      "engagement": "Engagement",
+      "churn_risk": "Churn risk",
+      "value": "Value"
     }
   }
 }

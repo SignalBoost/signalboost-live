@@ -1,6 +1,6 @@
 import type { CosContentWorkerInput, CosContentWorkerOutput } from './types'
 
-const SIGNALBOOST_URL = 'signalboostapp.com'
+const SIGNALBOOST_URL = 'www.' + 'saas.signalboostapp.com'
 
 function productAngle(input: CosContentWorkerInput) {
   const text = `${input.title} ${input.objective} ${input.brief}`.toLowerCase()
@@ -22,7 +22,7 @@ function platformTourScenes() {
     {
       label: 'Start here',
       narration: `Go to ${SIGNALBOOST_URL}. The goal is simple: bring business tools, provider status, approvals, and guided action into one console.`,
-      visual_direction: 'Show the SignalBoost URL as a persistent lower-third, then zoom into the main console dashboard.',
+      visual_direction: 'Show the SignalBoost platform address as a persistent lower-third, then zoom into the main console dashboard.',
     },
     {
       label: 'Console tour',

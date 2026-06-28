@@ -51,85 +51,84 @@ registerExecutor({
   },
 })
 
-// ── Live delivery list ───────────────────────────────────────────────────────
-// Resend has no "list all sent emails" API, so the sent list is built from our
-// own outreach_sends records joined to the delivery state the webhook captured
-// in email_delivery_status. Reads via the service role (admin-only data).
+// ── Email Delivery: a true mirror of the Resend "Emails" dashboard ───────────
+// Primary source is Resend's own List Sent Emails endpoint (GET /emails), so the
+// console shows exactly what Resend shows — no dependency on our own ledger. Each
+// row is then enriched with open/bounce detail captured by the delivery webhook
+// (email_delivery_status) when we have it.
 function adminDb() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const svc = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !svc) return null
   return createClient(url, svc, { auth: { persistSession: false, autoRefreshToken: false } })
 }
-function deriveStatus(st: any): string {
-  if (!st) return 'sent'
+function deriveFromWebhook(st: any): string | null {
+  if (!st) return null
   if (st.bounced_at) return 'bounced'
   if (st.complained_at) return 'complained'
+  if (st.opened_at) return 'opened'
   if (st.delivered_at) return 'delivered'
-  return st.last_event || 'sent'
+  return st.last_event || null
 }
 registerExecutor({
   providerId: 'resend', actionId: 'email_deliveries', policyActionId: 'read_provider_status',
   schema: schema('resend.email_deliveries', 'Email Delivery', 'view'),
   async run() {
+    // 1) Pull the real sent list from Resend, paginating up to ~100 most recent.
+    const collected: any[] = []
+    let after: string | undefined
+    let firstError: string | null = null
+    for (let page = 0; page < 5; page++) {
+      const r = await getJSON(after ? `/emails?after=${encodeURIComponent(after)}` : '/emails')
+      if (!r.ok) { firstError = r.error; break }
+      const data = rows(r.json)
+      collected.push(...data)
+      const hasMore = !!(r.json && r.json.has_more) && data.length > 0
+      after = data.length ? data[data.length - 1].id : undefined
+      if (!hasMore || !after) break
+    }
+    if (firstError && collected.length === 0) {
+      return { ok: false, error: `${firstError}. If this says the endpoint is unavailable, the Resend API key may lack access to List Sent Emails.` }
+    }
+
+    // 2) Enrich with delivery-webhook detail (open counts, bounce type) we hold.
     const db = adminDb()
-    if (!db) return { ok: false, error: 'Supabase admin not configured (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)' }
-
-    const countNotNull = async (col: string) => {
-      const { count } = await db.from('email_delivery_status')
-        .select('resend_email_id', { count: 'exact', head: true })
-        .not(col, 'is', null)
-      return count || 0
-    }
-    const [delivered, bounced, opened, complained] = await Promise.all([
-      countNotNull('delivered_at'), countNotNull('bounced_at'),
-      countNotNull('opened_at'), countNotNull('complained_at'),
-    ])
-    const { count: sentTotal } = await db.from('outreach_sends')
-      .select('id', { count: 'exact', head: true }).eq('channel', 'email')
-
-    const { data: sends } = await db.from('outreach_sends')
-      .select('id, outreach_id, sent_at, metadata')
-      .eq('channel', 'email')
-      .order('sent_at', { ascending: false })
-      .limit(50)
-    const list: any[] = sends || []
-
-    const ids = list.map(s => s?.metadata?.providerResult?.id).filter(Boolean)
     const statusById: Record<string, any> = {}
-    if (ids.length) {
-      const { data: st } = await db.from('email_delivery_status').select('*').in('resend_email_id', ids)
-      for (const r of (st || [])) statusById[(r as any).resend_email_id] = r
-    }
-    const outreachIds = Array.from(new Set(list.map(s => s.outreach_id).filter(Boolean)))
-    const nameById: Record<string, string> = {}
-    if (outreachIds.length) {
-      const { data: oq } = await db.from('outreach_queue').select('id, business_name').in('id', outreachIds)
-      for (const r of (oq || [])) nameById[(r as any).id] = (r as any).business_name
+    if (db && collected.length) {
+      const ids = collected.map(e => e.id).filter(Boolean)
+      for (let i = 0; i < ids.length; i += 100) {
+        const chunk = ids.slice(i, i + 100)
+        const { data: st } = await db.from('email_delivery_status').select('*').in('resend_email_id', chunk)
+        for (const r of (st || [])) statusById[(r as any).resend_email_id] = r
+      }
     }
 
-    const emails = list.map(s => {
-      const rid = s?.metadata?.providerResult?.id || null
-      const st = rid ? statusById[rid] : null
+    const emails = collected.map(e => {
+      const st = statusById[e.id]
+      const to = Array.isArray(e.to) ? e.to[0] : e.to
+      const status = e.last_event || deriveFromWebhook(st) || 'sent'
       return {
-        sent_at: s.sent_at,
-        to: s?.metadata?.toEmail || null,
-        business: s.outreach_id ? (nameById[s.outreach_id] || null) : null,
-        status: deriveStatus(st),
-        opened: !!(st && st.opened_at),
+        id: e.id,
+        to: to || null,
+        from: e.from || null,
+        subject: e.subject || null,
+        created_at: e.created_at || null,
+        status,
+        opened: !!(st && st.opened_at) || status === 'opened',
         open_count: st?.open_count || 0,
         bounce_type: st?.bounce_type || null,
-        resend_email_id: rid,
-        confirmed: !!st, // false = dispatched but no delivery event captured yet
       }
     })
 
-    const message = `${sentTotal || 0} sent · ${delivered} delivered · ${bounced} bounced · ${opened} opened${bounced ? '  ⚠ bounces' : ''}`
+    const has = (s: string) => emails.filter(e => (e.status || '').includes(s)).length
+    const delivered = has('delivered'), bounced = has('bounced'), opened = emails.filter(e => e.opened).length
+    const message = `${emails.length} email${emails.length === 1 ? '' : 's'} in Resend · ${delivered} delivered · ${bounced} bounced · ${opened} opened${bounced ? '  ⚠ bounces' : ''}`
     return {
       ok: true,
       message,
       data: {
-        summary: { sentTotal: sentTotal || 0, delivered, bounced, complained, opened, tracked: ids.length },
+        source: 'resend:GET /emails',
+        summary: { total: emails.length, delivered, bounced, opened },
         count: emails.length,
         emails,
       },

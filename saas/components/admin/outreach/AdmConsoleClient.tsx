@@ -7,6 +7,7 @@ type OutreachRow = {
   id: string
   business_name: string
   business_url: string
+  contact_email?: string | null
   source_platform: string
   status: string
   created_at: string
@@ -534,6 +535,7 @@ export default function AdmConsoleClient() {
                   <span className="sb-eyebrow">{t$(t.generatedAssets)}</span>
                   <h3 style={{ marginTop: 8, fontSize: 20, fontWeight: 600, color: '#fff' }}>{selected.business_name}</h3>
                   <p style={{ marginTop: 4, fontSize: 14, color: 'rgba(255,255,255,0.45)' }}>{selected.business_url}</p>
+                  <p style={{ marginTop: 8, fontSize: 14, fontWeight: 700, color: selected.contact_email ? '#1af0ff' : '#f59e0b' }}>{selected.contact_email ? `Will send to: ${selected.contact_email}` : 'No recipient email found — this draft cannot be sent.'}</p>
                   <p style={{ marginTop: 12, fontSize: 14, color: 'rgba(255,255,255,0.7)' }}>{selected.analyzer_summary?.hmi_summary}</p>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>

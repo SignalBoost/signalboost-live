@@ -28,6 +28,47 @@ type AdmData = {
   hmi?: { summary?: string; nextActions?: string[] }
 }
 
+type CompanyGoal = {
+  id: string
+  title: string
+  description: string
+  priority: string
+  status: string
+  kpi: string
+  target: number
+  current: number
+  unit: string
+}
+
+type ExecutiveMetric = {
+  id: string
+  label: string
+  value: string | number
+  status: 'healthy' | 'watch' | 'at_risk'
+  explanation: string
+}
+
+type ExecutiveBriefingItem = {
+  id: string
+  title: string
+  summary: string
+  priority: string
+  confidence: number
+  evidence: string[]
+  recommended_action: string
+  approval_required: boolean
+}
+
+type ExecutiveBriefing = {
+  generated_at: string
+  headline: string
+  operating_principle: string
+  goals: CompanyGoal[]
+  metrics: ExecutiveMetric[]
+  recommendations: ExecutiveBriefingItem[]
+  next_actions: string[]
+}
+
 function formatDate(value?: string) {
   if (!value) return 'Unknown time'
   try {
@@ -64,6 +105,11 @@ function riskLabel(row: OutreachRow) {
   return 'Logged'
 }
 
+function progressPercent(goal: CompanyGoal) {
+  if (!goal.target || goal.target <= 0) return 0
+  return Math.max(0, Math.min(100, Math.round((goal.current / goal.target) * 100)))
+}
+
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
     <section style={{
@@ -81,6 +127,7 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
 
 export default function MarketingSalesCosaPage() {
   const [data, setData] = useState<AdmData | null>(null)
+  const [briefing, setBriefing] = useState<ExecutiveBriefing | null>(null)
   const [selected, setSelected] = useState<OutreachRow | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -90,15 +137,26 @@ export default function MarketingSalesCosaPage() {
     setLoading(true)
     setMessage('')
     try {
-      const res = await fetch('/api/admin/adm', { cache: 'no-store' })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json?.error || 'Could not load COSA command data.')
+      const [admRes, briefingRes] = await Promise.all([
+        fetch('/api/admin/adm', { cache: 'no-store' }),
+        fetch('/api/cos/executive/briefing', { cache: 'no-store' }),
+      ])
+
+      const json = await admRes.json()
+      if (!admRes.ok) throw new Error(json?.error || 'Could not load COSA command data.')
       setData(json)
       setSelected((current) => {
         const rows = json.recentOutreach || []
         if (current) return rows.find((row: OutreachRow) => row.id === current.id) || rows[0] || null
         return rows.find((row: OutreachRow) => row.status === 'pending') || rows[0] || null
       })
+
+      if (briefingRes.ok) {
+        const executiveJson = await briefingRes.json().catch(() => null)
+        setBriefing(executiveJson?.briefing || null)
+      } else {
+        setBriefing(null)
+      }
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Could not load COSA command data.')
     } finally {
@@ -177,6 +235,40 @@ export default function MarketingSalesCosaPage() {
         <div style={{ border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.75)', color: '#fff', padding: '12px 16px', borderRadius: 14 }}>
           {message}
         </div>
+      )}
+
+      {briefing && (
+        <Card style={{ background: 'linear-gradient(145deg, rgba(255,195,0,0.1), rgba(15,23,42,0.72))', border: '1px solid rgba(255,195,0,0.24)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <div>
+              <p className="sb-eyebrow" style={{ margin: 0 }}>Executive Briefing</p>
+              <h2 style={{ color: '#fff', margin: '8px 0 0', fontSize: 24, lineHeight: 1.15 }}>{briefing.headline}</h2>
+              <p style={{ color: GOLD, margin: '10px 0 0', fontWeight: 900 }}>{briefing.operating_principle}</p>
+            </div>
+            <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>{formatDate(briefing.generated_at)}</span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginTop: 18 }}>
+            {briefing.metrics.map(metric => (
+              <InfoBlock key={metric.id} title={`${metric.label}: ${metric.value}`} body={metric.explanation} />
+            ))}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 0.9fr) minmax(300px, 1.1fr)', gap: 16, marginTop: 18 }} className="cosa-grid">
+            <div>
+              <p className="sb-eyebrow" style={{ margin: 0 }}>Company goals</p>
+              <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+                {briefing.goals.map(goal => <GoalCard key={goal.id} goal={goal} />)}
+              </div>
+            </div>
+            <div>
+              <p className="sb-eyebrow" style={{ margin: 0 }}>Executive recommendations</p>
+              <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+                {briefing.recommendations.map(item => <ExecutiveRecommendationCard key={item.id} item={item} />)}
+              </div>
+            </div>
+          </div>
+        </Card>
       )}
 
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 14 }}>
@@ -304,6 +396,49 @@ export default function MarketingSalesCosaPage() {
         }
       `}</style>
     </main>
+  )
+}
+
+function GoalCard({ goal }: { goal: CompanyGoal }) {
+  const percent = progressPercent(goal)
+
+  return (
+    <div style={{ background: 'rgba(0,0,0,0.24)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+        <div>
+          <strong style={{ color: '#fff', fontSize: 14 }}>{goal.title}</strong>
+          <p style={{ color: 'rgba(255,255,255,0.62)', fontSize: 12, lineHeight: 1.55, margin: '6px 0 0' }}>{goal.description}</p>
+        </div>
+        <span style={{ color: GOLD, fontSize: 11, fontWeight: 950, textTransform: 'uppercase' }}>{goal.priority}</span>
+      </div>
+      <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginTop: 12 }}>
+        <div style={{ width: `${percent}%`, height: '100%', background: GOLD }} />
+      </div>
+      <p style={{ color: 'rgba(255,255,255,0.52)', margin: '8px 0 0', fontSize: 12 }}>
+        {goal.kpi}: {goal.current}/{goal.target} {goal.unit} · {goal.status}
+      </p>
+    </div>
+  )
+}
+
+function ExecutiveRecommendationCard({ item }: { item: ExecutiveBriefingItem }) {
+  return (
+    <div style={{ background: 'rgba(0,0,0,0.24)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+        <div>
+          <strong style={{ color: '#fff', fontSize: 14 }}>{item.title}</strong>
+          <p style={{ color: 'rgba(255,255,255,0.68)', fontSize: 13, lineHeight: 1.6, margin: '7px 0 0' }}>{item.summary}</p>
+        </div>
+        <span style={{ color: GOLD, fontSize: 11, fontWeight: 950, textTransform: 'uppercase' }}>{item.priority}</span>
+      </div>
+      <p style={{ color: GOLD, fontWeight: 900, margin: '10px 0 0', fontSize: 13 }}>{item.confidence}% confidence</p>
+      <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 1.55, margin: '6px 0 0' }}>{item.recommended_action}</p>
+      {item.evidence.length > 0 && (
+        <ul style={{ margin: '10px 0 0', paddingLeft: 18, color: 'rgba(255,255,255,0.55)', fontSize: 12, lineHeight: 1.55 }}>
+          {item.evidence.map((entry, index) => <li key={`${item.id}-${index}`}>{entry}</li>)}
+        </ul>
+      )}
+    </div>
   )
 }
 

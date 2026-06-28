@@ -26,7 +26,7 @@ function variantsFor(channels: VideoDistributionChannel[]): VideoDistributionVar
       case 'community_feed':
         return { channel, format: 'short_form', duration_seconds: 60, adaptation_note: 'Use conversational tone and focus on the owner/operator problem.' }
       case 'email_embed':
-        return { channel, format: 'email_embed', duration_seconds: 90, adaptation_note: 'Use a compact version that supports a follow-up email or newsletter.' }
+        return { channel, format: 'embed', duration_seconds: 90, adaptation_note: 'Use a compact version that supports a follow-up email or newsletter.' }
       default:
         return { channel, format: 'embed', duration_seconds: 120, adaptation_note: 'Use a website-friendly product education cut.' }
     }

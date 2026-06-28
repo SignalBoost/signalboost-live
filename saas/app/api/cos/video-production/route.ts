@@ -8,6 +8,11 @@ export const dynamic = 'force-dynamic'
 
 const TABLE = 'cos_video_production_jobs'
 
+type PostBody = VideoProductionInput & {
+  queue_immediately?: boolean
+  concept_approved?: boolean
+}
+
 type PatchBody = {
   id?: string
   status?: VideoProductionStatus
@@ -41,9 +46,7 @@ export async function GET() {
   try {
     const supabase = getAdminSupabase()
     const { data, error } = await supabase.from(TABLE).select('*').order('created_at', { ascending: false }).limit(50)
-    if (error) {
-      return NextResponse.json({ ok: true, jobs: [], warning: error.message })
-    }
+    if (error) return NextResponse.json({ ok: true, jobs: [], warning: error.message })
     return NextResponse.json({ ok: true, jobs: data || [] })
   } catch (error) {
     return NextResponse.json({ ok: true, jobs: [], warning: error instanceof Error ? error.message : 'Could not load jobs.' })
@@ -54,17 +57,17 @@ export async function POST(req: NextRequest) {
   const ctx = await requireAdmin()
   if (ctx instanceof NextResponse) return ctx
 
-  let body: VideoProductionInput
+  let body: PostBody
   try { body = await req.json() } catch { body = {} }
 
   const planned = buildVideoProductionJob(body || {})
+  if (body.queue_immediately) planned.status = 'queued'
+  if (body.concept_approved || body.queue_immediately) planned.approval_state.concept_approved = true
 
   try {
     const supabase = getAdminSupabase()
     const { data, error } = await supabase.from(TABLE).insert(toDbJob(planned)).select('*').single()
-    if (error) {
-      return NextResponse.json({ ok: true, job: planned, persisted: false, warning: error.message })
-    }
+    if (error) return NextResponse.json({ ok: true, job: planned, persisted: false, warning: error.message })
     return NextResponse.json({ ok: true, job: data, persisted: true })
   } catch (error) {
     return NextResponse.json({ ok: true, job: planned, persisted: false, warning: error instanceof Error ? error.message : 'Could not persist job.' })

@@ -1,4 +1,4 @@
-import type { NicheVideoConcept, NicheVideoStrategyInput } from './types'
+import type { NicheVideoConcept, NicheVideoStrategyInput, VideoDistributionChannel, VideoDistributionVariant } from './types'
 
 function id(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -9,9 +9,34 @@ function evidenceSummary(input: NicheVideoStrategyInput) {
   return evidence.length ? evidence.slice(0, 3) : [`COSA identified ${input.niche} as a niche worth testing.`]
 }
 
+function defaultChannels(input: NicheVideoStrategyInput): VideoDistributionChannel[] {
+  if (input.preferred_channels?.length) return input.preferred_channels
+  return ['long_form_video', 'short_vertical_video', 'professional_feed', 'community_feed', 'website_embed']
+}
+
+function variantsFor(channels: VideoDistributionChannel[]): VideoDistributionVariant[] {
+  return channels.map((channel) => {
+    switch (channel) {
+      case 'long_form_video':
+        return { channel, format: 'long_form', duration_seconds: 300, adaptation_note: 'Use the full education story, proof points, demo flow, and CTA.' }
+      case 'short_vertical_video':
+        return { channel, format: 'vertical', duration_seconds: 45, adaptation_note: 'Use one pain point, one proof point, and one direct CTA.' }
+      case 'professional_feed':
+        return { channel, format: 'square', duration_seconds: 75, adaptation_note: 'Use business outcome language, concise captions, and a credibility-focused CTA.' }
+      case 'community_feed':
+        return { channel, format: 'short_form', duration_seconds: 60, adaptation_note: 'Use conversational tone and focus on the owner/operator problem.' }
+      case 'email_embed':
+        return { channel, format: 'email_embed', duration_seconds: 90, adaptation_note: 'Use a compact version that supports a follow-up email or newsletter.' }
+      default:
+        return { channel, format: 'embed', duration_seconds: 120, adaptation_note: 'Use a website-friendly product education cut.' }
+    }
+  })
+}
+
 export function buildNicheVideoConcept(input: NicheVideoStrategyInput): NicheVideoConcept {
   const proofPoints = evidenceSummary(input)
   const title = `${input.product_or_service} for ${input.niche}: solve ${input.primary_pain}`
+  const channels = defaultChannels(input)
 
   return {
     id: id('niche_video'),
@@ -57,12 +82,14 @@ export function buildNicheVideoConcept(input: NicheVideoStrategyInput): NicheVid
       },
     ],
     call_to_action: input.desired_action,
-    recommended_channels: ['youtube', 'linkedin', 'short_video_clips'],
+    recommended_channels: channels,
+    channel_variants: variantsFor(channels),
     approval_gates: [
       'Approve niche and target audience',
+      'Approve channel mix and creative angle',
       'Approve script and storyboard',
       'Approve final rendered video',
-      'Approve upload or scheduled release',
+      'Approve distribution or scheduled release',
     ],
     signals_used: input.signals,
     created_at: new Date().toISOString(),
@@ -81,6 +108,7 @@ export function defaultSignalBoostNicheVideoInput(): NicheVideoStrategyInput {
     primary_pain: 'too many growth tasks and not enough time or staff to coordinate them',
     desired_action: 'visit SignalBoost and review how COSA can prepare campaigns for approval',
     languages: ['en', 'es', 'pt'],
+    preferred_channels: ['long_form_video', 'short_vertical_video', 'professional_feed'],
     signals: [
       {
         source: 'cos_strategy',

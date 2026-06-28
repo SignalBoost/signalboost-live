@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { QueueVideoPlayer } from '@/lib/cos/ui/QueueVideoPlayer'
 import { getVideoQueueCopy, type VideoQueueItemCopy, type VideoQueueStatus } from '@/lib/cos/i18n/videoQueueCopy'
+import { ProductionJobsPanel } from './ProductionJobsPanel'
 
 const GOLD = '#ffc300'
 
@@ -82,6 +83,8 @@ export function VideoQueueClient() {
         </div>
         <Preview item={selected} copy={copy} onMove={move} />
       </section>
+
+      <ProductionJobsPanel />
       <style>{`@media (max-width:980px){.queueGrid{grid-template-columns:1fr!important}}`}</style>
     </main>
   )

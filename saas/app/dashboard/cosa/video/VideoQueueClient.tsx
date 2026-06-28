@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
-import { QueueVideoPlayer } from '@/lib/cos/ui/QueueVideoPlayer'
 import { getVideoQueueCopy, type VideoQueueItemCopy } from '@/lib/cos/i18n/videoQueueCopy'
 import { getVideoWorkflowCopy } from '@/lib/cos/i18n/videoWorkflowCopy'
 import { ProductionJobsPanel } from './ProductionJobsPanel'
@@ -80,120 +79,120 @@ export function VideoQueueClient() {
   }
 
   return (
-    <main style={{ maxWidth: 1420, margin: '0 auto', display: 'grid', gap: 18 }}>
-      <section style={heroCard}>
-        <p className="sb-eyebrow" style={{ margin: 0 }}>{workflowCopy.pageEyebrow}</p>
-        <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 36, letterSpacing: '-0.045em' }}>{workflowCopy.pageTitle}</h1>
-        <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.7, maxWidth: 980 }}>{workflowCopy.pageIntro}</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, marginTop: 16 }}>
+    <main style={pageShell}>
+      <section style={commandHeader}>
+        <div>
+          <p className="sb-eyebrow" style={{ margin: 0 }}>{workflowCopy.pageEyebrow}</p>
+          <h1 style={{ color: '#fff', margin: '6px 0 0', fontSize: 28, letterSpacing: '-0.04em' }}>{workflowCopy.pageTitle}</h1>
+          <p style={{ color: 'rgba(255,255,255,.65)', lineHeight: 1.55, margin: '8px 0 0', maxWidth: 820 }}>{workflowCopy.pageIntro}</p>
+        </div>
+        <div style={metricStrip}>
           <Metric label={workflowCopy.statusNeedApproval} value={counts.needs} />
           <Metric label={workflowCopy.renderingStage} value={counts.rendering} />
           <Metric label={workflowCopy.statusPublished} value={counts.published} />
         </div>
       </section>
 
-      <WorkflowStrip copy={workflowCopy} />
-
-      <section className="videoWorkflowGrid" style={workflowGrid}>
-        <LeftQueue campaigns={campaigns} selectedId={selected.id} copy={workflowCopy} onSelect={setSelectedId} />
-        <CenterPreview campaign={selected} queueCopy={queueCopy} copy={workflowCopy} onStatus={setWorkflowStatus} />
-        <RightMetadata campaign={selected} copy={workflowCopy} />
+      <section style={workflowStrip}>
+        {[workflowCopy.ideaGeneration, workflowCopy.approvalQueue, workflowCopy.renderingStage, workflowCopy.publishingStage, workflowCopy.monitoringDashboard].map((step, index) => (
+          <div key={step} style={stepCard}><b>{index + 1}</b><span>{step}</span></div>
+        ))}
       </section>
 
-      <BottomPublishingAnalytics campaign={selected} copy={workflowCopy} />
-      <ProductionJobsPanel />
+      <section className="videoBoardGrid" style={boardGrid}>
+        <section style={panel}>
+          <p className="sb-eyebrow" style={{ margin: 0 }}>{workflowCopy.leftPanelTitle}</p>
+          <div style={{ display: 'grid', gap: 10, marginTop: 12, maxHeight: 520, overflowY: 'auto', paddingRight: 4 }}>
+            {campaigns.map((campaign) => (
+              <button key={campaign.id} onClick={() => setSelectedId(campaign.id)} style={{ ...queueButton, border: campaign.id === selected.id ? '1px solid rgba(255,195,0,.62)' : queueButton.border }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                  <span style={{ color: 'rgba(255,255,255,.55)', fontSize: 12 }}>{campaign.aspect} · {campaign.duration}</span>
+                  <span style={statusBadge}>{statusLabel(campaign.workflow_status, workflowCopy)}</span>
+                </div>
+                <h3 style={{ color: '#fff', fontSize: 16, lineHeight: 1.25, margin: '8px 0 0' }}>{campaign.title}</h3>
+                <p style={{ color: 'rgba(255,255,255,.56)', margin: '8px 0 0', fontSize: 12 }}>{workflowCopy.niche}: {campaign.niche}</p>
+              </button>
+            ))}
+          </div>
+        </section>
 
-      <style>{`@media (max-width:1100px){.videoWorkflowGrid{grid-template-columns:1fr!important}}`}</style>
+        <section style={panel}>
+          <p className="sb-eyebrow" style={{ margin: 0 }}>{workflowCopy.centerPanelTitle}</p>
+          <DraftPreviewFrame campaign={selected} copy={workflowCopy} />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+            <button onClick={() => setWorkflowStatus(selected.id, 'on_hold')} style={secondary}>{workflowCopy.hold}</button>
+            {(selected.workflow_status === 'need_approval' || selected.workflow_status === 'on_hold') && <button onClick={() => setWorkflowStatus(selected.id, 'rejected')} style={secondary}>{workflowCopy.reject}</button>}
+            {(selected.workflow_status === 'need_approval' || selected.workflow_status === 'on_hold') && <button onClick={() => setWorkflowStatus(selected.id, 'approved_rendering')} style={primary}>{workflowCopy.approveRendering}</button>}
+          </div>
+        </section>
+
+        <section style={panel}>
+          <p className="sb-eyebrow" style={{ margin: 0 }}>{workflowCopy.rightPanelTitle}</p>
+          <MetadataRows campaign={selected} copy={workflowCopy} />
+        </section>
+
+        <section style={bottomPanel}>
+          <div>
+            <p className="sb-eyebrow" style={{ margin: 0 }}>{workflowCopy.bottomPanelTitle}</p>
+            <h2 style={{ color: '#fff', margin: '8px 0 0', fontSize: 21 }}>{workflowCopy.publishReady}</h2>
+            <p style={{ color: 'rgba(255,255,255,.62)', lineHeight: 1.6, margin: '8px 0 0' }}>{selected.funnel}</p>
+          </div>
+          <div style={analyticsGrid}>
+            <Metric label={workflowCopy.views} value={0} />
+            <Metric label={workflowCopy.clicks} value={0} />
+            <Metric label={workflowCopy.comments} value={0} />
+            <Metric label={workflowCopy.engagement} value="0%" />
+            <Metric label={workflowCopy.revenue} value="$0" />
+          </div>
+        </section>
+      </section>
+
+      <ProductionJobsPanel />
+      <style>{`@media (max-width:1100px){.videoBoardGrid{grid-template-columns:1fr!important}.videoBoardGrid > section{grid-column:auto!important}}`}</style>
     </main>
   )
 }
 
-function WorkflowStrip({ copy }: { copy: ReturnType<typeof getVideoWorkflowCopy> }) {
-  const steps = [copy.ideaGeneration, copy.approvalQueue, copy.renderingStage, copy.publishingStage, copy.monitoringDashboard]
-  return <section style={workflowStrip}>{steps.map((step, index) => <div key={step} style={stepCard}><b>{index + 1}</b><span>{step}</span></div>)}</section>
-}
-
-function LeftQueue({ campaigns, selectedId, copy, onSelect }: { campaigns: Campaign[]; selectedId: string; copy: ReturnType<typeof getVideoWorkflowCopy>; onSelect: (id: string) => void }) {
+function DraftPreviewFrame({ campaign, copy }: { campaign: Campaign; copy: ReturnType<typeof getVideoWorkflowCopy> }) {
   return (
-    <section style={panel}>
-      <p className="sb-eyebrow" style={{ margin: 0 }}>{copy.leftPanelTitle}</p>
-      <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
-        {campaigns.map((campaign) => (
-          <button key={campaign.id} onClick={() => onSelect(campaign.id)} style={{ ...queueButton, border: campaign.id === selectedId ? '1px solid rgba(255,195,0,.62)' : queueButton.border }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-              <span style={{ color: 'rgba(255,255,255,.52)', fontSize: 12 }}>{campaign.aspect} · {campaign.duration}</span>
-              <span style={{ color: GOLD, fontWeight: 900, fontSize: 11 }}>{statusLabel(campaign.workflow_status, copy)}</span>
-            </div>
-            <h3 style={{ color: '#fff', fontSize: 16, lineHeight: 1.25, margin: '8px 0 0' }}>{campaign.title}</h3>
-            <p style={{ color: 'rgba(255,255,255,.56)', margin: '8px 0 0', fontSize: 12 }}>{copy.niche}: {campaign.niche}</p>
-          </button>
-        ))}
+    <div style={previewFrame}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+        <span style={statusBadge}>{statusLabel(campaign.workflow_status, copy)}</span>
+        <span style={{ color: GOLD, fontWeight: 950, fontSize: 12 }}>{campaign.aspect} · {campaign.duration}</span>
       </div>
-    </section>
+      <h2 style={{ color: '#fff', fontSize: 26, lineHeight: 1.12, margin: '18px 0 0' }}>{campaign.title}</h2>
+      <p style={{ color: GOLD, fontWeight: 950, margin: '12px 0 0' }}>{copy.hook}</p>
+      <p style={{ color: '#fff', fontSize: 20, lineHeight: 1.35, margin: '6px 0 0' }}>“{campaign.hook}”</p>
+      <div style={{ display: 'grid', gap: 8, marginTop: 16 }}>
+        {campaign.scenes.map((scene, index) => <div key={scene} style={sceneRow}>{index + 1}. {scene}</div>)}
+      </div>
+    </div>
   )
 }
 
-function CenterPreview({ campaign, queueCopy, copy, onStatus }: { campaign: Campaign; queueCopy: ReturnType<typeof getVideoQueueCopy>; copy: ReturnType<typeof getVideoWorkflowCopy>; onStatus: (id: string, status: CampaignStatus) => void }) {
-  const canAct = campaign.workflow_status === 'need_approval' || campaign.workflow_status === 'on_hold'
-  return (
-    <section style={panel}>
-      <p className="sb-eyebrow" style={{ margin: 0 }}>{copy.centerPanelTitle}</p>
-      <h2 style={{ color: '#fff', margin: '8px 0 0', fontSize: 24 }}>{campaign.title}</h2>
-      <QueueVideoPlayer title={campaign.title} aspect={campaign.aspect} duration={campaign.duration} hero={campaign.hero} hook={campaign.hook} funnel={campaign.funnel} quality={campaign.quality} scenes={campaign.scenes} labels={{ qualityLabel: queueCopy.qualityLabel, sceneLabel: queueCopy.sceneLabel, playPreview: queueCopy.playPreview, pausePreview: queueCopy.pausePreview, nextScene: queueCopy.nextScene }} />
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-        <button onClick={() => onStatus(campaign.id, 'on_hold')} style={secondary}>{copy.hold}</button>
-        {canAct && <button onClick={() => onStatus(campaign.id, 'rejected')} style={secondary}>{copy.reject}</button>}
-        {canAct && <button onClick={() => onStatus(campaign.id, 'approved_rendering')} style={primary}>{copy.approveRendering}</button>}
-      </div>
-    </section>
-  )
-}
-
-function RightMetadata({ campaign, copy }: { campaign: Campaign; copy: ReturnType<typeof getVideoWorkflowCopy> }) {
-  const rows = [
-    [copy.hook, campaign.hook], [copy.niche, campaign.niche], [copy.hero, campaign.hero], [copy.format, campaign.format], [copy.quality, String(campaign.quality)], [copy.platforms, 'YouTube · Shorts · LinkedIn · TikTok · Instagram'], [copy.monetization, campaign.funnel],
-  ]
-  return (
-    <section style={panel}>
-      <p className="sb-eyebrow" style={{ margin: 0 }}>{copy.rightPanelTitle}</p>
-      <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
-        {rows.map(([label, value]) => <div key={label} style={metaRow}><span>{label}</span><strong>{value}</strong></div>)}
-      </div>
-    </section>
-  )
-}
-
-function BottomPublishingAnalytics({ campaign, copy }: { campaign: Campaign; copy: ReturnType<typeof getVideoWorkflowCopy> }) {
-  return (
-    <section style={bottomPanel}>
-      <div>
-        <p className="sb-eyebrow" style={{ margin: 0 }}>{copy.bottomPanelTitle}</p>
-        <h2 style={{ color: '#fff', margin: '8px 0 0', fontSize: 22 }}>{copy.publishReady}</h2>
-        <p style={{ color: 'rgba(255,255,255,.62)', lineHeight: 1.6, margin: '8px 0 0' }}>{campaign.funnel}</p>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,minmax(90px,1fr))', gap: 8 }}>
-        <Metric label={copy.views} value={0} />
-        <Metric label={copy.clicks} value={0} />
-        <Metric label={copy.comments} value={0} />
-        <Metric label={copy.engagement} value="0%" />
-        <Metric label={copy.revenue} value="$0" />
-      </div>
-    </section>
-  )
+function MetadataRows({ campaign, copy }: { campaign: Campaign; copy: ReturnType<typeof getVideoWorkflowCopy> }) {
+  const rows = [[copy.hook, campaign.hook], [copy.niche, campaign.niche], [copy.hero, campaign.hero], [copy.format, campaign.format], [copy.quality, String(campaign.quality)], [copy.platforms, 'YouTube · Shorts · LinkedIn · TikTok · Instagram'], [copy.monetization, campaign.funnel]]
+  return <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>{rows.map(([label, value]) => <div key={label} style={metaRow}><span>{label}</span><strong>{value}</strong></div>)}</div>
 }
 
 function Metric({ label, value }: { label: string; value: string | number }) {
-  return <div style={metric}><p style={{ color: 'rgba(255,255,255,.48)', fontSize: 11, margin: 0, textTransform: 'uppercase', fontWeight: 900 }}>{label}</p><p style={{ color: '#fff', fontSize: 26, fontWeight: 950, margin: '5px 0 0' }}>{value}</p></div>
+  return <div style={metric}><p style={{ color: 'rgba(255,255,255,.48)', fontSize: 10, margin: 0, textTransform: 'uppercase', fontWeight: 900 }}>{label}</p><p style={{ color: '#fff', fontSize: 22, fontWeight: 950, margin: '4px 0 0' }}>{value}</p></div>
 }
 
-const heroCard: React.CSSProperties = { border: '1px solid rgba(255,195,0,.22)', borderRadius: 24, padding: 24, background: 'linear-gradient(145deg, rgba(15,23,42,.94), rgba(2,6,23,.98))' }
-const workflowStrip: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10 }
-const stepCard: React.CSSProperties = { border: '1px solid rgba(255,195,0,.18)', borderRadius: 16, padding: 14, background: 'rgba(15,23,42,.72)', color: '#fff', display: 'grid', gap: 6 }
-const workflowGrid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'minmax(260px,.9fr) minmax(420px,1.3fr) minmax(260px,.9fr)', gap: 14, alignItems: 'start' }
-const panel: React.CSSProperties = { border: '1px solid rgba(255,255,255,.09)', borderRadius: 18, padding: 18, background: 'rgba(15,23,42,.72)' }
+const pageShell: React.CSSProperties = { maxWidth: 1500, margin: '0 auto', display: 'grid', gap: 12 }
+const commandHeader: React.CSSProperties = { border: '1px solid rgba(255,195,0,.22)', borderRadius: 22, padding: 18, background: 'linear-gradient(145deg, rgba(15,23,42,.94), rgba(2,6,23,.98))', display: 'grid', gridTemplateColumns: 'minmax(320px,1fr) minmax(360px,.75fr)', gap: 14, alignItems: 'center' }
+const metricStrip: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }
+const workflowStrip: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 8 }
+const stepCard: React.CSSProperties = { border: '1px solid rgba(255,195,0,.18)', borderRadius: 14, padding: 10, background: 'rgba(15,23,42,.72)', color: '#fff', display: 'grid', gap: 4, minHeight: 58 }
+const boardGrid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'minmax(270px,.85fr) minmax(420px,1.2fr) minmax(280px,.9fr)', gap: 12, alignItems: 'start' }
+const panel: React.CSSProperties = { border: '1px solid rgba(255,255,255,.09)', borderRadius: 18, padding: 16, background: 'rgba(15,23,42,.72)' }
 const queueButton: React.CSSProperties = { width: '100%', border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 12, background: 'rgba(255,255,255,.04)', textAlign: 'left', cursor: 'pointer' }
+const statusBadge: React.CSSProperties = { color: '#020617', background: GOLD, borderRadius: 999, padding: '5px 8px', fontWeight: 950, fontSize: 10, textTransform: 'uppercase' }
+const previewFrame: React.CSSProperties = { border: '1px solid rgba(255,195,0,.22)', borderRadius: 16, padding: 16, background: 'radial-gradient(circle at 20% 18%, rgba(255,195,0,.13), transparent 34%), rgba(0,0,0,.2)', marginTop: 14, minHeight: 330 }
 const metaRow: React.CSSProperties = { border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 10, background: 'rgba(0,0,0,.16)', display: 'grid', gap: 5, color: 'rgba(255,255,255,.68)' }
-const bottomPanel: React.CSSProperties = { border: '1px solid rgba(255,195,0,.18)', borderRadius: 20, padding: 18, background: 'rgba(15,23,42,.74)', display: 'grid', gridTemplateColumns: 'minmax(280px,1fr) minmax(420px,1.2fr)', gap: 14, alignItems: 'center' }
-const metric: React.CSSProperties = { border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 12, background: 'rgba(0,0,0,.22)' }
+const bottomPanel: React.CSSProperties = { gridColumn: '1 / -1', border: '1px solid rgba(255,195,0,.18)', borderRadius: 18, padding: 16, background: 'rgba(15,23,42,.74)', display: 'grid', gridTemplateColumns: 'minmax(280px,1fr) minmax(420px,1.2fr)', gap: 14, alignItems: 'center' }
+const analyticsGrid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(90px,1fr))', gap: 8 }
+const metric: React.CSSProperties = { border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 10, background: 'rgba(0,0,0,.22)' }
+const sceneRow: React.CSSProperties = { color: 'rgba(255,255,255,.78)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 10, background: 'rgba(0,0,0,.18)', lineHeight: 1.45 }
 const primary: React.CSSProperties = { border: 'none', background: GOLD, color: '#000', borderRadius: 12, padding: '10px 14px', fontWeight: 950, cursor: 'pointer' }
 const secondary: React.CSSProperties = { border: '1px solid rgba(255,255,255,.16)', background: 'rgba(255,255,255,.06)', color: '#fff', borderRadius: 12, padding: '10px 14px', fontWeight: 850, cursor: 'pointer' }

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatedVideoBackdrop } from './AnimatedVideoBackdrop'
+import { SignalBoostGuide } from './SignalBoostGuide'
 
 const GOLD = '#ffc300'
 const SIGNALBOOST_URL = 'www.saas.signalboostapp.com'
@@ -36,6 +37,7 @@ export function VideoPreviewRenderer({ title, scenes = [], callToAction }: Video
   const [sceneIndex, setSceneIndex] = useState(0)
   const playingRef = useRef(false)
   const current = safeScenes[sceneIndex] || safeScenes[0]
+  const hostActive = playing || speaking || audioEnabled
 
   useEffect(() => { playingRef.current = playing }, [playing])
 
@@ -108,11 +110,14 @@ export function VideoPreviewRenderer({ title, scenes = [], callToAction }: Video
         boxShadow: '0 24px 70px rgba(0,0,0,0.38)',
       }}>
         <AnimatedVideoBackdrop sceneIndex={sceneIndex} />
+        <div style={{ position: 'absolute', left: 22, top: 86, zIndex: 5 }}>
+          <SignalBoostGuide active={hostActive} />
+        </div>
         <div style={{ position: 'absolute', right: 18, bottom: 18, zIndex: 4, border: '1px solid rgba(255,195,0,0.44)', background: 'rgba(2,6,23,0.84)', color: GOLD, borderRadius: 999, padding: '8px 13px', fontWeight: 950, fontSize: 13, letterSpacing: '.02em', boxShadow: '0 0 28px rgba(255,195,0,.16)' }}>
           {SIGNALBOOST_URL}
         </div>
         <div style={{ position: 'absolute', inset: 0, padding: 22, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', zIndex: 2 }}>
-          <div>
+          <div style={{ paddingLeft: 178 }}>
             <p style={{ margin: 0, color: GOLD, fontSize: 11, fontWeight: 950, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
               COSA Social Video Preview · Scene {sceneIndex + 1}/{safeScenes.length} · {audioEnabled ? 'Audio on' : 'Audio off'}
             </p>
@@ -121,7 +126,7 @@ export function VideoPreviewRenderer({ title, scenes = [], callToAction }: Video
             </h3>
           </div>
 
-          <div style={{ display: 'grid', gap: 10, maxWidth: 820 }}>
+          <div style={{ display: 'grid', gap: 10, maxWidth: 770, marginLeft: 178 }}>
             <div style={{ display: 'inline-flex', alignSelf: 'flex-start', color: '#020617', background: GOLD, borderRadius: 999, padding: '6px 11px', fontWeight: 950, fontSize: 12 }}>
               {current.label}
             </div>

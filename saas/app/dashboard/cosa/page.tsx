@@ -69,6 +69,19 @@ type ExecutiveBriefing = {
   next_actions: string[]
 }
 
+type CampaignQueueRow = {
+  id: string
+  title: string
+  objective?: string
+  channel?: string
+  status?: string
+  risk_level?: string
+  approval_required?: boolean
+  languages?: string[]
+  work_items?: Array<{ id?: string; kind?: string; status?: string }>
+  created_at?: string
+}
+
 function formatDate(value?: string) {
   if (!value) return 'Unknown time'
   try {
@@ -128,6 +141,7 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
 export default function MarketingSalesCosaPage() {
   const [data, setData] = useState<AdmData | null>(null)
   const [briefing, setBriefing] = useState<ExecutiveBriefing | null>(null)
+  const [campaigns, setCampaigns] = useState<CampaignQueueRow[]>([])
   const [selected, setSelected] = useState<OutreachRow | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -137,9 +151,10 @@ export default function MarketingSalesCosaPage() {
     setLoading(true)
     setMessage('')
     try {
-      const [admRes, briefingRes] = await Promise.all([
+      const [admRes, briefingRes, campaignRes] = await Promise.all([
         fetch('/api/admin/adm', { cache: 'no-store' }),
         fetch('/api/cos/executive/briefing', { cache: 'no-store' }),
+        fetch('/api/cos/campaign-queue', { cache: 'no-store' }),
       ])
 
       const json = await admRes.json()
@@ -157,6 +172,13 @@ export default function MarketingSalesCosaPage() {
       } else {
         setBriefing(null)
       }
+
+      if (campaignRes.ok) {
+        const campaignJson = await campaignRes.json().catch(() => null)
+        setCampaigns(Array.isArray(campaignJson?.campaigns) ? campaignJson.campaigns : [])
+      } else {
+        setCampaigns([])
+      }
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Could not load COSA command data.')
     } finally {
@@ -168,6 +190,45 @@ export default function MarketingSalesCosaPage() {
 
   const pendingRows = useMemo(() => data?.recentOutreach?.filter(row => row.status === 'pending') || [], [data])
   const completedRows = useMemo(() => data?.recentOutreach?.filter(row => row.status !== 'pending') || [], [data])
+  const campaignQueue = useMemo(() => campaigns.slice(0, 8), [campaigns])
+
+  async function createStarterCampaign() {
+    setBusy(true)
+    try {
+      const res = await fetch('/api/cos/campaign-queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || 'Could not create campaign queue item.')
+      setMessage('Campaign queued for owner approval. COSA can now route it toward worker execution after approval.')
+      await load()
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Could not create campaign queue item.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function patchCampaign(id: string, status: 'approved' | 'rejected' | 'queued') {
+    setBusy(true)
+    try {
+      const res = await fetch('/api/cos/campaign-queue', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || `Could not mark campaign ${status}.`)
+      setMessage(`Campaign marked ${status}.`)
+      await load()
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : `Could not mark campaign ${status}.`)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function patchSelected(status: 'approved' | 'rejected') {
     if (!selected) return
@@ -192,6 +253,7 @@ export default function MarketingSalesCosaPage() {
   const metrics = data?.metrics || {}
   const metricCards = [
     ['Pending approvals', metrics.pending ?? 0],
+    ['Campaign queue', campaigns.length],
     ['Approved', metrics.approved ?? 0],
     ['Sent / executed', metrics.sent ?? 0],
     ['24h send limit', `${metrics.sendLimit?.count || 0}/${metrics.sendLimit?.limit || 50}`],
@@ -279,6 +341,31 @@ export default function MarketingSalesCosaPage() {
           </Card>
         ))}
       </section>
+
+      <Card>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div>
+            <p className="sb-eyebrow" style={{ margin: 0 }}>Campaign queue</p>
+            <h2 style={{ color: '#fff', margin: '8px 0 0', fontSize: 20 }}>Recommendations become campaign work</h2>
+            <p style={{ color: 'rgba(255,255,255,0.58)', margin: '8px 0 0', lineHeight: 1.6, maxWidth: 760 }}>
+              COSA now has a campaign queue layer between executive recommendations and worker execution. Campaigns can be approved, rejected, or queued without publishing or sending anything automatically.
+            </p>
+          </div>
+          <button disabled={busy} onClick={createStarterCampaign} style={primaryButton}>
+            Create first campaign
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>
+          {loading && <p style={{ color: 'rgba(255,255,255,0.55)' }}>Loading campaign queue...</p>}
+          {!loading && campaignQueue.length === 0 && (
+            <p style={{ color: 'rgba(255,255,255,0.55)', lineHeight: 1.6 }}>
+              No campaigns queued yet. Create one from the current COS recommendation, then approve it before any worker execution.
+            </p>
+          )}
+          {campaignQueue.map(campaign => <CampaignQueueCard key={campaign.id} campaign={campaign} busy={busy} onPatch={patchCampaign} />)}
+        </div>
+      </Card>
 
       <section style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 0.85fr) minmax(360px, 1.4fr)', gap: 18, alignItems: 'start' }} className="cosa-grid">
         <Card>
@@ -438,6 +525,32 @@ function ExecutiveRecommendationCard({ item }: { item: ExecutiveBriefingItem }) 
           {item.evidence.map((entry, index) => <li key={`${item.id}-${index}`}>{entry}</li>)}
         </ul>
       )}
+    </div>
+  )
+}
+
+function CampaignQueueCard({ campaign, busy, onPatch }: { campaign: CampaignQueueRow; busy: boolean; onPatch: (id: string, status: 'approved' | 'rejected' | 'queued') => void }) {
+  const waitingApproval = campaign.status === 'waiting_approval' || campaign.status === 'draft'
+  const canQueue = campaign.status === 'approved'
+
+  return (
+    <div style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.035)', borderRadius: 14, padding: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div>
+          <strong style={{ color: '#fff', display: 'block' }}>{campaign.title}</strong>
+          <span style={{ color: 'rgba(255,255,255,0.52)', fontSize: 12 }}>{campaign.channel || 'campaign'} · {campaign.status || 'waiting_approval'} · {formatDate(campaign.created_at)}</span>
+          <p style={{ color: 'rgba(255,255,255,0.68)', fontSize: 13, lineHeight: 1.6, margin: '8px 0 0' }}>{campaign.objective || 'No campaign objective attached.'}</p>
+        </div>
+        <span style={{ color: GOLD, fontSize: 11, fontWeight: 950, textTransform: 'uppercase' }}>{campaign.risk_level || 'medium'} risk</span>
+      </div>
+      <p style={{ color: 'rgba(255,255,255,0.52)', fontSize: 12, margin: '8px 0 0' }}>
+        Work items: {campaign.work_items?.length || 0} · Languages: {(campaign.languages || []).join(', ') || 'en'}
+      </p>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        {waitingApproval && <button disabled={busy} onClick={() => onPatch(campaign.id, 'rejected')} style={secondaryButton}>Reject</button>}
+        {waitingApproval && <button disabled={busy} onClick={() => onPatch(campaign.id, 'approved')} style={primaryButton}>Approve campaign</button>}
+        {canQueue && <button disabled={busy} onClick={() => onPatch(campaign.id, 'queued')} style={primaryButton}>Queue worker</button>}
+      </div>
     </div>
   )
 }

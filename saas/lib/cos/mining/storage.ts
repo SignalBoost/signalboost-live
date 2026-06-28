@@ -9,16 +9,40 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { RawEvent, FeatureRecord, SegmentRecord, AssociationRule } from './types'
 
+export interface MiningRunRow {
+  id: string
+  job: string
+  status: string
+  events_scanned: number
+  users_processed: number
+  features_written: number
+  segments_written: number
+  rules_found: number
+  error: string | null
+  started_at: string
+  finished_at: string | null
+}
+
+export interface SegmentCount {
+  segment: number
+  count: number
+}
+
 export interface MiningStore {
   appendEvents(events: RawEvent[]): Promise<{ ok: boolean; inserted: number; error?: string }>
   loadEvents(sinceISO: string, limit: number): Promise<RawEvent[]>
-  startRun(job: string, actor: string): Promise<string> // returns run_id
+  loadUserEvents(userId: string, sinceISO: string, limit: number): Promise<RawEvent[]>
+  startRun(job: string, actor: string): Promise<string>
   finishRun(runId: string, patch: Record<string, unknown>): Promise<void>
   writeFeatures(features: FeatureRecord[], runId: string): Promise<number>
   writeSegments(segments: SegmentRecord[], runId: string): Promise<number>
   writeRules(rules: AssociationRule[], runId: string): Promise<number>
   getUserFeatures(userId: string): Promise<FeatureRecord[]>
   getUserSegment(userId: string): Promise<SegmentRecord | null>
+  // Aggregate reads for the admin dashboard:
+  getRecentRuns(n: number): Promise<MiningRunRow[]>
+  getSegmentDistribution(): Promise<SegmentCount[]>
+  getTopRules(n: number): Promise<AssociationRule[]>
 }
 
 // ── Supabase admin client (service role; server-only; bypasses RLS) ──────────
@@ -57,6 +81,20 @@ class SupabaseMiningStore implements MiningStore {
     const { data, error } = await db
       .from('cos_events')
       .select('user_id,event_type,provider,amount_cents,device_type,occurred_at,metadata')
+      .gte('occurred_at', sinceISO)
+      .order('occurred_at', { ascending: false })
+      .limit(limit)
+    if (error || !data) return []
+    return data as RawEvent[]
+  }
+
+  async loadUserEvents(userId: string, sinceISO: string, limit: number) {
+    const db = admin()
+    if (!db) return []
+    const { data, error } = await db
+      .from('cos_events')
+      .select('user_id,event_type,provider,amount_cents,device_type,occurred_at,metadata')
+      .eq('user_id', userId)
       .gte('occurred_at', sinceISO)
       .order('occurred_at', { ascending: false })
       .limit(limit)
@@ -113,7 +151,6 @@ class SupabaseMiningStore implements MiningStore {
   async writeRules(rules: AssociationRule[], runId: string) {
     const db = admin()
     if (!db || rules.length === 0) return 0
-    // Replace this run's view: clear prior rules then insert the fresh set.
     await db.from('cos_rules').delete().not('id', 'is', null)
     const rows = rules.map((r) => ({
       antecedent: r.antecedent,
@@ -151,12 +188,46 @@ class SupabaseMiningStore implements MiningStore {
     if (!data) return null
     return { user_id: data.user_id, segment: data.segment, distance: data.distance } as SegmentRecord
   }
+
+  async getRecentRuns(n: number) {
+    const db = admin()
+    if (!db) return []
+    const { data } = await db
+      .from('cos_mining_runs')
+      .select('id,job,status,events_scanned,users_processed,features_written,segments_written,rules_found,error,started_at,finished_at')
+      .order('started_at', { ascending: false })
+      .limit(n)
+    return (data || []) as MiningRunRow[]
+  }
+
+  async getSegmentDistribution() {
+    const db = admin()
+    if (!db) return []
+    const { data } = await db.from('cos_segments').select('segment')
+    if (!data) return []
+    const counts = new Map<number, number>()
+    for (const r of data as any[]) counts.set(r.segment, (counts.get(r.segment) || 0) + 1)
+    return Array.from(counts.entries())
+      .map(([segment, count]) => ({ segment, count }))
+      .sort((a, b) => a.segment - b.segment)
+  }
+
+  async getTopRules(n: number) {
+    const db = admin()
+    if (!db) return []
+    const { data } = await db
+      .from('cos_rules')
+      .select('antecedent,consequent,support,confidence,lift')
+      .order('confidence', { ascending: false })
+      .order('lift', { ascending: false })
+      .limit(n)
+    return (data || []) as AssociationRule[]
+  }
 }
 
 // ── Azure adapter (Data Lake for raw events, Cosmos DB for features) ─────────
 // Implements the SAME interface. Not active until COS_MINING_BACKEND=azure AND the Azure
-// SDK + connection envs (sourced from Key Vault) are present. Kept as a typed seam so the
-// pipeline never needs to know which backend it is writing to.
+// SDK + connection envs (sourced from Key Vault) are present.
 class AzureMiningStore implements MiningStore {
   private fail(): never {
     throw new Error(
@@ -167,6 +238,7 @@ class AzureMiningStore implements MiningStore {
   }
   appendEvents(): Promise<{ ok: boolean; inserted: number; error?: string }> { this.fail() }
   loadEvents(): Promise<RawEvent[]> { this.fail() }
+  loadUserEvents(): Promise<RawEvent[]> { this.fail() }
   startRun(): Promise<string> { this.fail() }
   finishRun(): Promise<void> { this.fail() }
   writeFeatures(): Promise<number> { this.fail() }
@@ -174,6 +246,9 @@ class AzureMiningStore implements MiningStore {
   writeRules(): Promise<number> { this.fail() }
   getUserFeatures(): Promise<FeatureRecord[]> { this.fail() }
   getUserSegment(): Promise<SegmentRecord | null> { this.fail() }
+  getRecentRuns(): Promise<MiningRunRow[]> { this.fail() }
+  getSegmentDistribution(): Promise<SegmentCount[]> { this.fail() }
+  getTopRules(): Promise<AssociationRule[]> { this.fail() }
 }
 
 let store: MiningStore | null = null

@@ -36,6 +36,9 @@ jobs:
       - name: Verify route handler / page structure
         run: node scripts/verify-route-handlers.mjs
 
+      - name: Verify COS locale parity (5 languages)
+        run: node saas/scripts/verify-cos-locale-parity.mjs
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:

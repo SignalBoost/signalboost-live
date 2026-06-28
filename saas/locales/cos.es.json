@@ -70,6 +70,30 @@
     "meta": {
       "title": "Minería de datos COS — SignalBoost",
       "description": "Señales de comportamiento y transacciones que impulsan las predicciones de COS."
+    },
+    "dashboard": {
+      "overview": "Resumen",
+      "refresh": "Actualizar",
+      "run_history": "Historial de ejecuciones",
+      "segment_distribution": "Distribución de segmentos",
+      "top_patterns": "Principales patrones",
+      "no_access": "Se requiere acceso de administrador para ver la inteligencia de minería.",
+      "lookup_user": "Búsqueda de características de usuario",
+      "user_id_placeholder": "Ingresa el ID de usuario",
+      "view": "Ver",
+      "never": "Nunca",
+      "users": "usuarios"
+    },
+    "predict": {
+      "title": "Próximas acciones previstas",
+      "action": "Acción",
+      "score": "Puntuación",
+      "basis": "Motivo",
+      "none": "Aún no hay señal suficiente para predecir.",
+      "propensity": "Propensión",
+      "engagement": "Interacción",
+      "churn_risk": "Riesgo de abandono",
+      "value": "Valor"
     }
   }
 }

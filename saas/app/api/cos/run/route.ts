@@ -2,19 +2,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // The "Run" endpoint — hands-free execution of a compiled spec.
 //
-// HONEST IMPLEMENTATION NOTE: the COS gateway in lib/cos/ is scaffolding whose
-// engine/tool/prompt registries do not exist yet. Rather than stand up a parallel
-// (and inevitably drifting) Anthropic engine + tool stack there, this route hands
-// the compiled spec to the proven executor that already does all of it — the
-// chief-of-staff pipeline in /api/support — running it in EXECUTE MODE.
-//
-// Safety posture (unchanged from what the owner already runs):
-//   • OWNER ONLY. Admins are read/diagnose; only the owner can execute.
-//   • The executor commits to ai/* preview branches, NEVER main.
-//   • The owner still merges. Hands-free = auto-commit-to-branch, not auto-deploy.
+// This route now builds a COS reasoning context before delegating to the proven
+// support executor. That context carries mined / external signals, the marketing
+// decision engine output, and the hybrid reasoning rule: LLM for analogical
+// strategy, scoring engine for validation.
 // ─────────────────────────────────────────────────────────────────────────────
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth/permission-middleware'
+import { buildCosReasoningBridge } from '@/lib/cos/reasoning-bridge'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -24,7 +19,6 @@ const reply = (ok: boolean, text: string, error?: string, status = 200) =>
   NextResponse.json({ ok, text, timedOut: false, ...(error ? { error } : {}) }, { status })
 
 export async function POST(req: Request) {
-  // Principal resolved server-side; execution is owner-only.
   const user = await getCurrentUser(req as any)
   if (!user) return reply(false, '', 'Unauthorized', 401)
   if (user.role !== 'owner') return reply(false, '', 'Forbidden — COS execution is owner-only.', 403)
@@ -37,7 +31,22 @@ export async function POST(req: Request) {
   const conversationId = typeof body?.conversationId === 'string' ? body.conversationId : ''
   const locale = (req.headers.get('x-locale') || 'en').slice(0, 5)
 
-  // Delegate to the proven executor in execute mode, forwarding the owner's session.
+  const reasoning = buildCosReasoningBridge({
+    user_text: text,
+    surface,
+    external_signals: Array.isArray(body?.external_signals) ? body.external_signals : undefined,
+  })
+
+  const enrichedText = [
+    reasoning.formatted_context,
+    '',
+    'OWNER REQUEST / COMPILED SPEC',
+    text,
+    '',
+    'EXECUTION INSTRUCTION',
+    'Use the COS reasoning context above before answering or executing. Do not ask the owner to choose marketing strategy when COSA can decide from signals. Human approval remains required for release, posting, paid distribution, spending, or external outreach.',
+  ].join('\n')
+
   const origin = new URL(req.url).origin
   const cookie = req.headers.get('cookie') || ''
 
@@ -46,9 +55,9 @@ export async function POST(req: Request) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', cookie },
       body: JSON.stringify({
-        messages: [{ role: 'user', content: text }],
+        messages: [{ role: 'user', content: enrichedText }],
         executeMode: true,
-        context: { language: locale, currentPage: surface, conversationId },
+        context: { language: locale, currentPage: surface, conversationId, cosReasoningId: reasoning.id },
       }),
     })
     const data = await res.json().catch(() => null)

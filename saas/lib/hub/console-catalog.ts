@@ -1,369 +1,138 @@
-import { localizeProvider, cHub } from '@/lib/i18n/consoleCopy'
-import type { Dict } from '@/lib/i18n/loadLanguage'
-// saas/lib/hub/console-catalog.ts
-// Hub Command Console — Complete Tier and Provider Orchestration Register.
-//
-// Cards render straight from this file: each provider's `sections[].templateIds`
-// become the buttons shown on its card and workspace. Every id here resolves via
-// getTemplate() (provider-templates.ts + provider-templates-extra.ts). Tier
-// placement is data-driven via the `tier` field below.
+// saas/console-core/executors/resend.ts
+import { registerExecutor } from '../defaultHost'
+import type { ActionSchema } from '../types'
+import { createClient } from '@supabase/supabase-js'
 
-export type ConsoleTierId = 'core' | 'tier2' | 'tier3' | 'tier4' | string
-
-export const CONSOLE_TIERS = [
-  { id: 'core', index: '1', label: 'Core', sidebarTitle: 'Tier 1 Providers', blurb: 'Primary infrastructure: cloud, payments, data, hosting, and source control.' },
-  { id: 'tier2', index: '2', label: 'Scale', sidebarTitle: 'Tier 2 Providers', blurb: 'Messaging, email, edge networking, and compute integrations.' },
-  { id: 'tier3', index: '3', label: 'Enterprise', sidebarTitle: 'Tier 3 Providers', blurb: 'App platform, observability, error tracking, and incident response.' },
-  { id: 'tier4', index: '4', label: 'Internal', sidebarTitle: 'Tier 4 Tools', blurb: 'Encrypted secrets vault and team governance.' }
-]
-
-export const CONSOLE_UTILITY_PAGES = [
-  { id: 'domains', label: 'Domains/DNS', icon: '🌐' },
-  { id: 'deployments', label: 'Deployments', icon: '🚀' },
-  { id: 'logs', label: 'Logs', icon: '📝' },
-  { id: 'webhooks', label: 'Webhooks', icon: '🔗' },
-  { id: 'users', label: 'Team Access', icon: '👥' },
-  { id: 'settings', label: 'Settings', icon: '⚙️' }
-]
-
-export interface ConsoleProvider {
-  id: string
-  name: string
-  subtitle: string
-  accent: string
-  tier: ConsoleTierId
-  sections: {
-    title: string
-    templateIds: string[]
-  }[]
+const API = 'https://api.resend.com'
+function key(): string | null { return process.env.RESEND_API_KEY || null }
+async function getJSON(path: string) {
+  const k = key(); if (!k) return { ok: false as const, error: 'RESEND_API_KEY not set' }
+  const res = await fetch(`${API}${path}`, { headers: { Authorization: 'Bearer ' + k } })
+  if (!res.ok) return { ok: false as const, error: `Resend error (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}` }
+  return { ok: true as const, json: await res.json() }
 }
+const schema = (id: string, label: string, verb: string): ActionSchema => ({ id, label, verb, fields: [] })
+const rows = (j: any): any[] => Array.isArray(j) ? j : (j.data || [])
 
-export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
-  // ============================ TIER 1 · CORE ============================
-  {
-    id: 'aws',
-    name: 'AWS',
-    subtitle: 'CLOUD INFRASTRUCTURE',
-    accent: '#ff9900',
-    tier: 'core',
-    sections: [
-      { title: 'Storage', templateIds: ['aws.create_s3_bucket'] },
-      { title: 'IAM', templateIds: ['aws.list_iam_users', 'aws.disable_iam_user'] },
-      { title: 'Credentials', templateIds: ['aws.rotate_credential'] }
-    ]
+registerExecutor({
+  providerId: 'resend', actionId: 'list_domains', policyActionId: 'read_provider_status',
+  schema: schema('resend.list_domains', 'List Domains', 'view'),
+  async run() {
+    const r = await getJSON('/domains'); if (!r.ok) return r
+    const domains = rows(r.json).map((d: any) => ({ id: d.id, name: d.name, status: d.status, region: d.region, created_at: d.created_at }))
+    return { ok: true, message: `${domains.length} domain${domains.length === 1 ? '' : 's'}`, data: { count: domains.length, domains } }
   },
-  {
-    id: 'gcp',
-    name: 'GCP',
-    subtitle: 'CLOUD PLATFORM',
-    accent: '#4285f4',
-    tier: 'core',
-    sections: [
-      { title: 'IAM', templateIds: ['gcp.list_service_accounts'] }
-    ]
+})
+registerExecutor({
+  providerId: 'resend', actionId: 'list_audiences', policyActionId: 'read_provider_status',
+  schema: schema('resend.list_audiences', 'List Audiences', 'view'),
+  async run() {
+    const r = await getJSON('/audiences'); if (!r.ok) return r
+    const audiences = rows(r.json).map((a: any) => ({ id: a.id, name: a.name, created_at: a.created_at }))
+    return { ok: true, message: `${audiences.length} audience${audiences.length === 1 ? '' : 's'}`, data: { count: audiences.length, audiences } }
   },
-  {
-    id: 'azure',
-    name: 'Azure',
-    subtitle: 'MICROSOFT CLOUD',
-    accent: '#0078d4',
-    tier: 'core',
-    sections: []
+})
+registerExecutor({
+  providerId: 'resend', actionId: 'list_broadcasts', policyActionId: 'read_provider_status',
+  schema: schema('resend.list_broadcasts', 'List Broadcasts', 'view'),
+  async run() {
+    const r = await getJSON('/broadcasts'); if (!r.ok) return r
+    const broadcasts = rows(r.json).map((b: any) => ({ id: b.id, name: b.name, status: b.status, created_at: b.created_at }))
+    return { ok: true, message: `${broadcasts.length} broadcast${broadcasts.length === 1 ? '' : 's'}`, data: { count: broadcasts.length, broadcasts } }
   },
-  {
-    id: 'stripe',
-    name: 'Stripe',
-    subtitle: 'PAYMENTS & BILLING',
-    accent: '#635bff',
-    tier: 'core',
-    sections: [
-      { title: 'Catalog', templateIds: ['stripe.create_product', 'stripe.edit_product', 'stripe.view_products', 'stripe.archive_product', 'stripe.delete_product'] },
-      { title: 'Prices & Tiers', templateIds: ['stripe.create_price', 'stripe.view_prices', 'stripe.edit_price', 'stripe.archive_price', 'stripe.apply_tier_template'] },
-      { title: 'Customers', templateIds: ['stripe.list_customers', 'stripe.adjust_balance', 'stripe.issue_refund'] }
-    ]
+})
+registerExecutor({
+  providerId: 'resend', actionId: 'list_api_keys', policyActionId: 'read_provider_status',
+  schema: schema('resend.list_api_keys', 'List API Keys', 'view'),
+  async run() {
+    const r = await getJSON('/api-keys'); if (!r.ok) return r
+    const keys = rows(r.json).map((k: any) => ({ id: k.id, name: k.name, created_at: k.created_at }))
+    return { ok: true, message: `${keys.length} API key${keys.length === 1 ? '' : 's'}`, data: { count: keys.length, keys } }
   },
-  {
-    id: 'supabase',
-    name: 'Supabase',
-    subtitle: 'DATABASE & AUTHENTICATION',
-    accent: '#3ecf8e',
-    tier: 'core',
-    sections: [
-      { title: 'SQL Engine', templateIds: ['supabase.sql_editor', 'supabase.run_migration'] },
-      { title: 'Table CRUD', templateIds: ['supabase.insert_row', 'supabase.edit_row', 'supabase.archive_row', 'supabase.delete_row'] },
-      { title: 'Users & Access', templateIds: ['supabase.invite_user', 'supabase.edit_user', 'supabase.delete_user', 'supabase.reset_password', 'supabase.rotate_service_key'] },
-      { title: 'Storage', templateIds: ['supabase.storage_panel', 'supabase.create_bucket', 'supabase.empty_bucket'] }
-    ]
-  },
-  {
-    id: 'vercel',
-    name: 'Vercel',
-    subtitle: 'DEPLOYMENTS & NETWORKING',
-    accent: '#fff',
-    tier: 'core',
-    sections: [
-      // Buttons open real, live workspace panels (see CommandConsole VERCEL_PANEL_ROUTER).
-      { title: 'Deployments', templateIds: ['vercel.list_deployments', 'vercel.trigger_rollback', 'vercel.cancel_build'] },
-      { title: 'Environment Variables', templateIds: ['vercel.view_env', 'vercel.edit_env', 'vercel.delete_env'] },
-      { title: 'Networking & Logs', templateIds: ['vercel.sync_dns_domain', 'vercel.logs'] }
-    ]
-  },
-  {
-    id: 'github',
-    name: 'GitHub',
-    subtitle: 'SOURCE CONTROL',
-    accent: '#8b949e',
-    tier: 'core',
-    sections: [
-      { title: 'Repositories', templateIds: ['github.list_repos'] },
-      { title: 'Pull Requests', templateIds: ['github.list_prs', 'github.view_pr_files', 'github.merge_pr', 'github.close_pr'] },
-      { title: 'Branches', templateIds: ['github.list_branches', 'github.delete_branch'] },
-      { title: 'Issues', templateIds: ['github.list_issues', 'github.open_issue', 'github.edit_issue', 'github.close_issue'] },
-      { title: 'Activity', templateIds: ['github.list_commits'] },
-      { title: 'Secrets & Tokens', templateIds: ['github.rotate_token', 'github.manage_secrets'] }
-    ]
-  },
-  {
-    id: 'openai',
-    name: 'OpenAI',
-    subtitle: 'AI & MODELS',
-    accent: '#10a37f',
-    tier: 'core',
-    sections: [
-      { title: 'Models', templateIds: ['openai.list_models', 'openai.retrieve_model'] },
-      { title: 'Files', templateIds: ['openai.list_files'] },
-      { title: 'Jobs', templateIds: ['openai.list_fine_tunes', 'openai.list_batches'] }
-    ]
-  },
+})
 
-  // ============================ TIER 2 · SCALE ============================
-  {
-    id: 'twilio',
-    name: 'Twilio',
-    subtitle: 'MESSAGING & SMS',
-    accent: '#f22f46',
-    tier: 'tier2',
-    sections: [
-      { title: 'Messaging', templateIds: ['twilio.send_sms', 'twilio.verify_number'] }
-    ]
-  },
-  {
-    id: 'sendgrid',
-    name: 'SendGrid',
-    subtitle: 'TRANSACTIONAL EMAIL',
-    accent: '#1a82e2',
-    tier: 'tier2',
-    sections: [
-      { title: 'Email', templateIds: ['sendgrid.send_email', 'sendgrid.check_domain_auth'] }
-    ]
-  },
-  {
-    id: 'cloudflare',
-    name: 'Cloudflare',
-    subtitle: 'DNS, CDN & EDGE',
-    accent: '#f38020',
-    tier: 'tier2',
-    sections: [
-      { title: 'DNS', templateIds: ['cloudflare.add_dns_record', 'cloudflare.toggle_proxy'] },
-      { title: 'Cache', templateIds: ['cloudflare.purge_cache'] }
-    ]
-  },
-  {
-    id: 'digitalocean',
-    name: 'DigitalOcean',
-    subtitle: 'CLOUD COMPUTE',
-    accent: '#0080ff',
-    tier: 'tier2',
-    sections: [
-      { title: 'Compute', templateIds: ['digitalocean.create_droplet', 'digitalocean.view_droplets'] }
-    ]
-  },
-
-  // ========================== TIER 3 · ENTERPRISE =========================
-  {
-    id: 'firebase',
-    name: 'Firebase',
-    subtitle: 'APP PLATFORM',
-    accent: '#ffca28',
-    tier: 'tier3',
-    sections: [
-      { title: 'Security Rules', templateIds: ['firebase.upload_rules', 'firebase.view_rules'] }
-    ]
-  },
-  {
-    id: 'datadog',
-    name: 'Datadog',
-    subtitle: 'OBSERVABILITY',
-    accent: '#632ca6',
-    tier: 'tier3',
-    sections: [
-      { title: 'Monitoring', templateIds: ['datadog.create_monitor', 'datadog.check_metrics'] }
-    ]
-  },
-  {
-    id: 'sentry',
-    name: 'Sentry',
-    subtitle: 'ERROR MONITORING',
-    accent: '#b39ddb',
-    tier: 'tier3',
-    sections: [
-      { title: 'Issues', templateIds: ['sentry.list_issues', 'sentry.resolve_issue'] }
-    ]
-  },
-  {
-    id: 'pagerduty',
-    name: 'PagerDuty',
-    subtitle: 'INCIDENT RESPONSE',
-    accent: '#06ac38',
-    tier: 'tier3',
-    sections: [
-      { title: 'Incidents', templateIds: ['pagerduty.list_incidents', 'pagerduty.trigger_incident'] }
-    ]
-  },
-
-  // =========================== TIER 4 · INTERNAL ==========================
-  {
-    id: 'keyvault',
-    name: 'Key Vault',
-    subtitle: 'ENCRYPTED SECRET VAULT',
-    accent: '#eab308',
-    tier: 'tier4',
-    sections: [
-      { title: 'Security', templateIds: ['vault.unlock_vault', 'vault.seal_vault'] },
-      { title: 'Secrets Storage', templateIds: ['vault.add_secret', 'vault.edit_secret', 'vault.reveal_secret', 'vault.archive_secret', 'vault.delete_secret', 'vault.view_keys'] },
-      { title: 'Audit', templateIds: ['vault.audit_log'] }
-    ]
-  },
-  {
-    id: 'governance',
-    name: 'Governance',
-    subtitle: 'TEAM ACCESS & COMPLIANCE',
-    accent: '#f43f5e',
-    tier: 'tier4',
-    sections: [
-      { title: 'Team Access', templateIds: ['gov.assign_role', 'gov.change_permissions', 'gov.deactivate_member'] },
-      { title: 'Compliance & Audit', templateIds: ['gov.view_timeline', 'gov.run_compliance_audit', 'gov.clear_stale_sessions'] }
-    ]
-  },
-  {
-    id: 'elevenlabs',
-    name: 'ElevenLabs',
-    subtitle: 'VOICE & AUDIO',
-    accent: '#a78bfa',
-    tier: 'tier2',
-    sections: [
-      { title: 'Voices', templateIds: ['elevenlabs.list_voices', 'elevenlabs.voice_details'] },
-      { title: 'Models', templateIds: ['elevenlabs.list_models'] },
-      { title: 'Account', templateIds: ['elevenlabs.subscription'] },
-      { title: 'History', templateIds: ['elevenlabs.list_history'] }
-    ]
-  },
-  {
-    id: 'anthropic', name: 'Anthropic', subtitle: 'AI & MODELS', accent: '#d97757', tier: 'core',
-    sections: [
-      { title: 'Models', templateIds: ['anthropic.list_models', 'anthropic.retrieve_model'] }
-    ]
-  },
-  {
-    id: 'gemini', name: 'Google Gemini', subtitle: 'AI & MODELS', accent: '#4285f4', tier: 'core',
-    sections: [
-      { title: 'Models', templateIds: ['gemini.list_models', 'gemini.model_details'] }
-    ]
-  },
-  {
-    id: 'resend', name: 'Resend', subtitle: 'EMAIL', accent: '#e879f9', tier: 'tier2',
-    sections: [
-      { title: 'Domains', templateIds: ['resend.list_domains'] },
-      { title: 'Audiences', templateIds: ['resend.list_audiences'] },
-      { title: 'Broadcasts', templateIds: ['resend.list_broadcasts'] },
-      { title: 'API Keys', templateIds: ['resend.list_api_keys'] }
-    ]
-  },
-  {
-    id: 'assemblyai', name: 'AssemblyAI', subtitle: 'TRANSCRIPTION', accent: '#6366f1', tier: 'tier2',
-    sections: [
-      { title: 'Transcripts', templateIds: ['assemblyai.list_transcripts', 'assemblyai.transcript_details'] }
-    ]
-  },
-  {
-    id: 'supabase_mkt', name: 'Secondary Supabase', subtitle: 'SECOND DATABASE', accent: '#3ecf8e', tier: 'core',
-    sections: [
-      { title: 'Data', templateIds: ['supabase_mkt.list_tables', 'supabase_mkt.list_rows'] },
-      { title: 'Auth', templateIds: ['supabase_mkt.list_users'] },
-      { title: 'Storage', templateIds: ['supabase_mkt.list_buckets'] }
-    ]
-  },
-  {
-    // Open Banking — banks are providers like any other. Auth is Email-OTP -> OAuth2;
-    // the console never stores banking credentials, only vault-encrypted tokens that
-    // auto-refresh. Every action writes a banking compliance/audit entry. Per-institution
-    // API keys (State Dept FCU via Plaid, USAA via FDX, Discover via Discover Dev Center)
-    // stay as placeholders until registered; cards render live so enrollment can begin.
-    id: 'bank',
-    name: 'Bank',
-    subtitle: 'OPEN BANKING & PAYMENTS',
-    accent: '#16b364',
-    tier: 'tier2',
-    sections: [
-      { title: 'Connection', templateIds: ['bank.start_enrollment', 'bank.complete_enrollment', 'bank.refresh_token'] },
-      { title: 'Balances & Activity', templateIds: ['bank.list_accounts', 'bank.check_balance', 'bank.transaction_history'] },
-      { title: 'Payments', templateIds: ['bank.send_payment'] },
-      { title: 'Statements', templateIds: ['bank.download_statement'] },
-      { title: 'Compliance', templateIds: ['bank.compliance_log'] }
-    ]
-  }
-]
-
-export function getConsoleTier(id: ConsoleTierId, dict?: Dict | null) {
-  const tier = CONSOLE_TIERS.find(t => t.id === id) || CONSOLE_TIERS[0]
-  if (!dict) return tier
-  return { ...tier, label: cHub(dict, `console.tier.${tier.id}`, tier.label), sidebarTitle: cHub(dict, `console.tier.sidebar.${tier.id}`, tier.sidebarTitle), blurb: cHub(dict, `console.tier.blurb.${tier.id}`, (tier as any).blurb || '') }
+// ── Live delivery list ───────────────────────────────────────────────────────
+// Resend has no "list all sent emails" API, so the sent list is built from our
+// own outreach_sends records joined to the delivery state the webhook captured
+// in email_delivery_status. Reads via the service role (admin-only data).
+function adminDb() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const svc = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !svc) return null
+  return createClient(url, svc, { auth: { persistSession: false, autoRefreshToken: false } })
 }
-
-export function getConsoleProvider(id: string, dict?: Dict | null) {
-  const p = CONSOLE_PROVIDERS.find(p => p.id === id) || null
-  return p && dict ? localizeProvider(p, dict) : p
+function deriveStatus(st: any): string {
+  if (!st) return 'sent'
+  if (st.bounced_at) return 'bounced'
+  if (st.complained_at) return 'complained'
+  if (st.delivered_at) return 'delivered'
+  return st.last_event || 'sent'
 }
+registerExecutor({
+  providerId: 'resend', actionId: 'email_deliveries', policyActionId: 'read_provider_status',
+  schema: schema('resend.email_deliveries', 'Email Delivery', 'view'),
+  async run() {
+    const db = adminDb()
+    if (!db) return { ok: false, error: 'Supabase admin not configured (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)' }
 
-export function getTierProviders(tierId: ConsoleTierId, dict?: Dict | null) {
-  const known = CONSOLE_TIERS.some(t => t.id === tierId)
-  // Unknown/legacy tier ids fall back to Core so nothing ever renders empty.
-  const target = known ? tierId : 'core'
-  const list = CONSOLE_PROVIDERS.filter(p => p.tier === target)
-  return dict ? list.map(p => localizeProvider(p, dict)) : list
-}
+    const countNotNull = async (col: string) => {
+      const { count } = await db.from('email_delivery_status')
+        .select('resend_email_id', { count: 'exact', head: true })
+        .not(col, 'is', null)
+      return count || 0
+    }
+    const [delivered, bounced, opened, complained] = await Promise.all([
+      countNotNull('delivered_at'), countNotNull('bounced_at'),
+      countNotNull('opened_at'), countNotNull('complained_at'),
+    ])
+    const { count: sentTotal } = await db.from('outreach_sends')
+      .select('id', { count: 'exact', head: true }).eq('channel', 'email')
 
-export function isDestructiveTemplate(id: string): boolean {
-  const norm = id.toLowerCase()
-  return norm.includes('delete') || norm.includes('remove') || norm.includes('ban') || norm.includes('deactivate') || norm.includes('cancel') || norm.includes('empty') || norm.includes('seal') || norm.includes('purge') || norm.includes('disable')
-}
+    const { data: sends } = await db.from('outreach_sends')
+      .select('id, outreach_id, sent_at, metadata')
+      .eq('channel', 'email')
+      .order('sent_at', { ascending: false })
+      .limit(50)
+    const list: any[] = sends || []
 
-// Providers whose actions are fully implemented and execute for real today.
-// Everything else renders as "Coming soon" (disabled) so a buyer never clicks an
-// action that returns 501. Utility/page tiers (core/domains/...) are always live.
-export const LIVE_PROVIDER_IDS = new Set<string>([
-  'stripe', 'supabase', 'vercel', 'keyvault',
-  'github', 'openai', 'anthropic', 'elevenlabs', 'gemini', 'resend', 'assemblyai', 'supabase_mkt',
-  // Executors already wired into /api/hub/action — surfaced live and gated at
-  // run time by the per-provider credential probe (/api/hub/providers/status).
-  'sendgrid', 'twilio', 'cloudflare', 'digitalocean', 'datadog', 'sentry', 'pagerduty',
-  // Open Banking provider — live so Email-OTP enrollment can start; individual calls
-  // return a clean "institution not configured" until each aggregator app is registered.
-  'bank',
-  'core', 'domains', 'deployments', 'logs', 'settings',
-])
+    const ids = list.map(s => s?.metadata?.providerResult?.id).filter(Boolean)
+    const statusById: Record<string, any> = {}
+    if (ids.length) {
+      const { data: st } = await db.from('email_delivery_status').select('*').in('resend_email_id', ids)
+      for (const r of (st || [])) statusById[(r as any).resend_email_id] = r
+    }
+    const outreachIds = Array.from(new Set(list.map(s => s.outreach_id).filter(Boolean)))
+    const nameById: Record<string, string> = {}
+    if (outreachIds.length) {
+      const { data: oq } = await db.from('outreach_queue').select('id, business_name').in('id', outreachIds)
+      for (const r of (oq || [])) nameById[(r as any).id] = (r as any).business_name
+    }
 
-export function isProviderLive(id: string): boolean {
-  return LIVE_PROVIDER_IDS.has(id)
-}
+    const emails = list.map(s => {
+      const rid = s?.metadata?.providerResult?.id || null
+      const st = rid ? statusById[rid] : null
+      return {
+        sent_at: s.sent_at,
+        to: s?.metadata?.toEmail || null,
+        business: s.outreach_id ? (nameById[s.outreach_id] || null) : null,
+        status: deriveStatus(st),
+        opened: !!(st && st.opened_at),
+        open_count: st?.open_count || 0,
+        bounce_type: st?.bounce_type || null,
+        resend_email_id: rid,
+        confirmed: !!st, // false = dispatched but no delivery event captured yet
+      }
+    })
 
-// Individual actions that aren't fully implemented, even though their provider is
-// live. They render disabled with a "Soon" badge so a user never triggers a stub.
-export const INCOMPLETE_ACTION_IDS = new Set<string>([
-  'github.rotate_token',    // PATs cannot be rotated via API — regenerate manually.
-  'github.manage_secrets',  // needs libsodium sealed-box encryption (not yet wired).
-])
-
-export function isActionLive(templateId: string): boolean {
-  return !INCOMPLETE_ACTION_IDS.has(templateId)
-}
+    const message = `${sentTotal || 0} sent · ${delivered} delivered · ${bounced} bounced · ${opened} opened${bounced ? '  ⚠ bounces' : ''}`
+    return {
+      ok: true,
+      message,
+      data: {
+        summary: { sentTotal: sentTotal || 0, delivered, bounced, complained, opened, tracked: ids.length },
+        count: emails.length,
+        emails,
+      },
+    }
+  },
+})

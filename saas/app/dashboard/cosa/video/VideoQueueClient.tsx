@@ -36,8 +36,27 @@ export function VideoQueueClient() {
     published: items.filter(item => item.status === 'published').length,
   }), [items])
 
-  function move(id: string, status: Status) {
-    setItems(current => current.map(item => item.id === id ? { ...item, status, progress: status === 'in_progress' ? copy.statusProgress : item.progress } : item))
+  async function move(id: string, status: Status) {
+    const item = items.find(current => current.id === id)
+    setItems(current => current.map(entry => entry.id === id ? { ...entry, status, progress: status === 'in_progress' ? copy.statusProgress : entry.progress } : entry))
+
+    if (status !== 'in_progress' || !item) return
+
+    try {
+      await fetch('/api/cos/video-production', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: item.title,
+          hook: item.hook,
+          audience: item.niche,
+          production_tier: 'enterprise',
+          platforms: ['YouTube', 'Shorts', 'LinkedIn', 'Google Ads'],
+        }),
+      })
+    } catch {
+      // Keep local approval state. The production API returns persistence warnings when the migration is not installed.
+    }
   }
 
   return (

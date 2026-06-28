@@ -38,6 +38,8 @@ export function VideoQueueClient() {
   const workflowCopy = useMemo(() => getVideoWorkflowCopy(lang), [lang])
   const [campaigns, setCampaigns] = useState<Campaign[]>(makeCampaigns(queueCopy.items))
   const [selectedId, setSelectedId] = useState(queueCopy.items[0].id)
+  const [creatingCampaign, setCreatingCampaign] = useState(false)
+  const [generationMessage, setGenerationMessage] = useState('')
 
   useEffect(() => {
     const next = makeCampaigns(queueCopy.items)
@@ -52,6 +54,43 @@ export function VideoQueueClient() {
     rendering: campaigns.filter((item) => item.workflow_status === 'approved_rendering' || item.workflow_status === 'in_progress').length,
     published: campaigns.filter((item) => item.workflow_status === 'published').length,
   }), [campaigns])
+
+  async function createCosaCampaign() {
+    setCreatingCampaign(true)
+    setGenerationMessage('')
+    try {
+      const res = await fetch('/api/cos/video-campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.ok || !json.campaign) throw new Error(json.error || workflowCopy.generatedByCosa)
+      const campaign = json.campaign
+      const next: Campaign = {
+        id: String(campaign.id),
+        title: String(campaign.title),
+        aspect: String(campaign.aspect || '16:9'),
+        duration: String(campaign.duration || '0:30'),
+        niche: String(campaign.niche || ''),
+        format: String(campaign.format || ''),
+        hero: String(campaign.hero || ''),
+        quality: Number(campaign.quality || 82),
+        status: 'needs_approval',
+        hook: String(campaign.hook || ''),
+        funnel: String(campaign.funnel || ''),
+        scenes: Array.isArray(campaign.scenes) ? campaign.scenes.map(String) : [],
+        workflow_status: 'need_approval',
+      }
+      setCampaigns((current) => [next, ...current])
+      setSelectedId(next.id)
+      setGenerationMessage(workflowCopy.generatedByCosa)
+    } catch (error) {
+      setGenerationMessage(error instanceof Error ? error.message : workflowCopy.generatedByCosa)
+    } finally {
+      setCreatingCampaign(false)
+    }
+  }
 
   async function setWorkflowStatus(id: string, status: CampaignStatus) {
     const item = campaigns.find((current) => current.id === id)
@@ -86,10 +125,14 @@ export function VideoQueueClient() {
           <h1 style={{ color: '#fff', margin: '6px 0 0', fontSize: 28, letterSpacing: '-0.04em' }}>{workflowCopy.pageTitle}</h1>
           <p style={{ color: 'rgba(255,255,255,.65)', lineHeight: 1.55, margin: '8px 0 0', maxWidth: 820 }}>{workflowCopy.pageIntro}</p>
         </div>
-        <div style={metricStrip}>
-          <Metric label={workflowCopy.statusNeedApproval} value={counts.needs} />
-          <Metric label={workflowCopy.renderingStage} value={counts.rendering} />
-          <Metric label={workflowCopy.statusPublished} value={counts.published} />
+        <div style={headerRight}>
+          <div style={metricStrip}>
+            <Metric label={workflowCopy.statusNeedApproval} value={counts.needs} />
+            <Metric label={workflowCopy.renderingStage} value={counts.rendering} />
+            <Metric label={workflowCopy.statusPublished} value={counts.published} />
+          </div>
+          <button onClick={createCosaCampaign} disabled={creatingCampaign} style={primary}>{creatingCampaign ? workflowCopy.creatingCampaign : workflowCopy.createCampaign}</button>
+          {generationMessage && <p style={{ color: GOLD, fontSize: 12, margin: 0, fontWeight: 850 }}>{generationMessage}</p>}
         </div>
       </section>
 
@@ -181,6 +224,7 @@ function Metric({ label, value }: { label: string; value: string | number }) {
 
 const pageShell: React.CSSProperties = { maxWidth: 1500, margin: '0 auto', display: 'grid', gap: 12 }
 const commandHeader: React.CSSProperties = { border: '1px solid rgba(255,195,0,.22)', borderRadius: 22, padding: 18, background: 'linear-gradient(145deg, rgba(15,23,42,.94), rgba(2,6,23,.98))', display: 'grid', gridTemplateColumns: 'minmax(320px,1fr) minmax(360px,.75fr)', gap: 14, alignItems: 'center' }
+const headerRight: React.CSSProperties = { display: 'grid', gap: 10 }
 const metricStrip: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }
 const workflowStrip: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 8 }
 const stepCard: React.CSSProperties = { border: '1px solid rgba(255,195,0,.18)', borderRadius: 14, padding: 10, background: 'rgba(15,23,42,.72)', color: '#fff', display: 'grid', gap: 4, minHeight: 58 }

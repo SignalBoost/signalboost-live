@@ -69,6 +69,20 @@ type ExecutiveBriefing = {
   next_actions: string[]
 }
 
+type CampaignWorkItem = {
+  id?: string
+  kind?: string
+  status?: string
+  output?: {
+    title?: string
+    opening?: string
+    draft?: string
+    call_to_action?: string
+    estimated_duration_minutes?: number
+    scenes?: Array<{ label?: string; narration?: string; visual_direction?: string }>
+  }
+}
+
 type CampaignQueueRow = {
   id: string
   title: string
@@ -78,7 +92,7 @@ type CampaignQueueRow = {
   risk_level?: string
   approval_required?: boolean
   languages?: string[]
-  work_items?: Array<{ id?: string; kind?: string; status?: string }>
+  work_items?: CampaignWorkItem[]
   created_at?: string
 }
 
@@ -230,6 +244,25 @@ export default function MarketingSalesCosaPage() {
     }
   }
 
+  async function generateDraft(id: string) {
+    setBusy(true)
+    try {
+      const res = await fetch('/api/cos/script-worker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaign_id: id }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || 'Could not generate YouTube draft.')
+      setMessage('YouTube draft generated and attached to the campaign. This is content generation, not video rendering yet.')
+      await load()
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Could not generate YouTube draft.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function patchSelected(status: 'approved' | 'rejected') {
     if (!selected) return
     setBusy(true)
@@ -348,7 +381,7 @@ export default function MarketingSalesCosaPage() {
             <p className="sb-eyebrow" style={{ margin: 0 }}>Campaign queue</p>
             <h2 style={{ color: '#fff', margin: '8px 0 0', fontSize: 20 }}>Recommendations become campaign work</h2>
             <p style={{ color: 'rgba(255,255,255,0.58)', margin: '8px 0 0', lineHeight: 1.6, maxWidth: 760 }}>
-              COSA now has a campaign queue layer between executive recommendations and worker execution. Campaigns can be approved, rejected, or queued without publishing or sending anything automatically.
+              COSA now has a campaign queue layer between executive recommendations and worker execution. Campaigns can be approved, rejected, queued, and drafted without publishing or sending anything automatically.
             </p>
           </div>
           <button disabled={busy} onClick={createStarterCampaign} style={primaryButton}>
@@ -363,7 +396,7 @@ export default function MarketingSalesCosaPage() {
               No campaigns queued yet. Create one from the current COS recommendation, then approve it before any worker execution.
             </p>
           )}
-          {campaignQueue.map(campaign => <CampaignQueueCard key={campaign.id} campaign={campaign} busy={busy} onPatch={patchCampaign} />)}
+          {campaignQueue.map(campaign => <CampaignQueueCard key={campaign.id} campaign={campaign} busy={busy} onPatch={patchCampaign} onGenerateDraft={generateDraft} />)}
         </div>
       </Card>
 
@@ -529,9 +562,11 @@ function ExecutiveRecommendationCard({ item }: { item: ExecutiveBriefingItem }) 
   )
 }
 
-function CampaignQueueCard({ campaign, busy, onPatch }: { campaign: CampaignQueueRow; busy: boolean; onPatch: (id: string, status: 'approved' | 'rejected' | 'queued') => void }) {
+function CampaignQueueCard({ campaign, busy, onPatch, onGenerateDraft }: { campaign: CampaignQueueRow; busy: boolean; onPatch: (id: string, status: 'approved' | 'rejected' | 'queued') => void; onGenerateDraft: (id: string) => void }) {
   const waitingApproval = campaign.status === 'waiting_approval' || campaign.status === 'draft'
   const canQueue = campaign.status === 'approved'
+  const canDraft = campaign.status === 'approved' || campaign.status === 'queued' || campaign.status === 'running'
+  const output = campaign.work_items?.find(item => item.output)?.output
 
   return (
     <div style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.035)', borderRadius: 14, padding: 14 }}>
@@ -546,10 +581,20 @@ function CampaignQueueCard({ campaign, busy, onPatch }: { campaign: CampaignQueu
       <p style={{ color: 'rgba(255,255,255,0.52)', fontSize: 12, margin: '8px 0 0' }}>
         Work items: {campaign.work_items?.length || 0} · Languages: {(campaign.languages || []).join(', ') || 'en'}
       </p>
+      {output && (
+        <div style={{ marginTop: 14, border: '1px solid rgba(255,195,0,0.22)', borderRadius: 14, background: 'rgba(255,195,0,0.06)', padding: 14 }}>
+          <p className="sb-eyebrow" style={{ margin: 0 }}>YouTube draft generated</p>
+          <h3 style={{ color: '#fff', margin: '8px 0 0', fontSize: 16 }}>{output.title || 'Generated campaign draft'}</h3>
+          <p style={{ color: 'rgba(255,255,255,0.74)', lineHeight: 1.65, fontSize: 13 }}>{output.opening}</p>
+          <pre style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,0.8)', background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 12, fontSize: 12, lineHeight: 1.55, maxHeight: 360, overflow: 'auto' }}>{output.draft}</pre>
+          {output.call_to_action && <p style={{ color: GOLD, fontWeight: 900, margin: '10px 0 0', fontSize: 13 }}>CTA: {output.call_to_action}</p>}
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
         {waitingApproval && <button disabled={busy} onClick={() => onPatch(campaign.id, 'rejected')} style={secondaryButton}>Reject</button>}
         {waitingApproval && <button disabled={busy} onClick={() => onPatch(campaign.id, 'approved')} style={primaryButton}>Approve campaign</button>}
-        {canQueue && <button disabled={busy} onClick={() => onPatch(campaign.id, 'queued')} style={primaryButton}>Queue worker</button>}
+        {canQueue && <button disabled={busy} onClick={() => onPatch(campaign.id, 'queued')} style={secondaryButton}>Queue worker</button>}
+        {canDraft && !output && <button disabled={busy} onClick={() => onGenerateDraft(campaign.id)} style={primaryButton}>Generate YouTube Draft</button>}
       </div>
     </div>
   )

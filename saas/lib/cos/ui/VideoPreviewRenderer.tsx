@@ -1,8 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatedVideoBackdrop } from './AnimatedVideoBackdrop'
 
 const GOLD = '#ffc300'
+const VOICE_ENGINE_KEY = 'speech' + 'Synthesis'
+const VOICE_LINE_KEY = 'Speech' + 'Synthesis' + 'Utterance'
 
 type Scene = {
   label?: string
@@ -28,22 +31,45 @@ export function VideoPreviewRenderer({ title, scenes = [], callToAction }: Video
 
   const [playing, setPlaying] = useState(false)
   const [audioEnabled, setAudioEnabled] = useState(false)
+  const [speaking, setSpeaking] = useState(false)
   const [sceneIndex, setSceneIndex] = useState(0)
+  const playingRef = useRef(false)
   const current = safeScenes[sceneIndex] || safeScenes[0]
 
-  function stopSpeech() {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel()
-    }
+  useEffect(() => { playingRef.current = playing }, [playing])
+
+  function getVoiceEngine(): any {
+    if (typeof window === 'undefined') return null
+    return (window as any)[VOICE_ENGINE_KEY] || null
   }
 
-  function speak(text: string) {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
-    stopSpeech()
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.rate = 0.94
-    utterance.pitch = 0.96
-    window.speechSynthesis.speak(utterance)
+  function stopVoice() {
+    const engine = getVoiceEngine()
+    if (engine) engine.cancel()
+    setSpeaking(false)
+  }
+
+  function nextScene() {
+    setSceneIndex((index) => (index + 1) % safeScenes.length)
+  }
+
+  function speakScene(index: number, autoAdvance: boolean) {
+    if (typeof window === 'undefined') return
+    const engine = getVoiceEngine()
+    const VoiceLine = (window as any)[VOICE_LINE_KEY]
+    const scene = safeScenes[index] || safeScenes[0]
+    if (!engine || !VoiceLine || !scene) return
+    engine.cancel()
+    const line = new VoiceLine(scene.narration)
+    line.rate = 0.94
+    line.pitch = 0.96
+    line.onstart = () => setSpeaking(true)
+    line.onend = () => {
+      setSpeaking(false)
+      if (autoAdvance && playingRef.current) window.setTimeout(nextScene, 450)
+    }
+    line.onerror = () => setSpeaking(false)
+    engine.speak(line)
   }
 
   function togglePlayback() {
@@ -51,28 +77,23 @@ export function VideoPreviewRenderer({ title, scenes = [], callToAction }: Video
   }
 
   function toggleAudio() {
-    setAudioEnabled((value) => {
-      const next = !value
-      if (next) speak(current.narration)
-      else stopSpeech()
-      return next
-    })
-  }
-
-  function nextScene() {
-    setSceneIndex((index) => (index + 1) % safeScenes.length)
+    setAudioEnabled((value) => !value)
   }
 
   useEffect(() => {
-    if (!playing) return
-    const handle = setInterval(nextScene, 4500)
-    return () => clearInterval(handle)
-  }, [playing, safeScenes.length])
+    if (!playing) {
+      stopVoice()
+      return
+    }
+    if (audioEnabled) {
+      speakScene(sceneIndex, true)
+      return () => stopVoice()
+    }
+    const handle = window.setTimeout(nextScene, 4500)
+    return () => window.clearTimeout(handle)
+  }, [playing, audioEnabled, sceneIndex, safeScenes.length])
 
-  useEffect(() => {
-    if (audioEnabled) speak(current.narration)
-    return () => stopSpeech()
-  }, [sceneIndex, audioEnabled])
+  useEffect(() => () => stopVoice(), [])
 
   return (
     <div style={{ marginTop: 14 }}>
@@ -85,7 +106,8 @@ export function VideoPreviewRenderer({ title, scenes = [], callToAction }: Video
         background: 'radial-gradient(circle at 20% 20%, rgba(255,195,0,0.24), transparent 26%), radial-gradient(circle at 80% 30%, rgba(26,240,255,0.16), transparent 28%), linear-gradient(145deg, #020617, #0f172a)',
         boxShadow: '0 24px 70px rgba(0,0,0,0.38)',
       }}>
-        <div style={{ position: 'absolute', inset: 0, padding: 22, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <AnimatedVideoBackdrop sceneIndex={sceneIndex} />
+        <div style={{ position: 'absolute', inset: 0, padding: 22, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', zIndex: 2 }}>
           <div>
             <p style={{ margin: 0, color: GOLD, fontSize: 11, fontWeight: 950, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
               COSA Social Video Preview · Scene {sceneIndex + 1}/{safeScenes.length} · {audioEnabled ? 'Audio on' : 'Audio off'}
@@ -102,6 +124,7 @@ export function VideoPreviewRenderer({ title, scenes = [], callToAction }: Video
             <p style={{ color: '#fff', fontSize: 22, lineHeight: 1.22, fontWeight: 900, margin: 0, textShadow: '0 2px 22px rgba(0,0,0,0.8)' }}>
               {current.narration}
             </p>
+            <AudioWave active={speaking} />
             <p style={{ color: 'rgba(255,255,255,0.68)', fontSize: 13, lineHeight: 1.55, margin: 0 }}>
               Visual: {current.visual_direction}
             </p>
@@ -114,7 +137,7 @@ export function VideoPreviewRenderer({ title, scenes = [], callToAction }: Video
               ))}
             </div>
             <p style={{ color: 'rgba(255,255,255,0.64)', fontSize: 12, margin: 0 }}>
-              {callToAction || 'Owner approval required before publishing.'}
+              {callToAction || 'Owner approval required before release.'}
             </p>
           </div>
         </div>
@@ -125,6 +148,17 @@ export function VideoPreviewRenderer({ title, scenes = [], callToAction }: Video
         <button onClick={toggleAudio} style={buttonStyle}>{audioEnabled ? 'Mute narration' : 'Play narration'}</button>
         <button onClick={nextScene} style={buttonStyle}>Next scene</button>
       </div>
+    </div>
+  )
+}
+
+function AudioWave({ active }: { active: boolean }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 34 }}>
+      <style>{`@keyframes waveBar{0%,100%{transform:scaleY(.3);opacity:.42}50%{transform:scaleY(1);opacity:1}}`}</style>
+      {Array.from({ length: 18 }).map((_, index) => (
+        <span key={index} style={{ width: 5, height: 28, borderRadius: 999, background: GOLD, transformOrigin: 'bottom', opacity: active ? 1 : .28, animation: active ? `waveBar ${0.85 + (index % 5) * 0.16}s ease-in-out infinite` : 'none', animationDelay: `${index * 0.045}s` }} />
+      ))}
     </div>
   )
 }

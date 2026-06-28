@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 const GOLD = '#ffc300'
 
@@ -37,6 +37,12 @@ export function VideoPreviewRenderer({ title, scenes = [], callToAction }: Video
   function nextScene() {
     setSceneIndex((index) => (index + 1) % safeScenes.length)
   }
+
+  useEffect(() => {
+    if (!playing) return
+    const handle = setInterval(nextScene, 3500)
+    return () => clearInterval(handle)
+  }, [playing, safeScenes.length])
 
   return (
     <div style={{ marginTop: 14 }}>
@@ -84,24 +90,12 @@ export function VideoPreviewRenderer({ title, scenes = [], callToAction }: Video
         </div>
       </div>
 
-      {playing && (
-        <AutoAdvance intervalMs={3500} onTick={nextScene} />
-      )}
-
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
         <button onClick={togglePlayback} style={buttonStyle}>{playing ? 'Pause preview' : 'Play preview'}</button>
         <button onClick={nextScene} style={buttonStyle}>Next scene</button>
       </div>
     </div>
   )
-}
-
-function AutoAdvance({ intervalMs, onTick }: { intervalMs: number; onTick: () => void }) {
-  useMemo(() => {
-    const handle = setInterval(onTick, intervalMs)
-    return () => clearInterval(handle)
-  }, [intervalMs, onTick])
-  return null
 }
 
 const buttonStyle: React.CSSProperties = {

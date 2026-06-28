@@ -6,6 +6,7 @@ import {
   PRODUCT_WALKTHROUGH_VIDEO_PLAYBOOKS,
   playbookToNicheVideoInput,
 } from '@/lib/cos/niche-video'
+import { buildCosHeroStrategy } from '@/lib/cos/creative-strategy'
 import type { NicheVideoStrategyInput } from '@/lib/cos/niche-video'
 
 export const dynamic = 'force-dynamic'
@@ -14,6 +15,18 @@ const FIVE_LANGUAGES: NicheVideoStrategyInput['languages'] = ['en', 'es', 'pt', 
 
 function withFiveLanguages(input: NicheVideoStrategyInput): NicheVideoStrategyInput {
   return { ...input, languages: FIVE_LANGUAGES }
+}
+
+function heroInputFromVideoInput(input: NicheVideoStrategyInput) {
+  return {
+    company_name: input.company_name,
+    product_or_service: input.product_or_service,
+    niche: input.niche,
+    audience: input.target_audience,
+    pain: input.primary_pain,
+    traffic_goal: 'site_visit' as const,
+    languages: FIVE_LANGUAGES,
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -29,8 +42,9 @@ export async function GET(req: NextRequest) {
 
   const input = withFiveLanguages(rawInput)
   const concept = buildNicheVideoConcept(input)
+  const hero_strategy = buildCosHeroStrategy(heroInputFromVideoInput(input))
 
-  return NextResponse.json({ ok: true, input, concept, playbooks: PRODUCT_WALKTHROUGH_VIDEO_PLAYBOOKS })
+  return NextResponse.json({ ok: true, input, concept, hero_strategy, playbooks: PRODUCT_WALKTHROUGH_VIDEO_PLAYBOOKS })
 }
 
 export async function POST(req: NextRequest) {
@@ -54,5 +68,6 @@ export async function POST(req: NextRequest) {
   }
 
   const concept = buildNicheVideoConcept(input)
-  return NextResponse.json({ ok: true, input, concept, playbooks: PRODUCT_WALKTHROUGH_VIDEO_PLAYBOOKS })
+  const hero_strategy = buildCosHeroStrategy(heroInputFromVideoInput(input))
+  return NextResponse.json({ ok: true, input, concept, hero_strategy, playbooks: PRODUCT_WALKTHROUGH_VIDEO_PLAYBOOKS })
 }

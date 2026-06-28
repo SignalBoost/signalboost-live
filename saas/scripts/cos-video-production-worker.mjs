@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 import { createClient } from '@supabase/supabase-js'
+import { spawn } from 'node:child_process'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 if (process.argv.includes('--help')) {
-  console.log('Usage: NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... COS_VIDEO_RENDER_WEBHOOK_URL=... node scripts/cos-video-production-worker.mjs')
-  console.log('Polls queued cos_video_production_jobs, sends each job to a renderer/provider webhook, and stores returned MP4/thumbnail URLs.')
+  console.log('Usage: NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/cos-video-production-worker.mjs')
+  console.log('Optional: COS_VIDEO_RENDER_WEBHOOK_URL=... for an external renderer, or use local FFmpeg fallback when no webhook is configured.')
   process.exit(0)
 }
 
@@ -14,6 +18,7 @@ if (!url || !key) throw new Error('NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE
 const renderUrl = process.env.COS_VIDEO_RENDER_WEBHOOK_URL
 const renderToken = process.env.COS_VIDEO_RENDER_WEBHOOK_TOKEN
 const pollMs = Number(process.env.COS_VIDEO_WORKER_POLL_MS || 6000)
+const renderBucket = process.env.COS_VIDEO_RENDER_BUCKET || 'video-renders'
 const supabase = createClient(url, key, { auth: { persistSession: false } })
 
 async function claimJob() {
@@ -40,11 +45,7 @@ async function claimJob() {
   return claimed
 }
 
-async function callRenderer(job) {
-  if (!renderUrl) {
-    throw new Error('COS_VIDEO_RENDER_WEBHOOK_URL is not configured. No production renderer/provider is attached yet.')
-  }
-
+async function callWebhookRenderer(job) {
   const res = await fetch(renderUrl, {
     method: 'POST',
     headers: {
@@ -74,9 +75,99 @@ async function callRenderer(job) {
   }
 }
 
+function runFfmpeg(args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.env.FFMPEG_PATH || 'ffmpeg', args, { stdio: ['ignore', 'inherit', 'inherit'] })
+    child.on('error', reject)
+    child.on('exit', code => code === 0 ? resolve() : reject(new Error(`ffmpeg exited with ${code}`)))
+  })
+}
+
+function cleanText(value, fallback = '') {
+  return String(value || fallback).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 240)
+}
+
+function wrapText(value, max = 42) {
+  const words = cleanText(value).split(' ')
+  const lines = []
+  let current = ''
+  for (const word of words) {
+    if ((current + ' ' + word).trim().length > max) {
+      if (current) lines.push(current)
+      current = word
+    } else {
+      current = (current + ' ' + word).trim()
+    }
+  }
+  if (current) lines.push(current)
+  return lines.slice(0, 4).join('\\n')
+}
+
+function escapeDrawtext(value) {
+  return String(value || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/:/g, '\\:')
+    .replace(/'/g, "\\'")
+    .replace(/%/g, '\\%')
+}
+
+function drawText({ text, x = '(w-text_w)/2', y, size = 54, color = 'white', start = 0, end = 30 }) {
+  return `drawtext=text='${escapeDrawtext(text)}':fontcolor=${color}:fontsize=${size}:line_spacing=12:x=${x}:y=${y}:enable='between(t\\,${start}\\,${end})'`
+}
+
+function buildFilters(job, duration) {
+  const title = wrapText(job.title || 'SignalBoost video', 36)
+  const hook = wrapText(job.hook || 'SignalBoost turns scattered work into approved action.', 34)
+  const audience = wrapText(job.audience || 'business operators', 44)
+  const destination = cleanText(job.search_package?.destination_url || 'www.saas.signalboostapp.com')
+  const transcript = job.search_package?.captions_required ? 'Captions and transcript required' : 'Captions planned'
+  const segment = Math.max(4, Math.floor(duration / 4))
+  const filters = [
+    drawText({ text: 'SIGNALBOOST', x: '80', y: '60', size: 46, color: '0xffc300', start: 0, end: duration }),
+    drawText({ text: 'COSA PRODUCTION DRAFT', x: '80', y: '118', size: 28, color: '0x1af0ff', start: 0, end: duration }),
+    drawText({ text: title, y: '(h-text_h)/2-160', size: 68, color: 'white', start: 0, end: segment + 1 }),
+    drawText({ text: hook, y: '(h-text_h)/2-120', size: 72, color: 'white', start: segment, end: segment * 2 + 1 }),
+    drawText({ text: `For ${audience}`, y: '(h-text_h)/2-80', size: 54, color: '0xffffff', start: segment * 2, end: segment * 3 + 1 }),
+    drawText({ text: transcript, y: '(h-text_h)/2-80', size: 54, color: '0xffc300', start: segment * 3, end: duration }),
+    drawText({ text: destination, y: 'h-150', size: 44, color: '0xffc300', start: 0, end: duration }),
+  ]
+  return filters.join(',')
+}
+
+async function renderLocalMp4(job) {
+  const dir = await mkdtemp(join(tmpdir(), 'signalboost-cos-video-'))
+  const output = join(dir, 'final.mp4')
+  try {
+    const duration = Math.max(12, Math.min(60, Number(job.render_spec?.duration_seconds || 24)))
+    const filter = buildFilters(job, duration)
+    await runFfmpeg([
+      '-y',
+      '-f', 'lavfi', '-i', `color=c=0x020617:s=1920x1080:d=${duration}`,
+      '-f', 'lavfi', '-i', `anullsrc=channel_layout=stereo:sample_rate=44100:d=${duration}`,
+      '-vf', filter,
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20',
+      '-c:a', 'aac', '-shortest', '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
+      output,
+    ])
+
+    const bytes = await readFile(output)
+    const resultPath = `cos-video-production/${job.id}/final.mp4`
+    const { error: uploadError } = await supabase.storage.from(renderBucket).upload(resultPath, bytes, { contentType: 'video/mp4', upsert: true })
+    if (uploadError) throw uploadError
+    return { output_url: resultPath, thumbnail_url: null }
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+}
+
+async function renderJob(job) {
+  if (renderUrl) return callWebhookRenderer(job)
+  return renderLocalMp4(job)
+}
+
 async function processJob(job) {
   try {
-    const result = await callRenderer(job)
+    const result = await renderJob(job)
     await supabase
       .from('cos_video_production_jobs')
       .update({

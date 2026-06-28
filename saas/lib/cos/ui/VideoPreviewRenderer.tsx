@@ -27,11 +27,36 @@ export function VideoPreviewRenderer({ title, scenes = [], callToAction }: Video
   }, [scenes, title])
 
   const [playing, setPlaying] = useState(false)
+  const [audioEnabled, setAudioEnabled] = useState(false)
   const [sceneIndex, setSceneIndex] = useState(0)
   const current = safeScenes[sceneIndex] || safeScenes[0]
 
+  function stopSpeech() {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel()
+    }
+  }
+
+  function speak(text: string) {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
+    stopSpeech()
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.rate = 0.94
+    utterance.pitch = 0.96
+    window.speechSynthesis.speak(utterance)
+  }
+
   function togglePlayback() {
     setPlaying((value) => !value)
+  }
+
+  function toggleAudio() {
+    setAudioEnabled((value) => {
+      const next = !value
+      if (next) speak(current.narration)
+      else stopSpeech()
+      return next
+    })
   }
 
   function nextScene() {
@@ -40,9 +65,14 @@ export function VideoPreviewRenderer({ title, scenes = [], callToAction }: Video
 
   useEffect(() => {
     if (!playing) return
-    const handle = setInterval(nextScene, 3500)
+    const handle = setInterval(nextScene, 4500)
     return () => clearInterval(handle)
   }, [playing, safeScenes.length])
+
+  useEffect(() => {
+    if (audioEnabled) speak(current.narration)
+    return () => stopSpeech()
+  }, [sceneIndex, audioEnabled])
 
   return (
     <div style={{ marginTop: 14 }}>
@@ -58,7 +88,7 @@ export function VideoPreviewRenderer({ title, scenes = [], callToAction }: Video
         <div style={{ position: 'absolute', inset: 0, padding: 22, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <div>
             <p style={{ margin: 0, color: GOLD, fontSize: 11, fontWeight: 950, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
-              COSA Video Preview · Scene {sceneIndex + 1}/{safeScenes.length}
+              COSA Social Video Preview · Scene {sceneIndex + 1}/{safeScenes.length} · {audioEnabled ? 'Audio on' : 'Audio off'}
             </p>
             <h3 style={{ color: '#fff', fontSize: 26, lineHeight: 1.05, letterSpacing: '-0.04em', margin: '10px 0 0', maxWidth: 760 }}>
               {title || 'SignalBoost Campaign Preview'}
@@ -92,6 +122,7 @@ export function VideoPreviewRenderer({ title, scenes = [], callToAction }: Video
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
         <button onClick={togglePlayback} style={buttonStyle}>{playing ? 'Pause preview' : 'Play preview'}</button>
+        <button onClick={toggleAudio} style={buttonStyle}>{audioEnabled ? 'Mute narration' : 'Play narration'}</button>
         <button onClick={nextScene} style={buttonStyle}>Next scene</button>
       </div>
     </div>

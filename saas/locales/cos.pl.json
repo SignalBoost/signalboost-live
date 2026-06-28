@@ -70,6 +70,30 @@
     "meta": {
       "title": "Eksploracja danych COS — SignalBoost",
       "description": "Sygnały behawioralne i transakcyjne zasilające prognozy COS."
+    },
+    "dashboard": {
+      "overview": "Przegląd",
+      "refresh": "Odśwież",
+      "run_history": "Historia uruchomień",
+      "segment_distribution": "Rozkład segmentów",
+      "top_patterns": "Najważniejsze wzorce",
+      "no_access": "Wymagany dostęp administratora, aby zobaczyć analitykę eksploracji.",
+      "lookup_user": "Wyszukiwanie cech użytkownika",
+      "user_id_placeholder": "Podaj identyfikator użytkownika",
+      "view": "Pokaż",
+      "never": "Nigdy",
+      "users": "użytkownicy"
+    },
+    "predict": {
+      "title": "Przewidywane kolejne działania",
+      "action": "Działanie",
+      "score": "Wynik",
+      "basis": "Dlaczego",
+      "none": "Za mało sygnału, aby przewidywać.",
+      "propensity": "Skłonność",
+      "engagement": "Zaangażowanie",
+      "churn_risk": "Ryzyko odejścia",
+      "value": "Wartość"
     }
   }
 }

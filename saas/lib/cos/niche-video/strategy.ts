@@ -14,21 +14,25 @@ function defaultChannels(input: NicheVideoStrategyInput): VideoDistributionChann
   return ['long_form_video', 'short_vertical_video', 'professional_feed', 'community_feed', 'website_embed']
 }
 
+function variant(channel: VideoDistributionChannel, format: VideoDistributionVariant['format'], duration_seconds: number, adaptation_note: string): VideoDistributionVariant {
+  return { channel, format, duration_seconds, adaptation_note }
+}
+
 function variantsFor(channels: VideoDistributionChannel[]): VideoDistributionVariant[] {
   return channels.map((channel) => {
     switch (channel) {
       case 'long_form_video':
-        return { channel, format: 'long_form', duration_seconds: 300, adaptation_note: 'Use the full education story, proof points, demo flow, and CTA.' }
+        return variant(channel, 'long_form', 300, 'Use the full education story, proof points, demo flow, and CTA.')
       case 'short_vertical_video':
-        return { channel, format: 'vertical', duration_seconds: 45, adaptation_note: 'Use one pain point, one proof point, and one direct CTA.' }
+        return variant(channel, 'vertical', 45, 'Use one pain point, one proof point, and one direct CTA.')
       case 'professional_feed':
-        return { channel, format: 'square', duration_seconds: 75, adaptation_note: 'Use business outcome language, concise captions, and a credibility-focused CTA.' }
+        return variant(channel, 'square', 75, 'Use business outcome language, concise captions, and a credibility-focused CTA.')
       case 'community_feed':
-        return { channel, format: 'short_form', duration_seconds: 60, adaptation_note: 'Use conversational tone and focus on the owner/operator problem.' }
+        return variant(channel, 'short_form', 60, 'Use conversational tone and focus on the owner/operator problem.')
       case 'email_embed':
-        return { channel, format: 'embed', duration_seconds: 90, adaptation_note: 'Use a compact version that supports a follow-up email or newsletter.' }
+        return variant(channel, 'embed', 90, 'Use a compact version that supports a follow-up email or newsletter.')
       default:
-        return { channel, format: 'embed', duration_seconds: 120, adaptation_note: 'Use a website-friendly product education cut.' }
+        return variant(channel, 'embed', 120, 'Use a website-friendly product education cut.')
     }
   })
 }

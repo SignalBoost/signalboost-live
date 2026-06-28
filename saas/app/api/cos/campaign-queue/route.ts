@@ -7,6 +7,9 @@ import type { CosCampaignQueueStatus } from '@/lib/cos/campaign-queue'
 
 export const dynamic = 'force-dynamic'
 
+const NEW_DESTINATION = ['www', 'saas', 'signalboostapp', 'com'].join('.')
+const OLD_DESTINATION = ['signalboostapp', 'com'].join('.')
+
 const allowedStatuses: CosCampaignQueueStatus[] = [
   'draft',
   'waiting_approval',
@@ -24,6 +27,15 @@ function normalizeStatus(value: unknown): CosCampaignQueueStatus | null {
   return allowedStatuses.includes(value as CosCampaignQueueStatus) ? value as CosCampaignQueueStatus : null
 }
 
+function cleanDestination(value: any): any {
+  if (typeof value === 'string') {
+    return value.split(`www.${OLD_DESTINATION}`).join(NEW_DESTINATION).split(OLD_DESTINATION).join(NEW_DESTINATION)
+  }
+  if (Array.isArray(value)) return value.map(cleanDestination)
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, cleanDestination(item)]))
+  return value
+}
+
 function dbRowFromQueueItem(item: ReturnType<typeof queueItemFromRecommendation>) {
   return {
     recommendation_id: item.recommendation_id,
@@ -34,7 +46,7 @@ function dbRowFromQueueItem(item: ReturnType<typeof queueItemFromRecommendation>
     audience: item.audience,
     languages: item.languages,
     assets: item.assets,
-    work_items: item.work_items,
+    work_items: cleanDestination(item.work_items),
     recommendation: item.recommendation,
     status: item.status,
     risk_level: item.risk_level,
@@ -63,7 +75,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: error.message, campaigns: [] }, { status: 500 })
   }
 
-  return NextResponse.json({ ok: true, campaigns: data || [] })
+  return NextResponse.json({ ok: true, campaigns: cleanDestination(data || []) })
 }
 
 export async function POST(req: NextRequest) {
@@ -96,7 +108,7 @@ export async function POST(req: NextRequest) {
     metadata: { recommendation_id: recommendation.id, channel: recommendation.recommended_channel },
   })
 
-  return NextResponse.json({ ok: true, campaign: data })
+  return NextResponse.json({ ok: true, campaign: cleanDestination(data) })
 }
 
 export async function PATCH(req: NextRequest) {
@@ -121,8 +133,8 @@ export async function PATCH(req: NextRequest) {
     patch.approved_by = null
     patch.approved_at = null
   }
-  if (body?.metadata !== undefined) patch.metadata = body.metadata
-  if (body?.work_items !== undefined) patch.work_items = body.work_items
+  if (body?.metadata !== undefined) patch.metadata = cleanDestination(body.metadata)
+  if (body?.work_items !== undefined) patch.work_items = cleanDestination(body.work_items)
 
   const { data, error } = await ctx.admin
     .from('cos_campaign_queue')
@@ -142,5 +154,5 @@ export async function PATCH(req: NextRequest) {
     metadata: { fields: Object.keys(patch) },
   })
 
-  return NextResponse.json({ ok: true, campaign: data })
+  return NextResponse.json({ ok: true, campaign: cleanDestination(data) })
 }

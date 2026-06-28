@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { QueueVideoPlayer } from '@/lib/cos/ui/QueueVideoPlayer'
 import { getVideoQueueCopy, type VideoQueueItemCopy, type VideoQueueStatus } from '@/lib/cos/i18n/videoQueueCopy'
@@ -23,7 +23,7 @@ export function VideoQueueClient() {
   const [items, setItems] = useState<Item[]>(copy.items)
   const [selectedId, setSelectedId] = useState(copy.items[0].id)
 
-  useMemo(() => {
+  useEffect(() => {
     setItems(copy.items)
     setSelectedId(copy.items[0].id)
   }, [copy])

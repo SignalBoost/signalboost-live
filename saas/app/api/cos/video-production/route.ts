@@ -7,6 +7,7 @@ import type { VideoProductionInput, VideoProductionStatus } from '@/lib/cos/vide
 export const dynamic = 'force-dynamic'
 
 const TABLE = 'cos_video_production_jobs'
+const RENDER_BUCKET = 'video-renders'
 
 type PostBody = VideoProductionInput & {
   queue_immediately?: boolean
@@ -39,6 +40,35 @@ function toDbJob(job: ReturnType<typeof buildVideoProductionJob>) {
   }
 }
 
+async function withSignedAssets(supabase: ReturnType<typeof getAdminSupabase>, jobs: any[]) {
+  const enriched = []
+  for (const job of jobs) {
+    let signed_output_url: string | null = null
+    let signed_thumbnail_url: string | null = null
+
+    if (job.output_url) {
+      if (String(job.output_url).startsWith('http')) {
+        signed_output_url = job.output_url
+      } else {
+        const { data } = await supabase.storage.from(RENDER_BUCKET).createSignedUrl(job.output_url, 60 * 60)
+        signed_output_url = data?.signedUrl || null
+      }
+    }
+
+    if (job.thumbnail_url) {
+      if (String(job.thumbnail_url).startsWith('http')) {
+        signed_thumbnail_url = job.thumbnail_url
+      } else {
+        const { data } = await supabase.storage.from(RENDER_BUCKET).createSignedUrl(job.thumbnail_url, 60 * 60)
+        signed_thumbnail_url = data?.signedUrl || null
+      }
+    }
+
+    enriched.push({ ...job, signed_output_url, signed_thumbnail_url })
+  }
+  return enriched
+}
+
 export async function GET() {
   const ctx = await requireAdmin()
   if (ctx instanceof NextResponse) return ctx
@@ -47,7 +77,8 @@ export async function GET() {
     const supabase = getAdminSupabase()
     const { data, error } = await supabase.from(TABLE).select('*').order('created_at', { ascending: false }).limit(50)
     if (error) return NextResponse.json({ ok: true, jobs: [], warning: error.message })
-    return NextResponse.json({ ok: true, jobs: data || [] })
+    const jobs = await withSignedAssets(supabase, data || [])
+    return NextResponse.json({ ok: true, jobs })
   } catch (error) {
     return NextResponse.json({ ok: true, jobs: [], warning: error instanceof Error ? error.message : 'Could not load jobs.' })
   }

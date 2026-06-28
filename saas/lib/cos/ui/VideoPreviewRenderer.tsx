@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatedVideoBackdrop } from './AnimatedVideoBackdrop'
 
 const GOLD = '#ffc300'
-const SIGNALBOOST_URL = 'signalboostapp.com'
+const SIGNALBOOST_URL = 'www.saas.signalboostapp.com'
 const VOICE_ENGINE_KEY = 'speech' + 'Synthesis'
 const VOICE_LINE_KEY = 'Speech' + 'Synthesis' + 'Utterance'
 
@@ -140,7 +140,7 @@ export function VideoPreviewRenderer({ title, scenes = [], callToAction }: Video
                 <span key={index} style={{ width: index === sceneIndex ? 26 : 8, height: 8, borderRadius: 999, background: index === sceneIndex ? GOLD : 'rgba(255,255,255,0.22)', transition: 'all .2s ease' }} />
               ))}
             </div>
-            <p style={{ color: 'rgba(255,255,255,0.64)', fontSize: 12, margin: 0, paddingRight: 168 }}>
+            <p style={{ color: 'rgba(255,255,255,0.64)', fontSize: 12, margin: 0, paddingRight: 216 }}>
               {callToAction || 'Owner approval required before release.'}
             </p>
           </div>

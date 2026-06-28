@@ -3,6 +3,34 @@
 
 create extension if not exists pgcrypto;
 
+-- Some deployments may not have run the older outreach ADM migration yet.
+-- Keep this migration self-contained by creating the shared helpers it needs.
+create or replace function public.touch_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create or replace function public.is_signalboost_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(auth.role() = 'service_role', false)
+  or coalesce(
+    (auth.jwt() ->> 'email') = any(
+      string_to_array(coalesce(current_setting('app.admin_emails', true), ''), ',')
+    ),
+    false
+  );
+$$;
+
 create table if not exists public.cos_campaign_queue (
   id uuid primary key default gen_random_uuid(),
   recommendation_id text not null,

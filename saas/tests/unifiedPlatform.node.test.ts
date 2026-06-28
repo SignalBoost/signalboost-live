@@ -13,7 +13,7 @@ test('design tokens cover typography, spacing, colors, shadows, and glassmorphis
 test('unified nav and admin sidebar include Marketplace, SaaS, Concierge, and role sections', () => {
   assert.ok(UNIFIED_NAV.some(item => item.label === 'Marketplace'))
   assert.ok(UNIFIED_NAV.some(item => item.label === 'Outreach'))
-  assert.deepEqual(ADMIN_SIDEBAR.map(item => item.label), ['Overview', 'Logs', 'Outreach', 'Insights', 'Role Management', 'Marketplace Monitor', 'SaaS Monitor', 'Concierge Monitor'])
+  assert.deepEqual(ADMIN_SIDEBAR.map(item => item.label), ['Overview', 'Logs', 'Outreach', 'Marketing + Sales', 'Insights', 'Role Management', 'Marketplace Monitor', 'SaaS Monitor', 'Concierge Monitor'])
 })
 
 test('concierge routes marketplace and SaaS queries with telemetry role inference', () => {

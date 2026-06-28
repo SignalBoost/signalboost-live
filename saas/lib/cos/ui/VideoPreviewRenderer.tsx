@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatedVideoBackdrop } from './AnimatedVideoBackdrop'
 
 const GOLD = '#ffc300'
+const SIGNALBOOST_URL = 'signalboostapp.com'
 const VOICE_ENGINE_KEY = 'speech' + 'Synthesis'
 const VOICE_LINE_KEY = 'Speech' + 'Synthesis' + 'Utterance'
 
@@ -107,6 +108,9 @@ export function VideoPreviewRenderer({ title, scenes = [], callToAction }: Video
         boxShadow: '0 24px 70px rgba(0,0,0,0.38)',
       }}>
         <AnimatedVideoBackdrop sceneIndex={sceneIndex} />
+        <div style={{ position: 'absolute', right: 18, bottom: 18, zIndex: 4, border: '1px solid rgba(255,195,0,0.44)', background: 'rgba(2,6,23,0.84)', color: GOLD, borderRadius: 999, padding: '8px 13px', fontWeight: 950, fontSize: 13, letterSpacing: '.02em', boxShadow: '0 0 28px rgba(255,195,0,.16)' }}>
+          {SIGNALBOOST_URL}
+        </div>
         <div style={{ position: 'absolute', inset: 0, padding: 22, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', zIndex: 2 }}>
           <div>
             <p style={{ margin: 0, color: GOLD, fontSize: 11, fontWeight: 950, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
@@ -136,7 +140,7 @@ export function VideoPreviewRenderer({ title, scenes = [], callToAction }: Video
                 <span key={index} style={{ width: index === sceneIndex ? 26 : 8, height: 8, borderRadius: 999, background: index === sceneIndex ? GOLD : 'rgba(255,255,255,0.22)', transition: 'all .2s ease' }} />
               ))}
             </div>
-            <p style={{ color: 'rgba(255,255,255,0.64)', fontSize: 12, margin: 0 }}>
+            <p style={{ color: 'rgba(255,255,255,0.64)', fontSize: 12, margin: 0, paddingRight: 168 }}>
               {callToAction || 'Owner approval required before release.'}
             </p>
           </div>

@@ -428,7 +428,7 @@ export default function Concierge() {
                 ))}
               </div>
             )}
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -450,13 +450,18 @@ export default function Concierge() {
                   opacity: (loading || attachments.length >= ATTACH_MAX_FILES) ? 0.4 : 1,
                 }}
               >📎</button>
-              <input
+              <textarea
                 aria-label={t(dict, 'concierge.placeholder', 'Ask anything...')}
                 value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') ask(input) }}
+                onChange={e => {
+                  setInput(e.target.value)
+                  e.target.style.height = 'auto'
+                  e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px'
+                }}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(input) } }}
+                rows={1}
                 className="sb-input"
-                style={{ flex: 1, padding: '10px 14px', minWidth: 0, fontSize: 13 }}
+                style={{ flex: 1, padding: '10px 14px', minWidth: 0, fontSize: 13, resize: 'none', lineHeight: 1.4, maxHeight: 160, overflowY: 'auto', fontFamily: 'inherit' }}
                 placeholder={t(dict, 'concierge.placeholder', 'Ask anything...')}
               />
               <button

@@ -1,6 +1,8 @@
+// saas/app/api/outreach/generate/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, enforceRouteRateLimit, auditAdminAction } from '@/lib/outreach/security'
 import { generateOutreachAssets } from '@/lib/outreach/pipeline'
+import { findContactEmail } from '@/lib/outreach/emailFinder'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +25,12 @@ export async function POST(req: NextRequest) {
   if (!sourceUrl) return NextResponse.json({ error: 'business_url is required' }, { status: 400 })
 
   const assets = await generateOutreachAssets({ sourceUrl, businessName, sourcePlatform, language, publicText })
+
+  // Find a real, published contact email on the target's site. For the owner's
+  // manual generate flow we still create the draft if none is found (the owner
+  // can supply one), but the send route refuses to send without a real address.
+  const found = await findContactEmail(sourceUrl)
+
   const { data, error } = await ctx.admin
     .from('outreach_queue')
     .insert({
@@ -30,6 +38,7 @@ export async function POST(req: NextRequest) {
       source_platform: sourcePlatform,
       business_name: businessName || assets.analyzer_summary.business_name,
       business_url: sourceUrl,
+      contact_email: found.email,
       analyzer_summary: assets.analyzer_summary,
       business_model_profile: assets.business_model_profile,
       predictive_needs: assets.predictive_needs,
@@ -51,8 +60,8 @@ export async function POST(req: NextRequest) {
     action: 'outreach.generate_and_queue',
     targetType: 'outreach_queue',
     targetId: data.id,
-    metadata: { sourcePlatform, businessName: data.business_name },
+    metadata: { sourcePlatform, businessName: data.business_name, contactEmailFound: !!found.email },
   })
 
-  return NextResponse.json({ ok: true, outreach: data })
+  return NextResponse.json({ ok: true, outreach: data, contactEmailFound: !!found.email })
 }

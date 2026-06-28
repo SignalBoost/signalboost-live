@@ -10,17 +10,24 @@ import type { NicheVideoStrategyInput } from '@/lib/cos/niche-video'
 
 export const dynamic = 'force-dynamic'
 
+const FIVE_LANGUAGES: NicheVideoStrategyInput['languages'] = ['en', 'es', 'pt', 'pl', 'ru']
+
+function withFiveLanguages(input: NicheVideoStrategyInput): NicheVideoStrategyInput {
+  return { ...input, languages: FIVE_LANGUAGES }
+}
+
 export async function GET(req: NextRequest) {
   const ctx = await requireAdmin()
   if (ctx instanceof NextResponse) return ctx
 
   const playbookId = req.nextUrl.searchParams.get('playbook')
-  const input = playbookId ? playbookToNicheVideoInput(playbookId) : defaultSignalBoostNicheVideoInput()
+  const rawInput = playbookId ? playbookToNicheVideoInput(playbookId) : defaultSignalBoostNicheVideoInput()
 
-  if (!input) {
+  if (!rawInput) {
     return NextResponse.json({ ok: false, error: 'Unknown playbook.', playbooks: PRODUCT_WALKTHROUGH_VIDEO_PLAYBOOKS }, { status: 404 })
   }
 
+  const input = withFiveLanguages(rawInput)
   const concept = buildNicheVideoConcept(input)
 
   return NextResponse.json({ ok: true, input, concept, playbooks: PRODUCT_WALKTHROUGH_VIDEO_PLAYBOOKS })
@@ -35,13 +42,12 @@ export async function POST(req: NextRequest) {
 
   const playbookInput = body.playbook ? playbookToNicheVideoInput(body.playbook) : null
   const defaults = playbookInput || defaultSignalBoostNicheVideoInput()
-  const input: NicheVideoStrategyInput = {
+  const input: NicheVideoStrategyInput = withFiveLanguages({
     ...defaults,
     ...body,
     signals: Array.isArray(body.signals) && body.signals.length ? body.signals : defaults.signals,
-    languages: Array.isArray(body.languages) && body.languages.length ? body.languages as NicheVideoStrategyInput['languages'] : defaults.languages,
     preferred_channels: Array.isArray(body.preferred_channels) && body.preferred_channels.length ? body.preferred_channels : defaults.preferred_channels,
-  }
+  })
 
   if (!input.product_or_service || !input.niche || !input.target_audience) {
     return NextResponse.json({ ok: false, error: 'product_or_service, niche, and target_audience are required.' }, { status: 400 })

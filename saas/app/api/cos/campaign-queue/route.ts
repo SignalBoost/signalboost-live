@@ -9,6 +9,8 @@ export const dynamic = 'force-dynamic'
 
 const NEW_DESTINATION = ['www', 'saas', 'signalboostapp', 'com'].join('.')
 const OLD_DESTINATION = ['signalboostapp', 'com'].join('.')
+const DUPLICATE_DESTINATION = ['www', 'saas', 'www', 'saas', 'signalboostapp', 'com'].join('.')
+const WWW_OLD_DESTINATION = ['www', 'signalboostapp', 'com'].join('.')
 
 const allowedStatuses: CosCampaignQueueStatus[] = [
   'draft',
@@ -29,7 +31,12 @@ function normalizeStatus(value: unknown): CosCampaignQueueStatus | null {
 
 function cleanDestination(value: any): any {
   if (typeof value === 'string') {
-    return value.split(`www.${OLD_DESTINATION}`).join(NEW_DESTINATION).split(OLD_DESTINATION).join(NEW_DESTINATION)
+    return value
+      .split(DUPLICATE_DESTINATION).join(NEW_DESTINATION)
+      .split(WWW_OLD_DESTINATION).join(NEW_DESTINATION)
+      .split(`Visit ${OLD_DESTINATION}`).join(`Visit ${NEW_DESTINATION}`)
+      .split(`URL on screen: ${OLD_DESTINATION}`).join(`URL on screen: ${NEW_DESTINATION}`)
+      .split(`CTA: Visit ${OLD_DESTINATION}`).join(`CTA: Visit ${NEW_DESTINATION}`)
   }
   if (Array.isArray(value)) return value.map(cleanDestination)
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, cleanDestination(item)]))

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { VideoPreviewRenderer } from '@/lib/cos/ui/VideoPreviewRenderer'
 
+const GOLD = '#ffc300'
 const SAAS_URL = 'www.' + 'saas.signalboostapp.com'
 
 type Decision = {

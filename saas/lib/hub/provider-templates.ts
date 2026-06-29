@@ -2,6 +2,7 @@
 // Hub Console — Complete universal action form templates synchronized with backend policy dictionaries.
 
 import { EXTRA_TEMPLATES } from './provider-templates-extra'
+import { COMPLETE_TEMPLATES } from './provider-templates-complete'
 import { BANK_TEMPLATES } from './provider-templates-bank'
 import { RESEND_CONSOLE_TEMPLATES } from './provider-templates-resend'
 
@@ -517,6 +518,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
 // companion file) into the main registry. Without this, getTemplate() returns
 // null for those ids and their workspace cards render with no action buttons.
 Object.assign(PROVIDER_TEMPLATES, EXTRA_TEMPLATES)
+Object.assign(PROVIDER_TEMPLATES, COMPLETE_TEMPLATES)
 
 // Merge Open Banking templates (Bank provider: enrollment, balances, payments,
 // statements, compliance). Same pattern as EXTRA_TEMPLATES so getTemplate('bank.*')

@@ -4,7 +4,7 @@
 // Staff acts as the developer: when the owner gives an instruction, the model
 // generates the precise provider templateIds + JSON payloads and stages them as
 // an Open Pull Request via stageInfrastructurePR(). It NEVER fires them — that
-// is the owner's Merge click on the /hub/prs page.
+// is the owner's Merge click on the /dashboard/infrastructure page.
 //
 // This mirrors repoWriter.ts: the model proposes, the owner approves. Code goes
 // to ai/* branches; infrastructure goes to the infrastructure_prs queue.
@@ -83,7 +83,7 @@ export function formatStageResultForAI(r: StageResult): string {
     `Steps (${pr.steps.length}):`,
     lines,
     ``,
-    `Tell the owner it is waiting on the Hub Console → Pull Requests page (/hub/prs).`,
+    `Tell the owner it is waiting on the PR Cockpit at /dashboard/infrastructure.`,
     `It will only fire the live provider APIs when they click Merge / Approve.`,
   ].join('\n')
 }
@@ -97,7 +97,7 @@ export async function listInfraPRsForAI(): Promise<string> {
     return `• "${pr.title}" — ${steps} step${steps === 1 ? '' : 's'}, risk ${pr.risk} (id ${pr.id})`
   })
   return [
-    `${r.prs.length} open infrastructure PR${r.prs.length === 1 ? '' : 's'} awaiting the owner's Merge on /hub/prs:`,
+    `${r.prs.length} open infrastructure PR${r.prs.length === 1 ? '' : 's'} awaiting the owner's Merge at /dashboard/infrastructure:`,
     ...lines,
   ].join('\n')
 }

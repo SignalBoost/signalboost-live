@@ -19,9 +19,10 @@ const OUTREACH_TABLE = 'outreach_queue'
 // plain opt-out. COS writes only the body; this footer is appended in code so it
 // is guaranteed on every draft no matter what the model produced. Set the address
 // once in Vercel as OUTREACH_PHYSICAL_ADDRESS.
-function outreachComplianceFooter(): string {
+function outreachComplianceFooter(senderKey: string | null): string {
   const addr = String(process.env.OUTREACH_PHYSICAL_ADDRESS || '').trim()
-  const out = ['', '\u2014', 'Luis Claudio \u00b7 SignalBoost']
+  const team = senderKey === 'saasMarketing' ? 'The SignalBoost Marketing Team' : 'The SignalBoost Sales Team'
+  const out = ['', '\u2014', team]
   if (addr) out.push(addr)
   out.push('Not a fit? Reply "unsubscribe" and we will not contact you again.')
   return out.join('\n')
@@ -198,7 +199,7 @@ export async function createOutreachDraft(params: {
         business_url: businessUrl,
         contact_email: found.email,
         sender_key: senderKey,
-        outreach_message: message + outreachComplianceFooter(),
+        outreach_message: message + outreachComplianceFooter(senderKey),
         status: 'pending',
       })
       .select('id')

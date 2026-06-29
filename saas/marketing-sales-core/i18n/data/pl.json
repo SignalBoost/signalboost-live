@@ -32,5 +32,6 @@
   "overview": "Przegląd",
   "languages": "Języki",
   "channel": "Kanał",
-  "all": "Wszystkie"
+  "all": "Wszystkie",
+  "errNoAsset": "Brak wideo do opublikowania."
 }

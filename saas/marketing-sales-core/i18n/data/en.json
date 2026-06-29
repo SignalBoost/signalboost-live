@@ -32,5 +32,6 @@
   "overview": "Overview",
   "languages": "Languages",
   "channel": "Channel",
-  "all": "All"
+  "all": "All",
+  "errNoAsset": "No video is attached to publish."
 }

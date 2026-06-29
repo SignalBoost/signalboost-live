@@ -47,8 +47,8 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     accent: '#ff9900',
     tier: 'core',
     sections: [
-      { title: 'Storage', templateIds: ['aws.list_s3_buckets', 'aws.create_s3_bucket'] },
-      { title: 'IAM', templateIds: ['aws.list_iam_users', 'aws.disable_iam_user', 'aws.enable_iam_user'] },
+      { title: 'Storage', templateIds: ['aws.list_s3_buckets', 'aws.create_s3_bucket', 'aws.delete_s3_bucket', 'aws.list_regions'] },
+      { title: 'IAM', templateIds: ['aws.list_iam_users', 'aws.create_iam_user', 'aws.disable_iam_user', 'aws.enable_iam_user', 'aws.delete_iam_user'] },
       { title: 'Credentials', templateIds: ['aws.rotate_credential'] }
     ]
   },
@@ -59,7 +59,7 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     accent: '#4285f4',
     tier: 'core',
     sections: [
-      { title: 'IAM', templateIds: ['gcp.list_service_accounts', 'gcp.disable_service_account'] }
+      { title: 'IAM', templateIds: ['gcp.list_projects', 'gcp.list_service_accounts', 'gcp.create_service_account', 'gcp.disable_service_account', 'gcp.enable_service_account'] }
     ]
   },
   {
@@ -68,7 +68,11 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     subtitle: 'MICROSOFT CLOUD',
     accent: '#0078d4',
     tier: 'core',
-    sections: []
+    sections: [
+      { title: 'Subscriptions', templateIds: ['azure.list_subscriptions'] },
+      { title: 'Resource Groups', templateIds: ['azure.list_resource_groups', 'azure.create_resource_group', 'azure.delete_resource_group'] },
+      { title: 'Resources', templateIds: ['azure.list_resources'] }
+    ]
   },
   {
     id: 'stripe',
@@ -79,7 +83,10 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     sections: [
       { title: 'Catalog', templateIds: ['stripe.create_product', 'stripe.edit_product', 'stripe.view_products', 'stripe.archive_product', 'stripe.delete_product'] },
       { title: 'Prices & Tiers', templateIds: ['stripe.create_price', 'stripe.view_prices', 'stripe.edit_price', 'stripe.archive_price', 'stripe.apply_tier_template'] },
-      { title: 'Customers', templateIds: ['stripe.list_customers', 'stripe.adjust_balance', 'stripe.issue_refund'] }
+      { title: 'Customers', templateIds: ['stripe.list_customers', 'stripe.adjust_balance', 'stripe.issue_refund'] },
+      { title: 'Subscriptions', templateIds: ['stripe.list_subscriptions', 'stripe.cancel_subscription'] },
+      { title: 'Payments & Disputes', templateIds: ['stripe.list_payments', 'stripe.list_disputes'] },
+      { title: 'Coupons', templateIds: ['stripe.list_coupons', 'stripe.create_coupon'] }
     ]
   },
   {
@@ -104,7 +111,9 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     sections: [
       // Buttons open real, live workspace panels (see CommandConsole VERCEL_PANEL_ROUTER).
       { title: 'Deployments', templateIds: ['vercel.list_deployments', 'vercel.trigger_rollback', 'vercel.cancel_build'] },
-      { title: 'Environment Variables', templateIds: ['vercel.view_env', 'vercel.edit_env', 'vercel.delete_env'] },
+      { title: 'Environment Variables', templateIds: ['vercel.view_env', 'vercel.add_env', 'vercel.edit_env', 'vercel.delete_env'] },
+      { title: 'Domains', templateIds: ['vercel.list_domains', 'vercel.add_domain', 'vercel.remove_domain'] },
+      { title: 'Promote', templateIds: ['vercel.promote_to_production'] },
       { title: 'Networking & Logs', templateIds: ['vercel.sync_dns_domain', 'vercel.logs'] }
     ]
   },
@@ -120,7 +129,10 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
       { title: 'Branches', templateIds: ['github.list_branches', 'github.delete_branch'] },
       { title: 'Issues', templateIds: ['github.list_issues', 'github.open_issue', 'github.edit_issue', 'github.close_issue'] },
       { title: 'Activity', templateIds: ['github.list_commits'] },
-      { title: 'Secrets & Tokens', templateIds: ['github.rotate_token', 'github.manage_secrets'] }
+      { title: 'Secrets & Tokens', templateIds: ['github.rotate_token', 'github.manage_secrets', 'github.manage_secret'] },
+      { title: 'Repositories', templateIds: ['github.list_repos', 'github.create_repo'] },
+      { title: 'CI/CD', templateIds: ['github.list_workflows', 'github.trigger_workflow', 'github.list_workflow_runs'] },
+      { title: 'Branches', templateIds: ['github.list_branches', 'github.create_branch', 'github.delete_branch'] }
     ]
   },
   {
@@ -132,7 +144,9 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     sections: [
       { title: 'Models', templateIds: ['openai.list_models', 'openai.retrieve_model'] },
       { title: 'Files', templateIds: ['openai.list_files'] },
-      { title: 'Jobs', templateIds: ['openai.list_fine_tunes', 'openai.list_batches'] }
+      { title: 'Jobs', templateIds: ['openai.list_fine_tunes', 'openai.list_batches'] },
+      { title: 'Testing & Usage', templateIds: ['openai.test_completion', 'openai.view_usage'] },
+      { title: 'Files', templateIds: ['openai.list_files', 'openai.delete_file'] }
     ]
   },
 
@@ -144,7 +158,9 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     accent: '#f22f46',
     tier: 'tier2',
     sections: [
-      { title: 'Messaging', templateIds: ['twilio.send_sms', 'twilio.verify_number', 'twilio.list_messages', 'twilio.list_numbers'] }
+      { title: 'Messaging', templateIds: ['twilio.send_sms', 'twilio.verify_number', 'twilio.list_messages', 'twilio.list_numbers'] },
+      { title: 'Phone Numbers', templateIds: ['twilio.buy_number', 'twilio.release_number'] },
+      { title: 'Messaging Services', templateIds: ['twilio.list_messaging_services', 'twilio.create_messaging_service'] }
     ]
   },
   {
@@ -154,7 +170,10 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     accent: '#1a82e2',
     tier: 'tier2',
     sections: [
-      { title: 'Email', templateIds: ['sendgrid.send_email', 'sendgrid.check_domain_auth', 'sendgrid.list_templates', 'sendgrid.list_suppressions'] }
+      { title: 'Email', templateIds: ['sendgrid.send_email', 'sendgrid.check_domain_auth'] },
+      { title: 'Templates', templateIds: ['sendgrid.list_templates', 'sendgrid.create_template', 'sendgrid.delete_template'] },
+      { title: 'Suppressions', templateIds: ['sendgrid.list_suppressions', 'sendgrid.delete_suppression'] },
+      { title: 'Senders & Domains', templateIds: ['sendgrid.list_sender_identities', 'sendgrid.authenticate_domain'] }
     ]
   },
   {
@@ -164,9 +183,11 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     accent: '#f38020',
     tier: 'tier2',
     sections: [
-      { title: 'DNS', templateIds: ['cloudflare.add_dns_record', 'cloudflare.list_dns_records', 'cloudflare.toggle_proxy', 'cloudflare.delete_dns_record'] },
+      { title: 'Zones', templateIds: ['cloudflare.list_zones'] },
+      { title: 'DNS', templateIds: ['cloudflare.list_dns_records', 'cloudflare.add_dns_record', 'cloudflare.edit_dns_record', 'cloudflare.toggle_proxy', 'cloudflare.delete_dns_record'] },
       { title: 'Cache', templateIds: ['cloudflare.purge_cache'] },
-      { title: 'WAF & Security', templateIds: ['cloudflare.list_waf_rules', 'cloudflare.zone_settings'] }
+      { title: 'WAF & Security', templateIds: ['cloudflare.list_waf_rules', 'cloudflare.zone_settings'] },
+      { title: 'Page Rules & Workers', templateIds: ['cloudflare.list_page_rules', 'cloudflare.list_workers'] }
     ]
   },
   {
@@ -177,7 +198,9 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     tier: 'tier2',
     sections: [
       { title: 'Compute', templateIds: ['digitalocean.view_droplets', 'digitalocean.create_droplet', 'digitalocean.delete_droplet'] },
-      { title: 'Domains', templateIds: ['digitalocean.list_domains', 'digitalocean.add_domain'] }
+      { title: 'Domains', templateIds: ['digitalocean.list_domains', 'digitalocean.add_domain'] },
+      { title: 'Firewalls', templateIds: ['digitalocean.list_firewalls', 'digitalocean.create_firewall'] },
+      { title: 'Snapshots & Keys', templateIds: ['digitalocean.list_snapshots', 'digitalocean.list_ssh_keys', 'digitalocean.add_ssh_key'] }
     ]
   },
 
@@ -199,7 +222,8 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     accent: '#632ca6',
     tier: 'tier3',
     sections: [
-      { title: 'Monitoring', templateIds: ['datadog.create_monitor', 'datadog.check_metrics'] }
+      { title: 'Monitoring', templateIds: ['datadog.list_monitors', 'datadog.create_monitor', 'datadog.mute_monitor', 'datadog.unmute_monitor', 'datadog.check_metrics'] },
+      { title: 'Dashboards & Events', templateIds: ['datadog.list_dashboards', 'datadog.search_events'] }
     ]
   },
   {
@@ -209,7 +233,9 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     accent: '#b39ddb',
     tier: 'tier3',
     sections: [
-      { title: 'Issues', templateIds: ['sentry.list_issues', 'sentry.resolve_issue'] }
+      { title: 'Projects & Releases', templateIds: ['sentry.list_projects', 'sentry.list_releases'] },
+      { title: 'Issues', templateIds: ['sentry.list_issues', 'sentry.resolve_issue', 'sentry.update_issue', 'sentry.delete_issue'] },
+      { title: 'Alerts', templateIds: ['sentry.create_alert'] }
     ]
   },
   {
@@ -256,8 +282,10 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     sections: [
       { title: 'Voices', templateIds: ['elevenlabs.list_voices', 'elevenlabs.voice_details'] },
       { title: 'Models', templateIds: ['elevenlabs.list_models'] },
+      { title: 'Voices', templateIds: ['elevenlabs.list_voices', 'elevenlabs.delete_voice'] },
+      { title: 'Generate', templateIds: ['elevenlabs.generate_speech'] },
       { title: 'Account', templateIds: ['elevenlabs.subscription'] },
-      { title: 'History', templateIds: ['elevenlabs.list_history'] }
+      { title: 'History', templateIds: ['elevenlabs.list_history', 'elevenlabs.delete_history_item'] }
     ]
   },
   {
@@ -276,9 +304,9 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     id: 'resend', name: 'Resend', subtitle: 'EMAIL', accent: '#e879f9', tier: 'tier2',
     sections: [
       { title: 'Email Delivery', templateIds: ['resend.email_deliveries', 'resend.send_test_email'] },
-      { title: 'Domains', templateIds: ['resend.list_domains', 'resend.add_domain', 'resend.verify_domain', 'resend.delete_domain'] },
+      { title: 'Domains', templateIds: ['resend.list_domains', 'resend.get_domain', 'resend.add_domain', 'resend.verify_domain', 'resend.delete_domain'] },
       { title: 'Audiences', templateIds: ['resend.list_audiences', 'resend.create_audience', 'resend.delete_audience'] },
-      { title: 'Contacts', templateIds: ['resend.add_contact', 'resend.delete_contact'] },
+      { title: 'Contacts', templateIds: ['resend.list_contacts', 'resend.add_contact', 'resend.delete_contact'] },
       { title: 'Broadcasts', templateIds: ['resend.list_broadcasts'] },
       { title: 'API Keys', templateIds: ['resend.list_api_keys', 'resend.create_api_key', 'resend.delete_api_key'] },
     ]
@@ -286,7 +314,7 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
   {
     id: 'assemblyai', name: 'AssemblyAI', subtitle: 'TRANSCRIPTION', accent: '#6366f1', tier: 'tier2',
     sections: [
-      { title: 'Transcripts', templateIds: ['assemblyai.list_transcripts', 'assemblyai.transcript_details'] }
+      { title: 'Transcripts', templateIds: ['assemblyai.submit_transcript', 'assemblyai.list_transcripts', 'assemblyai.get_transcript', 'assemblyai.transcript_details', 'assemblyai.delete_transcript'] }
     ]
   },
   {

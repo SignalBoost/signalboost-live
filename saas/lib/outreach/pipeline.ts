@@ -1,3 +1,4 @@
+// saas/lib/outreach/pipeline.ts
 import { analyzeBusiness, extractPublicBusinessText } from '@/lib/ai/businessAnalyzer'
 import { profileBusinessModel } from '@/lib/ai/businessModelProfiler'
 import { predictBusinessNeeds } from '@/lib/ai/predictiveIntelligence'
@@ -8,6 +9,7 @@ import { generateOutreachMessage, type OutreachCategory } from '@/lib/ai/outreac
 import { runBusinessMode } from '@/lib/ai/modes'
 import type { OutreachAssets } from '@/lib/outreach/types'
 import { PARTNER_INTENT_GROUPS } from '@/lib/outreach/serviceIntents'
+import { pickOutreachLanguage } from '@/lib/outreach/regionLanguage'
 
 export async function generateOutreachAssets(args: {
   sourceUrl: string
@@ -48,6 +50,19 @@ export async function generateOutreachAssets(args: {
     social_plan,
     promo_plan,
   }
+
+  // Standing directive: communication with users in Brazil, Spanish-speaking Latin
+  // America, Poland, and Russia must be in their native language; every other country
+  // is English. We derive this from the target's OWN site content (script + country
+  // signals), so the user-facing message is localized even when the business name and
+  // URL alone don't reveal the country. Internal planning assets above keep the
+  // requested working language; only the outbound message is region-localized.
+  const messageLanguage = pickOutreachLanguage({
+    url: args.sourceUrl,
+    name: args.businessName || analyzer_summary.business_name,
+    text: `${extracted.text}\n${JSON.stringify(analyzer_summary)}`,
+  })
+
   const outreach_message = await generateOutreachMessage({
     assets: {
       ...messageAssets,
@@ -56,7 +71,7 @@ export async function generateOutreachAssets(args: {
         hmi_summary: `${promo_plan.hmi_summary} Partner intent groups: ${partnerIntentContext}`,
       },
     },
-    language: args.language,
+    language: messageLanguage,
     category: args.category,
   })
 

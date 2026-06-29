@@ -82,10 +82,11 @@ function rank(emails: string[], domain: string): string[] {
     const pref = PREFERRED.findIndex(p => local === p || local.startsWith(p))
     return (onDomain(e) ? 0 : 1000) + (pref === -1 ? 100 : pref)
   }
-  // Prefer the business's own domain; if none on-domain, fall back to the rest.
+  // ONLY the business's own domain. An off-domain hit (a different company the
+  // regex caught, or a third party) is NEVER returned — emailing the wrong
+  // company is worse than skipping. No on-domain address => caller SKIPS.
   const onDom = clean.filter(onDomain)
-  const pool = onDom.length ? onDom : clean
-  return pool.sort((a, b) => score(a) - score(b))
+  return onDom.sort((a, b) => score(a) - score(b))
 }
 
 export type ContactEmailResult = { email: string | null; source: string | null; candidates: string[] }

@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState, type CSSProperties, type FormEvent, type 
 
 const GOLD = '#ffc300'
 
+const DEFAULT_AUTONOMOUS_DIRECTIVE = 'Create an online outreach campaign for YouTube and other platforms showing our services and products that help companies grow. Feature www.saas.signalboostapp.com.'
+
 type OutreachRow = {
   id: string
   business_name?: string
@@ -30,6 +32,7 @@ type CampaignRow = {
   risk_level?: string
   created_at?: string
   languages?: string[]
+  metadata?: Record<string, any>
   assets?: Array<{ type?: string; status?: string; language?: string; brief?: string }>
   work_items?: Array<{
     id?: string
@@ -101,6 +104,7 @@ export default function MarketingSalesCosaPage() {
   const [outreach, setOutreach] = useState<OutreachRow[]>([])
   const [selected, setSelected] = useState<OutreachRow | null>(null)
   const [form, setForm] = useState<FormState>(defaultForm)
+  const [autonomousDirective, setAutonomousDirective] = useState(DEFAULT_AUTONOMOUS_DIRECTIVE)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -143,6 +147,39 @@ export default function MarketingSalesCosaPage() {
     setForm(current => ({ ...current, [key]: value }))
   }
 
+  async function generateDraft(id: string) {
+    const res = await fetch('/api/cos/script-worker', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campaign_id: id }) })
+    const json = await res.json().catch(() => null)
+    if (!res.ok) throw new Error(json?.error || 'Could not generate draft.')
+    return json
+  }
+
+  async function createAutonomousCampaign(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!autonomousDirective.trim()) {
+      setMessage('Add a campaign command first.')
+      return
+    }
+    setBusy(true)
+    try {
+      const res = await fetch('/api/cos/campaign-queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ directive: autonomousDirective }),
+      })
+      const json = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(json?.error || 'Could not create autonomous campaign.')
+      const campaignId = json?.campaign?.id
+      if (campaignId) await generateDraft(campaignId)
+      setMessage('COSA created the campaign and prepared an internal review draft. Publishing, sending, and spending are still locked until approval.')
+      await load(true)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not run autonomous campaign command.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function createCampaign(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!form.title.trim() || !form.objective.trim()) {
@@ -182,13 +219,11 @@ export default function MarketingSalesCosaPage() {
     }
   }
 
-  async function generateDraft(id: string) {
+  async function generateDraftFromButton(id: string) {
     setBusy(true)
     try {
-      const res = await fetch('/api/cos/script-worker', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campaign_id: id }) })
-      const json = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(json?.error || 'Could not generate draft.')
-      setMessage('Draft generated and attached to the campaign. Publishing is still gated.')
+      await generateDraft(id)
+      setMessage('Review draft generated. Publishing is still gated.')
       await load(true)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not generate draft.')
@@ -219,8 +254,8 @@ export default function MarketingSalesCosaPage() {
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap' }}>
           <div>
             <p className="sb-eyebrow" style={{ margin: 0 }}>Marketing & Sales Department</p>
-            <h1 style={{ color: '#fff', fontSize: 34, lineHeight: 1.05, letterSpacing: '-0.04em', margin: '10px 0 0', fontWeight: 950 }}>COSA turns ideas into approved campaign work.</h1>
-            <p style={{ color: 'rgba(255,255,255,0.68)', maxWidth: 820, lineHeight: 1.7, marginTop: 14 }}>The workflow is now enterprise-style: request, draft, approval, polish, publishing gate, monitoring, and optimization feedback. COSA can prepare work, but external action remains gated.</p>
+            <h1 style={{ color: '#fff', fontSize: 34, lineHeight: 1.05, letterSpacing: '-0.04em', margin: '10px 0 0', fontWeight: 950 }}>COSA turns one command into review-ready campaign work.</h1>
+            <p style={{ color: 'rgba(255,255,255,0.68)', maxWidth: 820, lineHeight: 1.7, marginTop: 14 }}>The owner-light workflow is: command, autonomous campaign setup, internal draft, owner review, final approval, publishing gate, monitoring, and optimization feedback.</p>
           </div>
           <button onClick={() => load()} disabled={loading || busy} style={ghostButton}>{loading ? 'Loading...' : 'Refresh department data'}</button>
         </div>
@@ -239,11 +274,21 @@ export default function MarketingSalesCosaPage() {
         ].map(([label, value]) => <Metric key={String(label)} label={String(label)} value={String(value)} />)}
       </section>
 
+      <Card style={{ background: 'linear-gradient(145deg, rgba(255,195,0,0.11), rgba(15,23,42,0.72))', border: '1px solid rgba(255,195,0,0.24)' }}>
+        <p className="sb-eyebrow" style={{ margin: 0 }}>Owner-light campaign command</p>
+        <h2 style={h2}>Tell COSA what you want. COSA prepares the draft.</h2>
+        <p style={bodyText}>This creates a governed campaign and an internal review draft. It does not publish, send outreach, or spend money.</p>
+        <form onSubmit={createAutonomousCampaign} style={{ display: 'grid', gap: 12, marginTop: 16 }}>
+          <Field label="Campaign command" value={autonomousDirective} onChange={setAutonomousDirective} textarea />
+          <button type="submit" disabled={busy} style={primaryButton}>{busy ? 'Working...' : 'Run COSA campaign command'}</button>
+        </form>
+      </Card>
+
       <section style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, .95fr) minmax(320px, 1.05fr)', gap: 18, alignItems: 'start' }} className="cosa-grid">
-        <Card style={{ background: 'linear-gradient(145deg, rgba(255,195,0,0.09), rgba(15,23,42,0.72))', border: '1px solid rgba(255,195,0,0.2)' }}>
-          <p className="sb-eyebrow" style={{ margin: 0 }}>Campaign request intake</p>
-          <h2 style={h2}>Start work like a real department</h2>
-          <p style={bodyText}>Create a campaign request. It enters the repository as waiting for approval; draft generation, worker queueing, publishing, and monitoring remain separate gates.</p>
+        <Card>
+          <p className="sb-eyebrow" style={{ margin: 0 }}>Detailed campaign request</p>
+          <h2 style={h2}>Use this only when you want manual control</h2>
+          <p style={bodyText}>The detailed form remains available for campaigns where you want to choose channel, priority, audience, and language yourself.</p>
           <form onSubmit={createCampaign} style={{ display: 'grid', gap: 12, marginTop: 16 }}>
             <Field label="Campaign title" value={form.title} onChange={value => setField('title', value)} />
             <Field label="Objective" value={form.objective} onChange={value => setField('objective', value)} textarea />
@@ -255,21 +300,21 @@ export default function MarketingSalesCosaPage() {
             <Field label="Target audience" value={form.audience} onChange={value => setField('audience', value)} />
             <Field label="Signal / reason" value={form.signal} onChange={value => setField('signal', value)} textarea />
             <Field label="Estimated cost USD" type="number" value={form.estimatedCostUsd} onChange={value => setField('estimatedCostUsd', value)} />
-            <button type="submit" disabled={busy} style={primaryButton}>{busy ? 'Working...' : 'Create governed campaign'}</button>
+            <button type="submit" disabled={busy} style={secondaryButton}>{busy ? 'Working...' : 'Create governed campaign'}</button>
           </form>
         </Card>
 
         <Card>
-          <p className="sb-eyebrow" style={{ margin: 0 }}>Enterprise workflow</p>
-          <h2 style={h2}>Founder to COSA Director to campaign execution</h2>
+          <p className="sb-eyebrow" style={{ margin: 0 }}>Autonomous workflow</p>
+          <h2 style={h2}>COSA handles execution steps; owner controls risk</h2>
           <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>
             {[
-              ['01', 'Request', 'Founder or COSA creates a campaign request.'],
-              ['02', 'Draft', 'COSA prepares scripts, messages, and asset plans.'],
-              ['03', 'Approve', 'Owner approves before any external action.'],
-              ['04', 'Polish', 'Metadata, captions, branding, and localization are prepared.'],
-              ['05', 'Publish gate', 'Connectors remain gated behind explicit approval.'],
-              ['06', 'Monitor', 'Results feed optimization for the next campaign.'],
+              ['01', 'Command', 'You give COSA a plain-language campaign directive.'],
+              ['02', 'Predict', 'COSA infers channel, audience, tone, and campaign structure.'],
+              ['03', 'Draft', 'COSA creates an internal review draft automatically.'],
+              ['04', 'Review', 'You approve, reject, archive, or request edits.'],
+              ['05', 'Publish gate', 'Publishing connectors stay locked until approval.'],
+              ['06', 'Optimize', 'Monitoring data feeds the optimization layer.'],
             ].map(([num, title, text]) => <WorkflowStep key={num} num={num} title={title} text={text} />)}
           </div>
         </Card>
@@ -278,11 +323,11 @@ export default function MarketingSalesCosaPage() {
       <Card>
         <p className="sb-eyebrow" style={{ margin: 0 }}>Campaign repository</p>
         <h2 style={h2}>Every campaign stays visible</h2>
-        <p style={bodyText}>This is the department record. It shows what was requested, what requires approval, what can be drafted, and what has been queued.</p>
+        <p style={bodyText}>This is the department record. It shows what was requested, what COSA drafted, what requires approval, and what has been queued.</p>
         <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>
           {loading && <p style={bodyText}>Loading campaign queue...</p>}
-          {!loading && campaigns.length === 0 && <p style={bodyText}>No campaigns queued yet. Create a request above, then approve it before worker execution.</p>}
-          {campaigns.slice(0, 10).map(campaign => <CampaignCard key={campaign.id} campaign={campaign} busy={busy} onPatch={patchCampaign} onGenerateDraft={generateDraft} />)}
+          {!loading && campaigns.length === 0 && <p style={bodyText}>No campaigns queued yet. Run the COSA command above to create a review-ready draft.</p>}
+          {campaigns.slice(0, 10).map(campaign => <CampaignCard key={campaign.id} campaign={campaign} busy={busy} onPatch={patchCampaign} onGenerateDraft={generateDraftFromButton} />)}
         </div>
       </Card>
 
@@ -307,7 +352,7 @@ export default function MarketingSalesCosaPage() {
         <p className="sb-eyebrow" style={{ margin: 0 }}>Enterprise control plane</p>
         <h2 style={h2}>The department plugs into your existing modules</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginTop: 14 }}>
-          <InfoBlock title="Audit" body="Campaign create, approve, reject, and queue actions go through admin checks and audit logging." />
+          <InfoBlock title="Audit" body="Campaign create, draft, approve, reject, and queue actions go through admin checks and audit logging." />
           <InfoBlock title="Cybersecurity" body="External connectors remain guarded; COSA prepares work without uncontrolled sending, posting, or spending." />
           <InfoBlock title="Optimization" body="Campaign results can feed predictive scoring, next-best-action logic, and future recommendations." />
         </div>
@@ -348,9 +393,10 @@ function SelectedOutreach({ row, busy, onPatch }: { row: OutreachRow; busy: bool
 function CampaignCard({ campaign, busy, onPatch, onGenerateDraft }: { campaign: CampaignRow; busy: boolean; onPatch: (id: string, status: 'approved' | 'rejected' | 'queued') => void; onGenerateDraft: (id: string) => void }) {
   const waiting = campaign.status === 'waiting_approval' || campaign.status === 'draft'
   const canQueue = campaign.status === 'approved'
-  const canDraft = campaign.work_items?.some(item => item.kind === 'script_worker') && ['approved', 'queued', 'running'].includes(campaign.status || '')
+  const canDraft = campaign.work_items?.some(item => item.kind === 'script_worker') && ['draft', 'waiting_approval', 'approved', 'queued', 'running'].includes(campaign.status || '')
   const output = campaign.work_items?.find(item => item.output)?.output
-  return <div style={{ border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.035)', borderRadius: 14, padding: 14 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}><div><strong style={{ color: '#fff', display: 'block' }}>{campaign.title}</strong><span style={{ color: 'rgba(255,255,255,.52)', fontSize: 12 }}>{campaign.channel || 'campaign'} · {campaign.status || 'waiting_approval'} · {formatDate(campaign.created_at)}</span><p style={{ color: 'rgba(255,255,255,.68)', fontSize: 13, lineHeight: 1.6, margin: '8px 0 0' }}>{campaign.objective || 'No objective attached.'}</p>{campaign.audience && <p style={{ color: 'rgba(255,255,255,.52)', fontSize: 12, margin: '8px 0 0' }}>Audience: {campaign.audience}</p>}</div><span style={{ color: GOLD, fontSize: 11, fontWeight: 950, textTransform: 'uppercase' }}>{campaign.risk_level || 'medium'} risk</span></div><p style={{ color: 'rgba(255,255,255,.52)', fontSize: 12, margin: '8px 0 0' }}>Work items: {campaign.work_items?.length || 0} · Languages: {(campaign.languages || []).join(', ') || 'en'}</p>{campaign.assets?.length ? <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>{campaign.assets.slice(0, 5).map((asset, index) => <span key={`${asset.type}-${index}`} style={{ border: '1px solid rgba(255,255,255,.1)', background: 'rgba(0,0,0,.18)', borderRadius: 999, padding: '5px 8px', color: 'rgba(255,255,255,.66)', fontSize: 11 }}>{asset.type || 'asset'} · {asset.status || 'needed'}</span>)}</div> : null}{output && <div style={{ marginTop: 14, border: '1px solid rgba(255,195,0,.22)', borderRadius: 14, background: 'rgba(255,195,0,.06)', padding: 14 }}><p className="sb-eyebrow" style={{ margin: 0 }}>Draft generated</p><h3 style={{ color: '#fff', margin: '8px 0 0', fontSize: 16 }}>{output.title || 'Generated campaign draft'}</h3><p style={{ color: 'rgba(255,255,255,.74)', lineHeight: 1.65, fontSize: 13 }}>{output.opening}</p><pre style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,.8)', background: 'rgba(0,0,0,.28)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 12, fontSize: 12, lineHeight: 1.55, maxHeight: 320, overflow: 'auto' }}>{output.draft}</pre>{output.call_to_action && <p style={{ color: GOLD, fontWeight: 900, margin: '10px 0 0', fontSize: 13 }}>CTA: {output.call_to_action}</p>}</div>}<div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>{waiting && <button disabled={busy} onClick={() => onPatch(campaign.id, 'rejected')} style={secondaryButton}>Reject</button>}{waiting && <button disabled={busy} onClick={() => onPatch(campaign.id, 'approved')} style={primaryButton}>Approve campaign</button>}{canQueue && <button disabled={busy} onClick={() => onPatch(campaign.id, 'queued')} style={secondaryButton}>Queue worker</button>}{canDraft && !output && <button disabled={busy} onClick={() => onGenerateDraft(campaign.id)} style={primaryButton}>Generate draft</button>}</div></div>
+  const autonomous = Boolean(campaign.metadata?.autonomous)
+  return <div style={{ border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.035)', borderRadius: 14, padding: 14 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}><div><strong style={{ color: '#fff', display: 'block' }}>{campaign.title}</strong><span style={{ color: 'rgba(255,255,255,.52)', fontSize: 12 }}>{campaign.channel || 'campaign'} · {campaign.status || 'waiting_approval'} · {formatDate(campaign.created_at)}{autonomous ? ' · autonomous' : ''}</span><p style={{ color: 'rgba(255,255,255,.68)', fontSize: 13, lineHeight: 1.6, margin: '8px 0 0' }}>{campaign.objective || 'No objective attached.'}</p>{campaign.audience && <p style={{ color: 'rgba(255,255,255,.52)', fontSize: 12, margin: '8px 0 0' }}>Audience: {campaign.audience}</p>}</div><span style={{ color: GOLD, fontSize: 11, fontWeight: 950, textTransform: 'uppercase' }}>{campaign.risk_level || 'medium'} risk</span></div><p style={{ color: 'rgba(255,255,255,.52)', fontSize: 12, margin: '8px 0 0' }}>Work items: {campaign.work_items?.length || 0} · Languages: {(campaign.languages || []).join(', ') || 'en'}</p>{campaign.assets?.length ? <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>{campaign.assets.slice(0, 5).map((asset, index) => <span key={`${asset.type}-${index}`} style={{ border: '1px solid rgba(255,255,255,.1)', background: 'rgba(0,0,0,.18)', borderRadius: 999, padding: '5px 8px', color: 'rgba(255,255,255,.66)', fontSize: 11 }}>{asset.type || 'asset'} · {asset.status || 'needed'}</span>)}</div> : null}{output && <div style={{ marginTop: 14, border: '1px solid rgba(255,195,0,.22)', borderRadius: 14, background: 'rgba(255,195,0,.06)', padding: 14 }}><p className="sb-eyebrow" style={{ margin: 0 }}>Review draft generated</p><h3 style={{ color: '#fff', margin: '8px 0 0', fontSize: 16 }}>{output.title || 'Generated campaign draft'}</h3><p style={{ color: 'rgba(255,255,255,.74)', lineHeight: 1.65, fontSize: 13 }}>{output.opening}</p><pre style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,.8)', background: 'rgba(0,0,0,.28)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 12, fontSize: 12, lineHeight: 1.55, maxHeight: 320, overflow: 'auto' }}>{output.draft}</pre>{output.call_to_action && <p style={{ color: GOLD, fontWeight: 900, margin: '10px 0 0', fontSize: 13 }}>CTA: {output.call_to_action}</p>}</div>}<div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>{waiting && <button disabled={busy} onClick={() => onPatch(campaign.id, 'rejected')} style={secondaryButton}>Reject</button>}{waiting && <button disabled={busy} onClick={() => onPatch(campaign.id, 'approved')} style={primaryButton}>Approve campaign</button>}{canQueue && <button disabled={busy} onClick={() => onPatch(campaign.id, 'queued')} style={secondaryButton}>Queue worker</button>}{canDraft && !output && <button disabled={busy} onClick={() => onGenerateDraft(campaign.id)} style={primaryButton}>Generate review draft</button>}</div></div>
 }
 
 function InfoBlock({ title, body, large = false }: { title: string; body: string; large?: boolean }) {

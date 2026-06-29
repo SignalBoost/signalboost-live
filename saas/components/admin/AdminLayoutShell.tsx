@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/utils/supabase/client'
 import { ADMIN_SIDEBAR } from '@/lib/platform/unifiedPlatform'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import CosaNotificationCenter from '@/components/admin/CosaNotificationCenter'
 
 const nav = ADMIN_SIDEBAR
 
@@ -19,7 +20,7 @@ const COPY: Record<string, Record<string, any>> = {
     controlRoomDesc: 'Overview, Logs, Outreach, Insights, Role Management, Marketplace Monitor, SaaS Monitor, and Concierge Monitor stay in one scan path.',
     adminFlow: 'Admin flow', execPreview: 'Executive preview', ownerRestricted: 'Owner/admin restricted',
     ownerRestrictedDesc: 'Financial, KPI, CRM, Outreach, Forecasting, and Concierge recommendations are restricted to owner/admin roles.',
-    nav: { 'Overview': 'Overview', 'Logs': 'Logs', 'Outreach': 'Outreach', 'Insights': 'Insights', 'Role Management': 'Role Management', 'Marketplace Monitor': 'Marketplace Monitor', 'SaaS Monitor': 'SaaS Monitor', 'Concierge Monitor': 'Concierge Monitor' },
+    nav: { 'Overview': 'Overview', 'Logs': 'Logs', 'Outreach': 'Outreach', 'Marketing + Sales': 'Marketing + Sales', 'Insights': 'Insights', 'Role Management': 'Role Management', 'Marketplace Monitor': 'Marketplace Monitor', 'SaaS Monitor': 'SaaS Monitor', 'Concierge Monitor': 'Concierge Monitor' },
   },
   es: {
     checkingAccess: 'Comprobando acceso de propietario/administrador…',
@@ -27,7 +28,7 @@ const COPY: Record<string, Record<string, any>> = {
     controlRoomDesc: 'Resumen, Registros, Prospección, Análisis, Gestión de roles, Monitor del marketplace, Monitor SaaS y Monitor del Concierge en una sola ruta.',
     adminFlow: 'Flujo de administración', execPreview: 'Vista ejecutiva', ownerRestricted: 'Restringido a propietario/administrador',
     ownerRestrictedDesc: 'Las recomendaciones de finanzas, KPI, CRM, prospección, previsiones y Concierge están restringidas a roles de propietario/administrador.',
-    nav: { 'Overview': 'Resumen', 'Logs': 'Registros', 'Outreach': 'Prospección', 'Insights': 'Análisis', 'Role Management': 'Gestión de roles', 'Marketplace Monitor': 'Monitor del marketplace', 'SaaS Monitor': 'Monitor SaaS', 'Concierge Monitor': 'Monitor del Concierge' },
+    nav: { 'Overview': 'Resumen', 'Logs': 'Registros', 'Outreach': 'Prospección', 'Marketing + Sales': 'Marketing + Ventas', 'Insights': 'Análisis', 'Role Management': 'Gestión de roles', 'Marketplace Monitor': 'Monitor del marketplace', 'SaaS Monitor': 'Monitor SaaS', 'Concierge Monitor': 'Monitor del Concierge' },
   },
   pt: {
     checkingAccess: 'Verificando acesso de proprietário/administrador…',
@@ -35,7 +36,7 @@ const COPY: Record<string, Record<string, any>> = {
     controlRoomDesc: 'Visão geral, Registros, Prospecção, Insights, Gestão de funções, Monitor do marketplace, Monitor SaaS e Monitor do Concierge em um único caminho.',
     adminFlow: 'Fluxo de administração', execPreview: 'Visão executiva', ownerRestricted: 'Restrito a proprietário/administrador',
     ownerRestrictedDesc: 'As recomendações de finanças, KPI, CRM, prospecção, previsões e Concierge são restritas a funções de proprietário/administrador.',
-    nav: { 'Overview': 'Visão geral', 'Logs': 'Registros', 'Outreach': 'Prospecção', 'Insights': 'Insights', 'Role Management': 'Gestão de funções', 'Marketplace Monitor': 'Monitor do marketplace', 'SaaS Monitor': 'Monitor SaaS', 'Concierge Monitor': 'Monitor do Concierge' },
+    nav: { 'Overview': 'Visão geral', 'Logs': 'Registros', 'Outreach': 'Prospecção', 'Marketing + Sales': 'Marketing + Vendas', 'Insights': 'Insights', 'Role Management': 'Gestão de funções', 'Marketplace Monitor': 'Monitor do marketplace', 'SaaS Monitor': 'Monitor SaaS', 'Concierge Monitor': 'Monitor do Concierge' },
   },
   pl: {
     checkingAccess: 'Sprawdzanie dostępu właściciela/administratora…',
@@ -43,7 +44,7 @@ const COPY: Record<string, Record<string, any>> = {
     controlRoomDesc: 'Przegląd, Dzienniki, Pozyskiwanie, Statystyki, Zarządzanie rolami, Monitor marketplace, Monitor SaaS i Monitor Concierge w jednej ścieżce.',
     adminFlow: 'Przepływ administracyjny', execPreview: 'Podgląd zarządczy', ownerRestricted: 'Tylko właściciel/administrator',
     ownerRestrictedDesc: 'Rekomendacje finansowe, KPI, CRM, pozyskiwania, prognoz i Concierge są dostępne tylko dla ról właściciela/administratora.',
-    nav: { 'Overview': 'Przegląd', 'Logs': 'Dzienniki', 'Outreach': 'Pozyskiwanie', 'Insights': 'Statystyki', 'Role Management': 'Zarządzanie rolami', 'Marketplace Monitor': 'Monitor marketplace', 'SaaS Monitor': 'Monitor SaaS', 'Concierge Monitor': 'Monitor Concierge' },
+    nav: { 'Overview': 'Przegląd', 'Logs': 'Dzienniki', 'Outreach': 'Pozyskiwanie', 'Marketing + Sales': 'Marketing i Sprzedaż', 'Insights': 'Statystyki', 'Role Management': 'Zarządzanie rolami', 'Marketplace Monitor': 'Monitor marketplace', 'SaaS Monitor': 'Monitor SaaS', 'Concierge Monitor': 'Monitor Concierge' },
   },
   ru: {
     checkingAccess: 'Проверка доступа владельца/администратора…',
@@ -51,7 +52,7 @@ const COPY: Record<string, Record<string, any>> = {
     controlRoomDesc: 'Обзор, Журналы, Привлечение, Аналитика, Управление ролями, Монитор маркетплейса, Монитор SaaS и Монитор Concierge — в одном месте.',
     adminFlow: 'Поток администрирования', execPreview: 'Обзор для руководства', ownerRestricted: 'Только для владельца/администратора',
     ownerRestrictedDesc: 'Рекомендации по финансам, KPI, CRM, привлечению, прогнозам и Concierge доступны только владельцу/администратору.',
-    nav: { 'Overview': 'Обзор', 'Logs': 'Журналы', 'Outreach': 'Привлечение', 'Insights': 'Аналитика', 'Role Management': 'Управление ролями', 'Marketplace Monitor': 'Монитор маркетплейса', 'SaaS Monitor': 'Монитор SaaS', 'Concierge Monitor': 'Монитор Concierge' },
+    nav: { 'Overview': 'Обзор', 'Logs': 'Журналы', 'Outreach': 'Привлечение', 'Marketing + Sales': 'Маркетинг + продажи', 'Insights': 'Аналитика', 'Role Management': 'Управление ролями', 'Marketplace Monitor': 'Монитор маркетплейса', 'SaaS Monitor': 'Монитор SaaS', 'Concierge Monitor': 'Монитор Concierge' },
   },
 }
 
@@ -113,9 +114,19 @@ export default function AdminLayoutShell({ children }: { children: React.ReactNo
           <section className="sb-sidebar__group">
             <p>{c.adminFlow}</p>
             {nav.map(({ icon, label, href }) => (
-              <Link key={href} href={href} className="sb-sidebar__link" style={pathname === href ? { background: 'rgba(26,240,255,.14)', color: '#fff', borderColor: 'rgba(26,240,255,.42)', boxShadow: '0 0 24px rgba(26,240,255,.14)' } : undefined}>
-                <span aria-hidden="true">{icon}</span><span>{c.nav[label] || label}</span>
-              </Link>
+              label === 'Marketing + Sales' ? (
+                <CosaNotificationCenter
+                  key={href}
+                  icon={icon}
+                  label={c.nav[label] || label}
+                  href={href}
+                  active={pathname === href || pathname === '/dashboard/cosa'}
+                />
+              ) : (
+                <Link key={href} href={href} className="sb-sidebar__link" style={pathname === href ? { background: 'rgba(26,240,255,.14)', color: '#fff', borderColor: 'rgba(26,240,255,.42)', boxShadow: '0 0 24px rgba(26,240,255,.14)' } : undefined}>
+                  <span aria-hidden="true">{icon}</span><span>{c.nav[label] || label}</span>
+                </Link>
+              )
             ))}
           </section>
         </nav>

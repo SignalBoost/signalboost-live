@@ -32,5 +32,6 @@
   "overview": "Visão geral",
   "languages": "Idiomas",
   "channel": "Canal",
-  "all": "Todos"
+  "all": "Todos",
+  "errNoAsset": "Nenhum vídeo anexado para publicar."
 }

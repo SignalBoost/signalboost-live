@@ -1,7 +1,7 @@
 // saas/app/api/marketing-sales/publish/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/outreach/security'
-import '@/marketing-sales-core' // load barrel so publishers self-register
+import '@/marketing-sales-host/registerExecutors' // core stubs + real host connectors (host wins)
 import { createSignalBoostMarketingHost, signalboostActor } from '@/marketing-sales-host/signalboostHost'
 import { publishCampaign } from '@/marketing-sales-core/publish'
 

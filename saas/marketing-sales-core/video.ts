@@ -15,7 +15,7 @@ export type VideoSubmit = (
 export type VideoPoll = (
   model: string,
   requestId: string,
-) => Promise<{ ok: boolean; status: 'pending' | 'done' | 'failed'; videoUrl?: string; error?: string }>
+) => Promise<{ ok: boolean; status?: 'pending' | 'done' | 'failed'; videoUrl?: string; error?: string }>
 
 // Durable rehost: copy a provider URL into storage we control, return a stable URL.
 export type VideoRehost = (

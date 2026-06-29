@@ -65,11 +65,10 @@ export default function CosaNotificationCenter({ label, href, icon, active }: Pr
   async function act(campaign: Campaign, action: 'approve' | 'request_edits' | 'reject' | 'archive') {
     setActingId(campaign.id)
     try {
-      const status = action === 'approve' ? 'approved' : action === 'reject' || action === 'archive' ? 'rejected' : (campaign.status || 'waiting_approval')
-      const response = await fetch('/api/cos/campaign-queue', {
-        method: 'PATCH',
+      const response = await fetch('/api/cos/campaign-notifications', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: campaign.id, status, action }),
+        body: JSON.stringify({ id: campaign.id, action }),
       })
       if (!response.ok) throw new Error('Action failed')
       await load()

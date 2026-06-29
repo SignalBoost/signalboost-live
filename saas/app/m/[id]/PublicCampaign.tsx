@@ -1,13 +1,27 @@
 // saas/app/m/[id]/PublicCampaign.tsx
 'use client'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 type Draft = { lang: string; title: string; body: string }
 
-export default function PublicCampaign({ drafts }: { drafts: Draft[] }) {
+export default function PublicCampaign({ campaignId, drafts }: { campaignId: string; drafts: Draft[] }) {
   const langs = drafts.map((d) => d.lang)
   const [lang, setLang] = useState(langs.includes('en') ? 'en' : (langs[0] || 'en'))
   const d = drafts.find((x) => x.lang === lang) || drafts[0]
+  const counted = useRef(false)
+
+  useEffect(() => {
+    if (counted.current || !campaignId) return
+    counted.current = true
+    // fire-and-forget; a failed beacon must never affect the page
+    fetch('/api/marketing-sales/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaignId, kind: 'view' }),
+      keepalive: true,
+    }).catch(() => {})
+  }, [campaignId])
+
   return (
     <main style={{ minHeight: '70vh', maxWidth: 720, margin: '0 auto', padding: '48px 22px', color: 'rgba(226,232,240,.92)' }}>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>

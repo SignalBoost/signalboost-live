@@ -12,6 +12,7 @@ type Row = {
   connector: string | null
   lastOk: boolean | null
   views: number
+  videoStatus?: string | null
 }
 
 const STATUS_KEY: Record<string, Parameters<typeof msT>[1]> = {
@@ -95,6 +96,9 @@ export default function ConsoleClient() {
                   <span>{msT(L, 'languages')}: {r.draftCount}</span>
                   {r.connector ? <span>{msT(L, 'channel')}: {r.connector}</span> : null}
                   <span title="views">👁 {r.views || 0}</span>
+                  {r.videoStatus && r.videoStatus !== 'none' ? (
+                    <span title="video render" style={{ fontWeight: 700, color: r.videoStatus === 'ready' ? '#34d399' : r.videoStatus === 'failed' ? '#f87171' : '#fbbf24' }}>🎬 {r.videoStatus === 'pending' ? 'rendering' : r.videoStatus}</span>
+                  ) : null}
                 </div>
               </div>
               <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>

@@ -118,6 +118,34 @@ export async function findContactEmail(businessUrl: string): Promise<ContactEmai
   }
 
   const ranked = rank(Array.from(all), domain)
-  if (!ranked.length) return { email: null, source: null, candidates: [] }
-  return { email: ranked[0], source, candidates: ranked.slice(0, 5) }
+  if (ranked.length) return { email: ranked[0], source, candidates: ranked.slice(0, 5) }
+
+  // Fallback: Apollo.io people/match enrichment — resolves many company-email-first
+  // businesses that hide behind contact forms. Same honesty rule: on-domain only.
+  const apolloEmail = await apolloLookup(domain)
+  if (apolloEmail) return { email: apolloEmail, source: 'apollo_enrichment', candidates: [apolloEmail] }
+
+  return { email: null, source: null, candidates: [] }
+}
+
+// Apollo.io /people/match — returns the best on-domain contact email for a given
+// company domain, or null when Apollo has no record. Requires APOLLO_API_KEY env var.
+async function apolloLookup(domain: string): Promise<string | null> {
+  const key = process.env.APOLLO_API_KEY
+  if (!key || !domain) return null
+  try {
+    const res = await fetch('https://api.apollo.io/api/v1/people/match', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
+      body: JSON.stringify({ api_key: key, organization_domain: domain }),
+    })
+    if (!res.ok) return null
+    const d: any = await res.json().catch(() => null)
+    const email: string = d?.person?.email || d?.person?.personal_emails?.[0] || ''
+    if (!email || !looksReal(email)) return null
+    const eDomain = email.split('@')[1] || ''
+    // Strict: only return an address whose domain matches the target.
+    if (eDomain !== domain && !eDomain.endsWith('.' + domain)) return null
+    return email.toLowerCase()
+  } catch { return null }
 }

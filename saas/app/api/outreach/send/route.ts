@@ -1,3 +1,4 @@
+// saas/app/api/outreach/send/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction, enforceDailySendLimit, isOutreachSendingDisabled } from '@/lib/outreach/security'
 import { assertSafeOutreachMessage } from '@/lib/ai/guardrails'
@@ -36,8 +37,14 @@ export async function POST(req: NextRequest) {
   const safe = assertSafeOutreachMessage(String(outreach.outreach_message || ''))
   if (!safe.ok) return NextResponse.json({ error: safe.reason }, { status: 400 })
 
-  let providerResult: Record<string, unknown> = { mode: 'manual_record_only' }
-  if (channel === 'email' && toEmail) {
+  // Honesty: an email only actually leaves when this is an email channel WITH a real
+  // recipient. Otherwise this is a manual record (e.g. the owner reached out another
+  // way) — we record it but never pretend an email was dispatched.
+  const willEmail = channel === 'email' && !!toEmail
+  let emailed = false
+  let providerResult: Record<string, unknown> = { mode: 'manual_record_only', delivery: 'recorded_only' }
+
+  if (willEmail) {
     const sent = await sendEmail({
       from: 'saasSales',
       to: toEmail,
@@ -45,7 +52,8 @@ export async function POST(req: NextRequest) {
       html: `<div style="font-family:Arial,sans-serif;line-height:1.5;white-space:pre-wrap">${String(outreach.outreach_message).replace(/[<>&]/g, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[char] || char))}</div>`,
     })
     if (!sent.ok) return NextResponse.json({ error: sent.error || 'Email send failed' }, { status: 502 })
-    providerResult = sent
+    emailed = true
+    providerResult = { ...sent, delivery: 'emailed' }
   }
 
   const sentAt = new Date().toISOString()
@@ -54,7 +62,7 @@ export async function POST(req: NextRequest) {
     business_id: outreach.business_id,
     channel,
     sent_at: sentAt,
-    metadata: { providerResult, toEmail: toEmail || null },
+    metadata: { providerResult, toEmail: toEmail || null, emailed, delivery: emailed ? 'emailed' : 'recorded_only' },
   })
   if (sendError) return NextResponse.json({ error: sendError.message }, { status: 500 })
 
@@ -65,8 +73,8 @@ export async function POST(req: NextRequest) {
     action: 'outreach.send',
     targetType: 'outreach_queue',
     targetId: outreachId,
-    metadata: { channel, providerResult },
+    metadata: { channel, emailed, delivery: emailed ? 'emailed' : 'recorded_only', providerResult },
   })
 
-  return NextResponse.json({ ok: true, sentAt, sendLimit: { ...limit, count: limit.count + 1 }, providerResult })
+  return NextResponse.json({ ok: true, sentAt, emailed, delivery: emailed ? 'emailed' : 'recorded_only', recipient: toEmail || null, sendLimit: { ...limit, count: limit.count + 1 }, providerResult })
 }

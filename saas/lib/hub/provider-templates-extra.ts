@@ -157,7 +157,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
   'supabase.edit_user': {
     id: 'supabase.edit_user',
     label: 'Edit User',
-    description: 'Update a user\'s email, metadata, or confirmation state.',
+    description: 'Update a user's email, metadata, or confirmation state.',
     icon: '✏️',
     policyActionId: 'edit_supabase_user',
     api: { service: 'Supabase', method: 'POST', endpoint: '/v1/auth/users/update' },
@@ -373,7 +373,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
   'github.edit_issue': {
     id: 'github.edit_issue',
     label: 'Edit Issue',
-    description: 'Update an issue\u2019s title or open/closed state.',
+    description: 'Update an issue’s title or open/closed state.',
     icon: '✏️',
     policyActionId: 'crud_actions',
     api: { service: 'GitHub', method: 'POST', endpoint: '/v1/issues/update' },
@@ -718,7 +718,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
   'audit.provision_pricing': {
     id: 'audit.provision_pricing',
     label: 'Provision Audit Pricing (Stripe → Vercel → Vault)',
-    description: 'One-shot: read lib/audit/pricingConfig.ts, create or refresh each tier\'s Stripe product + recurring price, write each price id into its NEXT_PUBLIC_* Vercel variable, and record each key in the Vault. Idempotent — safe to re-run; it only creates a new Stripe price when the configured amount changed. A redeploy is required afterward for the Vercel variables to take effect.',
+    description: 'One-shot: read lib/audit/pricingConfig.ts, create or refresh each tier's Stripe product + recurring price, write each price id into its NEXT_PUBLIC_* Vercel variable, and record each key in the Vault. Idempotent — safe to re-run; it only creates a new Stripe price when the configured amount changed. A redeploy is required afterward for the Vercel variables to take effect.',
     icon: '🧾',
     requiresConfirm: true,
     policyActionId: 'provision_audit_pricing',
@@ -726,4 +726,31 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     fields: [],
   },
   // ===================== GITHUB (console expansion) =====================
+
+  // ── Twilio (expanded) ──────────────────────────────────────────────────────
+  'twilio.list_messages': { id: 'twilio.list_messages', label: 'List Messages', icon: '📋', description: 'Recent SMS/MMS messages sent or received.', policyActionId: 'read_provider_status', api: { service: 'twilio', method: 'GET', endpoint: '/2010-04-01/Accounts/{AccountSid}/Messages.json' }, fields: [] },
+  'twilio.list_numbers': { id: 'twilio.list_numbers', label: 'List Phone Numbers', icon: '📞', description: 'Purchased phone numbers on the account.', policyActionId: 'read_provider_status', api: { service: 'twilio', method: 'GET', endpoint: '/2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers.json' }, fields: [] },
+
+  // ── SendGrid (expanded) ────────────────────────────────────────────────────
+  'sendgrid.list_templates': { id: 'sendgrid.list_templates', label: 'List Templates', icon: '📄', description: 'Dynamic email templates.', policyActionId: 'read_provider_status', api: { service: 'sendgrid', method: 'GET', endpoint: '/v3/templates?generations=dynamic' }, fields: [] },
+  'sendgrid.list_suppressions': { id: 'sendgrid.list_suppressions', label: 'List Suppressions', icon: '🚫', description: 'Global unsubscribes and bounced addresses.', policyActionId: 'read_provider_status', api: { service: 'sendgrid', method: 'GET', endpoint: '/v3/suppression/unsubscribes' }, fields: [] },
+  'sendgrid.delete_suppression': { id: 'sendgrid.delete_suppression', label: 'Remove Suppression', icon: '🗑️', description: 'Remove an email from the global suppression list.', policyActionId: 'crud_actions', requiresConfirm: true, api: { service: 'sendgrid', method: 'DELETE', endpoint: '/v3/asm/suppressions/global/{email}' }, fields: [{ id: 'email', label: 'Email to remove', type: 'email', required: true }] },
+
+  // ── Cloudflare (expanded) ──────────────────────────────────────────────────
+  'cloudflare.list_dns_records': { id: 'cloudflare.list_dns_records', label: 'List DNS Records', icon: '📋', description: 'All DNS records in the zone.', policyActionId: 'read_provider_status', api: { service: 'cloudflare', method: 'GET', endpoint: '/zones/{zoneId}/dns_records' }, fields: [] },
+  'cloudflare.delete_dns_record': { id: 'cloudflare.delete_dns_record', label: 'Delete DNS Record', icon: '🗑️', description: 'Remove a DNS record from the zone.', policyActionId: 'delete_provider_resource', requiresConfirm: true, api: { service: 'cloudflare', method: 'DELETE', endpoint: '/zones/{zoneId}/dns_records/{id}' }, fields: [{ id: 'id', label: 'Record ID', type: 'text', required: true }] },
+  'cloudflare.list_waf_rules': { id: 'cloudflare.list_waf_rules', label: 'List WAF Rules', icon: '🛡️', description: 'Active WAF firewall rules.', policyActionId: 'read_provider_status', api: { service: 'cloudflare', method: 'GET', endpoint: '/zones/{zoneId}/firewall/rules' }, fields: [] },
+  'cloudflare.zone_settings': { id: 'cloudflare.zone_settings', label: 'Zone Settings', icon: '⚙️', description: 'View current zone security and performance settings.', policyActionId: 'read_provider_status', api: { service: 'cloudflare', method: 'GET', endpoint: '/zones/{zoneId}/settings' }, fields: [] },
+
+  // ── DigitalOcean (expanded) ────────────────────────────────────────────────
+  'digitalocean.delete_droplet': { id: 'digitalocean.delete_droplet', label: 'Delete Droplet', icon: '🗑️', description: 'Permanently destroy a droplet.', policyActionId: 'delete_provider_resource', requiresConfirm: true, api: { service: 'digitalocean', method: 'DELETE', endpoint: '/v2/droplets/{id}' }, fields: [{ id: 'id', label: 'Droplet ID', type: 'text', required: true }] },
+  'digitalocean.list_domains': { id: 'digitalocean.list_domains', label: 'List Domains', icon: '🌐', description: 'Domains managed in DigitalOcean DNS.', policyActionId: 'read_provider_status', api: { service: 'digitalocean', method: 'GET', endpoint: '/v2/domains' }, fields: [] },
+  'digitalocean.add_domain': { id: 'digitalocean.add_domain', label: 'Add Domain', icon: '➕', description: 'Register a domain in DigitalOcean DNS.', policyActionId: 'crud_actions', api: { service: 'digitalocean', method: 'POST', endpoint: '/v2/domains' }, fields: [{ id: 'name', label: 'Domain name', type: 'text', required: true, placeholder: 'example.com' }] },
+
+  // ── AWS (expanded) ─────────────────────────────────────────────────────────
+  'aws.list_s3_buckets': { id: 'aws.list_s3_buckets', label: 'List S3 Buckets', icon: '📋', description: 'All S3 buckets in the account.', policyActionId: 'read_provider_status', api: { service: 'aws', method: 'GET', endpoint: '/s3/buckets' }, fields: [] },
+  'aws.enable_iam_user': { id: 'aws.enable_iam_user', label: 'Enable IAM User', icon: '✅', description: 'Re-activate a previously disabled IAM user.', policyActionId: 'disable_aws_iam_user', api: { service: 'aws', method: 'POST', endpoint: '/iam/enable' }, fields: [{ id: 'username', label: 'Username', type: 'text', required: true }] },
+
+  // ── GCP (expanded) ─────────────────────────────────────────────────────────
+  'gcp.disable_service_account': { id: 'gcp.disable_service_account', label: 'Disable Service Account', icon: '🚫', description: 'Disable a GCP service account.', policyActionId: 'disable_aws_iam_user', requiresConfirm: true, api: { service: 'gcp', method: 'POST', endpoint: '/iam/serviceaccounts/{email}/disable' }, fields: [{ id: 'email', label: 'Service account email', type: 'email', required: true }] },
 }

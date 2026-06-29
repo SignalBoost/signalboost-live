@@ -47,8 +47,8 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     accent: '#ff9900',
     tier: 'core',
     sections: [
-      { title: 'Storage', templateIds: ['aws.create_s3_bucket'] },
-      { title: 'IAM', templateIds: ['aws.list_iam_users', 'aws.disable_iam_user'] },
+      { title: 'Storage', templateIds: ['aws.list_s3_buckets', 'aws.create_s3_bucket'] },
+      { title: 'IAM', templateIds: ['aws.list_iam_users', 'aws.disable_iam_user', 'aws.enable_iam_user'] },
       { title: 'Credentials', templateIds: ['aws.rotate_credential'] }
     ]
   },
@@ -59,7 +59,7 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     accent: '#4285f4',
     tier: 'core',
     sections: [
-      { title: 'IAM', templateIds: ['gcp.list_service_accounts'] }
+      { title: 'IAM', templateIds: ['gcp.list_service_accounts', 'gcp.disable_service_account'] }
     ]
   },
   {
@@ -144,7 +144,7 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     accent: '#f22f46',
     tier: 'tier2',
     sections: [
-      { title: 'Messaging', templateIds: ['twilio.send_sms', 'twilio.verify_number'] }
+      { title: 'Messaging', templateIds: ['twilio.send_sms', 'twilio.verify_number', 'twilio.list_messages', 'twilio.list_numbers'] }
     ]
   },
   {
@@ -154,7 +154,7 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     accent: '#1a82e2',
     tier: 'tier2',
     sections: [
-      { title: 'Email', templateIds: ['sendgrid.send_email', 'sendgrid.check_domain_auth'] }
+      { title: 'Email', templateIds: ['sendgrid.send_email', 'sendgrid.check_domain_auth', 'sendgrid.list_templates', 'sendgrid.list_suppressions'] }
     ]
   },
   {
@@ -164,8 +164,9 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     accent: '#f38020',
     tier: 'tier2',
     sections: [
-      { title: 'DNS', templateIds: ['cloudflare.add_dns_record', 'cloudflare.toggle_proxy'] },
-      { title: 'Cache', templateIds: ['cloudflare.purge_cache'] }
+      { title: 'DNS', templateIds: ['cloudflare.add_dns_record', 'cloudflare.list_dns_records', 'cloudflare.toggle_proxy', 'cloudflare.delete_dns_record'] },
+      { title: 'Cache', templateIds: ['cloudflare.purge_cache'] },
+      { title: 'WAF & Security', templateIds: ['cloudflare.list_waf_rules', 'cloudflare.zone_settings'] }
     ]
   },
   {
@@ -175,7 +176,8 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     accent: '#0080ff',
     tier: 'tier2',
     sections: [
-      { title: 'Compute', templateIds: ['digitalocean.create_droplet', 'digitalocean.view_droplets'] }
+      { title: 'Compute', templateIds: ['digitalocean.view_droplets', 'digitalocean.create_droplet', 'digitalocean.delete_droplet'] },
+      { title: 'Domains', templateIds: ['digitalocean.list_domains', 'digitalocean.add_domain'] }
     ]
   },
 
@@ -273,11 +275,12 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
   {
     id: 'resend', name: 'Resend', subtitle: 'EMAIL', accent: '#e879f9', tier: 'tier2',
     sections: [
-      { title: 'Email Delivery', templateIds: ['resend.email_deliveries'] },
-      { title: 'Domains', templateIds: ['resend.list_domains'] },
-      { title: 'Audiences', templateIds: ['resend.list_audiences'] },
+      { title: 'Email Delivery', templateIds: ['resend.email_deliveries', 'resend.send_test_email'] },
+      { title: 'Domains', templateIds: ['resend.list_domains', 'resend.add_domain', 'resend.verify_domain', 'resend.delete_domain'] },
+      { title: 'Audiences', templateIds: ['resend.list_audiences', 'resend.create_audience', 'resend.delete_audience'] },
+      { title: 'Contacts', templateIds: ['resend.add_contact', 'resend.delete_contact'] },
       { title: 'Broadcasts', templateIds: ['resend.list_broadcasts'] },
-      { title: 'API Keys', templateIds: ['resend.list_api_keys'] }
+      { title: 'API Keys', templateIds: ['resend.list_api_keys', 'resend.create_api_key', 'resend.delete_api_key'] },
     ]
   },
   {

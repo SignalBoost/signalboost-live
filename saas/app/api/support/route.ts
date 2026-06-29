@@ -527,7 +527,7 @@ const TOOL_PROPOSE_INFRA_PR: ChatTool = {
   function: {
     name: 'proposeInfrastructurePR',
     description:
-      'Stage a real infrastructure change as an OPEN PULL REQUEST for the owner to approve — do NOT ask permission, the PR IS the proposal. Use whenever the owner asks to change live provider state: set/rotate a Vercel env var, sync a key to Vercel, create/edit a Stripe product or price, run a Supabase migration or SQL, manage a GitHub/Resend/ElevenLabs resource, trigger a redeploy, etc. You act as the developer: produce the EXACT ordered steps, each a real hub templateId (e.g. "vercel.add_env_var", "supabase.run_migration", "stripe.create_price") with a fully-filled payload. ALWAYS call listProviderActions FIRST to get the exact templateId and required field names for each provider — never guess template ids or payload field names. Nothing executes now — it fires only when the owner clicks Merge on /hub/prs. Never claim anything was applied; say it is staged for approval.',
+      'Stage a real infrastructure change as an OPEN PULL REQUEST for the owner to approve — do NOT ask permission, the PR IS the proposal. Use whenever the owner asks to change live provider state: set/rotate a Vercel env var, sync a key to Vercel, create/edit a Stripe product or price, run a Supabase migration or SQL, manage a GitHub/Resend/ElevenLabs resource, trigger a redeploy, etc. You act as the developer: produce the EXACT ordered steps, each a real hub templateId (e.g. "vercel.add_env_var", "supabase.run_migration", "stripe.create_price") with a fully-filled payload. ALWAYS call listProviderActions FIRST to get the exact templateId and required field names for each provider — never guess template ids or payload field names. Nothing executes now — it fires only when the owner clicks Merge at /dashboard/infrastructure. Never claim anything was applied; say it is staged for approval.',
     parameters: {
       type: 'object',
       properties: {
@@ -556,7 +556,7 @@ const TOOL_LIST_INFRA_PRS: ChatTool = {
   type: 'function',
   function: {
     name: 'listInfrastructurePRs',
-    description: 'List the infrastructure pull requests currently OPEN and awaiting the owner\'s Merge on /hub/prs. Call when the owner asks what infra changes are pending approval.',
+    description: 'List the infrastructure pull requests currently OPEN and awaiting the owner\'s Merge at /dashboard/infrastructure. Call when the owner asks what infra changes are pending approval.',
     parameters: { type: 'object', properties: {}, required: [] },
   },
 }

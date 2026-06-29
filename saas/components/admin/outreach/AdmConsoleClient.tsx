@@ -340,6 +340,7 @@ export default function AdmConsoleClient() {
   }
 
   useEffect(() => { load() }, [])
+  useEffect(() => { setSendEmail(selected?.contact_email || '') }, [selected])
 
   const predictedNeeds = useMemo(() => {
     const needs = data?.recentOutreach.flatMap(row => row.predictive_needs?.likely_next_needs || []) || []

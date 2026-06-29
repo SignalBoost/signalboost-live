@@ -17,5 +17,20 @@
   "errPlatformPending": "This channel is awaiting platform approval.",
   "errUnknown": "Something went wrong. Please try again.",
   "approveAndPublish": "Approve & publish",
-  "viewLive": "View live"
+  "viewLive": "View live",
+  "statusIntake": "Intake",
+  "statusDrafting": "Drafting",
+  "statusNeedsApproval": "Needs approval",
+  "statusApproved": "Approved",
+  "statusPublishing": "Publishing",
+  "statusPublished": "Published",
+  "statusPublishFailed": "Publish failed",
+  "statusEditsRequested": "Edits requested",
+  "statusRejected": "Rejected",
+  "statusArchived": "Archived",
+  "statusMeasuring": "Measuring",
+  "overview": "Overview",
+  "languages": "Languages",
+  "channel": "Channel",
+  "all": "All"
 }

@@ -17,5 +17,20 @@
   "errPlatformPending": "Этот канал ожидает одобрения платформы.",
   "errUnknown": "Что-то пошло не так. Повторите попытку.",
   "approveAndPublish": "Одобрить и опубликовать",
-  "viewLive": "Открыть"
+  "viewLive": "Открыть",
+  "statusIntake": "Приём",
+  "statusDrafting": "Черновик",
+  "statusNeedsApproval": "Требует одобрения",
+  "statusApproved": "Одобрено",
+  "statusPublishing": "Публикация",
+  "statusPublished": "Опубликовано",
+  "statusPublishFailed": "Ошибка публикации",
+  "statusEditsRequested": "Запрошены правки",
+  "statusRejected": "Отклонено",
+  "statusArchived": "В архиве",
+  "statusMeasuring": "Измерение",
+  "overview": "Обзор",
+  "languages": "Языки",
+  "channel": "Канал",
+  "all": "Все"
 }

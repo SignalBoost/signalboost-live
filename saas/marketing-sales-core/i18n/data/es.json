@@ -17,5 +17,20 @@
   "errPlatformPending": "Este canal está pendiente de aprobación de la plataforma.",
   "errUnknown": "Algo salió mal. Inténtalo de nuevo.",
   "approveAndPublish": "Aprobar y publicar",
-  "viewLive": "Ver publicado"
+  "viewLive": "Ver publicado",
+  "statusIntake": "Recepción",
+  "statusDrafting": "Redactando",
+  "statusNeedsApproval": "Requiere aprobación",
+  "statusApproved": "Aprobado",
+  "statusPublishing": "Publicando",
+  "statusPublished": "Publicado",
+  "statusPublishFailed": "Error al publicar",
+  "statusEditsRequested": "Cambios solicitados",
+  "statusRejected": "Rechazado",
+  "statusArchived": "Archivado",
+  "statusMeasuring": "Midiendo",
+  "overview": "Resumen",
+  "languages": "Idiomas",
+  "channel": "Canal",
+  "all": "Todos"
 }

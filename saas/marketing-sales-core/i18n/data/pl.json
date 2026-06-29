@@ -17,5 +17,20 @@
   "errPlatformPending": "Ten kanał oczekuje na zatwierdzenie platformy.",
   "errUnknown": "Coś poszło nie tak. Spróbuj ponownie.",
   "approveAndPublish": "Zatwierdź i opublikuj",
-  "viewLive": "Zobacz na żywo"
+  "viewLive": "Zobacz na żywo",
+  "statusIntake": "Przyjęcie",
+  "statusDrafting": "Tworzenie",
+  "statusNeedsApproval": "Wymaga zatwierdzenia",
+  "statusApproved": "Zatwierdzono",
+  "statusPublishing": "Publikowanie",
+  "statusPublished": "Opublikowano",
+  "statusPublishFailed": "Publikacja nie powiodła się",
+  "statusEditsRequested": "Poproszono o zmiany",
+  "statusRejected": "Odrzucono",
+  "statusArchived": "Zarchiwizowano",
+  "statusMeasuring": "Pomiar",
+  "overview": "Przegląd",
+  "languages": "Języki",
+  "channel": "Kanał",
+  "all": "Wszystkie"
 }

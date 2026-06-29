@@ -1,407 +1,175 @@
 'use client'
 
 import { useEffect, useMemo, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
+import { useI18n } from '@/components/i18n/I18nProvider'
 
 const GOLD = '#ffc300'
+type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type Option = readonly [string, string]
 
-const DEFAULT_AUTONOMOUS_DIRECTIVE = 'Create an online outreach campaign for YouTube and other platforms showing our services and products that help companies grow. Feature www.saas.signalboostapp.com.'
+type OutreachRow = { id: string; business_name?: string; business_url?: string; source_platform?: string; status?: string; created_at?: string; outreach_message?: string; analyzer_summary?: any; predictive_needs?: any; business_model_profile?: any; social_plan?: any; promo_plan?: any; review_strategy?: any }
+type CampaignRow = { id: string; title: string; objective?: string; audience?: string; channel?: string; status?: string; risk_level?: string; created_at?: string; languages?: string[]; metadata?: Record<string, any>; assets?: Array<{ type?: string; status?: string; language?: string; brief?: string }>; work_items?: Array<{ id?: string; kind?: string; status?: string; output?: { title?: string; opening?: string; draft?: string; call_to_action?: string } }> }
+type FormState = { title: string; objective: string; channel: string; audience: string; language: string; priority: string; estimatedCostUsd: string; signal: string }
 
-type OutreachRow = {
-  id: string
-  business_name?: string
-  business_url?: string
-  source_platform?: string
-  status?: string
-  created_at?: string
-  outreach_message?: string
-  analyzer_summary?: any
-  predictive_needs?: any
-  business_model_profile?: any
-  social_plan?: any
-  promo_plan?: any
-  review_strategy?: any
+const COPY = {
+  en: {
+    directive: 'Create an online outreach campaign for YouTube and other platforms showing our services and products that help companies grow. Feature www.saas.signalboostapp.com.',
+    form: { title: 'Educational campaign: AI-operated growth department', objective: 'Explain how SignalBoost turns business ideas into approved marketing actions while keeping auditability, security, optimization, and owner control.', audience: 'Business owners, operators, and enterprise buyers evaluating AI-assisted company operations.', signal: 'Founder requested a Fortune-500-style Marketing/Sales workflow: request, draft, approval, polish, publishing, monitoring, and learning.' },
+    channels: [['youtube', 'YouTube education'], ['short_video', 'Short-form video'], ['linkedin', 'LinkedIn post'], ['blog', 'SEO / blog'], ['email', 'Sales email'], ['outreach', 'Targeted outreach'], ['landing_page', 'Landing page'], ['review_campaign', 'Customer proof']] as Option[],
+    priorities: [['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['critical', 'Critical']] as Option[],
+    languages: [['en', 'English'], ['es', 'Spanish'], ['pt', 'Portuguese'], ['pl', 'Polish'], ['ru', 'Russian']] as Option[],
+    status: { draft: 'Draft', waiting_approval: 'Pending approval', approved: 'Approved', queued: 'Queued', running: 'Running', completed: 'Completed', measured: 'Measured', learned: 'Learned', rejected: 'Rejected' },
+    channel: { youtube: 'YouTube', short_video: 'Short video', linkedin: 'LinkedIn', blog: 'Blog', email: 'Email', outreach: 'Outreach', landing_page: 'Landing page', review_campaign: 'Review campaign', campaign: 'Campaign' },
+    risk: { low: 'Low risk', medium: 'Medium risk', high: 'High risk' },
+    assetType: { script: 'Script', thumbnail: 'Thumbnail', description: 'Description', seo: 'SEO', translation: 'Translation', post: 'Post', email: 'Email', asset: 'Asset' },
+    text: { kicker: 'Marketing & Sales Department', title: 'COSA turns one command into review-ready campaign work.', intro: 'The owner-light workflow is: command, autonomous campaign setup, internal draft, owner review, final approval, publishing gate, monitoring, and optimization feedback.', refresh: 'Refresh department data', loading: 'Loading...', campaigns: 'Campaigns', waiting: 'Awaiting approval', approved: 'Approved', queue: 'Worker queue', drafts: 'Drafts generated', outreachApprovals: 'Outreach approvals', commandKicker: 'Owner-light campaign command', commandTitle: 'Tell COSA what you want. COSA prepares the draft.', commandBody: 'This creates a governed campaign and an internal review draft. It does not publish, send outreach, or spend money.', commandLabel: 'Campaign command', runCommand: 'Run COSA campaign command', detailKicker: 'Detailed campaign request', detailTitle: 'Use this only when you want manual control', detailBody: 'The detailed form remains available when you want to choose channel, priority, audience, and language yourself.', campaignTitle: 'Campaign title', objective: 'Objective', channelField: 'Channel', priority: 'Priority', language: 'Language', audience: 'Target audience', signal: 'Signal / reason', cost: 'Estimated cost USD', createCampaign: 'Create governed campaign', workflowKicker: 'Autonomous workflow', workflowTitle: 'COSA handles execution steps; owner controls risk', repositoryKicker: 'Campaign repository', repositoryTitle: 'Every campaign stays visible', repositoryBody: 'This is the department record. It shows what was requested, what COSA drafted, what requires approval, and what has been queued.', noCampaigns: 'No campaigns queued yet. Run the COSA command above to create a review-ready draft.', approvalQueue: 'Approval queue', reviewOutreach: 'Review finished outreach', noOutreach: 'No pending outreach approvals right now.', inspect: 'Select a queued COSA recommendation to inspect.', controlKicker: 'Enterprise control plane', controlTitle: 'The department plugs into your existing modules', audit: 'Audit', auditBody: 'Campaign create, draft, approve, reject, and queue actions go through admin checks and audit logging.', cyber: 'Cybersecurity', cyberBody: 'External connectors remain guarded; COSA prepares work without uncontrolled sending, posting, or spending.', opt: 'Optimization', optBody: 'Campaign results can feed predictive scoring, next-best-action logic, and future recommendations.', recent: 'Recent decisions', working: 'Working...', requiredCommand: 'Add a campaign command first.', requiredCampaign: 'Campaign title and objective are required.', autoDone: 'COSA created the campaign and prepared an internal review draft. Publishing, sending, and spending are still locked until approval.', manualDone: 'Campaign request queued for owner approval. COSA has not published, sent, or spent anything.', draftDone: 'Review draft generated. Publishing is still gated.', campaignMarked: 'Campaign marked', outreachApproved: 'Approved. COSA can move this work to the next guarded step.', outreachRejected: 'Rejected. COSA will not execute this item.', errorLoad: 'Could not load Marketing/Sales data.', errorCreate: 'Could not create campaign.', errorAuto: 'Could not run autonomous campaign command.', errorDraft: 'Could not generate draft.', errorMark: 'Could not update this item.', noSummary: 'No summary attached yet.', noObjective: 'No objective attached.', reviewDraft: 'Review draft generated', cta: 'CTA', workItems: 'Work items', generated: 'Generate review draft', approveCampaign: 'Approve campaign', reject: 'Reject', queueWorker: 'Queue worker', audienceLabel: 'Audience', preparedOutreach: 'Prepared outreach', socialPlan: 'Social / promo plan', noDraft: 'No outreach draft attached yet.', noPlan: 'No channel plan attached yet.', analyzer: 'Analyzer', predictive: 'Predictive needs', profile: 'Business profile' },
+    workflow: [['01', 'Command', 'You give COSA a plain-language campaign directive.'], ['02', 'Predict', 'COSA infers channel, audience, tone, and campaign structure.'], ['03', 'Draft', 'COSA creates an internal review draft automatically.'], ['04', 'Review', 'You approve, reject, archive, or request edits.'], ['05', 'Publish gate', 'Publishing connectors stay locked until approval.'], ['06', 'Optimize', 'Monitoring data feeds the optimization layer.']] as Option[],
+  },
+  es: {
+    directive: 'Crea una campaña de alcance en línea para YouTube y otras plataformas mostrando nuestros servicios y productos que ayudan a las empresas a crecer. Incluye www.saas.signalboostapp.com.',
+    form: { title: 'Campaña educativa: departamento de crecimiento operado por IA', objective: 'Explicar cómo SignalBoost convierte ideas de negocio en acciones de marketing aprobadas, manteniendo auditoría, seguridad, optimización y control del propietario.', audience: 'Dueños de negocio, operadores y compradores empresariales que evalúan operaciones asistidas por IA.', signal: 'El fundador pidió un flujo Marketing/Ventas estilo Fortune 500: solicitud, borrador, aprobación, pulido, publicación, monitoreo y aprendizaje.' },
+    channels: [['youtube', 'Educación en YouTube'], ['short_video', 'Video corto'], ['linkedin', 'Publicación en LinkedIn'], ['blog', 'SEO / blog'], ['email', 'Email de ventas'], ['outreach', 'Alcance dirigido'], ['landing_page', 'Página de destino'], ['review_campaign', 'Prueba de clientes']] as Option[],
+    priorities: [['low', 'Baja'], ['medium', 'Media'], ['high', 'Alta'], ['critical', 'Crítica']] as Option[],
+    languages: [['en', 'Inglés'], ['es', 'Español'], ['pt', 'Portugués'], ['pl', 'Polaco'], ['ru', 'Ruso']] as Option[],
+    status: { draft: 'Borrador', waiting_approval: 'Pendiente de aprobación', approved: 'Aprobado', queued: 'En cola', running: 'En ejecución', completed: 'Completado', measured: 'Medido', learned: 'Aprendido', rejected: 'Rechazado' },
+    channel: { youtube: 'YouTube', short_video: 'Video corto', linkedin: 'LinkedIn', blog: 'Blog', email: 'Email', outreach: 'Alcance', landing_page: 'Página de destino', review_campaign: 'Campaña de reseñas', campaign: 'Campaña' },
+    risk: { low: 'Riesgo bajo', medium: 'Riesgo medio', high: 'Riesgo alto' },
+    assetType: { script: 'Guion', thumbnail: 'Miniatura', description: 'Descripción', seo: 'SEO', translation: 'Traducción', post: 'Publicación', email: 'Email', asset: 'Activo' },
+    text: { kicker: 'Departamento de Marketing y Ventas', title: 'COSA convierte un comando en trabajo de campaña listo para revisión.', intro: 'El flujo con poca intervención del propietario es: comando, campaña autónoma, borrador interno, revisión, aprobación final, compuerta de publicación, monitoreo y optimización.', refresh: 'Actualizar datos del departamento', loading: 'Cargando...', campaigns: 'Campañas', waiting: 'Esperando aprobación', approved: 'Aprobadas', queue: 'Cola de trabajo', drafts: 'Borradores generados', outreachApprovals: 'Aprobaciones de alcance', commandKicker: 'Comando de campaña ligero', commandTitle: 'Dile a COSA lo que quieres. COSA prepara el borrador.', commandBody: 'Esto crea una campaña gobernada y un borrador interno. No publica, no envía alcance y no gasta dinero.', commandLabel: 'Comando de campaña', runCommand: 'Ejecutar comando COSA', detailKicker: 'Solicitud detallada de campaña', detailTitle: 'Usa esto solo si quieres control manual', detailBody: 'El formulario detallado queda disponible si deseas elegir canal, prioridad, audiencia e idioma.', campaignTitle: 'Título de campaña', objective: 'Objetivo', channelField: 'Canal', priority: 'Prioridad', language: 'Idioma', audience: 'Audiencia objetivo', signal: 'Señal / motivo', cost: 'Costo estimado USD', createCampaign: 'Crear campaña gobernada', workflowKicker: 'Flujo autónomo', workflowTitle: 'COSA ejecuta pasos; el propietario controla el riesgo', repositoryKicker: 'Repositorio de campañas', repositoryTitle: 'Cada campaña queda visible', repositoryBody: 'Este es el registro del departamento. Muestra lo solicitado, lo que COSA redactó, lo que requiere aprobación y lo que está en cola.', noCampaigns: 'No hay campañas en cola. Ejecuta el comando COSA arriba para crear un borrador listo para revisión.', approvalQueue: 'Cola de aprobación', reviewOutreach: 'Revisar alcance terminado', noOutreach: 'No hay aprobaciones de alcance pendientes.', inspect: 'Selecciona una recomendación COSA en cola para inspeccionarla.', controlKicker: 'Plano de control empresarial', controlTitle: 'El departamento se conecta con tus módulos existentes', audit: 'Auditoría', auditBody: 'Crear, redactar, aprobar, rechazar y poner campañas en cola pasa por controles administrativos y registros de auditoría.', cyber: 'Ciberseguridad', cyberBody: 'Los conectores externos siguen protegidos; COSA prepara trabajo sin envíos, publicaciones ni gastos no controlados.', opt: 'Optimización', optBody: 'Los resultados de campaña pueden alimentar scoring predictivo, siguiente mejor acción y futuras recomendaciones.', recent: 'Decisiones recientes', working: 'Trabajando...', requiredCommand: 'Agrega primero un comando de campaña.', requiredCampaign: 'El título y el objetivo de la campaña son obligatorios.', autoDone: 'COSA creó la campaña y preparó un borrador interno. Publicar, enviar y gastar siguen bloqueados hasta la aprobación.', manualDone: 'La solicitud de campaña quedó en cola para aprobación del propietario. COSA no publicó, envió ni gastó nada.', draftDone: 'Borrador de revisión generado. La publicación sigue bloqueada.', campaignMarked: 'Campaña marcada como', outreachApproved: 'Aprobado. COSA puede mover este trabajo al siguiente paso protegido.', outreachRejected: 'Rechazado. COSA no ejecutará este elemento.', errorLoad: 'No se pudieron cargar los datos de Marketing/Ventas.', errorCreate: 'No se pudo crear la campaña.', errorAuto: 'No se pudo ejecutar el comando autónomo.', errorDraft: 'No se pudo generar el borrador.', errorMark: 'No se pudo actualizar este elemento.', noSummary: 'Aún no hay resumen.', noObjective: 'Sin objetivo adjunto.', reviewDraft: 'Borrador de revisión generado', cta: 'CTA', workItems: 'Elementos de trabajo', generated: 'Generar borrador de revisión', approveCampaign: 'Aprobar campaña', reject: 'Rechazar', queueWorker: 'Poner worker en cola', audienceLabel: 'Audiencia', preparedOutreach: 'Alcance preparado', socialPlan: 'Plan social / promocional', noDraft: 'Aún no hay borrador de alcance.', noPlan: 'Aún no hay plan de canal.', analyzer: 'Analizador', predictive: 'Necesidades predictivas', profile: 'Perfil de negocio' },
+    workflow: [['01', 'Comando', 'Das a COSA una directiva de campaña en lenguaje natural.'], ['02', 'Predicción', 'COSA infiere canal, audiencia, tono y estructura.'], ['03', 'Borrador', 'COSA crea automáticamente un borrador interno.'], ['04', 'Revisión', 'Apruebas, rechazas, archivas o pides cambios.'], ['05', 'Compuerta', 'Los conectores de publicación quedan bloqueados hasta la aprobación.'], ['06', 'Optimización', 'Los datos de monitoreo alimentan la capa de optimización.']] as Option[],
+  },
+  pt: {
+    directive: 'Crie uma campanha de alcance online para YouTube e outras plataformas mostrando nossos serviços e produtos que ajudam empresas a crescer. Inclua www.saas.signalboostapp.com.',
+    form: { title: 'Campanha educativa: departamento de crescimento operado por IA', objective: 'Explicar como o SignalBoost transforma ideias de negócio em ações de marketing aprovadas, mantendo auditoria, segurança, otimização e controle do proprietário.', audience: 'Donos de negócio, operadores e compradores empresariais avaliando operações assistidas por IA.', signal: 'O fundador pediu um fluxo Marketing/Vendas estilo Fortune 500: solicitação, rascunho, aprovação, acabamento, publicação, monitoramento e aprendizado.' },
+    channels: [['youtube', 'Educação no YouTube'], ['short_video', 'Vídeo curto'], ['linkedin', 'Post no LinkedIn'], ['blog', 'SEO / blog'], ['email', 'Email de vendas'], ['outreach', 'Alcance direcionado'], ['landing_page', 'Página de destino'], ['review_campaign', 'Prova de clientes']] as Option[],
+    priorities: [['low', 'Baixa'], ['medium', 'Média'], ['high', 'Alta'], ['critical', 'Crítica']] as Option[],
+    languages: [['en', 'Inglês'], ['es', 'Espanhol'], ['pt', 'Português'], ['pl', 'Polonês'], ['ru', 'Russo']] as Option[],
+    status: { draft: 'Rascunho', waiting_approval: 'Aguardando aprovação', approved: 'Aprovado', queued: 'Na fila', running: 'Em execução', completed: 'Concluído', measured: 'Medido', learned: 'Aprendido', rejected: 'Rejeitado' },
+    channel: { youtube: 'YouTube', short_video: 'Vídeo curto', linkedin: 'LinkedIn', blog: 'Blog', email: 'Email', outreach: 'Alcance', landing_page: 'Página de destino', review_campaign: 'Campanha de avaliações', campaign: 'Campanha' },
+    risk: { low: 'Risco baixo', medium: 'Risco médio', high: 'Risco alto' },
+    assetType: { script: 'Roteiro', thumbnail: 'Miniatura', description: 'Descrição', seo: 'SEO', translation: 'Tradução', post: 'Post', email: 'Email', asset: 'Asset' },
+    text: { kicker: 'Departamento de Marketing e Vendas', title: 'COSA transforma um comando em campanha pronta para revisão.', intro: 'O fluxo com pouca intervenção do proprietário é: comando, campanha autônoma, rascunho interno, revisão, aprovação final, bloqueio de publicação, monitoramento e otimização.', refresh: 'Atualizar dados do departamento', loading: 'Carregando...', campaigns: 'Campanhas', waiting: 'Aguardando aprovação', approved: 'Aprovadas', queue: 'Fila de workers', drafts: 'Rascunhos gerados', outreachApprovals: 'Aprovações de alcance', commandKicker: 'Comando de campanha leve', commandTitle: 'Diga à COSA o que você quer. A COSA prepara o rascunho.', commandBody: 'Isso cria uma campanha governada e um rascunho interno. Não publica, não envia alcance e não gasta dinheiro.', commandLabel: 'Comando de campanha', runCommand: 'Executar comando COSA', detailKicker: 'Solicitação detalhada de campanha', detailTitle: 'Use isto apenas se quiser controle manual', detailBody: 'O formulário detalhado permanece disponível quando você quiser escolher canal, prioridade, público e idioma.', campaignTitle: 'Título da campanha', objective: 'Objetivo', channelField: 'Canal', priority: 'Prioridade', language: 'Idioma', audience: 'Público-alvo', signal: 'Sinal / motivo', cost: 'Custo estimado USD', createCampaign: 'Criar campanha governada', workflowKicker: 'Fluxo autônomo', workflowTitle: 'COSA executa etapas; o proprietário controla o risco', repositoryKicker: 'Repositório de campanhas', repositoryTitle: 'Toda campanha fica visível', repositoryBody: 'Este é o registro do departamento. Mostra o que foi solicitado, o que a COSA rascunhou, o que exige aprovação e o que está na fila.', noCampaigns: 'Nenhuma campanha na fila. Execute o comando COSA acima para criar um rascunho pronto para revisão.', approvalQueue: 'Fila de aprovação', reviewOutreach: 'Revisar alcance finalizado', noOutreach: 'Nenhuma aprovação de alcance pendente agora.', inspect: 'Selecione uma recomendação COSA na fila para inspecionar.', controlKicker: 'Plano de controle empresarial', controlTitle: 'O departamento se conecta aos módulos existentes', audit: 'Auditoria', auditBody: 'Criar, rascunhar, aprovar, rejeitar e colocar campanhas na fila passa por controles administrativos e logs de auditoria.', cyber: 'Cibersegurança', cyberBody: 'Conectores externos continuam protegidos; a COSA prepara trabalho sem envio, publicação ou gasto não controlado.', opt: 'Otimização', optBody: 'Resultados de campanhas podem alimentar scoring preditivo, próxima melhor ação e futuras recomendações.', recent: 'Decisões recentes', working: 'Trabalhando...', requiredCommand: 'Adicione primeiro um comando de campanha.', requiredCampaign: 'Título e objetivo da campanha são obrigatórios.', autoDone: 'A COSA criou a campanha e preparou um rascunho interno. Publicar, enviar e gastar continuam bloqueados até aprovação.', manualDone: 'A solicitação de campanha ficou na fila para aprovação do proprietário. A COSA não publicou, enviou nem gastou nada.', draftDone: 'Rascunho de revisão gerado. A publicação continua bloqueada.', campaignMarked: 'Campanha marcada como', outreachApproved: 'Aprovado. A COSA pode mover este trabalho para o próximo passo protegido.', outreachRejected: 'Rejeitado. A COSA não executará este item.', errorLoad: 'Não foi possível carregar os dados de Marketing/Vendas.', errorCreate: 'Não foi possível criar a campanha.', errorAuto: 'Não foi possível executar o comando autônomo.', errorDraft: 'Não foi possível gerar o rascunho.', errorMark: 'Não foi possível atualizar este item.', noSummary: 'Nenhum resumo anexado ainda.', noObjective: 'Nenhum objetivo anexado.', reviewDraft: 'Rascunho de revisão gerado', cta: 'CTA', workItems: 'Itens de trabalho', generated: 'Gerar rascunho de revisão', approveCampaign: 'Aprovar campanha', reject: 'Rejeitar', queueWorker: 'Colocar worker na fila', audienceLabel: 'Público', preparedOutreach: 'Alcance preparado', socialPlan: 'Plano social / promocional', noDraft: 'Nenhum rascunho de alcance anexado ainda.', noPlan: 'Nenhum plano de canal anexado ainda.', analyzer: 'Analisador', predictive: 'Necessidades preditivas', profile: 'Perfil do negócio' },
+    workflow: [['01', 'Comando', 'Você dá à COSA uma diretriz de campanha em linguagem natural.'], ['02', 'Predição', 'A COSA infere canal, público, tom e estrutura.'], ['03', 'Rascunho', 'A COSA cria automaticamente um rascunho interno.'], ['04', 'Revisão', 'Você aprova, rejeita, arquiva ou pede ajustes.'], ['05', 'Bloqueio', 'Conectores de publicação ficam bloqueados até aprovação.'], ['06', 'Otimização', 'Dados de monitoramento alimentam a camada de otimização.']] as Option[],
+  },
+  pl: {
+    directive: 'Utwórz kampanię online na YouTube i inne platformy, pokazując nasze usługi i produkty pomagające firmom rosnąć. Dodaj www.saas.signalboostapp.com.',
+    form: { title: 'Kampania edukacyjna: dział wzrostu obsługiwany przez AI', objective: 'Wyjaśnij, jak SignalBoost zamienia pomysły biznesowe w zatwierdzone działania marketingowe z audytem, bezpieczeństwem, optymalizacją i kontrolą właściciela.', audience: 'Właściciele firm, operatorzy i kupujący korporacyjni oceniający operacje wspierane przez AI.', signal: 'Założyciel poprosił o przepływ Marketing/Sprzedaż w stylu Fortune 500: zgłoszenie, szkic, zatwierdzenie, dopracowanie, publikacja, monitoring i uczenie.' },
+    channels: [['youtube', 'Edukacja YouTube'], ['short_video', 'Krótki film'], ['linkedin', 'Post LinkedIn'], ['blog', 'SEO / blog'], ['email', 'Email sprzedażowy'], ['outreach', 'Ukierunkowany kontakt'], ['landing_page', 'Strona docelowa'], ['review_campaign', 'Dowód klientów']] as Option[],
+    priorities: [['low', 'Niska'], ['medium', 'Średnia'], ['high', 'Wysoka'], ['critical', 'Krytyczna']] as Option[],
+    languages: [['en', 'Angielski'], ['es', 'Hiszpański'], ['pt', 'Portugalski'], ['pl', 'Polski'], ['ru', 'Rosyjski']] as Option[],
+    status: { draft: 'Szkic', waiting_approval: 'Oczekuje na zatwierdzenie', approved: 'Zatwierdzone', queued: 'W kolejce', running: 'W toku', completed: 'Ukończone', measured: 'Zmierzone', learned: 'Nauczone', rejected: 'Odrzucone' },
+    channel: { youtube: 'YouTube', short_video: 'Krótki film', linkedin: 'LinkedIn', blog: 'Blog', email: 'Email', outreach: 'Kontakt', landing_page: 'Strona docelowa', review_campaign: 'Kampania opinii', campaign: 'Kampania' },
+    risk: { low: 'Niskie ryzyko', medium: 'Średnie ryzyko', high: 'Wysokie ryzyko' },
+    assetType: { script: 'Scenariusz', thumbnail: 'Miniatura', description: 'Opis', seo: 'SEO', translation: 'Tłumaczenie', post: 'Post', email: 'Email', asset: 'Zasób' },
+    text: { kicker: 'Dział Marketingu i Sprzedaży', title: 'COSA zamienia jedno polecenie w kampanię gotową do przeglądu.', intro: 'Lekki przepływ właściciela: polecenie, autonomiczna konfiguracja kampanii, szkic wewnętrzny, przegląd, zatwierdzenie, bramka publikacji, monitoring i optymalizacja.', refresh: 'Odśwież dane działu', loading: 'Ładowanie...', campaigns: 'Kampanie', waiting: 'Oczekuje na zatwierdzenie', approved: 'Zatwierdzone', queue: 'Kolejka workerów', drafts: 'Wygenerowane szkice', outreachApprovals: 'Zatwierdzenia kontaktu', commandKicker: 'Lekkie polecenie kampanii', commandTitle: 'Powiedz COSA, czego chcesz. COSA przygotuje szkic.', commandBody: 'To tworzy zarządzaną kampanię i szkic wewnętrzny. Nie publikuje, nie wysyła i nie wydaje pieniędzy.', commandLabel: 'Polecenie kampanii', runCommand: 'Uruchom polecenie COSA', detailKicker: 'Szczegółowe zgłoszenie kampanii', detailTitle: 'Użyj tego tylko, gdy chcesz ręcznej kontroli', detailBody: 'Formularz szczegółowy pozostaje dostępny, gdy chcesz sam wybrać kanał, priorytet, odbiorców i język.', campaignTitle: 'Tytuł kampanii', objective: 'Cel', channelField: 'Kanał', priority: 'Priorytet', language: 'Język', audience: 'Grupa docelowa', signal: 'Sygnał / powód', cost: 'Szacowany koszt USD', createCampaign: 'Utwórz kampanię zarządzaną', workflowKicker: 'Przepływ autonomiczny', workflowTitle: 'COSA wykonuje kroki; właściciel kontroluje ryzyko', repositoryKicker: 'Repozytorium kampanii', repositoryTitle: 'Każda kampania pozostaje widoczna', repositoryBody: 'To rejestr działu. Pokazuje zgłoszenia, szkice COSA, elementy wymagające zatwierdzenia i pozycje w kolejce.', noCampaigns: 'Brak kampanii w kolejce. Uruchom powyższe polecenie COSA, aby utworzyć szkic do przeglądu.', approvalQueue: 'Kolejka zatwierdzeń', reviewOutreach: 'Przegląd gotowego kontaktu', noOutreach: 'Brak oczekujących zatwierdzeń kontaktu.', inspect: 'Wybierz rekomendację COSA z kolejki do sprawdzenia.', controlKicker: 'Korporacyjna warstwa kontroli', controlTitle: 'Dział łączy się z istniejącymi modułami', audit: 'Audyt', auditBody: 'Tworzenie, szkicowanie, zatwierdzanie, odrzucanie i kolejkowanie kampanii przechodzi przez kontrole administracyjne i logi audytu.', cyber: 'Cyberbezpieczeństwo', cyberBody: 'Konektory zewnętrzne pozostają chronione; COSA przygotowuje pracę bez niekontrolowanego wysyłania, publikacji lub wydatków.', opt: 'Optymalizacja', optBody: 'Wyniki kampanii mogą zasilać scoring predykcyjny, logikę następnej najlepszej akcji i przyszłe rekomendacje.', recent: 'Ostatnie decyzje', working: 'Praca...', requiredCommand: 'Najpierw dodaj polecenie kampanii.', requiredCampaign: 'Tytuł i cel kampanii są wymagane.', autoDone: 'COSA utworzyła kampanię i przygotowała szkic wewnętrzny. Publikacja, wysyłka i wydatki pozostają zablokowane do zatwierdzenia.', manualDone: 'Zgłoszenie kampanii trafiło do kolejki zatwierdzenia właściciela. COSA nic nie opublikowała, nie wysłała ani nie wydała.', draftDone: 'Wygenerowano szkic do przeglądu. Publikacja pozostaje zablokowana.', campaignMarked: 'Kampania oznaczona jako', outreachApproved: 'Zatwierdzono. COSA może przenieść tę pracę do następnego chronionego kroku.', outreachRejected: 'Odrzucono. COSA nie wykona tego elementu.', errorLoad: 'Nie udało się załadować danych Marketing/Sprzedaż.', errorCreate: 'Nie udało się utworzyć kampanii.', errorAuto: 'Nie udało się uruchomić polecenia autonomicznego.', errorDraft: 'Nie udało się wygenerować szkicu.', errorMark: 'Nie udało się zaktualizować elementu.', noSummary: 'Brak podsumowania.', noObjective: 'Brak celu.', reviewDraft: 'Wygenerowany szkic do przeglądu', cta: 'CTA', workItems: 'Elementy pracy', generated: 'Wygeneruj szkic do przeglądu', approveCampaign: 'Zatwierdź kampanię', reject: 'Odrzuć', queueWorker: 'Dodaj workera do kolejki', audienceLabel: 'Odbiorcy', preparedOutreach: 'Przygotowany kontakt', socialPlan: 'Plan społecznościowy / promocyjny', noDraft: 'Brak szkicu kontaktu.', noPlan: 'Brak planu kanału.', analyzer: 'Analizator', predictive: 'Potrzeby predykcyjne', profile: 'Profil firmy' },
+    workflow: [['01', 'Polecenie', 'Dajesz COSA polecenie kampanii w zwykłym języku.'], ['02', 'Predykcja', 'COSA wnioskuje kanał, odbiorców, ton i strukturę.'], ['03', 'Szkic', 'COSA automatycznie tworzy szkic wewnętrzny.'], ['04', 'Przegląd', 'Zatwierdzasz, odrzucasz, archiwizujesz lub prosisz o zmiany.'], ['05', 'Bramka', 'Konektory publikacji są zablokowane do zatwierdzenia.'], ['06', 'Optymalizacja', 'Dane z monitoringu zasilają warstwę optymalizacji.']] as Option[],
+  },
+  ru: {
+    directive: 'Создай онлайн-кампанию для YouTube и других платформ, показывающую наши услуги и продукты, которые помогают компаниям расти. Добавь www.saas.signalboostapp.com.',
+    form: { title: 'Образовательная кампания: отдел роста на базе ИИ', objective: 'Объяснить, как SignalBoost превращает бизнес-идеи в утверждённые маркетинговые действия с аудитом, безопасностью, оптимизацией и контролем владельца.', audience: 'Владельцы бизнеса, операторы и корпоративные покупатели, оценивающие операции с поддержкой ИИ.', signal: 'Основатель запросил поток Маркетинг/Продажи уровня Fortune 500: запрос, черновик, утверждение, доработка, публикация, мониторинг и обучение.' },
+    channels: [['youtube', 'Обучение YouTube'], ['short_video', 'Короткое видео'], ['linkedin', 'Пост LinkedIn'], ['blog', 'SEO / блог'], ['email', 'Продажный email'], ['outreach', 'Целевой аутрич'], ['landing_page', 'Лендинг'], ['review_campaign', 'Доказательство клиентов']] as Option[],
+    priorities: [['low', 'Низкий'], ['medium', 'Средний'], ['high', 'Высокий'], ['critical', 'Критический']] as Option[],
+    languages: [['en', 'Английский'], ['es', 'Испанский'], ['pt', 'Португальский'], ['pl', 'Польский'], ['ru', 'Русский']] as Option[],
+    status: { draft: 'Черновик', waiting_approval: 'Ожидает утверждения', approved: 'Утверждено', queued: 'В очереди', running: 'Выполняется', completed: 'Завершено', measured: 'Измерено', learned: 'Изучено', rejected: 'Отклонено' },
+    channel: { youtube: 'YouTube', short_video: 'Короткое видео', linkedin: 'LinkedIn', blog: 'Блог', email: 'Email', outreach: 'Аутрич', landing_page: 'Лендинг', review_campaign: 'Кампания отзывов', campaign: 'Кампания' },
+    risk: { low: 'Низкий риск', medium: 'Средний риск', high: 'Высокий риск' },
+    assetType: { script: 'Сценарий', thumbnail: 'Миниатюра', description: 'Описание', seo: 'SEO', translation: 'Перевод', post: 'Пост', email: 'Email', asset: 'Материал' },
+    text: { kicker: 'Отдел маркетинга и продаж', title: 'COSA превращает одну команду в кампанию для проверки.', intro: 'Лёгкий поток владельца: команда, автономная настройка кампании, внутренний черновик, проверка владельцем, финальное утверждение, шлюз публикации, мониторинг и оптимизация.', refresh: 'Обновить данные отдела', loading: 'Загрузка...', campaigns: 'Кампании', waiting: 'Ожидает утверждения', approved: 'Утверждено', queue: 'Очередь worker', drafts: 'Черновики созданы', outreachApprovals: 'Утверждения аутрича', commandKicker: 'Лёгкая команда кампании', commandTitle: 'Скажите COSA, что нужно. COSA подготовит черновик.', commandBody: 'Это создаёт управляемую кампанию и внутренний черновик. Без публикации, отправки и расходов.', commandLabel: 'Команда кампании', runCommand: 'Запустить команду COSA', detailKicker: 'Подробный запрос кампании', detailTitle: 'Используйте только для ручного контроля', detailBody: 'Подробная форма остаётся доступной, когда нужно выбрать канал, приоритет, аудиторию и язык вручную.', campaignTitle: 'Название кампании', objective: 'Цель', channelField: 'Канал', priority: 'Приоритет', language: 'Язык', audience: 'Целевая аудитория', signal: 'Сигнал / причина', cost: 'Оценка стоимости USD', createCampaign: 'Создать управляемую кампанию', workflowKicker: 'Автономный поток', workflowTitle: 'COSA выполняет шаги; владелец контролирует риск', repositoryKicker: 'Репозиторий кампаний', repositoryTitle: 'Каждая кампания остаётся видимой', repositoryBody: 'Это запись отдела. Здесь видно, что запрошено, что COSA подготовила, что требует утверждения и что стоит в очереди.', noCampaigns: 'Нет кампаний в очереди. Запустите команду COSA выше, чтобы создать черновик для проверки.', approvalQueue: 'Очередь утверждений', reviewOutreach: 'Проверить готовый аутрич', noOutreach: 'Сейчас нет ожидающих утверждений аутрича.', inspect: 'Выберите рекомендацию COSA из очереди для проверки.', controlKicker: 'Корпоративный контур контроля', controlTitle: 'Отдел подключается к существующим модулям', audit: 'Аудит', auditBody: 'Создание, черновик, утверждение, отклонение и постановка кампаний в очередь проходят через админ-контроль и журналы аудита.', cyber: 'Кибербезопасность', cyberBody: 'Внешние коннекторы остаются защищёнными; COSA готовит работу без неконтролируемой отправки, публикации или расходов.', opt: 'Оптимизация', optBody: 'Результаты кампаний могут питать прогнозный scoring, следующую лучшую акцию и будущие рекомендации.', recent: 'Последние решения', working: 'Выполняется...', requiredCommand: 'Сначала добавьте команду кампании.', requiredCampaign: 'Название и цель кампании обязательны.', autoDone: 'COSA создала кампанию и подготовила внутренний черновик. Публикация, отправка и расходы заблокированы до утверждения.', manualDone: 'Запрос кампании поставлен в очередь на утверждение владельца. COSA ничего не публиковала, не отправляла и не тратила.', draftDone: 'Черновик для проверки создан. Публикация остаётся заблокированной.', campaignMarked: 'Кампания отмечена как', outreachApproved: 'Утверждено. COSA может перевести работу на следующий защищённый шаг.', outreachRejected: 'Отклонено. COSA не выполнит этот элемент.', errorLoad: 'Не удалось загрузить данные Маркетинг/Продажи.', errorCreate: 'Не удалось создать кампанию.', errorAuto: 'Не удалось выполнить автономную команду.', errorDraft: 'Не удалось создать черновик.', errorMark: 'Не удалось обновить элемент.', noSummary: 'Сводка не прикреплена.', noObjective: 'Цель не прикреплена.', reviewDraft: 'Черновик для проверки создан', cta: 'CTA', workItems: 'Рабочие элементы', generated: 'Создать черновик для проверки', approveCampaign: 'Утвердить кампанию', reject: 'Отклонить', queueWorker: 'Поставить worker в очередь', audienceLabel: 'Аудитория', preparedOutreach: 'Подготовленный аутрич', socialPlan: 'Социальный / промо-план', noDraft: 'Черновик аутрича не прикреплён.', noPlan: 'План канала не прикреплён.', analyzer: 'Анализатор', predictive: 'Прогнозные потребности', profile: 'Профиль бизнеса' },
+    workflow: [['01', 'Команда', 'Вы даёте COSA команду кампании обычным языком.'], ['02', 'Прогноз', 'COSA определяет канал, аудиторию, тон и структуру.'], ['03', 'Черновик', 'COSA автоматически создаёт внутренний черновик.'], ['04', 'Проверка', 'Вы утверждаете, отклоняете, архивируете или просите правки.'], ['05', 'Шлюз', 'Коннекторы публикации заблокированы до утверждения.'], ['06', 'Оптимизация', 'Данные мониторинга питают слой оптимизации.']] as Option[],
+  },
 }
 
-type CampaignRow = {
-  id: string
-  title: string
-  objective?: string
-  audience?: string
-  channel?: string
-  status?: string
-  risk_level?: string
-  created_at?: string
-  languages?: string[]
-  metadata?: Record<string, any>
-  assets?: Array<{ type?: string; status?: string; language?: string; brief?: string }>
-  work_items?: Array<{
-    id?: string
-    kind?: string
-    status?: string
-    output?: { title?: string; opening?: string; draft?: string; call_to_action?: string }
-  }>
-}
+type Copy = typeof COPY.en
+const lk = (raw: string): Lang => (['en', 'es', 'pt', 'pl', 'ru'].includes(raw) ? raw : 'en') as Lang
+const localeFor = (lang: Lang) => lang === 'pt' ? 'pt-BR' : lang
+const labelFrom = (map: Record<string, string>, key?: string, fallback = '') => map[key || ''] || key || fallback
 
-type FormState = {
-  title: string
-  objective: string
-  channel: string
-  audience: string
-  language: string
-  priority: string
-  estimatedCostUsd: string
-  signal: string
-}
-
-const defaultForm: FormState = {
-  title: 'Educational campaign: AI-operated growth department',
-  objective: 'Explain how SignalBoost turns business ideas into approved marketing actions while keeping auditability, security, optimization, and owner control.',
-  channel: 'youtube',
-  audience: 'Business owners, operators, and enterprise buyers evaluating AI-assisted company operations.',
-  language: 'en',
-  priority: 'high',
-  estimatedCostUsd: '12',
-  signal: 'Founder requested a Fortune-500-style Marketing/Sales workflow: request, draft, approval, polish, publishing, monitoring, and learning.',
-}
-
-const channels = [
-  ['youtube', 'YouTube education'],
-  ['short_video', 'Short-form video'],
-  ['linkedin', 'LinkedIn post'],
-  ['blog', 'SEO / blog'],
-  ['email', 'Sales email'],
-  ['outreach', 'Targeted outreach'],
-  ['landing_page', 'Landing page'],
-  ['review_campaign', 'Customer proof'],
-]
-
-const priorities = [['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['critical', 'Critical']]
-const languages = [['en', 'English'], ['es', 'Spanish'], ['pt', 'Portuguese'], ['pl', 'Polish'], ['ru', 'Russian']]
-
-function formatDate(value?: string) {
-  if (!value) return 'Unknown time'
-  try { return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value)) } catch { return value }
-}
-
-function summarize(value: any, fallback = 'No summary attached yet.') {
-  if (!value) return fallback
-  if (typeof value === 'string') return value
-  if (Array.isArray(value)) return value.slice(0, 4).map(item => typeof item === 'string' ? item : JSON.stringify(item)).join('\n')
-  if (typeof value === 'object') return String(value.summary || value.description || value.message || JSON.stringify(value, null, 2)).slice(0, 900)
-  return String(value)
-}
-
-function hasDraft(campaign: CampaignRow) {
-  return Boolean(campaign.work_items?.some(item => item.output))
-}
-
-function Card({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-  return <section style={{ background: 'rgba(15,23,42,0.7)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 18, padding: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.28)', ...style }}>{children}</section>
-}
+function statusLabel(c: Copy, status?: string) { return labelFrom(c.status, status, c.status.draft) }
+function channelLabel(c: Copy, channel?: string) { return labelFrom(c.channel, channel, c.channel.campaign) }
+function riskLabel(c: Copy, risk?: string) { return labelFrom(c.risk, risk, c.risk.medium) }
+function assetLabel(c: Copy, asset?: string) { return labelFrom(c.assetType, asset, c.assetType.asset) }
+function formatDate(value: string | undefined, lang: Lang) { if (!value) return '—'; try { return new Intl.DateTimeFormat(localeFor(lang), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value)) } catch { return value } }
+function summarize(value: any, fallback: string) { if (!value) return fallback; if (typeof value === 'string') return value; if (Array.isArray(value)) return value.slice(0, 4).map(item => typeof item === 'string' ? item : JSON.stringify(item)).join('\n'); if (typeof value === 'object') return String(value.summary || value.description || value.message || JSON.stringify(value, null, 2)).slice(0, 900); return String(value) }
+const hasDraft = (campaign: CampaignRow) => Boolean(campaign.work_items?.some(item => item.output))
+function Card({ children, style }: { children: ReactNode; style?: CSSProperties }) { return <section style={{ background: 'rgba(15,23,42,0.7)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 18, padding: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.28)', ...style }}>{children}</section> }
 
 export default function MarketingSalesCosaPage() {
+  const { lang: rawLang } = useI18n()
+  const lang = lk(rawLang)
+  const c = COPY[lang]
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([])
   const [outreach, setOutreach] = useState<OutreachRow[]>([])
   const [selected, setSelected] = useState<OutreachRow | null>(null)
-  const [form, setForm] = useState<FormState>(defaultForm)
-  const [autonomousDirective, setAutonomousDirective] = useState(DEFAULT_AUTONOMOUS_DIRECTIVE)
+  const [form, setForm] = useState<FormState>(() => ({ title: c.form.title, objective: c.form.objective, audience: c.form.audience, signal: c.form.signal, channel: 'youtube', language: lang, priority: 'high', estimatedCostUsd: '12' }))
+  const [autonomousDirective, setAutonomousDirective] = useState(c.directive)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
 
   async function load(keepMessage = false) {
-    setLoading(true)
-    if (!keepMessage) setMessage('')
+    setLoading(true); if (!keepMessage) setMessage('')
     try {
-      const [admRes, campaignRes] = await Promise.all([
-        fetch('/api/admin/adm', { cache: 'no-store' }),
-        fetch('/api/cos/campaign-queue', { cache: 'no-store' }),
-      ])
-      const admJson = await admRes.json().catch(() => null)
-      const campaignJson = await campaignRes.json().catch(() => null)
-      if (!admRes.ok) throw new Error(admJson?.error || 'Could not load approval data.')
-      if (!campaignRes.ok) throw new Error(campaignJson?.error || 'Could not load campaign queue.')
+      const [admRes, campaignRes] = await Promise.all([fetch('/api/admin/adm', { cache: 'no-store' }), fetch('/api/cos/campaign-queue', { cache: 'no-store' })])
+      const admJson = await admRes.json().catch(() => null); const campaignJson = await campaignRes.json().catch(() => null)
+      if (!admRes.ok || !campaignRes.ok) throw new Error(c.text.errorLoad)
       const rows = Array.isArray(admJson?.recentOutreach) ? admJson.recentOutreach : []
       setOutreach(rows)
       setSelected(current => current ? rows.find((row: OutreachRow) => row.id === current.id) || rows[0] || null : rows.find((row: OutreachRow) => row.status === 'pending') || rows[0] || null)
       setCampaigns(Array.isArray(campaignJson?.campaigns) ? campaignJson.campaigns : [])
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not load Marketing/Sales data.')
-    } finally {
-      setLoading(false)
-    }
+    } catch { setMessage(c.text.errorLoad) } finally { setLoading(false) }
   }
 
   useEffect(() => { load() }, [])
-
   const pendingOutreach = useMemo(() => outreach.filter(row => row.status === 'pending'), [outreach])
   const decidedOutreach = useMemo(() => outreach.filter(row => row.status !== 'pending'), [outreach])
-  const stats = useMemo(() => ({
-    waiting: campaigns.filter(row => row.status === 'waiting_approval' || row.status === 'draft').length,
-    approved: campaigns.filter(row => row.status === 'approved').length,
-    queued: campaigns.filter(row => row.status === 'queued' || row.status === 'running').length,
-    drafted: campaigns.filter(hasDraft).length,
-  }), [campaigns])
-
-  function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
-    setForm(current => ({ ...current, [key]: value }))
-  }
-
-  async function generateDraft(id: string) {
-    const res = await fetch('/api/cos/script-worker', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campaign_id: id }) })
-    const json = await res.json().catch(() => null)
-    if (!res.ok) throw new Error(json?.error || 'Could not generate draft.')
-    return json
-  }
+  const stats = useMemo(() => ({ waiting: campaigns.filter(row => row.status === 'waiting_approval' || row.status === 'draft').length, approved: campaigns.filter(row => row.status === 'approved').length, queued: campaigns.filter(row => row.status === 'queued' || row.status === 'running').length, drafted: campaigns.filter(hasDraft).length }), [campaigns])
+  function setField<K extends keyof FormState>(key: K, value: FormState[K]) { setForm(current => ({ ...current, [key]: value })) }
+  async function generateDraft(id: string) { const res = await fetch('/api/cos/script-worker', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campaign_id: id }) }); if (!res.ok) throw new Error(c.text.errorDraft); return res.json().catch(() => null) }
 
   async function createAutonomousCampaign(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!autonomousDirective.trim()) {
-      setMessage('Add a campaign command first.')
-      return
-    }
+    event.preventDefault(); if (!autonomousDirective.trim()) { setMessage(c.text.requiredCommand); return }
     setBusy(true)
-    try {
-      const res = await fetch('/api/cos/campaign-queue', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ directive: autonomousDirective }),
-      })
-      const json = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(json?.error || 'Could not create autonomous campaign.')
-      const campaignId = json?.campaign?.id
-      if (campaignId) await generateDraft(campaignId)
-      setMessage('COSA created the campaign and prepared an internal review draft. Publishing, sending, and spending are still locked until approval.')
-      await load(true)
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not run autonomous campaign command.')
-    } finally {
-      setBusy(false)
-    }
+    try { const res = await fetch('/api/cos/campaign-queue', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ directive: autonomousDirective }) }); const json = await res.json().catch(() => null); if (!res.ok) throw new Error(c.text.errorAuto); if (json?.campaign?.id) await generateDraft(json.campaign.id); setMessage(c.text.autoDone); await load(true) } catch { setMessage(c.text.errorAuto) } finally { setBusy(false) }
   }
 
   async function createCampaign(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!form.title.trim() || !form.objective.trim()) {
-      setMessage('Campaign title and objective are required.')
-      return
-    }
+    event.preventDefault(); if (!form.title.trim() || !form.objective.trim()) { setMessage(c.text.requiredCampaign); return }
     setBusy(true)
-    try {
-      const res = await fetch('/api/cos/campaign-queue', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ request: { ...form, estimatedCostUsd: Number(form.estimatedCostUsd || 0) } }),
-      })
-      const json = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(json?.error || 'Could not create campaign.')
-      setMessage('Campaign request queued for owner approval. COSA has not published, sent, or spent anything.')
-      await load(true)
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not create campaign.')
-    } finally {
-      setBusy(false)
-    }
+    try { const res = await fetch('/api/cos/campaign-queue', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ request: { ...form, estimatedCostUsd: Number(form.estimatedCostUsd || 0) } }) }); if (!res.ok) throw new Error(c.text.errorCreate); setMessage(c.text.manualDone); await load(true) } catch { setMessage(c.text.errorCreate) } finally { setBusy(false) }
   }
 
   async function patchCampaign(id: string, status: 'approved' | 'rejected' | 'queued') {
     setBusy(true)
-    try {
-      const res = await fetch('/api/cos/campaign-queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) })
-      const json = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(json?.error || `Could not mark campaign ${status}.`)
-      setMessage(`Campaign marked ${status}.`)
-      await load(true)
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : `Could not mark campaign ${status}.`)
-    } finally {
-      setBusy(false)
-    }
+    try { const res = await fetch('/api/cos/campaign-queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) }); if (!res.ok) throw new Error(c.text.errorMark); setMessage(`${c.text.campaignMarked} ${statusLabel(c, status)}.`); await load(true) } catch { setMessage(c.text.errorMark) } finally { setBusy(false) }
   }
 
-  async function generateDraftFromButton(id: string) {
-    setBusy(true)
-    try {
-      await generateDraft(id)
-      setMessage('Review draft generated. Publishing is still gated.')
-      await load(true)
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not generate draft.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function patchSelected(status: 'approved' | 'rejected') {
-    if (!selected) return
-    setBusy(true)
-    try {
-      const res = await fetch('/api/outreach/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: selected.id, status }) })
-      const json = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(json?.error || `Could not mark item ${status}.`)
-      setMessage(status === 'approved' ? 'Approved. COSA can move this work to the next guarded step.' : 'Rejected. COSA will not execute this item.')
-      await load(true)
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : `Could not mark item ${status}.`)
-    } finally {
-      setBusy(false)
-    }
-  }
+  async function generateDraftFromButton(id: string) { setBusy(true); try { await generateDraft(id); setMessage(c.text.draftDone); await load(true) } catch { setMessage(c.text.errorDraft) } finally { setBusy(false) } }
+  async function patchSelected(status: 'approved' | 'rejected') { if (!selected) return; setBusy(true); try { const res = await fetch('/api/outreach/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: selected.id, status }) }); if (!res.ok) throw new Error(c.text.errorMark); setMessage(status === 'approved' ? c.text.outreachApproved : c.text.outreachRejected); await load(true) } catch { setMessage(c.text.errorMark) } finally { setBusy(false) } }
 
   return (
     <main style={{ maxWidth: 1280, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <section style={{ background: 'linear-gradient(145deg, rgba(15,23,42,0.96), rgba(2,6,23,0.98))', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 24, padding: 28, boxShadow: '0 28px 80px rgba(0,0,0,0.38)' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap' }}>
-          <div>
-            <p className="sb-eyebrow" style={{ margin: 0 }}>Marketing & Sales Department</p>
-            <h1 style={{ color: '#fff', fontSize: 34, lineHeight: 1.05, letterSpacing: '-0.04em', margin: '10px 0 0', fontWeight: 950 }}>COSA turns one command into review-ready campaign work.</h1>
-            <p style={{ color: 'rgba(255,255,255,0.68)', maxWidth: 820, lineHeight: 1.7, marginTop: 14 }}>The owner-light workflow is: command, autonomous campaign setup, internal draft, owner review, final approval, publishing gate, monitoring, and optimization feedback.</p>
-          </div>
-          <button onClick={() => load()} disabled={loading || busy} style={ghostButton}>{loading ? 'Loading...' : 'Refresh department data'}</button>
-        </div>
-      </section>
-
+      <section style={{ background: 'linear-gradient(145deg, rgba(15,23,42,0.96), rgba(2,6,23,0.98))', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 24, padding: 28, boxShadow: '0 28px 80px rgba(0,0,0,0.38)' }}><div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap' }}><div><p className="sb-eyebrow" style={{ margin: 0 }}>{c.text.kicker}</p><h1 style={{ color: '#fff', fontSize: 34, lineHeight: 1.05, letterSpacing: '-0.04em', margin: '10px 0 0', fontWeight: 950 }}>{c.text.title}</h1><p style={{ color: 'rgba(255,255,255,0.68)', maxWidth: 820, lineHeight: 1.7, marginTop: 14 }}>{c.text.intro}</p></div><button onClick={() => load()} disabled={loading || busy} style={ghostButton}>{loading ? c.text.loading : c.text.refresh}</button></div></section>
       {message && <div style={{ border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.75)', color: '#fff', padding: '12px 16px', borderRadius: 14 }}>{message}</div>}
-
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14 }}>
-        {[
-          ['Campaigns', campaigns.length],
-          ['Awaiting approval', stats.waiting],
-          ['Approved', stats.approved],
-          ['Worker queue', stats.queued],
-          ['Drafts generated', stats.drafted],
-          ['Outreach approvals', pendingOutreach.length],
-        ].map(([label, value]) => <Metric key={String(label)} label={String(label)} value={String(value)} />)}
-      </section>
-
-      <Card style={{ background: 'linear-gradient(145deg, rgba(255,195,0,0.11), rgba(15,23,42,0.72))', border: '1px solid rgba(255,195,0,0.24)' }}>
-        <p className="sb-eyebrow" style={{ margin: 0 }}>Owner-light campaign command</p>
-        <h2 style={h2}>Tell COSA what you want. COSA prepares the draft.</h2>
-        <p style={bodyText}>This creates a governed campaign and an internal review draft. It does not publish, send outreach, or spend money.</p>
-        <form onSubmit={createAutonomousCampaign} style={{ display: 'grid', gap: 12, marginTop: 16 }}>
-          <Field label="Campaign command" value={autonomousDirective} onChange={setAutonomousDirective} textarea />
-          <button type="submit" disabled={busy} style={primaryButton}>{busy ? 'Working...' : 'Run COSA campaign command'}</button>
-        </form>
-      </Card>
-
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, .95fr) minmax(320px, 1.05fr)', gap: 18, alignItems: 'start' }} className="cosa-grid">
-        <Card>
-          <p className="sb-eyebrow" style={{ margin: 0 }}>Detailed campaign request</p>
-          <h2 style={h2}>Use this only when you want manual control</h2>
-          <p style={bodyText}>The detailed form remains available for campaigns where you want to choose channel, priority, audience, and language yourself.</p>
-          <form onSubmit={createCampaign} style={{ display: 'grid', gap: 12, marginTop: 16 }}>
-            <Field label="Campaign title" value={form.title} onChange={value => setField('title', value)} />
-            <Field label="Objective" value={form.objective} onChange={value => setField('objective', value)} textarea />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
-              <SelectField label="Channel" value={form.channel} options={channels} onChange={value => setField('channel', value)} />
-              <SelectField label="Priority" value={form.priority} options={priorities} onChange={value => setField('priority', value)} />
-              <SelectField label="Language" value={form.language} options={languages} onChange={value => setField('language', value)} />
-            </div>
-            <Field label="Target audience" value={form.audience} onChange={value => setField('audience', value)} />
-            <Field label="Signal / reason" value={form.signal} onChange={value => setField('signal', value)} textarea />
-            <Field label="Estimated cost USD" type="number" value={form.estimatedCostUsd} onChange={value => setField('estimatedCostUsd', value)} />
-            <button type="submit" disabled={busy} style={secondaryButton}>{busy ? 'Working...' : 'Create governed campaign'}</button>
-          </form>
-        </Card>
-
-        <Card>
-          <p className="sb-eyebrow" style={{ margin: 0 }}>Autonomous workflow</p>
-          <h2 style={h2}>COSA handles execution steps; owner controls risk</h2>
-          <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>
-            {[
-              ['01', 'Command', 'You give COSA a plain-language campaign directive.'],
-              ['02', 'Predict', 'COSA infers channel, audience, tone, and campaign structure.'],
-              ['03', 'Draft', 'COSA creates an internal review draft automatically.'],
-              ['04', 'Review', 'You approve, reject, archive, or request edits.'],
-              ['05', 'Publish gate', 'Publishing connectors stay locked until approval.'],
-              ['06', 'Optimize', 'Monitoring data feeds the optimization layer.'],
-            ].map(([num, title, text]) => <WorkflowStep key={num} num={num} title={title} text={text} />)}
-          </div>
-        </Card>
-      </section>
-
-      <Card>
-        <p className="sb-eyebrow" style={{ margin: 0 }}>Campaign repository</p>
-        <h2 style={h2}>Every campaign stays visible</h2>
-        <p style={bodyText}>This is the department record. It shows what was requested, what COSA drafted, what requires approval, and what has been queued.</p>
-        <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>
-          {loading && <p style={bodyText}>Loading campaign queue...</p>}
-          {!loading && campaigns.length === 0 && <p style={bodyText}>No campaigns queued yet. Run the COSA command above to create a review-ready draft.</p>}
-          {campaigns.slice(0, 10).map(campaign => <CampaignCard key={campaign.id} campaign={campaign} busy={busy} onPatch={patchCampaign} onGenerateDraft={generateDraftFromButton} />)}
-        </div>
-      </Card>
-
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, .85fr) minmax(360px, 1.4fr)', gap: 18, alignItems: 'start' }} className="cosa-grid">
-        <Card>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
-            <div><p className="sb-eyebrow" style={{ margin: 0 }}>Approval queue</p><h2 style={h2}>Review finished outreach</h2></div>
-            <span style={{ color: GOLD, fontWeight: 950 }}>{pendingOutreach.length}</span>
-          </div>
-          <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>
-            {pendingOutreach.length === 0 && <p style={bodyText}>No pending outreach approvals right now.</p>}
-            {pendingOutreach.map(row => <QueueButton key={row.id} row={row} active={selected?.id === row.id} onClick={() => setSelected(row)} />)}
-          </div>
-        </Card>
-        <Card style={{ minHeight: 430 }}>
-          {!selected && <div style={{ color: 'rgba(255,255,255,.55)', display: 'grid', minHeight: 340, placeItems: 'center', textAlign: 'center' }}>Select a queued COSA recommendation to inspect.</div>}
-          {selected && <SelectedOutreach row={selected} busy={busy} onPatch={patchSelected} />}
-        </Card>
-      </section>
-
-      <Card>
-        <p className="sb-eyebrow" style={{ margin: 0 }}>Enterprise control plane</p>
-        <h2 style={h2}>The department plugs into your existing modules</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginTop: 14 }}>
-          <InfoBlock title="Audit" body="Campaign create, draft, approve, reject, and queue actions go through admin checks and audit logging." />
-          <InfoBlock title="Cybersecurity" body="External connectors remain guarded; COSA prepares work without uncontrolled sending, posting, or spending." />
-          <InfoBlock title="Optimization" body="Campaign results can feed predictive scoring, next-best-action logic, and future recommendations." />
-        </div>
-      </Card>
-
-      {decidedOutreach.length > 0 && <Card><p className="sb-eyebrow" style={{ margin: 0 }}>Recent decisions</p><div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{decidedOutreach.slice(0, 8).map(row => <QueueButton key={row.id} row={row} active={selected?.id === row.id} onClick={() => setSelected(row)} />)}</div></Card>}
-
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14 }}>{[[c.text.campaigns, campaigns.length], [c.text.waiting, stats.waiting], [c.text.approved, stats.approved], [c.text.queue, stats.queued], [c.text.drafts, stats.drafted], [c.text.outreachApprovals, pendingOutreach.length]].map(([label, value]) => <Metric key={String(label)} label={String(label)} value={String(value)} />)}</section>
+      <Card style={{ background: 'linear-gradient(145deg, rgba(255,195,0,0.11), rgba(15,23,42,0.72))', border: '1px solid rgba(255,195,0,0.24)' }}><p className="sb-eyebrow" style={{ margin: 0 }}>{c.text.commandKicker}</p><h2 style={h2}>{c.text.commandTitle}</h2><p style={bodyText}>{c.text.commandBody}</p><form onSubmit={createAutonomousCampaign} style={{ display: 'grid', gap: 12, marginTop: 16 }}><Field label={c.text.commandLabel} value={autonomousDirective} onChange={setAutonomousDirective} textarea /><button type="submit" disabled={busy} style={primaryButton}>{busy ? c.text.working : c.text.runCommand}</button></form></Card>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, .95fr) minmax(320px, 1.05fr)', gap: 18, alignItems: 'start' }} className="cosa-grid"><Card><p className="sb-eyebrow" style={{ margin: 0 }}>{c.text.detailKicker}</p><h2 style={h2}>{c.text.detailTitle}</h2><p style={bodyText}>{c.text.detailBody}</p><form onSubmit={createCampaign} style={{ display: 'grid', gap: 12, marginTop: 16 }}><Field label={c.text.campaignTitle} value={form.title} onChange={value => setField('title', value)} /><Field label={c.text.objective} value={form.objective} onChange={value => setField('objective', value)} textarea /><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}><SelectField label={c.text.channelField} value={form.channel} options={c.channels} onChange={value => setField('channel', value)} /><SelectField label={c.text.priority} value={form.priority} options={c.priorities} onChange={value => setField('priority', value)} /><SelectField label={c.text.language} value={form.language} options={c.languages} onChange={value => setField('language', value)} /></div><Field label={c.text.audience} value={form.audience} onChange={value => setField('audience', value)} /><Field label={c.text.signal} value={form.signal} onChange={value => setField('signal', value)} textarea /><Field label={c.text.cost} type="number" value={form.estimatedCostUsd} onChange={value => setField('estimatedCostUsd', value)} /><button type="submit" disabled={busy} style={secondaryButton}>{busy ? c.text.working : c.text.createCampaign}</button></form></Card><Card><p className="sb-eyebrow" style={{ margin: 0 }}>{c.text.workflowKicker}</p><h2 style={h2}>{c.text.workflowTitle}</h2><div style={{ display: 'grid', gap: 10, marginTop: 16 }}>{c.workflow.map(([num, title, text]) => <WorkflowStep key={num} num={num} title={title} text={text} />)}</div></Card></section>
+      <Card><p className="sb-eyebrow" style={{ margin: 0 }}>{c.text.repositoryKicker}</p><h2 style={h2}>{c.text.repositoryTitle}</h2><p style={bodyText}>{c.text.repositoryBody}</p><div style={{ display: 'grid', gap: 10, marginTop: 16 }}>{loading && <p style={bodyText}>{c.text.loading}</p>}{!loading && campaigns.length === 0 && <p style={bodyText}>{c.text.noCampaigns}</p>}{campaigns.slice(0, 10).map(campaign => <CampaignCard key={campaign.id} campaign={campaign} busy={busy} c={c} lang={lang} onPatch={patchCampaign} onGenerateDraft={generateDraftFromButton} />)}</div></Card>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, .85fr) minmax(360px, 1.4fr)', gap: 18, alignItems: 'start' }} className="cosa-grid"><Card><div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}><div><p className="sb-eyebrow" style={{ margin: 0 }}>{c.text.approvalQueue}</p><h2 style={h2}>{c.text.reviewOutreach}</h2></div><span style={{ color: GOLD, fontWeight: 950 }}>{pendingOutreach.length}</span></div><div style={{ display: 'grid', gap: 10, marginTop: 16 }}>{pendingOutreach.length === 0 && <p style={bodyText}>{c.text.noOutreach}</p>}{pendingOutreach.map(row => <QueueButton key={row.id} row={row} active={selected?.id === row.id} c={c} lang={lang} onClick={() => setSelected(row)} />)}</div></Card><Card style={{ minHeight: 430 }}>{!selected && <div style={{ color: 'rgba(255,255,255,.55)', display: 'grid', minHeight: 340, placeItems: 'center', textAlign: 'center' }}>{c.text.inspect}</div>}{selected && <SelectedOutreach row={selected} busy={busy} c={c} onPatch={patchSelected} />}</Card></section>
+      <Card><p className="sb-eyebrow" style={{ margin: 0 }}>{c.text.controlKicker}</p><h2 style={h2}>{c.text.controlTitle}</h2><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginTop: 14 }}><InfoBlock title={c.text.audit} body={c.text.auditBody} /><InfoBlock title={c.text.cyber} body={c.text.cyberBody} /><InfoBlock title={c.text.opt} body={c.text.optBody} /></div></Card>
+      {decidedOutreach.length > 0 && <Card><p className="sb-eyebrow" style={{ margin: 0 }}>{c.text.recent}</p><div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{decidedOutreach.slice(0, 8).map(row => <QueueButton key={row.id} row={row} active={selected?.id === row.id} c={c} lang={lang} onClick={() => setSelected(row)} />)}</div></Card>}
       <style>{`@media (max-width: 920px) { .cosa-grid { grid-template-columns: 1fr !important; } }`}</style>
     </main>
   )
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return <Card><p style={{ margin: 0, color: 'rgba(255,255,255,.45)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 900 }}>{label}</p><p style={{ margin: '8px 0 0', color: '#fff', fontSize: 30, fontWeight: 950 }}>{value}</p></Card>
-}
-
-function WorkflowStep({ num, title, text }: { num: string; title: string; text: string }) {
-  return <div style={{ display: 'grid', gridTemplateColumns: '42px 1fr', gap: 12, border: '1px solid rgba(255,255,255,.07)', background: 'rgba(255,255,255,.035)', borderRadius: 14, padding: 12 }}><span style={{ width: 34, height: 34, borderRadius: 999, display: 'grid', placeItems: 'center', color: '#000', background: GOLD, fontWeight: 950, fontSize: 12 }}>{num}</span><div><strong style={{ color: '#fff', fontSize: 14 }}>{title}</strong><p style={{ color: 'rgba(255,255,255,.62)', fontSize: 13, lineHeight: 1.55, margin: '4px 0 0' }}>{text}</p></div></div>
-}
-
-function Field({ label, value, onChange, textarea = false, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; textarea?: boolean; type?: string }) {
-  const inputStyle: CSSProperties = { width: '100%', border: '1px solid rgba(255,255,255,.12)', background: 'rgba(2,6,23,.72)', color: '#fff', borderRadius: 12, padding: '11px 12px', outline: 'none' }
-  return <label style={labelStyle}><span>{label}</span>{textarea ? <textarea value={value} onChange={event => onChange(event.target.value)} rows={4} style={inputStyle} /> : <input type={type} value={value} onChange={event => onChange(event.target.value)} style={inputStyle} />}</label>
-}
-
-function SelectField({ label, value, options, onChange }: { label: string; value: string; options: string[][]; onChange: (value: string) => void }) {
-  return <label style={labelStyle}><span>{label}</span><select value={value} onChange={event => onChange(event.target.value)} style={{ width: '100%', border: '1px solid rgba(255,255,255,.12)', background: 'rgba(2,6,23,.72)', color: '#fff', borderRadius: 12, padding: '11px 12px', outline: 'none' }}>{options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-}
-
-function QueueButton({ row, active, onClick }: { row: OutreachRow; active: boolean; onClick: () => void }) {
-  return <button onClick={onClick} style={{ textAlign: 'left', border: active ? '1px solid rgba(255,195,0,.65)' : '1px solid rgba(255,255,255,.08)', background: active ? 'rgba(255,195,0,.09)' : 'rgba(255,255,255,.04)', color: '#fff', borderRadius: 14, padding: 14, cursor: 'pointer' }}><strong style={{ display: 'block', fontSize: 14 }}>{row.business_name || 'Unnamed opportunity'}</strong><span style={{ color: 'rgba(255,255,255,.55)', fontSize: 12 }}>{row.source_platform || 'COSA'} · {row.status || 'pending'} · {formatDate(row.created_at)}</span></button>
-}
-
-function SelectedOutreach({ row, busy, onPatch }: { row: OutreachRow; busy: boolean; onPatch: (status: 'approved' | 'rejected') => void }) {
-  return <div style={{ display: 'grid', gap: 14 }}><div><p className="sb-eyebrow" style={{ margin: 0 }}>{row.status || 'pending'} · {row.source_platform || 'COSA'}</p><h2 style={{ color: '#fff', fontSize: 26, margin: '8px 0 0', lineHeight: 1.15 }}>{row.business_name || 'Unnamed opportunity'}</h2>{row.business_url && <p style={{ color: 'rgba(255,255,255,.55)', margin: '6px 0 0' }}>{row.business_url}</p>}</div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}><InfoBlock title="Analyzer" body={summarize(row.analyzer_summary)} /><InfoBlock title="Predictive needs" body={summarize(row.predictive_needs)} /><InfoBlock title="Business profile" body={summarize(row.business_model_profile)} /></div><InfoBlock title="Prepared outreach" body={row.outreach_message || 'No outreach draft attached yet.'} large /><InfoBlock title="Social / promo plan" body={[summarize(row.social_plan, ''), summarize(row.promo_plan, ''), summarize(row.review_strategy, '')].filter(Boolean).join('\n\n') || 'No channel plan attached yet.'} large /><div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 16 }}><button disabled={busy || row.status !== 'pending'} onClick={() => onPatch('rejected')} style={secondaryButton}>Reject</button><button disabled={busy || row.status !== 'pending'} onClick={() => onPatch('approved')} style={primaryButton}>Approve next step</button></div></div>
-}
-
-function CampaignCard({ campaign, busy, onPatch, onGenerateDraft }: { campaign: CampaignRow; busy: boolean; onPatch: (id: string, status: 'approved' | 'rejected' | 'queued') => void; onGenerateDraft: (id: string) => void }) {
-  const waiting = campaign.status === 'waiting_approval' || campaign.status === 'draft'
-  const canQueue = campaign.status === 'approved'
-  const canDraft = campaign.work_items?.some(item => item.kind === 'script_worker') && ['draft', 'waiting_approval', 'approved', 'queued', 'running'].includes(campaign.status || '')
-  const output = campaign.work_items?.find(item => item.output)?.output
-  const autonomous = Boolean(campaign.metadata?.autonomous)
-  return <div style={{ border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.035)', borderRadius: 14, padding: 14 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}><div><strong style={{ color: '#fff', display: 'block' }}>{campaign.title}</strong><span style={{ color: 'rgba(255,255,255,.52)', fontSize: 12 }}>{campaign.channel || 'campaign'} · {campaign.status || 'waiting_approval'} · {formatDate(campaign.created_at)}{autonomous ? ' · autonomous' : ''}</span><p style={{ color: 'rgba(255,255,255,.68)', fontSize: 13, lineHeight: 1.6, margin: '8px 0 0' }}>{campaign.objective || 'No objective attached.'}</p>{campaign.audience && <p style={{ color: 'rgba(255,255,255,.52)', fontSize: 12, margin: '8px 0 0' }}>Audience: {campaign.audience}</p>}</div><span style={{ color: GOLD, fontSize: 11, fontWeight: 950, textTransform: 'uppercase' }}>{campaign.risk_level || 'medium'} risk</span></div><p style={{ color: 'rgba(255,255,255,.52)', fontSize: 12, margin: '8px 0 0' }}>Work items: {campaign.work_items?.length || 0} · Languages: {(campaign.languages || []).join(', ') || 'en'}</p>{campaign.assets?.length ? <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>{campaign.assets.slice(0, 5).map((asset, index) => <span key={`${asset.type}-${index}`} style={{ border: '1px solid rgba(255,255,255,.1)', background: 'rgba(0,0,0,.18)', borderRadius: 999, padding: '5px 8px', color: 'rgba(255,255,255,.66)', fontSize: 11 }}>{asset.type || 'asset'} · {asset.status || 'needed'}</span>)}</div> : null}{output && <div style={{ marginTop: 14, border: '1px solid rgba(255,195,0,.22)', borderRadius: 14, background: 'rgba(255,195,0,.06)', padding: 14 }}><p className="sb-eyebrow" style={{ margin: 0 }}>Review draft generated</p><h3 style={{ color: '#fff', margin: '8px 0 0', fontSize: 16 }}>{output.title || 'Generated campaign draft'}</h3><p style={{ color: 'rgba(255,255,255,.74)', lineHeight: 1.65, fontSize: 13 }}>{output.opening}</p><pre style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,.8)', background: 'rgba(0,0,0,.28)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 12, fontSize: 12, lineHeight: 1.55, maxHeight: 320, overflow: 'auto' }}>{output.draft}</pre>{output.call_to_action && <p style={{ color: GOLD, fontWeight: 900, margin: '10px 0 0', fontSize: 13 }}>CTA: {output.call_to_action}</p>}</div>}<div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>{waiting && <button disabled={busy} onClick={() => onPatch(campaign.id, 'rejected')} style={secondaryButton}>Reject</button>}{waiting && <button disabled={busy} onClick={() => onPatch(campaign.id, 'approved')} style={primaryButton}>Approve campaign</button>}{canQueue && <button disabled={busy} onClick={() => onPatch(campaign.id, 'queued')} style={secondaryButton}>Queue worker</button>}{canDraft && !output && <button disabled={busy} onClick={() => onGenerateDraft(campaign.id)} style={primaryButton}>Generate review draft</button>}</div></div>
-}
-
-function InfoBlock({ title, body, large = false }: { title: string; body: string; large?: boolean }) {
-  return <div style={{ background: 'rgba(0,0,0,.24)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 14, padding: 14, minHeight: large ? 120 : 96 }}><p style={{ margin: 0, color: GOLD, fontSize: 11, letterSpacing: '.09em', textTransform: 'uppercase', fontWeight: 950 }}>{title}</p><p style={{ margin: '8px 0 0', color: 'rgba(255,255,255,.78)', fontSize: 13, lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{body}</p></div>
-}
+function Metric({ label, value }: { label: string; value: string }) { return <Card><p style={{ margin: 0, color: 'rgba(255,255,255,.45)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 900 }}>{label}</p><p style={{ margin: '8px 0 0', color: '#fff', fontSize: 30, fontWeight: 950 }}>{value}</p></Card> }
+function WorkflowStep({ num, title, text }: { num: string; title: string; text: string }) { return <div style={{ display: 'grid', gridTemplateColumns: '42px 1fr', gap: 12, border: '1px solid rgba(255,255,255,.07)', background: 'rgba(255,255,255,.035)', borderRadius: 14, padding: 12 }}><span style={{ width: 34, height: 34, borderRadius: 999, display: 'grid', placeItems: 'center', color: '#000', background: GOLD, fontWeight: 950, fontSize: 12 }}>{num}</span><div><strong style={{ color: '#fff', fontSize: 14 }}>{title}</strong><p style={{ color: 'rgba(255,255,255,.62)', fontSize: 13, lineHeight: 1.55, margin: '4px 0 0' }}>{text}</p></div></div> }
+function Field({ label, value, onChange, textarea = false, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; textarea?: boolean; type?: string }) { const inputStyle: CSSProperties = { width: '100%', border: '1px solid rgba(255,255,255,.12)', background: 'rgba(2,6,23,.72)', color: '#fff', borderRadius: 12, padding: '11px 12px', outline: 'none' }; return <label style={labelStyle}><span>{label}</span>{textarea ? <textarea value={value} onChange={event => onChange(event.target.value)} rows={4} style={inputStyle} /> : <input type={type} value={value} onChange={event => onChange(event.target.value)} style={inputStyle} />}</label> }
+function SelectField({ label, value, options, onChange }: { label: string; value: string; options: readonly Option[]; onChange: (value: string) => void }) { return <label style={labelStyle}><span>{label}</span><select value={value} onChange={event => onChange(event.target.value)} style={{ width: '100%', border: '1px solid rgba(255,255,255,.12)', background: 'rgba(2,6,23,.72)', color: '#fff', borderRadius: 12, padding: '11px 12px', outline: 'none' }}>{options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label> }
+function QueueButton({ row, active, onClick, c, lang }: { row: OutreachRow; active: boolean; onClick: () => void; c: Copy; lang: Lang }) { return <button onClick={onClick} style={{ textAlign: 'left', border: active ? '1px solid rgba(255,195,0,.65)' : '1px solid rgba(255,255,255,.08)', background: active ? 'rgba(255,195,0,.09)' : 'rgba(255,255,255,.04)', color: '#fff', borderRadius: 14, padding: 14, cursor: 'pointer' }}><strong style={{ display: 'block', fontSize: 14 }}>{row.business_name || c.text.profile}</strong><span style={{ color: 'rgba(255,255,255,.55)', fontSize: 12 }}>{row.source_platform || 'COSA'} · {statusLabel(c, row.status)} · {formatDate(row.created_at, lang)}</span></button> }
+function SelectedOutreach({ row, busy, onPatch, c }: { row: OutreachRow; busy: boolean; onPatch: (status: 'approved' | 'rejected') => void; c: Copy }) { return <div style={{ display: 'grid', gap: 14 }}><div><p className="sb-eyebrow" style={{ margin: 0 }}>{statusLabel(c, row.status)} · {row.source_platform || 'COSA'}</p><h2 style={{ color: '#fff', fontSize: 26, margin: '8px 0 0', lineHeight: 1.15 }}>{row.business_name || c.text.profile}</h2>{row.business_url && <p style={{ color: 'rgba(255,255,255,.55)', margin: '6px 0 0' }}>{row.business_url}</p>}</div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}><InfoBlock title={c.text.analyzer} body={summarize(row.analyzer_summary, c.text.noSummary)} /><InfoBlock title={c.text.predictive} body={summarize(row.predictive_needs, c.text.noSummary)} /><InfoBlock title={c.text.profile} body={summarize(row.business_model_profile, c.text.noSummary)} /></div><InfoBlock title={c.text.preparedOutreach} body={row.outreach_message || c.text.noDraft} large /><InfoBlock title={c.text.socialPlan} body={[summarize(row.social_plan, ''), summarize(row.promo_plan, ''), summarize(row.review_strategy, '')].filter(Boolean).join('\n\n') || c.text.noPlan} large /><div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 16 }}><button disabled={busy || row.status !== 'pending'} onClick={() => onPatch('rejected')} style={secondaryButton}>{c.text.reject}</button><button disabled={busy || row.status !== 'pending'} onClick={() => onPatch('approved')} style={primaryButton}>{c.text.approveCampaign}</button></div></div> }
+function CampaignCard({ campaign, busy, onPatch, onGenerateDraft, c, lang }: { campaign: CampaignRow; busy: boolean; c: Copy; lang: Lang; onPatch: (id: string, status: 'approved' | 'rejected' | 'queued') => void; onGenerateDraft: (id: string) => void }) { const waiting = campaign.status === 'waiting_approval' || campaign.status === 'draft'; const canQueue = campaign.status === 'approved'; const canDraft = campaign.work_items?.some(item => item.kind === 'script_worker') && ['draft', 'waiting_approval', 'approved', 'queued', 'running'].includes(campaign.status || ''); const output = campaign.work_items?.find(item => item.output)?.output; return <div style={{ border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.035)', borderRadius: 14, padding: 14 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}><div><strong style={{ color: '#fff', display: 'block' }}>{campaign.title}</strong><span style={{ color: 'rgba(255,255,255,.52)', fontSize: 12 }}>{channelLabel(c, campaign.channel)} · {statusLabel(c, campaign.status)} · {formatDate(campaign.created_at, lang)}</span><p style={{ color: 'rgba(255,255,255,.68)', fontSize: 13, lineHeight: 1.6, margin: '8px 0 0' }}>{campaign.objective || c.text.noObjective}</p>{campaign.audience && <p style={{ color: 'rgba(255,255,255,.52)', fontSize: 12, margin: '8px 0 0' }}>{c.text.audienceLabel}: {campaign.audience}</p>}</div><span style={{ color: GOLD, fontSize: 11, fontWeight: 950, textTransform: 'uppercase' }}>{riskLabel(c, campaign.risk_level)}</span></div><p style={{ color: 'rgba(255,255,255,.52)', fontSize: 12, margin: '8px 0 0' }}>{c.text.workItems}: {campaign.work_items?.length || 0} · {c.text.language}: {(campaign.languages || []).join(', ') || 'en'}</p>{campaign.assets?.length ? <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>{campaign.assets.slice(0, 5).map((asset, index) => <span key={`${asset.type}-${index}`} style={{ border: '1px solid rgba(255,255,255,.1)', background: 'rgba(0,0,0,.18)', borderRadius: 999, padding: '5px 8px', color: 'rgba(255,255,255,.66)', fontSize: 11 }}>{assetLabel(c, asset.type)} · {statusLabel(c, asset.status)}</span>)}</div> : null}{output && <div style={{ marginTop: 14, border: '1px solid rgba(255,195,0,.22)', borderRadius: 14, background: 'rgba(255,195,0,.06)', padding: 14 }}><p className="sb-eyebrow" style={{ margin: 0 }}>{c.text.reviewDraft}</p><h3 style={{ color: '#fff', margin: '8px 0 0', fontSize: 16 }}>{output.title || campaign.title}</h3><p style={{ color: 'rgba(255,255,255,.74)', lineHeight: 1.65, fontSize: 13 }}>{output.opening}</p><pre style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,.8)', background: 'rgba(0,0,0,.28)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 12, fontSize: 12, lineHeight: 1.55, maxHeight: 320, overflow: 'auto' }}>{output.draft}</pre>{output.call_to_action && <p style={{ color: GOLD, fontWeight: 900, margin: '10px 0 0', fontSize: 13 }}>{c.text.cta}: {output.call_to_action}</p>}</div>}<div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>{waiting && <button disabled={busy} onClick={() => onPatch(campaign.id, 'rejected')} style={secondaryButton}>{c.text.reject}</button>}{waiting && <button disabled={busy} onClick={() => onPatch(campaign.id, 'approved')} style={primaryButton}>{c.text.approveCampaign}</button>}{canQueue && <button disabled={busy} onClick={() => onPatch(campaign.id, 'queued')} style={secondaryButton}>{c.text.queueWorker}</button>}{canDraft && !output && <button disabled={busy} onClick={() => onGenerateDraft(campaign.id)} style={primaryButton}>{c.text.generated}</button>}</div></div> }
+function InfoBlock({ title, body, large = false }: { title: string; body: string; large?: boolean }) { return <div style={{ background: 'rgba(0,0,0,.24)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 14, padding: 14, minHeight: large ? 120 : 96 }}><p style={{ margin: 0, color: GOLD, fontSize: 11, letterSpacing: '.09em', textTransform: 'uppercase', fontWeight: 950 }}>{title}</p><p style={{ margin: '8px 0 0', color: 'rgba(255,255,255,.78)', fontSize: 13, lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{body}</p></div> }
 
 const h2: CSSProperties = { color: '#fff', margin: '8px 0 0', fontSize: 20 }
 const bodyText: CSSProperties = { color: 'rgba(255,255,255,.62)', margin: '8px 0 0', lineHeight: 1.6 }

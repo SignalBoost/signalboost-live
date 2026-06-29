@@ -11,6 +11,7 @@ type Lead = {
   source_platform?: string
   status?: 'pending' | 'approved' | 'rejected'
   outreach_message?: string
+  contact_email?: string | null
   created_at?: string
 }
 
@@ -42,6 +43,8 @@ type ContactsCopy = {
   empty: string
   analyzeFirst: string
   unnamedBusiness: string
+  willSendTo: string
+  noRecipient: string
   approve: string
   approved: string
   reject: string
@@ -63,6 +66,8 @@ const COPY: Record<string, ContactsCopy> = {
     empty: 'No leads here yet.',
     analyzeFirst: 'Analyze your first lead',
     unnamedBusiness: 'Unnamed business',
+    willSendTo: 'Will send to',
+    noRecipient: 'No published email found — cannot be sent.',
     approve: 'Approve',
     approved: 'Approved',
     reject: 'Reject',
@@ -91,6 +96,8 @@ const COPY: Record<string, ContactsCopy> = {
     empty: 'Ainda não há leads aqui.',
     analyzeFirst: 'Analisar seu primeiro lead',
     unnamedBusiness: 'Negócio sem nome',
+    willSendTo: 'Será enviado para',
+    noRecipient: 'Nenhum email publicado encontrado — não pode ser enviado.',
     approve: 'Aprovar',
     approved: 'Aprovado',
     reject: 'Rejeitar',
@@ -119,6 +126,8 @@ const COPY: Record<string, ContactsCopy> = {
     empty: 'Aún no hay leads aquí.',
     analyzeFirst: 'Analizar tu primer lead',
     unnamedBusiness: 'Negocio sin nombre',
+    willSendTo: 'Se enviará a',
+    noRecipient: 'No se encontró un email publicado — no se puede enviar.',
     approve: 'Aprobar',
     approved: 'Aprobado',
     reject: 'Rechazar',
@@ -147,6 +156,8 @@ const COPY: Record<string, ContactsCopy> = {
     empty: 'Nie ma tu jeszcze leadów.',
     analyzeFirst: 'Przeanalizuj pierwszy lead',
     unnamedBusiness: 'Firma bez nazwy',
+    willSendTo: 'Zostanie wysłane do',
+    noRecipient: 'Nie znaleziono opublikowanego adresu email — nie można wysłać.',
     approve: 'Zatwierdź',
     approved: 'Zatwierdzony',
     reject: 'Odrzuć',
@@ -175,6 +186,8 @@ const COPY: Record<string, ContactsCopy> = {
     empty: 'Здесь пока нет лидов.',
     analyzeFirst: 'Проанализировать первый lead',
     unnamedBusiness: 'Компания без названия',
+    willSendTo: 'Будет отправлено на',
+    noRecipient: 'Опубликованный email не найден — отправка невозможна.',
     approve: 'Одобрить',
     approved: 'Одобрен',
     reject: 'Отклонить',
@@ -373,6 +386,16 @@ export default function OutreachContactsPage() {
                       {lead.business_url}
                     </a>
                   ) : null}
+
+                  {lead.contact_email ? (
+                    <p className="sb-caption" style={{ margin: '4px 0 0', fontWeight: 700, color: '#1af0ff' }}>
+                      {copy.willSendTo}: {lead.contact_email}
+                    </p>
+                  ) : (
+                    <p className="sb-caption" style={{ margin: '4px 0 0', fontWeight: 700, color: '#f59e0b' }}>
+                      {copy.noRecipient}
+                    </p>
+                  )}
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, alignSelf: 'flex-start', flexWrap: 'wrap', justifyContent: 'flex-end' }}>

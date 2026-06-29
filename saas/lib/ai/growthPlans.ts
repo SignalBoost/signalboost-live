@@ -14,6 +14,19 @@ import { findContactEmail } from '@/lib/outreach/emailFinder'
 const PLANS_TABLE = 'growth_plans'
 const OUTREACH_TABLE = 'outreach_queue'
 
+// CAN-SPAM + trust: every message must carry a real signer, the business's
+// physical mailing address (legally required for US commercial email), and a
+// plain opt-out. COS writes only the body; this footer is appended in code so it
+// is guaranteed on every draft no matter what the model produced. Set the address
+// once in Vercel as OUTREACH_PHYSICAL_ADDRESS.
+function outreachComplianceFooter(): string {
+  const addr = String(process.env.OUTREACH_PHYSICAL_ADDRESS || '').trim()
+  const out = ['', '\u2014', 'Luis Claudio \u00b7 SignalBoost']
+  if (addr) out.push(addr)
+  out.push('Not a fit? Reply "unsubscribe" and we will not contact you again.')
+  return out.join('\n')
+}
+
 export type GrowthPlan = {
   id: string
   alert_id: string | null
@@ -185,7 +198,7 @@ export async function createOutreachDraft(params: {
         business_url: businessUrl,
         contact_email: found.email,
         sender_key: senderKey,
-        outreach_message: message,
+        outreach_message: message + outreachComplianceFooter(),
         status: 'pending',
       })
       .select('id')

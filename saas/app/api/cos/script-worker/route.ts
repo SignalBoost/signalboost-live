@@ -5,6 +5,8 @@ import type { CosContentWorkerInput } from '@/lib/cos/script-worker'
 
 export const dynamic = 'force-dynamic'
 
+const DRAFTABLE_STATUSES = ['draft', 'waiting_approval', 'approved', 'queued', 'running']
+
 export async function POST(req: NextRequest) {
   const ctx = await requireAdmin()
   if (ctx instanceof NextResponse) return ctx
@@ -25,8 +27,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: loadError?.message || 'Campaign not found' }, { status: 404 })
   }
 
-  if (!['approved', 'queued', 'running'].includes(campaign.status)) {
-    return NextResponse.json({ ok: false, error: 'Campaign must be approved or queued before generating worker output.' }, { status: 400 })
+  if (!DRAFTABLE_STATUSES.includes(campaign.status)) {
+    return NextResponse.json({ ok: false, error: 'Campaign is not in a draftable state.' }, { status: 400 })
   }
 
   const workItems = Array.isArray(campaign.work_items) ? campaign.work_items : []
@@ -39,7 +41,7 @@ export async function POST(req: NextRequest) {
     channel: campaign.channel,
     audience: campaign.audience,
     language: firstWorkItem?.input?.language || 'en',
-    brief: firstWorkItem?.input?.brief || 'Create a 4-6 minute educational YouTube draft for this campaign.',
+    brief: firstWorkItem?.input?.brief || 'Create a concise review-ready campaign draft. Keep publishing, sending, and spending behind owner approval.',
   }
 
   const output = generateContentDraft(input)
@@ -52,13 +54,17 @@ export async function POST(req: NextRequest) {
     ...(campaign.metadata || {}),
     last_worker: 'script_worker',
     last_worker_completed_at: timestamp,
-    visible_output: 'youtube_content_draft',
+    visible_output: 'review_ready_campaign_draft',
+    owner_light_review: true,
+    publishing_gate: 'locked_until_owner_approval',
   }
+
+  const nextStatus = campaign.status === 'approved' ? 'queued' : campaign.status
 
   const { data: updated, error: updateError } = await ctx.admin
     .from('cos_campaign_queue')
     .update({
-      status: campaign.status === 'approved' ? 'queued' : campaign.status,
+      status: nextStatus,
       work_items: nextWorkItems,
       metadata,
     })
@@ -71,10 +77,10 @@ export async function POST(req: NextRequest) {
   await auditAdminAction({
     admin: ctx.admin,
     actorId: ctx.user.id,
-    action: 'cos_script_worker.completed',
+    action: 'cos_script_worker.review_draft_completed',
     targetType: 'cos_campaign_queue',
     targetId: campaign.id,
-    metadata: { recommendation_id: campaign.recommendation_id, channel: campaign.channel },
+    metadata: { recommendation_id: campaign.recommendation_id, channel: campaign.channel, original_status: campaign.status, next_status: nextStatus },
   })
 
   return NextResponse.json({ ok: true, campaign: updated, output })

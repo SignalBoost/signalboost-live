@@ -11,6 +11,7 @@ type Row = {
   liveUrl: string | null
   connector: string | null
   lastOk: boolean | null
+  views: number
 }
 
 const STATUS_KEY: Record<string, Parameters<typeof msT>[1]> = {
@@ -61,6 +62,10 @@ export default function ConsoleClient() {
         <a href="/dashboard/marketing-sales/review" style={{ color: '#1af0ff', fontWeight: 700, fontSize: 13 }}>{msT(L, 'pendingApproval')} →</a>
       </div>
 
+      <p style={{ margin: '0 0 14px', fontSize: 13, opacity: .7 }}>
+        👁 {rows.reduce((n, r) => n + (r.views || 0), 0)} · {rows.length} {msT(L, 'campaigns').toLowerCase()}
+      </p>
+
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
         {['all', ...statuses].map((s) => (
           <button key={s} onClick={() => setFilter(s)}
@@ -89,6 +94,7 @@ export default function ConsoleClient() {
                   {badge(r.campaign.status)}
                   <span>{msT(L, 'languages')}: {r.draftCount}</span>
                   {r.connector ? <span>{msT(L, 'channel')}: {r.connector}</span> : null}
+                  <span title="views">👁 {r.views || 0}</span>
                 </div>
               </div>
               <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>

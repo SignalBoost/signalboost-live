@@ -11,6 +11,7 @@ export interface ConsoleRow {
   liveUrl: string | null
   connector: string | null
   lastOk: boolean | null
+  views: number
 }
 
 export async function listConsole(host: MarketingHost, orgId: string): Promise<Result<ConsoleRow[]>> {
@@ -23,12 +24,15 @@ export async function listConsole(host: MarketingHost, orgId: string): Promise<R
     const sorted = [...results].sort((a, b) => String(a.at || '').localeCompare(String(b.at || '')))
     const okResults = sorted.filter((r) => r.ok && r.live_url)
     const chosen = okResults.length ? okResults[okResults.length - 1] : sorted[sorted.length - 1]
+    let views = 0
+    try { views = await host.store.count('ms_events', { campaign_id: c.id, kind: 'view' }) } catch { views = 0 }
     rows.push({
       campaign: c,
       draftCount: Array.isArray(drafts) ? drafts.length : 0,
       liveUrl: chosen ? (chosen.live_url || null) : null,
       connector: chosen ? (chosen.connector_id || null) : null,
       lastOk: chosen ? !!chosen.ok : null,
+      views,
     })
   }
   rows.sort((a, b) => String(b.campaign.created_at || '').localeCompare(String(a.campaign.created_at || '')))

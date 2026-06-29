@@ -10,6 +10,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { assertSafeOutreachMessage } from '@/lib/ai/guardrails'
 import { findContactEmail } from '@/lib/outreach/emailFinder'
+import Anthropic from '@anthropic-ai/sdk'
+import { pickOutreachLanguage } from '@/lib/outreach/regionLanguage'
 
 const PLANS_TABLE = 'growth_plans'
 const OUTREACH_TABLE = 'outreach_queue'
@@ -22,7 +24,7 @@ const OUTREACH_TABLE = 'outreach_queue'
 function outreachComplianceFooter(senderKey: string | null): string {
   const addr = String(process.env.OUTREACH_PHYSICAL_ADDRESS || '').trim()
   const team = senderKey === 'saasMarketing' ? 'The SignalBoost Marketing Team' : 'The SignalBoost Sales Team'
-  const out = ['', '\u2014', team]
+  const out = ['', '—', team]
   if (addr) out.push(addr)
   out.push('Not a fit? Reply "unsubscribe" and we will not contact you again.')
   return out.join('\n')
@@ -152,6 +154,38 @@ ${blocks.join('\n\n')}`
 // found on the target's own website. If none is found, the company is SKIPPED
 // (no draft, ok:false + skipped:true). COS never invents or guesses an address —
 // there is nothing to send to, so nothing is queued.
+const LANG_NAMES: Record<string, string> = { pt: 'Brazilian Portuguese', es: 'Spanish', pl: 'Polish', ru: 'Russian' }
+
+// Detect the target's region language from its OWN website content (script + signals),
+// so a generically-named Polish/Russian/Brazilian firm is still classified correctly.
+async function detectTargetLanguage(businessUrl: string, businessName: string): Promise<string> {
+  let text = ''
+  try {
+    const res = await fetch(businessUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SignalBoost/1.0)' } })
+    if (res.ok) text = (await res.text()).replace(/<[^>]+>/g, ' ').slice(0, 8000)
+  } catch { /* best-effort: fall back to url+name signals */ }
+  return pickOutreachLanguage({ url: businessUrl, name: businessName, text })
+}
+
+// Translate the COS-written message into the target's native language. Falls back to the
+// original English on any failure — never blocks a draft, never fabricates.
+async function localizeMessage(message: string, lang: string): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  const name = LANG_NAMES[lang]
+  if (!apiKey || !name) return message
+  try {
+    const client = new Anthropic({ apiKey })
+    const resp = await client.messages.create({
+      model: process.env.MARKETING_SALES_MODEL || 'claude-sonnet-4-6',
+      max_tokens: 1200,
+      system: `Translate the user's outreach email into natural, native ${name}. Preserve meaning, tone, names, links, and line breaks. Do not add or remove content. Output ONLY the translation with no preamble.`,
+      messages: [{ role: 'user', content: message }],
+    })
+    const out = resp.content.map((b: any) => (b?.type === 'text' ? b.text : '')).join('').trim()
+    return out || message
+  } catch { return message }
+}
+
 export async function createOutreachDraft(params: {
   businessName: string
   businessUrl: string
@@ -189,6 +223,12 @@ export async function createOutreachDraft(params: {
     // COS's per-message sender choice (sales vs marketing, etc.), validated.
     const senderKey = VALID_SENDER_KEYS.includes(String(params.senderKey || '')) ? String(params.senderKey) : null
 
+    // Standing directive enforced in code: localize the outbound message to the target's
+    // region (Brazil→pt, Spanish-speaking LATAM→es, Poland→pl, Russia→ru; else English).
+    // The COS writes English; this guaranteed chokepoint makes the prompt irrelevant.
+    const targetLang = await detectTargetLanguage(businessUrl, businessName)
+    const localizedMessage = targetLang === 'en' ? message : await localizeMessage(message, targetLang)
+
     const db = supabaseAdmin()
     const { data, error } = await db
       .from(OUTREACH_TABLE)
@@ -199,7 +239,7 @@ export async function createOutreachDraft(params: {
         business_url: businessUrl,
         contact_email: found.email,
         sender_key: senderKey,
-        outreach_message: message + outreachComplianceFooter(senderKey),
+        outreach_message: localizedMessage + outreachComplianceFooter(senderKey),
         status: 'pending',
       })
       .select('id')

@@ -30,7 +30,7 @@ export async function GET() {
 
   const { data: recentOutreach } = await ctx.admin
     .from('outreach_queue')
-    .select('id,business_name,business_url,source_platform,status,created_at,approved_at,sent_at,analyzer_summary,business_model_profile,predictive_needs,outreach_message,website_json,review_strategy,social_plan,promo_plan')
+    .select('id,business_name,business_url,source_platform,status,created_at,approved_at,sent_at,analyzer_summary,business_model_profile,predictive_needs,outreach_message,website_json,review_strategy,social_plan,promo_plan,contact_email,sender_key')
     .order('created_at', { ascending: false })
     .limit(25)
 

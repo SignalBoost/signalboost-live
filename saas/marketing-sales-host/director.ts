@@ -20,6 +20,7 @@ const THEMES: Theme[] = [
   { key: 'audit',   prompt: 'Promote the free SaaS operations & security audit (Audit Center): invite SaaS founders to run a free audit and receive a prioritized findings report.' },
   { key: 'website', prompt: 'Promote the free Website Optimizer: invite small businesses to scan their website and get a clear, prioritized list of fixes.' },
   { key: 'reviews', prompt: 'Promote the review collection tool: help service and local businesses collect and showcase real customer reviews.' },
+  { key: 'video',   prompt: 'Promote SignalBoost with a short vertical video concept: the title is a punchy on-screen hook line, and the body describes the voiceover and what is shown on screen for a ~5 second clip. Keep it concrete and grounded in real SignalBoost offerings.' },
 ]
 
 // The optimization step: read which theme's published campaigns drew the most real

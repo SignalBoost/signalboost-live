@@ -15,5 +15,7 @@
   "errNotConnected": "This channel is not connected yet.",
   "errNotImplemented": "This action is not available in this version yet.",
   "errPlatformPending": "This channel is awaiting platform approval.",
-  "errUnknown": "Something went wrong. Please try again."
+  "errUnknown": "Something went wrong. Please try again.",
+  "approveAndPublish": "Approve & publish",
+  "viewLive": "View live"
 }

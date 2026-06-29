@@ -19,3 +19,5 @@ export {
 import './executors/youtube'
 import './executors/tiktok'
 import './executors/linkedin'
+import './executors/site'
+export { publishCampaign } from './publish'

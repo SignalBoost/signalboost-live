@@ -15,5 +15,7 @@
   "errNotConnected": "Este canal aún no está conectado.",
   "errNotImplemented": "Esta acción aún no está disponible en esta versión.",
   "errPlatformPending": "Este canal está pendiente de aprobación de la plataforma.",
-  "errUnknown": "Algo salió mal. Inténtalo de nuevo."
+  "errUnknown": "Algo salió mal. Inténtalo de nuevo.",
+  "approveAndPublish": "Aprobar y publicar",
+  "viewLive": "Ver publicado"
 }

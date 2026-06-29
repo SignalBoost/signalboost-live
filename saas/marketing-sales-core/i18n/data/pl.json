@@ -15,5 +15,7 @@
   "errNotConnected": "Ten kanał nie jest jeszcze połączony.",
   "errNotImplemented": "Ta akcja nie jest jeszcze dostępna w tej wersji.",
   "errPlatformPending": "Ten kanał oczekuje na zatwierdzenie platformy.",
-  "errUnknown": "Coś poszło nie tak. Spróbuj ponownie."
+  "errUnknown": "Coś poszło nie tak. Spróbuj ponownie.",
+  "approveAndPublish": "Zatwierdź i opublikuj",
+  "viewLive": "Zobacz na żywo"
 }

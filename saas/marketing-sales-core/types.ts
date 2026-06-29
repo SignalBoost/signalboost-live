@@ -112,4 +112,4 @@ export interface MarketingHost {
 }
 
 // Flat result style (repo rule: tsconfig strict:false — keep unions flat).
-export type Result<T = unknown> = { ok: true; data?: T } | { ok: false; error: string }
+export type Result<T = unknown> = { ok: boolean; data?: T; error?: string }

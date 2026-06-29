@@ -13,7 +13,7 @@ type Row = {
   lastOk: boolean | null
 }
 
-const STATUS_KEY: Record<string, string> = {
+const STATUS_KEY: Record<string, Parameters<typeof msT>[1]> = {
   intake: 'statusIntake', drafting: 'statusDrafting', needs_approval: 'statusNeedsApproval',
   approved: 'statusApproved', publishing: 'statusPublishing', published: 'statusPublished',
   publish_failed: 'statusPublishFailed', edits_requested: 'statusEditsRequested',

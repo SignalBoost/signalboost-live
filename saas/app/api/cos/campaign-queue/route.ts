@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
 import { buildDefaultMarketingRecommendation } from '@/lib/cos/recommendation/engine'
-import type { CosRecommendation } from '@/lib/cos/recommendation/types'
+import type { CosChannel, CosDepartment, CosPriority, CosRecommendation } from '@/lib/cos/recommendation/types'
 import { queueItemFromRecommendation } from '@/lib/cos/campaign-queue'
 import type { CosCampaignQueueStatus } from '@/lib/cos/campaign-queue'
 
@@ -23,6 +23,23 @@ const allowedStatuses: CosCampaignQueueStatus[] = [
   'learned',
   'rejected',
 ]
+
+const allowedRequestChannels: CosChannel[] = [
+  'youtube',
+  'short_video',
+  'linkedin',
+  'blog',
+  'email',
+  'outreach',
+  'landing_page',
+  'review_campaign',
+]
+
+const allowedDepartments: CosDepartment[] = ['marketing', 'sales']
+const allowedPriorities: CosPriority[] = ['low', 'medium', 'high', 'critical']
+const allowedLanguages = ['en', 'es', 'pt', 'pl', 'ru'] as const
+
+type SupportedCampaignLanguage = typeof allowedLanguages[number]
 
 function normalizeStatus(value: unknown): CosCampaignQueueStatus | null {
   if (typeof value !== 'string') return null
@@ -62,6 +79,146 @@ function dbRowFromQueueItem(item: ReturnType<typeof queueItemFromRecommendation>
   }
 }
 
+function id(prefix: string) {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+}
+
+function cleanString(value: unknown, fallback: string, maxLength = 280) {
+  if (typeof value !== 'string') return fallback
+  const normalized = value.replace(/\s+/g, ' ').trim()
+  return normalized ? normalized.slice(0, maxLength) : fallback
+}
+
+function cleanLongText(value: unknown, fallback: string, maxLength = 1_500) {
+  if (typeof value !== 'string') return fallback
+  const normalized = value.trim()
+  return normalized ? normalized.slice(0, maxLength) : fallback
+}
+
+function normalizeChannel(value: unknown): CosChannel {
+  if (typeof value === 'string' && allowedRequestChannels.includes(value as CosChannel)) return value as CosChannel
+  return 'youtube'
+}
+
+function normalizePriority(value: unknown): CosPriority {
+  if (typeof value === 'string' && allowedPriorities.includes(value as CosPriority)) return value as CosPriority
+  return 'medium'
+}
+
+function normalizeLanguage(value: unknown): SupportedCampaignLanguage {
+  if (typeof value === 'string' && (allowedLanguages as readonly string[]).includes(value)) return value as SupportedCampaignLanguage
+  return 'en'
+}
+
+function normalizeDepartment(value: unknown, channel: CosChannel): CosDepartment {
+  if (typeof value === 'string' && allowedDepartments.includes(value as CosDepartment)) return value as CosDepartment
+  if (channel === 'email' || channel === 'outreach') return 'sales'
+  return 'marketing'
+}
+
+function normalizeEstimatedCost(value: unknown, channel: CosChannel) {
+  const defaultCost = channel === 'youtube' || channel === 'short_video' ? 12 : channel === 'email' || channel === 'outreach' ? 3 : 5
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric) || numeric < 0) return defaultCost
+  return Math.min(500, Math.round(numeric * 100) / 100)
+}
+
+function titleForChannel(channel: CosChannel) {
+  switch (channel) {
+    case 'youtube': return 'Create an educational YouTube campaign'
+    case 'short_video': return 'Create a short-form campaign'
+    case 'linkedin': return 'Create a LinkedIn authority campaign'
+    case 'blog': return 'Create an SEO education campaign'
+    case 'email': return 'Create a sales email campaign'
+    case 'outreach': return 'Create a targeted outreach campaign'
+    case 'landing_page': return 'Create a conversion landing page campaign'
+    case 'review_campaign': return 'Create a customer proof campaign'
+    default: return 'Create a governed growth campaign'
+  }
+}
+
+function confidenceForPriority(priority: CosPriority) {
+  if (priority === 'critical') return 88
+  if (priority === 'high') return 82
+  if (priority === 'medium') return 74
+  return 66
+}
+
+function expectedRoiForPriority(priority: CosPriority): CosRecommendation['expected_roi'] {
+  if (priority === 'critical' || priority === 'high') return 'high'
+  if (priority === 'medium') return 'medium'
+  return 'unknown'
+}
+
+function recommendationFromDepartmentRequest(input: unknown): CosRecommendation | null {
+  if (!input || typeof input !== 'object') return null
+  const request = input as Record<string, unknown>
+  const channel = normalizeChannel(request.channel)
+  const priority = normalizePriority(request.priority)
+  const language = normalizeLanguage(request.language)
+  const department = normalizeDepartment(request.department, channel)
+  const audience = cleanString(request.audience, 'Small business owners and operators who need more growth capacity without adding manual work.', 240)
+  const objective = cleanLongText(
+    request.objective,
+    'Create an owner-approved campaign that explains the business problem first, then presents SignalBoost as the solution.',
+    1_200,
+  )
+  const signal = cleanLongText(request.signal, 'Founder/operator submitted a Marketing/Sales department request.', 700)
+  const title = cleanString(request.title, titleForChannel(channel), 140)
+  const estimatedCostUsd = normalizeEstimatedCost(request.estimatedCostUsd, channel)
+  const now = new Date().toISOString()
+  const summary = [
+    objective,
+    `Target audience: ${audience}.`,
+    `Requested language: ${language}.`,
+    `Execution rule: draft, approval, final polish, publishing, monitoring, and learning must remain behind owner-approved workflow gates.`,
+  ].join(' ')
+
+  return {
+    id: id('rec_manual'),
+    department,
+    title,
+    summary,
+    recommended_channel: channel,
+    priority,
+    confidence: confidenceForPriority(priority),
+    expected_roi: expectedRoiForPriority(priority),
+    estimated_cost_usd: estimatedCostUsd,
+    reason: `Marketing/Sales department request created by an administrator. Channel=${channel}; priority=${priority}; language=${language}.`,
+    signals: [
+      {
+        id: id('signal'),
+        source: 'marketing_sales_department_request',
+        metric: 'campaign_request',
+        value: title,
+        confidence: confidenceForPriority(priority),
+        observed_at: now,
+        evidence: [objective, signal],
+      },
+      {
+        id: id('audience'),
+        source: 'marketing_sales_department_request',
+        metric: 'target_audience',
+        value: audience,
+        confidence: 90,
+        observed_at: now,
+        evidence: ['Preserved from the department campaign request.'],
+      },
+      {
+        id: id('language'),
+        source: 'marketing_sales_department_request',
+        metric: 'requested_language',
+        value: language,
+        confidence: 90,
+        observed_at: now,
+        evidence: ['Primary language requested before localization expansion.'],
+      },
+    ],
+    approval_status: 'pending_approval',
+    created_at: now,
+  }
+}
+
 export async function GET(req: NextRequest) {
   const ctx = await requireAdmin()
   if (ctx instanceof NextResponse) return ctx
@@ -92,7 +249,17 @@ export async function POST(req: NextRequest) {
   let body: any = null
   try { body = await req.json() } catch { body = {} }
 
-  const recommendation = (body?.recommendation || buildDefaultMarketingRecommendation()) as CosRecommendation
+  let recommendation: CosRecommendation
+  if (body?.recommendation) {
+    recommendation = body.recommendation as CosRecommendation
+  } else if ('request' in (body || {})) {
+    const built = recommendationFromDepartmentRequest(body.request)
+    if (!built) return NextResponse.json({ ok: false, error: 'A valid campaign request is required.' }, { status: 400 })
+    recommendation = built
+  } else {
+    recommendation = buildDefaultMarketingRecommendation()
+  }
+
   if (!recommendation?.id || !recommendation?.title || !recommendation?.recommended_channel) {
     return NextResponse.json({ ok: false, error: 'A valid COS recommendation is required.' }, { status: 400 })
   }
@@ -112,7 +279,7 @@ export async function POST(req: NextRequest) {
     action: 'cos_campaign.create',
     targetType: 'cos_campaign_queue',
     targetId: data.id,
-    metadata: { recommendation_id: recommendation.id, channel: recommendation.recommended_channel },
+    metadata: { recommendation_id: recommendation.id, channel: recommendation.recommended_channel, source: recommendation.signals?.[0]?.source || 'cos' },
   })
 
   return NextResponse.json({ ok: true, campaign: cleanDestination(data) })

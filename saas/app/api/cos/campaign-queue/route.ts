@@ -11,6 +11,7 @@ const NEW_DESTINATION = ['www', 'saas', 'signalboostapp', 'com'].join('.')
 const OLD_DESTINATION = ['signalboostapp', 'com'].join('.')
 const DUPLICATE_DESTINATION = ['www', 'saas', 'www', 'saas', 'signalboostapp', 'com'].join('.')
 const WWW_OLD_DESTINATION = ['www', 'signalboostapp', 'com'].join('.')
+const SAAS_URL = 'www.saas.signalboostapp.com'
 
 const allowedStatuses: CosCampaignQueueStatus[] = [
   'draft',
@@ -150,6 +151,49 @@ function expectedRoiForPriority(priority: CosPriority): CosRecommendation['expec
   return 'unknown'
 }
 
+function channelFromDirective(text: string): CosChannel {
+  const lower = text.toLowerCase()
+  if (lower.includes('tiktok') || lower.includes('short') || lower.includes('reel')) return 'short_video'
+  if (lower.includes('youtube') || lower.includes('video')) return 'youtube'
+  if (lower.includes('linkedin')) return 'linkedin'
+  if (lower.includes('email')) return 'email'
+  if (lower.includes('outreach')) return 'outreach'
+  if (lower.includes('blog') || lower.includes('seo')) return 'blog'
+  return 'youtube'
+}
+
+function secondaryChannelsFromDirective(text: string) {
+  const lower = text.toLowerCase()
+  const channels: string[] = []
+  if (lower.includes('youtube') || lower.includes('video')) channels.push('youtube')
+  if (lower.includes('tiktok') || lower.includes('short')) channels.push('tiktok')
+  if (lower.includes('linkedin')) channels.push('linkedin')
+  if (lower.includes('email')) channels.push('email')
+  if (lower.includes('blog') || lower.includes('seo')) channels.push('blog')
+  return channels.length ? Array.from(new Set(channels)) : ['youtube', 'tiktok', 'linkedin']
+}
+
+function requestFromAutonomousDirective(input: unknown) {
+  if (typeof input !== 'string') return null
+  const directive = input.replace(/\s+/g, ' ').trim().slice(0, 1_200)
+  if (directive.length < 8) return null
+  const channel = channelFromDirective(directive)
+  const secondaryChannels = secondaryChannelsFromDirective(directive)
+  return {
+    title: 'Autonomous online outreach campaign for SignalBoost',
+    objective: `Create a short, impactful, review-ready outreach campaign from this owner directive: "${directive}". Feature ${SAAS_URL}. Explain the products and services that help companies grow, keep the message enterprise-ready, and prepare the campaign for ${secondaryChannels.join(', ')} distribution after owner approval.`,
+    channel,
+    department: channel === 'email' || channel === 'outreach' ? 'sales' : 'marketing',
+    audience: 'Business owners, operators, and enterprise buyers looking for AI-assisted growth, marketing, sales, audit, cybersecurity, and optimization workflows.',
+    language: 'en',
+    priority: 'high',
+    estimatedCostUsd: channel === 'short_video' || channel === 'youtube' ? 12 : 5,
+    signal: `Autonomous COSA command. Secondary channels: ${secondaryChannels.join(', ')}. Directive: ${directive}`,
+    autonomous: true,
+    secondaryChannels,
+  }
+}
+
 function recommendationFromDepartmentRequest(input: unknown): CosRecommendation | null {
   if (!input || typeof input !== 'object') return null
   const request = input as Record<string, unknown>
@@ -175,7 +219,7 @@ function recommendationFromDepartmentRequest(input: unknown): CosRecommendation 
   ].join(' ')
 
   return {
-    id: id('rec_manual'),
+    id: id(request.autonomous ? 'rec_auto' : 'rec_manual'),
     department,
     title,
     summary,
@@ -184,11 +228,13 @@ function recommendationFromDepartmentRequest(input: unknown): CosRecommendation 
     confidence: confidenceForPriority(priority),
     expected_roi: expectedRoiForPriority(priority),
     estimated_cost_usd: estimatedCostUsd,
-    reason: `Marketing/Sales department request created by an administrator. Channel=${channel}; priority=${priority}; language=${language}.`,
+    reason: request.autonomous
+      ? `Autonomous COSA command interpreted into a governed campaign. Channel=${channel}; priority=${priority}; language=${language}.`
+      : `Marketing/Sales department request created by an administrator. Channel=${channel}; priority=${priority}; language=${language}.`,
     signals: [
       {
         id: id('signal'),
-        source: 'marketing_sales_department_request',
+        source: request.autonomous ? 'autonomous_cosa_campaign_command' : 'marketing_sales_department_request',
         metric: 'campaign_request',
         value: title,
         confidence: confidenceForPriority(priority),
@@ -197,16 +243,16 @@ function recommendationFromDepartmentRequest(input: unknown): CosRecommendation 
       },
       {
         id: id('audience'),
-        source: 'marketing_sales_department_request',
+        source: request.autonomous ? 'autonomous_cosa_campaign_command' : 'marketing_sales_department_request',
         metric: 'target_audience',
         value: audience,
         confidence: 90,
         observed_at: now,
-        evidence: ['Preserved from the department campaign request.'],
+        evidence: ['Preserved from the campaign request.'],
       },
       {
         id: id('language'),
-        source: 'marketing_sales_department_request',
+        source: request.autonomous ? 'autonomous_cosa_campaign_command' : 'marketing_sales_department_request',
         metric: 'requested_language',
         value: language,
         confidence: 90,
@@ -252,6 +298,11 @@ export async function POST(req: NextRequest) {
   let recommendation: CosRecommendation
   if (body?.recommendation) {
     recommendation = body.recommendation as CosRecommendation
+  } else if (typeof body?.directive === 'string') {
+    const request = requestFromAutonomousDirective(body.directive)
+    const built = recommendationFromDepartmentRequest({ ...(request || {}), ...(body.request || {}) })
+    if (!built) return NextResponse.json({ ok: false, error: 'A valid autonomous directive is required.' }, { status: 400 })
+    recommendation = built
   } else if ('request' in (body || {})) {
     const built = recommendationFromDepartmentRequest(body.request)
     if (!built) return NextResponse.json({ ok: false, error: 'A valid campaign request is required.' }, { status: 400 })
@@ -265,9 +316,16 @@ export async function POST(req: NextRequest) {
   }
 
   const queueItem = queueItemFromRecommendation(recommendation)
+  const row = dbRowFromQueueItem(queueItem)
+  row.metadata = {
+    ...(row.metadata || {}),
+    autonomous: recommendation.signals?.[0]?.source === 'autonomous_cosa_campaign_command',
+    publishing_gate: 'locked_until_owner_approval',
+  }
+
   const { data, error } = await ctx.admin
     .from('cos_campaign_queue')
-    .insert(dbRowFromQueueItem(queueItem))
+    .insert(row)
     .select('*')
     .single()
 

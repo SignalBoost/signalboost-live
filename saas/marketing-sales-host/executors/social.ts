@@ -26,13 +26,20 @@ const PLATFORMS: Array<{ id: string; platform: SocialPlatform; kind: Kind }> = [
   { id: 'twitter',   platform: 'twitter_x',          kind: 'text'  },
 ]
 
-// Modes the platform uploader returns when it did NOT really post.
-const STUB_MODES = new Set(['oauth_credentials_not_configured_logged', 'oauth_publish_ready'])
+// Modes the platform uploader returns when it did NOT really post. A genuine post
+// returns a mode ending in `_live` (or `youtube_live_upload`); anything here is a
+// non-post and must be refused so no fake URL is ever recorded.
+const STUB_MODES = new Set([
+  'oauth_credentials_not_configured_logged',
+  'oauth_publish_ready',
+  'account_ref_not_configured',
+])
 
 // PER-ORG credential seam. SignalBoost resolves the latest connected token for the
-// platform from outreach_social_tokens. An enterprise host overrides how this maps
-// to org_id; the connector logic above never changes.
-async function resolveOrgToken(host: MarketingHost, orgId: string, platform: SocialPlatform): Promise<{ refresh_token?: string; access_token?: string } | null> {
+// platform from outreach_social_tokens, including the destination account ref
+// (page id / org id / IG user id). An enterprise host overrides how this maps to
+// org_id; the connector logic below never changes.
+async function resolveOrgToken(host: MarketingHost, orgId: string, platform: SocialPlatform): Promise<{ refresh_token?: string; access_token?: string; account_ref?: string } | null> {
   try {
     const rows = await host.store.select('outreach_social_tokens', { platform })
     if (!Array.isArray(rows) || !rows.length) return null
@@ -52,7 +59,6 @@ function liveUrlFor(platform: SocialPlatform, id: string): string | null {
 }
 
 async function orgOf(host: MarketingHost): Promise<string> {
-  // The host's actor carries org_id — the real per-tenant scope for credentials.
   try { const a = await host.auth.getCurrentActor(); return a?.orgId || 'signalboost' } catch { return 'signalboost' }
 }
 
@@ -61,7 +67,6 @@ for (const def of PLATFORMS) {
     id: def.id,
     capabilities: { publish: true },
     async run(draft: Draft, host: MarketingHost): Promise<PublishResult> {
-      // content requirement per platform
       if (def.kind === 'video' && !draft?.asset_url) return { ok: false, errorCode: 'errNoAsset', error: 'video required' }
       if (def.kind === 'media' && !draft?.asset_url) return { ok: false, errorCode: 'errNoAsset', error: 'media required' }
       if (def.kind === 'text' && !(draft?.body || draft?.title)) return { ok: false, errorCode: 'errUnknown', error: 'empty draft' }
@@ -82,6 +87,7 @@ for (const def of PLATFORMS) {
           imageUrl: def.kind === 'media' ? (draft.asset_url || undefined) : undefined,
           refreshToken: tok.refresh_token,
           accessToken: tok.access_token,
+          accountRef: tok.account_ref,
           privacyStatus: 'public',
           tags: ['SignalBoost', 'AI', 'marketing'],
         })
@@ -89,13 +95,16 @@ for (const def of PLATFORMS) {
         return { ok: false, errorCode: 'errUnknown', error: e?.message || 'publish threw' }
       }
 
-      // Honesty guard: refuse anything that isn't a genuine post.
+      // Honesty guard: accept ONLY a genuine post. We trust the uploader's mode
+      // (real posts end in `_live`/`youtube_live_upload`; everything else is a stub
+      // or an error). No id-shape heuristic — a real Facebook id (pageid_postid)
+      // must not be mistaken for the synthetic stub id.
       const id = String(res?.providerPostId || '')
-      const synthetic = /_\d{13,}$/.test(id) // `${platform}_${Date.now()}`
-      const isStub = !res?.ok || STUB_MODES.has(res?.mode) || synthetic || !id
-      if (isStub) {
-        const code = res?.mode === 'youtube_requires_video' ? 'errNoAsset' : 'errNotConnected'
-        return { ok: false, errorCode: code, error: res?.mode || 'not published' }
+      const mode = String(res?.mode || '')
+      const isReal = !!res?.ok && !!id && !STUB_MODES.has(mode) && (mode.endsWith('_live') || mode === 'youtube_live_upload')
+      if (!isReal) {
+        const code = mode === 'youtube_requires_video' ? 'errNoAsset' : 'errNotConnected'
+        return { ok: false, errorCode: code, error: mode || 'not published' }
       }
 
       const liveUrl = liveUrlFor(def.platform, id)

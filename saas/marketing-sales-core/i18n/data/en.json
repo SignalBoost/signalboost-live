@@ -1,0 +1,19 @@
+{
+  "department": "Marketing & Sales",
+  "campaigns": "Campaigns",
+  "pendingApproval": "Pending approval",
+  "approve": "Approve",
+  "requestEdits": "Request edits",
+  "reject": "Reject",
+  "archive": "Archive",
+  "published": "Published",
+  "publishFailed": "Publish failed",
+  "willPublishTo": "Will publish to",
+  "noConnector": "No connected channel",
+  "director": "Department head",
+  "console": "Executive console",
+  "errNotConnected": "This channel is not connected yet.",
+  "errNotImplemented": "This action is not available in this version yet.",
+  "errPlatformPending": "This channel is awaiting platform approval.",
+  "errUnknown": "Something went wrong. Please try again."
+}

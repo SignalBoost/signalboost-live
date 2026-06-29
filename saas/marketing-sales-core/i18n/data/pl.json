@@ -1,0 +1,19 @@
+{
+  "department": "Marketing i Sprzedaż",
+  "campaigns": "Kampanie",
+  "pendingApproval": "Oczekuje na zatwierdzenie",
+  "approve": "Zatwierdź",
+  "requestEdits": "Poproś o zmiany",
+  "reject": "Odrzuć",
+  "archive": "Archiwizuj",
+  "published": "Opublikowano",
+  "publishFailed": "Publikacja nie powiodła się",
+  "willPublishTo": "Zostanie opublikowane w",
+  "noConnector": "Brak podłączonego kanału",
+  "director": "Szef działu",
+  "console": "Konsola wykonawcza",
+  "errNotConnected": "Ten kanał nie jest jeszcze połączony.",
+  "errNotImplemented": "Ta akcja nie jest jeszcze dostępna w tej wersji.",
+  "errPlatformPending": "Ten kanał oczekuje na zatwierdzenie platformy.",
+  "errUnknown": "Coś poszło nie tak. Spróbuj ponownie."
+}

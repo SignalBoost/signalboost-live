@@ -1,0 +1,19 @@
+{
+  "department": "Marketing e Vendas",
+  "campaigns": "Campanhas",
+  "pendingApproval": "Aguardando aprovação",
+  "approve": "Aprovar",
+  "requestEdits": "Solicitar edições",
+  "reject": "Rejeitar",
+  "archive": "Arquivar",
+  "published": "Publicado",
+  "publishFailed": "Falha na publicação",
+  "willPublishTo": "Será publicado em",
+  "noConnector": "Nenhum canal conectado",
+  "director": "Chefe de departamento",
+  "console": "Console executivo",
+  "errNotConnected": "Este canal ainda não está conectado.",
+  "errNotImplemented": "Esta ação ainda não está disponível nesta versão.",
+  "errPlatformPending": "Este canal aguarda aprovação da plataforma.",
+  "errUnknown": "Algo deu errado. Tente novamente."
+}

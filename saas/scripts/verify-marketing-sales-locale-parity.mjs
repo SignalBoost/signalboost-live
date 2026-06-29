@@ -1,36 +1,46 @@
 // saas/scripts/verify-marketing-sales-locale-parity.mjs
-// CI guard: the Marketing-Sales module's five language dictionaries must have
-// identical keys, and no value may be empty. Fails the build on any English
-// leak (a key present in en but missing/blank elsewhere). Run from saas/.
+// CI guard for the day-one i18n rule: every Marketing-Sales key must exist, with a
+// non-empty value, in ALL five languages. A page/component must never ship
+// English-only. Zero dependencies (node only). Run from the repo root or saas/:
 //
-// Wire into CI alongside verify-cos-locale-parity.mjs:
-//   node scripts/verify-marketing-sales-locale-parity.mjs
-import { build } from 'esbuild'
-import { mkdtempSync } from 'fs'
-import { tmpdir } from 'os'
-import { join } from 'path'
+//   node saas/scripts/verify-marketing-sales-locale-parity.mjs
+//
+// Exits non-zero (fails the build) on any missing key, extra key, or empty value.
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
 
-const out = mkdtempSync(join(tmpdir(), 'ms-parity-'))
-await build({
-  entryPoints: ['marketing-sales-core/i18n/dictionaries.ts'],
-  bundle: true, format: 'esm', outfile: join(out, 'd.mjs'), logLevel: 'silent',
-})
-const { DICTIONARIES } = await import(join(out, 'd.mjs'))
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const DATA = join(__dirname, '..', 'marketing-sales-core', 'i18n', 'data')
+const LANGS = ['en', 'es', 'pt', 'pl', 'ru']
 
-const langs = Object.keys(DICTIONARIES)
-const base = Object.keys(DICTIONARIES.en).sort()
-let bad = false
-
-for (const l of langs) {
-  const keys = Object.keys(DICTIONARIES[l]).sort()
-  const missing = base.filter((k) => !keys.includes(k))
-  const extra = keys.filter((k) => !base.includes(k))
-  if (missing.length) { bad = true; console.error(`[${l}] MISSING keys: ${missing.join(', ')}`) }
-  if (extra.length)   { bad = true; console.error(`[${l}] EXTRA keys: ${extra.join(', ')}`) }
-  for (const k of keys) {
-    if (!String(DICTIONARIES[l][k] || '').trim()) { bad = true; console.error(`[${l}] EMPTY value: ${k}`) }
+function load(lang) {
+  try {
+    return JSON.parse(readFileSync(join(DATA, `${lang}.json`), 'utf8'))
+  } catch (e) {
+    console.error(`✗ cannot read/parse ${lang}.json: ${e.message}`)
+    process.exit(1)
   }
 }
 
-if (bad) { console.error('\n❌ Marketing-Sales locale parity FAILED'); process.exit(1) }
-console.log(`✅ Marketing-Sales locale parity OK — ${langs.length} languages, ${base.length} keys each`)
+const dicts = Object.fromEntries(LANGS.map((l) => [l, load(l)]))
+const base = Object.keys(dicts.en).sort()
+let failures = 0
+
+for (const lang of LANGS) {
+  const keys = new Set(Object.keys(dicts[lang]))
+  for (const key of base) {
+    if (!keys.has(key)) { console.error(`✗ ${lang}: missing key  ${key}`); failures++; continue }
+    const v = dicts[lang][key]
+    if (typeof v !== 'string' || v.trim() === '') { console.error(`✗ ${lang}: empty value ${key}`); failures++ }
+  }
+  for (const key of keys) {
+    if (!base.includes(key)) { console.error(`✗ ${lang}: extra key    ${key} (not in en — structure must be identical)`); failures++ }
+  }
+}
+
+if (failures > 0) {
+  console.error(`\nMarketing-Sales locale parity FAILED: ${failures} problem(s) across ${LANGS.length} languages.`)
+  process.exit(1)
+}
+console.log(`✓ Marketing-Sales locale parity OK — ${base.length} keys × ${LANGS.length} languages, no gaps.`)

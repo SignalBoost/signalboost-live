@@ -157,7 +157,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
   'supabase.edit_user': {
     id: 'supabase.edit_user',
     label: 'Edit User',
-    description: 'Update a user's email, metadata, or confirmation state.',
+    description: "Update a user's email, metadata, or confirmation state.",
     icon: '✏️',
     policyActionId: 'edit_supabase_user',
     api: { service: 'Supabase', method: 'POST', endpoint: '/v1/auth/users/update' },
@@ -373,7 +373,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
   'github.edit_issue': {
     id: 'github.edit_issue',
     label: 'Edit Issue',
-    description: 'Update an issue’s title or open/closed state.',
+    description: 'Update an issue\u2019s title or open/closed state.',
     icon: '✏️',
     policyActionId: 'crud_actions',
     api: { service: 'GitHub', method: 'POST', endpoint: '/v1/issues/update' },
@@ -718,7 +718,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
   'audit.provision_pricing': {
     id: 'audit.provision_pricing',
     label: 'Provision Audit Pricing (Stripe → Vercel → Vault)',
-    description: 'One-shot: read lib/audit/pricingConfig.ts, create or refresh each tier's Stripe product + recurring price, write each price id into its NEXT_PUBLIC_* Vercel variable, and record each key in the Vault. Idempotent — safe to re-run; it only creates a new Stripe price when the configured amount changed. A redeploy is required afterward for the Vercel variables to take effect.',
+    description: "One-shot: read lib/audit/pricingConfig.ts, create or refresh each tier's Stripe product + recurring price, write each price id into its NEXT_PUBLIC_* Vercel variable, and record each key in the Vault. Idempotent — safe to re-run; it only creates a new Stripe price when the configured amount changed. A redeploy is required afterward for the Vercel variables to take effect.",
     icon: '🧾',
     requiresConfirm: true,
     policyActionId: 'provision_audit_pricing',

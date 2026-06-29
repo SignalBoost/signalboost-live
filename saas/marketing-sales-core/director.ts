@@ -9,7 +9,7 @@ import type { MarketingHost, Lang, Result } from './types'
 import { createCampaign, addDraftsAndQueue } from './flow'
 
 export type GeneratedCampaign =
-  | { objective: string; drafts: Array<{ lang: Lang; title: string; body: string }> }
+  | { objective: string; drafts: Array<{ lang: Lang; title: string; body: string }>; channel?: string }
   | null
 
 export type GenerateFn = (ctx: { orgId: string }) => Promise<GeneratedCampaign>
@@ -36,7 +36,7 @@ export async function runDirector(
     return { ok: true, data: { initiated: 0, pending, reason: 'no generation' } }
   }
 
-  const c = await createCampaign(host, { orgId: opts.orgId, actorId: opts.actorId, objective: gen.objective })
+  const c = await createCampaign(host, { orgId: opts.orgId, actorId: opts.actorId, objective: gen.objective, channel: gen.channel || null })
   if (!c.ok) return { ok: false, error: c.error }
   const q = await addDraftsAndQueue(host, { campaign: c.data, drafts: gen.drafts })
   if (!q.ok) return { ok: false, error: q.error }

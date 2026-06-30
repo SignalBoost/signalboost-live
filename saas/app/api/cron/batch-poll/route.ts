@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { pollBatches, type BatchHandler } from '@/lib/ai/batch/openaiBatch'
 import { ingestScanAlerts } from '@/lib/ai/opportunityScanner'
+import { applyCampaignCopyOutputs } from '@/lib/cos/script-worker/batchGenerator'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -19,7 +20,9 @@ export async function GET(req: NextRequest) {
     opportunity_scan: async (outputs) => {
       await ingestScanAlerts(outputs[0]?.content || '[]')
     },
-    // Future: campaign_copy, etc. — add one entry per batch kind.
+    campaign_copy: async (outputs, context) => {
+      await applyCampaignCopyOutputs(outputs, context)
+    },
   }
 
   const r = await pollBatches(handlers)

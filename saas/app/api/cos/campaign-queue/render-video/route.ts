@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     description: String(campaign.objective || campaign.title || 'an AI business operations platform'),
   }))
 
-  const started = await startSiteVideo(prompt, aspect)
+  const started: any = await startSiteVideo(prompt, aspect)
   if (!started.ok) return NextResponse.json({ ok: false, error: started.error || 'Could not start render.' }, { status: 502 })
 
   const startedAt = new Date().toISOString()

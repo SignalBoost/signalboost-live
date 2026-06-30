@@ -19,10 +19,9 @@ import type { ProviderTemplate } from './provider-templates'
 
 // Buyer-portable default for the GitHub "Repository" picker. Set
 // NEXT_PUBLIC_CONSOLE_DEFAULT_REPO (e.g. "acme/widgets") to pre-select a repo
-// in the console UI. Left unset, the picker opens with no pre-selection, so a
-// buyer never sees another tenant's repository as the default. NEXT_PUBLIC_ so
-// the value is available in the browser, where these templates render.
-const DEFAULT_GITHUB_SLUG = process.env.NEXT_PUBLIC_CONSOLE_DEFAULT_REPO || undefined
+// in the console UI. Defaults to SignalBoost/signalboost-live for the SignalBoost
+// owner console, while NEXT_PUBLIC_ keeps buyer overrides available in the browser.
+const DEFAULT_GITHUB_SLUG = process.env.NEXT_PUBLIC_CONSOLE_DEFAULT_REPO || 'SignalBoost/signalboost-live'
 
 export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
   // ---- Supabase (Marketing project) read actions — portable engine ----
@@ -106,11 +105,11 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'read_provider_status', api: { service: 'openai', method: 'POST', endpoint: '/codex/handoff/prompt' },
     fields: [
       { id: 'objective', label: 'Objective', type: 'textarea', required: true, placeholder: 'What should Codex change?' },
-      { id: 'repo', label: 'Repository', type: 'text', required: true, placeholder: 'owner/repo' },
-      { id: 'branch', label: 'Branch', type: 'text', required: true, placeholder: 'ai/my-codex-task' },
-      { id: 'files', label: 'Relevant Files', type: 'textarea', placeholder: 'One path per line' },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: DEFAULT_GITHUB_SLUG, source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'branch', label: 'Branch', type: 'remote_select', required: true, defaultValue: 'main', source: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
+      { id: 'files', label: 'Selected Files', type: 'remote_select', source: { action: 'github.list_files', dataPath: 'files', valueKey: 'path', labelTemplate: '{path}', dependsOn: ['repo', 'branch'], emptyHint: 'Pick a repository and branch first' } },
       { id: 'instructions', label: 'Instructions', type: 'textarea', placeholder: 'Constraints, acceptance criteria, implementation notes' },
-      { id: 'verificationStrings', label: 'Verification Strings', type: 'textarea', placeholder: 'Strings that should appear in the result, one per line' },
+      { id: 'verificationStrings', label: 'Verification Strings', type: 'textarea', placeholder: 'One exact expected string per line', help: 'Use exact strings to verify the Codex commit actually landed.' },
     ],
   },
   'openai.codex_save_handoff': {
@@ -118,8 +117,8 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'read_provider_status', api: { service: 'openai', method: 'POST', endpoint: '/codex/handoff/save' },
     fields: [
       { id: 'objective', label: 'Objective', type: 'textarea', required: true },
-      { id: 'repo', label: 'Repository', type: 'text', required: true, placeholder: 'owner/repo' },
-      { id: 'branch', label: 'Branch', type: 'text', required: true },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: DEFAULT_GITHUB_SLUG, source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'branch', label: 'Branch', type: 'remote_select', required: true, defaultValue: 'main', source: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
       { id: 'instructions', label: 'Codex Prompt / Handoff', type: 'textarea', required: true },
     ],
   },
@@ -127,20 +126,20 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     id: 'openai.codex_track_github_result', label: 'Track Codex Branch/PR', description: 'Verify whether Codex produced the expected GitHub branch, pull request, commit, or file.', icon: '🔎',
     policyActionId: 'read_provider_status', api: { service: 'openai', method: 'GET', endpoint: '/codex/github/track' },
     fields: [
-      { id: 'repo', label: 'Repository', type: 'text', required: true, placeholder: 'owner/repo' },
-      { id: 'branch', label: 'Branch', type: 'text', required: true },
-      { id: 'prNumber', label: 'Pull Request Number', type: 'number' },
-      { id: 'expectedFile', label: 'Expected File', type: 'text' },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: DEFAULT_GITHUB_SLUG, source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'branch', label: 'Branch', type: 'remote_select', required: true, defaultValue: 'main', source: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
+      { id: 'prNumber', label: 'Pull Request', type: 'remote_select', source: { action: 'github.list_prs', dataPath: 'pulls', valueKey: 'number', labelTemplate: '#{number} — {title} ({branch}, {state})', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
+      { id: 'expectedFile', label: 'Expected File', type: 'remote_select', source: { action: 'github.list_files', dataPath: 'files', valueKey: 'path', labelTemplate: '{path}', dependsOn: ['repo', 'branch'], emptyHint: 'Pick a repository and branch first' } },
     ],
   },
   'openai.codex_verify_result': {
     id: 'openai.codex_verify_result', label: 'Verify Codex Result', description: 'Read GitHub content and verify the expected file contains the expected strings.', icon: '✅',
     policyActionId: 'read_provider_status', api: { service: 'openai', method: 'GET', endpoint: '/codex/github/verify' },
     fields: [
-      { id: 'repo', label: 'Repository', type: 'text', required: true, placeholder: 'owner/repo' },
-      { id: 'ref', label: 'Ref', type: 'text', required: true, placeholder: 'branch, tag, or commit SHA' },
-      { id: 'filePath', label: 'File Path', type: 'text', required: true },
-      { id: 'expectedStrings', label: 'Expected Strings', type: 'textarea', required: true, placeholder: 'One expected string per line' },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: DEFAULT_GITHUB_SLUG, source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'ref', label: 'Branch / Ref', type: 'remote_select', required: true, defaultValue: 'main', source: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
+      { id: 'filePath', label: 'File Path', type: 'remote_select', required: true, source: { action: 'github.list_files', dataPath: 'files', valueKey: 'path', labelTemplate: '{path}', dependsOn: ['repo', 'ref'], emptyHint: 'Pick a repository and ref first' } },
+      { id: 'expectedStrings', label: 'Expected Strings', type: 'textarea', required: true, placeholder: 'One exact expected string per line', help: 'Use exact strings to verify the Codex commit actually landed.' },
     ],
   },
   // ---- Supabase read sources for select-don't-type pickers ----
@@ -366,6 +365,18 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     api: { service: 'GitHub', method: 'GET', endpoint: '/v1/branches' },
     fields: [
       { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: DEFAULT_GITHUB_SLUG, source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+    ],
+  },
+  'github.list_files': {
+    id: 'github.list_files',
+    label: 'List Files',
+    description: 'Files in a selected repository and branch/ref for picker fields.',
+    icon: '📄',
+    policyActionId: 'read_provider_status',
+    api: { service: 'GitHub', method: 'GET', endpoint: '/v1/files' },
+    fields: [
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: DEFAULT_GITHUB_SLUG, source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'ref', label: 'Branch / Ref', type: 'remote_select', required: true, defaultValue: 'main', source: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
     ],
   },
   'github.delete_branch': {

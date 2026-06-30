@@ -46,7 +46,7 @@ const errFrom = async (res: Response) =>
 
 // ---- declarative field builders (mirror the live templates) ----
 const REPO: ActionField = { id: 'repo', label: 'Repository', type: 'remote_select', required: true, remoteSource: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } }
-const PR_NUM: ActionField = { id: 'number', label: 'Pull Request', type: 'remote_select', required: true, remoteSource: { action: 'github.list_prs', dataPath: 'pulls', valueKey: 'number', labelTemplate: '#{number} — {title} ({branch})', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } }
+const PR_NUM: ActionField = { id: 'number', label: 'Pull Request', type: 'remote_select', required: true, remoteSource: { action: 'github.list_prs', dataPath: 'pulls', valueKey: 'number', labelTemplate: '#{number} — {title} ({branch}, {state})', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } }
 const ISSUE_NUM: ActionField = { id: 'number', label: 'Issue', type: 'remote_select', required: true, remoteSource: { action: 'github.list_issues', dataPath: 'issues', valueKey: 'number', labelTemplate: '#{number} — {title}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } }
 const BRANCH: ActionField = { id: 'branch', label: 'Branch', type: 'remote_select', required: true, remoteSource: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } }
 
@@ -75,7 +75,7 @@ registerExecutor({
     if (!res.ok) return { ok: false, error: await errFrom(res) }
     const data = await res.json(); const prs = Array.isArray(data) ? data : []
     return { ok: true, message: `${prs.length} open PR${prs.length === 1 ? '' : 's'}`,
-      data: { count: prs.length, pulls: prs.slice(0, 30).map((p: any) => ({ number: p.number, title: p.title, branch: p.head?.ref, url: p.html_url })) } }
+      data: { count: prs.length, pulls: prs.slice(0, 30).map((p: any) => ({ number: p.number, title: p.title, branch: p.head?.ref, state: p.state, status: p.draft ? 'draft' : p.state, url: p.html_url })) } }
   },
 })
 
@@ -100,9 +100,44 @@ registerExecutor({
     const c = gh(input); if (!c.ok) return c
     const res = await fetch(`${API}/repos/${c.owner}/${c.name}/branches?per_page=100`, { headers: c.headers })
     if (!res.ok) return { ok: false, error: await errFrom(res) }
-    const data = await res.json(); const branches = Array.isArray(data) ? data : []
+    const data = await res.json(); const branches = (Array.isArray(data) ? data : []).sort((a: any, b: any) => {
+      const rank = (name: string) => name === 'main' ? 0 : name.startsWith('ai/') ? 1 : 2
+      const ar = rank(String(a.name || '')); const br = rank(String(b.name || ''))
+      return ar === br ? String(a.name || '').localeCompare(String(b.name || '')) : ar - br
+    })
     return { ok: true, message: `${branches.length} branch${branches.length === 1 ? '' : 'es'}`,
       data: { count: branches.length, branches: branches.slice(0, 100).map((b: any) => ({ name: b.name, protected: b.protected })) } }
+  },
+})
+
+
+registerExecutor({
+  providerId: 'github', actionId: 'list_files', policyActionId: 'read_provider_status',
+  schema: schema('github.list_files', 'List Files', 'view', [REPO, { id: 'ref', label: 'Ref', type: 'text' }, { id: 'branch', label: 'Branch', type: 'text' }]),
+  async run(_ctx, input) {
+    const c = gh(input); if (!c.ok) return c
+    const ref = encodeURIComponent(String(input.ref || input.branch || 'main'))
+    const branchRes = await fetch(`${API}/repos/${c.owner}/${c.name}/branches/${ref}`, { headers: c.headers })
+    if (!branchRes.ok) return { ok: false, error: await errFrom(branchRes) }
+    const branch = await branchRes.json()
+    const treeSha = branch?.commit?.commit?.tree?.sha || branch?.commit?.sha
+    const treeRes = await fetch(`${API}/repos/${c.owner}/${c.name}/git/trees/${encodeURIComponent(treeSha)}?recursive=1`, { headers: c.headers })
+    if (!treeRes.ok) return { ok: false, error: await errFrom(treeRes) }
+    const data = await treeRes.json()
+    const relevant = new Set([
+      'saas/app/api/support/route.ts',
+      'saas/lib/hub/console-catalog.ts',
+      'saas/lib/hub/provider-templates.ts',
+      'saas/lib/hub/provider-templates-complete.ts',
+      'saas/lib/hub/provider-templates-extra.ts',
+      'saas/console-core/executors/index.ts',
+    ])
+    const files = (Array.isArray(data?.tree) ? data.tree : [])
+      .filter((item: any) => item?.type === 'blob' && item?.path)
+      .map((item: any) => ({ path: String(item.path), sha: item.sha, relevant: relevant.has(String(item.path)) }))
+      .sort((a: any, b: any) => Number(b.relevant) - Number(a.relevant) || a.path.localeCompare(b.path))
+      .slice(0, 500)
+    return { ok: true, message: `${files.length} file${files.length === 1 ? '' : 's'} available for picker`, data: { count: files.length, files } }
   },
 })
 

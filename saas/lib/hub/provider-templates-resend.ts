@@ -37,6 +37,14 @@ export const RESEND_CONSOLE_TEMPLATES: Record<string, ProviderTemplate> = {
       ]},
     ],
   },
+  'resend.get_domain': {
+    id: 'resend.get_domain', label: 'Domain DNS Records', icon: '🔍',
+    description: 'Show the exact DNS records Resend requires and their per-record verification status (which are verified vs missing).',
+    policyActionId: 'read_provider_status',
+    api: { service: 'resend', method: 'GET', endpoint: '/domains/{id}' },
+    fields: [{ id: 'domainId', label: 'Domain ID', type: 'remote_select', required: true, source: { action: 'resend.list_domains', dataPath: 'domains', valueKey: 'id', labelTemplate: '{name} — {status}' } }],
+  },
+
   'resend.verify_domain': {
     id: 'resend.verify_domain', label: 'Re-verify Domain', icon: '✅',
     description: 'Trigger re-verification for a domain after adding DNS records.',

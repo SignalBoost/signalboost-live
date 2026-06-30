@@ -239,3 +239,35 @@ registerExecutor({
     return { ok: true, message: `Test email sent to ${input.to}. Check the inbox — if it arrives, the domain is verified and sending is live.`, data: r.json }
   },
 })
+
+// ── GET domain detail — DNS records + per-record verification status ──────────
+registerExecutor({
+  providerId: 'resend', actionId: 'get_domain', policyActionId: 'read_provider_status',
+  schema: schema('resend.get_domain', 'Domain DNS Records', 'view', [
+    { id: 'domainId', label: 'Domain', type: 'remote_select', required: true,
+      source: { action: 'resend.list_domains', dataPath: 'domains', valueKey: 'id', labelTemplate: '{name} — {status}' } },
+  ]),
+  async run(_ctx, input) {
+    const r = await getJSON(`/domains/${String(input.domainId).trim()}`)
+    if (!r.ok) return r
+    const d: any = r.json
+    const records: any[] = d.records || d.dnsRecords || []
+    const missing = records.filter((rc: any) => rc.status !== 'verified' && rc.status !== 'valid')
+    return {
+      ok: true,
+      message: `${d.name} — ${d.status}. ${records.length} records required, ${missing.length} not yet verified.`,
+      data: {
+        id: d.id, name: d.name, status: d.status, region: d.region,
+        records: records.map((rc: any) => ({
+          type: rc.record || rc.type,
+          name: rc.name,
+          value: rc.value,
+          ttl: rc.ttl || 'auto',
+          priority: rc.priority || null,
+          status: rc.status,
+        })),
+        missing: missing.map((rc: any) => ({ type: rc.record || rc.type, name: rc.name, value: rc.value })),
+      },
+    }
+  },
+})

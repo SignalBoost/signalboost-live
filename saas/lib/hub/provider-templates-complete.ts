@@ -15,14 +15,17 @@ export const COMPLETE_TEMPLATES: Record<string, ProviderTemplate> = {
     description: 'Show every DNS record Resend requires and its per-record verification status — which are verified vs still missing.',
     policyActionId: 'read_provider_status',
     api: { service: 'resend', method: 'GET', endpoint: '/domains/{id}' },
-    fields: [{ id: 'domainId', label: 'Domain ID', type: 'text', required: true, placeholder: 'd1b7a15c-ceaf-4c68-858c-ae0321d36392' }],
+    fields: [
+      { id: 'domainId', label: 'Domain', type: 'remote_select', required: true,
+        source: { action: 'resend.list_domains', dataPath: 'domains', valueKey: 'id', labelTemplate: '{name} — {status}' } },
+    ],
   },
   'resend.list_contacts': {
     id: 'resend.list_contacts', label: 'List Contacts', icon: '📋',
     description: 'List all contacts in an audience.',
     policyActionId: 'read_provider_status',
     api: { service: 'resend', method: 'GET', endpoint: '/audiences/{audienceId}/contacts' },
-    fields: [{ id: 'audienceId', label: 'Audience ID', type: 'text', required: true }],
+    fields: [{ id: 'audienceId', label: 'Audience ID', type: 'remote_select', required: true, source: { action: 'resend.list_audiences', dataPath: 'audiences', valueKey: 'id', labelTemplate: '{name}' } }],
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -263,7 +266,7 @@ export const COMPLETE_TEMPLATES: Record<string, ProviderTemplate> = {
     api: { service: 'github', method: 'POST', endpoint: '/user/repos' },
     fields: [
       { id: 'name', label: 'Repository name', type: 'text', required: true },
-      { id: 'private', label: 'Private', type: 'toggle' },
+      { id: 'private', label: 'Private', type: 'boolean' },
       { id: 'description', label: 'Description', type: 'text' },
     ],
   },
@@ -515,7 +518,7 @@ export const COMPLETE_TEMPLATES: Record<string, ProviderTemplate> = {
     description: 'Delete a cloned voice.',
     policyActionId: 'delete_provider_resource', requiresConfirm: true,
     api: { service: 'elevenlabs', method: 'DELETE', endpoint: '/v1/voices/{voiceId}' },
-    fields: [{ id: 'voiceId', label: 'Voice ID', type: 'text', required: true }],
+    fields: [{ id: 'voiceId', label: 'Voice ID', type: 'remote_select', required: true, source: { action: 'elevenlabs.list_voices', dataPath: 'voices', valueKey: 'voice_id', labelTemplate: '{name}' } }],
   },
   'elevenlabs.generate_speech': {
     id: 'elevenlabs.generate_speech', label: 'Generate Speech', icon: '🔊',
@@ -523,7 +526,7 @@ export const COMPLETE_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'crud_actions',
     api: { service: 'elevenlabs', method: 'POST', endpoint: '/v1/text-to-speech/{voiceId}' },
     fields: [
-      { id: 'voiceId', label: 'Voice ID', type: 'text', required: true },
+      { id: 'voiceId', label: 'Voice ID', type: 'remote_select', required: true, source: { action: 'elevenlabs.list_voices', dataPath: 'voices', valueKey: 'voice_id', labelTemplate: '{name}' } },
       { id: 'text', label: 'Text', type: 'text', required: true },
     ],
   },
@@ -579,7 +582,7 @@ export const COMPLETE_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'crud_actions',
     api: { service: 'datadog', method: 'POST', endpoint: '/api/v1/monitor/{monitorId}/mute' },
     fields: [
-      { id: 'monitorId', label: 'Monitor ID', type: 'text', required: true },
+      { id: 'monitorId', label: 'Monitor ID', type: 'remote_select', required: true, source: { action: 'datadog.list_monitors', dataPath: 'monitors', valueKey: 'id', labelTemplate: '{name}' } },
       { id: 'end', label: 'Mute until (Unix timestamp, optional)', type: 'text' },
     ],
   },
@@ -588,7 +591,7 @@ export const COMPLETE_TEMPLATES: Record<string, ProviderTemplate> = {
     description: 'Unmute a previously muted monitor.',
     policyActionId: 'crud_actions',
     api: { service: 'datadog', method: 'POST', endpoint: '/api/v1/monitor/{monitorId}/unmute' },
-    fields: [{ id: 'monitorId', label: 'Monitor ID', type: 'text', required: true }],
+    fields: [{ id: 'monitorId', label: 'Monitor ID', type: 'remote_select', required: true, source: { action: 'datadog.list_monitors', dataPath: 'monitors', valueKey: 'id', labelTemplate: '{name}' } }],
   },
   'datadog.list_dashboards': {
     id: 'datadog.list_dashboards', label: 'List Dashboards', icon: '📊',

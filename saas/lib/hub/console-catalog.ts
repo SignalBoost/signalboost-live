@@ -191,6 +191,17 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
     ]
   },
   {
+    id: 'namecheap',
+    name: 'Namecheap',
+    subtitle: 'DOMAINS & DNS',
+    accent: '#de3723',
+    tier: 'tier2',
+    sections: [
+      { title: 'DNS', templateIds: ['namecheap.list_dns_records', 'namecheap.add_dns_record', 'namecheap.delete_dns_record'] },
+      { title: 'Email Setup', templateIds: ['namecheap.setup_resend_dns'] }
+    ]
+  },
+  {
     id: 'digitalocean',
     name: 'DigitalOcean',
     subtitle: 'CLOUD COMPUTE',
@@ -378,7 +389,7 @@ export const LIVE_PROVIDER_IDS = new Set<string>([
   'github', 'openai', 'anthropic', 'elevenlabs', 'gemini', 'resend', 'assemblyai', 'supabase_mkt',
   // Executors already wired into /api/hub/action — surfaced live and gated at
   // run time by the per-provider credential probe (/api/hub/providers/status).
-  'sendgrid', 'twilio', 'cloudflare', 'digitalocean', 'datadog', 'sentry', 'pagerduty',
+  'sendgrid', 'twilio', 'cloudflare', 'namecheap', 'digitalocean', 'datadog', 'sentry', 'pagerduty',
   // Open Banking provider — live so Email-OTP enrollment can start; individual calls
   // return a clean "institution not configured" until each aggregator app is registered.
   'bank',

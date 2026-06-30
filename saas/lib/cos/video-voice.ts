@@ -144,10 +144,13 @@ export async function addVoiceToCampaignVideo(
           video_url: finalUrl,
           language: lang,
           position: 'bottom',
-          words_per_subtitle: 3,
+          words_per_subtitle: 7,   // longer caption lines so a URL stays on one
+          font_size: 52,           // model default is ~100 (too big / splits)
           font_color: 'white',
           stroke_color: 'black',
-          stroke_width: 3,
+          stroke_width: 2,
+          y_offset: 80,
+          enable_animation: false, // static lines read cleaner than word-pop
         },
       })
       const capUrl = cap?.data?.video?.url || cap?.data?.video_url

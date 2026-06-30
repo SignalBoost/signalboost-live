@@ -7,6 +7,54 @@ import type { ProviderTemplate } from './provider-templates'
 
 export const COMPLETE_TEMPLATES: Record<string, ProviderTemplate> = {
 
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NAMECHEAP — DNS records + one-click Resend DNS setup
+  // ═══════════════════════════════════════════════════════════════════════════
+  'namecheap.list_dns_records': {
+    id: 'namecheap.list_dns_records', label: 'List DNS Records', icon: '🌐',
+    description: 'List all Namecheap DNS host records for a domain.',
+    policyActionId: 'read_provider_status',
+    api: { service: 'namecheap', method: 'GET', endpoint: '/domains/dns/hosts' },
+    fields: [{ id: 'domain', label: 'Domain', type: 'text', required: true, placeholder: 'example.com' }],
+  },
+  'namecheap.add_dns_record': {
+    id: 'namecheap.add_dns_record', label: 'Add DNS Record', icon: '➕',
+    description: 'Add a DNS host record in Namecheap while preserving existing records.',
+    policyActionId: 'crud_actions',
+    api: { service: 'namecheap', method: 'POST', endpoint: '/domains/dns/hosts' },
+    fields: [
+      { id: 'domain', label: 'Domain', type: 'text', required: true, placeholder: 'example.com' },
+      { id: 'type', label: 'Type', type: 'select', required: true, options: [
+        { value: 'A', label: 'A' }, { value: 'AAAA', label: 'AAAA' }, { value: 'CNAME', label: 'CNAME' }, { value: 'MX', label: 'MX' }, { value: 'TXT', label: 'TXT' },
+      ] },
+      { id: 'host', label: 'Host', type: 'text', required: true, placeholder: '@' },
+      { id: 'value', label: 'Value', type: 'text', required: true },
+      { id: 'ttl', label: 'TTL', type: 'number', placeholder: '1800' },
+      { id: 'mxPref', label: 'MX preference', type: 'number' },
+    ],
+  },
+  'namecheap.delete_dns_record': {
+    id: 'namecheap.delete_dns_record', label: 'Delete DNS Record', icon: '🗑️',
+    description: 'Delete a Namecheap DNS host record by Host ID.',
+    policyActionId: 'delete_provider_resource', requiresConfirm: true,
+    api: { service: 'namecheap', method: 'DELETE', endpoint: '/domains/dns/hosts/{hostId}' },
+    fields: [
+      { id: 'domain', label: 'Domain', type: 'text', required: true, placeholder: 'example.com' },
+      { id: 'hostId', label: 'Host ID', type: 'text', required: true },
+    ],
+  },
+  'namecheap.setup_resend_dns': {
+    id: 'namecheap.setup_resend_dns', label: 'Set Up Resend DNS', icon: '⚡',
+    description: 'Paste Resend domain DNS records and add them to Namecheap in one click.',
+    policyActionId: 'crud_actions',
+    api: { service: 'namecheap', method: 'POST', endpoint: '/domains/dns/resend' },
+    fields: [
+      { id: 'domain', label: 'Domain', type: 'text', required: true, placeholder: 'example.com' },
+      { id: 'records', label: 'Resend DNS records JSON', type: 'textarea', required: true },
+    ],
+  },
+
   // ═══════════════════════════════════════════════════════════════════════════
   // RESEND — get domain DNS records (per-record status)
   // ═══════════════════════════════════════════════════════════════════════════

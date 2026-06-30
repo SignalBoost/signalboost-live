@@ -1218,9 +1218,13 @@ export async function POST(req: NextRequest) {
       // owner/admin, return the route's existing 403 pattern here.
       if (!isPrivileged) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       const { runCosReasoning } = await import('@/lib/ai/cos/reasoningCore')
+      const { logCosDecision } = await import('@/lib/ai/cos/decisionLog')
       const result = runCosReasoning({
         objective: typeof body.objective === 'string' ? body.objective : '',
       })
+      // Instrumentation: persist the decision record. Fire-and-forget so a
+      // logging failure can never delay or break the diagnostic response.
+      void logCosDecision(result, userId).catch(() => {})
       return NextResponse.json(result, { status: result.ok ? 200 : 400 })
     }
 

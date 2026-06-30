@@ -1360,6 +1360,10 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
       }
     }
 
+    // Reused by the self-correction pass at the end of the handler.
+    let cosVerdict: any = null
+    let cosEvidence: string | undefined = undefined
+    // ── COS KNOWLEDGE LAYER continues below ──
     // ── COS KNOWLEDGE LAYER: ground current-fact questions on live data before
     // the model answers, so COS cannot answer them from memory. Privileged
     // (Chief-of-Staff) path only; best-effort; never blocks the response. This
@@ -1368,6 +1372,7 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
       try {
         const { runCosReasoning } = await import('@/lib/ai/cos/reasoningCore')
         const verdict = runCosReasoning({ objective: latestUserMessage })
+        cosVerdict = verdict
 
         // Log only substantive decisions — skip conversational filler and bare
         // "ok/continue" continuations, which classify as no-tool/no-action.
@@ -1389,6 +1394,7 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
           ])
           const ev = grounded && grounded.evidence
           if (ev && ev.fetched && ev.summary) {
+            cosEvidence = ev.summary
             systemContent += `
 
 ── VERIFIED LIVE DATA (fetched just now from ${ev.source}; treat this as the source of truth and do NOT answer this question from memory) ──
@@ -1544,6 +1550,49 @@ ${ev.summary}`
         pl: 'Nie udało mi się wygenerować odpowiedzi. Spróbuj przeformułować lub podzielić to na mniejsze kroki.',
         ru: 'Не удалось сформировать ответ. Попробуйте переформулировать или разбить на меньшие шаги.',
       } as Record<string, string>)[languageCode] || 'I could not produce a response for that. Please try rephrasing, or break it into smaller steps.'
+    }
+
+    // ── COS SELF-CORRECTION: before the answer reaches the owner, COS reviews
+    // its own draft against the objective + grounded evidence and revises once
+    // if it fails. Privileged only; best-effort; budget-gated. Skips media and
+    // commit replies so their special tags are never altered. ──
+    const cosSkipSpecial = /<VIDEO>|<PLAYLIST>|<IMAGE>|COMMIT SUCCEEDED/.test(reply)
+    if (
+      isPrivileged && reply && !cosSkipSpecial && cosVerdict && cosVerdict.ok &&
+      (cosVerdict.sourceRouting?.mustUseTool || cosVerdict.executionPlan?.proposesAction) &&
+      remainingMs() > 15_000
+    ) {
+      try {
+        const { runSelfCorrection } = await import('@/lib/ai/cos/selfReview')
+        const corrected = await runSelfCorrection(anthropic, model, {
+          objective: latestUserMessage,
+          draft: reply,
+          evidence: cosEvidence,
+        }, 1)
+        // Only override the answer when a revision was actually produced
+        // (round 1 failed). If round 1 passed, the draft is unchanged.
+        if (corrected.ok && corrected.rounds.length > 1 && corrected.finalDraft) {
+          reply = corrected.finalDraft
+        }
+        // Log the correction trace onto the decision record (best-effort).
+        void (async () => {
+          try {
+            const { updateCosDecisionOutcome } = await import('@/lib/ai/cos/decisionLog')
+            await updateCosDecisionOutcome(cosVerdict.decisionId, {
+              outcome: {
+                selfCorrection: {
+                  passed: corrected.passed,
+                  rounds: corrected.rounds.length,
+                  revised: corrected.rounds.length > 1,
+                  failedRules: corrected.rounds[0]?.review?.failedRules || [],
+                },
+              },
+            })
+          } catch {}
+        })()
+      } catch {
+        // self-correction is best-effort — never block or break the response
+      }
     }
 
     // ── Persist this exchange to conversation history (logged-in users) ───

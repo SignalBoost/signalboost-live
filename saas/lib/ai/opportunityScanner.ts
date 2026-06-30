@@ -89,12 +89,9 @@ export async function updateAlertStatus(
   }
 }
 
-// ── Run a full scan ─────────────────────────────────────────────────────────────
-export async function runOpportunityScan(): Promise<{ ok: boolean; inserted: number; error?: string }> {
+// ── Build scan request ─────────────────────────────────────────────────────────
+export async function buildScanRequest(): Promise<{ ok: boolean; body?: any; error?: string }> {
   try {
-    const apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) return { ok: false, inserted: 0, error: 'OPENAI_API_KEY is not configured.' }
-
     // 1) Gather live signals from the web.
     const signalBlocks: string[] = []
     for (const query of SCAN_QUERIES) {
@@ -109,7 +106,7 @@ export async function runOpportunityScan(): Promise<{ ok: boolean; inserted: num
     }
 
     if (signalBlocks.length === 0) {
-      return { ok: false, inserted: 0, error: 'No live web data available (check BRAVE_SEARCH_API_KEY).' }
+      return { ok: false, error: 'No live web data available (check BRAVE_SEARCH_API_KEY).' }
     }
 
     // 2) Recent alert titles for deduplication.
@@ -123,8 +120,7 @@ export async function runOpportunityScan(): Promise<{ ok: boolean; inserted: num
     const recentTitles = (recent ?? []).map(r => String(r.title))
 
     // 3) Strategist analysis → structured JSON alerts.
-    const openai = new OpenAI({ apiKey })
-    const completion = await openai.chat.completions.create({
+    const body = {
       model: 'gpt-4o',
       temperature: 0.4,
       max_tokens: 1800,
@@ -153,10 +149,18 @@ If nothing genuinely actionable is found, respond with [].`,
         },
         { role: 'user', content: signalBlocks.join('\n\n') },
       ],
-    })
+    }
 
-    const rawText = completion.choices[0]?.message?.content?.trim() || '[]'
-    const cleaned = rawText.replace(/^```(?:json)?/i, '').replace(/```$/,'').trim()
+    return { ok: true, body }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Unknown scan request error' }
+  }
+}
+
+// ── Ingest scan alerts ────────────────────────────────────────────────────────
+export async function ingestScanAlerts(rawText: string): Promise<{ ok: boolean; inserted: number; error?: string }> {
+  try {
+    const cleaned = rawText.trim().replace(/^```(?:json)?/i, '').replace(/```$/,'').trim()
 
     let parsed: unknown
     try {
@@ -169,6 +173,15 @@ If nothing genuinely actionable is found, respond with [].`,
     }
 
     // 4) Validate, dedupe, insert.
+    const db = supabaseAdmin()
+    const since = new Date(Date.now() - DEDUPE_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString()
+    const { data: recent } = await db
+      .from(ALERTS_TABLE)
+      .select('title')
+      .gte('created_at', since)
+      .limit(100)
+    const recentTitles = (recent ?? []).map(r => String(r.title))
+
     const rows = parsed
       .slice(0, MAX_ALERTS_PER_SCAN)
       .map((a: any) => ({
@@ -197,6 +210,24 @@ If nothing genuinely actionable is found, respond with [].`,
     }
 
     return { ok: true, inserted: rows.length }
+  } catch (err) {
+    return { ok: false, inserted: 0, error: err instanceof Error ? err.message : 'Unknown alert ingestion error' }
+  }
+}
+
+// ── Run a full scan ─────────────────────────────────────────────────────────────
+export async function runOpportunityScan(): Promise<{ ok: boolean; inserted: number; error?: string }> {
+  try {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) return { ok: false, inserted: 0, error: 'OPENAI_API_KEY is not configured.' }
+
+    const req = await buildScanRequest()
+    if (!req.ok || !req.body) return { ok: false, inserted: 0, error: req.error || 'Unable to build scan request.' }
+
+    const openai = new OpenAI({ apiKey })
+    const completion = await openai.chat.completions.create(req.body)
+
+    return await ingestScanAlerts(completion.choices[0]?.message?.content || '[]')
   } catch (err) {
     return { ok: false, inserted: 0, error: err instanceof Error ? err.message : 'Unknown scan error' }
   }

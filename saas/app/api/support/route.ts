@@ -1343,6 +1343,50 @@ CONVERSATION HISTORY: This user's conversations with you are stored. When they r
       }
     }
 
+    // ── COS KNOWLEDGE LAYER: ground current-fact questions on live data before
+    // the model answers, so COS cannot answer them from memory. Privileged
+    // (Chief-of-Staff) path only; best-effort; never blocks the response. This
+    // injects DATA only — it does not add approval/hold behavior to live COS. ──
+    if (isPrivileged && latestUserMessage.trim()) {
+      try {
+        const { runCosReasoning } = await import('@/lib/ai/cos/reasoningCore')
+        const verdict = runCosReasoning({ objective: latestUserMessage })
+
+        // Log only substantive decisions — skip conversational filler and bare
+        // "ok/continue" continuations, which classify as no-tool/no-action.
+        if (verdict.ok && (verdict.sourceRouting.mustUseTool || verdict.executionPlan.proposesAction)) {
+          void (async () => {
+            try {
+              const { logCosDecision } = await import('@/lib/ai/cos/decisionLog')
+              await logCosDecision(verdict, userId)
+            } catch {}
+          })()
+        }
+
+        // Ground current-fact questions: fetch the routed source and inject it.
+        if (verdict.ok && verdict.sourceRouting.mustUseTool) {
+          const { groundCosDecision } = await import('@/lib/ai/cos/knowledgeBridge')
+          const grounded: any = await Promise.race([
+            groundCosDecision(verdict),
+            new Promise((resolve) => setTimeout(() => resolve(null), 6000)),
+          ])
+          const ev = grounded && grounded.evidence
+          if (ev && ev.fetched && ev.summary) {
+            systemContent += `
+
+── VERIFIED LIVE DATA (fetched just now from ${ev.source}; treat this as the source of truth and do NOT answer this question from memory) ──
+${ev.summary}`
+          } else if (ev && ev.connectorWired === false) {
+            systemContent += `
+
+── SOURCE-OF-TRUTH NOTE ── Answering this accurately needs live data from ${ev.source}, which is not connected yet. Tell the owner you can't confirm the current figure rather than guessing from memory.`
+          }
+        }
+      } catch {
+        // Grounding is best-effort — never block or break the live response.
+      }
+    }
+
     const anthropicTools = toAnthropicTools(tools)
     const convo: ChatMessage[] = [...sanitized]
     applyAttachments(convo, body?.attachments)

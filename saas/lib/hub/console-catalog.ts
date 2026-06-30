@@ -114,7 +114,9 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
       { title: 'Environment Variables', templateIds: ['vercel.view_env', 'vercel.add_env', 'vercel.edit_env', 'vercel.delete_env'] },
       { title: 'Domains', templateIds: ['vercel.list_domains', 'vercel.add_domain', 'vercel.remove_domain'] },
       { title: 'Promote', templateIds: ['vercel.promote_to_production'] },
-      { title: 'Networking & Logs', templateIds: ['vercel.sync_dns_domain', 'vercel.logs'] }
+      { title: 'Networking & Logs', templateIds: ['vercel.sync_dns_domain', 'vercel.logs'] },
+      { title: 'DNS Records', templateIds: ['vercel.list_dns_records', 'vercel.add_dns_record', 'vercel.edit_dns_record', 'vercel.delete_dns_record'] },
+      { title: 'DNS Propagation Checker', templateIds: ['vercel.check_dns_propagation'] }
     ]
   },
   {

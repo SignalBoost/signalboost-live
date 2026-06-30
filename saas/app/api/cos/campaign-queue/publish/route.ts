@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
 
   // Owner-approved content wins; then the per-language draft; then stored fields.
   const text = String(body?.text || draftText || campaign.objective || campaign.title || '')
-  const videoUrl = body?.videoUrl ? String(body.videoUrl) : (campaign.metadata?.video?.url ? String(campaign.metadata.video.url) : undefined)
+  const videoUrl = body?.videoUrl ? String(body.videoUrl) : ((campaign.metadata?.video?.voicedUrl || campaign.metadata?.video?.url) ? String(campaign.metadata.video.voicedUrl || campaign.metadata.video.url) : undefined)
   const title = String(body?.title || draftTitle || campaign.title || '')
 
   const tok = await getValidSocialToken(ctx.admin, ctx.user.id, platform)

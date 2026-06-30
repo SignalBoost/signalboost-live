@@ -129,14 +129,15 @@ export async function reviseCosDraft(
 // The loop: critique → (only on failure) revise → re-critique. Bounded.
 export async function runSelfCorrection(
   client: Anthropic,
-  model: string,
+  model: string,                    // revision model (the strong one)
   input: CosReviewInput,
   maxRevisions = 1,
+  reviewModel = 'claude-haiku-4-5', // critique model (cheap; runs on every turn)
 ): Promise<CosCorrectionResult> {
   const rounds: CosCorrectionRound[] = []
   let currentDraft = input.draft
 
-  let review = await reviewCosDraft(client, model, { ...input, draft: currentDraft })
+  let review = await reviewCosDraft(client, reviewModel, { ...input, draft: currentDraft })
   rounds.push({ draft: currentDraft, review })
 
   let revisions = 0
@@ -149,7 +150,7 @@ export async function runSelfCorrection(
     })
     if (!rev.ok) break
     currentDraft = rev.draft
-    review = await reviewCosDraft(client, model, { ...input, draft: currentDraft })
+    review = await reviewCosDraft(client, reviewModel, { ...input, draft: currentDraft })
     rounds.push({ draft: currentDraft, review })
     revisions++
   }

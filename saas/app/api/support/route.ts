@@ -1211,6 +1211,19 @@ export async function POST(req: NextRequest) {
     }
     errIsPrivileged = isPrivileged
 
+    // ── COS reasoning simulator (owner/admin diagnostic) ──
+    // Returns the reasoning decision record without taking any action.
+    if (body?.simulateCos === true) {
+      // Reuse the route's EXISTING owner/admin gate. If the caller is not
+      // owner/admin, return the route's existing 403 pattern here.
+      if (!isPrivileged) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      const { runCosReasoning } = await import('@/lib/ai/cos/reasoningCore')
+      const result = runCosReasoning({
+        objective: typeof body.objective === 'string' ? body.objective : '',
+      })
+      return NextResponse.json(result, { status: result.ok ? 200 : 400 })
+    }
+
     if (!sanitized.length) {
       const local = getConciergeAnswer('', languageCode, currentPage)
       return NextResponse.json({ reply: local.reply, telemetry: local })

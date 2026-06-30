@@ -6,9 +6,11 @@
 
 import './anthropic'
 import './assemblyai'
+import './bank'
 import './elevenlabs'
 import './gemini'
 import './github'
+import './namecheap'
 import './openai'
 import './resend'
 import './supabase-marketing'

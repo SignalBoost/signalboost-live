@@ -1,38 +1,42 @@
 // saas/marketing-sales-host/executors/social.ts
-// Generic multi-platform social connector — built for portability and multi-tenant
-// adoption. It registers one executor per main platform (YouTube, LinkedIn,
-// Facebook, Instagram, X) and routes publishing through the platform's real
-// uploader (lib/outreach/social-connectors.publishSocialPost). Two enterprise-ready
-// properties are intentional here:
-//   1) Credentials are resolved PER ORG via resolveOrgToken() — the single seam an
-//      enterprise host swaps to feed each tenant's own connected accounts. SignalBoost
-//      (the first org) resolves from outreach_social_tokens; another adopter resolves
-//      from their own store, isolated by org_id.
-//   2) Honest by construction: every platform whose real publish path is not yet live
-//      returns the uploader's stub, and the guard below refuses it (errNotConnected)
-//      so a fake URL is NEVER recorded. A platform "lights up" automatically the moment
-//      its real publish path returns a genuine post id.
-import { publishSocialPost, type SocialPlatform } from '@/lib/outreach/social-connectors'
+// Registry-driven multi-platform connector. It registers ONE executor per adapter
+// in lib/outreach/social-connectors.ADAPTERS, so the platform list grows by adding
+// an adapter there — this file never changes. Two enterprise-ready properties hold:
+//   1) Credentials resolve PER ORG via resolveOrgToken() — the single seam an
+//      enterprise host swaps to feed each tenant's own connected accounts.
+//   2) Honest by construction: a post is recorded only when the platform returns a
+//      genuine id (mode ends in `_live`). Missing creds / destination / API errors are
+//      refused (errNotConnected) so a fake URL is NEVER recorded. A platform lights up
+//      automatically the moment its real publish path returns a real id.
+import { publishSocialPost, ADAPTERS, platformContentKind, type SocialPlatform } from '@/lib/outreach/social-connectors'
 import { registerExecutor } from '@/marketing-sales-core'
-import type { Draft, MarketingHost, Actor } from '@/marketing-sales-core/types'
+import type { Draft, MarketingHost } from '@/marketing-sales-core/types'
 import type { PublishResult } from '@/marketing-sales-core/executors/types'
 
-type Kind = 'video' | 'text' | 'media'
-const PLATFORMS: Array<{ id: string; platform: SocialPlatform; kind: Kind }> = [
-  { id: 'youtube',   platform: 'youtube_channels',   kind: 'video' },
-  { id: 'linkedin',  platform: 'linkedin_company',   kind: 'text'  },
-  { id: 'facebook',  platform: 'facebook_pages',     kind: 'text'  },
-  { id: 'instagram', platform: 'instagram_business', kind: 'media' },
-  { id: 'twitter',   platform: 'twitter_x',          kind: 'text'  },
-]
+// Stable connector ids for the platforms that already had them; new platforms use
+// their key. The marketing-sales publish flow refers to these ids.
+const ID_BY_PLATFORM: Partial<Record<SocialPlatform, string>> = {
+  youtube_channels: 'youtube',
+  linkedin_company: 'linkedin',
+  facebook_pages: 'facebook',
+  instagram_business: 'instagram',
+  twitter_x: 'twitter',
+}
+const idFor = (p: SocialPlatform) => ID_BY_PLATFORM[p] || p
 
-// Modes the platform uploader returns when it did NOT really post.
-const STUB_MODES = new Set(['oauth_credentials_not_configured_logged', 'oauth_publish_ready'])
+// Best-effort home reference so a genuinely-published post is always recordable even
+// when a platform doesn't return a canonical permalink synchronously (e.g. TikTok).
+const PLATFORM_HOME: Record<SocialPlatform, string> = {
+  youtube_channels: 'https://www.youtube.com/',
+  twitter_x: 'https://x.com/',
+  linkedin_company: 'https://www.linkedin.com/',
+  facebook_pages: 'https://www.facebook.com/',
+  instagram_business: 'https://www.instagram.com/',
+  tiktok: 'https://www.tiktok.com/',
+  reddit: 'https://www.reddit.com/',
+}
 
-// PER-ORG credential seam. SignalBoost resolves the latest connected token for the
-// platform from outreach_social_tokens. An enterprise host overrides how this maps
-// to org_id; the connector logic above never changes.
-async function resolveOrgToken(host: MarketingHost, orgId: string, platform: SocialPlatform): Promise<{ refresh_token?: string; access_token?: string } | null> {
+async function resolveOrgToken(host: MarketingHost, orgId: string, platform: SocialPlatform): Promise<{ refresh_token?: string; access_token?: string; account_ref?: string } | null> {
   try {
     const rows = await host.store.select('outreach_social_tokens', { platform })
     if (!Array.isArray(rows) || !rows.length) return null
@@ -40,48 +44,37 @@ async function resolveOrgToken(host: MarketingHost, orgId: string, platform: Soc
   } catch { return null }
 }
 
-function liveUrlFor(platform: SocialPlatform, id: string): string | null {
-  switch (platform) {
-    case 'youtube_channels':   return `https://www.youtube.com/watch?v=${id}`
-    case 'twitter_x':          return `https://x.com/i/web/status/${id}`
-    case 'linkedin_company':   return `https://www.linkedin.com/feed/update/${id}`
-    case 'facebook_pages':     return `https://www.facebook.com/${id}`
-    case 'instagram_business': return `https://www.instagram.com/p/${id}`
-    default:                   return null
-  }
-}
-
 async function orgOf(host: MarketingHost): Promise<string> {
-  // The host's actor carries org_id — the real per-tenant scope for credentials.
   try { const a = await host.auth.getCurrentActor(); return a?.orgId || 'signalboost' } catch { return 'signalboost' }
 }
 
-for (const def of PLATFORMS) {
+for (const platform of Object.keys(ADAPTERS) as SocialPlatform[]) {
+  const kind = platformContentKind(platform)
   registerExecutor({
-    id: def.id,
+    id: idFor(platform),
     capabilities: { publish: true },
     async run(draft: Draft, host: MarketingHost): Promise<PublishResult> {
-      // content requirement per platform
-      if (def.kind === 'video' && !draft?.asset_url) return { ok: false, errorCode: 'errNoAsset', error: 'video required' }
-      if (def.kind === 'media' && !draft?.asset_url) return { ok: false, errorCode: 'errNoAsset', error: 'media required' }
-      if (def.kind === 'text' && !(draft?.body || draft?.title)) return { ok: false, errorCode: 'errUnknown', error: 'empty draft' }
+      if (kind === 'video' && !draft?.asset_url) return { ok: false, errorCode: 'errNoAsset', error: 'video required' }
+      if (kind === 'media' && !draft?.asset_url) return { ok: false, errorCode: 'errNoAsset', error: 'media required' }
+      if (kind === 'text' && !(draft?.body || draft?.title)) return { ok: false, errorCode: 'errUnknown', error: 'empty draft' }
 
-      const tok = await resolveOrgToken(host, await orgOf(host), def.platform)
+      const tok = await resolveOrgToken(host, await orgOf(host), platform)
       if (!tok || (!tok.refresh_token && !tok.access_token)) {
-        return { ok: false, errorCode: 'errNotConnected', error: `${def.platform} not connected` }
+        return { ok: false, errorCode: 'errNotConnected', error: `${platform} not connected` }
       }
 
       let res: any
       try {
         res = await publishSocialPost({
-          platform: def.platform,
+          platform,
           text: [draft.title, draft.body].filter(Boolean).join('\n\n'),
           title: (draft.title || '').slice(0, 95),
           description: draft.body || '',
-          videoUrl: def.kind === 'video' ? (draft.asset_url || undefined) : undefined,
-          imageUrl: def.kind === 'media' ? (draft.asset_url || undefined) : undefined,
+          videoUrl: kind === 'video' ? (draft.asset_url || undefined) : undefined,
+          imageUrl: kind === 'media' ? (draft.asset_url || undefined) : undefined,
           refreshToken: tok.refresh_token,
           accessToken: tok.access_token,
+          accountRef: tok.account_ref,
           privacyStatus: 'public',
           tags: ['SignalBoost', 'AI', 'marketing'],
         })
@@ -89,17 +82,16 @@ for (const def of PLATFORMS) {
         return { ok: false, errorCode: 'errUnknown', error: e?.message || 'publish threw' }
       }
 
-      // Honesty guard: refuse anything that isn't a genuine post.
+      // Honesty guard: accept ONLY a genuine post (mode ends in `_live`).
       const id = String(res?.providerPostId || '')
-      const synthetic = /_\d{13,}$/.test(id) // `${platform}_${Date.now()}`
-      const isStub = !res?.ok || STUB_MODES.has(res?.mode) || synthetic || !id
-      if (isStub) {
-        const code = res?.mode === 'youtube_requires_video' ? 'errNoAsset' : 'errNotConnected'
-        return { ok: false, errorCode: code, error: res?.mode || 'not published' }
+      const mode = String(res?.mode || '')
+      const isReal = !!res?.ok && !!id && mode.endsWith('_live')
+      if (!isReal) {
+        const code = /requires_video|requires_media|errNoAsset/.test(mode) ? 'errNoAsset' : 'errNotConnected'
+        return { ok: false, errorCode: code, error: mode || 'not published' }
       }
 
-      const liveUrl = liveUrlFor(def.platform, id)
-      if (!liveUrl) return { ok: false, errorCode: 'errUnknown', error: 'no permalink' }
+      const liveUrl = res.liveUrl || PLATFORM_HOME[platform]
       return { ok: true, liveUrl, externalId: id }
     },
   })

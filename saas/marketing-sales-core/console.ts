@@ -12,13 +12,16 @@ export interface ConsoleRow {
   connector: string | null
   lastOk: boolean | null
   views: number
+  // For video-theme campaigns only: the render state of the lead draft's asset
+  // ('none' | 'pending' | 'ready' | 'failed'). null for non-video campaigns.
+  videoStatus: string | null
 }
 
 export async function listConsole(host: MarketingHost, orgId: string): Promise<Result<ConsoleRow[]>> {
   const campaigns = await host.store.select<Campaign>('ms_campaigns', { org_id: orgId })
   const rows: ConsoleRow[] = []
   for (const c of campaigns) {
-    const drafts = await host.store.select('ms_drafts', { campaign_id: c.id })
+    const drafts = await host.store.select<any>('ms_drafts', { campaign_id: c.id })
     const results = await host.store.select<any>('ms_publish_results', { campaign_id: c.id })
     // order is not guaranteed by the store; sort by 'at' to find the latest.
     const sorted = [...results].sort((a, b) => String(a.at || '').localeCompare(String(b.at || '')))
@@ -26,6 +29,15 @@ export async function listConsole(host: MarketingHost, orgId: string): Promise<R
     const chosen = okResults.length ? okResults[okResults.length - 1] : sorted[sorted.length - 1]
     let views = 0
     try { views = await host.store.count('ms_events', { campaign_id: c.id, kind: 'view' }) } catch { views = 0 }
+
+    // Video render state: only meaningful for video-theme campaigns. Read it from
+    // the lead (en) draft, falling back to any draft that carries a status.
+    let videoStatus: string | null = null
+    if ((c as any).channel === 'video' && Array.isArray(drafts) && drafts.length) {
+      const lead = drafts.find((d) => d.lang === 'en') || drafts[0]
+      videoStatus = lead ? String(lead.asset_status || 'none') : 'none'
+    }
+
     rows.push({
       campaign: c,
       draftCount: Array.isArray(drafts) ? drafts.length : 0,
@@ -33,6 +45,7 @@ export async function listConsole(host: MarketingHost, orgId: string): Promise<R
       connector: chosen ? (chosen.connector_id || null) : null,
       lastOk: chosen ? !!chosen.ok : null,
       views,
+      videoStatus,
     })
   }
   rows.sort((a, b) => String(b.campaign.created_at || '').localeCompare(String(a.campaign.created_at || '')))

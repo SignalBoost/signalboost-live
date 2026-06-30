@@ -13,6 +13,7 @@ import { getBusinessMetrics, formatMetricsForAI } from '@/lib/ai/tools/getBusine
 import { getAffiliateCount, formatAffiliatesForAI } from '@/lib/ai/tools/getAffiliateCount'
 import { getExternalInfo, formatExternalInfoForAI } from '@/lib/ai/tools/getExternalInfo'
 import { listRepoFiles } from '@/lib/ai/tools/repoReader'
+import { getVercelDeployments, type Deployment } from '@/lib/hub/deployments-service'
 
 export interface CosEvidence {
   source: CosSourceType
@@ -24,6 +25,25 @@ export interface CosEvidence {
 
 function notWired(source: CosSourceType, note: string): CosEvidence {
   return { source, connectorWired: false, fetched: false, summary: note }
+}
+
+function summarizeDeployments(deps: Deployment[]): string {
+  if (!deps.length) return 'No recent Vercel deployments found.'
+  const errors = deps.filter((d) => d.state === 'ERROR').length
+  const building = deps.filter((d) => d.state === 'BUILDING' || d.state === 'QUEUED' || d.state === 'INITIALIZING').length
+  const latest = deps[0]
+  const lines = deps.slice(0, 5).map((d) => {
+    const when = d.createdAt ? new Date(d.createdAt).toISOString() : 'unknown time'
+    const tgt = d.target ? ` (${d.target})` : ''
+    const url = d.url ? ` — ${d.url}` : ''
+    return `- ${d.state}${tgt} — ${d.name || 'deployment'} @ ${when}${url}`
+  })
+  return [
+    `Latest deployment state: ${latest.state}${latest.target ? ` (${latest.target})` : ''}.`,
+    `Recent window: ${deps.length} deployments, ${errors} errored, ${building} in progress.`,
+    'Most recent:',
+    ...lines,
+  ].join('\n')
 }
 
 export async function gatherEvidence(source: CosSourceType, objective: string): Promise<CosEvidence> {
@@ -59,9 +79,20 @@ export async function gatherEvidence(source: CosSourceType, objective: string): 
         return { source, connectorWired: true, fetched: true, summary: `Repo reachable: ${files.length} files at the queried path. Use readRepoFile for specific contents.` }
       }
       case 'analytics':
-        return notWired(source, 'No analytics connector wired yet (traffic, conversion, SEO, funnels). This is the next connector to add.')
-      case 'vercel_deployment':
-        return notWired(source, 'No Vercel/deployment connector wired yet (deploys, build logs, env vars, DNS). This is the next connector to add.')
+        return notWired(source, 'No analytics provider is integrated in this codebase yet (traffic, conversion, SEO, funnels). COS cannot report analytics figures until one is connected.')
+      case 'vercel_deployment': {
+        const token = process.env.VERCEL_TOKEN
+        const projectId = process.env.VERCEL_PROJECT_ID
+        const teamId = process.env.VERCEL_TEAM_ID
+        if (!token || !projectId) {
+          return notWired(source, 'Vercel credentials (VERCEL_TOKEN / VERCEL_PROJECT_ID) are not configured, so deployment status cannot be fetched.')
+        }
+        const r = await getVercelDeployments(teamId || '', projectId, token, 10)
+        if (!r.ok || !r.deployments) {
+          return { source, connectorWired: true, fetched: false, summary: '', error: r.error || 'deployment fetch failed' }
+        }
+        return { source, connectorWired: true, fetched: true, summary: summarizeDeployments(r.deployments) }
+      }
       case 'owner_memory':
         return notWired(source, 'Owner-memory exists in the platform (loadUserMemories) but is not bridged into the knowledge layer yet.')
       case 'no_tool_required':

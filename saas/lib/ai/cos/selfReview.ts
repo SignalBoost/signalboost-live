@@ -48,20 +48,36 @@ COMPLETENESS — The draft must fully solve the explicit objective, not partiall
 HONEST_CONFIDENCE — The draft must not overstate confidence, certainty, or capability beyond what the evidence supports.
 APPROVAL_GATE — If the draft commits to or implies an irreversible or external action (sending, publishing, paying, deploying, deleting, contacting), it must flag that owner approval is required first.
 
-Output ONLY a JSON object — no prose, no markdown fences:
-{"passed": boolean, "failedRules": ["RULE_NAME", ...], "issues": ["specific, actionable problems"], "revisedGuidance": "one short paragraph telling the drafting agent exactly how to fix it, or an empty string if it passed"}`
+Report your verdict by calling the report_review tool. Set passed to true only if NO rule is broken; list every broken rule by name in failedRules; put specific, actionable problems in issues; and put one short paragraph of fix guidance in revisedGuidance (empty string if it passed).`
 
 const REVISE_SYSTEM = `You are COS revising your own draft after an internal review found problems. Produce a corrected draft that: fully addresses the objective; uses ONLY the grounded evidence for any current fact (if the evidence is missing a needed fact, say plainly that it must be fetched and do not invent it); states uncertainty honestly; and flags that owner approval is required before any irreversible or external action. Output ONLY the revised draft text — no preamble, no explanation.`
 
-function parseReview(text: string): CosReviewResult {
-  const clean = text.replace(/```json/g, '').replace(/```/g, '').trim()
-  const parsed = JSON.parse(clean)
+// Structured output via Anthropic native tool-forcing: the model must return its
+// verdict as this tool's input, so it arrives as an already-shaped object — no
+// free-text JSON to strip or parse. This is what makes the cheap critique model
+// reliable.
+const REVIEW_TOOL = {
+  name: 'report_review',
+  description: 'Report the structured review verdict for the draft.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      passed: { type: 'boolean', description: 'true only if no rule is broken' },
+      failedRules: { type: 'array', items: { type: 'string' }, description: 'names of broken rules' },
+      issues: { type: 'array', items: { type: 'string' }, description: 'specific, actionable problems' },
+      revisedGuidance: { type: 'string', description: 'one short paragraph of fix guidance, empty if passed' },
+    },
+    required: ['passed', 'failedRules', 'issues', 'revisedGuidance'],
+  },
+}
+
+function coerceReview(input: any): CosReviewResult {
   return {
     ok: true,
-    passed: !!parsed.passed,
-    failedRules: Array.isArray(parsed.failedRules) ? parsed.failedRules.map((s: any) => String(s)) : [],
-    issues: Array.isArray(parsed.issues) ? parsed.issues.map((s: any) => String(s)) : [],
-    revisedGuidance: typeof parsed.revisedGuidance === 'string' ? parsed.revisedGuidance : '',
+    passed: !!input?.passed,
+    failedRules: Array.isArray(input?.failedRules) ? input.failedRules.map((s: any) => String(s)) : [],
+    issues: Array.isArray(input?.issues) ? input.issues.map((s: any) => String(s)) : [],
+    revisedGuidance: typeof input?.revisedGuidance === 'string' ? input.revisedGuidance : '',
   }
 }
 
@@ -79,6 +95,8 @@ export async function reviewCosDraft(
       max_tokens: 700,
       temperature: 0,
       system: REVIEW_SYSTEM,
+      tools: [REVIEW_TOOL as any],
+      tool_choice: { type: 'tool', name: 'report_review' } as any,
       messages: [
         {
           role: 'user',
@@ -89,8 +107,11 @@ export async function reviewCosDraft(
         },
       ],
     })
-    const text = ((res as any).content || []).filter((b: any) => b && b.type === 'text').map((b: any) => b.text).join('\n').trim()
-    return parseReview(text)
+    const toolUse = ((res as any).content || []).find((b: any) => b && b.type === 'tool_use' && b.name === 'report_review')
+    if (!toolUse || !toolUse.input) {
+      return { ok: false, passed: false, failedRules: [], issues: [], revisedGuidance: '', error: 'no structured verdict returned' }
+    }
+    return coerceReview(toolUse.input)
   } catch (e: any) {
     return { ok: false, passed: false, failedRules: [], issues: [], revisedGuidance: '', error: e?.message || 'review failed' }
   }

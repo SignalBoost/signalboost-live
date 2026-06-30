@@ -742,6 +742,7 @@ function RemoteSelect({
   const depValues = deps.map(d => String(allValues?.[d] ?? ''))
   const depsReady = deps.every((_d, i) => depValues[i] !== '')
   const depKey = JSON.stringify(depValues)
+  const listId = `remote-${field.id}-${source.action}`.replace(/[^a-zA-Z0-9_-]/g, '-')
 
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -756,9 +757,7 @@ function RemoteSelect({
     setLoading(true)
     setLoadError(null)
     const payload: Record<string, unknown> = {}
-    deps.forEach(d => {
-      payload[d] = allValues?.[d]
-    })
+    deps.forEach(d => { payload[d] = allValues?.[d] })
     fetch(hubActionEndpoint(source.action), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -768,7 +767,7 @@ function RemoteSelect({
       .then(res => {
         if (!active) return
         if (!res?.ok) {
-          setLoadError(res?.error || 'Could not load options')
+          setLoadError(res?.error || 'Could not load live options; fallback manual entry is enabled.')
           setOptions([])
           return
         }
@@ -777,79 +776,47 @@ function RemoteSelect({
         const opts = list.map((it: any) => ({
           value: String(it?.[source.valueKey] ?? ''),
           label: interpolateLabel(source.labelTemplate, it),
-        }))
+        })).filter(o => o.value)
         setOptions(opts)
-        // If a dependency changed and the previously-selected value no longer
-        // exists in the new list, clear it so a stale id can't be submitted.
         if (deps.length > 0) {
           const cur = String(value ?? '')
           if (cur && !opts.some(o => o.value === cur)) onChange('')
         }
       })
       .catch(() => {
-        if (active) setLoadError('Could not load options')
+        if (active) setLoadError('Could not load live options; fallback manual entry is enabled.')
       })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
-    return () => {
-      active = false
-    }
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [depKey, depsReady, source.action, source.dataPath, source.valueKey, source.labelTemplate])
 
   const baseStyle: CSSProperties = {
-    width: '100%',
-    padding: '10px 12px',
-    borderRadius: 8,
+    width: '100%', padding: '10px 12px', borderRadius: 8,
     border: error ? '1px solid rgba(239,68,68,.5)' : '1px solid rgba(255,255,255,.15)',
-    background: 'rgba(255,255,255,.04)',
-    color: '#fff',
-    fontSize: 13,
-    fontFamily: 'inherit',
-    outline: 'none',
-    cursor: 'pointer',
+    background: 'rgba(255,255,255,.04)', color: '#fff', fontSize: 13,
+    fontFamily: 'inherit', outline: 'none',
   }
 
-  if (!depsReady) {
-    return (
-      <div style={{ ...baseStyle, color: 'rgba(255,255,255,.45)', cursor: 'default' }}>
-        {source.emptyHint || 'Select a previous field first'}
-      </div>
-    )
-  }
+  if (!depsReady) return <div style={{ ...baseStyle, color: 'rgba(255,255,255,.45)' }}>{source.emptyHint || 'Select a previous field first'}</div>
 
   const current = String(value ?? '')
-  const hasCurrent = options.some(o => o.value === current)
-
   return (
     <div>
-      <select
+      <input
+        list={listId}
         value={current}
         onChange={e => onChange(e.target.value)}
+        placeholder={loading ? 'Loading live options…' : loadError ? 'Fallback manual entry' : options.length ? 'Search or select…' : 'No live options found — fallback manual entry'}
         style={baseStyle}
         disabled={loading}
-      >
-        <option value="" disabled style={{ color: '#111', background: '#fff' }}>
-          {loading ? 'Loading…' : options.length ? 'Select…' : 'No options found'}
-        </option>
-        {!hasCurrent && current !== '' && (
-          <option value={current} style={{ color: '#111', background: '#fff' }}>
-            {current}
-          </option>
-        )}
-        {options.map(o => (
-          <option key={o.value} value={o.value} style={{ color: '#111', background: '#fff' }}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      {loadError && (
-        <div style={{ fontSize: 11, color: 'rgba(239,68,68,.85)', marginTop: 4 }}>{loadError}</div>
-      )}
-      {!loading && !loadError && options.length === 0 && (
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 4 }}>{t('console.cui.nothing_to_select', 'Nothing to select here yet.')}</div>
-      )}
+      />
+      <datalist id={listId}>
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </datalist>
+      {loadError && <div style={{ fontSize: 11, color: 'rgba(239,68,68,.85)', marginTop: 4 }}>⚠️ {loadError}</div>}
+      {!loading && !loadError && options.length > 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 4 }}>Search live provider values; type manually only if the live value is unavailable.</div>}
+      {!loading && !loadError && options.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 4 }}>{t('console.cui.nothing_to_select', 'Nothing to select here yet. Fallback manual entry is enabled.')}</div>}
     </div>
   )
 }

@@ -85,6 +85,14 @@ registerExecutor({
 
 const CODEX_URL = 'https://chatgpt.com/codex/cloud'
 const TEXT_FIELD: ActionField['type'] = 'text'
+const DEFAULT_REPO = 'SignalBoost/signalboost-live'
+const GITHUB_REPO_FIELD: ActionField = { id: 'repo', label: 'Repository', type: 'remote_select', required: true, remoteSource: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } }
+const GITHUB_BRANCH_FIELD: ActionField = { id: 'branch', label: 'Branch', type: 'remote_select', required: true, remoteSource: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } }
+const GITHUB_REF_FIELD: ActionField = { id: 'ref', label: 'Branch / Ref', type: 'remote_select', required: true, remoteSource: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } }
+const GITHUB_FILES_FIELD: ActionField = { id: 'files', label: 'Selected Files', type: 'remote_select', remoteSource: { action: 'github.list_files', dataPath: 'files', valueKey: 'path', labelTemplate: '{path}', dependsOn: ['repo', 'branch'], emptyHint: 'Pick a repository and branch first' } }
+const GITHUB_FILE_PATH_FIELD: ActionField = { id: 'filePath', label: 'File Path', type: 'remote_select', required: true, remoteSource: { action: 'github.list_files', dataPath: 'files', valueKey: 'path', labelTemplate: '{path}', dependsOn: ['repo', 'ref'], emptyHint: 'Pick a repository and ref first' } }
+const GITHUB_EXPECTED_FILE_FIELD: ActionField = { id: 'expectedFile', label: 'Expected File', type: 'remote_select', remoteSource: { action: 'github.list_files', dataPath: 'files', valueKey: 'path', labelTemplate: '{path}', dependsOn: ['repo', 'branch'], emptyHint: 'Pick a repository and branch first' } }
+const GITHUB_PR_FIELD: ActionField = { id: 'prNumber', label: 'Pull Request', type: 'remote_select', remoteSource: { action: 'github.list_prs', dataPath: 'pulls', valueKey: 'number', labelTemplate: '#{number} — {title} ({branch}, {state})', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } }
 
 function lines(value: unknown): string[] {
   if (Array.isArray(value)) return value.map(v => String(v).trim()).filter(Boolean)
@@ -101,8 +109,8 @@ function codexPrompt(input: Record<string, unknown>): string {
   const files = lines(input.files)
   const checks = lines(input.verificationStrings)
   return [
-    `Repo: ${String(input.repo || '').trim()}`,
-    `Branch: ${String(input.branch || '').trim()}`,
+    `Repo: ${String(input.repo || DEFAULT_REPO).trim()}`,
+    `Target branch: ${String(input.branch || 'main').trim()}`,
     '',
     'Objective:',
     String(input.objective || '').trim(),
@@ -114,15 +122,18 @@ function codexPrompt(input: Record<string, unknown>): string {
     '',
     checks.length ? `Verification strings:\n${checks.map(v => `- ${v}`).join('\n')}` : 'Verification strings: Not specified.',
     '',
-    'After implementation, commit changes on the requested branch and open or update a GitHub pull request. Report the branch, PR URL, files changed, and verification output.',
+    `Commit message: ${String(input.commitMessage || 'fix(hub): replace Codex Cloud manual fields with searchable repo branch file selectors').trim()}`,
+    '',
+    'After implementation, commit changes on the requested branch and open or update a GitHub pull request. Report the branch, PR URL, files changed, verification output, and final commit SHA.',
   ].join('\n')
 }
 
 const CODEX_BASE_FIELDS: ActionField[] = [
   { id: 'objective', label: 'Objective', type: TEXT_FIELD, required: true },
-  { id: 'repo', label: 'Repository', type: TEXT_FIELD, required: true },
-  { id: 'branch', label: 'Branch', type: TEXT_FIELD, required: true },
-  { id: 'files', label: 'Relevant Files', type: TEXT_FIELD },
+  GITHUB_REPO_FIELD,
+  GITHUB_BRANCH_FIELD,
+  GITHUB_FILES_FIELD,
+  { id: 'commitMessage', label: 'Commit Message', type: TEXT_FIELD },
   { id: 'instructions', label: 'Instructions', type: TEXT_FIELD },
   { id: 'verificationStrings', label: 'Verification Strings', type: TEXT_FIELD },
 ]
@@ -148,8 +159,8 @@ registerExecutor({
   providerId: 'openai', actionId: 'codex_save_handoff', policyActionId: 'read_provider_status',
   schema: schema('openai.codex_save_handoff', 'Save Codex Handoff', 'create', [
     { id: 'objective', label: 'Objective', type: TEXT_FIELD, required: true },
-    { id: 'repo', label: 'Repository', type: TEXT_FIELD, required: true },
-    { id: 'branch', label: 'Branch', type: TEXT_FIELD, required: true },
+    GITHUB_REPO_FIELD,
+    GITHUB_BRANCH_FIELD,
     { id: 'instructions', label: 'Codex Prompt / Handoff', type: TEXT_FIELD, required: true },
   ]),
   async run(_ctx, input) {
@@ -172,10 +183,10 @@ async function githubJSON(path: string) {
 registerExecutor({
   providerId: 'openai', actionId: 'codex_track_github_result', policyActionId: 'read_provider_status',
   schema: schema('openai.codex_track_github_result', 'Track Codex Branch/PR', 'view', [
-    { id: 'repo', label: 'Repository', type: TEXT_FIELD, required: true },
-    { id: 'branch', label: 'Branch', type: TEXT_FIELD, required: true },
-    { id: 'prNumber', label: 'Pull Request Number', type: 'number' },
-    { id: 'expectedFile', label: 'Expected File', type: TEXT_FIELD },
+    GITHUB_REPO_FIELD,
+    GITHUB_BRANCH_FIELD,
+    GITHUB_PR_FIELD,
+    GITHUB_EXPECTED_FILE_FIELD,
   ]),
   async run(_ctx, input) {
     const repo = String(input.repo || '').trim(); const branch = String(input.branch || '').trim()
@@ -192,19 +203,22 @@ registerExecutor({
 registerExecutor({
   providerId: 'openai', actionId: 'codex_verify_result', policyActionId: 'read_provider_status',
   schema: schema('openai.codex_verify_result', 'Verify Codex Result', 'view', [
-    { id: 'repo', label: 'Repository', type: TEXT_FIELD, required: true },
-    { id: 'ref', label: 'Ref', type: TEXT_FIELD, required: true },
-    { id: 'filePath', label: 'File Path', type: TEXT_FIELD, required: true },
+    GITHUB_REPO_FIELD,
+    GITHUB_REF_FIELD,
+    GITHUB_FILE_PATH_FIELD,
     { id: 'expectedStrings', label: 'Expected Strings', type: TEXT_FIELD, required: true },
   ]),
   async run(_ctx, input) {
     const repo = String(input.repo || '').trim(); const ref = String(input.ref || '').trim(); const filePath = String(input.filePath || '').trim()
     const expected = lines(input.expectedStrings)
+    const branchResult = await githubJSON(`/repos/${repo}/branches/${encodeURIComponent(ref)}`)
+    const commitSha = branchResult.ok ? branchResult.json?.commit?.sha || null : null
     const r = await githubJSON(`/repos/${repo}/contents/${filePath.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(ref)}`)
-    if (!r.ok) return { ok: true, message: `Codex verification: file not found at ${filePath} on ${ref}.`, data: { fileFound: false, expected, matched: [], missing: expected, directExecution: false } }
+    if (!r.ok) return { ok: true, message: `Codex verification: NOT verified — file not found at ${filePath} on ${ref}.`, data: { repo, ref, filePath, fileFound: false, foundStrings: [], missingStrings: expected, matched: [], missing: expected, commitSha, passed: false, directExecution: false } }
     const content = Buffer.from(String(r.json?.content || ''), 'base64').toString('utf8')
     const matched = expected.filter(s => content.includes(s))
     const missing = expected.filter(s => !content.includes(s))
-    return { ok: true, message: `Codex verification: file found; ${matched.length}/${expected.length} expected string${expected.length === 1 ? '' : 's'} found.`, data: { fileFound: true, filePath, ref, matched, missing, passed: missing.length === 0, directExecution: false } }
+    const passed = missing.length === 0
+    return { ok: true, message: `Codex verification: ${passed ? 'verified' : 'NOT verified'} — ${matched.length}/${expected.length} expected string${expected.length === 1 ? '' : 's'} found.`, data: { repo, ref, filePath, foundStrings: matched, missingStrings: missing, matched, missing, commitSha, passed, fileFound: true, directExecution: false } }
   },
 })

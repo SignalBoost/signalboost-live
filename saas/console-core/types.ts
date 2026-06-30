@@ -58,6 +58,14 @@ export interface ActionField {
     dependsOn?: string[]
     emptyHint?: string
   }
+  liveOptions?: {
+    provider: 'github' | string
+    source: 'repositories' | 'branches' | 'pullRequests' | 'issues' | 'workflows' | 'files' | string
+    dependsOn?: string[]
+    labelField?: string
+    valueField?: string
+    searchFields?: string[]
+  }
 }
 
 /** A declarative action definition. The renderer needs nothing else to draw it. */

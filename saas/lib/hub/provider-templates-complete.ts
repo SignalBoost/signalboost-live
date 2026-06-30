@@ -324,9 +324,9 @@ export const COMPLETE_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'crud_actions',
     api: { service: 'github', method: 'POST', endpoint: '/repos/{owner}/{repo}/git/refs' },
     fields: [
-      { id: 'repo', label: 'Repository (owner/repo)', type: 'text', required: true },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' }, liveOptions: { provider: 'github', source: 'repositories', valueField: 'name', labelField: 'name', searchFields: ['name'] } },
       { id: 'branch', label: 'New branch name', type: 'text', required: true },
-      { id: 'from', label: 'From branch/SHA', type: 'text', required: true, placeholder: 'main' },
+      { id: 'from', label: 'Base branch', type: 'remote_select', required: true, defaultValue: 'main', source: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' }, liveOptions: { provider: 'github', source: 'branches', dependsOn: ['repo'], valueField: 'name', labelField: 'name', searchFields: ['name'] } },
     ],
   },
   'github.list_workflows': {
@@ -334,7 +334,7 @@ export const COMPLETE_TEMPLATES: Record<string, ProviderTemplate> = {
     description: 'All GitHub Actions workflows in the repo.',
     policyActionId: 'read_provider_status',
     api: { service: 'github', method: 'GET', endpoint: '/repos/{owner}/{repo}/actions/workflows' },
-    fields: [{ id: 'repo', label: 'Repository (owner/repo)', type: 'text', required: true }],
+    fields: [{ id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' }, liveOptions: { provider: 'github', source: 'repositories', valueField: 'name', labelField: 'name', searchFields: ['name'] } }],
   },
   'github.trigger_workflow': {
     id: 'github.trigger_workflow', label: 'Trigger Workflow', icon: '▶️',
@@ -342,9 +342,9 @@ export const COMPLETE_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'crud_actions',
     api: { service: 'github', method: 'POST', endpoint: '/repos/{owner}/{repo}/actions/workflows/{workflowId}/dispatches' },
     fields: [
-      { id: 'repo', label: 'Repository (owner/repo)', type: 'text', required: true },
-      { id: 'workflowId', label: 'Workflow ID or filename', type: 'text', required: true },
-      { id: 'ref', label: 'Branch/tag', type: 'text', required: true, placeholder: 'main' },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' }, liveOptions: { provider: 'github', source: 'repositories', valueField: 'name', labelField: 'name', searchFields: ['name'] } },
+      { id: 'workflowId', label: 'Workflow', type: 'remote_select', required: true, source: { action: 'github.list_workflows', dataPath: 'workflows', valueKey: 'id', labelTemplate: '{name} — {path}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' }, liveOptions: { provider: 'github', source: 'workflows', dependsOn: ['repo'], valueField: 'id', labelField: 'name', searchFields: ['name', 'path'] } },
+      { id: 'ref', label: 'Branch/tag', type: 'remote_select', required: true, defaultValue: 'main', source: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' }, liveOptions: { provider: 'github', source: 'branches', dependsOn: ['repo'], valueField: 'name', labelField: 'name', searchFields: ['name'] } },
     ],
   },
   'github.list_workflow_runs': {
@@ -352,7 +352,7 @@ export const COMPLETE_TEMPLATES: Record<string, ProviderTemplate> = {
     description: 'Recent workflow run history.',
     policyActionId: 'read_provider_status',
     api: { service: 'github', method: 'GET', endpoint: '/repos/{owner}/{repo}/actions/runs?per_page=20' },
-    fields: [{ id: 'repo', label: 'Repository (owner/repo)', type: 'text', required: true }],
+    fields: [{ id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' }, liveOptions: { provider: 'github', source: 'repositories', valueField: 'name', labelField: 'name', searchFields: ['name'] } }],
   },
   'github.manage_secret': {
     id: 'github.manage_secret', label: 'Set Repository Secret', icon: '🔒',
@@ -360,7 +360,7 @@ export const COMPLETE_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'rotate_secret_key',
     api: { service: 'github', method: 'PUT', endpoint: '/repos/{owner}/{repo}/actions/secrets/{name}' },
     fields: [
-      { id: 'repo', label: 'Repository (owner/repo)', type: 'text', required: true },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: 'SignalBoost/signalboost-live', source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' }, liveOptions: { provider: 'github', source: 'repositories', valueField: 'name', labelField: 'name', searchFields: ['name'] } },
       { id: 'name', label: 'Secret name', type: 'text', required: true },
       { id: 'value', label: 'Secret value', type: 'text', required: true },
     ],

@@ -1,78 +1,77 @@
 // saas/lib/cos/video-voice.ts
-// Managed COS campaign voice/video helper: creates ElevenLabs narration and
-// submits a fal.ai video-to-video pass that can attach the narration to the
-// current campaign render without adding client-side dependencies.
+// Adds a real spoken voiceover to a campaign's rendered (Kling) video, fully
+// managed: ElevenLabs TTS of the script → upload → fal ffmpeg merge-audio-video.
+// Runs entirely from Vercel; no self-hosted FFmpeg worker. Captions are added in
+// a follow-up step (fal compose with an SRT track).
+//
+// tsconfig non-strict: flat results; never throws to callers.
+
+import { createClient } from '@supabase/supabase-js'
 import { fal } from '@fal-ai/client'
 import { generateSpeech } from '@/lib/elevenlabs/client'
-import { CURATED_VOICES } from '@/lib/elevenlabs/voices'
 
-const VOICE_VIDEO_MODEL = 'fal-ai/ffmpeg-api/compose'
+const RENDER_BUCKET = 'video-renders'
 
-let configured = false
-function ensureFalConfigured() {
-  if (!configured) {
-    fal.config({ credentials: process.env.FAL_KEY })
-    configured = true
-  }
+// Curated ElevenLabs voices per language (multilingual model handles all five).
+const VOICE_BY_LANG: Record<string, string> = {
+  en: 'EXAVITQu4vr4xnSDxMaL',
+  es: '9BWtsMINqrJLrRacOk9x',
+  pt: 'XB0fDUnXU5powFXDhCwa',
+  pl: 'ThT5KcBeYPX3keUQqHPh',
+  ru: 'z9fAnlkpzviPz146aGWa',
 }
 
-export type VoiceVideoResult =
-  | { ok: true; requestId: string; model: string; voiceId: string; audioDataUrl: string }
-  | { ok: false; error: string }
-
-export function defaultCosVoiceId(language?: string): string {
-  const lang = String(language || 'en').toLowerCase().slice(0, 2)
-  const match = CURATED_VOICES.find(voice => voice.locale.toLowerCase().startsWith(lang))
-  return match?.id || CURATED_VOICES[0]?.id || '21m00Tcm4TlvDq8ikWAM'
+function db() {
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+    auth: { persistSession: false },
+  })
 }
 
-export function campaignNarration(campaign: any, language?: string): string {
-  const items = Array.isArray(campaign?.work_items) ? campaign.work_items : []
-  const item = language
-    ? items.find((it: any) => it?.input?.language === language && it?.output)
-    : items.find((it: any) => it?.output)
-  const output = item?.output || {}
-  const parts = [output.opening, output.draft, output.call_to_action]
-    .map(value => String(value || '').trim())
-    .filter(Boolean)
-  const fallback = [campaign?.title, campaign?.objective, 'Visit saas.signalboostapp.com to grow faster with SignalBoost.']
-    .map(value => String(value || '').trim())
-    .filter(Boolean)
-  return (parts.length ? parts : fallback).join('\n\n').slice(0, 4_500)
+let falConfigured = false
+function ensureFal() {
+  if (!falConfigured) { fal.config({ credentials: process.env.FAL_KEY }); falConfigured = true }
 }
 
-export async function startManagedVoiceVideo(opts: {
-  campaign: any
-  language?: string
-  videoUrl?: string
-  voiceId?: string
-  narration?: string
-}): Promise<VoiceVideoResult> {
+// Concise narration that fits a short promo clip. Uses the per-language draft's
+// title, falling back to campaign fields. Kept short so the voice matches the clip.
+function narrationFor(campaign: any, lang: string): string {
+  const items = Array.isArray(campaign.work_items) ? campaign.work_items : []
+  const match = items.find((it: any) => it?.input?.language === lang && it?.output) || items.find((it: any) => it?.output)
+  const o = (match && match.output) || {}
+  const base = String(o.title || campaign.title || campaign.objective || 'SignalBoost helps your business grow.')
+  return base.replace(/\s+/g, ' ').trim().slice(0, 240)
+}
+
+export async function addVoiceToCampaignVideo(campaign: any, lang: string = 'en'): Promise<{ ok: boolean; url?: string; error?: string }> {
   try {
-    const videoUrl = String(opts.videoUrl || opts.campaign?.metadata?.video?.url || '').trim()
-    if (!videoUrl) return { ok: false, error: 'A ready video URL is required before adding voice.' }
+    const videoUrl = campaign?.metadata?.video?.url
+    if (!videoUrl) return { ok: false, error: 'No rendered video to voice.' }
 
-    const narration = String(opts.narration || campaignNarration(opts.campaign, opts.language)).trim()
-    if (!narration) return { ok: false, error: 'A narration script is required.' }
+    const voiceId = VOICE_BY_LANG[lang] || VOICE_BY_LANG.en
+    const text = narrationFor(campaign, lang)
 
-    const voiceId = String(opts.voiceId || defaultCosVoiceId(opts.language)).trim()
-    const audio = await generateSpeech({ text: narration, voiceId })
-    const audioDataUrl = `data:audio/mpeg;base64,${Buffer.from(audio).toString('base64')}`
+    // 1) Text → speech (mp3 bytes)
+    let audio: ArrayBuffer
+    try { audio = await generateSpeech({ text, voiceId }) } catch (e: any) { return { ok: false, error: `TTS failed: ${e?.message || 'unknown'}` } }
 
-    ensureFalConfigured()
-    const submitted = await (fal.queue as any).submit(VOICE_VIDEO_MODEL, {
-      input: {
-        video_url: videoUrl,
-        audio_url: audioDataUrl,
-        output_format: 'mp4',
-      },
+    // 2) Upload mp3 and sign a URL fal can fetch
+    const sb = db()
+    const path = `cos-voice/${campaign.id}/${lang}-${Date.now()}.mp3`
+    const up = await sb.storage.from(RENDER_BUCKET).upload(path, Buffer.from(audio), { contentType: 'audio/mpeg', upsert: true })
+    if (up.error) return { ok: false, error: `audio upload failed: ${up.error.message}` }
+    const signed = await sb.storage.from(RENDER_BUCKET).createSignedUrl(path, 60 * 60 * 6)
+    const audioUrl = signed.data?.signedUrl
+    if (!audioUrl) return { ok: false, error: 'could not sign audio url' }
+
+    // 3) Merge audio + video via fal (managed FFmpeg)
+    ensureFal()
+    const result: any = await fal.subscribe('fal-ai/ffmpeg-api/merge-audio-video', {
+      input: { video_url: String(videoUrl), audio_url: audioUrl },
     })
-    const requestId = (submitted as { request_id?: string }).request_id
-    if (!requestId) return { ok: false, error: 'No request id returned from fal.' }
-    return { ok: true, requestId, model: VOICE_VIDEO_MODEL, voiceId, audioDataUrl }
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Could not start voice video.'
-    console.error('startManagedVoiceVideo error:', message)
-    return { ok: false, error: message }
+    const out = result?.data?.video?.url
+    if (!out) return { ok: false, error: 'merge returned no video url' }
+    return { ok: true, url: String(out) }
+  } catch (e: any) {
+    return { ok: false, error: e?.message || 'voice compose failed' }
   }
 }

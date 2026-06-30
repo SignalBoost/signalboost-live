@@ -97,6 +97,52 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     id: 'openai.list_batches', label: 'Batch Jobs', description: 'Recent batch jobs and their status.', icon: '📦',
     policyActionId: 'read_provider_status', api: { service: 'openai', method: 'GET', endpoint: '/v1/batches' }, fields: [],
   },
+  'openai.codex_open_cloud': {
+    id: 'openai.codex_open_cloud', label: 'Open Codex Cloud', description: 'Open the ChatGPT Codex Cloud workspace for manual task execution.', icon: '☁️',
+    policyActionId: 'read_provider_status', api: { service: 'openai', method: 'GET', endpoint: '/codex/cloud' }, fields: [],
+  },
+  'openai.codex_generate_prompt': {
+    id: 'openai.codex_generate_prompt', label: 'Generate Codex Prompt', description: 'Prepare a clean Codex Cloud task prompt from owner intent. Open Codex Cloud and paste this prompt.', icon: '🧾',
+    policyActionId: 'read_provider_status', api: { service: 'openai', method: 'POST', endpoint: '/codex/handoff/prompt' },
+    fields: [
+      { id: 'objective', label: 'Objective', type: 'textarea', required: true, placeholder: 'What should Codex change?' },
+      { id: 'repo', label: 'Repository', type: 'text', required: true, placeholder: 'owner/repo' },
+      { id: 'branch', label: 'Branch', type: 'text', required: true, placeholder: 'ai/my-codex-task' },
+      { id: 'files', label: 'Relevant Files', type: 'textarea', placeholder: 'One path per line' },
+      { id: 'instructions', label: 'Instructions', type: 'textarea', placeholder: 'Constraints, acceptance criteria, implementation notes' },
+      { id: 'verificationStrings', label: 'Verification Strings', type: 'textarea', placeholder: 'Strings that should appear in the result, one per line' },
+    ],
+  },
+  'openai.codex_save_handoff': {
+    id: 'openai.codex_save_handoff', label: 'Save Codex Handoff', description: 'Prepare a Codex handoff record for manual storage; persistence is roadmap until a hub handoff store is wired.', icon: '💾',
+    policyActionId: 'read_provider_status', api: { service: 'openai', method: 'POST', endpoint: '/codex/handoff/save' },
+    fields: [
+      { id: 'objective', label: 'Objective', type: 'textarea', required: true },
+      { id: 'repo', label: 'Repository', type: 'text', required: true, placeholder: 'owner/repo' },
+      { id: 'branch', label: 'Branch', type: 'text', required: true },
+      { id: 'instructions', label: 'Codex Prompt / Handoff', type: 'textarea', required: true },
+    ],
+  },
+  'openai.codex_track_github_result': {
+    id: 'openai.codex_track_github_result', label: 'Track Codex Branch/PR', description: 'Verify whether Codex produced the expected GitHub branch, pull request, commit, or file.', icon: '🔎',
+    policyActionId: 'read_provider_status', api: { service: 'openai', method: 'GET', endpoint: '/codex/github/track' },
+    fields: [
+      { id: 'repo', label: 'Repository', type: 'text', required: true, placeholder: 'owner/repo' },
+      { id: 'branch', label: 'Branch', type: 'text', required: true },
+      { id: 'prNumber', label: 'Pull Request Number', type: 'number' },
+      { id: 'expectedFile', label: 'Expected File', type: 'text' },
+    ],
+  },
+  'openai.codex_verify_result': {
+    id: 'openai.codex_verify_result', label: 'Verify Codex Result', description: 'Read GitHub content and verify the expected file contains the expected strings.', icon: '✅',
+    policyActionId: 'read_provider_status', api: { service: 'openai', method: 'GET', endpoint: '/codex/github/verify' },
+    fields: [
+      { id: 'repo', label: 'Repository', type: 'text', required: true, placeholder: 'owner/repo' },
+      { id: 'ref', label: 'Ref', type: 'text', required: true, placeholder: 'branch, tag, or commit SHA' },
+      { id: 'filePath', label: 'File Path', type: 'text', required: true },
+      { id: 'expectedStrings', label: 'Expected Strings', type: 'textarea', required: true, placeholder: 'One expected string per line' },
+    ],
+  },
   // ---- Supabase read sources for select-don't-type pickers ----
   'supabase.list_tables': {
     id: 'supabase.list_tables', label: 'List Tables', description: 'List public tables (picker source).', icon: '🗃️',

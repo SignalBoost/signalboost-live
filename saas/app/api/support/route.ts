@@ -24,6 +24,7 @@ import { PROVIDER_TEMPLATES } from '@/lib/hub/provider-templates'
 import { OWNER_ONLY_TOOLS, adminReadOnlyBlock } from '@/lib/ai/accessTier'
 import { promptCompilerModule } from '@/lib/ai/promptCompiler'
 import { cosArchitectModule, cosExecuteDirective } from '@/lib/ai/cosArchitect'
+import { proposeCampaign } from '@/lib/ai/proposeCampaign'
 
 export const maxDuration = 300
 
@@ -438,6 +439,25 @@ const TOOL_PROPOSE_PLAN: ChatTool = {
     },
   },
 }
+const TOOL_PROPOSE_MARKETING_CAMPAIGN: ChatTool = {
+  type: 'function',
+  function: {
+    name: 'proposeMarketingCampaign',
+    description: 'Create a COS marketing campaign proposal from a business goal, audience, channel, and optional source material. The proposal is a draft for owner review only — it does not publish, send, or spend anything.',
+    parameters: {
+      type: 'object',
+      properties: {
+        goal: { type: 'string', description: 'The business goal for the campaign, e.g. traffic, leads, demo signups, monetization, or product education.' },
+        audience: { type: 'string', description: 'The intended audience or market segment.' },
+        channel: { type: 'string', description: 'Preferred campaign channel, e.g. YouTube, short video, LinkedIn, blog, email, outreach, landing page, or review campaign.' },
+        offer: { type: 'string', description: 'Optional offer, call to action, product, plan, or promotion to feature.' },
+        sourceMaterial: { type: 'string', description: 'Optional notes, research, pasted material, or constraints the campaign should use.' },
+        language: { type: 'string', description: 'Optional campaign language code such as en, es, pt, pl, or ru.' },
+      },
+      required: ['goal', 'audience'],
+    },
+  },
+}
 const TOOL_UPDATE_PLAN_STATUS: ChatTool = {
   type: 'function',
   function: {
@@ -633,6 +653,7 @@ const CHIEF_OF_STAFF_TOOLS: ChatTool[] = [
   TOOL_LIST_CLEANUP_BRANCHES,
   TOOL_DELETE_BRANCHES,
   TOOL_PROPOSE_PLAN,
+  TOOL_PROPOSE_MARKETING_CAMPAIGN,
   TOOL_UPDATE_PLAN_STATUS,
   TOOL_LIST_PLANS,
   TOOL_CREATE_OUTREACH_DRAFT,
@@ -1051,6 +1072,14 @@ if (name === 'proposeGrowthPlan') {
     return result.ok
       ? `Growth plan stored as PROPOSED on ${new Date().toUTCString().slice(0, 16)} with id ${result.id}. Tell the owner it awaits their explicit approval before any execution.`
       : `Plan could not be stored: ${result.error ?? 'unknown error'}.`
+  }
+if (name === 'proposeMarketingCampaign') {
+    let args: any = {}
+    try { args = JSON.parse(rawArgs || '{}') } catch {}
+    const result = await proposeCampaign(args)
+    if (typeof result === 'string') return result
+    if (result && typeof result === 'object') return JSON.stringify(result, null, 2)
+    return 'Marketing campaign proposal tool returned no content.'
   }
 if (name === 'updateGrowthPlanStatus') {
     let planId = ''

@@ -95,6 +95,7 @@ const CUSTOMER_GROUPS: Group[] = [
       { icon: '🎛️', label: 'Audit Cockpit', href: '/hub/audit', desc: 'Reports, evidence, inventory, and roadmap.' },
       { icon: '🔑', label: 'Identity & Secrets', href: '/hub/audit/identity', desc: 'Identity, access, secrets, and keys.' },
       { icon: '🧾', label: 'Printable Reports', href: '/hub/audit', desc: 'Download PDF or print/save reports.' },
+      { icon: '🧠', label: 'COS Decision Log', href: '/hub/cos', desc: 'Reasoning decisions COS has made, with outcomes.' },
     ],
   },
   {

@@ -4,7 +4,6 @@
 // "Authorization: Bearer <CRON_SECRET>" with every cron invocation.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { runOpportunityScan } from '@/lib/ai/opportunityScanner'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -17,11 +16,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const result = await runOpportunityScan()
-  if (!result.ok) {
-    console.error('cron opportunity-scan failed:', result.error)
-    return NextResponse.json({ ok: false, error: result.error }, { status: 500 })
-  }
+  const { buildScanRequest } = await import('@/lib/ai/opportunityScanner')
+  const { submitBatch } = await import('@/lib/ai/batch/openaiBatch')
 
-  return NextResponse.json({ ok: true, inserted: result.inserted })
+  const req2 = await buildScanRequest()
+  if (!req2.ok || !req2.body) {
+    return NextResponse.json({ ok: false, error: req2.error || 'no scan request' }, { status: 500 })
+  }
+  const submitted = await submitBatch('opportunity_scan', [{ custom_id: 'scan', body: req2.body }], {})
+  if (!submitted.ok) {
+    return NextResponse.json({ ok: false, error: submitted.error }, { status: 500 })
+  }
+  return NextResponse.json({ ok: true, batchJob: submitted.jobId })
 }

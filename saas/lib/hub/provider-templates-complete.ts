@@ -13,7 +13,7 @@ export const COMPLETE_TEMPLATES: Record<string, ProviderTemplate> = {
   // ═══════════════════════════════════════════════════════════════════════════
   'namecheap.list_dns_records': {
     id: 'namecheap.list_dns_records', label: 'List DNS Records', icon: '🌐',
-    description: 'List all Namecheap DNS host records for a domain.',
+    description: '⚠️ BLOCKED: Namecheap requires a static whitelisted IP, but Vercel rotates outbound IPs per request — every call fails with "Invalid request IP". Use Vercel → DNS Records instead.',
     policyActionId: 'read_provider_status',
     api: { service: 'namecheap', method: 'GET', endpoint: '/domains/dns/hosts' },
     fields: [{ id: 'domain', label: 'Domain', type: 'text', required: true, placeholder: 'example.com' }],
@@ -36,7 +36,7 @@ export const COMPLETE_TEMPLATES: Record<string, ProviderTemplate> = {
   },
   'namecheap.delete_dns_record': {
     id: 'namecheap.delete_dns_record', label: 'Delete DNS Record', icon: '🗑️',
-    description: 'Delete a Namecheap DNS host record by Host ID.',
+    description: '⚠️ BLOCKED: same static-IP limitation as the other Namecheap DNS actions — see List DNS Records for details. Use Vercel → DNS Records instead.',
     policyActionId: 'delete_provider_resource', requiresConfirm: true,
     api: { service: 'namecheap', method: 'DELETE', endpoint: '/domains/dns/hosts/{hostId}' },
     fields: [

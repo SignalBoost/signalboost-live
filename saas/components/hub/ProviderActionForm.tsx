@@ -3,7 +3,7 @@
 // saas/components/hub/ProviderActionForm.tsx
 // Hub Console — Universal form renderer for provider actions with active intercept pickers.
 
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import {
   getTemplate,
   validateTemplatePayload,
@@ -68,6 +68,10 @@ export default function ProviderActionForm({
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [result, setResult] = useState<{ ok: boolean; message?: string; error?: string; data?: any } | null>(null)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const isCodexPromptTemplate = templateId === 'openai.codex_open_cloud' || templateId === 'openai.codex_generate_prompt'
+  const primaryFields = useMemo(() => template?.fields.filter(field => !(isCodexPromptTemplate && field.advanced)) || [], [isCodexPromptTemplate, template])
+  const advancedFields = useMemo(() => template?.fields.filter(field => isCodexPromptTemplate && field.advanced) || [], [isCodexPromptTemplate, template])
 
   const validate = useCallback((): boolean => {
     const validation = validateTemplatePayload(templateId, values)
@@ -200,18 +204,44 @@ export default function ProviderActionForm({
                 {t('console.actionForm.noExtraInfo', 'This action requires no additional information.')}
               </div>
             ) : (
-              template.fields.map(field => (
-                <FormField
-                  key={field.id}
-                  templateId={templateId}
-                  field={field}
-                  value={values[field.id]}
-                  allValues={values}
-                  error={errors[field.id]}
-                  onChange={value => handleFieldChange(field.id, value)}
-                  lang={lang}
-                />
-              ))
+              <>
+                {primaryFields.map(field => (
+                  <FormField
+                    key={field.id}
+                    templateId={templateId}
+                    field={field}
+                    value={values[field.id]}
+                    allValues={values}
+                    error={errors[field.id]}
+                    onChange={value => handleFieldChange(field.id, value)}
+                    lang={lang}
+                  />
+                ))}
+                {advancedFields.length > 0 && (
+                  <div style={{ border: '1px solid rgba(255,255,255,.10)', borderRadius: 12, background: 'rgba(255,255,255,.03)', overflow: 'hidden' }}>
+                    <button type="button" onClick={() => setShowAdvanced(v => !v)} className="hub-chip" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 13px', border: 0, borderRadius: 0, background: 'rgba(26,240,255,.06)', color: '#fff', cursor: 'pointer' }}>
+                      <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(26,240,255,.82)' }}>Advanced options</span>
+                      <span style={{ fontSize: 12, color: 'rgba(255,255,255,.55)' }}>{showAdvanced ? 'Hide' : 'Branch and selected files'}</span>
+                    </button>
+                    {showAdvanced && (
+                      <div style={{ padding: '13px 13px 0' }}>
+                        {advancedFields.map(field => (
+                          <FormField
+                            key={field.id}
+                            templateId={templateId}
+                            field={field}
+                            value={values[field.id]}
+                            allValues={values}
+                            error={errors[field.id]}
+                            onChange={value => handleFieldChange(field.id, value)}
+                            lang={lang}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
 
             {/* Embedded Variable Live Checker Track */}
@@ -788,9 +818,14 @@ function RemoteSelect({
         const defaultValue = field.defaultValue === undefined ? '' : String(field.defaultValue)
         const hasCurrent = cur ? opts.some(o => o.value === cur) : false
         const hasDefault = defaultValue ? opts.some(o => o.value === defaultValue) : false
+        const defaultBranch = String(res?.data?.defaultBranch || '')
+        const hasDefaultBranch = defaultBranch ? opts.some(o => o.value === defaultBranch) : false
+        const fallbackValue = field.id === 'branch' && source.action === 'github.list_branches'
+          ? hasDefault ? defaultValue : hasDefaultBranch ? defaultBranch : defaultValue
+          : defaultValue
 
-        if (!cur && hasDefault) {
-          onChange(defaultValue)
+        if (!cur && fallbackValue) {
+          onChange(fallbackValue)
         } else if (cur && !hasCurrent && cur === defaultValue) {
           onChange('')
         } else if (deps.length > 0 && cur && !hasCurrent) {

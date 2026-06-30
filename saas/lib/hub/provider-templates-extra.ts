@@ -102,8 +102,8 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     fields: [
       { id: 'objective', label: 'Objective', type: 'textarea', required: true, placeholder: 'What should Codex change?' },
       { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: DEFAULT_GITHUB_SLUG, source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
-      { id: 'branch', label: 'Branch', type: 'remote_select', required: true, defaultValue: 'main', source: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
-      { id: 'files', label: 'Selected Files', type: 'remote_select', source: { action: 'github.list_files', dataPath: 'files', valueKey: 'path', labelTemplate: '{path}', dependsOn: ['repo', 'branch'], emptyHint: 'Pick a repository and branch first' } },
+      { id: 'branch', label: 'Branch', type: 'remote_select', defaultValue: 'main', advanced: true, source: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
+      { id: 'files', label: 'Selected Files', type: 'remote_select', advanced: true, source: { action: 'github.list_files', dataPath: 'files', valueKey: 'path', labelTemplate: '{path}', dependsOn: ['repo', 'branch'], emptyHint: 'Pick a repository and branch first' } },
       { id: 'instructions', label: 'Instructions', type: 'textarea', placeholder: 'Constraints, acceptance criteria, implementation notes' },
       { id: 'commitMessage', label: 'Commit Message', type: 'text', placeholder: 'fix(scope): concise change summary' },
       { id: 'verificationStrings', label: 'Verification Strings', type: 'textarea', placeholder: 'One exact expected string per line', help: 'Use exact strings to verify the Codex commit actually landed.' },
@@ -115,8 +115,8 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     fields: [
       { id: 'objective', label: 'Objective', type: 'textarea', required: true, placeholder: 'What should Codex change?' },
       { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: DEFAULT_GITHUB_SLUG, source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
-      { id: 'branch', label: 'Branch', type: 'remote_select', required: true, defaultValue: 'main', source: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
-      { id: 'files', label: 'Selected Files', type: 'remote_select', source: { action: 'github.list_files', dataPath: 'files', valueKey: 'path', labelTemplate: '{path}', dependsOn: ['repo', 'branch'], emptyHint: 'Pick a repository and branch first' } },
+      { id: 'branch', label: 'Branch', type: 'remote_select', defaultValue: 'main', advanced: true, source: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
+      { id: 'files', label: 'Selected Files', type: 'remote_select', advanced: true, source: { action: 'github.list_files', dataPath: 'files', valueKey: 'path', labelTemplate: '{path}', dependsOn: ['repo', 'branch'], emptyHint: 'Pick a repository and branch first' } },
       { id: 'instructions', label: 'Instructions', type: 'textarea', placeholder: 'Constraints, acceptance criteria, implementation notes' },
       { id: 'commitMessage', label: 'Commit Message', type: 'text', placeholder: 'fix(scope): concise change summary' },
       { id: 'verificationStrings', label: 'Verification Strings', type: 'textarea', placeholder: 'One exact expected string per line', help: 'Use exact strings to verify the Codex commit actually landed.' },

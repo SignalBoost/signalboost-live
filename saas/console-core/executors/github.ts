@@ -127,15 +127,20 @@ registerExecutor({
   schema: schema('github.list_branches', 'List Branches', 'view', [REPO]),
   async run(_ctx, input) {
     const c = gh(input); if (!c.ok) return c
-    const res = await fetch(`${API}/repos/${c.owner}/${c.name}/branches?per_page=100`, { headers: c.headers })
-    if (!res.ok) return { ok: false, error: await errFrom(res) }
-    const data = await res.json(); const branches = (Array.isArray(data) ? data : []).sort((a: any, b: any) => {
+    const [repoRes, branchRes] = await Promise.all([
+      fetch(`${API}/repos/${c.owner}/${c.name}`, { headers: c.headers }),
+      fetch(`${API}/repos/${c.owner}/${c.name}/branches?per_page=100`, { headers: c.headers }),
+    ])
+    if (!branchRes.ok) return { ok: false, error: await errFrom(branchRes) }
+    const repoData = repoRes.ok ? await repoRes.json() : null
+    const defaultBranch = String(repoData?.default_branch || '')
+    const data = await branchRes.json(); const branches = (Array.isArray(data) ? data : []).sort((a: any, b: any) => {
       const rank = (name: string) => name === 'main' ? 0 : name.startsWith('ai/') ? 1 : 2
       const ar = rank(String(a.name || '')); const br = rank(String(b.name || ''))
       return ar === br ? String(a.name || '').localeCompare(String(b.name || '')) : ar - br
     })
     return { ok: true, message: `${branches.length} branch${branches.length === 1 ? '' : 'es'}`,
-      data: { count: branches.length, branches: branches.slice(0, 100).map((b: any) => ({ name: b.name, protected: b.protected })) } }
+      data: { count: branches.length, defaultBranch, branches: branches.slice(0, 100).map((b: any) => ({ name: b.name, protected: b.protected, default: defaultBranch === b.name })) } }
   },
 })
 

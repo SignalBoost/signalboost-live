@@ -42,6 +42,8 @@ export interface ActionField {
   label: string
   type: FieldType
   required?: boolean
+  /** Render in an optional advanced section when supported by the host UI. */
+  advanced?: boolean
   /** Static options for `select`. */
   options?: { label: string; value: string }[]
   /**

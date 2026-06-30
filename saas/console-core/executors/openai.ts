@@ -87,9 +87,9 @@ const CODEX_URL = 'https://chatgpt.com/codex/cloud'
 const TEXT_FIELD: ActionField['type'] = 'text'
 const DEFAULT_REPO = 'SignalBoost/signalboost-live'
 const GITHUB_REPO_FIELD: ActionField = { id: 'repo', label: 'Repository', type: 'remote_select', required: true, remoteSource: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } }
-const GITHUB_BRANCH_FIELD: ActionField = { id: 'branch', label: 'Branch', type: 'remote_select', required: true, remoteSource: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } }
+const GITHUB_BRANCH_FIELD: ActionField = { id: 'branch', label: 'Branch', type: 'remote_select', advanced: true, remoteSource: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } }
 const GITHUB_REF_FIELD: ActionField = { id: 'ref', label: 'Branch / Ref', type: 'remote_select', required: true, remoteSource: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } }
-const GITHUB_FILES_FIELD: ActionField = { id: 'files', label: 'Selected Files', type: 'remote_select', remoteSource: { action: 'github.list_files', dataPath: 'files', valueKey: 'path', labelTemplate: '{path}', dependsOn: ['repo', 'branch'], emptyHint: 'Pick a repository and branch first' } }
+const GITHUB_FILES_FIELD: ActionField = { id: 'files', label: 'Selected Files', type: 'remote_select', advanced: true, remoteSource: { action: 'github.list_files', dataPath: 'files', valueKey: 'path', labelTemplate: '{path}', dependsOn: ['repo', 'branch'], emptyHint: 'Pick a repository and branch first' } }
 const GITHUB_FILE_PATH_FIELD: ActionField = { id: 'filePath', label: 'File Path', type: 'remote_select', required: true, remoteSource: { action: 'github.list_files', dataPath: 'files', valueKey: 'path', labelTemplate: '{path}', dependsOn: ['repo', 'ref'], emptyHint: 'Pick a repository and ref first' } }
 const GITHUB_EXPECTED_FILE_FIELD: ActionField = { id: 'expectedFile', label: 'Expected File', type: 'remote_select', remoteSource: { action: 'github.list_files', dataPath: 'files', valueKey: 'path', labelTemplate: '{path}', dependsOn: ['repo', 'branch'], emptyHint: 'Pick a repository and branch first' } }
 const GITHUB_PR_FIELD: ActionField = { id: 'prNumber', label: 'Pull Request', type: 'remote_select', remoteSource: { action: 'github.list_prs', dataPath: 'pulls', valueKey: 'number', labelTemplate: '#{number} — {title} ({branch}, {state})', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } }
@@ -109,13 +109,12 @@ function codexPrompt(input: Record<string, unknown>): string {
   const files = lines(input.files)
   const checks = lines(input.verificationStrings)
   return [
-    `Repo: ${String(input.repo || DEFAULT_REPO).trim()}`,
-    `Target branch: ${String(input.branch || 'main').trim()}`,
+    `Repository: ${String(input.repo || DEFAULT_REPO).trim()}`,
+    `Branch: ${String(input.branch || 'main').trim()}`,
     '',
+    ...(files.length ? [`Files:\n${files.map(f => `- ${f}`).join('\n')}`, ''] : []),
     'Objective:',
     String(input.objective || '').trim(),
-    '',
-    files.length ? `Relevant files:\n${files.map(f => `- ${f}`).join('\n')}` : 'Relevant files: Not specified.',
     '',
     'Instructions:',
     String(input.instructions || '').trim() || 'Follow the repository conventions. Do not touch unrelated providers or files.',

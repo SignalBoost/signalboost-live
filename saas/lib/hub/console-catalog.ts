@@ -195,12 +195,14 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
   {
     id: 'namecheap',
     name: 'Namecheap',
-    subtitle: 'DOMAINS & DNS',
+    subtitle: 'REGISTRAR ONLY — DNS BLOCKED',
     accent: '#de3723',
     tier: 'tier2',
     sections: [
-      { title: 'DNS', templateIds: ['namecheap.list_dns_records', 'namecheap.add_dns_record', 'namecheap.delete_dns_record'] },
-      { title: 'Email Setup', templateIds: ['namecheap.setup_resend_dns'] }
+      {
+        title: '⚠️ DNS actions unavailable',
+        templateIds: ['namecheap.list_dns_records', 'namecheap.add_dns_record', 'namecheap.delete_dns_record', 'namecheap.setup_resend_dns']
+      }
     ]
   },
   {

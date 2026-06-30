@@ -261,3 +261,11 @@ export async function publishSocialPost(payload: SocialPostPayload): Promise<{ o
     return failed(`${payload.platform}_error:${err instanceof Error ? err.message : 'publish_failed'}`)
   }
 }
+
+// Public token-refresh helper for stored OAuth2 tokens. Uses each adapter's
+// configured tokenUrl; throws an honest error if the platform isn't refreshable here.
+export async function refreshSocialToken(platform: SocialPlatform, refreshToken: string): Promise<string> {
+  const adapter = ADAPTERS[platform]
+  if (!adapter?.tokenUrl) throw new Error(`${platform} does not support token refresh`)
+  return refreshOAuth2(platform, adapter.tokenUrl, refreshToken)
+}

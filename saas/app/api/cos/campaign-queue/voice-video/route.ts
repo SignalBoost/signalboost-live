@@ -1,12 +1,13 @@
 // saas/app/api/cos/campaign-queue/voice-video/route.ts
-// Owner-gated managed voice pass for COS campaign videos. It creates narration
-// with ElevenLabs and starts a fal.ai compose job against the latest approved
-// campaign render; status is stored in campaign metadata for review.
+// Owner-triggered: take a campaign's ready (Kling) video and add spoken voiceover
+// of the script via ElevenLabs + fal merge. Writes the voiced URL back to the
+// campaign. Publishing still gated and will prefer the voiced video.
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
-import { startManagedVoiceVideo } from '@/lib/cos/video-voice'
+import { addVoiceToCampaignVideo } from '@/lib/cos/video-voice'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 300
 
 export async function POST(req: NextRequest) {
   const ctx = await requireAdmin()
@@ -15,43 +16,33 @@ export async function POST(req: NextRequest) {
   let body: any = {}
   try { body = await req.json() } catch {}
   const id = String(body?.id || body?.campaign_id || '').trim()
+  const lang = String(body?.language || 'en').trim() || 'en'
   if (!id) return NextResponse.json({ ok: false, error: 'campaign_id is required' }, { status: 400 })
 
   const { data: campaign, error } = await ctx.admin.from('cos_campaign_queue').select('*').eq('id', id).single()
   if (error || !campaign) return NextResponse.json({ ok: false, error: error?.message || 'Campaign not found' }, { status: 404 })
 
-  const language = body?.language ? String(body.language) : undefined
-  const started = await startManagedVoiceVideo({
-    campaign,
-    language,
-    videoUrl: body?.videoUrl ? String(body.videoUrl) : undefined,
-    voiceId: body?.voiceId ? String(body.voiceId) : undefined,
-    narration: body?.narration ? String(body.narration) : undefined,
-  })
-  if (!started.ok) return NextResponse.json({ ok: false, error: (started as { ok: false; error: string }).error }, { status: 502 })
-
-  const startedAt = new Date().toISOString()
-  const metadata = {
-    ...(campaign.metadata || {}),
-    voiceVideo: {
-      status: 'rendering',
-      requestId: started.requestId,
-      model: started.model,
-      voiceId: started.voiceId,
-      language: language || null,
-      started_at: startedAt,
-    },
+  if (campaign?.metadata?.video?.status !== 'ready' || !campaign?.metadata?.video?.url) {
+    return NextResponse.json({ ok: false, error: 'Render a video first; no ready video found.' }, { status: 400 })
   }
-  await ctx.admin.from('cos_campaign_queue').update({ metadata }).eq('id', id)
+
+  const r = await addVoiceToCampaignVideo(campaign, lang)
+  if (!r.ok) return NextResponse.json({ ok: false, error: r.error || 'voice compose failed' }, { status: 502 })
+
+  const v = campaign.metadata.video
+  const voiced = { ...((v && v.voiced) || {}), [lang]: r.url }
+  await ctx.admin.from('cos_campaign_queue').update({
+    metadata: { ...(campaign.metadata || {}), video: { ...v, voiced, voicedUrl: r.url } },
+  }).eq('id', id)
 
   await auditAdminAction({
     admin: ctx.admin,
     actorId: ctx.user.id,
-    action: 'cos_campaign.voice_video_started',
+    action: 'cos_campaign.voice_video',
     targetType: 'cos_campaign_queue',
     targetId: id,
-    metadata: { requestId: started.requestId, language: language || null, voiceId: started.voiceId },
+    metadata: { language: lang },
   })
 
-  return NextResponse.json({ ok: true, status: 'rendering', requestId: started.requestId })
+  return NextResponse.json({ ok: true, url: r.url, language: lang })
 }

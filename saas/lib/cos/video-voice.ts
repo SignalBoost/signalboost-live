@@ -1,16 +1,25 @@
 // saas/lib/cos/video-voice.ts
-// Adds a real spoken voiceover to a campaign's rendered (Kling) video, fully
-// managed: ElevenLabs TTS of the script → upload → fal ffmpeg merge-audio-video.
-// Runs entirely from Vercel; no self-hosted FFmpeg worker. Captions are added in
-// a follow-up step (fal compose with an SRT track).
+// Adds a real spoken voiceover to a campaign's rendered (Kling) video AND
+// stretches the short clip to match the narration (up to ~60s), fully managed:
 //
-// tsconfig non-strict: flat results; never throws to callers.
+//   ElevenLabs TTS  ->  base64 data URI  ->  fal ffmpeg "compose" timeline
+//     • video track: the ~5s Kling clip looped to cover the narration length
+//     • audio track: the narration voiceover
+//
+// Runs entirely from Vercel — no self-hosted FFmpeg and no storage bucket
+// (the audio is handed to fal as a base64 data URI, so nothing is uploaded).
+// Captions are a separate follow-up step (a subtitle track on the same compose).
+//
+// tsconfig non-strict: flat { ok, error? } results; never throws to callers.
 
-import { createClient } from '@supabase/supabase-js'
 import { fal } from '@fal-ai/client'
 import { generateSpeech } from '@/lib/elevenlabs/client'
 
-const RENDER_BUCKET = 'video-renders'
+const COMPOSE_MODEL = 'fal-ai/ffmpeg-api/compose'
+const METADATA_MODEL = 'fal-ai/ffmpeg-api/metadata'
+const CLIP_MS = 5000        // Kling v3 standard renders ~5s clips
+const MIN_TOTAL_MS = 6000   // floor so a one-line VO still has room
+const MAX_TOTAL_MS = 60000  // cap the final video at one minute
 
 // Curated ElevenLabs voices per language (multilingual model handles all five).
 const VOICE_BY_LANG: Record<string, string> = {
@@ -21,28 +30,73 @@ const VOICE_BY_LANG: Record<string, string> = {
   ru: 'z9fAnlkpzviPz146aGWa',
 }
 
-function db() {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-    auth: { persistSession: false },
-  })
-}
-
 let falConfigured = false
 function ensureFal() {
   if (!falConfigured) { fal.config({ credentials: process.env.FAL_KEY }); falConfigured = true }
 }
 
-// Concise narration that fits a short promo clip. Uses the per-language draft's
-// title, falling back to campaign fields. Kept short so the voice matches the clip.
+// Build a spoken script from the per-language draft. Long enough to fill up to a
+// minute, but capped on a sentence boundary so it never overruns the clip.
 function narrationFor(campaign: any, lang: string): string {
   const items = Array.isArray(campaign.work_items) ? campaign.work_items : []
-  const match = items.find((it: any) => it?.input?.language === lang && it?.output) || items.find((it: any) => it?.output)
+  const match =
+    items.find((it: any) => it?.input?.language === lang && it?.output) ||
+    items.find((it: any) => it?.output)
   const o = (match && match.output) || {}
-  const base = String(o.title || campaign.title || campaign.objective || 'SignalBoost helps your business grow.')
-  return base.replace(/\s+/g, ' ').trim().slice(0, 240)
+  const parts = [o.title, o.opening, o.draft, o.call_to_action]
+    .map((v: any) => String(v || '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+  let text = parts.join('. ').replace(/\.\s*\.+/g, '.').replace(/\s+/g, ' ').trim()
+  if (!text) text = String(campaign.title || campaign.objective || 'SignalBoost helps your business grow faster.')
+  // ~150 wpm -> ~150 words / ~820 chars is close to 60s. Trim on a boundary.
+  if (text.length > 820) {
+    text = text.slice(0, 820)
+    const cut = Math.max(text.lastIndexOf('. '), text.lastIndexOf('! '), text.lastIndexOf('? '))
+    if (cut > 400) text = text.slice(0, cut + 1)
+  }
+  return text
 }
 
-export async function addVoiceToCampaignVideo(campaign: any, lang: string = 'en'): Promise<{ ok: boolean; url?: string; error?: string }> {
+// Rough fallback if fal metadata is unavailable: ~150 wpm, padded 15% so the
+// audio is never cut (a short silent tail is fine; a clipped VO is not).
+function estimateMs(text: string): number {
+  const words = text.split(/\s+/).filter(Boolean).length
+  return Math.round((words / 2.5) * 1000 * 1.15)
+}
+
+// Read the real audio duration (seconds) from fal metadata; fall back to estimate.
+async function probeAudioMs(dataUri: string, fallbackMs: number): Promise<number> {
+  try {
+    const r: any = await fal.subscribe(METADATA_MODEL, { input: { media_url: dataUri } })
+    const d = r?.data || {}
+    const sec =
+      d?.media?.duration ??
+      d?.duration ??
+      d?.audio?.duration ??
+      (Array.isArray(d?.streams) ? d.streams.find((s: any) => s?.duration)?.duration : undefined)
+    const ms = Number(sec) * 1000
+    if (Number.isFinite(ms) && ms > 500) return ms
+  } catch {}
+  return fallbackMs
+}
+
+// Tile the short clip across [0, totalMs); the last keyframe is truncated so the
+// video length matches the voice exactly.
+function buildVideoKeyframes(url: string, totalMs: number) {
+  const frames: { timestamp: number; duration: number; url: string }[] = []
+  let t = 0
+  while (t < totalMs) {
+    const dur = Math.min(CLIP_MS, totalMs - t)
+    frames.push({ timestamp: t, duration: dur, url })
+    t += dur
+  }
+  return frames
+}
+
+export async function addVoiceToCampaignVideo(
+  campaign: any,
+  lang: string = 'en'
+): Promise<{ ok: boolean; url?: string; error?: string }> {
   try {
     const videoUrl = campaign?.metadata?.video?.url
     if (!videoUrl) return { ok: false, error: 'No rendered video to voice.' }
@@ -50,26 +104,30 @@ export async function addVoiceToCampaignVideo(campaign: any, lang: string = 'en'
     const voiceId = VOICE_BY_LANG[lang] || VOICE_BY_LANG.en
     const text = narrationFor(campaign, lang)
 
-    // 1) Text → speech (mp3 bytes)
+    // 1) Text -> speech (mp3 bytes) -> base64 data URI (no storage bucket needed).
     let audio: ArrayBuffer
-    try { audio = await generateSpeech({ text, voiceId }) } catch (e: any) { return { ok: false, error: `TTS failed: ${e?.message || 'unknown'}` } }
+    try {
+      audio = await generateSpeech({ text, voiceId })
+    } catch (e: any) {
+      return { ok: false, error: `TTS failed: ${e?.message || 'unknown'}` }
+    }
+    const audioDataUri = `data:audio/mpeg;base64,${Buffer.from(audio).toString('base64')}`
 
-    // 2) Upload mp3 and sign a URL fal can fetch
-    const sb = db()
-    const path = `cos-voice/${campaign.id}/${lang}-${Date.now()}.mp3`
-    const up = await sb.storage.from(RENDER_BUCKET).upload(path, Buffer.from(audio), { contentType: 'audio/mpeg', upsert: true })
-    if (up.error) return { ok: false, error: `audio upload failed: ${up.error.message}` }
-    const signed = await sb.storage.from(RENDER_BUCKET).createSignedUrl(path, 60 * 60 * 6)
-    const audioUrl = signed.data?.signedUrl
-    if (!audioUrl) return { ok: false, error: 'could not sign audio url' }
-
-    // 3) Merge audio + video via fal (managed FFmpeg)
     ensureFal()
-    const result: any = await fal.subscribe('fal-ai/ffmpeg-api/merge-audio-video', {
-      input: { video_url: String(videoUrl), audio_url: audioUrl },
-    })
-    const out = result?.data?.video?.url
-    if (!out) return { ok: false, error: 'merge returned no video url' }
+
+    // 2) Decide final length from the real narration duration, capped at one minute.
+    const fallbackMs = Math.min(Math.max(estimateMs(text), MIN_TOTAL_MS), MAX_TOTAL_MS)
+    const audioMs = await probeAudioMs(audioDataUri, fallbackMs)
+    const totalMs = Math.min(Math.max(Math.ceil(audioMs), MIN_TOTAL_MS), MAX_TOTAL_MS)
+
+    // 3) Compose: loop the short clip across the timeline, lay the voice on top.
+    const tracks = [
+      { id: 'video', type: 'video', keyframes: buildVideoKeyframes(String(videoUrl), totalMs) },
+      { id: 'voice', type: 'audio', keyframes: [{ timestamp: 0, duration: totalMs, url: audioDataUri }] },
+    ]
+    const result: any = await fal.subscribe(COMPOSE_MODEL, { input: { tracks } })
+    const out = result?.data?.video_url || result?.data?.video?.url
+    if (!out) return { ok: false, error: 'compose returned no video url' }
     return { ok: true, url: String(out) }
   } catch (e: any) {
     return { ok: false, error: e?.message || 'voice compose failed' }

@@ -69,6 +69,9 @@ const REPO: ActionField = { id: 'repo', label: 'Repository', type: 'remote_selec
 const PR_NUM: ActionField = { id: 'number', label: 'Pull Request', type: 'remote_select', required: true, remoteSource: { action: 'github.list_prs', dataPath: 'pulls', valueKey: 'number', labelTemplate: '#{number} — {title} ({branch}, {state})', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } }
 const ISSUE_NUM: ActionField = { id: 'number', label: 'Issue', type: 'remote_select', required: true, remoteSource: { action: 'github.list_issues', dataPath: 'issues', valueKey: 'number', labelTemplate: '#{number} — {title}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } }
 const BRANCH: ActionField = { id: 'branch', label: 'Branch', type: 'remote_select', required: true, remoteSource: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } }
+const BASE_BRANCH: ActionField = { id: 'from', label: 'Base branch', type: 'remote_select', required: true, remoteSource: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } }
+const REF: ActionField = { id: 'ref', label: 'Branch / Ref', type: 'remote_select', required: true, remoteSource: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } }
+const WORKFLOW: ActionField = { id: 'workflowId', label: 'Workflow', type: 'remote_select', required: true, remoteSource: { action: 'github.list_workflows', dataPath: 'workflows', valueKey: 'id', labelTemplate: '{name} — {path}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } }
 
 const schema = (id: string, label: string, verb: string, fields: ActionField[]): ActionSchema => ({ id, label, verb, fields })
 
@@ -177,14 +180,48 @@ registerExecutor({
 
 registerExecutor({
   providerId: 'github', actionId: 'list_commits', policyActionId: 'read_provider_status',
-  schema: schema('github.list_commits', 'Recent Commits', 'view', [REPO]),
+  schema: schema('github.list_commits', 'Recent Commits', 'view', [REPO, { ...REF, required: false }]),
   async run(_ctx, input) {
     const c = gh(input); if (!c.ok) return c
-    const res = await fetch(`${API}/repos/${c.owner}/${c.name}/commits?per_page=20`, { headers: c.headers })
+    const sha = String(input.ref || input.branch || '').trim()
+    const qs = sha ? `?sha=${encodeURIComponent(sha)}&per_page=20` : '?per_page=20'
+    const res = await fetch(`${API}/repos/${c.owner}/${c.name}/commits${qs}`, { headers: c.headers })
     if (!res.ok) return { ok: false, error: await errFrom(res) }
     const data = await res.json(); const commits = Array.isArray(data) ? data : []
     return { ok: true, message: `${commits.length} recent commit${commits.length === 1 ? '' : 's'}`,
       data: { count: commits.length, commits: commits.slice(0, 20).map((cm: any) => ({ sha: String(cm.sha || '').slice(0, 7), message: String(cm.commit?.message || '').split('\n')[0].slice(0, 100), author: cm.commit?.author?.name, date: cm.commit?.author?.date })) } }
+  },
+})
+
+registerExecutor({
+  providerId: 'github', actionId: 'list_workflows', policyActionId: 'read_provider_status',
+  schema: schema('github.list_workflows', 'List Workflows', 'view', [REPO]),
+  async run(_ctx, input) {
+    const c = gh(input); if (!c.ok) return c
+    const res = await fetch(`${API}/repos/${c.owner}/${c.name}/actions/workflows?per_page=100`, { headers: c.headers })
+    if (!res.ok) return { ok: false, error: await errFrom(res) }
+    const data = await res.json()
+    const workflows = Array.isArray(data?.workflows) ? data.workflows : []
+    return { ok: true, message: `${workflows.length} workflow${workflows.length === 1 ? '' : 's'}`,
+      data: { count: workflows.length, workflows: workflows.map((w: any) => ({ id: String(w.id || w.path || ''), name: w.name, path: w.path, state: w.state })) } }
+  },
+})
+
+registerExecutor({
+  providerId: 'github', actionId: 'list_workflow_runs', policyActionId: 'read_provider_status',
+  schema: schema('github.list_workflow_runs', 'List Workflow Runs', 'view', [REPO, { ...WORKFLOW, required: false }]),
+  async run(_ctx, input) {
+    const c = gh(input); if (!c.ok) return c
+    const workflowId = String(input.workflowId || '').trim()
+    const path = workflowId
+      ? `/repos/${c.owner}/${c.name}/actions/workflows/${encodeURIComponent(workflowId)}/runs?per_page=20`
+      : `/repos/${c.owner}/${c.name}/actions/runs?per_page=20`
+    const res = await fetch(`${API}${path}`, { headers: c.headers })
+    if (!res.ok) return { ok: false, error: await errFrom(res) }
+    const data = await res.json()
+    const runs = Array.isArray(data?.workflow_runs) ? data.workflow_runs : []
+    return { ok: true, message: `${runs.length} workflow run${runs.length === 1 ? '' : 's'}`,
+      data: { count: runs.length, runs: runs.map((r: any) => ({ id: r.id, name: r.name, branch: r.head_branch, status: r.status, conclusion: r.conclusion, event: r.event, created_at: r.created_at, url: r.html_url })) } }
   },
 })
 
@@ -197,11 +234,33 @@ registerExecutor({
     if (!res.ok) return { ok: false, error: await errFrom(res) }
     const data = await res.json(); const issues = (Array.isArray(data) ? data : []).filter((i: any) => !i.pull_request)
     return { ok: true, message: `${issues.length} open issue${issues.length === 1 ? '' : 's'}`,
-      data: { count: issues.length, issues: issues.slice(0, 30).map((i: any) => ({ number: i.number, title: i.title, url: i.html_url })) } }
+      data: { count: issues.length, issues: issues.slice(0, 30).map((i: any) => ({ number: i.number, title: i.title, state: i.state, url: i.html_url })) } }
   },
 })
 
 // ---- WRITES ----
+registerExecutor({
+  providerId: 'github', actionId: 'create_repo', policyActionId: 'crud_actions',
+  schema: schema('github.create_repo', 'Create Repository', 'create', [
+    { id: 'name', label: 'Repository name', type: 'text', required: true },
+    { id: 'private', label: 'Private', type: 'boolean' },
+    { id: 'description', label: 'Description', type: 'text' },
+  ]),
+  async run(_ctx, input) {
+    const c = gh({ repo: 'placeholder/placeholder' }); if (!c.ok) return c
+    const name = String(input.name || '').trim()
+    if (!name) return { ok: false, error: 'Repository name is required' }
+    const res = await fetch(`${API}/user/repos`, {
+      method: 'POST',
+      headers: { ...c.headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, private: Boolean(input.private), description: String(input.description || '') }),
+    })
+    if (!res.ok) return { ok: false, error: await errFrom(res) }
+    const data = await res.json()
+    return { ok: true, message: `Repository created: ${data.full_name}`, data: { name: data.full_name, url: data.html_url } }
+  },
+})
+
 registerExecutor({
   providerId: 'github', actionId: 'open_issue', policyActionId: 'crud_actions',
   schema: schema('github.open_issue', 'Open Issue', 'create', [REPO, { id: 'title', label: 'Title', type: 'text', required: true }, { id: 'body', label: 'Description', type: 'text' }]),
@@ -283,6 +342,47 @@ registerExecutor({
     const res = await fetch(`${API}/repos/${c.owner}/${c.name}/git/refs/heads/${ref}`, { method: 'DELETE', headers: c.headers })
     if (res.status !== 204) return { ok: false, error: `GitHub error (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}` }
     return { ok: true, message: `Branch deleted: ${branch}`, data: { branch } }
+  },
+})
+
+registerExecutor({
+  providerId: 'github', actionId: 'create_branch', policyActionId: 'crud_actions',
+  schema: schema('github.create_branch', 'Create Branch', 'create', [REPO, { id: 'branch', label: 'New branch name', type: 'text', required: true }, BASE_BRANCH]),
+  async run(_ctx, input) {
+    const c = gh(input); if (!c.ok) return c
+    const branch = String(input.branch || '').trim()
+    const from = String(input.from || 'main').trim()
+    if (!branch) return { ok: false, error: 'New branch name is required' }
+    const baseRes = await fetch(`${API}/repos/${c.owner}/${c.name}/git/ref/heads/${from.split('/').map(encodeURIComponent).join('/')}`, { headers: c.headers })
+    if (!baseRes.ok) return { ok: false, error: await errFrom(baseRes) }
+    const base = await baseRes.json()
+    const sha = base?.object?.sha
+    if (!sha) return { ok: false, error: `Could not resolve base branch ${from}` }
+    const res = await fetch(`${API}/repos/${c.owner}/${c.name}/git/refs`, {
+      method: 'POST',
+      headers: { ...c.headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ref: `refs/heads/${branch}`, sha }),
+    })
+    if (!res.ok) return { ok: false, error: await errFrom(res) }
+    return { ok: true, message: `Branch created: ${branch}`, data: { branch, from, sha } }
+  },
+})
+
+registerExecutor({
+  providerId: 'github', actionId: 'trigger_workflow', policyActionId: 'crud_actions',
+  schema: schema('github.trigger_workflow', 'Trigger Workflow', 'create', [REPO, WORKFLOW, REF]),
+  async run(_ctx, input) {
+    const c = gh(input); if (!c.ok) return c
+    const workflowId = String(input.workflowId || '').trim()
+    const ref = String(input.ref || 'main').trim()
+    if (!workflowId) return { ok: false, error: 'Workflow is required' }
+    const res = await fetch(`${API}/repos/${c.owner}/${c.name}/actions/workflows/${encodeURIComponent(workflowId)}/dispatches`, {
+      method: 'POST',
+      headers: { ...c.headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ref }),
+    })
+    if (res.status !== 204) return { ok: false, error: await errFrom(res) }
+    return { ok: true, message: `Workflow dispatched on ${ref}`, data: { workflowId, ref } }
   },
 })
 

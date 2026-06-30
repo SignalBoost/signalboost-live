@@ -358,7 +358,7 @@ function FormField({ templateId, field, value, allValues, error, onChange }: For
   const useVercelEnvPicker = templateId === 'vercel.delete_env' && field.id === 'id'
 
   const renderInput = () => {
-    if (field.type === 'remote_select' && field.source) {
+    if (field.type === 'remote_select' && (field.source || field.liveOptions)) {
       return <RemoteSelect field={field} allValues={allValues} value={value} onChange={onChange} error={error} />
     }
     if (useStripeProductPicker) {
@@ -773,7 +773,8 @@ function RemoteSelect({
   allValues: Record<string, unknown>
 }) {
   const { t } = useTranslation()
-  const source = field.source!
+  const source = field.source || liveOptionsToSource(field)
+  if (!source) return null
   const deps = source.dependsOn || []
   const depValues = deps.map(d => String(allValues?.[d] ?? ''))
   const depsReady = deps.every((_d, i) => depValues[i] !== '')
@@ -864,10 +865,28 @@ function RemoteSelect({
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </datalist>
       {loadError && <div style={{ fontSize: 11, color: 'rgba(239,68,68,.85)', marginTop: 4 }}>⚠️ {loadError}</div>}
-      {!loading && !loadError && options.length > 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 4 }}>Search live provider values; type manually only if the live value is unavailable.</div>}
+      {!loading && !loadError && options.length > 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 4 }}>{source.action.startsWith('github.') ? 'Search live GitHub values.' : 'Search live provider values.'}</div>}
       {!loading && !loadError && options.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 4 }}>{t('console.cui.nothing_to_select', 'Nothing to select here yet. Fallback manual entry is enabled.')}</div>}
     </div>
   )
+}
+
+function liveOptionsToSource(field: ProviderFormField): ProviderFormField['source'] | null {
+  const live = field.liveOptions
+  if (!live) return null
+  if (live.provider === 'github') {
+    const map: Record<string, { action: string; dataPath: string; valueKey: string; labelTemplate: string; emptyHint?: string }> = {
+      repositories: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' },
+      branches: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', emptyHint: 'Pick a repository first' },
+      pullRequests: { action: 'github.list_prs', dataPath: 'pulls', valueKey: 'number', labelTemplate: '#{number} — {title} ({branch}, {state})', emptyHint: 'Pick a repository first' },
+      issues: { action: 'github.list_issues', dataPath: 'issues', valueKey: 'number', labelTemplate: '#{number} — {title} ({state})', emptyHint: 'Pick a repository first' },
+      workflows: { action: 'github.list_workflows', dataPath: 'workflows', valueKey: 'id', labelTemplate: '{name} — {path}', emptyHint: 'Pick a repository first' },
+      files: { action: 'github.list_files', dataPath: 'files', valueKey: 'path', labelTemplate: '{path}', emptyHint: 'Pick a repository and branch first' },
+    }
+    const mapped = map[live.source]
+    if (mapped) return { ...mapped, dependsOn: live.dependsOn }
+  }
+  return null
 }
 
 function ResultView({ data }: { data: any }) {

@@ -28,6 +28,14 @@ export interface ProviderFormField {
     dependsOn?: string[]
     emptyHint?: string
   }
+  liveOptions?: {
+    provider: 'github' | string
+    source: 'repositories' | 'branches' | 'pullRequests' | 'issues' | 'workflows' | 'files' | string
+    dependsOn?: string[]
+    labelField?: string
+    valueField?: string
+    searchFields?: string[]
+  }
   options?: { label: string; value: string }[]
 }
 

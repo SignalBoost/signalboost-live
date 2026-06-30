@@ -716,6 +716,12 @@ function EmbeddedVercelEnvList() {
   )
 }
 
+function remoteLoadErrorMessage(action: string): string {
+  return action.startsWith('github.')
+    ? 'Live GitHub values unavailable — manual fallback enabled.'
+    : 'Could not load live options; fallback manual entry is enabled.'
+}
+
 function interpolateLabel(tpl: string, item: any): string {
   return String(tpl).replace(/\{(\w+)\}/g, (_m, k) => {
     const v = item?.[k]
@@ -767,7 +773,7 @@ function RemoteSelect({
       .then(res => {
         if (!active) return
         if (!res?.ok) {
-          setLoadError(res?.error || 'Could not load live options; fallback manual entry is enabled.')
+          setLoadError(res?.error || remoteLoadErrorMessage(source.action))
           setOptions([])
           return
         }
@@ -778,13 +784,21 @@ function RemoteSelect({
           label: interpolateLabel(source.labelTemplate, it),
         })).filter(o => o.value)
         setOptions(opts)
-        if (deps.length > 0) {
-          const cur = String(value ?? '')
-          if (cur && !opts.some(o => o.value === cur)) onChange('')
+        const cur = String(value ?? '')
+        const defaultValue = field.defaultValue === undefined ? '' : String(field.defaultValue)
+        const hasCurrent = cur ? opts.some(o => o.value === cur) : false
+        const hasDefault = defaultValue ? opts.some(o => o.value === defaultValue) : false
+
+        if (!cur && hasDefault) {
+          onChange(defaultValue)
+        } else if (cur && !hasCurrent && cur === defaultValue) {
+          onChange('')
+        } else if (deps.length > 0 && cur && !hasCurrent) {
+          onChange('')
         }
       })
       .catch(() => {
-        if (active) setLoadError('Could not load live options; fallback manual entry is enabled.')
+        if (active) setLoadError(remoteLoadErrorMessage(source.action))
       })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }

@@ -9,6 +9,10 @@
       "schedule": "*/30 * * * *"
     },
     {
+      "path": "/api/cron/cos-video-poll",
+      "schedule": "*/2 * * * *"
+    },
+    {
       "path": "/api/cron/cyber-dependency-monitor",
       "schedule": "15 8 * * *"
     },

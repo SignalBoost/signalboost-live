@@ -148,7 +148,8 @@ export const CONSOLE_PROVIDERS: ConsoleProvider[] = [
       { title: 'Files', templateIds: ['openai.list_files'] },
       { title: 'Jobs', templateIds: ['openai.list_fine_tunes', 'openai.list_batches'] },
       { title: 'Testing & Usage', templateIds: ['openai.test_completion', 'openai.view_usage'] },
-      { title: 'Files', templateIds: ['openai.list_files', 'openai.delete_file'] }
+      { title: 'Files', templateIds: ['openai.list_files', 'openai.delete_file'] },
+      { title: 'Codex Cloud', templateIds: ['openai.codex_open_cloud', 'openai.codex_generate_prompt', 'openai.codex_save_handoff', 'openai.codex_track_github_result', 'openai.codex_verify_result'] }
     ]
   },
 

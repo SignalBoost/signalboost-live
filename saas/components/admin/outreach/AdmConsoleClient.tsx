@@ -372,7 +372,13 @@ export default function AdmConsoleClient() {
       body: JSON.stringify({ outreach_id: selected.id, channel: sendEmail ? 'email' : 'manual', to_email: sendEmail || undefined }),
     })
     const json = await res.json()
-    setMessage(res.ok ? t$(t.sendRecorded) : json.error || t$(t.sendFailed))
+    if (res.ok) {
+      const mode = String(json?.providerResult?.mode || '')
+      const reallyEmailed = mode !== '' && mode !== 'manual_record_only'
+      setMessage(reallyEmailed ? `✅ Email sent (${mode}).` : '⚠️ Recorded only — no email was sent (no recipient address or manual channel).')
+    } else {
+      setMessage(json.error || t$(t.sendFailed))
+    }
     setBusy(false)
     await load()
   }

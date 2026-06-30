@@ -1,12 +1,11 @@
-// saas/app/api/cos/script-worker/batch/route.ts
-// Submits a multilingual, platform-aware campaign-copy generation BATCH (OpenAI,
-// flat 50% Batch discount). One request per REQUESTED language. Results are
-// written back later by the batch-poll cron via applyCampaignCopyOutputs.
-// Publishing stays owner-gated; this only prepares review-ready drafts.
+// saas/app/api/cos/script-worker/route.ts
+// Single-item, instant draft worker (deterministic template). Used by the COS
+// cockpit "Generate Draft" button. For multilingual, platform-aware, batch copy
+// see saas/app/api/cos/script-worker/batch/route.ts.
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
-import { submitBatch } from '@/lib/ai/batch/openaiBatch'
-import { buildCampaignCopyRequests } from '@/lib/cos/script-worker/batchGenerator'
+import { generateContentDraft } from '@/lib/cos/script-worker'
+import type { CosContentWorkerInput } from '@/lib/cos/script-worker'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,38 +35,57 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Campaign is not in a draftable state.' }, { status: 400 })
   }
 
-  const requests = buildCampaignCopyRequests(campaign)
-  if (!requests.length) {
-    return NextResponse.json({ ok: false, error: 'Campaign has no requested languages to generate.' }, { status: 400 })
+  const workItems = Array.isArray(campaign.work_items) ? campaign.work_items : []
+  const firstWorkItem = workItems[0]
+  const input: CosContentWorkerInput = {
+    campaign_id: campaign.id,
+    recommendation_id: campaign.recommendation_id,
+    title: campaign.title,
+    objective: campaign.objective,
+    channel: campaign.channel,
+    audience: campaign.audience,
+    language: firstWorkItem?.input?.language || 'en',
+    brief: firstWorkItem?.input?.brief || 'Create a concise review-ready campaign draft. Keep publishing, sending, and spending behind owner approval.',
   }
 
-  const submitted = await submitBatch('campaign_copy', requests, { campaign_id: campaign.id })
-  if (!submitted.ok) {
-    return NextResponse.json({ ok: false, error: submitted.error || 'Failed to submit batch.' }, { status: 500 })
-  }
-
+  const output = generateContentDraft(input)
   const timestamp = new Date().toISOString()
-  const languages = requests.map((r) => r.custom_id.split('::')[1])
+  const nextWorkItems = workItems.length
+    ? workItems.map((item: any, index: number) => index === 0 ? { ...item, status: 'completed', output, updated_at: timestamp } : item)
+    : [{ id: `work_content_${Date.now()}`, kind: 'script_worker', status: 'completed', input, output, created_at: timestamp, updated_at: timestamp }]
 
   const metadata = {
     ...(campaign.metadata || {}),
-    last_worker: 'campaign_copy_batch',
-    batch_job_id: submitted.jobId,
-    batch_submitted_at: timestamp,
-    languages_pending: languages,
+    last_worker: 'script_worker',
+    last_worker_completed_at: timestamp,
+    visible_output: 'review_ready_campaign_draft',
+    owner_light_review: true,
     publishing_gate: 'locked_until_owner_approval',
   }
 
-  await ctx.admin.from('cos_campaign_queue').update({ metadata }).eq('id', campaign.id)
+  const nextStatus = campaign.status === 'approved' ? 'queued' : campaign.status
+
+  const { data: updated, error: updateError } = await ctx.admin
+    .from('cos_campaign_queue')
+    .update({
+      status: nextStatus,
+      work_items: nextWorkItems,
+      metadata,
+    })
+    .eq('id', campaign.id)
+    .select('*')
+    .single()
+
+  if (updateError) return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 })
 
   await auditAdminAction({
     admin: ctx.admin,
     actorId: ctx.user.id,
-    action: 'cos_script_worker.batch_copy_submitted',
+    action: 'cos_script_worker.review_draft_completed',
     targetType: 'cos_campaign_queue',
     targetId: campaign.id,
-    metadata: { channel: campaign.channel, languages, batch_job_id: submitted.jobId },
+    metadata: { recommendation_id: campaign.recommendation_id, channel: campaign.channel, original_status: campaign.status, next_status: nextStatus },
   })
 
-  return NextResponse.json({ ok: true, batchJob: submitted.jobId, languages })
+  return NextResponse.json({ ok: true, campaign: updated, output })
 }

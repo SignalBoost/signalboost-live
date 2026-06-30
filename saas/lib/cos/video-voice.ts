@@ -17,6 +17,8 @@ import { generateSpeech } from '@/lib/elevenlabs/client'
 
 const COMPOSE_MODEL = 'fal-ai/ffmpeg-api/compose'
 const METADATA_MODEL = 'fal-ai/ffmpeg-api/metadata'
+const CAPTION_MODEL = 'fal-ai/workflow-utilities/auto-subtitle' // transcribes audio -> burns synced captions
+const SITE_URL = 'saas.signalboostapp.com'
 const CLIP_MS = 5000        // Kling v3 standard renders ~5s clips
 const MIN_TOTAL_MS = 6000   // floor so a one-line VO still has room
 const MAX_TOTAL_MS = 60000  // cap the final video at one minute
@@ -48,11 +50,15 @@ function narrationFor(campaign: any, lang: string): string {
     .filter(Boolean)
   let text = parts.join('. ').replace(/\.\s*\.+/g, '.').replace(/\s+/g, ' ').trim()
   if (!text) text = String(campaign.title || campaign.objective || 'SignalBoost helps your business grow faster.')
-  // ~150 wpm -> ~150 words / ~820 chars is close to 60s. Trim on a boundary.
-  if (text.length > 820) {
-    text = text.slice(0, 820)
+  // ~150 wpm -> ~140 words / ~760 chars is close to a minute. Trim on a boundary,
+  // then make sure the site URL is spoken (so it lands in the burned captions).
+  if (text.length > 760) {
+    text = text.slice(0, 760)
     const cut = Math.max(text.lastIndexOf('. '), text.lastIndexOf('! '), text.lastIndexOf('? '))
-    if (cut > 400) text = text.slice(0, cut + 1)
+    if (cut > 380) text = text.slice(0, cut + 1)
+  }
+  if (!/signalboostapp\.com/i.test(text)) {
+    text = `${text} Visit ${SITE_URL}.`.replace(/\s+/g, ' ').trim()
   }
   return text
 }
@@ -126,9 +132,29 @@ export async function addVoiceToCampaignVideo(
       { id: 'voice', type: 'audio', keyframes: [{ timestamp: 0, duration: totalMs, url: audioDataUri }] },
     ]
     const result: any = await fal.subscribe(COMPOSE_MODEL, { input: { tracks } })
-    const out = result?.data?.video_url || result?.data?.video?.url
-    if (!out) return { ok: false, error: 'compose returned no video url' }
-    return { ok: true, url: String(out) }
+    const composed = result?.data?.video_url || result?.data?.video?.url
+    if (!composed) return { ok: false, error: 'compose returned no video url' }
+
+    // 4) Burn captions synced to the voice. Graceful: if captioning fails, return
+    //    the voiced (uncaptioned) video rather than erroring the whole step.
+    let finalUrl = String(composed)
+    try {
+      const cap: any = await fal.subscribe(CAPTION_MODEL, {
+        input: {
+          video_url: finalUrl,
+          language: lang,
+          position: 'bottom',
+          words_per_subtitle: 3,
+          font_color: 'white',
+          stroke_color: 'black',
+          stroke_width: 3,
+        },
+      })
+      const capUrl = cap?.data?.video?.url || cap?.data?.video_url
+      if (capUrl) finalUrl = String(capUrl)
+    } catch {}
+
+    return { ok: true, url: finalUrl }
   } catch (e: any) {
     return { ok: false, error: e?.message || 'voice compose failed' }
   }

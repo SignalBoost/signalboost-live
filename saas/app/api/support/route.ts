@@ -1225,6 +1225,17 @@ export async function POST(req: NextRequest) {
       // Instrumentation: persist the decision record. Fire-and-forget so a
       // logging failure can never delay or break the diagnostic response.
       void logCosDecision(result, userId).catch(() => {})
+      // Knowledge layer: when grounding is requested, actually fetch the routed
+      // source through the real connectors before returning.
+      if (body?.ground === true && result.ok) {
+        try {
+          const { groundCosDecision } = await import('@/lib/ai/cos/knowledgeBridge')
+          const grounded = await groundCosDecision(result)
+          return NextResponse.json({ ...result, evidence: grounded.evidence }, { status: 200 })
+        } catch (e: any) {
+          return NextResponse.json({ ...result, evidence: null, evidenceError: e?.message || 'grounding failed' }, { status: 200 })
+        }
+      }
       return NextResponse.json(result, { status: result.ok ? 200 : 400 })
     }
 

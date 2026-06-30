@@ -19,6 +19,7 @@ export interface ProviderFormField {
   step?: number
   defaultValue?: any 
   help?: string
+  advanced?: boolean
   source?: {
     action: string
     dataPath?: string

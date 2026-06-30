@@ -266,7 +266,7 @@ export const COMPLETE_TEMPLATES: Record<string, ProviderTemplate> = {
     api: { service: 'github', method: 'POST', endpoint: '/user/repos' },
     fields: [
       { id: 'name', label: 'Repository name', type: 'text', required: true },
-      { id: 'private', label: 'Private', type: 'boolean' },
+      { id: 'private', label: 'Private', type: 'toggle' },
       { id: 'description', label: 'Description', type: 'text' },
     ],
   },

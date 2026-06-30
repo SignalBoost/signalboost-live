@@ -1236,6 +1236,23 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ ...result, evidence: null, evidenceError: e?.message || 'grounding failed' }, { status: 200 })
         }
       }
+      // Diagnostic: run the full self-correction loop over a supplied draft.
+      if (body?.review === true && typeof body.objective === 'string' && typeof body.draft === 'string') {
+        try {
+          const anthropic = getAnthropicClient()
+          if (anthropic) {
+            const { runSelfCorrection } = await import('@/lib/ai/cos/selfReview')
+            const selfCorrection = await runSelfCorrection(anthropic, 'claude-sonnet-4-6', {
+              objective: body.objective,
+              draft: body.draft,
+              evidence: typeof body.evidence === 'string' ? body.evidence : undefined,
+            })
+            return NextResponse.json({ ...result, selfCorrection }, { status: 200 })
+          }
+        } catch {
+          // best-effort diagnostic — fall through to the normal response
+        }
+      }
       return NextResponse.json(result, { status: result.ok ? 200 : 400 })
     }
 

@@ -267,7 +267,7 @@ export default function ProviderActionForm({
           <>
             {onClose && <button onClick={onClose} className="hub-chip" style={secondaryButtonStyle}>{t('console.ui.cancel', 'Cancel')}</button>}
             <button onClick={handleSubmit} className="hub-btn" style={primaryButtonStyle}>
-              {template.previewBeforeSubmit ? t('console.ui.preview', 'Preview') : template.requiresConfirm ? t('console.ui.confirm', 'Confirm') : t('console.ui.execute', 'Execute')}
+              {templateId === 'openai.codex_open_cloud' || templateId === 'openai.codex_generate_prompt' ? 'Generate Prompt' : template.previewBeforeSubmit ? t('console.ui.preview', 'Preview') : template.requiresConfirm ? t('console.ui.confirm', 'Confirm') : t('console.ui.execute', 'Execute')}
             </button>
           </>
         )}
@@ -836,6 +836,10 @@ function RemoteSelect({
 }
 
 function ResultView({ data }: { data: any }) {
+  if (data && typeof data === 'object' && typeof data.prompt === 'string') {
+    return <CodexHandoffResult data={data} />
+  }
+
   if (data === null || data === undefined) return null
 
   const arrayKey = data && typeof data === 'object'
@@ -881,6 +885,54 @@ function ResultView({ data }: { data: any }) {
   }
 
   return <div style={jsonBoxStyle}>{JSON.stringify(data, null, 2)}</div>
+}
+
+function CodexHandoffResult({ data }: { data: any }) {
+  const [copied, setCopied] = useState(false)
+  const prompt = String(data.prompt || '')
+  const codexCloudUrl = String(data.codexCloudUrl || data.url || 'https://chatgpt.com/codex/cloud')
+
+  const copyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(prompt)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2200)
+    } catch {
+      setCopied(false)
+    }
+  }
+
+  return (
+    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12, overflow: 'hidden' }}>
+      <div style={noticeStyle}>
+        <strong style={{ color: '#ffc300' }}>Handoff-only workflow:</strong> Copy this prompt, open Codex Cloud, and paste it into the Codex task box.
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', flex: '0 0 auto' }}>
+        <button type="button" onClick={copyPrompt} className="hub-btn" style={primaryButtonStyle}>
+          {copied ? 'Copied' : 'Copy Prompt'}
+        </button>
+        <a href={codexCloudUrl} target="_blank" rel="noreferrer" className="hub-chip" style={{ ...secondaryButtonStyle, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
+          Open Codex Cloud
+        </a>
+      </div>
+
+      {copied && (
+        <div style={{ fontSize: 12, color: '#22c55e', fontWeight: 800, flex: '0 0 auto' }}>
+          ✅ Copied
+        </div>
+      )}
+
+      <label style={{ ...labelStyle, fontSize: 10.5, color: 'rgba(255,255,255,.62)' }}>
+        Generated Codex prompt
+      </label>
+      <textarea readOnly value={prompt} style={{ ...jsonBoxStyle, width: '100%', resize: 'vertical', color: 'rgba(255,255,255,.86)', minHeight: 260 }} />
+
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,.52)', flex: '0 0 auto' }}>
+        Direct Codex execution: {data.directExecution ? 'yes' : 'no'} — the Hub does not create a Codex Cloud task directly.
+      </div>
+    </div>
+  )
 }
 
 function ObjectArrayTable({ rows }: { rows: any[] }) {

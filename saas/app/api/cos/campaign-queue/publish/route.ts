@@ -1,8 +1,10 @@
 // saas/app/api/cos/campaign-queue/publish/route.ts
 // Publish an APPROVED COS campaign item to a live social platform. The approval
 // gate is enforced here: nothing publishes unless the owner approved it first.
-// Owner-reviewed content (body.text / body.videoUrl) wins; the stored campaign
-// fields are the fallback.
+// Language-aware: when a language is given (or owner text is not), the matching
+// per-language draft (work_items[].output) is used. Owner-reviewed content
+// (body.text / body.videoUrl) always wins. Published results are keyed by
+// platform + language so multiple languages to one platform never clobber.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
@@ -41,10 +43,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: `Channel "${campaign.channel}" is not a direct social-post target. Pass an explicit platform to override.` }, { status: 400 })
   }
 
-  // Owner-approved content wins; fall back to stored campaign fields.
-  const text = String(body?.text || campaign.objective || campaign.title || '')
+  // Resolve the per-language draft. When a language is given, use that draft;
+  // otherwise fall back to the first drafted work item.
+  const language = String(body?.language || '').trim()
+  const items = Array.isArray(campaign.work_items) ? campaign.work_items : []
+  const matched = language
+    ? items.find((it: any) => it?.input?.language === language && it?.output)
+    : items.find((it: any) => it?.output)
+  const draftText = matched?.output?.draft ? String(matched.output.draft) : ''
+  const draftTitle = matched?.output?.title ? String(matched.output.title) : ''
+
+  // Owner-approved content wins; then the per-language draft; then stored fields.
+  const text = String(body?.text || draftText || campaign.objective || campaign.title || '')
   const videoUrl = body?.videoUrl ? String(body.videoUrl) : (campaign.assets?.video_url ? String(campaign.assets.video_url) : undefined)
-  const title = String(body?.title || campaign.title || '')
+  const title = String(body?.title || draftTitle || campaign.title || '')
 
   const tok = await getValidSocialToken(ctx.admin, ctx.user.id, platform)
   if (!tok.ok || !tok.accessToken) {
@@ -62,11 +74,12 @@ export async function POST(req: NextRequest) {
   }
 
   const publishedAt = new Date().toISOString()
+  const publishedKey = language ? `${platform}::${language}` : platform
   await ctx.admin.from('cos_campaign_queue').update({
     status: 'running',
     metadata: {
       ...(campaign.metadata || {}),
-      published: { ...((campaign.metadata && campaign.metadata.published) || {}), [platform]: { result, publishedAt } },
+      published: { ...((campaign.metadata && campaign.metadata.published) || {}), [publishedKey]: { result, publishedAt, language: language || null } },
     },
   }).eq('id', id)
 
@@ -76,8 +89,8 @@ export async function POST(req: NextRequest) {
     action: 'cos_campaign.publish',
     targetType: 'cos_campaign_queue',
     targetId: id,
-    metadata: { platform, result },
+    metadata: { platform, language: language || null, result },
   })
 
-  return NextResponse.json({ ok: true, platform, publishedAt, result })
+  return NextResponse.json({ ok: true, platform, language: language || null, publishedAt, result })
 }

@@ -44,6 +44,26 @@ function gh(input: Record<string, unknown>):
 const errFrom = async (res: Response) =>
   `GitHub error (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}`
 
+async function fetchAllGitHubPages(url: string, headers: Record<string, string>, maxPages = 10): Promise<{ ok: true; items: any[] } | { ok: false; error: string }> {
+  const items: any[] = []
+  let nextUrl: string | null = url
+  let page = 0
+
+  while (nextUrl && page < maxPages) {
+    page += 1
+    const res = await fetch(nextUrl, { headers })
+    if (!res.ok) return { ok: false, error: await errFrom(res) }
+    const data = await res.json()
+    if (Array.isArray(data)) items.push(...data)
+
+    const link = res.headers.get('link') || ''
+    const nextMatch = link.match(/<([^>]+)>;\s*rel="next"/)
+    nextUrl = nextMatch ? nextMatch[1] : null
+  }
+
+  return { ok: true, items }
+}
+
 // ---- declarative field builders (mirror the live templates) ----
 const REPO: ActionField = { id: 'repo', label: 'Repository', type: 'remote_select', required: true, remoteSource: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } }
 const PR_NUM: ActionField = { id: 'number', label: 'Pull Request', type: 'remote_select', required: true, remoteSource: { action: 'github.list_prs', dataPath: 'pulls', valueKey: 'number', labelTemplate: '#{number} — {title} ({branch}, {state})', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } }
@@ -58,11 +78,20 @@ registerExecutor({
   schema: schema('github.list_repos', 'View Repos', 'view', []),
   async run() {
     const c = gh({}); if (!c.ok) return c
-    const res = await fetch(`${API}/user/repos?per_page=50&sort=updated`, { headers: c.headers })
-    if (!res.ok) return { ok: false, error: await errFrom(res) }
-    const data = await res.json(); const repos = Array.isArray(data) ? data : []
+    const page = await fetchAllGitHubPages(`${API}/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member`, c.headers)
+    if (!page.ok) return page
+    const repos = page.items
     return { ok: true, message: `${repos.length} repositor${repos.length === 1 ? 'y' : 'ies'} accessible`,
-      data: { count: repos.length, repos: repos.slice(0, 25).map((r: any) => ({ name: r.full_name, private: r.private, updated_at: r.updated_at })) } }
+      data: {
+        count: repos.length,
+        repos: repos.map((r: any) => ({
+          name: r.full_name,
+          private: r.private,
+          archived: r.archived,
+          default_branch: r.default_branch,
+          updated_at: r.updated_at,
+        })),
+      } }
   },
 })
 

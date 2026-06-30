@@ -122,7 +122,7 @@ function codexPrompt(input: Record<string, unknown>): string {
     '',
     checks.length ? `Verification strings:\n${checks.map(v => `- ${v}`).join('\n')}` : 'Verification strings: Not specified.',
     '',
-    `Commit message: ${String(input.commitMessage || 'fix(hub): replace Codex Cloud manual fields with searchable repo branch file selectors').trim()}`,
+    `Commit message: ${String(input.commitMessage || 'fix(hub): make Codex Cloud action generate copyable Codex prompt instead of static url output').trim()}`,
     '',
     'After implementation, commit changes on the requested branch and open or update a GitHub pull request. Report the branch, PR URL, files changed, verification output, and final commit SHA.',
   ].join('\n')
@@ -140,9 +140,10 @@ const CODEX_BASE_FIELDS: ActionField[] = [
 
 registerExecutor({
   providerId: 'openai', actionId: 'codex_open_cloud', policyActionId: 'read_provider_status',
-  schema: schema('openai.codex_open_cloud', 'Open Codex Cloud', 'view', []),
-  async run() {
-    return { ok: true, message: 'Open Codex Cloud manually and paste a prepared prompt. No Codex task was created by this SaaS.', data: { url: CODEX_URL, directExecution: false } }
+  schema: schema('openai.codex_open_cloud', 'Open Codex Cloud', 'create', CODEX_BASE_FIELDS),
+  async run(_ctx, input) {
+    const prompt = codexPrompt(input)
+    return { ok: true, message: 'Codex Cloud handoff prompt ready. Copy this prompt, open Codex Cloud, and paste it into the Codex task box. No Codex API task was created.', data: { codexCloudUrl: CODEX_URL, prompt, directExecution: false, handoffOnly: true } }
   },
 })
 

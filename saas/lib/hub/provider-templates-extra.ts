@@ -97,8 +97,17 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
     policyActionId: 'read_provider_status', api: { service: 'openai', method: 'GET', endpoint: '/v1/batches' }, fields: [],
   },
   'openai.codex_open_cloud': {
-    id: 'openai.codex_open_cloud', label: 'Open Codex Cloud', description: 'Open the ChatGPT Codex Cloud workspace for manual task execution.', icon: '☁️',
-    policyActionId: 'read_provider_status', api: { service: 'openai', method: 'GET', endpoint: '/codex/cloud' }, fields: [],
+    id: 'openai.codex_open_cloud', label: 'Open Codex Cloud', description: 'Build a copyable Codex Cloud handoff prompt, then open Codex Cloud to paste it manually.', icon: '☁️',
+    policyActionId: 'read_provider_status', api: { service: 'openai', method: 'POST', endpoint: '/codex/handoff/prompt' },
+    fields: [
+      { id: 'objective', label: 'Objective', type: 'textarea', required: true, placeholder: 'What should Codex change?' },
+      { id: 'repo', label: 'Repository', type: 'remote_select', required: true, defaultValue: DEFAULT_GITHUB_SLUG, source: { action: 'github.list_repos', dataPath: 'repos', valueKey: 'name', labelTemplate: '{name}' } },
+      { id: 'branch', label: 'Branch', type: 'remote_select', required: true, defaultValue: 'main', source: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
+      { id: 'files', label: 'Selected Files', type: 'remote_select', source: { action: 'github.list_files', dataPath: 'files', valueKey: 'path', labelTemplate: '{path}', dependsOn: ['repo', 'branch'], emptyHint: 'Pick a repository and branch first' } },
+      { id: 'instructions', label: 'Instructions', type: 'textarea', placeholder: 'Constraints, acceptance criteria, implementation notes' },
+      { id: 'commitMessage', label: 'Commit Message', type: 'text', placeholder: 'fix(scope): concise change summary' },
+      { id: 'verificationStrings', label: 'Verification Strings', type: 'textarea', placeholder: 'One exact expected string per line', help: 'Use exact strings to verify the Codex commit actually landed.' },
+    ],
   },
   'openai.codex_generate_prompt': {
     id: 'openai.codex_generate_prompt', label: 'Generate Codex Prompt', description: 'Prepare a clean Codex Cloud task prompt from owner intent. Open Codex Cloud and paste this prompt.', icon: '🧾',
@@ -109,6 +118,7 @@ export const EXTRA_TEMPLATES: Record<string, ProviderTemplate> = {
       { id: 'branch', label: 'Branch', type: 'remote_select', required: true, defaultValue: 'main', source: { action: 'github.list_branches', dataPath: 'branches', valueKey: 'name', labelTemplate: '{name}', dependsOn: ['repo'], emptyHint: 'Pick a repository first' } },
       { id: 'files', label: 'Selected Files', type: 'remote_select', source: { action: 'github.list_files', dataPath: 'files', valueKey: 'path', labelTemplate: '{path}', dependsOn: ['repo', 'branch'], emptyHint: 'Pick a repository and branch first' } },
       { id: 'instructions', label: 'Instructions', type: 'textarea', placeholder: 'Constraints, acceptance criteria, implementation notes' },
+      { id: 'commitMessage', label: 'Commit Message', type: 'text', placeholder: 'fix(scope): concise change summary' },
       { id: 'verificationStrings', label: 'Verification Strings', type: 'textarea', placeholder: 'One exact expected string per line', help: 'Use exact strings to verify the Codex commit actually landed.' },
     ],
   },

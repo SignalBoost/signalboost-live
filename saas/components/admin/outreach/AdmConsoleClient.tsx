@@ -88,6 +88,8 @@ const COPY: Record<string, CopyDict> = {
     analyzed: 'Business analyzed and queued.',
     analysisFailed: 'Analysis failed',
     sendRecorded: 'Outreach send recorded.',
+    sendEmailed: 'Email sent successfully via Resend.',
+    sendManualOnly: 'Recorded only — no email was sent (no recipient address or manual channel).',
     sendFailed: 'Send failed',
     updateFailed: 'Update failed',
     outreachLabel: (s: string) => `Outreach ${s}.`,
@@ -141,6 +143,8 @@ const COPY: Record<string, CopyDict> = {
     analyzed: 'Negocio analizado y en cola.',
     analysisFailed: 'Error en el análisis',
     sendRecorded: 'Envío de alcance registrado.',
+    sendEmailed: 'Correo enviado correctamente vía Resend.',
+    sendManualOnly: 'Solo registrado — no se envió ningún correo (sin dirección de destinatario o canal manual).',
     sendFailed: 'Error al enviar',
     updateFailed: 'Error al actualizar',
     outreachLabel: (s: string) => `Alcance ${s}.`,
@@ -194,6 +198,8 @@ const COPY: Record<string, CopyDict> = {
     analyzed: 'Negócio analisado e na fila.',
     analysisFailed: 'Falha na análise',
     sendRecorded: 'Envio de alcance registrado.',
+    sendEmailed: 'E-mail enviado com sucesso via Resend.',
+    sendManualOnly: 'Apenas registrado — nenhum e-mail foi enviado (sem endereço de destinatário ou canal manual).',
     sendFailed: 'Falha ao enviar',
     updateFailed: 'Falha ao atualizar',
     outreachLabel: (s: string) => `Alcance ${s}.`,
@@ -247,6 +253,8 @@ const COPY: Record<string, CopyDict> = {
     analyzed: 'Firma przeanalizowana i w kolejce.',
     analysisFailed: 'Błąd analizy',
     sendRecorded: 'Wysyłka zasięgowa zarejestrowana.',
+    sendEmailed: 'E-mail wysłany pomyślnie przez Resend.',
+    sendManualOnly: 'Tylko zarejestrowano — nie wysłano e-maila (brak adresu odbiorcy lub kanał ręczny).',
     sendFailed: 'Błąd wysyłki',
     updateFailed: 'Błąd aktualizacji',
     outreachLabel: (s: string) => `Zasięg ${s}.`,
@@ -300,6 +308,8 @@ const COPY: Record<string, CopyDict> = {
     analyzed: 'Бизнес проанализирован и в очереди.',
     analysisFailed: 'Ошибка анализа',
     sendRecorded: 'Отправка охвата зарегистрирована.',
+    sendEmailed: 'Письмо успешно отправлено через Resend.',
+    sendManualOnly: 'Только зарегистрировано — письмо не отправлено (нет адреса получателя или ручной канал).',
     sendFailed: 'Ошибка отправки',
     updateFailed: 'Ошибка обновления',
     outreachLabel: (s: string) => `Охват ${s}.`,
@@ -372,7 +382,13 @@ export default function AdmConsoleClient() {
       body: JSON.stringify({ outreach_id: selected.id, channel: sendEmail ? 'email' : 'manual', to_email: sendEmail || undefined }),
     })
     const json = await res.json()
-    setMessage(res.ok ? t$(t.sendRecorded) : json.error || t$(t.sendFailed))
+    if (res.ok) {
+      const mode = String(json?.providerResult?.mode || '')
+      const honestlyEmailed = mode !== 'manual_record_only' && mode !== ''
+      setMessage(honestlyEmailed ? t$(t.sendEmailed) : t$(t.sendManualOnly))
+    } else {
+      setMessage(json.error || t$(t.sendFailed))
+    }
     setBusy(false)
     await load()
   }

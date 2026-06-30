@@ -1,12 +1,14 @@
-// saas/app/api/cos/campaign-queue/render-status/route.ts
-// Owner-triggered poll of ONE campaign's video render. Mirrors the cron logic but
-// lets the owner force a status check from the cockpit without waiting for the
-// cron — so a finished render appears on demand, and a failed one shows its error.
+// saas/app/api/cos/campaign-queue/render-video/route.ts
+// Start an actual promo video render (fal.ai / Kling) for a video campaign and
+// store the render handle on the campaign. A poll cron (cos-video-poll) advances
+// it to a ready URL. Publishing stays owner-gated and uses the rendered URL.
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdmin } from '@/lib/outreach/security'
-import { fetchSiteVideo } from '@/lib/operator/video'
+import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
+import { startSiteVideo } from '@/lib/operator/video'
 
 export const dynamic = 'force-dynamic'
+
+const VIDEO_CHANNELS = ['youtube', 'short_video']
 
 export async function POST(req: NextRequest) {
   const ctx = await requireAdmin()
@@ -20,30 +22,34 @@ export async function POST(req: NextRequest) {
   const { data: campaign, error } = await ctx.admin.from('cos_campaign_queue').select('*').eq('id', id).single()
   if (error || !campaign) return NextResponse.json({ ok: false, error: error?.message || 'Campaign not found' }, { status: 404 })
 
-  const v = (campaign.metadata && campaign.metadata.video) || null
-  if (!v || !v.requestId || !v.model) {
-    return NextResponse.json({ ok: false, error: 'No render in progress for this campaign.' }, { status: 400 })
-  }
-  if (v.status === 'ready' && v.url) {
-    return NextResponse.json({ ok: true, status: 'ready', url: v.url })
+  if (!VIDEO_CHANNELS.includes(String(campaign.channel))) {
+    return NextResponse.json({ ok: false, error: `Channel "${campaign.channel}" is not a video channel.` }, { status: 400 })
   }
 
-  let res: any
-  try { res = await fetchSiteVideo(v.requestId, v.model) } catch (e: any) { res = { status: 'failed', error: e?.message } }
-  const now = new Date().toISOString()
+  const aspect: '9:16' | '16:9' = campaign.channel === 'short_video' ? '9:16' : '16:9'
+  const objective = String(campaign.objective || campaign.title || 'an AI platform that helps businesses grow').slice(0, 300)
+  const themedPrompt = `Cinematic promotional b-roll for a premium AI business platform. Theme: ${objective}. Modern professionals using sleek software dashboards, growth charts rising, AI automation and workflows, clean bright offices, confident entrepreneurs. Premium, optimistic, high-end tech commercial look, smooth camera motion.`.slice(0, 500)
+  const prompt = String(body?.prompt || themedPrompt)
 
-  if (res?.status === 'done' && res.videoUrl) {
-    await ctx.admin.from('cos_campaign_queue').update({
-      metadata: { ...(campaign.metadata || {}), video: { ...v, status: 'ready', url: res.videoUrl, ready_at: now } },
-    }).eq('id', id)
-    return NextResponse.json({ ok: true, status: 'ready', url: res.videoUrl })
-  }
-  if (res?.status === 'failed' || res?.ok === false) {
-    await ctx.admin.from('cos_campaign_queue').update({
-      metadata: { ...(campaign.metadata || {}), video: { ...v, status: 'failed', error: res?.error || 'render failed', failed_at: now } },
-    }).eq('id', id)
-    return NextResponse.json({ ok: true, status: 'failed', error: res?.error || 'render failed' })
-  }
+  const started: any = await startSiteVideo(prompt, aspect)
+  if (!started.ok) return NextResponse.json({ ok: false, error: started.error || 'Could not start render.' }, { status: 502 })
 
-  return NextResponse.json({ ok: true, status: 'rendering' })
+  const startedAt = new Date().toISOString()
+  await ctx.admin.from('cos_campaign_queue').update({
+    metadata: {
+      ...(campaign.metadata || {}),
+      video: { status: 'rendering', requestId: started.requestId, model: started.model, aspect, prompt, started_at: startedAt },
+    },
+  }).eq('id', id)
+
+  await auditAdminAction({
+    admin: ctx.admin,
+    actorId: ctx.user.id,
+    action: 'cos_campaign.render_video_started',
+    targetType: 'cos_campaign_queue',
+    targetId: id,
+    metadata: { channel: campaign.channel, aspect, requestId: started.requestId },
+  })
+
+  return NextResponse.json({ ok: true, status: 'rendering', requestId: started.requestId })
 }

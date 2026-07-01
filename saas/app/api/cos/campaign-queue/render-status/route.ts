@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
   const v = (campaign.metadata && campaign.metadata.video) || null
   if (!v || !v.requestId || !v.model) return NextResponse.json({ ok: false, error: 'No render in progress for this campaign.' }, { status: 400 })
-  if (v.status === 'ready' && v.voicedUrl) return NextResponse.json({ ok: true, status: 'ready', url: v.voicedUrl, baseUrl: v.url, branded: v.branded === true })
+  if (v.status === 'ready' && v.voicedUrl && v.branded === true) return NextResponse.json({ ok: true, status: 'ready', url: v.voicedUrl, baseUrl: v.url, branded: true })
   if (v.status === 'ready' && v.url) {
     const finalVideo = await buildFinal(ctx, campaign, v, lang)
     return NextResponse.json({ ok: true, status: 'ready', url: finalVideo.voicedUrl || finalVideo.url, baseUrl: finalVideo.url, branded: finalVideo.branded === true, warning: finalVideo.voiceError || null })

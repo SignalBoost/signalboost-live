@@ -26,7 +26,7 @@ async function buildFinal(ctx: any, campaign: any, video: any, lang: string) {
     const r = await addVoiceToCampaignVideo(readyCampaign, lang)
     if (r.ok && r.url) {
       finalUrl = r.url
-      voiceError = b.error ? `branded compose failed: ${b.error}` : ''
+      voiceError = `branded compose failed: ${b.error || 'unknown'}`
     } else {
       voiceError = `branded compose failed: ${b.error || 'unknown'} | fallback failed: ${r.error || 'unknown'}`
     }

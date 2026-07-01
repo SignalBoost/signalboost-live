@@ -56,7 +56,17 @@ export async function POST(req: NextRequest) {
       // Both failed — persist the error on the card and stop.
       const combined = `branded: ${brandErr} | fallback: ${r.error || 'voice compose failed'}`
       await ctx.admin.from('cos_campaign_queue').update({
-        metadata: { ...(campaign.metadata || {}), video: { ...v, branded: false, brandSchemaVersion: v.brandSchemaVersion || null, voiceError: combined } },
+        metadata: {
+          ...(campaign.metadata || {}),
+          video: {
+            ...v,
+            branded: false,
+            brandSchemaVersion: null,
+            brandText: null,
+            brandedAt: null,
+            voiceError: combined,
+          },
+        },
       }).eq('id', id)
       return NextResponse.json({ ok: false, error: combined }, { status: 502 })
     }

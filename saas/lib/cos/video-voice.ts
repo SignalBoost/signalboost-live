@@ -50,7 +50,10 @@ function narrationFor(campaign: any, lang: string): string {
     .map((v: any) => String(v || '').replace(/\s+/g, ' ').trim())
     .filter(Boolean)
   let text = parts.join('. ').replace(/\.\s*\.+/g, '.').replace(/\s+/g, ' ').trim()
-  if (!text) text = String(campaign.title || campaign.objective || 'SignalBoost helps your business grow faster.')
+  if (!text) {
+    const t = String(campaign.title || 'SignalBoost')
+    text = `${t}. SignalBoost helps companies grow faster with AI-built websites, branded content, outreach campaigns, and growth tools. Automate your marketing, launch new campaigns in minutes, reach more customers across every channel, and scale with confidence. See how it works and get started today.`
+  }
   if (text.length > 760) {
     text = text.slice(0, 760)
     const cut = Math.max(text.lastIndexOf('. '), text.lastIndexOf('! '), text.lastIndexOf('? '))

@@ -37,9 +37,20 @@ function ensureFal() {
   if (!falConfigured) { fal.config({ credentials: process.env.FAL_KEY }); falConfigured = true }
 }
 
+function normalizeUrlText(text: string): string {
+  return String(text || '')
+    .replace(/https?:\/\/www\.saas\.signalboostapp\.com/gi, SITE_URL)
+    .replace(/https?:\/\/saas\.signalboostapp\.com/gi, SITE_URL)
+    .replace(/\bwww\.saas\.signalboostapp\.com\b/gi, SITE_URL)
+    .replace(/\bsaas\.signalboostapp\.com\b/gi, SITE_URL)
+    .replace(/\bwww\.saas\.signalboost\.com\b/gi, SITE_URL)
+    .replace(/\bsignalboost\.com\b/gi, SITE_URL)
+    .replace(/www\.www\./gi, 'www.')
+}
+
 // Build a spoken script from the per-language draft. Long enough to fill up to a
-// minute, capped on a sentence boundary, and always ends by speaking the site URL
-// so it shows up in the burned captions.
+// minute, capped on a sentence boundary, and always ends by speaking the exact
+// public URL so it shows up correctly in the burned captions.
 function narrationFor(campaign: any, lang: string): string {
   const items = Array.isArray(campaign.work_items) ? campaign.work_items : []
   const match =
@@ -47,19 +58,21 @@ function narrationFor(campaign: any, lang: string): string {
     items.find((it: any) => it?.output)
   const o = (match && match.output) || {}
   const parts = [o.title, o.opening, o.draft, o.call_to_action]
-    .map((v: any) => String(v || '').replace(/\s+/g, ' ').trim())
+    .map((v: any) => normalizeUrlText(String(v || '').replace(/\s+/g, ' ').trim()))
     .filter(Boolean)
   let text = parts.join('. ').replace(/\.\s*\.+/g, '.').replace(/\s+/g, ' ').trim()
   if (!text) {
-    const t = String(campaign.title || 'SignalBoost')
-    text = `${t}. SignalBoost helps companies grow faster with AI-built websites, branded content, outreach campaigns, and growth tools. Automate your marketing, launch new campaigns in minutes, reach more customers across every channel, and scale with confidence. See how it works and get started today.`
+    const t = String(campaign.title || 'SignalBoostAi')
+    text = `${t}. SignalBoostAi helps companies grow faster with AI-built websites, branded content, outreach campaigns, and growth tools. Automate your marketing, launch new campaigns in minutes, reach more customers across every channel, and scale with confidence. See how it works and get started today.`
   }
+  text = normalizeUrlText(text)
   if (text.length > 760) {
     text = text.slice(0, 760)
     const cut = Math.max(text.lastIndexOf('. '), text.lastIndexOf('! '), text.lastIndexOf('? '))
     if (cut > 380) text = text.slice(0, cut + 1)
   }
-  if (!/signalboostapp\.com/i.test(text)) {
+  text = normalizeUrlText(text)
+  if (!text.toLowerCase().includes(SITE_URL)) {
     text = `${text} Visit ${SITE_URL}.`.replace(/\s+/g, ' ').trim()
   }
   return text

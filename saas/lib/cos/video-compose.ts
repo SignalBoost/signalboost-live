@@ -1,42 +1,48 @@
 // saas/lib/cos/video-compose.ts
-// Branded final-video assembly via JSON2Video (the reliable path for burning
-// exact on-screen text into the finished MP4).
+// Branded final-video assembly via JSON2Video (the ONLY reliable way to burn
+// EXACT on-screen text — fal/Kling cannot render text).
 //
-// Input : a fal b-roll URL (background) + campaign + language.
-// Output: one 60s MP4 with
-//   - the b-roll looped to fill 60s as the background,
-//   - an ElevenLabs voiceover,
-//   - auto-transcribed captions (subtitles element),
-//   - "SignalBoostAi" (gold) on screen for the full video,
-//   - "www.saas.signalboostapp.com" (cyan) on screen for the full video.
+// Output: a 60s MP4 with
+//   - the fal b-roll looped to fill 60s as the background,
+//   - an ElevenLabs voiceover (URL never spoken, so captions stay clean),
+//   - auto-transcribed captions at the bottom,
+//   - a PERSISTENT top banner: "SignalBoostAi" (gold) + the URL (cyan),
+//     placed inside the scene and layered last so it sits on top.
 //
-// Important: the brand text is added INSIDE the scene elements array, not at a
-// movie-level elements key, so it renders with the scene timeline instead of
-// being ignored by JSON2Video.
+// Verified against JSON2Video API v2 docs:
+//   POST https://api.json2video.com/v2/movies        (header: x-api-key)
+//   GET  https://api.json2video.com/v2/movies?project=ID   -> { movie: { status, url } }
+//   text element: styling lives in `settings`; vertical/horizontal-position place
+//   the textbox; text elements go inside the scene's elements array (layered last).
+//   video element: duration = positive seconds forces length; loop -1 = loop to fill.
 
 const J2V_ENDPOINT = 'https://api.json2video.com/v2/movies'
 const BRAND_NAME = 'SignalBoostAi'
 const BRAND_URL = 'www.saas.signalboostapp.com'
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
-const TOTAL = 60
-const OUTRO_START = TOTAL - 7
-const VOICE_MODEL = 'elevenlabs-flash-v2-5'
-const VOICE_NAME = 'Adam'
+const TOTAL = 60            // seconds — final video length (forced)
+const VOICE_MODEL = 'elevenlabs-flash-v2-5' // multilingual, included in JSON2Video credits
+const VOICE_NAME = 'Adam'  // verified supported voice for elevenlabs-flash-v2-5 (JSON2Video managed)
 
+// Localized value narration (~110 words ≈ ~45-55s). The URL is intentionally NOT
+// spoken — it appears only as the on-screen banner, so captions never garble it.
 const SCRIPT_BY_LANG: Record<string, string> = {
-  en: `SignalBoostAi is your AI-powered growth department. It builds professional websites in minutes, creates branded content and videos, turns reviews into marketing posts, and prepares outreach campaigns across every channel. From websites to content to growth workflows, SignalBoost gives small businesses, agencies, hotels, restaurants, and entrepreneurs one AI system to look sharper and move faster. Every campaign is drafted for you and kept behind your approval before anything goes live. Automate your marketing, launch faster, and grow with confidence. Start building smarter today at www.saas.signalboostapp.com.`,
-  es: `SignalBoostAi es tu departamento de crecimiento con inteligencia artificial. Crea sitios web profesionales en minutos, genera contenido y videos de marca, convierte reseñas en publicaciones de marketing y prepara campañas de difusión en todos los canales. Desde sitios web hasta contenido y flujos de crecimiento, SignalBoost ofrece a pequeñas empresas, agencias, hoteles, restaurantes y emprendedores un solo sistema de IA para verse mejor y avanzar más rápido. Cada campaña se redacta para ti y espera tu aprobación antes de publicarse. Automatiza tu marketing, lanza más rápido y crece con confianza. Empieza hoy en www.saas.signalboostapp.com.`,
-  pt: `A SignalBoostAi é o seu departamento de crescimento com inteligência artificial. Cria sites profissionais em minutos, gera conteúdo e vídeos de marca, transforma avaliações em publicações de marketing e prepara campanhas de prospecção em todos os canais. De sites a conteúdo e fluxos de crescimento, a SignalBoost oferece a pequenas empresas, agências, hotéis, restaurantes e empreendedores um único sistema de IA para parecer melhor e avançar mais rápido. Cada campanha é redigida para você e aguarda a sua aprovação antes de ir ao ar. Automatize o seu marketing, lance mais rápido e cresça com confiança. Comece hoje em www.saas.signalboostapp.com.`,
-  pl: `SignalBoostAi to twój dział wzrostu napędzany sztuczną inteligencją. Tworzy profesjonalne strony w kilka minut, generuje treści i filmy marki, zamienia opinie w posty marketingowe i przygotowuje kampanie docierania do klientów we wszystkich kanałach. Od stron po treści i procesy wzrostu, SignalBoost daje małym firmom, agencjom, hotelom, restauracjom i przedsiębiorcom jeden system SI, aby wyglądać lepiej i działać szybciej. Każda kampania jest przygotowywana za ciebie i czeka na twoją zgodę przed publikacją. Zautomatyzuj marketing, działaj szybciej i rozwijaj się z pewnością. Zacznij dziś na www.saas.signalboostapp.com.`,
-  ru: `SignalBoostAi — это ваш отдел роста на основе искусственного интеллекта. Он создаёт профессиональные сайты за минуты, генерирует брендированный контент и видео, превращает отзывы в маркетинговые посты и готовит кампании по всем каналам. От сайтов до контента и процессов роста SignalBoost даёт малому бизнесу, агентствам, отелям, ресторанам и предпринимателям единую систему ИИ, чтобы выглядеть лучше и двигаться быстрее. Каждая кампания готовится за вас и ждёт вашего одобрения перед публикацией. Автоматизируйте маркетинг, запускайте быстрее и растите уверенно. Начните сегодня на www.saas.signalboostapp.com.`,
+  en: `SignalBoostAi is your AI-powered growth department. It builds professional websites in minutes, creates branded content and videos, turns reviews into marketing posts, and prepares outreach campaigns across every channel. From websites to content to growth workflows, SignalBoost gives small businesses, agencies, hotels, restaurants, and entrepreneurs one AI system to look sharper and move faster. Every campaign is drafted for you and kept behind your approval before anything goes live. Automate your marketing, launch faster, and grow with confidence. Start building smarter today with SignalBoostAi.`,
+  es: `SignalBoostAi es tu departamento de crecimiento con inteligencia artificial. Crea sitios web profesionales en minutos, genera contenido y videos de marca, convierte reseñas en publicaciones de marketing y prepara campañas de difusión en todos los canales. Desde sitios web hasta contenido y flujos de crecimiento, SignalBoost ofrece a pequeñas empresas, agencias, hoteles, restaurantes y emprendedores un solo sistema de inteligencia artificial para verse mejor y avanzar más rápido. Cada campaña se redacta para ti y espera tu aprobación antes de publicarse. Automatiza tu marketing, lanza más rápido y crece con confianza. Empieza a construir de forma más inteligente hoy con SignalBoostAi.`,
+  pt: `A SignalBoostAi é o seu departamento de crescimento com inteligência artificial. Cria sites profissionais em minutos, gera conteúdo e vídeos de marca, transforma avaliações em publicações de marketing e prepara campanhas de prospecção em todos os canais. De sites a conteúdo e fluxos de crescimento, a SignalBoost oferece a pequenas empresas, agências, hotéis, restaurantes e empreendedores um único sistema de inteligência artificial para parecer melhor e avançar mais rápido. Cada campanha é redigida para você e aguarda a sua aprovação antes de ir ao ar. Automatize o seu marketing, lance mais rápido e cresça com confiança. Comece a construir de forma mais inteligente hoje com a SignalBoostAi.`,
+  pl: `SignalBoostAi to twój dział wzrostu napędzany sztuczną inteligencją. Tworzy profesjonalne strony w kilka minut, generuje treści i filmy marki, zamienia opinie w posty marketingowe i przygotowuje kampanie docierania do klientów we wszystkich kanałach. Od stron po treści i procesy wzrostu, SignalBoost daje małym firmom, agencjom, hotelom, restauracjom i przedsiębiorcom jeden system sztucznej inteligencji, aby wyglądać lepiej i działać szybciej. Każda kampania jest przygotowywana za ciebie i czeka na twoją zgodę przed publikacją. Zautomatyzuj marketing, działaj szybciej i rozwijaj się z pewnością. Zacznij budować mądrzej już dziś z SignalBoostAi.`,
+  ru: `SignalBoostAi — это ваш отдел роста на основе искусственного интеллекта. Он создаёт профессиональные сайты за минуты, генерирует брендированный контент и видео, превращает отзывы в маркетинговые посты и готовит кампании по всем каналам. От сайтов до контента и процессов роста SignalBoost даёт малому бизнесу, агентствам, отелям, ресторанам и предпринимателям единую систему искусственного интеллекта, чтобы выглядеть лучше и двигаться быстрее. Каждая кампания готовится за вас и ждёт вашего одобрения перед публикацией. Автоматизируйте маркетинг, запускайте быстрее и растите уверенно. Начните строить умнее уже сегодня с SignalBoostAi.`,
 }
 
-function normalizeBrandUrl(text: string): string {
-  return text
-    .replace(/(?:www\.)?saas\.signalboostapp\.com/gi, BRAND_URL)
-    .replace(/www\.saas\.signalboost\.com/gi, BRAND_URL)
-    .replace(/signalboost\.com/gi, BRAND_URL)
+// Strip any spoken URL/domain so the transcribed captions never contain a mangled link.
+function stripUrls(text: string): string {
+  return String(text || '')
+    .replace(/https?:\/\/\S+/gi, ' ')
+    .replace(/\bwww\.\S+/gi, ' ')
+    .replace(/\b[\w-]+\.(?:com|net|org|ai|app|io|co)\b\S*/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function scriptFor(campaign: any, lang: string): string {
@@ -48,10 +54,13 @@ function scriptFor(campaign: any, lang: string): string {
   const parts = [o.title, o.opening, o.draft, o.call_to_action]
     .map((v: any) => String(v || '').replace(/\s+/g, ' ').trim())
     .filter(Boolean)
-  let text = normalizeBrandUrl(parts.join('. ').replace(/\.\s*\.+/g, '.').replace(/\s+/g, ' ').trim())
+  let text = parts.join('. ').replace(/\.\s*\.+/g, '.').replace(/\s+/g, ' ').trim()
+
   const words = text.split(/\s+/).filter(Boolean).length
   if (words < 90) text = SCRIPT_BY_LANG[lang] || SCRIPT_BY_LANG.en
-  text = normalizeBrandUrl(text)
+
+  text = stripUrls(text)
+
   if (text.length > 1000) {
     text = text.slice(0, 1000)
     const cut = Math.max(text.lastIndexOf('. '), text.lastIndexOf('! '), text.lastIndexOf('? '))
@@ -60,24 +69,27 @@ function scriptFor(campaign: any, lang: string): string {
   return text
 }
 
-function brandOverlay(start: number, vertical: boolean) {
-  const canvasWidth = vertical ? 1080 : 1920
-  const boxWidth = vertical ? 960 : 1500
-  const y = vertical ? 72 : 44
-  const nameSize = vertical ? '104px' : '92px'
-  const urlSize = vertical ? '52px' : '48px'
-  const html = `<div style="box-sizing:border-box;width:100%;padding:${vertical ? '42px 44px' : '34px 56px'};border-radius:28px;background:rgba(0,0,0,0.78);box-shadow:0 18px 48px rgba(0,0,0,0.65);text-align:center;font-family:Montserrat,Arial,sans-serif;line-height:1.08;"><div style="font-size:${nameSize};font-weight:900;color:${GOLD};text-shadow:0 4px 18px rgba(0,0,0,0.95);">${BRAND_NAME}</div><div style="margin-top:18px;font-size:${urlSize};font-weight:900;color:${CYAN};text-shadow:0 4px 18px rgba(0,0,0,0.95);">${BRAND_URL}</div></div>`
+// A persistent top banner line. Placed inside the scene, layered last => on top.
+function bannerLine(text: string, color: string, sizePx: string, y: number, h: number, w: number) {
   return {
-    type: 'html',
-    html,
-    start,
-    duration: TOTAL,
-    x: Math.round((canvasWidth - boxWidth) / 2),
+    type: 'text',
+    text,
+    start: 0,
+    duration: -2,        // whole scene
+    x: 0,
     y,
-    width: boxWidth,
-    'fade-in': 0.2,
-    'fade-out': 0.2,
-    'z-index': 80,
+    width: w,
+    height: h,
+    settings: {
+      'font-family': 'Montserrat',
+      'font-weight': '800',
+      'font-size': sizePx,
+      'font-color': color,
+      'text-align': 'center',
+      'vertical-position': 'top',
+      'horizontal-position': 'center',
+      'text-shadow': '0px 2px 12px rgba(0,0,0,0.95), 0px 0px 4px rgba(0,0,0,0.9)',
+    },
   }
 }
 
@@ -85,19 +97,31 @@ function buildBrandedMovie(opts: { brollUrl: string; aspect: '16:9' | '9:16'; sc
   const vertical = opts.aspect === '9:16'
   const width = vertical ? 1080 : 1920
   const height = vertical ? 1920 : 1080
+
+  const nameSize = vertical ? '78px' : '72px'
+  const urlSize = vertical ? '42px' : '40px'
   const capSize = vertical ? '64' : '52'
+
+  // Stacked top banner: name then URL just below it.
+  const nameY = vertical ? 70 : 40
+  const nameH = vertical ? 120 : 108
+  const urlY = vertical ? 195 : 150
+  const urlH = vertical ? 80 : 70
 
   return {
     width,
     height,
     quality: 'high',
-    'client-data': { campaign_id: opts.campaignId, language: opts.lang, brand_name: BRAND_NAME, brand_url: BRAND_URL },
+    'client-data': { campaign_id: opts.campaignId, language: opts.lang },
     scenes: [
       {
         duration: TOTAL,
         elements: [
-          { type: 'video', src: opts.brollUrl, duration: TOTAL, loop: true, resize: 'cover', muted: true, 'z-index': 0 },
+          // Background: fal b-roll, explicit 60s + loop-to-fill.
+          { type: 'video', src: opts.brollUrl, duration: TOTAL, loop: -1, resize: 'cover', muted: true },
+          // Voiceover (ElevenLabs, multilingual). URL is not spoken.
           { type: 'voice', model: VOICE_MODEL, voice: VOICE_NAME, text: opts.script, 'model-settings': { language_code: opts.lang } },
+          // Auto captions transcribed from the voiceover, bottom-safe.
           {
             type: 'subtitles',
             language: opts.lang,
@@ -114,7 +138,9 @@ function buildBrandedMovie(opts: { brollUrl: string; aspect: '16:9' | '9:16'; sc
               style: 'classic',
             },
           },
-          brandOverlay(0, vertical),
+          // Persistent brand banner (layered last => on top).
+          bannerLine(BRAND_NAME, GOLD, nameSize, nameY, nameH, width),
+          bannerLine(BRAND_URL, CYAN, urlSize, urlY, urlH, width),
         ],
       },
     ],
@@ -127,6 +153,7 @@ async function j2vHeaders() {
   return { 'Content-Type': 'application/json', 'x-api-key': key }
 }
 
+// Submit + poll to completion (inside the caller's 300s budget).
 export async function renderBrandedVideo(opts: {
   campaign: any
   brollUrl: string

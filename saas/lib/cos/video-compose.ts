@@ -4,6 +4,8 @@
 // array (not inside a scene), and movie-level elements composite on TOP of every
 // scene. So subtitles + the brand image overlay are declared at movie level with a
 // high z-index. Caption accuracy for the brand name is enforced via keywords/replace.
+import { BRAND_SCHEMA_VERSION } from './brand-schema'
+
 const J2V_ENDPOINT = 'https://api.json2video.com/v2/movies'
 const SITE = 'https://saas.signalboostapp.com'
 const TOTAL = 60
@@ -114,6 +116,13 @@ export async function renderBrandedVideo(opts: {
   aspect: '16:9' | '9:16'
   lang: string
 }): Promise<{ ok: boolean; url?: string; error?: string }> {
+  const evidence: Record<string, any> = {
+    brandSchemaVersion: BRAND_SCHEMA_VERSION,
+    campaignId: String(opts.campaign?.id || ''),
+    language: opts.lang,
+    aspect: opts.aspect,
+    hasBrandingElements: false,
+  }
   try {
     if (!opts.brollUrl) return { ok: false, error: 'No b-roll URL to brand.' }
     const script = scriptFor(opts.campaign, opts.lang)
@@ -124,26 +133,35 @@ export async function renderBrandedVideo(opts: {
       lang: opts.lang,
       campaignId: String(opts.campaign?.id || ''),
     })
+    evidence.hasBrandingElements = Array.isArray((movie as any).elements) && (movie as any).elements.some((el: any) => el?.type === 'image')
     const headers = await j2vHeaders()
     const submitRes = await fetch(J2V_ENDPOINT, { method: 'POST', headers, body: JSON.stringify(movie) })
     const submitData: any = await submitRes.json().catch(() => ({}))
+    evidence.submitStatus = submitRes.status
+    evidence.renderId = submitData?.render || submitData?.render_id || submitData?.movie?.id || null
+    evidence.projectId = submitData?.project || submitData?.movie?.project || submitData?.id || null
+    console.info('[cos.brand.json2video.submit]', evidence)
     if (!submitRes.ok || submitData?.success === false) {
-      return { ok: false, error: submitData?.message || submitData?.error || `submit failed (${submitRes.status})` }
+      { const error = submitData?.message || submitData?.error || `submit failed (${submitRes.status})`; console.warn('[cos.brand.json2video.reject]', { ...evidence, error }); return { ok: false, error } }
     }
     const project = submitData?.project || submitData?.movie?.project || submitData?.id
-    if (!project) return { ok: false, error: 'No project id returned from JSON2Video.' }
+    if (!project) { console.warn('[cos.brand.json2video.reject]', { ...evidence, error: 'No project id returned from JSON2Video.' }); return { ok: false, error: 'No project id returned from JSON2Video.' } }
     const deadline = Date.now() + 240_000
     while (Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 8000))
       const pollRes = await fetch(`${J2V_ENDPOINT}?project=${encodeURIComponent(project)}`, { headers })
       const pollData: any = await pollRes.json().catch(() => ({}))
+      evidence.pollStatus = pollRes.status
       const m = pollData?.movie || {}
       const status = String(m?.status || '')
-      if (status === 'done' && m?.url) return { ok: true, url: String(m.url) }
-      if (status === 'error' || m?.success === false) return { ok: false, error: m?.message || 'render error' }
+      if (status === 'done' && m?.url) { console.info('[cos.brand.json2video.done]', { ...evidence, json2videoStatus: status, finalUrl: String(m.url), overlayExpected: evidence.hasBrandingElements }); return { ok: true, url: String(m.url) } }
+      if (status === 'error' || m?.success === false) { const error = m?.message || 'render error'; console.warn('[cos.brand.json2video.error]', { ...evidence, json2videoStatus: status, error }); return { ok: false, error } }
     }
+    console.warn('[cos.brand.json2video.timeout]', { ...evidence, error: 'JSON2Video render timed out.' })
     return { ok: false, error: 'JSON2Video render timed out.' }
   } catch (e: any) {
-    return { ok: false, error: e?.message || 'branded compose failed' }
+    const error = e?.message || 'branded compose failed'
+    console.warn('[cos.brand.json2video.exception]', { ...evidence, error })
+    return { ok: false, error }
   }
 }

@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
 import { addVoiceToCampaignVideo } from '@/lib/cos/video-voice'
 import { renderBrandedVideo } from '@/lib/cos/video-compose'
+import { BRAND_SCHEMA_VERSION, BRAND_TEXT } from '@/lib/cos/brand-schema'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -55,15 +56,37 @@ export async function POST(req: NextRequest) {
       // Both failed — persist the error on the card and stop.
       const combined = `branded: ${brandErr} | fallback: ${r.error || 'voice compose failed'}`
       await ctx.admin.from('cos_campaign_queue').update({
-        metadata: { ...(campaign.metadata || {}), video: { ...v, voiceError: combined } },
+        metadata: { ...(campaign.metadata || {}), video: { ...v, branded: false, brandSchemaVersion: v.brandSchemaVersion || null, voiceError: combined } },
       }).eq('id', id)
       return NextResponse.json({ ok: false, error: combined }, { status: 502 })
     }
   }
 
   const voiced = { ...((v && v.voiced) || {}), [lang]: url }
+  const doneIso = new Date().toISOString()
+  const updatedVideo = branded
+    ? {
+        ...v,
+        voiced,
+        voicedUrl: url,
+        branded: true,
+        brandSchemaVersion: BRAND_SCHEMA_VERSION,
+        brandText: BRAND_TEXT,
+        brandedAt: doneIso,
+        voiceError: null,
+      }
+    : {
+        ...v,
+        voiced,
+        voicedUrl: url,
+        branded: false,
+        brandSchemaVersion: null,
+        brandText: null,
+        brandedAt: null,
+        voiceError: `branded compose failed: ${brandErr}`,
+      }
   await ctx.admin.from('cos_campaign_queue').update({
-    metadata: { ...(campaign.metadata || {}), video: { ...v, voiced, voicedUrl: url, branded, voiceError: null } },
+    metadata: { ...(campaign.metadata || {}), video: updatedVideo },
   }).eq('id', id)
 
   await auditAdminAction({

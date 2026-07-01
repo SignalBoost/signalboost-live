@@ -4,11 +4,11 @@ import { requireAdmin } from '@/lib/outreach/security'
 import { fetchSiteVideo } from '@/lib/operator/video'
 import { renderBrandedVideo } from '@/lib/cos/video-compose'
 import { addVoiceToCampaignVideo } from '@/lib/cos/video-voice'
+import { BRAND_SCHEMA_VERSION, BRAND_TEXT } from '@/lib/cos/brand-schema'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-const BRAND_SCHEMA_VERSION = 7
 
 async function buildFinal(ctx: any, campaign: any, video: any, lang: string) {
   const aspect: '9:16' | '16:9' = video?.aspect === '9:16' || video?.aspect === '16:9'
@@ -34,10 +34,12 @@ async function buildFinal(ctx: any, campaign: any, video: any, lang: string) {
   const updatedVideo = {
     ...video,
     status: 'ready',
-    voicedUrl: finalUrl || video.voicedUrl || null,
+    voicedUrl: finalUrl || null,
     branded,
-    brandSchemaVersion: branded ? BRAND_SCHEMA_VERSION : (video.brandSchemaVersion || null),
-    brandText: branded ? { name: 'SignalBoostAi', url: 'www.saas.signalboostapp.com' } : (video.brandText || null),
+    brandSchemaVersion: branded ? BRAND_SCHEMA_VERSION : null,
+    brandText: branded ? BRAND_TEXT : null,
+    brandedAt: branded ? new Date().toISOString() : null,
+    voiced: finalUrl ? { ...((video && video.voiced) || {}), [lang]: finalUrl } : ((video && video.voiced) || {}),
     voiceError: voiceError || null,
   }
   await ctx.admin.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: updatedVideo } }).eq('id', campaign.id)

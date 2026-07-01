@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/marketing-sales-video",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/cos-brand-video",
+      "schedule": "*/2 * * * *"
     }
   ]
 }

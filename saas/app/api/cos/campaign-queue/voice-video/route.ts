@@ -1,7 +1,8 @@
 // saas/app/api/cos/campaign-queue/voice-video/route.ts
-// Owner-triggered: take a campaign's ready (Kling) video and add spoken voiceover
-// of the script via ElevenLabs + fal merge. Writes the voiced URL back to the
-// campaign. Publishing still gated and will prefer the voiced video.
+// Owner-triggered: take a campaign's ready (Kling) video, loop it to ~1 min with a
+// spoken voiceover (ElevenLabs) and burned captions (fal), then store the result.
+// On failure the error is PERSISTED to metadata.video.voiceError so it shows on the
+// card instead of only flashing in the top banner. Cleared on success.
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
 import { addVoiceToCampaignVideo } from '@/lib/cos/video-voice'
@@ -26,13 +27,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Render a video first; no ready video found.' }, { status: 400 })
   }
 
-  const r = await addVoiceToCampaignVideo(campaign, lang)
-  if (!r.ok) return NextResponse.json({ ok: false, error: r.error || 'voice compose failed' }, { status: 502 })
-
   const v = campaign.metadata.video
+  const r = await addVoiceToCampaignVideo(campaign, lang)
+
+  if (!r.ok) {
+    // Persist the failure so it is visible on the card, not just the top banner.
+    await ctx.admin.from('cos_campaign_queue').update({
+      metadata: { ...(campaign.metadata || {}), video: { ...v, voiceError: r.error || 'voice compose failed' } },
+    }).eq('id', id)
+    return NextResponse.json({ ok: false, error: r.error || 'voice compose failed' }, { status: 502 })
+  }
+
   const voiced = { ...((v && v.voiced) || {}), [lang]: r.url }
   await ctx.admin.from('cos_campaign_queue').update({
-    metadata: { ...(campaign.metadata || {}), video: { ...v, voiced, voicedUrl: r.url } },
+    metadata: { ...(campaign.metadata || {}), video: { ...v, voiced, voicedUrl: r.url, voiceError: null } },
   }).eq('id', id)
 
   await auditAdminAction({

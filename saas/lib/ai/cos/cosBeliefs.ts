@@ -32,6 +32,12 @@ export interface SensitiveCategory {
   signals: string[];
 }
 
+export interface SafeInternalAction {
+  id: string;
+  describes: string;
+  signals: string[];
+}
+
 // Order = precedence. First belief whose signals match wins.
 // signalboost_public_website is first so "affiliates SHOWN on signalboostapp.com"
 // routes to the public site, while a bare "affiliates" routes to internal_database.
@@ -181,7 +187,8 @@ export const CHANNEL_BELIEFS: readonly ChannelBelief[] = [
 
 // The reflex's editable target list. The approval-floor mechanism is fixed in
 // code; WHICH actions count as sensitive lives here so the owner can tune it.
-// COS may only read this and may only ESCALATE into it — never relax it.
+// COS may only read this and may only ESCALATE into it — never relax it. A
+// match here ALWAYS wins over SAFE_INTERNAL_ACTIONS below, no exceptions.
 export const SENSITIVE_CATEGORIES: readonly SensitiveCategory[] = [
   { id: 'public-facing communication', describes: 'Anything published or shown publicly.', signals: ['publish', 'post ', 'go live', 'make a video', 'make a post', 'tweet', 'announce', 'launch'] },
   { id: 'email sending', describes: 'Sending email to anyone.', signals: ['send email', 'email them', 'send the email', 'send a campaign', 'blast'] },
@@ -196,6 +203,20 @@ export const SENSITIVE_CATEGORIES: readonly SensitiveCategory[] = [
   { id: 'Vercel/environment variable changes', describes: 'Changing env/config.', signals: ['env var', 'environment variable', 'change config', 'set secret', 'rotate key'] },
   { id: 'GitHub merge or production code', describes: 'Merging or changing prod code.', signals: ['merge', 'merge to main', 'push to main', 'commit to main', 'production code'] },
   { id: 'contacting leads or customers', describes: 'Reaching out to people.', signals: ['contact', 'reach out', 'message them', 'partner with', 'partners with', 'cold email', 'dm them'] },
+];
+
+// NEW: internal-only COSA operations. Nothing external happens, nothing is
+// spent, nothing leaves the private queue — so these may EXECUTE without
+// stopping for owner approval, matching "AI runs day-to-day, human only
+// starts and gives final approval." A SENSITIVE_CATEGORIES match always
+// overrides a match here — this list can only ever narrow the approval
+// floor for things that are provably safe, never widen what's exempt from it.
+export const SAFE_INTERNAL_ACTIONS: readonly SafeInternalAction[] = [
+  { id: 'draft preparation', describes: 'Drafting content that has not been sent or published anywhere.', signals: ['draft', 'prepare a draft', 'write a draft', 'draft script', 'draft a script', 'draft the'] },
+  { id: 'content generation', describes: 'Generating scripts, storyboards, or copy variants inside the private queue.', signals: ['generate', 'write a script', 'write script', 'storyboard', 'outline'] },
+  { id: 'rendering and production', describes: 'Producing video/audio assets that stay in the private queue until approved.', signals: ['render', 'render the video', 'compose the video', 'add voice', 'add branding', 'brand the video'] },
+  { id: 'analysis and scoring', describes: 'Analyzing or scoring already-drafted work; produces no external effect.', signals: ['score', 'analyze', 'evaluate', 'compare', 'summarize', 'review the draft', 'check readiness'] },
+  { id: 'internal queueing', describes: 'Moving work between internal queue stages, never past the approval gate.', signals: ['queue', 'requeue', 'move to review', 'stage for approval'] },
 ];
 
 // Verbs that mean "do something in the world." Note: "find" is deliberately

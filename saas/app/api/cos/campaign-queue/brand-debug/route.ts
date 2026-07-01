@@ -18,12 +18,14 @@ export async function GET(req: NextRequest) {
   const full = q.get('full') === '1'
   const onlyId = (q.get('id') || '').trim()
 
-  const { data, error } = await ctx.admin
+  let query = ctx.admin
     .from('cos_campaign_queue')
     .select('*')
     .in('channel', ['youtube', 'short_video'])
     .order('updated_at', { ascending: false })
     .limit(12)
+  if (onlyId) query = query.eq('id', onlyId)
+  const { data, error } = await query
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
 
@@ -38,6 +40,8 @@ export async function GET(req: NextRequest) {
         nv.voiced = {}
         nv.voicedUrl = null
         nv.branded = false
+        nv.brandSchemaVersion = null
+        nv.brandText = null
         nv.brandedAt = null
       }
       await ctx.admin.from('cos_campaign_queue').update({
@@ -58,14 +62,32 @@ export async function GET(req: NextRequest) {
       video: {
         status: v.status || null,
         aspect: v.aspect || null,
-        hasBrollUrl: !!v.url,
-        hasVoicedUrl: full && wiped ? false : !!v.voicedUrl,
-        branded: full && wiped ? false : (v.branded || false),
+
+        url: v.url || null,
+        voicedUrl: full && wiped ? null : (v.voicedUrl || null),
+        displayUrlUsedByCosa: full && wiped ? (v.url || null) : (v.voicedUrl || v.url || null),
+
+        branded: full && wiped ? false : v.branded === true,
+        brandSchemaVersion: full && wiped ? null : (v.brandSchemaVersion || null),
+        brandText: full && wiped ? null : (v.brandText || null),
+        brandedAt: full && wiped ? null : (v.brandedAt || null),
+
+        voiceError: wiped ? null : (v.voiceError || null),
+        voiced: full && wiped ? {} : (v.voiced || {}),
         voicedLangs: full && wiped ? [] : Object.keys(v.voiced || {}),
+
         brandAttempts: wiped ? {} : (v.brandAttempts || {}),
         brandingLock: wiped ? null : (v.brandingLock || null),
-        voiceError: wiped ? null : (v.voiceError || null),
+
+        requestId: v.requestId || null,
+        model: v.model || null,
+        ready_at: v.ready_at || null,
+        error: v.error || null,
       },
+      hasBaseUrl: !!v.url,
+      hasVoicedUrl: full && wiped ? false : !!v.voicedUrl,
+      isDisplayingFallbackOrOldVoicedUrl: full && wiped ? false : !!v.voicedUrl && v.branded !== true,
+      isBrandedButSchemaMissing: full && wiped ? false : v.branded === true && !v.brandSchemaVersion,
     }
   })
 

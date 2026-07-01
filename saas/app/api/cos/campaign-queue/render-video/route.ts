@@ -58,7 +58,23 @@ export async function POST(req: NextRequest) {
   await ctx.admin.from('cos_campaign_queue').update({
     metadata: {
       ...(campaign.metadata || {}),
-      video: { status: 'rendering', requestId: started.requestId, model: started.model, aspect, prompt, started_at: startedAt },
+      video: {
+        status: 'rendering',
+        requestId: started.requestId,
+        model: started.model,
+        aspect,
+        prompt,
+        started_at: startedAt,
+        voicedUrl: null,
+        voiced: {},
+        branded: false,
+        brandSchemaVersion: null,
+        brandText: null,
+        brandedAt: null,
+        voiceError: null,
+        brandAttempts: {},
+        brandingLock: null,
+      },
     },
   }).eq('id', id)
 

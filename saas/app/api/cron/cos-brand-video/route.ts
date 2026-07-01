@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { renderBrandedVideo } from '@/lib/cos/video-compose'
+import { BRAND_SCHEMA_VERSION, BRAND_TEXT } from '@/lib/cos/brand-schema'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -81,7 +82,7 @@ export async function GET(req: NextRequest) {
 
     if (r.ok && r.url) {
       const newVoiced = { ...voiced, [lang]: r.url }
-      const patch: any = { ...v, voiced: newVoiced, branded: true, brandingLock: null, voiceError: null, brandedAt: doneIso }
+      const patch: any = { ...v, voiced: newVoiced, branded: true, brandSchemaVersion: BRAND_SCHEMA_VERSION, brandText: BRAND_TEXT, brandingLock: null, voiceError: null, brandedAt: doneIso }
       if (lang === 'en' || !v.voicedUrl) patch.voicedUrl = r.url
       await sb.from('cos_campaign_queue').update({
         metadata: { ...(campaign.metadata || {}), video: patch },
@@ -94,7 +95,7 @@ export async function GET(req: NextRequest) {
     await sb.from('cos_campaign_queue').update({
       metadata: {
         ...(campaign.metadata || {}),
-        video: { ...v, brandAttempts: newAttempts, brandingLock: null, voiceError: `[${lang}] ${r.error || 'branded compose failed'}` },
+        video: { ...v, branded: false, brandSchemaVersion: v.brandSchemaVersion || null, brandAttempts: newAttempts, brandingLock: null, voiceError: `branded compose failed: [${lang}] ${r.error || 'branded compose failed'}` },
       },
     }).eq('id', campaign.id)
     return NextResponse.json({ ok: false, campaign: campaign.id, lang, error: r.error || 'branded compose failed' })

@@ -1,15 +1,26 @@
 // saas/app/api/cos/campaign-queue/publish/route.ts
 // Publish an APPROVED COS campaign item to a live social platform. The approval
 // gate is enforced here: nothing publishes unless the owner approved it first.
+// Two AUTONOMOUS gates run before that human-approved content ever goes live:
+//   1. Video channels must have a finished, rendered video (COSA isn't done yet
+//      otherwise) — no human has to notice a missing video.
+//   2. COSA's own content-quality gate runs automatically (hero/format/CTA/
+//      branding/monetization/traffic-plan). Below the bar, publish is blocked
+//      and the reason is written to metadata.readiness — COSA's problem to fix,
+//      not something the owner has to catch by eye.
 // Language-aware: when a language is given (or owner text is not), the matching
 // per-language draft (work_items[].output) is used. Owner-reviewed content
 // (body.text / body.videoUrl) always wins. Published results are keyed by
 // platform + language so multiple languages to one platform never clobber.
+// After a real (non-stub) publish, the owner is emailed the live link
+// automatically — the last mile of "AI does the work, human just gets told."
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
 import { getValidSocialToken } from '@/lib/outreach/social-token'
 import { publishSocialPost, SOCIAL_CONNECTORS, type SocialPlatform } from '@/lib/outreach/social-connectors'
+import { scoreCampaignReadiness } from '@/lib/cos/video-quality/campaign-scoring'
+import { sendEmail, SENDERS } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +31,9 @@ const CHANNEL_TO_PLATFORM: Record<string, SocialPlatform | undefined> = {
   short_video: 'tiktok',
   linkedin: 'linkedin_company',
 }
+
+const VIDEO_CHANNELS = ['youtube', 'short_video']
+const MIN_READINESS_SCORE = 7 // matches the 'improved'+ grade floor in video-quality/scoring.ts
 
 export async function POST(req: NextRequest) {
   const ctx = await requireAdmin()
@@ -36,6 +50,34 @@ export async function POST(req: NextRequest) {
   // THE GATE: never publish anything the owner has not explicitly approved.
   if (campaign.status !== 'approved') {
     return NextResponse.json({ ok: false, error: 'Campaign must be approved before publishing.' }, { status: 409 })
+  }
+
+  // AUTONOMOUS GATE 1: video channels need a finished, rendered video. COSA
+  // isn't done producing yet if this isn't true — never let a half-finished
+  // or missing video go out, whether triggered by a human or a script.
+  if (VIDEO_CHANNELS.includes(String(campaign.channel))) {
+    const videoStatus = campaign.metadata?.video?.status
+    if (videoStatus !== 'ready') {
+      return NextResponse.json({
+        ok: false,
+        error: `COSA has not finished producing this video yet (status: ${videoStatus || 'not started'}). Publish will unlock automatically once rendering completes.`,
+      }, { status: 409 })
+    }
+  }
+
+  // AUTONOMOUS GATE 2: COSA's own quality/readiness check on the REAL content —
+  // not a demo. Runs every time, no human has to remember to review it.
+  const readiness = scoreCampaignReadiness(campaign)
+  const readinessOk = readiness.grade === 'improved' || readiness.grade === 'marketing_grade_ready'
+  if (!readinessOk) {
+    await ctx.admin.from('cos_campaign_queue').update({
+      metadata: { ...(campaign.metadata || {}), readiness },
+    }).eq('id', id)
+    return NextResponse.json({
+      ok: false,
+      error: `COSA scored this campaign ${readiness.score}/${readiness.max_score} (${readiness.grade}) — below the publish bar. Missing: ${readiness.failed_features.join(', ') || 'none listed'}.`,
+      readiness,
+    }, { status: 422 })
   }
 
   const platform = (body?.platform as SocialPlatform) || CHANNEL_TO_PLATFORM[String(campaign.channel)]
@@ -75,11 +117,37 @@ export async function POST(req: NextRequest) {
 
   const publishedAt = new Date().toISOString()
   const publishedKey = language ? `${platform}::${language}` : platform
+  const isReallyLive = Boolean(result.liveUrl) && !String(result.mode || '').includes('not_configured')
+
+  // AUTO-NOTIFY: tell the owner it's live, with the actual watch/post link, the
+  // moment it happens — no one has to remember to go check.
+  let notified = false
+  let notifyError: string | undefined
+  if (isReallyLive && ctx.user.email) {
+    const platformLabel = SOCIAL_CONNECTORS[platform]?.label || platform
+    const sent = await sendEmail({
+      from: 'saasMarketing',
+      to: ctx.user.email,
+      subject: `🎬 Your video is live on ${platformLabel}: ${title || campaign.title}`,
+      html: `
+        <p>COSA finished the full pipeline for <strong>${title || campaign.title}</strong> and it is now live on ${platformLabel}.</p>
+        <p><a href="${result.liveUrl}">${result.liveUrl}</a></p>
+        <p>Click through to verify it looks right. No further action needed unless something looks off.</p>
+      `.trim(),
+    })
+    notified = Boolean(sent?.ok)
+    if (!sent?.ok) notifyError = sent?.error
+  }
+
   await ctx.admin.from('cos_campaign_queue').update({
     status: 'running',
     metadata: {
       ...(campaign.metadata || {}),
-      published: { ...((campaign.metadata && campaign.metadata.published) || {}), [publishedKey]: { result, publishedAt, language: language || null } },
+      readiness,
+      published: {
+        ...((campaign.metadata && campaign.metadata.published) || {}),
+        [publishedKey]: { result, publishedAt, language: language || null, notified, notifyError: notifyError || null },
+      },
     },
   }).eq('id', id)
 
@@ -89,8 +157,8 @@ export async function POST(req: NextRequest) {
     action: 'cos_campaign.publish',
     targetType: 'cos_campaign_queue',
     targetId: id,
-    metadata: { platform, language: language || null, result },
+    metadata: { platform, language: language || null, result, notified },
   })
 
-  return NextResponse.json({ ok: true, platform, language: language || null, publishedAt, result })
+  return NextResponse.json({ ok: true, platform, language: language || null, publishedAt, result, readiness, notified })
 }

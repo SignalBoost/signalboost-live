@@ -1,11 +1,16 @@
 // saas/app/api/cos/campaign-queue/voice-video/route.ts
-// Owner-triggered: take a campaign's ready (Kling) video, loop it to ~1 min with a
-// spoken voiceover (ElevenLabs) and burned captions (fal), then store the result.
-// On failure the error is PERSISTED to metadata.video.voiceError so it shows on the
-// card instead of only flashing in the top banner. Cleared on success.
+// Owner-triggered "Add voice" for a campaign's ready (Kling) video.
+//
+// NEW: first tries a BRANDED assembly via JSON2Video — b-roll looped to ~60s +
+// ElevenLabs voiceover + auto captions + EXACT on-screen "SignalBoostAi" (gold)
+// and "www.saas.signalboostapp.com" (cyan) in the first and last seconds.
+// If that fails for any reason, it FALLS BACK to the existing fal voice/caption
+// path, so behavior is never worse than before. The result URL is stored the
+// same way either way, so the card renders it unchanged.
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
 import { addVoiceToCampaignVideo } from '@/lib/cos/video-voice'
+import { renderBrandedVideo } from '@/lib/cos/video-compose'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -28,19 +33,37 @@ export async function POST(req: NextRequest) {
   }
 
   const v = campaign.metadata.video
-  const r = await addVoiceToCampaignVideo(campaign, lang)
+  const aspect: '9:16' | '16:9' = v?.aspect === '9:16' || v?.aspect === '16:9'
+    ? v.aspect
+    : (campaign.channel === 'short_video' ? '9:16' : '16:9')
 
-  if (!r.ok) {
-    // Persist the failure so it is visible on the card, not just the top banner.
-    await ctx.admin.from('cos_campaign_queue').update({
-      metadata: { ...(campaign.metadata || {}), video: { ...v, voiceError: r.error || 'voice compose failed' } },
-    }).eq('id', id)
-    return NextResponse.json({ ok: false, error: r.error || 'voice compose failed' }, { status: 502 })
+  // 1) Preferred path: branded compose with exact on-screen text.
+  let url = ''
+  let branded = false
+  let brandErr = ''
+  const b = await renderBrandedVideo({ campaign, brollUrl: v.url, aspect, lang })
+  if (b.ok && b.url) {
+    url = b.url
+    branded = true
+  } else {
+    brandErr = b.error || 'branded compose failed'
+    // 2) Fallback: existing fal voice/caption path (never worse than before).
+    const r = await addVoiceToCampaignVideo(campaign, lang)
+    if (r.ok && r.url) {
+      url = r.url
+    } else {
+      // Both failed — persist the error on the card and stop.
+      const combined = `branded: ${brandErr} | fallback: ${r.error || 'voice compose failed'}`
+      await ctx.admin.from('cos_campaign_queue').update({
+        metadata: { ...(campaign.metadata || {}), video: { ...v, voiceError: combined } },
+      }).eq('id', id)
+      return NextResponse.json({ ok: false, error: combined }, { status: 502 })
+    }
   }
 
-  const voiced = { ...((v && v.voiced) || {}), [lang]: r.url }
+  const voiced = { ...((v && v.voiced) || {}), [lang]: url }
   await ctx.admin.from('cos_campaign_queue').update({
-    metadata: { ...(campaign.metadata || {}), video: { ...v, voiced, voicedUrl: r.url, voiceError: null } },
+    metadata: { ...(campaign.metadata || {}), video: { ...v, voiced, voicedUrl: url, branded, voiceError: null } },
   }).eq('id', id)
 
   await auditAdminAction({
@@ -49,8 +72,8 @@ export async function POST(req: NextRequest) {
     action: 'cos_campaign.voice_video',
     targetType: 'cos_campaign_queue',
     targetId: id,
-    metadata: { language: lang },
+    metadata: { language: lang, mode: branded ? 'branded' : 'fal_fallback', brandError: branded ? null : brandErr },
   })
 
-  return NextResponse.json({ ok: true, url: r.url, language: lang })
+  return NextResponse.json({ ok: true, url, language: lang, branded })
 }

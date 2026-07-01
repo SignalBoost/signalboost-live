@@ -4,8 +4,6 @@
 // array (not inside a scene), and movie-level elements composite on TOP of every
 // scene. So subtitles + the brand image overlay are declared at movie level with a
 // high z-index. Caption accuracy for the brand name is enforced via keywords/replace.
-import { BRAND_SCHEMA_VERSION } from './brand-schema'
-
 const J2V_ENDPOINT = 'https://api.json2video.com/v2/movies'
 const SITE = 'https://saas.signalboostapp.com'
 const TOTAL = 60
@@ -64,9 +62,13 @@ function buildBrandedMovie(opts: { brollUrl: string; aspect: '16:9' | '9:16'; sc
     'client-data': { campaign_id: opts.campaignId, language: opts.lang },
     scenes: [
       {
-        duration: TOTAL,
+        // Scene length is driven by the (finite) voiceover; the b-roll loops to fill it.
+        // JSON2Video spec: a forever-looping element (loop:-1) MUST set duration:-2 so it
+        // extends to the container length. A positive/fixed duration with loop:-1 makes the
+        // clip "play only once" — i.e. ~5s of motion then a frozen tail (the exact bug).
+        duration: -1,
         elements: [
-          { type: 'video', src: opts.brollUrl, duration: TOTAL, loop: -1, resize: 'cover', muted: true },
+          { type: 'video', src: opts.brollUrl, loop: -1, duration: -2, resize: 'cover', muted: true },
           { type: 'voice', model: VOICE_MODEL, voice: VOICE_NAME, text: opts.script, 'model-settings': { language_code: opts.lang } },
         ],
       },
@@ -110,58 +112,87 @@ async function j2vHeaders() {
   return { 'Content-Type': 'application/json', 'x-api-key': key }
 }
 
+// Pull whatever human-readable error JSON2Video hands back, wherever it hides it.
+// Their error text can live at the top level or inside movie{} / tasks[] entries.
+function j2vMessage(payload: any): string {
+  const m = (payload && payload.movie) || {}
+  const fromTasks = Array.isArray(m?.tasks)
+    ? m.tasks.map((t: any) => t?.message || t?.error).filter(Boolean).join(' | ')
+    : ''
+  return String(
+    m?.message || m?.error || payload?.message || payload?.error || fromTasks || '',
+  ).slice(0, 400)
+}
+
 export async function renderBrandedVideo(opts: {
   campaign: any
   brollUrl: string
   aspect: '16:9' | '9:16'
   lang: string
-}): Promise<{ ok: boolean; url?: string; error?: string }> {
-  const evidence: Record<string, any> = {
-    brandSchemaVersion: BRAND_SCHEMA_VERSION,
-    campaignId: String(opts.campaign?.id || ''),
-    language: opts.lang,
-    aspect: opts.aspect,
-    hasBrandingElements: false,
-  }
+}): Promise<{ ok: boolean; url?: string; error?: string; debug?: any }> {
+  const campaignId = String(opts.campaign?.id || '')
+  // Structured, secret-free trace. Ends up in Vercel logs AND (folded into the
+  // returned error) on the campaign card's ⚠ line, so one render is conclusive.
+  const trace: any = { campaignId, lang: opts.lang, aspect: opts.aspect, brandSchemaVersion: 7, phase: 'init' }
+  const log = () => { try { console.log('[branded-video]', JSON.stringify(trace)) } catch {} }
   try {
-    if (!opts.brollUrl) return { ok: false, error: 'No b-roll URL to brand.' }
+    if (!opts.brollUrl) { trace.phase = 'no-broll'; log(); return { ok: false, error: 'No b-roll URL to brand.', debug: trace } }
     const script = scriptFor(opts.campaign, opts.lang)
     const movie = buildBrandedMovie({
       brollUrl: opts.brollUrl,
       aspect: opts.aspect,
       script,
       lang: opts.lang,
-      campaignId: String(opts.campaign?.id || ''),
+      campaignId,
     })
-    evidence.hasBrandingElements = Array.isArray((movie as any).elements) && (movie as any).elements.some((el: any) => el?.type === 'image')
     const headers = await j2vHeaders()
+
+    // --- Submit ---------------------------------------------------------------
+    trace.phase = 'submit'
     const submitRes = await fetch(J2V_ENDPOINT, { method: 'POST', headers, body: JSON.stringify(movie) })
     const submitData: any = await submitRes.json().catch(() => ({}))
-    evidence.submitStatus = submitRes.status
-    evidence.renderId = submitData?.render || submitData?.render_id || submitData?.movie?.id || null
-    evidence.projectId = submitData?.project || submitData?.movie?.project || submitData?.id || null
-    console.info('[cos.brand.json2video.submit]', evidence)
+    trace.submitHttp = submitRes.status
     if (!submitRes.ok || submitData?.success === false) {
-      { const error = submitData?.message || submitData?.error || `submit failed (${submitRes.status})`; console.warn('[cos.brand.json2video.reject]', { ...evidence, error }); return { ok: false, error } }
+      const msg = j2vMessage(submitData) || `submit failed (${submitRes.status})`
+      trace.phase = 'submit-rejected'; trace.error = msg; log()
+      return { ok: false, error: `submit ${submitRes.status}: ${msg}`, debug: trace }
     }
     const project = submitData?.project || submitData?.movie?.project || submitData?.id
-    if (!project) { console.warn('[cos.brand.json2video.reject]', { ...evidence, error: 'No project id returned from JSON2Video.' }); return { ok: false, error: 'No project id returned from JSON2Video.' } }
+    if (!project) { trace.phase = 'no-project'; log(); return { ok: false, error: 'No project id returned from JSON2Video.', debug: trace } }
+    trace.project = String(project)
+
+    // --- Poll -----------------------------------------------------------------
+    trace.phase = 'poll'
+    let lastStatus = ''
+    let lastMessage = ''
     const deadline = Date.now() + 240_000
     while (Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 8000))
-      const pollRes = await fetch(`${J2V_ENDPOINT}?project=${encodeURIComponent(project)}`, { headers })
+      const pollRes = await fetch(`${J2V_ENDPOINT}?project=${encodeURIComponent(String(project))}`, { headers })
       const pollData: any = await pollRes.json().catch(() => ({}))
-      evidence.pollStatus = pollRes.status
       const m = pollData?.movie || {}
       const status = String(m?.status || '')
-      if (status === 'done' && m?.url) { console.info('[cos.brand.json2video.done]', { ...evidence, json2videoStatus: status, finalUrl: String(m.url), overlayExpected: evidence.hasBrandingElements }); return { ok: true, url: String(m.url) } }
-      if (status === 'error' || m?.success === false) { const error = m?.message || 'render error'; console.warn('[cos.brand.json2video.error]', { ...evidence, json2videoStatus: status, error }); return { ok: false, error } }
+      if (status) lastStatus = status
+      const msg = j2vMessage(pollData)
+      if (msg) lastMessage = msg
+      if (status === 'done' && m?.url) {
+        trace.phase = 'done'; trace.status = status; log()
+        return { ok: true, url: String(m.url), debug: trace }
+      }
+      if (status === 'error' || m?.success === false || pollData?.success === false) {
+        const em = msg || 'render error'
+        trace.phase = 'render-error'; trace.status = status; trace.error = em; log()
+        return { ok: false, error: `render error [${trace.project}]: ${em}`, debug: trace }
+      }
     }
-    console.warn('[cos.brand.json2video.timeout]', { ...evidence, error: 'JSON2Video render timed out.' })
-    return { ok: false, error: 'JSON2Video render timed out.' }
+    trace.phase = 'timeout'; trace.status = lastStatus; trace.error = lastMessage; log()
+    return {
+      ok: false,
+      error: `render timed out after 240s [${trace.project}, last status: ${lastStatus || 'unknown'}${lastMessage ? `, ${lastMessage}` : ''}]`,
+      debug: trace,
+    }
   } catch (e: any) {
-    const error = e?.message || 'branded compose failed'
-    console.warn('[cos.brand.json2video.exception]', { ...evidence, error })
-    return { ok: false, error }
+    trace.phase = 'exception'; trace.error = e?.message || 'branded compose failed'; log()
+    return { ok: false, error: e?.message || 'branded compose failed', debug: trace }
   }
 }

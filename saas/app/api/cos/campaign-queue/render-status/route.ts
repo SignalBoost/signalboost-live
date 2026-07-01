@@ -8,6 +8,8 @@ import { addVoiceToCampaignVideo } from '@/lib/cos/video-voice'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
+const BRAND_SCHEMA_VERSION = 3
+
 async function buildFinal(ctx: any, campaign: any, video: any, lang: string) {
   const aspect: '9:16' | '16:9' = video?.aspect === '9:16' || video?.aspect === '16:9'
     ? video.aspect
@@ -29,7 +31,15 @@ async function buildFinal(ctx: any, campaign: any, video: any, lang: string) {
       voiceError = `branded compose failed: ${b.error || 'unknown'} | fallback failed: ${r.error || 'unknown'}`
     }
   }
-  const updatedVideo = { ...video, status: 'ready', voicedUrl: finalUrl || video.voicedUrl || null, branded, voiceError: voiceError || null }
+  const updatedVideo = {
+    ...video,
+    status: 'ready',
+    voicedUrl: finalUrl || video.voicedUrl || null,
+    branded,
+    brandSchemaVersion: branded ? BRAND_SCHEMA_VERSION : (video.brandSchemaVersion || null),
+    brandText: branded ? { name: 'SignalBoostAi', url: 'www.saas.signalboostapp.com' } : (video.brandText || null),
+    voiceError: voiceError || null,
+  }
   await ctx.admin.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: updatedVideo } }).eq('id', campaign.id)
   return updatedVideo
 }
@@ -49,10 +59,12 @@ export async function POST(req: NextRequest) {
 
   const v = (campaign.metadata && campaign.metadata.video) || null
   if (!v || !v.requestId || !v.model) return NextResponse.json({ ok: false, error: 'No render in progress for this campaign.' }, { status: 400 })
-  if (v.status === 'ready' && v.voicedUrl && v.branded === true) return NextResponse.json({ ok: true, status: 'ready', url: v.voicedUrl, baseUrl: v.url, branded: true })
+  if (v.status === 'ready' && v.voicedUrl && v.branded === true && Number(v.brandSchemaVersion || 0) >= BRAND_SCHEMA_VERSION) {
+    return NextResponse.json({ ok: true, status: 'ready', url: v.voicedUrl, baseUrl: v.url, branded: true, brandSchemaVersion: v.brandSchemaVersion })
+  }
   if (v.status === 'ready' && v.url) {
     const finalVideo = await buildFinal(ctx, campaign, v, lang)
-    return NextResponse.json({ ok: true, status: 'ready', url: finalVideo.voicedUrl || finalVideo.url, baseUrl: finalVideo.url, branded: finalVideo.branded === true, warning: finalVideo.voiceError || null })
+    return NextResponse.json({ ok: true, status: 'ready', url: finalVideo.voicedUrl || finalVideo.url, baseUrl: finalVideo.url, branded: finalVideo.branded === true, brandSchemaVersion: finalVideo.brandSchemaVersion || null, warning: finalVideo.voiceError || null })
   }
 
   let res: any
@@ -62,7 +74,7 @@ export async function POST(req: NextRequest) {
   if (res?.status === 'done' && res.videoUrl) {
     const baseVideo = { ...v, status: 'ready', url: res.videoUrl, ready_at: now }
     const finalVideo = await buildFinal(ctx, campaign, baseVideo, lang)
-    return NextResponse.json({ ok: true, status: 'ready', url: finalVideo.voicedUrl || res.videoUrl, baseUrl: res.videoUrl, branded: finalVideo.branded === true, warning: finalVideo.voiceError || null })
+    return NextResponse.json({ ok: true, status: 'ready', url: finalVideo.voicedUrl || res.videoUrl, baseUrl: res.videoUrl, branded: finalVideo.branded === true, brandSchemaVersion: finalVideo.brandSchemaVersion || null, warning: finalVideo.voiceError || null })
   }
   if (res?.status === 'failed' || res?.ok === false) {
     await ctx.admin.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: { ...v, status: 'failed', error: res?.error || 'render failed', failed_at: now } } }).eq('id', id)

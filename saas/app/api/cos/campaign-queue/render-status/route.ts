@@ -8,7 +8,7 @@ import { addVoiceToCampaignVideo } from '@/lib/cos/video-voice'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-const BRAND_SCHEMA_VERSION = 3
+const BRAND_SCHEMA_VERSION = 7
 
 async function buildFinal(ctx: any, campaign: any, video: any, lang: string) {
   const aspect: '9:16' | '16:9' = video?.aspect === '9:16' || video?.aspect === '16:9'

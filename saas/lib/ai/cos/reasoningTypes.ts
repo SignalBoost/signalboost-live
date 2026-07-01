@@ -27,7 +27,7 @@ export type CosDecisionState =
   | 'ANALYZE_ONLY'        // pure strategy; no tool, no action
   | 'RETRIEVE_AND_ANSWER' // read-only fact question; must fetch first, no approval
   | 'PREPARE_AND_HOLD'    // draft/plan a gated action, stop at approval
-  | 'EXECUTE';            // safe action, no approval — UNREACHABLE in v1
+  | 'EXECUTE';            // known-safe internal action — no approval needed
 
 export interface CosReasoningInput {
   objective: string;

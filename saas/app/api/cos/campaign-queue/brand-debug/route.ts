@@ -1,12 +1,9 @@
 // saas/app/api/cos/campaign-queue/brand-debug/route.ts
 // TEMP admin diagnostic + reset. Signed in as admin:
-//   /api/cos/campaign-queue/brand-debug          -> dump stored video state
-//   /api/cos/campaign-queue/brand-debug?reset=1  -> clear stuck retry state so
-//                                                   the branded cron reprocesses
-//
-// Reset clears brandAttempts / voiceError / brandingLock on every 'ready' video
-// campaign (leaves url/status/voiced intact), so campaigns that already hit the
-// retry cap with the old bad voice get a fresh pass with the corrected voice.
+//   /api/cos/campaign-queue/brand-debug             -> dump stored video state
+//   /api/cos/campaign-queue/brand-debug?reset=1     -> clear retry state (attempts/error/lock)
+//   /api/cos/campaign-queue/brand-debug?full=1      -> FULL re-render: also clears voiced/voicedUrl/branded
+//   ...append &id=<campaignId>  -> limit the reset to a single campaign (credit-safe test)
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/outreach/security'
 
@@ -16,7 +13,10 @@ export async function GET(req: NextRequest) {
   const ctx = await requireAdmin()
   if (ctx instanceof NextResponse) return ctx
 
-  const reset = new URL(req.url).searchParams.get('reset') === '1'
+  const q = new URL(req.url).searchParams
+  const light = q.get('reset') === '1'
+  const full = q.get('full') === '1'
+  const onlyId = (q.get('id') || '').trim()
 
   const { data, error } = await ctx.admin
     .from('cos_campaign_queue')
@@ -28,11 +28,18 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
 
   let cleared = 0
-  if (reset) {
+  if (light || full) {
     for (const c of data || []) {
       const v = (c.metadata && c.metadata.video) || {}
       if (v.status !== 'ready') continue
-      const nv = { ...v, brandAttempts: {}, voiceError: null, brandingLock: null }
+      if (onlyId && c.id !== onlyId) continue
+      const nv: any = { ...v, brandAttempts: {}, voiceError: null, brandingLock: null }
+      if (full) {
+        nv.voiced = {}
+        nv.voicedUrl = null
+        nv.branded = false
+        nv.brandedAt = null
+      }
       await ctx.admin.from('cos_campaign_queue').update({
         metadata: { ...(c.metadata || {}), video: nv },
       }).eq('id', c.id)
@@ -42,6 +49,7 @@ export async function GET(req: NextRequest) {
 
   const rows = (data || []).map((c: any) => {
     const v = (c.metadata && c.metadata.video) || {}
+    const wiped = (light || full) && v.status === 'ready' && (!onlyId || c.id === onlyId)
     return {
       id: c.id,
       channel: c.channel,
@@ -51,15 +59,15 @@ export async function GET(req: NextRequest) {
         status: v.status || null,
         aspect: v.aspect || null,
         hasBrollUrl: !!v.url,
-        hasVoicedUrl: !!v.voicedUrl,
-        branded: v.branded || false,
-        voicedLangs: Object.keys(v.voiced || {}),
-        brandAttempts: reset ? {} : (v.brandAttempts || {}),
-        brandingLock: reset ? null : (v.brandingLock || null),
-        voiceError: reset ? null : (v.voiceError || null),
+        hasVoicedUrl: full && wiped ? false : !!v.voicedUrl,
+        branded: full && wiped ? false : (v.branded || false),
+        voicedLangs: full && wiped ? [] : Object.keys(v.voiced || {}),
+        brandAttempts: wiped ? {} : (v.brandAttempts || {}),
+        brandingLock: wiped ? null : (v.brandingLock || null),
+        voiceError: wiped ? null : (v.voiceError || null),
       },
     }
   })
 
-  return NextResponse.json({ ok: true, reset, cleared, count: rows.length, rows }, { headers: { 'cache-control': 'no-store' } })
+  return NextResponse.json({ ok: true, mode: full ? 'full' : light ? 'light' : 'view', onlyId: onlyId || null, cleared, count: rows.length, rows }, { headers: { 'cache-control': 'no-store' } })
 }

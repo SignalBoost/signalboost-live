@@ -95,7 +95,16 @@ export async function GET(req: NextRequest) {
     await sb.from('cos_campaign_queue').update({
       metadata: {
         ...(campaign.metadata || {}),
-        video: { ...v, branded: false, brandSchemaVersion: v.brandSchemaVersion || null, brandAttempts: newAttempts, brandingLock: null, voiceError: `branded compose failed: [${lang}] ${r.error || 'branded compose failed'}` },
+        video: {
+          ...v,
+          branded: false,
+          brandSchemaVersion: null,
+          brandText: null,
+          brandedAt: null,
+          brandAttempts: newAttempts,
+          brandingLock: null,
+          voiceError: `branded compose failed: [${lang}] ${r.error || 'branded compose failed'}`,
+        },
       },
     }).eq('id', campaign.id)
     return NextResponse.json({ ok: false, campaign: campaign.id, lang, error: r.error || 'branded compose failed' })

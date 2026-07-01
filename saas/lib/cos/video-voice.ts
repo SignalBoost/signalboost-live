@@ -136,22 +136,35 @@ export async function addVoiceToCampaignVideo(
     const audioMs = await probeAudioMs(audioDataUri, fallbackMs)
     const totalMs = Math.min(Math.max(Math.ceil(audioMs), MIN_TOTAL_MS), MAX_TOTAL_MS)
 
-    // 3) Compose: loop the short clip across the timeline, lay the voice on top,
-    //    and burn the brand banner (top) for the whole duration.
-    const aspect = campaign?.metadata?.video?.aspect === '9:16' ? '9:16' : '16:9'
-    const banner = aspect === '9:16' ? BANNER_916 : BANNER_169
+    // 3) Compose: loop the short clip across the timeline, lay the voice on top.
+    //    (Proven 2-track combo — this is what must never fail.)
     const tracks = [
       { id: 'video', type: 'video', keyframes: buildVideoKeyframes(String(videoUrl), totalMs) },
-      { id: 'brand', type: 'image', keyframes: [{ timestamp: 0, duration: totalMs, url: banner }] },
       { id: 'voice', type: 'audio', keyframes: [{ timestamp: 0, duration: totalMs, url: audioDataUri }] },
     ]
     const result: any = await fal.subscribe(COMPOSE_MODEL, { input: { tracks } })
-    const composed = result?.data?.video_url || result?.data?.video?.url
-    if (!composed) return { ok: false, error: 'compose returned no video url' }
+    let finalUrl = String(result?.data?.video_url || result?.data?.video?.url || '')
+    if (!finalUrl) return { ok: false, error: 'compose returned no video url' }
 
-    // 4) Burn captions synced to the voice. Graceful: if captioning fails, return
-    //    the voiced (uncaptioned) video rather than erroring the whole step.
-    let finalUrl = String(composed)
+    // 4) Brand banner overlay — SEPARATE call, graceful. If image overlay isn't
+    //    supported it is skipped and the voiced video is still returned.
+    try {
+      const aspect = campaign?.metadata?.video?.aspect === '9:16' ? '9:16' : '16:9'
+      const banner = aspect === '9:16' ? BANNER_916 : BANNER_169
+      const br: any = await fal.subscribe(COMPOSE_MODEL, {
+        input: {
+          tracks: [
+            { id: 'base', type: 'video', keyframes: [{ timestamp: 0, duration: totalMs, url: finalUrl }] },
+            { id: 'brand', type: 'image', keyframes: [{ timestamp: 0, duration: totalMs, url: banner }] },
+          ],
+        },
+      })
+      const brUrl = br?.data?.video_url || br?.data?.video?.url
+      if (brUrl) finalUrl = String(brUrl)
+    } catch {}
+
+    // 5) Burn captions synced to the voice — SEPARATE call, graceful. Runs last so
+    //    captions sit on top of whatever we have (voiced, or voiced + banner).
     try {
       const cap: any = await fal.subscribe(CAPTION_MODEL, {
         input: {

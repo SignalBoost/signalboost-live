@@ -7,8 +7,8 @@
 //   - the b-roll looped to fill 60s as the background,
 //   - an ElevenLabs voiceover,
 //   - auto-transcribed captions (subtitles element),
-//   - "SignalBoostAi" (gold) on screen in the first 7s and last 7s,
-//   - "www.saas.signalboostapp.com" (cyan) on screen in the first 7s and last 7s.
+//   - "SignalBoostAi" (gold) on screen for the full video,
+//   - "www.saas.signalboostapp.com" (cyan) on screen for the full video.
 //
 // Important: the brand text is added INSIDE the scene elements array, not at a
 // movie-level elements key, so it renders with the scene timeline instead of
@@ -61,6 +61,7 @@ function scriptFor(campaign: any, lang: string): string {
 }
 
 function brandOverlay(start: number, vertical: boolean) {
+  const canvasWidth = vertical ? 1080 : 1920
   const boxWidth = vertical ? 960 : 1500
   const y = vertical ? 72 : 44
   const nameSize = vertical ? '104px' : '92px'
@@ -70,8 +71,8 @@ function brandOverlay(start: number, vertical: boolean) {
     type: 'html',
     html,
     start,
-    duration: 7,
-    x: vertical ? 540 : 960,
+    duration: TOTAL,
+    x: Math.round((canvasWidth - boxWidth) / 2),
     y,
     width: boxWidth,
     'fade-in': 0.2,
@@ -90,7 +91,7 @@ function buildBrandedMovie(opts: { brollUrl: string; aspect: '16:9' | '9:16'; sc
     width,
     height,
     quality: 'high',
-    'client-data': { campaign_id: opts.campaignId, language: opts.lang },
+    'client-data': { campaign_id: opts.campaignId, language: opts.lang, brand_name: BRAND_NAME, brand_url: BRAND_URL },
     scenes: [
       {
         duration: TOTAL,
@@ -114,7 +115,6 @@ function buildBrandedMovie(opts: { brollUrl: string; aspect: '16:9' | '9:16'; sc
             },
           },
           brandOverlay(0, vertical),
-          brandOverlay(OUTRO_START, vertical),
         ],
       },
     ],

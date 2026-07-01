@@ -5,9 +5,15 @@
 // routing), and produces a single auditable decision record.
 //
 // Safety invariants that are mechanical, not policy you must remember:
-//   - reads NEVER trip the approval floor; actions ALWAYS do.
-//   - in v1 every action defaults to requiredApproval=true, so EXECUTE is
-//     structurally unreachable and COS cannot auto-act.
+//   - reads NEVER trip the approval floor; actions ALWAYS get checked.
+//   - a SENSITIVE_CATEGORIES match ALWAYS requires approval — no exceptions.
+//   - v2: an action matching NEITHER a sensitive category NOR a known-safe
+//     internal action (SAFE_INTERNAL_ACTIONS) still conservatively defaults
+//     to approval. Only actions provably internal-only (drafting, rendering,
+//     scoring, queueing — nothing external, nothing spent) may EXECUTE
+//     without stopping for the owner. This is what makes day-to-day COSA
+//     operation autonomous while every external/irreversible action still
+//     stops at the owner, exactly once, before it leaves the building.
 
 import type {
   CosReasoningInput,
@@ -18,6 +24,7 @@ import type {
 import {
   CHANNEL_BELIEFS,
   SENSITIVE_CATEGORIES,
+  SAFE_INTERNAL_ACTIONS,
   ACTION_VERBS,
 } from './cosBeliefs';
 import { routeCosSource } from './sourceRouter';
@@ -55,14 +62,25 @@ function channelBelief(channel: CosChannel) {
 }
 
 // Fixed mechanism. Owner tunes WHICH actions are sensitive (in cosBeliefs);
-// this function can only ever set approval TRUE, never clear it.
+// this function can escalate to requiredApproval=true from a sensitive match,
+// or clear it ONLY for a known-safe internal action. Anything matching
+// neither list stays conservative: default to approval.
 function approvalFloor(text: string, proposesAction: boolean): { requiredApproval: boolean; approvalReasons: string[] } {
   if (!proposesAction) return { requiredApproval: false, approvalReasons: [] };
-  const reasons = SENSITIVE_CATEGORIES
+
+  // Sensitivity is a one-way ratchet: a match here can NEVER be cleared below.
+  const sensitiveReasons = SENSITIVE_CATEGORIES
     .filter((c) => c.signals.some((s) => text.includes(s)))
     .map((c) => c.id);
-  if (reasons.length > 0) return { requiredApproval: true, approvalReasons: reasons };
-  // Action with no matched category → conservative reflex: default to approval.
+  if (sensitiveReasons.length > 0) return { requiredApproval: true, approvalReasons: sensitiveReasons };
+
+  // Not sensitive — is it a known-safe, internal-only COSA operation?
+  // Nothing external happens, nothing is spent, nothing leaves the private
+  // queue, so it may execute without stopping for the owner.
+  const safeMatch = SAFE_INTERNAL_ACTIONS.find((a) => a.signals.some((s) => text.includes(s)));
+  if (safeMatch) return { requiredApproval: false, approvalReasons: [] };
+
+  // Unclassified action → conservative reflex: default to approval.
   return { requiredApproval: true, approvalReasons: ['unclassified action — defaulting to approval'] };
 }
 
@@ -112,11 +130,11 @@ export function runCosReasoning(rawInput: CosReasoningInput | string): CosReason
 
   const state = deriveState(blocked, proposesAction, requiredApproval, sourceRouting.mustUseTool);
   const shouldPrepareNow = !blocked;
-  const shouldExecuteNow = state === 'EXECUTE'; // unreachable in v1
+  const shouldExecuteNow = state === 'EXECUTE';
 
   // ---- analysis ----
   const constraints = [
-    'v1: COS may PREPARE only; any execution requires explicit owner approval.',
+    'COS may PREPARE and EXECUTE known-safe internal actions on its own; anything sensitive or unclassified requires explicit owner approval.',
     'COS may not answer current-fact questions from memory; it must use the routed source.',
   ];
   const risks: string[] = [];
@@ -142,7 +160,9 @@ export function runCosReasoning(rawInput: CosReasoningInput | string): CosReason
   const recommendedAction = blocked
     ? 'Reject and request a valid objective.'
     : proposesAction
-      ? `Prepare a ${channel} ${requiredApproval ? 'plan/draft and hold for owner approval' : 'plan'}.`
+      ? requiredApproval
+        ? `Prepare a ${channel} plan/draft and hold for owner approval.`
+        : `Execute this internal ${channel} action directly — no external effect, no owner approval required.`
       : sourceRouting.mustUseTool
         ? `Fetch from ${sourceRouting.requiredSource}, then answer.`
         : `Answer directly as ${channel}.`;
@@ -151,7 +171,7 @@ export function runCosReasoning(rawInput: CosReasoningInput | string): CosReason
     `Channel classified as "${channel}" (${cb.describes}).`,
     sourceRouting.reason,
     proposesAction ? 'Objective proposes an action.' : 'Objective is a question/analysis, not an action.',
-    requiredApproval ? `Approval required: ${approvalReasons.join(', ')}.` : 'No owner approval required for this read.',
+    requiredApproval ? `Approval required: ${approvalReasons.join(', ')}.` : 'No owner approval required — either a read, or a known-safe internal action.',
   ];
 
   // ---- execution plan ----
@@ -162,7 +182,11 @@ export function runCosReasoning(rawInput: CosReasoningInput | string): CosReason
     if (sourceRouting.mustUseTool) steps.push(`Step 1 — consult source "${sourceRouting.requiredSource}" (tool required).`);
     if (proposesAction) {
       steps.push(`Step ${steps.length + 1} — draft the ${channel} action using frame: ${cb.messageFrame}`);
-      if (requiredApproval) steps.push(`Step ${steps.length + 1} — STOP and present to owner for approval. Do not execute.`);
+      if (requiredApproval) {
+        steps.push(`Step ${steps.length + 1} — STOP and present to owner for approval. Do not execute.`);
+      } else {
+        steps.push(`Step ${steps.length + 1} — execute directly; internal-only, nothing external affected.`);
+      }
     } else {
       steps.push(`Step ${steps.length + 1} — produce the answer/recommendation.`);
     }
@@ -173,11 +197,13 @@ export function runCosReasoning(rawInput: CosReasoningInput | string): CosReason
     metricsToWatch: cb.metricsToWatch,
     successCriteria: blocked
       ? ['A valid objective is supplied.']
-      : [`Owner approves the prepared ${channel} action.`, 'The answer is grounded in the routed source, not memory.'],
+      : requiredApproval
+        ? [`Owner approves the prepared ${channel} action.`, 'The answer is grounded in the routed source, not memory.']
+        : ['The internal action completes without error.', 'The answer is grounded in the routed source, not memory.'],
     retrainingSignals: [
       'Owner overrides the channel or source COS chose.',
       'Owner rejects a prepared action.',
-      'Prepared action underperforms its metrics after execution.',
+      'Prepared or executed action underperforms its metrics after release.',
     ],
   };
 
@@ -198,7 +224,9 @@ export function runCosReasoning(rawInput: CosReasoningInput | string): CosReason
       : `No live source needed; this is a reasoning-only answer.`,
     proposesAction && requiredApproval
       ? `I can prepare a draft/plan, but I will hold for your approval before executing.`
-      : ``,
+      : proposesAction
+        ? `This is an internal-only action — executing directly, no external effect.`
+        : ``,
     blocked ? `Blocked: ${blockedBy.join('; ')}.` : ``,
   ].filter(Boolean).join('\n');
 

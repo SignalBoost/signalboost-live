@@ -18,7 +18,7 @@ import { generateSpeech } from '@/lib/elevenlabs/client'
 const COMPOSE_MODEL = 'fal-ai/ffmpeg-api/compose'
 const METADATA_MODEL = 'fal-ai/ffmpeg-api/metadata'
 const CAPTION_MODEL = 'fal-ai/workflow-utilities/auto-subtitle' // transcribes audio -> burns synced captions
-const SITE_URL = 'saas.signalboostapp.com'
+const SITE_URL = 'www.saas.signalboostapp.com'
 const CLIP_MS = 5000        // Kling v3 standard renders ~5s clips
 const MIN_TOTAL_MS = 6000   // floor so a one-line VO still has room
 const MAX_TOTAL_MS = 60000  // cap the final video at one minute

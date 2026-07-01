@@ -24,7 +24,7 @@ const CYAN = '#1af0ff'
 const TOTAL = 60            // seconds — final video length
 const OUTRO_START = 55      // brand lockup reappears for the last 5s
 const VOICE_MODEL = 'elevenlabs-flash-v2-5' // multilingual, included in JSON2Video credits
-const VOICE_NAME = 'Brian'  // documented ElevenLabs voice; multilingual model speaks all 5
+const VOICE_NAME = 'Adam'  // verified supported voice for elevenlabs-flash-v2-5 (JSON2Video managed)
 
 // Localized value narration (~120 words ≈ ~50s, leaving room for the outro).
 // Used as the script when a per-language draft isn't present, so every language
@@ -103,7 +103,7 @@ function buildBrandedMovie(opts: { brollUrl: string; aspect: '16:9' | '9:16'; sc
           // Background: fal b-roll, looped to fill the full minute.
           { type: 'video', src: opts.brollUrl, duration: -2, loop: 30, resize: 'cover', muted: true, 'z-index': 0 },
           // Voiceover (ElevenLabs, multilingual).
-          { type: 'voice', model: VOICE_MODEL, voice: VOICE_NAME, text: opts.script },
+          { type: 'voice', model: VOICE_MODEL, voice: VOICE_NAME, text: opts.script, 'model-settings': { language_code: opts.lang } },
           // Auto captions transcribed from the voiceover, bottom-safe.
           {
             type: 'subtitles',

@@ -1,26 +1,44 @@
 // saas/app/api/cos/campaign-queue/brand-debug/route.ts
-// TEMP admin diagnostic. Open in a browser while signed in as admin:
-//   /api/cos/campaign-queue/brand-debug
-// Returns the exact stored state of recent video campaigns so we can see why a
-// campaign shows a 5s clip: is the render 'ready', did the branded cron write a
-// voicedUrl, how many attempts, is it locked, and what error (if any) it recorded.
+// TEMP admin diagnostic + reset. Signed in as admin:
+//   /api/cos/campaign-queue/brand-debug          -> dump stored video state
+//   /api/cos/campaign-queue/brand-debug?reset=1  -> clear stuck retry state so
+//                                                   the branded cron reprocesses
+//
+// Reset clears brandAttempts / voiceError / brandingLock on every 'ready' video
+// campaign (leaves url/status/voiced intact), so campaigns that already hit the
+// retry cap with the old bad voice get a fresh pass with the corrected voice.
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/outreach/security'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   const ctx = await requireAdmin()
   if (ctx instanceof NextResponse) return ctx
+
+  const reset = new URL(req.url).searchParams.get('reset') === '1'
 
   const { data, error } = await ctx.admin
     .from('cos_campaign_queue')
     .select('*')
     .in('channel', ['youtube', 'short_video'])
     .order('updated_at', { ascending: false })
-    .limit(6)
+    .limit(12)
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+
+  let cleared = 0
+  if (reset) {
+    for (const c of data || []) {
+      const v = (c.metadata && c.metadata.video) || {}
+      if (v.status !== 'ready') continue
+      const nv = { ...v, brandAttempts: {}, voiceError: null, brandingLock: null }
+      await ctx.admin.from('cos_campaign_queue').update({
+        metadata: { ...(c.metadata || {}), video: nv },
+      }).eq('id', c.id)
+      cleared++
+    }
+  }
 
   const rows = (data || []).map((c: any) => {
     const v = (c.metadata && c.metadata.video) || {}
@@ -36,12 +54,12 @@ export async function GET(_req: NextRequest) {
         hasVoicedUrl: !!v.voicedUrl,
         branded: v.branded || false,
         voicedLangs: Object.keys(v.voiced || {}),
-        brandAttempts: v.brandAttempts || {},
-        brandingLock: v.brandingLock || null,
-        voiceError: v.voiceError || null,
+        brandAttempts: reset ? {} : (v.brandAttempts || {}),
+        brandingLock: reset ? null : (v.brandingLock || null),
+        voiceError: reset ? null : (v.voiceError || null),
       },
     }
   })
 
-  return NextResponse.json({ ok: true, count: rows.length, rows }, { headers: { 'cache-control': 'no-store' } })
+  return NextResponse.json({ ok: true, reset, cleared, count: rows.length, rows }, { headers: { 'cache-control': 'no-store' } })
 }

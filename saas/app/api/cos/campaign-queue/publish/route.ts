@@ -60,8 +60,16 @@ export async function POST(req: NextRequest) {
   if (error || !campaign) return NextResponse.json({ ok: false, error: error?.message || 'Campaign not found' }, { status: 404 })
 
   // THE GATE: never publish anything the owner has not explicitly approved.
-  if (campaign.status !== 'approved') {
-    return NextResponse.json({ ok: false, error: 'Campaign must be approved before publishing.' }, { status: 409 })
+  // Owner approval is recorded as approved_at/approved_by on the row (and is
+  // nulled on rejection). After approval, the script worker legitimately moves
+  // the row from 'approved' to 'queued' while drafting — that must NOT lock
+  // publishing forever. So the gate is: the owner approved it, AND the status
+  // is still in the approved/queued working band (not rejected, not already
+  // running/completed).
+  const ownerApproved = Boolean(campaign.approved_at) && Boolean(campaign.approved_by)
+  const publishableStatus = campaign.status === 'approved' || campaign.status === 'queued'
+  if (!ownerApproved || !publishableStatus) {
+    return NextResponse.json({ ok: false, error: 'Campaign must be approved by the owner before publishing.' }, { status: 409 })
   }
 
   // AUTONOMOUS GATE 1 & 2: video channels need a finished AND branded video.

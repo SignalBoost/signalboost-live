@@ -1,0 +1,27 @@
+name: COS Brand Overlay (FFmpeg)
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # every 10 minutes (GitHub may add a few minutes of lag)
+  workflow_dispatch: {}       # manual "Run workflow" button for instant testing
+
+concurrency:
+  group: cos-brand-overlay
+  cancel-in-progress: false   # never kill a run mid-render
+
+jobs:
+  brand:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install FFmpeg
+        run: sudo apt-get update -y && sudo apt-get install -y ffmpeg
+
+      - name: Run brand overlay worker
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/brand-overlay-worker.mjs

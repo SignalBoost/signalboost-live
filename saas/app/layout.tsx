@@ -6,6 +6,7 @@ import Concierge from '@/components/Concierge'
 import LanguageSuggestion from '@/components/LanguageSuggestion'
 import ProductContextBridge from '@/components/ProductContextBridge'
 import { I18nProvider } from '@/components/i18n/I18nProvider'
+import { Analytics } from '@vercel/analytics/react'
 
 const SITE_URL = 'https://saas.signalboostapp.com'
 const SITE_TITLE = 'SignalBoost — AI Websites, Reviews & Content in Any Language'
@@ -123,6 +124,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Concierge />
           <LanguageSuggestion />
         </I18nProvider>
+        <Analytics />
       </body>
     </html>
   )

@@ -1,0 +1,50 @@
+version: "3.9"
+
+x-cos-ai-service: &cos-ai-service
+  build: ./services/cos-ai-department
+  image: signalboost/cos-ai-department:local
+  restart: unless-stopped
+  environment:
+    LOG_LEVEL: info
+
+services:
+  ml-engineer:
+    <<: *cos-ai-service
+    environment:
+      COS_AI_ROLE: ml-engineer
+    ports: ["8101:8000"]
+  ai-engineer:
+    <<: *cos-ai-service
+    environment:
+      COS_AI_ROLE: ai-engineer
+    ports: ["8102:8000"]
+  architect:
+    <<: *cos-ai-service
+    environment:
+      COS_AI_ROLE: architect
+    ports: ["8103:8000"]
+  data-scientist:
+    <<: *cos-ai-service
+    environment:
+      COS_AI_ROLE: data-scientist
+    ports: ["8104:8000"]
+  data-engineer:
+    <<: *cos-ai-service
+    environment:
+      COS_AI_ROLE: data-engineer
+    ports: ["8105:8000"]
+  research:
+    <<: *cos-ai-service
+    environment:
+      COS_AI_ROLE: research
+    ports: ["8106:8000"]
+  ethics:
+    <<: *cos-ai-service
+    environment:
+      COS_AI_ROLE: ethics
+    ports: ["8107:8000"]
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    volumes:
+      - ./monitoring/cos-ai-department/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports: ["9090:9090"]

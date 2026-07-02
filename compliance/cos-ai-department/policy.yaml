@@ -1,0 +1,22 @@
+name: cos-ai-department-compliance
+version: 1.0.0
+principles:
+  - privacy-by-design
+  - human-oversight
+  - explainability
+  - auditability
+  - fairness-and-safety
+shared_requirements:
+  request_logging: enabled
+  sensitive_field_redaction: enabled
+  prometheus_metrics: enabled
+  evidence_retention_days: 365
+  high_risk_actions_require_human_approval: true
+role_controls:
+  ml-engineer: [model-card-required, dataset-lineage-required, bias-evaluation-required]
+  ai-engineer: [prompt-audit-log, pii-redaction, human-approval-for-high-risk-actions]
+  architect: [architecture-decision-record, threat-model-review, slo-review]
+  data-scientist: [experiment-registry, statistical-validity-check, data-minimization]
+  data-engineer: [schema-contracts, retention-policy, access-control-review]
+  research: [source-attribution, reproducibility-notes, license-review]
+  ethics: [risk-tiering, appeals-path, audit-evidence-retention]

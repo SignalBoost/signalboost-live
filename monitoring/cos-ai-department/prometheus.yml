@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: cos-ai-department
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - ml-engineer:8000
+          - ai-engineer:8000
+          - architect:8000
+          - data-scientist:8000
+          - data-engineer:8000
+          - research:8000
+          - ethics:8000

@@ -5,7 +5,7 @@
 // scene. So subtitles + the brand image overlay are declared at movie level with a
 // high z-index. Caption accuracy for the brand name is enforced via keywords/replace.
 const J2V_ENDPOINT = 'https://api.json2video.com/v2/movies'
-const SITE = 'https://saas.signalboostapp.com'
+const SITE = 'https://www.saas.signalboostapp.com' // must match BRAND_TEXT.url etc. exactly — a bare-domain mismatch can silently redirect and drop the overlay fetch
 const TOTAL = 60
 const VOICE_MODEL = 'elevenlabs-flash-v2-5'
 const VOICE_NAME = 'Adam'
@@ -48,12 +48,11 @@ function scriptFor(campaign: any, lang: string): string {
   return text
 }
 
-function buildBrandedMovie(opts: { brollUrl: string; aspect: '16:9' | '9:16'; script: string; lang: string; campaignId: string }) {
+function buildBrandedMovie(opts: { brollUrl: string; aspect: '16:9' | '9:16'; script: string; lang: string; campaignId: string; overlayUrl: string }) {
   const vertical = opts.aspect === '9:16'
   const width = vertical ? 1080 : 1920
   const height = vertical ? 1920 : 1080
   const capSize = vertical ? 64 : 84
-  const overlayUrl = `${SITE}/api/brand-overlay?a=${vertical ? '9x16' : '16x9'}`
 
   return {
     width,
@@ -101,7 +100,7 @@ function buildBrandedMovie(opts: { brollUrl: string; aspect: '16:9' | '9:16'; sc
         },
       },
       // Brand banner as a transparent PNG overlay — always renders, always on top.
-      { type: 'image', src: overlayUrl, duration: -2, x: 0, y: 0, width, height, 'z-index': 99 },
+      { type: 'image', src: opts.overlayUrl, duration: -2, x: 0, y: 0, width, height, 'z-index': 99 },
     ],
   }
 }
@@ -124,6 +123,31 @@ function j2vMessage(payload: any): string {
   ).slice(0, 400)
 }
 
+// PRE-FLIGHT: confirm the brand overlay image is actually reachable BEFORE handing
+// its URL to JSON2Video. A redirect, a firewall block, or a slow edge cold-start
+// would otherwise let JSON2Video silently skip the image element — the movie
+// "succeeds" with no error, but the banner is just missing. This turns that
+// silent failure into a loud, specific one.
+async function verifyOverlayReachable(overlayUrl: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(overlayUrl, { redirect: 'manual' })
+    if (res.status >= 300 && res.status < 400) {
+      const loc = res.headers.get('location') || 'unknown'
+      return { ok: false, error: `brand overlay URL redirected (${res.status} -> ${loc}) instead of returning the image directly — fix SITE/domain config so this URL resolves without a redirect.` }
+    }
+    if (!res.ok) {
+      return { ok: false, error: `brand overlay URL returned ${res.status} — it must be publicly reachable with no auth for JSON2Video to fetch it.` }
+    }
+    const contentType = res.headers.get('content-type') || ''
+    if (!contentType.includes('image')) {
+      return { ok: false, error: `brand overlay URL did not return an image (content-type: ${contentType || 'unknown'}).` }
+    }
+    return { ok: true }
+  } catch (e: any) {
+    return { ok: false, error: `brand overlay URL unreachable: ${e?.message || 'fetch failed'}` }
+  }
+}
+
 export async function renderBrandedVideo(opts: {
   campaign: any
   brollUrl: string
@@ -137,6 +161,16 @@ export async function renderBrandedVideo(opts: {
   const log = () => { try { console.log('[branded-video]', JSON.stringify(trace)) } catch {} }
   try {
     if (!opts.brollUrl) { trace.phase = 'no-broll'; log(); return { ok: false, error: 'No b-roll URL to brand.', debug: trace } }
+
+    const overlayUrl = `${SITE}/api/brand-overlay?a=${opts.aspect === '9:16' ? '9x16' : '16x9'}`
+    trace.phase = 'verify-overlay'
+    trace.overlayUrl = overlayUrl
+    const overlayCheck = await verifyOverlayReachable(overlayUrl)
+    if (!overlayCheck.ok) {
+      trace.phase = 'overlay-unreachable'; trace.error = overlayCheck.error; log()
+      return { ok: false, error: overlayCheck.error, debug: trace }
+    }
+
     const script = scriptFor(opts.campaign, opts.lang)
     const movie = buildBrandedMovie({
       brollUrl: opts.brollUrl,
@@ -144,6 +178,7 @@ export async function renderBrandedVideo(opts: {
       script,
       lang: opts.lang,
       campaignId,
+      overlayUrl,
     })
     const headers = await j2vHeaders()
 

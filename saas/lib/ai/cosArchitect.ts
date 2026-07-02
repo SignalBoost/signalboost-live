@@ -11,8 +11,8 @@
 //                           handed off via /api/cos/run (owner-only). No theatre.
 //
 // Both anchor to the single canonical PLATFORM_DOCTRINE so the rules never drift.
-// Both are now prefixed with COS_PERSONA_DOCTRINE so COS behaves as a senior CTO,
-// systems architect, product strategist, and decisive execution manager.
+// COS_PERSONA_DOCTRINE is prepended to both prompts so COS always operates with
+// the full six-role AI department identity and autonomy rules active.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { PLATFORM_DOCTRINE } from '@/lib/ai/platformDoctrine'

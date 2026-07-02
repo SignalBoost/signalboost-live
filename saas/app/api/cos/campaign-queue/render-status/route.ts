@@ -33,18 +33,15 @@ async function buildFinal(ctx: any, campaign: any, video: any, lang: string) {
     return updatedVideo
   }
 
-  // No fallback here. The old fallback created an unbranded/caption-only video and
-  // saved it as voicedUrl, which made bad output look like the final COSA result.
-  // A final campaign video is only final when JSON2Video returns the branded asset.
   const updatedVideo = {
     ...video,
-    status: 'ready',
+    status: 'brand_error',
     voicedUrl: null,
     branded: false,
     brandSchemaVersion: null,
     brandText: null,
     brandedAt: null,
-    voiced: (video && video.voiced) || {},
+    voiced: {},
     voiceError: `branded compose failed: ${b.error || 'unknown'}`,
     brandDebug: b.debug || null,
   }
@@ -70,9 +67,9 @@ export async function POST(req: NextRequest) {
   if (v.status === 'ready' && v.voicedUrl && v.branded === true && Number(v.brandSchemaVersion || 0) >= BRAND_SCHEMA_VERSION) {
     return NextResponse.json({ ok: true, status: 'ready', url: v.voicedUrl, baseUrl: v.url, branded: true, brandSchemaVersion: v.brandSchemaVersion })
   }
-  if (v.status === 'ready' && v.url) {
-    const finalVideo = await buildFinal(ctx, campaign, v, lang)
-    return NextResponse.json({ ok: finalVideo.branded === true, status: 'ready', url: finalVideo.voicedUrl || null, baseUrl: finalVideo.url, branded: finalVideo.branded === true, brandSchemaVersion: finalVideo.brandSchemaVersion || null, warning: finalVideo.voiceError || null }, { status: finalVideo.branded === true ? 200 : 502 })
+  if ((v.status === 'ready' || v.status === 'brand_error') && v.url) {
+    const finalVideo = await buildFinal(ctx, campaign, { ...v, status: 'ready' }, lang)
+    return NextResponse.json({ ok: finalVideo.branded === true, status: finalVideo.status, url: finalVideo.voicedUrl || null, baseUrl: finalVideo.url, branded: finalVideo.branded === true, brandSchemaVersion: finalVideo.brandSchemaVersion || null, warning: finalVideo.voiceError || null }, { status: finalVideo.branded === true ? 200 : 502 })
   }
 
   let res: any
@@ -82,7 +79,7 @@ export async function POST(req: NextRequest) {
   if (res?.status === 'done' && res.videoUrl) {
     const baseVideo = { ...v, status: 'ready', url: res.videoUrl, ready_at: now }
     const finalVideo = await buildFinal(ctx, campaign, baseVideo, lang)
-    return NextResponse.json({ ok: finalVideo.branded === true, status: 'ready', url: finalVideo.voicedUrl || null, baseUrl: res.videoUrl, branded: finalVideo.branded === true, brandSchemaVersion: finalVideo.brandSchemaVersion || null, warning: finalVideo.voiceError || null }, { status: finalVideo.branded === true ? 200 : 502 })
+    return NextResponse.json({ ok: finalVideo.branded === true, status: finalVideo.status, url: finalVideo.voicedUrl || null, baseUrl: res.videoUrl, branded: finalVideo.branded === true, brandSchemaVersion: finalVideo.brandSchemaVersion || null, warning: finalVideo.voiceError || null }, { status: finalVideo.branded === true ? 200 : 502 })
   }
   if (res?.status === 'failed' || res?.ok === false) {
     await ctx.admin.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: { ...v, status: 'failed', error: res?.error || 'render failed', failed_at: now } } }).eq('id', id)

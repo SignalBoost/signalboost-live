@@ -3,6 +3,7 @@ import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
 import { buildDefaultMarketingRecommendation } from '@/lib/cos/recommendation/engine'
 import type { CosChannel, CosDepartment, CosPriority, CosRecommendation } from '@/lib/cos/recommendation/types'
 import { queueItemFromRecommendation } from '@/lib/cos/campaign-queue'
+import { autoPublishApprovedCampaign } from '@/lib/cos/campaign-queue/publish-core'
 import type { CosCampaignQueueStatus } from '@/lib/cos/campaign-queue'
 
 export const dynamic = 'force-dynamic'
@@ -386,5 +387,24 @@ export async function PATCH(req: NextRequest) {
     metadata: { fields: Object.keys(patch) },
   })
 
-  return NextResponse.json({ ok: true, campaign: cleanDestination(data) })
+  // AUTO-PUBLISH ON APPROVAL — the owner approves, the AI does the rest.
+  // Runs the full guarded pipeline (video ready + branded, quality gate,
+  // tracking link, live post, owner email) for every drafted language with a
+  // voiced render. Failures never break the approval itself: every outcome is
+  // returned here AND written to metadata.autoPublish, so nothing dies silently.
+  let autoPublish: any = null
+  if (status === 'approved') {
+    try {
+      autoPublish = await autoPublishApprovedCampaign({
+        admin: ctx.admin,
+        userId: ctx.user.id,
+        userEmail: ctx.user.email || null,
+        campaignId: id,
+      })
+    } catch (e: any) {
+      autoPublish = { attempted: 0, published: 0, results: [{ language: null, ok: false, error: e?.message || 'Auto-publish crashed' }] }
+    }
+  }
+
+  return NextResponse.json({ ok: true, campaign: cleanDestination(data), autoPublish })
 }

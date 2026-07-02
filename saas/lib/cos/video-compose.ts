@@ -2,23 +2,64 @@
 // JSON2Video is used only for the pixel brand overlay. The existing media path
 // still creates narration/captions first (video-voice.ts), then this module
 // burns in the exact SignalBoostAi name + URL overlay on top of that.
+//
+// FIX: JSON2Video's `duration: -1` asks IT to probe the source video's
+// intrinsic length itself. That probe can fail on a freshly-generated fal.media
+// CDN source (encoding quirk, timing, redirect), producing a vague "error
+// rendering scenes" with no further detail. We already have proven, working
+// code elsewhere in this pipeline (fal-ai/ffmpeg-api/metadata) for reliably
+// reading a video's real duration — so we probe it ourselves and hand
+// JSON2Video an explicit, known number instead of asking it to guess.
+
+import { fal } from '@fal-ai/client'
 
 const J2V_ENDPOINT = 'https://api.json2video.com/v2/movies'
 const SITE = 'https://www.saas.signalboostapp.com'
+const METADATA_MODEL = 'fal-ai/ffmpeg-api/metadata'
+
+let falConfigured = false
+function ensureFal() {
+  if (!falConfigured) { fal.config({ credentials: process.env.FAL_KEY }); falConfigured = true }
+}
+
+// Probe the real duration of the source video ourselves (in seconds), rather
+// than letting JSON2Video's own intrinsic-length detection be the single
+// point of failure. Falls back to null (caller uses -1 auto-detect) if the
+// probe itself fails, so this degrades gracefully instead of blocking.
+async function probeDurationSeconds(url: string): Promise<number | null> {
+  try {
+    ensureFal()
+    const r: any = await fal.subscribe(METADATA_MODEL, { input: { media_url: url } })
+    const d = r?.data || {}
+    const sec =
+      d?.media?.duration ??
+      d?.duration ??
+      d?.video?.duration ??
+      (Array.isArray(d?.streams) ? d.streams.find((s: any) => s?.duration)?.duration : undefined)
+    const n = Number(sec)
+    if (Number.isFinite(n) && n > 0.5) return n
+  } catch {}
+  return null
+}
 
 function dims(aspect: '16:9' | '9:16') {
   const vertical = aspect === '9:16'
   return { width: vertical ? 1080 : 1920, height: vertical ? 1920 : 1080 }
 }
 
-function buildOverlayMovie(opts: { sourceUrl: string; aspect: '16:9' | '9:16'; campaignId: string; lang: string; overlayUrl: string }) {
+function buildOverlayMovie(opts: { sourceUrl: string; aspect: '16:9' | '9:16'; campaignId: string; lang: string; overlayUrl: string; durationSec: number | null }) {
   const { width, height } = dims(opts.aspect)
+  // Prefer an explicit, known duration (from our own probe) over JSON2Video's
+  // own auto-detection (-1), which is the likely source of "rendering scenes"
+  // failures on a freshly-generated source file.
+  const videoDuration = opts.durationSec && opts.durationSec > 0 ? opts.durationSec : -1
+  const sceneDuration = opts.durationSec && opts.durationSec > 0 ? opts.durationSec : -1
   return {
     width,
     height,
     quality: 'high',
     'client-data': { campaign_id: opts.campaignId, language: opts.lang, mode: 'brand-overlay-only' },
-    scenes: [{ duration: -1, elements: [{ type: 'video', src: opts.sourceUrl, duration: -1, resize: 'cover' }] }],
+    scenes: [{ duration: sceneDuration, elements: [{ type: 'video', src: opts.sourceUrl, duration: videoDuration, resize: 'cover' }] }],
     elements: [{ type: 'image', src: opts.overlayUrl, duration: -2, x: 0, y: 0, width, height, 'z-index': 99 }],
   }
 }
@@ -107,6 +148,11 @@ export async function renderBrandOverlayVideo(opts: { campaign: any; sourceUrl: 
       log()
       return { ok: false, error: 'No source video URL to brand.', debug: trace }
     }
+
+    trace.phase = 'probe-duration'
+    const durationSec = await probeDurationSeconds(opts.sourceUrl)
+    trace.probedDurationSec = durationSec
+
     const overlayUrl = `${SITE}/api/brand-overlay?a=${opts.aspect === '9:16' ? '9x16' : '16x9'}`
     trace.phase = 'verify-overlay'
     trace.overlayUrl = overlayUrl
@@ -117,7 +163,7 @@ export async function renderBrandOverlayVideo(opts: { campaign: any; sourceUrl: 
       log()
       return { ok: false, error: overlayCheck.error, debug: trace }
     }
-    const movie = buildOverlayMovie({ sourceUrl: opts.sourceUrl, aspect: opts.aspect, campaignId, lang: opts.lang, overlayUrl })
+    const movie = buildOverlayMovie({ sourceUrl: opts.sourceUrl, aspect: opts.aspect, campaignId, lang: opts.lang, overlayUrl, durationSec })
     const result = await submitAndPoll(movie, trace)
     log()
     return result

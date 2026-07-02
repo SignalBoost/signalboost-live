@@ -1,12 +1,7 @@
 // saas/lib/cos/video-compose.ts
-// Branded final-video via JSON2Video.
-//
-// Production rule: JSON2Video should only do the thing it is best at here —
-// compositing the guaranteed pixel overlay (SignalBoostAi + URL) on top of an
-// already-rendered video. Voice/caption generation stays in the existing
-// fal/ElevenLabs path, which was already producing video. This avoids the older
-// all-in-one JSON2Video voice/subtitle job failing and leaving COSA with no
-// final video at all.
+// JSON2Video is used only for the pixel brand overlay. The existing media path
+// still creates narration/captions first, then this module burns in the exact
+// SignalBoostAi and URL overlay.
 
 const J2V_ENDPOINT = 'https://api.json2video.com/v2/movies'
 const SITE = 'https://www.saas.signalboostapp.com'
@@ -16,30 +11,15 @@ function dims(aspect: '16:9' | '9:16') {
   return { width: vertical ? 1080 : 1920, height: vertical ? 1920 : 1080 }
 }
 
-function buildOverlayMovie(opts: {
-  sourceUrl: string
-  aspect: '16:9' | '9:16'
-  campaignId: string
-  lang: string
-  overlayUrl: string
-}) {
+function buildOverlayMovie(opts: { sourceUrl: string; aspect: '16:9' | '9:16'; campaignId: string; lang: string; overlayUrl: string }) {
   const { width, height } = dims(opts.aspect)
   return {
     width,
     height,
     quality: 'high',
     'client-data': { campaign_id: opts.campaignId, language: opts.lang, mode: 'brand-overlay-only' },
-    scenes: [
-      {
-        duration: -1,
-        elements: [
-          { type: 'video', src: opts.sourceUrl, duration: -1, resize: 'cover' },
-        ],
-      },
-    ],
-    elements: [
-      { type: 'image', src: opts.overlayUrl, duration: -2, x: 0, y: 0, width, height, 'z-index': 99 },
-    ],
+    scenes: [{ duration: -1, elements: [{ type: 'video', src: opts.sourceUrl, duration: -1, resize: 'cover' }] }],
+    elements: [{ type: 'image', src: opts.overlayUrl, duration: -2, x: 0, y: 0, width, height, 'z-index': 99 }],
   }
 }
 
@@ -51,24 +31,16 @@ async function j2vHeaders() {
 
 function j2vMessage(payload: any): string {
   const m = (payload && payload.movie) || {}
-  const fromTasks = Array.isArray(m?.tasks)
-    ? m.tasks.map((t: any) => t?.message || t?.error).filter(Boolean).join(' | ')
-    : ''
-  return String(
-    m?.message || m?.error || payload?.message || payload?.error || fromTasks || '',
-  ).slice(0, 400)
+  const fromTasks = Array.isArray(m?.tasks) ? m.tasks.map((t: any) => t?.message || t?.error).filter(Boolean).join(' | ') : ''
+  return String(m?.message || m?.error || payload?.message || payload?.error || fromTasks || '').slice(0, 400)
 }
 
 async function verifyOverlayReachable(overlayUrl: string): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await fetch(overlayUrl, { redirect: 'follow' })
-    if (!res.ok) {
-      return { ok: false, error: `brand overlay URL returned ${res.status}` }
-    }
+    if (!res.ok) return { ok: false, error: `brand overlay URL returned ${res.status}` }
     const contentType = res.headers.get('content-type') || ''
-    if (!contentType.includes('image')) {
-      return { ok: false, error: `brand overlay URL did not return an image (content-type: ${contentType || 'unknown'})` }
-    }
+    if (!contentType.includes('image')) return { ok: false, error: `brand overlay URL did not return an image (content-type: ${contentType || 'unknown'})` }
     return { ok: true }
   } catch (e: any) {
     return { ok: false, error: `brand overlay URL unreachable: ${e?.message || 'fetch failed'}` }
@@ -77,7 +49,6 @@ async function verifyOverlayReachable(overlayUrl: string): Promise<{ ok: boolean
 
 async function submitAndPoll(movie: any, trace: any): Promise<{ ok: boolean; url?: string; error?: string; debug?: any }> {
   const headers = await j2vHeaders()
-
   trace.phase = 'submit'
   const submitRes = await fetch(J2V_ENDPOINT, { method: 'POST', headers, body: JSON.stringify(movie) })
   const submitData: any = await submitRes.json().catch(() => ({}))
@@ -88,7 +59,6 @@ async function submitAndPoll(movie: any, trace: any): Promise<{ ok: boolean; url
     trace.error = msg
     return { ok: false, error: `submit ${submitRes.status}: ${msg}`, debug: trace }
   }
-
   const project = submitData?.project || submitData?.movie?.project || submitData?.id
   if (!project) {
     trace.phase = 'no-project'
@@ -96,7 +66,6 @@ async function submitAndPoll(movie: any, trace: any): Promise<{ ok: boolean; url
   }
   trace.project = String(project)
   trace.phase = 'poll'
-
   let lastStatus = ''
   let lastMessage = ''
   const deadline = Date.now() + 240_000
@@ -122,34 +91,22 @@ async function submitAndPoll(movie: any, trace: any): Promise<{ ok: boolean; url
       return { ok: false, error: `render error [${trace.project}]: ${em}`, debug: trace }
     }
   }
-
   trace.phase = 'timeout'
   trace.status = lastStatus
   trace.error = lastMessage
-  return {
-    ok: false,
-    error: `render timed out after 240s [${trace.project}, last status: ${lastStatus || 'unknown'}${lastMessage ? `, ${lastMessage}` : ''}]`,
-    debug: trace,
-  }
+  return { ok: false, error: `render timed out after 240s [${trace.project}, last status: ${lastStatus || 'unknown'}${lastMessage ? `, ${lastMessage}` : ''}]`, debug: trace }
 }
 
-export async function renderBrandOverlayVideo(opts: {
-  campaign: any
-  sourceUrl: string
-  aspect: '16:9' | '9:16'
-  lang: string
-}): Promise<{ ok: boolean; url?: string; error?: string; debug?: any }> {
+export async function renderBrandOverlayVideo(opts: { campaign: any; sourceUrl: string; aspect: '16:9' | '9:16'; lang: string }): Promise<{ ok: boolean; url?: string; error?: string; debug?: any }> {
   const campaignId = String(opts.campaign?.id || '')
   const trace: any = { campaignId, lang: opts.lang, aspect: opts.aspect, brandSchemaVersion: 7, phase: 'init', mode: 'brand-overlay-only' }
   const log = () => { try { console.log('[branded-video]', JSON.stringify(trace)) } catch {} }
-
   try {
     if (!opts.sourceUrl) {
       trace.phase = 'no-source'
       log()
       return { ok: false, error: 'No source video URL to brand.', debug: trace }
     }
-
     const overlayUrl = `${SITE}/api/brand-overlay?a=${opts.aspect === '9:16' ? '9x16' : '16x9'}`
     trace.phase = 'verify-overlay'
     trace.overlayUrl = overlayUrl
@@ -160,14 +117,7 @@ export async function renderBrandOverlayVideo(opts: {
       log()
       return { ok: false, error: overlayCheck.error, debug: trace }
     }
-
-    const movie = buildOverlayMovie({
-      sourceUrl: opts.sourceUrl,
-      aspect: opts.aspect,
-      campaignId,
-      lang: opts.lang,
-      overlayUrl,
-    })
+    const movie = buildOverlayMovie({ sourceUrl: opts.sourceUrl, aspect: opts.aspect, campaignId, lang: opts.lang, overlayUrl })
     const result = await submitAndPoll(movie, trace)
     log()
     return result
@@ -179,13 +129,12 @@ export async function renderBrandOverlayVideo(opts: {
   }
 }
 
-// Backward-compatible name for older callers. It now means "brand this source
-// video" rather than "do voice, subtitles, and branding in one JSON2Video job".
-export async function renderBrandedVideo(opts: {
-  campaign: any
-  brollUrl: string
-  aspect: '16:9' | '9:16'
-  lang: string
-}): Promise<{ ok: boolean; url?: string; error?: string; debug?: any }> {
-  return renderBrandOverlayVideo({ campaign: opts.campaign, sourceUrl: opts.brollUrl, aspect: opts.aspect, lang: opts.lang })
+export async function renderBrandedVideo(opts: { campaign: any; brollUrl: string; aspect: '16:9' | '9:16'; lang: string }): Promise<{ ok: boolean; url?: string; error?: string; debug?: any }> {
+  const mod = await import('./video-' + 'voice')
+  const readyCampaign = { ...opts.campaign, metadata: { ...(opts.campaign?.metadata || {}), video: { ...((opts.campaign?.metadata && opts.campaign.metadata.video) || {}), status: 'ready', url: opts.brollUrl } } }
+  const voiced = await mod.addVoiceToCampaignVideo(readyCampaign, opts.lang)
+  if (!voiced.ok || !voiced.url) return { ok: false, error: voiced.error || 'voice compose failed' }
+  const overlay = await renderBrandOverlayVideo({ campaign: readyCampaign, sourceUrl: voiced.url, aspect: opts.aspect, lang: opts.lang })
+  if (overlay.ok && overlay.url) return overlay
+  return { ok: false, error: overlay.error || 'brand overlay failed', debug: overlay.debug }
 }

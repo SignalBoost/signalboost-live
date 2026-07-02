@@ -1,17 +1,18 @@
 // saas/app/api/cron/cos-campaign-measure/route.ts
 // Post-publish performance review — the "CEO checks what actually happened"
 // duty. Runs on a schedule, finds campaigns published long enough ago to have
-// real numbers, and pulls REAL stats using the same OAuth token already
-// stored for publishing (no new credentials needed for youtube_channels).
-// Also computes an estimated real-dollar cost per campaign (see
-// campaign-cost.ts for verified rates and honest limitations) so cost and
-// performance sit together in one place. Honest by construction: platforms
+// real numbers, and pulls REAL stats: platform performance (views/likes/
+// comments via the same OAuth token already stored for publishing), REAL
+// first-party click counts (from cos_campaign_clicks, logged by /api/track),
+// and estimated cost (see campaign-cost.ts). Cost, traffic, and performance
+// all land together on the campaign record. Honest by construction: platforms
 // without a readonly-capable token are marked unsupported, never faked.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { measureCampaignPerformance } from '@/lib/cos/campaign-queue/measure'
 import { estimateCampaignCost } from '@/lib/cos/campaign-queue/campaign-cost'
+import { getCampaignTraffic } from '@/lib/cos/campaign-queue/campaign-traffic'
 import type { SocialPlatform } from '@/lib/outreach/social-connectors'
 
 export const dynamic = 'force-dynamic'
@@ -68,12 +69,13 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    const traffic = await getCampaignTraffic(sb, campaign.id)
     const cost = estimateCampaignCost(campaign)
 
     const anySupported = Object.values(performance).some((m: any) => m.supported && !m.error)
     await sb.from('cos_campaign_queue').update({
       status: anySupported ? 'measured' : campaign.status,
-      metadata: { ...(campaign.metadata || {}), performance, cost, measured_at: new Date().toISOString() },
+      metadata: { ...(campaign.metadata || {}), performance, traffic, cost, measured_at: new Date().toISOString() },
     }).eq('id', campaign.id)
     measured++
   }

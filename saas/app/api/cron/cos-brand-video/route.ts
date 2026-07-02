@@ -12,6 +12,8 @@ const LANGS = ['en', 'es', 'pt', 'pl', 'ru']
 const LOCK_MS = 5 * 60 * 1000
 const MAX_ATTEMPTS = 2
 
+type VoiceResult = { ok: boolean; url?: string; error?: string }
+
 function db() {
   const url = process.env['NEXT_PUBLIC_SUPABASE_URL']!
   const key = process.env['SUPABASE_' + 'SERVICE_ROLE_KEY']!
@@ -51,11 +53,12 @@ export async function GET(req: NextRequest) {
     await sb.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: { ...v, brandingLock: { lang, at: nowIso } } } }).eq('id', campaign.id)
 
     const sourceUrl = v.unbrandedVoicedUrl || v.voicedUrl || null
-    const voice = sourceUrl ? { ok: true, url: sourceUrl } : await addVoiceToCampaignVideo(campaign, lang)
+    const voice: VoiceResult = sourceUrl ? { ok: true, url: String(sourceUrl) } : await addVoiceToCampaignVideo(campaign, lang)
     if (!voice.ok || !voice.url) {
       const newAttempts = { ...attempts, [lang]: (attempts[lang] || 0) + 1 }
-      await sb.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: { ...v, brandAttempts: newAttempts, brandingLock: null, voiceError: `voice compose error: [${lang}] ${voice.error || 'compose error'}` } } }).eq('id', campaign.id)
-      return NextResponse.json({ ok: false, campaign: campaign.id, lang, error: voice.error || 'compose error' }, { status: 502 })
+      const voiceError = voice.error || 'compose error'
+      await sb.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: { ...v, brandAttempts: newAttempts, brandingLock: null, voiceError: `voice compose error: [${lang}] ${voiceError}` } } }).eq('id', campaign.id)
+      return NextResponse.json({ ok: false, campaign: campaign.id, lang, error: voiceError }, { status: 502 })
     }
 
     const overlay = await renderBrandOverlayVideo({ campaign, sourceUrl: voice.url, aspect, lang })

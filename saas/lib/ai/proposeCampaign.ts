@@ -1,15 +1,15 @@
 // saas/lib/ai/proposeCampaign.ts
 // On-demand COS marketing campaign creation for the Chief of Staff chat tool.
-// This is not just a written proposal anymore: for video-style channels it
-// creates a real cos_campaign_queue row, injects the requested script/CTA as the
-// draft output, and starts the internal render pipeline. Publishing remains
-// owner-gated by the existing publish route.
+// Creates a real cos_campaign_queue row, injects the requested script/CTA as
+// the draft output, and starts the internal render pipeline immediately — so
+// the owner reviews the ACTUAL finished video, not a text promise.
 //
-// FIX: approved_by is a uuid column — writing the string marker
-// 'cos_internal_preparation' into it made Postgres reject EVERY chat-created
-// campaign ("invalid input syntax for type uuid"). approved_by now carries a
-// real user uuid (when the caller knows it) or null; the "approved via owner
-// chat command" semantics live in metadata.approved_via, where strings belong.
+// APPROVAL MODEL (owner's vision): COSA prepares everything first; the row is
+// created as waiting_approval. The owner's single Approve click (dashboard)
+// stamps approved_by, and the cos-auto-publish cron then publishes
+// automatically once branding + quality gates pass, emailing the live link.
+// No human Publish click needed. approved_by is a uuid column: it is only
+// ever a real user uuid (stamped at approval) or null — never a marker string.
 
 import { createClient } from '@supabase/supabase-js'
 import { queueItemFromRecommendation } from '@/lib/cos/campaign-queue'
@@ -97,7 +97,7 @@ export interface ProposeCampaignResult {
   error?: string
 }
 
-export async function proposeCampaign(args: any, approvedByUserId?: string | null): Promise<ProposeCampaignResult> {
+export async function proposeCampaign(args: any, _approvedByUserId?: string | null): Promise<ProposeCampaignResult> {
   const goal = text(args?.goal || args?.objective || args?.sourceMaterial, 'Create a SignalBoostAi promotional video campaign.', 1200)
   const audience = text(args?.audience, 'Small businesses, agencies, hotels, restaurants, and entrepreneurs.', 400)
   const channel = channelOf(args?.channel || goal)
@@ -122,7 +122,7 @@ export async function proposeCampaign(args: any, approvedByUserId?: string | nul
     confidence: 90,
     expected_roi: 'medium',
     estimated_cost_usd: VIDEO_CHANNELS.has(channel) ? 12 : 5,
-    reason: 'Owner/COS requested an executable marketing campaign from chat. Create the campaign, prepare the internal video asset, and keep publishing gated.',
+    reason: 'Owner/COS requested an executable marketing campaign from chat. Prepare the full video for owner review; publishing happens automatically after the owner approves.',
     signals: [{ id: id('signal'), source: 'cos_chat_video_campaign_tool', metric: 'owner_campaign_request', value: title, confidence: 95, observed_at: now, evidence: [goal, script] }],
     approval_status: 'pending_approval',
     created_at: now,
@@ -130,11 +130,11 @@ export async function proposeCampaign(args: any, approvedByUserId?: string | nul
 
   const item = queueItemFromRecommendation(recommendation)
   const row: any = rowFromQueueItem(item)
-  row.status = VIDEO_CHANNELS.has(channel) ? 'approved' : 'waiting_approval'
+  // Owner reviews the finished video, then a single Approve triggers auto-publish.
+  row.status = 'waiting_approval'
   row.approval_required = true
-  // uuid column: real user uuid when known, else null — NEVER a string marker.
-  row.approved_by = VIDEO_CHANNELS.has(channel) ? (approvedByUserId || null) : null
-  row.approved_at = VIDEO_CHANNELS.has(channel) ? now : null
+  row.approved_by = null
+  row.approved_at = null
   row.languages = [lang]
   row.work_items = (Array.isArray(row.work_items) ? row.work_items : []).map((w: any) => ({
     ...w,
@@ -150,8 +150,7 @@ export async function proposeCampaign(args: any, approvedByUserId?: string | nul
   row.metadata = {
     ...(row.metadata || {}),
     source: 'cos_chat_video_campaign_tool',
-    approved_via: VIDEO_CHANNELS.has(channel) ? 'owner_chat_command' : null,
-    owner_review_note: 'Internal production may run automatically. Public publishing remains locked until the owner clicks Publish.',
+    owner_review_note: 'Production runs automatically. After you Approve, publishing is automatic once the video is branded and passes quality gates; you will be emailed the live link.',
     required_burned_in_text: ['SignalBoostAi', SAAS_URL],
   }
 
@@ -172,11 +171,14 @@ export async function proposeCampaign(args: any, approvedByUserId?: string | nul
         voicedUrl: null,
         voiced: {},
         branded: false,
+        brandedLangs: {},
+        unbrandedVoiced: {},
         brandSchemaVersion: null,
         brandText: null,
         brandedAt: null,
         voiceError: null,
         brandAttempts: {},
+        ghOverlayAttempts: {},
         brandingLock: null,
       }
     }

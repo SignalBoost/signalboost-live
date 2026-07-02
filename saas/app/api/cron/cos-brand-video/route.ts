@@ -1,7 +1,8 @@
 // saas/app/api/cron/cos-brand-video/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { renderBrandedVideo } from '@/lib/cos/video-compose'
+import { addVoiceToCampaignVideo } from '@/lib/cos/video-voice'
+import { renderBrandOverlayVideo } from '@/lib/cos/video-compose'
 import { BRAND_SCHEMA_VERSION, BRAND_TEXT } from '@/lib/cos/brand-schema'
 
 export const dynamic = 'force-dynamic'
@@ -36,71 +37,48 @@ export async function GET(req: NextRequest) {
   for (const campaign of ready || []) {
     const v = (campaign.metadata && campaign.metadata.video) || {}
     if (!v.url) continue
+    if (v.branded === true && v.voicedUrl) continue
 
     const lock = v.brandingLock
     if (lock && lock.at && nowMs - Date.parse(lock.at) < LOCK_MS) continue
 
     const voiced = v.voiced || {}
     const attempts = v.brandAttempts || {}
-    const aspect: '9:16' | '16:9' =
-      v.aspect === '9:16' || v.aspect === '16:9'
-        ? v.aspect
-        : campaign.channel === 'short_video' ? '9:16' : '16:9'
-
-    const lang = LANGS.find((l) => !voiced[l] && (attempts[l] || 0) < MAX_ATTEMPTS)
-    if (!lang) continue
+    const aspect: '9:16' | '16:9' = v.aspect === '9:16' || v.aspect === '16:9' ? v.aspect : campaign.channel === 'short_video' ? '9:16' : '16:9'
+    const lang = LANGS.find((l) => !voiced[l] && (attempts[l] || 0) < MAX_ATTEMPTS) || 'en'
 
     const nowIso = new Date().toISOString()
+    await sb.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: { ...v, brandingLock: { lang, at: nowIso } } } }).eq('id', campaign.id)
 
-    await sb.from('cos_campaign_queue').update({
-      metadata: { ...(campaign.metadata || {}), video: { ...v, brandingLock: { lang, at: nowIso } } },
-    }).eq('id', campaign.id)
-
-    const r = await renderBrandedVideo({ campaign, brollUrl: v.url, aspect, lang })
-    const doneIso = new Date().toISOString()
-
-    if (r.ok && r.url) {
-      const newVoiced = { ...voiced, [lang]: r.url }
-      const patch: any = {
-        ...v,
-        status: 'ready',
-        voiced: newVoiced,
-        branded: true,
-        brandSchemaVersion: BRAND_SCHEMA_VERSION,
-        brandText: BRAND_TEXT,
-        brandingLock: null,
-        voiceError: null,
-        brandedAt: doneIso,
-        brandDebug: r.debug || null,
-      }
-      if (lang === 'en' || !v.voicedUrl) patch.voicedUrl = r.url
-      await sb.from('cos_campaign_queue').update({
-        metadata: { ...(campaign.metadata || {}), video: patch },
-      }).eq('id', campaign.id)
-      return NextResponse.json({ ok: true, campaign: campaign.id, lang, url: r.url })
+    const sourceUrl = v.unbrandedVoicedUrl || v.voicedUrl || null
+    const voice = sourceUrl ? { ok: true, url: sourceUrl } : await addVoiceToCampaignVideo(campaign, lang)
+    if (!voice.ok || !voice.url) {
+      const newAttempts = { ...attempts, [lang]: (attempts[lang] || 0) + 1 }
+      await sb.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: { ...v, brandAttempts: newAttempts, brandingLock: null, voiceError: `voice compose error: [${lang}] ${voice.error || 'compose error'}` } } }).eq('id', campaign.id)
+      return NextResponse.json({ ok: false, campaign: campaign.id, lang, error: voice.error || 'compose error' }, { status: 502 })
     }
 
-    const newAttempts = { ...attempts, [lang]: (attempts[lang] || 0) + 1 }
-    await sb.from('cos_campaign_queue').update({
-      metadata: {
-        ...(campaign.metadata || {}),
-        video: {
-          ...v,
-          status: 'brand_error',
-          voicedUrl: null,
-          voiced: {},
-          branded: false,
-          brandSchemaVersion: null,
-          brandText: null,
-          brandedAt: null,
-          brandAttempts: newAttempts,
-          brandingLock: null,
-          voiceError: `branded compose error: [${lang}] ${r.error || 'compose error'}`,
-          brandDebug: r.debug || null,
-        },
-      },
-    }).eq('id', campaign.id)
-    return NextResponse.json({ ok: false, campaign: campaign.id, lang, error: r.error || 'compose error', debug: r.debug || null }, { status: 502 })
+    const overlay = await renderBrandOverlayVideo({ campaign, sourceUrl: voice.url, aspect, lang })
+    const doneIso = new Date().toISOString()
+    const finalUrl = overlay.ok && overlay.url ? overlay.url : voice.url
+    const isBranded = overlay.ok && !!overlay.url
+    const newVoiced = { ...voiced, [lang]: finalUrl }
+    const patch: any = {
+      ...v,
+      status: 'ready',
+      voiced: newVoiced,
+      voicedUrl: finalUrl,
+      branded: isBranded,
+      brandSchemaVersion: isBranded ? BRAND_SCHEMA_VERSION : null,
+      brandText: isBranded ? BRAND_TEXT : null,
+      brandingLock: null,
+      voiceError: isBranded ? null : `brand overlay error: [${lang}] ${overlay.error || 'overlay error'}`,
+      brandedAt: isBranded ? doneIso : null,
+      brandDebug: overlay.debug || null,
+      unbrandedVoicedUrl: isBranded ? null : voice.url,
+    }
+    await sb.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: patch } }).eq('id', campaign.id)
+    return NextResponse.json({ ok: true, campaign: campaign.id, lang, url: finalUrl, branded: isBranded, warning: isBranded ? null : patch.voiceError })
   }
 
   return NextResponse.json({ ok: true, idle: true })

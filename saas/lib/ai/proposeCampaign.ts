@@ -7,8 +7,10 @@ import { createClient } from '@supabase/supabase-js'
 import { createCampaign, addDraftsAndQueue } from '@/marketing-sales-core/flow'
 import { createSignalBoostMarketingHost, signalboostActor } from '@/marketing-sales-host/signalboostHost'
 import { queueVideoProductionJob } from '@/lib/cos/video-production'
+import type { Lang } from '@/marketing-sales-core/types'
 
 const VALID_CHANNELS = ['video', 'social', 'blog', 'email', 'case-study', 'feature', 'youtube', 'short_video', 'linkedin'] as const
+const VALID_LANGS: Lang[] = ['en', 'es', 'pt', 'pl', 'ru']
 type Channel = typeof VALID_CHANNELS[number]
 
 type CampaignToolShape = {
@@ -50,6 +52,11 @@ function normalizedChannel(value: unknown): Channel {
   return 'video'
 }
 
+function normalizedLang(value: unknown): Lang {
+  const raw = clean(value, 'en').toLowerCase()
+  return VALID_LANGS.includes(raw as Lang) ? raw as Lang : 'en'
+}
+
 function isVideoChannel(channel: string): boolean {
   return channel === 'video' || channel === 'youtube' || channel === 'short_video'
 }
@@ -85,7 +92,7 @@ export async function proposeCampaign(p: ProposeCampaignParams): Promise<Propose
   const objective = objectiveFrom(p)
   const title = titleFrom(p)
   const body = bodyFrom(p)
-  const lang = clean(p.lang || p.language, 'en').toLowerCase() || 'en'
+  const lang = normalizedLang(p.lang || p.language)
 
   if (!objective) return { ok: false, error: 'objective is required' }
   if (!VALID_CHANNELS.includes(channel as Channel)) return { ok: false, error: `channel must be one of: ${VALID_CHANNELS.join(', ')}` }

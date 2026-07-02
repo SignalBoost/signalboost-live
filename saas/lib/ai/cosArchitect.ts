@@ -11,14 +11,12 @@
 //                           handed off via /api/cos/run (owner-only). No theatre.
 //
 // Both anchor to the single canonical PLATFORM_DOCTRINE so the rules never drift.
-// COS_PERSONA_DOCTRINE (cos/personaDoctrine.ts) encodes the six analytical disciplines
-// (Research Scientist, ML Engineer, Data Scientist, Data Engineer, AI Architect,
-// Software Engineer) and the autonomy rules that prevent COS from asking the owner
-// questions it can answer itself.
+// Both are now prefixed with COS_PERSONA_DOCTRINE so COS behaves as a senior CTO,
+// systems architect, product strategist, and decisive execution manager.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { PLATFORM_DOCTRINE } from './platformDoctrine'
-import { COS_PERSONA_DOCTRINE } from './cos/personaDoctrine'
+import { PLATFORM_DOCTRINE } from '@/lib/ai/platformDoctrine'
+import { COS_PERSONA_DOCTRINE } from '@/lib/ai/cos/personaDoctrine'
 
 /** Planning persona: blueprint-and-stop for design; execute for build. */
 export function cosArchitectModule(): string {

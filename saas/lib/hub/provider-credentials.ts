@@ -27,6 +27,9 @@ export const PROVIDER_REQUIRED_ENV: Record<string, string[]> = {
   gemini: ['GEMINI_API_KEY'],
   elevenlabs: ['ELEVENLABS_API_KEY'],
   assemblyai: ['ASSEMBLYAI_API_KEY'],
+  // ── Video production (COSA campaign pipeline) ──────────────────────────────
+  fal: ['FAL_KEY'],
+  json2video: ['JSON2VIDEO_API_KEY'],
   // ── Email ─────────────────────────────────────────────────────────────────
   resend: ['RESEND_API_KEY'],
   sendgrid: ['SENDGRID_API_KEY'],
@@ -47,7 +50,8 @@ export const PROVIDER_REQUIRED_ENV: Record<string, string[]> = {
 // Anything not in this set renders as a roadmap preview ("Coming soon").
 export const PROVIDER_HAS_BACKEND = new Set<string>([
   'stripe', 'supabase', 'supabase_mkt', 'vercel', 'github', 'keyvault',
-  'openai', 'anthropic', 'gemini', 'elevenlabs', 'assemblyai', 'resend',
-  'sendgrid', 'twilio', 'cloudflare', 'digitalocean', 'datadog', 'sentry', 'pagerduty',
+  'openai', 'anthropic', 'gemini', 'elevenlabs', 'assemblyai',
+  'fal', 'json2video',
+  'resend', 'sendgrid', 'twilio', 'cloudflare', 'digitalocean', 'datadog', 'sentry', 'pagerduty',
   'bank',
 ])

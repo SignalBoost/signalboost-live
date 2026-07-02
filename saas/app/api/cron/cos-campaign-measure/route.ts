@@ -5,8 +5,13 @@
 // comments via the same OAuth token already stored for publishing), REAL
 // first-party click counts (from cos_campaign_clicks, logged by /api/track),
 // and estimated cost (see campaign-cost.ts). Cost, traffic, and performance
-// all land together on the campaign record. Honest by construction: platforms
-// without a readonly-capable token are marked unsupported, never faked.
+// all land together on the campaign record.
+// TOKEN OWNER RESOLUTION: chat-created video campaigns carry
+// approved_by='cos_internal_preparation' (a marker, not a user), so the OAuth
+// token owner is resolved from published[*].publishedBy (the real user who
+// clicked Publish) first, falling back to approved_by only when it looks like
+// a real user id. Honest by construction: platforms without a usable token
+// are marked unsupported with the reason, never faked.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -19,11 +24,19 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 const MIN_HOURS_BEFORE_MEASURE = Number(process.env.COS_MEASURE_DELAY_HOURS || 24)
+const INTERNAL_APPROVAL_MARKER = 'cos_internal_preparation'
 
 function db() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     auth: { persistSession: false },
   })
+}
+
+function resolveTokenOwner(campaign: any, entry: any): string | null {
+  if (entry?.publishedBy) return String(entry.publishedBy)
+  const approvedBy = campaign?.approved_by
+  if (approvedBy && approvedBy !== INTERNAL_APPROVAL_MARKER) return String(approvedBy)
+  return null
 }
 
 export async function GET(req: NextRequest) {
@@ -50,7 +63,6 @@ export async function GET(req: NextRequest) {
 
     if (entries.length === 0) { skipped++; continue }
     if (campaign.metadata?.performance) { skipped++; continue } // already measured
-    if (!campaign.approved_by) { skipped++; continue } // no owner token to measure with
 
     const allOldEnough = entries.every(([, entry]) => {
       const t = entry?.publishedAt ? new Date(entry.publishedAt).getTime() : 0
@@ -61,9 +73,23 @@ export async function GET(req: NextRequest) {
     const performance: Record<string, any> = {}
     for (const [key, entry] of entries) {
       const platform = (key.includes('::') ? key.split('::')[0] : key) as SocialPlatform
+      const tokenOwner = resolveTokenOwner(campaign, entry)
+      if (!tokenOwner) {
+        performance[key] = {
+          platform,
+          videoId: null,
+          viewCount: null,
+          likeCount: null,
+          commentCount: null,
+          fetchedAt: new Date().toISOString(),
+          supported: false,
+          error: 'No resolvable token owner: published entry has no publishedBy and approved_by is an internal marker.',
+        }
+        continue
+      }
       performance[key] = await measureCampaignPerformance({
         admin: sb,
-        ownerUserId: campaign.approved_by,
+        ownerUserId: tokenOwner,
         platform,
         liveUrl: entry?.result?.liveUrl || null,
       })

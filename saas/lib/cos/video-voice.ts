@@ -5,7 +5,15 @@
 //   ElevenLabs TTS  ->  base64 data URI  ->  fal ffmpeg "compose" timeline
 //     - video track: the ~5s Kling clip looped to cover the narration length
 //     - audio track: the narration voiceover
-//   then fal auto-subtitle burns captions synced to the voice.
+//   then captions are burned from OUR OWN known-correct script text via an
+//   SRT we generate ourselves (veed/subtitles with srt_text) — NOT from
+//   auto-transcribing the resulting audio. FIX: the previous captioner
+//   (fal-ai/workflow-utilities/auto-subtitle) re-transcribes the synthesized
+//   voice via ASR, which has no way to know "SignalBoostAi" or the exact URL
+//   spelling and can mis-hear them. Since we already know precisely what was
+//   said (it's the same text we sent to TTS), there's nothing to transcribe —
+//   only to time. veed/subtitles skips transcription entirely when srt_text
+//   is provided, so caption text now matches the script byte-for-byte.
 //
 // Runs entirely from Vercel — no self-hosted FFmpeg and no storage bucket
 // (the audio is handed to fal as a base64 data URI, so nothing is uploaded).
@@ -17,7 +25,7 @@ import { generateSpeech } from '@/lib/elevenlabs/client'
 
 const COMPOSE_MODEL = 'fal-ai/ffmpeg-api/compose'
 const METADATA_MODEL = 'fal-ai/ffmpeg-api/metadata'
-const CAPTION_MODEL = 'fal-ai/workflow-utilities/auto-subtitle' // transcribes audio -> burns synced captions
+const SUBTITLE_MODEL = 'veed/subtitles' // srt_text bypasses ASR transcription entirely
 const SITE_URL = 'www.saas.signalboostapp.com'
 const CLIP_MS = 5000        // Kling v3 standard renders ~5s clips
 const MIN_TOTAL_MS = 6000   // floor so a one-line VO still has room
@@ -114,6 +122,43 @@ function buildVideoKeyframes(url: string, totalMs: number) {
   return frames
 }
 
+function formatSrtTime(ms: number): string {
+  const totalMs = Math.max(0, Math.round(ms))
+  const h = Math.floor(totalMs / 3600000)
+  const m = Math.floor((totalMs % 3600000) / 60000)
+  const s = Math.floor((totalMs % 60000) / 1000)
+  const msRem = totalMs % 1000
+  const pad = (n: number, len = 2) => String(n).padStart(len, '0')
+  return `${pad(h)}:${pad(m)}:${pad(s)},${pad(msRem, 3)}`
+}
+
+// Build our OWN subtitles from the EXACT text sent to TTS, with timing
+// distributed proportionally by word count across the real audio duration.
+// This deliberately replaces ASR-based auto-transcription: since we already
+// know precisely what was said, there is nothing to transcribe, only to time.
+function buildSrt(text: string, totalMs: number, wordsPerLine = 7): string {
+  const words = text.split(/\s+/).filter(Boolean)
+  if (words.length === 0 || totalMs <= 0) return ''
+  const lines: string[] = []
+  for (let i = 0; i < words.length; i += wordsPerLine) {
+    lines.push(words.slice(i, i + wordsPerLine).join(' '))
+  }
+  const totalWords = words.length
+  let cursorMs = 0
+  let idx = 1
+  const blocks: string[] = []
+  for (const line of lines) {
+    const lineWordCount = line.split(/\s+/).filter(Boolean).length
+    const lineMs = Math.round((lineWordCount / totalWords) * totalMs)
+    const startMs = cursorMs
+    const endMs = Math.min(totalMs, cursorMs + lineMs)
+    blocks.push(`${idx}\n${formatSrtTime(startMs)} --> ${formatSrtTime(endMs)}\n${line}\n`)
+    cursorMs = endMs
+    idx += 1
+  }
+  return blocks.join('\n')
+}
+
 export async function addVoiceToCampaignVideo(
   campaign: any,
   lang: string = 'en'
@@ -150,25 +195,19 @@ export async function addVoiceToCampaignVideo(
     let finalUrl = String(result?.data?.video_url || result?.data?.video?.url || '')
     if (!finalUrl) return { ok: false, error: 'compose returned no video url' }
 
-    // 4) Burn captions synced to the voice — graceful: if captioning fails, return
-    //    the voiced (uncaptioned) video rather than erroring the whole step.
+    // 4) Burn captions from OUR OWN known-correct script text, not ASR
+    //    transcription of the synthesized audio — so brand names and URLs
+    //    are never mis-heard. Graceful: if captioning fails, return the
+    //    voiced (uncaptioned) video rather than erroring the whole step.
     try {
-      const cap: any = await fal.subscribe(CAPTION_MODEL, {
-        input: {
-          video_url: finalUrl,
-          language: lang,
-          position: 'bottom',
-          words_per_subtitle: 7,
-          font_size: 52,
-          font_color: 'white',
-          stroke_color: 'black',
-          stroke_width: 2,
-          y_offset: 80,
-          enable_animation: false,
-        },
-      })
-      const capUrl = cap?.data?.video?.url || cap?.data?.video_url
-      if (capUrl) finalUrl = String(capUrl)
+      const srt = buildSrt(text, totalMs)
+      if (srt) {
+        const cap: any = await fal.subscribe(SUBTITLE_MODEL, {
+          input: { video_url: finalUrl, srt_text: srt, preset: 'simple' },
+        })
+        const capUrl = cap?.data?.video?.url
+        if (capUrl) finalUrl = String(capUrl)
+      }
     } catch {}
 
     return { ok: true, url: finalUrl }

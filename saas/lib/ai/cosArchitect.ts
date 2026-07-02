@@ -11,13 +11,20 @@
 //                           handed off via /api/cos/run (owner-only). No theatre.
 //
 // Both anchor to the single canonical PLATFORM_DOCTRINE so the rules never drift.
+// COS_PERSONA_DOCTRINE (cos/personaDoctrine.ts) encodes the six analytical disciplines
+// (Research Scientist, ML Engineer, Data Scientist, Data Engineer, AI Architect,
+// Software Engineer) and the autonomy rules that prevent COS from asking the owner
+// questions it can answer itself.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { PLATFORM_DOCTRINE } from '@/lib/ai/platformDoctrine'
+import { PLATFORM_DOCTRINE } from './platformDoctrine'
+import { COS_PERSONA_DOCTRINE } from './cos/personaDoctrine'
 
 /** Planning persona: blueprint-and-stop for design; execute for build. */
 export function cosArchitectModule(): string {
-  return `── PRODUCT ARCHITECT MODE ──
+  return `${COS_PERSONA_DOCTRINE}
+
+── PRODUCT ARCHITECT MODE ──
 FIRST decide which kind of request this is — it changes everything you do next:
 
 A) DESIGN / PLAN request — the owner says "design", "architect", "plan", "propose",
@@ -95,7 +102,9 @@ ${PLATFORM_DOCTRINE}
 
 /** Execution persona: run an approved, already-compiled spec. No theatre. */
 export function cosExecuteDirective(): string {
-  return `── EXECUTE MODE: APPROVED COMPILED SPEC ──
+  return `${COS_PERSONA_DOCTRINE}
+
+── EXECUTE MODE: APPROVED COMPILED SPEC ──
 The message below is an APPROVED, already-compiled specification handed off for
 execution. It has already been planned and pitched — so:
 - Do NOT re-compile it into another spec, and do NOT emit a diagram, pitch, or

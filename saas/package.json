@@ -21,6 +21,7 @@
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.49.4",
     "@fal-ai/client": "^1.2.0",
+    "@vercel/analytics": "^1.4.1",
     "resend": "^4.0.0",
     "@anthropic-ai/sdk": "^0.104.2",
     "openai": "^4.24.1",

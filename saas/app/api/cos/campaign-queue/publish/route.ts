@@ -5,7 +5,9 @@
 //   1. Video channels must have a finished, rendered video (COSA isn't done yet
 //      otherwise) — no human has to notice a missing video.
 //   2. Video channels must have a successfully BRANDED video (name + URL burned
-//      in) — an unbranded video can never publish, no matter why branding failed.
+//      in) — an unbranded video can never publish automatically. The owner can
+//      explicitly override this ONE video with acceptUnbranded:true in the
+//      request body — a deliberate, logged choice, not a silent bypass.
 //   3. COSA's own content-quality gate runs automatically (hero/format/CTA/
 //      branding/monetization/traffic-plan). Below the bar, publish is blocked
 //      and the reason is written to metadata.readiness — COSA's problem to fix,
@@ -22,7 +24,7 @@ import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
 import { getValidSocialToken } from '@/lib/outreach/social-token'
 import { publishSocialPost, SOCIAL_CONNECTORS, type SocialPlatform } from '@/lib/outreach/social-connectors'
 import { scoreCampaignReadiness } from '@/lib/cos/video-quality/campaign-scoring'
-import { sendEmail } from '@/lib/email'
+import { sendEmail, SENDERS } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,6 +37,7 @@ const CHANNEL_TO_PLATFORM: Record<string, SocialPlatform | undefined> = {
 }
 
 const VIDEO_CHANNELS = ['youtube', 'short_video']
+const MIN_READINESS_SCORE = 7 // matches the 'improved'+ grade floor in video-quality/scoring.ts
 
 export async function POST(req: NextRequest) {
   const ctx = await requireAdmin()
@@ -44,6 +47,7 @@ export async function POST(req: NextRequest) {
   try { body = await req.json() } catch {}
   const id = String(body?.id || '').trim()
   if (!id) return NextResponse.json({ ok: false, error: 'id is required' }, { status: 400 })
+  const acceptUnbranded = body?.acceptUnbranded === true
 
   const { data: campaign, error } = await ctx.admin.from('cos_campaign_queue').select('*').eq('id', id).single()
   if (error || !campaign) return NextResponse.json({ ok: false, error: error?.message || 'Campaign not found' }, { status: 404 })
@@ -55,7 +59,9 @@ export async function POST(req: NextRequest) {
 
   // AUTONOMOUS GATE 1 & 2: video channels need a finished AND branded video.
   // COSA isn't done producing yet if either isn't true — never let a missing,
-  // half-finished, or unbranded (missing name/URL overlay) video go out.
+  // half-finished, or unbranded (missing name/URL overlay) video go out
+  // AUTOMATICALLY. acceptUnbranded is an explicit, deliberate owner override
+  // for one specific video, not a way to silently disable this for everything.
   if (VIDEO_CHANNELS.includes(String(campaign.channel))) {
     const video = campaign.metadata?.video || {}
     if (video.status !== 'ready') {
@@ -64,10 +70,10 @@ export async function POST(req: NextRequest) {
         error: `COSA has not finished producing this video yet (status: ${video.status || 'not started'}). Publish will unlock automatically once rendering completes.`,
       }, { status: 409 })
     }
-    if (video.branded !== true) {
+    if (video.branded !== true && !acceptUnbranded) {
       return NextResponse.json({
         ok: false,
-        error: `COSA's branded overlay (name + URL burned into the video) did not complete successfully${video.voiceError ? `: ${video.voiceError}` : '.'} Publishing an unbranded video is blocked automatically — check the JSON2Video connection and re-render.`,
+        error: `COSA's branded overlay (name + URL burned into the video) did not complete successfully${video.voiceError ? `: ${video.voiceError}` : '.'} Publishing an unbranded video is blocked automatically. To publish this specific video anyway, resend with acceptUnbranded: true.`,
         voiceError: video.voiceError || null,
       }, { status: 409 })
     }
@@ -154,7 +160,7 @@ export async function POST(req: NextRequest) {
       readiness,
       published: {
         ...((campaign.metadata && campaign.metadata.published) || {}),
-        [publishedKey]: { result, publishedAt, language: language || null, notified, notifyError: notifyError || null },
+        [publishedKey]: { result, publishedAt, language: language || null, notified, notifyError: notifyError || null, publishedUnbranded: acceptUnbranded && campaign.metadata?.video?.branded !== true },
       },
     },
   }).eq('id', id)
@@ -165,7 +171,7 @@ export async function POST(req: NextRequest) {
     action: 'cos_campaign.publish',
     targetType: 'cos_campaign_queue',
     targetId: id,
-    metadata: { platform, language: language || null, result, notified },
+    metadata: { platform, language: language || null, result, notified, acceptUnbranded },
   })
 
   return NextResponse.json({ ok: true, platform, language: language || null, publishedAt, result, readiness, notified })

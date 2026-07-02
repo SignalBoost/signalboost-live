@@ -1,15 +1,10 @@
 // saas/app/api/cos/campaign-queue/voice-video/route.ts
-// Owner-triggered "Add voice" for a campaign's ready (Kling) video.
-//
-// NEW: first tries a BRANDED assembly via JSON2Video — b-roll looped to ~60s +
-// ElevenLabs voiceover + auto captions + EXACT on-screen "SignalBoostAi" (gold)
-// and "www.saas.signalboostapp.com" (cyan) in the first and last seconds.
-// If that fails for any reason, it FALLS BACK to the existing fal voice/caption
-// path, so behavior is never worse than before. The result URL is stored the
-// same way either way, so the card renders it unchanged.
+// Owner-triggered final branded video assembly for a campaign's ready video.
+// This route no longer falls back to an unbranded fal voice/caption render. A
+// COSA campaign video is final only when JSON2Video returns the branded asset
+// with the SignalBoostAi + www.saas.signalboostapp.com overlay burned in.
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
-import { addVoiceToCampaignVideo } from '@/lib/cos/video-voice'
 import { renderBrandedVideo } from '@/lib/cos/video-compose'
 import { BRAND_SCHEMA_VERSION, BRAND_TEXT } from '@/lib/cos/brand-schema'
 
@@ -38,63 +33,50 @@ export async function POST(req: NextRequest) {
     ? v.aspect
     : (campaign.channel === 'short_video' ? '9:16' : '16:9')
 
-  // 1) Preferred path: branded compose with exact on-screen text.
-  let url = ''
-  let branded = false
-  let brandErr = ''
   const b = await renderBrandedVideo({ campaign, brollUrl: v.url, aspect, lang })
-  if (b.ok && b.url) {
-    url = b.url
-    branded = true
-  } else {
-    brandErr = b.error || 'branded compose failed'
-    // 2) Fallback: existing fal voice/caption path (never worse than before).
-    const r = await addVoiceToCampaignVideo(campaign, lang)
-    if (r.ok && r.url) {
-      url = r.url
-    } else {
-      // Both failed — persist the error on the card and stop.
-      const combined = `branded: ${brandErr} | fallback: ${r.error || 'voice compose failed'}`
-      await ctx.admin.from('cos_campaign_queue').update({
-        metadata: {
-          ...(campaign.metadata || {}),
-          video: {
-            ...v,
-            branded: false,
-            brandSchemaVersion: null,
-            brandText: null,
-            brandedAt: null,
-            voiceError: combined,
-          },
+  if (!b.ok || !b.url) {
+    const errorText = `branded compose failed: ${b.error || 'branded compose failed'}`
+    await ctx.admin.from('cos_campaign_queue').update({
+      metadata: {
+        ...(campaign.metadata || {}),
+        video: {
+          ...v,
+          voicedUrl: null,
+          branded: false,
+          brandSchemaVersion: null,
+          brandText: null,
+          brandedAt: null,
+          voiceError: errorText,
+          brandDebug: b.debug || null,
         },
-      }).eq('id', id)
-      return NextResponse.json({ ok: false, error: combined }, { status: 502 })
-    }
+      },
+    }).eq('id', id)
+
+    await auditAdminAction({
+      admin: ctx.admin,
+      actorId: ctx.user.id,
+      action: 'cos_campaign.voice_video_failed',
+      targetType: 'cos_campaign_queue',
+      targetId: id,
+      metadata: { language: lang, mode: 'branded_required', brandError: errorText, brandDebug: b.debug || null },
+    })
+
+    return NextResponse.json({ ok: false, error: errorText, debug: b.debug || null }, { status: 502 })
   }
 
-  const voiced = { ...((v && v.voiced) || {}), [lang]: url }
+  const voiced = { ...((v && v.voiced) || {}), [lang]: b.url }
   const doneIso = new Date().toISOString()
-  const updatedVideo = branded
-    ? {
-        ...v,
-        voiced,
-        voicedUrl: url,
-        branded: true,
-        brandSchemaVersion: BRAND_SCHEMA_VERSION,
-        brandText: BRAND_TEXT,
-        brandedAt: doneIso,
-        voiceError: null,
-      }
-    : {
-        ...v,
-        voiced,
-        voicedUrl: url,
-        branded: false,
-        brandSchemaVersion: null,
-        brandText: null,
-        brandedAt: null,
-        voiceError: `branded compose failed: ${brandErr}`,
-      }
+  const updatedVideo = {
+    ...v,
+    voiced,
+    voicedUrl: b.url,
+    branded: true,
+    brandSchemaVersion: BRAND_SCHEMA_VERSION,
+    brandText: BRAND_TEXT,
+    brandedAt: doneIso,
+    voiceError: null,
+    brandDebug: b.debug || null,
+  }
   await ctx.admin.from('cos_campaign_queue').update({
     metadata: { ...(campaign.metadata || {}), video: updatedVideo },
   }).eq('id', id)
@@ -105,8 +87,8 @@ export async function POST(req: NextRequest) {
     action: 'cos_campaign.voice_video',
     targetType: 'cos_campaign_queue',
     targetId: id,
-    metadata: { language: lang, mode: branded ? 'branded' : 'fal_fallback', brandError: branded ? null : brandErr },
+    metadata: { language: lang, mode: 'branded', brandError: null, brandDebug: b.debug || null },
   })
 
-  return NextResponse.json({ ok: true, url, language: lang, branded })
+  return NextResponse.json({ ok: true, url: b.url, language: lang, branded: true, brandSchemaVersion: BRAND_SCHEMA_VERSION })
 }

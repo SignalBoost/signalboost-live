@@ -2,26 +2,25 @@
 // FFmpeg brand-overlay worker, run by GitHub Actions (free compute, real FFmpeg).
 // Replaces the JSON2Video overlay step at $0 per video.
 //
-// Flow per eligible campaign+language:
-//   1. Take the voiced+captioned video the Vercel cron already produced
-//      (unbrandedVoiced[lang], kept when the paid overlay step failed).
-//   2. Fetch the brand overlay PNG from the live site (/api/brand-overlay).
-//   3. FFmpeg: scale video to the target canvas, composite the PNG on top.
-//   4. Upload the branded MP4 to Supabase Storage (public bucket, auto-created).
-//   5. Update cos_campaign_queue metadata in the EXACT same shape the Vercel
-//      cron writes (brandedLangs, voiced, voicedUrl, brandSchemaVersion...),
-//      so the dashboard, publish gates, and measurement work unchanged.
+// DIAGNOSTICS: every failure path emits a GitHub Actions annotation
+// (::error::/::notice::) so the exact reason appears in the Annotations box on
+// the run summary page — no log-digging needed to know what went wrong.
 //
-// Guards mirror the Vercel cron: backlog cutoff, brandingLock respect,
-// bounded attempts (ghOverlayAttempts, max 5 per language).
+// Flow per eligible campaign+language:
+//   1. Take the voiced+captioned video the Vercel cron already produced.
+//   2. Fetch the brand overlay PNG from the live site (/api/brand-overlay).
+//   3. FFmpeg: scale to canvas, composite the PNG on top.
+//   4. Upload branded MP4 to Supabase Storage (public bucket, auto-created).
+//   5. Update cos_campaign_queue metadata in the exact shape the Vercel cron
+//      writes, so dashboard/publish gates/measurement work unchanged.
 //
 // Requires GitHub Actions secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
 
 import { execFileSync } from 'node:child_process'
 import { writeFileSync, readFileSync, mkdirSync } from 'node:fs'
 
-const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/+$/, '')
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '')
+const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()
 const SITE = 'https://www.saas.signalboostapp.com'
 const BUCKET = 'cos-videos'
 const BACKLOG_CUTOFF = process.env.COS_BRAND_SINCE || '2026-07-02T12:00:00Z'
@@ -30,22 +29,29 @@ const MAX_GH_ATTEMPTS = 5
 const BRAND_SCHEMA_VERSION = 7
 const BRAND_TEXT = { name: 'SignalBoostAi', url: 'www.saas.signalboostapp.com' }
 
+// GitHub Actions annotations — these surface in the run summary "Annotations" box.
+const oneLine = (s) => String(s).replace(/\r?\n/g, ' | ').slice(0, 400)
+const annotateError = (msg) => console.log(`::error::${oneLine(msg)}`)
+const annotateNotice = (msg) => console.log(`::notice::${oneLine(msg)}`)
+
+annotateNotice(
+  `Config check — SUPABASE_URL set: ${Boolean(SUPABASE_URL)} (${SUPABASE_URL ? SUPABASE_URL.slice(0, 30) + '...' : 'EMPTY'}), ` +
+  `SERVICE_ROLE_KEY set: ${Boolean(SERVICE_KEY)} (length ${SERVICE_KEY.length})`
+)
+
 if (!SUPABASE_URL || !SERVICE_KEY) {
-  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY secrets.')
+  annotateError('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. Add both under repo Settings → Secrets and variables → Actions, names exactly as shown, then Run workflow again.')
+  process.exit(1)
+}
+if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(SUPABASE_URL)) {
+  annotateError(`SUPABASE_URL looks malformed: "${SUPABASE_URL}". Expected the bare project URL like https://abcdefgh.supabase.co (Supabase → Settings → API → Project URL), no quotes, no trailing path.`)
   process.exit(1)
 }
 
-const sbHeaders = {
-  apikey: SERVICE_KEY,
-  Authorization: `Bearer ${SERVICE_KEY}`,
-}
+const sbHeaders = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` }
 
 async function rest(path, opts = {}) {
-  const res = await fetch(`${SUPABASE_URL}${path}`, {
-    ...opts,
-    headers: { ...sbHeaders, ...(opts.headers || {}) },
-  })
-  return res
+  return fetch(`${SUPABASE_URL}${path}`, { ...opts, headers: { ...sbHeaders, ...(opts.headers || {}) } })
 }
 
 async function ensureBucket() {
@@ -56,15 +62,22 @@ async function ensureBucket() {
   })
   if (res.ok) { console.log(`Created public bucket "${BUCKET}".`); return }
   const body = await res.text()
-  if (res.status === 409 || /already exists|duplicate/i.test(body)) return // fine
+  if (res.status === 409 || /already exists|duplicate/i.test(body)) return
+  if (res.status === 401 || res.status === 403) {
+    throw new Error(`Storage auth rejected (${res.status}). The key in SUPABASE_SERVICE_ROLE_KEY is probably the anon key — copy the service_role key instead (Supabase → Settings → API). Response: ${body.slice(0, 150)}`)
+  }
   throw new Error(`Bucket check failed (${res.status}): ${body.slice(0, 200)}`)
 }
 
 async function fetchCandidates() {
-  const res = await rest(
-    `/rest/v1/cos_campaign_queue?select=*&created_at=gte.${encodeURIComponent(BACKLOG_CUTOFF)}&order=created_at.desc&limit=20`,
-  )
-  if (!res.ok) throw new Error(`Candidate fetch failed: ${res.status} ${(await res.text()).slice(0, 200)}`)
+  const res = await rest(`/rest/v1/cos_campaign_queue?select=*&created_at=gte.${encodeURIComponent(BACKLOG_CUTOFF)}&order=created_at.desc&limit=20`)
+  if (!res.ok) {
+    const body = await res.text()
+    if (res.status === 401 || res.status === 403) {
+      throw new Error(`Database auth rejected (${res.status}). The key in SUPABASE_SERVICE_ROLE_KEY is probably the anon key — copy the service_role key instead. Response: ${body.slice(0, 150)}`)
+    }
+    throw new Error(`Candidate fetch failed: ${res.status} ${body.slice(0, 200)}`)
+  }
   return res.json()
 }
 
@@ -86,8 +99,6 @@ async function download(url, path) {
 
 function runFfmpeg(srcPath, overlayPath, outPath, aspect) {
   const [w, h] = aspect === '9:16' ? [1080, 1920] : [1920, 1080]
-  // Scale/crop the source to the exact canvas, then composite the full-frame
-  // transparent PNG on top. Audio re-encoded to AAC for container safety.
   execFileSync('ffmpeg', [
     '-y',
     '-i', srcPath,
@@ -128,7 +139,7 @@ function pickJob(campaign) {
     if (brandedLangs[lang]) continue
     if ((gh[lang] || 0) >= MAX_GH_ATTEMPTS) continue
     const source = unbranded[lang] || (lang === langs[0] ? (v.unbrandedVoicedUrl || v.voicedUrl) : null)
-    if (!source) continue // voice pass hasn't produced this language yet — cron's job
+    if (!source) continue
     return { lang, source: String(source), primary: langs[0], v, langs }
   }
   return null
@@ -141,7 +152,6 @@ async function processCampaign(campaign) {
   console.log(`\n=== Campaign ${campaign.id} [${lang}] ===`)
   console.log(`source: ${source}`)
 
-  // Take the lock so the Vercel cron and this worker never double-process.
   await patchVideoMeta(campaign, { ...v, brandingLock: { lang, at: new Date().toISOString(), by: 'github-actions' } })
 
   const aspect = v.aspect === '9:16' || v.aspect === '16:9' ? v.aspect : campaign.channel === 'short_video' ? '9:16' : '16:9'
@@ -181,7 +191,7 @@ async function processCampaign(campaign) {
     return 'branded'
   } catch (e) {
     const gh = { ...(v.ghOverlayAttempts || {}), [lang]: ((v.ghOverlayAttempts || {})[lang] || 0) + 1 }
-    console.error(`FAILED [${lang}]: ${e.message}`)
+    annotateError(`Campaign ${campaign.id} [${lang}] failed: ${e.message}`)
     await patchVideoMeta(campaign, {
       ...v,
       ghOverlayAttempts: gh,
@@ -203,8 +213,8 @@ async function main() {
     else if (r === 'failed') failed++
     else skipped++
   }
-  console.log(`\nDone. branded=${branded} failed=${failed} skipped=${skipped}`)
-  if (failed > 0) process.exit(1) // red run = visible in the Actions tab
+  annotateNotice(`Result: branded=${branded} failed=${failed} skipped=${skipped} of ${campaigns.length} scanned`)
+  if (failed > 0) process.exit(1)
 }
 
-main().catch((e) => { console.error(e); process.exit(1) })
+main().catch((e) => { annotateError(`Worker crashed: ${e.message}`); console.error(e); process.exit(1) })

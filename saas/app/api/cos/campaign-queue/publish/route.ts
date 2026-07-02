@@ -1,10 +1,12 @@
 // saas/app/api/cos/campaign-queue/publish/route.ts
 // Publish an APPROVED COS campaign item to a live social platform. The approval
 // gate is enforced here: nothing publishes unless the owner approved it first.
-// Two AUTONOMOUS gates run before that human-approved content ever goes live:
+// Three AUTONOMOUS gates run before that human-approved content ever goes live:
 //   1. Video channels must have a finished, rendered video (COSA isn't done yet
 //      otherwise) — no human has to notice a missing video.
-//   2. COSA's own content-quality gate runs automatically (hero/format/CTA/
+//   2. Video channels must have a successfully BRANDED video (name + URL burned
+//      in) — an unbranded video can never publish, no matter why branding failed.
+//   3. COSA's own content-quality gate runs automatically (hero/format/CTA/
 //      branding/monetization/traffic-plan). Below the bar, publish is blocked
 //      and the reason is written to metadata.readiness — COSA's problem to fix,
 //      not something the owner has to catch by eye.
@@ -20,7 +22,7 @@ import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
 import { getValidSocialToken } from '@/lib/outreach/social-token'
 import { publishSocialPost, SOCIAL_CONNECTORS, type SocialPlatform } from '@/lib/outreach/social-connectors'
 import { scoreCampaignReadiness } from '@/lib/cos/video-quality/campaign-scoring'
-import { sendEmail, SENDERS } from '@/lib/email'
+import { sendEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,7 +35,6 @@ const CHANNEL_TO_PLATFORM: Record<string, SocialPlatform | undefined> = {
 }
 
 const VIDEO_CHANNELS = ['youtube', 'short_video']
-const MIN_READINESS_SCORE = 7 // matches the 'improved'+ grade floor in video-quality/scoring.ts
 
 export async function POST(req: NextRequest) {
   const ctx = await requireAdmin()
@@ -52,20 +53,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Campaign must be approved before publishing.' }, { status: 409 })
   }
 
-  // AUTONOMOUS GATE 1: video channels need a finished, rendered video. COSA
-  // isn't done producing yet if this isn't true — never let a half-finished
-  // or missing video go out, whether triggered by a human or a script.
+  // AUTONOMOUS GATE 1 & 2: video channels need a finished AND branded video.
+  // COSA isn't done producing yet if either isn't true — never let a missing,
+  // half-finished, or unbranded (missing name/URL overlay) video go out.
   if (VIDEO_CHANNELS.includes(String(campaign.channel))) {
-    const videoStatus = campaign.metadata?.video?.status
-    if (videoStatus !== 'ready') {
+    const video = campaign.metadata?.video || {}
+    if (video.status !== 'ready') {
       return NextResponse.json({
         ok: false,
-        error: `COSA has not finished producing this video yet (status: ${videoStatus || 'not started'}). Publish will unlock automatically once rendering completes.`,
+        error: `COSA has not finished producing this video yet (status: ${video.status || 'not started'}). Publish will unlock automatically once rendering completes.`,
+      }, { status: 409 })
+    }
+    if (video.branded !== true) {
+      return NextResponse.json({
+        ok: false,
+        error: `COSA's branded overlay (name + URL burned into the video) did not complete successfully${video.voiceError ? `: ${video.voiceError}` : '.'} Publishing an unbranded video is blocked automatically — check the JSON2Video connection and re-render.`,
+        voiceError: video.voiceError || null,
       }, { status: 409 })
     }
   }
 
-  // AUTONOMOUS GATE 2: COSA's own quality/readiness check on the REAL content —
+  // AUTONOMOUS GATE 3: COSA's own quality/readiness check on the REAL content —
   // not a demo. Runs every time, no human has to remember to review it.
   const readiness = scoreCampaignReadiness(campaign)
   const readinessOk = readiness.grade === 'improved' || readiness.grade === 'marketing_grade_ready'

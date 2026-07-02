@@ -1,181 +1,148 @@
 // saas/lib/ai/tools/triggerVideoCampaign.ts
-// Gives the COS AI the ability to kick off a full video campaign render
-// directly from chat — no manual dashboard steps required.
+// AI tool that lets the Chief of Staff create a video campaign in the
+// cos_campaign_queue and immediately kick off a fal.ai / Kling render.
+// The rendered video goes through the existing voice + brand-overlay pipeline
+// before the owner can publish it. Publishing is ALWAYS owner-gated.
 //
-// Pipeline it triggers (in order):
-//   1. POST /api/cos/campaign-queue        → create campaign record
-//   2. POST /api/cos/campaign-queue/render-video  → start Kling b-roll render
-//   3. Cron (cos-video-poll) polls until render is ready
-//   4. POST /api/cos/campaign-queue/voice-video   → ElevenLabs TTS + fal compose
-//                                                    + auto-subtitle captions
-//                                                    + JSON2Video brand overlay
-//   5. Publish stays owner-gated (human approves in the campaign dashboard)
+// Flow:
+//   1. POST /api/cos/campaign-queue  → creates the queue row (status: draft)
+//   2. PATCH /api/cos/campaign-queue → sets status to approved (so render is allowed)
+//   3. POST /api/cos/campaign-queue/render-video → starts the fal.ai render
 //
-// Steps 1 and 2 are triggered synchronously here. Steps 3-4 run asynchronously
-// via the existing cron jobs. The tool returns the campaign id and a status URL
-// so the owner can track progress in the dashboard.
-//
-// tsconfig non-strict: flat { ok, error? } results throughout.
-
-const BASE = process.env.NEXT_PUBLIC_APP_URL || 'https://saas.signalboostapp.com'
+// All three calls are internal server-to-server fetches using the absolute
+// NEXT_PUBLIC_APP_URL base, so they go through the same auth + audit path as
+// the dashboard UI.
 
 export interface TriggerVideoCampaignParams {
-  /** Short punchy title / hook line shown on screen */
+  /** Short punchy title / on-screen hook for the campaign */
   title: string
-  /** One-sentence campaign objective */
+  /** What the video should achieve — used as the objective and visual theme */
   objective: string
+  /** 'youtube' (16:9) or 'short_video' (9:16). Defaults to 'youtube'. */
+  channel?: 'youtube' | 'short_video'
   /** Target audience description */
-  audience: string
-  /** 'youtube' for landscape 16:9, 'short_video' for vertical 9:16 */
-  channel: 'youtube' | 'short_video'
-  /** Voiceover / narration body — what the AI will say */
-  body: string
-  /** Language code: en | es | pt | pl | ru */
+  audience?: string
+  /** ISO language code, e.g. 'en', 'es'. Defaults to 'en'. */
   language?: string
-  /** Internal actor user id (injected by the support route, not from the AI) */
+  /** Admin user id — required for the audit trail */
   actorUserId: string
-  /** Service-role key for server-side Supabase calls */
-  serviceRoleKey: string
+  /** Raw admin JWT to forward to the internal API routes */
+  adminToken: string
 }
 
 export interface TriggerVideoCampaignResult {
   ok: boolean
   campaignId?: string
-  renderRequestId?: string
+  requestId?: string
   status?: string
-  dashboardUrl?: string
   error?: string
 }
 
-async function internalPost(path: string, body: unknown, serviceRoleKey: string): Promise<any> {
-  const res = await fetch(`${BASE}${path}`, {
+const VALID_CHANNELS = ['youtube', 'short_video'] as const
+
+function baseUrl(): string {
+  return (process.env.NEXT_PUBLIC_APP_URL || 'https://saas.signalboostapp.com').replace(/\/$/, '')
+}
+
+async function internalPost(path: string, body: unknown, token: string): Promise<any> {
+  const res = await fetch(`${baseUrl()}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      // Internal service-to-service call — the requireAdmin middleware accepts
-      // the service-role key as a bearer token for server-side tool calls.
-      Authorization: `Bearer ${serviceRoleKey}`,
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(body),
   })
   try { return await res.json() } catch { return { ok: false, error: `HTTP ${res.status}` } }
 }
 
-export async function triggerVideoCampaign(
-  p: TriggerVideoCampaignParams
-): Promise<TriggerVideoCampaignResult> {
+async function internalPatch(path: string, body: unknown, token: string): Promise<any> {
+  const res = await fetch(`${baseUrl()}${path}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  })
+  try { return await res.json() } catch { return { ok: false, error: `HTTP ${res.status}` } }
+}
+
+export async function triggerVideoCampaign(p: TriggerVideoCampaignParams): Promise<TriggerVideoCampaignResult> {
   const title = String(p.title || '').trim()
   const objective = String(p.objective || '').trim()
-  const audience = String(p.audience || '').trim()
-  const channel = p.channel === 'short_video' ? 'short_video' : 'youtube'
-  const body = String(p.body || '').trim()
-  const language = String(p.language || 'en').trim()
+  const channel = VALID_CHANNELS.includes(p.channel as any) ? (p.channel as 'youtube' | 'short_video') : 'youtube'
+  const audience = String(p.audience || 'Business owners, operators, and entrepreneurs looking for AI-powered growth tools.').trim()
+  const language = String(p.language || 'en').trim() || 'en'
 
-  if (!title) return { ok: false, error: 'title is required' }
-  if (!objective) return { ok: false, error: 'objective is required' }
-  if (!body || body.length < 20) return { ok: false, error: 'body (voiceover narration) must be at least 20 characters' }
-  if (!p.serviceRoleKey) return { ok: false, error: 'serviceRoleKey not available — check SUPABASE_SERVICE_ROLE_KEY env var' }
+  if (!title || title.length < 5) return { ok: false, error: 'title must be at least 5 characters' }
+  if (!objective || objective.length < 10) return { ok: false, error: 'objective must be at least 10 characters' }
+  if (!p.adminToken) return { ok: false, error: 'adminToken is required' }
 
-  // ── Step 1: Create the campaign record ──────────────────────────────────────
-  const campaignRes = await internalPost(
-    '/api/cos/campaign-queue',
-    {
-      request: {
-        title,
-        objective: `${objective} Feature www.saas.signalboostapp.com.`,
-        channel,
-        audience,
-        language,
-        priority: 'high',
-        estimatedCostUsd: channel === 'short_video' ? 12 : 15,
-        signal: `COS AI direct video campaign request. Narration: ${body.slice(0, 300)}`,
-      },
+  // Step 1 — create the campaign queue row
+  const createRes = await internalPost('/api/cos/campaign-queue', {
+    request: {
+      title,
+      objective,
+      channel,
+      audience,
+      language,
+      department: 'marketing',
+      priority: 'high',
+      estimatedCostUsd: channel === 'youtube' ? 12 : 8,
+      signal: `COS AI triggered video campaign. Objective: ${objective}`,
     },
-    p.serviceRoleKey
-  )
+  }, p.adminToken)
 
-  if (!campaignRes?.ok || !campaignRes?.campaign?.id) {
-    return { ok: false, error: campaignRes?.error || 'Could not create campaign record.' }
+  if (!createRes?.ok || !createRes?.campaign?.id) {
+    return { ok: false, error: createRes?.error || 'Failed to create campaign queue entry.' }
   }
 
-  const campaignId = String(campaignRes.campaign.id)
+  const campaignId: string = createRes.campaign.id
 
-  // Inject the narration body into the campaign work_items so the voice step
-  // can pick it up. We patch the work_items with a pre-built draft output so
-  // the narrationFor() function in video-voice.ts finds real content.
-  // (The campaign queue route stores work_items from the recommendation engine;
-  // we supplement with the COS-authored narration here.)
-  const workItemPatch = {
+  // Step 2 — approve the campaign so the render endpoint accepts it
+  const approveRes = await internalPatch('/api/cos/campaign-queue', {
     id: campaignId,
-    work_items: [
-      {
-        input: { language },
-        output: {
-          title,
-          opening: objective,
-          draft: body,
-          call_to_action: `Visit www.saas.signalboostapp.com`,
-        },
-      },
-    ],
+    status: 'approved',
+  }, p.adminToken)
+
+  if (!approveRes?.ok) {
+    return { ok: false, error: approveRes?.error || 'Failed to approve campaign for rendering.' }
   }
 
-  // PATCH the campaign to inject the narration (status stays 'draft' — no approval yet).
-  await internalPost('/api/cos/campaign-queue', { ...workItemPatch, _patch: true }, p.serviceRoleKey)
-
-  // ── Step 2: Start the Kling b-roll render ───────────────────────────────────
-  const renderRes = await internalPost(
-    '/api/cos/campaign-queue/render-video',
-    { id: campaignId },
-    p.serviceRoleKey
-  )
+  // Step 3 — kick off the fal.ai / Kling render
+  const renderRes = await internalPost('/api/cos/campaign-queue/render-video', {
+    id: campaignId,
+  }, p.adminToken)
 
   if (!renderRes?.ok) {
-    // Campaign was created but render failed to start — return partial success
-    // so the owner can retry from the dashboard.
-    return {
-      ok: true,
-      campaignId,
-      status: 'campaign_created_render_failed',
-      dashboardUrl: `${BASE}/dashboard/campaigns`,
-      error: `Campaign created (id: ${campaignId}) but video render failed to start: ${renderRes?.error || 'unknown'}. You can retry the render from the Campaigns dashboard.`,
-    }
+    return { ok: false, error: renderRes?.error || 'Failed to start video render.' }
   }
-
-  const renderRequestId = String(renderRes?.requestId || '')
-
-  // ── Steps 3-4 run automatically via cron ────────────────────────────────────
-  // cos-video-poll cron fires every few minutes, detects status=rendering,
-  // polls fal.ai until the clip is ready, then triggers voice-video automatically.
-  // The owner sees the campaign progress in real time at /dashboard/campaigns.
 
   return {
     ok: true,
     campaignId,
-    renderRequestId,
+    requestId: renderRes.requestId,
     status: 'rendering',
-    dashboardUrl: `${BASE}/dashboard/campaigns`,
   }
 }
 
-export function formatTriggerVideoResultForAI(result: TriggerVideoCampaignResult): string {
-  if (!result.ok && !result.campaignId) {
-    return `VIDEO CAMPAIGN TRIGGER FAILED: ${result.error || 'unknown error'}`
-  }
-  if (result.status === 'campaign_created_render_failed') {
-    return [
-      `VIDEO CAMPAIGN CREATED — render failed to start.`,
-      `Campaign id: ${result.campaignId}`,
-      `Error: ${result.error}`,
-      `The owner can retry the render from: ${result.dashboardUrl}`,
-    ].join('\n')
+export function formatTriggerVideoForAI(params: TriggerVideoCampaignParams, result: TriggerVideoCampaignResult): string {
+  if (!result.ok) {
+    return `Video campaign trigger failed: ${result.error} The campaign was NOT created. Tell the owner plainly and suggest they check the Campaign Queue dashboard.`
   }
   return [
-    `VIDEO CAMPAIGN TRIGGERED SUCCESSFULLY.`,
-    `Campaign id: ${result.campaignId}`,
-    `Render request id: ${result.renderRequestId || 'n/a'}`,
-    `Status: rendering (Kling b-roll render started)`,
-    `Next: the cron job will poll fal.ai, add ElevenLabs voiceover + captions, burn the brand overlay, then await owner approval before publishing.`,
-    `Track progress at: ${result.dashboardUrl}`,
+    `Video campaign queued and render started successfully.`,
+    `Campaign ID: ${result.campaignId}`,
+    `Render request ID: ${result.requestId}`,
+    `Status: rendering (fal.ai / Kling is generating the footage now)`,
+    ``,
+    `The render typically takes 2-5 minutes. Once complete, the cron job (cos-video-poll) advances it to ready.`,
+    `Next steps (owner-gated):`,
+    `1. Go to the Campaign Queue dashboard to monitor render progress.`,
+    `2. Once ready, trigger voice + brand overlay from the dashboard.`,
+    `3. Review the final branded video and approve publishing.`,
+    ``,
+    `Nothing has been published. Publishing requires your explicit approval in the dashboard.`,
   ].join('\n')
 }

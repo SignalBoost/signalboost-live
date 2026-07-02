@@ -4,6 +4,12 @@
 // creates a real cos_campaign_queue row, injects the requested script/CTA as the
 // draft output, and starts the internal render pipeline. Publishing remains
 // owner-gated by the existing publish route.
+//
+// FIX: approved_by is a uuid column — writing the string marker
+// 'cos_internal_preparation' into it made Postgres reject EVERY chat-created
+// campaign ("invalid input syntax for type uuid"). approved_by now carries a
+// real user uuid (when the caller knows it) or null; the "approved via owner
+// chat command" semantics live in metadata.approved_via, where strings belong.
 
 import { createClient } from '@supabase/supabase-js'
 import { queueItemFromRecommendation } from '@/lib/cos/campaign-queue'
@@ -91,7 +97,7 @@ export interface ProposeCampaignResult {
   error?: string
 }
 
-export async function proposeCampaign(args: any): Promise<ProposeCampaignResult> {
+export async function proposeCampaign(args: any, approvedByUserId?: string | null): Promise<ProposeCampaignResult> {
   const goal = text(args?.goal || args?.objective || args?.sourceMaterial, 'Create a SignalBoostAi promotional video campaign.', 1200)
   const audience = text(args?.audience, 'Small businesses, agencies, hotels, restaurants, and entrepreneurs.', 400)
   const channel = channelOf(args?.channel || goal)
@@ -126,7 +132,8 @@ export async function proposeCampaign(args: any): Promise<ProposeCampaignResult>
   const row: any = rowFromQueueItem(item)
   row.status = VIDEO_CHANNELS.has(channel) ? 'approved' : 'waiting_approval'
   row.approval_required = true
-  row.approved_by = 'cos_internal_preparation'
+  // uuid column: real user uuid when known, else null — NEVER a string marker.
+  row.approved_by = VIDEO_CHANNELS.has(channel) ? (approvedByUserId || null) : null
   row.approved_at = VIDEO_CHANNELS.has(channel) ? now : null
   row.languages = [lang]
   row.work_items = (Array.isArray(row.work_items) ? row.work_items : []).map((w: any) => ({
@@ -143,6 +150,7 @@ export async function proposeCampaign(args: any): Promise<ProposeCampaignResult>
   row.metadata = {
     ...(row.metadata || {}),
     source: 'cos_chat_video_campaign_tool',
+    approved_via: VIDEO_CHANNELS.has(channel) ? 'owner_chat_command' : null,
     owner_review_note: 'Internal production may run automatically. Public publishing remains locked until the owner clicks Publish.',
     required_burned_in_text: ['SignalBoostAi', SAAS_URL],
   }

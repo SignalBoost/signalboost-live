@@ -7,18 +7,16 @@
 //     - audio track: the narration voiceover
 //   then captions are burned from OUR OWN known-correct script text via an
 //   SRT we generate ourselves (veed/subtitles with srt_text) — NOT from
-//   auto-transcribing the resulting audio. FIX: the previous captioner
-//   (fal-ai/workflow-utilities/auto-subtitle) re-transcribes the synthesized
-//   voice via ASR, which has no way to know "SignalBoostAi" or the exact URL
-//   spelling and can mis-hear them. Since we already know precisely what was
-//   said (it's the same text we sent to TTS), there's nothing to transcribe —
-//   only to time. veed/subtitles skips transcription entirely when srt_text
-//   is provided, so caption text now matches the script byte-for-byte.
+//   auto-transcribing the resulting audio.
+//
+// URL CANONICALIZATION (hardened): ANY URL variant the AI writes into a draft
+// (paths like /website-optimizer, missing/extra www, protocol prefixes, typo'd
+// domains like signalboostappp) collapses to EXACTLY www.saas.signalboostapp.com
+// before TTS — so neither the voice nor the captions can ever carry a wrong or
+// path-suffixed URL. The persistent banner remains code-generated separately.
 //
 // Runs entirely from Vercel — no self-hosted FFmpeg and no storage bucket
 // (the audio is handed to fal as a base64 data URI, so nothing is uploaded).
-//
-// tsconfig non-strict: flat { ok, error? } results; never throws to callers.
 
 import { fal } from '@fal-ai/client'
 import { generateSpeech } from '@/lib/elevenlabs/client'
@@ -27,11 +25,10 @@ const COMPOSE_MODEL = 'fal-ai/ffmpeg-api/compose'
 const METADATA_MODEL = 'fal-ai/ffmpeg-api/metadata'
 const SUBTITLE_MODEL = 'veed/subtitles' // srt_text bypasses ASR transcription entirely
 const SITE_URL = 'www.saas.signalboostapp.com'
-const CLIP_MS = 5000        // Kling v3 standard renders ~5s clips
-const MIN_TOTAL_MS = 6000   // floor so a one-line VO still has room
-const MAX_TOTAL_MS = 60000  // cap the final video at one minute
+const CLIP_MS = 5000
+const MIN_TOTAL_MS = 6000
+const MAX_TOTAL_MS = 60000
 
-// Curated ElevenLabs voices per language (multilingual model handles all five).
 const VOICE_BY_LANG: Record<string, string> = {
   en: 'EXAVITQu4vr4xnSDxMaL',
   es: '9BWtsMINqrJLrRacOk9x',
@@ -45,20 +42,22 @@ function ensureFal() {
   if (!falConfigured) { fal.config({ credentials: process.env.FAL_KEY }); falConfigured = true }
 }
 
+// HARDENED: collapse EVERY variant of our URL — any protocol, any www-count,
+// common typos (extra p's), and ANY path/query suffix — to the exact canonical
+// form. Applied before TTS, so voice and captions are canonical by construction.
 function normalizeUrlText(text: string): string {
-  return String(text || '')
-    .replace(/https?:\/\/www\.saas\.signalboostapp\.com/gi, SITE_URL)
-    .replace(/https?:\/\/saas\.signalboostapp\.com/gi, SITE_URL)
-    .replace(/\bwww\.saas\.signalboostapp\.com\b/gi, SITE_URL)
-    .replace(/\bsaas\.signalboostapp\.com\b/gi, SITE_URL)
-    .replace(/\bwww\.saas\.signalboost\.com\b/gi, SITE_URL)
-    .replace(/\bsignalboost\.com\b/gi, SITE_URL)
-    .replace(/www\.www\./gi, 'www.')
+  let out = String(text || '')
+  // 1) Any protocol + any variant of the domain (incl. typos like signalboostappp),
+  //    with or without www / saas subdomain, plus ANY path/query tail → canonical.
+  out = out.replace(/(?:https?:\/\/)?(?:www\.)?(?:saas\.)?signalboost?ap{1,3}\.com(?:\/[^\s,.!?)]*)?/gi, SITE_URL)
+  // 2) signalboost.com legacy references → canonical.
+  out = out.replace(/(?:https?:\/\/)?(?:www\.)?signalboost\.com(?:\/[^\s,.!?)]*)?/gi, SITE_URL)
+  // 3) Safety: collapse accidental doubling from prior passes.
+  out = out.replace(/(?:www\.)+www\./gi, 'www.')
+  out = out.replace(new RegExp(`(${SITE_URL.replace(/\./g, '\\.')})(?:\\s*\\1)+`, 'gi'), '$1')
+  return out
 }
 
-// Build a spoken script from the per-language draft. Long enough to fill up to a
-// minute, capped on a sentence boundary, and always ends by speaking the exact
-// public URL so it shows up correctly in the burned captions.
 function narrationFor(campaign: any, lang: string): string {
   const items = Array.isArray(campaign.work_items) ? campaign.work_items : []
   const match =
@@ -86,14 +85,11 @@ function narrationFor(campaign: any, lang: string): string {
   return text
 }
 
-// Rough fallback if fal metadata is unavailable: ~150 wpm, padded 15% so the
-// audio is never cut (a short silent tail is fine; a clipped VO is not).
 function estimateMs(text: string): number {
   const words = text.split(/\s+/).filter(Boolean).length
   return Math.round((words / 2.5) * 1000 * 1.15)
 }
 
-// Read the real audio duration (seconds) from fal metadata; fall back to estimate.
 async function probeAudioMs(dataUri: string, fallbackMs: number): Promise<number> {
   try {
     const r: any = await fal.subscribe(METADATA_MODEL, { input: { media_url: dataUri } })
@@ -109,8 +105,6 @@ async function probeAudioMs(dataUri: string, fallbackMs: number): Promise<number
   return fallbackMs
 }
 
-// Tile the short clip across [0, totalMs); the last keyframe is truncated so the
-// video length matches the voice exactly.
 function buildVideoKeyframes(url: string, totalMs: number) {
   const frames: { timestamp: number; duration: number; url: string }[] = []
   let t = 0
@@ -132,10 +126,6 @@ function formatSrtTime(ms: number): string {
   return `${pad(h)}:${pad(m)}:${pad(s)},${pad(msRem, 3)}`
 }
 
-// Build our OWN subtitles from the EXACT text sent to TTS, with timing
-// distributed proportionally by word count across the real audio duration.
-// This deliberately replaces ASR-based auto-transcription: since we already
-// know precisely what was said, there is nothing to transcribe, only to time.
 function buildSrt(text: string, totalMs: number, wordsPerLine = 7): string {
   const words = text.split(/\s+/).filter(Boolean)
   if (words.length === 0 || totalMs <= 0) return ''
@@ -170,7 +160,6 @@ export async function addVoiceToCampaignVideo(
     const voiceId = VOICE_BY_LANG[lang] || VOICE_BY_LANG.en
     const text = narrationFor(campaign, lang)
 
-    // 1) Text -> speech (mp3 bytes) -> base64 data URI (no storage bucket needed).
     let audio: ArrayBuffer
     try {
       audio = await generateSpeech({ text, voiceId })
@@ -181,12 +170,10 @@ export async function addVoiceToCampaignVideo(
 
     ensureFal()
 
-    // 2) Decide final length from the real narration duration, capped at one minute.
     const fallbackMs = Math.min(Math.max(estimateMs(text), MIN_TOTAL_MS), MAX_TOTAL_MS)
     const audioMs = await probeAudioMs(audioDataUri, fallbackMs)
     const totalMs = Math.min(Math.max(Math.ceil(audioMs), MIN_TOTAL_MS), MAX_TOTAL_MS)
 
-    // 3) Compose: loop the short clip across the timeline, lay the voice on top.
     const tracks = [
       { id: 'video', type: 'video', keyframes: buildVideoKeyframes(String(videoUrl), totalMs) },
       { id: 'voice', type: 'audio', keyframes: [{ timestamp: 0, duration: totalMs, url: audioDataUri }] },
@@ -195,10 +182,6 @@ export async function addVoiceToCampaignVideo(
     let finalUrl = String(result?.data?.video_url || result?.data?.video?.url || '')
     if (!finalUrl) return { ok: false, error: 'compose returned no video url' }
 
-    // 4) Burn captions from OUR OWN known-correct script text, not ASR
-    //    transcription of the synthesized audio — so brand names and URLs
-    //    are never mis-heard. Graceful: if captioning fails, return the
-    //    voiced (uncaptioned) video rather than erroring the whole step.
     try {
       const srt = buildSrt(text, totalMs)
       if (srt) {

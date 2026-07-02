@@ -3,44 +3,50 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/outreach/security'
 import { fetchSiteVideo } from '@/lib/operator/video'
 import { renderBrandedVideo } from '@/lib/cos/video-compose'
-import { addVoiceToCampaignVideo } from '@/lib/cos/video-voice'
 import { BRAND_SCHEMA_VERSION, BRAND_TEXT } from '@/lib/cos/brand-schema'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
-
 
 async function buildFinal(ctx: any, campaign: any, video: any, lang: string) {
   const aspect: '9:16' | '16:9' = video?.aspect === '9:16' || video?.aspect === '16:9'
     ? video.aspect
     : (campaign.channel === 'short_video' ? '9:16' : '16:9')
   const readyCampaign = { ...campaign, metadata: { ...(campaign.metadata || {}), video: { ...video, status: 'ready' } } }
-  let finalUrl = ''
-  let branded = false
-  let voiceError = ''
   const b = await renderBrandedVideo({ campaign: readyCampaign, brollUrl: video.url, aspect, lang })
+  const doneIso = new Date().toISOString()
+
   if (b.ok && b.url) {
-    finalUrl = b.url
-    branded = true
-  } else {
-    const r = await addVoiceToCampaignVideo(readyCampaign, lang)
-    if (r.ok && r.url) {
-      finalUrl = r.url
-      voiceError = `branded compose failed: ${b.error || 'unknown'}`
-    } else {
-      voiceError = `branded compose failed: ${b.error || 'unknown'} | fallback failed: ${r.error || 'unknown'}`
+    const updatedVideo = {
+      ...video,
+      status: 'ready',
+      voicedUrl: b.url,
+      branded: true,
+      brandSchemaVersion: BRAND_SCHEMA_VERSION,
+      brandText: BRAND_TEXT,
+      brandedAt: doneIso,
+      voiced: { ...((video && video.voiced) || {}), [lang]: b.url },
+      voiceError: null,
+      brandDebug: b.debug || null,
     }
+    await ctx.admin.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: updatedVideo } }).eq('id', campaign.id)
+    return updatedVideo
   }
+
+  // No fallback here. The old fallback created an unbranded/caption-only video and
+  // saved it as voicedUrl, which made bad output look like the final COSA result.
+  // A final campaign video is only final when JSON2Video returns the branded asset.
   const updatedVideo = {
     ...video,
     status: 'ready',
-    voicedUrl: finalUrl || null,
-    branded,
-    brandSchemaVersion: branded ? BRAND_SCHEMA_VERSION : null,
-    brandText: branded ? BRAND_TEXT : null,
-    brandedAt: branded ? new Date().toISOString() : null,
-    voiced: finalUrl ? { ...((video && video.voiced) || {}), [lang]: finalUrl } : ((video && video.voiced) || {}),
-    voiceError: voiceError || null,
+    voicedUrl: null,
+    branded: false,
+    brandSchemaVersion: null,
+    brandText: null,
+    brandedAt: null,
+    voiced: (video && video.voiced) || {},
+    voiceError: `branded compose failed: ${b.error || 'unknown'}`,
+    brandDebug: b.debug || null,
   }
   await ctx.admin.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: updatedVideo } }).eq('id', campaign.id)
   return updatedVideo
@@ -66,7 +72,7 @@ export async function POST(req: NextRequest) {
   }
   if (v.status === 'ready' && v.url) {
     const finalVideo = await buildFinal(ctx, campaign, v, lang)
-    return NextResponse.json({ ok: true, status: 'ready', url: finalVideo.voicedUrl || finalVideo.url, baseUrl: finalVideo.url, branded: finalVideo.branded === true, brandSchemaVersion: finalVideo.brandSchemaVersion || null, warning: finalVideo.voiceError || null })
+    return NextResponse.json({ ok: finalVideo.branded === true, status: 'ready', url: finalVideo.voicedUrl || null, baseUrl: finalVideo.url, branded: finalVideo.branded === true, brandSchemaVersion: finalVideo.brandSchemaVersion || null, warning: finalVideo.voiceError || null }, { status: finalVideo.branded === true ? 200 : 502 })
   }
 
   let res: any
@@ -76,7 +82,7 @@ export async function POST(req: NextRequest) {
   if (res?.status === 'done' && res.videoUrl) {
     const baseVideo = { ...v, status: 'ready', url: res.videoUrl, ready_at: now }
     const finalVideo = await buildFinal(ctx, campaign, baseVideo, lang)
-    return NextResponse.json({ ok: true, status: 'ready', url: finalVideo.voicedUrl || res.videoUrl, baseUrl: res.videoUrl, branded: finalVideo.branded === true, brandSchemaVersion: finalVideo.brandSchemaVersion || null, warning: finalVideo.voiceError || null })
+    return NextResponse.json({ ok: finalVideo.branded === true, status: 'ready', url: finalVideo.voicedUrl || null, baseUrl: res.videoUrl, branded: finalVideo.branded === true, brandSchemaVersion: finalVideo.brandSchemaVersion || null, warning: finalVideo.voiceError || null }, { status: finalVideo.branded === true ? 200 : 502 })
   }
   if (res?.status === 'failed' || res?.ok === false) {
     await ctx.admin.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: { ...v, status: 'failed', error: res?.error || 'render failed', failed_at: now } } }).eq('id', id)

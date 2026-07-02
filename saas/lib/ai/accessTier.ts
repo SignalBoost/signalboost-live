@@ -20,12 +20,17 @@
  * memory/history) remains available to admins.
  */
 export const OWNER_ONLY_TOOLS = new Set<string>([
-  'proposeCodeCommit',       // commits code to an ai/* branch
-  'deleteBranches',          // deletes branches
-  'proposeInfrastructurePR', // stages a live infrastructure change
-  'proposeGrowthPlan',       // writes a growth plan
-  'updateGrowthPlanStatus',  // approves / executes a growth plan
-  'createOutreachDraft',     // places messages into the outreach pipeline
+  'proposeCodeCommit',          // commits code to an ai/* branch
+  'deleteBranches',             // deletes branches
+  'proposeInfrastructurePR',    // stages a live infrastructure change
+  'proposeGrowthPlan',          // writes a growth plan
+  'updateGrowthPlanStatus',     // approves / executes a growth plan
+  'createOutreachDraft',        // places messages into the outreach pipeline
+  'proposeMarketingCampaign',   // creates a REAL campaign that auto-approves video
+                                // channels and immediately starts spending money on
+                                // rendering (Kling/ElevenLabs/JSON2Video). Starting a
+                                // campaign is the owner's decision — matches the
+                                // operating vision: "me asking to start the campaign."
 ])
 
 /** True if a tool name is owner-only (i.e. an admin must not run it). */
@@ -53,7 +58,7 @@ YOU MAY:
 
 YOU MUST NOT (these tools are unavailable to admins and will refuse):
 - Commit or propose code, stage infrastructure changes, create/approve/execute
-  growth plans, create outreach, or delete branches.
+  growth plans, create marketing campaigns, create outreach, or delete branches.
 - Claim you performed any such action, or offer to do it "on the owner's behalf".
 
 WHEN A FIX REQUIRES A WRITE:

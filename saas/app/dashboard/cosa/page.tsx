@@ -9,7 +9,7 @@ const CYAN = '#1af0ff'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type OutreachRow = { id: string; business_name?: string; business_url?: string; source_platform?: string; status?: string; created_at?: string; outreach_message?: string }
-type CampaignRow = { id: string; title?: string; objective?: string; audience?: string; channel?: string; status?: string; risk_level?: string; created_at?: string; languages?: string[]; metadata?: Record<string, any>; assets?: Array<{ type?: string; status?: string }>; work_items?: Array<{ id?: string; kind?: string; status?: string; input?: { language?: string }; output?: { title?: string; opening?: string; draft?: string; call_to_action?: string } }> }
+type CampaignRow = { id: string; title?: string; objective?: string; audience?: string; channel?: string; status?: string; risk_level?: string; created_at?: string; approved_at?: string | null; approved_by?: string | null; languages?: string[]; metadata?: Record<string, any>; assets?: Array<{ type?: string; status?: string }>; work_items?: Array<{ id?: string; kind?: string; status?: string; input?: { language?: string }; output?: { title?: string; opening?: string; draft?: string; call_to_action?: string } }> }
 
 type Copy = {
   directive: string
@@ -62,7 +62,7 @@ function CampaignCard({ campaign, busy, c, onPatch, onGenerateDraft, onGenerateA
   const drafts = (campaign.work_items || []).filter(item => item.output)
   const video = (campaign.metadata as any)?.video || null
   const waiting = campaign.status === 'waiting_approval' || campaign.status === 'draft'
-  const canPublish = ['youtube', 'short_video', 'linkedin'].includes(campaign.channel || '') && campaign.status === 'approved'
+  const canPublish = ['youtube', 'short_video', 'linkedin'].includes(campaign.channel || '') && (campaign.status === 'approved' || campaign.status === 'queued') && Boolean(campaign.approved_at)
   const isVideo = ['youtube', 'short_video'].includes(campaign.channel || '')
   return <Card style={{ position: 'relative', overflow: 'hidden' }}>
     <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: campaign.status === 'approved' ? '#34d399' : campaign.status === 'rejected' ? '#f87171' : GOLD }} />

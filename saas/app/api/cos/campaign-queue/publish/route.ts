@@ -12,6 +12,12 @@
 //      branding/monetization/traffic-plan). Below the bar, publish is blocked
 //      and the reason is written to metadata.readiness — COSA's problem to fix,
 //      not something the owner has to catch by eye.
+// TRAFFIC ATTRIBUTION: the post/description text gets the campaign's tracking
+// link (/api/track?c=<id>&p=<platform>) appended, so every click a viewer
+// makes from the platform lands in cos_campaign_clicks before redirecting to
+// the real site. The burned-in on-screen URL and the spoken narration keep
+// the clean human-readable URL — only the clickable description link routes
+// through tracking.
 // Language-aware: when a language is given (or owner text is not), the matching
 // per-language draft (work_items[].output) is used. Owner-reviewed content
 // (body.text / body.videoUrl) always wins. Published results are keyed by
@@ -24,6 +30,7 @@ import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
 import { getValidSocialToken } from '@/lib/outreach/social-token'
 import { publishSocialPost, SOCIAL_CONNECTORS, type SocialPlatform } from '@/lib/outreach/social-connectors'
 import { scoreCampaignReadiness } from '@/lib/cos/video-quality/campaign-scoring'
+import { buildTrackingUrl } from '@/lib/cos/campaign-queue/campaign-traffic'
 import { sendEmail, SENDERS } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
@@ -98,8 +105,7 @@ export async function POST(req: NextRequest) {
   if (!platform || !SOCIAL_CONNECTORS[platform]) {
     return NextResponse.json({ ok: false, error: `Channel "${campaign.channel}" is not a direct social-post target. Pass an explicit platform to override.` }, { status: 400 })
   }
-
-  // Resolve the per-language draft. When a language is given, use that draft;
+// Resolve the per-language draft. When a language is given, use that draft;
   // otherwise fall back to the first drafted work item.
   const language = String(body?.language || '').trim()
   const items = Array.isArray(campaign.work_items) ? campaign.work_items : []
@@ -110,9 +116,18 @@ export async function POST(req: NextRequest) {
   const draftTitle = matched?.output?.title ? String(matched.output.title) : ''
 
   // Owner-approved content wins; then the per-language draft; then stored fields.
-  const text = String(body?.text || draftText || campaign.objective || campaign.title || '')
+  let text = String(body?.text || draftText || campaign.objective || campaign.title || '')
   const videoUrl = body?.videoUrl ? String(body.videoUrl) : ((campaign.metadata?.video?.voicedUrl || campaign.metadata?.video?.url) ? String(campaign.metadata.video.voicedUrl || campaign.metadata.video.url) : undefined)
   const title = String(body?.title || draftTitle || campaign.title || '')
+
+  // TRAFFIC ATTRIBUTION: append the campaign's tracking link to the clickable
+  // description text, so clicks from the platform land in cos_campaign_clicks
+  // and are attributable to THIS campaign. Skipped if a tracking link is
+  // already present (e.g. a re-publish).
+  const trackingUrl = buildTrackingUrl(campaign.id, platform)
+  if (!text.includes('/api/track?')) {
+    text = `${text}\n\n👉 ${trackingUrl}`.trim()
+  }
 
   const tok = await getValidSocialToken(ctx.admin, ctx.user.id, platform)
   if (!tok.ok || !tok.accessToken) {
@@ -146,6 +161,7 @@ export async function POST(req: NextRequest) {
       html: `
         <p>COSA finished the full pipeline for <strong>${title || campaign.title}</strong> and it is now live on ${platformLabel}.</p>
         <p><a href="${result.liveUrl}">${result.liveUrl}</a></p>
+        <p>Clicks on the description link are being tracked — traffic numbers will appear on the campaign record automatically.</p>
         <p>Click through to verify it looks right. No further action needed unless something looks off.</p>
       `.trim(),
     })
@@ -158,6 +174,7 @@ export async function POST(req: NextRequest) {
     metadata: {
       ...(campaign.metadata || {}),
       readiness,
+      tracking_url: trackingUrl,
       published: {
         ...((campaign.metadata && campaign.metadata.published) || {}),
         [publishedKey]: { result, publishedAt, language: language || null, notified, notifyError: notifyError || null, publishedUnbranded: acceptUnbranded && campaign.metadata?.video?.branded !== true },
@@ -174,5 +191,5 @@ export async function POST(req: NextRequest) {
     metadata: { platform, language: language || null, result, notified, acceptUnbranded },
   })
 
-  return NextResponse.json({ ok: true, platform, language: language || null, publishedAt, result, readiness, notified })
+  return NextResponse.json({ ok: true, platform, language: language || null, publishedAt, result, readiness, notified, trackingUrl })
 }

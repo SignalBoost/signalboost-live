@@ -1,7 +1,7 @@
 // saas/lib/cos/video-compose.ts
 // JSON2Video is used only for the pixel brand overlay. The existing media path
-// still creates narration/captions first, then this module burns in the exact
-// SignalBoostAi and URL overlay.
+// still creates narration/captions first (video-voice.ts), then this module
+// burns in the exact SignalBoostAi name + URL overlay on top of that.
 
 const J2V_ENDPOINT = 'https://api.json2video.com/v2/movies'
 const SITE = 'https://www.saas.signalboostapp.com'
@@ -127,14 +127,4 @@ export async function renderBrandOverlayVideo(opts: { campaign: any; sourceUrl: 
     log()
     return { ok: false, error: e?.message || 'branded overlay failed', debug: trace }
   }
-}
-
-export async function renderBrandedVideo(opts: { campaign: any; brollUrl: string; aspect: '16:9' | '9:16'; lang: string }): Promise<{ ok: boolean; url?: string; error?: string; debug?: any }> {
-  const mod = await import('./video-' + 'voice')
-  const readyCampaign = { ...opts.campaign, metadata: { ...(opts.campaign?.metadata || {}), video: { ...((opts.campaign?.metadata && opts.campaign.metadata.video) || {}), status: 'ready', url: opts.brollUrl } } }
-  const voiced = await mod.addVoiceToCampaignVideo(readyCampaign, opts.lang)
-  if (!voiced.ok || !voiced.url) return { ok: false, error: voiced.error || 'voice compose failed' }
-  const overlay = await renderBrandOverlayVideo({ campaign: readyCampaign, sourceUrl: voiced.url, aspect: opts.aspect, lang: opts.lang })
-  if (overlay.ok && overlay.url) return overlay
-  return { ok: false, error: overlay.error || 'brand overlay failed', debug: overlay.debug }
 }

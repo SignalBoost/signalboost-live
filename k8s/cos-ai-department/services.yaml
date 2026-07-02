@@ -1,0 +1,118 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cos-ai-ml-engineer
+  namespace: cos-ai-department
+  labels:
+    app: cos-ai-department
+    role: ml-engineer
+spec:
+  selector:
+    app: cos-ai-department
+    role: ml-engineer
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cos-ai-ai-engineer
+  namespace: cos-ai-department
+  labels:
+    app: cos-ai-department
+    role: ai-engineer
+spec:
+  selector:
+    app: cos-ai-department
+    role: ai-engineer
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cos-ai-architect
+  namespace: cos-ai-department
+  labels:
+    app: cos-ai-department
+    role: architect
+spec:
+  selector:
+    app: cos-ai-department
+    role: architect
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cos-ai-data-scientist
+  namespace: cos-ai-department
+  labels:
+    app: cos-ai-department
+    role: data-scientist
+spec:
+  selector:
+    app: cos-ai-department
+    role: data-scientist
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cos-ai-data-engineer
+  namespace: cos-ai-department
+  labels:
+    app: cos-ai-department
+    role: data-engineer
+spec:
+  selector:
+    app: cos-ai-department
+    role: data-engineer
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cos-ai-research
+  namespace: cos-ai-department
+  labels:
+    app: cos-ai-department
+    role: research
+spec:
+  selector:
+    app: cos-ai-department
+    role: research
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cos-ai-ethics
+  namespace: cos-ai-department
+  labels:
+    app: cos-ai-department
+    role: ethics
+spec:
+  selector:
+    app: cos-ai-department
+    role: ethics
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

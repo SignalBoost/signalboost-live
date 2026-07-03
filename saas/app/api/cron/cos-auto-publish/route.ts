@@ -30,7 +30,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const CHANNEL_TO_PLATFORM: Record<string, SocialPlatform | undefined> = {
   youtube: 'youtube_channels',
-  short_video: 'tiktok',
+  short_video: 'youtube_channels',
   linkedin: 'linkedin_company',
 }
 const VIDEO_CHANNELS = ['youtube', 'short_video']

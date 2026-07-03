@@ -1,13 +1,42 @@
-      - name: Notify Teams on success
+      - name: Notify Slack on success
         if: success()
-        run: |
-          curl -H 'Content-Type: application/json' \
-          -d '{"text":"✅ COS edits applied and deployed successfully on ai-cos-branch."}' \
-          ${{ secrets.TEAMS_WEBHOOK_URL }}
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "✅ COS pipeline succeeded",
+              "attachments": [
+                {
+                  "color": "#36a64f",
+                  "fields": [
+                    { "title": "Branch", "value": "${{ github.ref }}", "short": true },
+                    { "title": "Commit", "value": "${{ github.sha }}", "short": true },
+                    { "title": "Node.js Version", "value": "${{ matrix.node-version }}", "short": true },
+                    { "title": "Vercel Preview", "value": "https://signalboostapp.vercel.app", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      - name: Notify Teams on failure
+      - name: Notify Slack on failure
         if: failure()
-        run: |
-          curl -H 'Content-Type: application/json' \
-          -d '{"text":"❌ COS pipeline failed. Check logs for details."}' \
-          ${{ secrets.TEAMS_WEBHOOK_URL }}
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "❌ COS pipeline failed",
+              "attachments": [
+                {
+                  "color": "#ff0000",
+                  "fields": [
+                    { "title": "Branch", "value": "${{ github.ref }}", "short": true },
+                    { "title": "Commit", "value": "${{ github.sha }}", "short": true },
+                    { "title": "Node.js Version", "value": "${{ matrix.node-version }}", "short": true }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

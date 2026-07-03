@@ -1,58 +1,21 @@
-name: COS Commit Pipeline
-
-on:
-  workflow_dispatch:
-  push:
-    branches:
-      - ai-cos-branch
-
-jobs:
-  build-and-commit:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x, 22.x]
-
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+      - name: Notify Slack on success
+        if: success()
+        uses: slackapi/slack-github-action@v1.23.0
         with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'npm'   # built-in npm cache
+          payload: |
+            {
+              "text": "✅ COS edits applied and deployed successfully on ai-cos-branch."
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      - name: Cache Vercel build output
-        uses: actions/cache@v3
+      - name: Notify Slack on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.23.0
         with:
-          path: .vercel/cache
-          key: vercel-${{ runner.os }}-${{ matrix.node-version }}-${{ github.sha }}
-          restore-keys: |
-            vercel-${{ runner.os }}-${{ matrix.node-version }}-
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run COS edits (safe mode v5)
-        run: |
-          DRY_RUN=false ROLLBACK_ALL=false node scripts/cos-edit.js
-
-      - name: Run tests
-        run: npm test
-
-      - name: Build app
-        run: npm run build
-
-      - name: Commit changes
-        if: matrix.node-version == '20.x' # commit only once
-        run: |
-          git config --global user.name "COS Agent"
-          git config --global user.email "cos@signalboostapp.com"
-          git add .
-          git commit -m "COS: Applied automated fixes"
-          git push origin ai-cos-branch
-
-      - name: Deploy to Vercel
-        if: matrix.node-version == '20.x' # deploy only once
-        run: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }}
+          payload: |
+            {
+              "text": "❌ COS pipeline failed. Check logs for details."
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

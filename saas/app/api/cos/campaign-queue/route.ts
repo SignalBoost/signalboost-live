@@ -157,11 +157,6 @@ function expectedRoiForPriority(priority: CosPriority): CosRecommendation['expec
 function channelFromDirective(text: string): CosChannel {
   const lower = text.toLowerCase()
   if (lower.includes('tiktok') || lower.includes('short') || lower.includes('reel')) return 'short_video'
-  if (lower.includes('youtube') || lower.includes('video')) return 'youtube'
-  if (lower.includes('linkedin')) return 'linkedin'
-  if (lower.includes('email')) return 'email'
-  if (lower.includes('outreach')) return 'outreach'
-  if (lower.includes('blog') || lower.includes('seo')) return 'blog'
   return 'youtube'
 }
 

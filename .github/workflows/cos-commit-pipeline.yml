@@ -9,10 +9,18 @@ on:
 jobs:
   build-and-commit:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
 
       - name: Install dependencies
         run: npm install
@@ -28,6 +36,7 @@ jobs:
         run: npm run build
 
       - name: Commit changes
+        if: matrix.node-version == '20.x' # commit only once, not per matrix job
         run: |
           git config --global user.name "COS Agent"
           git config --global user.email "cos@signalboostapp.com"
@@ -36,4 +45,5 @@ jobs:
           git push origin ai-cos-branch
 
       - name: Deploy to Vercel
+        if: matrix.node-version == '20.x' # deploy only once
         run: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }}

@@ -1,36 +1,41 @@
 // saas/app/api/cron/cos-brand-video/route.ts
-// Voice + captions + persistent SignalBoostAi name/URL banner, one language
-// per campaign per tick, with real retries (success tracked in brandedLangs).
+// VOICE-ONLY stage. This cron now does exactly one thing: produce the voiced +
+// captioned (unbranded) video per language and store it in
+// metadata.video.unbrandedVoiced[lang].
+//
+// BRANDING IS NOT DONE HERE ANYMORE. The SignalBoostAi banner is burned in by
+// the free FFmpeg worker on GitHub Actions (scripts/brand-overlay-worker.mjs,
+// every 10 minutes), which reads unbrandedVoiced[lang] and writes voiced[lang]
+// + brandedLangs[lang]. JSON2Video is fully removed from the pipeline — no
+// credits, no vendor polling, no renderBrandOverlayVideo import.
+//
+// CRITICALLY: this cron must NEVER touch metadata.video.brandingLock. That
+// lock belongs to the GH worker; when this cron used to hold it every 2
+// minutes, the GH worker (5-minute lock respect) was starved and nothing ever
+// got branded. Voice work uses its own voiceLock key instead.
 //
 // GUARD 1 (backlog cutoff): only campaigns created after COS_BRAND_SINCE
-// (default 2026-07-02T12:00:00Z) are processed. Without this, enabling real
-// retries re-opened ~50 stale July-1 backlog campaigns × 5 languages and
-// burned the entire JSON2Video credit balance (credits = seconds rendered)
-// plus ElevenLabs voice costs on languages nobody wanted. Old campaigns are
-// permanently out of scope; to brand a specific old one, bump its created_at
-// or use the diagnose-brand-overlay route.
+// (default 2026-07-02T12:00:00Z) are processed, to keep the old backlog from
+// burning ElevenLabs credits. To voice an older campaign, set the
+// COS_BRAND_SINCE env var in Vercel to an earlier date (the GH worker reads
+// the same var from its own Actions env if needed).
 //
-// GUARD 2 (billing-aware attempts): a quota/credits error is the ACCOUNT's
-// fault, not the video's — it no longer consumes one of the 3 attempts. So a
-// credit outage can't push campaigns into brandingExhausted; when credits are
-// topped up, everything in scope resumes and self-heals automatically.
+// GUARD 2 (billing-aware attempts): an ElevenLabs quota error is the
+// account's fault, not the video's — it does not consume one of the 3 voice
+// attempts. When the quota resets or is topped up, everything resumes.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { addVoiceToCampaignVideo } from '@/lib/cos/video-voice'
-import { renderBrandOverlayVideo } from '@/lib/cos/video-compose'
-import { BRAND_SCHEMA_VERSION, BRAND_TEXT } from '@/lib/cos/brand-schema'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 const DEFAULT_LANGS = ['en']
-const LOCK_MS = 5 * 60 * 1000
-const MAX_ATTEMPTS = 3
+const VOICE_LOCK_MS = 5 * 60 * 1000
+const MAX_VOICE_ATTEMPTS = 3
 const TIME_BUDGET_MS = 260_000
 const BACKLOG_CUTOFF = process.env.COS_BRAND_SINCE || '2026-07-02T12:00:00Z'
-
-type VoiceResult = { ok: boolean; url?: string; error?: string }
 
 function db() {
   const url = process.env['NEXT_PUBLIC_SUPABASE_URL']!
@@ -45,97 +50,86 @@ function campaignLangs(campaign: any): string[] {
 
 function isBillingQuotaError(message: string): boolean {
   const m = String(message || '').toLowerCase()
-  return m.includes('quota') || m.includes('insufficient credit') || m.includes('upgrade your plan')
+  return m.includes('quota') || m.includes('insufficient credit') || m.includes('upgrade your plan') || m.includes('character limit')
 }
 
-async function processCampaign(sb: any, campaign: any): Promise<{ status: 'branded' | 'progressed' | 'exhausted' | 'skipped' | 'billing_blocked'; lang?: string; error?: string }> {
+async function processCampaign(
+  sb: any,
+  campaign: any
+): Promise<{ status: 'voiced' | 'progressed' | 'exhausted' | 'skipped' | 'billing_blocked'; lang?: string; error?: string }> {
   const v = (campaign.metadata && campaign.metadata.video) || {}
-  if (!v.url) return { status: 'skipped' }
-  if (v.brandingExhausted === true) return { status: 'skipped' }
+  if (!v.url) return { status: 'skipped' } // Kling render not done yet
+  if (v.status !== 'ready') return { status: 'skipped' }
 
-  // GUARD 1: backlog stays out of scope, permanently.
+  // GUARD 1: backlog stays out of scope.
   const createdAt = campaign.created_at ? Date.parse(campaign.created_at) : 0
   if (!createdAt || createdAt < Date.parse(BACKLOG_CUTOFF)) return { status: 'skipped' }
 
   const langs = campaignLangs(campaign)
   const primary = langs[0]
   const brandedLangs: Record<string, boolean> = v.brandedLangs || {}
-  if (v.branded === true && !Object.keys(brandedLangs).length) brandedLangs[primary] = true
-  if (langs.every((l) => brandedLangs[l])) return { status: 'skipped' }
+  const unbrandedVoiced: Record<string, string> = { ...(v.unbrandedVoiced || {}) }
 
+  // Legacy field migration: a pre-existing primary voiced-but-unbranded URL.
+  if (!unbrandedVoiced[primary] && !brandedLangs[primary] && v.unbrandedVoicedUrl) {
+    unbrandedVoiced[primary] = String(v.unbrandedVoicedUrl)
+  }
+
+  // A language needs voicing if it is neither branded nor already voiced.
+  const attempts: Record<string, number> = v.voiceAttempts || {}
+  const needsVoice = langs.filter((l) => !brandedLangs[l] && !unbrandedVoiced[l])
+  if (!needsVoice.length) return { status: 'skipped' } // voice done; GH worker owns the rest
+
+  // Our own lock — NEVER brandingLock, which belongs to the GH FFmpeg worker.
   const nowMs = Date.now()
-  const lock = v.brandingLock
-  if (lock && lock.at && nowMs - Date.parse(lock.at) < LOCK_MS) return { status: 'skipped' }
+  const lock = v.voiceLock
+  if (lock && lock.at && nowMs - Date.parse(lock.at) < VOICE_LOCK_MS) return { status: 'skipped' }
 
-  const attempts: Record<string, number> = v.brandAttempts || {}
-  const aspect: '9:16' | '16:9' = v.aspect === '9:16' || v.aspect === '16:9' ? v.aspect : campaign.channel === 'short_video' ? '9:16' : '16:9'
-
-  const eligibleLang = langs.find((l) => !brandedLangs[l] && (attempts[l] || 0) < MAX_ATTEMPTS)
-
+  const eligibleLang = needsVoice.find((l) => (attempts[l] || 0) < MAX_VOICE_ATTEMPTS)
   if (!eligibleLang) {
-    const exhaustedError = `All requested languages exhausted ${MAX_ATTEMPTS} branding attempts each: ${JSON.stringify(attempts)}`
+    const exhaustedError = `Voice attempts exhausted (${MAX_VOICE_ATTEMPTS}/lang): ${JSON.stringify(attempts)}. Branding of already-voiced languages continues on GitHub Actions.`
     await sb.from('cos_campaign_queue').update({
-      metadata: { ...(campaign.metadata || {}), video: { ...v, brandingLock: null, brandingExhausted: true, voiceError: exhaustedError } },
+      metadata: { ...(campaign.metadata || {}), video: { ...v, unbrandedVoiced, voiceLock: null, voiceError: exhaustedError } },
     }).eq('id', campaign.id)
     return { status: 'exhausted', error: exhaustedError }
   }
 
   const lang = eligibleLang
-  const nowIso = new Date().toISOString()
-  await sb.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: { ...v, brandingLock: { lang, at: nowIso } } } }).eq('id', campaign.id)
+  await sb.from('cos_campaign_queue').update({
+    metadata: { ...(campaign.metadata || {}), video: { ...v, voiceLock: { lang, at: new Date().toISOString() } } },
+  }).eq('id', campaign.id)
 
-  const unbrandedVoiced: Record<string, string> = v.unbrandedVoiced || {}
-  const reusable = unbrandedVoiced[lang] || (lang === primary && v.unbrandedVoicedUrl ? String(v.unbrandedVoicedUrl) : null)
-  const voice: VoiceResult = reusable ? { ok: true, url: reusable } : await addVoiceToCampaignVideo(campaign, lang)
-  if (!voice.ok || !voice.url) {
-    const newAttempts = { ...attempts, [lang]: (attempts[lang] || 0) + 1 }
-    const voiceError = voice.error || 'compose error'
-    await sb.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: { ...v, brandAttempts: newAttempts, brandingLock: null, voiceError: `voice compose error: [${lang}] ${voiceError}` } } }).eq('id', campaign.id)
-    return { status: 'progressed', lang, error: voiceError }
-  }
+  const voice = await addVoiceToCampaignVideo(campaign, lang)
+  const ok = voice.ok && !!voice.url
+  const billingBlocked = !ok && isBillingQuotaError(voice.error || '')
 
-  const overlay = await renderBrandOverlayVideo({ campaign, sourceUrl: voice.url, aspect, lang })
-  const doneIso = new Date().toISOString()
-  const isBranded = overlay.ok && !!overlay.url
-  const billingBlocked = !isBranded && isBillingQuotaError(overlay.error || '')
+  // GUARD 2: billing failures don't consume attempts.
+  const newAttempts: Record<string, number> = ok || billingBlocked ? attempts : { ...attempts, [lang]: (attempts[lang] || 0) + 1 }
+  if (ok) unbrandedVoiced[lang] = String(voice.url)
 
-  const newVoiced: Record<string, string> = { ...(v.voiced || {}) }
-  const newUnbranded: Record<string, string> = { ...unbrandedVoiced }
-  const newBrandedLangs: Record<string, boolean> = { ...brandedLangs }
-  // GUARD 2: billing failures don't consume attempts — the video did nothing wrong.
-  const newAttempts: Record<string, number> = isBranded || billingBlocked ? attempts : { ...attempts, [lang]: (attempts[lang] || 0) + 1 }
+  // voicedUrl: what the dashboard plays. Branded primary wins; otherwise the
+  // freshest unbranded primary (the GH worker overwrites this on branding).
+  const voiced: Record<string, string> = v.voiced || {}
+  const primaryFinal = voiced[primary] || unbrandedVoiced[primary] || v.voicedUrl || null
 
-  if (isBranded) {
-    newVoiced[lang] = String(overlay.url)
-    newBrandedLangs[lang] = true
-    delete newUnbranded[lang]
-  } else {
-    newUnbranded[lang] = String(voice.url)
-  }
-
-  const primaryFinal = newVoiced[primary] || newUnbranded[primary] || v.voicedUrl || null
   const patch: any = {
     ...v,
     status: 'ready',
-    voiced: newVoiced,
+    unbrandedVoiced,
     voicedUrl: primaryFinal,
-    branded: Boolean(newBrandedLangs[primary]),
-    brandedLangs: newBrandedLangs,
-    unbrandedVoiced: newUnbranded,
-    brandAttempts: newAttempts,
-    brandSchemaVersion: newBrandedLangs[primary] ? BRAND_SCHEMA_VERSION : null,
-    brandText: newBrandedLangs[primary] ? BRAND_TEXT : null,
-    brandingLock: null,
-    voiceError: isBranded
+    voiceAttempts: newAttempts,
+    voiceLock: null,
+    voiceError: ok
       ? null
       : billingBlocked
-        ? `JSON2Video credits exhausted — branding paused, no attempts consumed. Will resume automatically after top-up at json2video.com/dashboard/credits.`
-        : `brand overlay error: [${lang}] ${overlay.error || 'overlay error'} (attempt ${(newAttempts[lang] || 0)}/${MAX_ATTEMPTS} — will retry)`,
-    brandedAt: newBrandedLangs[primary] ? (v.brandedAt || doneIso) : null,
-    brandDebug: overlay.debug || null,
+        ? `ElevenLabs quota exhausted — voicing paused, no attempts consumed. Resumes automatically after quota reset/top-up.`
+        : `voice compose error: [${lang}] ${voice.error || 'unknown'} (attempt ${newAttempts[lang] || 0}/${MAX_VOICE_ATTEMPTS} — will retry)`,
   }
-  await sb.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: patch } }).eq('id', campaign.id)
-  return { status: isBranded ? 'branded' : billingBlocked ? 'billing_blocked' : 'progressed', lang, error: isBranded ? undefined : patch.voiceError }
+  await sb.from('cos_campaign_queue').update({
+    metadata: { ...(campaign.metadata || {}), video: patch },
+  }).eq('id', campaign.id)
+
+  return { status: ok ? 'voiced' : billingBlocked ? 'billing_blocked' : 'progressed', lang, error: ok ? undefined : patch.voiceError }
 }
 
 export async function GET(req: NextRequest) {
@@ -155,7 +149,7 @@ export async function GET(req: NextRequest) {
 
   const startMs = Date.now()
   const results: any[] = []
-  let branded = 0
+  let voiced = 0
   let progressed = 0
   let exhausted = 0
   let skipped = 0
@@ -164,7 +158,7 @@ export async function GET(req: NextRequest) {
   for (const campaign of ready || []) {
     if (Date.now() - startMs > TIME_BUDGET_MS) break
     const r = await processCampaign(sb, campaign)
-    if (r.status === 'branded') branded++
+    if (r.status === 'voiced') voiced++
     else if (r.status === 'progressed') progressed++
     else if (r.status === 'exhausted') exhausted++
     else if (r.status === 'billing_blocked') billingBlocked++
@@ -172,7 +166,5 @@ export async function GET(req: NextRequest) {
     if (r.status !== 'skipped') results.push({ campaign: campaign.id, ...r })
   }
 
-  // If credits are exhausted, one failure is all the information there is —
-  // stop hammering the vendor this tick.
-  return NextResponse.json({ ok: true, branded, progressed, exhausted, skipped, billingBlocked, results })
+  return NextResponse.json({ ok: true, mode: 'voice-only (branding on GitHub Actions FFmpeg)', voiced, progressed, exhausted, skipped, billingBlocked, results })
 }

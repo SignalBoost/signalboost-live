@@ -1,28 +1,26 @@
 // saas/app/api/cron/cos-brand-video/route.ts
-// VOICE-ONLY stage. This cron now does exactly one thing: produce the voiced +
-// captioned (unbranded) video per language and store it in
-// metadata.video.unbrandedVoiced[lang].
+// VOICE-ONLY stage. Produces the voiced + captioned (still UNBRANDED) video
+// per language and stores it in metadata.video.unbrandedVoiced[lang]. That is
+// its entire job.
 //
-// BRANDING IS NOT DONE HERE ANYMORE. The SignalBoostAi banner is burned in by
-// the free FFmpeg worker on GitHub Actions (scripts/brand-overlay-worker.mjs,
-// every 10 minutes), which reads unbrandedVoiced[lang] and writes voiced[lang]
-// + brandedLangs[lang]. JSON2Video is fully removed from the pipeline — no
-// credits, no vendor polling, no renderBrandOverlayVideo import.
+// THE MANDATORY BRAND BANNER (SignalBoostAi + www.saas.signalboostapp.com,
+// burned into the pixels) is applied by the FINAL COMPOSITION STEP: the free
+// FFmpeg worker on GitHub Actions (scripts/brand-overlay-worker.mjs). Only
+// that worker writes voiced[lang] / brandedLangs[lang] / voicedUrl.
 //
-// CRITICALLY: this cron must NEVER touch metadata.video.brandingLock. That
-// lock belongs to the GH worker; when this cron used to hold it every 2
-// minutes, the GH worker (5-minute lock respect) was starved and nothing ever
-// got branded. Voice work uses its own voiceLock key instead.
+// HARD RULE ENFORCED HERE: voicedUrl NEVER carries an unbranded URL. Until
+// the banner is burned in, voicedUrl stays null (or keeps a previously
+// branded URL). Unbranded intermediates live ONLY in unbrandedVoiced, which
+// nothing displays or publishes.
+//
+// This cron NEVER touches metadata.video.brandingLock — that lock belongs to
+// the GitHub Actions worker. Voice work uses its own voiceLock key.
 //
 // GUARD 1 (backlog cutoff): only campaigns created after COS_BRAND_SINCE
-// (default 2026-07-02T12:00:00Z) are processed, to keep the old backlog from
-// burning ElevenLabs credits. To voice an older campaign, set the
-// COS_BRAND_SINCE env var in Vercel to an earlier date (the GH worker reads
-// the same var from its own Actions env if needed).
-//
-// GUARD 2 (billing-aware attempts): an ElevenLabs quota error is the
-// account's fault, not the video's — it does not consume one of the 3 voice
-// attempts. When the quota resets or is topped up, everything resumes.
+// (default 2026-07-02T12:00:00Z) are processed. Override with the
+// COS_BRAND_SINCE env var in Vercel to reach older campaigns.
+// GUARD 2 (billing-aware attempts): an ElevenLabs quota error does not
+// consume a voice attempt; work resumes automatically after top-up.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -70,24 +68,23 @@ async function processCampaign(
   const brandedLangs: Record<string, boolean> = v.brandedLangs || {}
   const unbrandedVoiced: Record<string, string> = { ...(v.unbrandedVoiced || {}) }
 
-  // Legacy field migration: a pre-existing primary voiced-but-unbranded URL.
+  // Legacy migration: an old primary voiced-but-unbranded URL.
   if (!unbrandedVoiced[primary] && !brandedLangs[primary] && v.unbrandedVoicedUrl) {
     unbrandedVoiced[primary] = String(v.unbrandedVoicedUrl)
   }
 
-  // A language needs voicing if it is neither branded nor already voiced.
   const attempts: Record<string, number> = v.voiceAttempts || {}
   const needsVoice = langs.filter((l) => !brandedLangs[l] && !unbrandedVoiced[l])
-  if (!needsVoice.length) return { status: 'skipped' } // voice done; GH worker owns the rest
+  if (!needsVoice.length) return { status: 'skipped' } // voice done; the banner worker owns the rest
 
-  // Our own lock — NEVER brandingLock, which belongs to the GH FFmpeg worker.
+  // Our own lock — NEVER brandingLock (that belongs to the GH FFmpeg worker).
   const nowMs = Date.now()
   const lock = v.voiceLock
   if (lock && lock.at && nowMs - Date.parse(lock.at) < VOICE_LOCK_MS) return { status: 'skipped' }
 
   const eligibleLang = needsVoice.find((l) => (attempts[l] || 0) < MAX_VOICE_ATTEMPTS)
   if (!eligibleLang) {
-    const exhaustedError = `Voice attempts exhausted (${MAX_VOICE_ATTEMPTS}/lang): ${JSON.stringify(attempts)}. Branding of already-voiced languages continues on GitHub Actions.`
+    const exhaustedError = `Voice attempts exhausted (${MAX_VOICE_ATTEMPTS}/lang): ${JSON.stringify(attempts)}. Banner-burning of already-voiced languages continues on GitHub Actions.`
     await sb.from('cos_campaign_queue').update({
       metadata: { ...(campaign.metadata || {}), video: { ...v, unbrandedVoiced, voiceLock: null, voiceError: exhaustedError } },
     }).eq('id', campaign.id)
@@ -107,16 +104,17 @@ async function processCampaign(
   const newAttempts: Record<string, number> = ok || billingBlocked ? attempts : { ...attempts, [lang]: (attempts[lang] || 0) + 1 }
   if (ok) unbrandedVoiced[lang] = String(voice.url)
 
-  // voicedUrl: what the dashboard plays. Branded primary wins; otherwise the
-  // freshest unbranded primary (the GH worker overwrites this on branding).
+  // BANNER GUARANTEE: voicedUrl is BRANDED-ONLY. If the primary language has
+  // a banner-burned URL (written by the GH worker into voiced[primary]), keep
+  // it; otherwise voicedUrl is null and nothing plays or publishes.
   const voiced: Record<string, string> = v.voiced || {}
-  const primaryFinal = voiced[primary] || unbrandedVoiced[primary] || v.voicedUrl || null
+  const brandedPrimaryUrl = brandedLangs[primary] ? (voiced[primary] || (v.branded === true ? v.voicedUrl : null)) : null
 
   const patch: any = {
     ...v,
     status: 'ready',
     unbrandedVoiced,
-    voicedUrl: primaryFinal,
+    voicedUrl: brandedPrimaryUrl || null,
     voiceAttempts: newAttempts,
     voiceLock: null,
     voiceError: ok
@@ -166,5 +164,5 @@ export async function GET(req: NextRequest) {
     if (r.status !== 'skipped') results.push({ campaign: campaign.id, ...r })
   }
 
-  return NextResponse.json({ ok: true, mode: 'voice-only (branding on GitHub Actions FFmpeg)', voiced, progressed, exhausted, skipped, billingBlocked, results })
+  return NextResponse.json({ ok: true, mode: 'voice-only (banner burned by GitHub Actions FFmpeg worker)', voiced, progressed, exhausted, skipped, billingBlocked, results })
 }

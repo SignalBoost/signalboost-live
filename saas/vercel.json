@@ -43,6 +43,10 @@
     {
       "path": "/api/cron/cos-campaign-measure",
       "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/cos-auto-publish",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

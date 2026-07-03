@@ -65,8 +65,8 @@ export default function CosaVideoPipelinePage() {
   return <main style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gap: 18 }}>
     <section style={{ ...panel, background: 'linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,6,23,.98))' }}>
       <p style={{ margin: 0, color: GOLD, fontSize: 12, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>COSA Video Pipeline</p>
-      <h1 style={{ color: '#fff', margin: '10px 0 0', fontSize: 32 }}>Video render and approval diagnostics</h1>
-      <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.65, maxWidth: 820 }}>This page shows playable previews plus campaign ID, created time, render start time, and status so repeated videos are easier to tell apart. New renders now default to 10 seconds.</p>
+      <h1 style={{ color: '#fff', margin: '10px 0 0', fontSize: 32 }}>Final video review</h1>
+      <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.65, maxWidth: 820 }}>This page now separates raw base renders from final campaign videos. A video is final only when it has voice/captions and the SignalBoostAi + www.saas.signalboostapp.com banner burned into it.</p>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
         <button onClick={() => load()} disabled={loading} style={ghost}>{loading ? 'Loading...' : 'Refresh'}</button>
         <button onClick={kick} disabled={loading} style={button}>Kick missing renders</button>
@@ -87,10 +87,12 @@ export default function CosaVideoPipelinePage() {
         {campaigns.map((campaign: any) => {
           const video = campaign.video || null
           const stage = video?.stage || 'no video metadata'
-          const color = video?.previewable ? '#34d399' : stage === 'failed' ? '#fca5a5' : stage === 'rendering' ? CYAN : GOLD
+          const finalReady = video?.branded === true && Boolean(video?.finalUrl || video?.previewUrl) && video?.previewKind === 'branded final'
+          const rawOnly = Boolean(video?.previewUrl) && !finalReady
+          const color = finalReady ? '#34d399' : stage === 'failed' ? '#fca5a5' : stage === 'rendering' ? CYAN : GOLD
           const stuck = String(campaign.eligibility || '').startsWith('STUCK') || stage === 'failed'
-          const previewUrl = video?.previewUrl ? String(video.previewUrl) : ''
-          return <article key={campaign.id} style={{ border: '1px solid rgba(255,255,255,.1)', borderRadius: 14, padding: 14, background: 'rgba(2,6,23,.45)' }}>
+          const previewUrl = finalReady && video?.previewUrl ? String(video.previewUrl) : ''
+          return <article key={campaign.id} style={{ border: finalReady ? '1px solid rgba(52,211,153,.35)' : rawOnly ? '1px solid rgba(255,195,0,.35)' : '1px solid rgba(255,255,255,.1)', borderRadius: 14, padding: 14, background: finalReady ? 'rgba(52,211,153,.06)' : rawOnly ? 'rgba(255,195,0,.06)' : 'rgba(2,6,23,.45)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <div>
                 <strong style={{ color: '#fff' }}>{campaign.title || campaign.id}</strong>
@@ -98,7 +100,7 @@ export default function CosaVideoPipelinePage() {
                   Video ID {shortId(campaign.id)} · {campaign.channel} · {campaign.status}
                 </p>
               </div>
-              <span style={{ color, fontSize: 12, fontWeight: 900 }}>{stage}</span>
+              <span style={{ color, fontSize: 12, fontWeight: 900 }}>{finalReady ? 'FINAL READY' : rawOnly ? 'RAW DRAFT ONLY' : stage}</span>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, marginTop: 10 }}>
@@ -109,15 +111,21 @@ export default function CosaVideoPipelinePage() {
             </div>
 
             <p style={{ color: 'rgba(255,255,255,.72)', lineHeight: 1.55 }}>{campaign.eligibility}</p>
-            {previewUrl && <div style={{ margin: '12px 0', border: '1px solid rgba(26,240,255,.25)', borderRadius: 14, padding: 12, background: 'rgba(26,240,255,.06)' }}>
-              <p style={{ color: CYAN, margin: '0 0 8px', fontSize: 12, fontWeight: 900 }}>Playable preview: {video?.previewKind || 'video'} · Created {fmt(campaign.created_at)}</p>
+
+            {rawOnly && <div style={{ margin: '12px 0', border: '1px solid rgba(255,195,0,.32)', borderRadius: 14, padding: 12, background: 'rgba(255,195,0,.08)' }}>
+              <p style={{ color: GOLD, margin: 0, fontSize: 13, fontWeight: 900 }}>Not final yet: this campaign only has the raw base render. It may be short and will not have voice, captions, or the burned-in SignalBoostAi website banner yet. Wait for voice + brand stages, then refresh.</p>
+            </div>}
+
+            {previewUrl && <div style={{ margin: '12px 0', border: '1px solid rgba(52,211,153,.35)', borderRadius: 14, padding: 12, background: 'rgba(52,211,153,.08)' }}>
+              <p style={{ color: '#34d399', margin: '0 0 8px', fontSize: 12, fontWeight: 900 }}>Final playable campaign video · branded final · Created {fmt(campaign.created_at)}</p>
               <video src={previewUrl} controls style={{ width: '100%', maxHeight: 460, background: '#000', borderRadius: 12 }} />
             </div>}
-            {!previewUrl && <p style={{ color: 'rgba(255,255,255,.55)', fontSize: 12 }}>No playable URL returned yet for this campaign.</p>}
+
+            {!previewUrl && !rawOnly && <p style={{ color: 'rgba(255,255,255,.55)', fontSize: 12 }}>No final playable campaign video yet.</p>}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
               <small style={{ color: 'rgba(255,255,255,.55)' }}>Base video URL: {video?.hasKlingUrl ? 'yes' : 'no'}</small>
-              <small style={{ color: 'rgba(255,255,255,.55)' }}>Voiced: {(video?.voicedLangs || []).join(', ') || 'none'}</small>
-              <small style={{ color: 'rgba(255,255,255,.55)' }}>Branded: {(video?.brandedLangs || []).join(', ') || (video?.branded ? 'yes' : 'none')}</small>
+              <small style={{ color: 'rgba(255,255,255,.55)' }}>Voiced pending: {(video?.voicedLangs || []).join(', ') || 'none'}</small>
+              <small style={{ color: 'rgba(255,255,255,.55)' }}>Branded final: {(video?.brandedLangs || []).join(', ') || (video?.branded ? 'yes' : 'none')}</small>
               <small style={{ color: 'rgba(255,255,255,.55)' }}>Full campaign ID: {safe(campaign.id)}</small>
             </div>
             {(video?.voiceError || video?.renderError || video?.autoPublishNote) && <pre style={{ color: '#fca5a5', whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,.24)', borderRadius: 10, padding: 10, marginTop: 10 }}>{safe(video?.voiceError || video?.renderError || video?.autoPublishNote)}</pre>}

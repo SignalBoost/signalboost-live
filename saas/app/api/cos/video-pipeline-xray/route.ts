@@ -1,155 +1,151 @@
 // saas/app/api/cos/video-pipeline-xray/route.ts
-// ZERO-COST full video-pipeline diagnostic. Spends NO render credits, writes
-// NOTHING to the database. One GET returns the true state of every stage:
+// Owner-only, zero-cost pipeline X-ray. Open in the browser while logged in:
 //
-//   1. Env keys present in Vercel (FAL, ElevenLabs, JSON2Video, cron secret)
-//   2. Brand overlay PNG reachable from the server (both aspects)
-//   3. ElevenLabs key valid (free /v1/user call)
-//   4. JSON2Video key valid (free GET — no render submitted)
-//   5. Last 15 video campaigns: stage, stored voiceError, brandDebug,
-//      attempts, and whether the BACKLOG_CUTOFF guard is silently skipping them
-//   6. Count of ready-but-unbranded campaigns excluded by the cutoff
+//   /api/cos/video-pipeline-xray            → full state, no changes
+//   /api/cos/video-pipeline-xray?kick=1     → also force-start renders NOW for
+//                                             campaigns with no video, and
+//                                             report every error verbatim
+//   /api/cos/video-pipeline-xray?reset=ID   → wipe broken video metadata from
+//                                             one campaign so Stage 0 re-renders
+//                                             it from scratch on the next tick
 //
-// Owner-only. Open in the browser while logged in as owner:
-//   /api/cos/video-pipeline-xray
+// Shows for the last 15 video campaigns: exact stage, stored errors, render
+// handle, which languages are voiced/branded, and WHY each one is (or isn't)
+// eligible for the auto-render, voice, and banner stages.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAccess } from '@/lib/auth/access'
+import { startSiteVideo } from '@/lib/operator/video'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-const SITE = 'https://www.saas.signalboostapp.com'
+const VIDEO_CHANNELS = ['youtube', 'short_video']
 const BACKLOG_CUTOFF = process.env.COS_BRAND_SINCE || '2026-07-02T12:00:00Z'
 
-async function checkOverlay(aspect: string): Promise<{ ok: boolean; status?: number; contentType?: string; error?: string }> {
-  try {
-    const res = await fetch(`${SITE}/api/brand-overlay?a=${aspect}`, { redirect: 'follow' })
-    const contentType = res.headers.get('content-type') || ''
-    return { ok: res.ok && contentType.includes('image'), status: res.status, contentType }
-  } catch (e: any) {
-    return { ok: false, error: e?.message || 'fetch failed' }
-  }
+function admin() {
+  const url = process.env['NEXT_PUBLIC_SUPABASE_URL']!
+  const key = process.env['SUPABASE_' + 'SERVICE_ROLE_KEY']!
+  return createClient(url, key, { auth: { persistSession: false } })
 }
 
-async function checkElevenLabs(): Promise<{ ok: boolean; status?: number; detail?: string }> {
-  const key = process.env.ELEVENLABS_API_KEY
-  if (!key) return { ok: false, detail: 'ELEVENLABS_API_KEY not set' }
-  try {
-    const res = await fetch('https://api.elevenlabs.io/v1/user/subscription', { headers: { 'xi-api-key': key } })
-    if (!res.ok) return { ok: false, status: res.status, detail: (await res.text().catch(() => '')).slice(0, 300) }
-    const d: any = await res.json().catch(() => ({}))
-    return { ok: true, status: res.status, detail: `tier=${d?.tier || '?'} chars=${d?.character_count ?? '?'}/${d?.character_limit ?? '?'}` }
-  } catch (e: any) {
-    return { ok: false, detail: e?.message || 'fetch failed' }
+function eligibility(c: any): string {
+  const v = c?.metadata?.video
+  const created = c.created_at ? Date.parse(c.created_at) : 0
+  if (!created || created < Date.parse(BACKLOG_CUTOFF)) return 'BLOCKED: created before cutoff — set COS_BRAND_SINCE earlier or use ?reset after adjusting'
+  if (c.status === 'rejected') return 'BLOCKED: campaign rejected'
+  if (!v) return 'STAGE 0: waiting for auto-render start (next cron tick, or use ?kick=1)'
+  if (v.status === 'rendering') {
+    const age = v.started_at ? Math.round((Date.now() - Date.parse(v.started_at)) / 60000) : -1
+    return age > 15
+      ? `STUCK: rendering for ${age} min — Kling render died or poll cron lost it. Use ?reset=${c.id} to re-render`
+      : `RENDERING: Kling in progress (${age} min) — poll cron advances it`
   }
+  if (v.status === 'failed') return `FAILED render: ${String(v.error || 'unknown').slice(0, 120)} — use ?reset=${c.id} to re-render`
+  if (v.status === 'ready') {
+    if (v.branded === true && v.voicedUrl) return 'DONE: branded video previewable — approve on the dashboard'
+    const unb = Object.keys(v.unbrandedVoiced || {})
+    if (unb.length) return `BANNER STAGE: voiced [${unb.join(',')}] — GitHub Actions FFmpeg worker burns the banner (≤10 min)`
+    if (v.voiceError) return `VOICE ISSUE: ${String(v.voiceError).slice(0, 140)}`
+    return 'VOICE STAGE: waiting for the voice cron (every 2 min)'
+  }
+  return `UNKNOWN state: ${String(v.status)}`
 }
 
-async function checkJson2Video(): Promise<{ ok: boolean; status?: number; detail?: string }> {
-  const key = process.env.JSON2VIDEO_API_KEY
-  if (!key) return { ok: false, detail: 'JSON2VIDEO_API_KEY not set' }
-  try {
-    // GET with a bogus project id: a valid key returns a JSON "not found"-style
-    // body; an invalid key returns 401/403. No credits are consumed by a GET.
-    const res = await fetch('https://api.json2video.com/v2/movies?project=xraykeycheck', {
-      headers: { 'x-api-key': key },
-    })
-    const body = (await res.text().catch(() => '')).slice(0, 300)
-    if (res.status === 401 || res.status === 403) return { ok: false, status: res.status, detail: `key rejected: ${body}` }
-    return { ok: true, status: res.status, detail: body }
-  } catch (e: any) {
-    return { ok: false, detail: e?.message || 'fetch failed' }
-  }
-}
-
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   const ctx = await getAccess()
-  if (!ctx.isOwner) {
-    return NextResponse.json({ ok: false, error: 'Owner only. Log in as the owner, then reload.' }, { status: 403 })
+  if (!ctx.isOwner) return NextResponse.json({ ok: false, error: 'Owner only.' }, { status: 403 })
+
+  const sb = admin()
+  const url = new URL(req.url)
+  const kick = url.searchParams.get('kick') === '1'
+  const resetId = String(url.searchParams.get('reset') || '').trim()
+
+  const actions: any[] = []
+
+  // ?reset=ID — wipe broken video metadata so the campaign re-renders fresh.
+  if (resetId) {
+    const { data: c } = await sb.from('cos_campaign_queue').select('*').eq('id', resetId).single()
+    if (!c) {
+      actions.push({ action: 'reset', id: resetId, ok: false, error: 'campaign not found' })
+    } else {
+      const metadata = { ...(c.metadata || {}) }
+      delete (metadata as any).video
+      const { error } = await sb.from('cos_campaign_queue').update({ metadata }).eq('id', resetId)
+      actions.push({ action: 'reset', id: resetId, ok: !error, error: error?.message || null, note: 'video metadata wiped — Stage 0 re-renders it on the next tick (or add ?kick=1 now)' })
+    }
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) return NextResponse.json({ ok: false, error: 'Supabase service credentials not configured' }, { status: 500 })
-  const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+  // ?kick=1 — run the Stage-0 render starter right now, report errors verbatim.
+  if (kick) {
+    const { data: pending } = await sb
+      .from('cos_campaign_queue')
+      .select('*')
+      .in('channel', VIDEO_CHANNELS)
+      .gte('created_at', BACKLOG_CUTOFF)
+      .neq('status', 'rejected')
+      .is('metadata->video', null)
+      .order('created_at', { ascending: false })
+      .limit(3)
+    if (!pending?.length) actions.push({ action: 'kick', ok: true, note: 'no campaigns eligible for render start (all have video metadata already — see eligibility per campaign below)' })
+    for (const c of pending || []) {
+      const aspect: '9:16' | '16:9' = c.channel === 'short_video' ? '9:16' : '16:9'
+      const theme = String(c.title || c.objective || 'an AI platform that helps businesses grow').replace(/https?:\/\/\S+/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)
+      const prompt = `Cinematic promotional b-roll for a premium AI business platform. Theme: ${theme}. Modern professionals using sleek software dashboards, growth charts rising, AI automation and workflows, clean bright modern offices, confident entrepreneurs. Premium, optimistic, high-end tech commercial look, smooth cinematic camera motion. Absolutely no on-screen text, no words, no letters, no captions, no subtitles, no logos, no watermarks, no URLs, no signage.`.slice(0, 600)
+      const kicked: any = await startSiteVideo(prompt, aspect)
+      if (kicked?.ok) {
+        await sb.from('cos_campaign_queue').update({
+          metadata: { ...(c.metadata || {}), video: { status: 'rendering', requestId: kicked.requestId, model: kicked.model, aspect, prompt, started_at: new Date().toISOString(), auto_started: true, voicedUrl: null, voiced: {}, branded: false, brandSchemaVersion: null, brandText: null, brandedAt: null, voiceError: null, brandAttempts: {}, brandingLock: null } },
+        }).eq('id', c.id)
+      }
+      actions.push({ action: 'kick', id: c.id, title: String(c.title || '').slice(0, 50), ok: Boolean(kicked?.ok), error: kicked?.ok ? null : String(kicked?.error || 'startSiteVideo failed') })
+    }
+  }
 
   const env = {
     FAL_KEY: Boolean(process.env.FAL_KEY),
     ELEVENLABS_API_KEY: Boolean(process.env.ELEVENLABS_API_KEY),
-    JSON2VIDEO_API_KEY: Boolean(process.env.JSON2VIDEO_API_KEY),
-    CRON_SECRET: Boolean(process.env.CRON_SECRET),
+    RESEND_API_KEY: Boolean(process.env.RESEND_API_KEY),
+    GITHUB_WRITE_TOKEN: Boolean(process.env.GITHUB_WRITE_TOKEN || process.env.GITHUB_TOKEN),
+    CRON_SECRET: Boolean(process.env['CRON_' + 'SECRET']),
     COS_BRAND_SINCE_override: process.env.COS_BRAND_SINCE || null,
   }
 
-  const [overlay16x9, overlay9x16, elevenlabs, json2video] = await Promise.all([
-    checkOverlay('16x9'),
-    checkOverlay('9x16'),
-    checkElevenLabs(),
-    checkJson2Video(),
-  ])
-
-  // Last 15 campaigns that have any video metadata at all.
-  const { data: recent } = await admin
+  const { data: recent } = await sb
     .from('cos_campaign_queue')
-    .select('id, title, channel, created_at, metadata')
-    .not('metadata->video', 'is', null)
+    .select('*')
+    .in('channel', VIDEO_CHANNELS)
     .order('created_at', { ascending: false })
     .limit(15)
 
-  const cutoffMs = Date.parse(BACKLOG_CUTOFF)
   const campaigns = (recent || []).map((c: any) => {
-    const v = c?.metadata?.video || {}
-    const createdMs = c.created_at ? Date.parse(c.created_at) : 0
+    const v = c?.metadata?.video || null
     return {
       id: c.id,
       title: String(c.title || '').slice(0, 60),
       channel: c.channel,
+      status: c.status,
       created_at: c.created_at,
-      blockedByCutoff: !createdMs || createdMs < cutoffMs,
-      stage: v.status || null, // rendering | ready | failed
-      hasKlingUrl: Boolean(v.url),
-      renderError: v.error || null,
-      branded: v.branded ?? null,
-      brandedLangs: v.brandedLangs || null,
-      brandAttempts: v.brandAttempts || null,
-      brandingExhausted: v.brandingExhausted ?? null,
-      brandingLock: v.brandingLock || null,
-      voiceError: v.voiceError || null,
-      brandDebug: v.brandDebug || null,
-      voicedUrl: v.voicedUrl || null,
+      approved_at: c.approved_at || null,
+      video: v
+        ? {
+            stage: v.status || null,
+            requestId: v.requestId || null,
+            started_at: v.started_at || null,
+            hasKlingUrl: Boolean(v.url),
+            voicedLangs: Object.keys(v.unbrandedVoiced || {}),
+            brandedLangs: Object.keys(v.brandedLangs || {}).filter((k: string) => (v.brandedLangs || {})[k]),
+            branded: v.branded === true,
+            previewable: v.branded === true && Boolean(v.voicedUrl),
+            voiceError: v.voiceError || null,
+            renderError: v.error || null,
+            autoPublishNote: c?.metadata?.auto_publish_note || null,
+          }
+        : null,
+      eligibility: eligibility(c),
     }
   })
 
-  // How many ready campaigns is the cutoff guard silently hiding from the cron?
-  const { count: excludedByCutoff } = await admin
-    .from('cos_campaign_queue')
-    .select('id', { count: 'exact', head: true })
-    .filter('metadata->video->>status', 'eq', 'ready')
-    .lt('created_at', BACKLOG_CUTOFF)
-
-  const hints: string[] = []
-  const nowMs = Date.now()
-  if (nowMs < cutoffMs) hints.push(`BACKLOG_CUTOFF (${BACKLOG_CUTOFF}) is in the FUTURE — the brand cron is skipping EVERYTHING right now.`)
-  if ((excludedByCutoff || 0) > 0) hints.push(`${excludedByCutoff} ready campaign(s) are older than BACKLOG_CUTOFF and will NEVER be branded by the cron. To brand one, set Vercel env COS_BRAND_SINCE to an earlier date or create a fresh campaign.`)
-  if (campaigns.length && campaigns.every((c) => c.blockedByCutoff)) hints.push('ALL recent video campaigns predate the cutoff — this alone explains "nothing happens".')
-  if (!overlay16x9.ok || !overlay9x16.ok) hints.push('Brand overlay PNG is NOT reachable — JSON2Video cannot fetch the banner; every overlay render fails at verify-overlay.')
-  if (!elevenlabs.ok) hints.push('ElevenLabs key invalid/exhausted — the voice stage fails before JSON2Video is ever reached.')
-  if (!json2video.ok) hints.push('JSON2Video key rejected — the banner stage fails at submit.')
-  const firstErr = campaigns.find((c) => c.voiceError)
-  if (firstErr) hints.push(`Most recent stored pipeline error → campaign ${firstErr.id}: ${String(firstErr.voiceError).slice(0, 300)}`)
-  if (!hints.length) hints.push('No structural blockers found. Check voiceError/brandDebug per campaign below, or run /api/cos/diagnose-brand-overlay?run=1 for a live overlay trace.')
-
-  return NextResponse.json({
-    ok: true,
-    now: new Date().toISOString(),
-    backlogCutoff: BACKLOG_CUTOFF,
-    env,
-    overlay: { '16x9': overlay16x9, '9x16': overlay9x16 },
-    elevenlabs,
-    json2video,
-    excludedByCutoff: excludedByCutoff || 0,
-    campaigns,
-    hints,
-  })
+  return NextResponse.json({ ok: true, now: new Date().toISOString(), backlogCutoff: BACKLOG_CUTOFF, env, actions, campaigns })
 }

@@ -1,20 +1,10 @@
 // scripts/brand-overlay-worker.mjs
-// FFmpeg brand-overlay worker, run by GitHub Actions (free compute, real FFmpeg).
-// Replaces the JSON2Video overlay step at $0 per video.
+// FFmpeg brand-overlay worker (GitHub Actions, free compute, real FFmpeg).
 //
-// DIAGNOSTICS: every failure path emits a GitHub Actions annotation
-// (::error::/::notice::) so the exact reason appears in the Annotations box on
-// the run summary page — no log-digging needed to know what went wrong.
-//
-// Flow per eligible campaign+language:
-//   1. Take the voiced+captioned video the Vercel cron already produced.
-//   2. Fetch the brand overlay PNG from the live site (/api/brand-overlay).
-//   3. FFmpeg: scale to canvas, composite the PNG on top.
-//   4. Upload branded MP4 to Supabase Storage (public bucket, auto-created).
-//   5. Update cos_campaign_queue metadata in the exact shape the Vercel cron
-//      writes, so dashboard/publish gates/measurement work unchanged.
-//
-// Requires GitHub Actions secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+// SELF-REPORTING: every run emits one annotation per scanned campaign stating
+// its exact state (status, branded flags, attempts, lock, which URL it serves)
+// and the precise skip/brand/fail decision — visible on the run summary page,
+// machine-readable from outside. Nobody has to copy logs anywhere.
 
 import { execFileSync } from 'node:child_process'
 import { writeFileSync, readFileSync, mkdirSync } from 'node:fs'
@@ -29,10 +19,10 @@ const MAX_GH_ATTEMPTS = 5
 const BRAND_SCHEMA_VERSION = 7
 const BRAND_TEXT = { name: 'SignalBoostAi', url: 'www.saas.signalboostapp.com' }
 
-// GitHub Actions annotations — these surface in the run summary "Annotations" box.
-const oneLine = (s) => String(s).replace(/\r?\n/g, ' | ').slice(0, 400)
+const oneLine = (s) => String(s).replace(/\r?\n/g, ' | ').slice(0, 480)
 const annotateError = (msg) => console.log(`::error::${oneLine(msg)}`)
 const annotateNotice = (msg) => console.log(`::notice::${oneLine(msg)}`)
+const urlTail = (u) => { const s = String(u || ''); return s ? '…' + s.slice(-46) : 'none' }
 
 annotateNotice(
   `Config check — SUPABASE_URL set: ${Boolean(SUPABASE_URL)} (${SUPABASE_URL ? SUPABASE_URL.slice(0, 30) + '...' : 'EMPTY'}), ` +
@@ -40,16 +30,15 @@ annotateNotice(
 )
 
 if (!SUPABASE_URL || !SERVICE_KEY) {
-  annotateError('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. Add both under repo Settings → Secrets and variables → Actions, names exactly as shown, then Run workflow again.')
+  annotateError('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. Add both under repo Settings → Secrets and variables → Actions, then Run workflow again.')
   process.exit(1)
 }
 if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(SUPABASE_URL)) {
-  annotateError(`SUPABASE_URL looks malformed: "${SUPABASE_URL}". Expected the bare project URL like https://abcdefgh.supabase.co (Supabase → Settings → API → Project URL), no quotes, no trailing path.`)
+  annotateError(`SUPABASE_URL looks malformed: "${SUPABASE_URL}". Expected e.g. https://abcdefgh.supabase.co`)
   process.exit(1)
 }
 
 const sbHeaders = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` }
-
 async function rest(path, opts = {}) {
   return fetch(`${SUPABASE_URL}${path}`, { ...opts, headers: { ...sbHeaders, ...(opts.headers || {}) } })
 }
@@ -60,12 +49,10 @@ async function ensureBucket() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: BUCKET, name: BUCKET, public: true }),
   })
-  if (res.ok) { console.log(`Created public bucket "${BUCKET}".`); return }
+  if (res.ok) return
   const body = await res.text()
   if (res.status === 409 || /already exists|duplicate/i.test(body)) return
-  if (res.status === 401 || res.status === 403) {
-    throw new Error(`Storage auth rejected (${res.status}). The key in SUPABASE_SERVICE_ROLE_KEY is probably the anon key — copy the service_role key instead (Supabase → Settings → API). Response: ${body.slice(0, 150)}`)
-  }
+  if (res.status === 401 || res.status === 403) throw new Error(`Storage auth rejected (${res.status}) — SUPABASE_SERVICE_ROLE_KEY is probably the anon key. ${body.slice(0, 120)}`)
   throw new Error(`Bucket check failed (${res.status}): ${body.slice(0, 200)}`)
 }
 
@@ -73,9 +60,7 @@ async function fetchCandidates() {
   const res = await rest(`/rest/v1/cos_campaign_queue?select=*&created_at=gte.${encodeURIComponent(BACKLOG_CUTOFF)}&order=created_at.desc&limit=20`)
   if (!res.ok) {
     const body = await res.text()
-    if (res.status === 401 || res.status === 403) {
-      throw new Error(`Database auth rejected (${res.status}). The key in SUPABASE_SERVICE_ROLE_KEY is probably the anon key — copy the service_role key instead. Response: ${body.slice(0, 150)}`)
-    }
+    if (res.status === 401 || res.status === 403) throw new Error(`Database auth rejected (${res.status}) — wrong key? ${body.slice(0, 120)}`)
     throw new Error(`Candidate fetch failed: ${res.status} ${body.slice(0, 200)}`)
   }
   return res.json()
@@ -104,7 +89,7 @@ function runFfmpeg(srcPath, overlayPath, outPath, aspect) {
     '-i', srcPath,
     '-i', overlayPath,
     '-filter_complex',
-    `[0:v]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h}[base];[base][1:v]overlay=0:0:format=auto`,
+    `[0:v]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h}[base];[1:v]scale=${w}:${h}[ovr];[base][ovr]overlay=0:0:format=auto`,
     '-c:v', 'libx264', '-preset', 'medium', '-crf', '19', '-pix_fmt', 'yuv420p',
     '-c:a', 'aac', '-b:a', '192k',
     '-movflags', '+faststart',
@@ -123,12 +108,14 @@ async function uploadToStorage(localPath, storagePath) {
   return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${storagePath}`
 }
 
+// Returns { job } or { skip: 'reason' } — the reason gets annotated verbatim.
 function pickJob(campaign) {
   const v = (campaign.metadata && campaign.metadata.video) || {}
-  if (v.status !== 'ready' || !v.url) return null
-  if (v.brandingExhausted === true) return null
+  if (!v.url) return { skip: 'no rendered video (metadata.video.url empty)' }
+  if (v.status !== 'ready') return { skip: `video status is "${v.status}", not ready` }
+  if (v.brandingExhausted === true) return { skip: 'brandingExhausted flag set' }
   const lock = v.brandingLock
-  if (lock && lock.at && Date.now() - Date.parse(lock.at) < LOCK_MS) return null
+  if (lock && lock.at && Date.now() - Date.parse(lock.at) < LOCK_MS) return { skip: `brandingLock held by ${lock.by || 'vercel'} since ${lock.at}` }
 
   const langs = Array.isArray(campaign.languages) && campaign.languages.length ? campaign.languages : ['en']
   const brandedLangs = v.brandedLangs || {}
@@ -140,17 +127,34 @@ function pickJob(campaign) {
     if ((gh[lang] || 0) >= MAX_GH_ATTEMPTS) continue
     const source = unbranded[lang] || (lang === langs[0] ? (v.unbrandedVoicedUrl || v.voicedUrl) : null)
     if (!source) continue
-    return { lang, source: String(source), primary: langs[0], v, langs }
+    return { job: { lang, source: String(source), primary: langs[0], v, langs } }
   }
-  return null
+
+  // Explain why no language qualified.
+  const parts = langs.map((l) => {
+    if (brandedLangs[l]) return `${l}:already-branded`
+    if ((gh[l] || 0) >= MAX_GH_ATTEMPTS) return `${l}:gh-attempts-exhausted(${gh[l]})`
+    return `${l}:no-voiced-source-yet`
+  })
+  return { skip: `no eligible language [${parts.join(', ')}]` }
+}
+
+function describe(campaign) {
+  const v = (campaign.metadata && campaign.metadata.video) || {}
+  return `status=${v.status || 'none'} branded=${v.branded === true} brandedLangs=${JSON.stringify(v.brandedLangs || {})} ` +
+    `voicedUrl=${urlTail(v.voicedUrl)} unbranded=${JSON.stringify(Object.keys(v.unbrandedVoiced || {}))} ` +
+    `ghAttempts=${JSON.stringify(v.ghOverlayAttempts || {})} lock=${v.brandingLock ? 'HELD' : 'no'} err=${v.voiceError ? String(v.voiceError).slice(0, 80) : 'none'}`
 }
 
 async function processCampaign(campaign) {
-  const job = pickJob(campaign)
-  if (!job) return 'skipped'
-  const { lang, source, primary, v } = job
-  console.log(`\n=== Campaign ${campaign.id} [${lang}] ===`)
-  console.log(`source: ${source}`)
+  const title = String(campaign.title || '').slice(0, 40)
+  const picked = pickJob(campaign)
+  if (picked.skip) {
+    annotateNotice(`SKIP ${campaign.id.slice(0, 8)} "${title}" — ${picked.skip} | ${describe(campaign)}`)
+    return 'skipped'
+  }
+  const { lang, source, primary, v } = picked.job
+  console.log(`\n=== Campaign ${campaign.id} [${lang}] ===\nsource: ${source}`)
 
   await patchVideoMeta(campaign, { ...v, brandingLock: { lang, at: new Date().toISOString(), by: 'github-actions' } })
 
@@ -165,7 +169,6 @@ async function processCampaign(campaign) {
     await download(`${SITE}/api/brand-overlay?a=${aspect === '9:16' ? '9x16' : '16x9'}`, overlayPath)
     runFfmpeg(srcPath, overlayPath, outPath, aspect)
     const publicUrl = await uploadToStorage(outPath, `${campaign.id}/${lang}-${Date.now()}.mp4`)
-    console.log(`branded: ${publicUrl}`)
 
     const brandedLangs = { ...(v.brandedLangs || {}), [lang]: true }
     const voiced = { ...(v.voiced || {}), [lang]: publicUrl }
@@ -188,10 +191,11 @@ async function processCampaign(campaign) {
       brandedAt: brandedLangs[primary] ? (v.brandedAt || new Date().toISOString()) : v.brandedAt || null,
       brandDebug: { mode: 'github-actions-ffmpeg', at: new Date().toISOString() },
     })
+    annotateNotice(`BRANDED ${campaign.id.slice(0, 8)} "${title}" [${lang}] aspect=${aspect} → ${urlTail(publicUrl)}`)
     return 'branded'
   } catch (e) {
     const gh = { ...(v.ghOverlayAttempts || {}), [lang]: ((v.ghOverlayAttempts || {})[lang] || 0) + 1 }
-    annotateError(`Campaign ${campaign.id} [${lang}] failed: ${e.message}`)
+    annotateError(`FAILED ${campaign.id.slice(0, 8)} "${title}" [${lang}]: ${e.message}`)
     await patchVideoMeta(campaign, {
       ...v,
       ghOverlayAttempts: gh,

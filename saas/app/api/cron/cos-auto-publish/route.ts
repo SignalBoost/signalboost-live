@@ -58,7 +58,7 @@ async function publishOne(sb: any, campaign: any): Promise<{ status: 'published'
   const isVideo = VIDEO_CHANNELS.includes(String(campaign.channel))
   if (isVideo) {
     if (video.status !== 'ready') return { status: 'skipped', note: 'video not ready yet' }
-    if (video.branded !== true) return { status: 'skipped', note: 'not branded yet — auto-publish never ships unbranded' }
+    if (video.branded !== true || !video.voicedUrl) return { status: 'skipped', note: 'brand banner not burned in yet — auto-publish never ships without SignalBoostAi + www.saas.signalboostapp.com on the video' }
   }
 
   const langs = Array.isArray(campaign.languages) && campaign.languages.length ? campaign.languages : ['en']
@@ -88,7 +88,11 @@ async function publishOne(sb: any, campaign: any): Promise<{ status: 'published'
   const draftTitle = matched?.output?.title ? String(matched.output.title) : ''
   let text = String(draftText || campaign.objective || campaign.title || '')
   const title = String(draftTitle || campaign.title || '')
-  const videoUrl = video.voicedUrl ? String(video.voicedUrl) : video.url ? String(video.url) : undefined
+  // BANNER GUARANTEE: only banner-burned URLs may publish — per-language
+  // branded output first, then the branded primary. NEVER the raw render.
+  const brandedForLang = video.brandedLangs?.[language] ? video.voiced?.[language] : null
+  const videoUrl = brandedForLang ? String(brandedForLang) : (video.voicedUrl ? String(video.voicedUrl) : undefined)
+  if (isVideo && !videoUrl) return { status: 'skipped', note: 'branded video URL not ready yet — banner worker still running' }
 
   const trackingUrl = buildTrackingUrl(campaign.id, platform)
   if (!text.includes('/api/track?')) text = `${text}\n\n👉 ${trackingUrl}`.trim()

@@ -1,42 +1,32 @@
-      - name: Notify Slack on success
+      - name: Notify Teams on success
         if: success()
-        uses: slackapi/slack-github-action@v1.23.0
-        with:
-          payload: |
-            {
-              "text": "✅ COS pipeline succeeded",
-              "attachments": [
-                {
-                  "color": "#36a64f",
-                  "fields": [
-                    { "title": "Branch", "value": "${{ github.ref }}", "short": true },
-                    { "title": "Commit", "value": "${{ github.sha }}", "short": true },
-                    { "title": "Node.js Version", "value": "${{ matrix.node-version }}", "short": true },
-                    { "title": "Vercel Preview", "value": "https://signalboostapp.vercel.app", "short": false }
-                  ]
-                }
+        run: |
+          curl -H 'Content-Type: application/json' \
+          -d '{
+            "text": "✅ COS pipeline succeeded",
+            "sections": [{
+              "facts": [
+                { "name": "Branch", "value": "${{ github.ref }}" },
+                { "name": "Commit", "value": "${{ github.sha }}" },
+                { "name": "Node.js Version", "value": "${{ matrix.node-version }}" },
+                { "name": "Vercel Preview", "value": "https://signalboostapp.vercel.app" }
               ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+            }]
+          }' \
+          ${{ secrets.TEAMS_WEBHOOK_URL }}
 
-      - name: Notify Slack on failure
+      - name: Notify Teams on failure
         if: failure()
-        uses: slackapi/slack-github-action@v1.23.0
-        with:
-          payload: |
-            {
-              "text": "❌ COS pipeline failed",
-              "attachments": [
-                {
-                  "color": "#ff0000",
-                  "fields": [
-                    { "title": "Branch", "value": "${{ github.ref }}", "short": true },
-                    { "title": "Commit", "value": "${{ github.sha }}", "short": true },
-                    { "title": "Node.js Version", "value": "${{ matrix.node-version }}", "short": true }
-                  ]
-                }
+        run: |
+          curl -H 'Content-Type: application/json' \
+          -d '{
+            "text": "❌ COS pipeline failed",
+            "sections": [{
+              "facts": [
+                { "name": "Branch", "value": "${{ github.ref }}" },
+                { "name": "Commit", "value": "${{ github.sha }}" },
+                { "name": "Node.js Version", "value": "${{ matrix.node-version }}" }
               ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+            }]
+          }' \
+          ${{ secrets.TEAMS_WEBHOOK_URL }}

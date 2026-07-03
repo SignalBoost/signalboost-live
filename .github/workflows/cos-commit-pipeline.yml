@@ -1,0 +1,39 @@
+name: COS Commit Pipeline
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ai-cos-branch
+
+jobs:
+  build-and-commit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run COS edits (safe mode v5)
+        run: |
+          DRY_RUN=false ROLLBACK_ALL=false node scripts/cos-edit.js
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build app
+        run: npm run build
+
+      - name: Commit changes
+        run: |
+          git config --global user.name "COS Agent"
+          git config --global user.email "cos@signalboostapp.com"
+          git add .
+          git commit -m "COS: Applied automated fixes"
+          git push origin ai-cos-branch
+
+      - name: Deploy to Vercel
+        run: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }}

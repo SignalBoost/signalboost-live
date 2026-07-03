@@ -1,21 +1,13 @@
-      - name: Notify Slack on success
+      - name: Notify Teams on success
         if: success()
-        uses: slackapi/slack-github-action@v1.23.0
-        with:
-          payload: |
-            {
-              "text": "✅ COS edits applied and deployed successfully on ai-cos-branch."
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -H 'Content-Type: application/json' \
+          -d '{"text":"✅ COS edits applied and deployed successfully on ai-cos-branch."}' \
+          ${{ secrets.TEAMS_WEBHOOK_URL }}
 
-      - name: Notify Slack on failure
+      - name: Notify Teams on failure
         if: failure()
-        uses: slackapi/slack-github-action@v1.23.0
-        with:
-          payload: |
-            {
-              "text": "❌ COS pipeline failed. Check logs for details."
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -H 'Content-Type: application/json' \
+          -d '{"text":"❌ COS pipeline failed. Check logs for details."}' \
+          ${{ secrets.TEAMS_WEBHOOK_URL }}

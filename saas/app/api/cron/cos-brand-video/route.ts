@@ -25,6 +25,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { addVoiceToCampaignVideo } from '@/lib/cos/video-voice'
+import { startSiteVideo } from '@/lib/operator/video'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -34,6 +35,80 @@ const VOICE_LOCK_MS = 5 * 60 * 1000
 const MAX_VOICE_ATTEMPTS = 3
 const TIME_BUDGET_MS = 260_000
 const BACKLOG_CUTOFF = process.env.COS_BRAND_SINCE || '2026-07-02T12:00:00Z'
+
+const VIDEO_CHANNELS = ['youtube', 'short_video']
+const MAX_RENDER_STARTS_PER_TICK = 2
+
+// Pull a short, clean visual theme out of the campaign — no URLs, no directive
+// language, no leftover punctuation (text-to-video models cannot spell; words
+// in the prompt come out garbled, so the render must be text-free — the brand
+// banner and captions are burned in later by the pipeline).
+function cleanTheme(campaign: any): string {
+  const raw = String(campaign.title || campaign.objective || 'an AI platform that helps businesses grow')
+  return raw
+    .replace(/https?:\/\/\S+/gi, ' ')
+    .replace(/\b[\w-]+\.(?:com|app|io|net|org|ai|co)\b/gi, ' ')
+    .replace(/\b(must|should|do not|don't|caption|captions|subtitle|subtitles|on screen|on-screen|display|url|link|text)\b/gi, ' ')
+    .replace(/["\u201C\u201D'\u2019:;.\-\u2022|]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 160)
+}
+
+// AUTO-RENDER STAGE: COS campaigns used to sit forever because nothing started
+// the Kling render — only the manual "Render video" button did. This kicks off
+// renders automatically for every video campaign (after the cutoff) that has
+// no video yet, so the chain runs end-to-end with zero clicks:
+// create → render → voice → banner → preview → approve → publish → email.
+async function autoStartRenders(sb: any): Promise<{ started: number; errors: string[] }> {
+  const { data: pending } = await sb
+    .from('cos_campaign_queue')
+    .select('*')
+    .in('channel', VIDEO_CHANNELS)
+    .gte('created_at', BACKLOG_CUTOFF)
+    .neq('status', 'rejected')
+    .is('metadata->video', null)
+    .order('created_at', { ascending: false })
+    .limit(MAX_RENDER_STARTS_PER_TICK)
+
+  let started = 0
+  const errors: string[] = []
+  for (const campaign of pending || []) {
+    const aspect: '9:16' | '16:9' = campaign.channel === 'short_video' ? '9:16' : '16:9'
+    const theme = cleanTheme(campaign)
+    const prompt = `Cinematic promotional b-roll for a premium AI business platform. Theme: ${theme}. Modern professionals using sleek software dashboards, growth charts rising, AI automation and workflows, clean bright modern offices, confident entrepreneurs. Premium, optimistic, high-end tech commercial look, smooth cinematic camera motion. Absolutely no on-screen text, no words, no letters, no captions, no subtitles, no logos, no watermarks, no URLs, no signage.`.slice(0, 600)
+    const kicked: any = await startSiteVideo(prompt, aspect)
+    if (!kicked?.ok) {
+      errors.push(`${campaign.id}: ${kicked?.error || 'render start failed'}`)
+      continue
+    }
+    await sb.from('cos_campaign_queue').update({
+      metadata: {
+        ...(campaign.metadata || {}),
+        video: {
+          status: 'rendering',
+          requestId: kicked.requestId,
+          model: kicked.model,
+          aspect,
+          prompt,
+          started_at: new Date().toISOString(),
+          auto_started: true,
+          voicedUrl: null,
+          voiced: {},
+          branded: false,
+          brandSchemaVersion: null,
+          brandText: null,
+          brandedAt: null,
+          voiceError: null,
+          brandAttempts: {},
+          brandingLock: null,
+        },
+      },
+    }).eq('id', campaign.id)
+    started++
+  }
+  return { started, errors }
+}
 
 function db() {
   const url = process.env['NEXT_PUBLIC_SUPABASE_URL']!
@@ -138,6 +213,10 @@ export async function GET(req: NextRequest) {
   }
 
   const sb = db()
+
+  // Stage 0: start Kling renders for video campaigns that have none yet.
+  const renders = await autoStartRenders(sb)
+
   const { data: ready } = await sb
     .from('cos_campaign_queue')
     .select('*')
@@ -164,5 +243,5 @@ export async function GET(req: NextRequest) {
     if (r.status !== 'skipped') results.push({ campaign: campaign.id, ...r })
   }
 
-  return NextResponse.json({ ok: true, mode: 'voice-only (banner burned by GitHub Actions FFmpeg worker)', voiced, progressed, exhausted, skipped, billingBlocked, results })
+  return NextResponse.json({ ok: true, mode: 'auto-render + voice (banner burned by GitHub Actions FFmpeg worker)', rendersStarted: renders.started, renderErrors: renders.errors, voiced, progressed, exhausted, skipped, billingBlocked, results })
 }

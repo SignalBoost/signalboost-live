@@ -30,6 +30,14 @@ function admin() {
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
+function previewUrl(v: any): string | null {
+  if (!v) return null
+  if (v.branded === true && v.voicedUrl) return String(v.voicedUrl)
+  if (v.voicedUrl) return String(v.voicedUrl)
+  if (v.url) return String(v.url)
+  return null
+}
+
 function eligibility(c: any): string {
   const v = c?.metadata?.video
   const created = c.created_at ? Date.parse(c.created_at) : 0
@@ -45,6 +53,7 @@ function eligibility(c: any): string {
   if (v.status === 'failed') return `FAILED render: ${String(v.error || 'unknown').slice(0, 120)} — use ?reset=${c.id} to re-render`
   if (v.status === 'ready') {
     if (v.branded === true && v.voicedUrl) return 'DONE: branded video previewable — approve on the dashboard'
+    if (v.url) return 'DRAFT READY: base draft video previewable — final voice/brand may still be processing'
     const unb = Object.keys(v.unbrandedVoiced || {})
     if (unb.length) return `BANNER STAGE: voiced [${unb.join(',')}] — GitHub Actions FFmpeg worker burns the banner (≤10 min)`
     if (v.voiceError) return `VOICE ISSUE: ${String(v.voiceError).slice(0, 140)}`
@@ -64,7 +73,6 @@ export async function GET(req: NextRequest) {
 
   const actions: any[] = []
 
-  // ?reset=ID — wipe broken video metadata so the campaign re-renders fresh.
   if (resetId) {
     const { data: c } = await sb.from('cos_campaign_queue').select('*').eq('id', resetId).single()
     if (!c) {
@@ -77,7 +85,6 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // ?kick=1 — run the Stage-0 render starter right now, report errors verbatim.
   if (kick) {
     const { data: pending } = await sb
       .from('cos_campaign_queue')
@@ -121,6 +128,9 @@ export async function GET(req: NextRequest) {
 
   const campaigns = (recent || []).map((c: any) => {
     const v = c?.metadata?.video || null
+    const finalUrl = v?.branded === true && v?.voicedUrl ? String(v.voicedUrl) : null
+    const baseUrl = v?.url ? String(v.url) : null
+    const anyPreviewUrl = previewUrl(v)
     return {
       id: c.id,
       title: String(c.title || '').slice(0, 60),
@@ -134,10 +144,14 @@ export async function GET(req: NextRequest) {
             requestId: v.requestId || null,
             started_at: v.started_at || null,
             hasKlingUrl: Boolean(v.url),
+            baseUrl,
+            finalUrl,
+            previewUrl: anyPreviewUrl,
+            previewKind: finalUrl ? 'branded final' : baseUrl ? 'base draft' : anyPreviewUrl ? 'video' : null,
             voicedLangs: Object.keys(v.unbrandedVoiced || {}),
             brandedLangs: Object.keys(v.brandedLangs || {}).filter((k: string) => (v.brandedLangs || {})[k]),
             branded: v.branded === true,
-            previewable: v.branded === true && Boolean(v.voicedUrl),
+            previewable: Boolean(anyPreviewUrl),
             voiceError: v.voiceError || null,
             renderError: v.error || null,
             autoPublishNote: c?.metadata?.auto_publish_note || null,

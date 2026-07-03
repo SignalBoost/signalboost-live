@@ -17,8 +17,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install FFmpeg
-        run: sudo apt-get update -y && sudo apt-get install -y ffmpeg
+      - name: Install FFmpeg + fonts
+        run: sudo apt-get update -y && sudo apt-get install -y ffmpeg fonts-dejavu-core
 
       - name: Run brand overlay worker
         env:

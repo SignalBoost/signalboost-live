@@ -64,7 +64,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "✅ COS pipeline succeeded",
+              "text": "✅ COS outreach video published",
               "attachments": [
                 {
                   "color": "#36a64f",
@@ -72,7 +72,9 @@ jobs:
                     { "title": "Branch", "value": "${{ github.ref }}", "short": true },
                     { "title": "Commit", "value": "${{ github.sha }}", "short": true },
                     { "title": "Node.js Version", "value": "${{ matrix.node-version }}", "short": true },
-                    { "title": "Vercel Preview", "value": "https://signalboostapp.vercel.app", "short": false }
+                    { "title": "Video URL", "value": "https://youtube.com/watch?v=XYZ123", "short": false },
+                    { "title": "Duration", "value": "${{ job.duration }}", "short": true },
+                    { "title": "Triggered By", "value": "${{ github.actor }}", "short": true }
                   ]
                 }
               ]
@@ -93,7 +95,8 @@ jobs:
                   "fields": [
                     { "title": "Branch", "value": "${{ github.ref }}", "short": true },
                     { "title": "Commit", "value": "${{ github.sha }}", "short": true },
-                    { "title": "Node.js Version", "value": "${{ matrix.node-version }}", "short": true }
+                    { "title": "Node.js Version", "value": "${{ matrix.node-version }}", "short": true },
+                    { "title": "Triggered By", "value": "${{ github.actor }}", "short": true }
                   ]
                 }
               ]
@@ -107,13 +110,15 @@ jobs:
         run: |
           curl -H 'Content-Type: application/json' \
           -d '{
-            "text": "✅ COS pipeline succeeded",
+            "text": "✅ COS outreach video published",
             "sections": [{
               "facts": [
                 { "name": "Branch", "value": "${{ github.ref }}" },
                 { "name": "Commit", "value": "${{ github.sha }}" },
                 { "name": "Node.js Version", "value": "${{ matrix.node-version }}" },
-                { "name": "Vercel Preview", "value": "https://signalboostapp.vercel.app" }
+                { "name": "Video URL", "value": "https://youtube.com/watch?v=XYZ123" },
+                { "name": "Duration", "value": "${{ job.duration }}" },
+                { "name": "Triggered By", "value": "${{ github.actor }}" }
               ]
             }]
           }' \
@@ -129,8 +134,30 @@ jobs:
               "facts": [
                 { "name": "Branch", "value": "${{ github.ref }}" },
                 { "name": "Commit", "value": "${{ github.sha }}" },
-                { "name": "Node.js Version", "value": "${{ matrix.node-version }}" }
+                { "name": "Node.js Version", "value": "${{ matrix.node-version }}" },
+                { "name": "Triggered By", "value": "${{ github.actor }}" }
               ]
             }]
           }' \
           ${{ secrets.TEAMS_WEBHOOK_URL }}
+
+      # Email Notification
+      - name: Notify via Email
+        if: matrix.node-version == '20.x'
+        run: |
+          echo "Subject: Outreach Video Published
+          Hi Luis,
+
+          Your outreach campaign video has been published successfully.
+
+          Details:
+          - Branch: ${{ github.ref }}
+          - Commit: ${{ github.sha }}
+          - Node.js Version: ${{ matrix.node-version }}
+          - Duration: ${{ job.duration }}
+          - Triggered By: ${{ github.actor }}
+
+          Video Link: https://youtube.com/watch?v=XYZ123
+
+          Regards,
+          COS" | sendmail luis@example.com

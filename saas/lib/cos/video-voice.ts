@@ -54,7 +54,7 @@ function normalizeUrlText(text: string): string {
   out = out.replace(/(?:https?:\/\/)?(?:www\.)?signalboost\.com(?:\/[^\s,.!?)]*)?/gi, SITE_URL)
   // 3) Safety: collapse accidental doubling from prior passes.
   out = out.replace(/(?:www\.)+www\./gi, 'www.')
-  out = out.replace(new RegExp(`(${SITE_URL.replace(/\./g, '\\.')})(?:\s*\1)+`, 'gi'), '$1')
+  out = out.replace(new RegExp(`(${SITE_URL.replace(/\./g, '\\.')})(?:\\s*\\1)+`, 'gi'), '$1')
   return out
 }
 

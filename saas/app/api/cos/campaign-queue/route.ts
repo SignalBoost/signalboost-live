@@ -216,6 +216,7 @@ async function attachDraftVideoRender(row: any, recommendation: CosRecommendatio
   const prompt = videoPromptForRecommendation(recommendation)
   const started = await startSiteVideo(prompt, aspect)
   const now = new Date().toISOString()
+  const startedError = (started as any).error || 'Could not start draft render.'
   row.metadata = {
     ...(row.metadata || {}),
     video: started.ok ? {
@@ -240,7 +241,7 @@ async function attachDraftVideoRender(row: any, recommendation: CosRecommendatio
       brandingLock: null,
     } : {
       status: 'failed',
-      error: started.error || 'Could not start draft render.',
+      error: startedError,
       failed_at: now,
       voicedUrl: null,
       voiced: {},

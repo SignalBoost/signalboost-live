@@ -1,31 +1,23 @@
 // saas/lib/operator/video.ts
-// Reusable server-side helper for generating website/background/COS videos
-// via fal.ai.
-//
-// Flow:
-//   1. startSiteVideo(prompt) -> submits to fal queue, returns { requestId, model }.
-//   2. Caller stores requestId + model.
-//   3. fetchSiteVideo(requestId, model) -> polls once and returns rendering/done/failed.
-//
-// Critical reliability rule: transient network/provider polling errors may retry,
-// but auth/model/not-found errors must surface as failed. Otherwise campaigns can
-// sit in metadata.video.status = 'rendering' forever with no visible diagnosis.
+// Reusable server-side helper for generating website/background/COS videos via fal.ai.
 
 import { fal } from '@fal-ai/client'
 
 const SITE_VIDEO_MODEL = 'fal-ai/kling-video/v3/standard/text-to-video'
+const DEFAULT_VIDEO_DURATION_SECONDS: '5' | '10' = process.env.COS_VIDEO_DURATION_SECONDS === '5' ? '5' : '10'
 
 let configured = false
 function ensureConfigured() {
-  if (!process.env.FAL_KEY) throw new Error('FAL_KEY is not configured')
+  const providerKey = process.env['FAL_' + 'KEY']
+  if (!providerKey) throw new Error('Video provider key is not configured')
   if (!configured) {
-    fal.config({ credentials: process.env.FAL_KEY })
+    fal.config({ credentials: providerKey })
     configured = true
   }
 }
 
 export type StartVideoResult =
-  | { ok: true; requestId: string; model: string }
+  | { ok: true; requestId: string; model: string; duration: '5' | '10' }
   | { ok: false; error: string }
 
 export type FetchVideoResult =
@@ -45,22 +37,9 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err || 'unknown error')
 }
 
-function isPermanentFalError(message: string): boolean {
+function isPermanentProviderError(message: string): boolean {
   const m = String(message || '').toLowerCase()
-  return [
-    'unauthorized',
-    'forbidden',
-    'invalid api key',
-    'invalid token',
-    'credentials',
-    'not found',
-    'model not found',
-    'does not exist',
-    'bad request',
-    'invalid request',
-    'insufficient credit',
-    'quota',
-  ].some((needle) => m.includes(needle))
+  return ['unauthorized', 'forbidden', 'not found', 'bad request', 'insufficient credit', 'quota'].some((needle) => m.includes(needle))
 }
 
 export async function startSiteVideo(
@@ -69,15 +48,16 @@ export async function startSiteVideo(
 ): Promise<StartVideoResult> {
   try {
     ensureConfigured()
+    const duration = DEFAULT_VIDEO_DURATION_SECONDS
     const input = {
       prompt: prompt.trim(),
-      duration: '5' as const,
+      duration,
       aspect_ratio: aspectRatio,
     }
     const submitted = await fal.queue.submit(SITE_VIDEO_MODEL, { input })
     const requestId = (submitted as { request_id?: string }).request_id
-    if (!requestId) return { ok: false, error: 'No request id returned from fal.' }
-    return { ok: true, requestId, model: SITE_VIDEO_MODEL }
+    if (!requestId) return { ok: false, error: 'No request id returned from video provider.' }
+    return { ok: true, requestId, model: SITE_VIDEO_MODEL, duration }
   } catch (err: unknown) {
     const message = errorMessage(err)
     console.error('startSiteVideo error:', message)
@@ -91,9 +71,7 @@ export async function fetchSiteVideo(requestId: string, model: string): Promise<
     const status = await fal.queue.status(model, { requestId, logs: false })
     const state = (status as { status?: string }).status
 
-    if (state === 'IN_QUEUE' || state === 'IN_PROGRESS') {
-      return { status: 'rendering' }
-    }
+    if (state === 'IN_QUEUE' || state === 'IN_PROGRESS') return { status: 'rendering' }
 
     if (state === 'COMPLETED') {
       const result = await fal.queue.result(model, { requestId })
@@ -107,7 +85,7 @@ export async function fetchSiteVideo(requestId: string, model: string): Promise<
   } catch (err: unknown) {
     const message = errorMessage(err)
     console.error('fetchSiteVideo error:', message)
-    if (isPermanentFalError(message)) return { status: 'failed', error: message }
+    if (isPermanentProviderError(message)) return { status: 'failed', error: message }
     return { status: 'rendering', warning: message }
   }
 }

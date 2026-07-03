@@ -1,7 +1,7 @@
 // saas/app/api/cos/video-approval-notify/route.ts
-// Owner-only helper: notify the owner when previewable COSA videos are ready
-// for approval. This fills the missing handoff between COSA preparing the video
-// and the owner reviewing/approving it.
+// Owner-only helper: notify the owner only when the FINAL COSA video is ready
+// for approval. Raw/base renders are not campaign-ready and must not trigger
+// approval requests.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -20,12 +20,12 @@ function admin() {
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
-function previewUrl(video: any): string | null {
+function finalVideoUrl(video: any): string | null {
   if (!video) return null
-  if (video.branded === true && video.voicedUrl) return String(video.voicedUrl)
-  if (video.voicedUrl) return String(video.voicedUrl)
-  if (video.url) return String(video.url)
-  return null
+  if (video.status !== 'ready') return null
+  if (video.branded !== true) return null
+  if (!video.voicedUrl) return null
+  return String(video.voicedUrl)
 }
 
 function approvalUrl(req: NextRequest) {
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
   const toNotify = (campaigns || [])
     .filter((c: any) => {
       const video = c?.metadata?.video
-      if (!previewUrl(video)) return false
+      if (!finalVideoUrl(video)) return false
       if (video?.approvalRequestedAt) return false
       return true
     })
@@ -67,12 +67,13 @@ export async function GET(req: NextRequest) {
     const sent = await sendEmail({
       from: 'saasMarketing',
       to: ctx.email,
-      subject: `Video ready for approval: ${title.slice(0, 90)}`,
+      subject: `Final video ready for approval: ${title.slice(0, 90)}`,
       html: `
-        <p>COSA has prepared a video preview for your review.</p>
+        <p>COSA has prepared the final branded video for your review.</p>
         <p><strong>${title}</strong></p>
-        <p><a href="${link}">Open the video approval page</a></p>
-        <p>Review the playable preview, then approve or reject the campaign from the page.</p>
+        <p>This final version should include voice/captions plus the SignalBoostAi and www.saas.signalboostapp.com branding.</p>
+        <p><a href="${link}">Open the final video approval page</a></p>
+        <p>Approve once. After approval, COSA will continue automatically with publishing and tracking.</p>
       `.trim(),
     })
 
@@ -82,6 +83,7 @@ export async function GET(req: NextRequest) {
       approvalNotification: {
         ok: Boolean(sent?.ok),
         email: ctx.email,
+        finalOnly: true,
         error: sent?.ok ? null : sent?.error || 'send failed',
       },
     }
@@ -90,10 +92,10 @@ export async function GET(req: NextRequest) {
       metadata: { ...(campaign.metadata || {}), video: patchVideo },
     }).eq('id', campaign.id)
 
-    results.push({ campaign: campaign.id, title, notified: Boolean(sent?.ok), error: sent?.ok ? null : sent?.error || 'send failed' })
+    results.push({ campaign: campaign.id, title, notified: Boolean(sent?.ok), finalVideo: true, error: sent?.ok ? null : sent?.error || 'send failed' })
   }
 
-  return NextResponse.json({ ok: true, scanned: campaigns?.length || 0, notified: results.length, results, approvalPage: link })
+  return NextResponse.json({ ok: true, scanned: campaigns?.length || 0, notified: results.length, results, approvalPage: link, rule: 'final branded videos only' })
 }
 
 export async function POST(req: NextRequest) {

@@ -21,9 +21,18 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
+          cache: 'npm'   # built-in npm cache
+
+      - name: Cache Vercel build output
+        uses: actions/cache@v3
+        with:
+          path: .vercel/cache
+          key: vercel-${{ runner.os }}-${{ matrix.node-version }}-${{ github.sha }}
+          restore-keys: |
+            vercel-${{ runner.os }}-${{ matrix.node-version }}-
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run COS edits (safe mode v5)
         run: |
@@ -36,7 +45,7 @@ jobs:
         run: npm run build
 
       - name: Commit changes
-        if: matrix.node-version == '20.x' # commit only once, not per matrix job
+        if: matrix.node-version == '20.x' # commit only once
         run: |
           git config --global user.name "COS Agent"
           git config --global user.email "cos@signalboostapp.com"

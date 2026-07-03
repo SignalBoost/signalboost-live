@@ -37,7 +37,7 @@ import { auditAdminAction } from '@/lib/outreach/security'
 // outreach/review_campaign) are handled by their own flows.
 export const CHANNEL_TO_PLATFORM: Record<string, SocialPlatform | undefined> = {
   youtube: 'youtube_channels',
-  short_video: 'tiktok',
+  short_video: 'youtube_channels',
   linkedin: 'linkedin_company',
 }
 

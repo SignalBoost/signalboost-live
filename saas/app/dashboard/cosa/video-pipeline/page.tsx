@@ -48,7 +48,7 @@ export default function CosaVideoPipelinePage() {
     <section style={{ ...panel, background: 'linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,6,23,.98))' }}>
       <p style={{ margin: 0, color: GOLD, fontSize: 12, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>COSA Video Pipeline</p>
       <h1 style={{ color: '#fff', margin: '10px 0 0', fontSize: 32 }}>Video render and approval diagnostics</h1>
-      <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.65, maxWidth: 820 }}>This page shows the real stage for recent video campaigns. Use Kick missing renders when campaigns show only Render video or no preview.</p>
+      <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.65, maxWidth: 820 }}>This page now shows the actual video preview when the pipeline has a base draft or final branded URL. Use Kick missing renders only when campaigns show no preview and no video metadata.</p>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
         <button onClick={() => load()} disabled={loading} style={ghost}>{loading ? 'Loading...' : 'Refresh'}</button>
         <button onClick={kick} disabled={loading} style={button}>Kick missing renders</button>
@@ -71,6 +71,7 @@ export default function CosaVideoPipelinePage() {
           const stage = video?.stage || 'no video metadata'
           const color = video?.previewable ? '#34d399' : stage === 'failed' ? '#fca5a5' : stage === 'rendering' ? CYAN : GOLD
           const stuck = String(campaign.eligibility || '').startsWith('STUCK') || stage === 'failed'
+          const previewUrl = video?.previewUrl ? String(video.previewUrl) : ''
           return <article key={campaign.id} style={{ border: '1px solid rgba(255,255,255,.1)', borderRadius: 14, padding: 14, background: 'rgba(2,6,23,.45)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <div>
@@ -80,6 +81,11 @@ export default function CosaVideoPipelinePage() {
               <span style={{ color, fontSize: 12, fontWeight: 900 }}>{stage}</span>
             </div>
             <p style={{ color: 'rgba(255,255,255,.72)', lineHeight: 1.55 }}>{campaign.eligibility}</p>
+            {previewUrl && <div style={{ margin: '12px 0', border: '1px solid rgba(26,240,255,.25)', borderRadius: 14, padding: 12, background: 'rgba(26,240,255,.06)' }}>
+              <p style={{ color: CYAN, margin: '0 0 8px', fontSize: 12, fontWeight: 900 }}>Playable preview: {video?.previewKind || 'video'}</p>
+              <video src={previewUrl} controls style={{ width: '100%', maxHeight: 460, background: '#000', borderRadius: 12 }} />
+            </div>}
+            {!previewUrl && <p style={{ color: 'rgba(255,255,255,.55)', fontSize: 12 }}>No playable URL returned yet for this campaign.</p>}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
               <small style={{ color: 'rgba(255,255,255,.55)' }}>Request: {safe(video?.requestId)}</small>
               <small style={{ color: 'rgba(255,255,255,.55)' }}>Base video URL: {video?.hasKlingUrl ? 'yes' : 'no'}</small>

@@ -5,6 +5,7 @@ import type { CosChannel, CosDepartment, CosPriority, CosRecommendation } from '
 import { queueItemFromRecommendation } from '@/lib/cos/campaign-queue'
 import { autoPublishApprovedCampaign } from '@/lib/cos/campaign-queue/publish-core'
 import type { CosCampaignQueueStatus } from '@/lib/cos/campaign-queue'
+import { startSiteVideo } from '@/lib/operator/video'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +14,7 @@ const OLD_DESTINATION = ['signalboostapp', 'com'].join('.')
 const DUPLICATE_DESTINATION = ['www', 'saas', 'www', 'saas', 'signalboostapp', 'com'].join('.')
 const WWW_OLD_DESTINATION = ['www', 'signalboostapp', 'com'].join('.')
 const SAAS_URL = 'www.saas.signalboostapp.com'
+const VIDEO_CHANNELS: CosChannel[] = ['youtube', 'short_video']
 
 const allowedStatuses: CosCampaignQueueStatus[] = [
   'draft',
@@ -195,6 +197,59 @@ function requestFromAutonomousDirective(input: unknown) {
   }
 }
 
+function videoPromptForRecommendation(recommendation: CosRecommendation) {
+  const raw = [recommendation.title, recommendation.summary, recommendation.reason].filter(Boolean).join(' ')
+  const theme = raw
+    .replace(/https?:\/\/\S+/gi, ' ')
+    .replace(/\b[\w-]+\.(?:com|app|io|net|org|ai|co)\b/gi, ' ')
+    .replace(/\b(must|should|do not|don't|caption|captions|subtitle|subtitles|on screen|on-screen|display|url|link|text)\b/gi, ' ')
+    .replace(/["“”'’:;.\-•|]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 220)
+  return `Cinematic promotional b-roll for a premium AI business platform. Theme: ${theme || 'AI-powered business growth platform'}. Modern professionals using sleek software dashboards, growth charts rising, AI automation and workflows, clean bright modern offices, confident entrepreneurs. Premium, optimistic, high-end tech commercial look, smooth cinematic camera motion. Absolutely no on-screen text, no words, no letters, no captions, no subtitles, no logos, no watermarks, no URLs, no signage.`.slice(0, 700)
+}
+
+async function attachDraftVideoRender(row: any, recommendation: CosRecommendation) {
+  if (!VIDEO_CHANNELS.includes(row.channel)) return null
+  const aspect: '9:16' | '16:9' = row.channel === 'short_video' ? '9:16' : '16:9'
+  const prompt = videoPromptForRecommendation(recommendation)
+  const started = await startSiteVideo(prompt, aspect)
+  const now = new Date().toISOString()
+  row.metadata = {
+    ...(row.metadata || {}),
+    video: started.ok ? {
+      status: 'rendering',
+      requestId: started.requestId,
+      model: started.model,
+      aspect,
+      prompt,
+      started_at: now,
+      url: null,
+      voicedUrl: null,
+      voiced: {},
+      branded: false,
+      brandedLangs: {},
+      unbrandedVoiced: {},
+      brandSchemaVersion: null,
+      brandText: null,
+      brandedAt: null,
+      voiceError: null,
+      brandAttempts: {},
+      ghOverlayAttempts: {},
+      brandingLock: null,
+    } : {
+      status: 'failed',
+      error: started.error || 'Could not start draft render.',
+      failed_at: now,
+      voicedUrl: null,
+      voiced: {},
+      branded: false,
+    },
+  }
+  return started
+}
+
 function recommendationFromDepartmentRequest(input: unknown): CosRecommendation | null {
   if (!input || typeof input !== 'object') return null
   const request = input as Record<string, unknown>
@@ -323,6 +378,7 @@ export async function POST(req: NextRequest) {
     autonomous: recommendation.signals?.[0]?.source === 'autonomous_cosa_campaign_command',
     publishing_gate: 'locked_until_owner_approval',
   }
+  const render = await attachDraftVideoRender(row, recommendation)
 
   const { data, error } = await ctx.admin
     .from('cos_campaign_queue')
@@ -338,10 +394,10 @@ export async function POST(req: NextRequest) {
     action: 'cos_campaign.create',
     targetType: 'cos_campaign_queue',
     targetId: data.id,
-    metadata: { recommendation_id: recommendation.id, channel: recommendation.recommended_channel, source: recommendation.signals?.[0]?.source || 'cos' },
+    metadata: { recommendation_id: recommendation.id, channel: recommendation.recommended_channel, source: recommendation.signals?.[0]?.source || 'cos', render },
   })
 
-  return NextResponse.json({ ok: true, campaign: cleanDestination(data) })
+  return NextResponse.json({ ok: true, campaign: cleanDestination(data), render })
 }
 
 export async function PATCH(req: NextRequest) {
@@ -387,11 +443,6 @@ export async function PATCH(req: NextRequest) {
     metadata: { fields: Object.keys(patch) },
   })
 
-  // AUTO-PUBLISH ON APPROVAL — the owner approves, the AI does the rest.
-  // Runs the full guarded pipeline (video ready + branded, quality gate,
-  // tracking link, live post, owner email) for every drafted language with a
-  // voiced render. Failures never break the approval itself: every outcome is
-  // returned here AND written to metadata.autoPublish, so nothing dies silently.
   let autoPublish: any = null
   if (status === 'approved') {
     try {

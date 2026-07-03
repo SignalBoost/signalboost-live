@@ -26,7 +26,7 @@ const METADATA_MODEL = 'fal-ai/ffmpeg-api/metadata'
 const SUBTITLE_MODEL = 'veed/subtitles' // srt_text bypasses ASR transcription entirely
 const SITE_URL = 'www.saas.signalboostapp.com'
 const CLIP_MS = 5000
-const MIN_TOTAL_MS = 6000
+const MIN_TOTAL_MS = 50000
 const MAX_TOTAL_MS = 60000
 
 const VOICE_BY_LANG: Record<string, string> = {
@@ -54,7 +54,7 @@ function normalizeUrlText(text: string): string {
   out = out.replace(/(?:https?:\/\/)?(?:www\.)?signalboost\.com(?:\/[^\s,.!?)]*)?/gi, SITE_URL)
   // 3) Safety: collapse accidental doubling from prior passes.
   out = out.replace(/(?:www\.)+www\./gi, 'www.')
-  out = out.replace(new RegExp(`(${SITE_URL.replace(/\./g, '\\.')})(?:\\s*\\1)+`, 'gi'), '$1')
+  out = out.replace(new RegExp(`(${SITE_URL.replace(/\./g, '\\.')})(?:\s*\1)+`, 'gi'), '$1')
   return out
 }
 

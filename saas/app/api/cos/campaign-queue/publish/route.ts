@@ -5,9 +5,9 @@
 // video campaigns arrive already approved with the internal marker).
 // Three AUTONOMOUS gates run before that approved content ever goes live:
 //   1. Video channels must have a finished, rendered video.
-//   2. Video channels must have a successfully BRANDED video (name + URL burned
-//      in). The owner can explicitly override this ONE video with
-//      acceptUnbranded:true — a deliberate, logged choice, not a silent bypass.
+//   2. Video channels must carry the mandatory burned-in brand banner
+//      (SignalBoostAi + www.saas.signalboostapp.com). NO OVERRIDE EXISTS —
+//      an unbranded video can never publish, by design.
 //   3. COSA's own content-quality gate runs automatically.
 // TRAFFIC ATTRIBUTION: the description text gets the campaign's tracking link
 // (/api/track?c=<id>&p=<platform>) appended, so every click lands in
@@ -45,7 +45,6 @@ export async function POST(req: NextRequest) {
   try { body = await req.json() } catch {}
   const id = String(body?.id || '').trim()
   if (!id) return NextResponse.json({ ok: false, error: 'id is required' }, { status: 400 })
-  const acceptUnbranded = body?.acceptUnbranded === true
 
   const { data: campaign, error } = await ctx.admin.from('cos_campaign_queue').select('*').eq('id', id).single()
   if (error || !campaign) return NextResponse.json({ ok: false, error: error?.message || 'Campaign not found' }, { status: 404 })
@@ -64,10 +63,10 @@ export async function POST(req: NextRequest) {
         error: `COSA has not finished producing this video yet (status: ${video.status || 'not started'}). Publish will unlock automatically once rendering completes.`,
       }, { status: 409 })
     }
-    if (video.branded !== true && !acceptUnbranded) {
+    if (video.branded !== true || !video.voicedUrl) {
       return NextResponse.json({
         ok: false,
-        error: `COSA's branded overlay (name + URL burned into the video) did not complete successfully${video.voiceError ? `: ${video.voiceError}` : '.'} Publishing an unbranded video is blocked automatically. To publish this specific video anyway, resend with acceptUnbranded: true.`,
+        error: `The mandatory brand banner (SignalBoostAi + www.saas.signalboostapp.com burned into the video) is not on this video yet${video.voiceError ? `: ${video.voiceError}` : '.'} Publishing without the banner is blocked — no override. The GitHub Actions FFmpeg worker burns it in automatically; publish unlocks when done.`,
         voiceError: video.voiceError || null,
       }, { status: 409 })
     }
@@ -104,7 +103,11 @@ export async function POST(req: NextRequest) {
 
   // Owner-approved content wins; then the per-language draft; then stored fields.
   let text = String(body?.text || draftText || campaign.objective || campaign.title || '')
-  const videoUrl = body?.videoUrl ? String(body.videoUrl) : ((campaign.metadata?.video?.voicedUrl || campaign.metadata?.video?.url) ? String(campaign.metadata.video.voicedUrl || campaign.metadata.video.url) : undefined)
+  // BANNER GUARANTEE: only banner-burned URLs may publish — per-language branded
+  // output first, then the branded primary. NEVER the raw unbranded render.
+  const vmeta = campaign.metadata?.video || {}
+  const brandedForLang = language && vmeta.brandedLangs?.[language] ? vmeta.voiced?.[language] : null
+  const videoUrl = brandedForLang ? String(brandedForLang) : (vmeta.voicedUrl ? String(vmeta.voicedUrl) : undefined)
   const title = String(body?.title || draftTitle || campaign.title || '')
 
   // TRAFFIC ATTRIBUTION: append the campaign's tracking link to the clickable
@@ -161,7 +164,7 @@ export async function POST(req: NextRequest) {
       tracking_url: trackingUrl,
       published: {
         ...((campaign.metadata && campaign.metadata.published) || {}),
-        [publishedKey]: { result, publishedAt, language: language || null, notified, notifyError: notifyError || null, publishedBy: ctx.user.id, publishedUnbranded: acceptUnbranded && campaign.metadata?.video?.branded !== true },
+        [publishedKey]: { result, publishedAt, language: language || null, notified, notifyError: notifyError || null, publishedBy: ctx.user.id },
       },
     },
   }).eq('id', id)
@@ -172,7 +175,7 @@ export async function POST(req: NextRequest) {
     action: 'cos_campaign.publish',
     targetType: 'cos_campaign_queue',
     targetId: id,
-    metadata: { platform, language: language || null, result, notified, acceptUnbranded },
+    metadata: { platform, language: language || null, result, notified },
   })
 
   return NextResponse.json({ ok: true, platform, language: language || null, publishedAt, result, readiness, notified, trackingUrl })

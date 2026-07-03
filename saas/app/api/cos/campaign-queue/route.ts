@@ -409,6 +409,25 @@ export async function PATCH(req: NextRequest) {
   const status = normalizeStatus(body?.status)
   if (!status) return NextResponse.json({ ok: false, error: 'Valid status is required.' }, { status: 400 })
 
+  // PREVIEW-BEFORE-APPROVAL GATE: a video campaign can only be approved once
+  // its FINAL branded video (SignalBoostAi banner burned in) exists and is
+  // previewable on the dashboard. Applies to every caller, including COS.
+  if (status === 'approved') {
+    const { data: existing } = await ctx.admin
+      .from('cos_campaign_queue')
+      .select('channel, metadata')
+      .eq('id', id)
+      .single()
+    const isVideoChannel = ['youtube', 'short_video'].includes(String(existing?.channel || ''))
+    const vv: any = (existing?.metadata as any)?.video || {}
+    if (isVideoChannel && (vv.branded !== true || !vv.voicedUrl)) {
+      return NextResponse.json({
+        ok: false,
+        error: 'Approval blocked: preview required. The final branded video (SignalBoostAi + www.saas.signalboostapp.com burned in) is not ready yet — it must be previewable on the dashboard before this campaign can be approved.',
+      }, { status: 409 })
+    }
+  }
+
   const patch: Record<string, unknown> = { status }
   if (status === 'approved') {
     patch.approved_by = ctx.user.id

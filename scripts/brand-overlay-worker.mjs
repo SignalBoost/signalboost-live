@@ -1,10 +1,15 @@
 // scripts/brand-overlay-worker.mjs
 // FFmpeg brand-overlay worker (GitHub Actions, free compute, real FFmpeg).
 //
+// THROUGHPUT: brands EVERY eligible language of EVERY campaign in a single
+// run (previously one language per campaign per run, which at 5 languages
+// meant ~50 minutes of wall-clock per campaign). A 15-minute in-run time
+// budget keeps us safely inside the workflow's 20-minute timeout; anything
+// unfinished is picked up by the next scheduled run.
+//
 // SELF-REPORTING: every run emits one annotation per scanned campaign stating
-// its exact state (status, branded flags, attempts, lock, which URL it serves)
-// and the precise skip/brand/fail decision — visible on the run summary page,
-// machine-readable from outside. Nobody has to copy logs anywhere.
+// its exact state and the precise skip/brand/fail decision — visible on the
+// run summary page, machine-readable from outside.
 
 import { execFileSync } from 'node:child_process'
 import { writeFileSync, readFileSync, mkdirSync } from 'node:fs'
@@ -16,8 +21,12 @@ const BUCKET = 'cos-videos'
 const BACKLOG_CUTOFF = process.env.COS_BRAND_SINCE || '2026-07-02T12:00:00Z'
 const LOCK_MS = 5 * 60 * 1000
 const MAX_GH_ATTEMPTS = 5
+const RUN_BUDGET_MS = 15 * 60 * 1000
 const BRAND_SCHEMA_VERSION = 7
 const BRAND_TEXT = { name: 'SignalBoostAi', url: 'www.saas.signalboostapp.com' }
+
+const RUN_START = Date.now()
+const budgetLeft = () => RUN_BUDGET_MS - (Date.now() - RUN_START)
 
 const oneLine = (s) => String(s).replace(/\r?\n/g, ' | ').slice(0, 480)
 const annotateError = (msg) => console.log(`::error::${oneLine(msg)}`)
@@ -108,14 +117,12 @@ async function uploadToStorage(localPath, storagePath) {
   return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${storagePath}`
 }
 
-// Returns { job } or { skip: 'reason' } — the reason gets annotated verbatim.
-function pickJob(campaign) {
-  const v = (campaign.metadata && campaign.metadata.video) || {}
+// Next eligible language given the CURRENT video meta state (v), or a skip
+// reason if none qualifies. failedThisRun prevents retry-hammering the same
+// broken language five times within a single run.
+function pickNextLang(campaign, v, failedThisRun) {
   if (!v.url) return { skip: 'no rendered video (metadata.video.url empty)' }
   if (v.status !== 'ready') return { skip: `video status is "${v.status}", not ready` }
-  if (v.brandingExhausted === true) return { skip: 'brandingExhausted flag set' }
-  const lock = v.brandingLock
-  if (lock && lock.at && Date.now() - Date.parse(lock.at) < LOCK_MS) return { skip: `brandingLock held by ${lock.by || 'vercel'} since ${lock.at}` }
 
   const langs = Array.isArray(campaign.languages) && campaign.languages.length ? campaign.languages : ['en']
   const brandedLangs = v.brandedLangs || {}
@@ -124,100 +131,129 @@ function pickJob(campaign) {
 
   for (const lang of langs) {
     if (brandedLangs[lang]) continue
+    if (failedThisRun.has(lang)) continue
     if ((gh[lang] || 0) >= MAX_GH_ATTEMPTS) continue
     const source = unbranded[lang] || (lang === langs[0] ? (v.unbrandedVoicedUrl || v.voicedUrl) : null)
     if (!source) continue
-    return { job: { lang, source: String(source), primary: langs[0], v, langs } }
+    return { job: { lang, source: String(source), primary: langs[0], langs } }
   }
 
-  // Explain why no language qualified.
   const parts = langs.map((l) => {
     if (brandedLangs[l]) return `${l}:already-branded`
+    if (failedThisRun.has(l)) return `${l}:failed-this-run`
     if ((gh[l] || 0) >= MAX_GH_ATTEMPTS) return `${l}:gh-attempts-exhausted(${gh[l]})`
     return `${l}:no-voiced-source-yet`
   })
   return { skip: `no eligible language [${parts.join(', ')}]` }
 }
 
-function describe(campaign) {
-  const v = (campaign.metadata && campaign.metadata.video) || {}
+function describe(campaign, v) {
   return `status=${v.status || 'none'} branded=${v.branded === true} brandedLangs=${JSON.stringify(v.brandedLangs || {})} ` +
     `voicedUrl=${urlTail(v.voicedUrl)} unbranded=${JSON.stringify(Object.keys(v.unbrandedVoiced || {}))} ` +
     `ghAttempts=${JSON.stringify(v.ghOverlayAttempts || {})} lock=${v.brandingLock ? 'HELD' : 'no'} err=${v.voiceError ? String(v.voiceError).slice(0, 80) : 'none'}`
 }
 
+// Brands ALL eligible languages of one campaign, budget permitting.
+// Returns { branded, failed, note } counts for this campaign.
 async function processCampaign(campaign) {
   const title = String(campaign.title || '').slice(0, 40)
-  const picked = pickJob(campaign)
-  if (picked.skip) {
-    annotateNotice(`SKIP ${campaign.id.slice(0, 8)} "${title}" — ${picked.skip} | ${describe(campaign)}`)
-    return 'skipped'
+  let v = (campaign.metadata && campaign.metadata.video) || {}
+
+  if (v.brandingExhausted === true) {
+    annotateNotice(`SKIP ${campaign.id.slice(0, 8)} "${title}" — brandingExhausted flag set | ${describe(campaign, v)}`)
+    return { branded: 0, failed: 0 }
   }
-  const { lang, source, primary, v } = picked.job
-  console.log(`\n=== Campaign ${campaign.id} [${lang}] ===\nsource: ${source}`)
-
-  await patchVideoMeta(campaign, { ...v, brandingLock: { lang, at: new Date().toISOString(), by: 'github-actions' } })
-
-  const aspect = v.aspect === '9:16' || v.aspect === '16:9' ? v.aspect : campaign.channel === 'short_video' ? '9:16' : '16:9'
-  mkdirSync('/tmp/work', { recursive: true })
-  const srcPath = '/tmp/work/source.mp4'
-  const overlayPath = '/tmp/work/overlay.png'
-  const outPath = '/tmp/work/branded.mp4'
-
-  try {
-    await download(source, srcPath)
-    await download(`${SITE}/api/brand-overlay?a=${aspect === '9:16' ? '9x16' : '16x9'}`, overlayPath)
-    runFfmpeg(srcPath, overlayPath, outPath, aspect)
-    const publicUrl = await uploadToStorage(outPath, `${campaign.id}/${lang}-${Date.now()}.mp4`)
-
-    const brandedLangs = { ...(v.brandedLangs || {}), [lang]: true }
-    const voiced = { ...(v.voiced || {}), [lang]: publicUrl }
-    const unbrandedVoiced = { ...(v.unbrandedVoiced || {}) }
-    delete unbrandedVoiced[lang]
-    const isPrimary = lang === primary
-
-    await patchVideoMeta(campaign, {
-      ...v,
-      status: 'ready',
-      voiced,
-      voicedUrl: isPrimary ? publicUrl : (v.voicedUrl || publicUrl),
-      branded: Boolean(brandedLangs[primary]),
-      brandedLangs,
-      unbrandedVoiced,
-      brandSchemaVersion: brandedLangs[primary] ? BRAND_SCHEMA_VERSION : v.brandSchemaVersion || null,
-      brandText: brandedLangs[primary] ? BRAND_TEXT : v.brandText || null,
-      brandingLock: null,
-      voiceError: null,
-      brandedAt: brandedLangs[primary] ? (v.brandedAt || new Date().toISOString()) : v.brandedAt || null,
-      brandDebug: { mode: 'github-actions-ffmpeg', at: new Date().toISOString() },
-    })
-    annotateNotice(`BRANDED ${campaign.id.slice(0, 8)} "${title}" [${lang}] aspect=${aspect} → ${urlTail(publicUrl)}`)
-    return 'branded'
-  } catch (e) {
-    const gh = { ...(v.ghOverlayAttempts || {}), [lang]: ((v.ghOverlayAttempts || {})[lang] || 0) + 1 }
-    annotateError(`FAILED ${campaign.id.slice(0, 8)} "${title}" [${lang}]: ${e.message}`)
-    await patchVideoMeta(campaign, {
-      ...v,
-      ghOverlayAttempts: gh,
-      brandingLock: null,
-      voiceError: `ffmpeg overlay error: [${lang}] ${String(e.message).slice(0, 250)} (gh attempt ${gh[lang]}/${MAX_GH_ATTEMPTS})`,
-    })
-    return 'failed'
+  const lock = v.brandingLock
+  if (lock && lock.at && Date.now() - Date.parse(lock.at) < LOCK_MS) {
+    annotateNotice(`SKIP ${campaign.id.slice(0, 8)} "${title}" — brandingLock held by ${lock.by || 'vercel'} since ${lock.at} | ${describe(campaign, v)}`)
+    return { branded: 0, failed: 0 }
   }
+
+  const failedThisRun = new Set()
+  let branded = 0
+  let failed = 0
+  let lastSkip = null
+
+  while (budgetLeft() > 60_000) {
+    const picked = pickNextLang(campaign, v, failedThisRun)
+    if (picked.skip) { lastSkip = picked.skip; break }
+    const { lang, source, primary } = picked.job
+    console.log(`\n=== Campaign ${campaign.id} [${lang}] ===\nsource: ${source}`)
+
+    await patchVideoMeta(campaign, { ...v, brandingLock: { lang, at: new Date().toISOString(), by: 'github-actions' } })
+
+    const aspect = v.aspect === '9:16' || v.aspect === '16:9' ? v.aspect : campaign.channel === 'short_video' ? '9:16' : '16:9'
+    mkdirSync('/tmp/work', { recursive: true })
+    const srcPath = '/tmp/work/source.mp4'
+    const overlayPath = '/tmp/work/overlay.png'
+    const outPath = '/tmp/work/branded.mp4'
+
+    try {
+      await download(source, srcPath)
+      await download(`${SITE}/api/brand-overlay?a=${aspect === '9:16' ? '9x16' : '16x9'}`, overlayPath)
+      runFfmpeg(srcPath, overlayPath, outPath, aspect)
+      const publicUrl = await uploadToStorage(outPath, `${campaign.id}/${lang}-${Date.now()}.mp4`)
+
+      const brandedLangs = { ...(v.brandedLangs || {}), [lang]: true }
+      const voiced = { ...(v.voiced || {}), [lang]: publicUrl }
+      const unbrandedVoiced = { ...(v.unbrandedVoiced || {}) }
+      delete unbrandedVoiced[lang]
+      const isPrimary = lang === primary
+
+      v = {
+        ...v,
+        status: 'ready',
+        voiced,
+        voicedUrl: isPrimary ? publicUrl : (v.voicedUrl || publicUrl),
+        branded: Boolean(brandedLangs[primary]),
+        brandedLangs,
+        unbrandedVoiced,
+        brandSchemaVersion: brandedLangs[primary] ? BRAND_SCHEMA_VERSION : v.brandSchemaVersion || null,
+        brandText: brandedLangs[primary] ? BRAND_TEXT : v.brandText || null,
+        brandingLock: null,
+        voiceError: null,
+        brandedAt: brandedLangs[primary] ? (v.brandedAt || new Date().toISOString()) : v.brandedAt || null,
+        brandDebug: { mode: 'github-actions-ffmpeg', at: new Date().toISOString() },
+      }
+      await patchVideoMeta(campaign, v)
+      annotateNotice(`BRANDED ${campaign.id.slice(0, 8)} "${title}" [${lang}] aspect=${aspect} → ${urlTail(publicUrl)}`)
+      branded++
+    } catch (e) {
+      const gh = { ...(v.ghOverlayAttempts || {}), [lang]: ((v.ghOverlayAttempts || {})[lang] || 0) + 1 }
+      annotateError(`FAILED ${campaign.id.slice(0, 8)} "${title}" [${lang}]: ${e.message}`)
+      v = {
+        ...v,
+        ghOverlayAttempts: gh,
+        brandingLock: null,
+        voiceError: `ffmpeg overlay error: [${lang}] ${String(e.message).slice(0, 250)} (gh attempt ${gh[lang]}/${MAX_GH_ATTEMPTS})`,
+      }
+      await patchVideoMeta(campaign, v)
+      failedThisRun.add(lang)
+      failed++
+    }
+  }
+
+  if (!branded && !failed) {
+    annotateNotice(`SKIP ${campaign.id.slice(0, 8)} "${title}" — ${lastSkip || 'time budget spent'} | ${describe(campaign, v)}`)
+  } else if (lastSkip && !/no eligible language \[[^\]]*already-branded/.test(lastSkip)) {
+    console.log(`Campaign ${campaign.id}: stopped after ${branded} branded / ${failed} failed — ${lastSkip}`)
+  }
+  return { branded, failed }
 }
 
 async function main() {
   await ensureBucket()
   const campaigns = await fetchCandidates()
-  console.log(`Scanning ${campaigns.length} recent campaigns (cutoff ${BACKLOG_CUTOFF})...`)
+  console.log(`Scanning ${campaigns.length} recent campaigns (cutoff ${BACKLOG_CUTOFF}, run budget ${Math.round(RUN_BUDGET_MS / 60000)}m)...`)
   let branded = 0, failed = 0, skipped = 0
   for (const c of campaigns) {
+    if (budgetLeft() < 60_000) { console.log('Run budget spent — remaining campaigns roll to the next scheduled run.'); break }
     const r = await processCampaign(c)
-    if (r === 'branded') branded++
-    else if (r === 'failed') failed++
-    else skipped++
+    branded += r.branded
+    failed += r.failed
+    if (!r.branded && !r.failed) skipped++
   }
-  annotateNotice(`Result: branded=${branded} failed=${failed} skipped=${skipped} of ${campaigns.length} scanned`)
+  annotateNotice(`Result: branded=${branded} failed=${failed} skippedCampaigns=${skipped} of ${campaigns.length} scanned`)
   if (failed > 0) process.exit(1)
 }
 

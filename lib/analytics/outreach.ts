@@ -41,10 +41,24 @@ async function fetchJson<T>(url: string, accessToken?: string, init: RequestInit
   return response.json() as Promise<T>;
 }
 
-function matchesRegion<T extends { region: string }>(rows: T[], region?: string) {
+export function matchesRegion<T extends { region: string }>(rows: T[], region?: string) {
   if (!region || region === 'all') return rows;
   const needle = region.toLowerCase();
   return rows.filter((row) => row.region.toLowerCase().includes(needle));
+}
+
+function campaignField(filters: AnalyticsFilters) {
+  return filters.campaign ? { dimensionFilter: { filter: { fieldName: 'campaignName', stringFilter: { matchType: 'CONTAINS', value: filters.campaign } } } } : {};
+}
+
+function fallbackRegionalConversions() {
+  return [
+    { region: 'United States', conversions: 710 },
+    { region: 'Canada', conversions: 188 },
+    { region: 'United Kingdom', conversions: 151 },
+    { region: 'Brazil', conversions: 96 },
+    { region: 'Nicaragua', conversions: 25 },
+  ];
 }
 
 export async function getViewsAnalytics(requestUrl: string) {
@@ -132,6 +146,7 @@ export async function getClicksAnalytics(requestUrl: string) {
         dateRanges: [{ startDate: filters.startDate || '30daysAgo', endDate: filters.endDate || 'today' }],
         dimensions: [{ name: 'country' }],
         metrics: [{ name: 'sessions' }, { name: 'conversions' }],
+        ...campaignField(filters),
       }),
     }) : Promise.resolve(null),
     metaUrl ? fetchJson<{ data?: Array<{ impressions?: string; clicks?: string; actions?: Array<{ action_type: string; value: string }> }> }>(metaUrl, metaToken) : Promise.resolve(null),
@@ -157,6 +172,7 @@ export async function getClicksAnalytics(requestUrl: string) {
       { region: 'Canada', clicks: 2810, conversions: 188 },
       { region: 'United Kingdom', clicks: 2240, conversions: 151 },
       { region: 'Brazil', clicks: 1510, conversions: 96 },
+      { region: 'Nicaragua', clicks: 460, conversions: 25 },
     ], filters.region),
   };
 }
@@ -174,6 +190,7 @@ export async function getTrafficAnalytics(requestUrl: string) {
         dateRanges: [{ startDate: filters.startDate || '30daysAgo', endDate: filters.endDate || 'today' }],
         dimensions: [{ name: 'sessionDefaultChannelGroup' }],
         metrics: [{ name: 'sessions' }],
+        ...campaignField(filters),
       }),
     },
   ) : null;
@@ -191,5 +208,56 @@ export async function getTrafficAnalytics(requestUrl: string) {
       { source: 'referral', value: 16 },
       { source: 'direct', value: 10 },
     ],
+  };
+}
+
+
+export async function getConversionsAnalytics(requestUrl: string) {
+  const filters = readFilters(new URL(requestUrl).searchParams);
+  const propertyId = process.env.GA4_PROPERTY_ID;
+  const token = process.env.GOOGLE_OAUTH_ACCESS_TOKEN;
+  const metaAccountId = process.env.META_AD_ACCOUNT_ID;
+  const metaToken = process.env.META_ACCESS_TOKEN;
+
+  const ga = propertyId ? await fetchJson<{ rows?: Array<{ dimensionValues?: Array<{ value?: string }>; metricValues?: Array<{ value?: string }> }> }>(
+    `${GA_DATA_URL}/properties/${propertyId}:runReport`,
+    token,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        dateRanges: [{ startDate: filters.startDate || '30daysAgo', endDate: filters.endDate || 'today' }],
+        dimensions: [{ name: 'country' }],
+        metrics: [{ name: 'conversions' }],
+        ...campaignField(filters),
+      }),
+    },
+  ) : null;
+
+  const metaUrl = metaAccountId
+    ? `${META_GRAPH_URL}/act_${metaAccountId}/insights?${compactQuery({ fields: 'country,actions', breakdowns: 'country', level: 'campaign', date_preset: 'last_30d' })}`
+    : '';
+  const meta = metaUrl ? await fetchJson<{ data?: Array<{ country?: string; actions?: Array<{ action_type: string; value: string }> }> }>(metaUrl, metaToken) : null;
+
+  const gaRegions = ga?.rows?.map((row) => ({
+    region: row.dimensionValues?.[0]?.value || 'Unknown',
+    conversions: Number(row.metricValues?.[0]?.value || 0),
+  })) || [];
+  const metaRegions = meta?.data?.map((row) => ({
+    region: row.country || 'Unknown',
+    conversions: row.actions?.reduce((sum, action) => sum + (action.action_type.includes('conversion') ? Number(action.value || 0) : 0), 0) || 0,
+  })).filter((row) => row.conversions > 0) || [];
+
+  const combined = new Map<string, { region: string; conversions: number }>();
+  [...gaRegions, ...metaRegions].forEach((row) => {
+    const current = combined.get(row.region) || { region: row.region, conversions: 0 };
+    current.conversions += row.conversions;
+    combined.set(row.region, current);
+  });
+
+  const regions = Array.from(combined.values());
+  return {
+    source: regions.length ? 'google-analytics-meta-api' : 'demo-fallback',
+    filters,
+    regions: matchesRegion(regions.length ? regions : fallbackRegionalConversions(), filters.region),
   };
 }

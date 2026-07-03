@@ -88,7 +88,7 @@ function TrendLine({ trend }) {
 
 export default function OutreachAnalyticsPanel() {
   const [filters, setFilters] = useState({ startDate: '2026-06-01', endDate: '2026-07-03', region: 'all', campaign: '' });
-  const [data, setData] = useState({ views: null, clicks: null, traffic: null });
+  const [data, setData] = useState({ views: null, clicks: null, traffic: null, conversions: null });
   const [status, setStatus] = useState('Loading analytics…');
 
   useEffect(() => {
@@ -96,13 +96,14 @@ export default function OutreachAnalyticsPanel() {
     async function load() {
       setStatus('Refreshing analytics…');
       const query = qs(filters);
-      const [views, clicks, traffic] = await Promise.all([
+      const [views, clicks, traffic, conversions] = await Promise.all([
         fetch(`/api/analytics/views?${query}`).then((res) => res.json()),
         fetch(`/api/analytics/clicks?${query}`).then((res) => res.json()),
         fetch(`/api/analytics/traffic?${query}`).then((res) => res.json()),
+        fetch(`/api/analytics/conversions?${query}`).then((res) => res.json()),
       ]);
       if (active) {
-        setData({ views, clicks, traffic });
+        setData({ views, clicks, traffic, conversions });
         setStatus(`Last refreshed ${new Date().toLocaleTimeString()}`);
       }
     }
@@ -113,11 +114,12 @@ export default function OutreachAnalyticsPanel() {
 
   const tableRows = useMemo(() => {
     const clickMap = new Map((data.clicks?.regions || []).map((row) => [row.region, row]));
-    return (data.views?.regions || []).map((row) => ({ ...row, clicks: clickMap.get(row.region)?.clicks || 0, conversions: clickMap.get(row.region)?.conversions || 0 }));
+    const conversionMap = new Map((data.conversions?.regions || []).map((row) => [row.region, row]));
+    return (data.views?.regions || []).map((row) => ({ ...row, clicks: clickMap.get(row.region)?.clicks || 0, conversions: conversionMap.get(row.region)?.conversions ?? clickMap.get(row.region)?.conversions ?? 0 }));
   }, [data]);
 
   const heatMax = Math.max(1, ...tableRows.map((row) => row.views));
-  const exportPayload = { filters, tableRows, funnel: data.clicks?.funnel, trafficSources: data.traffic?.trafficSources, trend: data.views?.trend };
+  const exportPayload = { filters, tableRows, funnel: data.clicks?.funnel, trafficSources: data.traffic?.trafficSources, trend: data.views?.trend, conversions: data.conversions?.regions };
 
   return (
     <section className="space-y-6 rounded-3xl bg-slate-50 p-6 text-slate-800">

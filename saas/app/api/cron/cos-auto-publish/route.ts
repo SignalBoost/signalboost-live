@@ -1,10 +1,10 @@
 // saas/app/api/cron/cos-auto-publish/route.ts
 // The last mile of "AI does everything; the human only starts and approves."
-// Every few minutes: find APPROVED campaigns whose video is READY and BRANDED,
-// run the same autonomous quality gate as the manual publish route, publish to
-// the platform using the APPROVER's connected account (approved_by uuid), and
-// email the owner the live link. Humans never click Publish; the manual route
-// remains as an override.
+// Every few minutes: find OWNER-APPROVED campaigns whose video is READY and
+// BRANDED, run the same autonomous quality gate as the manual publish route,
+// publish to the platform using the APPROVER's connected account, and email the
+// owner the live link. Humans never click Publish; the manual route remains as
+// an override.
 //
 // Safety rails:
 //   - BACKLOG_CUTOFF: never touches pre-July-2 backlog campaigns.
@@ -26,7 +26,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 const BACKLOG_CUTOFF = process.env.COS_BRAND_SINCE || '2026-07-02T12:00:00Z'
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const CHANNEL_TO_PLATFORM: Record<string, SocialPlatform | undefined> = {
   youtube: 'youtube_channels',
@@ -72,7 +72,6 @@ async function publishOne(sb: any, campaign: any): Promise<{ status: 'published'
     return { status: 'blocked', note: 'no approver uuid on record — approve via the dashboard so the publisher knows whose account to use' }
   }
 
-  // Same autonomous quality gate as the manual publish route.
   const readiness = scoreCampaignReadiness(campaign)
   const readinessOk = readiness.grade === 'improved' || readiness.grade === 'marketing_grade_ready'
   if (!readinessOk) {
@@ -88,8 +87,7 @@ async function publishOne(sb: any, campaign: any): Promise<{ status: 'published'
   const draftTitle = matched?.output?.title ? String(matched.output.title) : ''
   let text = String(draftText || campaign.objective || campaign.title || '')
   const title = String(draftTitle || campaign.title || '')
-  // BANNER GUARANTEE: only banner-burned URLs may publish — per-language
-  // branded output first, then the branded primary. NEVER the raw render.
+
   const brandedForLang = video.brandedLangs?.[language] ? video.voiced?.[language] : null
   const videoUrl = brandedForLang ? String(brandedForLang) : (video.voicedUrl ? String(video.voicedUrl) : undefined)
   if (isVideo && !videoUrl) return { status: 'skipped', note: 'branded video URL not ready yet — banner worker still running' }
@@ -100,7 +98,7 @@ async function publishOne(sb: any, campaign: any): Promise<{ status: 'published'
   const tok = await getValidSocialToken(sb, approvedBy, platform)
   if (!tok.ok || !tok.accessToken) {
     await sb.from('cos_campaign_queue').update({
-      metadata: { ...(campaign.metadata || {}), auto_publish_note: `Blocked: no valid ${platform} token for approver (${tok.error || 'no token'}).` },
+      metadata: { ...(campaign.metadata || {}), auto_publish_note: `Blocked: no valid ${platform} token for approver (${tok.error || 'no token'}). Connect that platform once, then COSA will retry automatically on the next cron run.` },
     }).eq('id', campaign.id)
     return { status: 'blocked', note: tok.error || 'no valid token' }
   }
@@ -163,9 +161,11 @@ export async function GET(req: NextRequest) {
   const { data: approved } = await sb
     .from('cos_campaign_queue')
     .select('*')
-    .eq('status', 'approved')
+    .in('status', ['approved', 'queued', 'running'])
+    .not('approved_at', 'is', null)
+    .not('approved_by', 'is', null)
     .gte('created_at', BACKLOG_CUTOFF)
-    .limit(10)
+    .limit(20)
 
   const results: any[] = []
   let published = 0, skipped = 0, blocked = 0, failed = 0
@@ -175,8 +175,8 @@ export async function GET(req: NextRequest) {
     else if (r.status === 'skipped') skipped++
     else if (r.status === 'blocked') blocked++
     else failed++
-    if (r.status !== 'skipped') results.push({ campaign: campaign.id, ...r })
+    if (r.status !== 'skipped') results.push({ campaign: campaign.id, title: campaign.title, ...r })
   }
 
-  return NextResponse.json({ ok: true, published, skipped, blocked, failed, results })
+  return NextResponse.json({ ok: true, scanned: approved?.length || 0, published, skipped, blocked, failed, results })
 }

@@ -1,5 +1,109 @@
+name: COS Commit Pipeline
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ai-cos-branch
+
+jobs:
+  build-and-commit:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Cache Vercel build output
+        uses: actions/cache@v3
+        with:
+          path: .vercel/cache
+          key: vercel-${{ runner.os }}-${{ matrix.node-version }}-${{ github.sha }}
+          restore-keys: |
+            vercel-${{ runner.os }}-${{ matrix.node-version }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run COS edits (safe mode v5)
+        run: |
+          DRY_RUN=false ROLLBACK_ALL=false node scripts/cos-edit.js
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build app
+        run: npm run build
+
+      - name: Commit changes
+        if: matrix.node-version == '20.x'
+        run: |
+          git config --global user.name "COS Agent"
+          git config --global user.email "cos@signalboostapp.com"
+          git add .
+          git commit -m "COS: Applied automated fixes"
+          git push origin ai-cos-branch
+
+      - name: Deploy to Vercel
+        if: matrix.node-version == '20.x'
+        run: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      # Slack Notifications
+      - name: Notify Slack on success
+        if: success() && matrix.node-version == '20.x'
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "✅ COS pipeline succeeded",
+              "attachments": [
+                {
+                  "color": "#36a64f",
+                  "fields": [
+                    { "title": "Branch", "value": "${{ github.ref }}", "short": true },
+                    { "title": "Commit", "value": "${{ github.sha }}", "short": true },
+                    { "title": "Node.js Version", "value": "${{ matrix.node-version }}", "short": true },
+                    { "title": "Vercel Preview", "value": "https://signalboostapp.vercel.app", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify Slack on failure
+        if: failure() && matrix.node-version == '20.x'
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "❌ COS pipeline failed",
+              "attachments": [
+                {
+                  "color": "#ff0000",
+                  "fields": [
+                    { "title": "Branch", "value": "${{ github.ref }}", "short": true },
+                    { "title": "Commit", "value": "${{ github.sha }}", "short": true },
+                    { "title": "Node.js Version", "value": "${{ matrix.node-version }}", "short": true }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      # Teams Notifications
       - name: Notify Teams on success
-        if: success()
+        if: success() && matrix.node-version == '20.x'
         run: |
           curl -H 'Content-Type: application/json' \
           -d '{
@@ -16,7 +120,7 @@
           ${{ secrets.TEAMS_WEBHOOK_URL }}
 
       - name: Notify Teams on failure
-        if: failure()
+        if: failure() && matrix.node-version == '20.x'
         run: |
           curl -H 'Content-Type: application/json' \
           -d '{

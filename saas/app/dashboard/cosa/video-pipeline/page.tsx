@@ -8,6 +8,7 @@ const GREEN = '#34d399'
 const RED = '#fca5a5'
 const panel = { background: 'rgba(15,23,42,.78)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 18, padding: 18 } as const
 const button = { border: 'none', background: GOLD, color: '#000', borderRadius: 12, padding: '10px 14px', fontWeight: 900, cursor: 'pointer' } as const
+const cyanButton = { border: 'none', background: CYAN, color: '#001018', borderRadius: 12, padding: '10px 14px', fontWeight: 900, cursor: 'pointer' } as const
 const ghost = { border: '1px solid rgba(255,255,255,.18)', background: 'rgba(255,255,255,.06)', color: '#fff', borderRadius: 12, padding: '10px 14px', fontWeight: 800, cursor: 'pointer' } as const
 
 function safe(value: any) {
@@ -85,6 +86,21 @@ export default function CosaVideoPipelinePage() {
     await load('/api/cos/video-pipeline-xray?kick=1')
   }
 
+  async function kickBranding() {
+    setLoading(true)
+    setMessage('')
+    try {
+      const res = await fetch('/api/cos/brand-overlay-dispatch', { method: 'POST', cache: 'no-store' })
+      const json = await res.json().catch(() => null)
+      if (!res.ok || !json?.ok) throw new Error(json?.error || 'Could not dispatch branding worker.')
+      setData((prev: any) => ({ ...(prev || {}), actions: [{ action: 'brand-overlay-dispatch', ...json }] }))
+    } catch (e: any) {
+      setMessage(e?.message || 'Could not dispatch branding worker.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function reset(id: string) {
     await load(`/api/cos/video-pipeline-xray?reset=${encodeURIComponent(id)}&kick=1`)
   }
@@ -101,6 +117,7 @@ export default function CosaVideoPipelinePage() {
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
         <button onClick={() => load()} disabled={loading} style={ghost}>{loading ? 'Loading...' : 'Refresh'}</button>
         <button onClick={kick} disabled={loading} style={button}>Kick missing renders</button>
+        <button onClick={kickBranding} disabled={loading} style={cyanButton}>Kick branding worker</button>
         <a href="/dashboard/cosa" style={{ ...ghost, textDecoration: 'none' }}>Back to approval dashboard</a>
       </div>
       {message && <p style={{ color: RED, marginTop: 12 }}>{message}</p>}
@@ -147,7 +164,7 @@ export default function CosaVideoPipelinePage() {
             <p style={{ color: 'rgba(255,255,255,.72)', lineHeight: 1.55 }}>{campaign.eligibility}</p>
 
             {rawOnly && <div style={{ margin: '12px 0', border: '1px solid rgba(255,195,0,.32)', borderRadius: 14, padding: 12, background: 'rgba(255,195,0,.08)' }}>
-              <p style={{ color: GOLD, margin: 0, fontSize: 13, fontWeight: 900 }}>Not final yet: this campaign only has the raw base render. It may be short and will not have voice, captions, or the burned-in SignalBoostAi website banner yet. Wait for voice + brand stages, then refresh.</p>
+              <p style={{ color: GOLD, margin: 0, fontSize: 13, fontWeight: 900 }}>Not final yet: this campaign has not received the final burned-in SignalBoostAi website banner. If it says “BANNER WAITING” with attempts 0/5, use “Kick branding worker.”</p>
             </div>}
 
             {previewUrl && <div style={{ margin: '12px 0', border: '1px solid rgba(52,211,153,.35)', borderRadius: 14, padding: 12, background: 'rgba(52,211,153,.08)' }}>
@@ -165,6 +182,7 @@ export default function CosaVideoPipelinePage() {
             {(video?.voiceError || video?.renderError || video?.autoPublishNote) && <pre style={{ color: RED, whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,.24)', borderRadius: 10, padding: 10, marginTop: 10 }}>{safe(video?.voiceError || video?.renderError || video?.autoPublishNote)}</pre>}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
               <a href="/dashboard/cosa" style={{ ...ghost, textDecoration: 'none' }}>Open approval dashboard</a>
+              {rawOnly && <button onClick={kickBranding} disabled={loading} style={cyanButton}>Kick branding worker</button>}
               {stuck && <button onClick={() => reset(campaign.id)} disabled={loading} style={ghost}>Reset and kick</button>}
             </div>
           </article>

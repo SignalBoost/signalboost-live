@@ -1,27 +1,45 @@
 // saas/lib/operator/video.ts
-// Reusable server-side helper for generating website/background/COS videos
-// via fal.ai.
+// Reusable server-side helper for generating website/background/COS videos.
 //
-// Flow:
-//   1. startSiteVideo(prompt) -> submits to fal queue, returns { requestId, model }.
-//   2. Caller stores requestId + model.
-//   3. fetchSiteVideo(requestId, model) -> polls once and returns rendering/done/failed.
+// Cost-aware provider router:
+//   - COS_VIDEO_ENGINE=fal     -> premium fal.ai/Kling render.
+//   - COS_VIDEO_ENGINE=ffmpeg  -> cheap/free internal FFmpeg preview worker.
+//   - unset                   -> current behavior: fal.ai when FAL_KEY exists,
+//                                otherwise FFmpeg preview worker.
 //
-// Critical reliability rule: transient network/provider polling errors may retry,
-// but auth/model/not-found errors must surface as failed. Otherwise campaigns can
-// sit in metadata.video.status = 'rendering' forever with no visible diagnosis.
+// The FFmpeg path queues a cos_video_production_jobs row. The existing
+// scripts/cos-video-production-worker.mjs worker renders a branded preview-style
+// MP4 from that row using local FFmpeg and uploads it to Supabase storage.
+// This keeps COSA from calling FAL for every draft/demo render.
 
 import { fal } from '@fal-ai/client'
+import { createClient } from '@supabase/supabase-js'
 
-const SITE_VIDEO_MODEL = 'fal-ai/kling-video/v3/standard/text-to-video'
+const FAL_SITE_VIDEO_MODEL = 'fal-ai/kling-video/v3/standard/text-to-video'
+const LOCAL_FFMPEG_MODEL = 'signalboost/local-ffmpeg-preview'
+const RENDER_BUCKET = process.env.COS_VIDEO_RENDER_BUCKET || 'video-renders'
 
 let configured = false
-function ensureConfigured() {
+function ensureFalConfigured() {
   if (!process.env.FAL_KEY) throw new Error('FAL_KEY is not configured')
   if (!configured) {
     fal.config({ credentials: process.env.FAL_KEY })
     configured = true
   }
+}
+
+function adminDb() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) throw new Error('Supabase service credentials are not configured')
+  return createClient(url, key, { auth: { persistSession: false } })
+}
+
+function selectedEngine(): 'fal' | 'ffmpeg' {
+  const raw = String(process.env.COS_VIDEO_ENGINE || process.env.COS_VIDEO_RENDER_ENGINE || '').trim().toLowerCase()
+  if (['fal', 'fal.ai', 'kling', 'premium'].includes(raw)) return 'fal'
+  if (['ffmpeg', 'local', 'cheap', 'prototype', 'preview'].includes(raw)) return 'ffmpeg'
+  return process.env.FAL_KEY ? 'fal' : 'ffmpeg'
 }
 
 export type StartVideoResult =
@@ -63,21 +81,95 @@ function isPermanentFalError(message: string): boolean {
   ].some((needle) => m.includes(needle))
 }
 
+function cleanText(value: string, max = 240): string {
+  return String(value || '')
+    .replace(/https?:\/\/\S+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, max)
+}
+
+function titleFromPrompt(prompt: string): string {
+  const clean = cleanText(prompt, 80)
+  return clean || 'SignalBoostAi campaign preview'
+}
+
+function hookFromPrompt(prompt: string): string {
+  const clean = cleanText(prompt, 160)
+  return clean || 'One command can start a complete SignalBoostAi campaign.'
+}
+
+async function startFalVideo(prompt: string, aspectRatio: '9:16' | '16:9' | '1:1'): Promise<StartVideoResult> {
+  ensureFalConfigured()
+  const input = {
+    prompt: prompt.trim(),
+    duration: '5' as const,
+    aspect_ratio: aspectRatio,
+  }
+  const submitted = await fal.queue.submit(FAL_SITE_VIDEO_MODEL, { input })
+  const requestId = (submitted as { request_id?: string }).request_id
+  if (!requestId) return { ok: false, error: 'No request id returned from fal.' }
+  return { ok: true, requestId, model: FAL_SITE_VIDEO_MODEL }
+}
+
+async function startFfmpegPreview(prompt: string, aspectRatio: '9:16' | '16:9' | '1:1'): Promise<StartVideoResult> {
+  const sb = adminDb()
+  const now = new Date().toISOString()
+  const title = titleFromPrompt(prompt)
+  const hook = hookFromPrompt(prompt)
+  const platforms = aspectRatio === '9:16' ? ['Shorts', 'TikTok', 'Reels'] : ['YouTube', 'LinkedIn', 'Website']
+
+  const row = {
+    title,
+    status: 'queued',
+    production_tier: 'prototype',
+    platforms,
+    hook,
+    audience: 'business owners, agencies, consultants, and operators',
+    render_spec: {
+      format: 'mp4',
+      aspect_ratios: [aspectRatio],
+      duration_seconds: 24,
+      voice_strategy: 'voice and captions are added by the COSA campaign pipeline after the base preview render',
+      visual_strategy: 'internal FFmpeg preview with branded motion cards and CTA frame',
+      caption_strategy: 'burned-in captions plus transcript file for platform search',
+      provider_adapter: 'internal_ffmpeg_preview',
+    },
+    search_package: {
+      title_options: [title, `${title} | SignalBoostAi`, 'AI campaign operating system demo'],
+      description: `${hook} Learn more at www.saas.signalboostapp.com.`,
+      tags: ['SignalBoostAi', 'AI marketing', 'campaign automation', 'business growth', 'SaaS'],
+      thumbnail_text: hook.slice(0, 54),
+      transcript_required: true,
+      captions_required: true,
+      destination_url: 'www.saas.signalboostapp.com',
+    },
+    approval_state: {
+      concept_approved: true,
+      script_approved: true,
+      render_approved: false,
+      publish_approved: false,
+    },
+    output_url: null,
+    thumbnail_url: null,
+    error: null,
+    created_at: now,
+    updated_at: now,
+  }
+
+  const { data, error } = await sb.from('cos_video_production_jobs').insert(row).select('id').single()
+  if (error || !data?.id) return { ok: false, error: error?.message || 'Could not queue FFmpeg preview render.' }
+  return { ok: true, requestId: String(data.id), model: LOCAL_FFMPEG_MODEL }
+}
+
 export async function startSiteVideo(
   prompt: string,
   aspectRatio: '9:16' | '16:9' | '1:1' = '16:9'
 ): Promise<StartVideoResult> {
   try {
-    ensureConfigured()
-    const input = {
-      prompt: prompt.trim(),
-      duration: '5' as const,
-      aspect_ratio: aspectRatio,
-    }
-    const submitted = await fal.queue.submit(SITE_VIDEO_MODEL, { input })
-    const requestId = (submitted as { request_id?: string }).request_id
-    if (!requestId) return { ok: false, error: 'No request id returned from fal.' }
-    return { ok: true, requestId, model: SITE_VIDEO_MODEL }
+    const engine = selectedEngine()
+    if (engine === 'ffmpeg') return await startFfmpegPreview(prompt, aspectRatio)
+    return await startFalVideo(prompt, aspectRatio)
   } catch (err: unknown) {
     const message = errorMessage(err)
     console.error('startSiteVideo error:', message)
@@ -85,9 +177,31 @@ export async function startSiteVideo(
   }
 }
 
+async function fetchFfmpegPreview(requestId: string): Promise<FetchVideoResult> {
+  const sb = adminDb()
+  const { data, error } = await sb.from('cos_video_production_jobs').select('status, output_url, error').eq('id', requestId).single()
+  if (error || !data) return { status: 'failed', error: error?.message || 'FFmpeg preview job not found.' }
+
+  const status = String(data.status || '')
+  if (status === 'failed') return { status: 'failed', error: data.error || 'FFmpeg preview render failed.' }
+  if (status === 'rendered' || status === 'completed') {
+    const output = String(data.output_url || '').trim()
+    if (!output) return { status: 'failed', error: 'FFmpeg preview rendered but no output URL was saved.' }
+    if (output.startsWith('http')) return { status: 'done', videoUrl: output }
+
+    const { data: signed, error: signError } = await sb.storage.from(RENDER_BUCKET).createSignedUrl(output, 60 * 60 * 24 * 7)
+    if (signError || !signed?.signedUrl) return { status: 'failed', error: signError?.message || 'Could not sign FFmpeg preview output.' }
+    return { status: 'done', videoUrl: signed.signedUrl }
+  }
+
+  return { status: 'rendering', warning: `FFmpeg preview job is ${status || 'queued'}.` }
+}
+
 export async function fetchSiteVideo(requestId: string, model: string): Promise<FetchVideoResult> {
+  if (model === LOCAL_FFMPEG_MODEL) return fetchFfmpegPreview(requestId)
+
   try {
-    ensureConfigured()
+    ensureFalConfigured()
     const status = await fal.queue.status(model, { requestId, logs: false })
     const state = (status as { status?: string }).status
 

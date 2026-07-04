@@ -25,9 +25,9 @@ function inc(map: Record<string, number>, key: string | null | undefined) {
   map[clean] = (map[clean] || 0) + 1
 }
 
-export function targetRegionForLanguage(language?: string | null): string {
-  const lang = String(language || 'en').trim().toLowerCase()
-  return LANGUAGE_REGION[lang] || 'global'
+export function targetRegionForLanguage(language?: string | null): string | null {
+  const lang = String(language || '').trim().toLowerCase()
+  return LANGUAGE_REGION[lang] || null
 }
 
 export async function getCampaignTraffic(admin: any, campaignId: string): Promise<CampaignTraffic> {
@@ -69,8 +69,10 @@ export async function getCampaignTraffic(admin: any, campaignId: string): Promis
 
 export function buildTrackingUrl(campaignId: string, platform: string, language?: string | null, targetRegion?: string | null): string {
   const site = 'https://www.saas.signalboostapp.com'
-  const lang = String(language || 'en').trim().toLowerCase()
-  const region = String(targetRegion || targetRegionForLanguage(lang)).trim().toLowerCase()
-  const params = new URLSearchParams({ c: campaignId, p: platform, lang, region })
+  const params = new URLSearchParams({ c: campaignId, p: platform })
+  const lang = String(language || '').trim().toLowerCase()
+  const region = String(targetRegion || targetRegionForLanguage(lang) || '').trim().toLowerCase()
+  if (lang) params.set('lang', lang)
+  if (region) params.set('region', region)
   return `${site}/api/track?${params.toString()}`
 }

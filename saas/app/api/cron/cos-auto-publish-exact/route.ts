@@ -1,6 +1,6 @@
 // saas/app/api/cron/cos-auto-publish-exact/route.ts
 // Exact-campaign automatic publishing for final branded COSA videos.
-// Publishes only the exact approved campaign row and exact final branded video.
+// Also sends owner approval emails for final-ready videos before publishing.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -10,6 +10,7 @@ import { scoreCampaignReadiness } from '@/lib/cos/video-quality/campaign-scoring
 import { buildTrackingUrl } from '@/lib/cos/campaign-queue/campaign-traffic'
 import { sendEmail } from '@/lib/email'
 import { auditAdminAction } from '@/lib/outreach/security'
+import { GET as notifyFinalVideoApprovals } from '@/app/api/cos/video-approval-notify/route'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -23,6 +24,15 @@ function admin() {
   const url = process.env['NEXT_PUBLIC_SUPABASE_URL']!
   const key = process.env['SUPABASE_' + 'SERVICE_ROLE_KEY']!
   return createClient(url, key, { auth: { persistSession: false } })
+}
+
+async function approvalEmailSummary(req: NextRequest) {
+  try {
+    const res = await notifyFinalVideoApprovals(req)
+    return await res.json().catch(() => ({ ok: false, error: 'approval notification response was not json' }))
+  } catch (e: any) {
+    return { ok: false, error: e?.message || 'approval notification failed' }
+  }
 }
 
 function minutesSince(value: any): number {
@@ -155,6 +165,7 @@ export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization') || ''
   if (!secret || auth !== `Bearer ${secret}`) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
 
+  const approvalEmail = await approvalEmailSummary(req)
   const sb = admin()
   const { data, error } = await sb
     .from('cos_campaign_queue')
@@ -165,7 +176,7 @@ export async function GET(req: NextRequest) {
     .order('approved_at', { ascending: false })
     .limit(30)
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ ok: false, error: error.message, approvalEmail }, { status: 500 })
 
   const targets = (data || []).filter(eligible).slice(0, LIMIT)
   const results: any[] = []
@@ -182,7 +193,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, scanned: data?.length || 0, eligible: targets.length, published: results.filter(r => r.ok).length, results })
+  return NextResponse.json({ ok: true, approvalEmail, scanned: data?.length || 0, eligible: targets.length, published: results.filter(r => r.ok).length, results })
 }
 
 export async function POST(req: NextRequest) {

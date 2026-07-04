@@ -1,34 +1,38 @@
 // saas/lib/hub/provider-templates-vercel-console.ts
-// Extra Vercel console templates that keep the Console Catalog aligned with getTemplate().
+// Vercel dashboard and console templates. These are safe catalog entries for
+// the Console Hub Provider Matrix. Runtime actions still go through /api/hub/action.
 
 import type { ProviderTemplate } from './provider-templates'
 
 export const VERCEL_CONSOLE_TEMPLATES: Record<string, ProviderTemplate> = {
-  'vercel.list_env_vars': {
-    id: 'vercel.list_env_vars',
-    label: 'List Env Vars',
-    description: 'List project environment variable names and targets. Values remain masked by Vercel.',
-    icon: '🔑',
-    policyActionId: 'view_env_vars',
-    api: { service: 'vercel', method: 'GET', endpoint: '/v9/projects/{projectId}/env' },
-    fields: [],
-  },
-  'vercel.list_domains': {
-    id: 'vercel.list_domains',
-    label: 'List Domains',
-    description: 'List domains attached to the configured Vercel project.',
-    icon: '🌐',
-    policyActionId: 'read_provider_status',
-    api: { service: 'vercel', method: 'GET', endpoint: '/v9/projects/{projectId}/domains' },
-    fields: [],
-  },
-  'vercel.logs': {
-    id: 'vercel.logs',
-    label: 'Logs Viewer',
-    description: 'Open or query the Vercel logs workspace for recent build and runtime events.',
-    icon: '📝',
-    policyActionId: 'read_provider_status',
-    api: { service: 'vercel', method: 'GET', endpoint: '/v6/deployments' },
-    fields: [],
-  },
+  'vercel.overview': { id: 'vercel.overview', label: 'Overview', description: 'Open the project overview/status panel.', icon: '▲', policyActionId: 'read_provider_status', api: { service: 'vercel', method: 'GET', endpoint: '/v9/projects/{projectId}' }, fields: [] },
+  'vercel.list_deployments': { id: 'vercel.list_deployments', label: 'Deployments', description: 'List deployments for the configured Vercel project.', icon: '🚀', policyActionId: 'deployments_panel', api: { service: 'vercel', method: 'GET', endpoint: '/v6/deployments?projectId={projectId}' }, fields: [] },
+  'vercel.logs': { id: 'vercel.logs', label: 'Logs', description: 'Open or query recent build and runtime logs.', icon: '📝', policyActionId: 'read_provider_status', api: { service: 'vercel', method: 'GET', endpoint: '/v6/deployments' }, fields: [] },
+  'vercel.analytics': { id: 'vercel.analytics', label: 'Analytics', description: 'Project analytics surface. Live metrics should be fetched server-side when configured.', icon: '📈', policyActionId: 'read_provider_status', api: { service: 'vercel', method: 'GET', endpoint: '/v9/projects/{projectId}' }, fields: [] },
+  'vercel.speed_insights': { id: 'vercel.speed_insights', label: 'Speed Insights', description: 'Speed Insights status surface for the Vercel project.', icon: '⚡', policyActionId: 'read_provider_status', api: { service: 'vercel', method: 'GET', endpoint: '/v9/projects/{projectId}' }, fields: [] },
+  'vercel.observability': { id: 'vercel.observability', label: 'Observability', description: 'Observability status surface for runtime health and signals.', icon: '👁️', policyActionId: 'read_provider_status', api: { service: 'vercel', method: 'GET', endpoint: '/v9/projects/{projectId}' }, fields: [] },
+  'vercel.firewall': { id: 'vercel.firewall', label: 'Firewall', description: 'Firewall configuration surface. Changes should be staged before execution.', icon: '🛡️', policyActionId: 'read_provider_status', api: { service: 'vercel', method: 'GET', endpoint: '/v9/projects/{projectId}' }, fields: [] },
+  'vercel.cdn': { id: 'vercel.cdn', label: 'CDN', description: 'CDN and edge delivery status surface.', icon: '🌍', policyActionId: 'read_provider_status', api: { service: 'vercel', method: 'GET', endpoint: '/v9/projects/{projectId}' }, fields: [] },
+  'vercel.list_env_vars': { id: 'vercel.list_env_vars', label: 'Environment Variables', description: 'List environment variable names and targets. Values remain masked by Vercel.', icon: '🔑', policyActionId: 'view_env_vars', api: { service: 'vercel', method: 'GET', endpoint: '/v9/projects/{projectId}/env' }, fields: [] },
+  'vercel.add_env': { id: 'vercel.add_env', label: 'Add Env Var', description: 'Create or update a Vercel environment variable through the guarded Hub action route.', icon: '➕', policyActionId: 'edit_vercel_env', previewBeforeSubmit: true, api: { service: 'vercel', method: 'POST', endpoint: '/v9/projects/{projectId}/env' }, fields: [
+    { id: 'key', label: 'Variable Key', type: 'text', required: true, placeholder: 'NEXT_PUBLIC_API_URL' },
+    { id: 'value', label: 'Variable Value', type: 'secret', required: true },
+    { id: 'target', label: 'Environment', type: 'select', required: true, options: [ { value: 'production', label: 'Production' }, { value: 'preview', label: 'Preview' }, { value: 'development', label: 'Development' }, { value: 'all', label: 'All Environments' } ] },
+  ] },
+  'vercel.edit_env': { id: 'vercel.edit_env', label: 'Edit Env Var', description: 'Update a Vercel environment variable value and/or target.', icon: '✏️', policyActionId: 'edit_vercel_env', previewBeforeSubmit: true, requiresConfirm: true, api: { service: 'vercel', method: 'PATCH', endpoint: '/v9/projects/{projectId}/env/{id}' }, fields: [
+    { id: 'id', label: 'Environment Variable ID', type: 'text', required: true },
+    { id: 'value', label: 'New Value', type: 'secret' },
+    { id: 'target', label: 'Environment', type: 'select', options: [ { value: 'production', label: 'Production' }, { value: 'preview', label: 'Preview' }, { value: 'development', label: 'Development' } ] },
+  ] },
+  'vercel.delete_env_var': { id: 'vercel.delete_env_var', label: 'Delete Env Var', description: 'Remove a Vercel environment variable after confirmation.', icon: '🗑️', policyActionId: 'delete_vercel_env', requiresConfirm: true, api: { service: 'vercel', method: 'DELETE', endpoint: '/v9/projects/{projectId}/env/{id}' }, fields: [ { id: 'id', label: 'Environment Variable ID', type: 'text', required: true } ] },
+  'vercel.list_domains': { id: 'vercel.list_domains', label: 'Domains', description: 'List domains attached to the configured Vercel project.', icon: '🌐', policyActionId: 'read_provider_status', api: { service: 'vercel', method: 'GET', endpoint: '/v9/projects/{projectId}/domains' }, fields: [] },
+  'vercel.add_domain': { id: 'vercel.add_domain', label: 'Add Domain', description: 'Attach a domain to the configured Vercel project after review.', icon: '➕', policyActionId: 'update_production_environment', previewBeforeSubmit: true, requiresConfirm: true, api: { service: 'vercel', method: 'POST', endpoint: '/v10/projects/{projectId}/domains' }, fields: [ { id: 'name', label: 'Domain', type: 'text', required: true, placeholder: 'app.example.com' } ] },
+  'vercel.remove_domain': { id: 'vercel.remove_domain', label: 'Remove Domain', description: 'Detach a domain from the configured Vercel project after confirmation.', icon: '🗑️', policyActionId: 'delete_provider_resource', requiresConfirm: true, api: { service: 'vercel', method: 'DELETE', endpoint: '/v9/projects/{projectId}/domains/{domain}' }, fields: [ { id: 'domain', label: 'Domain', type: 'text', required: true, placeholder: 'app.example.com' } ] },
+  'vercel.connect': { id: 'vercel.connect', label: 'Connect', description: 'Connection and integration status surface.', icon: '🔗', policyActionId: 'read_provider_status', api: { service: 'vercel', method: 'GET', endpoint: '/v9/projects/{projectId}' }, fields: [] },
+  'vercel.integrations': { id: 'vercel.integrations', label: 'Integrations', description: 'Integration status surface for connected Vercel project services.', icon: '🧩', policyActionId: 'read_provider_status', api: { service: 'vercel', method: 'GET', endpoint: '/v9/projects/{projectId}' }, fields: [] },
+  'vercel.storage': { id: 'vercel.storage', label: 'Storage', description: 'Storage product status surface for the Vercel project.', icon: '🗄️', policyActionId: 'read_provider_status', api: { service: 'vercel', method: 'GET', endpoint: '/v9/projects/{projectId}' }, fields: [] },
+  'vercel.flags': { id: 'vercel.flags', label: 'Flags', description: 'Feature flags surface for the Vercel project.', icon: '🚩', policyActionId: 'read_provider_status', api: { service: 'vercel', method: 'GET', endpoint: '/v9/projects/{projectId}' }, fields: [] },
+  'vercel.agent': { id: 'vercel.agent', label: 'Agent', description: 'Vercel agent status surface.', icon: '🤖', policyActionId: 'read_provider_status', api: { service: 'vercel', method: 'GET', endpoint: '/v9/projects/{projectId}' }, fields: [] },
+  'vercel.ai_gateway': { id: 'vercel.ai_gateway', label: 'AI Gateway', description: 'AI Gateway status surface for model routing and usage.', icon: '🧠', policyActionId: 'read_provider_status', api: { service: 'vercel', method: 'GET', endpoint: '/v9/projects/{projectId}' }, fields: [] },
+  'vercel.promote_to_production': { id: 'vercel.promote_to_production', label: 'Promote to Production', description: 'Promote a ready deployment to production through the governed Hub workflow.', icon: '🚀', policyActionId: 'update_production_environment', previewBeforeSubmit: true, requiresConfirm: true, api: { service: 'vercel', method: 'POST', endpoint: '/v13/deployments/{deploymentId}/promote' }, fields: [ { id: 'deploymentId', label: 'Deployment ID', type: 'text', required: true, placeholder: 'dpl_...' } ] },
 }

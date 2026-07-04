@@ -17,6 +17,12 @@ export const maxDuration = 60
 const VIDEO_CHANNELS = ['youtube', 'short_video']
 const LIMIT = 10
 
+type OwnerResolveResult =
+  | { ok: true; email: string; userId: string; source: 'session' | 'cron' }
+  | { ok: false; error: string }
+
+type ListedUser = { id?: string; email?: string | null }
+
 function admin() {
   const url = process.env['NEXT_PUBLIC_SUPABASE_URL']!
   const key = process.env['SUPABASE_' + 'SERVICE_ROLE_KEY']!
@@ -47,7 +53,7 @@ function isCronRequest(req: NextRequest) {
   return Boolean(secret && auth === `Bearer ${secret}`)
 }
 
-async function resolveOwner(req: NextRequest, sb: ReturnType<typeof admin>) {
+async function resolveOwner(req: NextRequest, sb: ReturnType<typeof admin>): Promise<OwnerResolveResult> {
   const ctx = await getAccess()
   if (ctx.isOwner && ctx.email && ctx.userId) return { ok: true, email: ctx.email, userId: ctx.userId, source: 'session' }
 
@@ -58,7 +64,8 @@ async function resolveOwner(req: NextRequest, sb: ReturnType<typeof admin>) {
 
   try {
     const listed = await sb.auth.admin.listUsers({ page: 1, perPage: 1000 })
-    const owner = listed.data.users.find(user => String(user.email || '').toLowerCase() === ownerEmail)
+    const users = ((listed as any)?.data?.users || []) as ListedUser[]
+    const owner = users.find((user: ListedUser) => String(user.email || '').toLowerCase() === ownerEmail)
     if (!owner?.id) return { ok: false, error: `Owner user not found for ${ownerEmail}.` }
     return { ok: true, email: ownerEmail, userId: owner.id, source: 'cron' }
   } catch (error) {

@@ -44,7 +44,7 @@ const copy = {
   errorDraft: 'Could not generate the draft.',
   errorBatch: 'Could not start multilingual generation.',
   errorMark: 'Could not update this item.',
-  errorPublish: 'Could not publish. Check the connected account.',
+  errorPublish: 'Could not publish',
   errorRender: 'Could not start/check the video render.',
 }
 
@@ -69,6 +69,11 @@ function fmt(value?: string) {
   } catch {
     return value
   }
+}
+
+function errorText(value: unknown, fallback: string) {
+  const text = value instanceof Error ? value.message : String(value || '')
+  return text && text !== 'undefined' ? text : fallback
 }
 
 function videoStatusText(video: any) {
@@ -218,10 +223,14 @@ export default function MarketingSalesCosaPage() {
     try {
       const res = await fetch('/api/cos/campaign-queue/publish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, language }) })
       const j = await res.json().catch(() => null)
-      if (!res.ok || !j?.ok) throw new Error(j?.error || copy.errorPublish)
-      setMessage(copy.published)
+      if (!res.ok || !j?.ok) throw new Error(j?.error || j?.result?.error || j?.result?.mode || copy.errorPublish)
+      setMessage(j?.result?.liveUrl ? `${copy.published} ${j.result.liveUrl}` : copy.published)
       await load(true)
-    } catch { setMessage(copy.errorPublish) } finally { setBusy(false) }
+    } catch (e) {
+      setMessage(`${copy.errorPublish}: ${errorText(e, 'Unknown publish error')}`)
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function renderVideo(id: string) {

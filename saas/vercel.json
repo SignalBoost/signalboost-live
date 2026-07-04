@@ -45,7 +45,7 @@
       "schedule": "0 */6 * * *"
     },
     {
-      "path": "/api/cron/cos-auto-publish",
+      "path": "/api/cron/cos-auto-publish-ready",
       "schedule": "*/5 * * * *"
     },
     {

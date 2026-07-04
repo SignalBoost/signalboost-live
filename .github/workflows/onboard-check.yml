@@ -1,0 +1,48 @@
+name: Enforce ONBOARD.md Updates
+
+on:
+  pull_request:
+    paths:
+      - 'ONBOARD.md'
+      - 'saas/app/**'
+      - 'saas/components/**'
+      - 'saas/lib/**'
+      - 'saas/scripts/**'
+      - 'saas/supabase/**'
+      - 'saas/vercel.json'
+      - 'saas/package.json'
+      - 'saas/package-lock.json'
+      - '.github/workflows/**'
+      - 'docs/**'
+
+jobs:
+  onboard-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify ONBOARD.md is updated for critical changes
+        shell: bash
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          CHANGED_FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          CRITICAL_PATTERN='^(saas/app/|saas/components/|saas/lib/|saas/scripts/|saas/supabase/|saas/vercel\.json$|saas/package(-lock)?\.json$|\.github/workflows/)'
+
+          if echo "$CHANGED_FILES" | grep -Eq "$CRITICAL_PATTERN"; then
+            if ! echo "$CHANGED_FILES" | grep -qx 'ONBOARD.md'; then
+              echo "❌ ONBOARD.md must be updated when critical SignalBoostAi platform files change."
+              echo "Critical changes require onboarding alignment so developers and AI agents do not lose platform context."
+              echo "Update ONBOARD.md or explain the architecture/behavior change there before merging."
+              exit 1
+            fi
+          fi
+
+          echo "✅ ONBOARD.md check passed."

@@ -51,12 +51,12 @@ async function fetchResendEmail(id: string) {
 
 async function reconcileQueue(ctx: any, row: any) {
   if (!row?.outreach_id) return { ok: false, error: 'Missing outreach_id' }
-  const sentAt = row.sent_at || new Date().toISOString()
+  // Production outreach_queue does not have sent_at. Update status only.
   const { data, error } = await ctx.admin
     .from('outreach_queue')
-    .update({ status: 'sent', sent_at: sentAt })
+    .update({ status: 'sent' })
     .eq('id', row.outreach_id)
-    .select('id,status,sent_at')
+    .select('id,status')
     .maybeSingle()
   return { ok: !error && data?.status === 'sent', error: error?.message || null, row: data || null }
 }

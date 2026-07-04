@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
+const GREEN = '#34d399'
+const RED = '#fca5a5'
 const panel = { background: 'rgba(15,23,42,.78)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 18, padding: 18 } as const
 const button = { border: 'none', background: GOLD, color: '#000', borderRadius: 12, padding: '10px 14px', fontWeight: 900, cursor: 'pointer' } as const
 const ghost = { border: '1px solid rgba(255,255,255,.18)', background: 'rgba(255,255,255,.06)', color: '#fff', borderRadius: 12, padding: '10px 14px', fontWeight: 800, cursor: 'pointer' } as const
@@ -28,6 +30,35 @@ function fmt(value: any) {
 
 function shortId(value: any) {
   return String(value || '').slice(0, 8) || '—'
+}
+
+function progressFor(campaign: any, finalReady: boolean, rawOnly: boolean) {
+  const video = campaign?.video || {}
+  const stage = String(video?.stage || '').toLowerCase()
+  const hasBase = Boolean(video?.hasKlingUrl || rawOnly)
+  const voiced = Array.isArray(video?.voicedLangs) && video.voicedLangs.length > 0
+  const branded = Boolean(video?.branded) || (Array.isArray(video?.brandedLangs) && video.brandedLangs.length > 0)
+  if (finalReady) return { percent: 100, label: 'Final branded preview ready', color: GREEN }
+  if (stage === 'failed' || String(campaign?.eligibility || '').startsWith('STUCK')) return { percent: 100, label: 'Needs attention', color: RED }
+  if (!video?.stage) return { percent: 10, label: 'Preparing video job', color: GOLD }
+  if (stage === 'rendering' && !hasBase) return { percent: 30, label: 'Rendering base video', color: CYAN }
+  if (hasBase && !voiced && !branded) return { percent: 55, label: 'Base ready. Voice and captions next.', color: GOLD }
+  if (voiced && !branded) return { percent: 78, label: 'Voice/captions ready. Branding next.', color: CYAN }
+  if (branded && !finalReady) return { percent: 92, label: 'Branding detected. Final preview syncing.', color: CYAN }
+  return { percent: rawOnly ? 50 : 35, label: 'Processing video pipeline', color: CYAN }
+}
+
+function PipelineProgress({ info }: { info: ReturnType<typeof progressFor> }) {
+  return <div style={{ marginTop: 12, border: '1px solid rgba(255,255,255,.1)', borderRadius: 14, padding: 12, background: 'rgba(0,0,0,.2)' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+      <strong style={{ color: info.color, fontSize: 13 }}>{info.label}</strong>
+      <span style={{ color: 'rgba(255,255,255,.65)', fontSize: 12, fontWeight: 900 }}>{info.percent}%</span>
+    </div>
+    <div style={{ height: 12, borderRadius: 999, background: 'rgba(255,255,255,.08)', overflow: 'hidden', marginTop: 10 }}>
+      <div style={{ width: String(info.percent) + '%', height: '100%', borderRadius: 999, background: info.color }} />
+    </div>
+    <p style={{ color: 'rgba(255,255,255,.55)', margin: '8px 0 0', fontSize: 12 }}>Steps: render base video → add voice/captions → burn brand banner → final preview.</p>
+  </div>
 }
 
 export default function CosaVideoPipelinePage() {
@@ -72,7 +103,7 @@ export default function CosaVideoPipelinePage() {
         <button onClick={kick} disabled={loading} style={button}>Kick missing renders</button>
         <a href="/dashboard/cosa" style={{ ...ghost, textDecoration: 'none' }}>Back to approval dashboard</a>
       </div>
-      {message && <p style={{ color: '#fca5a5', marginTop: 12 }}>{message}</p>}
+      {message && <p style={{ color: RED, marginTop: 12 }}>{message}</p>}
     </section>
 
     {Array.isArray(data?.actions) && data.actions.length > 0 && <section style={panel}>
@@ -89,9 +120,10 @@ export default function CosaVideoPipelinePage() {
           const stage = video?.stage || 'no video metadata'
           const finalReady = video?.branded === true && Boolean(video?.finalUrl || video?.previewUrl) && video?.previewKind === 'branded final'
           const rawOnly = Boolean(video?.previewUrl) && !finalReady
-          const color = finalReady ? '#34d399' : stage === 'failed' ? '#fca5a5' : stage === 'rendering' ? CYAN : GOLD
+          const color = finalReady ? GREEN : stage === 'failed' ? RED : stage === 'rendering' ? CYAN : GOLD
           const stuck = String(campaign.eligibility || '').startsWith('STUCK') || stage === 'failed'
           const previewUrl = finalReady && video?.previewUrl ? String(video.previewUrl) : ''
+          const progress = progressFor(campaign, finalReady, rawOnly)
           return <article key={campaign.id} style={{ border: finalReady ? '1px solid rgba(52,211,153,.35)' : rawOnly ? '1px solid rgba(255,195,0,.35)' : '1px solid rgba(255,255,255,.1)', borderRadius: 14, padding: 14, background: finalReady ? 'rgba(52,211,153,.06)' : rawOnly ? 'rgba(255,195,0,.06)' : 'rgba(2,6,23,.45)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <div>
@@ -102,6 +134,8 @@ export default function CosaVideoPipelinePage() {
               </div>
               <span style={{ color, fontSize: 12, fontWeight: 900 }}>{finalReady ? 'FINAL READY' : rawOnly ? 'RAW DRAFT ONLY' : stage}</span>
             </div>
+
+            <PipelineProgress info={progress} />
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, marginTop: 10 }}>
               <small style={{ color: 'rgba(255,255,255,.68)' }}>Created: {fmt(campaign.created_at)}</small>
@@ -117,7 +151,7 @@ export default function CosaVideoPipelinePage() {
             </div>}
 
             {previewUrl && <div style={{ margin: '12px 0', border: '1px solid rgba(52,211,153,.35)', borderRadius: 14, padding: 12, background: 'rgba(52,211,153,.08)' }}>
-              <p style={{ color: '#34d399', margin: '0 0 8px', fontSize: 12, fontWeight: 900 }}>Final playable campaign video · branded final · Created {fmt(campaign.created_at)}</p>
+              <p style={{ color: GREEN, margin: '0 0 8px', fontSize: 12, fontWeight: 900 }}>Final playable campaign video · branded final · Created {fmt(campaign.created_at)}</p>
               <video src={previewUrl} controls style={{ width: '100%', maxHeight: 460, background: '#000', borderRadius: 12 }} />
             </div>}
 
@@ -128,7 +162,7 @@ export default function CosaVideoPipelinePage() {
               <small style={{ color: 'rgba(255,255,255,.55)' }}>Branded final: {(video?.brandedLangs || []).join(', ') || (video?.branded ? 'yes' : 'none')}</small>
               <small style={{ color: 'rgba(255,255,255,.55)' }}>Full campaign ID: {safe(campaign.id)}</small>
             </div>
-            {(video?.voiceError || video?.renderError || video?.autoPublishNote) && <pre style={{ color: '#fca5a5', whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,.24)', borderRadius: 10, padding: 10, marginTop: 10 }}>{safe(video?.voiceError || video?.renderError || video?.autoPublishNote)}</pre>}
+            {(video?.voiceError || video?.renderError || video?.autoPublishNote) && <pre style={{ color: RED, whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,.24)', borderRadius: 10, padding: 10, marginTop: 10 }}>{safe(video?.voiceError || video?.renderError || video?.autoPublishNote)}</pre>}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
               <a href="/dashboard/cosa" style={{ ...ghost, textDecoration: 'none' }}>Open approval dashboard</a>
               {stuck && <button onClick={() => reset(campaign.id)} disabled={loading} style={ghost}>Reset and kick</button>}

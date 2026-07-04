@@ -56,6 +56,21 @@ function creds(platform: SocialPlatform): { id?: string; secret?: string } {
   return { id: process.env[`SOCIAL_${P}_CLIENT_ID`], secret: process.env[`SOCIAL_${P}_CLIENT_SECRET`] }
 }
 
+function uploadMimeForVideoUrl(url: string, responseContentType: string | null): string {
+  const cleanHeader = String(responseContentType || '').split(';')[0].trim().toLowerCase()
+  if (cleanHeader.startsWith('video/')) return cleanHeader
+
+  const cleanUrl = url.split('?')[0].toLowerCase()
+  if (cleanUrl.endsWith('.mov')) return 'video/quicktime'
+  if (cleanUrl.endsWith('.webm')) return 'video/webm'
+
+  // Supabase/private storage can serve MP4 objects as application/octet-stream.
+  // YouTube accepts the upload session before processing, but the wrong media
+  // type can later surface as an unplayable video. COSA's final branded output
+  // is MP4, so default to video/mp4 for storage URLs with generic headers.
+  return 'video/mp4'
+}
+
 // Standard OAuth2 refresh_token grant — works for Google/X/LinkedIn/TikTok/Reddit.
 async function refreshOAuth2(platform: SocialPlatform, tokenUrl: string, refreshToken: string): Promise<string> {
   const { id, secret } = creds(platform)
@@ -78,7 +93,7 @@ async function uploadVideoToYouTube(payload: SocialPostPayload, accessToken: str
   const videoRes = await fetch(payload.videoUrl)
   if (!videoRes.ok) throw new Error(`Failed to fetch video from storage: ${videoRes.status}`)
   const videoBuffer = await videoRes.arrayBuffer()
-  const contentType = videoRes.headers.get('content-type') || 'video/mp4'
+  const contentType = uploadMimeForVideoUrl(payload.videoUrl, videoRes.headers.get('content-type'))
   const contentLength = videoBuffer.byteLength
   const metadata = {
     snippet: { title: payload.title || payload.text.slice(0, 100) || 'SignalBoost Video', description: payload.description || payload.text || '', tags: payload.tags || ['SignalBoost', 'AI', 'marketing'], categoryId: '22' },

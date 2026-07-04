@@ -47,6 +47,10 @@
     {
       "path": "/api/cron/cos-brand-dispatch",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/cos-auto-publish-exact",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

@@ -1,15 +1,15 @@
 // saas/app/api/cron/cos-auto-publish-exact/route.ts
 // Exact-campaign automatic publishing for final branded COSA videos.
 // Also sends owner approval emails for final-ready videos before publishing.
+//
+// Production safety: this cron no longer calls the platform connector directly.
+// It routes through publishCampaignCore so quota/circuit-breaker gates are shared
+// with manual publish and email approval publish paths.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getValidSocialToken } from '@/lib/outreach/social-token'
-import { publishSocialPost } from '@/lib/outreach/social-connectors'
-import { scoreCampaignReadiness } from '@/lib/cos/video-quality/campaign-scoring'
-import { buildTrackingUrl } from '@/lib/cos/campaign-queue/campaign-traffic'
+import { publishCampaignCore } from '@/lib/cos/campaign-queue/publish-core'
 import { sendEmail } from '@/lib/email'
-import { auditAdminAction } from '@/lib/outreach/security'
 import { GET as notifyFinalVideoApprovals } from '@/app/api/cos/video-approval-notify/route'
 
 export const dynamic = 'force-dynamic'
@@ -19,6 +19,7 @@ const VIDEO_CHANNELS = ['youtube', 'short_video']
 const PLATFORM = 'youtube_channels'
 const LIMIT = 5
 const RETRY_MINUTES = 20
+const QUOTA_RETRY_MINUTES = 24 * 60
 
 function admin() {
   const url = process.env['NEXT_PUBLIC_SUPABASE_URL']!
@@ -74,6 +75,28 @@ function finalReady(campaign: any): boolean {
   return video.status === 'ready' && video.branded === true && Boolean(video.voicedUrl)
 }
 
+function quotaBlockedUntil(campaign: any): string | null {
+  const meta = campaign?.metadata || {}
+  const candidates = [
+    meta?.youtubeQuota?.blockedUntil,
+    meta?.autoPublishExact?.quotaBlockedUntil,
+    meta?.autoPublishReady?.quotaBlockedUntil,
+    meta?.autoPublish?.quotaBlockedUntil,
+  ].filter(Boolean)
+  const future = candidates
+    .map((v: any) => String(v))
+    .filter((v: string) => Date.parse(v) > Date.now())
+    .sort()
+  return future[0] || null
+}
+
+function quotaRetryWindowActive(campaign: any): boolean {
+  const quotaUntil = quotaBlockedUntil(campaign)
+  if (quotaUntil) return true
+  const lastQuota = campaign?.metadata?.autoPublishExact?.lastQuotaErrorAt || campaign?.metadata?.youtubeQuota?.blockedAt
+  return minutesSince(lastQuota) < QUOTA_RETRY_MINUTES
+}
+
 function eligible(campaign: any): boolean {
   if (!VIDEO_CHANNELS.includes(String(campaign.channel))) return false
   if (String(campaign.status) !== 'approved') return false
@@ -83,18 +106,10 @@ function eligible(campaign: any): boolean {
   if (!lang) return false
   if (alreadyPublished(campaign, lang)) return false
   if (!exactFinalVideo(campaign, lang)) return false
+  if (quotaRetryWindowActive(campaign)) return false
   const last = campaign?.metadata?.autoPublishExact?.lastAttemptAt
   if (minutesSince(last) < RETRY_MINUTES) return false
   return true
-}
-
-function draftForLanguage(campaign: any, lang: string) {
-  const items = Array.isArray(campaign.work_items) ? campaign.work_items : []
-  const matched = items.find((it: any) => it?.input?.language === lang && it?.output) || items.find((it: any) => it?.output)
-  return {
-    text: matched?.output?.draft ? String(matched.output.draft) : String(campaign.objective || campaign.title || ''),
-    title: matched?.output?.title ? String(matched.output.title) : String(campaign.title || ''),
-  }
 }
 
 async function publishOne(sb: any, campaign: any) {
@@ -102,62 +117,62 @@ async function publishOne(sb: any, campaign: any) {
   const videoUrl = exactFinalVideo(campaign, lang)
   if (!videoUrl) return { ok: false, error: `No exact final video for ${lang || 'unknown language'}`, language: lang || null }
 
-  const readiness = scoreCampaignReadiness(campaign)
-  const readinessOk = readiness.grade === 'improved' || readiness.grade === 'marketing_grade_ready'
-  if (!readinessOk) return { ok: false, error: `Readiness blocked: ${readiness.score}/${readiness.max_score} ${readiness.grade}`, language: lang, readiness }
+  const res = await publishCampaignCore({
+    admin: sb,
+    userId: String(campaign.approved_by),
+    userEmail: campaign?.metadata?.autoPublishArm?.email || campaign?.metadata?.approvalNotification?.email || campaign?.metadata?.video?.approvalNotification?.email || null,
+    id: campaign.id,
+    language: lang,
+    videoUrl,
+  })
 
-  const token = await getValidSocialToken(sb, String(campaign.approved_by), PLATFORM as any)
-  if (!token.ok || !token.accessToken) return { ok: false, error: token.error || 'Could not obtain YouTube token', language: lang }
-
-  const draft = draftForLanguage(campaign, lang)
-  const trackingUrl = buildTrackingUrl(campaign.id, PLATFORM as any)
-  const text = draft.text.includes('/api/track?') ? draft.text : `${draft.text}\n\n👉 ${trackingUrl}`.trim()
-  const result = await publishSocialPost({ platform: PLATFORM as any, text, title: draft.title, videoUrl, accessToken: token.accessToken } as any)
-  if (!result?.ok) return { ok: false, error: result?.mode || 'Publish failed', language: lang, result }
-
-  const publishedAt = new Date().toISOString()
+  const now = new Date().toISOString()
   const { data: freshRow } = await sb.from('cos_campaign_queue').select('metadata').eq('id', campaign.id).single()
   const freshMeta = freshRow?.metadata || campaign.metadata || {}
+
+  if (!res.ok) {
+    const quota = res.status === 429 || String(res.error || '').toLowerCase().includes('quota')
+    const quotaBlocked = quota ? new Date(Date.now() + QUOTA_RETRY_MINUTES * 60000).toISOString() : null
+    await sb.from('cos_campaign_queue').update({
+      metadata: {
+        ...freshMeta,
+        autoPublishExact: {
+          lastAttemptAt: now,
+          ...(quota ? { lastQuotaErrorAt: now, quotaBlockedUntil: quotaBlocked } : {}),
+          ok: false,
+          error: res.error,
+          language: lang || null,
+        },
+      },
+    }).eq('id', campaign.id)
+    return { ok: false, error: res.error || 'Publish failed', language: lang, quotaBlockedUntil: quotaBlocked }
+  }
+
+  const liveUrl = res.result?.liveUrl || null
   await sb.from('cos_campaign_queue').update({
-    status: 'running',
     metadata: {
       ...freshMeta,
-      readiness,
-      tracking_url: trackingUrl,
-      published: {
-        ...((freshMeta && freshMeta.published) || {}),
-        [`${PLATFORM}::${lang}`]: { result, publishedAt, language: lang, videoUrl, publishedBy: campaign.approved_by },
-      },
       autoPublishExact: {
-        lastAttemptAt: publishedAt,
+        lastAttemptAt: now,
         ok: true,
         language: lang,
         videoUrl,
-        liveUrl: result.liveUrl || null,
+        liveUrl,
       },
     },
   }).eq('id', campaign.id)
 
-  await auditAdminAction({
-    admin: sb,
-    actorId: String(campaign.approved_by),
-    action: 'cos_campaign.auto_publish_exact',
-    targetType: 'cos_campaign_queue',
-    targetId: campaign.id,
-    metadata: { platform: PLATFORM, language: lang, videoUrl, result },
-  })
-
   const email = campaign?.metadata?.autoPublishArm?.email || campaign?.metadata?.approvalNotification?.email || campaign?.metadata?.video?.approvalNotification?.email
-  if (result.liveUrl && email) {
+  if (liveUrl && email) {
     await sendEmail({
       from: 'saasMarketing',
       to: email,
-      subject: `Your SignalBoostAi video is live: ${draft.title}`,
-      html: `<p>Your approved video is live.</p><p><a href="${result.liveUrl}">${result.liveUrl}</a></p>`,
+      subject: `Your SignalBoostAi video is live: ${campaign.title || 'approved video'}`,
+      html: `<p>Your approved video is live.</p><p><a href="${liveUrl}">${liveUrl}</a></p>`,
     })
   }
 
-  return { ok: true, language: lang, videoUrl, liveUrl: result.liveUrl || null }
+  return { ok: true, language: lang, videoUrl, liveUrl }
 }
 
 export async function GET(req: NextRequest) {
@@ -178,19 +193,25 @@ export async function GET(req: NextRequest) {
 
   if (error) return NextResponse.json({ ok: false, error: error.message, approvalEmail }, { status: 500 })
 
+  const activeQuotaBlock = (data || []).map(quotaBlockedUntil).filter(Boolean).sort()[0] || null
+  if (activeQuotaBlock) {
+    return NextResponse.json({
+      ok: true,
+      approvalEmail,
+      scanned: data?.length || 0,
+      eligible: 0,
+      published: 0,
+      quotaBlockedUntil: activeQuotaBlock,
+      results: [{ ok: false, status: 'blocked', error: `YouTube upload quota is paused until ${activeQuotaBlock}` }],
+    })
+  }
+
   const targets = (data || []).filter(eligible).slice(0, LIMIT)
   const results: any[] = []
   for (const campaign of targets) {
     const res = await publishOne(sb, campaign)
     results.push({ campaign: campaign.id, title: campaign.title, ...res })
-    if (!res.ok) {
-      await sb.from('cos_campaign_queue').update({
-        metadata: {
-          ...(campaign.metadata || {}),
-          autoPublishExact: { lastAttemptAt: new Date().toISOString(), ok: false, error: res.error, language: res.language || null },
-        },
-      }).eq('id', campaign.id)
-    }
+    if (!res.ok && res.quotaBlockedUntil) break
   }
 
   return NextResponse.json({ ok: true, approvalEmail, scanned: data?.length || 0, eligible: targets.length, published: results.filter(r => r.ok).length, results })

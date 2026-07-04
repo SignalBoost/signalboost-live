@@ -25,10 +25,12 @@ const CATEGORY_BY_PROVIDER: Record<string, ProviderMatrixCategory> = {
   supabase: 'database',
   firebase: 'database',
   mongodb: 'database',
+  'mongodb-atlas': 'database',
   redis: 'database',
   stripe: 'payments',
   aws: 'infrastructure',
   gcp: 'infrastructure',
+  'google-cloud': 'infrastructure',
   azure: 'infrastructure',
   vercel: 'infrastructure',
   cloudflare: 'infrastructure',
@@ -41,6 +43,7 @@ const CATEGORY_BY_PROVIDER: Record<string, ProviderMatrixCategory> = {
   gemini: 'ai',
   replicate: 'ai',
   elevenlabs: 'ai',
+  'hugging-face': 'ai',
   resend: 'communications',
   sendgrid: 'communications',
   twilio: 'communications',
@@ -49,6 +52,7 @@ const CATEGORY_BY_PROVIDER: Record<string, ProviderMatrixCategory> = {
   sentry: 'observability',
   datadog: 'observability',
   pagerduty: 'observability',
+  'new-relic': 'observability',
 }
 
 const SENSITIVE_WORDS = [
@@ -105,4 +109,8 @@ export function providerMatrixRisk(templateId: string): ProviderMatrixRisk {
 
 export function providerMatrixRequiresApproval(templateId: string): boolean {
   return providerMatrixRisk(templateId) === 'sensitive'
+}
+
+export function providerMatrixDisplayLabel(value: string): string {
+  return String(value || 'other').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }

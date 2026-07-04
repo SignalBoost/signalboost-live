@@ -16,5 +16,12 @@ export async function GET(req: NextRequest) {
   const url = buildOAuthUrl(platform, redirectUri, state)
 
   await auditAdminAction({ admin: ctx.admin, actorId: ctx.user.id, action: 'outreach.social.oauth_start', targetType: 'social_connector', targetId: platform })
-  return NextResponse.json({ ok: true, platform, connector: SOCIAL_CONNECTORS[platform], url })
+
+  // Human-facing behavior: send the admin straight to Google.
+  // Debug/API behavior: keep JSON available with ?json=1.
+  if (req.nextUrl.searchParams.get('json') === '1') {
+    return NextResponse.json({ ok: true, platform, connector: SOCIAL_CONNECTORS[platform], url, userId: ctx.user.id })
+  }
+
+  return NextResponse.redirect(url)
 }

@@ -31,18 +31,42 @@ jobs:
           HEAD_SHA="${{ github.event.pull_request.head.sha }}"
           CHANGED_FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
 
-          echo "Changed files:"
+          echo "Changed files in this PR:"
           echo "$CHANGED_FILES"
+          echo ""
 
           CRITICAL_PATTERN='^(saas/app/|saas/components/|saas/lib/|saas/scripts/|saas/supabase/|saas/vercel\.json$|saas/package(-lock)?\.json$|\.github/workflows/)'
+          CRITICAL_FILES="$(echo "$CHANGED_FILES" | grep -E "$CRITICAL_PATTERN" || true)"
+          ONBOARD_UPDATED="$(echo "$CHANGED_FILES" | grep -x 'ONBOARD.md' || true)"
 
-          if echo "$CHANGED_FILES" | grep -Eq "$CRITICAL_PATTERN"; then
-            if ! echo "$CHANGED_FILES" | grep -qx 'ONBOARD.md'; then
-              echo "❌ ONBOARD.md must be updated when critical SignalBoostAi platform files change."
-              echo "Critical changes require onboarding alignment so developers and AI agents do not lose platform context."
-              echo "Update ONBOARD.md or explain the architecture/behavior change there before merging."
-              exit 1
-            fi
+          if [ -n "$CRITICAL_FILES" ] && [ -z "$ONBOARD_UPDATED" ]; then
+            echo "::error title=ONBOARD.md update required::This PR changes critical SignalBoostAi platform files but does not update ONBOARD.md."
+            echo ""
+            echo "❌ ONBOARD.md CHECK FAILED"
+            echo ""
+            echo "Why this failed:"
+            echo "  This repository requires ONBOARD.md to stay aligned with important platform, COSA, provider, vault, audit, cybersecurity, video, workflow, and infrastructure changes."
+            echo "  Developers and AI agents must read ONBOARD.md first, then scan the repo. If critical behavior changes but ONBOARD.md is stale, future agents can make wrong assumptions."
+            echo ""
+            echo "Critical files that triggered the rule:"
+            echo "$CRITICAL_FILES" | sed 's/^/  - /'
+            echo ""
+            echo "How to fix:"
+            echo "  1. Open ONBOARD.md."
+            echo "  2. Add a short note describing the architecture, workflow, guardrail, provider, COSA, video, audit, cybersecurity, or infrastructure behavior changed by this PR."
+            echo "  3. Commit ONBOARD.md in the same PR."
+            echo ""
+            echo "If this PR is only a mechanical/refactor change and ONBOARD.md truly does not need a content update:"
+            echo "  Add a small 'No onboarding behavior change' note to ONBOARD.md under a maintenance/change-log section, or ask the owner to approve an exception."
+            echo ""
+            echo "Rule triggered by pattern:"
+            echo "  $CRITICAL_PATTERN"
+            exit 1
           fi
 
           echo "✅ ONBOARD.md check passed."
+          if [ -n "$CRITICAL_FILES" ]; then
+            echo "Critical files changed and ONBOARD.md was updated."
+          else
+            echo "No critical SignalBoostAi platform paths changed."
+          fi

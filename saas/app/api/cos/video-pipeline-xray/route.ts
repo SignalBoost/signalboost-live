@@ -23,6 +23,7 @@ export const maxDuration = 60
 
 const VIDEO_CHANNELS = ['youtube', 'short_video']
 const BACKLOG_CUTOFF = process.env.COS_BRAND_SINCE || '2026-07-02T12:00:00Z'
+const MAX_OVERLAY_ATTEMPTS = 5
 
 function admin() {
   const url = process.env['NEXT_PUBLIC_SUPABASE_URL']!
@@ -38,6 +39,40 @@ function previewUrl(v: any): string | null {
   return null
 }
 
+function minutesAgo(value: any): number | null {
+  if (!value) return null
+  const ts = Date.parse(String(value))
+  if (!Number.isFinite(ts)) return null
+  return Math.max(0, Math.round((Date.now() - ts) / 60000))
+}
+
+function keys(obj: any): string[] {
+  return obj && typeof obj === 'object' ? Object.keys(obj) : []
+}
+
+function brandingDiagnostics(c: any): string {
+  const v = c?.metadata?.video
+  if (!v) return 'BRANDING: no video metadata yet'
+
+  const langs = Array.isArray(c.languages) && c.languages.length ? c.languages.filter(Boolean) : ['en']
+  const primary = langs[0] || 'en'
+  const unbranded = keys(v.unbrandedVoiced)
+  const branded = keys(v.brandedLangs).filter((lang) => Boolean((v.brandedLangs || {})[lang]))
+  const attempts = v.ghOverlayAttempts || {}
+  const attemptSummary = langs.map((lang: string) => `${lang}:${Number(attempts[lang] || 0)}/${MAX_OVERLAY_ATTEMPTS}`).join(', ')
+  const lock = v.brandingLock || null
+  const lockAge = lock?.at ? minutesAgo(lock.at) : null
+  const overlayError = String(v.voiceError || '').toLowerCase().includes('ffmpeg overlay') || String(v.voiceError || '').toLowerCase().includes('storage upload') || String(v.voiceError || '').toLowerCase().includes('download failed')
+
+  if (v.branded === true && v.voicedUrl) return `BRANDING DONE: primary ${primary} final URL exists; branded languages: [${branded.join(',') || 'none'}]`
+  if (v.brandingExhausted === true) return `BRANDING EXHAUSTED: GitHub FFmpeg overlay attempts reached limit. Attempts: ${attemptSummary}. Last error: ${String(v.voiceError || 'none').slice(0, 180)}`
+  if (overlayError) return `BANNER ISSUE: GitHub FFmpeg overlay failed. Attempts: ${attemptSummary}. Last error: ${String(v.voiceError || '').slice(0, 220)}`
+  if (lock && lockAge !== null) return `BANNER LOCK: GitHub FFmpeg worker claimed ${String(lock.lang || 'unknown')} about ${lockAge} min ago. If this stays over 10 min, the workflow may have died mid-run.`
+  if (unbranded.length) return `BANNER WAITING: voiced/unbranded languages [${unbranded.join(',')}] are ready. GitHub Actions FFmpeg worker must burn the SignalBoostAi banner. Attempts: ${attemptSummary}.`
+  if (v.status === 'ready' && v.url && !unbranded.length && !branded.length) return 'BRANDING NOT READY: base video is ready but no unbranded voiced language exists yet; voice stage must create unbrandedVoiced first.'
+  return `BRANDING PENDING: status=${String(v.status || 'unknown')}; branded=[${branded.join(',') || 'none'}]; attempts=${attemptSummary}`
+}
+
 function eligibility(c: any): string {
   const v = c?.metadata?.video
   const created = c.created_at ? Date.parse(c.created_at) : 0
@@ -47,15 +82,14 @@ function eligibility(c: any): string {
   if (v.status === 'rendering') {
     const age = v.started_at ? Math.round((Date.now() - Date.parse(v.started_at)) / 60000) : -1
     return age > 15
-      ? `STUCK: rendering for ${age} min — Kling render died or poll cron lost it. Use ?reset=${c.id} to re-render`
-      : `RENDERING: Kling in progress (${age} min) — poll cron advances it`
+      ? `STUCK: rendering for ${age} min — render died or poll cron lost it. Use ?reset=${c.id} to re-render`
+      : `RENDERING: render in progress (${age} min) — poll cron advances it`
   }
   if (v.status === 'failed') return `FAILED render: ${String(v.error || 'unknown').slice(0, 120)} — use ?reset=${c.id} to re-render`
   if (v.status === 'ready') {
     if (v.branded === true && v.voicedUrl) return 'DONE: branded video previewable — approve on the dashboard'
-    if (v.url) return 'DRAFT READY: base draft video previewable — final voice/brand may still be processing'
-    const unb = Object.keys(v.unbrandedVoiced || {})
-    if (unb.length) return `BANNER STAGE: voiced [${unb.join(',')}] — GitHub Actions FFmpeg worker burns the banner (≤10 min)`
+    const unb = keys(v.unbrandedVoiced)
+    if (unb.length) return brandingDiagnostics(c)
     if (v.voiceError) return `VOICE ISSUE: ${String(v.voiceError).slice(0, 140)}`
     return 'VOICE STAGE: waiting for the voice cron (every 2 min)'
   }
@@ -148,12 +182,19 @@ export async function GET(req: NextRequest) {
             finalUrl,
             previewUrl: anyPreviewUrl,
             previewKind: finalUrl ? 'branded final' : baseUrl ? 'base draft' : anyPreviewUrl ? 'video' : null,
-            voicedLangs: Object.keys(v.unbrandedVoiced || {}),
-            brandedLangs: Object.keys(v.brandedLangs || {}).filter((k: string) => (v.brandedLangs || {})[k]),
+            voicedLangs: keys(v.unbrandedVoiced),
+            brandedLangs: keys(v.brandedLangs).filter((k: string) => (v.brandedLangs || {})[k]),
             branded: v.branded === true,
             previewable: Boolean(anyPreviewUrl),
             voiceError: v.voiceError || null,
             renderError: v.error || null,
+            ghOverlayAttempts: v.ghOverlayAttempts || {},
+            brandingLock: v.brandingLock || null,
+            brandingExhausted: v.brandingExhausted === true,
+            brandDebug: v.brandDebug || null,
+            brandSchemaVersion: v.brandSchemaVersion || null,
+            brandedAt: v.brandedAt || null,
+            brandingDiagnostics: brandingDiagnostics(c),
             autoPublishNote: c?.metadata?.auto_publish_note || null,
           }
         : null,

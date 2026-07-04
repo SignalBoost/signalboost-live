@@ -17,9 +17,7 @@ export const maxDuration = 60
 const VIDEO_CHANNELS = ['youtube', 'short_video']
 const LIMIT = 10
 
-type OwnerResolveResult =
-  | { ok: true; email: string; userId: string; source: 'session' | 'cron' }
-  | { ok: false; error: string }
+type OwnerResolveResult = any
 
 type ListedUser = { id?: string; email?: string | null }
 

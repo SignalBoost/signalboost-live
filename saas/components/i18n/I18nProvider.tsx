@@ -9,7 +9,7 @@ import {
 } from 'react'
 
 import englishCopy from '@/locales/en.json'
-import { loadLanguage, type Dict } from '@/lib/i18n/loadLanguage'
+import { loadLanguage, type Dict, type DictValue } from '@/lib/i18n/loadLanguage'
 
 type I18nContextType = {
   lang: string
@@ -69,6 +69,76 @@ function getInitialLanguage() {
   return normalizeLang(browser)
 }
 
+function isDict(value: DictValue | undefined): value is Dict {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function collectCopyPairs(english: Dict, localized: Dict, out: Map<string, string>) {
+  for (const [key, enValue] of Object.entries(english)) {
+    const locValue = localized[key]
+    if (typeof enValue === 'string' && typeof locValue === 'string') {
+      if (enValue && locValue && enValue !== locValue) out.set(enValue, locValue)
+      continue
+    }
+    if (isDict(enValue) && isDict(locValue)) collectCopyPairs(enValue, locValue, out)
+  }
+}
+
+function applyLocaleSafetyNet(map: Map<string, string>) {
+  if (typeof document === 'undefined' || !map.size) return () => {}
+
+  const translateExact = (value: string) => {
+    const trimmed = value.trim()
+    if (!trimmed) return value
+    const translated = map.get(trimmed)
+    if (!translated) return value
+    const leading = value.match(/^\s*/)?.[0] || ''
+    const trailing = value.match(/\s*$/)?.[0] || ''
+    return `${leading}${translated}${trailing}`
+  }
+
+  const translateElement = (el: Element) => {
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+      if (el.placeholder) el.placeholder = translateExact(el.placeholder)
+    }
+    const aria = el.getAttribute('aria-label')
+    if (aria) el.setAttribute('aria-label', translateExact(aria))
+    const title = el.getAttribute('title')
+    if (title) el.setAttribute('title', translateExact(title))
+  }
+
+  const translateTextNode = (node: Node) => {
+    if (node.nodeType !== Node.TEXT_NODE) return
+    const parent = node.parentElement
+    if (!parent) return
+    if (['SCRIPT', 'STYLE', 'TEXTAREA', 'CODE', 'PRE'].includes(parent.tagName)) return
+    const current = node.textContent || ''
+    const translated = translateExact(current)
+    if (translated !== current) node.textContent = translated
+  }
+
+  const scan = (root: ParentNode) => {
+    if (root instanceof Element) translateElement(root)
+    root.querySelectorAll?.('input,textarea,[aria-label],[title]').forEach(translateElement)
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    let node: Node | null
+    while ((node = walker.nextNode())) translateTextNode(node)
+  }
+
+  scan(document.body)
+  const observer = new MutationObserver(records => {
+    for (const record of records) {
+      record.addedNodes.forEach(node => {
+        if (node.nodeType === Node.TEXT_NODE) translateTextNode(node)
+        if (node instanceof Element) scan(node)
+      })
+      if (record.type === 'characterData') translateTextNode(record.target)
+    }
+  })
+  observer.observe(document.body, { childList: true, characterData: true, subtree: true })
+  return () => observer.disconnect()
+}
+
 export function I18nProvider({
   children,
 }: {
@@ -115,6 +185,13 @@ export function I18nProvider({
       cancelled = true
     }
   }, [lang])
+
+  useEffect(() => {
+    if (!isReady || lang === 'en') return
+    const map = new Map<string, string>()
+    collectCopyPairs(englishCopy as Dict, dict, map)
+    return applyLocaleSafetyNet(map)
+  }, [dict, isReady, lang])
 
   const setLang = async (
     newLang: string

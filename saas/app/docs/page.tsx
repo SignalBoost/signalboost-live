@@ -11,6 +11,12 @@ const COPY = {
   subtitle:  { en: 'Docs are organized by how a human thinks through work: choose an intent, follow AI guidance, review the output, and approve the final action.', es: 'Los docs están organizados por cómo una persona piensa el trabajo: elige una intención, sigue la guía IA, revisa el resultado y aprueba la acción final.', pt: 'Os docs estão organizados por como uma pessoa pensa o trabalho: escolha uma intenção, siga a orientação IA, revise o resultado e aprove a ação final.', pl: 'Dokumenty są zorganizowane według sposobu myślenia człowieka: wybierz intencję, śledź wskazówki AI, sprawdź wynik i zatwierdź końcowe działanie.', ru: 'Документы организованы так, как человек думает о работе: выберите намерение, следуйте руководству ИИ, проверьте результат и одобрите финальное действие.' },
   scanPath:  { en: 'Scan path', es: 'Ruta de escaneo', pt: 'Caminho de leitura', pl: 'Ścieżka skanowania', ru: 'Путь обзора' },
   step:      { en: 'Step', es: 'Paso', pt: 'Passo', pl: 'Krok', ru: 'Шаг' },
+  publicTools: {
+    title: { en: 'Free public tools / ad landing pages', es: 'Herramientas públicas gratis / páginas para anuncios', pt: 'Ferramentas públicas gratuitas / páginas para anúncios', pl: 'Darmowe narzędzia publiczne / strony do reklam', ru: 'Бесплатные публичные инструменты / страницы для рекламы' },
+    body: { en: 'Use these links when preparing digital newspaper, community classified, or local directory ads. The first two are public-safe and best for cold public ads.', es: 'Usa estos enlaces al preparar anuncios para periódicos digitales, clasificados comunitarios o directorios locales. Los dos primeros son públicos y mejores para anuncios fríos.', pt: 'Use estes links ao preparar anúncios para jornais digitais, classificados comunitários ou diretórios locais. Os dois primeiros são públicos e melhores para anúncios frios.', pl: 'Używaj tych linków przy przygotowywaniu reklam do gazet cyfrowych, ogłoszeń społecznościowych lub katalogów lokalnych. Pierwsze dwa są publiczne i najlepsze do reklam.', ru: 'Используйте эти ссылки для цифровых газет, объявлений и локальных каталогов. Первые две страницы публичные и лучше подходят для рекламы.' },
+    bestForAds: { en: 'Best for newspaper ads', es: 'Mejor para anuncios', pt: 'Melhor para anúncios', pl: 'Najlepsze do reklam', ru: 'Лучше для рекламы' },
+    internal: { en: 'Internal / logged-in reference', es: 'Referencia interna / con sesión', pt: 'Referência interna / com login', pl: 'Wewnętrzne / po zalogowaniu', ru: 'Внутренняя ссылка / вход' },
+  },
   quickLinks: {
     dashboard: { en: 'Dashboard', es: 'Panel', pt: 'Painel', pl: 'Panel', ru: 'Панель' },
     outreach:  { en: 'Outreach Engine', es: 'Motor de prospección', pt: 'Motor de prospecção', pl: 'Silnik outreach', ru: 'Движок аутрича' },
@@ -40,6 +46,30 @@ const COPY = {
     },
   ],
 }
+
+const AD_LANDING_LINKS = [
+  {
+    title: 'Free Website Optimization Scan',
+    href: '/website-optimizer',
+    url: 'https://www.saas.signalboostapp.com/website-optimizer',
+    badge: 'Best for newspaper ads',
+    description: 'SEO, performance, accessibility, security, conversion, and business-growth preview.',
+  },
+  {
+    title: 'Free Cybersecurity Preview',
+    href: '/cybersecurity-check',
+    url: 'https://www.saas.signalboostapp.com/cybersecurity-check',
+    badge: 'Best for newspaper ads',
+    description: 'Safe public website security signals: HTTPS, headers, cookie flags, and exposure indicators.',
+  },
+  {
+    title: 'Audit Console',
+    href: '/dashboard/audit',
+    url: 'https://www.saas.signalboostapp.com/dashboard/audit',
+    badge: 'Internal / logged-in reference',
+    description: 'Dashboard audit workspace. Use as internal reference, not as the default cold newspaper-ad CTA.',
+  },
+]
 
 function c(obj: any, lang: string): string {
   return obj?.[lang as Lang] ?? obj?.en ?? ''
@@ -81,6 +111,10 @@ export default function DocsPage() {
         <aside style={{ borderRight: '1px solid rgba(255,255,255,.08)', paddingRight: 20, position: 'sticky', top: 90 }}>
           <p className="sb-eyebrow" style={{ marginBottom: 14 }}>{c(COPY.scanPath, l)}</p>
           <nav style={{ display: 'grid', gap: 10 }}>
+            <a href="#ad-landing-pages" style={{ color: 'rgba(255,255,255,.7)', textDecoration: 'none', fontSize: 13, lineHeight: 1.5, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <span style={{ color: '#1af0ff', fontWeight: 900, fontSize: 11, marginTop: 2, flexShrink: 0 }}>ADS</span>
+              {c(COPY.publicTools.title, l)}
+            </a>
             {COPY.sections.map(s => (
               <a key={s.step} href={`#step-${s.step}`} style={{ color: 'rgba(255,255,255,.7)', textDecoration: 'none', fontSize: 13, lineHeight: 1.5, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                 <span style={{ color: '#ffc300', fontWeight: 900, fontSize: 11, marginTop: 2, flexShrink: 0 }}>{c(COPY.step, l)} {s.step}</span>
@@ -92,6 +126,24 @@ export default function DocsPage() {
 
         {/* Steps */}
         <div style={{ display: 'grid', gap: 14 }}>
+          <article id="ad-landing-pages" style={{ borderTop: '1px solid rgba(255,255,255,.08)', padding: '18px 0 8px', scrollMarginTop: 90 }}>
+            <p className="sb-eyebrow" style={{ marginBottom: 8 }}>📰 Digital newspaper ads</p>
+            <h2 style={{ fontSize: 'clamp(16px,2.5vw,22px)', fontWeight: 900, letterSpacing: '-.03em', margin: '0 0 10px' }}>{c(COPY.publicTools.title, l)}</h2>
+            <p style={{ color: 'rgba(255,255,255,.65)', lineHeight: 1.7, fontSize: 14, margin: 0 }}>{c(COPY.publicTools.body, l)}</p>
+            <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
+              {AD_LANDING_LINKS.map(link => (
+                <Link key={link.href} href={link.href} style={{ display: 'grid', gap: 6, border: '1px solid rgba(255,255,255,.09)', borderRadius: 14, padding: 14, color: 'inherit', textDecoration: 'none', background: 'rgba(255,255,255,.035)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <strong style={{ color: '#fff', fontSize: 14 }}>{link.title}</strong>
+                    <span style={{ border: '1px solid rgba(26,240,255,.28)', borderRadius: 999, color: '#1af0ff', padding: '3px 8px', fontSize: 11, fontWeight: 900 }}>{link.badge}</span>
+                  </div>
+                  <code style={{ color: '#ffc300', fontSize: 12, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{link.url}</code>
+                  <span style={{ color: 'rgba(255,255,255,.58)', fontSize: 13, lineHeight: 1.5 }}>{link.description}</span>
+                </Link>
+              ))}
+            </div>
+          </article>
+
           {COPY.sections.map(s => (
             <article key={s.step} id={`step-${s.step}`} style={{ borderTop: '1px solid rgba(255,255,255,.08)', padding: '18px 0 6px', scrollMarginTop: 90 }}>
               <p className="sb-eyebrow" style={{ marginBottom: 8 }}>{c(COPY.step, l)} {s.step}</p>

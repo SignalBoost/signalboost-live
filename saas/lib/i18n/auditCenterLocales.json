@@ -1,0 +1,107 @@
+{
+  "en": {
+    "center": {
+      "title": "Audit Center",
+      "subtitle": "Operational readiness reports across identity, providers, secrets, and remediation — scored deterministically.",
+      "open": "Open report",
+      "cybersecurity": { "title": "Cybersecurity Center", "desc": "Dependency advisory monitoring and technical cybersecurity checks separate from audit readiness reports." },
+      "executive": { "title": "Executive", "desc": "Executive readiness summary with score, risk posture, and priority actions." },
+      "identity": { "title": "Identity", "desc": "Review user access, roles, authentication posture, and account governance." },
+      "providers": { "title": "Providers", "desc": "Assess provider integrations, ownership, configuration health, and operational readiness." },
+      "secrets": { "title": "Secrets", "desc": "Track keys, tokens, rotation needs, and secret-handling controls." },
+      "remediation": { "title": "Remediation", "desc": "Prioritized repair plan for issues that need action before launch or scale." },
+      "usage": { "title": "Usage", "desc": "Review limits, consumption, credits, and usage patterns across the platform." },
+      "history": { "title": "History", "desc": "Timeline of audit runs, findings, changes, and readiness movement." },
+      "github": { "title": "GitHub", "desc": "Repository, branch, pull request, and source-control readiness checks." },
+      "supabase": { "title": "Supabase", "desc": "Database, auth, storage, and service-role readiness checks." },
+      "stripe": { "title": "Stripe", "desc": "Billing, products, prices, customers, and payment readiness checks." },
+      "vercel": { "title": "Vercel", "desc": "Deployment, environment, build, and domain readiness checks." },
+      "activity": { "title": "Activity", "desc": "Operational activity, team actions, and audit-relevant event history." },
+      "compliance": { "title": "Compliance", "desc": "Control coverage, governance evidence, and compliance readiness indicators." }
+    }
+  },
+  "es": {
+    "center": {
+      "title": "Centro de auditoría",
+      "subtitle": "Informes de preparación operativa sobre identidad, proveedores, secretos y remediación, puntuados de forma determinística.",
+      "open": "Abrir informe",
+      "cybersecurity": { "title": "Centro de ciberseguridad", "desc": "Monitoreo de avisos de dependencias y revisiones técnicas de ciberseguridad, separado de los informes de preparación de auditoría." },
+      "executive": { "title": "Ejecutivo", "desc": "Resumen ejecutivo de preparación con puntuación, postura de riesgo y acciones prioritarias." },
+      "identity": { "title": "Identidad", "desc": "Revisa acceso de usuarios, roles, postura de autenticación y gobernanza de cuentas." },
+      "providers": { "title": "Proveedores", "desc": "Evalúa integraciones de proveedores, propiedad, salud de configuración y preparación operativa." },
+      "secrets": { "title": "Secretos", "desc": "Controla claves, tokens, necesidades de rotación y controles de gestión de secretos." },
+      "remediation": { "title": "Remediación", "desc": "Plan de reparación priorizado para problemas que requieren acción antes del lanzamiento o escalado." },
+      "usage": { "title": "Uso", "desc": "Revisa límites, consumo, créditos y patrones de uso en toda la plataforma." },
+      "history": { "title": "Historial", "desc": "Cronología de auditorías, hallazgos, cambios y evolución de preparación." },
+      "github": { "title": "GitHub", "desc": "Revisiones de preparación de repositorios, ramas, pull requests y control de código." },
+      "supabase": { "title": "Supabase", "desc": "Revisiones de preparación de base de datos, autenticación, almacenamiento y service-role." },
+      "stripe": { "title": "Stripe", "desc": "Revisiones de preparación de facturación, productos, precios, clientes y pagos." },
+      "vercel": { "title": "Vercel", "desc": "Revisiones de preparación de despliegues, entornos, builds y dominios." },
+      "activity": { "title": "Actividad", "desc": "Actividad operativa, acciones del equipo e historial de eventos relevantes para auditoría." },
+      "compliance": { "title": "Cumplimiento", "desc": "Cobertura de controles, evidencia de gobernanza e indicadores de preparación de cumplimiento." }
+    }
+  },
+  "pt": {
+    "center": {
+      "title": "Centro de auditoria",
+      "subtitle": "Relatórios de prontidão operacional sobre identidade, provedores, segredos e remediação, pontuados de forma determinística.",
+      "open": "Abrir relatório",
+      "cybersecurity": { "title": "Centro de cibersegurança", "desc": "Monitoramento de avisos de dependências e verificações técnicas de cibersegurança, separados dos relatórios de prontidão de auditoria." },
+      "executive": { "title": "Executivo", "desc": "Resumo executivo de prontidão com pontuação, postura de risco e ações prioritárias." },
+      "identity": { "title": "Identidade", "desc": "Revise acesso de usuários, funções, postura de autenticação e governança de contas." },
+      "providers": { "title": "Provedores", "desc": "Avalie integrações de provedores, propriedade, saúde da configuração e prontidão operacional." },
+      "secrets": { "title": "Segredos", "desc": "Acompanhe chaves, tokens, necessidades de rotação e controles de gestão de segredos." },
+      "remediation": { "title": "Remediação", "desc": "Plano de correção priorizado para problemas que exigem ação antes do lançamento ou escala." },
+      "usage": { "title": "Uso", "desc": "Revise limites, consumo, créditos e padrões de uso em toda a plataforma." },
+      "history": { "title": "Histórico", "desc": "Linha do tempo de auditorias, descobertas, mudanças e evolução da prontidão." },
+      "github": { "title": "GitHub", "desc": "Verificações de prontidão de repositórios, branches, pull requests e controle de código." },
+      "supabase": { "title": "Supabase", "desc": "Verificações de prontidão de banco de dados, autenticação, armazenamento e service-role." },
+      "stripe": { "title": "Stripe", "desc": "Verificações de prontidão de faturamento, produtos, preços, clientes e pagamentos." },
+      "vercel": { "title": "Vercel", "desc": "Verificações de prontidão de deploys, ambientes, builds e domínios." },
+      "activity": { "title": "Atividade", "desc": "Atividade operacional, ações da equipe e histórico de eventos relevantes para auditoria." },
+      "compliance": { "title": "Conformidade", "desc": "Cobertura de controles, evidências de governança e indicadores de prontidão de conformidade." }
+    }
+  },
+  "pl": {
+    "center": {
+      "title": "Centrum audytu",
+      "subtitle": "Raporty gotowości operacyjnej dotyczące tożsamości, dostawców, sekretów i remediacji, oceniane deterministycznie.",
+      "open": "Otwórz raport",
+      "cybersecurity": { "title": "Centrum cyberbezpieczeństwa", "desc": "Monitorowanie alertów zależności i techniczne kontrole cyberbezpieczeństwa oddzielone od raportów gotowości audytowej." },
+      "executive": { "title": "Executive", "desc": "Podsumowanie gotowości dla kierownictwa z wynikiem, postawą ryzyka i priorytetowymi działaniami." },
+      "identity": { "title": "Tożsamość", "desc": "Przegląd dostępu użytkowników, ról, postawy uwierzytelniania i zarządzania kontami." },
+      "providers": { "title": "Dostawcy", "desc": "Ocena integracji dostawców, właścicielstwa, kondycji konfiguracji i gotowości operacyjnej." },
+      "secrets": { "title": "Sekrety", "desc": "Śledzenie kluczy, tokenów, rotacji i kontroli obsługi sekretów." },
+      "remediation": { "title": "Remediacja", "desc": "Priorytetowy plan napraw dla problemów wymagających działania przed uruchomieniem lub skalowaniem." },
+      "usage": { "title": "Użycie", "desc": "Przegląd limitów, zużycia, kredytów i wzorców użycia w całej platformie." },
+      "history": { "title": "Historia", "desc": "Oś czasu audytów, ustaleń, zmian i postępu gotowości." },
+      "github": { "title": "GitHub", "desc": "Kontrole gotowości repozytoriów, gałęzi, pull requestów i kontroli kodu." },
+      "supabase": { "title": "Supabase", "desc": "Kontrole gotowości bazy danych, uwierzytelniania, magazynu i service-role." },
+      "stripe": { "title": "Stripe", "desc": "Kontrole gotowości rozliczeń, produktów, cen, klientów i płatności." },
+      "vercel": { "title": "Vercel", "desc": "Kontrole gotowości wdrożeń, środowisk, buildów i domen." },
+      "activity": { "title": "Aktywność", "desc": "Aktywność operacyjna, działania zespołu i historia zdarzeń istotnych dla audytu." },
+      "compliance": { "title": "Zgodność", "desc": "Pokrycie kontroli, dowody zarządzania i wskaźniki gotowości zgodności." }
+    }
+  },
+  "ru": {
+    "center": {
+      "title": "Центр аудита",
+      "subtitle": "Отчёты об операционной готовности по идентификации, провайдерам, секретам и устранению проблем с детерминированной оценкой.",
+      "open": "Открыть отчёт",
+      "cybersecurity": { "title": "Центр кибербезопасности", "desc": "Мониторинг advisory по зависимостям и технические проверки кибербезопасности отдельно от отчётов аудиторской готовности." },
+      "executive": { "title": "Руководство", "desc": "Executive-сводка готовности с оценкой, рисковой позицией и приоритетными действиями." },
+      "identity": { "title": "Идентификация", "desc": "Проверка доступа пользователей, ролей, состояния аутентификации и управления аккаунтами." },
+      "providers": { "title": "Провайдеры", "desc": "Оценка интеграций провайдеров, владельцев, состояния конфигурации и операционной готовности." },
+      "secrets": { "title": "Секреты", "desc": "Отслеживание ключей, токенов, необходимости ротации и контролей работы с секретами." },
+      "remediation": { "title": "Устранение", "desc": "Приоритетный план исправлений для проблем, требующих действий до запуска или масштабирования." },
+      "usage": { "title": "Использование", "desc": "Проверка лимитов, потребления, кредитов и паттернов использования по всей платформе." },
+      "history": { "title": "История", "desc": "Хронология аудитов, находок, изменений и динамики готовности." },
+      "github": { "title": "GitHub", "desc": "Проверки готовности репозиториев, веток, pull request и контроля исходного кода." },
+      "supabase": { "title": "Supabase", "desc": "Проверки готовности базы данных, auth, storage и service-role." },
+      "stripe": { "title": "Stripe", "desc": "Проверки готовности биллинга, продуктов, цен, клиентов и платежей." },
+      "vercel": { "title": "Vercel", "desc": "Проверки готовности деплоев, окружений, сборок и доменов." },
+      "activity": { "title": "Активность", "desc": "Операционная активность, действия команды и история событий, важных для аудита." },
+      "compliance": { "title": "Комплаенс", "desc": "Покрытие контролей, доказательства управления и индикаторы комплаенс-готовности." }
+    }
+  }
+}

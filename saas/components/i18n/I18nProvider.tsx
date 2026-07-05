@@ -10,6 +10,7 @@ import {
 
 import englishCopy from '@/locales/en.json'
 import { loadLanguage, type Dict, type DictValue } from '@/lib/i18n/loadLanguage'
+import { applyHardcodedUiCopy } from '@/lib/i18n/hardcoded-ui-copy'
 
 type I18nContextType = {
   lang: string
@@ -84,17 +85,19 @@ function collectCopyPairs(english: Dict, localized: Dict, out: Map<string, strin
   }
 }
 
-function applyLocaleSafetyNet(map: Map<string, string>) {
-  if (typeof document === 'undefined' || !map.size) return () => {}
+function applyLocaleSafetyNet(map: Map<string, string>, lang: string) {
+  if (typeof document === 'undefined') return () => {}
 
   const translateExact = (value: string) => {
     const trimmed = value.trim()
     if (!trimmed) return value
     const translated = map.get(trimmed)
-    if (!translated) return value
-    const leading = value.match(/^\s*/)?.[0] || ''
-    const trailing = value.match(/\s*$/)?.[0] || ''
-    return `${leading}${translated}${trailing}`
+    if (translated) {
+      const leading = value.match(/^\s*/)?.[0] || ''
+      const trailing = value.match(/\s*$/)?.[0] || ''
+      return `${leading}${translated}${trailing}`
+    }
+    return applyHardcodedUiCopy(value, lang)
   }
 
   const translateElement = (el: Element) => {
@@ -190,7 +193,7 @@ export function I18nProvider({
     if (!isReady || lang === 'en') return
     const map = new Map<string, string>()
     collectCopyPairs(englishCopy as Dict, dict, map)
-    return applyLocaleSafetyNet(map)
+    return applyLocaleSafetyNet(map, lang)
   }, [dict, isReady, lang])
 
   const setLang = async (

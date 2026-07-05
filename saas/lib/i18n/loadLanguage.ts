@@ -19,6 +19,7 @@ const AUDIT_TABLE: Record<string, unknown> = {
 }
 import onboardingLocales from './onboardingLocales.json'
 import marketingSalesLocales from './marketingSalesLocales.json'
+import { mergeDict, mergePageLocales } from './pageLocales'
 
 export type DictValue = string | string[] | Dict
 export type Dict = { [key: string]: DictValue }
@@ -69,7 +70,7 @@ function mergeWithEnglishFallback(english: Dict, localized: Dict): Dict {
 }
 
 export async function loadLanguage(lang: string): Promise<Dict> {
-  const english = await dictionaries.en()
+  const english = mergePageLocales(await dictionaries.en(), 'en')
   const enConsole = loadConsole('en')
   const enAudit = loadAudit('en')
   const enMarketingSales = loadMarketingSales('en')
@@ -78,8 +79,8 @@ export async function loadLanguage(lang: string): Promise<Dict> {
   }
 
   try {
-    const localized = await dictionaries[lang]()
-    const merged = mergeWithEnglishFallback(english, localized)
+    const localized = mergePageLocales(await dictionaries[lang](), lang)
+    const merged = mergeDict(mergeWithEnglishFallback(english, localized), localized)
     merged.console = mergeWithEnglishFallback(enConsole, loadConsole(lang))
     merged.audit = mergeWithEnglishFallback(enAudit, loadAudit(lang))
     merged.onboarding = mergeWithEnglishFallback(loadOnboarding('en'), loadOnboarding(lang))

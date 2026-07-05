@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import LocalVideoPreviewReview from '@/components/studio/LocalVideoPreviewReview'
 import { VideoPreviewRenderer } from '@/lib/cos/ui/VideoPreviewRenderer'
 
 const GOLD = '#ffc300'
@@ -130,6 +131,8 @@ export default function CosaInstantVideoDraftPage() {
         <p className="sb-eyebrow" style={{ margin: 0 }}>Presenter-led video player</p>
         <VideoPreviewRenderer title={draft.title} scenes={previewScenes} callToAction={draft.cta} />
       </section>
+
+      <LocalVideoPreviewReview />
 
       <section style={gridTwo}>
         <section style={instructionCard}>

@@ -20,6 +20,11 @@ type CosaCampaignFeedProps = {
   hasMore?: boolean
   isFetchingNextPage?: boolean
   emptyLabel?: string
+  ariaLabel?: string
+  summaryFallback?: string
+  ctaLabel?: string
+  ctaFallback?: string
+  loadingMoreLabel?: string
 }
 
 function statusClassName(status: string) {
@@ -37,7 +42,12 @@ export default function CosaCampaignFeed({
   fetchNextPage,
   hasMore = false,
   isFetchingNextPage = false,
-  emptyLabel = 'No campaigns yet.',
+  emptyLabel = '',
+  ariaLabel = '',
+  summaryFallback = '',
+  ctaLabel = '',
+  ctaFallback = '',
+  loadingMoreLabel = '',
 }: CosaCampaignFeedProps) {
   const parentRef = useRef<HTMLDivElement>(null)
 
@@ -70,7 +80,7 @@ export default function CosaCampaignFeed({
     <div
       ref={parentRef}
       className="h-[520px] w-full overflow-y-auto pr-2"
-      aria-label="COSA campaign feed"
+      aria-label={ariaLabel}
     >
       <div className="relative w-full" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
         {virtualItems.map(virtualItem => {
@@ -107,14 +117,14 @@ export default function CosaCampaignFeed({
                 </div>
 
                 <p className="line-clamp-2 text-xs leading-5 text-white/55">
-                  {campaign.description || 'No campaign summary available yet.'}
+                  {campaign.description || summaryFallback}
                 </p>
 
                 <div className="mt-3 rounded-xl border border-white/5 bg-black/25 p-3 font-mono text-[11px] text-amber-300/90">
                   <span className="mb-1 block font-sans text-[10px] font-bold uppercase tracking-wider text-white/35">
-                    CTA Target
+                    {ctaLabel}
                   </span>
-                  <span className="line-clamp-1 break-all">{campaign.cta || campaign.source || 'No URL'}</span>
+                  <span className="line-clamp-1 break-all">{campaign.cta || campaign.source || ctaFallback}</span>
                 </div>
               </button>
             </div>
@@ -123,7 +133,7 @@ export default function CosaCampaignFeed({
 
         {isFetchingNextPage && (
           <div className="absolute bottom-0 left-0 w-full p-4 text-center text-sm text-white/45">
-            Loading more campaigns...
+            {loadingMoreLabel}
           </div>
         )}
       </div>

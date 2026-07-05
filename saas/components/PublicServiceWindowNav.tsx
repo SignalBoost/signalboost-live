@@ -6,23 +6,15 @@ import { useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
-type GroupId = 'free' | 'audit' | 'operations' | 'growth' | 'office'
+type GroupId = 'free' | 'growth' | 'office'
 type ItemId =
   | 'websiteOptimizer'
-  | 'cybersecurityCheck'
-  | 'repoAuditCheck'
-  | 'auditCenter'
-  | 'cybersecurityCenter'
-  | 'identitySecrets'
-  | 'consoleHub'
-  | 'prCockpit'
-  | 'adminCockpit'
-  | 'marketingSales'
+  | 'repoCheck'
+  | 'agencyEngine'
   | 'promoteBusiness'
   | 'outreach'
   | 'calendar'
   | 'spreadsheets'
-  | 'videoStudio'
 
 type ItemConfig = { icon: string; href: string; gated?: boolean }
 
@@ -35,60 +27,50 @@ type Copy = {
 
 const ITEMS: Record<ItemId, ItemConfig> = {
   websiteOptimizer: { icon: '🌐', href: '/website-optimizer' },
-  cybersecurityCheck: { icon: '🛡️', href: '/cybersecurity-check' },
-  repoAuditCheck: { icon: '📋', href: '/repo-check' },
-  auditCenter: { icon: '📋', href: '/products/audit-center', gated: true },
-  cybersecurityCenter: { icon: '🛡️', href: '/products/cybersecurity-center', gated: true },
-  identitySecrets: { icon: '🔑', href: '/products/identity-secrets', gated: true },
-  consoleHub: { icon: '🎛️', href: '/products/console-hub', gated: true },
-  prCockpit: { icon: '📋', href: '/products/pr-cockpit', gated: true },
-  adminCockpit: { icon: '🛰️', href: '/products/admin-cockpit', gated: true },
-  marketingSales: { icon: '📣', href: '/products/marketing-sales', gated: true },
+  repoCheck: { icon: '📋', href: '/repo-check' },
+  agencyEngine: { icon: '🚀', href: '/agency' },
   promoteBusiness: { icon: '📢', href: '/products/promote-business', gated: true },
   outreach: { icon: '🛸', href: '/products/outreach', gated: true },
   calendar: { icon: '📅', href: '/products/calendar', gated: true },
   spreadsheets: { icon: '📑', href: '/products/spreadsheets', gated: true },
-  videoStudio: { icon: '🎬', href: '/products/video-studio', gated: true },
 }
 
 const GROUPS: Array<{ id: GroupId; itemIds: ItemId[] }> = [
-  { id: 'free', itemIds: ['websiteOptimizer', 'cybersecurityCheck', 'repoAuditCheck'] },
-  { id: 'audit', itemIds: ['auditCenter', 'cybersecurityCenter', 'identitySecrets'] },
-  { id: 'operations', itemIds: ['consoleHub', 'prCockpit', 'adminCockpit'] },
-  { id: 'growth', itemIds: ['marketingSales', 'promoteBusiness', 'outreach'] },
-  { id: 'office', itemIds: ['calendar', 'spreadsheets', 'videoStudio'] },
+  { id: 'free', itemIds: ['websiteOptimizer', 'repoCheck'] },
+  { id: 'growth', itemIds: ['agencyEngine', 'promoteBusiness', 'outreach'] },
+  { id: 'office', itemIds: ['calendar', 'spreadsheets'] },
 ]
 
 const COPY: Record<Lang, Copy> = {
   en: {
-    intro: 'Explore all SignalBoost products before signing up',
+    intro: 'Quick access before signing up',
     gated: 'learn more',
-    groups: { free: 'Free tools', audit: 'Audit & Security', operations: 'Operations', growth: 'Marketing + Sales', office: 'Office & Studio' },
-    items: { websiteOptimizer: 'Website Optimizer', cybersecurityCheck: 'Cybersecurity Check', repoAuditCheck: 'Repo / Audit Check', auditCenter: 'Audit Center', cybersecurityCenter: 'Cybersecurity Center', identitySecrets: 'Identity & Secrets', consoleHub: 'Console Hub', prCockpit: 'PR Cockpit', adminCockpit: 'Owner/Admin Cockpit', marketingSales: 'Marketing + Sales', promoteBusiness: 'Promote Business', outreach: 'Outreach', calendar: 'Calendar', spreadsheets: 'Spreadsheets', videoStudio: 'Video Studio' },
+    groups: { free: 'Free tools', growth: 'Growth tools', office: 'Office tools' },
+    items: { websiteOptimizer: 'Website Optimizer', repoCheck: 'Repo Check', agencyEngine: 'Agency Engine', promoteBusiness: 'Promote Business', outreach: 'Outreach', calendar: 'Calendar', spreadsheets: 'Spreadsheets' },
   },
   es: {
-    intro: 'Explora todos los productos de SignalBoost antes de registrarte',
+    intro: 'Acceso rápido antes de registrarte',
     gated: 'más información',
-    groups: { free: 'Herramientas gratis', audit: 'Auditoría y Seguridad', operations: 'Operaciones', growth: 'Marketing + Ventas', office: 'Oficina y Studio' },
-    items: { websiteOptimizer: 'Optimizador Web', cybersecurityCheck: 'Revisión de Ciberseguridad', repoAuditCheck: 'Repo / Auditoría', auditCenter: 'Centro de Auditoría', cybersecurityCenter: 'Centro de Ciberseguridad', identitySecrets: 'Identidad y Secretos', consoleHub: 'Console Hub', prCockpit: 'PR Cockpit', adminCockpit: 'Cockpit Admin', marketingSales: 'Marketing + Ventas', promoteBusiness: 'Promocionar negocio', outreach: 'Outreach', calendar: 'Calendario', spreadsheets: 'Hojas de cálculo', videoStudio: 'Video Studio' },
+    groups: { free: 'Herramientas gratis', growth: 'Crecimiento', office: 'Oficina' },
+    items: { websiteOptimizer: 'Optimizador Web', repoCheck: 'Revisión de Repo', agencyEngine: 'Agency Engine', promoteBusiness: 'Promocionar negocio', outreach: 'Outreach', calendar: 'Calendario', spreadsheets: 'Hojas de cálculo' },
   },
   pt: {
-    intro: 'Explore todos os produtos SignalBoost antes de se cadastrar',
+    intro: 'Acesso rápido antes de se cadastrar',
     gated: 'saiba mais',
-    groups: { free: 'Ferramentas grátis', audit: 'Auditoria e Segurança', operations: 'Operações', growth: 'Marketing + Vendas', office: 'Office e Studio' },
-    items: { websiteOptimizer: 'Otimizador de Site', cybersecurityCheck: 'Verificação de Cibersegurança', repoAuditCheck: 'Repo / Auditoria', auditCenter: 'Centro de Auditoria', cybersecurityCenter: 'Centro de Cibersegurança', identitySecrets: 'Identidade e Segredos', consoleHub: 'Console Hub', prCockpit: 'PR Cockpit', adminCockpit: 'Cockpit Admin', marketingSales: 'Marketing + Vendas', promoteBusiness: 'Promover negócio', outreach: 'Outreach', calendar: 'Calendário', spreadsheets: 'Planilhas', videoStudio: 'Video Studio' },
+    groups: { free: 'Ferramentas grátis', growth: 'Crescimento', office: 'Escritório' },
+    items: { websiteOptimizer: 'Otimizador de Site', repoCheck: 'Verificação de Repo', agencyEngine: 'Agency Engine', promoteBusiness: 'Promover negócio', outreach: 'Outreach', calendar: 'Calendário', spreadsheets: 'Planilhas' },
   },
   pl: {
-    intro: 'Zobacz wszystkie produkty SignalBoost przed rejestracją',
+    intro: 'Szybki dostęp przed rejestracją',
     gated: 'dowiedz się więcej',
-    groups: { free: 'Darmowe narzędzia', audit: 'Audyt i Bezpieczeństwo', operations: 'Operacje', growth: 'Marketing + Sprzedaż', office: 'Office i Studio' },
-    items: { websiteOptimizer: 'Optymalizator Strony', cybersecurityCheck: 'Test Cyberbezpieczeństwa', repoAuditCheck: 'Repo / Audyt', auditCenter: 'Centrum Audytu', cybersecurityCenter: 'Centrum Cyberbezpieczeństwa', identitySecrets: 'Tożsamość i Sekrety', consoleHub: 'Console Hub', prCockpit: 'PR Cockpit', adminCockpit: 'Admin Cockpit', marketingSales: 'Marketing + Sprzedaż', promoteBusiness: 'Promocja firmy', outreach: 'Outreach', calendar: 'Kalendarz', spreadsheets: 'Arkusze', videoStudio: 'Video Studio' },
+    groups: { free: 'Darmowe narzędzia', growth: 'Wzrost', office: 'Biuro' },
+    items: { websiteOptimizer: 'Optymalizator Strony', repoCheck: 'Test Repo', agencyEngine: 'Agency Engine', promoteBusiness: 'Promocja firmy', outreach: 'Outreach', calendar: 'Kalendarz', spreadsheets: 'Arkusze' },
   },
   ru: {
-    intro: 'Посмотрите все продукты SignalBoost перед регистрацией',
+    intro: 'Быстрый доступ перед регистрацией',
     gated: 'подробнее',
-    groups: { free: 'Бесплатные инструменты', audit: 'Аудит и безопасность', operations: 'Операции', growth: 'Marketing + Sales', office: 'Office и Studio' },
-    items: { websiteOptimizer: 'Website Optimizer', cybersecurityCheck: 'Cybersecurity Check', repoAuditCheck: 'Repo / Audit Check', auditCenter: 'Audit Center', cybersecurityCenter: 'Cybersecurity Center', identitySecrets: 'Identity & Secrets', consoleHub: 'Console Hub', prCockpit: 'PR Cockpit', adminCockpit: 'Admin Cockpit', marketingSales: 'Marketing + Sales', promoteBusiness: 'Promote Business', outreach: 'Outreach', calendar: 'Calendar', spreadsheets: 'Spreadsheets', videoStudio: 'Video Studio' },
+    groups: { free: 'Бесплатные инструменты', growth: 'Рост', office: 'Офис' },
+    items: { websiteOptimizer: 'Website Optimizer', repoCheck: 'Repo Check', agencyEngine: 'Agency Engine', promoteBusiness: 'Promote Business', outreach: 'Outreach', calendar: 'Calendar', spreadsheets: 'Spreadsheets' },
   },
 }
 
@@ -109,7 +91,7 @@ export default function PublicServiceWindowNav() {
       <style>{`
         .sb-public-window{display:flex;gap:10px;align-items:center;flex-wrap:wrap;overflow:visible;padding:8px 22px;}
         .sb-public-group{position:relative;flex:0 0 auto;}
-        .sb-public-panel{position:absolute;top:calc(100% + 8px);left:0;width:340px;max-width:92vw;border:1px solid rgba(26,240,255,.22);background:linear-gradient(145deg,rgba(3,7,18,.99),rgba(15,23,42,.98));border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.55);padding:12px;z-index:1200;}
+        .sb-public-panel{position:absolute;top:calc(100% + 8px);left:0;width:310px;max-width:92vw;border:1px solid rgba(26,240,255,.22);background:linear-gradient(145deg,rgba(3,7,18,.99),rgba(15,23,42,.98));border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.55);padding:12px;z-index:1200;}
         .sb-public-link{display:flex;gap:10px;align-items:center;text-decoration:none;color:#fff;border-radius:12px;padding:10px;}
         .sb-public-link:hover{background:rgba(255,255,255,.07);}
         @media(max-width:760px){.sb-public-window{padding:8px 14px}.sb-public-intro{display:none}.sb-public-panel{position:fixed;left:12px;right:12px;width:auto;top:108px}}

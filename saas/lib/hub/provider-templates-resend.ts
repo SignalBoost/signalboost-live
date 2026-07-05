@@ -6,6 +6,20 @@
 import type { ProviderTemplate } from './provider-templates'
 
 export const RESEND_CONSOLE_TEMPLATES: Record<string, ProviderTemplate> = {
+  // ── Supabase setup helper ─────────────────────────────────────────────────
+  // Kept here because this template pack is already merged into the main provider
+  // registry. The id starts with supabase., so it renders under the Supabase card.
+  'supabase.vercel_env_setup': {
+    id: 'supabase.vercel_env_setup', label: 'Vercel Env Setup', icon: '🧭',
+    description: 'Shows the required Vercel environment variables for Supabase and the wider platform. Open /api/admin/setup/env-vars to see present/missing status without exposing raw secrets.',
+    policyActionId: 'read_provider_status',
+    api: { service: 'compliance', method: 'GET', endpoint: '/api/admin/setup/env-vars' },
+    fields: [
+      { id: 'setupUrl', label: 'Owner/Admin Setup URL', type: 'text', defaultValue: '/api/admin/setup/env-vars', help: 'Open this URL while logged in as owner/admin. It returns the full Vercel setup checklist and masks private secrets.' },
+      { id: 'requiredKeys', label: 'Core Required Vercel Keys', type: 'textarea', defaultValue: 'NEXT_PUBLIC_SUPABASE_URL\nNEXT_PUBLIC_SUPABASE_ANON_KEY\nSUPABASE_SERVICE_ROLE_KEY\nVERCEL_TOKEN\nVERCEL_HUB_PROJECT\nANTHROPIC_API_KEY', help: 'These are the minimum production keys for Supabase, Vercel provider control, and the AI chat backend.' },
+    ],
+  },
+
   // ── Read: delivery list ──────────────────────────────────────────────────
   'resend.email_deliveries': {
     id: 'resend.email_deliveries', label: 'Email Delivery', icon: '📬',

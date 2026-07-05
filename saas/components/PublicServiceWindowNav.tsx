@@ -45,31 +45,31 @@ const COPY: Record<Lang, Copy> = {
   en: {
     intro: 'Quick access before signing up',
     gated: 'learn more',
-    groups: { free: 'Free tools', growth: 'Growth tools', office: 'Office tools' },
+    groups: { free: 'Free tools', growth: 'Marketing + Sales', office: 'Office tools' },
     items: { websiteOptimizer: 'Website Optimizer', repoCheck: 'Repo Check', agencyEngine: 'Agency Engine', promoteBusiness: 'Promote Business', outreach: 'Outreach', calendar: 'Calendar', spreadsheets: 'Spreadsheets' },
   },
   es: {
     intro: 'Acceso rápido antes de registrarte',
     gated: 'más información',
-    groups: { free: 'Herramientas gratis', growth: 'Crecimiento', office: 'Oficina' },
+    groups: { free: 'Herramientas gratis', growth: 'Marketing + Ventas', office: 'Oficina' },
     items: { websiteOptimizer: 'Optimizador Web', repoCheck: 'Revisión de Repo', agencyEngine: 'Agency Engine', promoteBusiness: 'Promocionar negocio', outreach: 'Outreach', calendar: 'Calendario', spreadsheets: 'Hojas de cálculo' },
   },
   pt: {
     intro: 'Acesso rápido antes de se cadastrar',
     gated: 'saiba mais',
-    groups: { free: 'Ferramentas grátis', growth: 'Crescimento', office: 'Escritório' },
+    groups: { free: 'Ferramentas grátis', growth: 'Marketing + Vendas', office: 'Escritório' },
     items: { websiteOptimizer: 'Otimizador de Site', repoCheck: 'Verificação de Repo', agencyEngine: 'Agency Engine', promoteBusiness: 'Promover negócio', outreach: 'Outreach', calendar: 'Calendário', spreadsheets: 'Planilhas' },
   },
   pl: {
     intro: 'Szybki dostęp przed rejestracją',
     gated: 'dowiedz się więcej',
-    groups: { free: 'Darmowe narzędzia', growth: 'Wzrost', office: 'Biuro' },
+    groups: { free: 'Darmowe narzędzia', growth: 'Marketing + Sprzedaż', office: 'Biuro' },
     items: { websiteOptimizer: 'Optymalizator Strony', repoCheck: 'Test Repo', agencyEngine: 'Agency Engine', promoteBusiness: 'Promocja firmy', outreach: 'Outreach', calendar: 'Kalendarz', spreadsheets: 'Arkusze' },
   },
   ru: {
     intro: 'Быстрый доступ перед регистрацией',
     gated: 'подробнее',
-    groups: { free: 'Бесплатные инструменты', growth: 'Рост', office: 'Офис' },
+    groups: { free: 'Бесплатные инструменты', growth: 'Marketing + Sales', office: 'Офис' },
     items: { websiteOptimizer: 'Website Optimizer', repoCheck: 'Repo Check', agencyEngine: 'Agency Engine', promoteBusiness: 'Promote Business', outreach: 'Outreach', calendar: 'Calendar', spreadsheets: 'Spreadsheets' },
   },
 }

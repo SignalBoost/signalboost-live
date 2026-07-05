@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
     region: body?.region,
     language: body?.language,
     landingUrl: body?.landingUrl,
+    landingPageGoal: body?.landingPageGoal,
     adFormat: body?.adFormat,
     targetNames: Array.isArray(body?.targetNames) ? body.targetNames : [],
   })
@@ -35,6 +36,8 @@ export async function POST(req: NextRequest) {
     metadata: {
       region: adPackage.input.region,
       language: adPackage.input.language,
+      landingPageGoal: adPackage.input.landingPageGoal,
+      landingUrl: adPackage.input.landingUrl,
       targetCount: adPackage.targets.length,
       autoPostEnabled: false,
     },
@@ -51,7 +54,7 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     mode: 'preview',
-    message: 'POST to this endpoint with productName, offer, audience, region, language, landingUrl, adFormat, and targetNames to prepare a newspaper/classified ad package. This endpoint does not post ads.',
+    message: 'POST to this endpoint with productName, offer, audience, region, language, landingPageGoal, landingUrl, adFormat, and targetNames to prepare a newspaper/classified ad package. This endpoint does not post ads.',
     adPackage,
   })
 }

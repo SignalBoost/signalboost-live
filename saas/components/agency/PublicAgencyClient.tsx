@@ -8,29 +8,34 @@ type CheckoutResponse = {
   processingFee: number
   totalCharged: number
   currency: 'USD'
-  status: 'CHECKOUT_READY'
+  status: 'CHECKOUT_READY' | 'STRIPE_CHECKOUT_READY'
+  stripeCheckoutUrl?: string
+  stripeConfigured?: boolean
 }
 
 type PublicAgencyClientProps = {
   copy: AgencyCopy['client']
 }
 
+type Mode = 'download' | 'managed'
+
 const formatUsd = (value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
 
 export default function PublicAgencyClient({ copy }: PublicAgencyClientProps) {
   const [selectedBudget, setSelectedBudget] = useState('5000')
+  const [mode, setMode] = useState<Mode>('download')
+  const [consent, setConsent] = useState(false)
   const [summary, setSummary] = useState<CheckoutResponse | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  async function requestCheckout(createStripeSession: boolean) {
     setLoading(true)
     setError('')
     setSummary(null)
 
     const budget = Number(selectedBudget)
-    if (!Number.isFinite(budget) || budget <= 0) {
+    if (!Number.isFinite(budget) || budget <= 0 || (mode === 'managed' && !consent)) {
       setError(copy.error)
       setLoading(false)
       return
@@ -39,7 +44,7 @@ export default function PublicAgencyClient({ copy }: PublicAgencyClientProps) {
     const response = await fetch('/api/agency/checkout', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ selectedBudget: budget }),
+      body: JSON.stringify({ selectedBudget: budget, createStripeSession, mode }),
     })
 
     if (!response.ok) {
@@ -48,8 +53,13 @@ export default function PublicAgencyClient({ copy }: PublicAgencyClientProps) {
       return
     }
 
-    setSummary(await response.json())
+    const data = await response.json() as CheckoutResponse
+    setSummary(data)
     setLoading(false)
+
+    if (createStripeSession && data.stripeCheckoutUrl) {
+      window.location.href = data.stripeCheckoutUrl
+    }
   }
 
   return (
@@ -59,7 +69,16 @@ export default function PublicAgencyClient({ copy }: PublicAgencyClientProps) {
           <h2 className="sb-h2">{copy.title}</h2>
           <p className="sb-body" style={{ maxWidth: 760 }}>{copy.body}</p>
         </div>
-        <form onSubmit={onSubmit} style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'end' }}>
+
+        <div style={{ display: 'grid', gap: 10 }}>
+          <span className="sb-caption">{copy.modeLabel}</span>
+          <div className="sb-cta-row">
+            <button type="button" className={mode === 'download' ? 'sb-button-primary' : 'sb-button-secondary'} onClick={() => setMode('download')}>{copy.downloadMode}</button>
+            <button type="button" className={mode === 'managed' ? 'sb-button-primary' : 'sb-button-secondary'} onClick={() => setMode('managed')}>{copy.publishMode}</button>
+          </div>
+        </div>
+
+        <form onSubmit={(event) => { event.preventDefault(); requestCheckout(false) }} style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'end' }}>
           <label style={{ display: 'grid', gap: 8, minWidth: 240 }}>
             <span className="sb-caption">{copy.budgetLabel}</span>
             <input
@@ -73,16 +92,27 @@ export default function PublicAgencyClient({ copy }: PublicAgencyClientProps) {
           </label>
           <button className="sb-button-primary" type="submit" disabled={loading}>{copy.submit}</button>
         </form>
+
+        {mode === 'managed' ? (
+          <label className="sb-body" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: 0 }}>
+            <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
+            <span>{copy.consentLabel}</span>
+          </label>
+        ) : null}
+
         {error ? <p className="sb-body" style={{ color: '#fca5a5', margin: 0 }}>{error}</p> : null}
         {summary ? (
           <div className="sb-card" style={{ padding: 20 }}>
             <h3 className="sb-h3">{copy.summaryTitle}</h3>
-            <p className="sb-body">{copy.ready}</p>
+            <p className="sb-body">{summary.status === 'STRIPE_CHECKOUT_READY' ? copy.paymentReady : copy.ready}</p>
+            <p className="sb-caption">{copy.noBrokerDispatch}</p>
+            {!summary.stripeConfigured ? <p className="sb-caption">{copy.stripeUnavailable}</p> : null}
             <dl style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 14, margin: 0 }}>
               <div><dt className="sb-caption">{copy.selectedBudget}</dt><dd>{formatUsd(summary.selectedBudget)}</dd></div>
               <div><dt className="sb-caption">{copy.processingFee}</dt><dd>{formatUsd(summary.processingFee)}</dd></div>
               <div><dt className="sb-caption">{copy.totalCharged}</dt><dd>{formatUsd(summary.totalCharged)}</dd></div>
             </dl>
+            {mode === 'managed' ? <button className="sb-button-secondary" type="button" disabled={loading || !consent} onClick={() => requestCheckout(true)} style={{ marginTop: 16 }}>{copy.paymentSubmit}</button> : null}
           </div>
         ) : null}
       </div>

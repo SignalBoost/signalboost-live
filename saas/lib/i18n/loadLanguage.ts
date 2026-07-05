@@ -25,6 +25,7 @@ const AUDIT_TABLE: Record<string, unknown> = {
   en: auditEn, es: auditEs, pt: auditPt, pl: auditPl, ru: auditRu,
 }
 import onboardingLocales from './onboardingLocales.json'
+import auditCenterLocales from './auditCenterLocales.json'
 
 export type DictValue = string | string[] | Dict
 export type Dict = { [key: string]: DictValue }
@@ -52,6 +53,11 @@ function loadAudit(lang: string): Dict {
   return table[lang] || table.en || {}
 }
 
+function loadAuditCenter(lang: string): Dict {
+  const table = auditCenterLocales as unknown as Record<string, Dict>
+  return table[lang] || table.en || {}
+}
+
 function loadOnboarding(lang: string): Dict {
   const table = onboardingLocales as unknown as Record<string, Dict>
   return table[lang] || table.en || {}
@@ -59,6 +65,21 @@ function loadOnboarding(lang: string): Dict {
 
 function isDict(value: DictValue | undefined): value is Dict {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function mergeDict(base: Dict, localized: Dict): Dict {
+  const merged: Dict = { ...base }
+
+  for (const [key, value] of Object.entries(localized)) {
+    const existing = base[key]
+    if (isDict(existing) && isDict(value)) {
+      merged[key] = mergeDict(existing, value)
+    } else {
+      merged[key] = value
+    }
+  }
+
+  return merged
 }
 
 function mergeWithEnglishFallback(english: Dict, localized: Dict): Dict {
@@ -79,7 +100,7 @@ function mergeWithEnglishFallback(english: Dict, localized: Dict): Dict {
 export async function loadLanguage(lang: string): Promise<Dict> {
   const english = await dictionaries.en()
   const enConsole = loadConsole('en')
-  const enAudit = loadAudit('en')
+  const enAudit = mergeDict(loadAudit('en'), loadAuditCenter('en'))
   if (lang === 'en' || !dictionaries[lang]) {
     // Stamp the active language so suite copy (lib/i18n/suiteCopy.ts) can resolve correctly.
     return { ...english, console: enConsole, audit: enAudit, onboarding: loadOnboarding('en'), __lang: 'en' }
@@ -90,7 +111,7 @@ export async function loadLanguage(lang: string): Promise<Dict> {
     const merged = mergeWithEnglishFallback(english, localized)
     // English fallback for any console/audit key missing in the target language.
     merged.console = mergeWithEnglishFallback(enConsole, loadConsole(lang))
-    merged.audit = mergeWithEnglishFallback(enAudit, loadAudit(lang))
+    merged.audit = mergeWithEnglishFallback(enAudit, mergeDict(loadAudit(lang), loadAuditCenter(lang)))
     merged.onboarding = mergeWithEnglishFallback(loadOnboarding('en'), loadOnboarding(lang))
     merged.__lang = lang
     return merged

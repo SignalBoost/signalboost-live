@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "next build",
+    "typecheck": "tsc --noEmit",
     "start": "next start",
     "dev": "next dev",
     "test": "node --test tests/promptPreprocessor.node.test.ts tests/mediaSourcing.node.test.ts tests/unifiedPlatform.node.test.ts tests/reviews.node.test.ts tests/prRedact.node.test.ts tests/hubCatalogSource.node.test.ts",

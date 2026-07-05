@@ -20,6 +20,7 @@
     "react-dom": "19.2.6",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.49.4",
+    "@tanstack/react-virtual": "^3.13.12",
     "@fal-ai/client": "^1.2.0",
     "@vercel/analytics": "^1.4.1",
     "resend": "^4.0.0",

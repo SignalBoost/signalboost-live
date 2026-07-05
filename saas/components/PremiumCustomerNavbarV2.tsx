@@ -12,6 +12,7 @@ const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
 const GREEN = '#4ade80'
 const RED = '#f87171'
+const PINK = '#f472b6'
 
 type Item = { icon: string; label: string; href: string; desc?: string; customerOnly?: boolean }
 type Group = { id: string; label: string; eyebrow: string; accent: string; width?: number; align?: 'left' | 'right'; items: Item[] }
@@ -65,7 +66,7 @@ const CUSTOMER_GROUPS: Group[] = [
     width: 360,
     items: [
       { icon: '🏠', label: 'Dashboard', href: '/dashboard', desc: 'Customer home base and next actions.' },
-      { icon: '📋', label: 'Infrastructure PRs', href: '/dashboard/infrastructure', desc: 'Review and approve proposed infrastructure changes.' },
+      { icon: '📋', label: 'Infrastructure Changes', href: '/dashboard/infrastructure', desc: 'Proposed infrastructure work and status.' },
     ],
   },
   {
@@ -73,15 +74,26 @@ const CUSTOMER_GROUPS: Group[] = [
     label: 'SaaS Station',
     eyebrow: 'Daily office cockpit',
     accent: GREEN,
-    width: 430,
+    width: 390,
     items: [
       { icon: '📅', label: 'Calendar', href: '/dashboard/calendar', desc: 'Schedule and sync daily office work.' },
       { icon: '📑', label: 'Spreadsheets', href: '/dashboard/spreadsheets', desc: 'Data, models, lists, and working tables.' },
       { icon: '⭐', label: 'Reviews', href: '/dashboard/reviews', desc: 'Reputation and customer review workflow.' },
-      { icon: '🛸', label: 'Outreach', href: '/dashboard/outreach', desc: 'Contacts, messages, campaigns, and pipeline work.' },
-      { icon: '📢', label: 'Promote', href: '/dashboard/promote', desc: 'Marketing and promotion actions.' },
       { icon: '🤖', label: 'Concierge', href: '/dashboard/assistant', customerOnly: true, desc: 'Normal customer concierge for product help and office tasks.' },
       { icon: '💬', label: 'Feedback', href: '/dashboard/feedback', desc: 'Requests, issues, and comments.' },
+    ],
+  },
+  {
+    id: 'marketing-sales',
+    label: 'Marketing + Sales',
+    eyebrow: 'Campaigns, outreach & video',
+    accent: PINK,
+    width: 450,
+    items: [
+      { icon: '📣', label: 'COSA Campaign Console', href: '/dashboard/cosa', desc: 'Create and manage governed marketing campaigns.' },
+      { icon: '🎬', label: 'COSA Video Pipeline', href: '/dashboard/cosa/video-pipeline', desc: 'Final videos, render status, branding, and release readiness.' },
+      { icon: '🛸', label: 'Outreach', href: '/dashboard/outreach', desc: 'Contacts, messages, campaigns, and pipeline work.' },
+      { icon: '📢', label: 'Promote', href: '/dashboard/promote', desc: 'Marketing and promotion actions.' },
     ],
   },
   {
@@ -95,7 +107,7 @@ const CUSTOMER_GROUPS: Group[] = [
       { icon: '🎛️', label: 'Audit Cockpit', href: '/hub/audit', desc: 'Reports, evidence, inventory, and roadmap.' },
       { icon: '🔑', label: 'Identity & Secrets', href: '/hub/audit/identity', desc: 'Identity, access, secrets, and keys.' },
       { icon: '🧾', label: 'Printable Reports', href: '/hub/audit', desc: 'Download PDF or print/save reports.' },
-      { icon: '🧠', label: 'COS Decision Log', href: '/hub/cos', desc: 'Reasoning decisions COS has made, with outcomes.' },
+      { icon: '🧠', label: 'COS Decision Log', href: '/hub/cos', desc: 'COS reasoning decisions and outcomes.' },
     ],
   },
   {
@@ -106,9 +118,9 @@ const CUSTOMER_GROUPS: Group[] = [
     width: 400,
     items: [
       { icon: '🛡️', label: 'Cybersecurity Center', href: '/dashboard/cybersecurity', desc: 'Dependency scans, monitors, and alerts.' },
-      { icon: '🚨', label: 'Alert Inbox', href: '/dashboard/cybersecurity', desc: 'Review advisory alerts and monitor status.' },
-      { icon: '🧭', label: 'Remediation Plans', href: '/dashboard/cybersecurity', desc: 'Plan-first human-approved fixes.' },
-      { icon: '📄', label: 'Cyber PDF Reports', href: '/dashboard/cybersecurity', desc: 'Download or print issue reviews.' },
+      { icon: '🚨', label: 'Alert Inbox', href: '/dashboard/cybersecurity', desc: 'Advisory alerts and monitor status.' },
+      { icon: '🧭', label: 'Remediation Plans', href: '/dashboard/cybersecurity', desc: 'Plan-first human-guided fixes.' },
+      { icon: '📄', label: 'Cyber PDF Reports', href: '/dashboard/cybersecurity', desc: 'Download or print issue reports.' },
     ],
   },
 ]
@@ -354,13 +366,11 @@ export default function PremiumCustomerNavbarV2() {
             <span style={{ color: 'rgba(148,163,184,.72)', fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase' }}>{brandSubtitle}</span>
           </span>
         </Link>
-
         <div className="sbnav-desktop">
           <Link href="/" style={triggerStyle(pathname === '/', GOLD)}>{homeLabel}</Link>
           {groups.map((group) => <MenuGroup key={group.id} group={group} />)}
           <Link href="/pricing" style={triggerStyle(pathname === '/pricing', GOLD)}>{pricingLabel}</Link>
         </div>
-
         <div className="sbnav-right">
           <select value={String(lang || 'en')} onChange={(event) => setLang(event.target.value)} style={{ background: 'rgba(15,23,42,.82)', color: 'rgba(226,232,240,.78)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 999, padding: '8px 12px', fontSize: 12, cursor: 'pointer' }}>
             {LANGUAGES.map((language) => <option key={language.code} value={language.code}>{language.label}</option>)}
@@ -374,13 +384,11 @@ export default function PremiumCustomerNavbarV2() {
           ) : null}
           {user ? <button onClick={handleLogout} style={{ background: 'transparent', color: 'rgba(148,163,184,.78)', border: '1px solid rgba(255,255,255,.13)', borderRadius: 999, padding: '8px 14px', cursor: 'pointer' }}>{t(dict, 'logout', 'Log out')}</button> : <button onClick={() => setShowAuth(true)} style={{ background: GOLD, color: '#000', border: 'none', borderRadius: 999, padding: '9px 22px', fontWeight: 900, cursor: 'pointer' }}>{t(dict, 'getStarted', 'Get started')}</button>}
         </div>
-
         <span className="sbnav-mobile-auth" style={{ alignItems: 'center', gap: 8 }}>
           {user ? <><span style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,195,0,.95)', fontFamily: 'monospace' }}>⚡ {credits}</span><span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.06em', padding: '3px 10px', borderRadius: 999, background: currentPlanStyle.bg, color: currentPlanStyle.color, fontFamily: 'monospace' }}>{currentPlanLabel}</span></> : <button onClick={() => setShowAuth(true)} style={{ background: GOLD, color: '#000', border: 'none', borderRadius: 999, padding: '8px 16px', fontWeight: 900, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>{t(dict, 'getStarted', 'Get started')}</button>}
         </span>
         <button className="sbnav-burger" aria-label={menuLabel} onClick={() => setMobileOpen((open) => !open)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,.16)', borderRadius: 12, color: '#fff', padding: '8px 12px', cursor: 'pointer', fontSize: 18 }}>{mobileOpen ? '✕' : '☰'}</button>
       </nav>
-
       {mobileOpen ? (
         <div style={{ position: 'sticky', top: 65, zIndex: 99, background: 'rgba(4,8,18,.98)', borderBottom: '1px solid rgba(255,255,255,.14)', padding: 16, maxHeight: '80vh', overflowY: 'auto', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}>
           {user ? (
@@ -412,7 +420,6 @@ export default function PremiumCustomerNavbarV2() {
           ))}
         </div>
       ) : null}
-
       {showAuth ? <AuthModal onClose={() => setShowAuth(false)} /> : null}
     </>
   )

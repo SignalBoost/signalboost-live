@@ -9,6 +9,7 @@
     "dev": "next dev",
     "test": "node --test tests/promptPreprocessor.node.test.ts tests/mediaSourcing.node.test.ts tests/unifiedPlatform.node.test.ts tests/reviews.node.test.ts tests/prRedact.node.test.ts tests/hubCatalogSource.node.test.ts",
     "validate:conflicts": "node scripts/validate-conflict-cleanup.mjs",
+    "validate:i18n-copy": "node scripts/check-hardcoded-copy.mjs",
     "test:jest": "jest tests/unifiedPlatform.jest.test.ts tests/reviews.jest.test.ts",
     "test:playwright": "playwright test tests/unifiedPlatform.playwright.spec.ts tests/reviews.playwright.spec.ts",
     "worker:video": "node scripts/video-render-worker.mjs",

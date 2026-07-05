@@ -3,6 +3,8 @@
 // This module creates owner-reviewable ad packages only. It does not scrape,
 // bypass paywalls, auto-submit forms, or post to third-party sites.
 
+import { getAdLandingPage, getNewspaperAdLandingPageOptions, type AdLandingPage, type AdLandingPageGoal } from '@/lib/outreach/adLandingPages'
+
 export type DigitalNewspaperAdFormat = 'classified' | 'community_notice' | 'business_spotlight' | 'sponsored_blurb'
 
 export type DigitalNewspaperAdTarget = {
@@ -23,6 +25,7 @@ export type DigitalNewspaperAdInput = {
   region?: string
   language?: 'en' | 'es' | 'pt' | 'pl' | 'ru'
   landingUrl?: string
+  landingPageGoal?: AdLandingPageGoal
   adFormat?: DigitalNewspaperAdFormat
   targetNames?: string[]
 }
@@ -37,6 +40,8 @@ export type DigitalNewspaperAdPackage = {
     noMassPosting: true
   }
   input: Required<DigitalNewspaperAdInput>
+  landingPage: AdLandingPage
+  landingPageOptions: AdLandingPage[]
   targets: DigitalNewspaperAdTarget[]
   adCopy: {
     headline: string
@@ -82,20 +87,23 @@ const DEFAULT_TARGETS: DigitalNewspaperAdTarget[] = [
   },
 ]
 
-function normalizeInput(input: DigitalNewspaperAdInput): Required<DigitalNewspaperAdInput> {
+type NormalizedDigitalNewspaperAdInput = Required<DigitalNewspaperAdInput>
+
+function normalizeInput(input: DigitalNewspaperAdInput, landingPage: AdLandingPage): NormalizedDigitalNewspaperAdInput {
   return {
     productName: input.productName?.trim() || 'SignalBoostAi',
     offer: input.offer?.trim() || 'AI websites, reviews, outreach, and campaign tools for small businesses',
     audience: input.audience?.trim() || 'local businesses that want more visibility and better digital marketing',
     region: input.region?.trim() || 'local market',
     language: input.language || 'en',
-    landingUrl: input.landingUrl?.trim() || 'https://www.saas.signalboostapp.com',
+    landingUrl: input.landingUrl?.trim() || landingPage.url,
+    landingPageGoal: landingPage.goal,
     adFormat: input.adFormat || 'classified',
     targetNames: input.targetNames || [],
   }
 }
 
-function copyForLanguage(input: Required<DigitalNewspaperAdInput>) {
+function copyForLanguage(input: NormalizedDigitalNewspaperAdInput) {
   const product = input.productName
   const offer = input.offer
   const audience = input.audience
@@ -150,7 +158,7 @@ function copyForLanguage(input: Required<DigitalNewspaperAdInput>) {
   }
 }
 
-function buildTargets(input: Required<DigitalNewspaperAdInput>): DigitalNewspaperAdTarget[] {
+function buildTargets(input: NormalizedDigitalNewspaperAdInput): DigitalNewspaperAdTarget[] {
   if (!input.targetNames.length) {
     return DEFAULT_TARGETS.map(target => ({ ...target, region: input.region, language: input.language }))
   }
@@ -168,7 +176,8 @@ function buildTargets(input: Required<DigitalNewspaperAdInput>): DigitalNewspape
 }
 
 export function buildDigitalNewspaperAdPackage(input: DigitalNewspaperAdInput = {}): DigitalNewspaperAdPackage {
-  const normalized = normalizeInput(input)
+  const landingPage = getAdLandingPage(input.landingPageGoal)
+  const normalized = normalizeInput(input, landingPage)
   const adCopy = copyForLanguage(normalized)
 
   return {
@@ -181,6 +190,8 @@ export function buildDigitalNewspaperAdPackage(input: DigitalNewspaperAdInput = 
       noMassPosting: true,
     },
     input: normalized,
+    landingPage,
+    landingPageOptions: getNewspaperAdLandingPageOptions(),
     targets: buildTargets(normalized),
     adCopy,
     submissionChecklist: [

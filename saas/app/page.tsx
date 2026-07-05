@@ -9,6 +9,14 @@ import { t } from '@/lib/i18n/t'
 import { SERVICES } from '@/lib/services/catalog'
 import OrchestrationPanel from '@/components/orchestration/OrchestrationPanel'
 
+const AGENCY_COPY: Record<string, { label: string; kicker: string; title: string; text: string; cta: string }> = {
+  en: { label: 'SignalBoost Omnichannel Agency Engine', kicker: 'Hero product', title: 'Plan global campaigns with a pre-funded safety gate.', text: 'Create localized assets, estimate the campaign budget, and prepare managed publishing packages before any paid media or broker action is released.', cta: 'Open Agency Engine' },
+  pt: { label: 'Motor de Agência Omnichannel SignalBoost', kicker: 'Produto principal', title: 'Planeje campanhas globais com uma trava pré-financiada.', text: 'Crie ativos localizados, estime o orçamento da campanha e prepare pacotes de publicação gerenciada antes de qualquer mídia paga ou ação de broker ser liberada.', cta: 'Abrir Agency Engine' },
+  es: { label: 'Motor de Agencia Omnicanal SignalBoost', kicker: 'Producto principal', title: 'Planifica campañas globales con una compuerta prefinanciada.', text: 'Crea activos localizados, estima el presupuesto y prepara paquetes de publicación gestionada antes de liberar medios pagados o brokers.', cta: 'Abrir Agency Engine' },
+  pl: { label: 'Silnik Agencji Omnichannel SignalBoost', kicker: 'Produkt główny', title: 'Planuj globalne kampanie z przedpłaconą bramką bezpieczeństwa.', text: 'Twórz lokalizowane materiały, szacuj budżet i przygotuj pakiety publikacji zarządzanej przed odblokowaniem płatnych mediów lub brokerów.', cta: 'Otwórz Agency Engine' },
+  ru: { label: 'Омниканальный агентский движок SignalBoost', kicker: 'Главный продукт', title: 'Планируйте глобальные кампании через предоплаченную защитную точку.', text: 'Создавайте локализованные материалы, оценивайте бюджет и готовьте managed publishing пакеты до разблокировки платных медиа или брокеров.', cta: 'Открыть Agency Engine' },
+}
+
 const OPTIMIZER_COPY: Record<string, { label: string; kicker: string; title: string; text: string; cta: string }> = {
   en: { label: 'Free website optimization test', kicker: 'Free business utility', title: 'Test your website optimization for free.', text: 'Paste a public website URL and get a quick preview of speed, SEO, accessibility, security, and conversion opportunities. Then SignalBoost can help prepare the fix plan.', cta: 'Run website test' },
   pt: { label: 'Teste gratuito de otimização de site', kicker: 'Utilitário gratuito para negócios', title: 'Teste a otimização do seu site gratuitamente.', text: 'Cole uma URL pública de site e receba uma prévia rápida de velocidade, SEO, acessibilidade, segurança e oportunidades de conversão. Depois o SignalBoost pode ajudar a preparar o plano de correção.', cta: 'Executar teste do site' },
@@ -27,6 +35,7 @@ const CYBER_COPY: Record<string, { label: string; kicker: string; title: string;
 
 export default function Home() {
   const { dict, lang } = useI18n()
+  const agencyCopy = AGENCY_COPY[lang] || AGENCY_COPY.en
   const optimizerCopy = OPTIMIZER_COPY[lang] || OPTIMIZER_COPY.en
   const cyberCopy = CYBER_COPY[lang] || CYBER_COPY.en
   const featureCards = [1, 2, 3].map((item) => ({
@@ -38,6 +47,20 @@ export default function Home() {
   return (
     <main>
       <SignalHero />
+
+      <section className="sb-page-shell sb-section" aria-label={agencyCopy.label}>
+        <div className="sb-glass" style={{ padding: 28, display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 22, alignItems: 'center' }}>
+          <div>
+            <span className="sb-eyebrow">{agencyCopy.kicker}</span>
+            <h2 className="sb-h2" style={{ marginTop: 10 }}>{agencyCopy.title}</h2>
+            <p className="sb-body" style={{ maxWidth: 720 }}>{agencyCopy.text}</p>
+          </div>
+          <div className="sb-cta-row">
+            <Link className="sb-button-primary" href="/agency">{agencyCopy.cta}</Link>
+            <Link className="sb-button-secondary" href="/agency#agency-pricing">{t(dict, 'home.comparePlans', 'Compare plans')}</Link>
+          </div>
+        </div>
+      </section>
 
       <section className="sb-page-shell sb-section" aria-label={t(dict, 'home.repoCheckLabel', 'Free public repo check')}>
         <div className="sb-glass" style={{ padding: 28, display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 22, alignItems: 'center' }}>

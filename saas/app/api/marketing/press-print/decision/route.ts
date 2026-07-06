@@ -76,6 +76,8 @@ export async function POST(req: NextRequest) {
     submitted_at: decision === 'submitted' ? now : previous.press_print_execution?.submitted_at || null,
     published_at: decision === 'published' ? now : previous.press_print_execution?.published_at || null,
     live_url: liveUrl || previous.press_print_execution?.live_url || null,
+    live_url_required: false,
+    live_url_status: liveUrl ? 'provided' : 'not_provided',
     publication_date: publicationDate || previous.press_print_execution?.publication_date || null,
   }
 
@@ -86,6 +88,7 @@ export async function POST(req: NextRequest) {
     press_print_reviewed_at: ['ok', 'no', 'hold', 'staff'].includes(decision) ? now : previous.press_print_reviewed_at || now,
     press_print_execution_stage: stage,
     press_print_execution: execution,
+    press_print_live_url_required: false,
     staff_support_available: true,
     staff_support_mode: decision === 'staff' ? true : (previous.staff_support_mode || false),
     staff_support_started_at: decision === 'staff' ? now : (previous.staff_support_started_at || null),
@@ -103,5 +106,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard/marketing/press-print', req.url), { status: 303 })
   }
 
-  return NextResponse.json({ ok: true, stage, status })
+  return NextResponse.json({ ok: true, stage, status, live_url_required: false })
 }

@@ -3,17 +3,29 @@ import { requireAdmin } from '@/lib/outreach/security'
 
 export const dynamic = 'force-dynamic'
 
-type Decision = 'ok' | 'no' | 'hold' | 'staff'
+type Decision = 'ok' | 'no' | 'hold' | 'staff' | 'package' | 'submitted' | 'published'
 
 function normalizeDecision(value: unknown): Decision | null {
-  if (value === 'ok' || value === 'no' || value === 'hold' || value === 'staff') return value
+  if (value === 'ok' || value === 'no' || value === 'hold' || value === 'staff' || value === 'package' || value === 'submitted' || value === 'published') return value
   return null
 }
 
-function reviewValue(decision: Decision) {
+function reviewValue(decision: Decision, existingReview: string) {
   if (decision === 'ok') return 'APPROVED'
   if (decision === 'no') return 'REJECTED'
-  return 'ON_HOLD'
+  if (decision === 'hold' || decision === 'staff') return 'ON_HOLD'
+  return existingReview || 'APPROVED'
+}
+
+function executionStage(decision: Decision, existingStage: string) {
+  if (decision === 'ok') return existingStage || 'approved'
+  if (decision === 'no') return 'rejected'
+  if (decision === 'hold') return 'on_hold'
+  if (decision === 'staff') return 'staff_support'
+  if (decision === 'package') return 'package_prepared'
+  if (decision === 'submitted') return 'submitted'
+  if (decision === 'published') return 'published'
+  return existingStage || 'draft'
 }
 
 async function readPayload(req: NextRequest) {
@@ -41,15 +53,35 @@ export async function POST(req: NextRequest) {
 
   if (readError) return NextResponse.json({ ok: false, error: readError.message }, { status: 500 })
 
-  const status = decision === 'no' ? 'rejected' : 'draft'
+  const previous = ((existing?.metadata as any) || {})
+  const now = new Date().toISOString()
+  const liveUrl = String(body?.live_url || '').trim()
+  const publicationDate = String(body?.publication_date || '').trim()
+  const existingReview = String(previous.press_print_review || '')
+  const existingStage = String(previous.press_print_execution_stage || '')
+  const stage = executionStage(decision, existingStage)
+  const status = decision === 'no' ? 'rejected' : decision === 'published' ? 'completed' : 'draft'
+
+  const execution = {
+    ...((previous.press_print_execution && typeof previous.press_print_execution === 'object') ? previous.press_print_execution : {}),
+    stage,
+    package_prepared_at: decision === 'package' ? now : previous.press_print_execution?.package_prepared_at || null,
+    submitted_at: decision === 'submitted' ? now : previous.press_print_execution?.submitted_at || null,
+    published_at: decision === 'published' ? now : previous.press_print_execution?.published_at || null,
+    live_url: liveUrl || previous.press_print_execution?.live_url || null,
+    publication_date: publicationDate || previous.press_print_execution?.publication_date || null,
+  }
+
   const metadata = {
-    ...((existing?.metadata as any) || {}),
-    press_print_review: reviewValue(decision),
+    ...previous,
+    press_print_review: reviewValue(decision, existingReview),
     press_print_review_scope: 'local_marketing_workspace',
-    press_print_reviewed_at: new Date().toISOString(),
+    press_print_reviewed_at: ['ok', 'no', 'hold', 'staff'].includes(decision) ? now : previous.press_print_reviewed_at || now,
+    press_print_execution_stage: stage,
+    press_print_execution: execution,
     staff_support_available: true,
-    staff_support_mode: decision === 'staff' ? true : ((existing?.metadata as any)?.staff_support_mode || false),
-    staff_support_started_at: decision === 'staff' ? new Date().toISOString() : ((existing?.metadata as any)?.staff_support_started_at || null),
+    staff_support_mode: decision === 'staff' ? true : (previous.staff_support_mode || false),
+    staff_support_started_at: decision === 'staff' ? now : (previous.staff_support_started_at || null),
   }
 
   const { error } = await ctx.admin
@@ -64,5 +96,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard/marketing/press-print', req.url), { status: 303 })
   }
 
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, stage })
 }

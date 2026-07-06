@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/outreach/security'
 import { buildVideoProductionJob } from '@/lib/cos/video-production'
+import { publishApprovedVideoProductionJob } from '@/lib/cos/video-production/publish-approved-job'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import type { VideoProductionInput, VideoProductionStatus } from '@/lib/cos/video-production'
 
@@ -125,6 +126,15 @@ export async function PATCH(req: NextRequest) {
     const supabase = getAdminSupabase()
     const { data, error } = await supabase.from(TABLE).update(update).eq('id', body.id).select('*').single()
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+
+    if (body.status === 'approved') {
+      const publish = await publishApprovedVideoProductionJob({ admin: ctx.admin, user: ctx.user, job: data, renderBucket: RENDER_BUCKET })
+      const approvalState = { ...(data.approval_state || {}), publish_approved: Boolean(publish.ok && !publish.skipped), publish_notified: Boolean(publish.notified) }
+      const { data: finalJob } = await supabase.from(TABLE).update({ approval_state: approvalState, error: publish.ok ? null : publish.error || 'Publish failed.' }).eq('id', body.id).select('*').single()
+      if (!publish.ok) return NextResponse.json({ ok: false, error: publish.error || 'Publish failed.', job: finalJob || data, publish }, { status: 502 })
+      return NextResponse.json({ ok: true, job: finalJob || data, publish })
+    }
+
     return NextResponse.json({ ok: true, job: data })
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : 'Could not update job.' }, { status: 500 })

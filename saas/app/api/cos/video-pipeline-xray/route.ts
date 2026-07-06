@@ -35,7 +35,7 @@ function previewUrl(c: any, v: any): string | null {
 function brandingDiagnostics(c: any): string {
   const v = c?.metadata?.video
   if (!v) return 'BRANDING: no video metadata yet'
-  if (isRejected(c)) return 'BLOCKED: campaign rejected'
+  if (isRejected(c)) return `BLOCKED: campaign rejected. Underlying state: ${underlyingIssue(v)}`
   if (isFakeFinal(v)) return 'INVALID FINAL STATE: previous emergency fallback marked this as final without a real FFmpeg banner. Reset and reprocess this campaign.'
   const langs = Array.isArray(c.languages) && c.languages.length ? c.languages.filter(Boolean) : ['en']
   const primary = langs[0] || 'en'
@@ -52,11 +52,25 @@ function brandingDiagnostics(c: any): string {
   if (v.status === 'ready' && v.url && !unbranded.length && !branded.length) return 'BRANDING NOT READY: base video is ready but no unbranded voiced language exists yet.'
   return `BRANDING PENDING: status=${String(v.status || 'unknown')}; branded=[${branded.join(',') || 'none'}]; attempts=${attemptSummary}`
 }
+function underlyingIssue(v: any): string {
+  if (!v) return 'no video metadata yet'
+  if (v.voiceError) return `voice/brand error: ${String(v.voiceError).slice(0, 140)}`
+  if (v.status === 'rendering') return 'render in progress'
+  if (v.status === 'failed') return `render failed: ${String(v.error || 'unknown').slice(0, 100)}`
+  const unb = keys(v.unbrandedVoiced)
+  if (v.status === 'ready' && v.url && !unb.length) return 'base ready, not voiced yet'
+  if (unb.length) return `voiced [${unb.join(',')}], banner not burned`
+  return `stage=${String(v.status || 'unknown')}`
+}
 function eligibility(c: any): string {
   const v = c?.metadata?.video
   const created = c.created_at ? Date.parse(c.created_at) : 0
   if (!created || created < Date.parse(BACKLOG_CUTOFF)) return 'BLOCKED: created before cutoff'
-  if (isRejected(c)) return 'BLOCKED: campaign rejected'
+  // Rejected campaigns are frozen out of every pipeline stage (voice, banner,
+  // publish). The STUCK prefix is what makes the dashboard show the
+  // "Reset and kick" button (it matches eligibility.startsWith('STUCK')).
+  // Reset wipes video metadata and flips the campaign back to waiting_approval.
+  if (isRejected(c)) return `STUCK: campaign rejected — pipeline frozen. Underlying state: ${underlyingIssue(v)}. Press "Reset and kick" to clear video state, move it back to waiting_approval and re-render.`
   if (!v) return 'STAGE 0: waiting for auto-render start'
   if (isFakeFinal(v)) return 'INVALID: fake final artifact from emergency fallback. Reset and reprocess; do not approve this video.'
   if (v.status === 'rendering') return 'RENDERING: render in progress'

@@ -13,6 +13,30 @@ export type AgencyChannelCopy = {
   description: string
 }
 
+export type PressOutreachCopy = {
+  ariaLabel: string
+  eyebrow: string
+  title: string
+  subtitle: string
+  pendingBadge: string
+  pendingTitle: string
+  emptyPending: string
+  historyBadge: string
+  historyTitle: string
+  loading: string
+  target: string
+  contact: string
+  role: string
+  updated: string
+  pendingMetric: string
+  publishedMetric: string
+  modeMetric: string
+  freeOrganic: string
+  statuses: Record<'draft' | 'pending_owner_review' | 'approved' | 'published' | 'rejected', string>
+  roles: Record<'owner' | 'staff', string>
+  targets: Record<'newspaper_print' | 'magazine_print' | 'digital_press', string>
+}
+
 export type AgencyCopy = {
   hero: {
     eyebrow: string
@@ -70,6 +94,7 @@ export type AgencyCopy = {
     enterpriseTitle: string
     enterpriseBody: string
   }
+  pressOutreach?: PressOutreachCopy
 }
 
 const en: AgencyCopy = {
@@ -173,9 +198,24 @@ const ru: AgencyCopy = {
   notes: { complianceTitle: 'Граница безопасности и соответствия', complianceBody: 'Free Organic Mode готовит только unpaid media и PR e-mail workflows. SignalBoost не запускает paid media и не вызывает внешние API рекламы, brokers, press, radio, TV, LinkedIn или YouTube без серверного подтверждения платежа и operational approvals.', enterpriseTitle: 'Человеческий fallback для enterprise-команд', enterpriseBody: 'Крупные кампании могут проходить через оператора SignalBoost для procurement review, approval gates, проверки каналов и координации до live activation.' },
 }
 
-export const agencyCopy: Record<string, AgencyCopy> = { en, pt, es, pl, ru }
 
-export function getAgencyCopy(lang?: string): AgencyCopy {
+const pressOutreachCopy: Record<string, PressOutreachCopy> = {
+  en: { ariaLabel: 'Marketing Press & Print Outreach Studio', eyebrow: 'Marketing + Sales · Press Outreach', title: 'Press & Print Outreach Studio', subtitle: 'Review staff-submitted print, magazine, and digital press campaigns inside the Marketing workspace only.', pendingBadge: 'Owner review', pendingTitle: 'PendingApprovalsTable', emptyPending: 'No staff campaigns are waiting for owner review.', historyBadge: 'Timeline', historyTitle: 'CampaignHistoryTimeline', loading: 'Loading press outreach records…', target: 'Target', contact: 'Publication contact', role: 'Role', updated: 'Updated', pendingMetric: 'Pending approvals', publishedMetric: 'Published proofs', modeMetric: 'Processing mode', freeOrganic: 'Free organic', statuses: { draft: 'Draft', pending_owner_review: 'Pending owner review', approved: 'Approved', published: 'Published', rejected: 'Rejected' }, roles: { owner: 'Owner', staff: 'Staff' }, targets: { newspaper_print: 'Newspaper print', magazine_print: 'Magazine print', digital_press: 'Digital press' } },
+  pt: { ariaLabel: 'Estúdio de Marketing Press & Print Outreach', eyebrow: 'Marketing + Vendas · Press Outreach', title: 'Estúdio Press & Print Outreach', subtitle: 'Revise campanhas de imprensa impressa, revistas e imprensa digital enviadas pela equipe apenas no espaço de Marketing.', pendingBadge: 'Revisão do proprietário', pendingTitle: 'PendingApprovalsTable', emptyPending: 'Nenhuma campanha da equipe aguarda revisão do proprietário.', historyBadge: 'Linha do tempo', historyTitle: 'CampaignHistoryTimeline', loading: 'Carregando registros de press outreach…', target: 'Alvo', contact: 'Contato da publicação', role: 'Função', updated: 'Atualizado', pendingMetric: 'Aprovações pendentes', publishedMetric: 'Provas publicadas', modeMetric: 'Modo de processamento', freeOrganic: 'Orgânico grátis', statuses: { draft: 'Rascunho', pending_owner_review: 'Aguardando proprietário', approved: 'Aprovado', published: 'Publicado', rejected: 'Rejeitado' }, roles: { owner: 'Proprietário', staff: 'Equipe' }, targets: { newspaper_print: 'Jornal impresso', magazine_print: 'Revista impressa', digital_press: 'Imprensa digital' } },
+  es: { ariaLabel: 'Estudio de Marketing Press & Print Outreach', eyebrow: 'Marketing + Ventas · Press Outreach', title: 'Estudio Press & Print Outreach', subtitle: 'Revisa campañas de prensa impresa, revistas y prensa digital enviadas por el equipo solo dentro del espacio de Marketing.', pendingBadge: 'Revisión del propietario', pendingTitle: 'PendingApprovalsTable', emptyPending: 'No hay campañas del equipo esperando revisión del propietario.', historyBadge: 'Cronología', historyTitle: 'CampaignHistoryTimeline', loading: 'Cargando registros de press outreach…', target: 'Destino', contact: 'Contacto de publicación', role: 'Rol', updated: 'Actualizado', pendingMetric: 'Aprobaciones pendientes', publishedMetric: 'Pruebas publicadas', modeMetric: 'Modo de procesamiento', freeOrganic: 'Orgánico gratis', statuses: { draft: 'Borrador', pending_owner_review: 'Pendiente del propietario', approved: 'Aprobado', published: 'Publicado', rejected: 'Rechazado' }, roles: { owner: 'Propietario', staff: 'Equipo' }, targets: { newspaper_print: 'Periódico impreso', magazine_print: 'Revista impresa', digital_press: 'Prensa digital' } },
+  pl: { ariaLabel: 'Studio Marketing Press & Print Outreach', eyebrow: 'Marketing + Sprzedaż · Press Outreach', title: 'Studio Press & Print Outreach', subtitle: 'Przeglądaj kampanie druku, magazynów i prasy cyfrowej zespołu wyłącznie w przestrzeni Marketing.', pendingBadge: 'Przegląd właściciela', pendingTitle: 'PendingApprovalsTable', emptyPending: 'Brak kampanii zespołu oczekujących na właściciela.', historyBadge: 'Oś czasu', historyTitle: 'CampaignHistoryTimeline', loading: 'Ładowanie rekordów press outreach…', target: 'Cel', contact: 'Kontakt publikacji', role: 'Rola', updated: 'Aktualizacja', pendingMetric: 'Oczekujące zgody', publishedMetric: 'Opublikowane proofy', modeMetric: 'Tryb przetwarzania', freeOrganic: 'Darmowy organiczny', statuses: { draft: 'Szkic', pending_owner_review: 'Oczekuje na właściciela', approved: 'Zatwierdzone', published: 'Opublikowane', rejected: 'Odrzucone' }, roles: { owner: 'Właściciel', staff: 'Zespół' }, targets: { newspaper_print: 'Gazeta drukowana', magazine_print: 'Magazyn drukowany', digital_press: 'Prasa cyfrowa' } },
+  ru: { ariaLabel: 'Marketing Press & Print Outreach Studio', eyebrow: 'Marketing + Sales · Press Outreach', title: 'Press & Print Outreach Studio', subtitle: 'Проверяйте кампании печатной прессы, журналов и digital press от команды только в workspace Marketing.', pendingBadge: 'Проверка владельца', pendingTitle: 'PendingApprovalsTable', emptyPending: 'Нет кампаний команды на проверке владельца.', historyBadge: 'Лента', historyTitle: 'CampaignHistoryTimeline', loading: 'Загрузка записей press outreach…', target: 'Цель', contact: 'Контакт публикации', role: 'Роль', updated: 'Обновлено', pendingMetric: 'Ожидают approval', publishedMetric: 'Опубликованные proof', modeMetric: 'Режим обработки', freeOrganic: 'Free organic', statuses: { draft: 'Черновик', pending_owner_review: 'Ожидает владельца', approved: 'Одобрено', published: 'Опубликовано', rejected: 'Отклонено' }, roles: { owner: 'Владелец', staff: 'Команда' }, targets: { newspaper_print: 'Печатная газета', magazine_print: 'Печатный журнал', digital_press: 'Digital press' } },
+}
+
+export const agencyCopy: Record<string, AgencyCopy> = {
+  en: { ...en, pressOutreach: pressOutreachCopy.en },
+  pt: { ...pt, pressOutreach: pressOutreachCopy.pt },
+  es: { ...es, pressOutreach: pressOutreachCopy.es },
+  pl: { ...pl, pressOutreach: pressOutreachCopy.pl },
+  ru: { ...ru, pressOutreach: pressOutreachCopy.ru },
+}
+
+export function getAgencyCopy(lang?: string): AgencyCopy & { pressOutreach: PressOutreachCopy } {
   const safe = lang && agencyCopy[lang] ? lang : 'en'
-  return agencyCopy[safe]
+  return agencyCopy[safe] as AgencyCopy & { pressOutreach: PressOutreachCopy }
 }

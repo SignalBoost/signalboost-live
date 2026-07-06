@@ -59,6 +59,7 @@ const CUSTOMER_GROUPS: Group[] = [
     { icon: '📣', label: 'COSA Campaign Console', href: '/dashboard/cosa', desc: 'Create and manage governed marketing campaigns.' },
     { icon: '🎬', label: 'COSA Video Pipeline', href: '/dashboard/cosa/video-pipeline', desc: 'Final videos, render status, branding, and release readiness.' },
     { icon: '🗂️', label: 'Press & Print Media', href: '/dashboard/marketing/press-print', desc: 'Local review for newspaper, print, and magazine ad previews.' },
+    { icon: '🧾', label: 'Press Outreach Studio', href: '/dashboard/marketing/press-outreach', desc: 'Owner approval and history for press dispatch.' },
     { icon: '📰', label: 'Online Newspaper Outreach', href: '/dashboard/outreach?channel=online-newspapers', desc: 'Digital newspaper and online publisher outreach.' },
     { icon: '🗞️', label: 'Print Newspaper Outreach', href: '/dashboard/outreach?channel=print-newspapers', desc: 'Offline newspaper and print placement planning.' },
     { icon: '🧠', label: 'Magazine / Trade Press Outreach', href: '/dashboard/outreach?channel=trade-press', desc: 'IT magazines, SaaS publications, cybersecurity magazines, and industry trade press.' },

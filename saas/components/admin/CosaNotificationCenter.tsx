@@ -1,78 +1,407 @@
 'use client'
 
+import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import ResetButton from '@/components/ResetButton'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { t } from '@/lib/i18n/t'
+import AssistantMessage from '@/components/AssistantMessage'
 
-type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
-type Campaign = { id: string; title?: string; channel?: string; status?: string; metadata?: Record<string, any>; work_items?: Array<{ output?: Record<string, unknown> }> }
-type Props = { label: string; href: string; icon: string; active?: boolean }
+type Message = { role: 'user' | 'assistant'; content: string }
+type VideoItem = { title: string; type: string; id: string }
 
-const COPY: Record<Lang, Record<string, any>> = {
-  en: { approvals: 'pending approvals', eyebrow: 'COSA notifications', title: 'Approval center', refresh: 'Refresh', none: 'No draft campaigns waiting for approval.', untitled: 'Untitled campaign', approve: 'Approve', edit: 'Request edits', reject: 'Reject', archive: 'Archive', publishing: 'Publishing confirmations', viewAll: 'View all in Marketing/Sales →', status: { draft: 'Draft', waiting_approval: 'Pending approval', approved: 'Approved', queued: 'Queued', running: 'Running', rejected: 'Rejected' }, channel: { youtube: 'YouTube', short_video: 'Short video', linkedin: 'LinkedIn', blog: 'Blog', email: 'Email', outreach: 'Outreach', landing_page: 'Landing page', review_campaign: 'Review campaign', campaign: 'Campaign' } },
-  es: { approvals: 'aprobaciones pendientes', eyebrow: 'Notificaciones COSA', title: 'Centro de aprobaciones', refresh: 'Actualizar', none: 'No hay borradores de campaña esperando aprobación.', untitled: 'Campaña sin título', approve: 'Aprobar', edit: 'Pedir cambios', reject: 'Rechazar', archive: 'Archivar', publishing: 'Confirmaciones de publicación', viewAll: 'Ver todo en Marketing/Ventas →', status: { draft: 'Borrador', waiting_approval: 'Pendiente de aprobación', approved: 'Aprobado', queued: 'En cola', running: 'En ejecución', rejected: 'Rechazado' }, channel: { youtube: 'YouTube', short_video: 'Video corto', linkedin: 'LinkedIn', blog: 'Blog', email: 'Email', outreach: 'Alcance', landing_page: 'Página de destino', review_campaign: 'Campaña de reseñas', campaign: 'Campaña' } },
-  pt: { approvals: 'aprovações pendentes', eyebrow: 'Notificações COSA', title: 'Centro de aprovações', refresh: 'Atualizar', none: 'Nenhum rascunho de campanha aguardando aprovação.', untitled: 'Campanha sem título', approve: 'Aprovar', edit: 'Pedir ajustes', reject: 'Rejeitar', archive: 'Arquivar', publishing: 'Confirmações de publicação', viewAll: 'Ver tudo em Marketing/Vendas →', status: { draft: 'Rascunho', waiting_approval: 'Aguardando aprovação', approved: 'Aprovado', queued: 'Na fila', running: 'Em execução', rejected: 'Rejeitado' }, channel: { youtube: 'YouTube', short_video: 'Vídeo curto', linkedin: 'LinkedIn', blog: 'Blog', email: 'Email', outreach: 'Alcance', landing_page: 'Página de destino', review_campaign: 'Campanha de avaliações', campaign: 'Campanha' } },
-  pl: { approvals: 'oczekujące zatwierdzenia', eyebrow: 'Powiadomienia COSA', title: 'Centrum zatwierdzeń', refresh: 'Odśwież', none: 'Brak szkiców kampanii oczekujących na zatwierdzenie.', untitled: 'Kampania bez tytułu', approve: 'Zatwierdź', edit: 'Poproś o zmiany', reject: 'Odrzuć', archive: 'Archiwizuj', publishing: 'Potwierdzenia publikacji', viewAll: 'Zobacz wszystko w Marketing/Sprzedaż →', status: { draft: 'Szkic', waiting_approval: 'Oczekuje na zatwierdzenie', approved: 'Zatwierdzone', queued: 'W kolejce', running: 'W toku', rejected: 'Odrzucone' }, channel: { youtube: 'YouTube', short_video: 'Krótki film', linkedin: 'LinkedIn', blog: 'Blog', email: 'Email', outreach: 'Kontakt', landing_page: 'Strona docelowa', review_campaign: 'Kampania opinii', campaign: 'Kampania' } },
-  ru: { approvals: 'ожидающие утверждения', eyebrow: 'Уведомления COSA', title: 'Центр утверждений', refresh: 'Обновить', none: 'Нет черновиков кампаний, ожидающих утверждения.', untitled: 'Кампания без названия', approve: 'Утвердить', edit: 'Запросить правки', reject: 'Отклонить', archive: 'В архив', publishing: 'Подтверждения публикации', viewAll: 'Открыть всё в Маркетинг/Продажи →', status: { draft: 'Черновик', waiting_approval: 'Ожидает утверждения', approved: 'Утверждено', queued: 'В очереди', running: 'Выполняется', rejected: 'Отклонено' }, channel: { youtube: 'YouTube', short_video: 'Короткое видео', linkedin: 'LinkedIn', blog: 'Блог', email: 'Email', outreach: 'Аутрич', landing_page: 'Лендинг', review_campaign: 'Кампания отзывов', campaign: 'Кампания' } },
+type Attachment = {
+  id: string
+  name: string
+  type: string
+  size: number
+  dataUrl: string
+  isImage: boolean
+}
+const ATTACH_MAX_BYTES = 10 * 1024 * 1024
+const ATTACH_MAX_FILES = 5
+const ATTACH_ALLOWED_RE = /^(image\/(png|jpe?g|gif|webp)|application\/pdf|text\/(plain|csv|markdown))$/i
+const ATTACH_INPUT_ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain,.txt,.md,.csv'
+const DESKTOP_PANEL_OFFSET = '456px'
+const ASSET_READY_KEY = 'signalboost.concierge.assetReady'
+// Credit pack pricing shows only when the activation flag is on (Vercel env:
+// NEXT_PUBLIC_CREDITS_ACTIVATION=1). Mirrors the Studio catalog badge gate.
+const CREDITS_ACTIVATION = process.env.NEXT_PUBLIC_CREDITS_ACTIVATION === '1'
+
+const QUICK_KEYS = [
+  { label: 'concierge.quick.marketplace.label', prompt: 'concierge.quick.marketplace.prompt', fallbackLabel: '🛰️ Marketplace', fallbackPrompt: 'Guide me through marketplace partners, categories, and bookings.' },
+  { label: 'concierge.quick.saas.label', prompt: 'concierge.quick.saas.prompt', fallbackLabel: '🚀 SaaS cockpit', fallbackPrompt: 'Guide me through Promote Business, Reviews, Calendar, Spreadsheets, and Outreach.' },
+  { label: 'concierge.quick.executive.label', prompt: 'concierge.quick.executive.prompt', fallbackLabel: '📊 Executive insights', fallbackPrompt: 'Show financial, KPI, CRM, outreach, and forecasting recommendations.' },
+  { label: 'concierge.quick.support.label', prompt: 'concierge.quick.support.prompt', fallbackLabel: '💬 Support', fallbackPrompt: 'I need step-by-step help using SignalBoost.' },
+]
+
+function extractVideoJson(content: string): { before: string; videos: VideoItem[]; after: string } | null {
+  const startMatch = content.match(/\[\s*\{/)
+  if (!startMatch || startMatch.index === undefined) return null
+
+  const start = startMatch.index
+  const end = content.lastIndexOf(']')
+  if (end <= start) return null
+
+  const before = content.slice(0, start).trim()
+  const raw = content.slice(start, end + 1)
+  const after = content.slice(end + 1).trim()
+
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return null
+
+    const videos = parsed
+      .map((v: any) => ({
+        title: typeof v?.title === 'string' ? v.title : 'Video',
+        type: typeof v?.type === 'string' ? v.type : 'video',
+        id: typeof v?.id === 'string' ? v.id : '',
+      }))
+      .filter((v: VideoItem) => /^(video|youtube)$/i.test(v.type) && /^[A-Za-z0-9_-]{11}$/.test(v.id))
+
+    return videos.length ? { before, videos, after } : null
+  } catch {
+    return null
+  }
 }
 
-const pendingStatuses = new Set(['draft', 'waiting_approval'])
-const lk = (raw: string): Lang => (['en', 'es', 'pt', 'pl', 'ru'].includes(raw) ? raw : 'en') as Lang
-const hasReviewDraft = (campaign: Campaign) => Boolean(campaign.work_items?.some(item => item.output))
-const labelFrom = (map: Record<string, string>, key?: string, fallback = '') => map[key || ''] || key || fallback
-function thumbnail(campaign: Campaign) { return campaign.channel === 'youtube' ? '▶️' : campaign.channel === 'short_video' ? '🎬' : campaign.channel === 'linkedin' ? '💼' : campaign.channel === 'email' || campaign.channel === 'outreach' ? '✉️' : '📣' }
-
-export default function CosaNotificationCenter({ label, href, icon, active }: Props) {
-  const { lang } = useI18n()
-  const c = COPY[lk(lang)]
-  const [open, setOpen] = useState(false)
-  const [campaigns, setCampaigns] = useState<Campaign[]>([])
-  const [loading, setLoading] = useState(false)
-  const [actingId, setActingId] = useState<string | null>(null)
-
-  async function load() {
-    setLoading(true)
-    try {
-      const response = await fetch('/api/cos/campaign-queue?limit=25', { cache: 'no-store' })
-      const json = await response.json().catch(() => null)
-      setCampaigns(Array.isArray(json?.campaigns) ? json.campaigns : [])
-    } catch { setCampaigns([]) } finally { setLoading(false) }
-  }
-
-  useEffect(() => { load() }, [])
-
-  const pending = useMemo(() => campaigns.filter(campaign => pendingStatuses.has(campaign.status || '') && hasReviewDraft(campaign)), [campaigns])
-  const publishing = useMemo(() => campaigns.filter(campaign => campaign.status === 'queued' || campaign.status === 'running').slice(0, 3), [campaigns])
-  const count = pending.length
-
-  async function act(campaign: Campaign, action: 'approve' | 'request_edits' | 'reject' | 'archive') {
-    setActingId(campaign.id)
-    try {
-      await fetch('/api/cos/campaign-notifications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: campaign.id, action }) })
-      await load()
-    } catch { await load() } finally { setActingId(null) }
-  }
+function ConciergeVideoMessage({ content }: { content: string }) {
+  const block = extractVideoJson(content)
+  if (!block) return <AssistantMessage content={content} />
 
   return (
-    <div style={{ position: 'relative' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 8 }}>
-        <Link href={href} className="sb-sidebar__link" style={active ? { background: 'rgba(26,240,255,.14)', color: '#fff', borderColor: 'rgba(26,240,255,.42)', boxShadow: '0 0 24px rgba(26,240,255,.14)' } : undefined}><span aria-hidden="true">{icon}</span><span>{label}</span></Link>
-        <button type="button" aria-label={`${count} ${c.approvals}`} onClick={() => { setOpen(current => !current); if (!open) load() }} style={{ minWidth: 32, height: 26, borderRadius: 999, border: count ? '1px solid rgba(248,113,113,.7)' : '1px solid rgba(255,255,255,.14)', background: count ? 'rgba(248,113,113,.18)' : 'rgba(255,255,255,.06)', color: count ? '#fecaca' : 'rgba(255,255,255,.62)', fontSize: 11, fontWeight: 950, cursor: 'pointer' }}>{count || '0'}</button>
-      </div>
-      {open && <div style={{ position: 'absolute', zIndex: 50, left: 0, top: 'calc(100% + 8px)', width: 360, maxWidth: 'calc(100vw - 32px)', background: 'rgba(2,6,23,.98)', border: '1px solid rgba(255,255,255,.16)', borderRadius: 18, boxShadow: '0 28px 90px rgba(0,0,0,.55)', padding: 14 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}><div><p style={{ margin: 0, color: '#ffc300', fontSize: 11, letterSpacing: '.09em', textTransform: 'uppercase', fontWeight: 950 }}>{c.eyebrow}</p><h3 style={{ margin: '5px 0 0', color: '#fff', fontSize: 16 }}>{c.title}</h3></div><button type="button" onClick={load} disabled={loading} style={smallButton}>{loading ? '...' : c.refresh}</button></div>
-        <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
-          {pending.length === 0 && <p style={{ color: 'rgba(255,255,255,.58)', fontSize: 13, lineHeight: 1.5, margin: 0 }}>{c.none}</p>}
-          {pending.slice(0, 4).map(campaign => <div key={campaign.id} style={{ border: '1px solid rgba(255,255,255,.09)', background: 'rgba(255,255,255,.045)', borderRadius: 14, padding: 12 }}><Link href={`/dashboard/cosa?campaign=${campaign.id}`} style={{ display: 'grid', gridTemplateColumns: '44px 1fr', gap: 10, textDecoration: 'none' }}><div style={{ height: 44, borderRadius: 12, background: 'linear-gradient(145deg, rgba(255,195,0,.22), rgba(26,240,255,.12))', display: 'grid', placeItems: 'center', fontSize: 22 }}>{thumbnail(campaign)}</div><div><strong style={{ color: '#fff', fontSize: 13, lineHeight: 1.35 }}>{campaign.title || c.untitled}</strong><p style={{ color: '#fecaca', fontSize: 11, fontWeight: 850, margin: '5px 0 0' }}>{labelFrom(c.status, campaign.status, c.status.draft)} · {labelFrom(c.channel, campaign.channel, c.channel.campaign)}</p></div></Link><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}><button disabled={actingId === campaign.id} onClick={() => act(campaign, 'approve')} style={actionButton}>{c.approve}</button><button disabled={actingId === campaign.id} onClick={() => act(campaign, 'request_edits')} style={actionButton}>{c.edit}</button><button disabled={actingId === campaign.id} onClick={() => act(campaign, 'reject')} style={dangerButton}>{c.reject}</button><button disabled={actingId === campaign.id} onClick={() => act(campaign, 'archive')} style={mutedButton}>{c.archive}</button></div></div>)}
-          {publishing.length > 0 && <div style={{ borderTop: '1px solid rgba(255,255,255,.09)', paddingTop: 10 }}><p style={{ margin: '0 0 8px', color: '#93c5fd', fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase', fontWeight: 950 }}>{c.publishing}</p>{publishing.map(campaign => <Link key={campaign.id} href={`/dashboard/cosa?campaign=${campaign.id}`} style={{ display: 'block', color: 'rgba(255,255,255,.72)', fontSize: 12, textDecoration: 'none', marginBottom: 6 }}>{campaign.title || c.untitled} · {labelFrom(c.status, campaign.status)}</Link>)}</div>}
+    <div className="flex flex-col gap-2.5">
+      {block.before ? <AssistantMessage content={block.before} /> : null}
+      {block.videos.map((video, i) => (
+        <div key={`${video.id}-${i}`} className="overflow-hidden rounded-xl border border-cyan-300/25 bg-slate-950/90">
+          <div className="relative w-full bg-black pb-[56.25%]">
+            <iframe
+              src={`https://www.youtube.com/embed/${encodeURIComponent(video.id)}`}
+              title={video.title}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+              className="absolute inset-0 h-full w-full border-0"
+            />
+          </div>
+          <div className="p-2.5">
+            <div className="text-xs font-extrabold leading-snug text-white">{video.title}</div>
+            <a href={`https://www.youtube.com/watch?v=${encodeURIComponent(video.id)}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-[11px] text-cyan-300 underline">
+              Open on YouTube ↗
+            </a>
+          </div>
         </div>
-        <Link href="/dashboard/cosa" style={{ display: 'block', marginTop: 12, color: '#ffc300', fontSize: 12, fontWeight: 900, textDecoration: 'none' }}>{c.viewAll}</Link>
-      </div>}
+      ))}
+      {block.after ? <AssistantMessage content={block.after} /> : null}
     </div>
   )
 }
 
-const smallButton: React.CSSProperties = { border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.06)', color: '#fff', borderRadius: 9, padding: '6px 8px', fontSize: 11, fontWeight: 850, cursor: 'pointer' }
-const actionButton: React.CSSProperties = { border: 'none', background: '#ffc300', color: '#000', borderRadius: 9, padding: '7px 9px', fontSize: 11, fontWeight: 950, cursor: 'pointer' }
-const dangerButton: React.CSSProperties = { ...actionButton, background: 'rgba(248,113,113,.18)', color: '#fecaca', border: '1px solid rgba(248,113,113,.38)' }
-const mutedButton: React.CSSProperties = { ...actionButton, background: 'rgba(255,255,255,.06)', color: 'rgba(255,255,255,.72)', border: '1px solid rgba(255,255,255,.12)' }
+export default function Concierge() {
+  const pathname = usePathname()
+  const { lang, dict } = useI18n()
+  const activeLang = ['en', 'pt', 'es', 'pl', 'ru'].includes(lang) ? lang : 'en'
+
+  const [open, setOpen] = useState(false)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [dragOver, setDragOver] = useState(false)
+  const [utilityContext, setUtilityContext] = useState<string>('')
+  const [assetNotice, setAssetNotice] = useState<{ id: string; title: string } | null>(null)
+  const logRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const conversationIdRef = useRef<string>('')
+
+  useEffect(() => {
+    const syncLayout = () => {
+      const desktop = window.matchMedia('(min-width: 1024px)').matches
+      document.documentElement.style.setProperty('--concierge-panel-offset', open && desktop ? DESKTOP_PANEL_OFFSET : '0px')
+      document.body.style.paddingRight = open && desktop ? DESKTOP_PANEL_OFFSET : ''
+      document.body.style.transition = 'padding-right 220ms ease'
+    }
+    syncLayout()
+    window.addEventListener('resize', syncLayout)
+    return () => {
+      window.removeEventListener('resize', syncLayout)
+      document.documentElement.style.setProperty('--concierge-panel-offset', '0px')
+      document.body.style.paddingRight = ''
+    }
+  }, [open])
+
+  function readFileAsDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader()
+      r.onload = () => resolve(String(r.result || ''))
+      r.onerror = () => reject(new Error('read failed'))
+      r.readAsDataURL(file)
+    })
+  }
+
+  async function addFiles(fileList: FileList | File[] | null) {
+    if (!fileList) return
+    const incoming = Array.from(fileList)
+    const staged: Attachment[] = []
+    for (const file of incoming) {
+      const okType = ATTACH_ALLOWED_RE.test(file.type) || /\.(txt|md|csv)$/i.test(file.name)
+      if (!okType || file.size > ATTACH_MAX_BYTES) continue
+      try {
+        const dataUrl = await readFileAsDataUrl(file)
+        staged.push({
+          id: `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          name: file.name,
+          type: file.type || 'application/octet-stream',
+          size: file.size,
+          dataUrl,
+          isImage: /^image\//.test(file.type),
+        })
+      } catch { /* skip unreadable file */ }
+    }
+    if (staged.length) setAttachments(prev => [...prev, ...staged].slice(0, ATTACH_MAX_FILES))
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments(prev => prev.filter(a => a.id !== id))
+  }
+
+  useEffect(() => {
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight
+  }, [messages, loading])
+
+  useEffect(() => {
+    const key = 'signalboost.concierge.utilityContext'
+    const loadUtilityContext = () => {
+      try {
+        const raw = window.localStorage.getItem(key)
+        if (!raw) return
+        const parsed = JSON.parse(raw)
+        const report = typeof parsed?.report === 'string' ? parsed.report : ''
+        if (!report) return
+        setUtilityContext(report.slice(0, 1800))
+        setOpen(true)
+      } catch { /* ignore malformed lead-magnet context */ }
+    }
+    loadUtilityContext()
+    window.addEventListener('signalboost:concierge-utility-context', loadUtilityContext)
+    return () => window.removeEventListener('signalboost:concierge-utility-context', loadUtilityContext)
+  }, [])
+
+  // COS Core v1 completion channel: when the FFmpeg/Actions pipeline finishes a
+  // branded asset, any Studio surface (e.g. the COSA notification center) writes
+  // ASSET_READY_KEY and dispatches the event below. The Concierge then surfaces
+  // a localized notification with a direct link to the financial approval card.
+  useEffect(() => {
+    const loadAssetReady = () => {
+      try {
+        const raw = window.localStorage.getItem(ASSET_READY_KEY)
+        if (!raw) return
+        const parsed = JSON.parse(raw)
+        const id = typeof parsed?.campaignId === 'string' ? parsed.campaignId : ''
+        if (!id) return
+        setAssetNotice({ id, title: typeof parsed?.title === 'string' ? parsed.title : '' })
+        setOpen(true)
+        window.localStorage.removeItem(ASSET_READY_KEY)
+      } catch { /* ignore malformed asset-ready payload */ }
+    }
+    loadAssetReady()
+    window.addEventListener('signalboost:concierge-asset-ready', loadAssetReady)
+    return () => window.removeEventListener('signalboost:concierge-asset-ready', loadAssetReady)
+  }, [])
+
+  const contextualGreeting = utilityContext
+    ? `${t(dict, 'concierge.utilityOffer', 'I identified optimization opportunities on your URL. Would you like our media studio (COS Core v1) to automatically create a video campaign to boost your conversion for only 10 credits?')}\n\n${utilityContext}`
+    : t(dict, 'concierge.greeting', 'Hello, I am the SignalBoost Concierge. Ask me about your workspace, or open FAQ, support, and docs below.')
+
+  const assetNoticeMessage: Message | null = assetNotice
+    ? {
+        role: 'assistant',
+        content: [
+          `${t(dict, 'concierge.assetReady', 'Your COS Core v1 asset is ready. Review it on the Studio financial approval card before release:')}${assetNotice.title ? ` “${assetNotice.title}”` : ''}`,
+          `[${t(dict, 'concierge.assetReadyCta', 'Open approval card')}](/dashboard/cosa?campaign=${encodeURIComponent(assetNotice.id)})`,
+          CREDITS_ACTIVATION ? t(dict, 'credits.packs', 'Starter Pack: 50 Credits = $15 · Pro Pack: 200 Credits = $50.') : '',
+        ].filter(Boolean).join('\n\n'),
+      }
+    : null
+
+  const baseMessages: Message[] = messages.length
+    ? messages
+    : [{ role: 'assistant' as const, content: contextualGreeting }]
+  const visibleMessages = assetNoticeMessage ? [...baseMessages, assetNoticeMessage] : baseMessages
+
+  function resetVisibleChat() {
+    setAssetNotice(null)
+    setInput('')
+    setLoading(false)
+    setMessages([])
+    setAttachments([])
+    conversationIdRef.current = ''
+  }
+
+  async function ask(text: string) {
+    const content = text.trim()
+    const staged = attachments
+    if ((!content && staged.length === 0) || loading) return
+
+    if (!conversationIdRef.current) conversationIdRef.current = crypto.randomUUID()
+    const fileNote = staged.length ? `📎 ${staged.map(a => a.name).join(', ')}` : ''
+    const displayContent = [content, fileNote].filter(Boolean).join('\n\n')
+    const nextMessages: Message[] = [...messages, { role: 'user', content: displayContent }]
+    setMessages(nextMessages)
+    setInput('')
+    setAttachments([])
+    setLoading(true)
+
+    try {
+      const res = await fetch('/api/concierge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: nextMessages,
+          attachments: staged.map(a => ({ name: a.name, type: a.type, dataUrl: a.dataUrl })),
+          context: { currentPage: pathname, language: activeLang, conversationId: conversationIdRef.current, utilityReport: utilityContext, cosMode: 'silent_background_planning' },
+        }),
+      })
+      const data = await res.json()
+      setMessages(prev => [
+        ...prev,
+        { role: 'assistant', content: data.reply || data.error || t(dict, 'concierge.fallback', 'I could not create a response.') },
+      ])
+    } catch {
+      setMessages(prev => [...prev, { role: 'assistant', content: t(dict, 'concierge.connectionError', 'Connection problem. Please try again.') }])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <>
+      {!open && (
+        <div className="fixed bottom-4 right-4 z-[80] pointer-events-none sm:bottom-6 sm:right-6">
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-controls="signalboost-concierge-panel"
+            onClick={() => setOpen(true)}
+            className="pointer-events-auto flex items-center gap-2 rounded-full border border-amber-200/40 bg-gradient-to-br from-amber-300 to-orange-500 px-4 py-3 text-sm font-black text-slate-950 shadow-[0_12px_34px_rgba(255,149,0,.35)] outline-none transition hover:-translate-y-0.5 hover:shadow-[0_18px_48px_rgba(255,149,0,.45)] focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:px-5"
+          >
+            <span className="text-lg">✨</span>
+            {t(dict, 'concierge.button', 'Concierge')}
+          </button>
+        </div>
+      )}
+
+      {open && (
+        <aside
+          id="signalboost-concierge-panel"
+          role="dialog"
+          aria-label={t(dict, 'concierge.title', 'AI Concierge')}
+          onDragOver={e => { e.preventDefault(); if (!dragOver) setDragOver(true) }}
+          onDragLeave={e => { e.preventDefault(); if (e.currentTarget === e.target) setDragOver(false) }}
+          onDrop={e => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer?.files || null) }}
+          className="fixed inset-x-2 bottom-2 top-20 z-[90] flex max-h-[calc(100vh-5.5rem)] flex-col overflow-hidden rounded-3xl border border-white/10 bg-slate-950/92 text-white shadow-2xl shadow-black/70 backdrop-blur-md lg:inset-x-auto lg:bottom-4 lg:right-4 lg:top-20 lg:w-[432px] lg:rounded-l-3xl lg:rounded-r-2xl"
+        >
+          {dragOver && (
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-3xl border-2 border-dashed border-cyan-300 bg-slate-950/90 p-6 text-center backdrop-blur-md">
+              <div>
+                <div className="text-4xl">📎</div>
+                <div className="mt-2 text-sm font-extrabold text-cyan-300">{t(dict, 'concierge.dropHere', 'Drop files to attach')}</div>
+                <div className="mt-1 text-[11px] text-white/50">{t(dict, 'concierge.dropHint', 'Images, PDFs, or text — up to 10MB each')}</div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex shrink-0 items-center justify-between border-b border-white/10 bg-white/[.045] px-4 py-3 backdrop-blur-md">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-[.18em] text-cyan-300/80">SignalBoost</div>
+              <strong className="text-base text-white">{t(dict, 'concierge.title', 'AI Concierge')}</strong>
+            </div>
+            <div className="flex items-center gap-2">
+              <ResetButton onReset={resetVisibleChat} className="sb-button-ghost" />
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label={t(dict, 'concierge.close', 'Close concierge')}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/10 text-lg leading-none text-white outline-none transition hover:bg-white/15 focus-visible:ring-2 focus-visible:ring-cyan-300"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 flex-wrap gap-2 border-b border-white/10 bg-white/[.035] px-3.5 py-2.5">
+            <Link href="/faq" className="sb-button-ghost text-xs no-underline">❓ {t(dict, 'support.faq', 'FAQ')}</Link>
+            <Link href="/support" className="sb-button-ghost text-xs no-underline">✉️ {t(dict, 'support.contact', 'Contact')}</Link>
+            <Link href="/docs" className="sb-button-ghost text-xs no-underline">📖 {t(dict, 'support.documentation', 'Docs')}</Link>
+          </div>
+
+          <div ref={logRef} role="log" aria-live="polite" className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-3.5 py-3">
+            {visibleMessages.map((message, index) => (
+              <div
+                key={`${message.role}-${index}`}
+                className={message.role === 'user'
+                  ? 'max-w-[88%] self-end whitespace-pre-wrap rounded-2xl rounded-br-md border border-blue-400/35 bg-blue-500/25 px-3.5 py-2.5 text-[13px] leading-6 text-white'
+                  : 'max-w-[88%] self-start rounded-2xl rounded-bl-md border border-white/10 bg-white/10 px-3.5 py-2.5 text-[13px] leading-6 text-white'}
+              >
+                {message.role === 'assistant' ? <ConciergeVideoMessage content={message.content} /> : message.content}
+              </div>
+            ))}
+            {loading && <div className="px-1 py-1 text-[13px] text-white/45">{t(dict, 'concierge.thinking', 'Thinking...')}</div>}
+          </div>
+
+          <div className="grid shrink-0 grid-cols-1 gap-2 border-t border-white/10 bg-slate-950/80 px-3.5 py-2 sm:grid-cols-2">
+            {QUICK_KEYS.map(item => (
+              <button key={item.label} type="button" onClick={() => ask(t(dict, item.prompt, item.fallbackPrompt))} className="sb-button-ghost px-3 py-2 text-xs">
+                {t(dict, item.label, item.fallbackLabel)}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex shrink-0 flex-col gap-2 border-t border-white/10 bg-slate-950/90 px-3.5 py-3.5">
+            {attachments.length > 0 && (
+              <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto">
+                {attachments.map(a => (
+                  <div key={a.id} className="flex max-w-[180px] items-center gap-1.5 rounded-lg border border-white/10 bg-white/[.06] py-1 pl-1 pr-1.5">
+                    {a.isImage
+                      ? <img src={a.dataUrl} alt={a.name} className="h-7 w-7 shrink-0 rounded object-cover" />
+                      : <span className="flex h-7 w-7 shrink-0 items-center justify-center text-base">📄</span>}
+                    <span className="truncate text-[11px] text-white/80">{a.name}</span>
+                    <button type="button" onClick={() => removeAttachment(a.id)} aria-label={t(dict, 'concierge.removeFile', 'Remove file')} className="shrink-0 border-0 bg-transparent p-0.5 text-xs leading-none text-white/55">✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex items-end gap-2">
+              <input ref={fileInputRef} type="file" multiple accept={ATTACH_INPUT_ACCEPT} onChange={e => { addFiles(e.target.files); e.target.value = '' }} className="hidden" />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                aria-label={t(dict, 'concierge.attach', 'Attach files')}
+                title={t(dict, 'concierge.attach', 'Attach files')}
+                disabled={loading || attachments.length >= ATTACH_MAX_FILES}
+                className="h-[42px] w-10 shrink-0 rounded-xl border border-white/10 bg-white/[.06] text-base text-white outline-none transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
+              >📎</button>
+              <textarea
+                aria-label={t(dict, 'concierge.placeholder', 'Ask anything...')}
+                value={input}
+                onChange={e => {
+                  setInput(e.target.value)
+                  e.target.style.height = 'auto'
+                  e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px'
+                }}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(input) } }}
+                rows={1}
+                className="sb-input min-w-0 flex-1 resize-none px-3.5 py-2.5 text-[13px] leading-snug"
+                style={{ maxHeight: 160, overflowY: 'auto', fontFamily: 'inherit' }}
+                placeholder={t(dict, 'concierge.placeholder', 'Ask anything...')}
+              />
+              <button type="button" className="sb-button-primary shrink-0 px-4 py-2.5 text-[13px]" onClick={() => ask(input)} disabled={loading || (!input.trim() && attachments.length === 0)}>
+                {t(dict, 'concierge.send', 'Send')}
+              </button>
+            </div>
+          </div>
+        </aside>
+      )}
+    </>
+  )
+}

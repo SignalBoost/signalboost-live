@@ -1,12 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 
 type CampaignStatus = 'draft' | 'waiting_approval' | 'approved' | 'queued' | 'running' | 'completed' | 'measured' | 'learned' | 'rejected'
 type PressChannel = 'online-newspapers' | 'print-newspapers' | 'trade-press'
-type Decision = 'ok' | 'no' | 'hold' | 'staff'
+type Decision = 'ok' | 'no' | 'hold' | 'staff' | 'package' | 'submitted' | 'published'
 
 type Campaign = {
   id: string
@@ -82,13 +82,53 @@ function reviewLabel(copy: Copy, campaign: Campaign) {
   return copy.pending
 }
 
-function DecisionForm({ id, decision, label, style }: { id: string; decision: Decision; label: string; style: CSSProperties }) {
+function DecisionForm({ id, decision, label, style, children }: { id: string; decision: Decision; label: string; style: CSSProperties; children?: ReactNode }) {
   return (
-    <form method="post" action="/api/marketing/press-print/decision" style={{ display: 'inline-flex' }}>
+    <form method="post" action="/api/marketing/press-print/decision" style={{ display: 'grid', gap: 8 }}>
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="decision" value={decision} />
+      {children}
       <button type="submit" style={style}>{label}</button>
     </form>
+  )
+}
+
+function stageLabel(stage: string) {
+  if (stage === 'package_prepared') return 'Package prepared'
+  if (stage === 'submitted') return 'Submitted to publication'
+  if (stage === 'published') return 'Published'
+  if (stage === 'staff_support') return 'Staff support'
+  if (stage === 'on_hold') return 'On hold'
+  if (stage === 'rejected') return 'Rejected'
+  if (stage === 'approved') return 'Approved, ready for execution'
+  return 'Not started'
+}
+
+function ExecutionPanel({ campaign }: { campaign: Campaign }) {
+  const review = String(campaign.metadata?.press_print_review || '').toUpperCase()
+  if (review !== 'APPROVED') return null
+  const execution = campaign.metadata?.press_print_execution || {}
+  const stage = String(campaign.metadata?.press_print_execution_stage || execution.stage || 'approved')
+  const liveUrl = String(execution.live_url || '')
+  const publicationDate = String(execution.publication_date || '')
+  return (
+    <div style={executionBox}>
+      <h3 className="sb-h3" style={{ marginTop: 0 }}>Post-approval execution</h3>
+      <p className="sb-caption" style={{ color: '#fde68a', marginTop: -4 }}>Current stage: {stageLabel(stage)}</p>
+      <ol style={{ margin: '8px 0 14px', paddingLeft: 18, color: 'rgba(255,255,255,.72)', lineHeight: 1.65 }}>
+        <li>Prepare article/ad package for the selected publication.</li>
+        <li>Submit to the editor or media contact.</li>
+        <li>Record live URL and publication date when published.</li>
+      </ol>
+      <div style={{ display: 'grid', gap: 10 }}>
+        <DecisionForm id={campaign.id} decision="package" label="Mark package prepared" style={secondary} />
+        <DecisionForm id={campaign.id} decision="submitted" label="Mark submitted" style={secondary} />
+        <DecisionForm id={campaign.id} decision="published" label="Mark published" style={primary}>
+          <input name="live_url" defaultValue={liveUrl} placeholder="Live publication URL" style={input} />
+          <input name="publication_date" type="date" defaultValue={publicationDate} style={input} />
+        </DecisionForm>
+      </div>
+    </div>
   )
 }
 
@@ -160,6 +200,7 @@ export default function PressPrintMediaPage() {
                   <DecisionForm id={campaign.id} decision="hold" label={copy.putHold} style={secondary} />
                 </div>
                 <div style={staffBox}><h3 className="sb-h3" style={{ marginTop: 0 }}>Staff support mode</h3><p style={body}>Use this if the campaign needs person-to-person publication handling, media-kit review, layout adjustment, or final delivery coordination.</p><ol style={{ margin: '8px 0 12px', paddingLeft: 18, color: 'rgba(255,255,255,.72)', lineHeight: 1.65 }}><li>Confirm publication contact and deadline.</li><li>Adjust ad dimensions and media requirements.</li><li>Prepare the final layout package.</li><li>Keep the decision in Marketing + Sales.</li></ol><DecisionForm id={campaign.id} decision="staff" label={staffActive ? 'Staff support active' : 'Use staff support'} style={staffActive ? primary : secondary} /></div>
+                <ExecutionPanel campaign={campaign} />
               </aside>
             </div>
           </section>
@@ -179,6 +220,8 @@ const card: CSSProperties = { border: '1px solid rgba(255,255,255,.10)', borderR
 const mockup: CSSProperties = { border: '1px solid rgba(255,255,255,.10)', borderRadius: 18, padding: 16, background: 'rgba(255,255,255,.04)' }
 const sidePanel: CSSProperties = { border: '1px solid rgba(255,255,255,.10)', borderRadius: 18, padding: 16, background: 'rgba(0,0,0,.18)' }
 const staffBox: CSSProperties = { border: '1px solid rgba(255,195,0,.20)', borderRadius: 14, padding: 14, marginTop: 16, background: 'rgba(255,195,0,.06)' }
+const executionBox: CSSProperties = { border: '1px solid rgba(56,189,248,.22)', borderRadius: 14, padding: 14, marginTop: 16, background: 'rgba(56,189,248,.06)' }
 const body: CSSProperties = { color: 'rgba(255,255,255,.70)', lineHeight: 1.65, maxWidth: 860 }
+const input: CSSProperties = { width: '100%', borderRadius: 10, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(15,23,42,.76)', color: '#fff', padding: '9px 10px' }
 const primary: CSSProperties = { border: 'none', background: '#ffc300', color: '#000', borderRadius: 12, padding: '10px 14px', fontWeight: 900, cursor: 'pointer' }
 const secondary: CSSProperties = { border: '1px solid rgba(255,255,255,.16)', background: 'rgba(255,255,255,.06)', color: '#fff', borderRadius: 12, padding: '10px 14px', fontWeight: 850, cursor: 'pointer' }

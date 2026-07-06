@@ -8,29 +8,23 @@ const GREEN = '#34d399'
 const RED = '#fca5a5'
 const panel = { background: 'rgba(15,23,42,.78)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 18, padding: 18 } as const
 const button = { border: 'none', background: GOLD, color: '#000', borderRadius: 12, padding: '10px 14px', fontWeight: 900, cursor: 'pointer' } as const
+const approveButton = { border: 'none', background: GREEN, color: '#001018', borderRadius: 12, padding: '10px 14px', fontWeight: 950, cursor: 'pointer' } as const
 const cyanButton = { border: 'none', background: CYAN, color: '#001018', borderRadius: 12, padding: '10px 14px', fontWeight: 900, cursor: 'pointer' } as const
 const ghost = { border: '1px solid rgba(255,255,255,.18)', background: 'rgba(255,255,255,.06)', color: '#fff', borderRadius: 12, padding: '10px 14px', fontWeight: 800, cursor: 'pointer' } as const
 
 function safe(value: any) {
-  return value == null || value === '' ? '—' : String(value)
+  return value == null || value === '' ? '-' : String(value)
 }
 
 function fmt(value: any) {
-  if (!value) return '—'
+  if (!value) return '-'
   const d = new Date(String(value))
   if (Number.isNaN(d.getTime())) return String(value)
-  return d.toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  })
+  return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
 function shortId(value: any) {
-  return String(value || '').slice(0, 8) || '—'
+  return String(value || '').slice(0, 8) || '-'
 }
 
 function progressFor(campaign: any, finalReady: boolean, rawOnly: boolean) {
@@ -66,6 +60,7 @@ export default function CosaVideoPipelinePage() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
+  const [approvingId, setApprovingId] = useState('')
 
   async function load(path = '/api/cos/video-pipeline-xray') {
     setLoading(true)
@@ -82,9 +77,7 @@ export default function CosaVideoPipelinePage() {
     }
   }
 
-  async function kick() {
-    await load('/api/cos/video-pipeline-xray?kick=1')
-  }
+  async function kick() { await load('/api/cos/video-pipeline-xray?kick=1') }
 
   async function kickBranding() {
     setLoading(true)
@@ -101,26 +94,43 @@ export default function CosaVideoPipelinePage() {
     }
   }
 
-  async function reset(id: string) {
-    await load(`/api/cos/video-pipeline-xray?reset=${encodeURIComponent(id)}&kick=1`)
+  async function approveCampaign(id: string) {
+    setApprovingId(id)
+    setMessage('')
+    try {
+      const res = await fetch('/api/cos/campaign-queue', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: 'approved' }),
+      })
+      const json = await res.json().catch(() => null)
+      if (!res.ok || !json?.ok) throw new Error(json?.error || 'Approval failed.')
+      setMessage(json.autoPublish?.published ? 'Approved and published. Check your email for the YouTube link.' : 'Approved. Publishing result is shown in the campaign metadata.')
+      await load()
+    } catch (e: any) {
+      setMessage(e?.message || 'Approval failed.')
+    } finally {
+      setApprovingId('')
+    }
   }
 
-  useEffect(() => { load() }, [])
+  async function reset(id: string) { await load(`/api/cos/video-pipeline-xray?reset=${encodeURIComponent(id)}&kick=1`) }
 
+  useEffect(() => { load() }, [])
   const campaigns = Array.isArray(data?.campaigns) ? data.campaigns : []
 
   return <main style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gap: 18 }}>
     <section style={{ ...panel, background: 'linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,6,23,.98))' }}>
       <p style={{ margin: 0, color: GOLD, fontSize: 12, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>COSA Video Pipeline</p>
       <h1 style={{ color: '#fff', margin: '10px 0 0', fontSize: 32 }}>Final video review</h1>
-      <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.65, maxWidth: 820 }}>This page now separates raw base renders from final campaign videos. A video is final only when it has voice/captions and the SignalBoostAi + www.saas.signalboostapp.com banner burned into it.</p>
+      <p style={{ color: 'rgba(255,255,255,.68)', lineHeight: 1.65, maxWidth: 820 }}>This page separates raw base renders from final campaign videos. Only approve after you watch the final branded preview.</p>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
         <button onClick={() => load()} disabled={loading} style={ghost}>{loading ? 'Loading...' : 'Refresh'}</button>
         <button onClick={kick} disabled={loading} style={button}>Kick missing renders</button>
         <button onClick={kickBranding} disabled={loading} style={cyanButton}>Kick branding worker</button>
         <a href="/dashboard/cosa" style={{ ...ghost, textDecoration: 'none' }}>Back to approval dashboard</a>
       </div>
-      {message && <p style={{ color: RED, marginTop: 12 }}>{message}</p>}
+      {message && <p style={{ color: message.toLowerCase().includes('fail') ? RED : GREEN, marginTop: 12 }}>{message}</p>}
     </section>
 
     {Array.isArray(data?.actions) && data.actions.length > 0 && <section style={panel}>
@@ -145,9 +155,7 @@ export default function CosaVideoPipelinePage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <div>
                 <strong style={{ color: '#fff' }}>{campaign.title || campaign.id}</strong>
-                <p style={{ color: 'rgba(255,255,255,.5)', margin: '4px 0 0', fontSize: 12 }}>
-                  Video ID {shortId(campaign.id)} - {campaign.channel} - {campaign.status}
-                </p>
+                <p style={{ color: 'rgba(255,255,255,.5)', margin: '4px 0 0', fontSize: 12 }}>Video ID {shortId(campaign.id)} - {campaign.channel} - {campaign.status}</p>
               </div>
               <span style={{ color, fontSize: 12, fontWeight: 900 }}>{finalReady ? 'FINAL READY' : rawOnly ? 'RAW DRAFT ONLY' : stage}</span>
             </div>
@@ -163,16 +171,16 @@ export default function CosaVideoPipelinePage() {
 
             <p style={{ color: 'rgba(255,255,255,.72)', lineHeight: 1.55 }}>{campaign.eligibility}</p>
 
-            {rawOnly && <div style={{ margin: '12px 0', border: '1px solid rgba(255,195,0,.32)', borderRadius: 14, padding: 12, background: 'rgba(255,195,0,.08)' }}>
-              <p style={{ color: GOLD, margin: 0, fontSize: 13, fontWeight: 900 }}>Not final yet: this campaign has not received the final burned-in SignalBoostAi website banner. If it says BANNER WAITING with attempts 0/5, use Kick branding worker.</p>
-            </div>}
-
             {previewUrl && <div style={{ margin: '12px 0', border: '1px solid rgba(52,211,153,.35)', borderRadius: 14, padding: 12, background: 'rgba(52,211,153,.08)' }}>
               <p style={{ color: GREEN, margin: '0 0 8px', fontSize: 12, fontWeight: 900 }}>Final playable campaign video - branded final - Created {fmt(campaign.created_at)}</p>
               <video src={previewUrl} controls style={{ width: '100%', maxHeight: 460, background: '#000', borderRadius: 12 }} />
             </div>}
 
+            {!previewUrl && rawOnly && <div style={{ margin: '12px 0', border: '1px solid rgba(255,195,0,.32)', borderRadius: 14, padding: 12, background: 'rgba(255,195,0,.08)' }}>
+              <p style={{ color: GOLD, margin: 0, fontSize: 13, fontWeight: 900 }}>Not final yet: the SignalBoostAi website banner has not been burned in.</p>
+            </div>}
             {!previewUrl && !rawOnly && <p style={{ color: 'rgba(255,255,255,.55)', fontSize: 12 }}>No final playable campaign video yet.</p>}
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
               <small style={{ color: 'rgba(255,255,255,.55)' }}>Base video URL: {video?.hasKlingUrl ? 'yes' : 'no'}</small>
               <small style={{ color: 'rgba(255,255,255,.55)' }}>Voiced pending: {(video?.voicedLangs || []).join(', ') || 'none'}</small>
@@ -181,6 +189,8 @@ export default function CosaVideoPipelinePage() {
             </div>
             {(video?.voiceError || video?.renderError || video?.autoPublishNote) && <pre style={{ color: RED, whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,.24)', borderRadius: 10, padding: 10, marginTop: 10 }}>{safe(video?.voiceError || video?.renderError || video?.autoPublishNote)}</pre>}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+              {finalReady && !campaign.approved_at && <button onClick={() => approveCampaign(campaign.id)} disabled={approvingId === campaign.id} style={approveButton}>{approvingId === campaign.id ? 'Approving...' : 'Approve and publish'}</button>}
+              {finalReady && campaign.approved_at && <span style={{ color: GREEN, fontWeight: 900, alignSelf: 'center' }}>Approved</span>}
               <a href="/dashboard/cosa" style={{ ...ghost, textDecoration: 'none' }}>Open approval dashboard</a>
               {rawOnly && <button onClick={kickBranding} disabled={loading} style={cyanButton}>Kick branding worker</button>}
               {stuck && <button onClick={() => reset(campaign.id)} disabled={loading} style={ghost}>Reset and kick</button>}

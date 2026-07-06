@@ -4,6 +4,8 @@ export const dynamic = 'force-dynamic'
 
 const PROCESSING_RATE = 0.15
 const MAX_BUDGET = 100000
+const ENTERPRISE_READY = true
+const ENTERPRISE_CHANNEL_MODE = 'PROGRAMMATIC_ENTERPRISE'
 
 function roundMoney(value: number) {
   return Math.round(value * 100) / 100
@@ -45,6 +47,12 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null)
   const selectedBudget = Number(body?.selectedBudget)
   const createStripeSession = Boolean(body?.createStripeSession)
+  const enterpriseReady = Boolean(body?.enterpriseReady)
+  const channelMode = String(body?.channelMode || '')
+
+  if (createStripeSession && (!ENTERPRISE_READY || !enterpriseReady || channelMode !== ENTERPRISE_CHANNEL_MODE)) {
+    return NextResponse.json({ error: 'enterprise checkout is not enabled' }, { status: 403 })
+  }
 
   if (!Number.isFinite(selectedBudget) || selectedBudget <= 0 || selectedBudget > MAX_BUDGET) {
     return NextResponse.json({ error: 'selectedBudget must be greater than zero' }, { status: 400 })

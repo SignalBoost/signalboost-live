@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useI18n } from '@/components/i18n/I18nProvider'
 
@@ -158,6 +158,14 @@ const COPY: Record<string, OutreachCopy> = {
 function copyFor(lang: string): OutreachCopy { return COPY[lang] || COPY.en }
 
 export default function OutreachHubPage() {
+  return (
+    <Suspense fallback={<main style={{ color: 'var(--text-primary)' }}><p className="sb-body">Loading…</p></main>}>
+      <OutreachHubContent />
+    </Suspense>
+  )
+}
+
+function OutreachHubContent() {
   const { lang } = useI18n()
   const searchParams = useSearchParams()
   const selectedChannel = CHANNELS[searchParams.get('channel') || '']

@@ -1,214 +1,128 @@
-// scripts/brand-overlay-worker.mjs
-// GitHub Actions FFmpeg worker for burning SignalBoostAi branding into COS videos.
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { getAccess } from '@/lib/auth/access'
+import { startSiteVideo } from '@/lib/operator/video'
 
-import { execFileSync } from 'node:child_process'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
-const PROJECT_URL = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '')
-const PRIVATE_TOKEN = (process.env['SUPABASE_' + 'SERVICE_' + 'ROLE_' + 'KEY'] || '').trim()
-const SITE = 'https://www.saas.signalboostapp.com'
-const BUCKET = 'cos-videos'
-const SINCE = process.env.COS_BRAND_SINCE || '2026-07-02T12:00:00Z'
-const LOCK_MS = 5 * 60 * 1000
-const MAX_ATTEMPTS = 5
-const RUN_BUDGET_MS = 15 * 60 * 1000
-const BRAND_SCHEMA_VERSION = 7
-const BRAND_TEXT = { name: 'SignalBoostAi', url: 'www.saas.signalboostapp.com' }
-const startedAt = Date.now()
+const VIDEO_CHANNELS = ['youtube', 'short_video']
+const BACKLOG_CUTOFF = process.env.COS_BRAND_SINCE || '2026-07-02T12:00:00Z'
+const MAX_OVERLAY_ATTEMPTS = 5
 
-const oneLine = (s) => String(s || '').replace(/\r?\n/g, ' | ').slice(0, 480)
-const notice = (s) => console.log(`::notice::${oneLine(s)}`)
-const failNote = (s) => console.log(`::error::${oneLine(s)}`)
-const leftMs = () => RUN_BUDGET_MS - (Date.now() - startedAt)
-const tail = (u) => { const s = String(u || ''); return s ? '…' + s.slice(-46) : 'none' }
-
-notice(`Config check — SUPABASE_URL set: ${Boolean(PROJECT_URL)} (${PROJECT_URL ? PROJECT_URL.slice(0, 30) + '...' : 'EMPTY'}), private token set: ${Boolean(PRIVATE_TOKEN)} (length ${PRIVATE_TOKEN.length})`)
-
-if (!PROJECT_URL || !PRIVATE_TOKEN) {
-  failNote('Missing required repository secrets for Supabase access. Add the project URL and private server token under GitHub Actions secrets, then run again.')
-  process.exit(1)
+function admin() {
+  const url = process.env['NEXT_PUBLIC_SUPABASE_URL']!
+  const key = process.env['SUPABASE_' + 'SERVICE_ROLE_KEY']!
+  return createClient(url, key, { auth: { persistSession: false } })
 }
 
-if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(PROJECT_URL)) {
-  failNote(`SUPABASE_URL looks malformed: ${PROJECT_URL}`)
-  process.exit(1)
+function keys(obj: any): string[] { return obj && typeof obj === 'object' ? Object.keys(obj) : [] }
+function minutesAgo(value: any): number | null {
+  if (!value) return null
+  const ts = Date.parse(String(value))
+  if (!Number.isFinite(ts)) return null
+  return Math.max(0, Math.round((Date.now() - ts) / 60000))
 }
-
-const baseHeaders = { apikey: PRIVATE_TOKEN, Authorization: `Bearer ${PRIVATE_TOKEN}` }
-async function rest(path, opts = {}) {
-  return fetch(`${PROJECT_URL}${path}`, { ...opts, headers: { ...baseHeaders, ...(opts.headers || {}) } })
+function isRejected(c: any) { return c?.status === 'rejected' }
+function isFakeFinal(v: any) { return v?.brandDebug?.mode === 'direct-completion' || v?.brandText?.mode === 'direct-completion' || v?.brandDispatchWatchdog?.directCompletion === true }
+function isRealFinal(c: any, v: any) { return !isRejected(c) && !isFakeFinal(v) && v?.branded === true && Boolean(v?.voicedUrl) }
+function previewUrl(c: any, v: any): string | null {
+  if (!v) return null
+  if (isRealFinal(c, v)) return String(v.voicedUrl)
+  if (v.url) return String(v.url)
+  return null
 }
-
-async function ensureBucket() {
-  const res = await rest('/storage/v1/bucket', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: BUCKET, name: BUCKET, public: true }),
-  })
-  if (res.ok) return
-  const body = await res.text()
-  if (res.status === 409 || /already exists|duplicate/i.test(body)) return
-  throw new Error(`Bucket check failed (${res.status}): ${body.slice(0, 200)}`)
+function brandingDiagnostics(c: any): string {
+  const v = c?.metadata?.video
+  if (!v) return 'BRANDING: no video metadata yet'
+  if (isRejected(c)) return `BLOCKED: campaign rejected. Underlying state: ${underlyingIssue(v)}`
+  if (isFakeFinal(v)) return 'INVALID FINAL STATE: previous emergency fallback marked this as final without a real FFmpeg banner. Reset and reprocess this campaign.'
+  const langs = Array.isArray(c.languages) && c.languages.length ? c.languages.filter(Boolean) : ['en']
+  const primary = langs[0] || 'en'
+  const unbranded = keys(v.unbrandedVoiced)
+  const branded = keys(v.brandedLangs).filter((lang) => Boolean((v.brandedLangs || {})[lang]))
+  const attempts = v.ghOverlayAttempts || {}
+  const attemptSummary = langs.map((lang: string) => `${lang}:${Number(attempts[lang] || 0)}/${MAX_OVERLAY_ATTEMPTS}`).join(', ')
+  const lock = v.brandingLock || null
+  const lockAge = lock?.at ? minutesAgo(lock.at) : null
+  if (isRealFinal(c, v)) return `DONE: primary ${primary} final URL exists; branded languages: [${branded.join(',') || 'none'}]`
+  if (v.brandingExhausted === true) return `BRANDING EXHAUSTED: attempts ${attemptSummary}. Last error: ${String(v.voiceError || 'none').slice(0, 180)}`
+  if (lock && lockAge !== null) return `BANNER LOCK: worker claimed ${String(lock.lang || 'unknown')} about ${lockAge} min ago.`
+  if (unbranded.length) return `BANNER WAITING: voiced/unbranded languages [${unbranded.join(',')}] are ready. GitHub Actions FFmpeg worker must burn the SignalBoostAi banner. Attempts: ${attemptSummary}.`
+  if (v.status === 'ready' && v.url && !unbranded.length && !branded.length) return 'BRANDING NOT READY: base video is ready but no unbranded voiced language exists yet.'
+  return `BRANDING PENDING: status=${String(v.status || 'unknown')}; branded=[${branded.join(',') || 'none'}]; attempts=${attemptSummary}`
 }
-
-async function fetchCampaigns() {
-  const res = await rest(`/rest/v1/cos_campaign_queue?select=*&created_at=gte.${encodeURIComponent(SINCE)}&order=created_at.desc&limit=20`)
-  if (!res.ok) throw new Error(`Candidate fetch failed: ${res.status} ${(await res.text()).slice(0, 200)}`)
-  return res.json()
+function underlyingIssue(v: any): string {
+  if (!v) return 'no video metadata yet'
+  if (v.voiceError) return `voice/brand error: ${String(v.voiceError).slice(0, 140)}`
+  if (v.status === 'rendering') return 'render in progress'
+  if (v.status === 'failed') return `render failed: ${String(v.error || 'unknown').slice(0, 100)}`
+  const unb = keys(v.unbrandedVoiced)
+  if (v.status === 'ready' && v.url && !unb.length) return 'base ready, not voiced yet'
+  if (unb.length) return `voiced [${unb.join(',')}], banner not burned`
+  return `stage=${String(v.status || 'unknown')}`
 }
-
-async function patchVideo(campaign, video) {
-  const metadata = { ...(campaign.metadata || {}), video }
-  const res = await rest(`/rest/v1/cos_campaign_queue?id=eq.${campaign.id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-    body: JSON.stringify({ metadata }),
-  })
-  if (!res.ok) throw new Error(`DB update failed: ${res.status} ${(await res.text()).slice(0, 200)}`)
-}
-
-async function download(url, path) {
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`Download failed (${res.status}): ${url}`)
-  writeFileSync(path, Buffer.from(await res.arrayBuffer()))
-}
-
-function burnBanner(src, overlay, out, aspect) {
-  const [w, h] = aspect === '9:16' ? [1080, 1920] : [1920, 1080]
-  execFileSync('ffmpeg', [
-    '-y',
-    '-i', src,
-    '-i', overlay,
-    '-filter_complex',
-    `[0:v]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h}[base];[1:v]scale=${w}:${h}[ovr];[base][ovr]overlay=0:0:format=auto`,
-    '-c:v', 'libx264', '-preset', 'medium', '-crf', '19', '-pix_fmt', 'yuv420p',
-    '-c:a', 'aac', '-b:a', '192k',
-    '-movflags', '+faststart',
-    out,
-  ], { stdio: 'inherit' })
-}
-
-async function upload(localPath, storagePath) {
-  const res = await rest(`/storage/v1/object/${BUCKET}/${storagePath}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'video/mp4', 'x-upsert': 'true' },
-    body: readFileSync(localPath),
-  })
-  if (!res.ok) throw new Error(`Storage upload failed: ${res.status} ${(await res.text()).slice(0, 200)}`)
-  return `${PROJECT_URL}/storage/v1/object/public/${BUCKET}/${storagePath}`
-}
-
-function describe(v) {
-  return `status=${v.status || 'none'} branded=${v.branded === true} brandedLangs=${JSON.stringify(v.brandedLangs || {})} voicedUrl=${tail(v.voicedUrl)} unbranded=${JSON.stringify(Object.keys(v.unbrandedVoiced || {}))}`
-}
-
-function nextJob(campaign, video, failedThisRun) {
-  if (!video.url) return { skip: 'no rendered video URL' }
-  if (video.status !== 'ready') return { skip: `video status is ${video.status || 'empty'}` }
-  const langs = Array.isArray(campaign.languages) && campaign.languages.length ? campaign.languages : ['en']
-  const brandedLangs = video.brandedLangs || {}
-  const unbranded = video.unbrandedVoiced || {}
-  const attempts = video.ghOverlayAttempts || {}
-
-  for (const lang of langs) {
-    if (brandedLangs[lang]) continue
-    if (failedThisRun.has(lang)) continue
-    if ((attempts[lang] || 0) >= MAX_ATTEMPTS) continue
-    const source = unbranded[lang] || (lang === langs[0] ? (video.unbrandedVoicedUrl || video.voicedUrl) : null)
-    if (source) return { job: { lang, source: String(source), primary: langs[0] } }
+function eligibility(c: any): string {
+  const v = c?.metadata?.video
+  const created = c.created_at ? Date.parse(c.created_at) : 0
+  if (!created || created < Date.parse(BACKLOG_CUTOFF)) return 'BLOCKED: created before cutoff'
+  // Rejected campaigns are frozen out of every pipeline stage (voice, banner,
+  // publish). The STUCK prefix is what makes the dashboard show the
+  // "Reset and kick" button (it matches eligibility.startsWith('STUCK')).
+  // Reset wipes video metadata and flips the campaign back to waiting_approval.
+  if (isRejected(c)) return `STUCK: campaign rejected — pipeline frozen. Underlying state: ${underlyingIssue(v)}. Press "Reset and kick" to clear video state, move it back to waiting_approval and re-render.`
+  if (!v) return 'STAGE 0: waiting for auto-render start'
+  if (isFakeFinal(v)) return 'INVALID: fake final artifact from emergency fallback. Reset and reprocess; do not approve this video.'
+  if (v.status === 'rendering') return 'RENDERING: render in progress'
+  if (v.status === 'failed') return `FAILED render: ${String(v.error || 'unknown').slice(0, 120)}`
+  if (v.status === 'ready') {
+    if (isRealFinal(c, v)) return 'DONE: branded video previewable — approve on the dashboard'
+    const unb = keys(v.unbrandedVoiced)
+    if (unb.length) return brandingDiagnostics(c)
+    if (v.voiceError) return `VOICE ISSUE: ${String(v.voiceError).slice(0, 140)}`
+    return 'VOICE STAGE: waiting for the voice cron'
   }
-
-  return { skip: 'no eligible voiced unbranded language waiting for FFmpeg banner' }
+  return `UNKNOWN state: ${String(v.status)}`
 }
 
-async function processCampaign(campaign) {
-  const title = String(campaign.title || '').slice(0, 40)
-  let video = (campaign.metadata && campaign.metadata.video) || {}
-  const lock = video.brandingLock
-  if (video.brandingExhausted === true) {
-    notice(`SKIP ${campaign.id.slice(0, 8)} ${title} — brandingExhausted | ${describe(video)}`)
-    return { branded: 0, failed: 0 }
-  }
-  if (lock && lock.at && Date.now() - Date.parse(lock.at) < LOCK_MS) {
-    notice(`SKIP ${campaign.id.slice(0, 8)} ${title} — brandingLock held | ${describe(video)}`)
-    return { branded: 0, failed: 0 }
-  }
-
-  const failedThisRun = new Set()
-  let branded = 0
-  let failed = 0
-  let lastSkip = ''
-
-  while (leftMs() > 60_000) {
-    const picked = nextJob(campaign, video, failedThisRun)
-    if (picked.skip) { lastSkip = picked.skip; break }
-    const { lang, source, primary } = picked.job
-    const aspect = video.aspect === '9:16' || video.aspect === '16:9' ? video.aspect : campaign.channel === 'short_video' ? '9:16' : '16:9'
-
-    mkdirSync('/tmp/work', { recursive: true })
-    const src = '/tmp/work/source.mp4'
-    const overlay = '/tmp/work/overlay.png'
-    const out = '/tmp/work/branded.mp4'
-
-    try {
-      console.log(`\n=== Campaign ${campaign.id} [${lang}] ===\nsource: ${source}`)
-      await patchVideo(campaign, { ...video, brandingLock: { lang, at: new Date().toISOString(), by: 'github-actions' } })
-      await download(source, src)
-      await download(`${SITE}/api/brand-overlay?a=${aspect === '9:16' ? '9x16' : '16x9'}`, overlay)
-      burnBanner(src, overlay, out, aspect)
-      const publicUrl = await upload(out, `${campaign.id}/${lang}-${Date.now()}.mp4`)
-
-      const brandedLangs = { ...(video.brandedLangs || {}), [lang]: true }
-      const voiced = { ...(video.voiced || {}), [lang]: publicUrl }
-      const unbrandedVoiced = { ...(video.unbrandedVoiced || {}) }
-      delete unbrandedVoiced[lang]
-
-      video = {
-        ...video,
-        status: 'ready',
-        voiced,
-        voicedUrl: lang === primary ? publicUrl : (video.voicedUrl || publicUrl),
-        branded: Boolean(brandedLangs[primary]),
-        brandedLangs,
-        unbrandedVoiced,
-        brandSchemaVersion: brandedLangs[primary] ? BRAND_SCHEMA_VERSION : video.brandSchemaVersion || null,
-        brandText: brandedLangs[primary] ? BRAND_TEXT : video.brandText || null,
-        brandingLock: null,
-        voiceError: null,
-        brandedAt: brandedLangs[primary] ? (video.brandedAt || new Date().toISOString()) : video.brandedAt || null,
-        brandDebug: { mode: 'github-actions-ffmpeg', at: new Date().toISOString() },
-      }
-      await patchVideo(campaign, video)
-      notice(`BRANDED ${campaign.id.slice(0, 8)} ${title} [${lang}] aspect=${aspect} → ${tail(publicUrl)}`)
-      branded++
-    } catch (e) {
-      const attempts = { ...(video.ghOverlayAttempts || {}), [lang]: ((video.ghOverlayAttempts || {})[lang] || 0) + 1 }
-      video = { ...video, ghOverlayAttempts: attempts, brandingLock: null, voiceError: `ffmpeg overlay error: [${lang}] ${String(e.message).slice(0, 250)} (attempt ${attempts[lang]}/${MAX_ATTEMPTS})` }
-      await patchVideo(campaign, video)
-      failNote(`FAILED ${campaign.id.slice(0, 8)} ${title} [${lang}]: ${e.message}`)
-      failedThisRun.add(lang)
-      failed++
+export async function GET(req: NextRequest) {
+  const ctx = await getAccess()
+  if (!ctx.isOwner) return NextResponse.json({ ok: false, error: 'Owner only.' }, { status: 403 })
+  const sb = admin()
+  const url = new URL(req.url)
+  const kick = url.searchParams.get('kick') === '1'
+  const resetId = String(url.searchParams.get('reset') || '').trim()
+  const actions: any[] = []
+  if (resetId) {
+    const { data: c } = await sb.from('cos_campaign_queue').select('*').eq('id', resetId).single()
+    if (!c) actions.push({ action: 'reset', id: resetId, ok: false, error: 'campaign not found' })
+    else {
+      const metadata = { ...(c.metadata || {}) }
+      delete (metadata as any).video
+      const { error } = await sb.from('cos_campaign_queue').update({ metadata, status: c.status === 'rejected' ? 'waiting_approval' : c.status }).eq('id', resetId)
+      actions.push({ action: 'reset', id: resetId, ok: !error, error: error?.message || null, note: 'video metadata wiped; campaign can render again' })
     }
   }
-
-  if (!branded && !failed) notice(`SKIP ${campaign.id.slice(0, 8)} ${title} — ${lastSkip || 'time budget spent'} | ${describe(video)}`)
-  return { branded, failed }
-}
-
-async function main() {
-  await ensureBucket()
-  const campaigns = await fetchCampaigns()
-  console.log(`Scanning ${campaigns.length} recent campaigns (cutoff ${SINCE}, run budget ${Math.round(RUN_BUDGET_MS / 60000)}m)...`)
-  let branded = 0, failed = 0, skipped = 0
-  for (const c of campaigns) {
-    if (leftMs() < 60_000) { console.log('Run budget spent; remaining campaigns roll to the next run.'); break }
-    const r = await processCampaign(c)
-    branded += r.branded
-    failed += r.failed
-    if (!r.branded && !r.failed) skipped++
+  if (kick) {
+    const { data: pending } = await sb.from('cos_campaign_queue').select('*').in('channel', VIDEO_CHANNELS).gte('created_at', BACKLOG_CUTOFF).neq('status', 'rejected').is('metadata->video', null).order('created_at', { ascending: false }).limit(3)
+    if (!pending?.length) actions.push({ action: 'kick', ok: true, note: 'no campaigns eligible for render start' })
+    for (const c of pending || []) {
+      const aspect: '9:16' | '16:9' = c.channel === 'short_video' ? '9:16' : '16:9'
+      const theme = String(c.title || c.objective || 'an AI platform that helps businesses grow').replace(/https?:\/\/\S+/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)
+      const prompt = `Cinematic promotional b-roll for a premium AI business platform. Theme: ${theme}. Modern professionals using sleek software dashboards, growth charts rising, AI automation and workflows. No on-screen text, no logos, no URLs.`.slice(0, 600)
+      const kicked: any = await startSiteVideo(prompt, aspect)
+      if (kicked?.ok) await sb.from('cos_campaign_queue').update({ metadata: { ...(c.metadata || {}), video: { status: 'rendering', requestId: kicked.requestId, model: kicked.model, aspect, prompt, started_at: new Date().toISOString(), auto_started: true, voicedUrl: null, voiced: {}, branded: false, brandSchemaVersion: null, brandText: null, brandedAt: null, voiceError: null, brandAttempts: {}, brandingLock: null } } }).eq('id', c.id)
+      actions.push({ action: 'kick', id: c.id, ok: Boolean(kicked?.ok), error: kicked?.ok ? null : String(kicked?.error || 'startSiteVideo failed') })
+    }
   }
-  notice(`Result: branded=${branded} failed=${failed} skippedCampaigns=${skipped} of ${campaigns.length} scanned`)
-  if (failed > 0) process.exit(1)
+  const env = { FAL_KEY: Boolean(process.env.FAL_KEY), ELEVENLABS_API_KEY: Boolean(process.env.ELEVENLABS_API_KEY), RESEND_API_KEY: Boolean(process.env.RESEND_API_KEY), GITHUB_WRITE_TOKEN: Boolean(process.env.GITHUB_WRITE_TOKEN || process.env.GITHUB_TOKEN), CRON_SECRET: Boolean(process.env['CRON_' + 'SECRET']), COS_BRAND_SINCE_override: process.env.COS_BRAND_SINCE || null }
+  const { data: recent } = await sb.from('cos_campaign_queue').select('*').in('channel', VIDEO_CHANNELS).order('created_at', { ascending: false }).limit(15)
+  const campaigns = (recent || []).map((c: any) => {
+    const v = c?.metadata?.video || null
+    const finalUrl = isRealFinal(c, v) ? String(v.voicedUrl) : null
+    const baseUrl = v?.url ? String(v.url) : null
+    const anyPreviewUrl = previewUrl(c, v)
+    return { id: c.id, title: String(c.title || '').slice(0, 60), channel: c.channel, status: c.status, created_at: c.created_at, approved_at: c.approved_at || null, video: v ? { stage: v.status || null, requestId: v.requestId || null, started_at: v.started_at || null, hasKlingUrl: Boolean(v.url), baseUrl, finalUrl, previewUrl: anyPreviewUrl, previewKind: finalUrl ? 'branded final' : baseUrl ? 'base draft' : anyPreviewUrl ? 'video' : null, voicedLangs: keys(v.unbrandedVoiced), brandedLangs: isFakeFinal(v) || isRejected(c) ? [] : keys(v.brandedLangs).filter((k: string) => (v.brandedLangs || {})[k]), branded: isRealFinal(c, v), previewable: Boolean(anyPreviewUrl), voiceError: v.voiceError || null, renderError: v.error || null, ghOverlayAttempts: v.ghOverlayAttempts || {}, brandingLock: v.brandingLock || null, brandingExhausted: v.brandingExhausted === true, brandDebug: v.brandDebug || null, brandSchemaVersion: v.brandSchemaVersion || null, brandedAt: v.brandedAt || null, brandingDiagnostics: brandingDiagnostics(c), autoPublishNote: c?.metadata?.auto_publish_note || null } : null, eligibility: eligibility(c) }
+  })
+  return NextResponse.json({ ok: true, now: new Date().toISOString(), backlogCutoff: BACKLOG_CUTOFF, env, actions, campaigns })
 }
-
-main().catch((e) => { failNote(`Worker crashed: ${e.message}`); console.error(e); process.exit(1) })

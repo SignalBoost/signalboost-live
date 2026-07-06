@@ -67,6 +67,8 @@ export default function WebsiteOptimizerPage() {
       const json = await res.json().catch(() => null)
       if (!res.ok || !json?.ok) { setError(copy.scanFailed); return }
       setData(json)
+      window.localStorage.setItem('signalboost.concierge.utilityContext', JSON.stringify({ source: 'website_optimizer', target: json.finalUrl || json.target || url.trim(), report: `Free Website Optimizer report for ${json.finalUrl || json.target || url.trim()}: score ${json.summary?.score ?? 'n/a'}, findings ${json.summary?.findings ?? 'n/a'}, high ${json.summary?.high ?? 'n/a'}. Top opportunities: ${(json.findings || []).slice(0, 5).map((f: any) => f.code).join(', ') || 'none flagged'}.` }))
+      window.dispatchEvent(new Event('signalboost:concierge-utility-context'))
     } catch { setError(copy.scanFailed) } finally { setLoading(false) }
   }
 

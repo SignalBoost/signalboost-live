@@ -94,6 +94,7 @@ const CUSTOMER_GROUPS: Group[] = [
       { icon: '🎬', label: 'COSA Video Pipeline', href: '/dashboard/cosa/video-pipeline', desc: 'Final videos, render status, branding, and release readiness.' },
       { icon: '📰', label: 'Online Newspaper Outreach', href: '/dashboard/outreach?channel=online-newspapers', desc: 'Digital newspaper and online publisher outreach.' },
       { icon: '🗞️', label: 'Print Newspaper Outreach', href: '/dashboard/outreach?channel=print-newspapers', desc: 'Offline newspaper and print placement planning.' },
+      { icon: '🧠', label: 'Magazine / Trade Press Outreach', href: '/dashboard/outreach?channel=trade-press', desc: 'IT magazines, SaaS publications, cybersecurity magazines, and industry trade press.' },
       { icon: '🛸', label: 'Outreach', href: '/dashboard/outreach', desc: 'Contacts, messages, campaigns, and pipeline work.' },
       { icon: '📢', label: 'Promote', href: '/dashboard/promote', desc: 'Marketing and promotion actions.' },
     ],
@@ -305,24 +306,7 @@ export default function PremiumCustomerNavbarV2() {
     item.href !== '/' && (pathname === item.href || pathname?.startsWith(`${item.href}/`)),
   )
 
-  const triggerStyle = (active: boolean, accent?: string): CSSProperties => ({
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 7,
-    background: active ? 'rgba(255,255,255,.075)' : 'transparent',
-    border: active ? `1px solid ${accent || 'rgba(255,255,255,.18)'}` : '1px solid transparent',
-    borderRadius: 999,
-    cursor: 'pointer',
-    color: active ? '#fff' : 'rgba(226,232,240,.76)',
-    fontWeight: active ? 800 : 650,
-    fontSize: 13,
-    fontFamily: 'inherit',
-    padding: '8px 11px',
-    whiteSpace: 'nowrap',
-    textDecoration: 'none',
-    boxShadow: active && accent ? `0 0 18px ${accent}22` : 'none',
-  })
-
+  const triggerStyle = (active: boolean, accent?: string): CSSProperties => ({ display: 'inline-flex', alignItems: 'center', gap: 7, background: active ? 'rgba(255,255,255,.075)' : 'transparent', border: active ? `1px solid ${accent || 'rgba(255,255,255,.18)'}` : '1px solid transparent', borderRadius: 999, cursor: 'pointer', color: active ? '#fff' : 'rgba(226,232,240,.76)', fontWeight: active ? 800 : 650, fontSize: 13, fontFamily: 'inherit', padding: '8px 11px', whiteSpace: 'nowrap', textDecoration: 'none', boxShadow: active && accent ? `0 0 18px ${accent}22` : 'none' })
   const dropdownPosition = (align?: 'left' | 'right'): CSSProperties => align === 'right' ? { right: 0 } : { left: 0 }
 
   function MenuGroup({ group }: { group: Group }) {
@@ -330,27 +314,11 @@ export default function PremiumCustomerNavbarV2() {
     const active = open || groupActive(group.items)
     return (
       <div style={{ position: 'relative' }} onMouseEnter={() => openNow(group.id)} onMouseLeave={closeSoon}>
-        <button type="button" aria-haspopup="true" aria-expanded={open} onClick={() => setOpenMenu(open ? null : group.id)} style={triggerStyle(active, group.accent)}>
-          <span aria-hidden style={{ width: 7, height: 7, borderRadius: 99, background: group.accent, boxShadow: `0 0 12px ${group.accent}`, opacity: active ? 1 : .72 }} />
-          {group.label}<span style={{ fontSize: 10, opacity: .68, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .18s' }}>▾</span>
-        </button>
+        <button type="button" aria-haspopup="true" aria-expanded={open} onClick={() => setOpenMenu(open ? null : group.id)} style={triggerStyle(active, group.accent)}><span aria-hidden style={{ width: 7, height: 7, borderRadius: 99, background: group.accent, boxShadow: `0 0 12px ${group.accent}`, opacity: active ? 1 : .72 }} />{group.label}<span style={{ fontSize: 10, opacity: .68, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .18s' }}>▾</span></button>
         <div style={{ position: 'absolute', top: '100%', ...dropdownPosition(group.align), paddingTop: 12, opacity: open ? 1 : 0, visibility: open ? 'visible' : 'hidden', transform: open ? 'translateY(0)' : 'translateY(8px)', pointerEvents: open ? 'auto' : 'none', transition: 'opacity .18s ease, transform .18s ease, visibility .18s', zIndex: 220 }} onMouseEnter={() => openNow(group.id)} onMouseLeave={closeSoon}>
           <div style={{ width: group.width || 360, maxWidth: '92vw', position: 'relative', overflow: 'hidden', borderRadius: 22, border: `1px solid ${group.accent}33`, background: 'linear-gradient(145deg, rgba(3,7,18,.98), rgba(15,23,42,.96))', boxShadow: `0 28px 90px rgba(0,0,0,.58), 0 0 45px ${group.accent}12`, backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>
             <span aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${group.accent}, ${CYAN})` }} />
-            <div style={{ padding: '15px 15px 8px' }}>
-              <div style={{ color: group.accent, fontSize: 10, fontWeight: 900, letterSpacing: '.16em', textTransform: 'uppercase', marginBottom: 8 }}>{group.eyebrow}</div>
-              <div style={{ display: 'grid', gap: 4 }}>
-                {group.items.map((item) => (
-                  <Link key={`${group.id}:${item.href}:${item.label}`} href={item.href} onClick={() => setOpenMenu(null)} className="sbnav-row" style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 12, textDecoration: 'none' }}>
-                    <span style={{ fontSize: 19, flexShrink: 0 }}>{item.icon}</span>
-                    <span style={{ minWidth: 0 }}>
-                      <span style={{ display: 'block', color: '#fff', fontWeight: 800, fontSize: 13 }}>{item.label}</span>
-                      {item.desc ? <span style={{ display: 'block', color: 'rgba(148,163,184,.88)', fontSize: 11, marginTop: 2, lineHeight: 1.35 }}>{item.desc}</span> : null}
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </div>
+            <div style={{ padding: '15px 15px 8px' }}><div style={{ color: group.accent, fontSize: 10, fontWeight: 900, letterSpacing: '.16em', textTransform: 'uppercase', marginBottom: 8 }}>{group.eyebrow}</div><div style={{ display: 'grid', gap: 4 }}>{group.items.map((item) => (<Link key={`${group.id}:${item.href}:${item.label}`} href={item.href} onClick={() => setOpenMenu(null)} className="sbnav-row" style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 12, textDecoration: 'none' }}><span style={{ fontSize: 19, flexShrink: 0 }}>{item.icon}</span><span style={{ minWidth: 0 }}><span style={{ display: 'block', color: '#fff', fontWeight: 800, fontSize: 13 }}>{item.label}</span>{item.desc ? <span style={{ display: 'block', color: 'rgba(148,163,184,.88)', fontSize: 11, marginTop: 2, lineHeight: 1.35 }}>{item.desc}</span> : null}</span></Link>))}</div></div>
           </div>
         </div>
       </div>
@@ -361,67 +329,12 @@ export default function PremiumCustomerNavbarV2() {
     <>
       <style>{`.sbnav-desktop{display:flex;align-items:center;gap:6px}.sbnav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}.sbnav-burger{display:none}.sbnav-mobile-auth{display:none}.sbnav-row{border-radius:14px;transition:background .15s ease,transform .15s ease}.sbnav-row:hover{background:rgba(255,255,255,.065);transform:translateX(2px)}@media(max-width:1260px){.sbnav-desktop,.sbnav-right{display:none!important}.sbnav-burger{display:inline-flex!important}.sbnav-mobile-auth{display:inline-flex!important}}`}</style>
       <nav ref={navRef} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '11px 22px', background: 'linear-gradient(135deg, rgba(4,8,18,.92), rgba(15,23,42,.76))', borderBottom: '1px solid rgba(26,240,255,.18)', boxShadow: '0 18px 60px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.08)', position: 'sticky', top: 0, zIndex: 100, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}>
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0, marginRight: 8 }}>
-          <span style={{ width: 34, height: 34, borderRadius: 99, border: `1px solid ${GOLD}55`, display: 'grid', placeItems: 'center', color: GOLD, boxShadow: `0 0 24px ${GOLD}22` }}>⌁</span>
-          <span style={{ display: 'grid', lineHeight: 1.05 }}>
-            <span style={{ color: '#fff', fontWeight: 900, fontSize: 17 }}>signal<span style={{ color: GOLD }}>boost</span></span>
-            <span style={{ color: 'rgba(148,163,184,.72)', fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase' }}>{brandSubtitle}</span>
-          </span>
-        </Link>
-        <div className="sbnav-desktop">
-          <Link href="/" style={triggerStyle(pathname === '/', GOLD)}>{homeLabel}</Link>
-          {groups.map((group) => <MenuGroup key={group.id} group={group} />)}
-          <Link href="/pricing" style={triggerStyle(pathname === '/pricing', GOLD)}>{pricingLabel}</Link>
-        </div>
-        <div className="sbnav-right">
-          <select value={String(lang || 'en')} onChange={(event) => setLang(event.target.value)} style={{ background: 'rgba(15,23,42,.82)', color: 'rgba(226,232,240,.78)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 999, padding: '8px 12px', fontSize: 12, cursor: 'pointer' }}>
-            {LANGUAGES.map((language) => <option key={language.code} value={language.code}>{language.label}</option>)}
-          </select>
-          {user ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-              <span title={`Available video credits: ${credits.toLocaleString()}`} style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,195,0,.95)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>⚡{credits >= 100000 ? `${Math.floor(credits / 1000)}K` : credits.toLocaleString()}</span>
-              <span title={`Current plan: ${currentPlanLabel}`} style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.06em', padding: '3px 10px', borderRadius: 999, background: currentPlanStyle.bg, color: currentPlanStyle.color, fontFamily: 'monospace' }}>{currentPlanLabel}</span>
-              {displayName ? <span title={displayName} style={{ fontSize: 12, fontWeight: 650, color: 'rgba(226,232,240,.70)', maxWidth: 135, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</span> : null}
-            </span>
-          ) : null}
-          {user ? <button onClick={handleLogout} style={{ background: 'transparent', color: 'rgba(148,163,184,.78)', border: '1px solid rgba(255,255,255,.13)', borderRadius: 999, padding: '8px 14px', cursor: 'pointer' }}>{t(dict, 'logout', 'Log out')}</button> : <button onClick={() => setShowAuth(true)} style={{ background: GOLD, color: '#000', border: 'none', borderRadius: 999, padding: '9px 22px', fontWeight: 900, cursor: 'pointer' }}>{t(dict, 'getStarted', 'Get started')}</button>}
-        </div>
-        <span className="sbnav-mobile-auth" style={{ alignItems: 'center', gap: 8 }}>
-          {user ? <><span style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,195,0,.95)', fontFamily: 'monospace' }}>⚡ {credits}</span><span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.06em', padding: '3px 10px', borderRadius: 999, background: currentPlanStyle.bg, color: currentPlanStyle.color, fontFamily: 'monospace' }}>{currentPlanLabel}</span></> : <button onClick={() => setShowAuth(true)} style={{ background: GOLD, color: '#000', border: 'none', borderRadius: 999, padding: '8px 16px', fontWeight: 900, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>{t(dict, 'getStarted', 'Get started')}</button>}
-        </span>
-        <button className="sbnav-burger" aria-label={menuLabel} onClick={() => setMobileOpen((open) => !open)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,.16)', borderRadius: 12, color: '#fff', padding: '8px 12px', cursor: 'pointer', fontSize: 18 }}>{mobileOpen ? '✕' : '☰'}</button>
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0, marginRight: 8 }}><span style={{ width: 34, height: 34, borderRadius: 99, border: `1px solid ${GOLD}55`, display: 'grid', placeItems: 'center', color: GOLD, boxShadow: `0 0 24px ${GOLD}22` }}>⌁</span><span style={{ display: 'grid', lineHeight: 1.05 }}><span style={{ color: '#fff', fontWeight: 900, fontSize: 17 }}>signal<span style={{ color: GOLD }}>boost</span></span><span style={{ color: 'rgba(148,163,184,.72)', fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase' }}>{brandSubtitle}</span></span></Link>
+        <div className="sbnav-desktop"><Link href="/" style={triggerStyle(pathname === '/', GOLD)}>{homeLabel}</Link>{groups.map((group) => <MenuGroup key={group.id} group={group} />)}<Link href="/pricing" style={triggerStyle(pathname === '/pricing', GOLD)}>{pricingLabel}</Link></div>
+        <div className="sbnav-right"><select value={String(lang || 'en')} onChange={(event) => setLang(event.target.value)} style={{ background: 'rgba(15,23,42,.82)', color: 'rgba(226,232,240,.78)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 999, padding: '8px 12px', fontSize: 12, cursor: 'pointer' }}>{LANGUAGES.map((language) => <option key={language.code} value={language.code}>{language.label}</option>)}</select>{user ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><span title={`Available video credits: ${credits.toLocaleString()}`} style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,195,0,.95)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>⚡{credits >= 100000 ? `${Math.floor(credits / 1000)}K` : credits.toLocaleString()}</span><span title={`Current plan: ${currentPlanLabel}`} style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.06em', padding: '3px 10px', borderRadius: 999, background: currentPlanStyle.bg, color: currentPlanStyle.color, fontFamily: 'monospace' }}>{currentPlanLabel}</span>{displayName ? <span title={displayName} style={{ fontSize: 12, fontWeight: 650, color: 'rgba(226,232,240,.70)', maxWidth: 135, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</span> : null}</span>) : null}{user ? <button onClick={handleLogout} style={{ background: 'transparent', color: 'rgba(148,163,184,.78)', border: '1px solid rgba(255,255,255,.13)', borderRadius: 999, padding: '8px 14px', cursor: 'pointer' }}>{t(dict, 'logout', 'Log out')}</button> : <button onClick={() => setShowAuth(true)} style={{ background: GOLD, color: '#000', border: 'none', borderRadius: 999, padding: '9px 22px', fontWeight: 900, cursor: 'pointer' }}>{t(dict, 'getStarted', 'Get started')}</button>}</div>
+        <span className="sbnav-mobile-auth" style={{ alignItems: 'center', gap: 8 }}>{user ? <><span style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,195,0,.95)', fontFamily: 'monospace' }}>⚡ {credits}</span><span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.06em', padding: '3px 10px', borderRadius: 999, background: currentPlanStyle.bg, color: currentPlanStyle.color, fontFamily: 'monospace' }}>{currentPlanLabel}</span></> : <button onClick={() => setShowAuth(true)} style={{ background: GOLD, color: '#000', border: 'none', borderRadius: 999, padding: '8px 16px', fontWeight: 900, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>{t(dict, 'getStarted', 'Get started')}</button>}</span><button className="sbnav-burger" aria-label={menuLabel} onClick={() => setMobileOpen((open) => !open)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,.16)', borderRadius: 12, color: '#fff', padding: '8px 12px', cursor: 'pointer', fontSize: 18 }}>{mobileOpen ? '✕' : '☰'}</button>
       </nav>
-      {mobileOpen ? (
-        <div style={{ position: 'sticky', top: 65, zIndex: 99, background: 'rgba(4,8,18,.98)', borderBottom: '1px solid rgba(255,255,255,.14)', padding: 16, maxHeight: '80vh', overflowY: 'auto', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}>
-          {user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,195,0,.95)', fontFamily: 'monospace' }}>⚡ {credits}</span>
-              <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.06em', padding: '3px 10px', borderRadius: 999, background: currentPlanStyle.bg, color: currentPlanStyle.color, fontFamily: 'monospace' }}>{currentPlanLabel}</span>
-              {displayName ? <span style={{ fontSize: 12, fontWeight: 650, color: 'rgba(226,232,240,.72)' }}>{displayName}</span> : null}
-            </div>
-          ) : null}
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid rgba(255,255,255,.10)' }}>
-            <select value={String(lang || 'en')} onChange={(event) => setLang(event.target.value)} style={{ background: 'rgba(15,23,42,.82)', color: 'rgba(226,232,240,.78)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 999, padding: '8px 12px', fontSize: 12 }}>
-              {LANGUAGES.map((language) => <option key={language.code} value={language.code}>{language.label}</option>)}
-            </select>
-            {user ? <button onClick={handleLogout} style={{ background: 'transparent', color: 'rgba(148,163,184,.78)', border: '1px solid rgba(255,255,255,.13)', borderRadius: 999, padding: '9px 16px', cursor: 'pointer' }}>{t(dict, 'logout', 'Log out')}</button> : <button onClick={() => { setMobileOpen(false); setShowAuth(true) }} style={{ background: GOLD, color: '#000', border: 'none', borderRadius: 999, padding: '9px 22px', fontWeight: 900, cursor: 'pointer' }}>{t(dict, 'getStarted', 'Get started')}</button>}
-          </div>
-          <div style={{ display: 'grid', gap: 4, marginBottom: 14 }}>
-            <Link href="/" style={{ padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 800, fontSize: 14 }}>🏠 {homeLabel}</Link>
-            <Link href="/pricing" style={{ padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 800, fontSize: 14 }}>💳 {pricingLabel}</Link>
-          </div>
-          {groups.map((group) => (
-            <div key={group.id} style={{ display: 'grid', gap: 4, marginBottom: 15 }}>
-              <span style={{ color: group.accent, fontSize: 11, fontWeight: 900, letterSpacing: '.10em', textTransform: 'uppercase' }}>{group.label}</span>
-              {group.items.map((item) => (
-                <Link key={`${group.id}:${item.href}:${item.label}`} href={item.href} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 650, fontSize: 14, borderRadius: 12, background: 'rgba(255,255,255,.03)' }}>
-                  <span>{item.icon}</span><span>{item.label}</span>
-                </Link>
-              ))}
-            </div>
-          ))}
-        </div>
-      ) : null}
+      {mobileOpen ? (<div style={{ position: 'sticky', top: 65, zIndex: 99, background: 'rgba(4,8,18,.98)', borderBottom: '1px solid rgba(255,255,255,.14)', padding: 16, maxHeight: '80vh', overflowY: 'auto', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}>{user ? (<div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}><span style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,195,0,.95)', fontFamily: 'monospace' }}>⚡ {credits}</span><span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.06em', padding: '3px 10px', borderRadius: 999, background: currentPlanStyle.bg, color: currentPlanStyle.color, fontFamily: 'monospace' }}>{currentPlanLabel}</span>{displayName ? <span style={{ fontSize: 12, fontWeight: 650, color: 'rgba(226,232,240,.72)' }}>{displayName}</span> : null}</div>) : null}<div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid rgba(255,255,255,.10)' }}><select value={String(lang || 'en')} onChange={(event) => setLang(event.target.value)} style={{ background: 'rgba(15,23,42,.82)', color: 'rgba(226,232,240,.78)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 999, padding: '8px 12px', fontSize: 12 }}>{LANGUAGES.map((language) => <option key={language.code} value={language.code}>{language.label}</option>)}</select>{user ? <button onClick={handleLogout} style={{ background: 'transparent', color: 'rgba(148,163,184,.78)', border: '1px solid rgba(255,255,255,.13)', borderRadius: 999, padding: '9px 16px', cursor: 'pointer' }}>{t(dict, 'logout', 'Log out')}</button> : <button onClick={() => { setMobileOpen(false); setShowAuth(true) }} style={{ background: GOLD, color: '#000', border: 'none', borderRadius: 999, padding: '9px 22px', fontWeight: 900, cursor: 'pointer' }}>{t(dict, 'getStarted', 'Get started')}</button>}</div><div style={{ display: 'grid', gap: 4, marginBottom: 14 }}><Link href="/" style={{ padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 800, fontSize: 14 }}>🏠 {homeLabel}</Link><Link href="/pricing" style={{ padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 800, fontSize: 14 }}>💳 {pricingLabel}</Link></div>{groups.map((group) => (<div key={group.id} style={{ display: 'grid', gap: 4, marginBottom: 15 }}><span style={{ color: group.accent, fontSize: 11, fontWeight: 900, letterSpacing: '.10em', textTransform: 'uppercase' }}>{group.label}</span>{group.items.map((item) => (<Link key={`${group.id}:${item.href}:${item.label}`} href={item.href} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 650, fontSize: 14, borderRadius: 12, background: 'rgba(255,255,255,.03)' }}><span>{item.icon}</span><span>{item.label}</span></Link>))}</div>))}</div>) : null}
       {showAuth ? <AuthModal onClose={() => setShowAuth(false)} /> : null}
     </>
   )

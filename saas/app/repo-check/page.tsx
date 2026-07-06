@@ -67,6 +67,8 @@ export default function RepoCheckPage() {
       const json = await res.json().catch(() => null)
       if (!res.ok || !json?.ok) { setError(copy.checkFailed); return }
       setData(json)
+      window.localStorage.setItem('signalboost.concierge.utilityContext', JSON.stringify({ source: 'repo_check', target: json.target?.url || url.trim(), report: `Free Repo Check report for ${json.target?.url || url.trim()}: packages ${json.summary?.packagesScanned ?? json.summary?.packageCount ?? 'n/a'}, advisories ${json.summary?.advisoryCount ?? 'n/a'}, critical ${json.summary?.critical ?? 'n/a'}, high ${json.summary?.high ?? 'n/a'}. Top findings: ${(json.topAdvisories || []).slice(0, 5).map((f: any) => `${f.packageName} ${f.version}`).join(', ') || 'none flagged'}.` }))
+      window.dispatchEvent(new Event('signalboost:concierge-utility-context'))
     } catch { setError(copy.checkFailed) } finally { setLoading(false) }
   }
 

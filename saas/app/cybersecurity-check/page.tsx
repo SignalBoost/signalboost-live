@@ -68,6 +68,8 @@ export default function CybersecurityCheckPage() {
       const json = await response.json().catch(() => null)
       if (!response.ok || !json?.ok) { setError(copy.scanFailed); return }
       setData(json)
+      window.localStorage.setItem('signalboost.concierge.utilityContext', JSON.stringify({ source: 'cybersecurity_check', target: json.finalUrl || json.target || url.trim(), report: `Free Security Utility report for ${json.finalUrl || json.target || url.trim()}: score ${json.summary?.score ?? 'n/a'}, findings ${json.summary?.findings ?? 'n/a'}, high ${json.summary?.high ?? 'n/a'}. Security signals: ${(json.findings || []).slice(0, 5).map((f: any) => f.code).join(', ') || 'none flagged'}.` }))
+      window.dispatchEvent(new Event('signalboost:concierge-utility-context'))
     } catch { setError(copy.scanFailed) } finally { setLoading(false) }
   }
 

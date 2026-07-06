@@ -104,6 +104,7 @@ export default function Concierge() {
   const [loading, setLoading] = useState(false)
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [dragOver, setDragOver] = useState(false)
+  const [utilityContext, setUtilityContext] = useState<string>('')
   const logRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const conversationIdRef = useRef<string>('')
@@ -163,9 +164,31 @@ export default function Concierge() {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight
   }, [messages, loading])
 
+  useEffect(() => {
+    const key = 'signalboost.concierge.utilityContext'
+    const loadUtilityContext = () => {
+      try {
+        const raw = window.localStorage.getItem(key)
+        if (!raw) return
+        const parsed = JSON.parse(raw)
+        const report = typeof parsed?.report === 'string' ? parsed.report : ''
+        if (!report) return
+        setUtilityContext(report.slice(0, 1800))
+        setOpen(true)
+      } catch { /* ignore malformed lead-magnet context */ }
+    }
+    loadUtilityContext()
+    window.addEventListener('signalboost:concierge-utility-context', loadUtilityContext)
+    return () => window.removeEventListener('signalboost:concierge-utility-context', loadUtilityContext)
+  }, [])
+
+  const contextualGreeting = utilityContext
+    ? `${t(dict, 'concierge.utilityOffer', 'I identified optimization opportunities on your URL. Would you like our media studio (COS Core v1) to automatically create a video campaign to boost your conversion for only 10 credits?')}\n\n${utilityContext}`
+    : t(dict, 'concierge.greeting', 'Hello, I am the SignalBoost Concierge. Ask me about your workspace, or open FAQ, support, and docs below.')
+
   const visibleMessages = messages.length
     ? messages
-    : [{ role: 'assistant' as const, content: t(dict, 'concierge.greeting', 'Hello, I am the SignalBoost Concierge. Ask me about your workspace, or open FAQ, support, and docs below.') }]
+    : [{ role: 'assistant' as const, content: contextualGreeting }]
 
   function resetVisibleChat() {
     setInput('')
@@ -196,7 +219,7 @@ export default function Concierge() {
         body: JSON.stringify({
           messages: nextMessages,
           attachments: staged.map(a => ({ name: a.name, type: a.type, dataUrl: a.dataUrl })),
-          context: { currentPage: pathname, language: activeLang, conversationId: conversationIdRef.current },
+          context: { currentPage: pathname, language: activeLang, conversationId: conversationIdRef.current, utilityReport: utilityContext, cosMode: 'silent_background_planning' },
         }),
       })
       const data = await res.json()

@@ -58,6 +58,18 @@ const ORG_JSON_LD = {
   sameAs: [] as string[],
 }
 
+const OLD_PRESS_WORKFLOW_HIDE_CSS = `
+a[href="/dashboard/marketing/press-outreach"],
+a[href="/dashboard/marketing/outreach?channel=online-newspapers"],
+a[href="/dashboard/marketing/outreach?channel=print-newspapers"],
+a[href="/dashboard/marketing/outreach?channel=trade-press"],
+a[href="/dashboard/outreach?channel=online-newspapers"],
+a[href="/dashboard/outreach?channel=print-newspapers"],
+a[href="/dashboard/outreach?channel=trade-press"] {
+  display: none !important;
+}
+`
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -66,6 +78,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(ORG_JSON_LD) }}
         />
+        <style dangerouslySetInnerHTML={{ __html: OLD_PRESS_WORKFLOW_HIDE_CSS }} />
       </head>
       <body
         style={{

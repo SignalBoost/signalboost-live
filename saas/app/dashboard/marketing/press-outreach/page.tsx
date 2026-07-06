@@ -1,5 +1,5 @@
-import PressOutreachStudio from '@/components/agency/PressOutreachStudio'
+import { redirect } from 'next/navigation'
 
 export default function PressOutreachPage() {
-  return <PressOutreachStudio />
+  redirect('/dashboard/marketing/press-print')
 }

@@ -8,7 +8,7 @@ export const maxDuration = 300
 
 const VIDEO_CHANNELS = ['youtube', 'short_video']
 const BACKLOG_CUTOFF = process.env.COS_BRAND_SINCE || '2026-07-02T12:00:00Z'
-const LIMIT = 3
+const LIMIT = 50
 
 function admin() {
   const url = process.env['NEXT_PUBLIC_SUPABASE_URL']!
@@ -21,15 +21,23 @@ function campaignLangs(campaign: any): string[] {
   return langs.length ? langs : ['en']
 }
 
-function needsVoice(campaign: any) {
+function voiceSkipReason(campaign: any): string | null {
   const video = campaign?.metadata?.video || null
-  if (!video || video.status !== 'ready' || !video.url) return false
-  if (campaign.status === 'rejected') return false
+  if (campaign.status === 'rejected') return 'campaign rejected'
+  if (!video) return 'no video metadata'
+  if (video.status !== 'ready') return `video status is ${String(video.status || 'missing')}`
+  if (!video.url) return 'base video url missing'
   const createdAt = campaign.created_at ? Date.parse(campaign.created_at) : 0
-  if (!createdAt || createdAt < Date.parse(BACKLOG_CUTOFF)) return false
+  if (!createdAt || createdAt < Date.parse(BACKLOG_CUTOFF)) return 'before COS_BRAND_SINCE cutoff'
   const brandedLangs = video.brandedLangs || {}
   const unbranded = video.unbrandedVoiced || {}
-  return campaignLangs(campaign).some((lang) => !brandedLangs[lang] && !unbranded[lang])
+  const missing = campaignLangs(campaign).filter((lang) => !brandedLangs[lang] && !unbranded[lang])
+  if (!missing.length) return 'all campaign languages already have branded or unbranded voice artifact'
+  return null
+}
+
+function needsVoice(campaign: any) {
+  return voiceSkipReason(campaign) === null
 }
 
 async function runVoice(sb: any, campaign: any) {
@@ -68,10 +76,12 @@ async function handle(req: NextRequest) {
   if (id) query = sb.from('cos_campaign_queue').select('*').eq('id', id).limit(1)
   const { data, error } = await query
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
-  const candidates = (data || []).filter(needsVoice)
+  const rows = data || []
+  const candidates = rows.filter(needsVoice).slice(0, 5)
   const results = []
   for (const campaign of candidates) results.push(await runVoice(sb, campaign))
-  return NextResponse.json({ ok: true, scanned: data?.length || 0, processed: results.length, results })
+  const skipped = rows.slice(0, 20).filter((row: any) => !needsVoice(row)).map((row: any) => ({ id: row.id, status: row.status, title: String(row.title || '').slice(0, 60), reason: voiceSkipReason(row) }))
+  return NextResponse.json({ ok: true, scanned: rows.length, processed: results.length, results, skipped })
 }
 
 export async function GET(req: NextRequest) { return handle(req) }

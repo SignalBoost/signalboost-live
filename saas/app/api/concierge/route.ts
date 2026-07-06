@@ -74,7 +74,7 @@ function channelFrom(text: string): string {
 function titleFrom(text: string): string {
   const clean = String(text || '')
     .replace(/\s+/g, ' ')
-    .replace(/📎.*$/s, '')
+    .replace(/📎[\s\S]*$/, '')
     .trim()
     .slice(0, 110)
   return clean || 'Owner requested video render'

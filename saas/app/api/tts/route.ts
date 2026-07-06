@@ -20,6 +20,11 @@ import {
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+type StorageOperationResult = {
+  data?: unknown;
+  error: unknown | null;
+};
+
 const STORAGE_BUCKET = "tts-cache";
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 const MAX_AUDIO_FILE_SIZE_BYTES = 10 * 1024 * 1024;
@@ -133,7 +138,7 @@ export async function POST(req: NextRequest) {
   try {
     audioBuffer = await generateSpeech({ text, voiceId });
   } catch (err) {
-    console.error("ElevenLabs generation failed:", err);
+    console.error("Speech generation failed:", err);
     return NextResponse.json(
       { error: "Speech generation failed" },
       { status: 502 },
@@ -211,13 +216,13 @@ async function uploadTtsAudio(
   await ensureTtsBucket(supabase);
 
   const audioBytes = Buffer.from(audioBuffer);
-  const firstUpload = await withTimeout(
+  const firstUpload = await withTimeout<StorageOperationResult>(
     supabase.storage
       .from(STORAGE_BUCKET)
       .upload(storageKey, audioBytes, {
         contentType: "audio/mpeg",
         upsert: true,
-      }),
+      }) as PromiseLike<StorageOperationResult>,
     STORAGE_OPERATION_TIMEOUT_MS,
     "TTS storage upload timed out",
   );
@@ -228,13 +233,13 @@ async function uploadTtsAudio(
 
   await ensureTtsBucket(supabase, true);
 
-  const retryUpload = await withTimeout(
+  const retryUpload = await withTimeout<StorageOperationResult>(
     supabase.storage
       .from(STORAGE_BUCKET)
       .upload(storageKey, audioBytes, {
         contentType: "audio/mpeg",
         upsert: true,
-      }),
+      }) as PromiseLike<StorageOperationResult>,
     STORAGE_OPERATION_TIMEOUT_MS,
     "TTS storage retry upload timed out",
   );
@@ -244,8 +249,8 @@ async function uploadTtsAudio(
 
 async function ensureTtsBucket(supabase: any, forceCreate = false): Promise<void> {
   if (!forceCreate) {
-    const { data, error } = await withTimeout(
-      supabase.storage.getBucket(STORAGE_BUCKET),
+    const { data, error } = await withTimeout<StorageOperationResult>(
+      supabase.storage.getBucket(STORAGE_BUCKET) as PromiseLike<StorageOperationResult>,
       STORAGE_OPERATION_TIMEOUT_MS,
       "TTS storage bucket check timed out",
     );
@@ -256,12 +261,12 @@ async function ensureTtsBucket(supabase: any, forceCreate = false): Promise<void
     }
   }
 
-  const { error: createError } = await withTimeout(
+  const { error: createError } = await withTimeout<StorageOperationResult>(
     supabase.storage.createBucket(STORAGE_BUCKET, {
       public: false,
       fileSizeLimit: MAX_AUDIO_FILE_SIZE_BYTES,
       allowedMimeTypes: ["audio/mpeg"],
-    }),
+    }) as PromiseLike<StorageOperationResult>,
     STORAGE_OPERATION_TIMEOUT_MS,
     "TTS storage bucket creation timed out",
   );
@@ -305,8 +310,8 @@ function formatSupabaseError(error: unknown): string {
 async function withTimeout<T>(promise: PromiseLike<T>, ms: number, message: string): Promise<T> {
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
-    return await Promise.race([
-      promise,
+    return await Promise.race<T>([
+      Promise.resolve(promise),
       new Promise<never>((_, reject) => {
         timeout = setTimeout(() => reject(new Error(message)), ms);
       }),
@@ -317,17 +322,23 @@ async function withTimeout<T>(promise: PromiseLike<T>, ms: number, message: stri
 }
 
 async function getSignedUrl(supabase: any, storageKey: string): Promise<string> {
-  const { data, error } = await withTimeout(
+  const { data, error } = await withTimeout<StorageOperationResult>(
     supabase.storage
       .from(STORAGE_BUCKET)
-      .createSignedUrl(storageKey, SIGNED_URL_TTL_SECONDS),
+      .createSignedUrl(storageKey, SIGNED_URL_TTL_SECONDS) as PromiseLike<StorageOperationResult>,
     STORAGE_OPERATION_TIMEOUT_MS,
     "TTS signed URL creation timed out",
   );
   if (error || !data) {
-    throw new Error(`Failed to sign URL: ${error?.message ?? "unknown"}`);
+    throw new Error(`Failed to sign URL: ${formatSupabaseError(error)}`);
   }
-  return data.signedUrl;
+
+  const signedUrl = (data as { signedUrl?: string }).signedUrl;
+  if (!signedUrl) {
+    throw new Error("Failed to sign URL: signedUrl missing from Supabase response");
+  }
+
+  return signedUrl;
 }
 
 async function getUserPlan(supabase: any, userId: string): Promise<PlanId> {

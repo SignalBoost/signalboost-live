@@ -88,10 +88,12 @@ const CUSTOMER_GROUPS: Group[] = [
     label: 'Marketing + Sales',
     eyebrow: 'Campaigns, outreach & video',
     accent: PINK,
-    width: 450,
+    width: 470,
     items: [
       { icon: '📣', label: 'COSA Campaign Console', href: '/dashboard/cosa', desc: 'Create and manage governed marketing campaigns.' },
       { icon: '🎬', label: 'COSA Video Pipeline', href: '/dashboard/cosa/video-pipeline', desc: 'Final videos, render status, branding, and release readiness.' },
+      { icon: '📰', label: 'Online Newspaper Outreach', href: '/dashboard/outreach?channel=online-newspapers', desc: 'Digital newspaper and online publisher outreach.' },
+      { icon: '🗞️', label: 'Print Newspaper Outreach', href: '/dashboard/outreach?channel=print-newspapers', desc: 'Offline newspaper and print placement planning.' },
       { icon: '🛸', label: 'Outreach', href: '/dashboard/outreach', desc: 'Contacts, messages, campaigns, and pipeline work.' },
       { icon: '📢', label: 'Promote', href: '/dashboard/promote', desc: 'Marketing and promotion actions.' },
     ],

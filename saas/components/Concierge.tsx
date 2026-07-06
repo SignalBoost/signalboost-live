@@ -24,6 +24,10 @@ const ATTACH_MAX_FILES = 5
 const ATTACH_ALLOWED_RE = /^(image\/(png|jpe?g|gif|webp)|application\/pdf|text\/(plain|csv|markdown))$/i
 const ATTACH_INPUT_ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain,.txt,.md,.csv'
 const DESKTOP_PANEL_OFFSET = '456px'
+const ASSET_READY_KEY = 'signalboost.concierge.assetReady'
+// Credit pack pricing shows only when the activation flag is on (Vercel env:
+// NEXT_PUBLIC_CREDITS_ACTIVATION=1). Mirrors the Studio catalog badge gate.
+const CREDITS_ACTIVATION = process.env.NEXT_PUBLIC_CREDITS_ACTIVATION === '1'
 
 const QUICK_KEYS = [
   { label: 'concierge.quick.marketplace.label', prompt: 'concierge.quick.marketplace.prompt', fallbackLabel: '🛰️ Marketplace', fallbackPrompt: 'Guide me through marketplace partners, categories, and bookings.' },
@@ -105,6 +109,7 @@ export default function Concierge() {
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [dragOver, setDragOver] = useState(false)
   const [utilityContext, setUtilityContext] = useState<string>('')
+  const [assetNotice, setAssetNotice] = useState<{ id: string; title: string } | null>(null)
   const logRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const conversationIdRef = useRef<string>('')
@@ -182,15 +187,50 @@ export default function Concierge() {
     return () => window.removeEventListener('signalboost:concierge-utility-context', loadUtilityContext)
   }, [])
 
+  // COS Core v1 completion channel: when the FFmpeg/Actions pipeline finishes a
+  // branded asset, any Studio surface (e.g. the COSA notification center) writes
+  // ASSET_READY_KEY and dispatches the event below. The Concierge then surfaces
+  // a localized notification with a direct link to the financial approval card.
+  useEffect(() => {
+    const loadAssetReady = () => {
+      try {
+        const raw = window.localStorage.getItem(ASSET_READY_KEY)
+        if (!raw) return
+        const parsed = JSON.parse(raw)
+        const id = typeof parsed?.campaignId === 'string' ? parsed.campaignId : ''
+        if (!id) return
+        setAssetNotice({ id, title: typeof parsed?.title === 'string' ? parsed.title : '' })
+        setOpen(true)
+        window.localStorage.removeItem(ASSET_READY_KEY)
+      } catch { /* ignore malformed asset-ready payload */ }
+    }
+    loadAssetReady()
+    window.addEventListener('signalboost:concierge-asset-ready', loadAssetReady)
+    return () => window.removeEventListener('signalboost:concierge-asset-ready', loadAssetReady)
+  }, [])
+
   const contextualGreeting = utilityContext
     ? `${t(dict, 'concierge.utilityOffer', 'I identified optimization opportunities on your URL. Would you like our media studio (COS Core v1) to automatically create a video campaign to boost your conversion for only 10 credits?')}\n\n${utilityContext}`
     : t(dict, 'concierge.greeting', 'Hello, I am the SignalBoost Concierge. Ask me about your workspace, or open FAQ, support, and docs below.')
 
-  const visibleMessages = messages.length
+  const assetNoticeMessage: Message | null = assetNotice
+    ? {
+        role: 'assistant',
+        content: [
+          `${t(dict, 'concierge.assetReady', 'Your COS Core v1 asset is ready. Review it on the Studio financial approval card before release:')}${assetNotice.title ? ` “${assetNotice.title}”` : ''}`,
+          `[${t(dict, 'concierge.assetReadyCta', 'Open approval card')}](/dashboard/cosa?campaign=${encodeURIComponent(assetNotice.id)})`,
+          CREDITS_ACTIVATION ? t(dict, 'credits.packs', 'Starter Pack: 50 Credits = $15 · Pro Pack: 200 Credits = $50.') : '',
+        ].filter(Boolean).join('\n\n'),
+      }
+    : null
+
+  const baseMessages: Message[] = messages.length
     ? messages
     : [{ role: 'assistant' as const, content: contextualGreeting }]
+  const visibleMessages = assetNoticeMessage ? [...baseMessages, assetNoticeMessage] : baseMessages
 
   function resetVisibleChat() {
+    setAssetNotice(null)
     setInput('')
     setLoading(false)
     setMessages([])

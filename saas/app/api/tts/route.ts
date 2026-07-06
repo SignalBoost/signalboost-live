@@ -19,6 +19,7 @@ import {
 
 const STORAGE_BUCKET = "tts-cache";
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
+const MAX_AUDIO_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
   let body: { text?: string; voiceId?: string };
@@ -131,12 +132,14 @@ export async function POST(req: NextRequest) {
   }
 
   const storageKey = `${hash}.mp3`;
-  const { error: uploadError } = await supabaseAdmin.storage
-    .from(STORAGE_BUCKET)
-    .upload(storageKey, audioBuffer, {
-      contentType: "audio/mpeg",
-      upsert: true,
-    });
+  let uploadError: unknown = null;
+
+  try {
+    const uploadResult = await uploadTtsAudio(supabaseAdmin, storageKey, audioBuffer);
+    uploadError = uploadResult.error;
+  } catch (err) {
+    uploadError = err;
+  }
 
   if (uploadError) {
     console.error("Storage upload failed:", uploadError);
@@ -146,19 +149,27 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  await supabaseAdmin.from("tts_cache").insert({
+  const { error: cacheInsertError } = await supabaseAdmin.from("tts_cache").insert({
     hash,
     storage_key: storageKey,
     characters: text.length,
   });
 
-  await supabaseAdmin.from("tts_usage").insert({
+  if (cacheInsertError && cacheInsertError.code !== "23505") {
+    console.error("TTS cache insert failed:", cacheInsertError);
+  }
+
+  const { error: usageInsertError } = await supabaseAdmin.from("tts_usage").insert({
     user_id: user.id,
     characters: text.length,
     voice_id: voiceId,
     model_id: DEFAULT_MODEL_ID,
     cache_hit: false,
   });
+
+  if (usageInsertError) {
+    console.error("TTS usage insert failed:", usageInsertError);
+  }
 
   const signedUrl = await getSignedUrl(supabaseAdmin, storageKey);
 
@@ -174,6 +185,89 @@ export async function POST(req: NextRequest) {
 
 function sha256(input: string): string {
   return crypto.createHash("sha256").update(input).digest("hex");
+}
+
+async function uploadTtsAudio(
+  supabase: any,
+  storageKey: string,
+  audioBuffer: ArrayBuffer,
+): Promise<{ error: unknown }> {
+  await ensureTtsBucket(supabase);
+
+  const audioBytes = Buffer.from(audioBuffer);
+  const firstUpload = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .upload(storageKey, audioBytes, {
+      contentType: "audio/mpeg",
+      upsert: true,
+    });
+
+  if (!firstUpload.error || !isMissingBucketError(firstUpload.error)) {
+    return { error: firstUpload.error };
+  }
+
+  await ensureTtsBucket(supabase, true);
+
+  const retryUpload = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .upload(storageKey, audioBytes, {
+      contentType: "audio/mpeg",
+      upsert: true,
+    });
+
+  return { error: retryUpload.error };
+}
+
+async function ensureTtsBucket(supabase: any, forceCreate = false): Promise<void> {
+  if (!forceCreate) {
+    const { data, error } = await supabase.storage.getBucket(STORAGE_BUCKET);
+    if (data && !error) return;
+
+    if (error && !isMissingBucketError(error)) {
+      console.warn("Unable to verify TTS storage bucket before upload:", error);
+    }
+  }
+
+  const { error: createError } = await supabase.storage.createBucket(STORAGE_BUCKET, {
+    public: false,
+    fileSizeLimit: MAX_AUDIO_FILE_SIZE_BYTES,
+    allowedMimeTypes: ["audio/mpeg"],
+  });
+
+  if (createError && !isAlreadyExistsError(createError)) {
+    throw new Error(`Failed to create TTS storage bucket: ${formatSupabaseError(createError)}`);
+  }
+}
+
+function isMissingBucketError(error: unknown): boolean {
+  const message = formatSupabaseError(error).toLowerCase();
+  return (
+    message.includes("bucket not found") ||
+    message.includes("bucket_not_found") ||
+    message.includes("storage bucket") && message.includes("not found")
+  );
+}
+
+function isAlreadyExistsError(error: unknown): boolean {
+  const message = formatSupabaseError(error).toLowerCase();
+  return (
+    message.includes("already exists") ||
+    message.includes("already_exist") ||
+    message.includes("duplicate key") ||
+    message.includes("409")
+  );
+}
+
+function formatSupabaseError(error: unknown): string {
+  if (!error) return "unknown";
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
 }
 
 async function getSignedUrl(supabase: any, storageKey: string): Promise<string> {

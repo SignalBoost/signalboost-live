@@ -66,11 +66,18 @@ export async function publishApprovedVideoProductionJob(args: {
     const email = await sendEmail({
       from: 'saasMarketing',
       to: user.email,
-      subject: `Your video campaign is live: ${title}`,
-      html: `<p>Your approved SignalBoost video campaign is now live.</p><p><strong>${title}</strong></p><p><a href="${result.liveUrl}">${result.liveUrl}</a></p><p>The campaign was published after final approval in the COSA video production workflow.</p>`,
+      subject: `🎬 Your video is live on YouTube Channels: ${title}`,
+      html: `
+        <p>COSA finished the full pipeline for <strong>${title}</strong> and it is now live on YouTube Channels.</p>
+        <p><a href="${result.liveUrl}">${result.liveUrl}</a></p>
+        <p>Clicks on the description link are being tracked — traffic numbers will appear on the campaign record automatically.</p>
+        <p>Click through to verify it looks right. No further action needed unless something looks off.</p>
+      `.trim(),
     })
     notified = Boolean(email.ok)
     notifyError = email.ok ? null : email.error || 'Email send failed.'
+  } else {
+    notifyError = 'No owner email address was available for the publish notification.'
   }
 
   return { ok: true, liveUrl: result.liveUrl, providerPostId: result.providerPostId, notified, notifyError }

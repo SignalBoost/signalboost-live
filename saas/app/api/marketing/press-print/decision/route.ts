@@ -18,7 +18,7 @@ function reviewValue(decision: Decision, existingReview: string) {
 }
 
 function executionStage(decision: Decision, existingStage: string) {
-  if (decision === 'ok') return existingStage || 'approved'
+  if (decision === 'ok') return 'approved'
   if (decision === 'no') return 'rejected'
   if (decision === 'hold') return 'on_hold'
   if (decision === 'staff') return 'staff_support'
@@ -26,6 +26,13 @@ function executionStage(decision: Decision, existingStage: string) {
   if (decision === 'submitted') return 'submitted'
   if (decision === 'published') return 'published'
   return existingStage || 'draft'
+}
+
+function rowStatus(decision: Decision) {
+  if (decision === 'no') return 'rejected'
+  if (decision === 'hold' || decision === 'staff') return 'draft'
+  if (decision === 'published') return 'completed'
+  return 'approved'
 }
 
 async function readPayload(req: NextRequest) {
@@ -60,7 +67,7 @@ export async function POST(req: NextRequest) {
   const existingReview = String(previous.press_print_review || '')
   const existingStage = String(previous.press_print_execution_stage || '')
   const stage = executionStage(decision, existingStage)
-  const status = decision === 'no' ? 'rejected' : decision === 'published' ? 'completed' : 'draft'
+  const status = rowStatus(decision)
 
   const execution = {
     ...((previous.press_print_execution && typeof previous.press_print_execution === 'object') ? previous.press_print_execution : {}),
@@ -96,5 +103,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard/marketing/press-print', req.url), { status: 303 })
   }
 
-  return NextResponse.json({ ok: true, stage })
+  return NextResponse.json({ ok: true, stage, status })
 }

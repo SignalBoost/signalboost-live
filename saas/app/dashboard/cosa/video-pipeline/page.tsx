@@ -58,7 +58,7 @@ function PipelineProgress({ info }: { info: ReturnType<typeof progressFor> }) {
     <div style={{ height: 12, borderRadius: 999, background: 'rgba(255,255,255,.08)', overflow: 'hidden', marginTop: 10 }}>
       <div style={{ width: String(info.percent) + '%', height: '100%', borderRadius: 999, background: info.color }} />
     </div>
-    <p style={{ color: 'rgba(255,255,255,.55)', margin: '8px 0 0', fontSize: 12 }}>Steps: render base video → add voice/captions → burn brand banner → final preview.</p>
+    <p style={{ color: 'rgba(255,255,255,.55)', margin: '8px 0 0', fontSize: 12 }}>Steps: render base video - add voice/captions - burn brand banner - final preview.</p>
   </div>
 }
 
@@ -146,7 +146,7 @@ export default function CosaVideoPipelinePage() {
               <div>
                 <strong style={{ color: '#fff' }}>{campaign.title || campaign.id}</strong>
                 <p style={{ color: 'rgba(255,255,255,.5)', margin: '4px 0 0', fontSize: 12 }}>
-                  Video ID {shortId(campaign.id)} · {campaign.channel} · {campaign.status}
+                  Video ID {shortId(campaign.id)} - {campaign.channel} - {campaign.status}
                 </p>
               </div>
               <span style={{ color, fontSize: 12, fontWeight: 900 }}>{finalReady ? 'FINAL READY' : rawOnly ? 'RAW DRAFT ONLY' : stage}</span>
@@ -156,7 +156,7 @@ export default function CosaVideoPipelinePage() {
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, marginTop: 10 }}>
               <small style={{ color: 'rgba(255,255,255,.68)' }}>Created: {fmt(campaign.created_at)}</small>
-              <small style={{ color: 'rgba(255,255,255,.68)' }}>Approved: {fmt(campaign.approved_at)}</small>
+              <small style={{ color: 'rgba(255,255,255,.68)' }}>Final approval: {fmt(campaign.approved_at)}</small>
               <small style={{ color: 'rgba(255,255,255,.68)' }}>Render started: {fmt(video?.started_at)}</small>
               <small style={{ color: 'rgba(255,255,255,.68)' }}>Request: {shortId(video?.requestId)}</small>
             </div>
@@ -164,11 +164,11 @@ export default function CosaVideoPipelinePage() {
             <p style={{ color: 'rgba(255,255,255,.72)', lineHeight: 1.55 }}>{campaign.eligibility}</p>
 
             {rawOnly && <div style={{ margin: '12px 0', border: '1px solid rgba(255,195,0,.32)', borderRadius: 14, padding: 12, background: 'rgba(255,195,0,.08)' }}>
-              <p style={{ color: GOLD, margin: 0, fontSize: 13, fontWeight: 900 }}>Not final yet: this campaign has not received the final burned-in SignalBoostAi website banner. If it says “BANNER WAITING” with attempts 0/5, use “Kick branding worker.”</p>
+              <p style={{ color: GOLD, margin: 0, fontSize: 13, fontWeight: 900 }}>Not final yet: this campaign has not received the final burned-in SignalBoostAi website banner. If it says BANNER WAITING with attempts 0/5, use Kick branding worker.</p>
             </div>}
 
             {previewUrl && <div style={{ margin: '12px 0', border: '1px solid rgba(52,211,153,.35)', borderRadius: 14, padding: 12, background: 'rgba(52,211,153,.08)' }}>
-              <p style={{ color: GREEN, margin: '0 0 8px', fontSize: 12, fontWeight: 900 }}>Final playable campaign video · branded final · Created {fmt(campaign.created_at)}</p>
+              <p style={{ color: GREEN, margin: '0 0 8px', fontSize: 12, fontWeight: 900 }}>Final playable campaign video - branded final - Created {fmt(campaign.created_at)}</p>
               <video src={previewUrl} controls style={{ width: '100%', maxHeight: 460, background: '#000', borderRadius: 12 }} />
             </div>}
 

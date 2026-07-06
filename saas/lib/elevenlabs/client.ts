@@ -5,6 +5,7 @@
 import { DEFAULT_MODEL_ID } from "./voices";
 
 const ELEVENLABS_BASE_URL = "https://api.elevenlabs.io/v1";
+const DEFAULT_ELEVENLABS_TIMEOUT_MS = 45_000;
 
 function getApiKey(): string {
   const key = process.env.ELEVENLABS_API_KEY;
@@ -14,6 +15,13 @@ function getApiKey(): string {
     );
   }
   return key;
+}
+
+function getTimeoutMs(): number {
+  const configured = Number(process.env.ELEVENLABS_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured > 0
+    ? configured
+    : DEFAULT_ELEVENLABS_TIMEOUT_MS;
 }
 
 export interface TTSOptions {
@@ -42,27 +50,42 @@ export async function generateSpeech(opts: TTSOptions): Promise<ArrayBuffer> {
     style = 0,
   } = opts;
 
-  const res = await fetch(
-    `${ELEVENLABS_BASE_URL}/text-to-speech/${voiceId}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "xi-api-key": getApiKey(),
-        Accept: "audio/mpeg",
-      },
-      body: JSON.stringify({
-        text,
-        model_id: modelId,
-        voice_settings: {
-          stability,
-          similarity_boost: similarityBoost,
-          style,
-          use_speaker_boost: true,
+  const timeoutMs = getTimeoutMs();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  let res: Response;
+  try {
+    res = await fetch(
+      `${ELEVENLABS_BASE_URL}/text-to-speech/${voiceId}`,
+      {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          "xi-api-key": getApiKey(),
+          Accept: "audio/mpeg",
         },
-      }),
-    },
-  );
+        body: JSON.stringify({
+          text,
+          model_id: modelId,
+          voice_settings: {
+            stability,
+            similarity_boost: similarityBoost,
+            style,
+            use_speaker_boost: true,
+          },
+        }),
+      },
+    );
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(`ElevenLabs request timed out after ${Math.round(timeoutMs / 1000)} seconds`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!res.ok) {
     const errorText = await res.text().catch(() => "");

@@ -106,28 +106,31 @@ function stageLabel(stage: string) {
 
 function ExecutionPanel({ campaign }: { campaign: Campaign }) {
   const review = String(campaign.metadata?.press_print_review || '').toUpperCase()
-  if (review !== 'APPROVED') return null
+  const isApproved = review === 'APPROVED'
   const execution = campaign.metadata?.press_print_execution || {}
-  const stage = String(campaign.metadata?.press_print_execution_stage || execution.stage || 'approved')
+  const stage = String(campaign.metadata?.press_print_execution_stage || execution.stage || (isApproved ? 'approved' : 'not_started'))
   const liveUrl = String(execution.live_url || '')
   const publicationDate = String(execution.publication_date || '')
   return (
     <div style={executionBox}>
       <h3 className="sb-h3" style={{ marginTop: 0 }}>Post-approval execution</h3>
-      <p className="sb-caption" style={{ color: '#fde68a', marginTop: -4 }}>Current stage: {stageLabel(stage)}</p>
+      <p className="sb-caption" style={{ color: '#fde68a', marginTop: -4 }}>Review: {review || 'PENDING'} · Current stage: {stageLabel(stage)}</p>
+      {!isApproved ? <p style={body}>Approve the campaign first. After approval, use this panel to prepare the package, mark the campaign submitted, and record publication.</p> : null}
       <ol style={{ margin: '8px 0 14px', paddingLeft: 18, color: 'rgba(255,255,255,.72)', lineHeight: 1.65 }}>
         <li>Prepare article/ad package for the selected publication.</li>
         <li>Submit to the editor or media contact.</li>
         <li>Record live URL and publication date when published.</li>
       </ol>
-      <div style={{ display: 'grid', gap: 10 }}>
-        <DecisionForm id={campaign.id} decision="package" label="Mark package prepared" style={secondary} />
-        <DecisionForm id={campaign.id} decision="submitted" label="Mark submitted" style={secondary} />
-        <DecisionForm id={campaign.id} decision="published" label="Mark published" style={primary}>
-          <input name="live_url" defaultValue={liveUrl} placeholder="Live publication URL" style={input} />
-          <input name="publication_date" type="date" defaultValue={publicationDate} style={input} />
-        </DecisionForm>
-      </div>
+      {isApproved ? (
+        <div style={{ display: 'grid', gap: 10 }}>
+          <DecisionForm id={campaign.id} decision="package" label="Mark package prepared" style={secondary} />
+          <DecisionForm id={campaign.id} decision="submitted" label="Mark submitted" style={secondary} />
+          <DecisionForm id={campaign.id} decision="published" label="Mark published" style={primary}>
+            <input name="live_url" defaultValue={liveUrl} placeholder="Live publication URL" style={input} />
+            <input name="publication_date" type="date" defaultValue={publicationDate} style={input} />
+          </DecisionForm>
+        </div>
+      ) : null}
     </div>
   )
 }

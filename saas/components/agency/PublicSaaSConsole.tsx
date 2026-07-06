@@ -6,6 +6,11 @@ import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 import { SERVICES } from '@/lib/services/catalog'
 
+// Credit pack pricing renders only when the activation flag is on (Vercel env:
+// NEXT_PUBLIC_CREDITS_ACTIVATION=1). Off by default so the public console never
+// shows prices before the owner enables the credit ledger.
+const CREDITS_ACTIVATION = process.env.NEXT_PUBLIC_CREDITS_ACTIVATION === '1'
+
 const INTENT_GROUPS = [
   { key: 'growth', serviceKeys: ['promote', 'reviews'] },
   { key: 'media', serviceKeys: ['video', 'audio'] },
@@ -34,9 +39,11 @@ export default function PublicSaaSConsole() {
             <h2 className="text-3xl font-black tracking-tight text-white md:text-5xl">{t(dict, 'studio.catalog.title', 'Choose the exact outcome you want.')}</h2>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300 md:text-base">{t(dict, 'studio.catalog.subtitle', 'Studio now mirrors the Home Page taxonomy: nine services and free utilities grouped by real intent, with COS Core v1 preparing drafts silently until you approve the next financial step.')}</p>
           </div>
-          <div className="rounded-2xl border border-amber-200/25 bg-amber-300/10 px-4 py-3 text-sm font-bold text-amber-100">
-            {t(dict, 'studio.catalog.ledger', 'Credits display only when activation is enabled.')}
-          </div>
+          {CREDITS_ACTIVATION && (
+            <div className="rounded-2xl border border-amber-200/25 bg-amber-300/10 px-4 py-3 text-sm font-bold text-amber-100">
+              {t(dict, 'credits.packs', 'Starter Pack: 50 Credits = $15 · Pro Pack: 200 Credits = $50.')}
+            </div>
+          )}
         </div>
 
         <div className="mt-7 grid gap-5">

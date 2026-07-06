@@ -1,27 +1,34 @@
 // saas/lib/elevenlabs/client.ts
 // SERVER-SIDE ONLY. Never import this in a 'use client' component.
-// Reads ELEVENLABS_API_KEY from process.env (set in Vercel env vars).
+// Primary provider: ElevenLabs. Fallback provider: OpenAI speech, when OPENAI_API_KEY is set.
 
-import { DEFAULT_MODEL_ID } from "./voices";
+import { DEFAULT_MODEL_ID, findVoice } from "./voices";
 
 const ELEVENLABS_BASE_URL = "https://api.elevenlabs.io/v1";
+const OPENAI_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_ELEVENLABS_TIMEOUT_MS = 45_000;
+const DEFAULT_OPENAI_TTS_TIMEOUT_MS = 45_000;
 
-function getApiKey(): string {
-  const key = process.env.ELEVENLABS_API_KEY;
-  if (!key) {
-    throw new Error(
-      "ELEVENLABS_API_KEY is not set. Add it in Vercel → Settings → Environment Variables.",
-    );
-  }
-  return key;
+function getElevenLabsApiKey(): string | null {
+  return process.env.ELEVENLABS_API_KEY?.trim() || null;
 }
 
-function getTimeoutMs(): number {
+function getOpenAiApiKey(): string | null {
+  return process.env.OPENAI_API_KEY?.trim() || null;
+}
+
+function getElevenLabsTimeoutMs(): number {
   const configured = Number(process.env.ELEVENLABS_TIMEOUT_MS);
   return Number.isFinite(configured) && configured > 0
     ? configured
     : DEFAULT_ELEVENLABS_TIMEOUT_MS;
+}
+
+function getOpenAiTimeoutMs(): number {
+  const configured = Number(process.env.OPENAI_TTS_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured > 0
+    ? configured
+    : DEFAULT_OPENAI_TTS_TIMEOUT_MS;
 }
 
 export interface TTSOptions {
@@ -38,9 +45,42 @@ export interface TTSOptions {
 
 /**
  * Generate speech from text. Returns the MP3 as an ArrayBuffer.
- * Throws on any non-2xx response with the API's error message.
+ * Uses ElevenLabs when configured; falls back to OpenAI speech if ElevenLabs fails
+ * and OPENAI_API_KEY exists. This keeps the Audio Studio usable even when one
+ * provider key/voice/quota is misconfigured.
  */
 export async function generateSpeech(opts: TTSOptions): Promise<ArrayBuffer> {
+  const elevenLabsKey = getElevenLabsApiKey();
+  const openAiKey = getOpenAiApiKey();
+  let elevenLabsError: unknown = null;
+
+  if (elevenLabsKey) {
+    try {
+      return await generateSpeechWithElevenLabs(opts, elevenLabsKey);
+    } catch (err) {
+      elevenLabsError = err;
+      console.warn("ElevenLabs TTS failed; checking OpenAI fallback:", sanitizeProviderError(err));
+    }
+  } else {
+    elevenLabsError = new Error("ELEVENLABS_API_KEY is not set");
+  }
+
+  if (openAiKey) {
+    try {
+      return await generateSpeechWithOpenAI(opts, openAiKey);
+    } catch (openAiError) {
+      throw new Error(
+        `Speech generation failed. ElevenLabs: ${sanitizeProviderError(elevenLabsError)}. OpenAI fallback: ${sanitizeProviderError(openAiError)}`,
+      );
+    }
+  }
+
+  throw new Error(
+    `Speech generation failed. ElevenLabs: ${sanitizeProviderError(elevenLabsError)}. OPENAI_API_KEY is not set for fallback.`,
+  );
+}
+
+async function generateSpeechWithElevenLabs(opts: TTSOptions, apiKey: string): Promise<ArrayBuffer> {
   const {
     text,
     voiceId,
@@ -50,42 +90,30 @@ export async function generateSpeech(opts: TTSOptions): Promise<ArrayBuffer> {
     style = 0,
   } = opts;
 
-  const timeoutMs = getTimeoutMs();
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-  let res: Response;
-  try {
-    res = await fetch(
-      `${ELEVENLABS_BASE_URL}/text-to-speech/${voiceId}`,
-      {
-        method: "POST",
-        signal: controller.signal,
-        headers: {
-          "Content-Type": "application/json",
-          "xi-api-key": getApiKey(),
-          Accept: "audio/mpeg",
-        },
-        body: JSON.stringify({
-          text,
-          model_id: modelId,
-          voice_settings: {
-            stability,
-            similarity_boost: similarityBoost,
-            style,
-            use_speaker_boost: true,
-          },
-        }),
+  const timeoutMs = getElevenLabsTimeoutMs();
+  const res = await fetchWithTimeout(
+    `${ELEVENLABS_BASE_URL}/text-to-speech/${voiceId}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "xi-api-key": apiKey,
+        Accept: "audio/mpeg",
       },
-    );
-  } catch (err) {
-    if (err instanceof Error && err.name === "AbortError") {
-      throw new Error(`ElevenLabs request timed out after ${Math.round(timeoutMs / 1000)} seconds`);
-    }
-    throw err;
-  } finally {
-    clearTimeout(timeout);
-  }
+      body: JSON.stringify({
+        text,
+        model_id: modelId,
+        voice_settings: {
+          stability,
+          similarity_boost: similarityBoost,
+          style,
+          use_speaker_boost: true,
+        },
+      }),
+    },
+    timeoutMs,
+    `ElevenLabs request timed out after ${Math.round(timeoutMs / 1000)} seconds`,
+  );
 
   if (!res.ok) {
     const errorText = await res.text().catch(() => "");
@@ -95,4 +123,77 @@ export async function generateSpeech(opts: TTSOptions): Promise<ArrayBuffer> {
   }
 
   return await res.arrayBuffer();
+}
+
+async function generateSpeechWithOpenAI(opts: TTSOptions, apiKey: string): Promise<ArrayBuffer> {
+  const timeoutMs = getOpenAiTimeoutMs();
+  const res = await fetchWithTimeout(
+    `${OPENAI_BASE_URL}/audio/speech`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: process.env.OPENAI_TTS_MODEL || "tts-1",
+        voice: mapOpenAiVoice(opts.voiceId),
+        input: opts.text,
+        response_format: "mp3",
+      }),
+    },
+    timeoutMs,
+    `OpenAI speech request timed out after ${Math.round(timeoutMs / 1000)} seconds`,
+  );
+
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => "");
+    throw new Error(`OpenAI speech error ${res.status}: ${errorText || res.statusText}`);
+  }
+
+  return await res.arrayBuffer();
+}
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+  timeoutMessage: string,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(timeoutMessage);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function mapOpenAiVoice(voiceId: string): string {
+  const voice = findVoice(voiceId);
+  if (!voice) return "alloy";
+
+  if (voice.gender === "male") {
+    return voice.locale === "en" ? "onyx" : "echo";
+  }
+
+  return voice.locale === "en" ? "nova" : "shimmer";
+}
+
+function sanitizeProviderError(error: unknown): string {
+  if (!error) return "unknown";
+  const raw = error instanceof Error ? error.message : String(error);
+  return raw
+    .replace(/xi-api-key[^,}\n]*/gi, "xi-api-key redacted")
+    .replace(/Bearer\s+[A-Za-z0-9._\-]+/g, "Bearer redacted")
+    .slice(0, 800);
 }

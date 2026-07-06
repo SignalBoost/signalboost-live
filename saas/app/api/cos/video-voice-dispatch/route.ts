@@ -24,6 +24,10 @@ function campaignLangs(campaign: any): string[] {
   return langs.length ? langs : ['en']
 }
 
+function primaryLang(campaign: any) {
+  return campaignLangs(campaign)[0] || 'en'
+}
+
 function needsBrand(campaign: any) {
   const video = campaign?.metadata?.video || null
   if (!video || video.status !== 'ready') return false
@@ -31,6 +35,33 @@ function needsBrand(campaign: any) {
   if (video.branded === true && video.voicedUrl) return false
   const unbranded = video.unbrandedVoiced || {}
   return Object.keys(unbranded).some((lang) => Boolean(unbranded[lang]))
+}
+
+function canForceBrand(campaign: any) {
+  const video = campaign?.metadata?.video || null
+  if (!video || video.status !== 'ready') return false
+  if (campaign.status === 'rejected') return false
+  return Boolean(video.voicedUrl || video.url)
+}
+
+async function forceBrandQueue(sb: any, campaign: any) {
+  const video = campaign?.metadata?.video || {}
+  const lang = primaryLang(campaign)
+  const source = String(video.voicedUrl || video.url || '')
+  if (!source) return { id: campaign.id, ok: false, error: 'no video source to brand' }
+  const patch = {
+    ...video,
+    branded: false,
+    brandedLangs: {},
+    voicedUrl: null,
+    unbrandedVoiced: { ...(video.unbrandedVoiced || {}), [lang]: source },
+    brandingLock: null,
+    brandingExhausted: false,
+    brandDebug: { ...(video.brandDebug || {}), forceBrandQueuedAt: new Date().toISOString(), reason: 'manual forceBrand repair' },
+  }
+  const { error } = await sb.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: patch } }).eq('id', campaign.id)
+  campaign.metadata = { ...(campaign.metadata || {}), video: patch }
+  return { id: campaign.id, ok: !error, lang, error: error?.message || null }
 }
 
 function voiceSkipReason(campaign: any): string | null {
@@ -90,18 +121,24 @@ async function handle(req: NextRequest) {
   const sb = admin()
   const url = new URL(req.url)
   const id = String(url.searchParams.get('id') || '').trim()
+  const forceBrand = url.searchParams.get('forceBrand') === '1'
   let query = sb.from('cos_campaign_queue').select('*').in('channel', VIDEO_CHANNELS).neq('status', 'rejected').gte('created_at', BACKLOG_CUTOFF).order('created_at', { ascending: false }).limit(LIMIT)
   if (id) query = sb.from('cos_campaign_queue').select('*').eq('id', id).limit(1)
   const { data, error } = await query
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
   const rows = data || []
+  const forced = []
+  if (forceBrand) {
+    const forceRows = (id ? rows : rows.filter((row: any) => row.status === 'waiting_approval')).filter(canForceBrand).slice(0, id ? 1 : 3)
+    for (const campaign of forceRows) forced.push(await forceBrandQueue(sb, campaign))
+  }
   const candidates = rows.filter(needsVoice).slice(0, 5)
   const results = []
   for (const campaign of candidates) results.push(await runVoice(sb, campaign))
   const brandCandidates = rows.filter(needsBrand)
   const brandDispatch = brandCandidates.length ? await dispatchBrand() : { ok: true, skipped: true, reason: 'no branding candidates found' }
   const skipped = rows.slice(0, 20).filter((row: any) => !needsVoice(row)).map((row: any) => ({ id: row.id, status: row.status, title: String(row.title || '').slice(0, 60), reason: voiceSkipReason(row) }))
-  return NextResponse.json({ ok: true, scanned: rows.length, processed: results.length, results, brandCandidates: brandCandidates.length, brandDispatch, skipped })
+  return NextResponse.json({ ok: true, scanned: rows.length, processed: results.length, results, forced, brandCandidates: brandCandidates.length, brandDispatch, skipped })
 }
 
 export async function GET(req: NextRequest) { return handle(req) }

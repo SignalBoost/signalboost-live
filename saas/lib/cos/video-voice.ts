@@ -4,6 +4,7 @@
 
 import { fal } from '@fal-ai/client'
 import { generateSpeech } from '@/lib/elevenlabs/client'
+import { FALLBACK_VOICEOVER_MS, isVoiceQuotaError, silentWavDataUri } from '@/lib/cos/video-silent-fallback'
 
 const COMPOSE_MODEL = 'fal-ai/ffmpeg-api/compose'
 const METADATA_MODEL = 'fal-ai/ffmpeg-api/metadata'
@@ -34,7 +35,7 @@ function normalizeUrlText(text: string): string {
   out = out.replace(/(?:https?:\/\/)?(?:www\.)?(?:saas\.)?signalboost?ap{1,3}\.com(?:\/[^\s,.!?)]*)?/gi, SITE_URL)
   out = out.replace(/(?:https?:\/\/)?(?:www\.)?signalboost\.com(?:\/[^\s,.!?)]*)?/gi, SITE_URL)
   out = out.replace(/(?:www\.)+www\./gi, 'www.')
-  out = out.replace(new RegExp(`(${SITE_URL.replace(/\./g, '\\.')})(?:\\s*\\1)+`, 'gi'), '$1')
+  out = out.replace(new RegExp(`(${SITE_URL.replace(/\./g, '\\.')})(?:\s*\1)+`, 'gi'), '$1')
   return out
 }
 
@@ -124,7 +125,7 @@ function buildSrt(text: string, totalMs: number, wordsPerLine = 7): string {
   return blocks.join('\n')
 }
 
-export async function addVoiceToCampaignVideo(campaign: any, lang: string = 'en'): Promise<{ ok: boolean; url?: string; error?: string }> {
+export async function addVoiceToCampaignVideo(campaign: any, lang: string = 'en'): Promise<{ ok: boolean; url?: string; error?: string; fallback?: boolean; fallbackReason?: string }> {
   try {
     const videoUrl = campaign?.metadata?.video?.url
     if (!videoUrl) return { ok: false, error: 'No rendered video to voice.' }
@@ -132,18 +133,26 @@ export async function addVoiceToCampaignVideo(campaign: any, lang: string = 'en'
     const voiceId = VOICE_BY_LANG[lang] || VOICE_BY_LANG.en
     const text = narrationFor(campaign, lang)
 
-    let audio: ArrayBuffer
+    let audioDataUri = ''
+    let fallback = false
+    let fallbackReason = ''
+    const fallbackMs = Math.min(Math.max(estimateMs(text), MIN_TOTAL_MS), MAX_TOTAL_MS)
+    let audioMs = fallbackMs
+
     try {
-      audio = await generateSpeech({ text, voiceId })
+      const audio = await generateSpeech({ text, voiceId })
+      audioDataUri = `data:audio/mpeg;base64,${Buffer.from(audio).toString('base64')}`
+      ensureProvider()
+      audioMs = await probeAudioMs(audioDataUri, fallbackMs)
     } catch (error: any) {
-      return { ok: false, error: `TTS failed: ${error?.message || 'unknown'}` }
+      if (!isVoiceQuotaError(error)) return { ok: false, error: `TTS failed: ${error?.message || 'unknown'}` }
+      fallback = true
+      fallbackReason = `COMPLETED_FALLBACK: ElevenLabs unavailable, used silent ${Math.round(FALLBACK_VOICEOVER_MS / 1000)}s narration spacer.`
+      audioMs = FALLBACK_VOICEOVER_MS
+      audioDataUri = silentWavDataUri(audioMs)
+      ensureProvider()
     }
 
-    const audioDataUri = `data:audio/mpeg;base64,${Buffer.from(audio).toString('base64')}`
-    ensureProvider()
-
-    const fallbackMs = Math.min(Math.max(estimateMs(text), MIN_TOTAL_MS), MAX_TOTAL_MS)
-    const audioMs = await probeAudioMs(audioDataUri, fallbackMs)
     const totalMs = Math.min(Math.max(Math.ceil(audioMs), MIN_TOTAL_MS), MAX_TOTAL_MS)
 
     const tracks = [
@@ -164,7 +173,7 @@ export async function addVoiceToCampaignVideo(campaign: any, lang: string = 'en'
       }
     } catch {}
 
-    return { ok: true, url: finalUrl }
+    return { ok: true, url: finalUrl, fallback, fallbackReason: fallback ? fallbackReason : undefined }
   } catch (error: any) {
     return { ok: false, error: error?.message || 'voice compose failed' }
   }

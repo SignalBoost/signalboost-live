@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAccess } from '@/lib/auth/access'
+import { bannerAssetPath, firstBrandJob, runLocalBrandOverlay } from '@/lib/cos/local-brand-overlay'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 300
 
 const OWNER = 'SignalBoost'
 const REPO = 'signalboost-live'
 const WORKFLOW_FILE = 'brand-overlay.yml'
 const VIDEO_CHANNELS = ['youtube', 'short_video']
 const MAX_ATTEMPTS = 5
-const DISPATCH_TIMEOUT_MS = 10_000
+const DISPATCH_TIMEOUT_MS = 5_000
 
 function admin() {
   const url = process.env['NEXT_PUBLIC_SUPABASE_URL']!
@@ -80,6 +81,54 @@ async function markDispatchError(sb: any, campaigns: any[], reason: string) {
   return marked
 }
 
+
+async function primeFirstAttempts(sb: any, campaigns: any[]) {
+  const now = new Date().toISOString()
+  const primed: any[] = []
+  for (const campaign of campaigns) {
+    const video = campaign?.metadata?.video || {}
+    const job = firstBrandJob(campaign)
+    if (!job) continue
+    const ghOverlayAttempts = { ...(video.ghOverlayAttempts || {}), [job.lang]: Math.max(1, Number(video.ghOverlayAttempts?.[job.lang] || 0)) }
+    const patch = {
+      ...video,
+      ghOverlayAttempts,
+      brandAttempts: { ...(video.brandAttempts || {}), [job.lang]: Math.max(1, Number(video.brandAttempts?.[job.lang] || 0)) },
+      brandingLock: null,
+      brandingExhausted: false,
+      voiceError: null,
+      brandDispatchWatchdog: { at: now, ok: null, note: `Attempts: ${job.lang}/1/${MAX_ATTEMPTS}; dispatch initialized by Kick branding worker.` },
+    }
+    const { error } = await sb.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: patch } }).eq('id', campaign.id)
+    if (!error) {
+      campaign.metadata = { ...(campaign.metadata || {}), video: patch }
+      primed.push({ id: campaign.id, lang: job.lang, attempts: `pt/1/${MAX_ATTEMPTS}` })
+    } else {
+      primed.push({ id: campaign.id, lang: job.lang, error: error.message })
+    }
+  }
+  return primed
+}
+
+async function runEmergencyLocal(sb: any, campaigns: any[], reason: string) {
+  const results: any[] = []
+  for (const campaign of campaigns.slice(0, 1)) {
+    const video = campaign?.metadata?.video || {}
+    const job = firstBrandJob(campaign)
+    if (!job) { results.push({ id: campaign.id, ok: false, error: 'No unbranded voiced job found.' }); continue }
+    const aspect: '16:9' | '9:16' = video.aspect === '9:16' || video.aspect === '16:9' ? video.aspect : (campaign.channel === 'short_video' ? '9:16' : '16:9')
+    try {
+      const rendered = await runLocalBrandOverlay({ campaign, lang: job.lang, sourceUrl: job.sourceUrl, aspect })
+      results.push({ id: campaign.id, lang: job.lang, ok: true, reason, ...rendered })
+    } catch (e: any) {
+      const message = e?.message || 'local FFmpeg fallback failed'
+      await markDispatchError(sb, [campaign], `${reason}; local fallback failed: ${message}`)
+      results.push({ id: campaign.id, lang: job.lang, ok: false, reason, error: message, bannerAssetPath: bannerAssetPath() })
+    }
+  }
+  return results
+}
+
 async function handle(req: NextRequest) {
   const ctx = await getAccess()
   if (!ctx.isOwner) return NextResponse.json({ ok: false, error: 'Owner only.' }, { status: 403 })
@@ -89,17 +138,19 @@ async function handle(req: NextRequest) {
   const candidates = (recent || []).filter(isWaitingForBrand)
   const force = new URL(req.url).searchParams.get('force') === '1'
   if (!candidates.length && !force) return NextResponse.json({ ok: true, dispatched: false, reason: 'No banner-waiting campaigns found.', waitingCount: 0 })
+  const primed = await primeFirstAttempts(sb, candidates)
   const token = process.env.GITHUB_WRITE_TOKEN || process.env.GITHUB_TOKEN
   if (!token) {
-    const marked = await markDispatchError(sb, candidates, 'missing GitHub Actions token')
-    return NextResponse.json({ ok: false, dispatched: false, waitingCount: candidates.length, marked, error: 'Missing GitHub token.' }, { status: 500 })
+    const local = await runEmergencyLocal(sb, candidates, 'missing GitHub Actions token')
+    return NextResponse.json({ ok: local.some((r) => r.ok), dispatched: false, waitingCount: candidates.length, primed, local, error: 'Missing GitHub token; emergency local FFmpeg fallback attempted.' }, { status: local.some((r) => r.ok) ? 200 : 500 })
   }
   const dispatched = await dispatchWorkflow(token)
   if (!dispatched.ok) {
-    const marked = await markDispatchError(sb, candidates, `workflow dispatch failed: ${dispatched.error || dispatched.status}`)
-    return NextResponse.json({ ok: false, dispatched: false, dispatch: dispatched, waitingCount: candidates.length, marked }, { status: 502 })
+    const reason = `workflow dispatch failed or timed out within ${DISPATCH_TIMEOUT_MS}ms: ${dispatched.error || dispatched.status}`
+    const local = await runEmergencyLocal(sb, candidates, reason)
+    return NextResponse.json({ ok: local.some((r) => r.ok), dispatched: false, dispatch: dispatched, waitingCount: candidates.length, primed, local }, { status: local.some((r) => r.ok) ? 200 : 502 })
   }
-  return NextResponse.json({ ok: true, dispatched: true, status: dispatched.status, waitingCount: candidates.length })
+  return NextResponse.json({ ok: true, dispatched: true, status: dispatched.status, waitingCount: candidates.length, primed })
 }
 
 export async function GET(req: NextRequest) { return handle(req) }

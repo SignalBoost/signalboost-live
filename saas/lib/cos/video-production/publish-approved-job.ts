@@ -71,6 +71,8 @@ export async function publishApprovedVideoProductionJob(args: {
     })
     notified = Boolean(email.ok)
     notifyError = email.ok ? null : email.error || 'Email send failed.'
+  } else {
+    notifyError = 'No owner email address was available for the publish notification.'
   }
 
   return { ok: true, liveUrl: result.liveUrl, providerPostId: result.providerPostId, notified, notifyError }

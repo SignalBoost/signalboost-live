@@ -4,11 +4,19 @@ import { assertSafeOutreachMessage } from '@/lib/ai/guardrails'
 
 export const dynamic = 'force-dynamic'
 
+function withChannel(row: any) {
+  const website = row?.website_json && typeof row.website_json === 'object' ? row.website_json : {}
+  const analyzer = row?.analyzer_summary && typeof row.analyzer_summary === 'object' ? row.analyzer_summary : {}
+  const channel = row?.outreach_channel || row?.channel || website.outreach_channel || website.channel || analyzer.outreach_channel || analyzer.channel || ''
+  return { ...row, outreach_channel: channel, channel }
+}
+
 export async function GET(req: NextRequest) {
   const ctx = await requireAdmin()
   if (ctx instanceof NextResponse) return ctx
 
   const status = req.nextUrl.searchParams.get('status')
+  const channel = req.nextUrl.searchParams.get('channel')
   const limit = Math.min(100, Number(req.nextUrl.searchParams.get('limit') || 50))
   let query = ctx.admin
     .from('outreach_queue')
@@ -20,8 +28,10 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  const normalized = (data || []).map(withChannel)
+  const outreach = channel ? normalized.filter((row: any) => row.outreach_channel === channel || row.channel === channel) : normalized
   const sendLimit = await enforceDailySendLimit(ctx.admin)
-  return NextResponse.json({ outreach: data || [], sendLimit })
+  return NextResponse.json({ outreach, sendLimit })
 }
 
 export async function PATCH(req: NextRequest) {
@@ -78,5 +88,5 @@ export async function PATCH(req: NextRequest) {
     metadata: { fields: Object.keys(patch) },
   })
 
-  return NextResponse.json({ ok: true, outreach: data })
+  return NextResponse.json({ ok: true, outreach: withChannel(data) })
 }

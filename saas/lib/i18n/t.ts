@@ -1,6 +1,7 @@
 import type { Dict } from '@/lib/i18n/loadLanguage'
 import en from '@/locales/en.json'
 import { DASHBOARD_COPY } from '@/lib/i18n/dashboardCopy'
+import { STUDIO_HUB_COPY } from '@/lib/i18n/studioHubCopy'
 import { PLATFORM_COPY } from '@/lib/i18n/platformCopy'
 import { SUITE_COPY } from '@/lib/i18n/suiteCopy'
 import { WORKSPACE_COPY } from '@/lib/i18n/workspaceCopy'
@@ -16,6 +17,11 @@ export function t(dict: Dict | null | undefined, path: string, fallback: string)
   const dashboardForLang = DASHBOARD_COPY[safeLang]
   if (dashboardForLang && typeof dashboardForLang[path] === 'string') {
     return dashboardForLang[path]
+  }
+
+  const studioHubForLang = STUDIO_HUB_COPY[safeLang]
+  if (studioHubForLang && typeof studioHubForLang[path] === 'string') {
+    return studioHubForLang[path]
   }
 
   const workspaceForLang = WORKSPACE_COPY[safeLang]
@@ -42,6 +48,7 @@ export function t(dict: Dict | null | undefined, path: string, fallback: string)
   if (typeof englishValue === 'string') return englishValue
 
   if (typeof DASHBOARD_COPY.en[path] === 'string') return DASHBOARD_COPY.en[path]
+  if (typeof STUDIO_HUB_COPY.en[path] === 'string') return STUDIO_HUB_COPY.en[path]
   if (typeof WORKSPACE_COPY.en[path] === 'string') return WORKSPACE_COPY.en[path]
   if (typeof PLATFORM_COPY.en[path] === 'string') return PLATFORM_COPY.en[path]
   if (typeof SUITE_COPY.en[path] === 'string') return SUITE_COPY.en[path]

@@ -58,6 +58,10 @@
       "untitledCampaign": "Untitled campaign",
       "noCampaignSummary": "No campaign summary available yet.",
       "noCtaTarget": "No CTA target available"
+    },
+    "pressPrint": {
+      "description": "One official workflow for digital newspapers, print newspapers, and IT magazines. The old separate newspaper and trade-press workflows have been removed.",
+      "startStaffLedCampaign": "Start staff-led campaign"
     }
   },
   "pt": {
@@ -119,6 +123,10 @@
       "untitledCampaign": "Campanha sem título",
       "noCampaignSummary": "Ainda não há resumo da campanha.",
       "noCtaTarget": "Nenhum destino de CTA disponível"
+    },
+    "pressPrint": {
+      "description": "Um fluxo oficial para jornais digitais, jornais impressos e revistas de TI. Os fluxos antigos separados para jornais e imprensa especializada foram removidos.",
+      "startStaffLedCampaign": "Iniciar campanha conduzida pela equipe"
     }
   },
   "es": {
@@ -180,6 +188,10 @@
       "untitledCampaign": "Campaña sin título",
       "noCampaignSummary": "Aún no hay resumen de campaña.",
       "noCtaTarget": "No hay destino de CTA disponible"
+    },
+    "pressPrint": {
+      "description": "Un flujo oficial para periódicos digitales, periódicos impresos y revistas de TI. Se eliminaron los antiguos flujos separados para periódicos y prensa especializada.",
+      "startStaffLedCampaign": "Iniciar campaña dirigida por el equipo"
     }
   },
   "pl": {
@@ -241,6 +253,10 @@
       "untitledCampaign": "Kampania bez tytułu",
       "noCampaignSummary": "Brak podsumowania kampanii.",
       "noCtaTarget": "Brak dostępnego celu CTA"
+    },
+    "pressPrint": {
+      "description": "Jeden oficjalny przepływ pracy dla gazet cyfrowych, gazet drukowanych i magazynów IT. Dawne oddzielne przepływy dla gazet i prasy branżowej zostały usunięte.",
+      "startStaffLedCampaign": "Rozpocznij kampanię prowadzoną przez zespół"
     }
   },
   "ru": {
@@ -302,6 +318,10 @@
       "untitledCampaign": "Кампания без названия",
       "noCampaignSummary": "Сводка кампании пока недоступна.",
       "noCtaTarget": "Цель CTA недоступна"
+    },
+    "pressPrint": {
+      "description": "Единый официальный процесс для цифровых газет, печатных газет и ИТ-журналов. Старые отдельные процессы для газет и отраслевой прессы удалены.",
+      "startStaffLedCampaign": "Запустить кампанию силами команды"
     }
   }
 }

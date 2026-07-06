@@ -2,9 +2,12 @@
 
 import Link from 'next/link'
 import { useEffect, useState, type CSSProperties } from 'react'
+import { useTranslation } from '@/components/i18n/useTranslation'
 
 type Campaign = { id: string; title?: string; objective?: string; status?: string; metadata?: Record<string, any> }
 type Decision = 'ok' | 'no' | 'hold' | 'staff' | 'package' | 'submitted' | 'published'
+
+const PRESS_PRINT_CHANNELS = ['online-newspapers', 'print-newspapers', 'trade-press'] as const
 
 const channelLabels: Record<string, string> = {
   'online-newspapers': 'Digital newspaper',
@@ -42,14 +45,15 @@ function Action({ id, decision, children, primary = false }: { id: string; decis
 export default function PressPrintMediaPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
+  const { t } = useTranslation()
 
   useEffect(() => {
     let live = true
     ;(async () => {
       try {
-        const res = await fetch('/api/cos/campaign-queue', { cache: 'no-store' })
+        const res = await fetch('/api/marketing/press-print', { cache: 'no-store' })
         const json = await res.json()
-        if (live) setCampaigns((Array.isArray(json.campaigns) ? json.campaigns : []).filter((row: Campaign) => ['online-newspapers', 'print-newspapers', 'trade-press'].includes(channel(row))))
+        if (live) setCampaigns((Array.isArray(json.campaigns) ? json.campaigns : []).filter((row: Campaign) => PRESS_PRINT_CHANNELS.includes(channel(row) as any)))
       } finally {
         if (live) setLoading(false)
       }
@@ -61,8 +65,8 @@ export default function PressPrintMediaPage() {
     <section style={hero}>
       <p className="sb-eyebrow">Marketing + Sales</p>
       <h1 style={h1}>Press & Print Media</h1>
-      <p style={body}>One official workflow for digital newspapers, print newspapers, and IT magazines. The old separate newspaper and trade-press workflows have been removed.</p>
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}><Link href="/dashboard/marketing/press-print/direct" className="sb-button-primary">Start staff-led campaign</Link><Link href="/dashboard/cosa" className="sb-button-secondary">Open COSA</Link></div>
+      <p style={body}>{t('marketingSales.pressPrint.description', 'One official workflow for digital newspapers, print newspapers, and IT magazines. The old separate newspaper and trade-press workflows have been removed.')}</p>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}><Link href="/dashboard/marketing/press-print/direct" className="sb-button-primary">{t('marketingSales.pressPrint.startStaffLedCampaign', 'Start staff-led campaign')}</Link></div>
     </section>
 
     {loading ? <p className="sb-body">Loading…</p> : null}

@@ -15,7 +15,22 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install worker dependencies
+        # The worker imports @supabase/supabase-js. The previous workflow ran
+        # `node scripts/brand-overlay-worker.mjs` with no npm install, so every
+        # run died instantly with ERR_MODULE_NOT_FOUND (exit code 1) before the
+        # worker could touch Supabase — which is why attempts froze and no
+        # voiceError ever appeared in the dashboard. Install only what the
+        # script needs; pulling the full Next.js dependency tree here would
+        # waste minutes per run.
+        run: npm install --no-save --no-audit --no-fund @supabase/supabase-js@^2
 
       - name: Install FFmpeg + fonts
         run: sudo apt-get update -y && sudo apt-get install -y ffmpeg fonts-dejavu-core

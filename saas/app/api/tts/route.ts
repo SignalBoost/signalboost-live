@@ -17,9 +17,13 @@ import {
   type PlanId,
 } from "@/lib/elevenlabs/limits";
 
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 const STORAGE_BUCKET = "tts-cache";
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 const MAX_AUDIO_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const STORAGE_OPERATION_TIMEOUT_MS = 15_000;
 
 export async function POST(req: NextRequest) {
   let body: { text?: string; voiceId?: string };
@@ -111,13 +115,18 @@ export async function POST(req: NextRequest) {
       cache_hit: true,
     });
 
-    const signedUrl = await getSignedUrl(supabaseAdmin, cached.storage_key);
-    return NextResponse.json({
-      audioUrl: signedUrl,
-      cached: true,
-      characters: text.length,
-      remaining: remaining - text.length,
-    });
+    try {
+      const signedUrl = await getSignedUrl(supabaseAdmin, cached.storage_key);
+      return NextResponse.json({
+        audioUrl: signedUrl,
+        cached: true,
+        characters: text.length,
+        remaining: remaining - text.length,
+      });
+    } catch (err) {
+      console.error("Cached TTS URL signing failed:", err);
+      await supabaseAdmin.from("tts_cache").delete().eq("hash", hash);
+    }
   }
 
   let audioBuffer: ArrayBuffer;
@@ -171,14 +180,21 @@ export async function POST(req: NextRequest) {
     console.error("TTS usage insert failed:", usageInsertError);
   }
 
-  const signedUrl = await getSignedUrl(supabaseAdmin, storageKey);
-
-  return NextResponse.json({
-    audioUrl: signedUrl,
-    cached: false,
-    characters: text.length,
-    remaining: remaining - text.length,
-  });
+  try {
+    const signedUrl = await getSignedUrl(supabaseAdmin, storageKey);
+    return NextResponse.json({
+      audioUrl: signedUrl,
+      cached: false,
+      characters: text.length,
+      remaining: remaining - text.length,
+    });
+  } catch (err) {
+    console.error("TTS URL signing failed:", err);
+    return NextResponse.json(
+      { error: "Audio was generated but the playback link could not be created" },
+      { status: 500 },
+    );
+  }
 }
 
 // ---------- Helpers ----------
@@ -195,12 +211,16 @@ async function uploadTtsAudio(
   await ensureTtsBucket(supabase);
 
   const audioBytes = Buffer.from(audioBuffer);
-  const firstUpload = await supabase.storage
-    .from(STORAGE_BUCKET)
-    .upload(storageKey, audioBytes, {
-      contentType: "audio/mpeg",
-      upsert: true,
-    });
+  const firstUpload = await withTimeout(
+    supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(storageKey, audioBytes, {
+        contentType: "audio/mpeg",
+        upsert: true,
+      }),
+    STORAGE_OPERATION_TIMEOUT_MS,
+    "TTS storage upload timed out",
+  );
 
   if (!firstUpload.error || !isMissingBucketError(firstUpload.error)) {
     return { error: firstUpload.error };
@@ -208,19 +228,27 @@ async function uploadTtsAudio(
 
   await ensureTtsBucket(supabase, true);
 
-  const retryUpload = await supabase.storage
-    .from(STORAGE_BUCKET)
-    .upload(storageKey, audioBytes, {
-      contentType: "audio/mpeg",
-      upsert: true,
-    });
+  const retryUpload = await withTimeout(
+    supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(storageKey, audioBytes, {
+        contentType: "audio/mpeg",
+        upsert: true,
+      }),
+    STORAGE_OPERATION_TIMEOUT_MS,
+    "TTS storage retry upload timed out",
+  );
 
   return { error: retryUpload.error };
 }
 
 async function ensureTtsBucket(supabase: any, forceCreate = false): Promise<void> {
   if (!forceCreate) {
-    const { data, error } = await supabase.storage.getBucket(STORAGE_BUCKET);
+    const { data, error } = await withTimeout(
+      supabase.storage.getBucket(STORAGE_BUCKET),
+      STORAGE_OPERATION_TIMEOUT_MS,
+      "TTS storage bucket check timed out",
+    );
     if (data && !error) return;
 
     if (error && !isMissingBucketError(error)) {
@@ -228,11 +256,15 @@ async function ensureTtsBucket(supabase: any, forceCreate = false): Promise<void
     }
   }
 
-  const { error: createError } = await supabase.storage.createBucket(STORAGE_BUCKET, {
-    public: false,
-    fileSizeLimit: MAX_AUDIO_FILE_SIZE_BYTES,
-    allowedMimeTypes: ["audio/mpeg"],
-  });
+  const { error: createError } = await withTimeout(
+    supabase.storage.createBucket(STORAGE_BUCKET, {
+      public: false,
+      fileSizeLimit: MAX_AUDIO_FILE_SIZE_BYTES,
+      allowedMimeTypes: ["audio/mpeg"],
+    }),
+    STORAGE_OPERATION_TIMEOUT_MS,
+    "TTS storage bucket creation timed out",
+  );
 
   if (createError && !isAlreadyExistsError(createError)) {
     throw new Error(`Failed to create TTS storage bucket: ${formatSupabaseError(createError)}`);
@@ -244,7 +276,7 @@ function isMissingBucketError(error: unknown): boolean {
   return (
     message.includes("bucket not found") ||
     message.includes("bucket_not_found") ||
-    message.includes("storage bucket") && message.includes("not found")
+    (message.includes("storage bucket") && message.includes("not found"))
   );
 }
 
@@ -270,10 +302,28 @@ function formatSupabaseError(error: unknown): string {
   }
 }
 
+async function withTimeout<T>(promise: PromiseLike<T>, ms: number, message: string): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(message)), ms);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
 async function getSignedUrl(supabase: any, storageKey: string): Promise<string> {
-  const { data, error } = await supabase.storage
-    .from(STORAGE_BUCKET)
-    .createSignedUrl(storageKey, SIGNED_URL_TTL_SECONDS);
+  const { data, error } = await withTimeout(
+    supabase.storage
+      .from(STORAGE_BUCKET)
+      .createSignedUrl(storageKey, SIGNED_URL_TTL_SECONDS),
+    STORAGE_OPERATION_TIMEOUT_MS,
+    "TTS signed URL creation timed out",
+  );
   if (error || !data) {
     throw new Error(`Failed to sign URL: ${error?.message ?? "unknown"}`);
   }

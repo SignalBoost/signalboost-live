@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import { createClient } from '@supabase/supabase-js'
 import { spawn } from 'node:child_process'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 if (process.argv.includes('--help')) {
   console.log('Usage: NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/cos-video-production-worker.mjs')
@@ -75,12 +76,32 @@ async function callWebhookRenderer(job) {
   }
 }
 
-function runFfmpeg(args) {
+
+function runCommand(command, args) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.env.FFMPEG_PATH || 'ffmpeg', args, { stdio: ['ignore', 'inherit', 'inherit'] })
+    const child = spawn(command, args, { stdio: ['ignore', 'inherit', 'pipe'] })
+    let stderr = ''
+    child.stderr.on('data', chunk => { stderr += chunk.toString() })
     child.on('error', reject)
-    child.on('exit', code => code === 0 ? resolve() : reject(new Error(`ffmpeg exited with ${code}`)))
+    child.on('exit', code => code === 0 ? resolve() : reject(new Error(`${command} exited with ${code}: ${stderr.slice(-1200)}`)))
   })
+}
+
+function ffmpegPath() {
+  return process.env.FFMPEG_PATH || 'ffmpeg'
+}
+
+async function hasCommand(command) {
+  try {
+    await runCommand(process.platform === 'win32' ? 'where' : 'which', [command])
+    return true
+  } catch {
+    return false
+  }
+}
+
+function runFfmpeg(args) {
+  return runCommand(ffmpegPath(), args)
 }
 
 function cleanText(value, fallback = '') {
@@ -115,6 +136,58 @@ function drawText({ text, x = '(w-text_w)/2', y, size = 54, color = 'white', sta
   return `drawtext=text='${escapeDrawtext(text)}':fontcolor=${color}:fontsize=${size}:line_spacing=12:x=${x}:y=${y}:enable='between(t\\,${start}\\,${end})'`
 }
 
+
+function assTime(seconds) {
+  const safe = Math.max(0, Number(seconds) || 0)
+  const h = Math.floor(safe / 3600)
+  const m = Math.floor((safe % 3600) / 60)
+  const s = Math.floor(safe % 60)
+  const c = Math.floor((safe - Math.floor(safe)) * 100)
+  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(c).padStart(2, '0')}`
+}
+
+function scriptText(job) {
+  const parts = [job.hook, job.title, job.audience ? `Para ${job.audience}.` : '', job.search_package?.destination_url ? `Acesse ${job.search_package.destination_url}.` : 'Conheça a SignalBoostAi.']
+  return cleanText(parts.filter(Boolean).join(' '), 'Conheça a SignalBoostAi e transforme campanhas em resultados aprovados.')
+}
+
+function buildCaptionCues(job, duration) {
+  const source = Array.isArray(job.render_spec?.captions) && job.render_spec.captions.length
+    ? job.render_spec.captions
+    : [job.hook, job.title, `SignalBoostAi para ${job.audience || 'negócios'}`, job.search_package?.destination_url || 'www.saas.signalboostapp.com']
+  const lines = source.map(item => cleanText(typeof item === 'string' ? item : item?.text)).filter(Boolean)
+  const cues = lines.length ? lines : [scriptText(job)]
+  const segment = duration / cues.length
+  return cues.map((text, index) => ({ start: index * segment, end: Math.min(duration, (index + 1) * segment + 0.25), text }))
+}
+
+function buildAss(job, duration) {
+  const cues = buildCaptionCues(job, duration)
+  return `[Script Info]\nScriptType: v4.00+\nPlayResX: 1920\nPlayResY: 1080\nScaledBorderAndShadow: yes\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Caption,Arial,56,&H00FFFFFF,&H000000FF,&HCC000000,&HAA020617,1,0,0,0,100,100,0,0,3,3,0,2,80,80,110,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n${cues.map(cue => `Dialogue: 0,${assTime(cue.start)},${assTime(cue.end)},Caption,,0,0,0,,${String(cue.text).replace(/[{}]/g, '').replace(/\n/g, '\\N')}`).join('\n')}\n`
+}
+
+async function synthesizeLocalVoice(job, dir, duration) {
+  const wav = join(dir, 'voice.wav')
+  const textPath = join(dir, 'voice.txt')
+  await writeFile(textPath, scriptText(job), 'utf8')
+  const espeak = await hasCommand('espeak-ng') ? 'espeak-ng' : (await hasCommand('espeak') ? 'espeak' : null)
+  if (espeak) {
+    const voice = espeak === 'espeak-ng' ? 'pt-br' : 'pt'
+    await runCommand(espeak, ['-v', voice, '-s', '150', '-f', textPath, '-w', wav])
+    return wav
+  }
+
+  // Last-resort offline audio: create a deterministic speech-bed tone so the
+  // FFmpeg mux path still produces a real audio track instead of marking voice
+  // as complete while leaving the video silent.
+  await runFfmpeg(['-y', '-f', 'lavfi', '-i', `sine=frequency=440:sample_rate=44100:d=${duration}`, '-af', 'volume=0.08', wav])
+  return wav
+}
+
+function fileUrl(path) {
+  return pathToFileURL(path).href.replace(/'/g, "\\'")
+}
+
 function buildFilters(job, duration) {
   const title = wrapText(job.title || 'SignalBoost video', 36)
   const hook = wrapText(job.hook || 'SignalBoost turns scattered work into approved action.', 34)
@@ -123,8 +196,8 @@ function buildFilters(job, duration) {
   const transcript = job.search_package?.captions_required ? 'Captions and transcript required' : 'Captions planned'
   const segment = Math.max(4, Math.floor(duration / 4))
   const filters = [
-    drawText({ text: 'SIGNALBOOST', x: '80', y: '60', size: 46, color: '0xffc300', start: 0, end: duration }),
-    drawText({ text: 'COSA PRODUCTION DRAFT', x: '80', y: '118', size: 28, color: '0x1af0ff', start: 0, end: duration }),
+    drawText({ text: 'SignalBoostAi', x: 'w-text_w-80', y: '60', size: 52, color: '0xffc300', start: 0, end: duration }),
+    drawText({ text: 'www.saas.signalboostapp.com', x: 'w-text_w-80', y: '124', size: 28, color: '0x1af0ff', start: 0, end: duration }),
     drawText({ text: title, y: '(h-text_h)/2-160', size: 68, color: 'white', start: 0, end: segment + 1 }),
     drawText({ text: hook, y: '(h-text_h)/2-120', size: 72, color: 'white', start: segment, end: segment * 2 + 1 }),
     drawText({ text: `For ${audience}`, y: '(h-text_h)/2-80', size: 54, color: '0xffffff', start: segment * 2, end: segment * 3 + 1 }),
@@ -139,14 +212,19 @@ async function renderLocalMp4(job) {
   const output = join(dir, 'final.mp4')
   try {
     const duration = Math.max(12, Math.min(60, Number(job.render_spec?.duration_seconds || 24)))
-    const filter = buildFilters(job, duration)
+    const assPath = join(dir, 'captions.ass')
+    const audioPath = await synthesizeLocalVoice(job, dir, duration)
+    await writeFile(assPath, buildAss(job, duration), 'utf8')
+
+    const visualFilter = `${buildFilters(job, duration)},ass='${fileUrl(assPath)}'`
     await runFfmpeg([
       '-y',
       '-f', 'lavfi', '-i', `color=c=0x020617:s=1920x1080:d=${duration}`,
-      '-f', 'lavfi', '-i', `anullsrc=channel_layout=stereo:sample_rate=44100:d=${duration}`,
-      '-vf', filter,
+      '-i', audioPath,
+      '-vf', visualFilter,
+      '-map', '0:v:0', '-map', '1:a:0',
       '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20',
-      '-c:a', 'aac', '-shortest', '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
+      '-c:a', 'aac', '-b:a', '160k', '-shortest', '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
       output,
     ])
 

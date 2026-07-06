@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { spawn } from 'node:child_process'
 import { createClient } from '@supabase/supabase-js'
 
@@ -24,7 +25,18 @@ function buildAss(payload) {
   const cues = Array.isArray(payload.captions) ? payload.captions : []
   return `[Script Info]\nScriptType: v4.00+\nPlayResX: 1920\nPlayResY: 1080\nScaledBorderAndShadow: yes\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: SignalBoost,${fontFamily},${Number(style.fontSize) || 34},${primary},&H000000FF,&HAA000000,&HAA000000,1,0,0,0,100,100,0,0,3,2,0,${alignment(style)},64,64,${Math.max(16, Math.round((100 - (Number(style.y) || 78)) * 7))},1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n${cues.map((cue) => `Dialogue: 0,${assTime(cue.start)},${assTime(Math.max(Number(cue.end) || 0, (Number(cue.start) || 0) + 0.5))},SignalBoost,,0,0,0,,${effect}${String(cue.text || '').replace(/[{}]/g, '')}`).join('\n')}\n`
 }
-function runFfmpeg(args) { return new Promise((resolve, reject) => { const child = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] }); let stderr = ''; child.stderr.on('data', (chunk) => { stderr += chunk.toString() }); child.on('error', reject); child.on('close', (code) => code === 0 ? resolve() : reject(new Error(stderr || `ffmpeg exited with ${code}`))) }) }
+function runFfmpeg(args) { return new Promise((resolve, reject) => { const child = spawn(process.env.FFMPEG_PATH || 'ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] }); let stderr = ''; child.stderr.on('data', (chunk) => { stderr += chunk.toString() }); child.on('error', reject); child.on('close', (code) => code === 0 ? resolve() : reject(new Error(stderr || `ffmpeg exited with ${code}`))) }) }
+function ffmpegFile(path) { return pathToFileURL(path).href.replace(/'/g, "\\'") }
+function resolveLocalPath(value) {
+  const raw = String(value || '')
+  if (!raw) return ''
+  if (raw.startsWith('/')) return join(process.cwd(), 'public', raw)
+  if (raw.startsWith('file://')) return new URL(raw)
+  return raw
+}
+function brandDrawtext() {
+  return "drawtext=text='SignalBoostAi':fontcolor=0xffc300:fontsize=46:x=w-text_w-56:y=48:box=1:boxcolor=0x02061799:boxborderw=18,drawtext=text='www.saas.signalboostapp.com':fontcolor=0x1af0ff:fontsize=24:x=w-text_w-56:y=112:box=1:boxcolor=0x02061799:boxborderw=12"
+}
 async function renderCaptionBurnJob(jobId, payload) {
   await mkdir(renderDir, { recursive: true })
   const sourcePath = String(payload.sourceUrl || '').startsWith('/video-storage/') ? join(process.cwd(), 'public', payload.sourceUrl) : payload.sourceUrl
@@ -33,7 +45,12 @@ async function renderCaptionBurnJob(jobId, payload) {
   const outputName = `${jobId}-${safeFileName(payload.filename).replace(/\.[^.]+$/, '')}.mp4`
   const outputPath = join(renderDir, outputName)
   await writeFile(assPath, buildAss(payload), 'utf8')
-  await runFfmpeg(['-y', '-i', sourcePath, '-vf', `ass=${assPath}`, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-c:a', 'aac', '-movflags', '+faststart', outputPath])
+  const filters = [`ass='${ffmpegFile(assPath)}'`, brandDrawtext()].join(',')
+  const audioPath = payload.audioUrl ? resolveLocalPath(payload.audioUrl) : ''
+  const args = audioPath && existsSync(audioPath)
+    ? ['-y', '-i', sourcePath, '-i', audioPath, '-vf', filters, '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-c:a', 'aac', '-b:a', '160k', '-shortest', '-movflags', '+faststart', outputPath]
+    : ['-y', '-i', sourcePath, '-vf', filters, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-c:a', 'aac', '-movflags', '+faststart', outputPath]
+  await runFfmpeg(args)
   return { resultUrl: `/video-renders/${outputName}`, outputPath }
 }
 async function updateJob(id, patch) { if (supabase) await supabase.from('video_jobs').update(patch).eq('id', id); await writeFile(join(queueDir, `${id}.result.json`), JSON.stringify({ id, ...patch }, null, 2), 'utf8') }

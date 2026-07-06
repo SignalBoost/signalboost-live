@@ -80,9 +80,15 @@ function langOf(value: any) {
   return allowedLanguages.includes(l) ? l : 'en'
 }
 
-function channelOf(value: any): CosChannel {
-  const raw = String(value || '').toLowerCase()
-  if (raw.includes('short') || raw.includes('tiktok') || raw.includes('reel')) return 'short_video'
+function channelOf(...values: any[]): CosChannel {
+  // Scan the FULL, untruncated request text. Routing used to run on the goal
+  // sliced to 1200 chars, so a long brief whose intro mentioned "fila de
+  // outreach" was routed to the outreach channel even though it explicitly
+  // requested a Reels/TikTok/Shorts video further down.
+  const raw = values.map((v) => String(v || '')).join(' ').toLowerCase()
+  // Explicit video intent always wins over incidental mentions of text channels.
+  if (raw.includes('short') || raw.includes('tiktok') || raw.includes('reel') || raw.includes('9:16') || raw.includes('vertical')) return 'short_video'
+  if (raw.includes('youtube') || raw.includes('video') || raw.includes('vídeo') || raw.includes('wideo') || raw.includes('видео')) return 'youtube'
   if (raw.includes('linkedin')) return 'linkedin'
   if (raw.includes('blog')) return 'blog'
   if (raw.includes('email')) return 'email'
@@ -163,7 +169,7 @@ export interface ProposeCampaignResult {
 
 async function createOneCampaign(admin: any, args: any, spec?: RegionalSpec): Promise<{ ok: boolean; campaignId?: string; render?: any; error?: string }> {
   const baseGoal = text(args?.goal || args?.objective || args?.sourceMaterial, 'Create a SignalBoostAi promotional video campaign.', 1200)
-  const channel = channelOf(args?.channel || baseGoal)
+  const channel = channelOf(args?.channel, args?.goal, args?.objective, args?.sourceMaterial)
   const lang = spec?.lang || langOf(args?.language || args?.lang)
   const audience = spec?.audience || text(args?.audience, 'Small businesses, agencies, hotels, restaurants, and entrepreneurs.', 400)
   const offer = text(args?.offer || args?.callToAction, `Start your free trial at ${SAAS_URL}.`, 300)

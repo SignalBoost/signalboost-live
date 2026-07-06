@@ -6,6 +6,7 @@ import { useI18n } from '@/components/i18n/I18nProvider'
 
 type CampaignStatus = 'draft' | 'waiting_approval' | 'approved' | 'queued' | 'running' | 'completed' | 'measured' | 'learned' | 'rejected'
 type PressChannel = 'online-newspapers' | 'print-newspapers' | 'trade-press'
+type PressAction = 'APPROVED' | 'REJECTED' | 'ON_HOLD' | 'STAFF_SUPPORT'
 
 type Campaign = {
   id: string
@@ -44,11 +45,11 @@ type Copy = {
 }
 
 const COPY: Record<string, Copy> = {
-  en: { eyebrow: 'Press & Print Media', title: 'Local review for newspapers and magazines.', subtitle: 'COSA-created digital newspaper, print newspaper, and IT magazine campaigns appear here for visual review before release.', empty: 'No Press & Print Media campaigns are waiting here yet. Ask COSA to start an online newspaper, print newspaper, or IT magazine campaign.', pending: 'Pending human review', approved: 'Approved', rejected: 'Rejected', hold: 'On hold', approve: 'Approve', reject: 'Reject', putHold: 'Put on hold', preview: 'Visual ad preview', tracking: 'Tracking URL with UTM', qr: 'Dynamic QR placement', analytics: 'Channel analytics', clicks: 'Clicks', reach: 'Reach', conversions: 'Conversions', digital: 'Digital newspaper', print: 'Print newspaper', trade: 'Magazine / trade press', openCosa: 'Open COSA Campaign Console' },
-  pt: { eyebrow: 'Press & Print Media', title: 'Revisão local para jornais e revistas.', subtitle: 'Campanhas criadas pelo COSA para jornais digitais, jornais impressos e revistas de TI aparecem aqui para revisão visual antes da liberação.', empty: 'Nenhuma campanha Press & Print Media aguardando aqui ainda. Peça ao COSA para iniciar uma campanha de jornal digital, jornal impresso ou revista de TI.', pending: 'Aguardando revisão humana', approved: 'Aprovado', rejected: 'Rejeitado', hold: 'Em espera', approve: 'Aprovar', reject: 'Rejeitar', putHold: 'Colocar em espera', preview: 'Preview visual do anúncio', tracking: 'URL rastreável com UTM', qr: 'QR dinâmico no layout', analytics: 'Analytics do canal', clicks: 'Cliques', reach: 'Alcance', conversions: 'Conversões', digital: 'Jornal digital', print: 'Jornal impresso', trade: 'Revista / trade press', openCosa: 'Abrir COSA Campaign Console' },
-  es: { eyebrow: 'Press & Print Media', title: 'Revisión local para periódicos y revistas.', subtitle: 'Las campañas creadas por COSA para periódicos digitales, impresos y revistas de TI aparecen aquí para revisión visual antes de liberar.', empty: 'Aún no hay campañas Press & Print Media esperando aquí. Pide a COSA iniciar una campaña de periódico digital, impreso o revista de TI.', pending: 'Pendiente de revisión humana', approved: 'Aprobado', rejected: 'Rechazado', hold: 'En espera', approve: 'Aprobar', reject: 'Rechazar', putHold: 'Poner en espera', preview: 'Vista visual del anuncio', tracking: 'URL con UTM', qr: 'QR dinámico en el diseño', analytics: 'Analytics del canal', clicks: 'Clics', reach: 'Alcance', conversions: 'Conversiones', digital: 'Periódico digital', print: 'Periódico impreso', trade: 'Revista / trade press', openCosa: 'Abrir COSA Campaign Console' },
-  pl: { eyebrow: 'Press & Print Media', title: 'Lokalny przegląd gazet i magazynów.', subtitle: 'Kampanie COSA dla gazet cyfrowych, drukowanych i magazynów IT pojawiają się tutaj do wizualnego przeglądu przed wydaniem.', empty: 'Brak kampanii Press & Print Media oczekujących tutaj. Poproś COSA o kampanię gazety cyfrowej, drukowanej lub magazynu IT.', pending: 'Oczekuje na review', approved: 'Zatwierdzone', rejected: 'Odrzucone', hold: 'Wstrzymane', approve: 'Zatwierdź', reject: 'Odrzuć', putHold: 'Wstrzymaj', preview: 'Podgląd wizualny reklamy', tracking: 'URL z UTM', qr: 'Dynamiczny QR w layoucie', analytics: 'Analityka kanału', clicks: 'Kliknięcia', reach: 'Zasięg', conversions: 'Konwersje', digital: 'Gazeta cyfrowa', print: 'Gazeta drukowana', trade: 'Magazyn / trade press', openCosa: 'Otwórz COSA Campaign Console' },
-  ru: { eyebrow: 'Press & Print Media', title: 'Локальный просмотр газет и журналов.', subtitle: 'Кампании COSA для цифровых газет, печатных газет и IT-журналов появляются здесь для визуального просмотра перед выпуском.', empty: 'Пока нет кампаний Press & Print Media. Попросите COSA запустить кампанию для цифровой газеты, печатной газеты или IT-журнала.', pending: 'Ожидает проверки', approved: 'Одобрено', rejected: 'Отклонено', hold: 'На паузе', approve: 'Одобрить', reject: 'Отклонить', putHold: 'Поставить на паузу', preview: 'Визуальный preview объявления', tracking: 'URL с UTM', qr: 'Динамический QR в макете', analytics: 'Аналитика канала', clicks: 'Клики', reach: 'Охват', conversions: 'Конверсии', digital: 'Цифровая газета', print: 'Печатная газета', trade: 'Журнал / trade press', openCosa: 'Открыть COSA Campaign Console' },
+  en: { eyebrow: 'Press & Print Media', title: 'Local review for newspapers and magazines.', subtitle: 'COSA-created digital newspaper, print newspaper, and IT magazine campaigns appear here for visual review before release. Staff support is available when the campaign needs hands-on publication handling.', empty: 'No Press & Print Media campaigns are waiting here yet. Ask COSA to start an online newspaper, print newspaper, or IT magazine campaign.', pending: 'Pending human review', approved: 'Approved', rejected: 'Rejected', hold: 'On hold', approve: 'Approve', reject: 'Reject', putHold: 'Put on hold', preview: 'Visual ad preview', tracking: 'Tracking URL with UTM', qr: 'Dynamic QR placement', analytics: 'Channel analytics', clicks: 'Clicks', reach: 'Reach', conversions: 'Conversions', digital: 'Digital newspaper', print: 'Print newspaper', trade: 'Magazine / trade press', openCosa: 'Open COSA Campaign Console' },
+  pt: { eyebrow: 'Press & Print Media', title: 'Revisão local para jornais e revistas.', subtitle: 'Campanhas criadas pelo COSA para jornais digitais, jornais impressos e revistas de TI aparecem aqui para revisão visual antes da liberação. Suporte da equipe está disponível quando a campanha precisa de tratamento manual da publicação.', empty: 'Nenhuma campanha Press & Print Media aguardando aqui ainda. Peça ao COSA para iniciar uma campanha de jornal digital, jornal impresso ou revista de TI.', pending: 'Aguardando revisão humana', approved: 'Aprovado', rejected: 'Rejeitado', hold: 'Em espera', approve: 'Aprovar', reject: 'Rejeitar', putHold: 'Colocar em espera', preview: 'Preview visual do anúncio', tracking: 'URL rastreável com UTM', qr: 'QR dinâmico no layout', analytics: 'Analytics do canal', clicks: 'Cliques', reach: 'Alcance', conversions: 'Conversões', digital: 'Jornal digital', print: 'Jornal impresso', trade: 'Revista / trade press', openCosa: 'Abrir COSA Campaign Console' },
+  es: { eyebrow: 'Press & Print Media', title: 'Revisión local para periódicos y revistas.', subtitle: 'Las campañas creadas por COSA para periódicos digitales, impresos y revistas de TI aparecen aquí para revisión visual antes de liberar. El apoyo del equipo está disponible cuando la campaña requiere manejo directo de publicación.', empty: 'Aún no hay campañas Press & Print Media esperando aquí. Pide a COSA iniciar una campaña de periódico digital, impreso o revista de TI.', pending: 'Pendiente de revisión humana', approved: 'Aprobado', rejected: 'Rechazado', hold: 'En espera', approve: 'Aprobar', reject: 'Rechazar', putHold: 'Poner en espera', preview: 'Vista visual del anuncio', tracking: 'URL con UTM', qr: 'QR dinámico en el diseño', analytics: 'Analytics del canal', clicks: 'Clics', reach: 'Alcance', conversions: 'Conversiones', digital: 'Periódico digital', print: 'Periódico impreso', trade: 'Revista / trade press', openCosa: 'Abrir COSA Campaign Console' },
+  pl: { eyebrow: 'Press & Print Media', title: 'Lokalny przegląd gazet i magazynów.', subtitle: 'Kampanie COSA dla gazet cyfrowych, drukowanych i magazynów IT pojawiają się tutaj do wizualnego przeglądu przed wydaniem. Wsparcie zespołu jest dostępne, gdy kampania wymaga bezpośredniej obsługi publikacji.', empty: 'Brak kampanii Press & Print Media oczekujących tutaj. Poproś COSA o kampanię gazety cyfrowej, drukowanej lub magazynu IT.', pending: 'Oczekuje na review', approved: 'Zatwierdzone', rejected: 'Odrzucone', hold: 'Wstrzymane', approve: 'Zatwierdź', reject: 'Odrzuć', putHold: 'Wstrzymaj', preview: 'Podgląd wizualny reklamy', tracking: 'URL z UTM', qr: 'Dynamiczny QR w layoucie', analytics: 'Analityka kanału', clicks: 'Kliknięcia', reach: 'Zasięg', conversions: 'Konwersje', digital: 'Gazeta cyfrowa', print: 'Gazeta drukowana', trade: 'Magazyn / trade press', openCosa: 'Otwórz COSA Campaign Console' },
+  ru: { eyebrow: 'Press & Print Media', title: 'Локальный просмотр газет и журналов.', subtitle: 'Кампании COSA для цифровых газет, печатных газет и IT-журналов появляются здесь для визуального просмотра перед выпуском. Поддержка команды доступна, когда кампании нужна ручная работа с публикацией.', empty: 'Пока нет кампаний Press & Print Media. Попросите COSA запустить кампанию для цифровой газеты, печатной газеты или IT-журнала.', pending: 'Ожидает проверки', approved: 'Одобрено', rejected: 'Отклонено', hold: 'На паузе', approve: 'Одобрить', reject: 'Отклонить', putHold: 'Поставить на паузу', preview: 'Визуальный preview объявления', tracking: 'URL с UTM', qr: 'Динамический QR в макете', analytics: 'Аналитика канала', clicks: 'Клики', reach: 'Охват', conversions: 'Конверсии', digital: 'Цифровая газета', print: 'Печатная газета', trade: 'Журнал / trade press', openCosa: 'Открыть COSA Campaign Console' },
 }
 
 const CHANNELS: Record<PressChannel, { labelKey: keyof Pick<Copy, 'digital' | 'print' | 'trade'>; accent: string }> = {
@@ -73,6 +74,7 @@ function trackingUrl(campaign: Campaign, channel: PressChannel) {
 
 function reviewLabel(copy: Copy, campaign: Campaign) {
   const review = String(campaign.metadata?.press_print_review || '').toUpperCase()
+  if (campaign.metadata?.staff_support_mode === true) return 'Staff support active'
   if (campaign.status === 'approved' || review === 'APPROVED') return copy.approved
   if (campaign.status === 'rejected' || review === 'REJECTED') return copy.rejected
   if (review === 'ON_HOLD' || campaign.status === 'draft') return copy.hold
@@ -102,9 +104,16 @@ export default function PressPrintMediaPage() {
 
   const pressCampaigns = useMemo(() => campaigns.filter(channelFor), [campaigns])
 
-  async function patch(campaign: Campaign, action: 'APPROVED' | 'REJECTED' | 'ON_HOLD') {
+  async function patch(campaign: Campaign, action: PressAction) {
     const status = action === 'APPROVED' ? 'approved' : action === 'REJECTED' ? 'rejected' : 'draft'
-    const metadata = { ...(campaign.metadata || {}), press_print_review: action, press_print_reviewed_at: new Date().toISOString() }
+    const metadata = {
+      ...(campaign.metadata || {}),
+      press_print_review: action === 'STAFF_SUPPORT' ? 'ON_HOLD' : action,
+      press_print_reviewed_at: new Date().toISOString(),
+      staff_support_available: true,
+      staff_support_mode: action === 'STAFF_SUPPORT' ? true : campaign.metadata?.staff_support_mode,
+      staff_support_started_at: action === 'STAFF_SUPPORT' ? new Date().toISOString() : campaign.metadata?.staff_support_started_at,
+    }
     setBusy(campaign.id + action)
     try {
       const res = await fetch('/api/cos/campaign-queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: campaign.id, status, metadata }) })
@@ -135,6 +144,7 @@ export default function PressPrintMediaPage() {
         const channelMeta = CHANNELS[channel]
         const url = trackingUrl(campaign, channel)
         const analytics = campaign.metadata?.press_print_analytics || {}
+        const staffActive = campaign.metadata?.staff_support_mode === true
         return (
           <section key={campaign.id} style={{ ...card, borderColor: `${channelMeta.accent}55` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
@@ -143,7 +153,7 @@ export default function PressPrintMediaPage() {
                 <h2 style={{ color: '#fff', margin: '8px 0 0', fontSize: 24 }}>{campaign.title || copy.preview}</h2>
                 <p style={body}>{campaign.objective || campaign.audience || 'Press and print campaign prepared by COSA.'}</p>
               </div>
-              <strong style={{ color: channelMeta.accent }}>{reviewLabel(copy, campaign)}</strong>
+              <strong style={{ color: staffActive ? '#fde68a' : channelMeta.accent }}>{reviewLabel(copy, campaign)}</strong>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1.2fr) minmax(240px, .8fr)', gap: 16, marginTop: 16 }}>
               <article style={mockup}>
@@ -170,6 +180,17 @@ export default function PressPrintMediaPage() {
                   <button disabled={Boolean(busy)} onClick={() => patch(campaign, 'REJECTED')} style={secondary}>{copy.reject}</button>
                   <button disabled={Boolean(busy)} onClick={() => patch(campaign, 'ON_HOLD')} style={secondary}>{copy.putHold}</button>
                 </div>
+                <div style={staffBox}>
+                  <h3 className="sb-h3" style={{ marginTop: 0 }}>Staff support mode</h3>
+                  <p style={body}>Use this if the campaign needs person-to-person publication handling, media-kit review, layout adjustment, or final delivery coordination.</p>
+                  <ol style={{ margin: '8px 0 12px', paddingLeft: 18, color: 'rgba(255,255,255,.72)', lineHeight: 1.65 }}>
+                    <li>Confirm publication contact and deadline.</li>
+                    <li>Adjust ad dimensions and media requirements.</li>
+                    <li>Prepare the final layout package.</li>
+                    <li>Keep the decision in Marketing + Sales.</li>
+                  </ol>
+                  <button disabled={Boolean(busy)} onClick={() => patch(campaign, 'STAFF_SUPPORT')} style={staffActive ? primary : secondary}>{staffActive ? 'Staff support active' : 'Use staff support'}</button>
+                </div>
               </aside>
             </div>
           </section>
@@ -188,6 +209,7 @@ const heroCard: CSSProperties = { border: '1px solid rgba(244,114,182,.24)', bor
 const card: CSSProperties = { border: '1px solid rgba(255,255,255,.10)', borderRadius: 22, padding: 20, background: 'linear-gradient(145deg, rgba(3,7,18,.88), rgba(15,23,42,.76))', backdropFilter: 'blur(18px)' }
 const mockup: CSSProperties = { border: '1px solid rgba(255,255,255,.10)', borderRadius: 18, padding: 16, background: 'rgba(255,255,255,.04)' }
 const sidePanel: CSSProperties = { border: '1px solid rgba(255,255,255,.10)', borderRadius: 18, padding: 16, background: 'rgba(0,0,0,.18)' }
+const staffBox: CSSProperties = { border: '1px solid rgba(255,195,0,.20)', borderRadius: 14, padding: 14, marginTop: 16, background: 'rgba(255,195,0,.06)' }
 const body: CSSProperties = { color: 'rgba(255,255,255,.70)', lineHeight: 1.65, maxWidth: 860 }
 const primary: CSSProperties = { border: 'none', background: '#ffc300', color: '#000', borderRadius: 12, padding: '10px 14px', fontWeight: 900, cursor: 'pointer' }
 const secondary: CSSProperties = { border: '1px solid rgba(255,255,255,.16)', background: 'rgba(255,255,255,.06)', color: '#fff', borderRadius: 12, padding: '10px 14px', fontWeight: 850, cursor: 'pointer' }

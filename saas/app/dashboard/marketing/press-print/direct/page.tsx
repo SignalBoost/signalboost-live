@@ -33,7 +33,7 @@ export default function DirectPressCampaignPage() {
         notes.trim() ? `Article/ad notes: ${notes.trim()}.` : '',
         `CTA URL: ${ctaUrl.trim() || 'https://saas.signalboostapp.com'}.`,
       ].filter(Boolean).join(' ')
-      const res = await fetch('/api/cos/campaign-queue', {
+      const res = await fetch('/api/marketing/press-print', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -69,7 +69,7 @@ export default function DirectPressCampaignPage() {
       <section style={heroCard}>
         <p className="sb-eyebrow" style={{ margin: 0 }}>Marketing + Sales · Press & Print Media</p>
         <h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 34, letterSpacing: '-0.04em' }}>Start a staff-led press campaign</h1>
-        <p style={body}>Use this when the team will identify the publication, prepare the article or ad, coordinate with the editor or media contact, and handle the campaign directly. No COSA command is required.</p>
+        <p style={body}>Use this when the team will identify the publication, prepare the article or ad, coordinate with the editor or media contact, and handle the campaign directly. No rich-media workflow is required.</p>
         <Link href="/dashboard/marketing/press-print" className="sb-button-secondary" style={{ textDecoration: 'none', display: 'inline-flex', marginTop: 12 }}>Back to Press & Print Media</Link>
       </section>
 

@@ -6,7 +6,7 @@ import { useI18n } from '@/components/i18n/I18nProvider'
 
 type CampaignStatus = 'draft' | 'waiting_approval' | 'approved' | 'queued' | 'running' | 'completed' | 'measured' | 'learned' | 'rejected'
 type PressChannel = 'online-newspapers' | 'print-newspapers' | 'trade-press'
-type PressAction = 'APPROVED' | 'REJECTED' | 'ON_HOLD' | 'STAFF_SUPPORT'
+type Decision = 'ok' | 'no' | 'hold' | 'staff'
 
 type Campaign = {
   id: string
@@ -82,13 +82,21 @@ function reviewLabel(copy: Copy, campaign: Campaign) {
   return copy.pending
 }
 
+function DecisionForm({ id, decision, label, style }: { id: string; decision: Decision; label: string; style: CSSProperties }) {
+  return (
+    <form method="post" action="/api/marketing/press-print/decision" style={{ display: 'inline-flex' }}>
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="decision" value={decision} />
+      <button type="submit" style={style}>{label}</button>
+    </form>
+  )
+}
+
 export default function PressPrintMediaPage() {
   const { lang } = useI18n()
   const copy = COPY[lang] || COPY.en
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
-  const [busy, setBusy] = useState('')
-  const [message, setMessage] = useState('')
 
   async function load() {
     setLoading(true)
@@ -102,34 +110,7 @@ export default function PressPrintMediaPage() {
   }
 
   useEffect(() => { load() }, [])
-
   const pressCampaigns = useMemo(() => campaigns.filter(channelFor), [campaigns])
-
-  async function patch(campaign: Campaign, action: PressAction) {
-    const status: CampaignStatus = action === 'REJECTED' ? 'rejected' : 'draft'
-    const metadata = {
-      ...(campaign.metadata || {}),
-      press_print_review: action === 'STAFF_SUPPORT' ? 'ON_HOLD' : action,
-      press_print_reviewed_at: new Date().toISOString(),
-      press_print_review_scope: 'local_marketing_workspace',
-      staff_support_available: true,
-      staff_support_mode: action === 'STAFF_SUPPORT' ? true : campaign.metadata?.staff_support_mode,
-      staff_support_started_at: action === 'STAFF_SUPPORT' ? new Date().toISOString() : campaign.metadata?.staff_support_started_at,
-    }
-    setBusy(campaign.id + action)
-    setMessage(`${campaign.title || campaign.id}: ${action}`)
-    setCampaigns((prev) => prev.map((row) => row.id === campaign.id ? { ...row, status, metadata } : row))
-    try {
-      const res = await fetch('/api/cos/campaign-queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: campaign.id, status, metadata }) })
-      const json = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(json?.error || 'Update failed')
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Update failed')
-      await load()
-    } finally {
-      setBusy('')
-    }
-  }
 
   return (
     <main style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gap: 18 }}>
@@ -142,7 +123,6 @@ export default function PressPrintMediaPage() {
           <Link href="/dashboard/cosa" className="sb-button-secondary" style={{ textDecoration: 'none', display: 'inline-flex' }}>{copy.openCosa}</Link>
         </div>
       </section>
-      {message ? <p className="sb-caption" style={{ color: '#fde68a' }}>{message}</p> : null}
       {loading ? <p className="sb-body">Loading…</p> : null}
       {!loading && pressCampaigns.length === 0 ? <section style={card}><p style={body}>{copy.empty}</p></section> : null}
       {pressCampaigns.map((campaign) => {
@@ -174,8 +154,12 @@ export default function PressPrintMediaPage() {
               <aside style={sidePanel}>
                 <h3 className="sb-h3">{copy.tracking}</h3><p style={{ ...body, wordBreak: 'break-all' }}>{url}</p>
                 <h3 className="sb-h3">{copy.analytics}</h3><Metric label={copy.clicks} value={Number(analytics.clicks || 0)} /><Metric label={copy.reach} value={Number(analytics.reach || 0)} /><Metric label={copy.conversions} value={Number(analytics.conversions || 0)} />
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16 }}><button disabled={Boolean(busy)} onClick={() => patch(campaign, 'APPROVED')} style={primary}>{copy.approve}</button><button disabled={Boolean(busy)} onClick={() => patch(campaign, 'REJECTED')} style={secondary}>{copy.reject}</button><button disabled={Boolean(busy)} onClick={() => patch(campaign, 'ON_HOLD')} style={secondary}>{copy.putHold}</button></div>
-                <div style={staffBox}><h3 className="sb-h3" style={{ marginTop: 0 }}>Staff support mode</h3><p style={body}>Use this if the campaign needs person-to-person publication handling, media-kit review, layout adjustment, or final delivery coordination.</p><ol style={{ margin: '8px 0 12px', paddingLeft: 18, color: 'rgba(255,255,255,.72)', lineHeight: 1.65 }}><li>Confirm publication contact and deadline.</li><li>Adjust ad dimensions and media requirements.</li><li>Prepare the final layout package.</li><li>Keep the decision in Marketing + Sales.</li></ol><button disabled={Boolean(busy)} onClick={() => patch(campaign, 'STAFF_SUPPORT')} style={staffActive ? primary : secondary}>{staffActive ? 'Staff support active' : 'Use staff support'}</button></div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16 }}>
+                  <DecisionForm id={campaign.id} decision="ok" label={copy.approve} style={primary} />
+                  <DecisionForm id={campaign.id} decision="no" label={copy.reject} style={secondary} />
+                  <DecisionForm id={campaign.id} decision="hold" label={copy.putHold} style={secondary} />
+                </div>
+                <div style={staffBox}><h3 className="sb-h3" style={{ marginTop: 0 }}>Staff support mode</h3><p style={body}>Use this if the campaign needs person-to-person publication handling, media-kit review, layout adjustment, or final delivery coordination.</p><ol style={{ margin: '8px 0 12px', paddingLeft: 18, color: 'rgba(255,255,255,.72)', lineHeight: 1.65 }}><li>Confirm publication contact and deadline.</li><li>Adjust ad dimensions and media requirements.</li><li>Prepare the final layout package.</li><li>Keep the decision in Marketing + Sales.</li></ol><DecisionForm id={campaign.id} decision="staff" label={staffActive ? 'Staff support active' : 'Use staff support'} style={staffActive ? primary : secondary} /></div>
               </aside>
             </div>
           </section>

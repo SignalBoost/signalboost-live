@@ -1,24 +1,18 @@
 // saas/lib/operator/video.ts
 // Reusable server-side helper for generating website/background/COS videos.
 //
-// Cost safety rule:
-//   - Default engine is internal FFmpeg preview, even when a Fal key exists.
-//   - Paid fal.ai/Kling only runs when COS_VIDEO_ENGINE=fal and
-//     COS_ALLOW_PAID_FAL=true are both set.
-//
-// This prevents failed tests, crons, or stuck campaign retries from spending
-// money automatically.
+// COST SAFETY MODE:
+// Automatic COS/video retries must not spend money on paid media providers.
+// This helper now always queues the internal FFmpeg preview path for new video
+// work. Paid external rendering can be reintroduced later behind a separate,
+// explicit owner approval flow.
 
-import { fal } from '@fal-ai/client'
 import { createClient } from '@supabase/supabase-js'
 
-const FAL_SITE_VIDEO_MODEL = 'fal-ai/kling-video/v3/standard/text-to-video'
 const LOCAL_FFMPEG_MODEL = 'signalboost/local-ffmpeg-preview'
 const RENDER_BUCKET = process.env.COS_VIDEO_RENDER_BUCKET || 'video-renders'
-const FAL_PROVIDER_KEY = ['FAL', 'KEY'].join('_')
 const SUPABASE_URL_KEY = ['NEXT', 'PUBLIC', 'SUPABASE', 'URL'].join('_')
 const SUPABASE_SERVICE_KEY = ['SUPABASE', 'SERVICE', 'ROLE', 'KEY'].join('_')
-const PAID_FAL_FLAG = ['COS', 'ALLOW', 'PAID', 'FAL'].join('_')
 
 type ImageMotionSource = {
   sourceImageUrl?: string
@@ -27,31 +21,11 @@ type ImageMotionSource = {
   visualStrategy?: string
 }
 
-let configured = false
-function ensureFalConfigured() {
-  const providerKey = process.env[FAL_PROVIDER_KEY]
-  if (!providerKey) throw new Error('Fal provider key is not configured')
-  if (!configured) {
-    fal.config({ credentials: providerKey })
-    configured = true
-  }
-}
-
 function adminDb() {
   const url = process.env[SUPABASE_URL_KEY]
   const key = process.env[SUPABASE_SERVICE_KEY]
   if (!url || !key) throw new Error('Supabase service credentials are not configured')
   return createClient(url, key, { auth: { persistSession: false } })
-}
-
-function paidFalAllowed(): boolean {
-  return String(process.env[PAID_FAL_FLAG] || '').trim().toLowerCase() === 'true'
-}
-
-function selectedEngine(): 'fal' | 'ffmpeg' {
-  const raw = String(process.env.COS_VIDEO_ENGINE || process.env.COS_VIDEO_RENDER_ENGINE || '').trim().toLowerCase()
-  if (['fal', 'fal.ai', 'kling', 'premium'].includes(raw) && paidFalAllowed()) return 'fal'
-  return 'ffmpeg'
 }
 
 export type StartVideoResult =
@@ -75,24 +49,6 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err || 'unknown error')
 }
 
-function isPermanentFalError(message: string): boolean {
-  const m = String(message || '').toLowerCase()
-  return [
-    'unauthorized',
-    'forbidden',
-    ['invalid api', 'key'].join(' '),
-    ['invalid', 'token'].join(' '),
-    'credentials',
-    'not found',
-    'model not found',
-    'does not exist',
-    'bad request',
-    'invalid request',
-    'insufficient credit',
-    'quota',
-  ].some((needle) => m.includes(needle))
-}
-
 function cleanText(value: string, max = 240): string {
   return String(value || '')
     .replace(/https?:\/\/\S+/gi, ' ')
@@ -109,20 +65,6 @@ function titleFromPrompt(prompt: string): string {
 function hookFromPrompt(prompt: string): string {
   const clean = cleanText(prompt, 160)
   return clean || 'One command can start a complete SignalBoostAi campaign.'
-}
-
-async function startFalVideo(prompt: string, aspectRatio: '9:16' | '16:9' | '1:1'): Promise<StartVideoResult> {
-  if (!paidFalAllowed()) return { ok: false, error: 'Paid fal.ai rendering is disabled by COS_ALLOW_PAID_FAL.' }
-  ensureFalConfigured()
-  const input = {
-    prompt: prompt.trim(),
-    duration: '5' as const,
-    aspect_ratio: aspectRatio,
-  }
-  const submitted = await fal.queue.submit(FAL_SITE_VIDEO_MODEL, { input })
-  const requestId = (submitted as { request_id?: string }).request_id
-  if (!requestId) return { ok: false, error: 'No request id returned from fal.' }
-  return { ok: true, requestId, model: FAL_SITE_VIDEO_MODEL }
 }
 
 async function startFfmpegPreview(prompt: string, aspectRatio: '9:16' | '16:9' | '1:1', source: ImageMotionSource = {}): Promise<StartVideoResult> {
@@ -175,7 +117,7 @@ async function startFfmpegPreview(prompt: string, aspectRatio: '9:16' | '16:9' |
   }
 
   const { data, error } = await sb.from('cos_video_production_jobs').insert(row).select('id').single()
-  if (error || !data?.id) return { ok: false, error: error?.message || 'Could not queue FFmpeg preview render.' }
+  if (error || !data?.id) return { ok: false, error: error?.message || 'Could not queue internal FFmpeg preview render.' }
   return { ok: true, requestId: String(data.id), model: LOCAL_FFMPEG_MODEL }
 }
 
@@ -197,83 +139,38 @@ export async function startSiteVideo(
   prompt: string,
   aspectRatio: '9:16' | '16:9' | '1:1' = '16:9'
 ): Promise<StartVideoResult> {
-  const engine = selectedEngine()
-  if (engine === 'ffmpeg') {
-    try {
-      return await startFfmpegPreview(prompt, aspectRatio)
-    } catch (err: unknown) {
-      const message = errorMessage(err)
-      console.error('startSiteVideo ffmpeg error:', message)
-      return { ok: false, error: message }
-    }
-  }
-
-  let falError = ''
   try {
-    const premium = await startFalVideo(prompt, aspectRatio)
-    if (premium.ok === true) return premium
-    falError = premium.error
+    return await startFfmpegPreview(prompt, aspectRatio)
   } catch (err: unknown) {
-    falError = errorMessage(err)
-  }
-
-  console.warn('startSiteVideo premium provider failed; falling back to internal FFmpeg worker:', falError)
-  try {
-    const fallback = await startFfmpegPreview(prompt, aspectRatio)
-    if (fallback.ok === true) return { ...fallback, fallbackFrom: FAL_SITE_VIDEO_MODEL, warning: falError }
-    return { ok: false, error: `Primary provider failed (${falError}); fallback also failed (${fallback.error}).` }
-  } catch (err: unknown) {
-    const fallbackError = errorMessage(err)
-    console.error('startSiteVideo fallback error:', fallbackError)
-    return { ok: false, error: `Primary provider failed (${falError}); fallback also failed (${fallbackError}).` }
+    const message = errorMessage(err)
+    console.error('startSiteVideo internal FFmpeg error:', message)
+    return { ok: false, error: message }
   }
 }
 
 async function fetchFfmpegPreview(requestId: string): Promise<FetchVideoResult> {
   const sb = adminDb()
   const { data, error } = await sb.from('cos_video_production_jobs').select('status, output_url, error').eq('id', requestId).single()
-  if (error || !data) return { status: 'failed', error: error?.message || 'FFmpeg preview job not found.' }
+  if (error || !data) return { status: 'failed', error: error?.message || 'Internal FFmpeg preview job not found.' }
 
   const status = String(data.status || '')
-  if (status === 'failed') return { status: 'failed', error: data.error || 'FFmpeg preview render failed.' }
+  if (status === 'failed') return { status: 'failed', error: data.error || 'Internal FFmpeg preview render failed.' }
   if (status === 'rendered' || status === 'completed') {
     const output = String(data.output_url || '').trim()
-    if (!output) return { status: 'failed', error: 'FFmpeg preview rendered but no output URL was saved.' }
+    if (!output) return { status: 'failed', error: 'Internal FFmpeg preview rendered but no output URL was saved.' }
     if (output.startsWith('http')) return { status: 'done', videoUrl: output }
 
     const { data: signed, error: signError } = await sb.storage.from(RENDER_BUCKET).createSignedUrl(output, 60 * 60 * 24 * 7)
-    if (signError || !signed?.signedUrl) return { status: 'failed', error: signError?.message || 'Could not sign FFmpeg preview output.' }
+    if (signError || !signed?.signedUrl) return { status: 'failed', error: signError?.message || 'Could not sign internal FFmpeg preview output.' }
     return { status: 'done', videoUrl: signed.signedUrl }
   }
 
-  return { status: 'rendering', warning: `FFmpeg preview job is ${status || 'queued'}.` }
+  return { status: 'rendering', warning: `Internal FFmpeg preview job is ${status || 'queued'}.` }
 }
 
 export async function fetchSiteVideo(requestId: string, model: string): Promise<FetchVideoResult> {
-  if (model === LOCAL_FFMPEG_MODEL) return fetchFfmpegPreview(requestId)
-
-  try {
-    ensureFalConfigured()
-    const status = await fal.queue.status(model, { requestId, logs: false })
-    const state = (status as { status?: string }).status
-
-    if (state === 'IN_QUEUE' || state === 'IN_PROGRESS') {
-      return { status: 'rendering' }
-    }
-
-    if (state === 'COMPLETED') {
-      const result = await fal.queue.result(model, { requestId })
-      const data = (result as { data?: { video?: { url?: string } }).data
-      const videoUrl = data?.video?.url
-      if (!videoUrl) return { status: 'failed', error: 'Completed but no video URL.' }
-      return { status: 'done', videoUrl }
-    }
-
-    return { status: 'failed', error: `Unexpected state: ${state ?? 'unknown'}` }
-  } catch (err: unknown) {
-    const message = errorMessage(err)
-    console.error('fetchSiteVideo error:', message)
-    if (isPermanentFalError(message)) return { status: 'failed', error: message }
-    return { status: 'rendering', warning: message }
+  if (model !== LOCAL_FFMPEG_MODEL) {
+    return { status: 'failed', error: 'Paid external video provider fetch is disabled in cost-safety mode. Re-render with the internal FFmpeg provider.' }
   }
+  return fetchFfmpegPreview(requestId)
 }

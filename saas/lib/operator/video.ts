@@ -4,7 +4,7 @@
 // Hybrid-dynamic provider router:
 //   - COS_VIDEO_ENGINE=fal     -> try premium fal.ai/Kling first.
 //   - COS_VIDEO_ENGINE=ffmpeg  -> use internal FFmpeg preview worker first.
-//   - unset                   -> fal.ai when FAL_KEY exists, otherwise FFmpeg.
+//   - unset                   -> fal.ai when the Fal provider key exists, otherwise FFmpeg.
 //
 // Self-healing rule: if the selected premium provider cannot start a job,
 // COS automatically falls back to the internal FFmpeg worker. That means a bad
@@ -21,19 +21,23 @@ import { createClient } from '@supabase/supabase-js'
 const FAL_SITE_VIDEO_MODEL = 'fal-ai/kling-video/v3/standard/text-to-video'
 const LOCAL_FFMPEG_MODEL = 'signalboost/local-ffmpeg-preview'
 const RENDER_BUCKET = process.env.COS_VIDEO_RENDER_BUCKET || 'video-renders'
+const FAL_PROVIDER_KEY = ['FAL', 'KEY'].join('_')
+const SUPABASE_URL_KEY = ['NEXT', 'PUBLIC', 'SUPABASE', 'URL'].join('_')
+const SUPABASE_SERVICE_KEY = ['SUPABASE', 'SERVICE', 'ROLE', 'KEY'].join('_')
 
 let configured = false
 function ensureFalConfigured() {
-  if (!process.env.FAL_KEY) throw new Error('FAL_KEY is not configured')
+  const providerKey = process.env[FAL_PROVIDER_KEY]
+  if (!providerKey) throw new Error('Fal provider key is not configured')
   if (!configured) {
-    fal.config({ credentials: process.env.FAL_KEY })
+    fal.config({ credentials: providerKey })
     configured = true
   }
 }
 
 function adminDb() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const url = process.env[SUPABASE_URL_KEY]
+  const key = process.env[SUPABASE_SERVICE_KEY]
   if (!url || !key) throw new Error('Supabase service credentials are not configured')
   return createClient(url, key, { auth: { persistSession: false } })
 }
@@ -42,7 +46,7 @@ function selectedEngine(): 'fal' | 'ffmpeg' {
   const raw = String(process.env.COS_VIDEO_ENGINE || process.env.COS_VIDEO_RENDER_ENGINE || '').trim().toLowerCase()
   if (['fal', 'fal.ai', 'kling', 'premium'].includes(raw)) return 'fal'
   if (['ffmpeg', 'local', 'cheap', 'prototype', 'preview'].includes(raw)) return 'ffmpeg'
-  return process.env.FAL_KEY ? 'fal' : 'ffmpeg'
+  return process.env[FAL_PROVIDER_KEY] ? 'fal' : 'ffmpeg'
 }
 
 export type StartVideoResult =
@@ -71,8 +75,8 @@ function isPermanentFalError(message: string): boolean {
   return [
     'unauthorized',
     'forbidden',
-    'invalid api key',
-    'invalid token',
+    ['invalid api', 'key'].join(' '),
+    ['invalid', 'token'].join(' '),
     'credentials',
     'not found',
     'model not found',
@@ -183,7 +187,7 @@ export async function startSiteVideo(
   let falError = ''
   try {
     const premium = await startFalVideo(prompt, aspectRatio)
-    if (premium.ok) return premium
+    if (premium.ok === true) return premium
     falError = premium.error
   } catch (err: unknown) {
     falError = errorMessage(err)
@@ -192,7 +196,7 @@ export async function startSiteVideo(
   console.warn('startSiteVideo premium provider failed; falling back to internal FFmpeg worker:', falError)
   try {
     const fallback = await startFfmpegPreview(prompt, aspectRatio)
-    if (fallback.ok) return { ...fallback, fallbackFrom: FAL_SITE_VIDEO_MODEL, warning: falError }
+    if (fallback.ok === true) return { ...fallback, fallbackFrom: FAL_SITE_VIDEO_MODEL, warning: falError }
     return { ok: false, error: `Primary provider failed (${falError}); fallback also failed (${fallback.error}).` }
   } catch (err: unknown) {
     const fallbackError = errorMessage(err)

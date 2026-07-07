@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+changed="$(git diff --cached --name-only)"
+critical="$(printf '%s\n' "$changed" | grep -E '^(saas/app/|saas/components/|saas/lib/|saas/scripts/|saas/supabase/|saas/vercel\.json$|saas/package(-lock)?\.json$|\.github/workflows/|docs/)' || true)"
+onboard="$(printf '%s\n' "$changed" | grep -x 'ONBOARD.md' || true)"
+
+if [ -n "$critical" ] && [ -z "$onboard" ]; then
+  echo "FAILED: ONBOARD.md must be staged with this commit."
+  echo ""
+  echo "What failed: critical files are staged, but ONBOARD.md is not staged."
+  echo ""
+  echo "Files that triggered the rule:"
+  printf '%s\n' "$critical" | sed 's/^/  - /'
+  echo ""
+  echo "How to fix:"
+  echo "  1. Update ONBOARD.md with a short note."
+  echo "  2. Run: git add ONBOARD.md"
+  echo "  3. Commit again."
+  echo ""
+  exit 1
+fi
+
+exit 0

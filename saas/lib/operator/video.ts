@@ -98,14 +98,14 @@ function isMissingJobsTable(message: string): boolean {
   return m.includes('cos_video_production_jobs') && (m.includes('not find') || m.includes('schema cache') || m.includes('does not exist'))
 }
 
-async function ensureJobsTable(sb: ReturnType<typeof createClient>) {
+async function ensureJobsTable(sb: any) {
   const rpc = await sb.rpc('hub_exec_sql', { query: JOBS_TABLE_SQL })
   if (rpc.error) throw new Error('Could not create video jobs table: ' + rpc.error.message)
   const check = await sb.from('cos_video_production_jobs').select('id').limit(1)
   if (check.error) throw new Error('Video jobs table still unavailable after setup: ' + check.error.message)
 }
 
-async function insertJob(sb: ReturnType<typeof createClient>, row: Record<string, unknown>) {
+async function insertJob(sb: any, row: Record<string, unknown>) {
   return await sb.from('cos_video_production_jobs').insert(row).select('id').single()
 }
 

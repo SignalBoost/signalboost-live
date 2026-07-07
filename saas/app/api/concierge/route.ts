@@ -48,10 +48,6 @@ function attachmentMime(a: AttachmentInfo): string {
   return ''
 }
 
-function attachmentLooksImage(a: AttachmentInfo): boolean {
-  return attachmentMime(a).startsWith('image/')
-}
-
 function attachmentSummary(attachments: any): string {
   if (!Array.isArray(attachments) || attachments.length === 0) return ''
   return attachments
@@ -59,11 +55,9 @@ function attachmentSummary(attachments: any): string {
     .join(', ')
 }
 
-function isVideoCreationRequest(text: string, attachments: any): boolean {
+function isVideoCreationRequest(text: string): boolean {
   const t = String(text || '').toLowerCase()
-  const hasImageAttachment = Array.isArray(attachments) && attachments.some((a: AttachmentInfo) => attachmentLooksImage(a))
   const mentionsVideo = /\b(video|vídeo|clip|reel|short|tiktok|youtube|filme|movie)\b/i.test(t)
-  const mentionsImageSource = /(foto|photo|imagem|image|picture|screenshot|print|attached image|anexo|anexada|anexado)/i.test(t)
   const createVerb = /(faça|faca|crie|criar|cria|gere|gerar|gera|render|renderizar|produza|produzir|make|create|generate|render|animate|turn\s+.*\s+into|transforme|transformar)/i.test(t)
   const watchVerb = /(watch|assistir|ver\s+o\s+vídeo|ver\s+o\s+video|find|search|procure|buscar|encontre|mostre\s+um\s+video|mostrar\s+um\s+video)/i.test(t)
 
@@ -71,7 +65,7 @@ function isVideoCreationRequest(text: string, attachments: any): boolean {
   // the floating Concierge panel, and Portuguese requests such as
   // "faça um vídeo dessa foto" where the assistant page sends mimeType instead
   // of type for image attachments.
-  return mentionsVideo && createVerb && !watchVerb && (hasImageAttachment || mentionsImageSource || true)
+  return mentionsVideo && createVerb && !watchVerb
 }
 
 function languageFrom(body: any, text: string): string {
@@ -122,7 +116,7 @@ export async function POST(req: NextRequest) {
     const text = latestUserText(body)
     const attachments = Array.isArray(body?.attachments) ? body.attachments : []
 
-    if (isVideoCreationRequest(text, attachments)) {
+    if (isVideoCreationRequest(text)) {
       const ctx = await getAccess()
       if (ctx.isOwner) {
         const files = attachmentSummary(attachments)

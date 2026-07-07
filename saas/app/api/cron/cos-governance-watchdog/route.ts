@@ -130,10 +130,17 @@ async function startOrRestartRender(sb: any, campaign: any, reason: string) {
   const started = await startSiteVideo(promptFor(campaign), aspectFor(campaign))
   const at = now()
   const previousVideo = video(campaign)
-  const nextVideo = started.ok ? { status: 'rendering', requestId: started.requestId, model: started.model, aspect: aspectFor(campaign), prompt: promptFor(campaign), started_at: at, auto_started: true, governanceRestartCount: count + 1, governanceReason: reason, providerFallback: (started as any).fallbackFrom || null, providerWarning: (started as any).warning || null, previousVideo, voicedUrl: null, voiced: {}, branded: false, brandedLangs: {}, unbrandedVoiced: {}, brandAttempts: {}, ghOverlayAttempts: {}, brandingLock: null } : { ...(previousVideo || {}), status: 'failed', error: started.error, failed_at: at, governanceRestartCount: count + 1, governanceReason: reason }
+
+  if (started.ok === false) {
+    const nextVideo = { ...(previousVideo || {}), status: 'failed', error: started.error, failed_at: at, governanceRestartCount: count + 1, governanceReason: reason }
+    await sb.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: nextVideo } }).eq('id', campaign.id)
+    await logDecision(sb, `Failed to restart COSA render for ${campaign.title || campaign.id}`, 'EXECUTE', 'executed', { action: 'auto_apply', pipeline: 'backup', riskLevel: 'high', campaignId: campaign.id, reason, started, fallback: 'watchdog_will_retry_without_human' })
+    return { action: 'restart_render_failed_will_retry', id: campaign.id, ok: false, error: started.error, autonomous: true }
+  }
+
+  const nextVideo = { status: 'rendering', requestId: started.requestId, model: started.model, aspect: aspectFor(campaign), prompt: promptFor(campaign), started_at: at, auto_started: true, governanceRestartCount: count + 1, governanceReason: reason, providerFallback: (started as any).fallbackFrom || null, providerWarning: (started as any).warning || null, previousVideo, voicedUrl: null, voiced: {}, branded: false, brandedLangs: {}, unbrandedVoiced: {}, brandAttempts: {}, ghOverlayAttempts: {}, brandingLock: null }
   await sb.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: nextVideo } }).eq('id', campaign.id)
-  await logDecision(sb, `${started.ok ? 'Auto-restarted' : 'Failed to restart'} COSA render for ${campaign.title || campaign.id}`, started.ok ? 'EXECUTE' : 'EXECUTE', 'executed', { action: 'auto_apply', pipeline: started.ok ? 'primary' : 'backup', riskLevel: started.ok ? 'medium' : 'high', campaignId: campaign.id, reason, started, fallback: started.ok ? 'render_started' : 'watchdog_will_retry_without_human' })
-  if (!started.ok) return { action: 'restart_render_failed_will_retry', id: campaign.id, ok: false, error: started.error, autonomous: true }
+  await logDecision(sb, `Auto-restarted COSA render for ${campaign.title || campaign.id}`, 'EXECUTE', 'executed', { action: 'auto_apply', pipeline: 'primary', riskLevel: 'medium', campaignId: campaign.id, reason, started, fallback: 'render_started' })
   return { action: 'restart_render', id: campaign.id, ok: true, requestId: started.requestId, fallbackFrom: (started as any).fallbackFrom || null }
 }
 

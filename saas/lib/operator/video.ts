@@ -1,16 +1,19 @@
 // saas/lib/operator/video.ts
 // Reusable server-side helper for generating website/background/COS videos.
 //
-// Cost-aware provider router:
-//   - COS_VIDEO_ENGINE=fal     -> premium fal.ai/Kling render.
-//   - COS_VIDEO_ENGINE=ffmpeg  -> cheap/free internal FFmpeg preview worker.
-//   - unset                   -> current behavior: fal.ai when FAL_KEY exists,
-//                                otherwise FFmpeg preview worker.
+// Hybrid-dynamic provider router:
+//   - COS_VIDEO_ENGINE=fal     -> try premium fal.ai/Kling first.
+//   - COS_VIDEO_ENGINE=ffmpeg  -> use internal FFmpeg preview worker first.
+//   - unset                   -> fal.ai when FAL_KEY exists, otherwise FFmpeg.
+//
+// Self-healing rule: if the selected premium provider cannot start a job,
+// COS automatically falls back to the internal FFmpeg worker. That means a bad
+// provider token, quota issue, model error, or provider outage does not leave the
+// COSA campaign dead. Human approval is not needed for this common-sense fix.
 //
 // The FFmpeg path queues a cos_video_production_jobs row. The existing
 // scripts/cos-video-production-worker.mjs worker renders a branded preview-style
 // MP4 from that row using local FFmpeg and uploads it to Supabase storage.
-// This keeps COSA from calling FAL for every draft/demo render.
 
 import { fal } from '@fal-ai/client'
 import { createClient } from '@supabase/supabase-js'
@@ -43,7 +46,7 @@ function selectedEngine(): 'fal' | 'ffmpeg' {
 }
 
 export type StartVideoResult =
-  | { ok: true; requestId: string; model: string }
+  | { ok: true; requestId: string; model: string; fallbackFrom?: string; warning?: string }
   | { ok: false; error: string }
 
 export type FetchVideoResult =
@@ -166,14 +169,35 @@ export async function startSiteVideo(
   prompt: string,
   aspectRatio: '9:16' | '16:9' | '1:1' = '16:9'
 ): Promise<StartVideoResult> {
+  const engine = selectedEngine()
+  if (engine === 'ffmpeg') {
+    try {
+      return await startFfmpegPreview(prompt, aspectRatio)
+    } catch (err: unknown) {
+      const message = errorMessage(err)
+      console.error('startSiteVideo ffmpeg error:', message)
+      return { ok: false, error: message }
+    }
+  }
+
+  let falError = ''
   try {
-    const engine = selectedEngine()
-    if (engine === 'ffmpeg') return await startFfmpegPreview(prompt, aspectRatio)
-    return await startFalVideo(prompt, aspectRatio)
+    const premium = await startFalVideo(prompt, aspectRatio)
+    if (premium.ok) return premium
+    falError = premium.error
   } catch (err: unknown) {
-    const message = errorMessage(err)
-    console.error('startSiteVideo error:', message)
-    return { ok: false, error: message }
+    falError = errorMessage(err)
+  }
+
+  console.warn('startSiteVideo premium provider failed; falling back to internal FFmpeg worker:', falError)
+  try {
+    const fallback = await startFfmpegPreview(prompt, aspectRatio)
+    if (fallback.ok) return { ...fallback, fallbackFrom: FAL_SITE_VIDEO_MODEL, warning: falError }
+    return { ok: false, error: `Primary provider failed (${falError}); fallback also failed (${fallback.error}).` }
+  } catch (err: unknown) {
+    const fallbackError = errorMessage(err)
+    console.error('startSiteVideo fallback error:', fallbackError)
+    return { ok: false, error: `Primary provider failed (${falError}); fallback also failed (${fallbackError}).` }
   }
 }
 

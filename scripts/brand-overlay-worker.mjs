@@ -1,291 +1,435 @@
-// saas/lib/outreach/social-connectors.ts
-// Multi-platform social publishing, built as an ADAPTER REGISTRY so the product can
-// support any platform a tenant uses. Adding a network = add ONE adapter entry below
-// (auth + scopes + whether it needs a destination ref + a publish fn + a permalink).
-// Nothing else in the codebase changes. Honest by construction: a post is reported
-// only when the platform returns a genuine id; missing creds / destination / API
-// errors are refused, never faked.
 
-export type SocialPlatform =
-  | 'facebook_pages'
-  | 'instagram_business'
-  | 'linkedin_company'
-  | 'twitter_x'
-  | 'youtube_channels'
-  | 'tiktok'
-  | 'reddit'
+⌁
+signalboost
+Client suite
+Home
 
-export type SocialPostPayload = {
-  platform: SocialPlatform
-  text: string
-  imageUrl?: string
-  videoUrl?: string
-  accessToken?: string
-  refreshToken?: string
-  // Destination handle for platforms that post to a specific entity:
-  //   linkedin_company -> organization id, facebook_pages -> page id,
-  //   instagram_business -> IG business user id, reddit -> subreddit name.
-  //   X, YouTube, and TikTok post as the authenticated user (no ref needed).
-  accountRef?: string
-  title?: string
-  description?: string
-  tags?: string[]
-  privacyStatus?: 'public' | 'unlisted' | 'private'
-}
+Console Hub
+▾
 
-export type SocialEngagementMetrics = { likes: number; shares: number; comments: number }
-const NO_METRICS: SocialEngagementMetrics = { likes: 0, shares: 0, comments: 0 }
+SaaS Station
+▾
 
-type RawPost = { id: string; url?: string | null }
-type ContentKind = 'text' | 'media' | 'video'
+Marketing + Sales
+▾
 
-type Adapter = {
-  label: string
-  authUrl: string
-  tokenUrl?: string            // OAuth2 token endpoint (enables refresh) — omit if not refreshable here
-  scopes: string[]
-  needsAccountRef: boolean
-  content: ContentKind         // minimum content this platform needs
-  userAgent?: string           // some APIs (Reddit) require one
-  publish: (p: SocialPostPayload, accessToken: string) => Promise<RawPost>
-  permalink: (id: string, accountRef?: string) => string | null
-}
+Audit Cockpit
+▾
 
-function creds(platform: SocialPlatform): { id?: string; secret?: string } {
-  const P = platform.toUpperCase()
-  return { id: process.env[`SOCIAL_${P}_CLIENT_ID`], secret: process.env[`SOCIAL_${P}_CLIENT_SECRET`] }
-}
+Cybersecurity
+▾
 
-function uploadMimeForVideoUrl(url: string, responseContentType: string | null): string {
-  const cleanHeader = String(responseContentType || '').split(';')[0].trim().toLowerCase()
-  if (cleanHeader.startsWith('video/')) return cleanHeader
+Website
+▾
 
-  const cleanUrl = url.split('?')[0].toLowerCase()
-  if (cleanUrl.endsWith('.mov')) return 'video/quicktime'
-  if (cleanUrl.endsWith('.webm')) return 'video/webm'
+Studio
+▾
 
-  // Supabase/private storage can serve MP4 objects as application/octet-stream.
-  // YouTube accepts the upload session before processing, but the wrong media
-  // type can later surface as an unplayable video. COSA's final branded output
-  // is MP4, so default to video/mp4 for storage URLs with generic headers.
-  return 'video/mp4'
-}
+Launchpad
+▾
 
-// Standard OAuth2 refresh_token grant — works for Google/X/LinkedIn/TikTok/Reddit.
-async function refreshOAuth2(platform: SocialPlatform, tokenUrl: string, refreshToken: string): Promise<string> {
-  const { id, secret } = creds(platform)
-  if (!id) throw new Error(`${platform} client id not configured`)
-  const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' }
-  if (secret) headers.Authorization = `Basic ${Buffer.from(`${id}:${secret}`).toString('base64')}`
-  const res = await fetch(tokenUrl, {
-    method: 'POST',
-    headers,
-    body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken, client_id: id, ...(secret ? { client_secret: secret } : {}) }),
-  })
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok || !data.access_token) throw new Error(data.error_description || data.error || `${platform}_refresh_failed`)
-  return data.access_token as string
-}
+Owner/Admin
+▾
 
-// ── YouTube resumable upload (real) ──────────────────────────────────────────────
-async function uploadVideoToYouTube(payload: SocialPostPayload, accessToken: string): Promise<RawPost> {
-  if (!payload.videoUrl) throw new Error('youtube_requires_video')
-  const videoRes = await fetch(payload.videoUrl)
-  if (!videoRes.ok) throw new Error(`Failed to fetch video from storage: ${videoRes.status}`)
-  const videoBuffer = await videoRes.arrayBuffer()
-  const contentType = uploadMimeForVideoUrl(payload.videoUrl, videoRes.headers.get('content-type'))
-  const contentLength = videoBuffer.byteLength
-  // YouTube rejects titles that are empty, longer than 100 characters, or that
-  // contain < or > with "The request metadata specifies an invalid or empty
-  // video title." Campaign titles are stored at up to 140 chars, so clamp here.
-  const rawTitle = String(payload.title || payload.text || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim()
-  const ytTitle = (rawTitle.length > 100 ? rawTitle.slice(0, 97).trimEnd() + '…' : rawTitle) || 'SignalBoost Video'
-  const metadata = {
-    snippet: { title: ytTitle, description: payload.description || payload.text || '', tags: payload.tags || ['SignalBoost', 'AI', 'marketing'], categoryId: '22' },
-    status: { privacyStatus: payload.privacyStatus || 'public', selfDeclaredMadeForKids: false },
-  }
-  const initRes = await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': contentType, 'X-Upload-Content-Length': String(contentLength) },
-    body: JSON.stringify(metadata),
-  })
-  if (!initRes.ok) { const e = await initRes.json().catch(() => ({})); throw new Error(e?.error?.message || `YouTube resumable init failed: ${initRes.status}`) }
-  const uploadUrl = initRes.headers.get('location')
-  if (!uploadUrl) throw new Error('YouTube did not return a resumable upload URL')
-  const uploadRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType, 'Content-Length': String(contentLength) }, body: videoBuffer })
-  if (!uploadRes.ok) { const e = await uploadRes.json().catch(() => ({})); throw new Error(e?.error?.message || `YouTube video upload failed: ${uploadRes.status}`) }
-  const uploadData = await uploadRes.json()
-  return { id: String(uploadData.id), url: `https://www.youtube.com/watch?v=${uploadData.id}` }
-}
+Help
+▾
+Pricing
 
-// ── The registry ─────────────────────────────────────────────────────────────────
-export const ADAPTERS: Record<SocialPlatform, Adapter> = {
-  youtube_channels: {
-    label: 'YouTube Channels', authUrl: 'https://accounts.google.com/o/oauth2/v2/auth', tokenUrl: 'https://oauth2.googleapis.com/token',
-    scopes: ['https://www.googleapis.com/auth/youtube.upload', 'https://www.googleapis.com/auth/youtube.readonly'],
-    needsAccountRef: false, content: 'video',
-    publish: uploadVideoToYouTube,
-    permalink: (id) => `https://www.youtube.com/watch?v=${id}`,
-  },
+English
+⚡999K
+Command
+Luis Claudio
+Log out
+You came here for Promote Business
+SignalBoost remembered this product locally so your workspace starts with context.
+Continue product setup
+Dismiss
+COSA Video Pipeline
 
-  twitter_x: {
-    label: 'Twitter/X', authUrl: 'https://twitter.com/i/oauth2/authorize', tokenUrl: 'https://api.twitter.com/2/oauth2/token',
-    scopes: ['tweet.read', 'tweet.write', 'users.read', 'offline.access'], needsAccountRef: false, content: 'text',
-    publish: async (p, token) => {
-      const res = await fetch('https://api.twitter.com/2/tweets', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ text: p.text.slice(0, 280) }) })
-      const d = await res.json().catch(() => ({}))
-      if (!res.ok || !d?.data?.id) throw new Error(d?.detail || d?.title || `x_publish_failed_${res.status}`)
-      return { id: String(d.data.id), url: `https://x.com/i/web/status/${d.data.id}` }
-    },
-    permalink: (id) => `https://x.com/i/web/status/${id}`,
-  },
+Final video review
+This page separates raw base renders from final campaign videos. Only approve after you watch the final branded preview.
 
-  linkedin_company: {
-    label: 'LinkedIn Company', authUrl: 'https://www.linkedin.com/oauth/v2/authorization', tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
-    scopes: ['w_organization_social', 'r_organization_social'], needsAccountRef: true, content: 'text',
-    publish: async (p, token) => {
-      const res = await fetch('https://api.linkedin.com/rest/posts', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'LinkedIn-Version': '202401', 'X-Restli-Protocol-Version': '2.0.0' },
-        body: JSON.stringify({ author: `urn:li:organization:${p.accountRef}`, commentary: p.text, visibility: 'PUBLIC', distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] }, lifecycleState: 'PUBLISHED', isReshareDisabledByAuthor: false }),
-      })
-      const id = res.headers.get('x-restli-id') || res.headers.get('x-linkedin-id')
-      if (!res.ok || !id) { const e = await res.json().catch(() => ({})); throw new Error(e?.message || `linkedin_publish_failed_${res.status}`) }
-      return { id, url: `https://www.linkedin.com/feed/update/${id}` }
-    },
-    permalink: (id) => `https://www.linkedin.com/feed/update/${id}`,
-  },
+Refresh
+Kick missing renders
+Kick branding worker
+Back to approval dashboard
+Recent video campaigns
+faca um video dessa foto de pele, ele vibrando e gritado goa
+Video ID 74794835 - youtube - waiting_approval
 
-  facebook_pages: {
-    label: 'Facebook Pages', authUrl: 'https://www.facebook.com/v20.0/dialog/oauth',
-    scopes: ['pages_manage_posts', 'pages_read_engagement'], needsAccountRef: true, content: 'text',
-    publish: async (p, pageToken) => {
-      const base = `https://graph.facebook.com/v20.0/${p.accountRef}`
-      const isImg = !!p.imageUrl
-      const url = isImg ? `${base}/photos` : `${base}/feed`
-      const body = isImg ? new URLSearchParams({ url: p.imageUrl as string, caption: p.text, access_token: pageToken }) : new URLSearchParams({ message: p.text, access_token: pageToken })
-      const res = await fetch(url, { method: 'POST', body })
-      const d = await res.json().catch(() => ({}))
-      if (!res.ok || d.error || !(d.id || d.post_id)) throw new Error(d?.error?.message || `facebook_publish_failed_${res.status}`)
-      const id = String(d.post_id || d.id)
-      return { id, url: `https://www.facebook.com/${id}` }
-    },
-    permalink: (id) => `https://www.facebook.com/${id}`,
-  },
+RAW DRAFT ONLY
+Voice/captions ready. Branding next.
+78%
+Steps: render base video - add voice/captions - burn brand banner - final preview.
 
-  instagram_business: {
-    label: 'Instagram Business', authUrl: 'https://www.facebook.com/v20.0/dialog/oauth',
-    scopes: ['instagram_basic', 'instagram_content_publish'], needsAccountRef: true, content: 'media',
-    publish: async (p, token) => {
-      if (!p.imageUrl && !p.videoUrl) throw new Error('instagram_requires_media')
-      const base = `https://graph.facebook.com/v20.0/${p.accountRef}`
-      const createBody = new URLSearchParams({ caption: p.text, access_token: token })
-      if (p.imageUrl) createBody.set('image_url', p.imageUrl)
-      else { createBody.set('media_type', 'REELS'); createBody.set('video_url', p.videoUrl as string) }
-      const cRes = await fetch(`${base}/media`, { method: 'POST', body: createBody })
-      const cData = await cRes.json().catch(() => ({}))
-      if (!cRes.ok || !cData.id) throw new Error(cData?.error?.message || `instagram_create_failed_${cRes.status}`)
-      const pRes = await fetch(`${base}/media_publish`, { method: 'POST', body: new URLSearchParams({ creation_id: String(cData.id), access_token: token }) })
-      const pData = await pRes.json().catch(() => ({}))
-      if (!pRes.ok || !pData.id) throw new Error(pData?.error?.message || `instagram_publish_failed_${pRes.status}`)
-      // Fetch the real permalink (media id alone doesn't form a /p/ shortcode URL).
-      let permalink: string | null = null
-      try {
-        const lRes = await fetch(`https://graph.facebook.com/v20.0/${pData.id}?fields=permalink&access_token=${encodeURIComponent(token)}`)
-        const lData = await lRes.json().catch(() => ({}))
-        if (lRes.ok && lData.permalink) permalink = String(lData.permalink)
-      } catch { /* permalink is best-effort */ }
-      return { id: String(pData.id), url: permalink }
-    },
-    permalink: () => null,
-  },
+Created: Jul 06, 2026, 11:29:18 AM
+Final approval: -
+Render started: Jul 06, 2026, 11:29:17 AM
+Request: 019f387a
+BRANDING EXHAUSTED: attempts pt:5/5. Last error: brand overlay FFmpeg failed [pt] attempt 5/5: ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers built with gcc 13 (Ubuntu 13.2.0-23ubuntu3) configurat
 
-  // ── TikTok (video; posts to the authenticated creator via PULL_FROM_URL) ──
-  tiktok: {
-    label: 'TikTok', authUrl: 'https://www.tiktok.com/v2/auth/authorize/', tokenUrl: 'https://open.tiktokapis.com/v2/oauth/token/',
-    scopes: ['video.publish', 'video.upload'], needsAccountRef: false, content: 'video',
-    publish: async (p, token) => {
-      if (!p.videoUrl) throw new Error('tiktok_requires_video')
-      const res = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json; charset=UTF-8' },
-        body: JSON.stringify({ post_info: { title: (p.title || p.text || '').slice(0, 150), privacy_level: 'PUBLIC_TO_EVERYONE', disable_comment: false }, source_info: { source: 'PULL_FROM_URL', video_url: p.videoUrl } }),
-      })
-      const d = await res.json().catch(() => ({}))
-      const publishId = d?.data?.publish_id
-      const errCode = d?.error?.code
-      if (!res.ok || !publishId || (errCode && errCode !== 'ok')) throw new Error(d?.error?.message || `tiktok_publish_failed_${res.status}`)
-      // TikTok processes asynchronously and does not return a canonical post URL here.
-      return { id: String(publishId), url: 'https://www.tiktok.com/' }
-    },
-    permalink: () => 'https://www.tiktok.com/',
-  },
+Not final yet: the SignalBoostAi website banner has not been burned in.
 
-  // ── Reddit (self/text post to a subreddit) ──
-  reddit: {
-    label: 'Reddit', authUrl: 'https://www.reddit.com/api/v1/authorize', tokenUrl: 'https://www.reddit.com/api/v1/access_token',
-    scopes: ['submit', 'identity'], needsAccountRef: true, content: 'text', userAgent: 'SignalBoost/1.0 (by SignalBoost)',
-    publish: async (p, token) => {
-      const body = new URLSearchParams({ api_type: 'json', sr: String(p.accountRef), kind: 'self', title: (p.title || p.text).slice(0, 300), text: p.text })
-      const res = await fetch('https://oauth.reddit.com/api/submit', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'SignalBoost/1.0 (by SignalBoost)' }, body })
-      const d = await res.json().catch(() => ({}))
-      const errs = d?.json?.errors
-      const data = d?.json?.data
-      if (!res.ok || (Array.isArray(errs) && errs.length) || !data?.url) throw new Error((Array.isArray(errs) && errs[0]?.[1]) || `reddit_publish_failed_${res.status}`)
-      return { id: String(data.name || data.id), url: String(data.url) }
-    },
-    permalink: (_id, accountRef) => (accountRef ? `https://www.reddit.com/r/${accountRef}/` : null),
-  },
-}
+Base video URL: yes
+Voiced pending: pt
+Branded final: none
+Full campaign ID: 74794835-e796-4340-953c-893a2daaae12
+brand overlay FFmpeg failed [pt] attempt 5/5: ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers
+  built with gcc 13 (Ubuntu 13.2.0-23ubuntu3)
+  configuration: --prefix=/usr --extra-version=3ubuntu5 --toolchain=hardened --libdir=/usr/lib/x86_64-linux-gnu --incdir=/usr/include/x86_64-linux-gnu --arch=amd64 --enable-gpl --disable-stripping --disable-omx --enable-gnutls --enable-libaom --enable-libass --enable-libbs2b --enable-libcaca --enable-libcdio --enable-libcodec2 --enable-libdav1d --enable-libflite --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libglslang --enable-libgme --enable-libgsm --enable-libharfbuzz --enable-libmp3lame --enable-libmysofa --enable-libopenjpeg --enable-libopenmpt --enable-libopus --enable-librubberband --enable-libshine --enable-libsnappy --enable-libsoxr --enable-libspeex --enable-libtheora --enable-libtwolame --enable-libvidstab --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libx265 --enable-libxml2 --enable-libxvid --enable-libzimg --enable-openal --enable-opencl --enable-opengl --disable-sndio --enable-libvpl --disable-libmfx --enable-libdc1394 --enable-libdrm --enable-libiec61883 --enable-chromaprint --enable-frei0r --enable-ladspa --enable-libbluray --enable-libjack --enable-libpulse --enable-librabbitmq --enable-librist --enable-libsrt --enable-libssh --enable-libsvtav1 --enable-libx264 --enable-libzmq --enable-libzvbi --enable-lv2 --enable-sdl2 --enable-libplacebo --enable-librav1e --enable-pocketsphinx --enable-librsvg --enable-libjxl --enable-shared
+  libavutil      58. 29.100 / 58. 29.100
+  libavcodec     60. 31.102 / 60. 31.102
+  libavformat    60. 16.100 / 60. 16.100
+  libavdevice    60.  3.100 / 60.  3.100
+  libavfilter     9. 12.100 /  9. 12.100
+  libswscale      7.  5.100 /  7.  5.100
+  libswresample   4. 12.100 /  4. 12.100
+  libpostproc    57.  3.100 / 57.  3.100
+[AVFilterGraph @ 0x55a037596400] No such filter: '1000):-1'
+Failed to set value '[1:v]scale=min(iw*0.58,1000):-1[brand];[0:v][brand]overlay=(W-w)/2:60:format=auto' for option 'filter_complex': Filter not found
+Error parsing global options: Filter not found
+Open approval dashboard
+Kick branding worker
+Lead generation and free trial signups from Brazilian small
+Video ID 526089a8 - short_video - waiting_approval
 
-// Back-compat: the connector catalog some UI/config reads.
-export const SOCIAL_CONNECTORS: Record<SocialPlatform, { label: string; authUrl: string; scopes: string[]; rateLimit: string }> = Object.fromEntries(
-  (Object.keys(ADAPTERS) as SocialPlatform[]).map((k) => [k, { label: ADAPTERS[k].label, authUrl: ADAPTERS[k].authUrl, scopes: ADAPTERS[k].scopes, rateLimit: `${ADAPTERS[k].label} API limits observed before publishing` }]),
-) as Record<SocialPlatform, { label: string; authUrl: string; scopes: string[]; rateLimit: string }>
+RAW DRAFT ONLY
+Voice/captions ready. Branding next.
+78%
+Steps: render base video - add voice/captions - burn brand banner - final preview.
 
-export function buildOAuthUrl(platform: SocialPlatform, redirectUri: string, state: string) {
-  const a = ADAPTERS[platform]
-  const params = new URLSearchParams({ client_id: process.env[`SOCIAL_${platform.toUpperCase()}_CLIENT_ID`] || 'configure-client-id', redirect_uri: redirectUri, response_type: 'code', scope: a.scopes.join(' '), state, access_type: 'offline', prompt: 'consent' })
-  return `${a.authUrl}?${params.toString()}`
-}
+Created: Jul 05, 2026, 11:24:56 PM
+Final approval: -
+Render started: Jul 05, 2026, 11:24:56 PM
+Request: 019f35e2
+BRANDING EXHAUSTED: attempts pt:5/5. Last error: brand overlay FFmpeg failed [pt] attempt 5/5: ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers built with gcc 13 (Ubuntu 13.2.0-23ubuntu3) configurat
 
-// Content requirement helper, so the executor can ask without hardcoding per platform.
-export function platformContentKind(platform: SocialPlatform): ContentKind {
-  return ADAPTERS[platform]?.content || 'text'
-}
+Not final yet: the SignalBoostAi website banner has not been burned in.
 
-const STUB_NOT_CONFIGURED = 'oauth_credentials_not_configured_logged'
-function stub(mode: string) { return { ok: true, providerPostId: '', liveUrl: null as string | null, metrics: NO_METRICS, mode } }
-function failed(mode: string) { return { ok: false, providerPostId: '', liveUrl: null as string | null, metrics: NO_METRICS, mode } }
+Base video URL: yes
+Voiced pending: pt
+Branded final: none
+Full campaign ID: 526089a8-970b-4056-abdb-96a26312edbd
+brand overlay FFmpeg failed [pt] attempt 5/5: ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers
+  built with gcc 13 (Ubuntu 13.2.0-23ubuntu3)
+  configuration: --prefix=/usr --extra-version=3ubuntu5 --toolchain=hardened --libdir=/usr/lib/x86_64-linux-gnu --incdir=/usr/include/x86_64-linux-gnu --arch=amd64 --enable-gpl --disable-stripping --disable-omx --enable-gnutls --enable-libaom --enable-libass --enable-libbs2b --enable-libcaca --enable-libcdio --enable-libcodec2 --enable-libdav1d --enable-libflite --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libglslang --enable-libgme --enable-libgsm --enable-libharfbuzz --enable-libmp3lame --enable-libmysofa --enable-libopenjpeg --enable-libopenmpt --enable-libopus --enable-librubberband --enable-libshine --enable-libsnappy --enable-libsoxr --enable-libspeex --enable-libtheora --enable-libtwolame --enable-libvidstab --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libx265 --enable-libxml2 --enable-libxvid --enable-libzimg --enable-openal --enable-opencl --enable-opengl --disable-sndio --enable-libvpl --disable-libmfx --enable-libdc1394 --enable-libdrm --enable-libiec61883 --enable-chromaprint --enable-frei0r --enable-ladspa --enable-libbluray --enable-libjack --enable-libpulse --enable-librabbitmq --enable-librist --enable-libsrt --enable-libssh --enable-libsvtav1 --enable-libx264 --enable-libzmq --enable-libzvbi --enable-lv2 --enable-sdl2 --enable-libplacebo --enable-librav1e --enable-pocketsphinx --enable-librsvg --enable-libjxl --enable-shared
+  libavutil      58. 29.100 / 58. 29.100
+  libavcodec     60. 31.102 / 60. 31.102
+  libavformat    60. 16.100 / 60. 16.100
+  libavdevice    60.  3.100 / 60.  3.100
+  libavfilter     9. 12.100 /  9. 12.100
+  libswscale      7.  5.100 /  7.  5.100
+  libswresample   4. 12.100 /  4. 12.100
+  libpostproc    57.  3.100 / 57.  3.100
+[AVFilterGraph @ 0x56358c948400] No such filter: '900):-1'
+Failed to set value '[1:v]scale=min(iw*0.86,900):-1[brand];[0:v][brand]overlay=(W-w)/2:110:format=auto' for option 'filter_complex': Filter not found
+Error parsing global options: Filter not found
+Open approval dashboard
+Kick branding worker
+Atrair pequenas e médias empresas brasileiras para o plano p
+Video ID 2aa54a26 - short_video - waiting_approval
 
-export async function publishSocialPost(payload: SocialPostPayload): Promise<{ ok: boolean; providerPostId: string; liveUrl: string | null; metrics: SocialEngagementMetrics; mode: string }> {
-  if (!payload.text.trim() && !payload.imageUrl && !payload.videoUrl) throw new Error('Social post requires text, image, or video content.')
-  const adapter = ADAPTERS[payload.platform]
-  if (!adapter) return stub(STUB_NOT_CONFIGURED)
+RAW DRAFT ONLY
+Voice/captions ready. Branding next.
+78%
+Steps: render base video - add voice/captions - burn brand banner - final preview.
 
-  const hasCreds = !!payload.accessToken || !!payload.refreshToken
-  if (!hasCreds) return stub(STUB_NOT_CONFIGURED)
-  if (adapter.needsAccountRef && !payload.accountRef) return stub('account_ref_not_configured')
+Created: Jul 05, 2026, 08:28:18 PM
+Final approval: -
+Render started: Jul 05, 2026, 10:32:00 PM
+Request: 019f35b2
+BRANDING EXHAUSTED: attempts pt:5/5. Last error: brand overlay FFmpeg failed [pt] attempt 5/5: ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers built with gcc 13 (Ubuntu 13.2.0-23ubuntu3) configurat
 
-  try {
-    let accessToken = payload.accessToken
-    if (!accessToken && payload.refreshToken) {
-      if (!adapter.tokenUrl) return stub(STUB_NOT_CONFIGURED)
-      accessToken = await refreshOAuth2(payload.platform, adapter.tokenUrl, payload.refreshToken)
-    }
-    const raw = await adapter.publish(payload, accessToken as string)
-    if (!raw?.id) return failed(`${payload.platform}_no_id`)
-    const liveUrl = raw.url || adapter.permalink(raw.id, payload.accountRef)
-    return { ok: true, providerPostId: raw.id, liveUrl, metrics: NO_METRICS, mode: `${payload.platform}_live` }
-  } catch (err) {
-    return failed(`${payload.platform}_error:${err instanceof Error ? err.message : 'publish_failed'}`)
-  }
-}
+Not final yet: the SignalBoostAi website banner has not been burned in.
 
-// Public token-refresh helper for stored OAuth2 tokens. Uses each adapter's
-// configured tokenUrl; throws an honest error if the platform isn't refreshable here.
-export async function refreshSocialToken(platform: SocialPlatform, refreshToken: string): Promise<string> {
-  const adapter = ADAPTERS[platform]
-  if (!adapter?.tokenUrl) throw new Error(`${platform} does not support token refresh`)
-  return refreshOAuth2(platform, adapter.tokenUrl, refreshToken)
-}
+Base video URL: yes
+Voiced pending: pt
+Branded final: none
+Full campaign ID: 2aa54a26-2e68-4d5d-9c7f-55cf806a4689
+brand overlay FFmpeg failed [pt] attempt 5/5: ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers
+  built with gcc 13 (Ubuntu 13.2.0-23ubuntu3)
+  configuration: --prefix=/usr --extra-version=3ubuntu5 --toolchain=hardened --libdir=/usr/lib/x86_64-linux-gnu --incdir=/usr/include/x86_64-linux-gnu --arch=amd64 --enable-gpl --disable-stripping --disable-omx --enable-gnutls --enable-libaom --enable-libass --enable-libbs2b --enable-libcaca --enable-libcdio --enable-libcodec2 --enable-libdav1d --enable-libflite --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libglslang --enable-libgme --enable-libgsm --enable-libharfbuzz --enable-libmp3lame --enable-libmysofa --enable-libopenjpeg --enable-libopenmpt --enable-libopus --enable-librubberband --enable-libshine --enable-libsnappy --enable-libsoxr --enable-libspeex --enable-libtheora --enable-libtwolame --enable-libvidstab --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libx265 --enable-libxml2 --enable-libxvid --enable-libzimg --enable-openal --enable-opencl --enable-opengl --disable-sndio --enable-libvpl --disable-libmfx --enable-libdc1394 --enable-libdrm --enable-libiec61883 --enable-chromaprint --enable-frei0r --enable-ladspa --enable-libbluray --enable-libjack --enable-libpulse --enable-librabbitmq --enable-librist --enable-libsrt --enable-libssh --enable-libsvtav1 --enable-libx264 --enable-libzmq --enable-libzvbi --enable-lv2 --enable-sdl2 --enable-libplacebo --enable-librav1e --enable-pocketsphinx --enable-librsvg --enable-libjxl --enable-shared
+  libavutil      58. 29.100 / 58. 29.100
+  libavcodec     60. 31.102 / 60. 31.102
+  libavformat    60. 16.100 / 60. 16.100
+  libavdevice    60.  3.100 / 60.  3.100
+  libavfilter     9. 12.100 /  9. 12.100
+  libswscale      7.  5.100 /  7.  5.100
+  libswresample   4. 12.100 /  4. 12.100
+  libpostproc    57.  3.100 / 57.  3.100
+[AVFilterGraph @ 0x558e026bb400] No such filter: '900):-1'
+Failed to set value '[1:v]scale=min(iw*0.86,900):-1[brand];[0:v][brand]overlay=(W-w)/2:110:format=auto' for option 'filter_complex': Filter not found
+Error parsing global options: Filter not found
+Open approval dashboard
+Kick branding worker
+Atrair pequenas e médias empresas brasileiras para o SignalB
+Video ID 99cbb93f - short_video - rejected
+
+RAW DRAFT ONLY
+Needs attention
+100%
+Steps: render base video - add voice/captions - burn brand banner - final preview.
+
+Created: Jul 05, 2026, 07:34:20 PM
+Final approval: -
+Render started: Jul 05, 2026, 07:34:20 PM
+Request: 019f350f
+STUCK: campaign rejected — pipeline frozen. Underlying state: base ready, not voiced yet. Press "Reset and kick" to clear video state, move it back to waiting_approval and re-render.
+
+Not final yet: the SignalBoostAi website banner has not been burned in.
+
+Base video URL: yes
+Voiced pending: none
+Branded final: none
+Full campaign ID: 99cbb93f-c448-4f40-9ae2-90a817a71e69
+Open approval dashboard
+Kick branding worker
+Reset and kick
+Atrair pequenas e médias empresas brasileiras para o SignalB
+Video ID d0c0cad8 - short_video - approved
+
+FINAL READY
+Final branded preview ready
+100%
+Steps: render base video - add voice/captions - burn brand banner - final preview.
+
+Created: Jul 05, 2026, 04:36:27 PM
+Final approval: Jul 05, 2026, 05:54:38 PM
+Render started: Jul 05, 2026, 04:36:27 PM
+Request: 019f346d
+DONE: branded video previewable — approve on the dashboard
+
+Final playable campaign video - branded final - Created Jul 05, 2026, 04:36:27 PM
+
+Base video URL: yes
+Voiced pending: none
+Branded final: pt
+Full campaign ID: d0c0cad8-e4f8-479a-a55d-6414d72331be
+Approved
+Open approval dashboard
+Atrair pequenas e médias empresas brasileiras para experimen
+Video ID 3332d2fb - short_video - approved
+
+FINAL READY
+Final branded preview ready
+100%
+Steps: render base video - add voice/captions - burn brand banner - final preview.
+
+Created: Jul 04, 2026, 11:52:49 AM
+Final approval: Jul 04, 2026, 01:39:29 PM
+Render started: Jul 04, 2026, 11:52:48 AM
+Request: 019f2e42
+DONE: branded video previewable — approve on the dashboard
+
+Final playable campaign video - branded final - Created Jul 04, 2026, 11:52:49 AM
+
+Base video URL: yes
+Voiced pending: none
+Branded final: pt
+Full campaign ID: 3332d2fb-0537-4a64-b888-009c34fc58af
+Approved
+Open approval dashboard
+Atrair pequenas e médias empresas brasileiras para o SignalB
+Video ID c3c20e2b - short_video - approved
+
+FINAL READY
+Final branded preview ready
+100%
+Steps: render base video - add voice/captions - burn brand banner - final preview.
+
+Created: Jul 04, 2026, 10:46:07 AM
+Final approval: Jul 04, 2026, 01:00:24 PM
+Render started: Jul 04, 2026, 10:46:06 AM
+Request: 019f2e05
+DONE: branded video previewable — approve on the dashboard
+
+Final playable campaign video - branded final - Created Jul 04, 2026, 10:46:07 AM
+
+Base video URL: yes
+Voiced pending: none
+Branded final: pt
+Full campaign ID: c3c20e2b-5214-476f-87cf-1a60ea95b714
+Approved
+Open approval dashboard
+Atrair criadores de conteúdo, agências pequenas e empreended
+Video ID 5a8c362d - short_video - approved
+
+FINAL READY
+Final branded preview ready
+100%
+Steps: render base video - add voice/captions - burn brand banner - final preview.
+
+Created: Jul 04, 2026, 02:21:20 AM
+Final approval: Jul 04, 2026, 04:06:19 AM
+Render started: Jul 04, 2026, 02:21:20 AM
+Request: 019f2c37
+DONE: branded video previewable — approve on the dashboard
+
+Final playable campaign video - branded final - Created Jul 04, 2026, 02:21:20 AM
+
+Base video URL: yes
+Voiced pending: none
+Branded final: pt
+Full campaign ID: 5a8c362d-a44e-4c21-aba6-c0ef0520fb09
+Approved
+Open approval dashboard
+Drive free trial signups and brand awareness for SignalBoost
+Video ID c46c022e - short_video - waiting_approval
+
+FINAL READY
+Final branded preview ready
+100%
+Steps: render base video - add voice/captions - burn brand banner - final preview.
+
+Created: Jul 04, 2026, 02:18:29 AM
+Final approval: -
+Render started: Jul 04, 2026, 02:18:29 AM
+Request: 019f2c35
+DONE: branded video previewable — approve on the dashboard
+
+Final playable campaign video - branded final - Created Jul 04, 2026, 02:18:29 AM
+
+Base video URL: yes
+Voiced pending: none
+Branded final: en
+Full campaign ID: c46c022e-9442-4d3e-84be-2e2348e7734d
+Approve and publish
+Open approval dashboard
+Drive free trial signups and brand awareness for SignalBoost
+Video ID 985d95ba - short_video - waiting_approval
+
+FINAL READY
+Final branded preview ready
+100%
+Steps: render base video - add voice/captions - burn brand banner - final preview.
+
+Created: Jul 04, 2026, 02:18:29 AM
+Final approval: -
+Render started: Jul 04, 2026, 02:18:29 AM
+Request: 019f2c35
+DONE: branded video previewable — approve on the dashboard
+
+Final playable campaign video - branded final - Created Jul 04, 2026, 02:18:29 AM
+
+Base video URL: yes
+Voiced pending: none
+Branded final: ru
+Full campaign ID: 985d95ba-a5ec-43e5-bdd5-726d8d633b3b
+Approve and publish
+Open approval dashboard
+Drive free trial signups and brand awareness for SignalBoost
+Video ID 694c3f76 - short_video - waiting_approval
+
+FINAL READY
+Final branded preview ready
+100%
+Steps: render base video - add voice/captions - burn brand banner - final preview.
+
+Created: Jul 04, 2026, 02:18:29 AM
+Final approval: -
+Render started: Jul 04, 2026, 02:18:29 AM
+Request: 019f2c35
+DONE: branded video previewable — approve on the dashboard
+
+Final playable campaign video - branded final - Created Jul 04, 2026, 02:18:29 AM
+
+Base video URL: yes
+Voiced pending: none
+Branded final: pl
+Full campaign ID: 694c3f76-29ed-4050-9622-189f1cbca852
+Approve and publish
+Open approval dashboard
+Drive free trial signups and brand awareness for SignalBoost
+Video ID f0ed075e - short_video - waiting_approval
+
+FINAL READY
+Final branded preview ready
+100%
+Steps: render base video - add voice/captions - burn brand banner - final preview.
+
+Created: Jul 04, 2026, 02:18:29 AM
+Final approval: -
+Render started: Jul 04, 2026, 02:18:28 AM
+Request: 019f2c35
+DONE: branded video previewable — approve on the dashboard
+
+Final playable campaign video - branded final - Created Jul 04, 2026, 02:18:29 AM
+
+Base video URL: yes
+Voiced pending: none
+Branded final: pt
+Full campaign ID: f0ed075e-292f-403a-a3b6-5f6d224ae5f7
+Approve and publish
+Open approval dashboard
+Product demo video campaign — drive free trial signups from
+Video ID 23e9fefe - short_video - waiting_approval
+
+FINAL READY
+Final branded preview ready
+100%
+Steps: render base video - add voice/captions - burn brand banner - final preview.
+
+Created: Jul 03, 2026, 11:58:00 PM
+Final approval: -
+Render started: Jul 03, 2026, 11:58:00 PM
+Request: 019f2bb4
+DONE: branded video previewable — approve on the dashboard
+
+Final playable campaign video - branded final - Created Jul 03, 2026, 11:58:00 PM
+
+Base video URL: yes
+Voiced pending: none
+Branded final: ru
+Full campaign ID: 23e9fefe-2dd9-4bdb-a8bd-972f345bca8c
+Approve and publish
+Open approval dashboard
+Product demo video campaign — drive free trial signups from
+Video ID f3b8611e - short_video - waiting_approval
+
+FINAL READY
+Final branded preview ready
+100%
+Steps: render base video - add voice/captions - burn brand banner - final preview.
+
+Created: Jul 03, 2026, 11:57:53 PM
+Final approval: -
+Render started: Jul 03, 2026, 11:57:52 PM
+Request: 019f2bb4
+DONE: branded video previewable — approve on the dashboard
+
+Final playable campaign video - branded final - Created Jul 03, 2026, 11:57:53 PM
+
+Base video URL: yes
+Voiced pending: none
+Branded final: pl
+Full campaign ID: f3b8611e-99a9-48ce-a7c7-07e741dd7f7a
+Approve and publish
+Open approval dashboard
+Product demo video campaign — drive free trial signups from
+Video ID fc23012e - short_video - waiting_approval
+
+FINAL READY
+Final branded preview ready
+100%
+Steps: render base video - add voice/captions - burn brand banner - final preview.
+
+Created: Jul 03, 2026, 11:57:46 PM
+Final approval: -
+Render started: Jul 03, 2026, 11:57:45 PM
+Request: 019f2bb4
+DONE: branded video previewable — approve on the dashboard
+
+Final playable campaign video - branded final - Created Jul 03, 2026, 11:57:46 PM
+
+Base video URL: yes
+Voiced pending: none
+Branded final: pt
+Full campaign ID: fc23012e-49db-4e3b-a61e-a21f2e36b955
+Approve and publish
+Open approval dashboard
+
+✨
+Concierge
+
+✨
+Concierge

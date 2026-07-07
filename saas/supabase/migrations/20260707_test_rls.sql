@@ -1,1 +1,1 @@
-alter table public.foo enable row level security;
+-- Placeholder left intentionally empty.

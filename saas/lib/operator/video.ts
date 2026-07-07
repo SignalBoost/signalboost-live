@@ -12,8 +12,8 @@
 // COSA campaign dead. Human approval is not needed for this common-sense fix.
 //
 // The FFmpeg path queues a cos_video_production_jobs row. The existing
-// scripts/cos-video-production-worker.mjs worker renders a branded preview-style
-// MP4 from that row using local FFmpeg and uploads it to Supabase storage.
+// scripts/cos-video-production-worker.mjs worker renders a preview-style MP4
+// from that row using local FFmpeg and uploads it to Supabase storage.
 
 import { fal } from '@fal-ai/client'
 import { createClient } from '@supabase/supabase-js'
@@ -24,6 +24,13 @@ const RENDER_BUCKET = process.env.COS_VIDEO_RENDER_BUCKET || 'video-renders'
 const FAL_PROVIDER_KEY = ['FAL', 'KEY'].join('_')
 const SUPABASE_URL_KEY = ['NEXT', 'PUBLIC', 'SUPABASE', 'URL'].join('_')
 const SUPABASE_SERVICE_KEY = ['SUPABASE', 'SERVICE', 'ROLE', 'KEY'].join('_')
+
+type ImageMotionSource = {
+  sourceImageUrl?: string
+  sourceImagePath?: string
+  sourceImageBucket?: string
+  visualStrategy?: string
+}
 
 let configured = false
 function ensureFalConfigured() {
@@ -119,12 +126,13 @@ async function startFalVideo(prompt: string, aspectRatio: '9:16' | '16:9' | '1:1
   return { ok: true, requestId, model: FAL_SITE_VIDEO_MODEL }
 }
 
-async function startFfmpegPreview(prompt: string, aspectRatio: '9:16' | '16:9' | '1:1'): Promise<StartVideoResult> {
+async function startFfmpegPreview(prompt: string, aspectRatio: '9:16' | '16:9' | '1:1', source: ImageMotionSource = {}): Promise<StartVideoResult> {
   const sb = adminDb()
   const now = new Date().toISOString()
   const title = titleFromPrompt(prompt)
   const hook = hookFromPrompt(prompt)
   const platforms = aspectRatio === '9:16' ? ['Shorts', 'TikTok', 'Reels'] : ['YouTube', 'LinkedIn', 'Website']
+  const hasSourceImage = Boolean(source.sourceImageUrl || source.sourceImagePath)
 
   const row = {
     title,
@@ -138,9 +146,12 @@ async function startFfmpegPreview(prompt: string, aspectRatio: '9:16' | '16:9' |
       aspect_ratios: [aspectRatio],
       duration_seconds: 24,
       voice_strategy: 'voice and captions are added by the COSA campaign pipeline after the base preview render',
-      visual_strategy: 'internal FFmpeg preview with branded motion cards and CTA frame',
-      caption_strategy: 'burned-in captions plus transcript file for platform search',
+      visual_strategy: source.visualStrategy || (hasSourceImage ? 'creative_image_motion_ken_burns' : 'internal_ffmpeg_preview_motion_cards'),
+      caption_strategy: 'captions are added after base render; final brand banner is burned by the brand overlay worker',
       provider_adapter: 'internal_ffmpeg_preview',
+      source_image_url: source.sourceImageUrl || null,
+      source_image_path: source.sourceImagePath || null,
+      source_image_bucket: source.sourceImageBucket || null,
     },
     search_package: {
       title_options: [title, `${title} | SignalBoostAi`, 'AI campaign operating system demo'],
@@ -167,6 +178,20 @@ async function startFfmpegPreview(prompt: string, aspectRatio: '9:16' | '16:9' |
   const { data, error } = await sb.from('cos_video_production_jobs').insert(row).select('id').single()
   if (error || !data?.id) return { ok: false, error: error?.message || 'Could not queue FFmpeg preview render.' }
   return { ok: true, requestId: String(data.id), model: LOCAL_FFMPEG_MODEL }
+}
+
+export async function startCreativeImageMotionVideo(
+  prompt: string,
+  aspectRatio: '9:16' | '16:9' | '1:1' = '16:9',
+  source: ImageMotionSource,
+): Promise<StartVideoResult> {
+  try {
+    return await startFfmpegPreview(prompt, aspectRatio, source)
+  } catch (err: unknown) {
+    const message = errorMessage(err)
+    console.error('startCreativeImageMotionVideo error:', message)
+    return { ok: false, error: message }
+  }
 }
 
 export async function startSiteVideo(

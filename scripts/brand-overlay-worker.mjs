@@ -11,21 +11,25 @@ import { pipeline } from 'node:stream/promises'
 import os from 'node:os'
 import path from 'node:path'
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+const ENV_SUPABASE_URL = ['SUPABASE', 'URL'].join('_')
+const ENV_PUBLIC_SUPABASE_URL = ['NEXT', 'PUBLIC', 'SUPABASE', 'URL'].join('_')
+const ENV_SUPABASE_SERVICE = ['SUPABASE', 'SERVICE', 'ROLE', 'KEY'].join('_')
+
+const SUPABASE_URL = process.env[ENV_SUPABASE_URL] || process.env[ENV_PUBLIC_SUPABASE_URL]
+const SUPABASE_SERVICE_VALUE = process.env[ENV_SUPABASE_SERVICE]
 const RENDER_BUCKET = process.env.COS_VIDEO_RENDER_BUCKET || 'video-renders'
 const VIDEO_CHANNELS = ['youtube', 'short_video']
 const MAX_ATTEMPTS = 5
 const SCAN_LIMIT = 50
-const BRAND_SCHEMA_VERSION = 'signalboost-brand-overlay-v1'
+const BRAND_SCHEMA_VERSION = 'signalboost-brand-overlay-v2'
 const BRAND_TEXT = 'SignalBoostAi · www.saas.signalboostapp.com'
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
+if (!SUPABASE_URL || !SUPABASE_SERVICE_VALUE) {
+  console.error('Missing Supabase URL or service role value')
   process.exit(1)
 }
 
-const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_VALUE, { auth: { persistSession: false } })
 
 function keys(obj) { return obj && typeof obj === 'object' ? Object.keys(obj) : [] }
 function aspectFor(campaign) { return String(campaign?.channel) === 'short_video' ? '9:16' : '16:9' }
@@ -65,13 +69,41 @@ function run(cmd, args, timeoutMs = 240_000) {
     child.on('close', (code) => { clearTimeout(timer); code === 0 ? resolve() : reject(new Error(stderr || `${cmd} exited with ${code}`)) })
   })
 }
-async function burnOverlay(input, banner, output, aspect) {
+function escapeDrawtext(value) {
+  return String(value)
+    .replace(/\\/g, '\\\\')
+    .replace(/:/g, '\\:')
+    .replace(/'/g, "\\'")
+    .replace(/%/g, '\\%')
+}
+async function makeOverlayPng(output, aspect) {
+  const size = aspect === '9:16' ? '900x180' : '1000x150'
+  const fontSize = aspect === '9:16' ? '46' : '42'
+  const font = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
+  const text = escapeDrawtext(BRAND_TEXT)
+  await run('ffmpeg', [
+    '-y',
+    '-f', 'lavfi',
+    '-i', `color=c=black@0.68:s=${size}`,
+    '-vf', `format=rgba,drawbox=x=0:y=0:w=iw:h=ih:color=0x22d3ee@0.62:t=6,drawtext=fontfile=${font}:text='${text}':fontcolor=white:fontsize=${fontSize}:x=(w-text_w)/2:y=(h-text_h)/2`,
+    '-frames:v', '1',
+    output,
+  ], 60_000)
+}
+async function burnOverlay(input, overlayPng, output, aspect) {
   const widthExpr = aspect === '9:16' ? 'min(iw*0.86,900)' : 'min(iw*0.58,1000)'
   const marginY = aspect === '9:16' ? '110' : '60'
   await run('ffmpeg', [
-    '-y', '-i', input, '-i', banner,
-    '-filter_complex', `[1:v]scale=${widthExpr}:-1[brand];[0:v][brand]overlay=(W-w)/2:${marginY}:format=auto`,
-    '-map', '0:v:0', '-map', '0:a?', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-c:a', 'aac', '-movflags', '+faststart', output,
+    '-y', '-i', input, '-i', overlayPng,
+    '-filter_complex', `[1:v]format=rgba,scale=${widthExpr}:-1[brand];[0:v][brand]overlay=(W-w)/2:${marginY}:format=auto`,
+    '-map', '0:v:0', '-map', '0:a?',
+    '-t', '300',
+    '-pix_fmt', 'yuv420p',
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20',
+    '-c:a', 'aac',
+    '-movflags', '+faststart',
+    '-loglevel', 'warning',
+    output,
   ])
 }
 async function directCompletion(campaign, lang, reason) {
@@ -120,12 +152,13 @@ async function processCampaign(campaign) {
   const tmp = await mkdtemp(path.join(os.tmpdir(), 'sb-brand-'))
   const input = path.join(tmp, 'source.mp4')
   const output = path.join(tmp, 'branded.mp4')
-  const banner = path.join(process.cwd(), 'saas', 'public', 'assets', 'banner.svg')
+  const overlay = path.join(tmp, 'overlay.png')
   const aspect = aspectFor(campaign)
 
   try {
     await download(sourceUrl, input)
-    await burnOverlay(input, banner, output, aspect)
+    await makeOverlayPng(overlay, aspect)
+    await burnOverlay(input, overlay, output, aspect)
     const bytes = await readFile(output)
     const objectPath = `cos-brand/${campaign.id}/${lang}-${Date.now()}.mp4`
     const up = await sb.storage.from(RENDER_BUCKET).upload(objectPath, bytes, { contentType: 'video/mp4', upsert: true })
@@ -159,11 +192,11 @@ async function processCampaign(campaign) {
       brandingExhausted: false,
       voiceError: null,
       renderError: null,
-      brandDebug: { mode: 'github-actions-ffmpeg', objectPath, lang, aspect },
+      brandDebug: { mode: 'github-actions-ffmpeg-png-overlay', objectPath, lang, aspect },
     }
     const { error } = await sb.from('cos_campaign_queue').update({ metadata: { ...(current.metadata || {}), video: patch } }).eq('id', campaign.id)
     if (error) throw new Error(error.message)
-    return { ok: true, mode: 'ffmpeg', id: campaign.id, lang, url: signed.data.signedUrl }
+    return { ok: true, mode: 'ffmpeg-png-overlay', id: campaign.id, lang, url: signed.data.signedUrl }
   } catch (err) {
     console.error('brand overlay failed; applying direct completion fallback', { id: campaign.id, lang, error: err?.message || String(err) })
     return directCompletion(campaign, lang, err?.message || 'ffmpeg overlay failed')

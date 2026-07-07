@@ -70,11 +70,7 @@ function run(cmd, args, timeoutMs = 240_000) {
   })
 }
 function escapeDrawtext(value) {
-  return String(value)
-    .replace(/\/g, '\\')
-    .replace(/:/g, '\:')
-    .replace(/'/g, "\'")
-    .replace(/%/g, '\%')
+  return String(value || '').replace(/'/g, '').replace(/%/g, '')
 }
 async function makeOverlayPng(output, aspect) {
   const size = aspect === '9:16' ? '900x180' : '900x150'

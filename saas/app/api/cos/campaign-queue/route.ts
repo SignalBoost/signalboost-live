@@ -153,11 +153,22 @@ function outreachChannelFromRequest(request: Record<string, unknown>): OutreachC
   return null
 }
 
+function isShortVideoIntent(text: string) {
+  const lower = text.toLowerCase()
+  return lower.includes('tiktok') || lower.includes('short') || lower.includes('reel') || lower.includes('vertical') || lower.includes('9:16')
+}
+
+function isVideoIntent(text: string) {
+  const lower = text.toLowerCase()
+  return /\b(video|vídeo|clip|youtube|filme|movie|wideo|видео)\b/i.test(lower) || isShortVideoIntent(lower) || /(foto|photo|imagem|image|picture|screenshot).*(video|vídeo|clip)/i.test(lower)
+}
+
 function channelFromDirective(text: string): CosChannel {
   const lower = text.toLowerCase()
+  if (isShortVideoIntent(lower)) return 'short_video'
+  if (isVideoIntent(lower)) return 'youtube'
   if (outreachChannelFromDirective(text)) return 'outreach'
   if (lower.includes('email outreach') || lower.includes('email campaign')) return 'email'
-  if (lower.includes('tiktok') || lower.includes('short') || lower.includes('reel')) return 'short_video'
   return 'youtube'
 }
 
@@ -166,8 +177,8 @@ function secondaryChannelsFromDirective(text: string) {
   const channels: string[] = []
   const outreachChannel = outreachChannelFromDirective(text)
   if (outreachChannel) channels.push(outreachChannel)
-  if (lower.includes('youtube') || lower.includes('video')) channels.push('youtube')
-  if (lower.includes('tiktok') || lower.includes('short')) channels.push('tiktok')
+  if (lower.includes('youtube') || lower.includes('video') || lower.includes('vídeo')) channels.push('youtube')
+  if (lower.includes('tiktok') || lower.includes('short') || lower.includes('reel')) channels.push('tiktok')
   if (lower.includes('linkedin')) channels.push('linkedin')
   if (lower.includes('email')) channels.push('email')
   if (lower.includes('blog') || lower.includes('seo')) channels.push('blog')
@@ -179,11 +190,12 @@ function requestFromAutonomousDirective(input: unknown) {
   const directive = input.replace(/\s+/g, ' ').trim().slice(0, 1_200)
   if (directive.length < 8) return null
   const channel = channelFromDirective(directive)
-  const outreachChannel = outreachChannelFromDirective(directive)
+  const wantsVideo = VIDEO_CHANNELS.includes(channel) || isVideoIntent(directive)
+  const outreachChannel = wantsVideo ? null : outreachChannelFromDirective(directive)
   const secondaryChannels = secondaryChannelsFromDirective(directive)
   const channelLabel = outreachChannel ? outreachChannel.replace(/-/g, ' ') : secondaryChannels.join(', ')
   return {
-    title: outreachChannel ? titleForChannel('outreach', outreachChannel) : 'Autonomous online outreach campaign for SignalBoost',
+    title: outreachChannel ? titleForChannel('outreach', outreachChannel) : titleForChannel(channel),
     objective: `Create a short, impactful, review-ready campaign from this owner directive: "${directive}". Feature ${SAAS_URL}. Explain the products and services that help companies grow, keep the message enterprise-ready, and prepare the campaign for ${channelLabel} distribution after owner approval.`,
     channel,
     department: channel === 'email' || channel === 'outreach' ? 'sales' : 'marketing',
@@ -229,24 +241,28 @@ function recommendationFromDepartmentRequest(input: unknown): CosRecommendation 
   if (!input || typeof input !== 'object') return null
   const request = input as Record<string, unknown>
   const requestedOutreachChannel = outreachChannelFromRequest(request)
-  const channel = requestedOutreachChannel ? 'outreach' : normalizeChannel(request.channel)
+  const requestedChannel = normalizeChannel(request.channel)
+  const requestText = [request.title, request.objective, request.signal, request.channel, request.sourceMaterial].map(value => String(value || '')).join(' ')
+  const requestWantsVideo = VIDEO_CHANNELS.includes(requestedChannel) || isVideoIntent(requestText)
+  const channel: CosChannel = requestWantsVideo ? (requestedChannel === 'short_video' || isShortVideoIntent(requestText) ? 'short_video' : 'youtube') : requestedOutreachChannel ? 'outreach' : requestedChannel
+  const effectiveOutreachChannel = requestWantsVideo ? null : requestedOutreachChannel
   const priority = normalizePriority(request.priority)
   const language = normalizeLanguage(request.language)
   const department = normalizeDepartment(request.department, channel)
-  const audience = cleanString(request.audience, requestedOutreachChannel ? 'Editors, reporters, publication managers, and business technology readers relevant to the selected media channel.' : 'Small business owners and operators who need more growth capacity without adding manual work.', 240)
+  const audience = cleanString(request.audience, effectiveOutreachChannel ? 'Editors, reporters, publication managers, and business technology readers relevant to the selected media channel.' : 'Small business owners and operators who need more growth capacity without adding manual work.', 240)
   const objective = cleanLongText(request.objective, 'Create an owner-approved campaign that explains the business problem first, then presents SignalBoost as the solution.', 1_200)
   const signal = cleanLongText(request.signal, 'Founder/operator submitted a Marketing/Sales department request.', 700)
-  const title = cleanString(request.title, titleForChannel(channel, requestedOutreachChannel), 140)
+  const title = cleanString(request.title, titleForChannel(channel, effectiveOutreachChannel), 140)
   const estimatedCostUsd = normalizeEstimatedCost(request.estimatedCostUsd, channel)
   const now = new Date().toISOString()
-  const summary = [objective, `Target audience: ${audience}.`, `Requested language: ${language}.`, requestedOutreachChannel ? `Specific outreach channel: ${requestedOutreachChannel}.` : '', 'Execution rule: draft, approval, final polish, publishing, monitoring, and learning must remain behind owner-approved workflow gates.'].filter(Boolean).join(' ')
+  const summary = [objective, `Target audience: ${audience}.`, `Requested language: ${language}.`, effectiveOutreachChannel ? `Specific outreach channel: ${effectiveOutreachChannel}.` : '', 'Execution rule: draft, approval, final polish, publishing, monitoring, and learning must remain behind owner-approved workflow gates.'].filter(Boolean).join(' ')
   const signals = [
     { id: id('signal'), source: request.autonomous ? 'autonomous_cosa_campaign_command' : 'marketing_sales_department_request', metric: 'campaign_request', value: title, confidence: confidenceForPriority(priority), observed_at: now, evidence: [objective, signal] },
     { id: id('audience'), source: request.autonomous ? 'autonomous_cosa_campaign_command' : 'marketing_sales_department_request', metric: 'target_audience', value: audience, confidence: 90, observed_at: now, evidence: ['Preserved from the campaign request.'] },
     { id: id('language'), source: request.autonomous ? 'autonomous_cosa_campaign_command' : 'marketing_sales_department_request', metric: 'requested_language', value: language, confidence: 90, observed_at: now, evidence: ['Primary language requested before localization expansion.'] },
   ]
-  if (requestedOutreachChannel) signals.push({ id: id('outreach_channel'), source: request.autonomous ? 'autonomous_cosa_campaign_command' : 'marketing_sales_department_request', metric: 'outreach_channel', value: requestedOutreachChannel, confidence: 96, observed_at: now, evidence: ['Derived from the owner directive or selected Marketing + Sales channel.'] })
-  return { id: id(request.autonomous ? 'rec_auto' : 'rec_manual'), department, title, summary, recommended_channel: channel, priority, confidence: confidenceForPriority(priority), expected_roi: expectedRoiForPriority(priority), estimated_cost_usd: estimatedCostUsd, reason: request.autonomous ? `Autonomous COSA command interpreted into a governed campaign. Channel=${channel}; outreach_channel=${requestedOutreachChannel || 'none'}; priority=${priority}; language=${language}.` : `Marketing/Sales department request created by an administrator. Channel=${channel}; outreach_channel=${requestedOutreachChannel || 'none'}; priority=${priority}; language=${language}.`, signals, approval_status: 'pending_approval', created_at: now }
+  if (effectiveOutreachChannel) signals.push({ id: id('outreach_channel'), source: request.autonomous ? 'autonomous_cosa_campaign_command' : 'marketing_sales_department_request', metric: 'outreach_channel', value: effectiveOutreachChannel, confidence: 96, observed_at: now, evidence: ['Derived from the owner directive or selected Marketing + Sales channel.'] })
+  return { id: id(request.autonomous ? 'rec_auto' : 'rec_manual'), department, title, summary, recommended_channel: channel, priority, confidence: confidenceForPriority(priority), expected_roi: expectedRoiForPriority(priority), estimated_cost_usd: estimatedCostUsd, reason: request.autonomous ? `Autonomous COSA command interpreted into a governed campaign. Channel=${channel}; outreach_channel=${effectiveOutreachChannel || 'none'}; priority=${priority}; language=${language}.` : `Marketing/Sales department request created by an administrator. Channel=${channel}; outreach_channel=${effectiveOutreachChannel || 'none'}; priority=${priority}; language=${language}.`, signals, approval_status: 'pending_approval', created_at: now }
 }
 
 async function mirrorCosaCampaignToOutreachQueue(admin: any, campaign: any, outreachChannel: OutreachChannel | null) {
@@ -305,7 +321,11 @@ export async function POST(req: NextRequest) {
     recommendation = built
   } else recommendation = buildDefaultMarketingRecommendation()
   if (!recommendation?.id || !recommendation?.title || !recommendation?.recommended_channel) return NextResponse.json({ ok: false, error: 'A valid COS recommendation is required.' }, { status: 400 })
-  const outreachChannel = outreachChannelFromRecommendation(recommendation)
+  const recommendationText = [recommendation.title, recommendation.summary, recommendation.reason, recommendation.recommended_channel].join(' ')
+  if (!VIDEO_CHANNELS.includes(recommendation.recommended_channel) && isVideoIntent(recommendationText)) {
+    recommendation = { ...recommendation, recommended_channel: isShortVideoIntent(recommendationText) ? 'short_video' : 'youtube', department: 'marketing' }
+  }
+  const outreachChannel = VIDEO_CHANNELS.includes(recommendation.recommended_channel) ? null : outreachChannelFromRecommendation(recommendation)
   const queueItem = queueItemFromRecommendation(recommendation)
   const row = dbRowFromQueueItem(queueItem)
   row.metadata = { ...(row.metadata || {}), autonomous: recommendation.signals?.[0]?.source === 'autonomous_cosa_campaign_command', publishing_gate: 'locked_until_owner_approval', outreach_channel: outreachChannel || undefined, channel_group: outreachChannel ? 'marketing-sales-outreach' : undefined }

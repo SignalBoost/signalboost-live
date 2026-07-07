@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { requireAdmin } from '@/lib/auth/access'
+import { getVercelSystemHealth } from '@/lib/admin/system-health'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +32,11 @@ async function latest(admin: any, table: string, col = 'created_at'): Promise<st
     if (isNaN(d.getTime())) return null
     return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   } catch { return null }
+}
+
+async function failedBuildsMetric(): Promise<number | string> {
+  const health = await getVercelSystemHealth()
+  return health.failedBuilds == null ? health.failedBuildsStatus : health.failedBuilds
 }
 
 async function supabaseHealth(admin: any): Promise<string | null> {
@@ -177,7 +183,10 @@ const METRICS: Record<string, Spec> = {
   'email-5': a => countRows(a, 'marketing_campaigns'),
   // System Health
   'sys-0': a => countRows(a, 'error_logs'),
+  'sys-1': async () => failedBuildsMetric(),
   'sys-2': a => supabaseHealth(a),
+  'sys-3': async () => (await getVercelSystemHealth()).deploymentStatus,
+  'sys-4': async () => (await getVercelSystemHealth()).cronStatus,
   'sys-5': a => releasedOutreachToday(a),
   'sys-6': a => latest(a, 'outreach_sends', 'sent_at'),
   'sys-7': a => latest(a, 'outreach_queue'),

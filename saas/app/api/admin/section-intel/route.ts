@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { requireAdmin } from '@/lib/auth/access'
+import { getVercelSystemHealth } from '@/lib/admin/system-health'
 
 export const dynamic = 'force-dynamic'
 
@@ -88,11 +89,14 @@ function pct(numerator: number, denominator: number): string {
 async function sectionRows(a: any, section: string): Promise<string[][]> {
   try {
     if (section === 'system') {
-      const [health, lastOutreach, lastProspect, errors] = await Promise.all([
-        supabaseHealth(a), latest(a, 'outreach_sends', 'sent_at'), latest(a, 'outreach_queue'), countRows(a, 'error_logs'),
+      const [health, lastOutreach, lastProspect, errors, vercel] = await Promise.all([
+        supabaseHealth(a), latest(a, 'outreach_sends', 'sent_at'), latest(a, 'outreach_queue'), countRows(a, 'error_logs'), getVercelSystemHealth(),
       ])
       const rows: string[][] = []
       rows.push(['Supabase', health ? 'Connected' : 'Unknown', health ? 'just now' : '—', health ? 'Health probe OK' : 'No response'])
+      rows.push(['Vercel deployment health', vercel.deploymentStatus, vercel.latestDeploymentAt || vercel.checkedAt, vercel.details.deployment])
+      rows.push(['Failed builds/deployments', vercel.failedBuilds == null ? vercel.failedBuildsStatus : String(vercel.failedBuilds), vercel.checkedAt, vercel.details.failedBuilds])
+      rows.push(['Cron health', vercel.cronStatus, vercel.checkedAt, vercel.details.cron])
       if (lastOutreach) rows.push(['Outreach engine', 'Active', lastOutreach, 'Last successful send'])
       if (lastProspect) rows.push(['Prospect discovery', 'Active', lastProspect, 'Last successful run'])
       if (errors != null) rows.push(['Error log', errors === 0 ? 'Clean' : 'Attention', '—', `${errors} logged error${errors === 1 ? '' : 's'}`])
@@ -150,7 +154,7 @@ export async function GET(req: Request) {
 
   const [
     accounts, paidSubs, freeSubs, prospects, outreachSends, aiTasks, sites, videos, reviews, errors,
-    acc7, acc30, acc90, health, lastOutreach, lastProspect, rows,
+    acc7, acc30, acc90, health, lastOutreach, lastProspect, vercel, rows,
   ] = await Promise.all([
     countRows(a, 'accounts'),
     countRows(a, 'subscriptions', (q: any) => q.in('plan', PAYING_PLANS)),
@@ -168,6 +172,7 @@ export async function GET(req: Request) {
     supabaseHealth(a),
     latest(a, 'outreach_sends', 'sent_at'),
     latest(a, 'outreach_queue'),
+    getVercelSystemHealth(),
     sectionRows(a, section),
   ])
 
@@ -177,7 +182,7 @@ export async function GET(req: Request) {
       generatedAt: new Date().toISOString(),
       totals: { accounts, paidSubs, freeSubs, prospects, outreachSends, aiTasks, sites, videos, reviews, errors },
       windows: { accounts7: acc7, accounts30: acc30, accounts90: acc90 },
-      health: { supabase: health, errors, lastOutreach, lastProspect },
+      health: { supabase: health, errors, lastOutreach, lastProspect, vercel },
       rows,
     },
     { headers: { 'Cache-Control': 'no-store, private' } },

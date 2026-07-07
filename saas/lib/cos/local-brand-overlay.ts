@@ -85,7 +85,27 @@ export async function runLocalBrandOverlay(opts: { campaign: any; lang: string; 
   const unbrandedVoiced = { ...(video.unbrandedVoiced || {}) }; delete unbrandedVoiced[opts.lang]
   const brandedLangs = { ...(video.brandedLangs || {}), [opts.lang]: true }
   const voiced = { ...(video.voiced || {}), [opts.lang]: signed.data.signedUrl }
-  const patch = { ...video, status: 'ready', voiced, unbrandedVoiced, brandedLangs, voicedUrl: opts.lang === primary ? signed.data.signedUrl : (video.voicedUrl || signed.data.signedUrl), branded: Boolean(brandedLangs[primary]), brandSchemaVersion: brandedLangs[primary] ? BRAND_SCHEMA_VERSION : video.brandSchemaVersion || null, brandText: brandedLangs[primary] ? BRAND_TEXT : video.brandText || null, brandedAt: brandedLangs[primary] ? new Date().toISOString() : video.brandedAt || null, brandingLock: null, brandingExhausted: false, voiceError: null, brandDebug: { mode: 'local-ffmpeg-emergency', bannerAssetPath: banner, objectPath } }
+  const finalUrl = opts.lang === primary ? signed.data.signedUrl : (video.finalUrl || video.previewUrl || video.voicedUrl || signed.data.signedUrl)
+  const patch = {
+    ...video,
+    status: 'ready',
+    voiced,
+    unbrandedVoiced,
+    brandedLangs,
+    voicedUrl: opts.lang === primary ? signed.data.signedUrl : (video.voicedUrl || signed.data.signedUrl),
+    finalUrl,
+    previewUrl: finalUrl,
+    previewKind: 'branded final',
+    branded: Boolean(brandedLangs[primary]) || opts.lang === primary,
+    brandSchemaVersion: BRAND_SCHEMA_VERSION,
+    brandText: BRAND_TEXT,
+    brandedAt: new Date().toISOString(),
+    brandingLock: null,
+    brandingExhausted: false,
+    voiceError: null,
+    renderError: null,
+    brandDebug: { mode: 'local-ffmpeg-emergency', bannerAssetPath: banner, objectPath },
+  }
   const db = await sb.from('cos_campaign_queue').update({ metadata: { ...(opts.campaign.metadata || {}), video: patch } }).eq('id', opts.campaign.id)
   if (db.error) throw new Error(db.error.message)
   return { ok: true, url: signed.data.signedUrl, objectPath, bannerAssetPath: banner }

@@ -1098,7 +1098,7 @@ if (name === 'listGrowthPlans') {
     const result = await listGrowthPlans(10)
     if (!result.ok) {
       return `Growth plans could not be retrieved: ${result.error ?? 'unknown error'}.`
-    }
+}
     return formatPlansForAI(result.plans)
   }
 if (name === 'createOutreachDraft') {
@@ -1439,7 +1439,7 @@ ${ev.summary}`
     // so a long task degrades into a graceful "say continue" reply, never a 500.
     // Transient errors (overloaded / rate-limited / 5xx) are retried with backoff
     // while time remains, so a recoverable blip never hard-freezes the assistant.
-    const callModel = async (choiceMode: 'auto' | 'required' | 'none') => {
+    const callModel = async (choiceMode: 'auto' | 'required' | 'none' | 'campaign') => {
       let lastErr: any = null
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
@@ -1451,7 +1451,7 @@ ${ev.summary}`
               system: cachedSystem(systemContent) as any, // ephemeral prompt cache: caches the tools+system prefix across the multi-turn tool loop
               messages: convo as any,
               tools: anthropicTools as any,
-              tool_choice: choiceMode === 'required' ? { type: 'any' } : choiceMode === 'none' ? { type: 'none' } : { type: 'auto' },
+              tool_choice: choiceMode === 'required' ? { type: 'any' } : choiceMode === 'campaign' ? { type: 'tool', name: 'proposeMarketingCampaign' } : choiceMode === 'none' ? { type: 'none' } : { type: 'auto' },
             })
           )
           // Meter every model call (owner Chief of Staff vs external Concierge),
@@ -1483,7 +1483,18 @@ ${ev.summary}`
       systemContent += '\n\nOWNER COMMAND: an affirmation ("continue"/"go"/"yes" or similar) was received. Immediately perform the next pending action — for multi-page tasks, read the next queued page file and COMMIT it within this reply. Do not output a plan, do not ask anything, do not repeat instructions to say continue.'
     }
 
-    let msg        = await callModel(forceAction ? 'required' : 'auto')
+    // Owner campaign-request forcer. When the owner asks to create a campaign or
+    // video (any of the 5 platform languages), the FIRST model call is forced to
+    // invoke proposeMarketingCampaign — replying with campaign copy in prose and
+    // never inserting a row is exactly the silent failure this prevents.
+    const CAMPAIGN_VERB = /(cri(e|ar)|fa(ç|c)a|fazer|gerar?|lan(ç|c)ar|lance|create|make|generate|launch|start|produz|prepare|montar?|stw(ó|o)rz|utw(ó|o)rz|созда|запусти)/i
+    const CAMPAIGN_NOUN = /(campanha|campaign|kampani|кампани|v(í|i)deo|video|wideo|видео|reels?|shorts?|tiktok)/i
+    const forceCampaign = isOwner && !forceAction && CAMPAIGN_VERB.test(latestUserMessage) && CAMPAIGN_NOUN.test(latestUserMessage)
+    if (forceCampaign) {
+      systemContent += '\n\nOWNER CAMPAIGN REQUEST: the owner asked for a campaign/video in this message. You MUST call proposeMarketingCampaign now. Pass the owner\'s FULL message verbatim as sourceMaterial, and extract goal, audience, channel, offer, and language from it. Do NOT answer a campaign request with campaign copy in prose: a reply that describes a campaign but contains no campaign id from the tool is a failure.'
+    }
+
+    let msg        = await callModel(forceCampaign ? 'campaign' : forceAction ? 'required' : 'auto')
     let toolRounds = 0
     let timedOut   = msg === null
 

@@ -23,6 +23,38 @@ function minutesAgo(value: any): number | null {
   if (!Number.isFinite(ts)) return null
   return Math.max(0, Math.round((Date.now() - ts) / 60000))
 }
+function isVideoChannel(c: any) { return VIDEO_CHANNELS.includes(String(c?.channel || '')) }
+function campaignText(c: any): string {
+  return [
+    c?.title,
+    c?.objective,
+    c?.audience,
+    c?.channel,
+    JSON.stringify(c?.recommendation || {}),
+    JSON.stringify(c?.work_items || []),
+    JSON.stringify(c?.metadata || {}),
+  ].filter(Boolean).join(' ').toLowerCase()
+}
+function isShortVideoRequest(c: any) {
+  const text = campaignText(c)
+  return /(short|tiktok|reel|reels|vertical|9:16|story|stories)/i.test(text)
+}
+function looksLikeVideoRequest(c: any) {
+  if (isVideoChannel(c)) return true
+  const text = campaignText(c)
+  return /\b(video|vídeo|clip|youtube|filme|movie|wideo|видео)\b/i.test(text) || /(foto|photo|imagem|image|picture|screenshot).*(video|vídeo|clip)/i.test(text)
+}
+function inferredVideoChannel(c: any): 'youtube' | 'short_video' {
+  return isShortVideoRequest(c) ? 'short_video' : 'youtube'
+}
+function renderPromptForCampaign(c: any) {
+  const theme = String(c?.title || c?.objective || 'an AI platform that helps businesses grow')
+    .replace(/https?:\/\/\S+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 180)
+  return `Cinematic promotional b-roll for a premium AI business platform. Theme: ${theme}. Modern professionals using sleek software dashboards, growth charts rising, AI automation and workflows. No on-screen text, no logos, no URLs.`.slice(0, 600)
+}
 function isRejected(c: any) { return c?.status === 'rejected' }
 function isFakeFinal(v: any) { return v?.brandDebug?.mode === 'direct-completion' || v?.brandText?.mode === 'direct-completion' || v?.brandDispatchWatchdog?.directCompletion === true }
 function isRealFinal(c: any, v: any) { return !isRejected(c) && !isFakeFinal(v) && v?.branded === true && Boolean(v?.voicedUrl) }
@@ -71,6 +103,7 @@ function eligibility(c: any): string {
   // "Reset and kick" button (it matches eligibility.startsWith('STUCK')).
   // Reset wipes video metadata and flips the campaign back to waiting_approval.
   if (isRejected(c)) return `STUCK: campaign rejected — pipeline frozen. Underlying state: ${underlyingIssue(v)}. Press "Reset and kick" to clear video state, move it back to waiting_approval and re-render.`
+  if (!isVideoChannel(c) && looksLikeVideoRequest(c) && !v) return `STUCK: video request was routed as ${String(c.channel || 'unknown')} instead of youtube/short_video. Press "Kick missing renders" to rescue it, move it into the video pipeline, and start rendering.`
   if (!v) return 'STAGE 0: waiting for auto-render start'
   if (isFakeFinal(v)) return 'INVALID: fake final artifact from emergency fallback. Reset and reprocess; do not approve this video.'
   if (v.status === 'rendering') return 'RENDERING: render in progress'
@@ -104,25 +137,38 @@ export async function GET(req: NextRequest) {
     }
   }
   if (kick) {
-    const { data: pending } = await sb.from('cos_campaign_queue').select('*').in('channel', VIDEO_CHANNELS).gte('created_at', BACKLOG_CUTOFF).neq('status', 'rejected').is('metadata->video', null).order('created_at', { ascending: false }).limit(3)
-    if (!pending?.length) actions.push({ action: 'kick', ok: true, note: 'no campaigns eligible for render start' })
-    for (const c of pending || []) {
-      const aspect: '9:16' | '16:9' = c.channel === 'short_video' ? '9:16' : '16:9'
-      const theme = String(c.title || c.objective || 'an AI platform that helps businesses grow').replace(/https?:\/\/\S+/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)
-      const prompt = `Cinematic promotional b-roll for a premium AI business platform. Theme: ${theme}. Modern professionals using sleek software dashboards, growth charts rising, AI automation and workflows. No on-screen text, no logos, no URLs.`.slice(0, 600)
+    const { data: pendingAll } = await sb.from('cos_campaign_queue').select('*').gte('created_at', BACKLOG_CUTOFF).neq('status', 'rejected').is('metadata->video', null).order('created_at', { ascending: false }).limit(20)
+    const pending = (pendingAll || []).filter((c: any) => isVideoChannel(c) || looksLikeVideoRequest(c)).slice(0, 3)
+    if (!pending.length) actions.push({ action: 'kick', ok: true, note: 'no campaigns eligible for render start' })
+    for (const c of pending) {
+      const rescued = !isVideoChannel(c)
+      const channel = rescued ? inferredVideoChannel(c) : String(c.channel || 'youtube')
+      const aspect: '9:16' | '16:9' = channel === 'short_video' ? '9:16' : '16:9'
+      const prompt = renderPromptForCampaign(c)
       const kicked: any = await startSiteVideo(prompt, aspect)
-      if (kicked?.ok) await sb.from('cos_campaign_queue').update({ metadata: { ...(c.metadata || {}), video: { status: 'rendering', requestId: kicked.requestId, model: kicked.model, aspect, prompt, started_at: new Date().toISOString(), auto_started: true, voicedUrl: null, voiced: {}, branded: false, brandSchemaVersion: null, brandText: null, brandedAt: null, voiceError: null, brandAttempts: {}, brandingLock: null } } }).eq('id', c.id)
-      actions.push({ action: 'kick', id: c.id, ok: Boolean(kicked?.ok), error: kicked?.ok ? null : String(kicked?.error || 'startSiteVideo failed') })
+      if (kicked?.ok) {
+        const patch: any = {
+          metadata: {
+            ...(c.metadata || {}),
+            video: { status: 'rendering', requestId: kicked.requestId, model: kicked.model, aspect, prompt, started_at: new Date().toISOString(), auto_started: true, rescued_from_channel: rescued ? c.channel : null, voicedUrl: null, voiced: {}, branded: false, brandSchemaVersion: null, brandText: null, brandedAt: null, voiceError: null, brandAttempts: {}, brandingLock: null }
+          }
+        }
+        if (rescued) patch.channel = channel
+        await sb.from('cos_campaign_queue').update(patch).eq('id', c.id)
+      }
+      actions.push({ action: rescued ? 'rescue-and-kick' : 'kick', id: c.id, previousChannel: rescued ? c.channel : null, channel, ok: Boolean(kicked?.ok), error: kicked?.ok ? null : String(kicked?.error || 'startSiteVideo failed') })
     }
   }
   const env = { FAL_KEY: Boolean(process.env.FAL_KEY), ELEVENLABS_API_KEY: Boolean(process.env.ELEVENLABS_API_KEY), RESEND_API_KEY: Boolean(process.env.RESEND_API_KEY), GITHUB_WRITE_TOKEN: Boolean(process.env.GITHUB_WRITE_TOKEN || process.env.GITHUB_TOKEN), CRON_SECRET: Boolean(process.env['CRON_' + 'SECRET']), COS_BRAND_SINCE_override: process.env.COS_BRAND_SINCE || null }
-  const { data: recent } = await sb.from('cos_campaign_queue').select('*').in('channel', VIDEO_CHANNELS).order('created_at', { ascending: false }).limit(15)
-  const campaigns = (recent || []).map((c: any) => {
+  const { data: rawRecent } = await sb.from('cos_campaign_queue').select('*').order('created_at', { ascending: false }).limit(40)
+  const recent = (rawRecent || []).filter((c: any) => isVideoChannel(c) || looksLikeVideoRequest(c)).slice(0, 15)
+  const campaigns = recent.map((c: any) => {
     const v = c?.metadata?.video || null
     const finalUrl = isRealFinal(c, v) ? String(v.voicedUrl) : null
     const baseUrl = v?.url ? String(v.url) : null
     const anyPreviewUrl = previewUrl(c, v)
-    return { id: c.id, title: String(c.title || '').slice(0, 60), channel: c.channel, status: c.status, created_at: c.created_at, approved_at: c.approved_at || null, video: v ? { stage: v.status || null, requestId: v.requestId || null, started_at: v.started_at || null, hasKlingUrl: Boolean(v.url), baseUrl, finalUrl, previewUrl: anyPreviewUrl, previewKind: finalUrl ? 'branded final' : baseUrl ? 'base draft' : anyPreviewUrl ? 'video' : null, voicedLangs: keys(v.unbrandedVoiced), brandedLangs: isFakeFinal(v) || isRejected(c) ? [] : keys(v.brandedLangs).filter((k: string) => (v.brandedLangs || {})[k]), branded: isRealFinal(c, v), previewable: Boolean(anyPreviewUrl), voiceError: v.voiceError || null, renderError: v.error || null, ghOverlayAttempts: v.ghOverlayAttempts || {}, brandingLock: v.brandingLock || null, brandingExhausted: v.brandingExhausted === true, brandDebug: v.brandDebug || null, brandSchemaVersion: v.brandSchemaVersion || null, brandedAt: v.brandedAt || null, brandingDiagnostics: brandingDiagnostics(c), autoPublishNote: c?.metadata?.auto_publish_note || null } : null, eligibility: eligibility(c) }
+    const misrouted = !isVideoChannel(c) && looksLikeVideoRequest(c)
+    return { id: c.id, title: String(c.title || '').slice(0, 60), channel: c.channel, intendedChannel: misrouted ? inferredVideoChannel(c) : c.channel, status: c.status, created_at: c.created_at, approved_at: c.approved_at || null, misrouted, video: v ? { stage: v.status || null, requestId: v.requestId || null, started_at: v.started_at || null, hasKlingUrl: Boolean(v.url), baseUrl, finalUrl, previewUrl: anyPreviewUrl, previewKind: finalUrl ? 'branded final' : baseUrl ? 'base draft' : anyPreviewUrl ? 'video' : null, voicedLangs: keys(v.unbrandedVoiced), brandedLangs: isFakeFinal(v) || isRejected(c) ? [] : keys(v.brandedLangs).filter((k: string) => (v.brandedLangs || {})[k]), branded: isRealFinal(c, v), previewable: Boolean(anyPreviewUrl), voiceError: v.voiceError || null, renderError: v.error || null, ghOverlayAttempts: v.ghOverlayAttempts || {}, brandingLock: v.brandingLock || null, brandingExhausted: v.brandingExhausted === true, brandDebug: v.brandDebug || null, brandSchemaVersion: v.brandSchemaVersion || null, brandedAt: v.brandedAt || null, brandingDiagnostics: brandingDiagnostics(c), autoPublishNote: c?.metadata?.auto_publish_note || null } : null, eligibility: eligibility(c) }
   })
   return NextResponse.json({ ok: true, now: new Date().toISOString(), backlogCutoff: BACKLOG_CUTOFF, env, actions, campaigns })
 }

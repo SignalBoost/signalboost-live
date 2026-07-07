@@ -1,6 +1,6 @@
 # ONBOARD.md — Mandatory SignalBoostAi / COSA Onboarding
 
-This document is the mandatory first read for every developer, AI coding agent, AI reviewer, infrastructure assistant, and operator working on this repository.
+This document is the mandatory first read for every developer, AI coding agent, AI reviewer, infrastructure assistant, operator, contractor, and contributor working on this repository.
 
 It is a map, not a substitute for repo inspection.
 
@@ -13,6 +13,35 @@ Every contributor must follow this order:
 5. Never code, report status, or claim behavior from memory alone.
 
 The current repository is always the source of truth.
+
+---
+
+## 0. Mandatory Enforcement
+
+This repository treats onboarding as an operational control, not a suggestion.
+
+Every pull request that changes platform, COSA, provider, infrastructure, workflow, security, video, audit, dashboard, Supabase, or Vercel behavior must:
+
+- Confirm in the PR body that `ONBOARD.md` was read before scanning or changing files.
+- Update `ONBOARD.md` when the change affects architecture, workflow, provider templates, environment variables, approval gates, video pipeline, infrastructure, audit, cybersecurity, or developer/operator instructions.
+- Explain the onboarding impact, or explicitly state that there is no onboarding behavior change.
+
+Mandatory acknowledgement text for PRs:
+
+```text
+ONBOARD.md read before repo scan: YES
+```
+
+If a PR fails onboarding enforcement, the failure message must explain:
+
+1. What failed.
+2. Why it failed.
+3. Which files triggered the rule.
+4. Exactly how to fix it.
+
+The failure should never be vague. Developers must know immediately what to do.
+
+Important limitation: GitHub cannot technically stop someone from cloning or opening a file locally before reading this page. The repository enforces this through PR checks, PR templates, branch protection, review doctrine, and owner expectations. Any contributor who bypasses the onboarding order is violating repository policy.
 
 ---
 
@@ -91,30 +120,39 @@ Sensitive actions must stay behind approval gates:
 ## 4. Core Workspace Map
 
 ### Console Hub
+
 Central control surface for provider actions, provider status, templates, logs, Vault, and infrastructure operations.
 
 ### SaaS Station
+
 Administration area for SaaS configuration, runtime settings, platform modules, and business controls.
 
 ### Audit Cockpit / PR Cockpit / Infrastructure PRs
+
 Owner-governed staging system for infrastructure changes. AI can stage exact provider steps as open PRs. The owner approves/merges. Only then do provider APIs execute.
 
 ### Cybersecurity
+
 Security automation, dependency checks, provider posture, vulnerability monitoring, platform scans, and operational security safeguards.
 
 ### Website / Brand Surface
+
 Marketing pages, public website, landing pages, brand copy, and user-facing product surfaces.
 
 ### Studio
+
 Creative production layer: video, images, audio, voice, captions, thumbnails, previews, and media rendering workflows.
 
 ### Launchpad
+
 Deployment and release coordination: Vercel, GitHub, Supabase, provider readiness, and integration validation.
 
 ### Owner/Admin
+
 High-privilege administration. Use strict owner/admin role gates.
 
 ### Marketing + Sales Engine / COSA
+
 COSA is the Campaign Operating System / Campaign Orchestration and Signal Agent. It is the autonomous marketing and sales engine for strategy, outreach, videos, localization, approval, publishing, tracking, learning, and optimization.
 
 ---
@@ -232,7 +270,7 @@ Required pipeline:
 1. Campaign row created.
 2. Base render starts.
 3. Base video completes.
-4. Voice/narration and captions are created.
+4. Voice/narration and captions are created or a cost-safe fallback advances the render.
 5. Final brand banner is burned into the video.
 6. Final branded preview becomes visible.
 7. Owner approval gate opens.
@@ -249,10 +287,12 @@ Raw/base renders are not final. They may be short, unvoiced, uncaptained, unbran
 
 A final preview must include voice/captions where applicable and burned-in brand/URL.
 
-Cost-control rule:
+Cost-control rules:
 
-- Use premium providers such as FAL/Kling only when premium generation is required.
+- Use premium providers such as FAL/Kling only when premium generation is explicitly required and approved.
 - Use FFmpeg/internal preview paths for low-cost drafts and pipeline tests when appropriate.
+- Failed tests must not keep spending money.
+- Automatic retries must not use paid media providers unless a separate owner-approved paid-provider flag or workflow allows it.
 
 ---
 
@@ -294,9 +334,22 @@ Security rules:
 
 ---
 
-## 12. Provider Templates, Vault, Vercel Env, and Infrastructure PRs
+## 12. Console Hub Provider Templates, Vault, Vercel Env, and Infrastructure PRs
 
 SignalBoostAi has an autonomous provider-template workflow.
+
+Provider templates are not just static documentation. In Console Hub, provider templates are live action definitions used by the app to render provider cards, actions, form fields, and operational workflows.
+
+Important doctrine for developers:
+
+- The Console Hub provider templates are the first place to check when a provider action, provider variable, live provider panel, or provider workflow is discussed.
+- Do not ask the owner to repeatedly explain provider-template architecture. Read `ONBOARD.md`, then inspect `saas/lib/hub/console-catalog.ts`, `saas/lib/hub/provider-templates*.ts`, and the matching provider executors/routes.
+- The provider templates define the provider action names, API service names, methods, endpoints, form fields, and live action IDs used by the console.
+- Environment variable names are safe to reference in code. Secret values must never be exposed.
+- A provider template can represent a live provider action, but the actual secret value may still live in Vercel environment variables, Vault, or provider-specific storage.
+- Do not confuse the variable name with the secret value. Example: `OPENAI_API_KEY` is the safe variable name; the actual key value must remain hidden.
+- If a provider action exists in Console Hub, inspect the template and executor before claiming the action is missing.
+- If a provider template is changed, removed, renamed, or routed differently, update this onboarding document in the same PR.
 
 The system can stage or execute provider operations through Console Hub templates, including:
 
@@ -456,7 +509,39 @@ Examples:
 
 ---
 
-## 18. Mandatory Final Reminder
+## 18. Mandatory ONBOARD Maintenance Rule
+
+`ONBOARD.md` must stay current.
+
+A PR must update this file when it changes any of the following:
+
+- COSA behavior, campaign flow, video rendering, approval, publishing, localization, prediction, or optimization.
+- Console Hub provider templates, provider routing, provider cards, provider executors, provider variable names, provider live panels, or provider action behavior.
+- Vercel environment-variable handling, Vault handling, provider-key handling, secrets, DNS, infrastructure, workflow, or CI/CD behavior.
+- Supabase schema, storage buckets, service-role behavior, migrations, or data model assumptions.
+- Audit, cybersecurity, approval gates, owner/admin gating, or compliance behavior.
+- Developer instructions, build/test/deploy process, or repo governance.
+
+If a critical file changes and no user-facing or architecture-facing behavior changed, still add a short maintenance note under the change log below saying:
+
+```text
+No onboarding behavior change; mechanical/refactor-only update.
+```
+
+This keeps the onboarding document current and prevents future developers or AI agents from relying on stale assumptions.
+
+---
+
+## 19. Onboarding Change Log
+
+Use this section for short notes when architecture, provider behavior, platform workflow, or governance rules change.
+
+- 2026-07-07: Added explicit Console Hub provider-template doctrine. Provider templates are live app action definitions, not just documentation. Developers must inspect provider templates and matching executors/routes before asking the owner to explain provider architecture.
+- 2026-07-07: Added stronger onboarding enforcement doctrine. PRs must acknowledge ONBOARD was read before repo scan, and critical changes must keep ONBOARD current or the check must fail with a clear reason and fix instructions.
+
+---
+
+## 20. Mandatory Final Reminder
 
 This file is the starting point.
 

@@ -1,0 +1,27 @@
+name: COS Video Production
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: cos-video-production
+  cancel-in-progress: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: npm install --no-save --no-audit --no-fund @supabase/supabase-js@^2
+      - run: sudo apt-get update -y && sudo apt-get install -y ffmpeg fonts-dejavu-core espeak-ng
+      - working-directory: saas
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/cos-video-production-worker.mjs

@@ -28,4 +28,16 @@ alter table public.cos_video_production_jobs add column if not exists max_attemp
 alter table public.cos_video_production_jobs add column if not exists reroute_count integer not null default 0;
 alter table public.cos_video_production_jobs add column if not exists auto_apply boolean not null default true;
 alter table public.cos_video_production_jobs add column if not exists priority integer not null default 100;
+alter table public.cos_video_production_jobs add column if not exists machine_id text;
+alter table public.cos_video_production_jobs add column if not exists provider_ref text;
+alter table public.cos_video_production_jobs add column if not exists vercel_environment text;
+alter table public.cos_video_production_jobs add column if not exists last_heartbeat_at timestamptz;
+alter table public.cos_video_production_jobs add column if not exists reroute_reason text;
+alter table public.cos_video_production_jobs add column if not exists queue_drop_reason text;
+alter table public.cos_video_production_jobs add column if not exists cockpit_ticket_id uuid;
+alter table public.cos_video_production_jobs add column if not exists escalated_at timestamptz;
+alter table public.cos_video_production_jobs add column if not exists completed_at timestamptz;
+alter table public.cos_video_production_jobs add column if not exists telemetry jsonb not null default '{}'::jsonb;
+alter table public.cos_video_production_jobs add column if not exists watchdog_signal jsonb not null default '{}'::jsonb;
+alter table public.cos_video_production_jobs add column if not exists audit_trail jsonb not null default '[]'::jsonb;
 `.trim()

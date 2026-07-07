@@ -30,6 +30,14 @@ const SUPPORTED_LANGS = [
   'ru',
 ] as const
 
+type SupportedLang = (typeof SUPPORTED_LANGS)[number]
+type TranslatableAttr = 'placeholder' | 'aria-label' | 'title'
+
+const ORIGINAL_TEXT = new WeakMap<Node, string>()
+const LAST_TRANSLATED_TEXT = new WeakMap<Node, string>()
+const ORIGINAL_ATTRS = new WeakMap<Element, Partial<Record<TranslatableAttr, string>>>()
+const LAST_TRANSLATED_ATTRS = new WeakMap<Element, Partial<Record<TranslatableAttr, string>>>()
+
 function normalizeLang(value: string | null) {
   if (!value) return 'en'
 
@@ -42,11 +50,14 @@ function normalizeLang(value: string | null) {
 }
 
 function persistLanguage(lang: string) {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined') return normalizeLang(lang)
+
   const safe = normalizeLang(lang)
   localStorage.setItem('signalboost_language', safe)
   localStorage.setItem('site-language', safe)
+  document.documentElement.lang = safe
   document.cookie = `signalboost_language=${encodeURIComponent(safe)}; Path=/; Max-Age=31536000; SameSite=Lax`
+  return safe
 }
 
 function getInitialLanguage() {
@@ -62,12 +73,9 @@ function getInitialLanguage() {
     return normalizeLang(saved)
   }
 
-  const browser =
-    navigator.languages?.[0] ||
-    navigator.language ||
-    null
-
-  return normalizeLang(browser)
+  // Keep English as the explicit product default. Browser-language detection is
+  // handled by LanguageSuggestion, so the dropdown and rendered UI never disagree.
+  return 'en'
 }
 
 function isDict(value: DictValue | undefined): value is Dict {
@@ -85,39 +93,94 @@ function collectCopyPairs(english: Dict, localized: Dict, out: Map<string, strin
   }
 }
 
-function applyLocaleSafetyNet(map: Map<string, string>, lang: string) {
-  if (typeof document === 'undefined') return () => {}
+function translateFromOriginal(value: string, map: Map<string, string>, lang: SupportedLang) {
+  if (lang === 'en') return value
 
-  const translateExact = (value: string) => {
-    const trimmed = value.trim()
-    if (!trimmed) return value
-    const translated = map.get(trimmed)
-    if (translated) {
-      const leading = value.match(/^\s*/)?.[0] || ''
-      const trailing = value.match(/\s*$/)?.[0] || ''
-      return `${leading}${translated}${trailing}`
-    }
-    return applyHardcodedUiCopy(value, lang)
+  const trimmed = value.trim()
+  if (!trimmed) return value
+
+  const leading = value.match(/^\s*/)?.[0] || ''
+  const trailing = value.match(/\s*$/)?.[0] || ''
+  const translated = map.get(trimmed)
+
+  if (translated) return `${leading}${translated}${trailing}`
+  return applyHardcodedUiCopy(value, lang)
+}
+
+function originalTextFor(node: Node, current: string) {
+  const lastTranslated = LAST_TRANSLATED_TEXT.get(node)
+  const shouldCaptureCurrent =
+    !ORIGINAL_TEXT.has(node) ||
+    (lastTranslated !== undefined && current !== lastTranslated)
+
+  if (shouldCaptureCurrent) ORIGINAL_TEXT.set(node, current)
+  return ORIGINAL_TEXT.get(node) ?? current
+}
+
+function originalAttrFor(el: Element, attr: TranslatableAttr, current: string) {
+  const originalAttrs = ORIGINAL_ATTRS.get(el) ?? {}
+  const lastAttrs = LAST_TRANSLATED_ATTRS.get(el) ?? {}
+  const lastTranslated = lastAttrs[attr]
+  const shouldCaptureCurrent =
+    originalAttrs[attr] === undefined ||
+    (lastTranslated !== undefined && current !== lastTranslated)
+
+  if (shouldCaptureCurrent) {
+    originalAttrs[attr] = current
+    ORIGINAL_ATTRS.set(el, originalAttrs)
   }
+
+  return originalAttrs[attr] ?? current
+}
+
+function rememberTranslatedAttr(el: Element, attr: TranslatableAttr, value: string) {
+  const lastAttrs = LAST_TRANSLATED_ATTRS.get(el) ?? {}
+  lastAttrs[attr] = value
+  LAST_TRANSLATED_ATTRS.set(el, lastAttrs)
+}
+
+function applyLocaleSafetyNet(map: Map<string, string>, lang: SupportedLang) {
+  if (typeof document === 'undefined') return () => {}
 
   const translateElement = (el: Element) => {
     if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-      if (el.placeholder) el.placeholder = translateExact(el.placeholder)
+      if (el.placeholder) {
+        const original = originalAttrFor(el, 'placeholder', el.placeholder)
+        const translated = translateFromOriginal(original, map, lang)
+        if (translated !== el.placeholder) el.placeholder = translated
+        rememberTranslatedAttr(el, 'placeholder', translated)
+      }
     }
+
     const aria = el.getAttribute('aria-label')
-    if (aria) el.setAttribute('aria-label', translateExact(aria))
+    if (aria) {
+      const original = originalAttrFor(el, 'aria-label', aria)
+      const translated = translateFromOriginal(original, map, lang)
+      if (translated !== aria) el.setAttribute('aria-label', translated)
+      rememberTranslatedAttr(el, 'aria-label', translated)
+    }
+
     const title = el.getAttribute('title')
-    if (title) el.setAttribute('title', translateExact(title))
+    if (title) {
+      const original = originalAttrFor(el, 'title', title)
+      const translated = translateFromOriginal(original, map, lang)
+      if (translated !== title) el.setAttribute('title', translated)
+      rememberTranslatedAttr(el, 'title', translated)
+    }
   }
 
   const translateTextNode = (node: Node) => {
     if (node.nodeType !== Node.TEXT_NODE) return
     const parent = node.parentElement
     if (!parent) return
-    if (['SCRIPT', 'STYLE', 'TEXTAREA', 'CODE', 'PRE'].includes(parent.tagName)) return
+    if (['SCRIPT', 'STYLE', 'TEXTAREA', 'CODE', 'PRE', 'OPTION'].includes(parent.tagName)) return
+
     const current = node.textContent || ''
-    const translated = translateExact(current)
+    const original = originalTextFor(node, current)
+    const translated = translateFromOriginal(original, map, lang)
+
     if (translated !== current) node.textContent = translated
+    LAST_TRANSLATED_TEXT.set(node, translated)
   }
 
   const scan = (root: ParentNode) => {
@@ -136,9 +199,16 @@ function applyLocaleSafetyNet(map: Map<string, string>, lang: string) {
         if (node instanceof Element) scan(node)
       })
       if (record.type === 'characterData') translateTextNode(record.target)
+      if (record.type === 'attributes' && record.target instanceof Element) translateElement(record.target)
     }
   })
-  observer.observe(document.body, { childList: true, characterData: true, subtree: true })
+  observer.observe(document.body, {
+    attributes: true,
+    attributeFilter: ['placeholder', 'aria-label', 'title'],
+    childList: true,
+    characterData: true,
+    subtree: true,
+  })
   return () => observer.disconnect()
 }
 
@@ -148,7 +218,7 @@ export function I18nProvider({
   children: React.ReactNode
 }) {
   const [lang, setLangState] =
-    useState('en')
+    useState<SupportedLang>('en')
 
   const [dict, setDict] =
     useState<Dict>(englishCopy as Dict)
@@ -156,8 +226,7 @@ export function I18nProvider({
     useState(false)
 
   useEffect(() => {
-    const initialLang = getInitialLanguage()
-    persistLanguage(initialLang)
+    const initialLang = persistLanguage(getInitialLanguage())
 
     if (initialLang !== lang) {
       setLangState(initialLang)
@@ -172,10 +241,10 @@ export function I18nProvider({
     async function init() {
       setIsReady(false)
       setDict(englishCopy as Dict)
-      persistLanguage(lang)
+      const safeLang = persistLanguage(lang)
 
       const loaded =
-        await loadLanguage(lang)
+        await loadLanguage(safeLang)
 
       if (cancelled) return
 
@@ -190,9 +259,9 @@ export function I18nProvider({
   }, [lang])
 
   useEffect(() => {
-    if (!isReady || lang === 'en') return
+    if (!isReady) return
     const map = new Map<string, string>()
-    collectCopyPairs(englishCopy as Dict, dict, map)
+    if (lang !== 'en') collectCopyPairs(englishCopy as Dict, dict, map)
     return applyLocaleSafetyNet(map, lang)
   }, [dict, isReady, lang])
 
@@ -200,9 +269,8 @@ export function I18nProvider({
     newLang: string
   ) => {
     const safeLang =
-      normalizeLang(newLang)
+      persistLanguage(newLang)
 
-    persistLanguage(safeLang)
     setLangState(safeLang)
   }
 

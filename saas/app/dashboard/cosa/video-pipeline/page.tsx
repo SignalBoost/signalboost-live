@@ -66,7 +66,7 @@ export default function CosaVideoPipelinePage() {
     setLoading(true)
     setMessage('')
     try {
-      const res = await fetch(path, { cache: 'no-store' })
+      const res = await fetch(path, { cache: 'no-store', credentials: 'include' })
       const json = await res.json().catch(() => null)
       if (!res.ok || !json?.ok) throw new Error(json?.error || 'Could not load video pipeline.')
       setData(json)
@@ -83,7 +83,7 @@ export default function CosaVideoPipelinePage() {
     setLoading(true)
     setMessage('')
     try {
-      const res = await fetch('/api/cos/brand-overlay-dispatch', { method: 'POST', cache: 'no-store' })
+      const res = await fetch('/api/cos/brand-overlay-dispatch', { method: 'POST', cache: 'no-store', credentials: 'include' })
       const json = await res.json().catch(() => null)
       if (!res.ok || !json?.ok) throw new Error(json?.error || 'Could not dispatch branding worker.')
       setData((prev: any) => ({ ...(prev || {}), actions: [{ action: 'brand-overlay-dispatch', ...json }] }))
@@ -101,6 +101,7 @@ export default function CosaVideoPipelinePage() {
       const res = await fetch('/api/cos/campaign-queue', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ id, status: 'approved' }),
       })
       const json = await res.json().catch(() => null)

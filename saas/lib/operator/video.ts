@@ -8,37 +8,15 @@
 // explicit owner approval flow.
 
 import { createClient } from '@supabase/supabase-js'
+import { COS_VIDEO_QUEUE_SQL } from '@/lib/operator/videoQueueSchema'
 
 const LOCAL_FFMPEG_MODEL = 'signalboost/local-ffmpeg-preview'
 const RENDER_BUCKET = process.env.COS_VIDEO_RENDER_BUCKET || 'video-renders'
 const SUPABASE_URL_KEY = ['NEXT', 'PUBLIC', 'SUPABASE', 'URL'].join('_')
 const SUPABASE_SERVICE_KEY = ['SUPABASE', 'SERVICE', 'ROLE', 'KEY'].join('_')
 
-const JOBS_TABLE_SQL = `
-create extension if not exists pgcrypto;
-create table if not exists public.cos_video_production_jobs (
-  id uuid primary key default gen_random_uuid(),
-  title text,
-  status text not null default 'queued',
-  production_tier text default 'prototype',
-  platforms jsonb not null default '[]'::jsonb,
-  hook text,
-  audience text,
-  render_spec jsonb not null default '{}'::jsonb,
-  search_package jsonb not null default '{}'::jsonb,
-  approval_state jsonb not null default '{}'::jsonb,
-  output_url text,
-  thumbnail_url text,
-  error text,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-create index if not exists cos_video_production_jobs_status_idx on public.cos_video_production_jobs (status);
-create index if not exists cos_video_production_jobs_created_at_idx on public.cos_video_production_jobs (created_at desc);
-alter table public.cos_video_production_jobs enable row level security;
-drop policy if exists cos_video_production_jobs_service_role_all on public.cos_video_production_jobs;
-create policy cos_video_production_jobs_service_role_all on public.cos_video_production_jobs for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
-`.trim()
+const DEFAULT_MAX_ATTEMPTS = Math.max(1, Number(process.env.COS_VIDEO_MAX_ATTEMPTS || 5))
+const AUTO_APPLY_DEFAULT = process.env.COS_VIDEO_AUTO_APPLY === 'false' ? false : true
 
 type ImageMotionSource = {
   sourceImageUrl?: string
@@ -93,13 +71,24 @@ function hookFromPrompt(prompt: string): string {
   return clean || 'One command can start a complete SignalBoostAi campaign.'
 }
 
-function isMissingJobsTable(message: string): boolean {
+function needsQueueSetup(message: string): boolean {
   const m = String(message || '').toLowerCase()
-  return m.includes('cos_video_production_jobs') && (m.includes('not find') || m.includes('schema cache') || m.includes('does not exist'))
+  return (
+    m.includes('cos_video_production_jobs') ||
+    m.includes('cos_video_lifecycle_events') ||
+    m.includes('cos_video_escalation_tickets') ||
+    m.includes('lifecycle_state') ||
+    m.includes('warning_level') ||
+    m.includes('attempt_count') ||
+    m.includes('reroute_count') ||
+    m.includes('schema cache') ||
+    m.includes('does not exist') ||
+    m.includes('not find')
+  )
 }
 
 async function ensureJobsTable(sb: any) {
-  const rpc = await sb.rpc('hub_exec_sql', { query: JOBS_TABLE_SQL })
+  const rpc = await sb.rpc('hub_exec_sql', { query: COS_VIDEO_QUEUE_SQL })
   if (rpc.error) throw new Error('Could not create video jobs table: ' + rpc.error.message)
   const check = await sb.from('cos_video_production_jobs').select('id').limit(1)
   if (check.error) throw new Error('Video jobs table still unavailable after setup: ' + check.error.message)
@@ -120,6 +109,24 @@ async function startFfmpegPreview(prompt: string, aspectRatio: '9:16' | '16:9' |
   const row = {
     title,
     status: 'queued',
+    lifecycle_state: 'incoming',
+    warning_level: 'green',
+    pool: 'primary',
+    fallback_pool: 'secondary',
+    attempt_count: 0,
+    max_attempts: DEFAULT_MAX_ATTEMPTS,
+    reroute_count: 0,
+    auto_apply: AUTO_APPLY_DEFAULT,
+    priority: 100,
+    machine_id: null,
+    provider_ref: LOCAL_FFMPEG_MODEL,
+    vercel_environment: process.env.VERCEL_ENV || process.env.NODE_ENV || 'local',
+    last_heartbeat_at: null,
+    reroute_reason: null,
+    queue_drop_reason: null,
+    cockpit_ticket_id: null,
+    escalated_at: null,
+    completed_at: null,
     production_tier: 'prototype',
     platforms,
     hook,
@@ -154,14 +161,25 @@ async function startFfmpegPreview(prompt: string, aspectRatio: '9:16' | '16:9' |
     output_url: null,
     thumbnail_url: null,
     error: null,
+    telemetry: {
+      request_type: 'incoming_video_request',
+      source: 'operator_video_helper',
+      aspect_ratio: aspectRatio,
+      provider: LOCAL_FFMPEG_MODEL,
+    },
+    watchdog_signal: {},
+    audit_trail: [{ event: 'incoming_video_request', at: now, actor: 'system', provider: LOCAL_FFMPEG_MODEL }],
     created_at: now,
     updated_at: now,
   }
 
   let inserted = await insertJob(sb, row)
-  if ((inserted.error || !inserted.data?.id) && isMissingJobsTable(inserted.error?.message || '')) {
-    await ensureJobsTable(sb)
-    inserted = await insertJob(sb, row)
+  if (inserted.error || !inserted.data?.id) {
+    const message = inserted.error?.message || ''
+    if (needsQueueSetup(message)) {
+      await ensureJobsTable(sb)
+      inserted = await insertJob(sb, row)
+    }
   }
   if (inserted.error || !inserted.data?.id) return { ok: false, error: inserted.error?.message || 'Could not queue internal FFmpeg preview render.' }
   return { ok: true, requestId: String(inserted.data.id), model: LOCAL_FFMPEG_MODEL }
@@ -196,11 +214,34 @@ export async function startSiteVideo(
 
 async function fetchFfmpegPreview(requestId: string): Promise<FetchVideoResult> {
   const sb = adminDb()
-  const { data, error } = await sb.from('cos_video_production_jobs').select('status, output_url, error').eq('id', requestId).single()
+  let query = await sb
+    .from('cos_video_production_jobs')
+    .select('status, output_url, error, lifecycle_state, warning_level, pool, queue_drop_reason, cockpit_ticket_id')
+    .eq('id', requestId)
+    .single()
+
+  if (query.error && needsQueueSetup(query.error.message || '')) {
+    try {
+      await ensureJobsTable(sb)
+      query = await sb
+        .from('cos_video_production_jobs')
+        .select('status, output_url, error, lifecycle_state, warning_level, pool, queue_drop_reason, cockpit_ticket_id')
+        .eq('id', requestId)
+        .single()
+    } catch {
+      query = await sb.from('cos_video_production_jobs').select('status, output_url, error').eq('id', requestId).single()
+    }
+  }
+
+  const { data, error } = query
   if (error || !data) return { status: 'failed', error: error?.message || 'Internal FFmpeg preview job not found.' }
 
   const status = String(data.status || '')
+  const queueDropReason = String((data as any).queue_drop_reason || '').trim()
+  const cockpitTicketId = String((data as any).cockpit_ticket_id || '').trim()
   if (status === 'failed') return { status: 'failed', error: data.error || 'Internal FFmpeg preview render failed.' }
+  if (status === 'escalated') return { status: 'failed', error: data.error || `Video render escalated to Cockpit${cockpitTicketId ? ` ticket ${cockpitTicketId}` : ''}.` }
+  if (status === 'dlq') return { status: 'failed', error: queueDropReason || data.error || 'Video render was moved out of the primary stream for operator review.' }
   if (status === 'rendered' || status === 'completed') {
     const output = String(data.output_url || '').trim()
     if (!output) return { status: 'failed', error: 'Internal FFmpeg preview rendered but no output URL was saved.' }
@@ -211,7 +252,10 @@ async function fetchFfmpegPreview(requestId: string): Promise<FetchVideoResult> 
     return { status: 'done', videoUrl: signed.signedUrl }
   }
 
-  return { status: 'rendering', warning: `Internal FFmpeg preview job is ${status || 'queued'}.` }
+  const warning = (data as any).warning_level && (data as any).warning_level !== 'green'
+    ? `Internal FFmpeg preview job is ${status || 'queued'} in ${(data as any).pool || 'primary'} pool (${(data as any).warning_level}).`
+    : `Internal FFmpeg preview job is ${status || 'queued'}.`
+  return { status: 'rendering', warning }
 }
 
 export async function fetchSiteVideo(requestId: string, model: string): Promise<FetchVideoResult> {

@@ -1,214 +1,200 @@
 'use client'
 
-// saas/app/hub/cos/page.tsx
-// COS Decision Log — owner/admin view of every reasoning decision COS has made,
-// with one-click outcome marking. Reads /api/cos/decisions; writes outcomes to
-// /api/cos/decisions/outcome. All text flows through t() with English fallbacks.
+import { useEffect, useMemo, useState } from 'react'
 
-import { useCallback, useEffect, useState } from 'react'
-import { useTranslation } from '@/components/i18n/useTranslation'
-
-type Decision = {
-  decision_id: string
-  objective: string
-  channel: string
-  state: string
-  required_source: string
-  must_use_tool: boolean
-  proposes_action: boolean
-  required_approval: boolean
-  approval_reasons: string[]
-  confidence: number | null
-  output: any
-  status: string
-  created_at: string
+type Gov = {
+  ok: boolean
+  error?: string
+  generatedAt?: string
+  mode?: string
+  pipelines?: any[]
+  alerts?: any[]
+  fixes?: any[]
+  escalations?: any[]
+  timeline?: any[]
+  graph?: { nodes: any[]; edges: any[] }
+  sourceErrors?: Record<string, string | null>
 }
 
-type ListResponse = { ok: boolean; rows?: Decision[]; error?: string }
+const gold = '#ffc300'
+const cyan = '#1af0ff'
+const green = '#22c55e'
+const orange = '#fb923c'
+const red = '#ef4444'
+const slate = '#94a3b8'
+const panel = { background: 'rgba(15,23,42,.82)', border: '1px solid rgba(148,163,184,.16)', borderRadius: 18, padding: 18 } as const
+const ghost = { border: '1px solid rgba(255,255,255,.18)', background: 'rgba(255,255,255,.06)', color: '#fff', borderRadius: 12, padding: '9px 12px', fontWeight: 850, cursor: 'pointer' } as const
+const primary = { border: 'none', background: gold, color: '#020617', borderRadius: 12, padding: '9px 12px', fontWeight: 950, cursor: 'pointer' } as const
 
-const CARD = 'rounded-md border border-border bg-surface'
-const BTN = 'inline-flex items-center justify-center rounded-md border px-2.5 py-1 text-xs font-medium transition-fast disabled:opacity-50'
-
-const STATE_COLOR: Record<string, string> = {
-  BLOCKED: '#ef4444',
-  ANALYZE_ONLY: '#94a3b8',
-  RETRIEVE_AND_ANSWER: '#1af0ff',
-  PREPARE_AND_HOLD: '#ffc300',
-  EXECUTE: '#22c55e',
+function eventColor(value?: string) {
+  if (value === 'green') return green
+  if (value === 'orange') return orange
+  if (value === 'red') return red
+  if (value === 'cyan') return cyan
+  if (value === 'yellow') return gold
+  return slate
 }
-const STATUS_COLOR: Record<string, string> = {
-  logged: '#94a3b8',
-  approved: '#22c55e',
-  rejected: '#ef4444',
-  executed: '#1af0ff',
-  measured: '#ffc300',
+function severityColor(value?: string) {
+  if (value === 'critical') return red
+  if (value === 'high') return '#fb7185'
+  if (value === 'medium') return orange
+  return gold
+}
+function chip(text: any, color = slate) {
+  return <span style={{ display: 'inline-flex', border: `1px solid ${color}55`, color, background: `${color}16`, borderRadius: 999, padding: '3px 9px', fontSize: 11, fontWeight: 900 }}>{text}</span>
+}
+function fmt(value?: string) {
+  if (!value) return '-'
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? value : d.toLocaleString(undefined, { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
+function json(value: any) {
+  try { return JSON.stringify(value ?? {}, null, 2) } catch { return String(value) }
+}
+function Details({ value }: { value: any }) {
+  return <details style={{ marginTop: 10 }}><summary style={{ color: cyan, cursor: 'pointer', fontSize: 12, fontWeight: 850 }}>Telemetry JSON</summary><pre style={{ marginTop: 8, whiteSpace: 'pre-wrap', maxHeight: 230, overflow: 'auto', borderRadius: 12, padding: 12, background: 'rgba(0,0,0,.28)', color: 'rgba(226,232,240,.82)', fontSize: 11 }}>{json(value)}</pre></details>
 }
 
-function Chip({ text, color }: { text: string; color: string }) {
-  return (
-    <span style={{
-      display: 'inline-block', padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700,
-      color: '#0b1020', background: color, whiteSpace: 'nowrap',
-    }}>{text}</span>
-  )
+function Pipeline({ item }: { item: any }) {
+  const color = item.status === 'healthy' ? green : item.status === 'watch' ? gold : item.status === 'degraded' ? orange : red
+  return <article style={panel}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><strong style={{ color: '#fff' }}>{item.name}</strong>{chip(item.status, color)}</div>
+    <p style={{ color: 'rgba(255,255,255,.58)', fontSize: 12, lineHeight: 1.45 }}>{item.role}</p>
+    <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}><div style={{ width: `${item.healthScore || 0}%`, height: '100%', background: color }} /></div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginTop: 12, fontSize: 12, color: 'rgba(255,255,255,.65)' }}>
+      <span>Health <b style={{ color: '#fff' }}>{item.healthScore}%</b></span><span>Risk <b style={{ color }}>{item.overloadRisk}%</b></span>
+      <span>Latency <b style={{ color: '#fff' }}>{item.latencyMs}ms</b></span><span>Cost <b style={{ color: '#fff' }}>${item.estimatedCostUsd}</b></span>
+      <span>Active <b style={{ color: '#fff' }}>{item.activeJobs}</b></span><span>Failed <b style={{ color: item.failedJobs ? red : '#fff' }}>{item.failedJobs}</b></span>
+    </div>
+    <p style={{ color: cyan, fontSize: 12, fontWeight: 850 }}>Next: {String(item.nextAction || '').replace(/_/g, ' ')}</p>
+  </article>
 }
 
-export default function CosDecisionLogPage() {
-  const { t } = useTranslation()
-  const [rows, setRows] = useState<Decision[]>([])
+function AlertCard({ item, act, busy }: { item: any; act: (name: string, item: any) => void; busy: boolean }) {
+  const color = severityColor(item.severity)
+  return <article style={{ border: `1px solid ${color}55`, borderRadius: 16, padding: 14, background: `${color}0f` }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><strong style={{ color: '#fff' }}>{item.title}</strong>{chip(item.severity, color)}</div>
+    <p style={{ color: 'rgba(255,255,255,.72)', fontSize: 13, lineHeight: 1.55 }}>{item.forecast}</p>
+    <p style={{ color: gold, fontSize: 12, fontWeight: 850 }}>Suggested: {item.suggestedFix}</p>
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><button disabled={busy} onClick={() => act('auto_apply', item)} style={primary}>✅ Auto-Apply</button><button disabled={busy} onClick={() => act('override', item)} style={ghost}>❌ Override</button><button disabled={busy} onClick={() => act('escalate', item)} style={{ ...ghost, color: orange, borderColor: `${orange}88` }}>Escalate</button></div>
+    <Details value={item.telemetry} />
+  </article>
+}
+
+function FixCard({ item, act, busy }: { item: any; act: (name: string, item: any) => void; busy: boolean }) {
+  return <article style={{ border: `1px solid ${cyan}44`, borderRadius: 16, padding: 14, background: 'rgba(255,255,255,.035)' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><strong style={{ color: '#fff' }}>{item.rootCause}</strong>{chip(String(item.status || '').replace(/_/g, ' '), cyan)}</div>
+    <p style={{ color: 'rgba(255,255,255,.7)', fontSize: 13 }}>Fix: {item.suggestedFix}</p>
+    <p style={{ color: cyan, fontSize: 12, fontWeight: 850 }}>Confidence {item.confidence}% · {String(item.action || '').replace(/_/g, ' ')}</p>
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><button disabled={busy} onClick={() => act('auto_apply', item)} style={primary}>✅ Auto-Apply</button><button disabled={busy} onClick={() => act('override', item)} style={ghost}>❌ Override</button></div>
+    <Details value={item.telemetry} />
+  </article>
+}
+
+function EscalationCard({ item, act, busy }: { item: any; act: (name: string, item: any) => void; busy: boolean }) {
+  const color = item.status === 'rejected' ? red : orange
+  return <article style={{ border: `1px solid ${color}55`, borderRadius: 16, padding: 14, background: `${color}0f` }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><strong style={{ color: '#fff' }}>{String(item.intent || '').replace(/_/g, ' ')}</strong>{chip(item.status, color)}</div>
+    <p style={{ color: 'rgba(255,255,255,.65)', fontSize: 12 }}>Pipeline {item.pipeline} · Risk {item.riskLevel} · Approver {item.approver}</p>
+    <p style={{ color: gold, fontSize: 12, fontWeight: 850 }}>Alternatives: {(item.fallbackAlternatives || []).join(' · ')}</p>
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><button disabled={busy} onClick={() => act('auto_apply', item)} style={primary}>✅ Approve Fix</button><button disabled={busy} onClick={() => act('override', item)} style={ghost}>❌ Reject</button><button disabled={busy} onClick={() => act('escalate', item)} style={{ ...ghost, color: orange, borderColor: `${orange}88` }}>Send to PR Cockpit</button></div>
+    <Details value={item.telemetry} />
+  </article>
+}
+
+function TimelineRow({ item }: { item: any }) {
+  const color = eventColor(item.color)
+  return <article style={{ display: 'grid', gridTemplateColumns: '132px 14px 1fr', gap: 12, alignItems: 'start' }}>
+    <span style={{ color: 'rgba(255,255,255,.52)', fontSize: 11 }}>{fmt(item.timestamp)}</span>
+    <span style={{ width: 11, height: 11, borderRadius: 99, background: color, boxShadow: `0 0 18px ${color}`, marginTop: 4 }} />
+    <div style={{ border: `1px solid ${color}44`, borderRadius: 14, padding: 12, background: 'rgba(255,255,255,.035)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}><strong style={{ color: '#fff' }}>{item.title}</strong><span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{chip(item.type, color)}{chip(item.severity, severityColor(item.severity))}{chip(item.status)}</span></div>
+      <p style={{ margin: '7px 0 0', color: 'rgba(255,255,255,.62)', fontSize: 12 }}>Pipeline {item.pipeline}{item.approverRole ? ` · Approver ${item.approverRole}` : ''}{item.decision ? ` · Decision ${item.decision}` : ''}</p>
+      {item.recommendation ? <p style={{ color: cyan, fontSize: 12 }}>{item.recommendation}</p> : null}
+      <Details value={item.telemetry} />
+    </div>
+  </article>
+}
+
+export default function CosGovernanceDashboardPage() {
+  const [data, setData] = useState<Gov | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [selected, setSelected] = useState<Decision | null>(null)
   const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  const [filter, setFilter] = useState('all')
 
-  const load = useCallback(async () => {
+  async function load() {
     setLoading(true)
-    setError(null)
+    setMessage('')
     try {
-      const res = await fetch('/api/cos/decisions?limit=100', { credentials: 'include' })
-      const data: ListResponse = await res.json()
-      if (!data.ok) { setError(data.error || 'Failed to load'); setRows([]) }
-      else setRows(data.rows || [])
+      const res = await fetch('/api/cos/governance-router', { cache: 'no-store', credentials: 'include' })
+      const json = await res.json().catch(() => ({ ok: false, error: 'Invalid governance response' }))
+      if (!res.ok || !json.ok) throw new Error(json.error || 'Could not load COS governance router.')
+      setData(json)
     } catch (e: any) {
-      setError(e?.message || 'Failed to load')
+      setMessage(e?.message || 'Could not load COS governance router.')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load() }, [])
 
-  const setOutcome = useCallback(async (decisionId: string, status: string) => {
+  async function action(name: string, item: any) {
     setBusy(true)
+    setMessage('')
     try {
-      const res = await fetch('/api/cos/decisions/outcome', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ decisionId, status }),
-      })
-      const data = await res.json()
-      if (data.ok) {
-        setRows((prev) => prev.map((r) => r.decision_id === decisionId ? { ...r, status } : r))
-        setSelected((prev) => prev && prev.decision_id === decisionId ? { ...prev, status } : prev)
-      }
-    } catch {
-      // non-fatal; the row simply keeps its previous status
+      const res = await fetch('/api/cos/governance-router', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ action: name, targetId: item.id || item.alertId || item.pipeline, pipeline: item.pipeline || 'primary', objective: `${name.replace(/_/g, ' ')}: ${item.title || item.rootCause || item.intent || 'COS governance control'}`, intent: item.intent || item.action || 'hybrid_dynamic_router_control', riskLevel: item.severity || item.riskLevel || 'medium', decision: name === 'auto_apply' ? 'approved_auto_fix' : name === 'override' ? 'admin_override' : 'escalated_to_pr_cockpit', telemetry: item }) })
+      const json = await res.json().catch(() => null)
+      if (!res.ok || !json?.ok) throw new Error(json?.error || 'Governance action failed.')
+      setMessage(`Governance action logged: ${name.replace(/_/g, ' ')}.`)
+      await load()
+    } catch (e: any) {
+      setMessage(e?.message || 'Governance action failed.')
     } finally {
       setBusy(false)
     }
-  }, [])
+  }
 
-  return (
-    <div style={{ padding: 24, maxWidth: 1100, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>{t('cos.log.title', 'COS Decision Log')}</div>
-          <div style={{ fontSize: 13, opacity: 0.7 }}>
-            {t('cos.log.subtitle', 'Every reasoning decision COS has made. Mark outcomes to build the training set.')}
-          </div>
-        </div>
-        <button className={BTN} style={{ borderColor: '#1af0ff', color: '#1af0ff' }} onClick={load} disabled={loading}>
-          {loading ? t('cos.log.loading', 'Loading…') : t('cos.log.refresh', 'Refresh')}
-        </button>
+  const timeline = useMemo(() => {
+    const rows = data?.timeline || []
+    return filter === 'all' ? rows : rows.filter((row: any) => row.type === filter)
+  }, [data?.timeline, filter])
+
+  const alerts = data?.alerts || []
+  const fixes = data?.fixes || []
+  const escalations = data?.escalations || []
+  const pipelines = data?.pipelines || []
+
+  return <main style={{ maxWidth: 1380, margin: '0 auto', display: 'grid', gap: 18, padding: '24px 22px' }}>
+    <section style={{ ...panel, background: 'radial-gradient(circle at top left, rgba(26,240,255,.14), transparent 28rem), linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,6,23,.98))' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 16, flexWrap: 'wrap' }}>
+        <div><p style={{ margin: 0, color: gold, fontSize: 12, fontWeight: 950, letterSpacing: '.14em', textTransform: 'uppercase' }}>COS Governance</p><h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 'clamp(28px, 4vw, 44px)', letterSpacing: '-.04em' }}>Hybrid-Dynamic COS Router</h1><p style={{ color: 'rgba(255,255,255,.68)', maxWidth: 880, lineHeight: 1.65 }}>Predictive monitoring, self-healing logs, fallback routing, escalation workflows, and complete audit visibility for COS orchestration.</p></div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}><button onClick={load} disabled={loading || busy} style={primary}>{loading ? 'Loading…' : 'Refresh governance'}</button>{chip(data?.mode || 'hybrid-dynamic-governed', cyan)}</div>
       </div>
+      {message ? <p style={{ color: message.toLowerCase().includes('fail') || message.toLowerCase().includes('could not') ? red : green, margin: '12px 0 0', fontWeight: 800 }}>{message}</p> : null}
+      {data?.sourceErrors && (data.sourceErrors.campaigns || data.sourceErrors.decisions) ? <p style={{ color: orange, fontSize: 12 }}>Source warnings: {Object.entries(data.sourceErrors).filter(([, value]) => value).map(([key, value]) => `${key}: ${value}`).join(' · ')}</p> : null}
+    </section>
 
-      {error && (
-        <div className={CARD} style={{ padding: 12, borderColor: '#ef4444', marginBottom: 12, fontSize: 13 }}>{error}</div>
-      )}
+    <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>{pipelines.map(item => <Pipeline key={item.id} item={item} />)}{!loading && !pipelines.length ? <div style={panel}>No pipeline telemetry returned.</div> : null}</section>
 
-      {!loading && rows.length === 0 && !error && (
-        <div className={CARD} style={{ padding: 24, textAlign: 'center', fontSize: 13, opacity: 0.7 }}>
-          {t('cos.log.empty', 'No decisions logged yet. Run a COS simulation to populate this.')}
-        </div>
-      )}
+    <section style={panel}>
+      <p style={{ color: gold, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Telemetry graph</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>Failing nodes and reroute paths</h2>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12, marginTop: 16 }}>{(data?.graph?.nodes || []).map((node: any) => <div key={node.id} style={{ border: `1px solid ${eventColor(node.status === 'healthy' ? 'green' : node.status === 'watch' ? 'yellow' : 'orange')}55`, borderRadius: 16, padding: 12 }}><strong style={{ color: '#fff' }}>{node.label}</strong><p style={{ color: 'rgba(255,255,255,.6)', fontSize: 12 }}>Health {node.healthScore}% · {node.status}</p></div>)}</div>
+      <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>{(data?.graph?.edges || []).map((edge: any, i: number) => <div key={i} style={{ color: edge.active ? cyan : 'rgba(255,255,255,.55)', fontSize: 12 }}><b>{edge.from}</b> {edge.active ? '━━▶' : '──▶'} <b>{edge.to}</b> · {edge.label}</div>)}</div>
+    </section>
 
-      {rows.length > 0 && (
-        <div className={CARD} style={{ overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ textAlign: 'left', opacity: 0.6, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.05em' }}>
-                <th style={{ padding: '10px 12px' }}>{t('cos.log.col_objective', 'Objective')}</th>
-                <th style={{ padding: '10px 12px' }}>{t('cos.log.col_channel', 'Channel')}</th>
-                <th style={{ padding: '10px 12px' }}>{t('cos.log.col_source', 'Source')}</th>
-                <th style={{ padding: '10px 12px' }}>{t('cos.log.col_state', 'State')}</th>
-                <th style={{ padding: '10px 12px' }}>{t('cos.log.col_status', 'Outcome')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr
-                  key={r.decision_id}
-                  onClick={() => setSelected(r)}
-                  style={{ borderTop: '1px solid rgba(148,163,184,.15)', cursor: 'pointer' }}
-                >
-                  <td style={{ padding: '10px 12px', maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {r.objective || '(empty)'}
-                  </td>
-                  <td style={{ padding: '10px 12px', opacity: 0.85 }}>{r.channel}</td>
-                  <td style={{ padding: '10px 12px', opacity: 0.85 }}>{r.required_source}</td>
-                  <td style={{ padding: '10px 12px' }}><Chip text={r.state} color={STATE_COLOR[r.state] || '#94a3b8'} /></td>
-                  <td style={{ padding: '10px 12px' }}><Chip text={r.status} color={STATUS_COLOR[r.status] || '#94a3b8'} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+    <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 18 }}>
+      <div style={{ display: 'grid', gap: 14 }}>
+        <section style={panel}><div style={{ display: 'flex', justifyContent: 'space-between' }}><div><p style={{ color: gold, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Predictive Alerts Panel</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>Problems before they happen</h2></div>{chip(`${alerts.length} alerts`, gold)}</div><div style={{ display: 'grid', gap: 12, marginTop: 14 }}>{alerts.length ? alerts.map(item => <AlertCard key={item.id} item={item} act={action} busy={busy} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>No predictive alerts.</p>}</div></section>
+        <section style={panel}><div style={{ display: 'flex', justifyContent: 'space-between' }}><div><p style={{ color: cyan, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Problem + Fix Panel</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>Root cause and fix attempts</h2></div>{chip(`${fixes.length} fixes`, cyan)}</div><div style={{ display: 'grid', gap: 12, marginTop: 14 }}>{fixes.length ? fixes.map(item => <FixCard key={item.id} item={item} act={action} busy={busy} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>No fix attempts required.</p>}</div></section>
+      </div>
+      <section style={panel}><div style={{ display: 'flex', justifyContent: 'space-between' }}><div><p style={{ color: orange, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Escalation Panel</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>Unresolved alerts → PR Cockpit</h2></div>{chip(`${escalations.length} escalations`, orange)}</div><div style={{ display: 'grid', gap: 12, marginTop: 14 }}>{escalations.length ? escalations.map(item => <EscalationCard key={item.id} item={item} act={action} busy={busy} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>No unresolved high-risk alerts.</p>}</div></section>
+    </section>
 
-      {selected && (
-        <div
-          onClick={() => setSelected(null)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,23,.55)', zIndex: 50, display: 'flex', justifyContent: 'flex-end' }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="bg-surface border-border"
-            style={{ width: 'min(560px, 100%)', height: '100%', borderLeft: '1px solid', padding: 24, overflowY: 'auto' }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-              <div style={{ fontSize: 16, fontWeight: 800 }}>{t('cos.log.detail', 'Decision detail')}</div>
-              <button className={BTN} style={{ borderColor: 'rgba(148,163,184,.4)' }} onClick={() => setSelected(null)}>✕</button>
-            </div>
-
-            <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5 }}>
-              <div style={{ opacity: 0.6, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.05em' }}>{t('cos.log.objective', 'Objective')}</div>
-              <div style={{ marginBottom: 12 }}>{selected.objective || '(empty)'}</div>
-
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-                <Chip text={selected.state} color={STATE_COLOR[selected.state] || '#94a3b8'} />
-                <Chip text={selected.status} color={STATUS_COLOR[selected.status] || '#94a3b8'} />
-                <Chip text={`${selected.channel}`} color="#64748b" />
-                <Chip text={selected.required_source} color="#475569" />
-                {selected.must_use_tool && <Chip text={t('cos.log.tool_required', 'tool required')} color="#1af0ff" />}
-                {selected.required_approval && <Chip text={t('cos.log.approval_required', 'approval required')} color="#ffc300" />}
-              </div>
-
-              {Array.isArray(selected.approval_reasons) && selected.approval_reasons.length > 0 && (
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ opacity: 0.6, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.05em' }}>{t('cos.log.approval_reasons', 'Approval reasons')}</div>
-                  <div>{selected.approval_reasons.join(', ')}</div>
-                </div>
-              )}
-
-              <div style={{ opacity: 0.6, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>{t('cos.log.report', 'Report')}</div>
-              <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, background: 'rgba(148,163,184,.10)', padding: 12, borderRadius: 8, lineHeight: 1.5 }}>
-{selected.output?.report || '(no report)'}
-              </pre>
-
-              <div style={{ opacity: 0.6, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.05em', margin: '14px 0 8px' }}>{t('cos.log.mark_outcome', 'Mark outcome')}</div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button className={BTN} style={{ borderColor: '#22c55e', color: '#22c55e' }} disabled={busy} onClick={() => setOutcome(selected.decision_id, 'approved')}>{t('cos.log.approve', 'Approved')}</button>
-                <button className={BTN} style={{ borderColor: '#ef4444', color: '#ef4444' }} disabled={busy} onClick={() => setOutcome(selected.decision_id, 'rejected')}>{t('cos.log.reject', 'Rejected')}</button>
-                <button className={BTN} style={{ borderColor: '#1af0ff', color: '#1af0ff' }} disabled={busy} onClick={() => setOutcome(selected.decision_id, 'executed')}>{t('cos.log.executed', 'Executed')}</button>
-              </div>
-              <div style={{ marginTop: 10, fontSize: 11, opacity: 0.55 }}>
-                {t('cos.log.created', 'Logged')}: {new Date(selected.created_at).toLocaleString()}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
+    <section style={panel}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}><div><p style={{ color: gold, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Unified Timeline View</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 22 }}>Full lifecycle visibility</h2><p style={{ color: 'rgba(255,255,255,.58)', margin: '5px 0 0', fontSize: 13 }}>Yellow = alert · Green = fix success · Orange = escalation pending · Red = rejected</p></div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{['all', 'alert', 'fix', 'escalation', 'decision'].map(item => <button key={item} onClick={() => setFilter(item)} style={filter === item ? primary : ghost}>{item}</button>)}</div></div>
+      <div style={{ display: 'grid', gap: 12, marginTop: 16 }}>{timeline.length ? timeline.map((item: any) => <TimelineRow key={item.id} item={item} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>{loading ? 'Loading timeline…' : 'No governance timeline events yet.'}</p>}</div>
+    </section>
+  </main>
 }

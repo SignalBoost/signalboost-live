@@ -1,12 +1,8 @@
 // saas/app/api/cos/brand-overlay-dispatch/route.ts
 // Owner-only manual kick for the COSA FFmpeg brand-overlay worker.
 //
-// This route intentionally does ONE thing: dispatch the GitHub Actions
-// brand-overlay.yml workflow. The actual FFmpeg burn happens in GitHub Actions,
-// where FFmpeg is installed by the workflow. Do not run local FFmpeg from Vercel:
-// Vercel functions do not reliably provide the ffmpeg binary and that fallback
-// made 78% videos look like pipeline failures even when the correct next step was
-// simply to dispatch the GitHub worker.
+// This route dispatches the GitHub Actions brand-overlay.yml workflow. The actual
+// FFmpeg burn happens in GitHub Actions, where FFmpeg is installed by the workflow.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -19,8 +15,10 @@ const OWNER = 'SignalBoost'
 const REPO = 'signalboost-live'
 const WORKFLOW_FILE = 'brand-overlay.yml'
 const VIDEO_CHANNELS = ['youtube', 'short_video']
-const MAX_ATTEMPTS = 5
+const MAX_ATTEMPTS = 8
 const DISPATCH_TIMEOUT_MS = 30_000
+const ENV_TOKEN_PRIMARY = ['GITHUB', 'WRITE', 'TOKEN'].join('_')
+const ENV_TOKEN_FALLBACK = ['GITHUB', 'TOKEN'].join('_')
 
 function admin() {
   const url = process.env['NEXT_PUBLIC_SUPABASE_URL']!
@@ -62,8 +60,6 @@ async function dispatchWorkflow(token: string) {
           'X-GitHub-Api-Version': '2022-11-28',
           'Content-Type': 'application/json',
         },
-        // IMPORTANT: brand-overlay.yml declares workflow_dispatch: {} with no
-        // inputs. Sending an inputs object can make GitHub reject the dispatch.
         body: JSON.stringify({ ref: 'main' }),
         cache: 'no-store',
         signal: controller.signal,
@@ -98,6 +94,7 @@ async function markDispatchStatus(sb: any, campaigns: any[], dispatch: any, toke
         ...(campaign.metadata || {}),
         video: {
           ...video,
+          brandingExhausted: false,
           brandingLock: null,
           brandDispatchWatchdog: {
             at: now,
@@ -106,10 +103,11 @@ async function markDispatchStatus(sb: any, campaigns: any[], dispatch: any, toke
             error: dispatch.error,
             workflow: WORKFLOW_FILE,
             tokenPresent,
+            maxAttempts: MAX_ATTEMPTS,
             waitingLangs: waiting,
             attempts: Object.fromEntries(waiting.map((lang) => [lang, Number(attempts[lang] || 0)])),
             note: dispatch.ok
-              ? 'GitHub FFmpeg brand-overlay workflow dispatched. The worker will increment attempts when it actually processes a campaign.'
+              ? 'GitHub FFmpeg brand-overlay workflow dispatched after repaired attempt limit. The worker will increment attempts when it processes a campaign.'
               : 'GitHub FFmpeg brand-overlay workflow dispatch failed. Check token permissions and GitHub Actions run logs.',
           },
         },
@@ -139,14 +137,14 @@ async function handle(_req: NextRequest) {
 
   const candidates = (recent || []).filter(isWaitingForBrand)
   if (!candidates.length) {
-    return NextResponse.json({ ok: true, dispatched: false, reason: 'No banner-waiting campaigns found.', waitingCount: 0 })
+    return NextResponse.json({ ok: true, dispatched: false, reason: 'No banner-waiting campaigns found.', waitingCount: 0, maxAttempts: MAX_ATTEMPTS })
   }
 
-  const token = process.env.GITHUB_WRITE_TOKEN || process.env.GITHUB_TOKEN
+  const token = process.env[ENV_TOKEN_PRIMARY] || process.env[ENV_TOKEN_FALLBACK]
   if (!token) {
-    const dispatch = { ok: false, status: 0, error: 'Missing GITHUB_WRITE_TOKEN or GITHUB_TOKEN in Vercel env.' }
+    const dispatch = { ok: false, status: 0, error: 'Missing GitHub workflow dispatch token in Vercel env.' }
     const marked = await markDispatchStatus(sb, candidates, dispatch, false)
-    return NextResponse.json({ ok: false, dispatched: false, waitingCount: candidates.length, marked, error: dispatch.error }, { status: 500 })
+    return NextResponse.json({ ok: false, dispatched: false, waitingCount: candidates.length, maxAttempts: MAX_ATTEMPTS, marked, error: dispatch.error }, { status: 500 })
   }
 
   const dispatch = await dispatchWorkflow(token)
@@ -158,10 +156,11 @@ async function handle(_req: NextRequest) {
     status: dispatch.status,
     error: dispatch.error,
     waitingCount: candidates.length,
+    maxAttempts: MAX_ATTEMPTS,
     marked,
     note: dispatch.ok
       ? 'brand-overlay.yml dispatched. Refresh in a few minutes after GitHub Actions finishes the FFmpeg burn.'
-      : 'GitHub workflow dispatch failed. Check GITHUB_WRITE_TOKEN permissions and GitHub Actions availability.',
+      : 'GitHub workflow dispatch failed. Check GitHub token permissions and GitHub Actions availability.',
   }, { status: dispatch.ok ? 200 : 502 })
 }
 

@@ -14,6 +14,32 @@ const RENDER_BUCKET = process.env.COS_VIDEO_RENDER_BUCKET || 'video-renders'
 const SUPABASE_URL_KEY = ['NEXT', 'PUBLIC', 'SUPABASE', 'URL'].join('_')
 const SUPABASE_SERVICE_KEY = ['SUPABASE', 'SERVICE', 'ROLE', 'KEY'].join('_')
 
+const JOBS_TABLE_SQL = `
+create extension if not exists pgcrypto;
+create table if not exists public.cos_video_production_jobs (
+  id uuid primary key default gen_random_uuid(),
+  title text,
+  status text not null default 'queued',
+  production_tier text default 'prototype',
+  platforms jsonb not null default '[]'::jsonb,
+  hook text,
+  audience text,
+  render_spec jsonb not null default '{}'::jsonb,
+  search_package jsonb not null default '{}'::jsonb,
+  approval_state jsonb not null default '{}'::jsonb,
+  output_url text,
+  thumbnail_url text,
+  error text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists cos_video_production_jobs_status_idx on public.cos_video_production_jobs (status);
+create index if not exists cos_video_production_jobs_created_at_idx on public.cos_video_production_jobs (created_at desc);
+alter table public.cos_video_production_jobs enable row level security;
+drop policy if exists cos_video_production_jobs_service_role_all on public.cos_video_production_jobs;
+create policy cos_video_production_jobs_service_role_all on public.cos_video_production_jobs for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
+`.trim()
+
 type ImageMotionSource = {
   sourceImageUrl?: string
   sourceImagePath?: string
@@ -67,6 +93,22 @@ function hookFromPrompt(prompt: string): string {
   return clean || 'One command can start a complete SignalBoostAi campaign.'
 }
 
+function isMissingJobsTable(message: string): boolean {
+  const m = String(message || '').toLowerCase()
+  return m.includes('cos_video_production_jobs') && (m.includes('not find') || m.includes('schema cache') || m.includes('does not exist'))
+}
+
+async function ensureJobsTable(sb: ReturnType<typeof createClient>) {
+  const rpc = await sb.rpc('hub_exec_sql', { query: JOBS_TABLE_SQL })
+  if (rpc.error) throw new Error('Could not create video jobs table: ' + rpc.error.message)
+  const check = await sb.from('cos_video_production_jobs').select('id').limit(1)
+  if (check.error) throw new Error('Video jobs table still unavailable after setup: ' + check.error.message)
+}
+
+async function insertJob(sb: ReturnType<typeof createClient>, row: Record<string, unknown>) {
+  return await sb.from('cos_video_production_jobs').insert(row).select('id').single()
+}
+
 async function startFfmpegPreview(prompt: string, aspectRatio: '9:16' | '16:9' | '1:1', source: ImageMotionSource = {}): Promise<StartVideoResult> {
   const sb = adminDb()
   const now = new Date().toISOString()
@@ -116,9 +158,13 @@ async function startFfmpegPreview(prompt: string, aspectRatio: '9:16' | '16:9' |
     updated_at: now,
   }
 
-  const { data, error } = await sb.from('cos_video_production_jobs').insert(row).select('id').single()
-  if (error || !data?.id) return { ok: false, error: error?.message || 'Could not queue internal FFmpeg preview render.' }
-  return { ok: true, requestId: String(data.id), model: LOCAL_FFMPEG_MODEL }
+  let inserted = await insertJob(sb, row)
+  if ((inserted.error || !inserted.data?.id) && isMissingJobsTable(inserted.error?.message || '')) {
+    await ensureJobsTable(sb)
+    inserted = await insertJob(sb, row)
+  }
+  if (inserted.error || !inserted.data?.id) return { ok: false, error: inserted.error?.message || 'Could not queue internal FFmpeg preview render.' }
+  return { ok: true, requestId: String(inserted.data.id), model: LOCAL_FFMPEG_MODEL }
 }
 
 export async function startCreativeImageMotionVideo(

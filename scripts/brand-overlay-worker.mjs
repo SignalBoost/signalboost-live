@@ -19,9 +19,9 @@ const SUPABASE_URL = process.env[ENV_SUPABASE_URL] || process.env[ENV_PUBLIC_SUP
 const SUPABASE_SERVICE_VALUE = process.env[ENV_SUPABASE_SERVICE]
 const RENDER_BUCKET = process.env.COS_VIDEO_RENDER_BUCKET || 'video-renders'
 const VIDEO_CHANNELS = ['youtube', 'short_video']
-const MAX_ATTEMPTS = 5
+const MAX_ATTEMPTS = 8
 const SCAN_LIMIT = 50
-const BRAND_SCHEMA_VERSION = 'signalboost-brand-overlay-v2'
+const BRAND_SCHEMA_VERSION = 'signalboost-brand-overlay-v3'
 const BRAND_TEXT = 'SignalBoostAi · www.saas.signalboostapp.com'
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_VALUE) {
@@ -71,13 +71,13 @@ function run(cmd, args, timeoutMs = 240_000) {
 }
 function escapeDrawtext(value) {
   return String(value)
-    .replace(/\\/g, '\\\\')
-    .replace(/:/g, '\\:')
-    .replace(/'/g, "\\'")
-    .replace(/%/g, '\\%')
+    .replace(/\/g, '\\')
+    .replace(/:/g, '\:')
+    .replace(/'/g, "\'")
+    .replace(/%/g, '\%')
 }
 async function makeOverlayPng(output, aspect) {
-  const size = aspect === '9:16' ? '900x180' : '1000x150'
+  const size = aspect === '9:16' ? '900x180' : '900x150'
   const fontSize = aspect === '9:16' ? '46' : '42'
   const font = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
   const text = escapeDrawtext(BRAND_TEXT)
@@ -91,11 +91,11 @@ async function makeOverlayPng(output, aspect) {
   ], 60_000)
 }
 async function burnOverlay(input, overlayPng, output, aspect) {
-  const widthExpr = aspect === '9:16' ? 'min(iw*0.86,900)' : 'min(iw*0.58,1000)'
+  const overlayWidth = aspect === '9:16' ? '860' : '760'
   const marginY = aspect === '9:16' ? '110' : '60'
   await run('ffmpeg', [
     '-y', '-i', input, '-i', overlayPng,
-    '-filter_complex', `[1:v]format=rgba,scale=${widthExpr}:-1[brand];[0:v][brand]overlay=(W-w)/2:${marginY}:format=auto`,
+    '-filter_complex', `[1:v]format=rgba,scale=${overlayWidth}:-1[brand];[0:v][brand]overlay=(W-w)/2:${marginY}:format=auto`,
     '-map', '0:v:0', '-map', '0:a?',
     '-t', '300',
     '-pix_fmt', 'yuv420p',
@@ -147,7 +147,7 @@ async function processCampaign(campaign) {
   if (!sourceUrl) return { skipped: true, reason: 'no source url', lang }
   const video = campaign?.metadata?.video || {}
   const attempts = { ...(video.ghOverlayAttempts || {}), [lang]: Number(video.ghOverlayAttempts?.[lang] || 0) + 1 }
-  await sb.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: { ...video, ghOverlayAttempts: attempts, brandingLock: { at: new Date().toISOString(), worker: 'github-actions-brand-overlay', lang } } } }).eq('id', campaign.id)
+  await sb.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: { ...video, ghOverlayAttempts: attempts, brandingExhausted: false, brandingLock: { at: new Date().toISOString(), worker: 'github-actions-brand-overlay', lang } } } }).eq('id', campaign.id)
 
   const tmp = await mkdtemp(path.join(os.tmpdir(), 'sb-brand-'))
   const input = path.join(tmp, 'source.mp4')
@@ -192,11 +192,11 @@ async function processCampaign(campaign) {
       brandingExhausted: false,
       voiceError: null,
       renderError: null,
-      brandDebug: { mode: 'github-actions-ffmpeg-png-overlay', objectPath, lang, aspect },
+      brandDebug: { mode: 'github-actions-ffmpeg-fixed-scale-overlay', objectPath, lang, aspect, overlayWidth },
     }
     const { error } = await sb.from('cos_campaign_queue').update({ metadata: { ...(current.metadata || {}), video: patch } }).eq('id', campaign.id)
     if (error) throw new Error(error.message)
-    return { ok: true, mode: 'ffmpeg-png-overlay', id: campaign.id, lang, url: signed.data.signedUrl }
+    return { ok: true, mode: 'ffmpeg-fixed-scale-overlay', id: campaign.id, lang, url: signed.data.signedUrl }
   } catch (err) {
     console.error('brand overlay failed; applying direct completion fallback', { id: campaign.id, lang, error: err?.message || String(err) })
     return directCompletion(campaign, lang, err?.message || 'ffmpeg overlay failed')

@@ -95,8 +95,13 @@ async function uploadVideoToYouTube(payload: SocialPostPayload, accessToken: str
   const videoBuffer = await videoRes.arrayBuffer()
   const contentType = uploadMimeForVideoUrl(payload.videoUrl, videoRes.headers.get('content-type'))
   const contentLength = videoBuffer.byteLength
+  // YouTube rejects titles that are empty, longer than 100 characters, or that
+  // contain < or > with "The request metadata specifies an invalid or empty
+  // video title." Campaign titles are stored at up to 140 chars, so clamp here.
+  const rawTitle = String(payload.title || payload.text || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim()
+  const ytTitle = (rawTitle.length > 100 ? rawTitle.slice(0, 97).trimEnd() + '…' : rawTitle) || 'SignalBoost Video'
   const metadata = {
-    snippet: { title: payload.title || payload.text.slice(0, 100) || 'SignalBoost Video', description: payload.description || payload.text || '', tags: payload.tags || ['SignalBoost', 'AI', 'marketing'], categoryId: '22' },
+    snippet: { title: ytTitle, description: payload.description || payload.text || '', tags: payload.tags || ['SignalBoost', 'AI', 'marketing'], categoryId: '22' },
     status: { privacyStatus: payload.privacyStatus || 'public', selfDeclaredMadeForKids: false },
   }
   const initRes = await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status', {

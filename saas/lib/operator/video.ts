@@ -1,19 +1,13 @@
 // saas/lib/operator/video.ts
 // Reusable server-side helper for generating website/background/COS videos.
 //
-// Hybrid-dynamic provider router:
-//   - COS_VIDEO_ENGINE=fal     -> try premium fal.ai/Kling first.
-//   - COS_VIDEO_ENGINE=ffmpeg  -> use internal FFmpeg preview worker first.
-//   - unset                   -> fal.ai when the Fal provider key exists, otherwise FFmpeg.
+// Cost safety rule:
+//   - Default engine is internal FFmpeg preview, even when a Fal key exists.
+//   - Paid fal.ai/Kling only runs when COS_VIDEO_ENGINE=fal and
+//     COS_ALLOW_PAID_FAL=true are both set.
 //
-// Self-healing rule: if the selected premium provider cannot start a job,
-// COS automatically falls back to the internal FFmpeg worker. That means a bad
-// provider token, quota issue, model error, or provider outage does not leave the
-// COSA campaign dead. Human approval is not needed for this common-sense fix.
-//
-// The FFmpeg path queues a cos_video_production_jobs row. The existing
-// scripts/cos-video-production-worker.mjs worker renders a preview-style MP4
-// from that row using local FFmpeg and uploads it to Supabase storage.
+// This prevents failed tests, crons, or stuck campaign retries from spending
+// money automatically.
 
 import { fal } from '@fal-ai/client'
 import { createClient } from '@supabase/supabase-js'
@@ -24,6 +18,7 @@ const RENDER_BUCKET = process.env.COS_VIDEO_RENDER_BUCKET || 'video-renders'
 const FAL_PROVIDER_KEY = ['FAL', 'KEY'].join('_')
 const SUPABASE_URL_KEY = ['NEXT', 'PUBLIC', 'SUPABASE', 'URL'].join('_')
 const SUPABASE_SERVICE_KEY = ['SUPABASE', 'SERVICE', 'ROLE', 'KEY'].join('_')
+const PAID_FAL_FLAG = ['COS', 'ALLOW', 'PAID', 'FAL'].join('_')
 
 type ImageMotionSource = {
   sourceImageUrl?: string
@@ -49,11 +44,14 @@ function adminDb() {
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
+function paidFalAllowed(): boolean {
+  return String(process.env[PAID_FAL_FLAG] || '').trim().toLowerCase() === 'true'
+}
+
 function selectedEngine(): 'fal' | 'ffmpeg' {
   const raw = String(process.env.COS_VIDEO_ENGINE || process.env.COS_VIDEO_RENDER_ENGINE || '').trim().toLowerCase()
-  if (['fal', 'fal.ai', 'kling', 'premium'].includes(raw)) return 'fal'
-  if (['ffmpeg', 'local', 'cheap', 'prototype', 'preview'].includes(raw)) return 'ffmpeg'
-  return process.env[FAL_PROVIDER_KEY] ? 'fal' : 'ffmpeg'
+  if (['fal', 'fal.ai', 'kling', 'premium'].includes(raw) && paidFalAllowed()) return 'fal'
+  return 'ffmpeg'
 }
 
 export type StartVideoResult =
@@ -114,6 +112,7 @@ function hookFromPrompt(prompt: string): string {
 }
 
 async function startFalVideo(prompt: string, aspectRatio: '9:16' | '16:9' | '1:1'): Promise<StartVideoResult> {
+  if (!paidFalAllowed()) return { ok: false, error: 'Paid fal.ai rendering is disabled by COS_ALLOW_PAID_FAL.' }
   ensureFalConfigured()
   const input = {
     prompt: prompt.trim(),
@@ -264,7 +263,7 @@ export async function fetchSiteVideo(requestId: string, model: string): Promise<
 
     if (state === 'COMPLETED') {
       const result = await fal.queue.result(model, { requestId })
-      const data = (result as { data?: { video?: { url?: string } } }).data
+      const data = (result as { data?: { video?: { url?: string } }).data
       const videoUrl = data?.video?.url
       if (!videoUrl) return { status: 'failed', error: 'Completed but no video URL.' }
       return { status: 'done', videoUrl }

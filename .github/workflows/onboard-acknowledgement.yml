@@ -1,0 +1,40 @@
+name: Require ONBOARD.md Acknowledgement
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+jobs:
+  onboarding-acknowledgement:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify PR body confirms ONBOARD.md was read first
+        shell: bash
+        run: |
+          REQUIRED='ONBOARD.md read before repo scan: YES'
+          BODY_FILE="${{ runner.temp }}/pr_body.txt"
+          cat > "$BODY_FILE" <<'PR_BODY_EOF'
+          ${{ github.event.pull_request.body }}
+          PR_BODY_EOF
+
+          if ! grep -Fq "$REQUIRED" "$BODY_FILE"; then
+            echo "::error title=ONBOARD.md acknowledgement missing::The PR body does not include the required onboarding confirmation."
+            echo ""
+            echo "FAILED: Mandatory onboarding acknowledgement is missing."
+            echo ""
+            echo "Why this failed:"
+            echo "  Every developer and AI agent must read ONBOARD.md before scanning or changing repository files."
+            echo "  This check enforces that rule before the PR can be merged."
+            echo ""
+            echo "What to do now:"
+            echo "  1. Open ONBOARD.md at the repository root."
+            echo "  2. Read it before continuing work."
+            echo "  3. Edit the PR description and add this exact line:"
+            echo ""
+            echo "     ONBOARD.md read before repo scan: YES"
+            echo ""
+            echo "  4. Save the PR description and re-run checks."
+            exit 1
+          fi
+
+          echo "ONBOARD.md acknowledgement found."

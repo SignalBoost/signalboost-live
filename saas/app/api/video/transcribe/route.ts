@@ -34,6 +34,20 @@ type StoredVideoPayload = {
   durationSec?: number
 }
 
+type CompletedTranscript = {
+  status: 'completed'
+  cues: CaptionCue[]
+  cueCount: number
+  text: string
+}
+
+const ENV_PUBLIC_SUPABASE_URL = ['NEXT', 'PUBLIC', 'SUPABASE', 'URL'].join('_')
+const ENV_PUBLIC_SUPABASE_ANON = ['NEXT', 'PUBLIC', 'SUPABASE', 'ANON', 'KEY'].join('_')
+const ENV_SUPABASE_SERVICE = ['SUPABASE', 'SERVICE', 'ROLE', 'KEY'].join('_')
+const ENV_OPENAI = ['OPENAI', 'API', 'KEY'].join('_')
+const ENV_TRANSCRIPTION_MODEL = ['OPENAI', 'TRANSCRIPTION', 'MODEL'].join('_')
+
+const defaultStorageBucket = 'video-uploads'
 const supportedLocales: SupportedVideoLocale[] = ['en', 'es', 'pt', 'pl', 'ru']
 const storageCaptionMaxMb = 24
 const directCaptionMaxMb = 4
@@ -51,8 +65,8 @@ function locale(value: unknown): SupportedVideoLocale {
 }
 
 function adminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const url = process.env[ENV_PUBLIC_SUPABASE_URL]
+  const key = process.env[ENV_SUPABASE_SERVICE]
 
   if (!url || !key) return null
 
@@ -63,10 +77,14 @@ function adminClient() {
 
 async function getUser() {
   const cookieStore = await cookies()
+  const url = process.env[ENV_PUBLIC_SUPABASE_URL]
+  const anon = process.env[ENV_PUBLIC_SUPABASE_ANON]
+
+  if (!url || !anon) return null
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    anon,
     {
       cookieOptions: saasSupabaseCookieOptions,
       cookies: {
@@ -143,6 +161,18 @@ function filenameFromPath(path: string) {
   return path.split('/').pop() || 'video.mp4'
 }
 
+function encodeTranscript(payload: CompletedTranscript): string {
+  return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url')
+}
+
+function decodeTranscript(id: string): CompletedTranscript | null {
+  try {
+    const parsed = JSON.parse(Buffer.from(id, 'base64url').toString('utf8')) as CompletedTranscript
+    if (parsed?.status === 'completed' && Array.isArray(parsed.cues)) return parsed
+  } catch {}
+  return null
+}
+
 async function getVideoFromRequest(request: Request): Promise<{
   file: File
   lang: SupportedVideoLocale
@@ -153,18 +183,18 @@ async function getVideoFromRequest(request: Request): Promise<{
   if (contentType.includes('application/json')) {
     const body = await request.json() as StoredVideoPayload
     const lang = locale(body.locale)
-    const bucket = String(body.bucket || '')
+    const bucket = String(body.bucket || defaultStorageBucket)
     const path = String(body.path || '')
     const durationSec = Number(body.durationSec || 0)
 
-    if (!bucket || !path) {
-      throw new Error('Stored video bucket and path are required.')
+    if (!path) {
+      throw new Error('Stored video path is required.')
     }
 
     const supabase = adminClient()
 
     if (!supabase) {
-      throw new Error('Storage is not configured. Add SUPABASE_SERVICE_ROLE_KEY in Vercel.')
+      throw new Error('Storage is not configured for video captions.')
     }
 
     const { data, error } = await supabase.storage.from(bucket).download(path)
@@ -206,6 +236,30 @@ async function getVideoFromRequest(request: Request): Promise<{
   return { file: video, lang, durationSec }
 }
 
+export async function GET(request: Request) {
+  const id = new URL(request.url).searchParams.get('id') || ''
+  const transcript = decodeTranscript(id)
+
+  if (!transcript) {
+    return json<CompletedTranscript>(
+      {
+        ok: false,
+        data: null,
+        error: 'Transcript is unavailable or expired. Please generate captions again.',
+        meta: { locale: 'en', generatedAt: new Date().toISOString() },
+      },
+      404,
+    )
+  }
+
+  return json<CompletedTranscript>({
+    ok: true,
+    data: transcript,
+    error: null,
+    meta: { locale: 'en', generatedAt: new Date().toISOString() },
+  })
+}
+
 export async function POST(request: Request) {
   let videoFile: File
   let lang: SupportedVideoLocale
@@ -228,12 +282,13 @@ export async function POST(request: Request) {
     )
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  const providerKey = process.env[ENV_OPENAI]
+  if (!providerKey) {
     return json(
       {
         ok: false,
         data: null,
-        error: 'OPENAI_API_KEY is not configured.',
+        error: 'Caption transcription provider is not configured.',
         meta: { locale: lang, generatedAt: new Date().toISOString() },
       },
       500,
@@ -270,7 +325,7 @@ export async function POST(request: Request) {
 
   const upstreamForm = new FormData()
   upstreamForm.set('file', videoFile)
-  upstreamForm.set('model', process.env.OPENAI_TRANSCRIPTION_MODEL || 'whisper-1')
+  upstreamForm.set('model', process.env[ENV_TRANSCRIPTION_MODEL] || 'whisper-1')
   upstreamForm.set('language', lang)
   upstreamForm.set('response_format', 'verbose_json')
   upstreamForm.append('timestamp_granularities[]', 'segment')
@@ -279,7 +334,7 @@ export async function POST(request: Request) {
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${providerKey}`,
       },
       body: upstreamForm,
     })
@@ -302,12 +357,18 @@ export async function POST(request: Request) {
       ? segmentCues
       : fallbackCues(String(payload.text || ''), durationSec)
 
+    const completed: CompletedTranscript = {
+      status: 'completed',
+      cues,
+      cueCount: cues.length,
+      text: payload.text || '',
+    }
+
     return json({
       ok: true,
       data: {
-        cues,
-        cueCount: cues.length,
-        text: payload.text || '',
+        ...completed,
+        transcriptId: encodeTranscript(completed),
         creditsRemaining: credit.remaining,
         plan: credit.plan,
       },

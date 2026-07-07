@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+changed="$(git diff --cached --name-only)"
+critical="$(printf '%s\n' "$changed" | grep -E '^(saas/app/|saas/components/|saas/lib/|saas/scripts/|saas/supabase/|saas/vercel\.json$|saas/package(-lock)?\.json$|\.github/workflows/|docs/)' || true)"
+onboard="$(printf '%s\n' "$changed" | grep -x 'ONBOARD.md' || true)"
+
+if [ -n "$critical" ] && [ -z "$onboard" ]; then
+  today="$(date +%F)"
+  printf '\n- %s: Auto ONBOARD note added for staged repository changes. Review and improve this note if needed.\n' "$today" >> ONBOARD.md
+  git add ONBOARD.md
+  echo "ONBOARD.md was automatically updated and staged."
+fi
+
+exit 0

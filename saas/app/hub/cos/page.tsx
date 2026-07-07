@@ -13,6 +13,7 @@ type Gov = {
   escalations?: any[]
   timeline?: any[]
   graph?: { nodes: any[]; edges: any[] }
+  automation?: Record<string, any>
   sourceErrors?: Record<string, string | null>
 }
 
@@ -70,34 +71,32 @@ function Pipeline({ item }: { item: any }) {
   </article>
 }
 
-function AlertCard({ item, act, busy }: { item: any; act: (name: string, item: any) => void; busy: boolean }) {
+function AlertCard({ item }: { item: any }) {
   const color = severityColor(item.severity)
   return <article style={{ border: `1px solid ${color}55`, borderRadius: 16, padding: 14, background: `${color}0f` }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><strong style={{ color: '#fff' }}>{item.title}</strong>{chip(item.severity, color)}</div>
     <p style={{ color: 'rgba(255,255,255,.72)', fontSize: 13, lineHeight: 1.55 }}>{item.forecast}</p>
-    <p style={{ color: gold, fontSize: 12, fontWeight: 850 }}>Suggested: {item.suggestedFix}</p>
-    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><button disabled={busy} onClick={() => act('auto_apply', item)} style={primary}>✅ Auto-Apply</button><button disabled={busy} onClick={() => act('override', item)} style={ghost}>❌ Override</button><button disabled={busy} onClick={() => act('escalate', item)} style={{ ...ghost, color: orange, borderColor: `${orange}88` }}>Escalate</button></div>
+    <p style={{ color: gold, fontSize: 12, fontWeight: 850 }}>Autonomous action: {item.suggestedFix}</p>
+    {chip('informational alert - no approval required', green)}
     <Details value={item.telemetry} />
   </article>
 }
 
-function FixCard({ item, act, busy }: { item: any; act: (name: string, item: any) => void; busy: boolean }) {
-  return <article style={{ border: `1px solid ${cyan}44`, borderRadius: 16, padding: 14, background: 'rgba(255,255,255,.035)' }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><strong style={{ color: '#fff' }}>{item.rootCause}</strong>{chip(String(item.status || '').replace(/_/g, ' '), cyan)}</div>
+function FixCard({ item }: { item: any }) {
+  return <article style={{ border: `1px solid ${green}44`, borderRadius: 16, padding: 14, background: 'rgba(34,197,94,.06)' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><strong style={{ color: '#fff' }}>{item.rootCause}</strong>{chip(String(item.status || '').replace(/_/g, ' '), green)}</div>
     <p style={{ color: 'rgba(255,255,255,.7)', fontSize: 13 }}>Fix: {item.suggestedFix}</p>
     <p style={{ color: cyan, fontSize: 12, fontWeight: 850 }}>Confidence {item.confidence}% · {String(item.action || '').replace(/_/g, ' ')}</p>
-    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><button disabled={busy} onClick={() => act('auto_apply', item)} style={primary}>✅ Auto-Apply</button><button disabled={busy} onClick={() => act('override', item)} style={ghost}>❌ Override</button></div>
+    {chip('auto-applied / watchdog-managed', green)}
     <Details value={item.telemetry} />
   </article>
 }
 
-function EscalationCard({ item, act, busy }: { item: any; act: (name: string, item: any) => void; busy: boolean }) {
-  const color = item.status === 'rejected' ? red : orange
-  return <article style={{ border: `1px solid ${color}55`, borderRadius: 16, padding: 14, background: `${color}0f` }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><strong style={{ color: '#fff' }}>{String(item.intent || '').replace(/_/g, ' ')}</strong>{chip(item.status, color)}</div>
+function EscalationCard({ item }: { item: any }) {
+  return <article style={{ border: `1px solid ${orange}55`, borderRadius: 16, padding: 14, background: `${orange}0f` }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}><strong style={{ color: '#fff' }}>{String(item.intent || '').replace(/_/g, ' ')}</strong>{chip(item.status, orange)}</div>
     <p style={{ color: 'rgba(255,255,255,.65)', fontSize: 12 }}>Pipeline {item.pipeline} · Risk {item.riskLevel} · Approver {item.approver}</p>
-    <p style={{ color: gold, fontSize: 12, fontWeight: 850 }}>Alternatives: {(item.fallbackAlternatives || []).join(' · ')}</p>
-    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><button disabled={busy} onClick={() => act('auto_apply', item)} style={primary}>✅ Approve Fix</button><button disabled={busy} onClick={() => act('override', item)} style={ghost}>❌ Reject</button><button disabled={busy} onClick={() => act('escalate', item)} style={{ ...ghost, color: orange, borderColor: `${orange}88` }}>Send to PR Cockpit</button></div>
+    <p style={{ color: gold, fontSize: 12, fontWeight: 850 }}>This panel is reserved for life-critical exceptions only.</p>
     <Details value={item.telemetry} />
   </article>
 }
@@ -119,7 +118,6 @@ function TimelineRow({ item }: { item: any }) {
 export default function CosGovernanceDashboardPage() {
   const [data, setData] = useState<Gov | null>(null)
   const [loading, setLoading] = useState(true)
-  const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [filter, setFilter] = useState('all')
 
@@ -140,22 +138,6 @@ export default function CosGovernanceDashboardPage() {
 
   useEffect(() => { load() }, [])
 
-  async function action(name: string, item: any) {
-    setBusy(true)
-    setMessage('')
-    try {
-      const res = await fetch('/api/cos/governance-router', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ action: name, targetId: item.id || item.alertId || item.pipeline, pipeline: item.pipeline || 'primary', objective: `${name.replace(/_/g, ' ')}: ${item.title || item.rootCause || item.intent || 'COS governance control'}`, intent: item.intent || item.action || 'hybrid_dynamic_router_control', riskLevel: item.severity || item.riskLevel || 'medium', decision: name === 'auto_apply' ? 'approved_auto_fix' : name === 'override' ? 'admin_override' : 'escalated_to_pr_cockpit', telemetry: item }) })
-      const json = await res.json().catch(() => null)
-      if (!res.ok || !json?.ok) throw new Error(json?.error || 'Governance action failed.')
-      setMessage(`Governance action logged: ${name.replace(/_/g, ' ')}.`)
-      await load()
-    } catch (e: any) {
-      setMessage(e?.message || 'Governance action failed.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
   const timeline = useMemo(() => {
     const rows = data?.timeline || []
     return filter === 'all' ? rows : rows.filter((row: any) => row.type === filter)
@@ -169,31 +151,32 @@ export default function CosGovernanceDashboardPage() {
   return <main style={{ maxWidth: 1380, margin: '0 auto', display: 'grid', gap: 18, padding: '24px 22px' }}>
     <section style={{ ...panel, background: 'radial-gradient(circle at top left, rgba(26,240,255,.14), transparent 28rem), linear-gradient(145deg, rgba(15,23,42,.96), rgba(2,6,23,.98))' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 16, flexWrap: 'wrap' }}>
-        <div><p style={{ margin: 0, color: gold, fontSize: 12, fontWeight: 950, letterSpacing: '.14em', textTransform: 'uppercase' }}>COS Governance</p><h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 'clamp(28px, 4vw, 44px)', letterSpacing: '-.04em' }}>Hybrid-Dynamic COS Router</h1><p style={{ color: 'rgba(255,255,255,.68)', maxWidth: 880, lineHeight: 1.65 }}>Predictive monitoring, self-healing logs, fallback routing, escalation workflows, and complete audit visibility for COS orchestration.</p></div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}><button onClick={load} disabled={loading || busy} style={primary}>{loading ? 'Loading…' : 'Refresh governance'}</button>{chip(data?.mode || 'hybrid-dynamic-governed', cyan)}</div>
+        <div><p style={{ margin: 0, color: gold, fontSize: 12, fontWeight: 950, letterSpacing: '.14em', textTransform: 'uppercase' }}>COS Governance</p><h1 style={{ color: '#fff', margin: '8px 0 0', fontSize: 'clamp(28px, 4vw, 44px)', letterSpacing: '-.04em' }}>Fully Autonomous Hybrid-Dynamic COS Router</h1><p style={{ color: 'rgba(255,255,255,.68)', maxWidth: 900, lineHeight: 1.65 }}>COS monitors, predicts, reroutes, restarts, and fixes ordinary operational issues automatically. Human review appears only for life-critical exceptions.</p></div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}><button onClick={load} disabled={loading} style={primary}>{loading ? 'Loading…' : 'Refresh cockpit'}</button>{chip(data?.mode || 'fully-autonomous-except-life-critical', cyan)}{chip('24x7 watchdog active', green)}</div>
       </div>
       {message ? <p style={{ color: message.toLowerCase().includes('fail') || message.toLowerCase().includes('could not') ? red : green, margin: '12px 0 0', fontWeight: 800 }}>{message}</p> : null}
+      {data?.automation ? <p style={{ color: green, fontSize: 12, margin: '12px 0 0' }}>Automation: {Object.entries(data.automation).map(([k, v]) => `${k}=${String(v)}`).join(' · ')}</p> : null}
       {data?.sourceErrors && (data.sourceErrors.campaigns || data.sourceErrors.decisions) ? <p style={{ color: orange, fontSize: 12 }}>Source warnings: {Object.entries(data.sourceErrors).filter(([, value]) => value).map(([key, value]) => `${key}: ${value}`).join(' · ')}</p> : null}
     </section>
 
     <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>{pipelines.map(item => <Pipeline key={item.id} item={item} />)}{!loading && !pipelines.length ? <div style={panel}>No pipeline telemetry returned.</div> : null}</section>
 
     <section style={panel}>
-      <p style={{ color: gold, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Telemetry graph</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>Failing nodes and reroute paths</h2>
+      <p style={{ color: gold, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Telemetry graph</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>Failing nodes and autonomous reroute paths</h2>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12, marginTop: 16 }}>{(data?.graph?.nodes || []).map((node: any) => <div key={node.id} style={{ border: `1px solid ${eventColor(node.status === 'healthy' ? 'green' : node.status === 'watch' ? 'yellow' : 'orange')}55`, borderRadius: 16, padding: 12 }}><strong style={{ color: '#fff' }}>{node.label}</strong><p style={{ color: 'rgba(255,255,255,.6)', fontSize: 12 }}>Health {node.healthScore}% · {node.status}</p></div>)}</div>
       <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>{(data?.graph?.edges || []).map((edge: any, i: number) => <div key={i} style={{ color: edge.active ? cyan : 'rgba(255,255,255,.55)', fontSize: 12 }}><b>{edge.from}</b> {edge.active ? '━━▶' : '──▶'} <b>{edge.to}</b> · {edge.label}</div>)}</div>
     </section>
 
     <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 18 }}>
       <div style={{ display: 'grid', gap: 14 }}>
-        <section style={panel}><div style={{ display: 'flex', justifyContent: 'space-between' }}><div><p style={{ color: gold, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Predictive Alerts Panel</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>Problems before they happen</h2></div>{chip(`${alerts.length} alerts`, gold)}</div><div style={{ display: 'grid', gap: 12, marginTop: 14 }}>{alerts.length ? alerts.map(item => <AlertCard key={item.id} item={item} act={action} busy={busy} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>No predictive alerts.</p>}</div></section>
-        <section style={panel}><div style={{ display: 'flex', justifyContent: 'space-between' }}><div><p style={{ color: cyan, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Problem + Fix Panel</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>Root cause and fix attempts</h2></div>{chip(`${fixes.length} fixes`, cyan)}</div><div style={{ display: 'grid', gap: 12, marginTop: 14 }}>{fixes.length ? fixes.map(item => <FixCard key={item.id} item={item} act={action} busy={busy} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>No fix attempts required.</p>}</div></section>
+        <section style={panel}><div style={{ display: 'flex', justifyContent: 'space-between' }}><div><p style={{ color: gold, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Predictive Alerts Panel</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>Informational early warnings</h2></div>{chip(`${alerts.length} alerts`, gold)}</div><div style={{ display: 'grid', gap: 12, marginTop: 14 }}>{alerts.length ? alerts.map(item => <AlertCard key={item.id} item={item} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>No predictive alerts.</p>}</div></section>
+        <section style={panel}><div style={{ display: 'flex', justifyContent: 'space-between' }}><div><p style={{ color: cyan, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Problem + Fix Panel</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>Autonomous fixes and fallback logic</h2></div>{chip(`${fixes.length} fixes`, green)}</div><div style={{ display: 'grid', gap: 12, marginTop: 14 }}>{fixes.length ? fixes.map(item => <FixCard key={item.id} item={item} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>No fix attempts required.</p>}</div></section>
       </div>
-      <section style={panel}><div style={{ display: 'flex', justifyContent: 'space-between' }}><div><p style={{ color: orange, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Escalation Panel</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>Unresolved alerts → PR Cockpit</h2></div>{chip(`${escalations.length} escalations`, orange)}</div><div style={{ display: 'grid', gap: 12, marginTop: 14 }}>{escalations.length ? escalations.map(item => <EscalationCard key={item.id} item={item} act={action} busy={busy} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>No unresolved high-risk alerts.</p>}</div></section>
+      <section style={panel}><div style={{ display: 'flex', justifyContent: 'space-between' }}><div><p style={{ color: orange, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Escalation Panel</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 20 }}>Life-critical exceptions only</h2></div>{chip(`${escalations.length} escalations`, escalations.length ? orange : green)}</div><div style={{ display: 'grid', gap: 12, marginTop: 14 }}>{escalations.length ? escalations.map(item => <EscalationCard key={item.id} item={item} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>No life-critical escalation. Ordinary issues are handled autonomously.</p>}</div></section>
     </section>
 
     <section style={panel}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}><div><p style={{ color: gold, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Unified Timeline View</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 22 }}>Full lifecycle visibility</h2><p style={{ color: 'rgba(255,255,255,.58)', margin: '5px 0 0', fontSize: 13 }}>Yellow = alert · Green = fix success · Orange = escalation pending · Red = rejected</p></div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{['all', 'alert', 'fix', 'escalation', 'decision'].map(item => <button key={item} onClick={() => setFilter(item)} style={filter === item ? primary : ghost}>{item}</button>)}</div></div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}><div><p style={{ color: gold, margin: 0, fontSize: 11, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Unified Timeline View</p><h2 style={{ color: '#fff', margin: '6px 0 0', fontSize: 22 }}>Full lifecycle visibility</h2><p style={{ color: 'rgba(255,255,255,.58)', margin: '5px 0 0', fontSize: 13 }}>Yellow = alert · Green = fix success · Orange = life-critical pending · Red = rejected.</p></div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{['all', 'alert', 'fix', 'escalation', 'decision'].map(item => <button key={item} onClick={() => setFilter(item)} style={filter === item ? primary : ghost}>{item}</button>)}</div></div>
       <div style={{ display: 'grid', gap: 12, marginTop: 16 }}>{timeline.length ? timeline.map((item: any) => <TimelineRow key={item.id} item={item} />) : <p style={{ color: 'rgba(255,255,255,.6)' }}>{loading ? 'Loading timeline…' : 'No governance timeline events yet.'}</p>}</div>
     </section>
   </main>

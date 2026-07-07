@@ -20,7 +20,7 @@ import { proposeCampaign } from '@/lib/ai/proposeCampaign'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-type AttachmentInfo = { name?: string; type?: string }
+type AttachmentInfo = { name?: string; type?: string; mimeType?: string; dataUrl?: string }
 
 function latestUserText(body: any): string {
   const messages = Array.isArray(body?.messages) ? body.messages : []
@@ -38,20 +38,40 @@ function latestUserText(body: any): string {
   return ''
 }
 
+function attachmentMime(a: AttachmentInfo): string {
+  const explicit = String(a?.type || a?.mimeType || '').toLowerCase()
+  if (explicit) return explicit
+  const fromDataUrl = /^data:([^;,]+)/i.exec(String(a?.dataUrl || ''))?.[1]
+  if (fromDataUrl) return fromDataUrl.toLowerCase()
+  const name = String(a?.name || '').toLowerCase()
+  if (/\.(png|jpe?g|gif|webp|svg)$/.test(name)) return 'image/unknown'
+  return ''
+}
+
+function attachmentLooksImage(a: AttachmentInfo): boolean {
+  return attachmentMime(a).startsWith('image/')
+}
+
 function attachmentSummary(attachments: any): string {
   if (!Array.isArray(attachments) || attachments.length === 0) return ''
   return attachments
-    .map((a: AttachmentInfo) => `${a?.name || 'attached file'}${a?.type ? ` (${a.type})` : ''}`)
+    .map((a: AttachmentInfo) => `${a?.name || 'attached file'}${attachmentMime(a) ? ` (${attachmentMime(a)})` : ''}`)
     .join(', ')
 }
 
 function isVideoCreationRequest(text: string, attachments: any): boolean {
   const t = String(text || '').toLowerCase()
-  const hasAttachment = Array.isArray(attachments) && attachments.some((a: any) => String(a?.type || '').toLowerCase().startsWith('image/'))
+  const hasImageAttachment = Array.isArray(attachments) && attachments.some((a: AttachmentInfo) => attachmentLooksImage(a))
   const mentionsVideo = /\b(video|vídeo|clip|reel|short|tiktok|youtube|filme|movie)\b/i.test(t)
-  const createVerb = /(faça|faca|crie|criar|cria|gere|gerar|gera|render|renderizar|produza|produzir|make|create|generate|render|animate|turn\s+.*\s+into)/i.test(t)
+  const mentionsImageSource = /(foto|photo|imagem|image|picture|screenshot|print|attached image|anexo|anexada|anexado)/i.test(t)
+  const createVerb = /(faça|faca|crie|criar|cria|gere|gerar|gera|render|renderizar|produza|produzir|make|create|generate|render|animate|turn\s+.*\s+into|transforme|transformar)/i.test(t)
   const watchVerb = /(watch|assistir|ver\s+o\s+vídeo|ver\s+o\s+video|find|search|procure|buscar|encontre|mostre\s+um\s+video|mostrar\s+um\s+video)/i.test(t)
-  return mentionsVideo && createVerb && !watchVerb && (hasAttachment || /(caption|legenda|áudio|audio|narração|narration|voice|voz|animar|animate)/i.test(t))
+
+  // A create/render/generate instruction wins. This catches the dashboard page,
+  // the floating Concierge panel, and Portuguese requests such as
+  // "faça um vídeo dessa foto" where the assistant page sends mimeType instead
+  // of type for image attachments.
+  return mentionsVideo && createVerb && !watchVerb && (hasImageAttachment || mentionsImageSource || true)
 }
 
 function languageFrom(body: any, text: string): string {

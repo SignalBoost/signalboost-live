@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import AdminMetricCard from '@/components/admin/AdminMetricCard'
 import { useTranslation } from '@/components/i18n/useTranslation'
+import { getAdminMetricAction } from '@/lib/admin/metricActions'
 import { AdminSectionConfig, translateSection } from '@/lib/admin/sections'
 
 const SUPPORTED = new Set(['en', 'es', 'pt', 'pl', 'ru'])
@@ -66,17 +67,6 @@ function noneYetLabel(lang: string): string {
 }
 
 
-const SYSTEM_METRIC_ROUTES: Record<string, { href: string; actionLabel: string; tone: 'danger' | 'warning' | 'healthy' | 'neutral' }> = {
-  'sys-0': { href: '/admin/logs?type=api-errors', actionLabel: 'Investigate →', tone: 'danger' },
-  'sys-1': { href: '/admin/deployments?status=failed', actionLabel: 'Investigate →', tone: 'danger' },
-  'sys-2': { href: '/admin/integrations/supabase', actionLabel: 'Open Supabase →', tone: 'healthy' },
-  'sys-3': { href: '/admin/integrations/vercel', actionLabel: 'Open Vercel →', tone: 'healthy' },
-  'sys-4': { href: '/admin/jobs/cron', actionLabel: 'View details →', tone: 'warning' },
-  'sys-5': { href: '/admin/jobs/daily', actionLabel: 'View details →', tone: 'warning' },
-  'sys-6': { href: '/admin/outreach/runs/latest', actionLabel: 'View details →', tone: 'neutral' },
-  'sys-7': { href: '/admin/prospects/discovery/latest', actionLabel: 'View details →', tone: 'neutral' },
-}
-
 function missionCardTone(value: number | null | undefined): 'danger' | 'warning' | 'healthy' | 'neutral' {
   if (typeof value !== 'number') return 'neutral'
   return value > 0 ? 'healthy' : 'neutral'
@@ -84,18 +74,14 @@ function missionCardTone(value: number | null | undefined): 'danger' | 'warning'
 
 function systemTone(value: string | number): 'danger' | 'warning' | 'healthy' | 'neutral' {
   const text = String(value).toLowerCase()
-  if (typeof value === 'number') return value > 0 ? 'danger' : 'healthy'
+  const numericValue = typeof value === 'number' ? value : Number(text.replace(/,/g, ''))
+  if (Number.isFinite(numericValue)) return numericValue > 0 ? 'danger' : 'healthy'
   if (/error|failed|down|not connected|critical|degraded/.test(text)) return 'danger'
   if (/warning|watch|pending|unknown|no activity|not configured/.test(text)) return 'warning'
   if (/connected|healthy|ready|success|ok|normal/.test(text)) return 'healthy'
   return 'neutral'
 }
 
-function metricHref(sectionKey: string, metricKey: string): string {
-  if (sectionKey === 'overview') return `/admin?metric=${encodeURIComponent(metricKey)}`
-  if (sectionKey === 'settings') return `/admin/settings?metric=${encodeURIComponent(metricKey)}`
-  return `/admin/${sectionKey}?metric=${encodeURIComponent(metricKey)}`
-}
 
 function notConnectedLabel(lang: string): string {
   const copy: Record<string, string> = {
@@ -183,9 +169,9 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
 
       <section className="sb-cockpit-grid" aria-label="Dashboard panels">
         {section.metrics.map(metric => {
-          const route = rawSection.key === 'system' ? SYSTEM_METRIC_ROUTES[metric.key] : null
+          const action = getAdminMetricAction(rawSection.key, metric.key)
           const value = metricValue(metric.label, metric.key, metric.value)
-          const href = route?.href ?? metricHref(rawSection.key, metric.key)
+          const href = action.href
           return (
             <AdminMetricCard
               key={metric.key}
@@ -193,8 +179,8 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
               value={value}
               subtitle={metric.helper ?? emptyMetricLabel(activeLang)}
               href={href}
-              actionLabel={route?.actionLabel ?? 'Open metric →'}
-              tone={rawSection.key === 'system' ? systemTone(value) : 'neutral'}
+              actionLabel={action.actionLabel}
+              tone={rawSection.key === 'system' ? systemTone(value) : action.tone ?? 'neutral'}
               status={String(value)}
             />
           )

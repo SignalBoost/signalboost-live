@@ -1,6 +1,6 @@
-import { Resend } from 'resend'
+import { sendEmail } from '@/lib/email'
 
-type EmailResult = { ok: boolean; skipped?: boolean; reason?: string; error?: string }
+type EmailResult = { ok: boolean; skipped?: boolean; reason?: string; error?: string; id?: string }
 
 type PreviewArgs = {
   campaignId: string
@@ -17,11 +17,13 @@ type PublishedArgs = PreviewArgs & {
 }
 
 function ownerEmail() {
-  return process.env.OWNER_EMAIL || process.env.SIGNALBOOST_OWNER_EMAIL || process.env.ADMIN_EMAIL || ''
-}
-
-function fromEmail() {
-  return process.env.RESEND_FROM_EMAIL || 'SignalBoost Press <press@signalboostapp.com>'
+  return String(
+    (process.env.OWNER_EMAILS || '').split(',')[0] ||
+    process.env.OWNER_EMAIL ||
+    process.env.SIGNALBOOST_OWNER_EMAIL ||
+    process.env.ADMIN_EMAIL ||
+    '',
+  ).trim().toLowerCase()
 }
 
 function appBaseUrl() {
@@ -32,37 +34,49 @@ function dashboardLink(campaignId: string) {
   return `${appBaseUrl()}/dashboard/marketing/press-print?campaign=${encodeURIComponent(campaignId)}`
 }
 
-async function sendOwnerMail(subject: string, text: string): Promise<EmailResult> {
+async function sendOwnerMail(subject: string, html: string): Promise<EmailResult> {
   const to = ownerEmail()
-  const key = process.env.RESEND_API_KEY
-  if (!to || !key) return { ok: false, skipped: true, reason: 'missing_owner_email_or_resend_key' }
+  if (!to) return { ok: false, skipped: true, reason: 'missing_owner_email' }
 
-  try {
-    const resend = new Resend(key)
-    await resend.emails.send({ from: fromEmail(), to, subject, text })
-    return { ok: true }
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : String(error) }
-  }
+  const sent = await sendEmail({
+    from: 'saasMarketing',
+    to,
+    subject,
+    html,
+  })
+
+  if (!sent?.ok) return { ok: false, error: sent?.error || 'send failed' }
+  return { ok: true, id: sent.id }
+}
+
+function escapeHtml(value: string) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function buttonLink(url: string, label: string, background = '#ffc300', color = '#020617') {
+  return `<a href="${escapeHtml(url)}" style="display:inline-block;margin:6px 8px 6px 0;padding:12px 16px;border-radius:10px;background:${background};color:${color};font-weight:800;text-decoration:none">${escapeHtml(label)}</a>`
 }
 
 export async function sendPressPrintPreviewEmail(args: PreviewArgs): Promise<EmailResult> {
+  const reviewUrl = args.dashboardUrl || dashboardLink(args.campaignId)
   return sendOwnerMail(
-    `Owner approval required: ${args.title || 'Press & Print campaign'}`,
-    [
-      'A Press & Print Media campaign is ready for owner review before publication.',
-      '',
-      `Campaign: ${args.campaignId}`,
-      `Channel: ${args.channel || 'press-print'}`,
-      args.contact ? `Publication/contact: ${args.contact}` : '',
-      '',
-      'Preview:',
-      args.objective || 'No preview text was provided.',
-      '',
-      `Review and approve here: ${args.dashboardUrl || dashboardLink(args.campaignId)}`,
-      '',
-      'Nothing should be published or sent externally until the owner approves it.',
-    ].filter(Boolean).join('\n'),
+    `Press & Print preview ready for approval: ${args.title || 'campaign'}`,
+    `
+      <p>COS has prepared a Press & Print Media campaign for owner review before publication.</p>
+      <p><strong>${escapeHtml(args.title || 'Press & Print campaign')}</strong></p>
+      <p><strong>Campaign:</strong> ${escapeHtml(args.campaignId)}</p>
+      <p><strong>Channel:</strong> ${escapeHtml(args.channel || 'press-print')}</p>
+      ${args.contact ? `<p><strong>Publication/contact:</strong> ${escapeHtml(args.contact)}</p>` : ''}
+      <p><strong>Preview:</strong></p>
+      <div style="white-space:pre-wrap;border:1px solid #e2e8f0;border-radius:12px;padding:12px;background:#f8fafc;color:#0f172a">${escapeHtml(args.objective || 'No preview text was provided.')}</div>
+      <p>${buttonLink(reviewUrl, 'Open and approve campaign')}</p>
+      <p>Nothing should be published or sent externally until the owner approves it.</p>
+    `.trim(),
   )
 }
 
@@ -70,17 +84,16 @@ export async function sendPressPrintPublishedEmail(args: PublishedArgs): Promise
   const location = args.liveUrl || args.dashboardUrl || dashboardLink(args.campaignId)
   return sendOwnerMail(
     `Press & Print published/completed: ${args.title || 'campaign'}`,
-    [
-      'A Press & Print Media campaign has been marked published/completed.',
-      '',
-      `Campaign: ${args.campaignId}`,
-      `Channel: ${args.channel || 'press-print'}`,
-      args.contact ? `Publication/contact: ${args.contact}` : '',
-      args.publicationDate ? `Publication date: ${args.publicationDate}` : '',
-      `Publication/proof location: ${location}`,
-      '',
-      'Final published/placed content preview:',
-      args.objective || 'No campaign text was provided.',
-    ].filter(Boolean).join('\n'),
+    `
+      <p>A Press & Print Media campaign has been marked published/completed.</p>
+      <p><strong>${escapeHtml(args.title || 'Press & Print campaign')}</strong></p>
+      <p><strong>Campaign:</strong> ${escapeHtml(args.campaignId)}</p>
+      <p><strong>Channel:</strong> ${escapeHtml(args.channel || 'press-print')}</p>
+      ${args.contact ? `<p><strong>Publication/contact:</strong> ${escapeHtml(args.contact)}</p>` : ''}
+      ${args.publicationDate ? `<p><strong>Publication date:</strong> ${escapeHtml(args.publicationDate)}</p>` : ''}
+      <p><strong>Publication/proof location:</strong> <a href="${escapeHtml(location)}">${escapeHtml(location)}</a></p>
+      <p><strong>Final published/placed content preview:</strong></p>
+      <div style="white-space:pre-wrap;border:1px solid #e2e8f0;border-radius:12px;padding:12px;background:#f8fafc;color:#0f172a">${escapeHtml(args.objective || 'No campaign text was provided.')}</div>
+    `.trim(),
   )
 }

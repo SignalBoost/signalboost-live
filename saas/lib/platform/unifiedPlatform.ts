@@ -24,7 +24,7 @@ export const UNIFIED_NAV = [
 
 export const ADMIN_SIDEBAR = [
   { icon: '🌌', label: 'Overview', href: '/admin' },
-  { icon: '🧾', label: 'Logs', href: '/admin/system' },
+  { icon: '🧾', label: 'Logs', href: '/admin/logs' },
   { icon: '📡', label: 'Outreach', href: '/admin/sales' },
   { icon: '📣', label: 'Marketing + Sales', href: '/admin/marketing-sales' },
   { icon: '🧠', label: 'Insights', href: '/admin/ai' },
@@ -32,6 +32,8 @@ export const ADMIN_SIDEBAR = [
   { icon: '🛰️', label: 'Marketplace Monitor', href: '/admin/partners' },
   { icon: '🚀', label: 'SaaS Monitor', href: '/admin/saas' },
   { icon: '🤖', label: 'Concierge Monitor', href: '/admin/adm' },
+  { icon: '⚖️', label: 'Governance', href: '/admin/governance' },
+  { icon: '🕒', label: 'Timeline', href: '/admin/timeline' },
 ]
 
 export const COCKPIT_PANELS = [

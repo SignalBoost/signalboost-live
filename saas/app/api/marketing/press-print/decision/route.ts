@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/outreach/security'
+import { sendPressPrintPublishedEmail } from '@/lib/marketing/pressPrintEmail'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
 
   const { data: existing, error: readError } = await ctx.admin
     .from('cos_campaign_queue')
-    .select('metadata')
+    .select('title,objective,metadata')
     .eq('id', id)
     .single()
 
@@ -81,6 +82,19 @@ export async function POST(req: NextRequest) {
     publication_date: publicationDate || previous.press_print_execution?.publication_date || null,
   }
 
+  let publishedEmail: unknown = null
+  if (decision === 'published') {
+    publishedEmail = await sendPressPrintPublishedEmail({
+      campaignId: id,
+      title: existing?.title || 'Press & Print campaign',
+      objective: existing?.objective || previous.signal || '',
+      channel: String(previous.outreach_channel || previous.media_channel || 'press-print'),
+      contact: String(previous.signal || ''),
+      liveUrl: liveUrl || execution.live_url || undefined,
+      publicationDate: publicationDate || execution.publication_date || undefined,
+    })
+  }
+
   const metadata = {
     ...previous,
     press_print_review: reviewValue(decision, existingReview),
@@ -92,6 +106,8 @@ export async function POST(req: NextRequest) {
     staff_support_available: true,
     staff_support_mode: decision === 'staff' ? true : (previous.staff_support_mode || false),
     staff_support_started_at: decision === 'staff' ? now : (previous.staff_support_started_at || null),
+    owner_published_email_sent_at: decision === 'published' && (publishedEmail as any)?.ok ? now : previous.owner_published_email_sent_at || null,
+    owner_published_email_status: decision === 'published' ? ((publishedEmail as any)?.ok ? 'sent' : ((publishedEmail as any)?.reason || (publishedEmail as any)?.error || 'not_sent')) : previous.owner_published_email_status || null,
   }
 
   const { error } = await ctx.admin
@@ -106,5 +122,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard/marketing/press-print', req.url), { status: 303 })
   }
 
-  return NextResponse.json({ ok: true, stage, status, live_url_required: false })
+  return NextResponse.json({ ok: true, stage, status, live_url_required: false, publishedEmail })
 }

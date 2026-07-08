@@ -23,6 +23,10 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error || 'unknown error')
 }
 
+function id(prefix: string) {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+}
+
 function admin() {
   const url = process.env['NEXT_PUBLIC_SUPABASE_URL']!
   const key = process.env['SUPABASE_' + 'SERVICE_ROLE_KEY']!
@@ -138,6 +142,80 @@ function buildPressObjective(args: { publicationName: string; editorContact: str
   ].join(' ')
 }
 
+function pressQueueRow(args: { headline: string; objective: string; outreachChannel: PressPrintChannel; publicationName: string; editorContact: string; articleNotes: string; ctaUrl: string; lang: string; now: string }) {
+  const recommendationId = id('rec_press_print')
+  const audience = 'Small businesses, local businesses, agencies, entrepreneurs, and service providers.'
+  return {
+    recommendation_id: recommendationId,
+    department: 'marketing',
+    title: args.headline,
+    objective: args.objective,
+    channel: 'outreach',
+    audience,
+    languages: [args.lang],
+    assets: [],
+    work_items: [
+      {
+        id: id('work_press_preview'),
+        type: 'press_print_campaign',
+        title: 'Prepare Press & Print publication preview',
+        status: 'drafted',
+        input: {
+          channel: args.outreachChannel,
+          publication_name: args.publicationName,
+          editor_contact: args.editorContact,
+          cta_url: args.ctaUrl,
+        },
+        output: {
+          title: args.headline,
+          draft: args.objective,
+          call_to_action: args.ctaUrl,
+        },
+      },
+    ],
+    recommendation: {
+      id: recommendationId,
+      department: 'marketing',
+      title: args.headline,
+      summary: args.objective,
+      recommended_channel: 'outreach',
+      priority: 'medium',
+      confidence: 85,
+      expected_roi: 'medium',
+      estimated_cost_usd: 0,
+      reason: 'Concierge/COS requested an owner-gated Press & Print campaign. No external publication action is allowed until owner approval.',
+      approval_status: 'pending_approval',
+      created_at: args.now,
+    },
+    status: 'draft',
+    risk_level: 'medium',
+    approval_required: true,
+    metadata: {
+      source: 'concierge_cos_press_print_campaign',
+      outreach_channel: args.outreachChannel,
+      media_channel: args.outreachChannel,
+      publication_name: args.publicationName,
+      editor_contact: args.editorContact,
+      headline: args.headline,
+      article_notes: args.articleNotes,
+      cta_url: args.ctaUrl,
+      press_print_review: 'PENDING',
+      press_print_review_scope: 'owner_approval_required',
+      press_print_execution_stage: 'not_started',
+      press_print_live_url_required: false,
+      staff_support_available: true,
+      owner_preview_required: true,
+      owner_preview_email_sent_at: null,
+      owner_preview_email_status: 'pending',
+      concierge_requested_at: args.now,
+      audience,
+      signal: `Publication: ${args.publicationName}. Contact: ${args.editorContact}. Headline: ${args.headline}. CTA: ${args.ctaUrl}`,
+    },
+    created_at: args.now,
+    updated_at: args.now,
+  }
+}
+
 async function createConciergePressCampaign(text: string, lang = 'en') {
   const outreachChannel = pressChannelFrom(text)
   const publicationName = fieldFrom(text, ['Publication name', 'Publication', 'Media outlet']) || (outreachChannel === 'trade-press' ? 'IT magazine / trade press target to be selected by COS' : 'Digital business publication to be selected by COS')
@@ -148,40 +226,7 @@ async function createConciergePressCampaign(text: string, lang = 'en') {
   const objective = buildPressObjective({ publicationName, editorContact, headline, articleNotes, ctaUrl, channel: outreachChannel, language: lang })
   const now = new Date().toISOString()
   const sb = admin()
-
-  const row = {
-    title: headline,
-    objective,
-    summary: objective,
-    department: 'marketing',
-    channel: 'outreach',
-    priority: 'medium',
-    status: 'draft',
-    estimated_cost_usd: 0,
-    metadata: {
-      source: 'concierge_cos_press_print_campaign',
-      outreach_channel: outreachChannel,
-      media_channel: outreachChannel,
-      publication_name: publicationName,
-      editor_contact: editorContact,
-      headline,
-      article_notes: articleNotes,
-      cta_url: ctaUrl,
-      press_print_review: 'PENDING',
-      press_print_review_scope: 'owner_approval_required',
-      press_print_execution_stage: 'not_started',
-      press_print_live_url_required: false,
-      staff_support_available: true,
-      owner_preview_required: true,
-      owner_preview_email_sent_at: null,
-      owner_preview_email_status: 'pending',
-      concierge_requested_at: now,
-      audience: 'Small businesses, local businesses, agencies, entrepreneurs, and service providers.',
-      signal: `Publication: ${publicationName}. Contact: ${editorContact}. Headline: ${headline}. CTA: ${ctaUrl}`,
-    },
-    created_at: now,
-    updated_at: now,
-  }
+  const row = pressQueueRow({ headline, objective, outreachChannel, publicationName, editorContact, articleNotes, ctaUrl, lang, now })
 
   const { data, error } = await sb
     .from('cos_campaign_queue')

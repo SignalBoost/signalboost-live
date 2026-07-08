@@ -1,0 +1,50 @@
+# Sensitive areas require owner/code-owner review when branch protection enables
+# "Require review from Code Owners". Replace or supplement @SignalBoostAi with
+# the exact GitHub owner/team handle if this repository uses a different owner.
+
+ONBOARD.md @SignalBoostAi
+.github/ @SignalBoostAi
+
+# COSA / COS / campaign orchestration and AI department
+*COSA* @SignalBoostAi
+*cosa* @SignalBoostAi
+*cos-* @SignalBoostAi
+auditor-router/ @SignalBoostAi
+compliance/ @SignalBoostAi
+services/cos-ai-department/ @SignalBoostAi
+k8s/cos-ai-department/ @SignalBoostAi
+monitoring/cos-ai-department/ @SignalBoostAi
+
+# Video pipeline
+app/**/video/** @SignalBoostAi
+components/video/ @SignalBoostAi
+lib/video/ @SignalBoostAi
+scripts/*video* @SignalBoostAi
+saas/**/video* @SignalBoostAi
+saas/scripts/*video* @SignalBoostAi
+saas/marketing-sales-core/video.ts @SignalBoostAi
+saas/marketing-sales-host/video.ts @SignalBoostAi
+
+# Provider templates, infrastructure, secrets, Vercel env, Vault
+**/*provider* @SignalBoostAi
+**/*template* @SignalBoostAi
+**/*vercel* @SignalBoostAi
+**/*env* @SignalBoostAi
+**/*vault* @SignalBoostAi
+**/*secret* @SignalBoostAi
+**/*infra* @SignalBoostAi
+vercel.json @SignalBoostAi
+saas/vercel.json @SignalBoostAi
+
+# Supabase, storage buckets, audit, cybersecurity, approval gates
+**/*supabase* @SignalBoostAi
+**/*storage* @SignalBoostAi
+**/*bucket* @SignalBoostAi
+**/*audit* @SignalBoostAi
+**/*auditor* @SignalBoostAi
+**/*cyber* @SignalBoostAi
+**/*security* @SignalBoostAi
+**/*approval* @SignalBoostAi
+saas/supabase/ @SignalBoostAi
+saas/components/audit/ @SignalBoostAi
+saas/app/cybersecurity-check/ @SignalBoostAi

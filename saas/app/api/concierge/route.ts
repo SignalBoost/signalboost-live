@@ -1,5 +1,6 @@
 // saas/app/api/concierge/route.ts
 // Thin alias: the Concierge widget posts here; the brain lives in /api/support.
+// Keep route config local so long COS/Campaign requests do not hit default Vercel timeouts.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -163,7 +164,7 @@ async function createConciergePressCampaign(text: string, lang = 'en') {
   let discoverySourceUrl: string | null = null
 
   if (!publisherTargetIsResolved(publicationName, editorContact)) {
-    const discovered = await discoverPublisherTarget({ brief: text, channel: outreachChannel }).catch((err) => ({ ok: false, error: errorMessage(err) }))
+    const discovered: any = await discoverPublisherTarget({ brief: text, channel: outreachChannel }).catch((err) => ({ ok: false, error: errorMessage(err) }))
     if (discovered.ok && discovered.publicationName && discovered.editorContact) {
       publicationName = discovered.publicationName
       editorContact = discovered.editorContact

@@ -18,6 +18,7 @@ import { isActionLive } from '@/lib/hub/console-catalog'
 // Side-effect imports: each registers its provider's executors at module load.
 import '@/console-core/executors/openai'
 import '@/console-core/executors/github'
+import '@/console-core/executors/stripe'
 import '@/console-core/executors/elevenlabs'
 import '@/console-core/executors/anthropic'
 import '@/console-core/executors/gemini'

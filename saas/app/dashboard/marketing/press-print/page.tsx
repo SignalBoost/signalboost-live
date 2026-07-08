@@ -9,29 +9,13 @@ type Decision = 'ok' | 'no' | 'staff' | 'submitted' | 'published'
 
 const PRESS_PRINT_CHANNELS = ['online-newspapers', 'print-newspapers', 'trade-press'] as const
 
-const channelLabels: Record<string, string> = {
-  'online-newspapers': 'Digital newspaper',
-  'print-newspapers': 'Print newspaper',
-  'trade-press': 'IT magazine / trade press',
-}
-
-function channel(campaign: Campaign) {
-  return String(campaign.metadata?.outreach_channel || campaign.metadata?.media_channel || '')
-}
-
-function review(campaign: Campaign) {
-  return String(campaign.metadata?.press_print_review || 'PENDING').toUpperCase()
-}
-
-function stage(campaign: Campaign) {
-  return String(campaign.metadata?.press_print_execution_stage || campaign.metadata?.press_print_execution?.stage || 'not_started')
-}
-
+const channelLabels: Record<string, string> = { 'online-newspapers': 'Digital newspaper', 'print-newspapers': 'Print newspaper', 'trade-press': 'IT magazine / trade press' }
+function channel(campaign: Campaign) { return String(campaign.metadata?.outreach_channel || campaign.metadata?.media_channel || '') }
+function review(campaign: Campaign) { return String(campaign.metadata?.press_print_review || 'PENDING').toUpperCase() }
+function stage(campaign: Campaign) { return String(campaign.metadata?.press_print_execution_stage || campaign.metadata?.press_print_execution?.stage || 'not_started') }
 function labelStage(value: string) {
   if (value === 'approved') return 'Ready to submit'
   if (value === 'submitted_to_publisher') return 'Submitted to publisher'
-  if (value === 'package_prepared') return 'In progress'
-  if (value === 'submitted') return 'Submitted to publisher'
   if (value === 'published') return 'Published / completed'
   if (value === 'staff_support') return 'Staff support'
   if (value === 'on_hold') return 'On hold'
@@ -57,18 +41,15 @@ export default function PressPrintMediaPage() {
         const res = await fetch('/api/marketing/press-print', { cache: 'no-store' })
         const json = await res.json()
         if (live) setCampaigns((Array.isArray(json.campaigns) ? json.campaigns : []).filter((row: Campaign) => PRESS_PRINT_CHANNELS.includes(channel(row) as any)))
-      } finally {
-        if (live) setLoading(false)
-      }
+      } finally { if (live) setLoading(false) }
     })()
     return () => { live = false }
   }, [])
 
   return <main style={shell}>
     <section style={hero}>
-      <p className="sb-eyebrow">Marketing + Sales</p>
-      <h1 style={h1}>Press & Print Media</h1>
-      <p style={body}>{t('marketingSales.pressPrint.description', 'One official workflow for digital newspapers, print newspapers, and IT magazines. The old separate newspaper and trade-press workflows have been removed.')}</p>
+      <p className="sb-eyebrow">Marketing + Sales</p><h1 style={h1}>Press & Print Media</h1>
+      <p style={body}>{t('marketingSales.pressPrint.description', 'Automated Press & Print only accepts free, real newspaper/magazine/publication targets unless the user explicitly asks for paid advertising. The target must include a publisher/editor email or a real submit-news/contact form.')}</p>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}><Link href="/dashboard/marketing/press-print/direct" className="sb-button-primary">{t('marketingSales.pressPrint.startStaffLedCampaign', 'Start staff-led campaign')}</Link></div>
     </section>
 
@@ -76,46 +57,23 @@ export default function PressPrintMediaPage() {
     {!loading && campaigns.length === 0 ? <section style={card}><p style={body}>No Press & Print Media campaigns yet.</p></section> : null}
 
     {campaigns.map((campaign) => {
-      const currentReview = review(campaign)
-      const currentStage = stage(campaign)
-      const approved = currentReview === 'APPROVED'
+      const currentReview = review(campaign), currentStage = stage(campaign), approved = currentReview === 'APPROVED'
       const submitted = currentStage === 'submitted_to_publisher' || campaign.metadata?.publisher_submission_status === 'submitted'
-      const completed = currentStage === 'published'
-      const exec = campaign.metadata?.press_print_execution || {}
+      const completed = currentStage === 'published', exec = campaign.metadata?.press_print_execution || {}
       const publisher = String(campaign.metadata?.publisher_name || campaign.metadata?.publication_name || '')
       const publisherEmail = String(campaign.metadata?.publisher_email || '')
       const publisherForm = String(campaign.metadata?.publisher_submission_form_url || '')
+      const sourceUrl = String(campaign.metadata?.publisher_discovery_source_url || '')
       const hasPublisherTarget = Boolean(publisher && (publisherEmail || publisherForm))
       return <section key={campaign.id} style={card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}><div><p className="sb-eyebrow">{channelLabels[channel(campaign)] || 'Press media'}</p><h2 style={h2}>{campaign.title || 'Press campaign'}</h2><p style={body}>{campaign.objective || 'Campaign prepared inside Marketing + Sales.'}</p></div><strong style={pill}>{currentReview} · {labelStage(currentStage)}</strong></div>
-
-        <div style={targetBox}>
-          <h3 style={h3}>Publisher target</h3>
-          {hasPublisherTarget ? <p style={body}>Publisher: <strong>{publisher}</strong><br />Submission method: <strong>{publisherEmail ? 'Email' : 'Online form'}</strong><br />Target: {publisherEmail || publisherForm}</p> : <p style={body}>No verified publisher email or online submission form is recorded. Automated campaigns should stop here. Use staff support only for manual research.</p>}
-        </div>
-
+        <div style={targetBox}><h3 style={h3}>Free publisher target</h3>{hasPublisherTarget ? <p style={body}>Publisher: <strong>{publisher}</strong><br />Submission method: <strong>{publisherEmail ? 'Publisher/editor email' : 'Free online submission/contact form'}</strong><br />Target: {publisherEmail || publisherForm}{sourceUrl ? <><br />Discovery source: {sourceUrl}</> : null}</p> : <p style={body}>No verified free newspaper, magazine, or publication contact is recorded. Automated campaigns should stop here unless the user explicitly asked for paid advertising.</p>}</div>
         {!approved && !completed ? <div style={actions}><Action id={campaign.id} decision="ok" primary>Approve</Action><Action id={campaign.id} decision="no">Reject</Action><Action id={campaign.id} decision="staff">Needs staff help</Action></div> : null}
-
-        <div style={workflowBox}>
-          <h3 style={h3}>{completed ? 'Done' : submitted ? 'Awaiting publication proof' : approved ? 'Next step' : 'Approval needed'}</h3>
-          {!approved && !completed ? <p style={body}>Review the campaign. Approval only authorizes submission to the verified publisher target shown above.</p> : null}
-          {approved && !submitted && !completed ? <div style={simpleForm}>
-            <p style={body}>Approved does not mean published. The next step is to submit it to the verified publisher target.</p>
-            {hasPublisherTarget ? <Action id={campaign.id} decision="submitted" primary>Mark submitted to publisher</Action> : <p style={body}>Submission is blocked because no verified publisher target exists.</p>}
-          </div> : null}
-          {submitted && !completed ? <form method="post" action="/api/marketing/press-print/decision" style={simpleForm}>
-            <input type="hidden" name="id" value={campaign.id} />
-            <input type="hidden" name="decision" value="published" />
-            <p style={body}>Only click this after the article/ad is actually published or placed. Add the proof link/date if available.</p>
-            <input name="live_url" defaultValue={String(exec.live_url || '')} placeholder="Optional article/proof link" style={input} />
-            <input name="publication_date" type="date" defaultValue={String(exec.publication_date || '')} style={input} />
-            <button style={primaryButton}>Confirm published / completed</button>
-          </form> : null}
-          {completed ? <div style={doneBox}>
-            <p style={body}>This campaign is marked published/completed. No more action is needed here.</p>
-            {exec.live_url ? <a href={String(exec.live_url)} target="_blank" rel="noreferrer" style={link}>Open published/proof link ↗</a> : null}
-            {exec.publication_date ? <p style={body}>Publication date: {String(exec.publication_date)}</p> : null}
-          </div> : null}
+        <div style={workflowBox}><h3 style={h3}>{completed ? 'Done' : submitted ? 'Awaiting publication proof' : approved ? 'Next step' : 'Approval needed'}</h3>
+          {!approved && !completed ? <p style={body}>Review the campaign. Approval only authorizes submission to the verified free publisher target shown above.</p> : null}
+          {approved && !submitted && !completed ? <div style={simpleForm}><p style={body}>Approved does not mean published. The next step is to submit it to the verified publisher target.</p>{hasPublisherTarget ? <Action id={campaign.id} decision="submitted" primary>Mark submitted to publisher</Action> : <p style={body}>Submission is blocked because no verified publisher target exists.</p>}</div> : null}
+          {submitted && !completed ? <form method="post" action="/api/marketing/press-print/decision" style={simpleForm}><input type="hidden" name="id" value={campaign.id} /><input type="hidden" name="decision" value="published" /><p style={body}>Only click this after the article/ad is actually published or placed. Add the proof link/date if available.</p><input name="live_url" defaultValue={String(exec.live_url || '')} placeholder="Optional article/proof link" style={input} /><input name="publication_date" type="date" defaultValue={String(exec.publication_date || '')} style={input} /><button style={primaryButton}>Confirm published / completed</button></form> : null}
+          {completed ? <div style={doneBox}><p style={body}>This campaign is marked published/completed. No more action is needed here.</p>{exec.live_url ? <a href={String(exec.live_url)} target="_blank" rel="noreferrer" style={link}>Open published/proof link ↗</a> : null}{exec.publication_date ? <p style={body}>Publication date: {String(exec.publication_date)}</p> : null}</div> : null}
         </div>
       </section>
     })}

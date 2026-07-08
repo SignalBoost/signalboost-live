@@ -24,7 +24,7 @@ function executionStage(decision: Decision, existingStage: string) {
   if (decision === 'hold') return 'on_hold'
   if (decision === 'staff') return 'staff_support'
   if (decision === 'package') return 'package_prepared'
-  if (decision === 'submitted') return 'submitted'
+  if (decision === 'submitted') return 'submitted_to_publisher'
   if (decision === 'published') return 'published'
   return existingStage || 'draft'
 }
@@ -32,6 +32,7 @@ function executionStage(decision: Decision, existingStage: string) {
 function rowStatus(decision: Decision) {
   if (decision === 'no') return 'rejected'
   if (decision === 'hold' || decision === 'staff') return 'draft'
+  if (decision === 'submitted') return 'running'
   if (decision === 'published') return 'completed'
   return 'approved'
 }
@@ -69,12 +70,22 @@ export async function POST(req: NextRequest) {
   const existingStage = String(previous.press_print_execution_stage || '')
   const stage = executionStage(decision, existingStage)
   const status = rowStatus(decision)
+  const publisherName = String(previous.publisher_name || previous.publication_name || '')
+  const publisherEmail = String(previous.publisher_email || '')
+  const publisherFormUrl = String(previous.publisher_submission_form_url || '')
+  const submissionTarget = publisherEmail || publisherFormUrl
+
+  if ((decision === 'submitted' || decision === 'published') && !submissionTarget) {
+    return NextResponse.json({ ok: false, error: 'Missing publisher email or online submission form. Cannot submit/publish automated Press & Print campaign.' }, { status: 400 })
+  }
 
   const execution = {
     ...((previous.press_print_execution && typeof previous.press_print_execution === 'object') ? previous.press_print_execution : {}),
     stage,
     package_prepared_at: decision === 'package' ? now : previous.press_print_execution?.package_prepared_at || null,
     submitted_at: decision === 'submitted' ? now : previous.press_print_execution?.submitted_at || null,
+    submitted_to: decision === 'submitted' ? submissionTarget : previous.press_print_execution?.submitted_to || null,
+    submitted_to_publisher: decision === 'submitted' ? publisherName : previous.press_print_execution?.submitted_to_publisher || null,
     published_at: decision === 'published' ? now : previous.press_print_execution?.published_at || null,
     live_url: liveUrl || previous.press_print_execution?.live_url || null,
     live_url_required: false,
@@ -106,6 +117,9 @@ export async function POST(req: NextRequest) {
     staff_support_available: true,
     staff_support_mode: decision === 'staff' ? true : (previous.staff_support_mode || false),
     staff_support_started_at: decision === 'staff' ? now : (previous.staff_support_started_at || null),
+    publisher_submission_status: decision === 'submitted' ? 'submitted' : previous.publisher_submission_status || null,
+    publisher_submitted_at: decision === 'submitted' ? now : previous.publisher_submitted_at || null,
+    publisher_submitted_to: decision === 'submitted' ? submissionTarget : previous.publisher_submitted_to || null,
     owner_published_email_sent_at: decision === 'published' && (publishedEmail as any)?.ok ? now : previous.owner_published_email_sent_at || null,
     owner_published_email_status: decision === 'published' ? ((publishedEmail as any)?.ok ? 'sent' : ((publishedEmail as any)?.reason || (publishedEmail as any)?.error || 'not_sent')) : previous.owner_published_email_status || null,
   }

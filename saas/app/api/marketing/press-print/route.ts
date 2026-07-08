@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/outreach/security'
+import { sendPressPrintPreviewEmail } from '@/lib/marketing/pressPrintEmail'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,6 +65,8 @@ export async function POST(req: NextRequest) {
       press_print_execution_stage: 'not_started',
       press_print_live_url_required: false,
       staff_support_available: true,
+      owner_preview_required: true,
+      owner_preview_email_sent_at: null,
       audience: String(request.audience || ''),
       signal: String(request.signal || ''),
     },
@@ -78,5 +81,26 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true, campaign: data })
+
+  const previewEmail = await sendPressPrintPreviewEmail({
+    campaignId: data.id,
+    title: data.title || title,
+    objective: data.objective || objective,
+    channel: outreachChannel,
+    contact: String(request.signal || request.contact || request.publication || ''),
+  })
+
+  if (previewEmail.ok) {
+    await ctx.admin
+      .from('cos_campaign_queue')
+      .update({ metadata: { ...((data.metadata as any) || {}), owner_preview_email_sent_at: new Date().toISOString(), owner_preview_email_status: 'sent' } })
+      .eq('id', data.id)
+  } else if (previewEmail.skipped || previewEmail.error) {
+    await ctx.admin
+      .from('cos_campaign_queue')
+      .update({ metadata: { ...((data.metadata as any) || {}), owner_preview_email_status: previewEmail.reason || previewEmail.error || 'not_sent' } })
+      .eq('id', data.id)
+  }
+
+  return NextResponse.json({ ok: true, campaign: data, previewEmail })
 }

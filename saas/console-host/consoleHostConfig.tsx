@@ -17,12 +17,15 @@ import { LogsPage } from '@/components/hub/pages/LogsPage'
 import { SettingsPage } from '@/components/hub/pages/SettingsPage'
 import { UsersPage } from '@/components/hub/pages/UsersPage'
 import { WebhooksPage } from '@/components/hub/pages/WebhooksPage'
+import SocialOutreachPage from '@/app/dashboard/outreach/social/page'
 import {
   CONSOLE_TIERS,
   CONSOLE_UTILITY_PAGES,
   getConsoleTier,
   getConsoleProvider,
   getTierProviders,
+  type ConsoleProvider,
+  type ConsoleTierId,
 } from '@/lib/hub/console-catalog'
 
 /** A workspace panel that a provider action opens instead of a single-action form. */
@@ -67,6 +70,40 @@ const ENV_PANEL: ConsolePanel = {
   render: () => <EnvVarsPage />,
 }
 
+const SOCIAL_PANEL: ConsolePanel = {
+  title: 'Social Provider Connector Cockpit',
+  subtitle: 'Live OAuth readiness, automated destination discovery, and publish-readiness for social platforms.',
+  render: () => <SocialOutreachPage />,
+}
+
+const SOCIAL_ACTIONS = ['capabilities', 'connect_oauth', 'discover_destinations', 'save_destination']
+const SOCIAL_PROVIDER_IDS = ['youtube', 'linkedin', 'tiktok', 'reddit', 'instagram', 'facebook', 'twitter_x']
+const SOCIAL_PROVIDERS: ConsoleProvider[] = [
+  { id: 'youtube', name: 'YouTube', subtitle: 'VIDEO CHANNELS', accent: '#ff0000', tier: 'tier2', sections: [{ title: 'Connection', templateIds: SOCIAL_ACTIONS.map(a => `youtube.${a}`) }] },
+  { id: 'tiktok', name: 'TikTok', subtitle: 'SHORT VIDEO', accent: '#25f4ee', tier: 'tier2', sections: [{ title: 'Connection', templateIds: SOCIAL_ACTIONS.map(a => `tiktok.${a}`) }] },
+  { id: 'linkedin', name: 'LinkedIn', subtitle: 'B2B SOCIAL', accent: '#0a66c2', tier: 'tier2', sections: [{ title: 'Connection', templateIds: SOCIAL_ACTIONS.map(a => `linkedin.${a}`) }] },
+  { id: 'reddit', name: 'Reddit', subtitle: 'COMMUNITY OUTREACH', accent: '#ff4500', tier: 'tier2', sections: [{ title: 'Connection', templateIds: SOCIAL_ACTIONS.map(a => `reddit.${a}`) }] },
+  { id: 'instagram', name: 'Instagram', subtitle: 'VISUAL SOCIAL', accent: '#e1306c', tier: 'tier2', sections: [{ title: 'Connection', templateIds: SOCIAL_ACTIONS.map(a => `instagram.${a}`) }] },
+  { id: 'facebook', name: 'Facebook', subtitle: 'PAGES', accent: '#1877f2', tier: 'tier2', sections: [{ title: 'Connection', templateIds: SOCIAL_ACTIONS.map(a => `facebook.${a}`) }] },
+  { id: 'twitter_x', name: 'X / Twitter', subtitle: 'SOCIAL POSTS', accent: '#d1d5db', tier: 'tier2', sections: [{ title: 'Connection', templateIds: SOCIAL_ACTIONS.map(a => `twitter_x.${a}`) }] },
+]
+
+function socialPanelRouter(): Record<string, ConsolePanel> {
+  return Object.fromEntries(SOCIAL_PROVIDER_IDS.flatMap(id => SOCIAL_ACTIONS.map(action => [`${id}.${action}`, SOCIAL_PANEL])))
+}
+
+function providerWithSocial(id: string, dict?: any) {
+  const social = SOCIAL_PROVIDERS.find(p => p.id === id)
+  return social || getConsoleProvider(id, dict)
+}
+
+function tierProvidersWithSocial(tierId: ConsoleTierId, dict?: any) {
+  const base = getTierProviders(tierId, dict)
+  if (tierId !== 'tier2') return base
+  const existing = new Set(base.map(p => p.id))
+  return [...base, ...SOCIAL_PROVIDERS.filter(p => !existing.has(p.id))]
+}
+
 export const signalboostConsoleUI: ConsoleHostUI = {
   branding: {
     productName: 'SignalBoost',
@@ -105,6 +142,7 @@ export const signalboostConsoleUI: ConsoleHostUI = {
       subtitle: 'Configure domains, alias paths, verification, and SSL.',
       render: () => <DomainsPage />,
     },
+    ...socialPanelRouter(),
   },
   utilityPages: {
     domains: () => <DomainsPage />,
@@ -119,7 +157,7 @@ export const signalboostConsoleUI: ConsoleHostUI = {
     tiers: CONSOLE_TIERS,
     utilityNav: CONSOLE_UTILITY_PAGES,
     getTier: getConsoleTier,
-    getTierProviders: getTierProviders,
-    getProvider: getConsoleProvider,
+    getTierProviders: tierProvidersWithSocial as typeof getTierProviders,
+    getProvider: providerWithSocial as typeof getConsoleProvider,
   },
 }

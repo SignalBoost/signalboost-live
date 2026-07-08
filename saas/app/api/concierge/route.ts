@@ -3,18 +3,30 @@
 // Keep route config local so long COS/Campaign requests do not hit default Vercel timeouts.
 
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { POST as supportPost } from '@/app/api/support/route'
 import { getAccess } from '@/lib/auth/access'
 import { proposeCampaign } from '@/lib/ai/proposeCampaign'
-import { getPressAdminClient, runLocalPressDistributionWorker, validatePressCampaignInput, type PressCampaign } from '@/lib/agency/pressOutreach'
+import { sendPressPrintPreviewEmail } from '@/lib/marketing/pressPrintEmail'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 type AttachmentInfo = { name?: string; type?: string; mimeType?: string; dataUrl?: string }
+type ConciergePressCampaign = { id: string; title?: string; objective?: string; metadata?: Record<string, any> }
+
+const PRESS_PRINT_CHANNELS = ['online-newspapers', 'print-newspapers', 'trade-press'] as const
+
+type PressPrintChannel = typeof PRESS_PRINT_CHANNELS[number]
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error || 'unknown error')
+}
+
+function admin() {
+  const url = process.env['NEXT_PUBLIC_SUPABASE_URL']!
+  const key = process.env['SUPABASE_' + 'SERVICE_ROLE_KEY']!
+  return createClient(url, key, { auth: { persistSession: false } })
 }
 
 function latestUserText(body: any): string {
@@ -75,7 +87,7 @@ function channelFrom(text: string): string {
   return 'youtube'
 }
 
-function pressChannelFrom(text: string): string {
+function pressChannelFrom(text: string): PressPrintChannel {
   const t = String(text || '').toLowerCase()
   if (/(print|offline|newspaper_print|printed|jornal impresso)/.test(t)) return 'print-newspapers'
   if (/(trade press|magazine|it magazine|revista|publication trade)/.test(t)) return 'trade-press'
@@ -103,58 +115,100 @@ function queuedReply(lang: string, result: any): string {
   return `Sent this request to the COSA video pipeline. Campaign ID: ${ids}. Open ${link} and click Refresh/Kick missing renders if it does not appear yet.`
 }
 
-function pressReply(lang: string, campaign: PressCampaign): string {
-  const link = `/dashboard/marketing/press-outreach?campaign=${encodeURIComponent(campaign.id)}`
-  if (lang === 'pt') return `A Concierge criou a campanha Press & Print e a COS preparou o preview. ID: ${campaign.id}. Nada será publicado até aprovação do proprietário. Revise aqui: ${link}`
-  if (lang === 'es') return `Concierge creó la campaña Press & Print y COS preparó la vista previa. ID: ${campaign.id}. No se publicará hasta la aprobación del propietario. Revisa aquí: ${link}`
-  return `Concierge created the Press & Print campaign and COS prepared the publication preview. Campaign ID: ${campaign.id}. Nothing will publish until the owner approves it. Review it here: ${link}`
+function pressReply(lang: string, campaign: ConciergePressCampaign, previewEmail: any): string {
+  const link = `/dashboard/marketing/press-print?campaign=${encodeURIComponent(campaign.id)}`
+  const emailStatus = previewEmail?.ok ? ' Preview email sent to the owner.' : previewEmail?.skipped || previewEmail?.error ? ` Preview email was not sent yet: ${previewEmail.reason || previewEmail.error || 'email send failed'}.` : ''
+  if (lang === 'pt') return `A Concierge criou a campanha Press & Print na fila existente da COS. ID: ${campaign.id}. Nada será publicado até aprovação do proprietário. Revise aqui: ${link}.${emailStatus}`
+  if (lang === 'es') return `Concierge creó la campaña Press & Print en la cola existente de COS. ID: ${campaign.id}. No se publicará hasta la aprobación del propietario. Revisa aquí: ${link}.${emailStatus}`
+  return `Concierge created the Press & Print campaign in the existing COS campaign queue. Campaign ID: ${campaign.id}. Nothing will publish until the owner approves it. Review it here: ${link}.${emailStatus}`
 }
 
-async function createConciergePressCampaign(text: string) {
-  const channel = pressChannelFrom(text)
-  const publicationName = fieldFrom(text, ['Publication name', 'Publication', 'Media outlet']) || (channel === 'trade-press' ? 'IT magazines' : 'Online newspaper / digital publisher')
+function buildPressObjective(args: { publicationName: string; editorContact: string; headline: string; articleNotes: string; ctaUrl: string; channel: string; language: string }) {
+  return [
+    `Prepare a COS-led Press & Print Media campaign for ${args.publicationName}.`,
+    `Publication/contact: ${args.editorContact}.`,
+    `Headline / campaign title: ${args.headline}.`,
+    `Article/ad notes: ${args.articleNotes}.`,
+    `CTA URL: ${args.ctaUrl}.`,
+    'Target audience: Publication editors, readers, and business technology buyers reached through the selected press media channel.',
+    `Requested language: ${args.language}.`,
+    `Specific outreach channel: ${args.channel}.`,
+    'Execution rule: draft, approval, final polish, publishing, monitoring, and learning must remain behind owner-approved workflow gates.',
+    'Safety rule: do not contact, submit, publish, or send anything externally until the owner receives the preview email and approves the campaign.',
+  ].join(' ')
+}
+
+async function createConciergePressCampaign(text: string, lang = 'en') {
+  const outreachChannel = pressChannelFrom(text)
+  const publicationName = fieldFrom(text, ['Publication name', 'Publication', 'Media outlet']) || (outreachChannel === 'trade-press' ? 'IT magazine / trade press target to be selected by COS' : 'Digital business publication to be selected by COS')
   const editorContact = fieldFrom(text, ['Editor / media contact', 'Editor contact', 'Media contact', 'Contact']) || 'Name, email, phone, media-kit link, or notes to be confirmed by COS'
   const headline = fieldFrom(text, ['Headline / campaign title', 'Headline', 'Campaign title']) || 'SignalBoost introduces AI-powered business growth tools for modern businesses'
   const articleNotes = fieldFrom(text, ['Article / ad notes', 'Article notes', 'Ad notes', 'Notes']) || text
   const ctaUrl = fieldFrom(text, ['CTA URL', 'CTA', 'Link']) || 'https://saas.signalboostapp.com'
-  const input = validatePressCampaignInput({ created_by_role: 'staff', source: 'concierge_cos', force_owner_review: true, channel, publication_name: publicationName, editor_contact: editorContact, headline, article_notes: articleNotes, cta_url: ctaUrl, brief: text })
-
-  const supabase = getPressAdminClient()
+  const objective = buildPressObjective({ publicationName, editorContact, headline, articleNotes, ctaUrl, channel: outreachChannel, language: lang })
   const now = new Date().toISOString()
-  const fullRow = {
-    status: 'pending_owner_review',
-    created_by_role: 'staff',
-    media_target_type: input.media_target_type,
-    publication_contact: input.publication_contact,
-    content_body: input.content_body,
-    processing_state: 'free_organic_distribution',
-    source: input.source || 'concierge_cos',
-    channel: input.channel || channel,
-    publication_name: input.publication_name || publicationName,
-    editor_contact: input.editor_contact || editorContact,
-    headline: input.headline || headline,
-    article_notes: input.article_notes || articleNotes,
-    cta_url: input.cta_url || ctaUrl,
-    preview_sent_at: now,
+  const sb = admin()
+
+  const row = {
+    title: headline,
+    objective,
+    summary: objective,
+    department: 'marketing',
+    channel: 'outreach',
+    priority: 'medium',
+    status: 'draft',
+    estimated_cost_usd: 0,
+    metadata: {
+      source: 'concierge_cos_press_print_campaign',
+      outreach_channel: outreachChannel,
+      media_channel: outreachChannel,
+      publication_name: publicationName,
+      editor_contact: editorContact,
+      headline,
+      article_notes: articleNotes,
+      cta_url: ctaUrl,
+      press_print_review: 'PENDING',
+      press_print_review_scope: 'owner_approval_required',
+      press_print_execution_stage: 'not_started',
+      press_print_live_url_required: false,
+      staff_support_available: true,
+      owner_preview_required: true,
+      owner_preview_email_sent_at: null,
+      owner_preview_email_status: 'pending',
+      concierge_requested_at: now,
+      audience: 'Small businesses, local businesses, agencies, entrepreneurs, and service providers.',
+      signal: `Publication: ${publicationName}. Contact: ${editorContact}. Headline: ${headline}. CTA: ${ctaUrl}`,
+    },
+    created_at: now,
+    updated_at: now,
   }
 
-  let result = await supabase.from('press_campaigns').insert(fullRow).select('*').single()
-  if (result.error) {
-    console.error('Press campaign full insert failed, retrying minimal schema:', result.error.message)
-    result = await supabase.from('press_campaigns').insert({
-      status: 'pending_owner_review',
-      created_by_role: 'staff',
-      media_target_type: input.media_target_type,
-      publication_contact: input.publication_contact,
-      content_body: input.content_body,
-      processing_state: 'free_organic_distribution',
-    }).select('*').single()
-  }
-  if (result.error) throw new Error(result.error.message)
+  const { data, error } = await sb
+    .from('cos_campaign_queue')
+    .insert(row)
+    .select('id,title,objective,status,metadata,created_at')
+    .single()
 
-  const campaign = result.data as PressCampaign
-  const previewEmail = await runLocalPressDistributionWorker(campaign, input.owner_email).catch((err) => ({ ok: false, skipped: true, reason: errorMessage(err) }))
-  return { campaign, previewEmail }
+  if (error) throw new Error(error.message)
+
+  const previewEmail = await sendPressPrintPreviewEmail({
+    campaignId: data.id,
+    title: data.title || headline,
+    objective: data.objective || objective,
+    channel: outreachChannel,
+    contact: `${publicationName}; ${editorContact}`,
+  }).catch((err) => ({ ok: false, error: errorMessage(err) }))
+
+  const emailPatch = previewEmail.ok
+    ? { owner_preview_email_sent_at: new Date().toISOString(), owner_preview_email_status: 'sent' }
+    : { owner_preview_email_status: previewEmail.reason || previewEmail.error || 'not_sent' }
+
+  await sb
+    .from('cos_campaign_queue')
+    .update({ metadata: { ...((data.metadata as any) || {}), ...emailPatch } })
+    .eq('id', data.id)
+
+  return { campaign: data as ConciergePressCampaign, previewEmail }
 }
 
 export async function POST(req: NextRequest) {
@@ -179,8 +233,8 @@ export async function POST(req: NextRequest) {
     if (isPressCreationRequest(text)) {
       const lang = languageFrom(body, text)
       try {
-        const created = await createConciergePressCampaign(text)
-        return NextResponse.json({ reply: pressReply(lang, created.campaign), source: 'concierge-cos-press-router', campaignId: created.campaign.id, execution_locked: true, preview_email: created.previewEmail })
+        const created = await createConciergePressCampaign(text, lang)
+        return NextResponse.json({ reply: pressReply(lang, created.campaign, created.previewEmail), source: 'concierge-cos-press-router', campaignId: created.campaign.id, execution_locked: true, preview_email: created.previewEmail })
       } catch (err) {
         const message = errorMessage(err)
         console.error('Concierge press workflow failed:', message)

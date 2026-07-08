@@ -13,6 +13,14 @@ function isPlatform(value: string): value is SocialPlatform {
   return Boolean((SOCIAL_CONNECTORS as any)[value])
 }
 
+function normalizePlatformFilter(body: any): Set<string> | undefined {
+  const values = Array.isArray(body?.platforms)
+    ? body.platforms
+    : body?.platform ? [body.platform] : []
+  const platforms = values.map((item: any) => String(item)).filter(isPlatform)
+  return platforms.length ? new Set<string>(platforms) : undefined
+}
+
 function sendablePost(post: any, platforms?: Set<string>) {
   if (!post) return false
   if (platforms && !platforms.has(String(post.platform))) return false
@@ -30,9 +38,7 @@ export async function POST(req: NextRequest) {
   if (!campaignId) return NextResponse.json({ ok: false, error: 'campaign_id is required' }, { status: 400 })
   if (await isOutreachSendingDisabled(ctx.admin)) return NextResponse.json({ ok: false, error: 'Outreach sending is disabled by the panic switch.' }, { status: 423 })
 
-  const platformFilter = Array.isArray(body?.platforms)
-    ? new Set(body.platforms.map((item: any) => String(item)).filter(isPlatform))
-    : body?.platform ? new Set([String(body.platform)].filter(isPlatform)) : undefined
+  const platformFilter = normalizePlatformFilter(body)
 
   const { data: campaign, error } = await ctx.admin.from('outreach_social_campaigns').select('*').eq('id', campaignId).single()
   if (error || !campaign) return NextResponse.json({ ok: false, error: error?.message || 'Campaign not found' }, { status: 404 })

@@ -67,15 +67,15 @@ export async function sendPressPrintPreviewEmail(args: PreviewArgs): Promise<Ema
   return sendOwnerMail(
     `Press & Print preview ready for approval: ${args.title || 'campaign'}`,
     `
-      <p>COS has prepared a Press & Print Media campaign for owner review before publication.</p>
+      <p>COS has prepared a Press & Print Media campaign for owner review.</p>
       <p><strong>${escapeHtml(args.title || 'Press & Print campaign')}</strong></p>
       <p><strong>Campaign:</strong> ${escapeHtml(args.campaignId)}</p>
       <p><strong>Channel:</strong> ${escapeHtml(args.channel || 'press-print')}</p>
-      ${args.contact ? `<p><strong>Publication/contact:</strong> ${escapeHtml(args.contact)}</p>` : ''}
+      ${args.contact ? `<p><strong>Verified publisher target:</strong> ${escapeHtml(args.contact)}</p>` : ''}
       <p><strong>Preview:</strong></p>
       <div style="white-space:pre-wrap;border:1px solid #e2e8f0;border-radius:12px;padding:12px;background:#f8fafc;color:#0f172a">${escapeHtml(args.objective || 'No preview text was provided.')}</div>
       <p>${buttonLink(reviewUrl, 'Open and approve campaign')}</p>
-      <p>Nothing should be published or sent externally until the owner approves it.</p>
+      <p>Approval authorizes submission to the verified publisher target. It does not mean the article is already published.</p>
     `.trim(),
   )
 }
@@ -89,7 +89,7 @@ export async function sendPressPrintPublishedEmail(args: PublishedArgs): Promise
       <p><strong>${escapeHtml(args.title || 'Press & Print campaign')}</strong></p>
       <p><strong>Campaign:</strong> ${escapeHtml(args.campaignId)}</p>
       <p><strong>Channel:</strong> ${escapeHtml(args.channel || 'press-print')}</p>
-      ${args.contact ? `<p><strong>Publication/contact:</strong> ${escapeHtml(args.contact)}</p>` : ''}
+      ${args.contact ? `<p><strong>Publisher/contact:</strong> ${escapeHtml(args.contact)}</p>` : ''}
       ${args.publicationDate ? `<p><strong>Publication date:</strong> ${escapeHtml(args.publicationDate)}</p>` : ''}
       <p><strong>Publication/proof location:</strong> <a href="${escapeHtml(location)}">${escapeHtml(location)}</a></p>
       <p><strong>Final published/placed content preview:</strong></p>

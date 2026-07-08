@@ -14,6 +14,19 @@ export type ValidSocialToken = {
   error?: string
 }
 
+async function destinationToken(admin: any, userId: string, platform: SocialPlatform, accountRef: string | null) {
+  if (!accountRef) return null
+  const { data } = await admin
+    .from('outreach_social_destinations')
+    .select('access_token, account_ref, account_name')
+    .eq('user_id', userId)
+    .eq('platform', platform)
+    .eq('account_ref', accountRef)
+    .maybeSingle()
+  if (data?.access_token) return data
+  return null
+}
+
 export async function getValidSocialToken(
   admin: any,
   userId: string,
@@ -31,10 +44,14 @@ export async function getValidSocialToken(
 
     const accountRef = data.account_ref ? String(data.account_ref) : null
     const accountName = data.account_name ? String(data.account_name) : null
+    const selectedDestination = await destinationToken(admin, userId, platform, accountRef)
     const stillValid = data.expires_at && new Date(data.expires_at).getTime() > Date.now() + 60_000
-    if (stillValid && data.access_token) return { ok: true, accessToken: data.access_token, accountRef, accountName }
+    if (stillValid && (selectedDestination?.access_token || data.access_token)) {
+      return { ok: true, accessToken: selectedDestination?.access_token || data.access_token, accountRef: selectedDestination?.account_ref || accountRef, accountName: selectedDestination?.account_name || accountName }
+    }
 
     if (!data.refresh_token) {
+      if (selectedDestination?.access_token || data.access_token) return { ok: true, accessToken: selectedDestination?.access_token || data.access_token, accountRef, accountName }
       return { ok: false, error: `${platform} token expired and has no refresh token — reconnect the account.` }
     }
 
@@ -53,7 +70,8 @@ export async function getValidSocialToken(
       },
       { onConflict: 'user_id,platform' },
     )
-    return { ok: true, accessToken: fresh, accountRef, accountName }
+    const refreshedDestination = await destinationToken(admin, userId, platform, accountRef)
+    return { ok: true, accessToken: refreshedDestination?.access_token || fresh, accountRef, accountName }
   } catch (e: any) {
     return { ok: false, error: e?.message || 'token load failed' }
   }

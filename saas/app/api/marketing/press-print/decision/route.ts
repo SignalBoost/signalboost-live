@@ -9,14 +9,7 @@ function normalizeDecision(value: unknown): Decision | null { return value === '
 function reviewValue(decision: Decision, existingReview: string) { if (decision === 'ok') return 'APPROVED'; if (decision === 'no') return 'REJECTED'; if (decision === 'hold' || decision === 'staff') return 'ON_HOLD'; return existingReview || 'APPROVED' }
 function executionStage(decision: Decision, existingStage: string) { if (decision === 'ok') return 'approved'; if (decision === 'no') return 'rejected'; if (decision === 'hold') return 'on_hold'; if (decision === 'staff') return 'staff_support'; if (decision === 'package') return 'package_prepared'; if (decision === 'submitted') return 'submitted_to_publisher'; if (decision === 'published') return 'published'; return existingStage || 'draft' }
 function rowStatus(decision: Decision) { if (decision === 'no') return 'rejected'; if (decision === 'hold' || decision === 'staff') return 'draft'; if (decision === 'submitted') return 'running'; if (decision === 'published') return 'completed'; return 'approved' }
-
-async function readPayload(req: NextRequest) {
-  const contentType = req.headers.get('content-type') || ''
-  if (contentType.includes('application/json')) return req.json().catch(() => ({}))
-  const form = await req.formData().catch(() => null)
-  if (!form) return {}
-  return Object.fromEntries(form.entries())
-}
+async function readPayload(req: NextRequest) { const contentType = req.headers.get('content-type') || ''; if (contentType.includes('application/json')) return req.json().catch(() => ({})); const form = await req.formData().catch(() => null); if (!form) return {}; return Object.fromEntries(form.entries()) }
 
 export async function POST(req: NextRequest) {
   const ctx = await requireAdmin()
@@ -39,7 +32,7 @@ export async function POST(req: NextRequest) {
   const publisherEmail = String(previous.publisher_email || '')
   const publisherFormUrl = String(previous.publisher_submission_form_url || '')
   const submissionTarget = publisherEmail || publisherFormUrl
-  const verifiedTarget = previous.target_discovery_status === 'resolved' && publisherName && submissionTarget
+  const verifiedTarget = Boolean(previous.target_discovery_status === 'resolved' && publisherName && submissionTarget)
   const manualStaffLed = previous.automation_mode === 'manual_staff_led'
   if ((decision === 'submitted' || decision === 'published') && !verifiedTarget && !manualStaffLed) return NextResponse.json({ ok: false, error: 'Missing verified free publisher target. Cannot submit/publish automated Press & Print campaign.' }, { status: 400 })
   const execution = { ...((previous.press_print_execution && typeof previous.press_print_execution === 'object') ? previous.press_print_execution : {}), stage, package_prepared_at: decision === 'package' ? now : previous.press_print_execution?.package_prepared_at || null, submitted_at: decision === 'submitted' ? now : previous.press_print_execution?.submitted_at || null, submitted_to: decision === 'submitted' ? submissionTarget : previous.press_print_execution?.submitted_to || null, submitted_to_publisher: decision === 'submitted' ? publisherName : previous.press_print_execution?.submitted_to_publisher || null, published_at: decision === 'published' ? now : previous.press_print_execution?.published_at || null, live_url: liveUrl || previous.press_print_execution?.live_url || null, live_url_required: false, live_url_status: liveUrl ? 'provided' : 'not_provided', publication_date: publicationDate || previous.press_print_execution?.publication_date || null }

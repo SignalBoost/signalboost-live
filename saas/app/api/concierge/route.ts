@@ -113,9 +113,15 @@ function queuedReply(lang: string, result: any): string {
   return `Sent this request to the COSA video pipeline. Campaign ID: ${ids}. Open ${link} and click Refresh/Kick missing renders if it does not appear yet.`
 }
 
+function stopReasonText(reason: string) {
+  if (reason === 'no_free_actual_publication_contact_found') return 'no free actual newspaper, magazine, or publication with a publisher/editor email or real free submission form was found'
+  if (reason === 'publisher_search_api_not_configured') return 'publisher search is not configured'
+  return reason
+}
+
 function pressReply(lang: string, campaign: ConciergePressCampaign, previewEmail: any): string {
   if (campaign.metadata?.target_discovery_status === 'stopped_no_publisher_contact') {
-    const reason = String(campaign.metadata?.stop_reason || 'publisher_contact_not_found')
+    const reason = stopReasonText(String(campaign.metadata?.stop_reason || 'publisher_contact_not_found'))
     if (lang === 'pt') return `Campanha Press & Print automática interrompida: ${reason}. Nenhuma campanha foi criada e nenhum pedido de aprovação foi enviado.`
     if (lang === 'es') return `Campaña Press & Print automática detenida: ${reason}. No se creó ninguna campaña y no se envió solicitud de aprobación.`
     return `Automated Press & Print campaign stopped: ${reason}. No campaign was created and no owner approval request was sent.`
@@ -171,8 +177,8 @@ async function createConciergePressCampaign(text: string, lang = 'en'): Promise<
       editorContact = discovered.editorContact
       discoverySourceUrl = discovered.sourceUrl || null
     } else {
-      const stopReason = discovered.error || 'no_publisher_with_public_contact_found'
-      return { campaign: { id: 'stopped_no_publisher_contact', title: headline, objective: 'Automated Press & Print campaign stopped before creation because no publisher contact method was found/provided.', metadata: { target_discovery_status: 'stopped_no_publisher_contact', publication_name: publicationName, editor_contact: editorContact, outreach_channel: outreachChannel, media_channel: outreachChannel, press_print_execution_stage: 'stopped', press_print_review: 'STOPPED', stop_reason: stopReason } }, previewEmail: { ok: false, skipped: true, reason: stopReason }, stopped: true }
+      const stopReason = discovered.error || 'no_free_actual_publication_contact_found'
+      return { campaign: { id: 'stopped_no_publisher_contact', title: headline, objective: 'Automated Press & Print campaign stopped before creation because no valid free publisher contact method was found/provided.', metadata: { target_discovery_status: 'stopped_no_publisher_contact', publication_name: publicationName, editor_contact: editorContact, outreach_channel: outreachChannel, media_channel: outreachChannel, press_print_execution_stage: 'stopped', press_print_review: 'STOPPED', stop_reason: stopReason } }, previewEmail: { ok: false, skipped: true, reason: stopReason }, stopped: true }
     }
   }
 

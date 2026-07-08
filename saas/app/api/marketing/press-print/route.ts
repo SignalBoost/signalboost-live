@@ -15,6 +15,67 @@ function channelFromMetadata(metadata: Record<string, any> | null | undefined) {
   return String(metadata?.outreach_channel || metadata?.media_channel || '')
 }
 
+function id(prefix: string) {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+}
+
+function buildPressQueueRow(args: { title: string; objective: string; outreachChannel: PressPrintChannel; audience: string; signal: string; now: string }) {
+  const recommendationId = id('rec_press_print')
+  return {
+    recommendation_id: recommendationId,
+    department: 'marketing',
+    title: args.title,
+    objective: args.objective,
+    channel: 'outreach',
+    audience: args.audience,
+    languages: ['en'],
+    assets: [],
+    work_items: [
+      {
+        id: id('work_press_print'),
+        type: 'press_print_campaign',
+        title: 'Prepare Press & Print publication preview',
+        status: 'drafted',
+        input: { channel: args.outreachChannel, signal: args.signal },
+        output: { title: args.title, draft: args.objective },
+      },
+    ],
+    recommendation: {
+      id: recommendationId,
+      department: 'marketing',
+      title: args.title,
+      summary: args.objective,
+      recommended_channel: 'outreach',
+      priority: 'medium',
+      confidence: 80,
+      expected_roi: 'medium',
+      estimated_cost_usd: 0,
+      reason: 'Staff-led Press & Print campaign prepared for owner-gated workflow.',
+      approval_status: 'pending_approval',
+      created_at: args.now,
+    },
+    status: 'draft',
+    risk_level: 'medium',
+    approval_required: true,
+    metadata: {
+      source: 'press_print_staff_led_campaign',
+      outreach_channel: args.outreachChannel,
+      media_channel: args.outreachChannel,
+      press_print_review: 'PENDING',
+      press_print_review_scope: 'local_marketing_workspace',
+      press_print_execution_stage: 'not_started',
+      press_print_live_url_required: false,
+      staff_support_available: true,
+      owner_preview_required: true,
+      owner_preview_email_sent_at: null,
+      audience: args.audience,
+      signal: args.signal,
+    },
+    created_at: args.now,
+    updated_at: args.now,
+  }
+}
+
 export async function GET() {
   const ctx = await requireAdmin()
   if (ctx instanceof NextResponse) return ctx
@@ -45,34 +106,9 @@ export async function POST(req: NextRequest) {
   const now = new Date().toISOString()
   const title = String(request.title || 'Press & Print Media campaign').trim()
   const objective = String(request.objective || '').trim()
-  const priority = String(request.priority || 'medium').trim()
-
-  const row = {
-    title,
-    objective,
-    summary: objective,
-    department: 'marketing',
-    channel: 'outreach',
-    priority,
-    status: 'draft',
-    estimated_cost_usd: Number(request.estimatedCostUsd || 0),
-    metadata: {
-      source: 'press_print_staff_led_campaign',
-      outreach_channel: outreachChannel,
-      media_channel: outreachChannel,
-      press_print_review: 'PENDING',
-      press_print_review_scope: 'local_marketing_workspace',
-      press_print_execution_stage: 'not_started',
-      press_print_live_url_required: false,
-      staff_support_available: true,
-      owner_preview_required: true,
-      owner_preview_email_sent_at: null,
-      audience: String(request.audience || ''),
-      signal: String(request.signal || ''),
-    },
-    created_at: now,
-    updated_at: now,
-  }
+  const audience = String(request.audience || 'Publication editors, readers, and business technology buyers reached through the selected press media channel.').trim()
+  const signal = String(request.signal || '').trim()
+  const row = buildPressQueueRow({ title, objective, outreachChannel, audience, signal, now })
 
   const { data, error } = await ctx.admin
     .from('cos_campaign_queue')

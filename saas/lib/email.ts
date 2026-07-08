@@ -1,6 +1,8 @@
 import { Resend } from 'resend'
 
 // Verified sender identities, aligned to the Signal ecosystem.
+// These addresses are used for outbound sending through Resend.
+// Reply handling is controlled separately by fallbackReplyTo() so replies do not depend on an inbound mailbox existing for every sender alias.
 export const SENDERS = {
   signalSupport: 'SignalBoost Team <signalsupport@signalboostapp.com>',
   saasSupport:   'SaaSSignal Team <saassupport@signalboostapp.com>',
@@ -16,6 +18,22 @@ function getResendClient() {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) return null
   return new Resend(apiKey)
+}
+
+function firstEmail(value: string | undefined) {
+  return String(value || '').split(',')[0]?.trim().toLowerCase() || ''
+}
+
+function fallbackReplyTo() {
+  return (
+    firstEmail(process.env.EMAIL_REPLY_TO) ||
+    firstEmail(process.env.REPLY_TO_EMAIL) ||
+    firstEmail(process.env.OWNER_EMAILS) ||
+    firstEmail(process.env.OWNER_EMAIL) ||
+    firstEmail(process.env.SIGNALBOOST_OWNER_EMAIL) ||
+    firstEmail(process.env.ADMIN_EMAIL) ||
+    undefined
+  )
 }
 
 export async function sendEmail(opts: {
@@ -34,7 +52,7 @@ export async function sendEmail(opts: {
       to: opts.to,
       subject: opts.subject,
       html: opts.html,
-      replyTo: opts.replyTo,
+      replyTo: opts.replyTo || fallbackReplyTo(),
     })
     if (error) return { ok: false, error: error.message }
     return { ok: true, id: data?.id }

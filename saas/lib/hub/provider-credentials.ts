@@ -33,6 +33,14 @@ export const PROVIDER_REQUIRED_ENV: Record<string, string[]> = {
   // ── Email ─────────────────────────────────────────────────────────────────
   resend: ['RESEND_API_KEY'],
   sendgrid: ['SENDGRID_API_KEY'],
+  // ── Social outreach providers ─────────────────────────────────────────────
+  youtube: ['SOCIAL_YOUTUBE_CHANNELS_CLIENT_ID', 'SOCIAL_YOUTUBE_CHANNELS_CLIENT_SECRET'],
+  linkedin: ['SOCIAL_LINKEDIN_COMPANY_CLIENT_ID', 'SOCIAL_LINKEDIN_COMPANY_CLIENT_SECRET'],
+  tiktok: ['SOCIAL_TIKTOK_CLIENT_ID', 'SOCIAL_TIKTOK_CLIENT_SECRET'],
+  reddit: ['SOCIAL_REDDIT_CLIENT_ID', 'SOCIAL_REDDIT_CLIENT_SECRET'],
+  instagram: ['SOCIAL_INSTAGRAM_BUSINESS_CLIENT_ID', 'SOCIAL_INSTAGRAM_BUSINESS_CLIENT_SECRET'],
+  facebook: ['SOCIAL_FACEBOOK_PAGES_CLIENT_ID', 'SOCIAL_FACEBOOK_PAGES_CLIENT_SECRET'],
+  twitter_x: ['SOCIAL_TWITTER_X_CLIENT_ID', 'SOCIAL_TWITTER_X_CLIENT_SECRET'],
   // ── Messaging / edge / observability (executors already wired) ────────────
   twilio: ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN'],
   cloudflare: ['CLOUDFLARE_API_TOKEN'],
@@ -53,5 +61,6 @@ export const PROVIDER_HAS_BACKEND = new Set<string>([
   'openai', 'anthropic', 'gemini', 'elevenlabs', 'assemblyai',
   'fal', 'json2video',
   'resend', 'sendgrid', 'twilio', 'cloudflare', 'digitalocean', 'datadog', 'sentry', 'pagerduty',
+  'youtube', 'linkedin', 'tiktok', 'reddit', 'instagram', 'facebook', 'twitter_x',
   'bank',
 ])

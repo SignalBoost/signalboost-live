@@ -4,7 +4,6 @@ import { spawn } from 'node:child_process'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
 
 if (process.argv.includes('--help')) {
   console.log('Usage: NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/cos-video-production-worker.mjs')
@@ -76,7 +75,6 @@ async function callWebhookRenderer(job) {
   }
 }
 
-
 function runCommand(command, args) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { stdio: ['ignore', 'inherit', 'pipe'] })
@@ -121,7 +119,7 @@ function wrapText(value, max = 42) {
     }
   }
   if (current) lines.push(current)
-  return lines.slice(0, 4).join('\\n')
+  return lines.slice(0, 4).join('\n')
 }
 
 function escapeDrawtext(value) {
@@ -135,7 +133,6 @@ function escapeDrawtext(value) {
 function drawText({ text, x = '(w-text_w)/2', y, size = 54, color = 'white', start = 0, end = 30 }) {
   return `drawtext=text='${escapeDrawtext(text)}':fontcolor=${color}:fontsize=${size}:line_spacing=12:x=${x}:y=${y}:enable='between(t\\,${start}\\,${end})'`
 }
-
 
 function assTime(seconds) {
   const safe = Math.max(0, Number(seconds) || 0)
@@ -177,15 +174,16 @@ async function synthesizeLocalVoice(job, dir, duration) {
     return wav
   }
 
-  // Last-resort offline audio: create a deterministic speech-bed tone so the
-  // FFmpeg mux path still produces a real audio track instead of marking voice
-  // as complete while leaving the video silent.
   await runFfmpeg(['-y', '-f', 'lavfi', '-i', `sine=frequency=440:sample_rate=44100:d=${duration}`, '-af', 'volume=0.08', wav])
   return wav
 }
 
-function fileUrl(path) {
-  return pathToFileURL(path).href.replace(/'/g, "\\'")
+function escapeAssFilterPath(value) {
+  // Use the local POSIX path directly. Do not pass a file:// URL here:
+  // the FFmpeg ass filter parses the colon in file:///tmp/... as the
+  // separator for original_size, which caused "Unable to parse option value
+  // ///tmp/.../captions.ass as image size" and froze COSA renders.
+  return String(value || '').replace(/\\/g, '/').replace(/'/g, "\\'")
 }
 
 function buildFilters(job, duration) {
@@ -216,7 +214,7 @@ async function renderLocalMp4(job) {
     const audioPath = await synthesizeLocalVoice(job, dir, duration)
     await writeFile(assPath, buildAss(job, duration), 'utf8')
 
-    const visualFilter = `${buildFilters(job, duration)},ass='${fileUrl(assPath)}'`
+    const visualFilter = `${buildFilters(job, duration)},ass='${escapeAssFilterPath(assPath)}'`
     await runFfmpeg([
       '-y',
       '-f', 'lavfi', '-i', `color=c=0x020617:s=1920x1080:d=${duration}`,

@@ -6,6 +6,7 @@ import { COMPLETE_TEMPLATES } from './provider-templates-complete'
 import { VERCEL_DNS_TEMPLATES } from './provider-templates-vercel-dns'
 import { BANK_TEMPLATES } from './provider-templates-bank'
 import { RESEND_CONSOLE_TEMPLATES } from './provider-templates-resend'
+import { SOCIAL_PROVIDER_TEMPLATES } from './provider-templates-social'
 
 export interface ProviderFormField {
   id: string
@@ -279,54 +280,28 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
   },
   'supabase.archive_row': {
     id: 'supabase.archive_row',
-    label: 'Archive Rows',
-    description: 'Flip active visibility flags on a specific database item record.',
+    label: 'Archive Row',
+    description: 'Mark a table record as inactive/archived when soft delete paths exist.',
     icon: '🗄️',
     policyActionId: 'table_crud',
-    api: { service: 'supabase', method: 'POST', endpoint: '/v1/db/archive' },
+    api: { service: 'supabase', method: 'PATCH', endpoint: '/v1/db/archive' },
     fields: [
-      { id: 'table', label: 'Table', type: 'remote_select', required: true, source: { action: 'supabase.list_tables', dataPath: 'tables', valueKey: 'name', labelTemplate: '{name}' } },
-      { id: 'rowId', label: 'Row', type: 'remote_select', required: true, source: { action: 'supabase.list_rows', dataPath: 'rows', valueKey: 'id', labelTemplate: '{label}', dependsOn: ['table'], emptyHint: 'Pick a table first' } }
+      { id: 'table', label: 'Table Name', type: 'text', required: true },
+      { id: 'id', label: 'Row ID', type: 'text', required: true }
     ]
   },
   'supabase.delete_row': {
     id: 'supabase.delete_row',
     label: 'Delete Row',
-    description: 'Hard purge row records out of the storage layer completely.',
+    description: 'Delete a row by primary identifier. High-risk action.',
     icon: '🗑️',
     requiresConfirm: true,
     policyActionId: 'table_crud',
-    api: { service: 'supabase', method: 'DELETE', endpoint: '/v1/db/row' },
+    api: { service: 'supabase', method: 'DELETE', endpoint: '/v1/db/delete' },
     fields: [
-      { id: 'table', label: 'Table', type: 'remote_select', required: true, source: { action: 'supabase.list_tables', dataPath: 'tables', valueKey: 'name', labelTemplate: '{name}' } },
-      { id: 'rowId', label: 'Row', type: 'remote_select', required: true, source: { action: 'supabase.list_rows', dataPath: 'rows', valueKey: 'id', labelTemplate: '{label}', dependsOn: ['table'], emptyHint: 'Pick a table first' } }
+      { id: 'table', label: 'Table Name', type: 'text', required: true },
+      { id: 'id', label: 'Row ID', type: 'text', required: true }
     ]
-  },
-  'supabase.manage_user': {
-    id: 'supabase.manage_user',
-    label: 'Auth Management',
-    description: 'Directly alter raw metadata configurations or update confirmation state metrics.',
-    icon: '👤',
-    policyActionId: 'auth_management',
-    api: { service: 'supabase', method: 'POST', endpoint: '/v1/auth/manage' },
-    fields: [
-      { id: 'email', label: 'User Email Address', type: 'email', required: true, placeholder: 'name@domain.com' },
-      { id: 'action', label: 'Administrative Action', type: 'select', required: true, options: [
-        { label: 'Force Confirm Email', value: 'confirm' },
-        { label: 'Reset Password Link', value: 'reset' },
-        { label: 'Ban Account Record', value: 'ban' }
-      ]}
-    ]
-  },
-  'supabase.rotate_service_key': {
-    id: 'supabase.rotate_service_key',
-    label: 'Rotate Keys',
-    description: 'Invalidate current service_role JSON tokens and issue fresh credentials.',
-    icon: '🔄',
-    requiresConfirm: true,
-    policyActionId: 'auth_management',
-    api: { service: 'supabase', method: 'POST', endpoint: '/v1/auth/keys/rotate' },
-    fields: []
   },
   'supabase.create_bucket': {
     id: 'supabase.create_bucket',
@@ -524,21 +499,12 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
   }
 }
 
-// Merge the extended provider templates (GitHub and others defined in the
-// companion file) into the main registry. Without this, getTemplate() returns
-// null for those ids and their workspace cards render with no action buttons.
 Object.assign(PROVIDER_TEMPLATES, EXTRA_TEMPLATES)
 Object.assign(PROVIDER_TEMPLATES, COMPLETE_TEMPLATES)
 Object.assign(PROVIDER_TEMPLATES, VERCEL_DNS_TEMPLATES)
-
-// Merge Open Banking templates (Bank provider: enrollment, balances, payments,
-// statements, compliance). Same pattern as EXTRA_TEMPLATES so getTemplate('bank.*')
-// resolves and the Bank card renders its action buttons.
 Object.assign(PROVIDER_TEMPLATES, BANK_TEMPLATES)
-
-// Dedicated Resend console module (delivery list + full CRUD). Kept in its own
-// file so new Resend actions never require re-pasting the large template files.
 Object.assign(PROVIDER_TEMPLATES, RESEND_CONSOLE_TEMPLATES)
+Object.assign(PROVIDER_TEMPLATES, SOCIAL_PROVIDER_TEMPLATES)
 
 export function getTemplate(id: string, dict?: Dict | null): ProviderTemplate | null {
   const tpl = PROVIDER_TEMPLATES[id] || null

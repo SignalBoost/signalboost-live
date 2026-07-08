@@ -111,6 +111,28 @@ function titleFrom(text: string): string {
   return String(text || '').replace(/\s+/g, ' ').replace(/📎[\s\S]*$/, '').trim().slice(0, 110) || 'Owner requested video render'
 }
 
+function hasEmail(value: string) {
+  return /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(value)
+}
+
+function hasOnlineSubmission(value: string) {
+  return /https?:\/\//i.test(value) && /(submit|contact|advertis|media|press|form|sponsor|partner|editor|news|pr)/i.test(value)
+}
+
+function publisherTargetIsResolved(publicationName: string, editorContact: string) {
+  const pub = String(publicationName || '').toLowerCase()
+  const contact = String(editorContact || '').toLowerCase()
+  const genericPub = !pub || /(to be selected|target to be selected|digital business publication|online newspaper|it magazine|trade press target|publication target|suitable real)/i.test(pub)
+  const genericContact = !contact || /(to be confirmed|name, email|media-kit link|notes|editor contact|contact to be confirmed)/i.test(contact)
+  return !genericPub && !genericContact && (hasEmail(editorContact) || hasOnlineSubmission(editorContact))
+}
+
+function submissionMethod(editorContact: string) {
+  if (hasEmail(editorContact)) return 'email'
+  if (hasOnlineSubmission(editorContact)) return 'online_form'
+  return 'unresolved'
+}
+
 function queuedReply(lang: string, result: any): string {
   const ids = Array.isArray(result?.campaignIds) && result.campaignIds.length ? result.campaignIds.join(', ') : result?.campaignId || 'created'
   const link = '/dashboard/cosa/video-pipeline'
@@ -121,30 +143,39 @@ function queuedReply(lang: string, result: any): string {
 
 function pressReply(lang: string, campaign: ConciergePressCampaign, previewEmail: any): string {
   const link = `/dashboard/marketing/press-print?campaign=${encodeURIComponent(campaign.id)}`
+  const targetStatus = String(campaign.metadata?.target_discovery_status || '')
+  if (targetStatus !== 'resolved') {
+    if (lang === 'pt') return `A campanha Press & Print foi criada, mas ainda NÃO está pronta para aprovação. A COS precisa primeiro identificar/verificar o publisher e o método de envio (email do editor ou formulário online). ID: ${campaign.id}. Abra: ${link}`
+    if (lang === 'es') return `La campaña Press & Print fue creada, pero todavía NO está lista para aprobación. COS debe identificar/verificar primero el publisher y el método de envío (email del editor o formulario online). ID: ${campaign.id}. Abre: ${link}`
+    return `Press & Print campaign created, but it is NOT ready for owner approval yet. COS must first identify and verify the publisher plus submission method: editor email address or online submission form. Campaign ID: ${campaign.id}. Open it here: ${link}`
+  }
   const emailStatus = previewEmail?.ok ? ' Preview email sent to the owner.' : previewEmail?.skipped || previewEmail?.error ? ` Preview email was not sent yet: ${previewEmail.reason || previewEmail.error || 'email send failed'}.` : ''
-  if (lang === 'pt') return `A Concierge criou a campanha Press & Print na fila existente da COS. ID: ${campaign.id}. Nada será publicado até aprovação do proprietário. Revise aqui: ${link}.${emailStatus}`
-  if (lang === 'es') return `Concierge creó la campaña Press & Print en la cola existente de COS. ID: ${campaign.id}. No se publicará hasta la aprobación del propietario. Revisa aquí: ${link}.${emailStatus}`
-  return `Concierge created the Press & Print campaign in the existing COS campaign queue. Campaign ID: ${campaign.id}. Nothing will publish until the owner approves it. Review it here: ${link}.${emailStatus}`
+  if (lang === 'pt') return `A Concierge criou a campanha Press & Print com publisher verificado. ID: ${campaign.id}. Nada será publicado até aprovação do proprietário. Revise aqui: ${link}.${emailStatus}`
+  if (lang === 'es') return `Concierge creó la campaña Press & Print con publisher verificado. ID: ${campaign.id}. No se publicará hasta la aprobación del propietario. Revisa aquí: ${link}.${emailStatus}`
+  return `Concierge created the Press & Print campaign with a verified publisher target. Campaign ID: ${campaign.id}. Nothing will publish until the owner approves it. Review it here: ${link}.${emailStatus}`
 }
 
-function buildPressObjective(args: { publicationName: string; editorContact: string; headline: string; articleNotes: string; ctaUrl: string; channel: string; language: string }) {
+function buildPressObjective(args: { publicationName: string; editorContact: string; headline: string; articleNotes: string; ctaUrl: string; channel: string; language: string; targetResolved: boolean }) {
   return [
     `Prepare a COS-led Press & Print Media campaign for ${args.publicationName}.`,
     `Publication/contact: ${args.editorContact}.`,
+    `Submission method: ${submissionMethod(args.editorContact)}.`,
+    `Target status: ${args.targetResolved ? 'verified before owner approval' : 'publisher target must be identified before owner approval'}.`,
     `Headline / campaign title: ${args.headline}.`,
     `Article/ad notes: ${args.articleNotes}.`,
     `CTA URL: ${args.ctaUrl}.`,
     'Target audience: Publication editors, readers, and business technology buyers reached through the selected press media channel.',
     `Requested language: ${args.language}.`,
     `Specific outreach channel: ${args.channel}.`,
-    'Execution rule: draft, approval, final polish, publishing, monitoring, and learning must remain behind owner-approved workflow gates.',
-    'Safety rule: do not contact, submit, publish, or send anything externally until the owner receives the preview email and approves the campaign.',
+    'Execution rule: draft, approval, final polish, submission, publishing, monitoring, and learning must remain behind owner-approved workflow gates.',
+    'Safety rule: do not request owner approval until a concrete publisher name and submission method are recorded. Do not contact, submit, publish, or send anything externally until the owner approves the exact target and preview.',
   ].join(' ')
 }
 
-function pressQueueRow(args: { headline: string; objective: string; outreachChannel: PressPrintChannel; publicationName: string; editorContact: string; articleNotes: string; ctaUrl: string; lang: string; now: string }) {
+function pressQueueRow(args: { headline: string; objective: string; outreachChannel: PressPrintChannel; publicationName: string; editorContact: string; articleNotes: string; ctaUrl: string; lang: string; now: string; targetResolved: boolean }) {
   const recommendationId = id('rec_press_print')
   const audience = 'Small businesses, local businesses, agencies, entrepreneurs, and service providers.'
+  const method = submissionMethod(args.editorContact)
   return {
     recommendation_id: recommendationId,
     department: 'marketing',
@@ -156,14 +187,15 @@ function pressQueueRow(args: { headline: string; objective: string; outreachChan
     assets: [],
     work_items: [
       {
-        id: id('work_press_preview'),
-        type: 'press_print_campaign',
-        title: 'Prepare Press & Print publication preview',
-        status: 'drafted',
+        id: id(args.targetResolved ? 'work_press_preview' : 'work_press_target'),
+        type: args.targetResolved ? 'press_print_campaign' : 'publisher_target_research',
+        title: args.targetResolved ? 'Prepare Press & Print publication preview' : 'Identify and verify publisher target before owner approval',
+        status: args.targetResolved ? 'drafted' : 'needs_research',
         input: {
           channel: args.outreachChannel,
           publication_name: args.publicationName,
           editor_contact: args.editorContact,
+          submission_method: method,
           cta_url: args.ctaUrl,
         },
         output: {
@@ -180,33 +212,40 @@ function pressQueueRow(args: { headline: string; objective: string; outreachChan
       summary: args.objective,
       recommended_channel: 'outreach',
       priority: 'medium',
-      confidence: 85,
+      confidence: args.targetResolved ? 85 : 45,
       expected_roi: 'medium',
       estimated_cost_usd: 0,
-      reason: 'Concierge/COS requested an owner-gated Press & Print campaign. No external publication action is allowed until owner approval.',
-      approval_status: 'pending_approval',
+      reason: args.targetResolved
+        ? 'Concierge/COS requested an owner-gated Press & Print campaign with a concrete publisher target. No external publication action is allowed until owner approval.'
+        : 'Concierge/COS requested a Press & Print campaign, but no concrete publisher email address or online submission form is verified yet. Owner approval must wait until target discovery is complete.',
+      approval_status: args.targetResolved ? 'pending_approval' : 'target_required',
       created_at: args.now,
     },
     status: 'draft',
     risk_level: 'medium',
-    approval_required: true,
+    approval_required: args.targetResolved,
     metadata: {
       source: 'concierge_cos_press_print_campaign',
       outreach_channel: args.outreachChannel,
       media_channel: args.outreachChannel,
       publication_name: args.publicationName,
       editor_contact: args.editorContact,
+      publisher_name: args.targetResolved ? args.publicationName : null,
+      publisher_contact_method: method,
+      publisher_email: hasEmail(args.editorContact) ? args.editorContact.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] : null,
+      publisher_submission_form_url: hasOnlineSubmission(args.editorContact) ? args.editorContact.match(/https?:\/\/\S+/i)?.[0] : null,
+      target_discovery_status: args.targetResolved ? 'resolved' : 'required',
       headline: args.headline,
       article_notes: args.articleNotes,
       cta_url: args.ctaUrl,
-      press_print_review: 'PENDING',
-      press_print_review_scope: 'owner_approval_required',
-      press_print_execution_stage: 'not_started',
+      press_print_review: args.targetResolved ? 'PENDING' : 'TARGET_NEEDED',
+      press_print_review_scope: args.targetResolved ? 'owner_approval_required' : 'publisher_target_required_before_owner_approval',
+      press_print_execution_stage: args.targetResolved ? 'not_started' : 'target_selection_required',
       press_print_live_url_required: false,
       staff_support_available: true,
-      owner_preview_required: true,
+      owner_preview_required: args.targetResolved,
       owner_preview_email_sent_at: null,
-      owner_preview_email_status: 'pending',
+      owner_preview_email_status: args.targetResolved ? 'pending' : 'blocked_until_publisher_target_resolved',
       concierge_requested_at: args.now,
       audience,
       signal: `Publication: ${args.publicationName}. Contact: ${args.editorContact}. Headline: ${args.headline}. CTA: ${args.ctaUrl}`,
@@ -219,14 +258,15 @@ function pressQueueRow(args: { headline: string; objective: string; outreachChan
 async function createConciergePressCampaign(text: string, lang = 'en') {
   const outreachChannel = pressChannelFrom(text)
   const publicationName = fieldFrom(text, ['Publication name', 'Publication', 'Media outlet']) || (outreachChannel === 'trade-press' ? 'IT magazine / trade press target to be selected by COS' : 'Digital business publication to be selected by COS')
-  const editorContact = fieldFrom(text, ['Editor / media contact', 'Editor contact', 'Media contact', 'Contact']) || 'Name, email, phone, media-kit link, or notes to be confirmed by COS'
+  const editorContact = fieldFrom(text, ['Editor / media contact', 'Editor contact', 'Media contact', 'Contact', 'Submission form', 'Submission URL']) || 'Name, email, phone, media-kit link, or notes to be confirmed by COS'
   const headline = fieldFrom(text, ['Headline / campaign title', 'Headline', 'Campaign title']) || 'SignalBoost introduces AI-powered business growth tools for modern businesses'
   const articleNotes = fieldFrom(text, ['Article / ad notes', 'Article notes', 'Ad notes', 'Notes']) || text
   const ctaUrl = fieldFrom(text, ['CTA URL', 'CTA', 'Link']) || 'https://saas.signalboostapp.com'
-  const objective = buildPressObjective({ publicationName, editorContact, headline, articleNotes, ctaUrl, channel: outreachChannel, language: lang })
+  const targetResolved = publisherTargetIsResolved(publicationName, editorContact)
+  const objective = buildPressObjective({ publicationName, editorContact, headline, articleNotes, ctaUrl, channel: outreachChannel, language: lang, targetResolved })
   const now = new Date().toISOString()
   const sb = admin()
-  const row = pressQueueRow({ headline, objective, outreachChannel, publicationName, editorContact, articleNotes, ctaUrl, lang, now })
+  const row = pressQueueRow({ headline, objective, outreachChannel, publicationName, editorContact, articleNotes, ctaUrl, lang, now, targetResolved })
 
   const { data, error } = await sb
     .from('cos_campaign_queue')
@@ -236,13 +276,15 @@ async function createConciergePressCampaign(text: string, lang = 'en') {
 
   if (error) throw new Error(error.message)
 
-  const previewEmail: any = await sendPressPrintPreviewEmail({
-    campaignId: data.id,
-    title: data.title || headline,
-    objective: data.objective || objective,
-    channel: outreachChannel,
-    contact: `${publicationName}; ${editorContact}`,
-  }).catch((err) => ({ ok: false, error: errorMessage(err) }))
+  const previewEmail: any = targetResolved
+    ? await sendPressPrintPreviewEmail({
+      campaignId: data.id,
+      title: data.title || headline,
+      objective: data.objective || objective,
+      channel: outreachChannel,
+      contact: `${publicationName}; ${editorContact}`,
+    }).catch((err) => ({ ok: false, error: errorMessage(err) }))
+    : { ok: false, skipped: true, reason: 'publisher_target_required_before_owner_approval' }
 
   const emailPatch = previewEmail.ok
     ? { owner_preview_email_sent_at: new Date().toISOString(), owner_preview_email_status: 'sent' }
@@ -253,7 +295,7 @@ async function createConciergePressCampaign(text: string, lang = 'en') {
     .update({ metadata: { ...((data.metadata as any) || {}), ...emailPatch } })
     .eq('id', data.id)
 
-  return { campaign: data as ConciergePressCampaign, previewEmail }
+  return { campaign: { ...(data as ConciergePressCampaign), metadata: { ...((data.metadata as any) || {}), ...emailPatch } }, previewEmail }
 }
 
 export async function POST(req: NextRequest) {

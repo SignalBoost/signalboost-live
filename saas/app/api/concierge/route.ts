@@ -15,6 +15,7 @@ export const maxDuration = 300
 
 type AttachmentInfo = { name?: string; type?: string; mimeType?: string; dataUrl?: string }
 type ConciergePressCampaign = { id: string; title?: string; objective?: string; metadata?: Record<string, any> }
+type ConciergePressResult = { campaign: ConciergePressCampaign; previewEmail: any; stopped?: boolean }
 
 const PRESS_PRINT_CHANNELS = ['online-newspapers', 'print-newspapers', 'trade-press'] as const
 type PressPrintChannel = typeof PRESS_PRINT_CHANNELS[number]
@@ -154,7 +155,7 @@ function pressQueueRow(a: { headline: string; objective: string; outreachChannel
   }
 }
 
-async function createConciergePressCampaign(text: string, lang = 'en') {
+async function createConciergePressCampaign(text: string, lang = 'en'): Promise<ConciergePressResult> {
   const outreachChannel = pressChannelFrom(text)
   let publicationName = fieldFrom(text, ['Publication name', 'Publication', 'Media outlet']) || (outreachChannel === 'trade-press' ? 'IT magazine / trade press target to be selected by COS' : 'Digital business publication to be selected by COS')
   let editorContact = fieldFrom(text, ['Editor / media contact', 'Editor contact', 'Media contact', 'Contact', 'Submission form', 'Submission URL']) || 'Name, email, phone, media-kit link, or notes to be confirmed by COS'
@@ -171,7 +172,7 @@ async function createConciergePressCampaign(text: string, lang = 'en') {
       discoverySourceUrl = discovered.sourceUrl || null
     } else {
       const stopReason = discovered.error || 'no_publisher_with_public_contact_found'
-      return { campaign: { id: 'stopped_no_publisher_contact', title: headline, objective: 'Automated Press & Print campaign stopped before creation because no publisher contact method was found/provided.', metadata: { target_discovery_status: 'stopped_no_publisher_contact', publication_name: publicationName, editor_contact: editorContact, outreach_channel: outreachChannel, media_channel: outreachChannel, press_print_execution_stage: 'stopped', press_print_review: 'STOPPED', stop_reason: stopReason } } as ConciergePressCampaign, previewEmail: { ok: false, skipped: true, reason: stopReason }, stopped: true }
+      return { campaign: { id: 'stopped_no_publisher_contact', title: headline, objective: 'Automated Press & Print campaign stopped before creation because no publisher contact method was found/provided.', metadata: { target_discovery_status: 'stopped_no_publisher_contact', publication_name: publicationName, editor_contact: editorContact, outreach_channel: outreachChannel, media_channel: outreachChannel, press_print_execution_stage: 'stopped', press_print_review: 'STOPPED', stop_reason: stopReason } }, previewEmail: { ok: false, skipped: true, reason: stopReason }, stopped: true }
     }
   }
 

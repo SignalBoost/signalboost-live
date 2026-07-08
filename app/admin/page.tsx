@@ -17,10 +17,11 @@ export default function AdminConsolePage() {
 
       <section className="mt-8 grid gap-4 md:grid-cols-4">
         {adminTelemetrySummary.metrics.map((metric) => (
-          <div key={metric.label} className="rounded-3xl border border-white/10 bg-white/[.04] p-5">
+          <Link key={metric.label} href={metric.href} className="rounded-3xl border border-white/10 bg-white/[.04] p-5 no-underline hover:border-[#FFD700]/60">
             <p className="text-sm text-white/50">{metric.label}</p>
             <p className="mt-2 text-2xl font-bold text-[#FFD700]">{metric.value}</p>
-          </div>
+            <p className="mt-3 text-xs text-white/50">Open investigation →</p>
+          </Link>
         ))}
       </section>
 

@@ -25,9 +25,9 @@ export const adminTelemetrySummary = {
   description:
     'SaaS usage is logged in the SignalBoost repo and correlated with Marketplace partner, category, booking, and Concierge activity.',
   metrics: [
-    { label: 'SaaS modules monitored', value: String(signalBoostModules.length) },
-    { label: 'Marketplace context', value: 'Partners + bookings' },
-    { label: 'Concierge coverage', value: 'Marketplace + SaaS' },
-    { label: 'Telemetry stream', value: 'Unified cockpit' },
+    { label: 'SaaS modules monitored', value: String(signalBoostModules.length), href: '/admin/system' },
+    { label: 'Marketplace context', value: 'Partners + bookings', href: '/admin/governance' },
+    { label: 'Concierge coverage', value: 'Marketplace + SaaS', href: '/admin/timeline' },
+    { label: 'Telemetry stream', value: 'Unified cockpit', href: '/admin/logs' },
   ],
 }

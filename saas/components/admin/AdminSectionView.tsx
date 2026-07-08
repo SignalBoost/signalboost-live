@@ -6,9 +6,12 @@
 // placeholder copy, so owner/admin pages look operational even before a source
 // has produced its first row.
 
-import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { KeyboardEvent, useEffect, useState } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { AdminSectionConfig, translateSection } from '@/lib/admin/sections'
+import { getAdminMetricAction } from '@/lib/admin/metricActions'
 
 const SUPPORTED = new Set(['en', 'es', 'pt', 'pl', 'ru'])
 const PLACEHOLDER_VALUES = new Set([
@@ -84,6 +87,7 @@ function defaultMetricValue(label: string, lang: string): string | number {
 }
 
 export default function AdminSectionView({ section: rawSection }: { section: AdminSectionConfig }) {
+  const router = useRouter()
   const { t, lang } = useTranslation()
   const activeLang = SUPPORTED.has(lang) ? lang : 'en'
   const section = translateSection(rawSection, activeLang)
@@ -126,17 +130,24 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
   const fmt = (n: number | null | undefined): string =>
     typeof n === 'number' ? n.toLocaleString() : empty
 
+  const openWithKeyboard = (event: KeyboardEvent<HTMLElement>, href: string) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      router.push(href)
+    }
+  }
+
   const totals = intel?.totals
-  const totalRows: [string, number | null | undefined][] = [
-    [t('audit.admin.totAccounts', 'Accounts'), totals?.accounts],
-    [t('audit.admin.totPaid', 'Paid subscriptions'), totals?.paidSubs],
-    [t('audit.admin.totFree', 'Free subscriptions'), totals?.freeSubs],
-    [t('audit.admin.totProspects', 'Prospects'), totals?.prospects],
-    [t('audit.admin.totOutreach', 'Outreach sends'), totals?.outreachSends],
-    [t('audit.admin.totAi', 'AI tasks'), totals?.aiTasks],
-    [t('audit.admin.totSites', 'Sites built'), totals?.sites],
-    [t('audit.admin.totVideos', 'Video jobs'), totals?.videos],
-    [t('audit.admin.totReviews', 'Reviews'), totals?.reviews],
+  const totalRows: [string, number | null | undefined, string][] = [
+    [t('audit.admin.totAccounts', 'Accounts'), totals?.accounts, '/admin/accounts'],
+    [t('audit.admin.totPaid', 'Paid subscriptions'), totals?.paidSubs, '/admin/billing/subscriptions?status=paid'],
+    [t('audit.admin.totFree', 'Free subscriptions'), totals?.freeSubs, '/admin/billing/subscriptions?status=free'],
+    [t('audit.admin.totProspects', 'Prospects'), totals?.prospects, '/admin/prospects'],
+    [t('audit.admin.totOutreach', 'Outreach sends'), totals?.outreachSends, '/admin/outreach/runs'],
+    [t('audit.admin.totAi', 'AI tasks'), totals?.aiTasks, '/admin/ai/tasks'],
+    [t('audit.admin.totSites', 'Sites built'), totals?.sites, '/admin/sites'],
+    [t('audit.admin.totVideos', 'Video jobs'), totals?.videos, '/admin/video/jobs'],
+    [t('audit.admin.totReviews', 'Reviews'), totals?.reviews, '/admin/reviews'],
   ]
 
   return (
@@ -148,35 +159,49 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
       </header>
 
       <section className="sb-cockpit-grid" aria-label="Dashboard panels">
-        {section.metrics.map(metric => (
-          <article key={metric.key} className="sb-neon-panel" tabIndex={0}>
-            <p>{metric.label}</p>
-            <strong>{metricValue(metric.label, metric.key, metric.value)}</strong>
-            <span>{metric.helper ?? emptyMetricLabel(activeLang)}</span>
-          </article>
-        ))}
+        {section.metrics.map(metric => {
+          const action = getAdminMetricAction({ sectionKey: rawSection.key, metricKey: metric.key, label: metric.label })
+          return (
+            <Link key={metric.key} className="sb-neon-panel sb-action-card" href={action.href} aria-label={`${metric.label}: ${action.label}`}>
+              <p>{metric.label}</p>
+              <strong>{metricValue(metric.label, metric.key, metric.value)}</strong>
+              <span>{metric.helper ?? emptyMetricLabel(activeLang)}</span>
+              <em className={`sb-card-action sb-card-action--${action.priority}`}>{action.label}</em>
+            </Link>
+          )
+        })}
       </section>
 
       <section className="sb-mission-grid" aria-label="Live operational intelligence">
-        <article className="sb-glass-panel">
+        <article
+          className="sb-glass-panel sb-action-card"
+          role="link"
+          tabIndex={0}
+          onClick={() => router.push('/admin/analytics/platform')}
+          onKeyDown={event => openWithKeyboard(event, '/admin/analytics/platform')}
+          aria-label="Platform totals: View details"
+        >
           <h3>{t('audit.admin.platformTotals', 'Platform totals')}</h3>
-          {totalRows.map(([label, value]) => (
-            <p key={label}><strong>{label}</strong> · {fmt(value)}</p>
+          {totalRows.map(([label, value, href]) => (
+            <Link key={label} href={href} onClick={event => event.stopPropagation()} aria-label={`${label}: View details`}><strong>{label}</strong> · {fmt(value)}</Link>
           ))}
+          <em className="sb-card-action">View details →</em>
         </article>
-        <article className="sb-glass-panel">
+        <Link className="sb-glass-panel sb-action-card" href="/admin/accounts" aria-label="New accounts: View details">
           <h3>{t('audit.admin.newAccounts', 'New accounts')}</h3>
           <p><strong>{t('audit.admin.win7', 'Last 7 days')}</strong> · {fmt(intel?.windows.accounts7)}</p>
           <p><strong>{t('audit.admin.win30', 'Last 30 days')}</strong> · {fmt(intel?.windows.accounts30)}</p>
           <p><strong>{t('audit.admin.win90', 'Last 90 days')}</strong> · {fmt(intel?.windows.accounts90)}</p>
-        </article>
-        <article className="sb-glass-panel">
+          <em className="sb-card-action">View details →</em>
+        </Link>
+        <Link className="sb-glass-panel sb-action-card" href="/admin/system" aria-label="Operational health: Investigate">
           <h3>{t('audit.admin.operationalHealth', 'Operational health')}</h3>
           <p><strong>{t('audit.admin.supabase', 'Supabase')}</strong> · {intel?.health.supabase ?? notConnectedLabel(activeLang)}</p>
           <p><strong>{t('audit.admin.errors', 'Logged errors')}</strong> · {fmt(intel?.health.errors)}</p>
           <p><strong>{t('audit.admin.lastOutreach', 'Last outreach run')}</strong> · {intel?.health.lastOutreach ?? empty}</p>
           <p><strong>{t('audit.admin.lastProspect', 'Last prospect run')}</strong> · {intel?.health.lastProspect ?? empty}</p>
-        </article>
+          <em className="sb-card-action sb-card-action--warning">Investigate →</em>
+        </Link>
       </section>
 
       <section className="sb-orbit-table" aria-label={section.tableTitle}>

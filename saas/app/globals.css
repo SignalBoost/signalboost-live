@@ -386,3 +386,10 @@ html, body { margin: 0; padding: 0; font-family: system-ui, sans-serif; backgrou
 
 /* Docs layout: fixed rail on wide screens, stacked on narrow */
 @media (min-width: 821px) { .sb-docs-grid { grid-template-columns: 240px minmax(0, 1fr) !important; } }
+.sb-action-card { cursor: pointer; }
+.sb-card-action { color: var(--sb-cyan); display: block; font-size: 12px; font-style: normal; font-weight: 900; letter-spacing: .08em; margin-top: 16px; text-align: right; text-transform: uppercase; }
+.sb-card-action--warning, .sb-card-action--danger { color: #fca5a5; }
+.sb-card-action--healthy { color: #86efac; }
+.sb-glass-panel.sb-action-card { color: inherit; display: block; min-height: 100%; position: relative; text-decoration: none; }
+.sb-glass-panel.sb-action-card > a { color: rgba(226,232,240,.72); display: block; line-height: 1.6; margin: 8px 0; text-decoration: none; }
+.sb-glass-panel.sb-action-card > a:hover, .sb-glass-panel.sb-action-card > a:focus-visible { color: #fff; outline: 2px solid rgba(255,195,0,.35); outline-offset: 2px; }

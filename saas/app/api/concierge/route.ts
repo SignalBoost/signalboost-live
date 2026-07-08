@@ -191,7 +191,7 @@ async function createConciergePressCampaign(text: string, lang = 'en') {
 
   if (error) throw new Error(error.message)
 
-  const previewEmail = await sendPressPrintPreviewEmail({
+  const previewEmail: any = await sendPressPrintPreviewEmail({
     campaignId: data.id,
     title: data.title || headline,
     objective: data.objective || objective,

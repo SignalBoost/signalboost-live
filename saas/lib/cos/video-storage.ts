@@ -9,13 +9,14 @@ export type CosStorageCheck = {
   bucketExists: boolean
 }
 
+/**
+ * Resolve the COSA video render bucket without failing during Next/Vercel
+ * build-time module evaluation. Runtime storage validation still happens in
+ * ensureCosVideoRenderBucket(), where we have a Supabase client and can check
+ * or create the bucket safely.
+ */
 export function cosVideoRenderBucket(): string {
-  const bucket = String(process.env[COS_VIDEO_RENDER_BUCKET_ENV] || '').trim()
-  if (bucket) return bucket
-  if (process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production') {
-    throw new Error(`${COS_VIDEO_RENDER_BUCKET_ENV} is required for the COSA video pipeline. Expected Supabase Storage bucket name, for example "${DEFAULT_COS_VIDEO_RENDER_BUCKET}".`)
-  }
-  return DEFAULT_COS_VIDEO_RENDER_BUCKET
+  return String(process.env[COS_VIDEO_RENDER_BUCKET_ENV] || DEFAULT_COS_VIDEO_RENDER_BUCKET).trim() || DEFAULT_COS_VIDEO_RENDER_BUCKET
 }
 
 function storageMessage(error: any): string {

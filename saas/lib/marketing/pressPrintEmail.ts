@@ -2,62 +2,26 @@ import { sendEmail } from '@/lib/email'
 
 type EmailResult = { ok: boolean; skipped?: boolean; reason?: string; error?: string; id?: string }
 
-type PreviewArgs = {
-  campaignId: string
-  title: string
-  objective: string
-  channel: string
-  contact?: string
-  dashboardUrl?: string
-}
-
-type PublishedArgs = PreviewArgs & {
-  liveUrl?: string
-  publicationDate?: string
-}
+type PreviewArgs = { campaignId: string; title: string; objective: string; channel: string; contact?: string; dashboardUrl?: string }
+type PublishedArgs = PreviewArgs & { liveUrl?: string; publicationDate?: string }
 
 function ownerEmail() {
-  return String(
-    (process.env.OWNER_EMAILS || '').split(',')[0] ||
-    process.env.OWNER_EMAIL ||
-    process.env.SIGNALBOOST_OWNER_EMAIL ||
-    process.env.ADMIN_EMAIL ||
-    '',
-  ).trim().toLowerCase()
+  return String((process.env.OWNER_EMAILS || '').split(',')[0] || process.env.OWNER_EMAIL || process.env.SIGNALBOOST_OWNER_EMAIL || process.env.ADMIN_EMAIL || '').trim().toLowerCase()
 }
-
-function appBaseUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://saas.signalboostapp.com').replace(/\/$/, '')
-}
-
-function dashboardLink(campaignId: string) {
-  return `${appBaseUrl()}/dashboard/marketing/press-print?campaign=${encodeURIComponent(campaignId)}`
-}
+function appBaseUrl() { return (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://saas.signalboostapp.com').replace(/\/$/, '') }
+function dashboardLink(campaignId: string) { return `${appBaseUrl()}/dashboard/marketing/press-print?campaign=${encodeURIComponent(campaignId)}` }
 
 async function sendOwnerMail(subject: string, html: string): Promise<EmailResult> {
   const to = ownerEmail()
   if (!to) return { ok: false, skipped: true, reason: 'missing_owner_email' }
-
-  const sent = await sendEmail({
-    from: 'saasMarketing',
-    to,
-    subject,
-    html,
-  })
-
+  const sent = await sendEmail({ from: 'saasMarketing', to, subject, html })
   if (!sent?.ok) return { ok: false, error: sent?.error || 'send failed' }
   return { ok: true, id: sent.id }
 }
 
 function escapeHtml(value: string) {
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
+  return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }
-
 function buttonLink(url: string, label: string, background = '#ffc300', color = '#020617') {
   return `<a href="${escapeHtml(url)}" style="display:inline-block;margin:6px 8px 6px 0;padding:12px 16px;border-radius:10px;background:${background};color:${color};font-weight:800;text-decoration:none">${escapeHtml(label)}</a>`
 }
@@ -71,11 +35,11 @@ export async function sendPressPrintPreviewEmail(args: PreviewArgs): Promise<Ema
       <p><strong>${escapeHtml(args.title || 'Press & Print campaign')}</strong></p>
       <p><strong>Campaign:</strong> ${escapeHtml(args.campaignId)}</p>
       <p><strong>Channel:</strong> ${escapeHtml(args.channel || 'press-print')}</p>
-      ${args.contact ? `<p><strong>Verified publisher target:</strong> ${escapeHtml(args.contact)}</p>` : ''}
+      ${args.contact ? `<p><strong>Verified free publisher target:</strong> ${escapeHtml(args.contact)}</p>` : ''}
       <p><strong>Preview:</strong></p>
       <div style="white-space:pre-wrap;border:1px solid #e2e8f0;border-radius:12px;padding:12px;background:#f8fafc;color:#0f172a">${escapeHtml(args.objective || 'No preview text was provided.')}</div>
       <p>${buttonLink(reviewUrl, 'Open and approve campaign')}</p>
-      <p>Approval authorizes submission to the verified publisher target. It does not mean the article is already published.</p>
+      <p>Approval authorizes submission to the verified free newspaper, magazine, or publication target. It does not mean the article is already published.</p>
     `.trim(),
   )
 }

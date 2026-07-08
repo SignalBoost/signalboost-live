@@ -6,8 +6,49 @@ import { discoverSocialDestinations } from '@/lib/outreach/social-destinations'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
+const DESTINATION_SQL = `
+create table if not exists public.outreach_social_destinations (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
+  platform text not null,
+  account_ref text not null,
+  account_name text,
+  kind text,
+  access_token text,
+  metadata jsonb not null default '{}'::jsonb,
+  discovered_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(user_id, platform, account_ref)
+);
+create index if not exists outreach_social_destinations_user_platform_idx on public.outreach_social_destinations(user_id, platform);
+create index if not exists outreach_social_destinations_platform_idx on public.outreach_social_destinations(platform, discovered_at desc);
+alter table public.outreach_social_destinations enable row level security;
+do $$
+begin
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'outreach_social_destinations' and policyname = 'Admins manage social destinations') then
+    create policy "Admins manage social destinations" on public.outreach_social_destinations for all using (public.is_signalboost_admin()) with check (public.is_signalboost_admin());
+  end if;
+end $$;
+select pg_notify('pgrst', 'reload schema');
+`.trim()
+
 function isPlatform(value: string): value is SocialPlatform {
   return Boolean((SOCIAL_CONNECTORS as any)[value])
+}
+
+function sleep(ms: number) { return new Promise(resolve => setTimeout(resolve, ms)) }
+
+async function ensureDestinationsTable(admin: any) {
+  const res = await admin.from('outreach_social_destinations').select('id').limit(1)
+  if (!res.error) return { ok: true, created: false }
+  const setup = await admin.rpc('hub_exec_sql', { query: DESTINATION_SQL })
+  if (setup.error) return { ok: false, error: setup.error.message }
+  for (let i = 0; i < 5; i++) {
+    const check = await admin.from('outreach_social_destinations').select('id').limit(1)
+    if (!check.error) return { ok: true, created: true }
+    await sleep(600)
+  }
+  return { ok: false, error: 'Destination table created but schema cache has not refreshed yet. Retry in a few seconds.' }
 }
 
 function safeDestination(row: any) {
@@ -27,8 +68,6 @@ function safeDestination(row: any) {
 async function loadToken(admin: any, userId: string, platform: SocialPlatform) {
   const { data } = await admin.from('outreach_social_tokens').select('*').eq('user_id', userId).eq('platform', platform).maybeSingle()
   if (data) return data
-  // Instagram Business uses the Meta/Facebook OAuth surface. In enterprise setups
-  // admins often connect Facebook first and then discover the linked IG business account.
   if (platform === 'instagram_business') {
     const fb = await admin.from('outreach_social_tokens').select('*').eq('user_id', userId).eq('platform', 'facebook_pages').maybeSingle()
     return fb.data || null
@@ -47,16 +86,20 @@ async function listStored(admin: any, userId: string, platform?: SocialPlatform)
 export async function GET(req: NextRequest) {
   const ctx = await requireAdmin()
   if (ctx instanceof NextResponse) return ctx
+  const ensured = await ensureDestinationsTable(ctx.admin)
+  if (!ensured.ok) return NextResponse.json({ ok: false, error: ensured.error }, { status: 202 })
   const raw = req.nextUrl.searchParams.get('platform') || ''
   const platform = raw && isPlatform(raw) ? raw : undefined
   if (raw && !platform) return NextResponse.json({ ok: false, error: 'Unsupported social platform.' }, { status: 400 })
   const stored = await listStored(ctx.admin, ctx.user.id, platform)
-  return NextResponse.json(stored, { status: stored.ok ? 200 : 500 })
+  return NextResponse.json({ ...stored, ensured }, { status: stored.ok ? 200 : 500 })
 }
 
 export async function POST(req: NextRequest) {
   const ctx = await requireAdmin()
   if (ctx instanceof NextResponse) return ctx
+  const ensured = await ensureDestinationsTable(ctx.admin)
+  if (!ensured.ok) return NextResponse.json({ ok: false, error: ensured.error }, { status: 202 })
 
   let body: any = {}
   try { body = await req.json() } catch { body = {} }
@@ -105,5 +148,5 @@ export async function POST(req: NextRequest) {
 
   await auditAdminAction({ admin: ctx.admin, actorId: ctx.user.id, action: 'outreach.social.destinations.discover', targetType: 'social_connector', targetId: platform, metadata: { discovered: discovered.destinations.length, stored: stored.length, autoSelect, selected: selected ? { accountRef: selected.accountRef, accountName: selected.accountName } : null } })
 
-  return NextResponse.json({ ok: true, mode: discovered.mode, platform, discovered: discovered.destinations.length, destinations: stored, selected })
+  return NextResponse.json({ ok: true, mode: discovered.mode, platform, discovered: discovered.destinations.length, destinations: stored, selected, ensured })
 }

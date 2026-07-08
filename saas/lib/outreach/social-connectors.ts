@@ -1,10 +1,8 @@
 // saas/lib/outreach/social-connectors.ts
-// Multi-platform social publishing, built as an ADAPTER REGISTRY so the product can
-// support any platform a tenant uses. Adding a network = add ONE adapter entry below
-// (auth + scopes + whether it needs a destination ref + a publish fn + a permalink).
-// Nothing else in the codebase changes. Honest by construction: a post is reported
-// only when the platform returns a genuine id; missing creds / destination / API
-// errors are refused, never faked.
+// Multi-platform social publishing adapter registry.
+// Honest by construction: a post is reported as published only when the platform
+// returns a genuine provider id. Missing tokens, destination refs, media, or API
+// errors return ok:false and never create fake success records.
 
 export type SocialPlatform =
   | 'facebook_pages'
@@ -22,10 +20,6 @@ export type SocialPostPayload = {
   videoUrl?: string
   accessToken?: string
   refreshToken?: string
-  // Destination handle for platforms that post to a specific entity:
-  //   linkedin_company -> organization id, facebook_pages -> page id,
-  //   instagram_business -> IG business user id, reddit -> subreddit name.
-  //   X, YouTube, and TikTok post as the authenticated user (no ref needed).
   accountRef?: string
   title?: string
   description?: string
@@ -42,11 +36,11 @@ type ContentKind = 'text' | 'media' | 'video'
 type Adapter = {
   label: string
   authUrl: string
-  tokenUrl?: string            // OAuth2 token endpoint (enables refresh) — omit if not refreshable here
+  tokenUrl?: string
   scopes: string[]
   needsAccountRef: boolean
-  content: ContentKind         // minimum content this platform needs
-  userAgent?: string           // some APIs (Reddit) require one
+  content: ContentKind
+  userAgent?: string
   publish: (p: SocialPostPayload, accessToken: string) => Promise<RawPost>
   permalink: (id: string, accountRef?: string) => string | null
 }
@@ -59,19 +53,12 @@ function creds(platform: SocialPlatform): { id?: string; secret?: string } {
 function uploadMimeForVideoUrl(url: string, responseContentType: string | null): string {
   const cleanHeader = String(responseContentType || '').split(';')[0].trim().toLowerCase()
   if (cleanHeader.startsWith('video/')) return cleanHeader
-
   const cleanUrl = url.split('?')[0].toLowerCase()
   if (cleanUrl.endsWith('.mov')) return 'video/quicktime'
   if (cleanUrl.endsWith('.webm')) return 'video/webm'
-
-  // Supabase/private storage can serve MP4 objects as application/octet-stream.
-  // YouTube accepts the upload session before processing, but the wrong media
-  // type can later surface as an unplayable video. COSA's final branded output
-  // is MP4, so default to video/mp4 for storage URLs with generic headers.
   return 'video/mp4'
 }
 
-// Standard OAuth2 refresh_token grant — works for Google/X/LinkedIn/TikTok/Reddit.
 async function refreshOAuth2(platform: SocialPlatform, tokenUrl: string, refreshToken: string): Promise<string> {
   const { id, secret } = creds(platform)
   if (!id) throw new Error(`${platform} client id not configured`)
@@ -87,7 +74,6 @@ async function refreshOAuth2(platform: SocialPlatform, tokenUrl: string, refresh
   return data.access_token as string
 }
 
-// ── YouTube resumable upload (real) ──────────────────────────────────────────────
 async function uploadVideoToYouTube(payload: SocialPostPayload, accessToken: string): Promise<RawPost> {
   if (!payload.videoUrl) throw new Error('youtube_requires_video')
   const videoRes = await fetch(payload.videoUrl)
@@ -95,15 +81,9 @@ async function uploadVideoToYouTube(payload: SocialPostPayload, accessToken: str
   const videoBuffer = await videoRes.arrayBuffer()
   const contentType = uploadMimeForVideoUrl(payload.videoUrl, videoRes.headers.get('content-type'))
   const contentLength = videoBuffer.byteLength
-  // YouTube rejects titles that are empty, longer than 100 characters, or that
-  // contain < or > with "The request metadata specifies an invalid or empty
-  // video title." Campaign titles are stored at up to 140 chars, so clamp here.
   const rawTitle = String(payload.title || payload.text || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim()
   const ytTitle = (rawTitle.length > 100 ? rawTitle.slice(0, 97).trimEnd() + '…' : rawTitle) || 'SignalBoost Video'
-  const metadata = {
-    snippet: { title: ytTitle, description: payload.description || payload.text || '', tags: payload.tags || ['SignalBoost', 'AI', 'marketing'], categoryId: '22' },
-    status: { privacyStatus: payload.privacyStatus || 'public', selfDeclaredMadeForKids: false },
-  }
+  const metadata = { snippet: { title: ytTitle, description: payload.description || payload.text || '', tags: payload.tags || ['SignalBoost', 'AI', 'marketing'], categoryId: '22' }, status: { privacyStatus: payload.privacyStatus || 'public', selfDeclaredMadeForKids: false } }
   const initRes = await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status', {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': contentType, 'X-Upload-Content-Length': String(contentLength) },
@@ -118,16 +98,13 @@ async function uploadVideoToYouTube(payload: SocialPostPayload, accessToken: str
   return { id: String(uploadData.id), url: `https://www.youtube.com/watch?v=${uploadData.id}` }
 }
 
-// ── The registry ─────────────────────────────────────────────────────────────────
 export const ADAPTERS: Record<SocialPlatform, Adapter> = {
   youtube_channels: {
     label: 'YouTube Channels', authUrl: 'https://accounts.google.com/o/oauth2/v2/auth', tokenUrl: 'https://oauth2.googleapis.com/token',
-    scopes: ['https://www.googleapis.com/auth/youtube.upload', 'https://www.googleapis.com/auth/youtube.readonly'],
-    needsAccountRef: false, content: 'video',
+    scopes: ['https://www.googleapis.com/auth/youtube.upload', 'https://www.googleapis.com/auth/youtube.readonly'], needsAccountRef: false, content: 'video',
     publish: uploadVideoToYouTube,
     permalink: (id) => `https://www.youtube.com/watch?v=${id}`,
   },
-
   twitter_x: {
     label: 'Twitter/X', authUrl: 'https://twitter.com/i/oauth2/authorize', tokenUrl: 'https://api.twitter.com/2/oauth2/token',
     scopes: ['tweet.read', 'tweet.write', 'users.read', 'offline.access'], needsAccountRef: false, content: 'text',
@@ -139,7 +116,6 @@ export const ADAPTERS: Record<SocialPlatform, Adapter> = {
     },
     permalink: (id) => `https://x.com/i/web/status/${id}`,
   },
-
   linkedin_company: {
     label: 'LinkedIn Company', authUrl: 'https://www.linkedin.com/oauth/v2/authorization', tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
     scopes: ['w_organization_social', 'r_organization_social'], needsAccountRef: true, content: 'text',
@@ -155,7 +131,6 @@ export const ADAPTERS: Record<SocialPlatform, Adapter> = {
     },
     permalink: (id) => `https://www.linkedin.com/feed/update/${id}`,
   },
-
   facebook_pages: {
     label: 'Facebook Pages', authUrl: 'https://www.facebook.com/v20.0/dialog/oauth',
     scopes: ['pages_manage_posts', 'pages_read_engagement'], needsAccountRef: true, content: 'text',
@@ -172,7 +147,6 @@ export const ADAPTERS: Record<SocialPlatform, Adapter> = {
     },
     permalink: (id) => `https://www.facebook.com/${id}`,
   },
-
   instagram_business: {
     label: 'Instagram Business', authUrl: 'https://www.facebook.com/v20.0/dialog/oauth',
     scopes: ['instagram_basic', 'instagram_content_publish'], needsAccountRef: true, content: 'media',
@@ -188,19 +162,16 @@ export const ADAPTERS: Record<SocialPlatform, Adapter> = {
       const pRes = await fetch(`${base}/media_publish`, { method: 'POST', body: new URLSearchParams({ creation_id: String(cData.id), access_token: token }) })
       const pData = await pRes.json().catch(() => ({}))
       if (!pRes.ok || !pData.id) throw new Error(pData?.error?.message || `instagram_publish_failed_${pRes.status}`)
-      // Fetch the real permalink (media id alone doesn't form a /p/ shortcode URL).
       let permalink: string | null = null
       try {
         const lRes = await fetch(`https://graph.facebook.com/v20.0/${pData.id}?fields=permalink&access_token=${encodeURIComponent(token)}`)
         const lData = await lRes.json().catch(() => ({}))
         if (lRes.ok && lData.permalink) permalink = String(lData.permalink)
-      } catch { /* permalink is best-effort */ }
+      } catch {}
       return { id: String(pData.id), url: permalink }
     },
     permalink: () => null,
   },
-
-  // ── TikTok (video; posts to the authenticated creator via PULL_FROM_URL) ──
   tiktok: {
     label: 'TikTok', authUrl: 'https://www.tiktok.com/v2/auth/authorize/', tokenUrl: 'https://open.tiktokapis.com/v2/oauth/token/',
     scopes: ['video.publish', 'video.upload'], needsAccountRef: false, content: 'video',
@@ -215,13 +186,10 @@ export const ADAPTERS: Record<SocialPlatform, Adapter> = {
       const publishId = d?.data?.publish_id
       const errCode = d?.error?.code
       if (!res.ok || !publishId || (errCode && errCode !== 'ok')) throw new Error(d?.error?.message || `tiktok_publish_failed_${res.status}`)
-      // TikTok processes asynchronously and does not return a canonical post URL here.
       return { id: String(publishId), url: 'https://www.tiktok.com/' }
     },
     permalink: () => 'https://www.tiktok.com/',
   },
-
-  // ── Reddit (self/text post to a subreddit) ──
   reddit: {
     label: 'Reddit', authUrl: 'https://www.reddit.com/api/v1/authorize', tokenUrl: 'https://www.reddit.com/api/v1/access_token',
     scopes: ['submit', 'identity'], needsAccountRef: true, content: 'text', userAgent: 'SignalBoost/1.0 (by SignalBoost)',
@@ -238,7 +206,6 @@ export const ADAPTERS: Record<SocialPlatform, Adapter> = {
   },
 }
 
-// Back-compat: the connector catalog some UI/config reads.
 export const SOCIAL_CONNECTORS: Record<SocialPlatform, { label: string; authUrl: string; scopes: string[]; rateLimit: string }> = Object.fromEntries(
   (Object.keys(ADAPTERS) as SocialPlatform[]).map((k) => [k, { label: ADAPTERS[k].label, authUrl: ADAPTERS[k].authUrl, scopes: ADAPTERS[k].scopes, rateLimit: `${ADAPTERS[k].label} API limits observed before publishing` }]),
 ) as Record<SocialPlatform, { label: string; authUrl: string; scopes: string[]; rateLimit: string }>
@@ -249,28 +216,25 @@ export function buildOAuthUrl(platform: SocialPlatform, redirectUri: string, sta
   return `${a.authUrl}?${params.toString()}`
 }
 
-// Content requirement helper, so the executor can ask without hardcoding per platform.
-export function platformContentKind(platform: SocialPlatform): ContentKind {
-  return ADAPTERS[platform]?.content || 'text'
-}
+export function platformContentKind(platform: SocialPlatform): ContentKind { return ADAPTERS[platform]?.content || 'text' }
+export function platformNeedsAccountRef(platform: SocialPlatform): boolean { return ADAPTERS[platform]?.needsAccountRef === true }
 
-const STUB_NOT_CONFIGURED = 'oauth_credentials_not_configured_logged'
-function stub(mode: string) { return { ok: true, providerPostId: '', liveUrl: null as string | null, metrics: NO_METRICS, mode } }
 function failed(mode: string) { return { ok: false, providerPostId: '', liveUrl: null as string | null, metrics: NO_METRICS, mode } }
 
 export async function publishSocialPost(payload: SocialPostPayload): Promise<{ ok: boolean; providerPostId: string; liveUrl: string | null; metrics: SocialEngagementMetrics; mode: string }> {
   if (!payload.text.trim() && !payload.imageUrl && !payload.videoUrl) throw new Error('Social post requires text, image, or video content.')
   const adapter = ADAPTERS[payload.platform]
-  if (!adapter) return stub(STUB_NOT_CONFIGURED)
-
+  if (!adapter) return failed('unsupported_social_platform')
   const hasCreds = !!payload.accessToken || !!payload.refreshToken
-  if (!hasCreds) return stub(STUB_NOT_CONFIGURED)
-  if (adapter.needsAccountRef && !payload.accountRef) return stub('account_ref_not_configured')
+  if (!hasCreds) return failed('oauth_credentials_not_configured')
+  if (adapter.needsAccountRef && !payload.accountRef) return failed('account_ref_not_configured')
+  if (adapter.content === 'video' && !payload.videoUrl) return failed(`${payload.platform}_requires_video`)
+  if (adapter.content === 'media' && !payload.videoUrl && !payload.imageUrl) return failed(`${payload.platform}_requires_media`)
 
   try {
     let accessToken = payload.accessToken
     if (!accessToken && payload.refreshToken) {
-      if (!adapter.tokenUrl) return stub(STUB_NOT_CONFIGURED)
+      if (!adapter.tokenUrl) return failed('oauth_refresh_not_supported')
       accessToken = await refreshOAuth2(payload.platform, adapter.tokenUrl, payload.refreshToken)
     }
     const raw = await adapter.publish(payload, accessToken as string)
@@ -282,8 +246,6 @@ export async function publishSocialPost(payload: SocialPostPayload): Promise<{ o
   }
 }
 
-// Public token-refresh helper for stored OAuth2 tokens. Uses each adapter's
-// configured tokenUrl; throws an honest error if the platform isn't refreshable here.
 export async function refreshSocialToken(platform: SocialPlatform, refreshToken: string): Promise<string> {
   const adapter = ADAPTERS[platform]
   if (!adapter?.tokenUrl) throw new Error(`${platform} does not support token refresh`)

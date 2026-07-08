@@ -21,6 +21,7 @@ import SocialOutreachPage from '@/app/dashboard/outreach/social/page'
 import {
   CONSOLE_TIERS,
   CONSOLE_UTILITY_PAGES,
+  LIVE_PROVIDER_IDS,
   getConsoleTier,
   getConsoleProvider,
   getTierProviders,
@@ -78,6 +79,8 @@ const SOCIAL_PANEL: ConsolePanel = {
 
 const SOCIAL_ACTIONS = ['capabilities', 'connect_oauth', 'discover_destinations', 'save_destination']
 const SOCIAL_PROVIDER_IDS = ['youtube', 'linkedin', 'tiktok', 'reddit', 'instagram', 'facebook', 'twitter_x']
+for (const id of SOCIAL_PROVIDER_IDS) LIVE_PROVIDER_IDS.add(id)
+
 const SOCIAL_PROVIDERS: ConsoleProvider[] = [
   { id: 'youtube', name: 'YouTube', subtitle: 'VIDEO CHANNELS', accent: '#ff0000', tier: 'tier2', sections: [{ title: 'Connection', templateIds: SOCIAL_ACTIONS.map(a => `youtube.${a}`) }] },
   { id: 'tiktok', name: 'TikTok', subtitle: 'SHORT VIDEO', accent: '#25f4ee', tier: 'tier2', sections: [{ title: 'Connection', templateIds: SOCIAL_ACTIONS.map(a => `tiktok.${a}`) }] },

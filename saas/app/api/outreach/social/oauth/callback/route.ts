@@ -1,10 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { ADAPTERS, SOCIAL_CONNECTORS, type SocialPlatform } from '@/lib/outreach/social-connectors'
 
 export const dynamic = 'force-dynamic'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+function isPlatform(value: string): value is SocialPlatform {
+  return Boolean((SOCIAL_CONNECTORS as any)[value])
+}
+
+function creds(platform: SocialPlatform) {
+  const prefix = `SOCIAL_${platform.toUpperCase()}`
+  return { id: process.env[`${prefix}_CLIENT_ID`], secret: process.env[`${prefix}_CLIENT_SECRET`] }
+}
+
+function dashboardUrl(origin: string, params: Record<string, string>) {
+  const search = new URLSearchParams(params)
+  return `${origin}/dashboard/outreach/social?${search.toString()}`
+}
+
+async function exchangeCode(args: { platform: SocialPlatform; code: string; redirectUri: string }) {
+  const adapter = ADAPTERS[args.platform]
+  const tokenUrl = adapter.tokenUrl
+  if (!tokenUrl) throw new Error(`${args.platform}_token_exchange_not_supported`)
+
+  const { id, secret } = creds(args.platform)
+  if (!id) throw new Error(`${args.platform}_client_id_not_configured`)
+  if (!secret && args.platform !== 'twitter_x') throw new Error(`${args.platform}_client_secret_not_configured`)
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' }
+  const body = new URLSearchParams({
+    grant_type: 'authorization_code',
+    code: args.code,
+    redirect_uri: args.redirectUri,
+  })
+
+  if (args.platform === 'reddit') {
+    if (!secret) throw new Error('reddit_client_secret_not_configured')
+    headers.Authorization = `Basic ${Buffer.from(`${id}:${secret}`).toString('base64')}`
+  } else if (args.platform === 'tiktok') {
+    body.set('client_key', id)
+    if (secret) body.set('client_secret', secret)
+  } else {
+    body.set('client_id', id)
+    if (secret) body.set('client_secret', secret)
+  }
+
+  const res = await fetch(tokenUrl, { method: 'POST', headers, body, cache: 'no-store' })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok || data.error || !data.access_token) throw new Error(data.error_description || data.error_message || data.error || `${args.platform}_token_exchange_failed_${res.status}`)
+  return data
+}
 
 export async function GET(req: NextRequest) {
   const { searchParams, origin } = req.nextUrl
@@ -12,80 +60,42 @@ export async function GET(req: NextRequest) {
   const state = searchParams.get('state')
   const errorParam = searchParams.get('error')
 
-  if (errorParam) {
-    return NextResponse.redirect(`${origin}/dashboard/outreach?social_error=${encodeURIComponent(errorParam)}`)
-  }
+  if (errorParam) return NextResponse.redirect(dashboardUrl(origin, { social_error: errorParam }))
+  if (!code || !state) return NextResponse.redirect(dashboardUrl(origin, { social_error: 'missing_code_or_state' }))
 
-  if (!code || !state) {
-    return NextResponse.redirect(`${origin}/dashboard/outreach?social_error=missing_code_or_state`)
-  }
-
-  // state = userId:platform:timestamp
   const parts = state.split(':')
-  if (parts.length < 3) {
-    return NextResponse.redirect(`${origin}/dashboard/outreach?social_error=invalid_state`)
-  }
+  if (parts.length < 3) return NextResponse.redirect(dashboardUrl(origin, { social_error: 'invalid_state' }))
   const userId = parts[0]
   const platform = parts[1]
+  if (!isPlatform(platform)) return NextResponse.redirect(dashboardUrl(origin, { social_error: 'unsupported_platform' }))
 
-  // Only YouTube OAuth is handled here for now; other platforms use their own SDKs
-  if (platform !== 'youtube_channels') {
-    return NextResponse.redirect(`${origin}/dashboard/outreach?social_error=unsupported_platform`)
-  }
-
-  const clientId = process.env.SOCIAL_YOUTUBE_CHANNELS_CLIENT_ID
-  const clientSecret = process.env.SOCIAL_YOUTUBE_CHANNELS_CLIENT_SECRET
-  if (!clientId || !clientSecret) {
-    return NextResponse.redirect(`${origin}/dashboard/outreach?social_error=youtube_not_configured`)
-  }
-
+  const adapter = ADAPTERS[platform]
   const redirectUri = `${origin}/api/outreach/social/oauth/callback`
 
-  // Exchange authorization code for tokens
   let tokenData: any
   try {
-    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code,
-        client_id: clientId,
-        client_secret: clientSecret,
-        redirect_uri: redirectUri,
-        grant_type: 'authorization_code',
-      }),
-    })
-    tokenData = await tokenRes.json()
-    if (!tokenRes.ok || tokenData.error) {
-      throw new Error(tokenData.error_description || tokenData.error || 'token_exchange_failed')
-    }
+    tokenData = await exchangeCode({ platform, code, redirectUri })
   } catch (err: any) {
-    return NextResponse.redirect(`${origin}/dashboard/outreach?social_error=${encodeURIComponent(err.message || 'token_exchange_failed')}`)
+    return NextResponse.redirect(dashboardUrl(origin, { social_error: err?.message || 'token_exchange_failed', platform }))
   }
 
-  const { access_token, refresh_token, expires_in } = tokenData
-  const expiresAt = new Date(Date.now() + (expires_in || 3600) * 1000).toISOString()
+  const expiresAt = new Date(Date.now() + Number(tokenData.expires_in || 3600) * 1000).toISOString()
+  const scopes = String(tokenData.scope || '').trim() ? String(tokenData.scope).split(/[\s,]+/).filter(Boolean) : adapter.scopes
 
-  // Store tokens in Supabase (outreach_social_tokens table)
-  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-  const { error: upsertError } = await admin
-    .from('outreach_social_tokens')
-    .upsert(
-      {
-        user_id: userId,
-        platform,
-        access_token,
-        refresh_token: refresh_token || null,
-        expires_at: expiresAt,
-        scopes: ['https://www.googleapis.com/auth/youtube.upload', 'https://www.googleapis.com/auth/youtube.readonly'],
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id,platform' }
-    )
+  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false } })
+  const { error: upsertError } = await admin.from('outreach_social_tokens').upsert(
+    {
+      user_id: userId,
+      platform,
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token || null,
+      expires_at: expiresAt,
+      scopes,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,platform' },
+  )
 
-  if (upsertError) {
-    return NextResponse.redirect(`${origin}/dashboard/outreach?social_error=${encodeURIComponent(upsertError.message)}`)
-  }
-
-  return NextResponse.redirect(`${origin}/dashboard/outreach?social_connected=youtube_channels`)
+  if (upsertError) return NextResponse.redirect(dashboardUrl(origin, { social_error: upsertError.message, platform }))
+  return NextResponse.redirect(dashboardUrl(origin, { social_connected: platform }))
 }

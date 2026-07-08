@@ -159,7 +159,7 @@ export async function GET(req: NextRequest) {
       actions.push({ action: rescued ? 'rescue-and-kick' : 'kick', id: c.id, previousChannel: rescued ? c.channel : null, channel, ok: Boolean(kicked?.ok), error: kicked?.ok ? null : String(kicked?.error || 'startSiteVideo failed') })
     }
   }
-  const env = { FAL_KEY: Boolean(process.env.FAL_KEY), ELEVENLABS_API_KEY: Boolean(process.env.ELEVENLABS_API_KEY), RESEND_API_KEY: Boolean(process.env.RESEND_API_KEY), GITHUB_WRITE_TOKEN: Boolean(process.env.GITHUB_WRITE_TOKEN || process.env.GITHUB_TOKEN), CRON_SECRET: Boolean(process.env['CRON_' + 'SECRET']), COS_BRAND_SINCE_override: process.env.COS_BRAND_SINCE || null }
+  const env = { FAL_KEY: Boolean(process.env.FAL_KEY), ELEVENLABS_API_KEY: Boolean(process.env.ELEVENLABS_API_KEY), RESEND_API_KEY: Boolean(process.env.RESEND_API_KEY), GITHUB_WRITE_TOKEN: Boolean(process.env.GITHUB_WRITE_TOKEN || process.env.GITHUB_TOKEN), CRON_SECRET: Boolean(process.env['CRON_' + 'SECRET']), COS_VIDEO_RENDER_BUCKET: process.env.COS_VIDEO_RENDER_BUCKET || null, COS_BRAND_SINCE_override: process.env.COS_BRAND_SINCE || null }
   const { data: rawRecent } = await sb.from('cos_campaign_queue').select('*').order('created_at', { ascending: false }).limit(40)
   const recent = (rawRecent || []).filter((c: any) => isVideoChannel(c) || looksLikeVideoRequest(c)).slice(0, 15)
   const campaigns = recent.map((c: any) => {

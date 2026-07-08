@@ -5,9 +5,10 @@ import os from 'node:os'
 import { pipeline } from 'node:stream/promises'
 import { spawn } from 'node:child_process'
 import { createClient } from '@supabase/supabase-js'
+import { cosVideoRenderBucket, ensureCosVideoRenderBucket, logCosVideoStorageFailure } from './video-storage'
 import { BRAND_SCHEMA_VERSION, BRAND_TEXT } from './brand-schema'
 
-const RENDER_BUCKET = process.env.COS_VIDEO_RENDER_BUCKET || 'video-renders'
+const RENDER_BUCKET = cosVideoRenderBucket()
 const MAX_ATTEMPTS = 5
 
 function adminDb() {
@@ -74,12 +75,19 @@ export async function runLocalBrandOverlay(opts: { campaign: any; lang: string; 
   }
   if (last) throw last
   const sb = adminDb()
+  const storage = await ensureCosVideoRenderBucket(sb, { createIfMissing: true, bucket: RENDER_BUCKET })
   const bytes = await readFile(output)
   const objectPath = `cos-brand/${opts.campaign.id}/${opts.lang}-${Date.now()}.mp4`
   const up = await sb.storage.from(RENDER_BUCKET).upload(objectPath, bytes, { contentType: 'video/mp4', upsert: true })
-  if (up.error) throw new Error(up.error.message)
+  if (up.error) {
+    logCosVideoStorageFailure({ stage: 'branded-final-upload', campaignId: opts.campaign.id, requestId: opts.campaign.metadata?.video?.requestId, bucket: RENDER_BUCKET, objectPath, bucketExists: storage.bucketExists, error: up.error })
+    throw new Error(`Supabase Storage upload failed for bucket "${RENDER_BUCKET}" object "${objectPath}": ${up.error.message}`)
+  }
   const signed = await sb.storage.from(RENDER_BUCKET).createSignedUrl(objectPath, 60 * 60 * 24 * 7)
-  if (signed.error || !signed.data?.signedUrl) throw new Error(signed.error?.message || 'Could not sign branded video')
+  if (signed.error || !signed.data?.signedUrl) {
+    logCosVideoStorageFailure({ stage: 'branded-final-sign', campaignId: opts.campaign.id, requestId: opts.campaign.metadata?.video?.requestId, bucket: RENDER_BUCKET, objectPath, bucketExists: storage.bucketExists, error: signed.error || 'missing signed URL' })
+    throw new Error(signed.error?.message || `Could not sign branded video in Supabase Storage bucket "${RENDER_BUCKET}"`)
+  }
   const video = opts.campaign.metadata?.video || {}
   const primary = Array.isArray(opts.campaign.languages) && opts.campaign.languages.length ? opts.campaign.languages[0] : opts.lang
   const unbrandedVoiced = { ...(video.unbrandedVoiced || {}) }; delete unbrandedVoiced[opts.lang]

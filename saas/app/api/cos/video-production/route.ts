@@ -4,11 +4,12 @@ import { buildVideoProductionJob } from '@/lib/cos/video-production'
 import { publishApprovedVideoProductionJob } from '@/lib/cos/video-production/publish-approved-job'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import type { VideoProductionInput, VideoProductionStatus } from '@/lib/cos/video-production'
+import { cosVideoRenderBucket, ensureCosVideoRenderBucket } from '@/lib/cos/video-storage'
 
 export const dynamic = 'force-dynamic'
 
 const TABLE = 'cos_video_production_jobs'
-const RENDER_BUCKET = 'video-renders'
+const RENDER_BUCKET = cosVideoRenderBucket()
 
 type PostBody = VideoProductionInput & {
   queue_immediately?: boolean
@@ -76,6 +77,7 @@ export async function GET() {
 
   try {
     const supabase = getAdminSupabase()
+    await ensureCosVideoRenderBucket(supabase, { createIfMissing: true, bucket: RENDER_BUCKET })
     const { data, error } = await supabase.from(TABLE).select('*').order('created_at', { ascending: false }).limit(50)
     if (error) return NextResponse.json({ ok: true, jobs: [], warning: error.message })
     const jobs = await withSignedAssets(supabase, data || [])
@@ -98,6 +100,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const supabase = getAdminSupabase()
+    await ensureCosVideoRenderBucket(supabase, { createIfMissing: true, bucket: RENDER_BUCKET })
     const { data, error } = await supabase.from(TABLE).insert(toDbJob(planned)).select('*').single()
     if (error) return NextResponse.json({ ok: true, job: planned, persisted: false, warning: error.message })
     return NextResponse.json({ ok: true, job: data, persisted: true })
@@ -124,6 +127,7 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const supabase = getAdminSupabase()
+    await ensureCosVideoRenderBucket(supabase, { createIfMissing: true, bucket: RENDER_BUCKET })
     const { data, error } = await supabase.from(TABLE).update(update).eq('id', body.id).select('*').single()
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
 

@@ -1,9 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
+import { cosVideoRenderBucket, ensureCosVideoRenderBucket, logCosVideoStorageFailure } from './video-storage'
 
 const ENV_OPENAI = ['OPENAI', 'API', 'KEY'].join('_')
 const ENV_SUPABASE_URL = ['NEXT', 'PUBLIC', 'SUPABASE', 'URL'].join('_')
 const ENV_SUPABASE_SERVICE = ['SUPABASE', 'SERVICE', 'ROLE', 'KEY'].join('_')
-const RENDER_BUCKET = process.env.COS_VIDEO_RENDER_BUCKET || 'video-renders'
+const RENDER_BUCKET = cosVideoRenderBucket()
 
 export type CosCreativeImageResult =
   | { ok: true; imageUrl: string; objectPath: string; bucket: string; model: string }
@@ -77,13 +78,20 @@ export async function generateCosCreativeImage(opts: {
     if (!b64) return { ok: false, error: 'Creative image provider returned no image data.' }
 
     const sb = adminDb()
+    const storage = await ensureCosVideoRenderBucket(sb, { createIfMissing: true, bucket: RENDER_BUCKET })
     const bytes = dataUrlToBuffer(b64)
     const objectPath = `cos-creative/${safeSlug(opts.campaignKey)}/${Date.now()}.png`
     const up = await sb.storage.from(RENDER_BUCKET).upload(objectPath, bytes, { contentType: 'image/png', upsert: true })
-    if (up.error) return { ok: false, error: up.error.message }
+    if (up.error) {
+      logCosVideoStorageFailure({ stage: 'creative-image-upload', campaignId: opts.campaignKey, bucket: RENDER_BUCKET, objectPath, bucketExists: storage.bucketExists, error: up.error })
+      return { ok: false, error: `Supabase Storage upload failed for bucket "${RENDER_BUCKET}" object "${objectPath}": ${up.error.message}` }
+    }
 
     const signed = await sb.storage.from(RENDER_BUCKET).createSignedUrl(objectPath, 60 * 60 * 24 * 7)
-    if (signed.error || !signed.data?.signedUrl) return { ok: false, error: signed.error?.message || 'Could not sign creative image.' }
+    if (signed.error || !signed.data?.signedUrl) {
+      logCosVideoStorageFailure({ stage: 'creative-image-sign', campaignId: opts.campaignKey, bucket: RENDER_BUCKET, objectPath, bucketExists: storage.bucketExists, error: signed.error || 'missing signed URL' })
+      return { ok: false, error: signed.error?.message || `Could not sign creative image in Supabase Storage bucket "${RENDER_BUCKET}".` }
+    }
 
     return { ok: true, imageUrl: signed.data.signedUrl, objectPath, bucket: RENDER_BUCKET, model: 'gpt-image-1' }
   } catch (error) {

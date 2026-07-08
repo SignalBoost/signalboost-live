@@ -18,8 +18,37 @@ if (!url || !key) throw new Error('NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE
 const renderUrl = process.env.COS_VIDEO_RENDER_WEBHOOK_URL
 const renderToken = process.env.COS_VIDEO_RENDER_WEBHOOK_TOKEN
 const pollMs = Number(process.env.COS_VIDEO_WORKER_POLL_MS || 6000)
-const renderBucket = process.env.COS_VIDEO_RENDER_BUCKET || 'video-renders'
+const renderBucket = String(process.env.COS_VIDEO_RENDER_BUCKET || '').trim()
+if (!renderBucket) throw new Error('COS_VIDEO_RENDER_BUCKET is required for the COSA video production worker. Expected Supabase Storage bucket name, for example "video-renders".')
 const supabase = createClient(url, key, { auth: { persistSession: false } })
+
+function storageErrorMessage(error) { return error?.message || error?.error || String(error || 'unknown storage error') }
+
+async function ensureRenderBucket() {
+  const listed = await supabase.storage.listBuckets()
+  if (listed.error) throw new Error(`Supabase Storage bucket check failed for bucket "${renderBucket}": ${storageErrorMessage(listed.error)}`)
+  const exists = Boolean((listed.data || []).some(b => b?.name === renderBucket || b?.id === renderBucket))
+  if (exists) return { provider: 'supabase-storage', bucket: renderBucket, bucketExists: true }
+  const created = await supabase.storage.createBucket(renderBucket, { public: false })
+  if (!created.error) return { provider: 'supabase-storage', bucket: renderBucket, bucketExists: true }
+  const refreshed = await supabase.storage.listBuckets()
+  const nowExists = Boolean((refreshed.data || []).some(b => b?.name === renderBucket || b?.id === renderBucket))
+  if (nowExists) return { provider: 'supabase-storage', bucket: renderBucket, bucketExists: true }
+  throw new Error(`Supabase Storage bucket "${renderBucket}" does not exist and automatic creation failed: ${storageErrorMessage(created.error)}`)
+}
+
+function logStorageFailure({ stage, job, objectPath, bucketExists, error }) {
+  console.error('COSA video storage failure', {
+    stage,
+    campaignId: job?.campaign_id || job?.metadata?.campaignId || null,
+    requestId: job?.id || null,
+    storageProvider: 'supabase-storage',
+    bucket: renderBucket,
+    objectPath: objectPath || null,
+    bucketExists: bucketExists ?? null,
+    storageSdkError: storageErrorMessage(error),
+  })
+}
 
 async function claimJob() {
   const { data: jobs, error } = await supabase
@@ -228,8 +257,12 @@ async function renderLocalMp4(job) {
 
     const bytes = await readFile(output)
     const resultPath = `cos-video-production/${job.id}/final.mp4`
+    const storage = await ensureRenderBucket()
     const { error: uploadError } = await supabase.storage.from(renderBucket).upload(resultPath, bytes, { contentType: 'video/mp4', upsert: true })
-    if (uploadError) throw uploadError
+    if (uploadError) {
+      logStorageFailure({ stage: 'raw-base-render-upload', job, objectPath: resultPath, bucketExists: storage.bucketExists, error: uploadError })
+      throw new Error(`Supabase Storage upload failed for bucket "${renderBucket}" object "${resultPath}": ${storageErrorMessage(uploadError)}`)
+    }
     return { output_url: resultPath, thumbnail_url: null }
   } finally {
     await rm(dir, { recursive: true, force: true })
@@ -265,6 +298,8 @@ async function processJob(job) {
       .eq('id', job.id)
   }
 }
+
+await ensureRenderBucket()
 
 while (true) {
   const job = await claimJob()

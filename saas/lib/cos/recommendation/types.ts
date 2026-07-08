@@ -1,6 +1,19 @@
 export type CosDepartment = 'executive' | 'marketing' | 'sales' | 'finance' | 'operations' | 'support'
 
-export type CosChannel = 'youtube' | 'short_video' | 'linkedin' | 'blog' | 'email' | 'outreach' | 'landing_page' | 'review_campaign'
+export type CosChannel =
+  | 'youtube'
+  | 'short_video'
+  | 'linkedin'
+  | 'reddit'
+  | 'instagram'
+  | 'facebook'
+  | 'twitter_x'
+  | 'tiktok'
+  | 'blog'
+  | 'email'
+  | 'outreach'
+  | 'landing_page'
+  | 'review_campaign'
 
 export type CosPriority = 'low' | 'medium' | 'high' | 'critical'
 

@@ -538,6 +538,7 @@ Use this section for short notes when architecture, provider behavior, platform 
 
 - 2026-07-07: Added explicit Console Hub provider-template doctrine. Provider templates are live app action definitions, not just documentation. Developers must inspect provider templates and matching executors/routes before asking the owner to explain provider architecture.
 - 2026-07-07: Added stronger onboarding enforcement doctrine. PRs must acknowledge ONBOARD was read before repo scan, and critical changes must keep ONBOARD current or the check must fail with a clear reason and fix instructions.
+- 2026-07-08: Added repository-enforced onboarding controls: PR template acknowledgement, stable required check naming, critical-file CI enforcement with an exact mechanical/refactor-only exception, CODEOWNERS coverage for sensitive areas, and branch-protection setup documentation.
 
 ---
 

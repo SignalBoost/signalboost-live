@@ -7,6 +7,8 @@
 // has produced its first row.
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import AdminMetricCard from '@/components/admin/AdminMetricCard'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { AdminSectionConfig, translateSection } from '@/lib/admin/sections'
 
@@ -61,6 +63,23 @@ function noneYetLabel(lang: string): string {
     ru: 'Пока нет',
   }
   return copy[lang] || copy.en
+}
+
+
+const SYSTEM_METRIC_ROUTES: Record<string, { href: string; actionLabel: string; tone: 'danger' | 'warning' | 'healthy' | 'neutral' }> = {
+  'sys-0': { href: '/admin/logs?type=api-errors', actionLabel: 'Investigate →', tone: 'danger' },
+  'sys-1': { href: '/admin/deployments?status=failed', actionLabel: 'Investigate →', tone: 'danger' },
+  'sys-2': { href: '/admin/integrations/supabase', actionLabel: 'Open Supabase →', tone: 'healthy' },
+  'sys-3': { href: '/admin/integrations/vercel', actionLabel: 'Open Vercel →', tone: 'healthy' },
+  'sys-4': { href: '/admin/jobs/cron', actionLabel: 'View details →', tone: 'warning' },
+  'sys-5': { href: '/admin/jobs/daily', actionLabel: 'View details →', tone: 'warning' },
+  'sys-6': { href: '/admin/outreach/runs/latest', actionLabel: 'View details →', tone: 'neutral' },
+  'sys-7': { href: '/admin/prospects/discovery/latest', actionLabel: 'View details →', tone: 'neutral' },
+}
+
+function missionCardTone(value: number | null | undefined): 'danger' | 'warning' | 'healthy' | 'neutral' {
+  if (typeof value !== 'number') return 'neutral'
+  return value > 0 ? 'healthy' : 'neutral'
 }
 
 function notConnectedLabel(lang: string): string {
@@ -148,35 +167,59 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
       </header>
 
       <section className="sb-cockpit-grid" aria-label="Dashboard panels">
-        {section.metrics.map(metric => (
-          <article key={metric.key} className="sb-neon-panel" tabIndex={0}>
-            <p>{metric.label}</p>
-            <strong>{metricValue(metric.label, metric.key, metric.value)}</strong>
-            <span>{metric.helper ?? emptyMetricLabel(activeLang)}</span>
-          </article>
-        ))}
+        {section.metrics.map(metric => {
+          const route = rawSection.key === 'system' ? SYSTEM_METRIC_ROUTES[metric.key] : null
+          const value = metricValue(metric.label, metric.key, metric.value)
+          if (route) {
+            return (
+              <AdminMetricCard
+                key={metric.key}
+                title={metric.label}
+                value={value}
+                subtitle={metric.helper ?? emptyMetricLabel(activeLang)}
+                href={route.href}
+                actionLabel={route.actionLabel}
+                tone={route.tone}
+                status={String(value)}
+              />
+            )
+          }
+          return (
+            <article key={metric.key} className="sb-neon-panel" tabIndex={0}>
+              <p>{metric.label}</p>
+              <strong>{value}</strong>
+              <span>{metric.helper ?? emptyMetricLabel(activeLang)}</span>
+            </article>
+          )
+        })}
       </section>
 
       <section className="sb-mission-grid" aria-label="Live operational intelligence">
-        <article className="sb-glass-panel">
+        <Link className="sb-glass-panel sb-admin-action-card" href="/admin/analytics/platform" aria-label="View platform totals details">
           <h3>{t('audit.admin.platformTotals', 'Platform totals')}</h3>
           {totalRows.map(([label, value]) => (
             <p key={label}><strong>{label}</strong> · {fmt(value)}</p>
           ))}
-        </article>
-        <article className="sb-glass-panel">
+          <span className="sb-admin-action-card__cue">View details →</span>
+        </Link>
+        <Link className="sb-glass-panel sb-admin-action-card" href="/admin/accounts?range=7d" aria-label="View new accounts details">
           <h3>{t('audit.admin.newAccounts', 'New accounts')}</h3>
           <p><strong>{t('audit.admin.win7', 'Last 7 days')}</strong> · {fmt(intel?.windows.accounts7)}</p>
           <p><strong>{t('audit.admin.win30', 'Last 30 days')}</strong> · {fmt(intel?.windows.accounts30)}</p>
           <p><strong>{t('audit.admin.win90', 'Last 90 days')}</strong> · {fmt(intel?.windows.accounts90)}</p>
-        </article>
-        <article className="sb-glass-panel">
+          <span className="sb-admin-action-card__cue">View details →</span>
+        </Link>
+        <Link className="sb-glass-panel sb-admin-action-card" href="/admin/integrations/supabase" aria-label="Investigate operational health">
           <h3>{t('audit.admin.operationalHealth', 'Operational health')}</h3>
           <p><strong>{t('audit.admin.supabase', 'Supabase')}</strong> · {intel?.health.supabase ?? notConnectedLabel(activeLang)}</p>
           <p><strong>{t('audit.admin.errors', 'Logged errors')}</strong> · {fmt(intel?.health.errors)}</p>
           <p><strong>{t('audit.admin.lastOutreach', 'Last outreach run')}</strong> · {intel?.health.lastOutreach ?? empty}</p>
           <p><strong>{t('audit.admin.lastProspect', 'Last prospect run')}</strong> · {intel?.health.lastProspect ?? empty}</p>
-        </article>
+          <span className="sb-admin-action-card__cue">Investigate →</span>
+        </Link>
+        <AdminMetricCard title={t('audit.admin.totPaid', 'Paid subscriptions')} value={fmt(totals?.paidSubs)} subtitle="Subscription ledger" href="/admin/billing/subscriptions?status=paid" actionLabel="View details →" tone={missionCardTone(totals?.paidSubs)} />
+        <AdminMetricCard title={t('audit.admin.totFree', 'Free subscriptions')} value={fmt(totals?.freeSubs)} subtitle="Subscription ledger" href="/admin/billing/subscriptions?status=free" actionLabel="View details →" tone={missionCardTone(totals?.freeSubs)} />
+        <AdminMetricCard title={t('audit.admin.totProspects', 'Prospects')} value={fmt(totals?.prospects)} subtitle="Prospect inventory" href="/admin/prospects" actionLabel="View details →" tone={missionCardTone(totals?.prospects)} />
       </section>
 
       <section className="sb-orbit-table" aria-label={section.tableTitle}>

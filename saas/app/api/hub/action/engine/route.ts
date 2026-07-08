@@ -26,6 +26,7 @@ import '@/console-core/executors/resend'
 import '@/console-core/executors/assemblyai'
 import '@/console-core/executors/supabase-marketing'
 import '@/console-core/executors/bank'
+import '@/console-core/executors/social-outreach'
 
 export async function POST(req: NextRequest) {
   try {

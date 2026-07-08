@@ -34,7 +34,7 @@ function buildPressQueueRow(args: { title: string; objective: string; outreachCh
       {
         id: id('work_press_print'),
         type: 'press_print_campaign',
-        title: 'Prepare Press & Print publication preview',
+        title: 'Manual staff-led Press & Print publication preview',
         status: 'drafted',
         input: { channel: args.outreachChannel, signal: args.signal },
         output: { title: args.title, draft: args.objective },
@@ -50,7 +50,7 @@ function buildPressQueueRow(args: { title: string; objective: string; outreachCh
       confidence: 80,
       expected_roi: 'medium',
       estimated_cost_usd: 0,
-      reason: 'Staff-led Press & Print campaign prepared for owner-gated workflow.',
+      reason: 'Manual staff-led Press & Print campaign prepared for owner-gated workflow.',
       approval_status: 'pending_approval',
       created_at: args.now,
     },
@@ -59,6 +59,7 @@ function buildPressQueueRow(args: { title: string; objective: string; outreachCh
     approval_required: true,
     metadata: {
       source: 'press_print_staff_led_campaign',
+      automation_mode: 'manual_staff_led',
       outreach_channel: args.outreachChannel,
       media_channel: args.outreachChannel,
       press_print_review: 'PENDING',
@@ -108,7 +109,7 @@ export async function POST(req: NextRequest) {
   const objective = String(request.objective || '').trim()
   const audience = String(request.audience || 'Publication editors, readers, and business technology buyers reached through the selected press media channel.').trim()
   const signal = String(request.signal || '').trim()
-  const row = buildPressQueueRow({ title, objective, outreachChannel, audience, signal, now })
+  const row = buildPressQueueRow({ title, objective, outreachChannel: outreachChannel as PressPrintChannel, audience, signal, now })
 
   const { data, error } = await ctx.admin
     .from('cos_campaign_queue')

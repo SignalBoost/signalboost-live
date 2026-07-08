@@ -12,7 +12,6 @@ import { COS_VIDEO_QUEUE_SQL } from '@/lib/operator/videoQueueSchema'
 import { cosVideoRenderBucket, ensureCosVideoRenderBucket, logCosVideoStorageFailure } from '@/lib/cos/video-storage'
 
 const LOCAL_FFMPEG_MODEL = 'signalboost/local-ffmpeg-preview'
-const RENDER_BUCKET = cosVideoRenderBucket()
 const SUPABASE_URL_KEY = ['NEXT', 'PUBLIC', 'SUPABASE', 'URL'].join('_')
 const SUPABASE_SERVICE_KEY = ['SUPABASE', 'SERVICE', 'ROLE', 'KEY'].join('_')
 
@@ -101,7 +100,8 @@ async function insertJob(sb: any, row: Record<string, unknown>) {
 
 async function startFfmpegPreview(prompt: string, aspectRatio: '9:16' | '16:9' | '1:1', source: ImageMotionSource = {}): Promise<StartVideoResult> {
   const sb = adminDb()
-  await ensureCosVideoRenderBucket(sb, { createIfMissing: true, bucket: RENDER_BUCKET })
+  const renderBucket = cosVideoRenderBucket()
+  await ensureCosVideoRenderBucket(sb, { createIfMissing: true, bucket: renderBucket })
   const now = new Date().toISOString()
   const title = titleFromPrompt(prompt)
   const hook = hookFromPrompt(prompt)
@@ -249,11 +249,12 @@ async function fetchFfmpegPreview(requestId: string): Promise<FetchVideoResult> 
     if (!output) return { status: 'failed', error: 'Internal FFmpeg preview rendered but no output URL was saved.' }
     if (output.startsWith('http')) return { status: 'done', videoUrl: output }
 
-    const storage = await ensureCosVideoRenderBucket(sb, { createIfMissing: true, bucket: RENDER_BUCKET })
-    const { data: signed, error: signError } = await sb.storage.from(RENDER_BUCKET).createSignedUrl(output, 60 * 60 * 24 * 7)
+    const renderBucket = cosVideoRenderBucket()
+    const storage = await ensureCosVideoRenderBucket(sb, { createIfMissing: true, bucket: renderBucket })
+    const { data: signed, error: signError } = await sb.storage.from(renderBucket).createSignedUrl(output, 60 * 60 * 24 * 7)
     if (signError || !signed?.signedUrl) {
-      logCosVideoStorageFailure({ stage: 'base-render-sign', requestId, bucket: RENDER_BUCKET, objectPath: output, bucketExists: storage.bucketExists, error: signError || 'missing signed URL' })
-      return { status: 'failed', error: signError?.message || `Could not sign internal FFmpeg preview output from Supabase Storage bucket "${RENDER_BUCKET}".` }
+      logCosVideoStorageFailure({ stage: 'base-render-sign', requestId, bucket: renderBucket, objectPath: output, bucketExists: storage.bucketExists, error: signError || 'missing signed URL' })
+      return { status: 'failed', error: signError?.message || `Could not sign internal FFmpeg preview output from Supabase Storage bucket "${renderBucket}".` }
     }
     return { status: 'done', videoUrl: signed.signedUrl }
   }

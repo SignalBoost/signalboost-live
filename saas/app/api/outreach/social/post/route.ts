@@ -5,6 +5,10 @@ import { getValidSocialToken } from '@/lib/outreach/social-token'
 
 export const dynamic = 'force-dynamic'
 
+const NEEDS_ACCOUNT_REF = new Set<SocialPlatform>(['linkedin_company', 'facebook_pages', 'instagram_business', 'reddit'])
+const NEEDS_VIDEO = new Set<SocialPlatform>(['tiktok', 'youtube_channels'])
+const NEEDS_MEDIA = new Set<SocialPlatform>(['instagram_business'])
+
 export async function POST(req: NextRequest) {
   const ctx = await requireAdmin()
   if (ctx instanceof NextResponse) return ctx
@@ -29,12 +33,19 @@ export async function POST(req: NextRequest) {
   if (!tok.ok || !tok.accessToken) return NextResponse.json({ error: tok.error || `${platform} is not connected.` }, { status: 400 })
 
   const accountRef = body?.account_ref ? String(body.account_ref) : tok.accountRef || undefined
+  const imageUrl = body?.image_url ? String(body.image_url) : undefined
+  const videoUrl = body?.video_url ? String(body.video_url) : undefined
+
+  if (NEEDS_ACCOUNT_REF.has(platform) && !accountRef) return NextResponse.json({ error: `${platform} requires account_ref/destination before publishing.` }, { status: 400 })
+  if (NEEDS_VIDEO.has(platform) && !videoUrl) return NextResponse.json({ error: `${platform} requires video_url before publishing.` }, { status: 400 })
+  if (NEEDS_MEDIA.has(platform) && !imageUrl && !videoUrl) return NextResponse.json({ error: `${platform} requires image_url or video_url before publishing.` }, { status: 400 })
+
   const result = await publishSocialPost({
     platform,
     text: String(body?.text || outreach.outreach_message || ''),
     title: body?.title ? String(body.title) : String(outreach.business_name || 'SignalBoost outreach'),
-    imageUrl: body?.image_url ? String(body.image_url) : undefined,
-    videoUrl: body?.video_url ? String(body.video_url) : undefined,
+    imageUrl,
+    videoUrl,
     accessToken: tok.accessToken,
     accountRef,
   })

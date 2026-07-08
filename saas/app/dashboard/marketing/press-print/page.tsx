@@ -5,7 +5,7 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 
 type Campaign = { id: string; title?: string; objective?: string; status?: string; metadata?: Record<string, any> }
-type Decision = 'ok' | 'no' | 'hold' | 'staff' | 'package' | 'submitted' | 'published'
+type Decision = 'ok' | 'no' | 'hold' | 'staff' | 'published'
 
 const PRESS_PRINT_CHANNELS = ['online-newspapers', 'print-newspapers', 'trade-press'] as const
 
@@ -29,13 +29,13 @@ function stage(campaign: Campaign) {
 
 function labelStage(value: string) {
   if (value === 'approved') return 'Approved'
-  if (value === 'package_prepared') return 'Package prepared'
-  if (value === 'submitted') return 'Submitted'
-  if (value === 'published') return 'Placement confirmed'
+  if (value === 'package_prepared') return 'In progress'
+  if (value === 'submitted') return 'In progress'
+  if (value === 'published') return 'Completed'
   if (value === 'staff_support') return 'Staff support'
   if (value === 'on_hold') return 'On hold'
   if (value === 'rejected') return 'Rejected'
-  return 'Not started'
+  return 'Needs review'
 }
 
 function Action({ id, decision, children, primary = false }: { id: string; decision: Decision; children: React.ReactNode; primary?: boolean }) {
@@ -77,8 +77,19 @@ export default function PressPrintMediaPage() {
       const exec = campaign.metadata?.press_print_execution || {}
       return <section key={campaign.id} style={card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}><div><p className="sb-eyebrow">{channelLabels[channel(campaign)] || 'Press media'}</p><h2 style={h2}>{campaign.title || 'Press campaign'}</h2><p style={body}>{campaign.objective || 'Campaign prepared inside Marketing + Sales.'}</p></div><strong style={pill}>{review(campaign)} · {labelStage(stage(campaign))}</strong></div>
-        <div style={actions}><Action id={campaign.id} decision="ok" primary>Approve</Action><Action id={campaign.id} decision="no">Reject</Action><Action id={campaign.id} decision="hold">Put on hold</Action><Action id={campaign.id} decision="staff">Use staff support</Action></div>
-        <div style={workflowBox}><h3 style={h3}>Execution</h3><p style={body}>Approve first, then continue through package prepared, submitted, and placement confirmed. URL is optional; leave it blank for print or no URL.</p>{approved ? <div style={actions}><Action id={campaign.id} decision="package">Mark package prepared</Action><Action id={campaign.id} decision="submitted">Mark submitted</Action><form method="post" action="/api/marketing/press-print/decision" style={{ display: 'grid', gap: 8 }}><input type="hidden" name="id" value={campaign.id} /><input type="hidden" name="decision" value="published" /><input name="live_url" defaultValue={String(exec.live_url || '')} placeholder="Optional live URL" style={input} /><input name="publication_date" type="date" defaultValue={String(exec.publication_date || '')} style={input} /><button style={primaryButton}>Mark placement confirmed</button></form></div> : null}</div>
+        <div style={actions}><Action id={campaign.id} decision="ok" primary>Approve</Action><Action id={campaign.id} decision="no">Reject</Action><Action id={campaign.id} decision="staff">Needs staff help</Action></div>
+        <div style={workflowBox}>
+          <h3 style={h3}>Simple completion</h3>
+          {!approved ? <p style={body}>Step 1: approve this campaign. After approval, there is only one final step: confirm when the article or ad has been placed.</p> : null}
+          {approved ? <form method="post" action="/api/marketing/press-print/decision" style={simpleForm}>
+            <input type="hidden" name="id" value={campaign.id} />
+            <input type="hidden" name="decision" value="published" />
+            <p style={body}>When the article/ad is published or placed, add a link/date if you have one and click the button below. For print media, the link can stay blank.</p>
+            <input name="live_url" defaultValue={String(exec.live_url || '')} placeholder="Optional article/proof link" style={input} />
+            <input name="publication_date" type="date" defaultValue={String(exec.publication_date || '')} style={input} />
+            <button style={primaryButton}>Confirm published / completed</button>
+          </form> : null}
+        </div>
       </section>
     })}
   </main>
@@ -89,6 +100,7 @@ const hero: CSSProperties = { border: '1px solid rgba(244,114,182,.24)', borderR
 const card: CSSProperties = { border: '1px solid rgba(255,255,255,.10)', borderRadius: 22, padding: 20, background: 'linear-gradient(145deg, rgba(3,7,18,.88), rgba(15,23,42,.76))' }
 const workflowBox: CSSProperties = { border: '1px solid rgba(56,189,248,.22)', borderRadius: 14, padding: 14, marginTop: 16, background: 'rgba(56,189,248,.06)' }
 const actions: CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16 }
+const simpleForm: CSSProperties = { display: 'grid', gap: 10, maxWidth: 560, marginTop: 12 }
 const body: CSSProperties = { color: 'rgba(255,255,255,.72)', lineHeight: 1.65, maxWidth: 860 }
 const h1: CSSProperties = { color: '#fff', fontSize: 34, margin: '8px 0' }
 const h2: CSSProperties = { color: '#fff', fontSize: 24, margin: '6px 0' }

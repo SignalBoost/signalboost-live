@@ -109,13 +109,13 @@ function sectionSummary(href: string, values: MetricValues, c: typeof COPY.en): 
     case '/admin':
       return [['Users', String(value(values, 'overview-0'))], ['Outreach', String(value(values, 'overview-12'))], ['Leads', String(value(values, 'overview-13'))]]
     case '/admin/system':
-      return [['API errors', String(value(values, 'system-0'))], ['Supabase', String(value(values, 'system-2', c.notConnected))], ['Daily jobs', String(value(values, 'sys-5'))]]
+      return [['API errors', String(value(values, 'sys-0'))], ['Supabase', String(value(values, 'sys-2', c.notConnected))], ['Daily jobs', String(value(values, 'sys-5'))]]
     case '/admin/sales':
       return [['Prospects', String(value(values, 'sales-0'))], ['Released', String(value(values, 'sales-4'))], ['Response', String(value(values, 'sales-9', '0%'))]]
     case '/admin/ai':
       return [['AI tasks', String(value(values, 'ai-0'))], ['Errors', String(value(values, 'ai-3'))], ['Latency', String(value(values, 'ai-4', c.noActivity))]]
     case '/admin/settings/roles':
-      return [['Access', 'Owner/Admin'], ['Status', 'Protected'], ['Audit', String(value(values, 'system-0'))]]
+      return [['Access', 'Owner/Admin'], ['Status', 'Protected'], ['Audit', String(value(values, 'sys-0'))]]
     case '/admin/partners':
       return [['Partners', String(value(values, 'partners-0'))], ['Top category', String(value(values, 'partners-4', c.noneYet))], ['Monitor', c.live]]
     case '/admin/saas':

@@ -82,6 +82,21 @@ function missionCardTone(value: number | null | undefined): 'danger' | 'warning'
   return value > 0 ? 'healthy' : 'neutral'
 }
 
+function systemTone(value: string | number): 'danger' | 'warning' | 'healthy' | 'neutral' {
+  const text = String(value).toLowerCase()
+  if (typeof value === 'number') return value > 0 ? 'danger' : 'healthy'
+  if (/error|failed|down|not connected|critical|degraded/.test(text)) return 'danger'
+  if (/warning|watch|pending|unknown|no activity|not configured/.test(text)) return 'warning'
+  if (/connected|healthy|ready|success|ok|normal/.test(text)) return 'healthy'
+  return 'neutral'
+}
+
+function metricHref(sectionKey: string, metricKey: string): string {
+  if (sectionKey === 'overview') return `/admin?metric=${encodeURIComponent(metricKey)}`
+  if (sectionKey === 'settings') return `/admin/settings?metric=${encodeURIComponent(metricKey)}`
+  return `/admin/${sectionKey}?metric=${encodeURIComponent(metricKey)}`
+}
+
 function notConnectedLabel(lang: string): string {
   const copy: Record<string, string> = {
     en: 'Not connected',
@@ -170,38 +185,32 @@ export default function AdminSectionView({ section: rawSection }: { section: Adm
         {section.metrics.map(metric => {
           const route = rawSection.key === 'system' ? SYSTEM_METRIC_ROUTES[metric.key] : null
           const value = metricValue(metric.label, metric.key, metric.value)
-          if (route) {
-            return (
-              <AdminMetricCard
-                key={metric.key}
-                title={metric.label}
-                value={value}
-                subtitle={metric.helper ?? emptyMetricLabel(activeLang)}
-                href={route.href}
-                actionLabel={route.actionLabel}
-                tone={route.tone}
-                status={String(value)}
-              />
-            )
-          }
+          const href = route?.href ?? metricHref(rawSection.key, metric.key)
           return (
-            <article key={metric.key} className="sb-neon-panel" tabIndex={0}>
-              <p>{metric.label}</p>
-              <strong>{value}</strong>
-              <span>{metric.helper ?? emptyMetricLabel(activeLang)}</span>
-            </article>
+            <AdminMetricCard
+              key={metric.key}
+              title={metric.label}
+              value={value}
+              subtitle={metric.helper ?? emptyMetricLabel(activeLang)}
+              href={href}
+              actionLabel={route?.actionLabel ?? 'Open metric →'}
+              tone={rawSection.key === 'system' ? systemTone(value) : 'neutral'}
+              status={String(value)}
+            />
           )
         })}
       </section>
 
       <section className="sb-mission-grid" aria-label="Live operational intelligence">
-        <Link className="sb-glass-panel sb-admin-action-card" href="/admin/analytics/platform" aria-label="View platform totals details">
+        <section className="sb-glass-panel sb-admin-action-card" aria-label="Platform totals details">
           <h3>{t('audit.admin.platformTotals', 'Platform totals')}</h3>
-          {totalRows.map(([label, value]) => (
-            <p key={label}><strong>{label}</strong> · {fmt(value)}</p>
+          {totalRows.map(([label, value], index) => (
+            <Link key={label} href={`/admin/analytics/platform?total=${index}`} aria-label={`View ${label} total details`}>
+              <strong>{label}</strong> · {fmt(value)}
+            </Link>
           ))}
-          <span className="sb-admin-action-card__cue">View details →</span>
-        </Link>
+          <Link className="sb-admin-action-card__cue" href="/admin/analytics/platform">View details →</Link>
+        </section>
         <Link className="sb-glass-panel sb-admin-action-card" href="/admin/accounts?range=7d" aria-label="View new accounts details">
           <h3>{t('audit.admin.newAccounts', 'New accounts')}</h3>
           <p><strong>{t('audit.admin.win7', 'Last 7 days')}</strong> · {fmt(intel?.windows.accounts7)}</p>

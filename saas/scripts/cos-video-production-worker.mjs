@@ -1,4 +1,16 @@
 #!/usr/bin/env node
+// saas/scripts/cos-video-production-worker.mjs
+// v2 FIXES:
+// 1. ORPHANED JOB RECOVERY: the workflow has timeout-minutes: 20 but this
+//    worker looped forever, so GitHub SIGKILLed every run. Any job claimed
+//    (queued -> rendering) at the moment of the kill stayed 'rendering'
+//    forever — claimJob only picks 'queued' and nothing requeued stale jobs.
+//    Campaigns then showed "render in progress" eternally. Now: on every
+//    cycle, 'rendering' jobs untouched for STALE_MS are requeued (up to
+//    MAX_REQUEUES, tracked in watchdog_signal), then failed honestly.
+// 2. GRACEFUL SHUTDOWN: the worker now exits cleanly after RUN_BUDGET_MS
+//    (default 14 min), before GitHub's 20-min SIGKILL. No more orphaned
+//    claims, and Actions runs show green instead of a wall of timeouts.
 import { createClient } from '@supabase/supabase-js'
 import { spawn } from 'node:child_process'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -21,6 +33,13 @@ const pollMs = Number(process.env.COS_VIDEO_WORKER_POLL_MS || 6000)
 const renderBucket = String(process.env.COS_VIDEO_RENDER_BUCKET || '').trim()
 if (!renderBucket) throw new Error('COS_VIDEO_RENDER_BUCKET is required for the COSA video production worker. Expected Supabase Storage bucket name, for example "video-renders".')
 const supabase = createClient(url, key, { auth: { persistSession: false } })
+
+// Exit cleanly well before the workflow's timeout-minutes: 20 SIGKILL.
+const RUN_BUDGET_MS = Number(process.env.COS_VIDEO_RUN_BUDGET_MS || 14 * 60 * 1000)
+// A 'rendering' job untouched this long is orphaned (renders take seconds).
+const STALE_MS = Number(process.env.COS_VIDEO_STALE_MS || 10 * 60 * 1000)
+const MAX_REQUEUES = 3
+const startedAt = Date.now()
 
 function storageErrorMessage(error) { return error?.message || error?.error || String(error || 'unknown storage error') }
 
@@ -48,6 +67,40 @@ function logStorageFailure({ stage, job, objectPath, bucketExists, error }) {
     bucketExists: bucketExists ?? null,
     storageSdkError: storageErrorMessage(error),
   })
+}
+
+// ORPHAN RECOVERY: requeue 'rendering' jobs whose updated_at is stale. Each
+// requeue is counted in watchdog_signal.requeues; past MAX_REQUEUES the job
+// is failed honestly so the campaign poll surfaces a real error instead of
+// spinning forever.
+async function recoverStaleJobs() {
+  const cutoff = new Date(Date.now() - STALE_MS).toISOString()
+  const { data: stale, error } = await supabase
+    .from('cos_video_production_jobs')
+    .select('id, watchdog_signal, updated_at')
+    .eq('status', 'rendering')
+    .lt('updated_at', cutoff)
+    .limit(10)
+  if (error) { console.error('stale job scan failed:', error.message); return }
+  for (const job of stale || []) {
+    const requeues = Number(job?.watchdog_signal?.requeues || 0)
+    if (requeues >= MAX_REQUEUES) {
+      await supabase.from('cos_video_production_jobs').update({
+        status: 'failed',
+        error: `Render orphaned ${requeues + 1} times (worker killed mid-render). Giving up after ${MAX_REQUEUES} requeues — press "Reset and kick" on the campaign to start over.`,
+        updated_at: new Date().toISOString(),
+      }).eq('id', job.id).eq('status', 'rendering')
+      console.log(`stale job ${job.id}: failed after ${requeues} requeues`)
+    } else {
+      await supabase.from('cos_video_production_jobs').update({
+        status: 'queued',
+        error: null,
+        watchdog_signal: { ...(job.watchdog_signal || {}), requeues: requeues + 1, lastRequeueAt: new Date().toISOString(), reason: 'stale rendering claim recovered' },
+        updated_at: new Date().toISOString(),
+      }).eq('id', job.id).eq('status', 'rendering')
+      console.log(`stale job ${job.id}: requeued (requeue ${requeues + 1}/${MAX_REQUEUES})`)
+    }
+  }
 }
 
 async function claimJob() {
@@ -300,9 +353,19 @@ async function processJob(job) {
 }
 
 await ensureRenderBucket()
+await recoverStaleJobs()
 
-while (true) {
+let cycles = 0
+while (Date.now() - startedAt < RUN_BUDGET_MS) {
   const job = await claimJob()
-  if (job) await processJob(job)
-  else await new Promise(resolve => setTimeout(resolve, pollMs))
+  if (job) {
+    await processJob(job)
+  } else {
+    await new Promise(resolve => setTimeout(resolve, pollMs))
+  }
+  // Re-scan for orphans periodically so recovery happens even in long runs.
+  cycles++
+  if (cycles % 20 === 0) await recoverStaleJobs()
 }
+console.log(`run budget reached (${Math.round(RUN_BUDGET_MS / 60000)} min) — exiting cleanly before workflow timeout; next scheduled run continues.`)
+process.exit(0)

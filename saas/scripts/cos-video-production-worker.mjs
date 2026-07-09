@@ -1,371 +1,309 @@
-#!/usr/bin/env node
-// saas/scripts/cos-video-production-worker.mjs
-// v2 FIXES:
-// 1. ORPHANED JOB RECOVERY: the workflow has timeout-minutes: 20 but this
-//    worker looped forever, so GitHub SIGKILLed every run. Any job claimed
-//    (queued -> rendering) at the moment of the kill stayed 'rendering'
-//    forever — claimJob only picks 'queued' and nothing requeued stale jobs.
-//    Campaigns then showed "render in progress" eternally. Now: on every
-//    cycle, 'rendering' jobs untouched for STALE_MS are requeued (up to
-//    MAX_REQUEUES, tracked in watchdog_signal), then failed honestly.
-// 2. GRACEFUL SHUTDOWN: the worker now exits cleanly after RUN_BUDGET_MS
-//    (default 14 min), before GitHub's 20-min SIGKILL. No more orphaned
-//    claims, and Actions runs show green instead of a wall of timeouts.
+// saas/lib/operator/video.ts
+// Reusable server-side helper for generating website/background/COS videos.
+//
+// COST SAFETY MODE:
+// Automatic COS/video retries must not spend money on paid media providers.
+// This helper now always queues the internal FFmpeg preview path for new video
+// work. Paid external rendering can be reintroduced later behind a separate,
+// explicit owner approval flow.
+
 import { createClient } from '@supabase/supabase-js'
-import { spawn } from 'node:child_process'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { COS_VIDEO_QUEUE_SQL } from '@/lib/operator/videoQueueSchema'
+import { cosVideoRenderBucket, ensureCosVideoRenderBucket, logCosVideoStorageFailure } from '@/lib/cos/video-storage'
 
-if (process.argv.includes('--help')) {
-  console.log('Usage: NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/cos-video-production-worker.mjs')
-  console.log('Optional: COS_VIDEO_RENDER_WEBHOOK_URL=... for an external renderer, or use local FFmpeg fallback when no webhook is configured.')
-  process.exit(0)
+const LOCAL_FFMPEG_MODEL = 'signalboost/local-ffmpeg-preview'
+const SUPABASE_URL_KEY = ['NEXT', 'PUBLIC', 'SUPABASE', 'URL'].join('_')
+const SUPABASE_SERVICE_KEY = ['SUPABASE', 'SERVICE', 'ROLE', 'KEY'].join('_')
+
+const DEFAULT_MAX_ATTEMPTS = Math.max(1, Number(process.env.COS_VIDEO_MAX_ATTEMPTS || 5))
+const AUTO_APPLY_DEFAULT = process.env.COS_VIDEO_AUTO_APPLY === 'false' ? false : true
+
+type ImageMotionSource = {
+  sourceImageUrl?: string
+  sourceImagePath?: string
+  sourceImageBucket?: string
+  visualStrategy?: string
 }
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-if (!url || !key) throw new Error('NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required')
+// Language plumbing: the campaign's language must reach the render worker so
+// voice + captions come out in EN/ES/PT/PL/RU. Carried in render_spec.language
+// (jsonb — no schema change needed).
+export type StartVideoOpts = { lang?: string; title?: string; hook?: string }
 
-const renderUrl = process.env.COS_VIDEO_RENDER_WEBHOOK_URL
-const renderToken = process.env.COS_VIDEO_RENDER_WEBHOOK_TOKEN
-const pollMs = Number(process.env.COS_VIDEO_WORKER_POLL_MS || 6000)
-const renderBucket = String(process.env.COS_VIDEO_RENDER_BUCKET || '').trim()
-if (!renderBucket) throw new Error('COS_VIDEO_RENDER_BUCKET is required for the COSA video production worker. Expected Supabase Storage bucket name, for example "video-renders".')
-const supabase = createClient(url, key, { auth: { persistSession: false } })
+export const SUPPORTED_VIDEO_LANGS = ['en', 'es', 'pt', 'pl', 'ru'] as const
 
-// Exit cleanly well before the workflow's timeout-minutes: 20 SIGKILL.
-const RUN_BUDGET_MS = Number(process.env.COS_VIDEO_RUN_BUDGET_MS || 14 * 60 * 1000)
-// A 'rendering' job untouched this long is orphaned (renders take seconds).
-const STALE_MS = Number(process.env.COS_VIDEO_STALE_MS || 10 * 60 * 1000)
-const MAX_REQUEUES = 3
-const startedAt = Date.now()
-
-function storageErrorMessage(error) { return error?.message || error?.error || String(error || 'unknown storage error') }
-
-async function ensureRenderBucket() {
-  const listed = await supabase.storage.listBuckets()
-  if (listed.error) throw new Error(`Supabase Storage bucket check failed for bucket "${renderBucket}": ${storageErrorMessage(listed.error)}`)
-  const exists = Boolean((listed.data || []).some(b => b?.name === renderBucket || b?.id === renderBucket))
-  if (exists) return { provider: 'supabase-storage', bucket: renderBucket, bucketExists: true }
-  const created = await supabase.storage.createBucket(renderBucket, { public: false })
-  if (!created.error) return { provider: 'supabase-storage', bucket: renderBucket, bucketExists: true }
-  const refreshed = await supabase.storage.listBuckets()
-  const nowExists = Boolean((refreshed.data || []).some(b => b?.name === renderBucket || b?.id === renderBucket))
-  if (nowExists) return { provider: 'supabase-storage', bucket: renderBucket, bucketExists: true }
-  throw new Error(`Supabase Storage bucket "${renderBucket}" does not exist and automatic creation failed: ${storageErrorMessage(created.error)}`)
+export function normalizeVideoLang(value: any): string {
+  const raw = String(value || '').toLowerCase().trim()
+  const short = raw.split(/[-_]/)[0]
+  return (SUPPORTED_VIDEO_LANGS as readonly string[]).includes(short) ? short : 'en'
 }
 
-function logStorageFailure({ stage, job, objectPath, bucketExists, error }) {
-  console.error('COSA video storage failure', {
-    stage,
-    campaignId: job?.campaign_id || job?.metadata?.campaignId || null,
-    requestId: job?.id || null,
-    storageProvider: 'supabase-storage',
-    bucket: renderBucket,
-    objectPath: objectPath || null,
-    bucketExists: bucketExists ?? null,
-    storageSdkError: storageErrorMessage(error),
-  })
+const AUDIENCE_BY_LANG: Record<string, string> = {
+  en: 'business owners, agencies, consultants, and operators',
+  es: 'dueños de negocios, agencias, consultores y operadores',
+  pt: 'donos de negócios, agências, consultores e operadores',
+  pl: 'właścicieli firm, agencji, konsultantów i operatorów',
+  ru: 'владельцев бизнеса, агентств, консультантов и операторов',
 }
 
-// ORPHAN RECOVERY: requeue 'rendering' jobs whose updated_at is stale. Each
-// requeue is counted in watchdog_signal.requeues; past MAX_REQUEUES the job
-// is failed honestly so the campaign poll surfaces a real error instead of
-// spinning forever.
-async function recoverStaleJobs() {
-  const cutoff = new Date(Date.now() - STALE_MS).toISOString()
-  const { data: stale, error } = await supabase
-    .from('cos_video_production_jobs')
-    .select('id, watchdog_signal, updated_at')
-    .eq('status', 'rendering')
-    .lt('updated_at', cutoff)
-    .limit(10)
-  if (error) { console.error('stale job scan failed:', error.message); return }
-  for (const job of stale || []) {
-    const requeues = Number(job?.watchdog_signal?.requeues || 0)
-    if (requeues >= MAX_REQUEUES) {
-      await supabase.from('cos_video_production_jobs').update({
-        status: 'failed',
-        error: `Render orphaned ${requeues + 1} times (worker killed mid-render). Giving up after ${MAX_REQUEUES} requeues — press "Reset and kick" on the campaign to start over.`,
-        updated_at: new Date().toISOString(),
-      }).eq('id', job.id).eq('status', 'rendering')
-      console.log(`stale job ${job.id}: failed after ${requeues} requeues`)
-    } else {
-      await supabase.from('cos_video_production_jobs').update({
-        status: 'queued',
-        error: null,
-        watchdog_signal: { ...(job.watchdog_signal || {}), requeues: requeues + 1, lastRequeueAt: new Date().toISOString(), reason: 'stale rendering claim recovered' },
-        updated_at: new Date().toISOString(),
-      }).eq('id', job.id).eq('status', 'rendering')
-      console.log(`stale job ${job.id}: requeued (requeue ${requeues + 1}/${MAX_REQUEUES})`)
-    }
-  }
+const LEARN_MORE_BY_LANG: Record<string, string> = {
+  en: 'Learn more at www.saas.signalboostapp.com.',
+  es: 'Más información en www.saas.signalboostapp.com.',
+  pt: 'Saiba mais em www.saas.signalboostapp.com.',
+  pl: 'Dowiedz się więcej na www.saas.signalboostapp.com.',
+  ru: 'Подробнее на www.saas.signalboostapp.com.',
 }
 
-async function claimJob() {
-  const { data: jobs, error } = await supabase
-    .from('cos_video_production_jobs')
-    .select('*')
-    .eq('status', 'queued')
-    .order('created_at', { ascending: true })
-    .limit(1)
-
-  if (error) throw error
-  const job = jobs?.[0]
-  if (!job) return null
-
-  const { data: claimed, error: claimError } = await supabase
-    .from('cos_video_production_jobs')
-    .update({ status: 'rendering', error: null, updated_at: new Date().toISOString() })
-    .eq('id', job.id)
-    .eq('status', 'queued')
-    .select('*')
-    .maybeSingle()
-
-  if (claimError) throw claimError
-  return claimed
+function adminDb() {
+  const url = process.env[SUPABASE_URL_KEY]
+  const key = process.env[SUPABASE_SERVICE_KEY]
+  if (!url || !key) throw new Error('Supabase service credentials are not configured')
+  return createClient(url, key, { auth: { persistSession: false } })
 }
 
-async function callWebhookRenderer(job) {
-  const res = await fetch(renderUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(renderToken ? { Authorization: `Bearer ${renderToken}` } : {}),
-    },
-    body: JSON.stringify({
-      job_id: job.id,
-      title: job.title,
-      hook: job.hook,
-      audience: job.audience,
-      production_tier: job.production_tier,
-      platforms: job.platforms,
-      render_spec: job.render_spec,
-      search_package: job.search_package,
-      approval_state: job.approval_state,
-    }),
-  })
+export type StartVideoResult =
+  | { ok: true; requestId: string; model: string; fallbackFrom?: string; warning?: string }
+  | { ok: false; error: string }
 
-  if (!res.ok) throw new Error(`renderer returned ${res.status}`)
-  const json = await res.json()
-  if (!json.output_url) throw new Error('renderer did not return output_url')
+export type FetchVideoResult =
+  | { status: 'rendering'; warning?: string }
+  | { status: 'done'; videoUrl: string }
+  | { status: 'failed'; error?: string }
 
-  return {
-    output_url: String(json.output_url),
-    thumbnail_url: json.thumbnail_url ? String(json.thumbnail_url) : null,
-  }
+export function buildSiteVideoPrompt(opts: { businessName?: string; description?: string; mood?: string }): string {
+  const name = (opts.businessName || '').trim()
+  const desc = (opts.description || '').trim()
+  const mood = (opts.mood || 'cinematic, premium, smooth motion').trim()
+  const subject = desc || name || 'a modern business'
+  return `A short, looping cinematic background video for ${name ? name + ', ' : ''}${subject}. ${mood}. No text, no logos, no captions. Elegant, atmospheric, gentle camera movement.`
 }
 
-function runCommand(command, args) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: ['ignore', 'inherit', 'pipe'] })
-    let stderr = ''
-    child.stderr.on('data', chunk => { stderr += chunk.toString() })
-    child.on('error', reject)
-    child.on('exit', code => code === 0 ? resolve() : reject(new Error(`${command} exited with ${code}: ${stderr.slice(-1200)}`)))
-  })
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err || 'unknown error')
 }
 
-function ffmpegPath() {
-  return process.env.FFMPEG_PATH || 'ffmpeg'
-}
-
-async function hasCommand(command) {
-  try {
-    await runCommand(process.platform === 'win32' ? 'where' : 'which', [command])
-    return true
-  } catch {
-    return false
-  }
-}
-
-function runFfmpeg(args) {
-  return runCommand(ffmpegPath(), args)
-}
-
-function cleanText(value, fallback = '') {
-  return String(value || fallback).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 240)
-}
-
-function wrapText(value, max = 42) {
-  const words = cleanText(value).split(' ')
-  const lines = []
-  let current = ''
-  for (const word of words) {
-    if ((current + ' ' + word).trim().length > max) {
-      if (current) lines.push(current)
-      current = word
-    } else {
-      current = (current + ' ' + word).trim()
-    }
-  }
-  if (current) lines.push(current)
-  return lines.slice(0, 4).join('\n')
-}
-
-function escapeDrawtext(value) {
+function cleanText(value: string, max = 240): string {
   return String(value || '')
-    .replace(/\\/g, '\\\\')
-    .replace(/:/g, '\\:')
-    .replace(/'/g, "\\'")
-    .replace(/%/g, '\\%')
+    .replace(/https?:\/\/\S+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, max)
 }
 
-function drawText({ text, x = '(w-text_w)/2', y, size = 54, color = 'white', start = 0, end = 30 }) {
-  return `drawtext=text='${escapeDrawtext(text)}':fontcolor=${color}:fontsize=${size}:line_spacing=12:x=${x}:y=${y}:enable='between(t\\,${start}\\,${end})'`
+function titleFromPrompt(prompt: string): string {
+  const clean = cleanText(prompt, 80)
+  return clean || 'SignalBoostAi campaign preview'
 }
 
-function assTime(seconds) {
-  const safe = Math.max(0, Number(seconds) || 0)
-  const h = Math.floor(safe / 3600)
-  const m = Math.floor((safe % 3600) / 60)
-  const s = Math.floor(safe % 60)
-  const c = Math.floor((safe - Math.floor(safe)) * 100)
-  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(c).padStart(2, '0')}`
+function hookFromPrompt(prompt: string): string {
+  const clean = cleanText(prompt, 160)
+  return clean || 'One command can start a complete SignalBoostAi campaign.'
 }
 
-function scriptText(job) {
-  const parts = [job.hook, job.title, job.audience ? `Para ${job.audience}.` : '', job.search_package?.destination_url ? `Acesse ${job.search_package.destination_url}.` : 'Conheça a SignalBoostAi.']
-  return cleanText(parts.filter(Boolean).join(' '), 'Conheça a SignalBoostAi e transforme campanhas em resultados aprovados.')
+function needsQueueSetup(message: string): boolean {
+  const m = String(message || '').toLowerCase()
+  return (
+    m.includes('cos_video_production_jobs') ||
+    m.includes('cos_video_lifecycle_events') ||
+    m.includes('cos_video_escalation_tickets') ||
+    m.includes('lifecycle_state') ||
+    m.includes('warning_level') ||
+    m.includes('attempt_count') ||
+    m.includes('reroute_count') ||
+    m.includes('schema cache') ||
+    m.includes('does not exist') ||
+    m.includes('not find')
+  )
 }
 
-function buildCaptionCues(job, duration) {
-  const source = Array.isArray(job.render_spec?.captions) && job.render_spec.captions.length
-    ? job.render_spec.captions
-    : [job.hook, job.title, `SignalBoostAi para ${job.audience || 'negócios'}`, job.search_package?.destination_url || 'www.saas.signalboostapp.com']
-  const lines = source.map(item => cleanText(typeof item === 'string' ? item : item?.text)).filter(Boolean)
-  const cues = lines.length ? lines : [scriptText(job)]
-  const segment = duration / cues.length
-  return cues.map((text, index) => ({ start: index * segment, end: Math.min(duration, (index + 1) * segment + 0.25), text }))
+async function ensureJobsTable(sb: any) {
+  const rpc = await sb.rpc('hub_exec_sql', { query: COS_VIDEO_QUEUE_SQL })
+  if (rpc.error) throw new Error('Could not create video jobs table: ' + rpc.error.message)
+  const check = await sb.from('cos_video_production_jobs').select('id').limit(1)
+  if (check.error) throw new Error('Video jobs table still unavailable after setup: ' + check.error.message)
 }
 
-function buildAss(job, duration) {
-  const cues = buildCaptionCues(job, duration)
-  return `[Script Info]\nScriptType: v4.00+\nPlayResX: 1920\nPlayResY: 1080\nScaledBorderAndShadow: yes\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Caption,Arial,56,&H00FFFFFF,&H000000FF,&HCC000000,&HAA020617,1,0,0,0,100,100,0,0,3,3,0,2,80,80,110,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n${cues.map(cue => `Dialogue: 0,${assTime(cue.start)},${assTime(cue.end)},Caption,,0,0,0,,${String(cue.text).replace(/[{}]/g, '').replace(/\n/g, '\\N')}`).join('\n')}\n`
+async function insertJob(sb: any, row: Record<string, unknown>) {
+  return await sb.from('cos_video_production_jobs').insert(row).select('id').single()
 }
 
-async function synthesizeLocalVoice(job, dir, duration) {
-  const wav = join(dir, 'voice.wav')
-  const textPath = join(dir, 'voice.txt')
-  await writeFile(textPath, scriptText(job), 'utf8')
-  const espeak = await hasCommand('espeak-ng') ? 'espeak-ng' : (await hasCommand('espeak') ? 'espeak' : null)
-  if (espeak) {
-    const voice = espeak === 'espeak-ng' ? 'pt-br' : 'pt'
-    await runCommand(espeak, ['-v', voice, '-s', '150', '-f', textPath, '-w', wav])
-    return wav
+async function startFfmpegPreview(prompt: string, aspectRatio: '9:16' | '16:9' | '1:1', source: ImageMotionSource = {}, opts: StartVideoOpts = {}): Promise<StartVideoResult> {
+  const sb = adminDb()
+  const renderBucket = cosVideoRenderBucket()
+  await ensureCosVideoRenderBucket(sb, { createIfMissing: true, bucket: renderBucket })
+  const now = new Date().toISOString()
+  const lang = normalizeVideoLang(opts.lang)
+  // Prefer the campaign's own copy (already in the campaign language) over
+  // text derived from the English cinematic render prompt.
+  const title = cleanText(opts.title || '', 80) || titleFromPrompt(prompt)
+  const hook = cleanText(opts.hook || '', 160) || hookFromPrompt(prompt)
+  const audience = AUDIENCE_BY_LANG[lang] || AUDIENCE_BY_LANG.en
+  const platforms = aspectRatio === '9:16' ? ['Shorts', 'TikTok', 'Reels'] : ['YouTube', 'LinkedIn', 'Website']
+  const hasSourceImage = Boolean(source.sourceImageUrl || source.sourceImagePath)
+
+  const row = {
+    title,
+    status: 'queued',
+    lifecycle_state: 'incoming',
+    warning_level: 'green',
+    pool: 'primary',
+    fallback_pool: 'secondary',
+    attempt_count: 0,
+    max_attempts: DEFAULT_MAX_ATTEMPTS,
+    reroute_count: 0,
+    auto_apply: AUTO_APPLY_DEFAULT,
+    priority: 100,
+    machine_id: null,
+    provider_ref: LOCAL_FFMPEG_MODEL,
+    vercel_environment: process.env.VERCEL_ENV || process.env.NODE_ENV || 'local',
+    last_heartbeat_at: null,
+    reroute_reason: null,
+    queue_drop_reason: null,
+    cockpit_ticket_id: null,
+    escalated_at: null,
+    completed_at: null,
+    production_tier: 'prototype',
+    platforms,
+    hook,
+    audience,
+    render_spec: {
+      format: 'mp4',
+      language: lang,
+      aspect_ratios: [aspectRatio],
+      duration_seconds: 24,
+      voice_strategy: 'voice and captions are added by the COSA campaign pipeline after the base preview render',
+      visual_strategy: source.visualStrategy || (hasSourceImage ? 'creative_image_motion_ken_burns' : 'internal_ffmpeg_preview_motion_cards'),
+      caption_strategy: 'captions are added after base render; final brand banner is burned by the brand overlay worker',
+      provider_adapter: 'internal_ffmpeg_preview',
+      source_image_url: source.sourceImageUrl || null,
+      source_image_path: source.sourceImagePath || null,
+      source_image_bucket: source.sourceImageBucket || null,
+    },
+    search_package: {
+      title_options: [title, `${title} | SignalBoostAi`, 'AI campaign operating system demo'],
+      description: `${hook} ${LEARN_MORE_BY_LANG[lang] || LEARN_MORE_BY_LANG.en}`,
+      tags: ['SignalBoostAi', 'AI marketing', 'campaign automation', 'business growth', 'SaaS'],
+      thumbnail_text: hook.slice(0, 54),
+      transcript_required: true,
+      captions_required: true,
+      destination_url: 'www.saas.signalboostapp.com',
+    },
+    approval_state: {
+      concept_approved: true,
+      script_approved: true,
+      render_approved: false,
+      publish_approved: false,
+    },
+    output_url: null,
+    thumbnail_url: null,
+    error: null,
+    telemetry: {
+      request_type: 'incoming_video_request',
+      source: 'operator_video_helper',
+      aspect_ratio: aspectRatio,
+      provider: LOCAL_FFMPEG_MODEL,
+    },
+    watchdog_signal: {},
+    audit_trail: [{ event: 'incoming_video_request', at: now, actor: 'system', provider: LOCAL_FFMPEG_MODEL }],
+    created_at: now,
+    updated_at: now,
   }
 
-  await runFfmpeg(['-y', '-f', 'lavfi', '-i', `sine=frequency=440:sample_rate=44100:d=${duration}`, '-af', 'volume=0.08', wav])
-  return wav
-}
-
-function escapeAssFilterPath(value) {
-  // Use the local POSIX path directly. Do not pass a file:// URL here:
-  // the FFmpeg ass filter parses the colon in file:///tmp/... as the
-  // separator for original_size, which caused "Unable to parse option value
-  // ///tmp/.../captions.ass as image size" and froze COSA renders.
-  return String(value || '').replace(/\\/g, '/').replace(/'/g, "\\'")
-}
-
-function buildFilters(job, duration) {
-  const title = wrapText(job.title || 'SignalBoost video', 36)
-  const hook = wrapText(job.hook || 'SignalBoost turns scattered work into approved action.', 34)
-  const audience = wrapText(job.audience || 'business operators', 44)
-  const destination = cleanText(job.search_package?.destination_url || 'www.saas.signalboostapp.com')
-  const transcript = job.search_package?.captions_required ? 'Captions and transcript required' : 'Captions planned'
-  const segment = Math.max(4, Math.floor(duration / 4))
-  const filters = [
-    drawText({ text: 'SignalBoostAi', x: 'w-text_w-80', y: '60', size: 52, color: '0xffc300', start: 0, end: duration }),
-    drawText({ text: 'www.saas.signalboostapp.com', x: 'w-text_w-80', y: '124', size: 28, color: '0x1af0ff', start: 0, end: duration }),
-    drawText({ text: title, y: '(h-text_h)/2-160', size: 68, color: 'white', start: 0, end: segment + 1 }),
-    drawText({ text: hook, y: '(h-text_h)/2-120', size: 72, color: 'white', start: segment, end: segment * 2 + 1 }),
-    drawText({ text: `For ${audience}`, y: '(h-text_h)/2-80', size: 54, color: '0xffffff', start: segment * 2, end: segment * 3 + 1 }),
-    drawText({ text: transcript, y: '(h-text_h)/2-80', size: 54, color: '0xffc300', start: segment * 3, end: duration }),
-    drawText({ text: destination, y: 'h-150', size: 44, color: '0xffc300', start: 0, end: duration }),
-  ]
-  return filters.join(',')
-}
-
-async function renderLocalMp4(job) {
-  const dir = await mkdtemp(join(tmpdir(), 'signalboost-cos-video-'))
-  const output = join(dir, 'final.mp4')
-  try {
-    const duration = Math.max(12, Math.min(60, Number(job.render_spec?.duration_seconds || 24)))
-    const assPath = join(dir, 'captions.ass')
-    const audioPath = await synthesizeLocalVoice(job, dir, duration)
-    await writeFile(assPath, buildAss(job, duration), 'utf8')
-
-    const visualFilter = `${buildFilters(job, duration)},ass='${escapeAssFilterPath(assPath)}'`
-    await runFfmpeg([
-      '-y',
-      '-f', 'lavfi', '-i', `color=c=0x020617:s=1920x1080:d=${duration}`,
-      '-i', audioPath,
-      '-vf', visualFilter,
-      '-map', '0:v:0', '-map', '1:a:0',
-      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20',
-      '-c:a', 'aac', '-b:a', '160k', '-shortest', '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
-      output,
-    ])
-
-    const bytes = await readFile(output)
-    const resultPath = `cos-video-production/${job.id}/final.mp4`
-    const storage = await ensureRenderBucket()
-    const { error: uploadError } = await supabase.storage.from(renderBucket).upload(resultPath, bytes, { contentType: 'video/mp4', upsert: true })
-    if (uploadError) {
-      logStorageFailure({ stage: 'raw-base-render-upload', job, objectPath: resultPath, bucketExists: storage.bucketExists, error: uploadError })
-      throw new Error(`Supabase Storage upload failed for bucket "${renderBucket}" object "${resultPath}": ${storageErrorMessage(uploadError)}`)
+  let inserted = await insertJob(sb, row)
+  if (inserted.error || !inserted.data?.id) {
+    const message = inserted.error?.message || ''
+    if (needsQueueSetup(message)) {
+      await ensureJobsTable(sb)
+      inserted = await insertJob(sb, row)
     }
-    return { output_url: resultPath, thumbnail_url: null }
-  } finally {
-    await rm(dir, { recursive: true, force: true })
   }
+  if (inserted.error || !inserted.data?.id) return { ok: false, error: inserted.error?.message || 'Could not queue internal FFmpeg preview render.' }
+  return { ok: true, requestId: String(inserted.data.id), model: LOCAL_FFMPEG_MODEL }
 }
 
-async function renderJob(job) {
-  if (renderUrl) return callWebhookRenderer(job)
-  return renderLocalMp4(job)
-}
-
-async function processJob(job) {
+export async function startCreativeImageMotionVideo(
+  prompt: string,
+  aspectRatio: '9:16' | '16:9' | '1:1' = '16:9',
+  source: ImageMotionSource,
+  opts: StartVideoOpts = {},
+): Promise<StartVideoResult> {
   try {
-    const result = await renderJob(job)
-    await supabase
-      .from('cos_video_production_jobs')
-      .update({
-        status: 'rendered',
-        output_url: result.output_url,
-        thumbnail_url: result.thumbnail_url,
-        error: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', job.id)
-  } catch (error) {
-    await supabase
-      .from('cos_video_production_jobs')
-      .update({
-        status: 'failed',
-        error: error instanceof Error ? error.message : String(error),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', job.id)
+    return await startFfmpegPreview(prompt, aspectRatio, source, opts)
+  } catch (err: unknown) {
+    const message = errorMessage(err)
+    console.error('startCreativeImageMotionVideo error:', message)
+    return { ok: false, error: message }
   }
 }
 
-await ensureRenderBucket()
-await recoverStaleJobs()
-
-let cycles = 0
-while (Date.now() - startedAt < RUN_BUDGET_MS) {
-  const job = await claimJob()
-  if (job) {
-    await processJob(job)
-  } else {
-    await new Promise(resolve => setTimeout(resolve, pollMs))
+export async function startSiteVideo(
+  prompt: string,
+  aspectRatio: '9:16' | '16:9' | '1:1' = '16:9',
+  opts: StartVideoOpts = {},
+): Promise<StartVideoResult> {
+  try {
+    return await startFfmpegPreview(prompt, aspectRatio, {}, opts)
+  } catch (err: unknown) {
+    const message = errorMessage(err)
+    console.error('startSiteVideo internal FFmpeg error:', message)
+    return { ok: false, error: message }
   }
-  // Re-scan for orphans periodically so recovery happens even in long runs.
-  cycles++
-  if (cycles % 20 === 0) await recoverStaleJobs()
 }
-console.log(`run budget reached (${Math.round(RUN_BUDGET_MS / 60000)} min) — exiting cleanly before workflow timeout; next scheduled run continues.`)
-process.exit(0)
+
+async function fetchFfmpegPreview(requestId: string): Promise<FetchVideoResult> {
+  const sb = adminDb()
+  let query = await sb
+    .from('cos_video_production_jobs')
+    .select('status, output_url, error, lifecycle_state, warning_level, pool, queue_drop_reason, cockpit_ticket_id')
+    .eq('id', requestId)
+    .single()
+
+  if (query.error && needsQueueSetup(query.error.message || '')) {
+    try {
+      await ensureJobsTable(sb)
+      query = await sb
+        .from('cos_video_production_jobs')
+        .select('status, output_url, error, lifecycle_state, warning_level, pool, queue_drop_reason, cockpit_ticket_id')
+        .eq('id', requestId)
+        .single()
+    } catch {
+      query = await sb.from('cos_video_production_jobs').select('status, output_url, error').eq('id', requestId).single()
+    }
+  }
+
+  const { data, error } = query
+  if (error || !data) return { status: 'failed', error: error?.message || 'Internal FFmpeg preview job not found.' }
+
+  const status = String(data.status || '')
+  const queueDropReason = String((data as any).queue_drop_reason || '').trim()
+  const cockpitTicketId = String((data as any).cockpit_ticket_id || '').trim()
+  if (status === 'failed') return { status: 'failed', error: data.error || 'Internal FFmpeg preview render failed.' }
+  if (status === 'escalated') return { status: 'failed', error: data.error || `Video render escalated to Cockpit${cockpitTicketId ? ` ticket ${cockpitTicketId}` : ''}.` }
+  if (status === 'dlq') return { status: 'failed', error: queueDropReason || data.error || 'Video render was moved out of the primary stream for operator review.' }
+  if (status === 'rendered' || status === 'completed') {
+    const output = String(data.output_url || '').trim()
+    if (!output) return { status: 'failed', error: 'Internal FFmpeg preview rendered but no output URL was saved.' }
+    if (output.startsWith('http')) return { status: 'done', videoUrl: output }
+
+    const renderBucket = cosVideoRenderBucket()
+    const storage = await ensureCosVideoRenderBucket(sb, { createIfMissing: true, bucket: renderBucket })
+    const { data: signed, error: signError } = await sb.storage.from(renderBucket).createSignedUrl(output, 60 * 60 * 24 * 7)
+    if (signError || !signed?.signedUrl) {
+      logCosVideoStorageFailure({ stage: 'base-render-sign', requestId, bucket: renderBucket, objectPath: output, bucketExists: storage.bucketExists, error: signError || 'missing signed URL' })
+      return { status: 'failed', error: signError?.message || `Could not sign internal FFmpeg preview output from Supabase Storage bucket "${renderBucket}".` }
+    }
+    return { status: 'done', videoUrl: signed.signedUrl }
+  }
+
+  const warning = (data as any).warning_level && (data as any).warning_level !== 'green'
+    ? `Internal FFmpeg preview job is ${status || 'queued'} in ${(data as any).pool || 'primary'} pool (${(data as any).warning_level}).`
+    : `Internal FFmpeg preview job is ${status || 'queued'}.`
+  return { status: 'rendering', warning }
+}
+
+export async function fetchSiteVideo(requestId: string, model: string): Promise<FetchVideoResult> {
+  if (model !== LOCAL_FFMPEG_MODEL) {
+    return { status: 'failed', error: 'Paid external video provider fetch is disabled in cost-safety mode. Re-render with the internal FFmpeg provider.' }
+  }
+  return fetchFfmpegPreview(requestId)
+}

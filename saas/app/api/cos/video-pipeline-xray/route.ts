@@ -94,7 +94,7 @@ function underlyingIssue(v: any): string {
   if (unb.length) return `voiced [${unb.join(',')}], banner not burned`
   return `stage=${String(v.status || 'unknown')}`
 }
-function eligibility(c: any): string {
+function eligibility(c: any, job?: any): string {
   const v = c?.metadata?.video
   const created = c.created_at ? Date.parse(c.created_at) : 0
   if (!created || created < Date.parse(BACKLOG_CUTOFF)) return 'BLOCKED: created before cutoff'
@@ -109,7 +109,28 @@ function eligibility(c: any): string {
   // button when eligibility starts with STUCK. The old INVALID prefix told the
   // owner to reset while hiding the only reset control — an unreachable cure.
   if (isFakeFinal(v)) return 'STUCK: fake final artifact from old emergency fallback. Press "Reset and kick" (or wait — the brand overlay worker now self-heals these every 10 min). Do not approve this video.'
-  if (v.status === 'rendering') return 'RENDERING: render in progress'
+  if (v.status === 'rendering') {
+    // Job-aware diagnostics: "render in progress" used to hide the real queue
+    // state. Surface it, and show the Reset button (STUCK prefix) when the
+    // job is dead or has waited far too long.
+    if (job) {
+      const jobStatus = String(job.status || 'unknown')
+      const idleMin = minutesAgo(job.updated_at)
+      if (jobStatus === 'failed' || jobStatus === 'escalated' || jobStatus === 'dlq') {
+        return `STUCK: render job ${jobStatus}: ${String(job.error || job.queue_drop_reason || 'unknown').slice(0, 140)}. Press "Reset and kick" to re-render.`
+      }
+      if (jobStatus === 'rendering' && idleMin !== null && idleMin > 20) {
+        return `STUCK: render job orphaned — claimed by a worker ${idleMin} min ago and never finished (worker was likely killed). The production worker requeues these automatically every run; press "Reset and kick" to force a fresh render now.`
+      }
+      if (jobStatus === 'queued' && idleMin !== null && idleMin > 30) {
+        return `STUCK: render job has been queued for ${idleMin} min with no worker pickup. Check GitHub Actions → "COS Video Production" for red runs (missing secrets, disabled schedule). Press "Reset and kick" to requeue.`
+      }
+      return `RENDERING: job ${jobStatus}${idleMin !== null ? ` (last update ${idleMin} min ago)` : ''} — GitHub Actions worker runs every 10 min.`
+    }
+    const startedMin = minutesAgo(v.started_at)
+    if (startedMin !== null && startedMin > 30) return `STUCK: rendering for ${startedMin} min and the render job row cannot be found. Press "Reset and kick" to start over.`
+    return 'RENDERING: render in progress'
+  }
   if (v.status === 'failed') return `FAILED render: ${String(v.error || 'unknown').slice(0, 120)}`
   if (v.status === 'ready') {
     if (isRealFinal(c, v)) return 'DONE: branded video previewable — approve on the dashboard'
@@ -165,13 +186,29 @@ export async function GET(req: NextRequest) {
   const env = { FAL_KEY: Boolean(process.env.FAL_KEY), ELEVENLABS_API_KEY: Boolean(process.env.ELEVENLABS_API_KEY), RESEND_API_KEY: Boolean(process.env.RESEND_API_KEY), GITHUB_WRITE_TOKEN: Boolean(process.env.GITHUB_WRITE_TOKEN || process.env.GITHUB_TOKEN), CRON_SECRET: Boolean(process.env['CRON_' + 'SECRET']), COS_VIDEO_RENDER_BUCKET: process.env.COS_VIDEO_RENDER_BUCKET || null, COS_BRAND_SINCE_override: process.env.COS_BRAND_SINCE || null }
   const { data: rawRecent } = await sb.from('cos_campaign_queue').select('*').order('created_at', { ascending: false }).limit(40)
   const recent = (rawRecent || []).filter((c: any) => isVideoChannel(c) || looksLikeVideoRequest(c)).slice(0, 15)
+
+  // Fetch production job rows for campaigns mid-render so the xray (and the
+  // eligibility text driving the dashboard) reflects the REAL queue state
+  // instead of a blind "render in progress".
+  const renderingIds = recent
+    .map((c: any) => c?.metadata?.video)
+    .filter((v: any) => v && v.status === 'rendering' && v.requestId)
+    .map((v: any) => String(v.requestId))
+  const jobById: Record<string, any> = {}
+  if (renderingIds.length) {
+    const { data: jobs } = await sb
+      .from('cos_video_production_jobs')
+      .select('id, status, error, queue_drop_reason, updated_at, created_at, watchdog_signal')
+      .in('id', renderingIds)
+    for (const j of jobs || []) jobById[String(j.id)] = j
+  }
   const campaigns = recent.map((c: any) => {
     const v = c?.metadata?.video || null
     const finalUrl = isRealFinal(c, v) ? String(v.voicedUrl) : null
     const baseUrl = v?.url ? String(v.url) : null
     const anyPreviewUrl = previewUrl(c, v)
     const misrouted = !isVideoChannel(c) && looksLikeVideoRequest(c)
-    return { id: c.id, title: String(c.title || '').slice(0, 60), channel: c.channel, intendedChannel: misrouted ? inferredVideoChannel(c) : c.channel, status: c.status, created_at: c.created_at, approved_at: c.approved_at || null, misrouted, video: v ? { stage: v.status || null, requestId: v.requestId || null, started_at: v.started_at || null, hasKlingUrl: Boolean(v.url), baseUrl, finalUrl, previewUrl: anyPreviewUrl, previewKind: finalUrl ? 'branded final' : baseUrl ? 'base draft' : anyPreviewUrl ? 'video' : null, voicedLangs: keys(v.unbrandedVoiced), brandedLangs: isFakeFinal(v) || isRejected(c) ? [] : keys(v.brandedLangs).filter((k: string) => (v.brandedLangs || {})[k]), branded: isRealFinal(c, v), previewable: Boolean(anyPreviewUrl), voiceError: v.voiceError || null, renderError: v.error || null, ghOverlayAttempts: v.ghOverlayAttempts || {}, brandingLock: v.brandingLock || null, brandingExhausted: v.brandingExhausted === true, brandDebug: v.brandDebug || null, brandSchemaVersion: v.brandSchemaVersion || null, brandedAt: v.brandedAt || null, brandingDiagnostics: brandingDiagnostics(c), autoPublishNote: c?.metadata?.auto_publish_note || null } : null, eligibility: eligibility(c) }
+    return { id: c.id, title: String(c.title || '').slice(0, 60), channel: c.channel, intendedChannel: misrouted ? inferredVideoChannel(c) : c.channel, status: c.status, created_at: c.created_at, approved_at: c.approved_at || null, misrouted, video: v ? { stage: v.status || null, requestId: v.requestId || null, started_at: v.started_at || null, hasKlingUrl: Boolean(v.url), baseUrl, finalUrl, previewUrl: anyPreviewUrl, previewKind: finalUrl ? 'branded final' : baseUrl ? 'base draft' : anyPreviewUrl ? 'video' : null, voicedLangs: keys(v.unbrandedVoiced), brandedLangs: isFakeFinal(v) || isRejected(c) ? [] : keys(v.brandedLangs).filter((k: string) => (v.brandedLangs || {})[k]), branded: isRealFinal(c, v), previewable: Boolean(anyPreviewUrl), voiceError: v.voiceError || null, renderError: v.error || null, ghOverlayAttempts: v.ghOverlayAttempts || {}, brandingLock: v.brandingLock || null, brandingExhausted: v.brandingExhausted === true, brandDebug: v.brandDebug || null, brandSchemaVersion: v.brandSchemaVersion || null, brandedAt: v.brandedAt || null, brandingDiagnostics: brandingDiagnostics(c), autoPublishNote: c?.metadata?.auto_publish_note || null, renderJob: v?.requestId ? (jobById[String(v.requestId)] || null) : null } : null, eligibility: eligibility(c, v?.requestId ? jobById[String(v.requestId)] : undefined) }
   })
   return NextResponse.json({ ok: true, now: new Date().toISOString(), backlogCutoff: BACKLOG_CUTOFF, env, actions, campaigns })
 }

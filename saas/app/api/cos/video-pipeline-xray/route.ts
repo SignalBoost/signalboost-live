@@ -169,7 +169,11 @@ export async function GET(req: NextRequest) {
       const channel = rescued ? inferredVideoChannel(c) : String(c.channel || 'youtube')
       const aspect: '9:16' | '16:9' = channel === 'short_video' ? '9:16' : '16:9'
       const prompt = renderPromptForCampaign(c)
-      const kicked: any = await startSiteVideo(prompt, aspect)
+      const kicked: any = await startSiteVideo(prompt, aspect, {
+        lang: Array.isArray(c.languages) && c.languages.length ? String(c.languages[0]) : 'en',
+        title: c.title,
+        hook: c.objective || c.title,
+      })
       if (kicked?.ok) {
         const patch: any = {
           metadata: {

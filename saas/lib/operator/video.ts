@@ -25,6 +25,35 @@ type ImageMotionSource = {
   visualStrategy?: string
 }
 
+// Language plumbing: the campaign's language must reach the render worker so
+// voice + captions come out in EN/ES/PT/PL/RU. Carried in render_spec.language
+// (jsonb — no schema change needed).
+export type StartVideoOpts = { lang?: string; title?: string; hook?: string }
+
+export const SUPPORTED_VIDEO_LANGS = ['en', 'es', 'pt', 'pl', 'ru'] as const
+
+export function normalizeVideoLang(value: any): string {
+  const raw = String(value || '').toLowerCase().trim()
+  const short = raw.split(/[-_]/)[0]
+  return (SUPPORTED_VIDEO_LANGS as readonly string[]).includes(short) ? short : 'en'
+}
+
+const AUDIENCE_BY_LANG: Record<string, string> = {
+  en: 'business owners, agencies, consultants, and operators',
+  es: 'dueños de negocios, agencias, consultores y operadores',
+  pt: 'donos de negócios, agências, consultores e operadores',
+  pl: 'właścicieli firm, agencji, konsultantów i operatorów',
+  ru: 'владельцев бизнеса, агентств, консультантов и операторов',
+}
+
+const LEARN_MORE_BY_LANG: Record<string, string> = {
+  en: 'Learn more at www.saas.signalboostapp.com.',
+  es: 'Más información en www.saas.signalboostapp.com.',
+  pt: 'Saiba mais em www.saas.signalboostapp.com.',
+  pl: 'Dowiedz się więcej na www.saas.signalboostapp.com.',
+  ru: 'Подробнее на www.saas.signalboostapp.com.',
+}
+
 function adminDb() {
   const url = process.env[SUPABASE_URL_KEY]
   const key = process.env[SUPABASE_SERVICE_KEY]
@@ -98,13 +127,17 @@ async function insertJob(sb: any, row: Record<string, unknown>) {
   return await sb.from('cos_video_production_jobs').insert(row).select('id').single()
 }
 
-async function startFfmpegPreview(prompt: string, aspectRatio: '9:16' | '16:9' | '1:1', source: ImageMotionSource = {}): Promise<StartVideoResult> {
+async function startFfmpegPreview(prompt: string, aspectRatio: '9:16' | '16:9' | '1:1', source: ImageMotionSource = {}, opts: StartVideoOpts = {}): Promise<StartVideoResult> {
   const sb = adminDb()
   const renderBucket = cosVideoRenderBucket()
   await ensureCosVideoRenderBucket(sb, { createIfMissing: true, bucket: renderBucket })
   const now = new Date().toISOString()
-  const title = titleFromPrompt(prompt)
-  const hook = hookFromPrompt(prompt)
+  const lang = normalizeVideoLang(opts.lang)
+  // Prefer the campaign's own copy (already in the campaign language) over
+  // text derived from the English cinematic render prompt.
+  const title = cleanText(opts.title || '', 80) || titleFromPrompt(prompt)
+  const hook = cleanText(opts.hook || '', 160) || hookFromPrompt(prompt)
+  const audience = AUDIENCE_BY_LANG[lang] || AUDIENCE_BY_LANG.en
   const platforms = aspectRatio === '9:16' ? ['Shorts', 'TikTok', 'Reels'] : ['YouTube', 'LinkedIn', 'Website']
   const hasSourceImage = Boolean(source.sourceImageUrl || source.sourceImagePath)
 
@@ -132,9 +165,10 @@ async function startFfmpegPreview(prompt: string, aspectRatio: '9:16' | '16:9' |
     production_tier: 'prototype',
     platforms,
     hook,
-    audience: 'business owners, agencies, consultants, and operators',
+    audience,
     render_spec: {
       format: 'mp4',
+      language: lang,
       aspect_ratios: [aspectRatio],
       duration_seconds: 24,
       voice_strategy: 'voice and captions are added by the COSA campaign pipeline after the base preview render',
@@ -147,7 +181,7 @@ async function startFfmpegPreview(prompt: string, aspectRatio: '9:16' | '16:9' |
     },
     search_package: {
       title_options: [title, `${title} | SignalBoostAi`, 'AI campaign operating system demo'],
-      description: `${hook} Learn more at www.saas.signalboostapp.com.`,
+      description: `${hook} ${LEARN_MORE_BY_LANG[lang] || LEARN_MORE_BY_LANG.en}`,
       tags: ['SignalBoostAi', 'AI marketing', 'campaign automation', 'business growth', 'SaaS'],
       thumbnail_text: hook.slice(0, 54),
       transcript_required: true,
@@ -191,9 +225,10 @@ export async function startCreativeImageMotionVideo(
   prompt: string,
   aspectRatio: '9:16' | '16:9' | '1:1' = '16:9',
   source: ImageMotionSource,
+  opts: StartVideoOpts = {},
 ): Promise<StartVideoResult> {
   try {
-    return await startFfmpegPreview(prompt, aspectRatio, source)
+    return await startFfmpegPreview(prompt, aspectRatio, source, opts)
   } catch (err: unknown) {
     const message = errorMessage(err)
     console.error('startCreativeImageMotionVideo error:', message)
@@ -203,10 +238,11 @@ export async function startCreativeImageMotionVideo(
 
 export async function startSiteVideo(
   prompt: string,
-  aspectRatio: '9:16' | '16:9' | '1:1' = '16:9'
+  aspectRatio: '9:16' | '16:9' | '1:1' = '16:9',
+  opts: StartVideoOpts = {},
 ): Promise<StartVideoResult> {
   try {
-    return await startFfmpegPreview(prompt, aspectRatio)
+    return await startFfmpegPreview(prompt, aspectRatio, {}, opts)
   } catch (err: unknown) {
     const message = errorMessage(err)
     console.error('startSiteVideo internal FFmpeg error:', message)

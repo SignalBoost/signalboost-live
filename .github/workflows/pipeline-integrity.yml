@@ -1,0 +1,38 @@
+name: Pipeline Integrity
+
+# Runs on EVERY push — including direct web-UI commits to main, which the
+# PR-only "Repo Targeting QA" workflow never sees. This is the tripwire for
+# the recurring paste-misfile incidents: a corrupted worker/workflow/route
+# turns this red within ~30 seconds and GitHub emails the owner.
+on:
+  push: {}
+  pull_request: {}
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pipeline-integrity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integrity:
+    name: Verify workers, workflows, and routes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      # Zero-dependency checks — no npm install, finishes in seconds.
+      - name: Verify worker scripts and workflow files (misfile guard)
+        run: node scripts/verify-workers.mjs
+
+      - name: Verify route handler / page structure
+        run: node scripts/verify-route-handlers.mjs

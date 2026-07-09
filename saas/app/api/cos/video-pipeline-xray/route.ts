@@ -105,7 +105,10 @@ function eligibility(c: any): string {
   if (isRejected(c)) return `STUCK: campaign rejected — pipeline frozen. Underlying state: ${underlyingIssue(v)}. Press "Reset and kick" to clear video state, move it back to waiting_approval and re-render.`
   if (!isVideoChannel(c) && looksLikeVideoRequest(c) && !v) return `STUCK: video request was routed as ${String(c.channel || 'unknown')} instead of youtube/short_video. Press "Kick missing renders" to rescue it, move it into the video pipeline, and start rendering.`
   if (!v) return 'STAGE 0: waiting for auto-render start'
-  if (isFakeFinal(v)) return 'INVALID: fake final artifact from emergency fallback. Reset and reprocess; do not approve this video.'
+  // STUCK prefix is required: the dashboard only renders the "Reset and kick"
+  // button when eligibility starts with STUCK. The old INVALID prefix told the
+  // owner to reset while hiding the only reset control — an unreachable cure.
+  if (isFakeFinal(v)) return 'STUCK: fake final artifact from old emergency fallback. Press "Reset and kick" (or wait — the brand overlay worker now self-heals these every 10 min). Do not approve this video.'
   if (v.status === 'rendering') return 'RENDERING: render in progress'
   if (v.status === 'failed') return `FAILED render: ${String(v.error || 'unknown').slice(0, 120)}`
   if (v.status === 'ready') {

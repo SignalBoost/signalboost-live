@@ -22,6 +22,15 @@ jobs:
         with:
           node-version: 24
 
+      # PREFLIGHT: fail loudly if the worker file is corrupted (e.g. YAML or
+      # TypeScript pasted over it) instead of a cryptic instant SyntaxError.
+      - name: Preflight — worker file integrity
+        run: |
+          if ! node --check scripts/brand-overlay-worker.mjs; then
+            echo "::error file=scripts/brand-overlay-worker.mjs::MISFILED OR CORRUPTED WORKER — not valid JavaScript. Another file's content was likely pasted here. All video branding is stopped until scripts/brand-overlay-worker.mjs is restored."
+            exit 1
+          fi
+
       - name: Install worker dependencies
         # The worker imports @supabase/supabase-js. Install only what the
         # script needs; pulling the full Next.js dependency tree here would

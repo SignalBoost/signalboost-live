@@ -1,199 +1,218 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { startSiteVideo, fetchSiteVideo } from '@/lib/operator/video'
-import { proposeInfrastructurePr } from '@/lib/infra-pr/tool'
+import { getAccess } from '@/lib/auth/access'
+import { startSiteVideo } from '@/lib/operator/video'
 
 export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
 export const maxDuration = 60
 
 const VIDEO_CHANNELS = ['youtube', 'short_video']
-const WORKFLOW_FILE = 'brand-overlay.yml'
-const RENDER_STALE_MINUTES = 45
-const RENDER_RESTART_MINUTES = 90
-const MISSING_RENDER_MINUTES = 5
-const MAX_RESTARTS_BEFORE_THROTTLE = 5
-const MAX_PER_RUN = 6
-const OWNER_EMAIL = 'cos-governance-watchdog@signalboost.internal'
+const BACKLOG_CUTOFF = process.env.COS_BRAND_SINCE || '2026-07-02T12:00:00Z'
+const MAX_OVERLAY_ATTEMPTS = 5
 
-function isCronRequest(req: NextRequest) {
-  const secret = process.env.CRON_SECRET
-  const auth = req.headers.get('authorization') || ''
-  return Boolean(secret && auth === `Bearer ${secret}`)
+function admin() {
+  const url = process.env['NEXT_PUBLIC_SUPABASE_URL']!
+  const key = process.env['SUPABASE_' + 'SERVICE_ROLE_KEY']!
+  return createClient(url, key, { auth: { persistSession: false } })
 }
 
-function db() {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } })
-}
-
-function now() { return new Date().toISOString() }
-function ageMinutes(value: any): number | null {
+function keys(obj: any): string[] { return obj && typeof obj === 'object' ? Object.keys(obj) : [] }
+function minutesAgo(value: any): number | null {
   if (!value) return null
   const ts = Date.parse(String(value))
   if (!Number.isFinite(ts)) return null
   return Math.max(0, Math.round((Date.now() - ts) / 60000))
 }
-function keys(obj: any): string[] { return obj && typeof obj === 'object' ? Object.keys(obj) : [] }
-function video(campaign: any) { return campaign?.metadata?.video || null }
-function isVideoCampaign(campaign: any) { return VIDEO_CHANNELS.includes(String(campaign?.channel || '')) }
-function restartCount(campaign: any) { return Number(video(campaign)?.governanceRestartCount || 0) }
-function aspectFor(campaign: any): '16:9' | '9:16' { return String(campaign?.channel) === 'short_video' ? '9:16' : '16:9' }
-function lifeCriticalText(value: any): boolean {
-  const t = JSON.stringify(value || {}).toLowerCase()
-  return ['life-critical', 'life critical', 'life and death', 'medical device', 'patient safety', 'aviation fuel', 'aircraft safety', 'hospital emergency', 'nuclear', 'radiological', 'human safety', 'safety critical'].some(word => t.includes(word))
+function isVideoChannel(c: any) { return VIDEO_CHANNELS.includes(String(c?.channel || '')) }
+function campaignText(c: any): string {
+  return [
+    c?.title,
+    c?.objective,
+    c?.audience,
+    c?.channel,
+    JSON.stringify(c?.recommendation || {}),
+    JSON.stringify(c?.work_items || []),
+    JSON.stringify(c?.metadata || {}),
+  ].filter(Boolean).join(' ').toLowerCase()
 }
-function promptFor(campaign: any) {
-  const existing = String(video(campaign)?.prompt || '').trim()
-  if (existing) return existing.slice(0, 900)
-  const theme = [campaign?.title, campaign?.objective, campaign?.audience].filter(Boolean).join(' ').replace(/https?:\/\/\S+/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 220)
-  return `Cinematic promotional b-roll for a premium AI business platform. Theme: ${theme || 'SignalBoostAi business growth campaign'}. Modern professionals using software dashboards, growth charts rising, AI automation workflows. No text, no logos, no URLs.`.slice(0, 900)
+function isShortVideoRequest(c: any) {
+  const text = campaignText(c)
+  return /(short|tiktok|reel|reels|vertical|9:16|story|stories)/i.test(text)
 }
-function waitingLangs(v: any): string[] {
-  const unbranded = v?.unbrandedVoiced || {}
-  const branded = v?.brandedLangs || {}
-  const attempts = v?.ghOverlayAttempts || {}
-  return keys(unbranded).filter(lang => unbranded[lang] && !branded[lang] && Number(attempts[lang] || 0) < 5)
+function looksLikeVideoRequest(c: any) {
+  if (isVideoChannel(c)) return true
+  const text = campaignText(c)
+  return /\b(video|vídeo|clip|youtube|filme|movie|wideo|видео)\b/i.test(text) || /(foto|photo|imagem|image|picture|screenshot).*(video|vídeo|clip)/i.test(text)
 }
-function isWaitingForBrand(campaign: any) {
-  const v = video(campaign)
-  if (!v || v.status !== 'ready') return false
-  if (v.branded === true && v.voicedUrl) return false
-  return waitingLangs(v).length > 0
+function inferredVideoChannel(c: any): 'youtube' | 'short_video' {
+  return isShortVideoRequest(c) ? 'short_video' : 'youtube'
 }
-function eventId(prefix: string) { return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` }
-
-async function logDecision(sb: any, objective: string, state: string, status: string, payload: any) {
-  const at = now()
-  const lifeCritical = lifeCriticalText(payload)
-  await sb.from('cos_decisions').insert({
-    decision_id: eventId('gov_watchdog'),
-    user_id: null,
-    objective,
-    channel: 'cos_governance',
-    state,
-    required_source: 'cron_cos_governance_watchdog',
-    must_use_tool: true,
-    proposes_action: true,
-    required_approval: lifeCritical,
-    approval_reasons: [`pipeline=${payload?.pipeline || 'primary'}`, `risk=${payload?.riskLevel || 'medium'}`, `lifeCritical=${lifeCritical}`],
-    confidence: status === 'executed' ? 92 : 78,
-    output: { report: objective, governance: { ...payload, lifeCritical, autonomous: !lifeCritical } },
-    status,
-    created_at: at,
-  })
+function renderPromptForCampaign(c: any) {
+  const theme = String(c?.title || c?.objective || 'an AI platform that helps businesses grow')
+    .replace(/https?:\/\/\S+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 180)
+  return `Cinematic promotional b-roll for a premium AI business platform. Theme: ${theme}. Modern professionals using sleek software dashboards, growth charts rising, AI automation and workflows. No on-screen text, no logos, no URLs.`.slice(0, 600)
 }
-
-async function createLifeCriticalEscalation(reason: string, payload: any) {
-  if (!lifeCriticalText({ reason, payload })) return { ok: true, skipped: true, reason: 'not_life_critical_autonomous_resolution_continues' }
-  return proposeInfrastructurePr({
-    provider: 'cos_governance',
-    actionId: 'create_life_critical_escalation_ticket',
-    verb: 'create',
-    title: reason.slice(0, 140),
-    description: `24x7 COS governance watchdog escalated a life-critical condition. ${reason}`,
-    payload: { ...payload, status: 'pending_human_review', source: 'cos-governance-watchdog', fallbackAlternatives: ['hold action', 'notify responsible human', 'keep system in safest state'], createdAt: now() },
-  }, { userId: null, role: 'owner' })
+function isRejected(c: any) { return c?.status === 'rejected' }
+function isFakeFinal(v: any) { return v?.brandDebug?.mode === 'direct-completion' || v?.brandText?.mode === 'direct-completion' || v?.brandDispatchWatchdog?.directCompletion === true }
+function isRealFinal(c: any, v: any) { return !isRejected(c) && !isFakeFinal(v) && v?.branded === true && Boolean(v?.voicedUrl) }
+function previewUrl(c: any, v: any): string | null {
+  if (!v) return null
+  if (isRealFinal(c, v)) return String(v.voicedUrl)
+  if (v.url) return String(v.url)
+  return null
 }
-
-async function dispatchBrandOverlay() {
-  const token = process.env.GITHUB_WRITE_TOKEN || process.env.GITHUB_TOKEN
-  if (!token) return { ok: false, status: 0, error: 'Missing GitHub token for brand overlay dispatch.' }
-  const res = await fetch('https://api.github.com/repos/SignalBoost/signalboost-live/actions/workflows/brand-overlay.yml/dispatches', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ref: 'main' }),
-    cache: 'no-store',
-  })
-  if (res.status === 204) return { ok: true, status: 204, error: null }
-  return { ok: false, status: res.status, error: (await res.text()).slice(0, 700) }
+function brandingDiagnostics(c: any): string {
+  const v = c?.metadata?.video
+  if (!v) return 'BRANDING: no video metadata yet'
+  if (isRejected(c)) return `BLOCKED: campaign rejected. Underlying state: ${underlyingIssue(v)}`
+  if (isFakeFinal(v)) return 'INVALID FINAL STATE: previous emergency fallback marked this as final without a real FFmpeg banner. Reset and reprocess this campaign.'
+  const langs = Array.isArray(c.languages) && c.languages.length ? c.languages.filter(Boolean) : ['en']
+  const primary = langs[0] || 'en'
+  const unbranded = keys(v.unbrandedVoiced)
+  const branded = keys(v.brandedLangs).filter((lang) => Boolean((v.brandedLangs || {})[lang]))
+  const attempts = v.ghOverlayAttempts || {}
+  const attemptSummary = langs.map((lang: string) => `${lang}:${Number(attempts[lang] || 0)}/${MAX_OVERLAY_ATTEMPTS}`).join(', ')
+  const lock = v.brandingLock || null
+  const lockAge = lock?.at ? minutesAgo(lock.at) : null
+  if (isRealFinal(c, v)) return `DONE: primary ${primary} final URL exists; branded languages: [${branded.join(',') || 'none'}]`
+  if (v.brandingExhausted === true) return `BRANDING EXHAUSTED: attempts ${attemptSummary}. Last error: ${String(v.voiceError || 'none').slice(0, 180)}`
+  if (lock && lockAge !== null) return `BANNER LOCK: worker claimed ${String(lock.lang || 'unknown')} about ${lockAge} min ago.`
+  if (unbranded.length) return `BANNER WAITING: voiced/unbranded languages [${unbranded.join(',')}] are ready. GitHub Actions FFmpeg worker must burn the SignalBoostAi banner. Attempts: ${attemptSummary}.`
+  if (v.status === 'ready' && v.url && !unbranded.length && !branded.length) return 'BRANDING NOT READY: base video is ready but no unbranded voiced language exists yet.'
+  return `BRANDING PENDING: status=${String(v.status || 'unknown')}; branded=[${branded.join(',') || 'none'}]; attempts=${attemptSummary}`
 }
-
-async function throttleNonLifeCritical(sb: any, campaign: any, reason: string) {
-  const v = video(campaign) || {}
-  const payload = { action: 'autonomous_throttle_after_restart_limit', pipeline: 'backup', riskLevel: 'medium', campaignId: campaign.id, reason, restartCount: restartCount(campaign) }
-  await sb.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: { ...v, governanceThrottle: { at: now(), reason, mode: 'autonomous_retry_backoff', nextWatchdogWillReassess: true } } } }).eq('id', campaign.id)
-  await logDecision(sb, `Autonomous throttle/backoff for ${campaign.title || campaign.id}`, 'EXECUTE', 'executed', payload)
-  return { action: 'autonomous_throttle_backoff', id: campaign.id, ok: true, payload }
+function underlyingIssue(v: any): string {
+  if (!v) return 'no video metadata yet'
+  if (v.voiceError) return `voice/brand error: ${String(v.voiceError).slice(0, 140)}`
+  if (v.status === 'rendering') return 'render in progress'
+  if (v.status === 'failed') return `render failed: ${String(v.error || 'unknown').slice(0, 100)}`
+  const unb = keys(v.unbrandedVoiced)
+  if (v.status === 'ready' && v.url && !unb.length) return 'base ready, not voiced yet'
+  if (unb.length) return `voiced [${unb.join(',')}], banner not burned`
+  return `stage=${String(v.status || 'unknown')}`
 }
-
-async function startOrRestartRender(sb: any, campaign: any, reason: string) {
-  const count = restartCount(campaign)
-  if (count >= MAX_RESTARTS_BEFORE_THROTTLE) {
-    if (lifeCriticalText(campaign)) {
-      const pr = await createLifeCriticalEscalation(`Life-critical render restart limit reached for ${campaign.id}`, { pipeline: 'primary', riskLevel: 'critical', reason, campaignId: campaign.id, title: campaign.title, video: video(campaign), restartCount: count })
-      await logDecision(sb, `Life-critical escalation for render restart limit ${campaign.title || campaign.id}`, 'PREPARE_AND_HOLD', 'logged', { action: 'life_critical_escalate', pipeline: 'primary', riskLevel: 'critical', campaignId: campaign.id, prCockpit: pr })
-      return { action: 'life_critical_escalation', id: campaign.id, ok: pr.ok, pr }
+function eligibility(c: any, job?: any): string {
+  const v = c?.metadata?.video
+  const created = c.created_at ? Date.parse(c.created_at) : 0
+  if (!created || created < Date.parse(BACKLOG_CUTOFF)) return 'BLOCKED: created before cutoff'
+  // Rejected campaigns are frozen out of every pipeline stage (voice, banner,
+  // publish). The STUCK prefix is what makes the dashboard show the
+  // "Reset and kick" button (it matches eligibility.startsWith('STUCK')).
+  // Reset wipes video metadata and flips the campaign back to waiting_approval.
+  if (isRejected(c)) return `STUCK: campaign rejected — pipeline frozen. Underlying state: ${underlyingIssue(v)}. Press "Reset and kick" to clear video state, move it back to waiting_approval and re-render.`
+  if (!isVideoChannel(c) && looksLikeVideoRequest(c) && !v) return `STUCK: video request was routed as ${String(c.channel || 'unknown')} instead of youtube/short_video. Press "Kick missing renders" to rescue it, move it into the video pipeline, and start rendering.`
+  if (!v) return 'STAGE 0: waiting for auto-render start'
+  // STUCK prefix is required: the dashboard only renders the "Reset and kick"
+  // button when eligibility starts with STUCK. The old INVALID prefix told the
+  // owner to reset while hiding the only reset control — an unreachable cure.
+  if (isFakeFinal(v)) return 'STUCK: fake final artifact from old emergency fallback. Press "Reset and kick" (or wait — the brand overlay worker now self-heals these every 10 min). Do not approve this video.'
+  if (v.status === 'rendering') {
+    // Job-aware diagnostics: "render in progress" used to hide the real queue
+    // state. Surface it, and show the Reset button (STUCK prefix) when the
+    // job is dead or has waited far too long.
+    if (job) {
+      const jobStatus = String(job.status || 'unknown')
+      const idleMin = minutesAgo(job.updated_at)
+      if (jobStatus === 'failed' || jobStatus === 'escalated' || jobStatus === 'dlq') {
+        return `STUCK: render job ${jobStatus}: ${String(job.error || job.queue_drop_reason || 'unknown').slice(0, 140)}. Press "Reset and kick" to re-render.`
+      }
+      if (jobStatus === 'rendering' && idleMin !== null && idleMin > 20) {
+        return `STUCK: render job orphaned — claimed by a worker ${idleMin} min ago and never finished (worker was likely killed). The production worker requeues these automatically every run; press "Reset and kick" to force a fresh render now.`
+      }
+      if (jobStatus === 'queued' && idleMin !== null && idleMin > 30) {
+        return `STUCK: render job has been queued for ${idleMin} min with no worker pickup. Check GitHub Actions → "COS Video Production" for red runs (missing secrets, disabled schedule). Press "Reset and kick" to requeue.`
+      }
+      return `RENDERING: job ${jobStatus}${idleMin !== null ? ` (last update ${idleMin} min ago)` : ''} — GitHub Actions worker runs every 10 min.`
     }
-    return throttleNonLifeCritical(sb, campaign, reason)
+    const startedMin = minutesAgo(v.started_at)
+    if (startedMin !== null && startedMin > 30) return `STUCK: rendering for ${startedMin} min and the render job row cannot be found. Press "Reset and kick" to start over.`
+    return 'RENDERING: render in progress'
   }
-
-  const started = await startSiteVideo(promptFor(campaign), aspectFor(campaign))
-  const at = now()
-  const previousVideo = video(campaign)
-
-  if (started.ok === false) {
-    const nextVideo = { ...(previousVideo || {}), status: 'failed', error: started.error, failed_at: at, governanceRestartCount: count + 1, governanceReason: reason }
-    await sb.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: nextVideo } }).eq('id', campaign.id)
-    await logDecision(sb, `Failed to restart COSA render for ${campaign.title || campaign.id}`, 'EXECUTE', 'executed', { action: 'auto_apply', pipeline: 'backup', riskLevel: 'high', campaignId: campaign.id, reason, started, fallback: 'watchdog_will_retry_without_human' })
-    return { action: 'restart_render_failed_will_retry', id: campaign.id, ok: false, error: started.error, autonomous: true }
+  if (v.status === 'failed') return `FAILED render: ${String(v.error || 'unknown').slice(0, 120)}`
+  if (v.status === 'ready') {
+    if (isRealFinal(c, v)) return 'DONE: branded video previewable — approve on the dashboard'
+    const unb = keys(v.unbrandedVoiced)
+    if (unb.length) return brandingDiagnostics(c)
+    if (v.voiceError) return `VOICE ISSUE: ${String(v.voiceError).slice(0, 140)}`
+    return 'VOICE STAGE: waiting for the voice cron'
   }
-
-  const nextVideo = { status: 'rendering', requestId: started.requestId, model: started.model, aspect: aspectFor(campaign), prompt: promptFor(campaign), started_at: at, auto_started: true, governanceRestartCount: count + 1, governanceReason: reason, providerFallback: (started as any).fallbackFrom || null, providerWarning: (started as any).warning || null, previousVideo, voicedUrl: null, voiced: {}, branded: false, brandedLangs: {}, unbrandedVoiced: {}, brandAttempts: {}, ghOverlayAttempts: {}, brandingLock: null }
-  await sb.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: nextVideo } }).eq('id', campaign.id)
-  await logDecision(sb, `Auto-restarted COSA render for ${campaign.title || campaign.id}`, 'EXECUTE', 'executed', { action: 'auto_apply', pipeline: 'primary', riskLevel: 'medium', campaignId: campaign.id, reason, started, fallback: 'render_started' })
-  return { action: 'restart_render', id: campaign.id, ok: true, requestId: started.requestId, fallbackFrom: (started as any).fallbackFrom || null }
+  return `UNKNOWN state: ${String(v.status)}`
 }
 
 export async function GET(req: NextRequest) {
-  if (!isCronRequest(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-  const sb = db()
-  const report: any = { ok: true, at: now(), monitor: 'cos-governance-watchdog', mode: 'autonomous_except_life_critical', actions: [], escalations: [], scanned: 0 }
-  const { data: recent, error } = await sb.from('cos_campaign_queue').select('*').order('created_at', { ascending: false }).limit(100)
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
-  const campaigns = recent || []
-  report.scanned = campaigns.length
-  const videoCampaigns = campaigns.filter(isVideoCampaign).filter((c: any) => c.status !== 'rejected')
-  const missingRender = videoCampaigns.filter((c: any) => !video(c) && (ageMinutes(c.created_at) || 0) >= MISSING_RENDER_MINUTES).slice(0, MAX_PER_RUN)
-  const failed = videoCampaigns.filter((c: any) => video(c)?.status === 'failed').slice(0, MAX_PER_RUN)
-  const rendering = videoCampaigns.filter((c: any) => video(c)?.status === 'rendering').slice(0, MAX_PER_RUN)
-  const waitingBrand = videoCampaigns.filter(isWaitingForBrand)
-
-  for (const campaign of missingRender) report.actions.push(await startOrRestartRender(sb, campaign, 'missing_video_metadata_watchdog'))
-  for (const campaign of failed) report.actions.push(await startOrRestartRender(sb, campaign, 'failed_render_watchdog'))
-
-  for (const campaign of rendering) {
-    const v = video(campaign)
-    const age = ageMinutes(v?.started_at || campaign.created_at) || 0
-    if (v?.requestId && v?.model) {
-      const polled = await fetchSiteVideo(v.requestId, v.model).catch((e: any) => ({ status: 'failed', error: e?.message || 'poll failed' }))
-      if (polled.status === 'done' && (polled as any).videoUrl) {
-        await sb.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: { ...v, status: 'ready', url: (polled as any).videoUrl, ready_at: now(), governancePoll: { at: now(), by: OWNER_EMAIL } } } }).eq('id', campaign.id)
-        report.actions.push({ action: 'advanced_render_to_ready', id: campaign.id, ok: true })
-        await logDecision(sb, `Advanced render to ready for ${campaign.title || campaign.id}`, 'EXECUTE', 'executed', { action: 'poll_render', pipeline: 'primary', riskLevel: 'low', campaignId: campaign.id })
-      } else if (polled.status === 'failed') {
-        await sb.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: { ...v, status: 'failed', error: (polled as any).error || 'render failed', failed_at: now(), governancePoll: { at: now(), by: OWNER_EMAIL } } } }).eq('id', campaign.id)
-        report.actions.push(await startOrRestartRender(sb, { ...campaign, metadata: { ...(campaign.metadata || {}), video: { ...v, status: 'failed' } } }, 'poll_detected_failed_render'))
-      } else if (age >= RENDER_RESTART_MINUTES) report.actions.push(await startOrRestartRender(sb, campaign, `stale_render_${age}_minutes`))
-      else if (age >= RENDER_STALE_MINUTES) report.actions.push({ action: 'render_stale_watch', id: campaign.id, ok: true, ageMinutes: age })
-    } else if (age >= RENDER_STALE_MINUTES) report.actions.push(await startOrRestartRender(sb, campaign, `rendering_missing_request_id_${age}_minutes`))
-  }
-
-  if (waitingBrand.length) {
-    const dispatch = await dispatchBrandOverlay()
-    report.actions.push({ action: 'dispatch_brand_overlay', ok: dispatch.ok, status: dispatch.status, waitingCount: waitingBrand.length, error: dispatch.error })
-    for (const campaign of waitingBrand.slice(0, 25)) {
-      const v = video(campaign) || {}
-      await sb.from('cos_campaign_queue').update({ metadata: { ...(campaign.metadata || {}), video: { ...v, brandingLock: null, governanceBrandDispatch: { at: now(), ok: dispatch.ok, status: dispatch.status, error: dispatch.error, waitingLangs: waitingLangs(v), workflow: WORKFLOW_FILE, autonomous: true } } } }).eq('id', campaign.id)
-    }
-    await logDecision(sb, `${dispatch.ok ? 'Dispatched' : 'Failed to dispatch'} brand overlay workflow for ${waitingBrand.length} campaign(s)`, 'EXECUTE', 'executed', { action: 'dispatch_brand_overlay', pipeline: dispatch.ok ? 'primary' : 'backup', riskLevel: dispatch.ok ? 'medium' : 'high', dispatch, waitingCount: waitingBrand.length, fallback: dispatch.ok ? 'primary_worker' : 'watchdog_retry_next_cycle' })
-    if (!dispatch.ok) {
-      const lifeCriticalWaiting = waitingBrand.filter(lifeCriticalText)
-      if (lifeCriticalWaiting.length) report.escalations.push(await createLifeCriticalEscalation('Life-critical brand overlay dispatch failed from watchdog', { pipeline: 'primary', riskLevel: 'critical', dispatch, waitingCampaigns: lifeCriticalWaiting.map((c: any) => c.id) }))
+  const ctx = await getAccess()
+  if (!ctx.isOwner) return NextResponse.json({ ok: false, error: 'Owner only.' }, { status: 403 })
+  const sb = admin()
+  const url = new URL(req.url)
+  const kick = url.searchParams.get('kick') === '1'
+  const resetId = String(url.searchParams.get('reset') || '').trim()
+  const actions: any[] = []
+  if (resetId) {
+    const { data: c } = await sb.from('cos_campaign_queue').select('*').eq('id', resetId).single()
+    if (!c) actions.push({ action: 'reset', id: resetId, ok: false, error: 'campaign not found' })
+    else {
+      const metadata = { ...(c.metadata || {}) }
+      delete (metadata as any).video
+      const { error } = await sb.from('cos_campaign_queue').update({ metadata, status: c.status === 'rejected' ? 'waiting_approval' : c.status }).eq('id', resetId)
+      actions.push({ action: 'reset', id: resetId, ok: !error, error: error?.message || null, note: 'video metadata wiped; campaign can render again' })
     }
   }
+  if (kick) {
+    const { data: pendingAll } = await sb.from('cos_campaign_queue').select('*').gte('created_at', BACKLOG_CUTOFF).neq('status', 'rejected').is('metadata->video', null).order('created_at', { ascending: false }).limit(20)
+    const pending = (pendingAll || []).filter((c: any) => isVideoChannel(c) || looksLikeVideoRequest(c)).slice(0, 3)
+    if (!pending.length) actions.push({ action: 'kick', ok: true, note: 'no campaigns eligible for render start' })
+    for (const c of pending) {
+      const rescued = !isVideoChannel(c)
+      const channel = rescued ? inferredVideoChannel(c) : String(c.channel || 'youtube')
+      const aspect: '9:16' | '16:9' = channel === 'short_video' ? '9:16' : '16:9'
+      const prompt = renderPromptForCampaign(c)
+      const kicked: any = await startSiteVideo(prompt, aspect, {
+        lang: Array.isArray(c.languages) && c.languages.length ? String(c.languages[0]) : 'en',
+        title: c.title,
+        hook: c.objective || c.title,
+      })
+      if (kicked?.ok) {
+        const patch: any = {
+          metadata: {
+            ...(c.metadata || {}),
+            video: { status: 'rendering', requestId: kicked.requestId, model: kicked.model, aspect, prompt, started_at: new Date().toISOString(), auto_started: true, rescued_from_channel: rescued ? c.channel : null, voicedUrl: null, voiced: {}, branded: false, brandSchemaVersion: null, brandText: null, brandedAt: null, voiceError: null, brandAttempts: {}, brandingLock: null }
+          }
+        }
+        if (rescued) patch.channel = channel
+        await sb.from('cos_campaign_queue').update(patch).eq('id', c.id)
+      }
+      actions.push({ action: rescued ? 'rescue-and-kick' : 'kick', id: c.id, previousChannel: rescued ? c.channel : null, channel, ok: Boolean(kicked?.ok), error: kicked?.ok ? null : String(kicked?.error || 'startSiteVideo failed') })
+    }
+  }
+  const env = { FAL_KEY: Boolean(process.env.FAL_KEY), ELEVENLABS_API_KEY: Boolean(process.env.ELEVENLABS_API_KEY), RESEND_API_KEY: Boolean(process.env.RESEND_API_KEY), GITHUB_WRITE_TOKEN: Boolean(process.env.GITHUB_WRITE_TOKEN || process.env.GITHUB_TOKEN), CRON_SECRET: Boolean(process.env['CRON_' + 'SECRET']), COS_VIDEO_RENDER_BUCKET: process.env.COS_VIDEO_RENDER_BUCKET || null, COS_BRAND_SINCE_override: process.env.COS_BRAND_SINCE || null }
+  const { data: rawRecent } = await sb.from('cos_campaign_queue').select('*').order('created_at', { ascending: false }).limit(40)
+  const recent = (rawRecent || []).filter((c: any) => isVideoChannel(c) || looksLikeVideoRequest(c)).slice(0, 15)
 
-  report.summary = { missingRender: missingRender.length, failed: failed.length, rendering: rendering.length, waitingBrand: waitingBrand.length, actions: report.actions.length, escalations: report.escalations.length }
-  return NextResponse.json(report)
+  // Fetch production job rows for campaigns mid-render so the xray (and the
+  // eligibility text driving the dashboard) reflects the REAL queue state
+  // instead of a blind "render in progress".
+  const renderingIds = recent
+    .map((c: any) => c?.metadata?.video)
+    .filter((v: any) => v && v.status === 'rendering' && v.requestId)
+    .map((v: any) => String(v.requestId))
+  const jobById: Record<string, any> = {}
+  if (renderingIds.length) {
+    const { data: jobs } = await sb
+      .from('cos_video_production_jobs')
+      .select('id, status, error, queue_drop_reason, updated_at, created_at, watchdog_signal')
+      .in('id', renderingIds)
+    for (const j of jobs || []) jobById[String(j.id)] = j
+  }
+  const campaigns = recent.map((c: any) => {
+    const v = c?.metadata?.video || null
+    const finalUrl = isRealFinal(c, v) ? String(v.voicedUrl) : null
+    const baseUrl = v?.url ? String(v.url) : null
+    const anyPreviewUrl = previewUrl(c, v)
+    const misrouted = !isVideoChannel(c) && looksLikeVideoRequest(c)
+    return { id: c.id, title: String(c.title || '').slice(0, 60), channel: c.channel, intendedChannel: misrouted ? inferredVideoChannel(c) : c.channel, status: c.status, created_at: c.created_at, approved_at: c.approved_at || null, misrouted, video: v ? { stage: v.status || null, requestId: v.requestId || null, started_at: v.started_at || null, hasKlingUrl: Boolean(v.url), baseUrl, finalUrl, previewUrl: anyPreviewUrl, previewKind: finalUrl ? 'branded final' : baseUrl ? 'base draft' : anyPreviewUrl ? 'video' : null, voicedLangs: keys(v.unbrandedVoiced), brandedLangs: isFakeFinal(v) || isRejected(c) ? [] : keys(v.brandedLangs).filter((k: string) => (v.brandedLangs || {})[k]), branded: isRealFinal(c, v), previewable: Boolean(anyPreviewUrl), voiceError: v.voiceError || null, renderError: v.error || null, ghOverlayAttempts: v.ghOverlayAttempts || {}, brandingLock: v.brandingLock || null, brandingExhausted: v.brandingExhausted === true, brandDebug: v.brandDebug || null, brandSchemaVersion: v.brandSchemaVersion || null, brandedAt: v.brandedAt || null, brandingDiagnostics: brandingDiagnostics(c), autoPublishNote: c?.metadata?.auto_publish_note || null, renderJob: v?.requestId ? (jobById[String(v.requestId)] || null) : null } : null, eligibility: eligibility(c, v?.requestId ? jobById[String(v.requestId)] : undefined) }
+  })
+  return NextResponse.json({ ok: true, now: new Date().toISOString(), backlogCutoff: BACKLOG_CUTOFF, env, actions, campaigns })
 }
-
-export async function POST(req: NextRequest) { return GET(req) }

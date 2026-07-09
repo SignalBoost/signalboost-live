@@ -77,7 +77,11 @@ async function autoStartRenders(sb: any): Promise<{ started: number; errors: str
     const aspect: '9:16' | '16:9' = campaign.channel === 'short_video' ? '9:16' : '16:9'
     const theme = cleanTheme(campaign)
     const prompt = `Cinematic promotional b-roll for a premium AI business platform. Theme: ${theme}. Modern professionals using sleek software dashboards, growth charts rising, AI automation and workflows, clean bright modern offices, confident entrepreneurs. Premium, optimistic, high-end tech commercial look, smooth cinematic camera motion. Absolutely no on-screen text, no words, no letters, no captions, no subtitles, no logos, no watermarks, no URLs, no signage.`.slice(0, 600)
-    const kicked: any = await startSiteVideo(prompt, aspect)
+    const kicked: any = await startSiteVideo(prompt, aspect, {
+      lang: campaignLangs(campaign)[0],
+      title: campaign.title,
+      hook: campaign.objective || campaign.title,
+    })
     if (!kicked?.ok) {
       errors.push(`${campaign.id}: ${kicked?.error || 'render start failed'}`)
       continue

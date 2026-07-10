@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+export const runtime = 'nodejs'
+
 const API_BASE = process.env.IMPROVMX_API_BASE_URL?.trim() || 'https://api.improvmx.com/v3'
 
 function authHeaders(): HeadersInit | null {
@@ -19,8 +23,8 @@ async function improvmxFetch(path: string, init: RequestInit = {}) {
       response: null,
       json: null,
       error: NextResponse.json(
-        { ok: false, error: 'IMPROVMX_API_KEY is not configured in Vercel' },
-        { status: 500 },
+        { ok: false, live: false, error: 'IMPROVMX_API_KEY is not configured in Vercel' },
+        { status: 500, headers: { 'Cache-Control': 'no-store' } },
       ),
     }
   }
@@ -54,7 +58,38 @@ function apiError(status: number, json: any) {
     json?.raw ||
     'ImprovMX request failed'
 
-  return NextResponse.json({ ok: false, error: String(message) }, { status })
+  return NextResponse.json(
+    { ok: false, live: false, error: String(message) },
+    { status, headers: { 'Cache-Control': 'no-store' } },
+  )
+}
+
+function rows(json: any, key: 'domains' | 'aliases'): any[] {
+  if (Array.isArray(json)) return json
+  if (Array.isArray(json?.[key])) return json[key]
+  if (Array.isArray(json?.data?.[key])) return json.data[key]
+  if (Array.isArray(json?.data)) return json.data
+  return []
+}
+
+function liveResponse(payload: Record<string, unknown>) {
+  return NextResponse.json(
+    {
+      ok: true,
+      live: true,
+      source: 'improvmx',
+      fetchedAt: new Date().toISOString(),
+      ...payload,
+    },
+    {
+      status: 200,
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        Pragma: 'no-cache',
+        Expires: '0',
+      },
+    },
+  )
 }
 
 export async function GET(req: NextRequest) {
@@ -68,10 +103,19 @@ export async function GET(req: NextRequest) {
     if (error) return error
     if (!response?.ok) return apiError(response?.status || 502, json)
 
-    return NextResponse.json({ ok: true, ...json })
+    if (domain) {
+      const aliases = rows(json, 'aliases')
+      return liveResponse({ domain, aliases, count: aliases.length })
+    }
+
+    const domains = rows(json, 'domains')
+    return liveResponse({ domains, count: domains.length })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal Server Error'
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return NextResponse.json(
+      { ok: false, live: false, error: message },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } },
+    )
   }
 }
 
@@ -84,8 +128,8 @@ export async function POST(req: NextRequest) {
 
     if (!domain || !alias || !forward.includes('@')) {
       return NextResponse.json(
-        { ok: false, error: 'A domain, alias, and valid forwarding email are required' },
-        { status: 400 },
+        { ok: false, live: false, error: 'A domain, alias, and valid forwarding email are required' },
+        { status: 400, headers: { 'Cache-Control': 'no-store' } },
       )
     }
 
@@ -96,10 +140,13 @@ export async function POST(req: NextRequest) {
     if (error) return error
     if (!response?.ok) return apiError(response?.status || 502, json)
 
-    return NextResponse.json({ ok: true, ...json })
+    return liveResponse({ domain, alias, forward, result: json })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal Server Error'
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return NextResponse.json(
+      { ok: false, live: false, error: message },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } },
+    )
   }
 }
 
@@ -111,8 +158,8 @@ export async function DELETE(req: NextRequest) {
 
     if (!domain || !alias) {
       return NextResponse.json(
-        { ok: false, error: 'Domain and alias are required' },
-        { status: 400 },
+        { ok: false, live: false, error: 'Domain and alias are required' },
+        { status: 400, headers: { 'Cache-Control': 'no-store' } },
       )
     }
 
@@ -123,9 +170,12 @@ export async function DELETE(req: NextRequest) {
     if (error) return error
     if (!response?.ok) return apiError(response?.status || 502, json)
 
-    return NextResponse.json({ ok: true, ...json })
+    return liveResponse({ domain, alias, deleted: true, result: json })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal Server Error'
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return NextResponse.json(
+      { ok: false, live: false, error: message },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } },
+    )
   }
 }

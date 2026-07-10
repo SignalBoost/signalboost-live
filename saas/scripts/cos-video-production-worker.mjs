@@ -323,7 +323,48 @@ function buildAss(job, duration) {
   return `[Script Info]\nScriptType: v4.00+\nPlayResX: 1920\nPlayResY: 1080\nScaledBorderAndShadow: yes\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Caption,Arial,56,&H00FFFFFF,&H000000FF,&HCC000000,&HAA020617,1,0,0,0,100,100,0,0,3,3,0,2,80,80,110,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n${cues.map(cue => `Dialogue: 0,${assTime(cue.start)},${assTime(cue.end)},Caption,,0,0,0,,${String(cue.text).replace(/[{}]/g, '').replace(/\n/g, '\\N')}`).join('\n')}\n`
 }
 
-async function synthesizeLocalVoice(job, dir, duration) {
+// PRIMARY VOICE: ElevenLabs (natural, native-quality in all 5 languages).
+// Requires ELEVENLABS_API_KEY (GitHub Actions secret). Optional:
+// ELEVENLABS_VOICE_ID (defaults to a multilingual premade voice) and
+// ELEVENLABS_MODEL_ID (defaults to eleven_multilingual_v2).
+// Cost guard: one call per render attempt, text capped at 900 chars;
+// job requeues are capped at 3, so a pathological video costs at most
+// 4 short TTS calls. Falls back to espeak only if the API is unavailable,
+// so a quota problem degrades audio quality instead of stopping renders.
+async function synthesizeElevenLabs(job, dir) {
+  const apiKey = process.env.ELEVENLABS_API_KEY
+  if (!apiKey) return null
+  const voiceId = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM'
+  const modelId = process.env.ELEVENLABS_MODEL_ID || 'eleven_multilingual_v2'
+  const text = scriptText(job).slice(0, 900)
+  try {
+    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method: 'POST',
+      headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
+      body: JSON.stringify({
+        text,
+        model_id: modelId,
+        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+      }),
+    })
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '')
+      console.error(`ElevenLabs TTS failed (HTTP ${res.status}) — falling back to espeak. ${detail.slice(0, 200)}`)
+      return null
+    }
+    const bytes = Buffer.from(await res.arrayBuffer())
+    if (!bytes.length) return null
+    const mp3 = join(dir, 'voice.mp3')
+    await writeFile(mp3, bytes)
+    console.log(`ElevenLabs narration OK: lang=${jobLang(job)} chars=${text.length} bytes=${bytes.length}`)
+    return mp3
+  } catch (err) {
+    console.error('ElevenLabs TTS error — falling back to espeak:', err?.message || String(err))
+    return null
+  }
+}
+
+async function synthesizeEspeak(job, dir, duration) {
   const wav = join(dir, 'voice.wav')
   const textPath = join(dir, 'voice.txt')
   await writeFile(textPath, scriptText(job), 'utf8')
@@ -334,15 +375,30 @@ async function synthesizeLocalVoice(job, dir, duration) {
     try {
       await runCommand(espeak, ['-v', voice, '-s', '150', '-f', textPath, '-w', wav])
     } catch {
-      // Voice pack missing for this language on the runner — fall back to
-      // English rather than failing the whole render.
       await runCommand(espeak, ['-v', espeak === 'espeak-ng' ? 'en-us' : 'en', '-s', '150', '-f', textPath, '-w', wav])
     }
     return wav
   }
-
   await runFfmpeg(['-y', '-f', 'lavfi', '-i', `sine=frequency=440:sample_rate=44100:d=${duration}`, '-af', 'volume=0.08', wav])
   return wav
+}
+
+async function synthesizeLocalVoice(job, dir, duration) {
+  const eleven = await synthesizeElevenLabs(job, dir)
+  if (eleven) return eleven
+  return synthesizeEspeak(job, dir, duration)
+}
+
+// Measure the narration length so the video lasts as long as the voice —
+// previously a fixed duration + '-shortest' could cut narration mid-sentence.
+async function audioSeconds(path) {
+  return new Promise((resolve) => {
+    const child = spawn('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', path], { stdio: ['ignore', 'pipe', 'pipe'] })
+    let out = ''
+    child.stdout.on('data', c => { out += c.toString() })
+    child.on('error', () => resolve(0))
+    child.on('close', () => resolve(Number(out.trim()) || 0))
+  })
 }
 
 function escapeAssFilterPath(value) {
@@ -377,9 +433,12 @@ async function renderLocalMp4(job) {
   const dir = await mkdtemp(join(tmpdir(), 'signalboost-cos-video-'))
   const output = join(dir, 'final.mp4')
   try {
-    const duration = Math.max(12, Math.min(60, Number(job.render_spec?.duration_seconds || 24)))
+    const requested = Math.max(12, Math.min(60, Number(job.render_spec?.duration_seconds || 24)))
     const assPath = join(dir, 'captions.ass')
-    const audioPath = await synthesizeLocalVoice(job, dir, duration)
+    const audioPath = await synthesizeLocalVoice(job, dir, requested)
+    // The video must last as long as the narration (+1s tail), capped at 90s.
+    const spoken = await audioSeconds(audioPath)
+    const duration = Math.max(12, Math.min(90, Math.max(requested, Math.ceil(spoken) + 1)))
     await writeFile(assPath, buildAss(job, duration), 'utf8')
 
     const visualFilter = `${buildFilters(job, duration)},ass='${escapeAssFilterPath(assPath)}'`

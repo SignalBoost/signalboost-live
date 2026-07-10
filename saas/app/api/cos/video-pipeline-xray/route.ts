@@ -188,8 +188,25 @@ export async function GET(req: NextRequest) {
     }
   }
   const env = { FAL_KEY: Boolean(process.env.FAL_KEY), ELEVENLABS_API_KEY: Boolean(process.env.ELEVENLABS_API_KEY), RESEND_API_KEY: Boolean(process.env.RESEND_API_KEY), GITHUB_WRITE_TOKEN: Boolean(process.env.GITHUB_WRITE_TOKEN || process.env.GITHUB_TOKEN), CRON_SECRET: Boolean(process.env['CRON_' + 'SECRET']), COS_VIDEO_RENDER_BUCKET: process.env.COS_VIDEO_RENDER_BUCKET || null, COS_BRAND_SINCE_override: process.env.COS_BRAND_SINCE || null }
-  const { data: rawRecent } = await sb.from('cos_campaign_queue').select('*').order('created_at', { ascending: false }).limit(40)
-  const recent = (rawRecent || []).filter((c: any) => isVideoChannel(c) || looksLikeVideoRequest(c)).slice(0, 15)
+  // Two queries, merged:
+  // (a) video-channel campaigns straight from SQL — immune to being pushed
+  //     out of a recency window by the dozens of non-video drafts COSA
+  //     creates daily (the old single 40-row window starved video campaigns
+  //     off this page entirely on busy days);
+  // (b) a recent any-channel window, kept only to catch MISROUTED video
+  //     requests (video keywords but wrong channel) so they can be rescued.
+  const [videoRes, broadRes] = await Promise.all([
+    sb.from('cos_campaign_queue').select('*').in('channel', VIDEO_CHANNELS).order('created_at', { ascending: false }).limit(15),
+    sb.from('cos_campaign_queue').select('*').order('created_at', { ascending: false }).limit(40),
+  ])
+  const byId = new Map<string, any>()
+  for (const c of (videoRes.data || [])) byId.set(String(c.id), c)
+  for (const c of (broadRes.data || [])) {
+    if (!byId.has(String(c.id)) && looksLikeVideoRequest(c)) byId.set(String(c.id), c)
+  }
+  const recent = Array.from(byId.values())
+    .sort((a: any, b: any) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+    .slice(0, 20)
 
   // Fetch production job rows for campaigns mid-render so the xray (and the
   // eligibility text driving the dashboard) reflects the REAL queue state

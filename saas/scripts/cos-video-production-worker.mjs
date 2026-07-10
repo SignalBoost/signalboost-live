@@ -331,9 +331,18 @@ function buildAss(job, duration) {
 // job requeues are capped at 3, so a pathological video costs at most
 // 4 short TTS calls. Falls back to espeak only if the API is unavailable,
 // so a quota problem degrades audio quality instead of stopping renders.
+// Voice telemetry for the current job — surfaced in the job row so the
+// dashboard's Technical details answers "which voice engine was used and
+// why" without digging through Actions logs.
+let lastVoice = { engine: 'unknown', note: null }
+
 async function synthesizeElevenLabs(job, dir) {
   const apiKey = process.env.ELEVENLABS_API_KEY
-  if (!apiKey) return null
+  if (!apiKey) {
+    lastVoice = { engine: 'espeak-fallback', note: 'ELEVENLABS_API_KEY is not set in this GitHub Actions runner (add it under repo Settings → Secrets and variables → Actions).' }
+    console.error(lastVoice.note)
+    return null
+  }
   const voiceId = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM'
   const modelId = process.env.ELEVENLABS_MODEL_ID || 'eleven_multilingual_v2'
   const text = scriptText(job).slice(0, 900)
@@ -349,6 +358,7 @@ async function synthesizeElevenLabs(job, dir) {
     })
     if (!res.ok) {
       const detail = await res.text().catch(() => '')
+      lastVoice = { engine: 'espeak-fallback', note: `ElevenLabs TTS failed (HTTP ${res.status}): ${detail.slice(0, 180)}` }
       console.error(`ElevenLabs TTS failed (HTTP ${res.status}) — falling back to espeak. ${detail.slice(0, 200)}`)
       return null
     }
@@ -356,9 +366,11 @@ async function synthesizeElevenLabs(job, dir) {
     if (!bytes.length) return null
     const mp3 = join(dir, 'voice.mp3')
     await writeFile(mp3, bytes)
+    lastVoice = { engine: 'elevenlabs', note: `lang=${jobLang(job)} voice=${voiceId} model=${modelId}` }
     console.log(`ElevenLabs narration OK: lang=${jobLang(job)} chars=${text.length} bytes=${bytes.length}`)
     return mp3
   } catch (err) {
+    lastVoice = { engine: 'espeak-fallback', note: `ElevenLabs TTS error: ${String(err?.message || err).slice(0, 180)}` }
     console.error('ElevenLabs TTS error — falling back to espeak:', err?.message || String(err))
     return null
   }
@@ -386,6 +398,7 @@ async function synthesizeEspeak(job, dir, duration) {
 async function synthesizeLocalVoice(job, dir, duration) {
   const eleven = await synthesizeElevenLabs(job, dir)
   if (eleven) return eleven
+  if (lastVoice.engine === 'unknown') lastVoice = { engine: 'espeak-fallback', note: 'ElevenLabs unavailable' }
   return synthesizeEspeak(job, dir, duration)
 }
 
@@ -473,6 +486,7 @@ async function renderJob(job) {
 }
 
 async function processJob(job) {
+  lastVoice = { engine: 'unknown', note: null }
   try {
     const result = await renderJob(job)
     await supabase
@@ -482,6 +496,7 @@ async function processJob(job) {
         output_url: result.output_url,
         thumbnail_url: result.thumbnail_url,
         error: null,
+        watchdog_signal: { ...(job.watchdog_signal || {}), voiceEngine: lastVoice.engine, voiceNote: lastVoice.note, renderedAt: new Date().toISOString() },
         updated_at: new Date().toISOString(),
       })
       .eq('id', job.id)

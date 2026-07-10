@@ -1,14 +1,5 @@
 'use client'
 
-// saas/console-host/consoleHostConfig.tsx
-//
-// The UI extension contract for the console shell, plus SignalBoost's
-// implementation of it. This is the host-UI seam: the console shell
-// (components/hub/console/CommandConsole) renders pages and branding from a
-// ConsoleHostUI object instead of importing app-specific pages directly. Another
-// company supplies its own ConsoleHostUI (its pages, its brand colors) and the
-// shell is unchanged.
-
 import type { ReactNode } from 'react'
 import { DomainsPage } from '@/components/hub/pages/DomainsPage'
 import EnvVarsPage from '@/components/hub/pages/EnvVarsPage'
@@ -17,8 +8,8 @@ import { LogsPage } from '@/components/hub/pages/LogsPage'
 import { SettingsPage } from '@/components/hub/pages/SettingsPage'
 import { UsersPage } from '@/components/hub/pages/UsersPage'
 import { WebhooksPage } from '@/components/hub/pages/WebhooksPage'
+import ImprovMXPage from '@/components/hub/pages/ImprovMXPage'
 import SocialOutreachPage from '@/app/dashboard/outreach/social/page'
-import { IMPROVMX_PROVIDER } from './improvmxProvider'
 import {
   CONSOLE_TIERS,
   CONSOLE_UTILITY_PAGES,
@@ -30,31 +21,20 @@ import {
   type ConsoleTierId,
 } from '@/lib/hub/console-catalog'
 
-/** A workspace panel that a provider action opens instead of a single-action form. */
 export interface ConsolePanel {
   title: string
   subtitle: string
   render: () => ReactNode
 }
 
-/**
- * The UI extension contract a host implements to plug its own pages and branding
- * into the portable console shell. Swap this object to rebrand or re-page the
- * console without touching the shell.
- */
 export interface ConsoleHostUI {
   branding: {
     productName: string
-    /** Primary accent (used for highlights / active states). */
     accent: string
-    /** Secondary accent (used for instrument readouts). */
     secondary: string
   }
-  /** Action id → workspace panel (e.g. Vercel env / logs / deployments / domains). */
   panelRouter: Record<string, ConsolePanel>
-  /** Utility page id → renderer (domains / env / logs / deployments / settings). */
   utilityPages: Record<string, () => ReactNode>
-  /** Provider catalog: tiers, sidebar nav, and lookups. A host supplies its own. */
   catalog: {
     tiers: typeof CONSOLE_TIERS
     utilityNav: typeof CONSOLE_UTILITY_PAGES
@@ -64,12 +44,16 @@ export interface ConsoleHostUI {
   }
 }
 
-// ── SignalBoost's implementation ────────────────────────────────────────────
-
 const ENV_PANEL: ConsolePanel = {
   title: 'Environment Variables',
   subtitle: 'View, add, edit, and delete variables across Production, Preview, and Development.',
   render: () => <EnvVarsPage />,
+}
+
+const IMPROVMX_PANEL: ConsolePanel = {
+  title: 'ImprovMX Email Forwarding',
+  subtitle: 'Live domains and forwarding aliases from the ImprovMX API.',
+  render: () => <ImprovMXPage />,
 }
 
 const SOCIAL_PANEL: ConsolePanel = {
@@ -81,6 +65,7 @@ const SOCIAL_PANEL: ConsolePanel = {
 const SOCIAL_ACTIONS = ['capabilities', 'connect_oauth', 'discover_destinations', 'save_destination']
 const SOCIAL_PROVIDER_IDS = ['youtube', 'linkedin', 'tiktok', 'reddit', 'instagram', 'facebook', 'twitter_x']
 for (const id of SOCIAL_PROVIDER_IDS) LIVE_PROVIDER_IDS.add(id)
+LIVE_PROVIDER_IDS.add('improvmx')
 
 const SOCIAL_PROVIDERS: ConsoleProvider[] = [
   { id: 'youtube', name: 'YouTube', subtitle: 'VIDEO CHANNELS', accent: '#ff0000', tier: 'tier2', sections: [{ title: 'Connection', templateIds: SOCIAL_ACTIONS.map(a => `youtube.${a}`) }] },
@@ -96,21 +81,16 @@ function socialPanelRouter(): Record<string, ConsolePanel> {
   return Object.fromEntries(SOCIAL_PROVIDER_IDS.flatMap(id => SOCIAL_ACTIONS.map(action => [`${id}.${action}`, SOCIAL_PANEL])))
 }
 
-function providerWithExtensions(id: string, dict?: any) {
-  if (id === IMPROVMX_PROVIDER.id) return IMPROVMX_PROVIDER
+function providerWithSocial(id: string, dict?: any) {
   const social = SOCIAL_PROVIDERS.find(p => p.id === id)
   return social || getConsoleProvider(id, dict)
 }
 
-function tierProvidersWithExtensions(tierId: ConsoleTierId, dict?: any) {
+function tierProvidersWithSocial(tierId: ConsoleTierId, dict?: any) {
   const base = getTierProviders(tierId, dict)
   if (tierId !== 'tier2') return base
   const existing = new Set(base.map(p => p.id))
-  return [
-    ...base,
-    ...(existing.has(IMPROVMX_PROVIDER.id) ? [] : [IMPROVMX_PROVIDER]),
-    ...SOCIAL_PROVIDERS.filter(p => !existing.has(p.id)),
-  ]
+  return [...base, ...SOCIAL_PROVIDERS.filter(p => !existing.has(p.id))]
 }
 
 export const signalboostConsoleUI: ConsoleHostUI = {
@@ -126,6 +106,12 @@ export const signalboostConsoleUI: ConsoleHostUI = {
     'vercel.delete_env_var': ENV_PANEL,
     'vercel.edit_env': ENV_PANEL,
     'vercel.delete_env': ENV_PANEL,
+    'improvmx.list_domains': IMPROVMX_PANEL,
+    'improvmx.get_domain': IMPROVMX_PANEL,
+    'improvmx.list_aliases': IMPROVMX_PANEL,
+    'improvmx.create_alias': IMPROVMX_PANEL,
+    'improvmx.update_alias': IMPROVMX_PANEL,
+    'improvmx.delete_alias': IMPROVMX_PANEL,
     'vercel.logs': {
       title: 'Logs Viewer',
       subtitle: 'Recent platform, build, and runtime log events.',
@@ -166,7 +152,7 @@ export const signalboostConsoleUI: ConsoleHostUI = {
     tiers: CONSOLE_TIERS,
     utilityNav: CONSOLE_UTILITY_PAGES,
     getTier: getConsoleTier,
-    getTierProviders: tierProvidersWithExtensions as typeof getTierProviders,
-    getProvider: providerWithExtensions as typeof getConsoleProvider,
+    getTierProviders: tierProvidersWithSocial as typeof getTierProviders,
+    getProvider: providerWithSocial as typeof getConsoleProvider,
   },
 }

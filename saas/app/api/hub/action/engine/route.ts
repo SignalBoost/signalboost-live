@@ -6,8 +6,7 @@
 //
 // Accepts BOTH request shapes:
 //   native : { providerId, actionId, input? }
-//   legacy : { templateId: "provider.action", payload? }   ← so the existing form
-//            can target this route with only a URL change, no body change.
+//   legacy : { templateId: "provider.action", payload? }
 
 import { NextRequest, NextResponse } from 'next/server'
 import { runAction } from '@/console-core/actionEngine'
@@ -15,7 +14,6 @@ import { listRegistered } from '@/console-core/defaultHost'
 import { createSignalBoostHost } from '@/console-host/signalboostHost'
 import { isActionLive } from '@/lib/hub/console-catalog'
 
-// Side-effect imports: each registers its provider's executors at module load.
 import '@/console-core/executors/openai'
 import '@/console-core/executors/github'
 import '@/console-core/executors/stripe'
@@ -23,6 +21,7 @@ import '@/console-core/executors/elevenlabs'
 import '@/console-core/executors/anthropic'
 import '@/console-core/executors/gemini'
 import '@/console-core/executors/resend'
+import '@/console-core/executors/improvmx'
 import '@/console-core/executors/assemblyai'
 import '@/console-core/executors/supabase-marketing'
 import '@/console-core/executors/bank'
@@ -39,7 +38,6 @@ export async function POST(req: NextRequest) {
     let actionId: unknown = (body as any).actionId
     let input: unknown = (body as any).input
 
-    // Legacy-shape alias: split "provider.action" → providerId + actionId.
     if ((typeof providerId !== 'string' || typeof actionId !== 'string') && typeof (body as any).templateId === 'string') {
       const tid = String((body as any).templateId)
       const dot = tid.indexOf('.')
@@ -54,14 +52,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'providerId and actionId (or templateId) are required' }, { status: 400 })
     }
 
-    // Defense in depth: actions flagged incomplete in the catalog (e.g.
-    // github.rotate_token, github.manage_secrets) are hidden in the UI, but a
-    // direct API call must also be refused cleanly — never reach a stub executor.
     if (!isActionLive(`${providerId}.${actionId}`)) {
-      return NextResponse.json(
-        { ok: false, error: 'This action is not available yet.' },
-        { status: 501 },
-      )
+      return NextResponse.json({ ok: false, error: 'This action is not available yet.' }, { status: 501 })
     }
 
     const host = createSignalBoostHost(req)
@@ -78,9 +70,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// GET → which executors are wired (handy while migrating providers).
-// The executor list reveals the full action surface, so it is restricted to an
-// authenticated owner/admin — never exposed to anonymous or member callers.
 export async function GET(req: NextRequest) {
   const host = createSignalBoostHost(req)
   const user = await host.auth.getCurrentUser()

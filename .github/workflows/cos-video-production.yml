@@ -39,4 +39,8 @@ jobs:
           COS_VIDEO_RENDER_WEBHOOK_URL: ${{ secrets.COS_VIDEO_RENDER_WEBHOOK_URL }}
           COS_VIDEO_RENDER_WEBHOOK_TOKEN: ${{ secrets.COS_VIDEO_RENDER_WEBHOOK_TOKEN }}
           COS_VIDEO_WORKER_POLL_MS: ${{ vars.COS_VIDEO_WORKER_POLL_MS || '6000' }}
+          # Natural narration (all 5 languages). Falls back to espeak if unset.
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          ELEVENLABS_VOICE_ID: ${{ vars.ELEVENLABS_VOICE_ID }}
+          ELEVENLABS_MODEL_ID: ${{ vars.ELEVENLABS_MODEL_ID }}
         run: node scripts/cos-video-production-worker.mjs

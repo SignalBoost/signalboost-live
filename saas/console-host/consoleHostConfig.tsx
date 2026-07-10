@@ -10,6 +10,7 @@ import { UsersPage } from '@/components/hub/pages/UsersPage'
 import { WebhooksPage } from '@/components/hub/pages/WebhooksPage'
 import ImprovMXPage from '@/components/hub/pages/ImprovMXPage'
 import SocialOutreachPage from '@/app/dashboard/outreach/social/page'
+import { IMPROVMX_PROVIDER } from '@/console-host/improvmxProvider'
 import {
   CONSOLE_TIERS,
   CONSOLE_UTILITY_PAGES,
@@ -77,20 +78,21 @@ const SOCIAL_PROVIDERS: ConsoleProvider[] = [
   { id: 'twitter_x', name: 'X / Twitter', subtitle: 'SOCIAL POSTS', accent: '#d1d5db', tier: 'tier2', sections: [{ title: 'Connection', templateIds: SOCIAL_ACTIONS.map(a => `twitter_x.${a}`) }] },
 ]
 
+const EXTRA_PROVIDERS: ConsoleProvider[] = [IMPROVMX_PROVIDER, ...SOCIAL_PROVIDERS]
+
 function socialPanelRouter(): Record<string, ConsolePanel> {
   return Object.fromEntries(SOCIAL_PROVIDER_IDS.flatMap(id => SOCIAL_ACTIONS.map(action => [`${id}.${action}`, SOCIAL_PANEL])))
 }
 
-function providerWithSocial(id: string, dict?: any) {
-  const social = SOCIAL_PROVIDERS.find(p => p.id === id)
-  return social || getConsoleProvider(id, dict)
+function providerWithExtras(id: string, dict?: any) {
+  const extra = EXTRA_PROVIDERS.find(provider => provider.id === id)
+  return extra || getConsoleProvider(id, dict)
 }
 
-function tierProvidersWithSocial(tierId: ConsoleTierId, dict?: any) {
+function tierProvidersWithExtras(tierId: ConsoleTierId, dict?: any) {
   const base = getTierProviders(tierId, dict)
-  if (tierId !== 'tier2') return base
-  const existing = new Set(base.map(p => p.id))
-  return [...base, ...SOCIAL_PROVIDERS.filter(p => !existing.has(p.id))]
+  const existing = new Set(base.map(provider => provider.id))
+  return [...base, ...EXTRA_PROVIDERS.filter(provider => provider.tier === tierId && !existing.has(provider.id))]
 }
 
 export const signalboostConsoleUI: ConsoleHostUI = {
@@ -152,7 +154,7 @@ export const signalboostConsoleUI: ConsoleHostUI = {
     tiers: CONSOLE_TIERS,
     utilityNav: CONSOLE_UTILITY_PAGES,
     getTier: getConsoleTier,
-    getTierProviders: tierProvidersWithSocial as typeof getTierProviders,
-    getProvider: providerWithSocial as typeof getConsoleProvider,
+    getTierProviders: tierProvidersWithExtras as typeof getTierProviders,
+    getProvider: providerWithExtras as typeof getConsoleProvider,
   },
 }

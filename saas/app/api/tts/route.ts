@@ -138,9 +138,10 @@ export async function POST(req: NextRequest) {
   try {
     audioBuffer = await generateSpeech({ text, voiceId });
   } catch (err) {
-    console.error("Speech generation failed:", err);
+    const message = formatTtsError(err);
+    console.error("[TTS Error] Speech generation failed:", message);
     return NextResponse.json(
-      { error: "Speech generation failed" },
+      { error: "Speech generation failed", details: message },
       { status: 502 },
     );
   }
@@ -293,6 +294,12 @@ function isAlreadyExistsError(error: unknown): boolean {
     message.includes("duplicate key") ||
     message.includes("409")
   );
+}
+
+function formatTtsError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "Unknown TTS provider error";
 }
 
 function formatSupabaseError(error: unknown): string {

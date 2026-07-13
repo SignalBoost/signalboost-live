@@ -6,8 +6,9 @@ import { DEFAULT_MODEL_ID, findVoice } from "./voices";
 
 const ELEVENLABS_BASE_URL = "https://api.elevenlabs.io/v1";
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
-const DEFAULT_ELEVENLABS_TIMEOUT_MS = 45_000;
-const DEFAULT_OPENAI_TTS_TIMEOUT_MS = 45_000;
+const DEFAULT_PROVIDER_TIMEOUT_MS = 10_000;
+const GENERATE_SPEECH_TIMEOUT_MS = 15_000;
+const OPENAI_TTS_HD_MODEL = "tts-1-hd";
 
 function getElevenLabsApiKey(): string | null {
   return process.env.ELEVENLABS_API_KEY?.trim() || null;
@@ -17,18 +18,11 @@ function getOpenAiApiKey(): string | null {
   return process.env.OPENAI_API_KEY?.trim() || null;
 }
 
-function getElevenLabsTimeoutMs(): number {
-  const configured = Number(process.env.ELEVENLABS_TIMEOUT_MS);
+function getProviderTimeoutMs(envName: "ELEVENLABS_TIMEOUT_MS" | "OPENAI_TTS_TIMEOUT_MS"): number {
+  const configured = Number(process.env[envName]);
   return Number.isFinite(configured) && configured > 0
-    ? configured
-    : DEFAULT_ELEVENLABS_TIMEOUT_MS;
-}
-
-function getOpenAiTimeoutMs(): number {
-  const configured = Number(process.env.OPENAI_TTS_TIMEOUT_MS);
-  return Number.isFinite(configured) && configured > 0
-    ? configured
-    : DEFAULT_OPENAI_TTS_TIMEOUT_MS;
+    ? Math.min(configured, DEFAULT_PROVIDER_TIMEOUT_MS)
+    : DEFAULT_PROVIDER_TIMEOUT_MS;
 }
 
 export interface TTSOptions {
@@ -45,11 +39,20 @@ export interface TTSOptions {
 
 /**
  * Generate speech from text. Returns the MP3 as an ArrayBuffer.
- * Uses ElevenLabs when configured; falls back to OpenAI speech if ElevenLabs fails
- * and OPENAI_API_KEY exists. This keeps the Audio Studio usable even when one
- * provider key/voice/quota is misconfigured.
+ * Uses ElevenLabs when configured; falls back to OpenAI high-definition speech
+ * if ElevenLabs fails and OPENAI_API_KEY exists. Provider calls are capped at
+ * 10 seconds and the full wrapper is capped at 15 seconds so background
+ * rendering workers fail fast instead of hanging.
  */
 export async function generateSpeech(opts: TTSOptions): Promise<ArrayBuffer> {
+  return await withTimeout(
+    generateSpeechFromProviders(opts),
+    GENERATE_SPEECH_TIMEOUT_MS,
+    `Speech generation timed out after ${Math.round(GENERATE_SPEECH_TIMEOUT_MS / 1000)} seconds`,
+  );
+}
+
+async function generateSpeechFromProviders(opts: TTSOptions): Promise<ArrayBuffer> {
   const elevenLabsKey = getElevenLabsApiKey();
   const openAiKey = getOpenAiApiKey();
   let elevenLabsError: unknown = null;
@@ -59,25 +62,31 @@ export async function generateSpeech(opts: TTSOptions): Promise<ArrayBuffer> {
       return await generateSpeechWithElevenLabs(opts, elevenLabsKey);
     } catch (err) {
       elevenLabsError = err;
-      console.warn("ElevenLabs TTS failed; checking OpenAI fallback:", sanitizeProviderError(err));
+      console.warn(
+        `[TTS Warning] ElevenLabs failed (${diagnoseProviderError(err)}).`,
+        sanitizeProviderError(err),
+      );
     }
   } else {
     elevenLabsError = new Error("ELEVENLABS_API_KEY is not set");
+    console.warn("[TTS Warning] ElevenLabs skipped because ELEVENLABS_API_KEY is not set.");
   }
 
-  if (openAiKey) {
-    try {
-      return await generateSpeechWithOpenAI(opts, openAiKey);
-    } catch (openAiError) {
-      throw new Error(
-        `Speech generation failed. ElevenLabs: ${sanitizeProviderError(elevenLabsError)}. OpenAI fallback: ${sanitizeProviderError(openAiError)}`,
-      );
-    }
+  if (!openAiKey) {
+    const message = `Speech generation failed. ElevenLabs: ${sanitizeProviderError(elevenLabsError)}. OPENAI_API_KEY is not set for fallback.`;
+    console.error(`[TTS Error] ${message}`);
+    throw new Error(message);
   }
 
-  throw new Error(
-    `Speech generation failed. ElevenLabs: ${sanitizeProviderError(elevenLabsError)}. OPENAI_API_KEY is not set for fallback.`,
-  );
+  console.warn("[TTS Warning] ElevenLabs failed. Falling back to OpenAI tts-1-hd...");
+
+  try {
+    return await generateSpeechWithOpenAI(opts, openAiKey);
+  } catch (openAiError) {
+    const message = `Speech generation failed. ElevenLabs: ${sanitizeProviderError(elevenLabsError)}. OpenAI tts-1-hd fallback: ${sanitizeProviderError(openAiError)}`;
+    console.error(`[TTS Error] ${message}`);
+    throw new Error(message);
+  }
 }
 
 async function generateSpeechWithElevenLabs(opts: TTSOptions, apiKey: string): Promise<ArrayBuffer> {
@@ -90,7 +99,7 @@ async function generateSpeechWithElevenLabs(opts: TTSOptions, apiKey: string): P
     style = 0,
   } = opts;
 
-  const timeoutMs = getElevenLabsTimeoutMs();
+  const timeoutMs = getProviderTimeoutMs("ELEVENLABS_TIMEOUT_MS");
   const res = await fetchWithTimeout(
     `${ELEVENLABS_BASE_URL}/text-to-speech/${voiceId}`,
     {
@@ -118,7 +127,7 @@ async function generateSpeechWithElevenLabs(opts: TTSOptions, apiKey: string): P
   if (!res.ok) {
     const errorText = await res.text().catch(() => "");
     throw new Error(
-      `ElevenLabs error ${res.status}: ${errorText || res.statusText}`,
+      `ElevenLabs ${describeHttpStatus(res.status)}: ${errorText || res.statusText}`,
     );
   }
 
@@ -126,7 +135,7 @@ async function generateSpeechWithElevenLabs(opts: TTSOptions, apiKey: string): P
 }
 
 async function generateSpeechWithOpenAI(opts: TTSOptions, apiKey: string): Promise<ArrayBuffer> {
-  const timeoutMs = getOpenAiTimeoutMs();
+  const timeoutMs = getProviderTimeoutMs("OPENAI_TTS_TIMEOUT_MS");
   const res = await fetchWithTimeout(
     `${OPENAI_BASE_URL}/audio/speech`,
     {
@@ -136,19 +145,19 @@ async function generateSpeechWithOpenAI(opts: TTSOptions, apiKey: string): Promi
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: process.env.OPENAI_TTS_MODEL || "tts-1",
+        model: OPENAI_TTS_HD_MODEL,
         voice: mapOpenAiVoice(opts.voiceId),
         input: opts.text,
         response_format: "mp3",
       }),
     },
     timeoutMs,
-    `OpenAI speech request timed out after ${Math.round(timeoutMs / 1000)} seconds`,
+    `OpenAI tts-1-hd request timed out after ${Math.round(timeoutMs / 1000)} seconds`,
   );
 
   if (!res.ok) {
     const errorText = await res.text().catch(() => "");
-    throw new Error(`OpenAI speech error ${res.status}: ${errorText || res.statusText}`);
+    throw new Error(`OpenAI tts-1-hd ${describeHttpStatus(res.status)}: ${errorText || res.statusText}`);
   }
 
   return await res.arrayBuffer();
@@ -178,6 +187,20 @@ async function fetchWithTimeout(
   }
 }
 
+async function withTimeout<T>(promise: PromiseLike<T>, ms: number, message: string): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race<T>([
+      Promise.resolve(promise),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(message)), ms);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
 function mapOpenAiVoice(voiceId: string): string {
   const voice = findVoice(voiceId);
   if (!voice) return "alloy";
@@ -187,6 +210,21 @@ function mapOpenAiVoice(voiceId: string): string {
   }
 
   return voice.locale === "en" ? "nova" : "shimmer";
+}
+
+function describeHttpStatus(status: number): string {
+  if (status === 401) return "error 401 (unauthorized - check API key)";
+  if (status === 429) return "error 429 (rate limited or quota exceeded)";
+  if (status >= 500) return `error ${status} (provider server error)`;
+  return `error ${status}`;
+}
+
+function diagnoseProviderError(error: unknown): string {
+  const message = sanitizeProviderError(error).toLowerCase();
+  if (message.includes("401") || message.includes("unauthorized")) return "401 unauthorized";
+  if (message.includes("429") || message.includes("rate limit") || message.includes("quota")) return "429 rate limit or quota";
+  if (message.includes("timed out") || message.includes("abort")) return "timeout";
+  return "provider error";
 }
 
 function sanitizeProviderError(error: unknown): string {

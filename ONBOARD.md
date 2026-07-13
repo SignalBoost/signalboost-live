@@ -14,6 +14,12 @@ Every contributor must follow this order:
 
 The current repository is always the source of truth.
 
+CI/runtime baseline: SaaS CI uses Node.js 24 for typecheck, production build,
+and unit-test jobs because the Node test suite executes TypeScript test files
+directly. Pipeline Integrity also uses Node.js 24 and must recognize both direct
+HTTP handler exports and thin route wrappers that re-export handlers from a
+canonical route.
+
 ---
 
 ## 0. Mandatory Enforcement

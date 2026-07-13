@@ -20,7 +20,7 @@ import { readFileSync } from 'node:fs'
 import { readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 const ROOTS = ['app', 'saas/app', 'components', 'saas/components', 'scripts']
-const HTTP = /export\s+(async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b|export\s+const\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*=/
+const HTTP = /export\s+(async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b|export\s+const\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*=|export\s*\{[^}]*\b(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b[^}]*\}\s+from\s+['"]/
 const USE_CLIENT = /^\s*['"]use client['"]/m
 const DEFAULT_EXPORT = /export\s+default\b|export\s*\{[^}]*\bdefault\b[^}]*\}/
 const JSX_HINT = /return\s*\(?\s*</

@@ -14,12 +14,10 @@
 -- rows (so the SQL Editor card still gets a JSON array back), and runs
 -- everything else raw, returning a small status object instead.
 --
--- ── BOOTSTRAP NOTE ──────────────────────────────────────────────────────────
--- This file is itself DDL (create or replace function), so it cannot be
--- installed through the broken card. Run THIS one time in the Supabase
--- dashboard SQL editor (project qpblefwtnbivuusxmabv). After it succeeds, the
--- Hub Console SQL Editor / Run Migration cards will run DDL normally — including
--- 20260616_infrastructure_prs.sql.
+-- BOOTSTRAP NOTE
+-- Run this once in every Supabase project that the Console Hub SQL Editor
+-- should control. The final NOTIFY refreshes PostgREST's schema cache so the
+-- RPC becomes available immediately after creation.
 
 create or replace function public.hub_exec_sql(query text)
 returns jsonb
@@ -33,23 +31,16 @@ declare
   v_result jsonb;
   v_rows   bigint;
 begin
-  -- Detect the leading keyword on a comment-stripped COPY (the original `query`
-  -- is executed untouched — Postgres handles its comments fine).
-  v_detect := regexp_replace(query, '--[^\n]*', '', 'g');     -- line comments
-  v_detect := regexp_replace(v_detect, '/\*.*?\*/', '', 'g'); -- block comments
+  v_detect := regexp_replace(query, '--[^\n]*', '', 'g');
+  v_detect := regexp_replace(v_detect, '/\*.*?\*/', '', 'g');
   v_first  := lower(coalesce(substring(v_detect from '[a-zA-Z]+'), ''));
 
-  -- Row-returning statements → aggregate to a JSON array (legacy contract that
-  -- the SQL Editor card and any list-style actions depend on).
   if v_first in ('select', 'with', 'values', 'table', 'show', 'explain') then
     execute format('select coalesce(jsonb_agg(t), ''[]''::jsonb) from (%s) t', query)
       into v_result;
     return v_result;
   end if;
 
-  -- Everything else (create / alter / drop / insert / update / delete / grant /
-  -- comment / truncate / …) runs raw. EXECUTE accepts multi-statement strings,
-  -- so a full migration with several statements applies in one call.
   execute query;
   get diagnostics v_rows = row_count;
   return jsonb_build_object(
@@ -59,12 +50,13 @@ begin
   );
 
 exception when others then
-  -- The route checks for an `error` key and surfaces it as a failed action.
   return jsonb_build_object('error', SQLERRM, 'sqlstate', SQLSTATE);
 end;
 $$;
 
--- Only the service role (used by the gated, owner/admin-only hub action route)
--- may call this. Never expose it to anon/authenticated.
 revoke all on function public.hub_exec_sql(text) from public;
 grant execute on function public.hub_exec_sql(text) to service_role;
+
+-- Supabase PostgREST caches function signatures. Refresh it so a newly-created
+-- RPC is visible to /rest/v1/rpc/hub_exec_sql without waiting for cache expiry.
+notify pgrst, 'reload schema';

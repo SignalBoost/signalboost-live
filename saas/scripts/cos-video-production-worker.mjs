@@ -12,6 +12,8 @@
 //    (default 14 min), before GitHub's 20-min SIGKILL. No more orphaned
 //    claims, and Actions runs show green instead of a wall of timeouts.
 import { createClient } from '@supabase/supabase-js'
+import { createHash } from 'node:crypto'
+import { generateSpeech } from '../lib/elevenlabs/client.mjs'
 import { spawn } from 'node:child_process'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -40,8 +42,30 @@ const RUN_BUDGET_MS = Number(process.env.COS_VIDEO_RUN_BUDGET_MS || 14 * 60 * 10
 const STALE_MS = Number(process.env.COS_VIDEO_STALE_MS || 10 * 60 * 1000)
 const MAX_REQUEUES = 3
 const startedAt = Date.now()
+let shutdownRequested = false
+process.once('SIGINT', () => { shutdownRequested = true; console.log('SIGINT received — finishing current COSA video worker step before exit.') })
+process.once('SIGTERM', () => { shutdownRequested = true; console.log('SIGTERM received — finishing current COSA video worker step before exit.') })
 
 function storageErrorMessage(error) { return error?.message || error?.error || String(error || 'unknown storage error') }
+
+function storageErrorDiagnostics(error) {
+  if (!error) return { message: 'unknown storage error' }
+  return {
+    name: error.name || null,
+    message: error.message || null,
+    error: error.error || null,
+    status: error.status || error.statusCode || null,
+    code: error.code || null,
+    details: error.details || null,
+    hint: error.hint || null,
+    cause: error.cause ? storageErrorMessage(error.cause) : null,
+    raw: String(error).slice(0, 1000),
+  }
+}
+
+function sha256Hex(bytes) {
+  return createHash('sha256').update(bytes).digest('hex')
+}
 
 async function ensureRenderBucket() {
   const listed = await supabase.storage.listBuckets()
@@ -56,16 +80,37 @@ async function ensureRenderBucket() {
   throw new Error(`Supabase Storage bucket "${renderBucket}" does not exist and automatic creation failed: ${storageErrorMessage(created.error)}`)
 }
 
-function logStorageFailure({ stage, job, objectPath, bucketExists, error }) {
+function logStorageFailure({ stage, job, objectPath, bucketExists, error, metadata, payload }) {
   console.error('COSA video storage failure', {
     stage,
     campaignId: job?.campaign_id || job?.metadata?.campaignId || null,
     requestId: job?.id || null,
     storageProvider: 'supabase-storage',
+    supabaseUrl: url,
     bucket: renderBucket,
     objectPath: objectPath || null,
+    uploadMetadata: metadata || null,
+    payloadByteLength: payload?.byteLength ?? payload?.length ?? null,
+    payloadSha256: payload ? sha256Hex(payload) : null,
     bucketExists: bucketExists ?? null,
     storageSdkError: storageErrorMessage(error),
+    storageErrorDiagnostics: storageErrorDiagnostics(error),
+  })
+}
+
+function logStorageUploadAttempt({ stage, job, objectPath, metadata, payload, bucketExists }) {
+  console.log('COSA video storage upload attempt', {
+    stage,
+    campaignId: job?.campaign_id || job?.metadata?.campaignId || null,
+    requestId: job?.id || null,
+    storageProvider: 'supabase-storage',
+    supabaseUrl: url,
+    bucket: renderBucket,
+    objectPath,
+    uploadMetadata: metadata,
+    payloadByteLength: payload.byteLength,
+    payloadSha256: sha256Hex(payload),
+    bucketExists,
   })
 }
 
@@ -329,50 +374,74 @@ function buildAss(job, duration) {
 // ELEVENLABS_MODEL_ID (defaults to eleven_multilingual_v2).
 // Cost guard: one call per render attempt, text capped at 900 chars;
 // job requeues are capped at 3, so a pathological video costs at most
-// 4 short TTS calls. Falls back to espeak only if the API is unavailable,
-// so a quota problem degrades audio quality instead of stopping renders.
+// 4 short TTS calls. Strict fallback chain: ElevenLabs -> OpenAI tts-1-hd ->
+// local espeak/espeak-ng -> emergency FFmpeg tone.
 // Voice telemetry for the current job — surfaced in the job row so the
 // dashboard's Technical details answers "which voice engine was used and
 // why" without digging through Actions logs.
 let lastVoice = { engine: 'unknown', note: null }
 
 async function synthesizeElevenLabs(job, dir) {
-  const apiKey = process.env.ELEVENLABS_API_KEY
-  if (!apiKey) {
-    lastVoice = { engine: 'espeak-fallback', note: 'ELEVENLABS_API_KEY is not set in this GitHub Actions runner (add it under repo Settings → Secrets and variables → Actions).' }
-    console.error(lastVoice.note)
-    return null
-  }
   const voiceId = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM'
   const modelId = process.env.ELEVENLABS_MODEL_ID || 'eleven_multilingual_v2'
   const text = scriptText(job).slice(0, 900)
   try {
-    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-      method: 'POST',
-      headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
-      body: JSON.stringify({
-        text,
-        model_id: modelId,
-        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
-      }),
-    })
-    if (!res.ok) {
-      const detail = await res.text().catch(() => '')
-      lastVoice = { engine: 'espeak-fallback', note: `ElevenLabs TTS failed (HTTP ${res.status}): ${detail.slice(0, 180)}` }
-      console.error(`ElevenLabs TTS failed (HTTP ${res.status}) — falling back to espeak. ${detail.slice(0, 200)}`)
-      return null
-    }
-    const bytes = Buffer.from(await res.arrayBuffer())
-    if (!bytes.length) return null
-    const mp3 = join(dir, 'voice.mp3')
+    const bytes = Buffer.from(await generateSpeech({
+      text,
+      voiceId,
+      modelId,
+      stability: 0.5,
+      similarityBoost: 0.75,
+      fallbackToOpenAI: false,
+    }))
+    if (!bytes.length) throw new Error('ElevenLabs returned an empty audio payload')
+    const mp3 = join(dir, 'voice-elevenlabs.mp3')
     await writeFile(mp3, bytes)
     lastVoice = { engine: 'elevenlabs', note: `lang=${jobLang(job)} voice=${voiceId} model=${modelId}` }
     console.log(`ElevenLabs narration OK: lang=${jobLang(job)} chars=${text.length} bytes=${bytes.length}`)
     return mp3
   } catch (err) {
-    lastVoice = { engine: 'espeak-fallback', note: `ElevenLabs TTS error: ${String(err?.message || err).slice(0, 180)}` }
-    console.error('ElevenLabs TTS error — falling back to espeak:', err?.message || String(err))
+    lastVoice = { engine: 'openai-fallback', note: `ElevenLabs TTS unavailable: ${String(err?.message || err).slice(0, 180)}` }
+    console.error('ElevenLabs TTS unavailable — falling back to OpenAI tts-1-hd:', err?.message || String(err))
     return null
+  }
+}
+
+async function synthesizeOpenAi(job, dir) {
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  if (!apiKey) {
+    lastVoice = { engine: 'espeak-fallback', note: 'OPENAI_API_KEY is not set for the OpenAI tts-1-hd fallback.' }
+    console.error(lastVoice.note)
+    return null
+  }
+  const text = scriptText(job).slice(0, 900)
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), Number(process.env.OPENAI_TTS_TIMEOUT_MS || 10000))
+  try {
+    const res = await fetch('https://api.openai.com/v1/audio/speech', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: 'tts-1-hd', voice: 'alloy', input: text, response_format: 'mp3' }),
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '')
+      throw new Error(`OpenAI tts-1-hd failed (HTTP ${res.status}): ${detail.slice(0, 180)}`)
+    }
+    const bytes = Buffer.from(await res.arrayBuffer())
+    if (!bytes.length) throw new Error('OpenAI returned an empty audio payload')
+    const mp3 = join(dir, 'voice-openai.mp3')
+    await writeFile(mp3, bytes)
+    lastVoice = { engine: 'openai-tts-1-hd', note: `lang=${jobLang(job)} model=tts-1-hd bytes=${bytes.length}` }
+    console.log(`OpenAI tts-1-hd narration OK: lang=${jobLang(job)} chars=${text.length} bytes=${bytes.length}`)
+    return mp3
+  } catch (err) {
+    const reason = err instanceof Error && err.name === 'AbortError' ? 'OpenAI tts-1-hd timed out' : String(err?.message || err)
+    lastVoice = { engine: 'espeak-fallback', note: `OpenAI tts-1-hd unavailable: ${reason.slice(0, 180)}` }
+    console.error('OpenAI tts-1-hd unavailable — falling back to local espeak:', reason)
+    return null
+  } finally {
+    clearTimeout(timeout)
   }
 }
 
@@ -391,15 +460,27 @@ async function synthesizeEspeak(job, dir, duration) {
     }
     return wav
   }
+  throw new Error('Neither espeak-ng nor espeak is installed')
+}
+
+async function synthesizeEmergencyTone(dir, duration) {
+  const wav = join(dir, 'voice-emergency-tone.wav')
   await runFfmpeg(['-y', '-f', 'lavfi', '-i', `sine=frequency=440:sample_rate=44100:d=${duration}`, '-af', 'volume=0.08', wav])
+  lastVoice = { engine: 'ffmpeg-emergency-tone', note: 'ElevenLabs, OpenAI, and local espeak all failed; generated a basic FFmpeg tone.' }
   return wav
 }
 
 async function synthesizeLocalVoice(job, dir, duration) {
   const eleven = await synthesizeElevenLabs(job, dir)
   if (eleven) return eleven
-  if (lastVoice.engine === 'unknown') lastVoice = { engine: 'espeak-fallback', note: 'ElevenLabs unavailable' }
-  return synthesizeEspeak(job, dir, duration)
+  const openai = await synthesizeOpenAi(job, dir)
+  if (openai) return openai
+  try {
+    return await synthesizeEspeak(job, dir, duration)
+  } catch (err) {
+    console.error('Local espeak unavailable — generating emergency FFmpeg audio tone:', err?.message || String(err))
+    return synthesizeEmergencyTone(dir, duration)
+  }
 }
 
 // Measure the narration length so the video lasts as long as the voice —
@@ -469,10 +550,22 @@ async function renderLocalMp4(job) {
     const bytes = await readFile(output)
     const resultPath = `cos-video-production/${job.id}/final.mp4`
     const storage = await ensureRenderBucket()
-    const { error: uploadError } = await supabase.storage.from(renderBucket).upload(resultPath, bytes, { contentType: 'video/mp4', upsert: true })
-    if (uploadError) {
-      logStorageFailure({ stage: 'raw-base-render-upload', job, objectPath: resultPath, bucketExists: storage.bucketExists, error: uploadError })
-      throw new Error(`Supabase Storage upload failed for bucket "${renderBucket}" object "${resultPath}": ${storageErrorMessage(uploadError)}`)
+    const uploadMetadata = { contentType: 'video/mp4', cacheControl: '3600', upsert: true }
+    logStorageUploadAttempt({ stage: 'raw-base-render-upload', job, objectPath: resultPath, metadata: uploadMetadata, payload: bytes, bucketExists: storage.bucketExists })
+    try {
+      const { error: uploadError } = await supabase.storage.from(renderBucket).upload(resultPath, bytes, uploadMetadata)
+      if (uploadError) throw uploadError
+      console.log('COSA video storage upload complete', {
+        supabaseUrl: url,
+        bucket: renderBucket,
+        objectPath: resultPath,
+        uploadMetadata,
+        payloadByteLength: bytes.byteLength,
+        payloadSha256: sha256Hex(bytes),
+      })
+    } catch (uploadError) {
+      logStorageFailure({ stage: 'raw-base-render-upload', job, objectPath: resultPath, bucketExists: storage.bucketExists, error: uploadError, metadata: uploadMetadata, payload: bytes })
+      throw new Error(`Supabase Storage upload failed for project "${url}" bucket "${renderBucket}" object "${resultPath}": ${storageErrorMessage(uploadError)}`)
     }
     return { output_url: resultPath, thumbnail_url: null }
   } finally {
@@ -516,7 +609,7 @@ await ensureRenderBucket()
 await recoverStaleJobs()
 
 let cycles = 0
-while (Date.now() - startedAt < RUN_BUDGET_MS) {
+while (!shutdownRequested && Date.now() - startedAt < RUN_BUDGET_MS) {
   const job = await claimJob()
   if (job) {
     await processJob(job)
@@ -527,5 +620,7 @@ while (Date.now() - startedAt < RUN_BUDGET_MS) {
   cycles++
   if (cycles % 20 === 0) await recoverStaleJobs()
 }
-console.log(`run budget reached (${Math.round(RUN_BUDGET_MS / 60000)} min) — exiting cleanly before workflow timeout; next scheduled run continues.`)
+console.log(shutdownRequested
+  ? 'shutdown requested — exiting cleanly after current COSA video worker step; next scheduled run continues.'
+  : `run budget reached (${Math.round(RUN_BUDGET_MS / 60000)} min) — exiting cleanly before workflow timeout; next scheduled run continues.`)
 process.exit(0)

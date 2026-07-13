@@ -19,19 +19,18 @@ jobs:
         with:
           node-version: 24
 
-      # PREFLIGHT: fail loudly and clearly if the worker file is corrupted
-      # (e.g. another file's content pasted over it) instead of dying with a
-      # cryptic SyntaxError. Renders are DEAD until this file is valid.
-      - name: Preflight — worker file integrity
-        run: |
-          if ! node --check saas/scripts/cos-video-production-worker.mjs; then
-            echo "::error file=saas/scripts/cos-video-production-worker.mjs::MISFILED OR CORRUPTED WORKER — not valid JavaScript. Another file's content was likely pasted here. All video rendering is stopped until saas/scripts/cos-video-production-worker.mjs is restored."
-            exit 1
-          fi
+      - name: Install worker dependencies
+        run: npm install --no-save --no-audit --no-fund @supabase/supabase-js@^2 tsx@^4
 
-      - run: npm install --no-save --no-audit --no-fund @supabase/supabase-js@^2
+      # Validate both the worker and its imported TypeScript TTS client.
+      - name: Preflight — worker and shared TTS import integrity
+        working-directory: saas
+        run: npx tsx scripts/cos-video-production-worker.mjs --help
+
       - run: sudo apt-get update -y && sudo apt-get install -y ffmpeg fonts-dejavu-core espeak-ng
-      - working-directory: saas
+
+      - name: Run COS video production worker
+        working-directory: saas
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -39,8 +38,13 @@ jobs:
           COS_VIDEO_RENDER_WEBHOOK_URL: ${{ secrets.COS_VIDEO_RENDER_WEBHOOK_URL }}
           COS_VIDEO_RENDER_WEBHOOK_TOKEN: ${{ secrets.COS_VIDEO_RENDER_WEBHOOK_TOKEN }}
           COS_VIDEO_WORKER_POLL_MS: ${{ vars.COS_VIDEO_WORKER_POLL_MS || '6000' }}
-          # Natural narration (all 5 languages). Falls back to espeak if unset.
+
+          # Shared provider chain: ElevenLabs -> OpenAI tts-1-hd -> local espeak.
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
           ELEVENLABS_VOICE_ID: ${{ vars.ELEVENLABS_VOICE_ID }}
           ELEVENLABS_MODEL_ID: ${{ vars.ELEVENLABS_MODEL_ID }}
-        run: node scripts/cos-video-production-worker.mjs
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ELEVENLABS_TIMEOUT_MS: ${{ vars.ELEVENLABS_TIMEOUT_MS || '10000' }}
+          OPENAI_TTS_TIMEOUT_MS: ${{ vars.OPENAI_TTS_TIMEOUT_MS || '10000' }}
+
+        run: npx tsx scripts/cos-video-production-worker.mjs

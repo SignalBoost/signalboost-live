@@ -323,19 +323,18 @@ export default function PremiumCustomerNavbarV2() {
       return hrefPath !== '/' && (pathname === hrefPath || pathname?.startsWith(`${hrefPath}/`))
     })
 
+  // Sizing (padding / font-size / gap) lives in the .sbnav-trigger CSS class so
+  // media queries can compress the nav at narrower desktop widths.
   const triggerStyle = (active: boolean, accent?: string): CSSProperties => ({
     display: 'inline-flex',
     alignItems: 'center',
-    gap: 7,
     background: active ? 'rgba(255,255,255,.075)' : 'transparent',
     border: active ? `1px solid ${accent || 'rgba(255,255,255,.18)'}` : '1px solid transparent',
     borderRadius: 999,
     cursor: 'pointer',
     color: active ? '#fff' : 'rgba(226,232,240,.76)',
     fontWeight: active ? 800 : 650,
-    fontSize: 13,
     fontFamily: 'inherit',
-    padding: '8px 11px',
     whiteSpace: 'nowrap',
     textDecoration: 'none',
     boxShadow: active && accent ? `0 0 18px ${accent}22` : 'none',
@@ -349,10 +348,10 @@ export default function PremiumCustomerNavbarV2() {
 
     return (
       <div style={{ position: 'relative' }} onMouseEnter={() => openNow(group.id)} onMouseLeave={closeSoon}>
-        <button type="button" aria-haspopup="true" aria-expanded={open} onClick={() => setOpenMenu(open ? null : group.id)} style={triggerStyle(active, group.accent)}>
-          <span aria-hidden style={{ width: 7, height: 7, borderRadius: 99, background: group.accent, boxShadow: `0 0 12px ${group.accent}`, opacity: active ? 1 : .72 }} />
+        <button type="button" aria-haspopup="true" aria-expanded={open} onClick={() => setOpenMenu(open ? null : group.id)} className="sbnav-trigger" style={triggerStyle(active, group.accent)}>
+          <span aria-hidden className="sbnav-dot" style={{ width: 7, height: 7, borderRadius: 99, background: group.accent, boxShadow: `0 0 12px ${group.accent}`, opacity: active ? 1 : .72 }} />
           {group.label}
-          <span style={{ fontSize: 10, opacity: .68, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .18s' }}>▾</span>
+          <span className="sbnav-caret" style={{ fontSize: 10, opacity: .68, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .18s' }}>▾</span>
         </button>
         <div
           style={{
@@ -394,20 +393,44 @@ export default function PremiumCustomerNavbarV2() {
 
   return (
     <>
-      <style>{`.sbnav-desktop{display:flex;align-items:center;gap:6px}.sbnav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}.sbnav-burger{display:none}.sbnav-mobile-auth{display:none}.sbnav-row{border-radius:14px;transition:background .15s ease,transform .15s ease}.sbnav-row:hover{background:rgba(255,255,255,.065);transform:translateX(2px)}@media(max-width:1260px){.sbnav-desktop,.sbnav-right{display:none!important}.sbnav-burger{display:inline-flex!important}.sbnav-mobile-auth{display:inline-flex!important}}`}</style>
+      <style>{`
+.sbnav-desktop{display:flex;align-items:center;gap:6px;min-width:0}
+.sbnav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.sbnav-burger{display:none}
+.sbnav-mobile-auth{display:none}
+.sbnav-trigger{padding:8px 11px;font-size:13px;gap:7px}
+.sbnav-row{border-radius:14px;transition:background .15s ease,transform .15s ease}
+.sbnav-row:hover{background:rgba(255,255,255,.065);transform:translateX(2px)}
+@media(max-width:1700px){
+  .sbnav-trigger{padding:7px 8px;font-size:12px;gap:5px}
+  .sbnav-dot,.sbnav-caret,.sbnav-name{display:none!important}
+  .sbnav-desktop{gap:4px}
+}
+@media(max-width:1480px){
+  .sbnav-trigger{padding:6px 6px;font-size:11.5px;gap:4px}
+  .sbnav-subtitle{display:none!important}
+  .sbnav-desktop{gap:3px}
+  .sbnav-right{gap:6px}
+}
+@media(max-width:1360px){
+  .sbnav-desktop,.sbnav-right{display:none!important}
+  .sbnav-burger{display:inline-flex!important}
+  .sbnav-mobile-auth{display:inline-flex!important}
+}
+`}</style>
       <nav ref={navRef} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '11px 22px', background: 'linear-gradient(135deg, rgba(4,8,18,.92), rgba(15,23,42,.76))', borderBottom: '1px solid rgba(26,240,255,.18)', boxShadow: '0 18px 60px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.08)', position: 'sticky', top: 0, zIndex: 100, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0, marginRight: 8 }}>
           <span style={{ width: 34, height: 34, borderRadius: 99, border: `1px solid ${GOLD}55`, display: 'grid', placeItems: 'center', color: GOLD, boxShadow: `0 0 24px ${GOLD}22` }}>⌁</span>
           <span style={{ display: 'grid', lineHeight: 1.05 }}>
             <span style={{ color: '#fff', fontWeight: 900, fontSize: 17 }}>signal<span style={{ color: GOLD }}>boost</span></span>
-            <span style={{ color: 'rgba(148,163,184,.72)', fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase' }}>{brandSubtitle}</span>
+            <span className="sbnav-subtitle" style={{ color: 'rgba(148,163,184,.72)', fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase' }}>{brandSubtitle}</span>
           </span>
         </Link>
 
         <div className="sbnav-desktop">
-          <Link href="/" style={triggerStyle(pathname === '/', GOLD)}>{homeLabel}</Link>
+          <Link href="/" className="sbnav-trigger" style={triggerStyle(pathname === '/', GOLD)}>{homeLabel}</Link>
           {groups.map((group) => <MenuGroup key={group.id} group={group} />)}
-          <Link href="/pricing" style={triggerStyle(pathname === '/pricing', GOLD)}>{pricingLabel}</Link>
+          <Link href="/pricing" className="sbnav-trigger" style={triggerStyle(pathname === '/pricing', GOLD)}>{pricingLabel}</Link>
         </div>
 
         <div className="sbnav-right">
@@ -418,7 +441,7 @@ export default function PremiumCustomerNavbarV2() {
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
               <span title={`Available video credits: ${credits.toLocaleString()}`} style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,195,0,.95)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>⚡{credits >= 100000 ? `${Math.floor(credits / 1000)}K` : credits.toLocaleString()}</span>
               <span title={`Current plan: ${currentPlanLabel}`} style={{ fontSize: 11, fontWeight: 900, letterSpacing: '.06em', padding: '3px 10px', borderRadius: 999, background: currentPlanStyle.bg, color: currentPlanStyle.color, fontFamily: 'monospace' }}>{currentPlanLabel}</span>
-              {displayName ? <span title={displayName} style={{ fontSize: 12, fontWeight: 650, color: 'rgba(226,232,240,.70)', maxWidth: 135, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</span> : null}
+              {displayName ? <span className="sbnav-name" title={displayName} style={{ fontSize: 12, fontWeight: 650, color: 'rgba(226,232,240,.70)', maxWidth: 135, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</span> : null}
             </span>
           ) : null}
           {user ? (

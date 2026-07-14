@@ -29,6 +29,12 @@ Required order (from ONBOARD.md, non-negotiable):
 - Never use a platform AI key in BYOK user flows.
 - Never bypass owner/HMI approval on any dispatch, publish, spend, delete, rotate, or infrastructure action.
 
+**Zero-manual-entry enterprise UI rule:**
+- Read and follow `docs/zero-manual-entry-ui.md` for COSA, Campaign Studio, Launchpad, and every enterprise campaign/configuration workspace.
+- Do not add campaign-generation `<input type="text">` or `<textarea>` controls. URL fields must use `type="url"` with strict validation.
+- Use shared searchable schema-backed selects for categorical values and card selection for AI-generated creative choices.
+- Preserve all human approval gates. Zero manual entry does not mean zero human control.
+
 **Adapter/driver model:** new media providers (ElevenLabs, Runway, Kling, …) are added as one catalog entry + one small adapter in `saas/lib/agency/userProviders.ts` implementing the shared contract. The engine, UI, and approval flows never change per provider. Only advertise a provider as "live" once its adapter exists — a user key unlocks billing, not capability.
 
 **Owner workflow constraints (critical):**

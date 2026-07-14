@@ -74,6 +74,12 @@ const ORGANIC_COPY: Record<string, {
   dispatchQueued: string
   dispatchError: string
   emailInvalid: string
+  byokTitle: string
+  byokBody: string
+  byokProviderLabel: string
+  byokKeyLabel: string
+  byokKeyRequired: string
+  byokKeyInvalid: string
   sections: { youtube: string; linkedin: string; press: string }
   labels: {
     youtubeTitle: string
@@ -86,7 +92,7 @@ const ORGANIC_COPY: Record<string, {
   }
 }> = {
   en: {
-    formTitle: 'Generate your free organic campaign',
+    formTitle: 'Describe your campaign in one prompt',
     companyLabel: 'Company or brand name',
     companyPlaceholder: 'e.g. Acme Analytics',
     announcementLabel: 'What are you announcing or promoting?',
@@ -112,6 +118,12 @@ const ORGANIC_COPY: Record<string, {
     dispatchQueued: 'Queued. The press release is locked for owner approval and will be emailed to the journalist once approved.',
     dispatchError: 'Could not queue the press release. Please try again.',
     emailInvalid: 'Enter the publication name and a valid editor email.',
+    byokTitle: 'Power it with your own AI account',
+    byokBody: 'You pay your AI provider directly — roughly $0.03 per generation with Claude, less with OpenAI. Your key is used only for this request, never stored, never logged.',
+    byokProviderLabel: 'AI provider',
+    byokKeyLabel: 'Your API key',
+    byokKeyRequired: 'Paste your AI provider API key to generate. You pay the provider directly per generation.',
+    byokKeyInvalid: 'Your API key was rejected by the provider. Check it and try again.',
     sections: { youtube: 'YouTube organic', linkedin: 'LinkedIn organic', press: 'Press release email' },
     labels: {
       youtubeTitle: 'Video title',
@@ -124,7 +136,7 @@ const ORGANIC_COPY: Record<string, {
     },
   },
   es: {
-    formTitle: 'Genera tu campaña orgánica gratis',
+    formTitle: 'Describe tu campaña en un solo prompt',
     companyLabel: 'Nombre de la empresa o marca',
     companyPlaceholder: 'ej. Acme Analytics',
     announcementLabel: '¿Qué estás anunciando o promocionando?',
@@ -150,6 +162,12 @@ const ORGANIC_COPY: Record<string, {
     dispatchQueued: 'En cola. El press release queda bloqueado para aprobación del owner y se enviará por email al periodista una vez aprobado.',
     dispatchError: 'No se pudo poner en cola el press release. Inténtalo de nuevo.',
     emailInvalid: 'Ingresa el nombre de la publicación y un email válido del editor.',
+    byokTitle: 'Impúlsalo con tu propia cuenta de IA',
+    byokBody: 'Pagas directamente a tu proveedor de IA — aprox. $0.03 por generación con Claude, menos con OpenAI. Tu clave se usa solo para esta solicitud, nunca se guarda ni se registra.',
+    byokProviderLabel: 'Proveedor de IA',
+    byokKeyLabel: 'Tu API key',
+    byokKeyRequired: 'Pega la API key de tu proveedor de IA para generar. Pagas al proveedor directamente por generación.',
+    byokKeyInvalid: 'El proveedor rechazó tu API key. Revísala e inténtalo de nuevo.',
     sections: { youtube: 'YouTube orgánico', linkedin: 'LinkedIn orgánico', press: 'Email de press release' },
     labels: {
       youtubeTitle: 'Título del video',
@@ -162,7 +180,7 @@ const ORGANIC_COPY: Record<string, {
     },
   },
   pt: {
-    formTitle: 'Gere sua campanha orgânica gratuita',
+    formTitle: 'Descreva sua campanha em um único prompt',
     companyLabel: 'Nome da empresa ou marca',
     companyPlaceholder: 'ex. Acme Analytics',
     announcementLabel: 'O que você está anunciando ou promovendo?',
@@ -188,6 +206,12 @@ const ORGANIC_COPY: Record<string, {
     dispatchQueued: 'Na fila. O press release fica bloqueado para aprovação do owner e será enviado por e-mail ao jornalista após aprovação.',
     dispatchError: 'Não foi possível colocar o press release na fila. Tente novamente.',
     emailInvalid: 'Informe o nome da publicação e um e-mail válido do editor.',
+    byokTitle: 'Use sua própria conta de IA',
+    byokBody: 'Você paga diretamente ao seu provedor de IA — cerca de US$ 0,03 por geração com Claude, menos com OpenAI. Sua chave é usada apenas nesta solicitação, nunca é armazenada nem registrada.',
+    byokProviderLabel: 'Provedor de IA',
+    byokKeyLabel: 'Sua API key',
+    byokKeyRequired: 'Cole a API key do seu provedor de IA para gerar. Você paga o provedor diretamente por geração.',
+    byokKeyInvalid: 'O provedor rejeitou sua API key. Verifique e tente novamente.',
     sections: { youtube: 'YouTube orgânico', linkedin: 'LinkedIn orgânico', press: 'E-mail de press release' },
     labels: {
       youtubeTitle: 'Título do vídeo',
@@ -200,7 +224,7 @@ const ORGANIC_COPY: Record<string, {
     },
   },
   pl: {
-    formTitle: 'Wygeneruj darmową kampanię organiczną',
+    formTitle: 'Opisz swoją kampanię jednym promptem',
     companyLabel: 'Nazwa firmy lub marki',
     companyPlaceholder: 'np. Acme Analytics',
     announcementLabel: 'Co ogłaszasz lub promujesz?',
@@ -226,6 +250,12 @@ const ORGANIC_COPY: Record<string, {
     dispatchQueued: 'W kolejce. Press release jest zablokowany do akceptacji ownera i zostanie wysłany e-mailem do dziennikarza po zatwierdzeniu.',
     dispatchError: 'Nie udało się dodać press release do kolejki. Spróbuj ponownie.',
     emailInvalid: 'Podaj nazwę publikacji i prawidłowy e-mail redaktora.',
+    byokTitle: 'Zasil to własnym kontem AI',
+    byokBody: 'Płacisz bezpośrednio swojemu dostawcy AI — ok. 0,03 USD za generację z Claude, mniej z OpenAI. Twój klucz jest używany tylko dla tego żądania, nigdy nie jest zapisywany ani logowany.',
+    byokProviderLabel: 'Dostawca AI',
+    byokKeyLabel: 'Twój klucz API',
+    byokKeyRequired: 'Wklej klucz API swojego dostawcy AI, aby generować. Płacisz dostawcy bezpośrednio za generację.',
+    byokKeyInvalid: 'Dostawca odrzucił Twój klucz API. Sprawdź go i spróbuj ponownie.',
     sections: { youtube: 'YouTube organicznie', linkedin: 'LinkedIn organicznie', press: 'E-mail press release' },
     labels: {
       youtubeTitle: 'Tytuł wideo',
@@ -238,7 +268,7 @@ const ORGANIC_COPY: Record<string, {
     },
   },
   ru: {
-    formTitle: 'Сгенерируйте бесплатную organic-кампанию',
+    formTitle: 'Опишите вашу кампанию одним промптом',
     companyLabel: 'Название компании или бренда',
     companyPlaceholder: 'напр. Acme Analytics',
     announcementLabel: 'Что вы анонсируете или продвигаете?',
@@ -264,6 +294,12 @@ const ORGANIC_COPY: Record<string, {
     dispatchQueued: 'В очереди. Press release заблокирован до одобрения owner и будет отправлен журналисту по e-mail после утверждения.',
     dispatchError: 'Не удалось поставить press release в очередь. Попробуйте снова.',
     emailInvalid: 'Укажите название издания и корректный e-mail редактора.',
+    byokTitle: 'Работает с вашим собственным AI-аккаунтом',
+    byokBody: 'Вы платите AI-провайдеру напрямую — около $0.03 за генерацию с Claude, меньше с OpenAI. Ключ используется только для этого запроса, никогда не сохраняется и не логируется.',
+    byokProviderLabel: 'AI-провайдер',
+    byokKeyLabel: 'Ваш API-ключ',
+    byokKeyRequired: 'Вставьте API-ключ вашего AI-провайдера для генерации. Вы платите провайдеру напрямую за каждую генерацию.',
+    byokKeyInvalid: 'Провайдер отклонил ваш API-ключ. Проверьте его и попробуйте снова.',
     sections: { youtube: 'YouTube organic', linkedin: 'LinkedIn organic', press: 'Press release e-mail' },
     labels: {
       youtubeTitle: 'Название видео',
@@ -337,6 +373,9 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const [apiProvider, setApiProvider] = useState<'anthropic' | 'openai'>('anthropic')
+  const [apiKey, setApiKey] = useState('')
+
   const [company, setCompany] = useState('')
   const [announcement, setAnnouncement] = useState('')
   const [audience, setAudience] = useState('')
@@ -360,6 +399,11 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
     event.preventDefault()
     setOrganicError('')
 
+    if (apiKey.trim().length < 20) {
+      setOrganicError(oc.byokKeyRequired)
+      return
+    }
+
     if (!company.trim() || !announcement.trim()) {
       setOrganicError(oc.requiredError)
       return
@@ -374,13 +418,16 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
       const response = await fetch('/api/agency/organic-workflow', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ company, announcement, audience, website, lang }),
+        body: JSON.stringify({ company, announcement, audience, website, lang, apiProvider, apiKey: apiKey.trim() }),
       })
 
       const data = await response.json().catch(() => null) as OrganicResponse | null
 
       if (!response.ok || !data || !data.ok || !data.assets) {
-        setOrganicError(oc.genError)
+        const code = (data as any)?.error_code
+        if (code === 'missing_key') setOrganicError(oc.byokKeyRequired)
+        else if (code === 'invalid_key') setOrganicError(oc.byokKeyInvalid)
+        else setOrganicError(oc.genError)
         setOrganicLoading(false)
         return
       }
@@ -513,6 +560,25 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
 
           <form onSubmit={generateOrganic} style={{ display: 'grid', gap: 12, marginTop: 18, maxWidth: 720 }}>
             <h3 className="sb-h3" style={{ margin: 0 }}>{oc.formTitle}</h3>
+
+            <div style={{ border: '1px solid rgba(251,191,36,.3)', borderRadius: 16, padding: 14, display: 'grid', gap: 10 }}>
+              <h4 className="sb-h3" style={{ margin: 0, fontSize: 15 }}>{oc.byokTitle}</h4>
+              <p className="sb-body" style={{ margin: 0, fontSize: 13 }}>{oc.byokBody}</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(140px, 200px) 1fr', gap: 12 }}>
+                <label style={{ display: 'grid', gap: 6 }}>
+                  <span className="sb-caption">{oc.byokProviderLabel}</span>
+                  <select value={apiProvider} onChange={(e) => setApiProvider(e.target.value === 'openai' ? 'openai' : 'anthropic')} style={fieldStyle}>
+                    <option value="anthropic">Claude (Anthropic)</option>
+                    <option value="openai">OpenAI</option>
+                  </select>
+                </label>
+                <label style={{ display: 'grid', gap: 6 }}>
+                  <span className="sb-caption">{oc.byokKeyLabel}</span>
+                  <input type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={apiProvider === 'openai' ? 'sk-…' : 'sk-ant-…'} maxLength={400} style={fieldStyle} />
+                </label>
+              </div>
+            </div>
+
             <label style={{ display: 'grid', gap: 6 }}>
               <span className="sb-caption">{oc.companyLabel}</span>
               <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder={oc.companyPlaceholder} maxLength={120} style={fieldStyle} />

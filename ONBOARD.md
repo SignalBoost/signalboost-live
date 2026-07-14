@@ -14,6 +14,8 @@ Every contributor must follow this order:
 
 The current repository is always the source of truth.
 
+AI entry points: `CLAUDE.md` and `AGENTS.md` at the repository root are auto-read by AI coding agents at session start. They exist only to route every agent into this document — they summarize, never replace, `ONBOARD.md`. If those files and this document ever disagree, this document wins and the pointer files must be fixed in the same change.
+
 CI/runtime baseline: SaaS CI uses Node.js 24 for typecheck, production build,
 and unit-test jobs because the Node test suite executes TypeScript test files
 directly. Pipeline Integrity also uses Node.js 24 and must recognize both direct
@@ -389,6 +391,22 @@ Never bypass this model for risky actions unless the owner explicitly instructs 
 
 ---
 
+## 12B. BYOK Campaign Studio Doctrine (public /agency)
+
+The public agency page is the BYOK Campaign Studio: one prompt produces a complete organic campaign (YouTube copy, LinkedIn posts, press release) generated with the USER'S OWN AI provider key.
+
+Rules:
+
+- Users pay AI/media providers directly with their own keys. Platform keys are never used in BYOK user flows, and the platform never absorbs per-use AI costs.
+- Positioning: sell the outcome ("your entire campaign from one prompt"), not pay-as-you-go. Pay-as-you-go is supporting detail.
+- Provider integration follows the adapter/driver model in `saas/lib/agency/userProviders.ts`: catalog entry + small adapter implementing the shared contract. The engine, UI, and approval flows never change per provider.
+- Only advertise a provider as live once its adapter exists. A user key unlocks billing, not capability.
+- Logged-in users store keys once in `user_provider_keys` (AES-256-GCM via `lib/vault/crypto`, service-role access only, per-user unique). Anonymous users may paste a key per request; it is used in memory only, never stored, never logged.
+- Press dispatch from the studio always inserts `press_campaigns` rows as `pending_owner_review` (`force_owner_review`). The journalist email is sent only after owner approval in `/dashboard/marketing/press-outreach` (`PressOutreachStudio`), via `dispatchPressReleaseToEditor` (Resend, owner BCC).
+- Public generation and press-queue endpoints are IP rate-limited and origin-checked. Keep those guards when editing.
+
+---
+
 ## 13. Vault and Secret Rules
 
 Secrets must never be hard-coded.
@@ -545,6 +563,8 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-07: Added explicit Console Hub provider-template doctrine. Provider templates are live app action definitions, not just documentation. Developers must inspect provider templates and matching executors/routes before asking the owner to explain provider architecture.
 - 2026-07-07: Added stronger onboarding enforcement doctrine. PRs must acknowledge ONBOARD was read before repo scan, and critical changes must keep ONBOARD current or the check must fail with a clear reason and fix instructions.
 - 2026-07-08: Added repository-enforced onboarding controls: PR template acknowledgement, stable required check naming, critical-file CI enforcement with an exact mechanical/refactor-only exception, CODEOWNERS coverage for sensitive areas, and branch-protection setup documentation.
+- 2026-07-14: Added BYOK Campaign Studio doctrine (Section 12B): user-key-funded generation, adapter/driver provider model, per-user encrypted key vault (`user_provider_keys`), owner-gated real press dispatch, outcome-first positioning rule.
+- 2026-07-14: Added AI entry-point files `CLAUDE.md` and `AGENTS.md` at the repository root. AI coding agents auto-read these at session start; they route every agent into ONBOARD.md. Reason: onboarding enforcement previously ran only on pull requests, which never fire in the owner's direct-to-main GitHub-web workflow, so AI agents never encountered this document.
 
 ---
 

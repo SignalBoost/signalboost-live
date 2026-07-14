@@ -159,7 +159,7 @@ export default function SalesPage() {
                 <h3 style={{ marginTop: 24 }}>{t('sales.email', 'Email')}</h3>
                 <div style={boxStyle}>{draft.body}</div>
 
-                
+                <a
                   href={mailto}
                   style={{
                     ...buttonStyle,

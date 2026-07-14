@@ -1,5 +1,7 @@
-import { redirect } from 'next/navigation'
+import PressOutreachStudio from '@/components/agency/PressOutreachStudio'
+
+export const dynamic = 'force-dynamic'
 
 export default function PressOutreachPage() {
-  redirect('/dashboard/marketing/press-print')
+  return <PressOutreachStudio />
 }

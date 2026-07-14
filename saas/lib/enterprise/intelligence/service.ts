@@ -1,4 +1,12 @@
 import { analyzePublicUrl } from '@/lib/enterprise/url-intelligence'
+import {
+  acquireRefreshLock,
+  determineRefreshRequirements,
+  getIntelligenceSnapshot,
+  mergeIntelligence,
+  releaseRefreshLock,
+  resolveOrganization,
+} from '@/lib/enterprise/memory/service'
 import type { EnterpriseApprovalPackage, EnterpriseIntelligenceRequest, EnterpriseWorkspace } from './types'
 
 function schemaLanguage(value?: string) {
@@ -19,8 +27,10 @@ function creativeSuggestions(workspace: EnterpriseWorkspace): EnterpriseApproval
   return [common.authority, common.demonstration, common.education]
 }
 
-export async function buildEnterpriseIntelligence(request: EnterpriseIntelligenceRequest): Promise<EnterpriseApprovalPackage> {
-  const intelligence = await analyzePublicUrl(request.sourceUrl)
+function packageFromIntelligence(
+  request: EnterpriseIntelligenceRequest,
+  intelligence: Awaited<ReturnType<typeof analyzePublicUrl>>,
+): EnterpriseApprovalPackage {
   const audienceConfidence = intelligence.detected.audiences.length
     ? Math.min(...intelligence.detected.audiences.map((item) => item.confidence))
     : 0
@@ -59,5 +69,61 @@ export async function buildEnterpriseIntelligence(request: EnterpriseIntelligenc
     requiresConfirmation: intelligence.requiresConfirmation,
     intelligence,
     approvalRequired: true,
+  }
+}
+
+// Issue #205 Section 1.4 — memory-aware entry point. Consults Enterprise Memory
+// before expensive analysis, reuses a valid snapshot, and refreshes only when stale.
+export async function buildEnterpriseIntelligence(request: EnterpriseIntelligenceRequest): Promise<EnterpriseApprovalPackage> {
+  // Resolve to a canonical organization (dedupes URL variants to one identity).
+  let resolved: Awaited<ReturnType<typeof resolveOrganization>> | null = null
+  try {
+    resolved = await resolveOrganization(request.sourceUrl)
+  } catch {
+    // Memory unavailable (e.g. migration not yet applied) — fall back to direct analysis.
+    const intelligence = await analyzePublicUrl(request.sourceUrl)
+    return packageFromIntelligence(request, intelligence)
+  }
+
+  const { organization, fingerprint } = resolved
+  const snapshot = await getIntelligenceSnapshot(organization.id, request.workspace)
+  const requirements = determineRefreshRequirements(organization, snapshot)
+
+  // Reuse valid intelligence.
+  if (!requirements.snapshotStale && snapshot) {
+    return snapshot.snapshot as unknown as EnterpriseApprovalPackage
+  }
+
+  // Refresh under a per-fingerprint lock so concurrent callers don't double-analyze.
+  const jobId = await acquireRefreshLock(fingerprint, organization.id)
+  if (!jobId) {
+    // Another analysis is running. Prefer returning the last valid snapshot if present.
+    if (snapshot) return snapshot.snapshot as unknown as EnterpriseApprovalPackage
+    const intelligence = await analyzePublicUrl(request.sourceUrl)
+    return packageFromIntelligence(request, intelligence)
+  }
+
+  try {
+    const intelligence = await analyzePublicUrl(request.sourceUrl)
+    const pkg = packageFromIntelligence(request, intelligence)
+    await mergeIntelligence({
+      organizationId: organization.id,
+      workspace: request.workspace,
+      snapshot: pkg as unknown as Record<string, unknown>,
+      confidence: pkg.confidence,
+      organizationPatch: {
+        name: pkg.organization,
+        industry: pkg.classification.industry,
+        profile: { description: pkg.description, sourceType: pkg.sourceType },
+        confidence: pkg.confidence.industry || 0,
+      },
+    })
+    await releaseRefreshLock(jobId, 'completed')
+    return pkg
+  } catch (error) {
+    await releaseRefreshLock(jobId, 'failed')
+    // A failed refresh must not destroy the last valid snapshot.
+    if (snapshot) return snapshot.snapshot as unknown as EnterpriseApprovalPackage
+    throw error
   }
 }

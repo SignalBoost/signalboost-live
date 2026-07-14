@@ -48,7 +48,7 @@ async function jsonFetch(url, init = {}) {
 }
 
 async function authenticatePocketBase() {
-  const result = await jsonFetch(`${pocketBaseUrl}/api/admins/auth-with-password`, {
+  const result = await jsonFetch(`${pocketBaseUrl}/api/collections/_superusers/auth-with-password`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

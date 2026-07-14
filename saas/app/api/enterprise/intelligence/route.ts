@@ -20,19 +20,19 @@ export async function POST(request: Request) {
   const sourceUrl = typeof (body as { sourceUrl?: unknown })?.sourceUrl === 'string'
     ? (body as { sourceUrl: string }).sourceUrl.trim()
     : ''
-  const requestedWorkspace = (body as { workspace?: unknown })?.workspace
-  const workspace: EnterpriseWorkspace = typeof requestedWorkspace === 'string' && WORKSPACES.has(requestedWorkspace as EnterpriseWorkspace)
-    ? requestedWorkspace as EnterpriseWorkspace
-    : 'campaign-studio'
+  const workspace = (body as { workspace?: unknown })?.workspace
 
   if (!sourceUrl) return NextResponse.json({ ok: false, error: 'sourceUrl is required.' }, { status: 400 })
   if (sourceUrl.length > 2_048) return NextResponse.json({ ok: false, error: 'sourceUrl is too long.' }, { status: 400 })
+  if (typeof workspace !== 'string' || !WORKSPACES.has(workspace as EnterpriseWorkspace)) {
+    return NextResponse.json({ ok: false, error: 'A supported enterprise workspace is required.' }, { status: 400 })
+  }
 
   try {
-    const enterprise = await buildEnterpriseIntelligence({ sourceUrl, workspace })
-    return NextResponse.json({ ok: true, result: enterprise.intelligence, enterprise })
+    const result = await buildEnterpriseIntelligence({ sourceUrl, workspace: workspace as EnterpriseWorkspace })
+    return NextResponse.json({ ok: true, result })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'URL analysis failed.'
+    const message = error instanceof Error ? error.message : 'Enterprise intelligence failed.'
     const clientError = /required|supported|public|private|reserved|redirect|content type|HTTP 4|too long|exceeds/i.test(message)
     return NextResponse.json({ ok: false, error: message }, { status: clientError ? 400 : 502 })
   }

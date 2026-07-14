@@ -269,6 +269,21 @@ Rules:
 
 ---
 
+## 8A. Zero-Manual-Entry Master Schema Doctrine
+
+`docs/zero-manual-entry-ui.md` defines the mandatory enterprise UI architecture, and `saas/config/master_config_schema.json` is the authoritative catalog of approved selectable values.
+
+Rules:
+
+- COSA, Campaign Studio, Launchpad, and new enterprise workflows must consume typed adapters derived from the master schema instead of defining page-specific option arrays.
+- Goals, audiences, tones, regions, industries, roles, platforms, languages, formats, offer types, and CTA strategies must be changed in the master schema through the normal pull-request process.
+- Enterprise campaign-generation inputs must use validated source URLs, structured selectors, or bounded generated suggestions; unrestricted campaign prose fields are not permitted except for the documented exceptions.
+- Automated extraction and draft generation may occur before approval, but publishing, sending, spending, launching, deletion, and infrastructure changes remain behind the final HMI approval gate.
+- Region entries must preserve the canonical campaign IDs `us`, `latam`, `brazil`, `poland`, and `global_ru`. Display labels or macro-region groupings must never replace or collapse those IDs.
+- If a component, prompt, or local option list conflicts with the master schema and this doctrine, the master schema and this doctrine win.
+
+---
+
 ## 9. Video Pipeline Doctrine
 
 COSA video production is staged.
@@ -565,6 +580,7 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-08: Added repository-enforced onboarding controls: PR template acknowledgement, stable required check naming, critical-file CI enforcement with an exact mechanical/refactor-only exception, CODEOWNERS coverage for sensitive areas, and branch-protection setup documentation.
 - 2026-07-14: Added BYOK Campaign Studio doctrine (Section 12B): user-key-funded generation, adapter/driver provider model, per-user encrypted key vault (`user_provider_keys`), owner-gated real press dispatch, outcome-first positioning rule.
 - 2026-07-14: Added AI entry-point files `CLAUDE.md` and `AGENTS.md` at the repository root. AI coding agents auto-read these at session start; they route every agent into ONBOARD.md. Reason: onboarding enforcement previously ran only on pull requests, which never fire in the owner's direct-to-main GitHub-web workflow, so AI agents never encountered this document.
+- 2026-07-14: Added the zero-manual-entry master-schema doctrine (Section 8A), made `saas/config/master_config_schema.json` authoritative for enterprise selectors, preserved canonical campaign region IDs, and reaffirmed the final HMI approval gate for live actions.
 
 ---
 

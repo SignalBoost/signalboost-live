@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "schema_version": "1.0.0",
+  "schema_version": "1.0.1",
   "description": "Authoritative option catalog for zero-manual-entry enterprise campaign and launch workflows.",
   "enterprise_config": {
     "goals": [
@@ -23,10 +23,13 @@
       "Urgent & Direct"
     ],
     "regions": [
-      "North America",
-      "EMEA",
-      "APAC",
-      "LATAM"
+      { "id": "us", "label": "United States / North America", "group": "North America" },
+      { "id": "latam", "label": "LATAM", "group": "LATAM" },
+      { "id": "brazil", "label": "Brazil", "group": "LATAM" },
+      { "id": "poland", "label": "Poland", "group": "EMEA" },
+      { "id": "global_ru", "label": "Global Russian-speaking", "group": "Global" },
+      { "id": "emea", "label": "EMEA", "group": "EMEA" },
+      { "id": "apac", "label": "APAC", "group": "APAC" }
     ],
     "industries": [
       "Technology & Software",

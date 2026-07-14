@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema_version": "1.0.0",
+  "description": "Authoritative option catalog for zero-manual-entry enterprise campaign and launch workflows.",
+  "enterprise_config": {
+    "goals": [
+      "Lead Generation",
+      "Brand Awareness",
+      "Educational/Training",
+      "Sales Conversion"
+    ],
+    "audiences": [
+      "C-Suite",
+      "IT Managers",
+      "Developers",
+      "Marketing Leads",
+      "Procurement"
+    ],
+    "tones": [
+      "Professional & Conservative",
+      "Enthusiastic & Creative",
+      "Technical & Precise",
+      "Urgent & Direct"
+    ],
+    "regions": [
+      "North America",
+      "EMEA",
+      "APAC",
+      "LATAM"
+    ],
+    "industries": [
+      "Technology & Software",
+      "Professional Services",
+      "Financial Services",
+      "Healthcare",
+      "Travel & Hospitality",
+      "Retail & E-commerce",
+      "Education & Training",
+      "Manufacturing",
+      "Media & Entertainment",
+      "Government & Public Sector",
+      "Nonprofit",
+      "Other"
+    ],
+    "roles": [
+      "Decision Maker",
+      "Technical Evaluator",
+      "Economic Buyer",
+      "End User",
+      "Influencer",
+      "Procurement Reviewer"
+    ],
+    "platforms": [
+      "Website",
+      "Email",
+      "LinkedIn",
+      "YouTube",
+      "Facebook",
+      "Instagram",
+      "TikTok",
+      "Press Outreach"
+    ],
+    "languages": [
+      "English",
+      "Spanish",
+      "Portuguese",
+      "Polish",
+      "Russian"
+    ],
+    "formats": [
+      "Landing Page",
+      "Email Campaign",
+      "Social Campaign",
+      "Short Video",
+      "Long-form Video",
+      "Press Release",
+      "Sales Enablement",
+      "Training Content"
+    ],
+    "offer_types": [
+      "Free Trial",
+      "Product Demo",
+      "Consultation",
+      "Limited-Time Offer",
+      "Educational Resource",
+      "Event Registration",
+      "Direct Purchase",
+      "Contact Sales"
+    ],
+    "cta_strategies": [
+      "Start Free Trial",
+      "Book a Demo",
+      "Request Information",
+      "Download Resource",
+      "Register Now",
+      "Buy Now",
+      "Contact Sales",
+      "Learn More"
+    ]
+  },
+  "input_policy": {
+    "campaign_free_text_allowed": false,
+    "validated_url_allowed": true,
+    "generated_output_edit_mode_allowed": true,
+    "human_review_comments_allowed": true,
+    "approval_required_before_live_action": true
+  }
+}

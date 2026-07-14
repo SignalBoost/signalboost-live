@@ -12,7 +12,7 @@ RUN test -n "$PB_VERSION" \
   && rm -f /tmp/pocketbase.zip
 
 WORKDIR /pb
-COPY pb_migrations ./pb_migrations
+COPY infrastructure/pocketbase/pb_migrations ./pb_migrations
 
 EXPOSE 8090
 VOLUME ["/pb/pb_data"]

@@ -5,13 +5,47 @@ import { SearchableMultiSelect, SearchableSelect, SourceUrlField, SuggestionCard
 import { enterpriseOptions } from '@/lib/enterprise/masterConfig'
 import { buildCampaignDirective, isCampaignBriefComplete, type StructuredCampaignBrief } from '@/lib/enterprise/campaignBrief'
 
-type Props = { busy?: boolean; onSubmit: (directive: string) => Promise<void> | void }
+type CampaignRequest = {
+  channel: 'youtube' | 'linkedin' | 'email' | 'outreach' | 'landing_page'
+  outreach_channel?: 'trade-press'
+  title: string
+  objective: string
+  audience: string
+  signal: string
+  sourceMaterial: string
+  autonomous: true
+}
+
+type Submission = { directive: string; request: CampaignRequest }
+type Props = { busy?: boolean; onSubmit: (submission: Submission) => Promise<void> | void }
 
 const concepts: SuggestionCard[] = [
   { id: 'authority', title: 'Enterprise authority', description: 'Lead with credibility, operational control, and measurable business value.', metadata: ['Trust', 'ROI', 'Decision makers'] },
   { id: 'demonstration', title: 'Product demonstration', description: 'Show the product workflow and move the audience toward a concrete next step.', metadata: ['Demo', 'Proof', 'CTA'] },
   { id: 'education', title: 'Educational campaign', description: 'Teach the problem and solution clearly before presenting the offer.', metadata: ['Training', 'Clarity', 'Value'] },
 ]
+
+const supportedPlatforms = enterpriseOptions.platforms.filter((option) => ['Website', 'Email', 'LinkedIn', 'YouTube', 'Press Outreach'].includes(option.value))
+
+function requestForPlatform(platform: string, brief: StructuredCampaignBrief, directive: string): CampaignRequest {
+  const channelMap: Record<string, CampaignRequest['channel']> = {
+    Website: 'landing_page',
+    Email: 'email',
+    LinkedIn: 'linkedin',
+    YouTube: 'youtube',
+    'Press Outreach': 'outreach',
+  }
+  return {
+    channel: channelMap[platform] || 'youtube',
+    outreach_channel: platform === 'Press Outreach' ? 'trade-press' : undefined,
+    title: brief.suggestionTitle || `Create a ${platform} campaign`,
+    objective: directive,
+    audience: brief.audiences.join(', '),
+    signal: `Structured COSA configuration. Platform=${platform}; Region=${brief.region}; Tone=${brief.tone}; Goal=${brief.goal}.`,
+    sourceMaterial: brief.sourceUrl,
+    autonomous: true,
+  }
+}
 
 export function CosaCampaignConfigurator({ busy, onSubmit }: Props) {
   const [sourceUrl, setSourceUrl] = useState('')
@@ -33,7 +67,8 @@ export function CosaCampaignConfigurator({ busy, onSubmit }: Props) {
     event.preventDefault()
     if (!ready) { setError('Select a valid source and complete every required campaign option.'); return }
     setError('')
-    await onSubmit(buildCampaignDirective(brief))
+    const directive = buildCampaignDirective(brief)
+    await onSubmit({ directive, request: requestForPlatform(platform, brief, directive) })
   }
 
   return <form onSubmit={submit} style={{ display: 'grid', gap: 14, marginTop: 16 }}>
@@ -43,7 +78,7 @@ export function CosaCampaignConfigurator({ busy, onSubmit }: Props) {
       <SearchableMultiSelect label="Audience" options={enterpriseOptions.audiences} values={audiences} onChange={setAudiences} />
       <SearchableSelect label="Tone" options={enterpriseOptions.tones} value={tone} onChange={setTone} required />
       <SearchableSelect label="Region" options={enterpriseOptions.regions} value={region} onChange={setRegion} required />
-      <SearchableSelect label="Platform" options={enterpriseOptions.platforms} value={platform} onChange={setPlatform} required />
+      <SearchableSelect label="Platform" options={supportedPlatforms} value={platform} onChange={setPlatform} required />
       <SearchableSelect label="Format" options={enterpriseOptions.formats} value={format} onChange={setFormat} required />
       <SearchableSelect label="Offer type" options={enterpriseOptions.offer_types} value={offerType} onChange={setOfferType} required />
       <SearchableSelect label="CTA strategy" options={enterpriseOptions.cta_strategies} value={ctaStrategy} onChange={setCtaStrategy} required />

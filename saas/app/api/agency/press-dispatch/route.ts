@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import {
+  dispatchPressReleaseToEditor,
   getPressAdminClient,
   ownerOverrideIsValid,
   runLocalPressDistributionWorker,
@@ -10,11 +11,36 @@ import {
 
 export const dynamic = 'force-dynamic'
 
+const RATE_WINDOW_MS = 10 * 60_000
+const RATE_MAX = 4
+const rateBuckets = new Map<string, { count: number; resetAt: number }>()
+
+function clientIpKey(req: Request) {
+  const forwarded = req.headers.get('x-forwarded-for') || ''
+  const first = forwarded.split(',')[0]?.trim()
+  return first || req.headers.get('x-real-ip') || 'unknown'
+}
+
+function rateLimited(key: string) {
+  const now = Date.now()
+  const existing = rateBuckets.get(key)
+  if (!existing || existing.resetAt <= now) {
+    rateBuckets.set(key, { count: 1, resetAt: now + RATE_WINDOW_MS })
+    return false
+  }
+  existing.count += 1
+  if (existing.count % 50 === 0 || rateBuckets.size > 5000) {
+    for (const [bucketKey, bucket] of rateBuckets) if (bucket.resetAt <= now) rateBuckets.delete(bucketKey)
+  }
+  return existing.count > RATE_MAX
+}
+
 type DispatchResult = {
   campaign: PressCampaign
   execution_locked: boolean
   proof_email?: unknown
   preview_email?: unknown
+  editor_dispatch?: unknown
 }
 
 export async function GET() {
@@ -66,8 +92,13 @@ export async function POST(req: NextRequest) {
         .single()
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       const campaign = data as PressCampaign
+      const editor_dispatch = await dispatchPressReleaseToEditor(campaign)
       const proof_email = await runLocalPressDistributionWorker(campaign, input.owner_email)
-      return NextResponse.json({ campaign, execution_locked: false, proof_email, published_url: publishedUrl })
+      return NextResponse.json({ campaign, execution_locked: false, proof_email, editor_dispatch, published_url: publishedUrl })
+    }
+
+    if (!ownerApproved && rateLimited(`press-dispatch-create:${clientIpKey(req)}`)) {
+      return NextResponse.json({ error: 'Too many press submissions from this network. Please try again later.' }, { status: 429 })
     }
 
     const status = input.created_by_role === 'owner' && ownerApproved && !forceOwnerReview ? 'published' : 'pending_owner_review'
@@ -97,7 +128,10 @@ export async function POST(req: NextRequest) {
     const campaign = data as PressCampaign
     const result: DispatchResult = { campaign, execution_locked: campaign.status === 'pending_owner_review' }
 
-    if (campaign.status === 'published') result.proof_email = await runLocalPressDistributionWorker(campaign, input.owner_email)
+    if (campaign.status === 'published') {
+      result.editor_dispatch = await dispatchPressReleaseToEditor(campaign)
+      result.proof_email = await runLocalPressDistributionWorker(campaign, input.owner_email)
+    }
     if (campaign.status === 'pending_owner_review') {
       // Preview e-mail is sent by the worker helper when email configuration is present.
       result.preview_email = await runLocalPressDistributionWorker({ ...campaign, status: 'pending_owner_review' } as PressCampaign, input.owner_email)

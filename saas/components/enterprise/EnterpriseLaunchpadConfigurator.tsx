@@ -7,24 +7,10 @@ import type { UrlIntelligenceResult } from '@/lib/enterprise/url-intelligence/ty
 
 export type LaunchpadWorkspace = 'business' | 'creator' | 'podcast' | 'store'
 export type LaunchpadApprovalPackage = {
-  workspace: LaunchpadWorkspace
-  sourceUrl: string
-  organization: string
-  description: string
-  industry: string
-  audiences: string[]
-  region: string
-  language: string
-  goal: string
-  tone: string
-  format: string
-  offerType: string
-  ctaStrategy: string
-  creativeDirection: string
-  confidence: Record<string, number>
-  requiresConfirmation: string[]
+  workspace: LaunchpadWorkspace; sourceUrl: string; organization: string; description: string; industry: string
+  audiences: string[]; region: string; language: string; goal: string; tone: string; format: string
+  offerType: string; ctaStrategy: string; creativeDirection: string; confidence: Record<string, number>; requiresConfirmation: string[]
 }
-
 type Props = { workspace: LaunchpadWorkspace; busy?: boolean; onApprove: (value: LaunchpadApprovalPackage) => Promise<void> | void }
 
 const directions: Record<LaunchpadWorkspace, SuggestionCard[]> = {
@@ -50,53 +36,43 @@ const directions: Record<LaunchpadWorkspace, SuggestionCard[]> = {
   ],
 }
 
+function schemaLanguage(value?: string) {
+  const code = (value || '').toLowerCase().split(/[-_]/)[0]
+  return ({ en: 'English', es: 'Spanish', pt: 'Portuguese', pl: 'Polish', ru: 'Russian' } as Record<string, string>)[code] || 'English'
+}
+
 export function EnterpriseLaunchpadConfigurator({ workspace, busy = false, onApprove }: Props) {
   const cards = directions[workspace]
-  const [sourceUrl, setSourceUrl] = useState('')
-  const [data, setData] = useState<UrlIntelligenceResult | null>(null)
-  const [industry, setIndustry] = useState('')
-  const [audiences, setAudiences] = useState<string[]>([])
-  const [region, setRegion] = useState('')
-  const [language, setLanguage] = useState('')
-  const [goal, setGoal] = useState('')
-  const [tone, setTone] = useState('')
-  const [format, setFormat] = useState('')
-  const [offerType, setOfferType] = useState('')
-  const [ctaStrategy, setCtaStrategy] = useState('')
-  const [direction, setDirection] = useState(cards[0]?.id || '')
-  const [analyzing, setAnalyzing] = useState(false)
-  const [error, setError] = useState('')
+  const [sourceUrl, setSourceUrl] = useState(''); const [data, setData] = useState<UrlIntelligenceResult | null>(null)
+  const [industry, setIndustry] = useState(''); const [audiences, setAudiences] = useState<string[]>([])
+  const [region, setRegion] = useState(''); const [language, setLanguage] = useState(''); const [goal, setGoal] = useState('')
+  const [tone, setTone] = useState(''); const [format, setFormat] = useState(''); const [offerType, setOfferType] = useState('')
+  const [ctaStrategy, setCtaStrategy] = useState(''); const [direction, setDirection] = useState(cards[0]?.id || '')
+  const [analyzing, setAnalyzing] = useState(false); const [error, setError] = useState('')
   const selected = useMemo(() => cards.find((item) => item.id === direction), [cards, direction])
   const ready = Boolean(data && industry && audiences.length && region && language && goal && tone && format && offerType && ctaStrategy && selected)
 
   async function analyze() {
-    const invalid = validateSourceUrl(sourceUrl)
-    if (invalid) return setError(invalid)
+    const invalid = validateSourceUrl(sourceUrl); if (invalid) return setError(invalid)
     setAnalyzing(true); setError('')
     try {
       const response = await fetch('/api/enterprise/url-intelligence', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceUrl }) })
       const payload = await response.json().catch(() => null)
       if (!response.ok || !payload?.ok || !payload?.result) throw new Error(payload?.error || 'URL analysis failed.')
       const result = payload.result as UrlIntelligenceResult
-      setData(result); setSourceUrl(result.finalUrl || result.sourceUrl)
-      setIndustry(result.detected.industry.value); setAudiences(result.detected.audiences.map((item) => item.value))
-      setRegion(result.detected.region.value); setLanguage(result.detected.language.value); setGoal(result.detected.goal.value)
-      setTone(result.detected.tone.value); setFormat(result.detected.format.value); setOfferType(result.detected.offerType.value)
-      setCtaStrategy(result.detected.ctaStrategy.value)
+      setData(result); setSourceUrl(result.finalUrl || result.sourceUrl); setIndustry(result.detected.industry.value)
+      setAudiences(result.detected.audiences.map((item) => item.value)); setRegion(result.detected.region.value)
+      setLanguage(schemaLanguage(result.metadata.language)); setGoal(result.detected.goal.value); setTone(result.detected.tone.value)
+      setFormat(result.detected.format.value); setOfferType(result.detected.offerType.value); setCtaStrategy(result.detected.ctaStrategy.value)
     } catch (value) { setData(null); setError(value instanceof Error ? value.message : 'URL analysis failed.') }
     finally { setAnalyzing(false) }
   }
 
   async function approve() {
     if (!data || !selected || !ready) return setError('Analyze the source and review every required launch option before approval.')
-    setError('')
     const audienceConfidence = data.detected.audiences.length ? Math.min(...data.detected.audiences.map((item) => item.confidence)) : 0
-    await onApprove({
-      workspace, sourceUrl: data.finalUrl || data.sourceUrl, organization: data.organization || data.title || '', description: data.description || '',
-      industry, audiences, region, language, goal, tone, format, offerType, ctaStrategy, creativeDirection: selected.title,
-      confidence: { industry: data.detected.industry.confidence, audience: audienceConfidence, region: data.detected.region.confidence, language: data.detected.language.confidence, goal: data.detected.goal.confidence },
-      requiresConfirmation: data.requiresConfirmation,
-    })
+    setError('')
+    await onApprove({ workspace, sourceUrl: data.finalUrl || data.sourceUrl, organization: data.organization || data.title || '', description: data.description || '', industry, audiences, region, language, goal, tone, format, offerType, ctaStrategy, creativeDirection: selected.title, confidence: { industry: data.detected.industry.confidence, audience: audienceConfidence, region: data.detected.region.confidence, goal: data.detected.goal.confidence }, requiresConfirmation: data.requiresConfirmation })
   }
 
   return <section className="sb-glass-panel" style={{ padding: 20, display: 'grid', gap: 14 }} aria-labelledby={`${workspace}-profile`}>
@@ -104,10 +80,9 @@ export function EnterpriseLaunchpadConfigurator({ workspace, busy = false, onApp
     <SourceUrlField label="Website or GitHub source" helperText="Analyze a public source to build a structured launch profile." value={sourceUrl} onChange={(value) => { setSourceUrl(value); setData(null) }} required />
     <div><button type="button" className="sb-button-secondary" onClick={analyze} disabled={busy || analyzing || Boolean(validateSourceUrl(sourceUrl))}>{analyzing ? 'Analyzing source…' : 'Analyze and prefill'}</button></div>
     {data && <div role="status" aria-live="polite" style={{ border: '1px solid rgba(26,240,255,.25)', borderRadius: 14, padding: 14, background: 'rgba(26,240,255,.06)' }}>
-      <strong style={{ color: '#1af0ff' }}>Enterprise intelligence ready</strong>
-      <h3 style={{ margin: '8px 0 4px' }}>{data.organization || data.title || 'Analyzed organization'}</h3>
+      <strong style={{ color: '#1af0ff' }}>Enterprise intelligence ready</strong><h3 style={{ margin: '8px 0 4px' }}>{data.organization || data.title || 'Analyzed organization'}</h3>
       <p style={{ margin: 0, color: 'rgba(255,255,255,.68)' }}>{data.description || 'No public description was available.'}</p>
-      <p style={{ margin: '10px 0 0', fontSize: 12 }}>Industry {data.detected.industry.confidence}% · Region {data.detected.region.confidence}% · Language {data.detected.language.confidence}%</p>
+      <p style={{ margin: '10px 0 0', fontSize: 12 }}>Industry {data.detected.industry.confidence}% · Region {data.detected.region.confidence}% · Language {schemaLanguage(data.metadata.language)}</p>
       {data.requiresConfirmation.length > 0 && <p style={{ color: '#ffc300', margin: '8px 0 0', fontSize: 12 }}>Review recommended for: {data.requiresConfirmation.join(', ')}.</p>}
     </div>}
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>

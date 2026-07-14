@@ -49,7 +49,7 @@ export async function pocketBaseAdminToken(): Promise<string> {
   if (cachedAdminToken && cachedAdminToken.expiresAt > Date.now() + 60_000) return cachedAdminToken.token;
 
   const { email, password } = pocketBaseAdminCredentials();
-  const auth = await request<{ token: string }>("/api/admins/auth-with-password", {
+  const auth = await request<{ token: string }>("/api/collections/_superusers/auth-with-password", {
     method: "POST",
     body: JSON.stringify({ identity: email, password }),
   });

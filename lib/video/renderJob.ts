@@ -71,7 +71,20 @@ export async function renderCaptionBurnJob(jobId: string, payload: VideoExportPa
   const outputName = `${jobId}-${safeFileName(payload.filename).replace(/\.[^.]+$/, '')}.mp4`
   const outputPath = join(videoRenderDir, outputName)
   await writeFile(assPath, buildAssSubtitles(payload), 'utf8')
-  await runFfmpeg(['-y', '-i', sourcePath, '-vf', `ass=${ffmpegFilterPath(assPath)}`, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-c:a', 'aac', '-movflags', '+faststart', outputPath])
+  await runFfmpeg([
+    '-y',
+    '-i', sourcePath,
+    '-vf', `ass=${ffmpegFilterPath(assPath)}`,
+    '-c:v', 'libx264',
+    '-preset', 'veryfast',
+    '-crf', '20',
+    '-c:a', 'aac',
+    '-b:a', '192k',
+    '-ar', '44100',
+    '-ac', '2',
+    '-movflags', '+faststart',
+    outputPath,
+  ])
   return { resultUrl: `/video-renders/${outputName}`, outputPath }
 }
 

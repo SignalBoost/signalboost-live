@@ -50,8 +50,8 @@ async function renderCaptionBurnJob(jobId, payload) {
   const filters = [`ass=${ffmpegFile(assPath)}`, brandDrawtext()].join(',')
   const audioPath = payload.audioUrl ? resolveLocalPath(payload.audioUrl) : ''
   const args = audioPath && existsSync(audioPath)
-    ? ['-y', '-i', sourcePath, '-i', audioPath, '-vf', filters, '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-c:a', 'aac', '-b:a', '160k', '-shortest', '-movflags', '+faststart', outputPath]
-    : ['-y', '-i', sourcePath, '-vf', filters, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-c:a', 'aac', '-movflags', '+faststart', outputPath]
+    ? ['-y', '-i', sourcePath, '-i', audioPath, '-vf', filters, '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-c:a', 'aac', '-b:a', '192k', '-ar', '44100', '-ac', '2', '-shortest', '-movflags', '+faststart', outputPath]
+    : ['-y', '-i', sourcePath, '-vf', filters, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-c:a', 'aac', '-b:a', '192k', '-ar', '44100', '-ac', '2', '-movflags', '+faststart', outputPath]
   await runFfmpeg(args)
   return { resultUrl: `/video-renders/${outputName}`, outputPath }
 }

@@ -40,7 +40,7 @@ export function CosaCampaignConfigurator({ busy, onSubmit }: Props) {
     <SourceUrlField label="Website or GitHub source" value={sourceUrl} onChange={setSourceUrl} required helperText="COSA uses this public source as the factual basis for the campaign." />
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
       <SearchableSelect label="Goal" options={enterpriseOptions.goals} value={goal} onChange={setGoal} required />
-      <SearchableMultiSelect label="Audience" options={enterpriseOptions.audiences} values={audiences} onChange={setAudiences} required />
+      <SearchableMultiSelect label="Audience" options={enterpriseOptions.audiences} values={audiences} onChange={setAudiences} />
       <SearchableSelect label="Tone" options={enterpriseOptions.tones} value={tone} onChange={setTone} required />
       <SearchableSelect label="Region" options={enterpriseOptions.regions} value={region} onChange={setRegion} required />
       <SearchableSelect label="Platform" options={enterpriseOptions.platforms} value={platform} onChange={setPlatform} required />

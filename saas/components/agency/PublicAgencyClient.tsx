@@ -64,6 +64,16 @@ const ORGANIC_COPY: Record<string, {
   regenerate: string
   genError: string
   requiredError: string
+  dispatchTitle: string
+  dispatchBody: string
+  publicationLabel: string
+  publicationPlaceholder: string
+  editorEmailLabel: string
+  dispatchBtn: string
+  dispatching: string
+  dispatchQueued: string
+  dispatchError: string
+  emailInvalid: string
   sections: { youtube: string; linkedin: string; press: string }
   labels: {
     youtubeTitle: string
@@ -92,6 +102,16 @@ const ORGANIC_COPY: Record<string, {
     regenerate: 'Regenerate',
     genError: 'Generation failed. Please try again in a moment.',
     requiredError: 'Enter your company name and what you are announcing.',
+    dispatchTitle: 'Dispatch this press release',
+    dispatchBody: 'Queue the press release for real email dispatch. It goes to owner review first — nothing is sent to the journalist until it is approved in the Marketing workspace.',
+    publicationLabel: 'Publication name',
+    publicationPlaceholder: 'e.g. TechCrunch, Local Business Journal',
+    editorEmailLabel: 'Editor / journalist email',
+    dispatchBtn: 'Queue press release for dispatch',
+    dispatching: 'Queuing for approval…',
+    dispatchQueued: 'Queued. The press release is locked for owner approval and will be emailed to the journalist once approved.',
+    dispatchError: 'Could not queue the press release. Please try again.',
+    emailInvalid: 'Enter the publication name and a valid editor email.',
     sections: { youtube: 'YouTube organic', linkedin: 'LinkedIn organic', press: 'Press release email' },
     labels: {
       youtubeTitle: 'Video title',
@@ -120,6 +140,16 @@ const ORGANIC_COPY: Record<string, {
     regenerate: 'Regenerar',
     genError: 'La generación falló. Inténtalo de nuevo en un momento.',
     requiredError: 'Ingresa el nombre de tu empresa y qué estás anunciando.',
+    dispatchTitle: 'Enviar este press release',
+    dispatchBody: 'Pon en cola el press release para envío real por email. Primero pasa por revisión del owner — nada se envía al periodista hasta que se apruebe en el espacio de Marketing.',
+    publicationLabel: 'Nombre de la publicación',
+    publicationPlaceholder: 'ej. TechCrunch, diario local de negocios',
+    editorEmailLabel: 'Email del editor / periodista',
+    dispatchBtn: 'Poner press release en cola de envío',
+    dispatching: 'Poniendo en cola para aprobación…',
+    dispatchQueued: 'En cola. El press release queda bloqueado para aprobación del owner y se enviará por email al periodista una vez aprobado.',
+    dispatchError: 'No se pudo poner en cola el press release. Inténtalo de nuevo.',
+    emailInvalid: 'Ingresa el nombre de la publicación y un email válido del editor.',
     sections: { youtube: 'YouTube orgánico', linkedin: 'LinkedIn orgánico', press: 'Email de press release' },
     labels: {
       youtubeTitle: 'Título del video',
@@ -148,6 +178,16 @@ const ORGANIC_COPY: Record<string, {
     regenerate: 'Gerar novamente',
     genError: 'A geração falhou. Tente novamente em instantes.',
     requiredError: 'Informe o nome da empresa e o que você está anunciando.',
+    dispatchTitle: 'Despachar este press release',
+    dispatchBody: 'Coloque o press release na fila para envio real por e-mail. Ele passa primeiro pela revisão do owner — nada é enviado ao jornalista até ser aprovado no espaço de Marketing.',
+    publicationLabel: 'Nome da publicação',
+    publicationPlaceholder: 'ex. TechCrunch, jornal local de negócios',
+    editorEmailLabel: 'E-mail do editor / jornalista',
+    dispatchBtn: 'Colocar press release na fila de envio',
+    dispatching: 'Colocando na fila para aprovação…',
+    dispatchQueued: 'Na fila. O press release fica bloqueado para aprovação do owner e será enviado por e-mail ao jornalista após aprovação.',
+    dispatchError: 'Não foi possível colocar o press release na fila. Tente novamente.',
+    emailInvalid: 'Informe o nome da publicação e um e-mail válido do editor.',
     sections: { youtube: 'YouTube orgânico', linkedin: 'LinkedIn orgânico', press: 'E-mail de press release' },
     labels: {
       youtubeTitle: 'Título do vídeo',
@@ -176,6 +216,16 @@ const ORGANIC_COPY: Record<string, {
     regenerate: 'Wygeneruj ponownie',
     genError: 'Generowanie nie powiodło się. Spróbuj ponownie za chwilę.',
     requiredError: 'Podaj nazwę firmy i co ogłaszasz.',
+    dispatchTitle: 'Wyślij ten press release',
+    dispatchBody: 'Dodaj press release do kolejki prawdziwej wysyłki e-mail. Najpierw trafia do przeglądu ownera — nic nie jest wysyłane do dziennikarza do czasu akceptacji w przestrzeni Marketing.',
+    publicationLabel: 'Nazwa publikacji',
+    publicationPlaceholder: 'np. TechCrunch, lokalny dziennik biznesowy',
+    editorEmailLabel: 'E-mail redaktora / dziennikarza',
+    dispatchBtn: 'Dodaj press release do kolejki wysyłki',
+    dispatching: 'Dodawanie do kolejki akceptacji…',
+    dispatchQueued: 'W kolejce. Press release jest zablokowany do akceptacji ownera i zostanie wysłany e-mailem do dziennikarza po zatwierdzeniu.',
+    dispatchError: 'Nie udało się dodać press release do kolejki. Spróbuj ponownie.',
+    emailInvalid: 'Podaj nazwę publikacji i prawidłowy e-mail redaktora.',
     sections: { youtube: 'YouTube organicznie', linkedin: 'LinkedIn organicznie', press: 'E-mail press release' },
     labels: {
       youtubeTitle: 'Tytuł wideo',
@@ -204,6 +254,16 @@ const ORGANIC_COPY: Record<string, {
     regenerate: 'Сгенерировать заново',
     genError: 'Генерация не удалась. Попробуйте снова через минуту.',
     requiredError: 'Укажите название компании и что вы анонсируете.',
+    dispatchTitle: 'Отправить этот press release',
+    dispatchBody: 'Поставьте press release в очередь на реальную e-mail-отправку. Сначала он проходит проверку owner — журналисту ничего не отправляется до одобрения в Marketing workspace.',
+    publicationLabel: 'Название издания',
+    publicationPlaceholder: 'напр. TechCrunch, местный деловой журнал',
+    editorEmailLabel: 'E-mail редактора / журналиста',
+    dispatchBtn: 'Поставить press release в очередь отправки',
+    dispatching: 'Постановка в очередь на одобрение…',
+    dispatchQueued: 'В очереди. Press release заблокирован до одобрения owner и будет отправлен журналисту по e-mail после утверждения.',
+    dispatchError: 'Не удалось поставить press release в очередь. Попробуйте снова.',
+    emailInvalid: 'Укажите название издания и корректный e-mail редактора.',
     sections: { youtube: 'YouTube organic', linkedin: 'LinkedIn organic', press: 'Press release e-mail' },
     labels: {
       youtubeTitle: 'Название видео',
@@ -285,6 +345,12 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
   const [organicError, setOrganicError] = useState('')
   const [assets, setAssets] = useState<OrganicAssets | null>(null)
 
+  const [publication, setPublication] = useState('')
+  const [editorEmail, setEditorEmail] = useState('')
+  const [dispatchLoading, setDispatchLoading] = useState(false)
+  const [dispatchError, setDispatchError] = useState('')
+  const [dispatchQueued, setDispatchQueued] = useState(false)
+
   const enterpriseEnabled = ENTERPRISE_READY && hasEnterpriseAccess(tenantProfile)
   const channelMode: ChannelMode = enterpriseEnabled ? 'PROGRAMMATIC_ENTERPRISE' : 'FREE_ORGANIC_MODE'
   const organicChannels = Object.values(copy.organicChannels)
@@ -301,6 +367,8 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
 
     setOrganicLoading(true)
     setAssets(null)
+    setDispatchQueued(false)
+    setDispatchError('')
 
     try {
       const response = await fetch('/api/agency/organic-workflow', {
@@ -323,6 +391,51 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
     }
 
     setOrganicLoading(false)
+  }
+
+  async function queuePressDispatch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setDispatchError('')
+
+    if (!assets) return
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(editorEmail.trim())
+    if (!publication.trim() || !emailOk) {
+      setDispatchError(oc.emailInvalid)
+      return
+    }
+
+    setDispatchLoading(true)
+    try {
+      const response = await fetch('/api/agency/press-dispatch', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create',
+          created_by_role: 'staff',
+          source: 'public_agency_page',
+          channel: 'online-newspapers',
+          publication_name: publication.trim(),
+          editor_contact: editorEmail.trim(),
+          headline: assets.pressReleaseSubject,
+          article_notes: assets.pressReleaseBody,
+          cta_url: website.trim() || undefined,
+          force_owner_review: true,
+        }),
+      })
+
+      const data = await response.json().catch(() => null)
+      if (!response.ok || !data?.campaign) {
+        setDispatchError(String(data?.error || oc.dispatchError))
+        setDispatchLoading(false)
+        return
+      }
+
+      setDispatchQueued(true)
+    } catch {
+      setDispatchError(oc.dispatchError)
+    }
+
+    setDispatchLoading(false)
   }
 
   async function requestCheckout(createStripeSession: boolean) {
@@ -447,6 +560,33 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
               <div style={{ display: 'grid', gap: 12 }}>
                 <AssetBlock label={oc.labels.pressReleaseSubject} value={assets.pressReleaseSubject} copyBtn={oc.copyBtn} copied={oc.copied} />
                 <AssetBlock label={oc.labels.pressReleaseBody} value={assets.pressReleaseBody} copyBtn={oc.copyBtn} copied={oc.copied} />
+              </div>
+
+              <div style={{ border: '1px solid rgba(26,240,255,.25)', borderRadius: 16, padding: 16, marginTop: 4 }}>
+                <h4 className="sb-h3" style={{ margin: '0 0 6px', fontSize: 15 }}>{oc.dispatchTitle}</h4>
+                <p className="sb-body" style={{ margin: '0 0 12px', fontSize: 13 }}>{oc.dispatchBody}</p>
+                {dispatchQueued ? (
+                  <p className="sb-body" style={{ color: '#86efac', margin: 0 }}>{oc.dispatchQueued}</p>
+                ) : (
+                  <form onSubmit={queuePressDispatch} style={{ display: 'grid', gap: 12 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+                      <label style={{ display: 'grid', gap: 6 }}>
+                        <span className="sb-caption">{oc.publicationLabel}</span>
+                        <input value={publication} onChange={(e) => setPublication(e.target.value)} placeholder={oc.publicationPlaceholder} maxLength={140} style={fieldStyle} />
+                      </label>
+                      <label style={{ display: 'grid', gap: 6 }}>
+                        <span className="sb-caption">{oc.editorEmailLabel}</span>
+                        <input value={editorEmail} onChange={(e) => setEditorEmail(e.target.value)} placeholder="editor@publication.com" maxLength={200} style={fieldStyle} />
+                      </label>
+                    </div>
+                    <div className="sb-cta-row">
+                      <button className="sb-button-primary" type="submit" disabled={dispatchLoading}>
+                        {dispatchLoading ? oc.dispatching : oc.dispatchBtn}
+                      </button>
+                    </div>
+                    {dispatchError ? <p className="sb-body" style={{ color: '#fca5a5', margin: 0 }}>{dispatchError}</p> : null}
+                  </form>
+                )}
               </div>
             </div>
           ) : null}

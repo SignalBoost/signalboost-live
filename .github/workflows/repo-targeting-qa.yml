@@ -51,20 +51,7 @@ jobs:
         run: npm install --no-package-lock
 
       - name: Typecheck root app
-        run: |
-          mkdir -p qa
-          set +e
-          npm run typecheck > qa/root-typecheck.log 2>&1
-          status=$?
-          cat qa/root-typecheck.log
-          exit $status
-
-      - name: Upload root typecheck log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: root-typecheck-log
-          path: qa/root-typecheck.log
+        run: npm run typecheck
 
       - name: Build root app
         run: npm run build

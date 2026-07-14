@@ -5,19 +5,7 @@ import { SearchableMultiSelect, SearchableSelect, SourceUrlField, SuggestionCard
 import { enterpriseOptions } from '@/lib/enterprise/masterConfig'
 import { buildCampaignDirective, isCampaignBriefComplete, type StructuredCampaignBrief } from '@/lib/enterprise/campaignBrief'
 
-type CampaignRequest = {
-  channel: 'youtube' | 'linkedin' | 'email' | 'outreach' | 'landing_page'
-  outreach_channel?: 'trade-press'
-  title: string
-  objective: string
-  audience: string
-  signal: string
-  sourceMaterial: string
-  autonomous: true
-}
-
-type Submission = { directive: string; request: CampaignRequest }
-type Props = { busy?: boolean; onSubmit: (submission: Submission) => Promise<void> | void }
+type Props = { busy?: boolean; onSubmit: (directive: string) => Promise<void> | void }
 
 const concepts: SuggestionCard[] = [
   { id: 'authority', title: 'Enterprise authority', description: 'Lead with credibility, operational control, and measurable business value.', metadata: ['Trust', 'ROI', 'Decision makers'] },
@@ -26,26 +14,6 @@ const concepts: SuggestionCard[] = [
 ]
 
 const supportedPlatforms = enterpriseOptions.platforms.filter((option) => ['Website', 'Email', 'LinkedIn', 'YouTube', 'Press Outreach'].includes(option.value))
-
-function requestForPlatform(platform: string, brief: StructuredCampaignBrief, directive: string): CampaignRequest {
-  const channelMap: Record<string, CampaignRequest['channel']> = {
-    Website: 'landing_page',
-    Email: 'email',
-    LinkedIn: 'linkedin',
-    YouTube: 'youtube',
-    'Press Outreach': 'outreach',
-  }
-  return {
-    channel: channelMap[platform] || 'youtube',
-    outreach_channel: platform === 'Press Outreach' ? 'trade-press' : undefined,
-    title: brief.suggestionTitle || `Create a ${platform} campaign`,
-    objective: directive,
-    audience: brief.audiences.join(', '),
-    signal: `Structured COSA configuration. Platform=${platform}; Region=${brief.region}; Tone=${brief.tone}; Goal=${brief.goal}.`,
-    sourceMaterial: brief.sourceUrl,
-    autonomous: true,
-  }
-}
 
 export function CosaCampaignConfigurator({ busy, onSubmit }: Props) {
   const [sourceUrl, setSourceUrl] = useState('')
@@ -67,8 +35,7 @@ export function CosaCampaignConfigurator({ busy, onSubmit }: Props) {
     event.preventDefault()
     if (!ready) { setError('Select a valid source and complete every required campaign option.'); return }
     setError('')
-    const directive = buildCampaignDirective(brief)
-    await onSubmit({ directive, request: requestForPlatform(platform, brief, directive) })
+    await onSubmit(`${buildCampaignDirective(brief)} Primary distribution platform: ${platform}.`)
   }
 
   return <form onSubmit={submit} style={{ display: 'grid', gap: 14, marginTop: 16 }}>

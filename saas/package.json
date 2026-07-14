@@ -13,6 +13,7 @@
     "test:playwright": "playwright test tests/unifiedPlatform.playwright.spec.ts tests/reviews.playwright.spec.ts",
     "worker:video": "node scripts/video-render-worker.mjs",
     "worker:cos-video": "node scripts/cos-video-production-worker.mjs",
+    "migrate:pocketbase": "node scripts/pocketbase-migrate.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -180,7 +180,7 @@ export default function PricingPage() {
           <p className="mx-auto mt-2 max-w-2xl text-sm text-neutral-400">
             {t('pricing.enterprise.subtitle', 'Multi-location businesses and agencies can request custom usage, white-label, and priority onboarding.')}
           </p>
-          
+          <a
             href={`mailto:${CONTACT_EMAIL}`}
             className="mt-4 inline-block rounded-full border border-[#FFD700]/30 bg-[#FFD700]/10 px-5 py-3 font-bold text-[#FFD700] no-underline"
           >

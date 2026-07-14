@@ -10,8 +10,8 @@
 // validates the media type as an exact type instead of a substring match.
 
 export type ReadJsonResult<T = unknown> =
-  | { ok: true; value: T }
-  | { ok: false; status: number; error: string }
+  | { ok: true; value: T; status?: never; error?: never }
+  | { ok: false; status: number; error: string; value?: never }
 
 export interface ReadJsonOptions {
   /** Hard ceiling on the raw request body, in bytes. */

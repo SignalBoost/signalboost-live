@@ -198,7 +198,7 @@ function Stat({ label: l, value }: { label: string; value: number }) {
 }
 
 function UserLookup({ lang, predictUrlBase }: { lang: string; predictUrlBase: string }) {
-  const T = (p: string, f?: string) => cosT(lang, p, f)
+  const lookupT = (p: string, f?: string) => cosT(lang, p, f)
   const [uid, setUid] = useState('')
   const [res, setRes] = useState<PredictResponse | null>(null)
   const [busy, setBusy] = useState(false)
@@ -218,12 +218,12 @@ function UserLookup({ lang, predictUrlBase }: { lang: string; predictUrlBase: st
 
   return (
     <section className={card}>
-      <div className={label + ' mb-3'}>{T('dashboard.lookup_user')}</div>
+      <div className={label + ' mb-3'}>{lookupT('dashboard.lookup_user')}</div>
       <div className="flex flex-wrap items-end gap-2">
         <input
           value={uid}
           onChange={(e) => setUid(e.target.value)}
-          placeholder={T('dashboard.user_id_placeholder')}
+          placeholder={lookupT('dashboard.user_id_placeholder')}
           className="min-w-[240px] flex-1 rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-accent"
         />
         <button
@@ -231,7 +231,7 @@ function UserLookup({ lang, predictUrlBase }: { lang: string; predictUrlBase: st
           disabled={busy}
           className="rounded-md border border-border bg-surfaceElevated px-4 py-2 text-sm font-semibold text-text transition-fast hover:border-accent disabled:opacity-50"
         >
-          {T('dashboard.view')}
+          {lookupT('dashboard.view')}
         </button>
       </div>
 
@@ -239,15 +239,15 @@ function UserLookup({ lang, predictUrlBase }: { lang: string; predictUrlBase: st
         <div className="mt-4 flex flex-col gap-4">
           {res.propensity && (
             <div className="grid grid-cols-3 gap-3">
-              <Meter label={T('predict.engagement')} v={res.propensity.engagement} />
-              <Meter label={T('predict.churn_risk')} v={res.propensity.churn_risk} />
-              <Meter label={T('predict.value')} v={res.propensity.value} />
+              <Meter label={lookupT('predict.engagement')} v={res.propensity.engagement} />
+              <Meter label={lookupT('predict.churn_risk')} v={res.propensity.churn_risk} />
+              <Meter label={lookupT('predict.value')} v={res.propensity.value} />
             </div>
           )}
           <div>
-            <div className={label + ' mb-2'}>{T('predict.title')}</div>
+            <div className={label + ' mb-2'}>{lookupT('predict.title')}</div>
             {!res.predictions || res.predictions.length === 0 ? (
-              <p className="text-sm text-text-muted">{T('predict.none')}</p>
+              <p className="text-sm text-text-muted">{lookupT('predict.none')}</p>
             ) : (
               <ul className="flex flex-col gap-1.5">
                 {res.predictions.map((p, i) => (
@@ -271,7 +271,7 @@ function UserLookup({ lang, predictUrlBase }: { lang: string; predictUrlBase: st
           )}
         </div>
       )}
-      {res && !res.ok && <p className="mt-3 text-sm text-danger">{T('errors.load_failed')}</p>}
+      {res && !res.ok && <p className="mt-3 text-sm text-danger">{lookupT('errors.load_failed')}</p>}
     </section>
   )
 }

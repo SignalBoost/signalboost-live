@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { CosaCampaignConfigurator } from '@/components/enterprise'
 
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
@@ -23,15 +24,10 @@ type OutreachRow = { id: string; status?: string }
 
 const copy = {
   title: 'COSA Campaign Console',
-  intro: 'Create, review, approve, render, and publish governed marketing campaigns.',
-  command: 'Campaign command',
-  placeholder: 'Create a YouTube promotional video campaign for SignalBoostAi. Feature www.saas.signalboostapp.com.',
-  run: 'Run COSA campaign command',
+  intro: 'Create, review, approve, render, and publish governed marketing campaigns without writing campaign prose.',
   refresh: 'Refresh',
   loading: 'Loading...',
-  working: 'Working...',
   noCampaigns: 'No campaigns queued yet.',
-  requiredCommand: 'Add a campaign command first.',
   created: 'COSA created the campaign and started preparing the draft video.',
   draftDone: 'Review draft generated.',
   batchDone: 'Generating drafts for all requested languages.',
@@ -40,7 +36,7 @@ const copy = {
   rendering: 'Rendering video… check again shortly.',
   brandedPreview: 'Final branded video preview.',
   errorLoad: 'Could not load Marketing/Sales data.',
-  errorAuto: 'Could not run the campaign command.',
+  errorAuto: 'Could not build the structured campaign.',
   errorDraft: 'Could not generate the draft.',
   errorBatch: 'Could not start multilingual generation.',
   errorMark: 'Could not update this item.',
@@ -53,29 +49,10 @@ const primary: CSSProperties = { border: 'none', background: GOLD, color: '#000'
 const secondary: CSSProperties = { border: '1px solid rgba(255,255,255,.16)', background: 'rgba(255,255,255,.06)', color: '#fff', borderRadius: 12, padding: '10px 14px', fontWeight: 800, cursor: 'pointer' }
 const muted: CSSProperties = { color: 'rgba(255,255,255,.62)', lineHeight: 1.6 }
 
-function hasDraft(campaign: CampaignRow) {
-  return Boolean(campaign.work_items?.some(item => item.output))
-}
-
-function short(value?: string, fallback = '—') {
-  const s = String(value || '').trim()
-  return s ? (s.length > 180 ? s.slice(0, 180).trim() + '…' : s) : fallback
-}
-
-function fmt(value?: string) {
-  if (!value) return '—'
-  try {
-    return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
-  } catch {
-    return value
-  }
-}
-
-function errorText(value: unknown, fallback: string) {
-  const text = value instanceof Error ? value.message : String(value || '')
-  return text && text !== 'undefined' ? text : fallback
-}
-
+function hasDraft(campaign: CampaignRow) { return Boolean(campaign.work_items?.some(item => item.output)) }
+function short(value?: string, fallback = '—') { const s = String(value || '').trim(); return s ? (s.length > 180 ? s.slice(0, 180).trim() + '…' : s) : fallback }
+function fmt(value?: string) { if (!value) return '—'; try { return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value)) } catch { return value } }
+function errorText(value: unknown, fallback: string) { const text = value instanceof Error ? value.message : String(value || ''); return text && text !== 'undefined' ? text : fallback }
 function videoStatusText(video: any) {
   if (!video) return 'No video render has started yet.'
   if (video.status === 'rendering') return 'Base render is still running.'
@@ -90,7 +67,6 @@ function VideoBox({ campaign, busy, onRenderVideo, onCheckStatus }: { campaign: 
   const video = (campaign.metadata as any)?.video || null
   if (!['youtube', 'short_video'].includes(campaign.channel || '')) return null
   if (!video) return <button disabled={busy} onClick={() => onRenderVideo(campaign.id)} style={secondary}>Render video</button>
-
   const finalUrl = video.branded === true && video.voicedUrl ? String(video.voicedUrl) : ''
   return <div style={{ marginTop: 12, border: '1px solid rgba(26,240,255,.25)', borderRadius: 12, background: 'rgba(26,240,255,.06)', padding: 12 }}>
     {video.status === 'rendering' && <div><p style={{ color: CYAN, fontSize: 13, margin: 0 }}>{copy.rendering}</p><button disabled={busy} onClick={() => onCheckStatus(campaign.id)} style={{ ...secondary, marginTop: 8 }}>Check status</button></div>}
@@ -107,7 +83,6 @@ function CampaignCard({ campaign, busy, onPatch, onGenerateDraft, onGenerateAll,
   const canPublish = ['youtube', 'short_video', 'linkedin'].includes(campaign.channel || '') && (campaign.status === 'approved' || campaign.status === 'queued') && Boolean(campaign.approved_at)
   const video = (campaign.metadata as any)?.video || null
   const finalVideoReady = video?.branded === true && Boolean(video?.voicedUrl)
-
   return <section style={{ ...panel, position: 'relative', overflow: 'hidden' }}>
     <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: campaign.status === 'approved' ? '#34d399' : campaign.status === 'rejected' ? '#f87171' : GOLD }} />
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><div><strong style={{ color: '#fff' }}>{campaign.title || campaign.channel || 'Campaign'}</strong><p style={{ color: 'rgba(255,255,255,.48)', margin: '4px 0 0', fontSize: 12 }}>{campaign.channel || 'campaign'} · {fmt(campaign.created_at)}</p></div><span style={{ color: GOLD, fontSize: 12, fontWeight: 900 }}>{campaign.status || 'pending'}</span></div>
@@ -128,7 +103,6 @@ export default function MarketingSalesCosaPage() {
   useI18n()
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([])
   const [outreach, setOutreach] = useState<OutreachRow[]>([])
-  const [autonomousDirective, setAutonomousDirective] = useState('')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -143,11 +117,7 @@ export default function MarketingSalesCosaPage() {
       if (!admRes.ok || !campaignRes.ok) throw new Error(copy.errorLoad)
       setOutreach(Array.isArray(admJson?.recentOutreach) ? admJson.recentOutreach : [])
       setCampaigns(Array.isArray(campaignJson?.campaigns) ? campaignJson.campaigns : [])
-    } catch {
-      setMessage(copy.errorLoad)
-    } finally {
-      setLoading(false)
-    }
+    } catch { setMessage(copy.errorLoad) } finally { setLoading(false) }
   }
 
   useEffect(() => { load() }, [])
@@ -158,124 +128,34 @@ export default function MarketingSalesCosaPage() {
     return () => { if (t) clearTimeout(t); supabase.removeChannel(channel) }
   }, [])
 
-  const stats = useMemo(() => ({
-    waiting: campaigns.filter(row => row.status === 'waiting_approval' || row.status === 'draft').length,
-    approved: campaigns.filter(row => row.status === 'approved').length,
-    running: campaigns.filter(row => row.status === 'queued' || row.status === 'running').length,
-    drafted: campaigns.filter(hasDraft).length,
-  }), [campaigns])
+  const stats = useMemo(() => ({ waiting: campaigns.filter(row => row.status === 'waiting_approval' || row.status === 'draft').length, approved: campaigns.filter(row => row.status === 'approved').length, running: campaigns.filter(row => row.status === 'queued' || row.status === 'running').length, drafted: campaigns.filter(hasDraft).length }), [campaigns])
 
-  async function generateDraft(id: string) {
-    const res = await fetch('/api/cos/script-worker', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campaign_id: id }) })
-    if (!res.ok) throw new Error(copy.errorDraft)
-    return res.json().catch(() => null)
-  }
-
-  async function createAutonomousCampaign(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!autonomousDirective.trim()) { setMessage(copy.requiredCommand); return }
+  async function generateDraft(id: string) { const res = await fetch('/api/cos/script-worker', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campaign_id: id }) }); if (!res.ok) throw new Error(copy.errorDraft); return res.json().catch(() => null) }
+  async function createStructuredCampaign(directive: string) {
     setBusy(true)
     try {
-      const res = await fetch('/api/cos/campaign-queue', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ directive: autonomousDirective }) })
+      const res = await fetch('/api/cos/campaign-queue', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ directive }) })
       const json = await res.json().catch(() => null)
       if (!res.ok) throw new Error(copy.errorAuto)
       if (json?.campaign?.id) await generateDraft(json.campaign.id)
       setMessage(copy.created)
       await load(true)
-    } catch {
-      setMessage(copy.errorAuto)
-    } finally {
-      setBusy(false)
-    }
+    } catch { setMessage(copy.errorAuto) } finally { setBusy(false) }
   }
-
-  async function patchCampaign(id: string, status: 'approved' | 'rejected' | 'queued') {
-    setBusy(true)
-    try {
-      const res = await fetch('/api/cos/campaign-queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) })
-      if (!res.ok) throw new Error(copy.errorMark)
-      setMessage(`${copy.marked} ${status}.`)
-      await load(true)
-    } catch {
-      setMessage(copy.errorMark)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function generateDraftFromButton(id: string) {
-    setBusy(true)
-    try { await generateDraft(id); setMessage(copy.draftDone); await load(true) } catch { setMessage(copy.errorDraft) } finally { setBusy(false) }
-  }
-
-  async function generateAllFromButton(id: string) {
-    setBusy(true)
-    try {
-      const res = await fetch('/api/cos/script-worker/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campaign_id: id }) })
-      if (!res.ok) throw new Error(copy.errorBatch)
-      setMessage(copy.batchDone)
-      await load(true)
-    } catch { setMessage(copy.errorBatch) } finally { setBusy(false) }
-  }
-
-  async function publishLanguage(id: string, language?: string) {
-    setBusy(true)
-    try {
-      const res = await fetch('/api/cos/campaign-queue/publish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, language }) })
-      const j = await res.json().catch(() => null)
-      if (!res.ok || !j?.ok) throw new Error(j?.error || j?.result?.error || j?.result?.mode || copy.errorPublish)
-      setMessage(j?.result?.liveUrl ? `${copy.published} ${j.result.liveUrl}` : copy.published)
-      await load(true)
-    } catch (e) {
-      setMessage(`${copy.errorPublish}: ${errorText(e, 'Unknown publish error')}`)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function renderVideo(id: string) {
-    setBusy(true)
-    try {
-      const res = await fetch('/api/cos/campaign-queue/render-video', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-      const j = await res.json().catch(() => null)
-      if (!res.ok || !j?.ok) throw new Error(j?.error || copy.errorRender)
-      setMessage(copy.rendering)
-      await load(true)
-    } catch { setMessage(copy.errorRender) } finally { setBusy(false) }
-  }
-
-  async function checkVideoStatus(id: string) {
-    setBusy(true)
-    try {
-      const res = await fetch(`/api/cos/campaign-queue/render-video?id=${encodeURIComponent(id)}`, { cache: 'no-store' })
-      const j = await res.json().catch(() => null)
-      if (!res.ok || !j?.ok) throw new Error(j?.error || copy.errorRender)
-      setMessage('Video status refreshed.')
-      await load(true)
-    } catch { setMessage(copy.errorRender) } finally { setBusy(false) }
-  }
+  async function patchCampaign(id: string, status: 'approved' | 'rejected' | 'queued') { setBusy(true); try { const res = await fetch('/api/cos/campaign-queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) }); if (!res.ok) throw new Error(copy.errorMark); setMessage(`${copy.marked} ${status}.`); await load(true) } catch { setMessage(copy.errorMark) } finally { setBusy(false) } }
+  async function generateDraftFromButton(id: string) { setBusy(true); try { await generateDraft(id); setMessage(copy.draftDone); await load(true) } catch { setMessage(copy.errorDraft) } finally { setBusy(false) } }
+  async function generateAllFromButton(id: string) { setBusy(true); try { const res = await fetch('/api/cos/script-worker/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campaign_id: id }) }); if (!res.ok) throw new Error(copy.errorBatch); setMessage(copy.batchDone); await load(true) } catch { setMessage(copy.errorBatch) } finally { setBusy(false) } }
+  async function publishLanguage(id: string, language?: string) { setBusy(true); try { const res = await fetch('/api/cos/campaign-queue/publish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, language }) }); const j = await res.json().catch(() => null); if (!res.ok || !j?.ok) throw new Error(j?.error || j?.result?.error || j?.result?.mode || copy.errorPublish); setMessage(j?.result?.liveUrl ? `${copy.published} ${j.result.liveUrl}` : copy.published); await load(true) } catch (e) { setMessage(`${copy.errorPublish}: ${errorText(e, 'Unknown publish error')}`) } finally { setBusy(false) } }
+  async function renderVideo(id: string) { setBusy(true); try { const res = await fetch('/api/cos/campaign-queue/render-video', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }); const j = await res.json().catch(() => null); if (!res.ok || !j?.ok) throw new Error(j?.error || copy.errorRender); setMessage(copy.rendering); await load(true) } catch { setMessage(copy.errorRender) } finally { setBusy(false) } }
+  async function checkVideoStatus(id: string) { setBusy(true); try { const res = await fetch(`/api/cos/campaign-queue/render-video?id=${encodeURIComponent(id)}`, { cache: 'no-store' }); const j = await res.json().catch(() => null); if (!res.ok || !j?.ok) throw new Error(j?.error || copy.errorRender); setMessage('Video status refreshed.'); await load(true) } catch { setMessage(copy.errorRender) } finally { setBusy(false) } }
 
   return <main style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gap: 18 }}>
     <section style={{ ...panel, background: 'linear-gradient(145deg, rgba(15,23,42,.95), rgba(2,6,23,.97))' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-        <div>
-          <p style={{ margin: 0, color: GOLD, fontSize: 12, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Marketing / Sales Console</p>
-          <h1 style={{ color: '#fff', margin: '10px 0 0', fontSize: 34 }}>{copy.title}</h1>
-          <p style={{ ...muted, maxWidth: 760 }}>{copy.intro}</p>
-        </div>
-        <button disabled={busy || loading} onClick={() => load()} style={secondary}>{loading ? copy.loading : copy.refresh}</button>
-      </div>
-      <form onSubmit={createAutonomousCampaign} style={{ display: 'grid', gap: 10, marginTop: 16 }}>
-        <label style={{ color: '#fff', fontWeight: 900 }}>{copy.command}</label>
-        <textarea value={autonomousDirective} onChange={(e) => setAutonomousDirective(e.target.value)} placeholder={copy.placeholder} rows={4} style={{ width: '100%', border: '1px solid rgba(255,255,255,.14)', background: 'rgba(2,6,23,.78)', color: '#fff', borderRadius: 14, padding: 14, resize: 'vertical' }} />
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-          <div style={{ color: 'rgba(255,255,255,.56)', fontSize: 12 }}>Waiting {stats.waiting} · Approved {stats.approved} · Running {stats.running} · Drafted {stats.drafted} · Outreach {outreach.length}</div>
-          <button disabled={busy} style={primary}>{busy ? copy.working : copy.run}</button>
-        </div>
-      </form>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}><div><p style={{ margin: 0, color: GOLD, fontSize: 12, fontWeight: 950, letterSpacing: '.12em', textTransform: 'uppercase' }}>Marketing / Sales Console</p><h1 style={{ color: '#fff', margin: '10px 0 0', fontSize: 34 }}>{copy.title}</h1><p style={{ ...muted, maxWidth: 760 }}>{copy.intro}</p></div><button disabled={busy || loading} onClick={() => load()} style={secondary}>{loading ? copy.loading : copy.refresh}</button></div>
+      <CosaCampaignConfigurator busy={busy} onSubmit={createStructuredCampaign} />
+      <div style={{ color: 'rgba(255,255,255,.56)', fontSize: 12, marginTop: 12 }}>Waiting {stats.waiting} · Approved {stats.approved} · Running {stats.running} · Drafted {stats.drafted} · Outreach {outreach.length}</div>
       {message && <p style={{ color: message.includes('Could not') ? '#fca5a5' : CYAN, margin: '12px 0 0' }}>{message}</p>}
     </section>
-
     <section style={{ display: 'grid', gap: 14 }}>
       {loading && <div style={panel}><p style={muted}>{copy.loading}</p></div>}
       {!loading && campaigns.length === 0 && <div style={panel}><p style={muted}>{copy.noCampaigns}</p></div>}

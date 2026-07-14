@@ -40,6 +40,13 @@ export function buildAssSubtitles(payload: VideoExportPayload) {
   return `[Script Info]\nScriptType: v4.00+\nPlayResX: 1920\nPlayResY: 1080\nScaledBorderAndShadow: yes\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: SignalBoost,${fontFamily},${style.fontSize},${primary},&H000000FF,&HAA000000,&HAA000000,1,0,0,0,100,100,0,0,3,2,0,${alignment},64,64,${marginV},1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n${dialogues.map((cue) => `Dialogue: 0,${assTime(cue.start)},${assTime(cue.end)},SignalBoost,,0,0,0,,${effect}${cue.text}`).join('\n')}\n`
 }
 
+// Escape a filesystem path for use inside an FFmpeg filtergraph. Bare POSIX
+// path only — a file:// URL makes the ass filter treat everything after the
+// colon as original_size and the render dies with 'Invalid argument'.
+function ffmpegFilterPath(value: string) {
+  return String(value || '').replace(/\\/g, '/').replace(/([:,'\[\]])/g, '\\$1')
+}
+
 function runFfmpeg(args: string[]) {
   return new Promise<void>((resolve, reject) => {
     const child = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] })
@@ -64,7 +71,7 @@ export async function renderCaptionBurnJob(jobId: string, payload: VideoExportPa
   const outputName = `${jobId}-${safeFileName(payload.filename).replace(/\.[^.]+$/, '')}.mp4`
   const outputPath = join(videoRenderDir, outputName)
   await writeFile(assPath, buildAssSubtitles(payload), 'utf8')
-  await runFfmpeg(['-y', '-i', sourcePath, '-vf', `ass=${assPath}`, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-c:a', 'aac', '-movflags', '+faststart', outputPath])
+  await runFfmpeg(['-y', '-i', sourcePath, '-vf', `ass=${ffmpegFilterPath(assPath)}`, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-c:a', 'aac', '-movflags', '+faststart', outputPath])
   return { resultUrl: `/video-renders/${outputName}`, outputPath }
 }
 

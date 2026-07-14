@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import type { AgencyCopy } from '@/lib/i18n/agencyCopy'
 
@@ -80,6 +80,11 @@ const ORGANIC_COPY: Record<string, {
   byokKeyLabel: string
   byokKeyRequired: string
   byokKeyInvalid: string
+  byokLiveLabel: string
+  byokComingLabel: string
+  byokConnected: string
+  byokSaveKey: string
+  byokDisconnect: string
   sections: { youtube: string; linkedin: string; press: string }
   labels: {
     youtubeTitle: string
@@ -124,6 +129,11 @@ const ORGANIC_COPY: Record<string, {
     byokKeyLabel: 'Your API key',
     byokKeyRequired: 'Paste your AI provider API key to generate. You pay the provider directly per generation.',
     byokKeyInvalid: 'Your API key was rejected by the provider. Check it and try again.',
+    byokLiveLabel: 'Available now',
+    byokComingLabel: 'Coming soon',
+    byokConnected: 'Connected',
+    byokSaveKey: 'Save this key to my account for next time',
+    byokDisconnect: 'Disconnect',
     sections: { youtube: 'YouTube organic', linkedin: 'LinkedIn organic', press: 'Press release email' },
     labels: {
       youtubeTitle: 'Video title',
@@ -168,6 +178,11 @@ const ORGANIC_COPY: Record<string, {
     byokKeyLabel: 'Tu API key',
     byokKeyRequired: 'Pega la API key de tu proveedor de IA para generar. Pagas al proveedor directamente por generación.',
     byokKeyInvalid: 'El proveedor rechazó tu API key. Revísala e inténtalo de nuevo.',
+    byokLiveLabel: 'Disponible ahora',
+    byokComingLabel: 'Próximamente',
+    byokConnected: 'Conectado',
+    byokSaveKey: 'Guardar esta clave en mi cuenta para la próxima vez',
+    byokDisconnect: 'Desconectar',
     sections: { youtube: 'YouTube orgánico', linkedin: 'LinkedIn orgánico', press: 'Email de press release' },
     labels: {
       youtubeTitle: 'Título del video',
@@ -212,6 +227,11 @@ const ORGANIC_COPY: Record<string, {
     byokKeyLabel: 'Sua API key',
     byokKeyRequired: 'Cole a API key do seu provedor de IA para gerar. Você paga o provedor diretamente por geração.',
     byokKeyInvalid: 'O provedor rejeitou sua API key. Verifique e tente novamente.',
+    byokLiveLabel: 'Disponível agora',
+    byokComingLabel: 'Em breve',
+    byokConnected: 'Conectado',
+    byokSaveKey: 'Salvar esta chave na minha conta para a próxima vez',
+    byokDisconnect: 'Desconectar',
     sections: { youtube: 'YouTube orgânico', linkedin: 'LinkedIn orgânico', press: 'E-mail de press release' },
     labels: {
       youtubeTitle: 'Título do vídeo',
@@ -256,6 +276,11 @@ const ORGANIC_COPY: Record<string, {
     byokKeyLabel: 'Twój klucz API',
     byokKeyRequired: 'Wklej klucz API swojego dostawcy AI, aby generować. Płacisz dostawcy bezpośrednio za generację.',
     byokKeyInvalid: 'Dostawca odrzucił Twój klucz API. Sprawdź go i spróbuj ponownie.',
+    byokLiveLabel: 'Dostępne teraz',
+    byokComingLabel: 'Wkrótce',
+    byokConnected: 'Połączono',
+    byokSaveKey: 'Zapisz ten klucz na moim koncie na przyszłość',
+    byokDisconnect: 'Odłącz',
     sections: { youtube: 'YouTube organicznie', linkedin: 'LinkedIn organicznie', press: 'E-mail press release' },
     labels: {
       youtubeTitle: 'Tytuł wideo',
@@ -300,6 +325,11 @@ const ORGANIC_COPY: Record<string, {
     byokKeyLabel: 'Ваш API-ключ',
     byokKeyRequired: 'Вставьте API-ключ вашего AI-провайдера для генерации. Вы платите провайдеру напрямую за каждую генерацию.',
     byokKeyInvalid: 'Провайдер отклонил ваш API-ключ. Проверьте его и попробуйте снова.',
+    byokLiveLabel: 'Доступно сейчас',
+    byokComingLabel: 'Скоро',
+    byokConnected: 'Подключено',
+    byokSaveKey: 'Сохранить этот ключ в моем аккаунте на будущее',
+    byokDisconnect: 'Отключить',
     sections: { youtube: 'YouTube organic', linkedin: 'LinkedIn organic', press: 'Press release e-mail' },
     labels: {
       youtubeTitle: 'Название видео',
@@ -311,6 +341,18 @@ const ORGANIC_COPY: Record<string, {
       pressReleaseBody: 'Текст письма',
     },
   },
+}
+
+const LIVE_PROVIDERS = ['Claude (Anthropic)', 'OpenAI']
+const COMING_PROVIDERS = ['ElevenLabs \u2014 AI voiceover', 'Runway \u2014 cinematic video', 'Kling \u2014 3D video']
+
+const chipStyle: React.CSSProperties = {
+  border: '1px solid rgba(255,255,255,.16)',
+  borderRadius: 999,
+  padding: '5px 12px',
+  fontSize: 12,
+  color: 'rgba(255,255,255,.85)',
+  background: 'rgba(255,255,255,.06)',
 }
 
 const formatUsd = (value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
@@ -375,6 +417,28 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
 
   const [apiProvider, setApiProvider] = useState<'anthropic' | 'openai'>('anthropic')
   const [apiKey, setApiKey] = useState('')
+  const [saveKey, setSaveKey] = useState(false)
+  const [signedIn, setSignedIn] = useState(false)
+  const [connectedProviders, setConnectedProviders] = useState<string[]>([])
+
+  useEffect(() => {
+    let live = true
+    ;(async () => {
+      try {
+        const res = await fetch('/api/agency/provider-keys', { cache: 'no-store' })
+        const json = await res.json().catch(() => null)
+        if (!live || !json) return
+        setSignedIn(Boolean(json.signedIn))
+        const list = Array.isArray(json.connected) ? json.connected.map((c: any) => String(c.provider)) : []
+        setConnectedProviders(list)
+      } catch {
+        // vault unavailable — pasted-key flow still works
+      }
+    })()
+    return () => { live = false }
+  }, [])
+
+  const providerConnected = connectedProviders.includes(apiProvider)
 
   const [company, setCompany] = useState('')
   const [announcement, setAnnouncement] = useState('')
@@ -399,7 +463,7 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
     event.preventDefault()
     setOrganicError('')
 
-    if (apiKey.trim().length < 20) {
+    if (!providerConnected && apiKey.trim().length < 20) {
       setOrganicError(oc.byokKeyRequired)
       return
     }
@@ -418,7 +482,7 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
       const response = await fetch('/api/agency/organic-workflow', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ company, announcement, audience, website, lang, apiProvider, apiKey: apiKey.trim() }),
+        body: JSON.stringify({ company, announcement, audience, website, lang, apiProvider, apiKey: providerConnected && !apiKey.trim() ? undefined : apiKey.trim() }),
       })
 
       const data = await response.json().catch(() => null) as OrganicResponse | null
@@ -433,6 +497,22 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
       }
 
       setAssets(data.assets)
+
+      if (saveKey && signedIn && apiKey.trim().length >= 20) {
+        try {
+          const saved = await fetch('/api/agency/provider-keys', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ provider: apiProvider, value: apiKey.trim() }),
+          })
+          if (saved.ok) {
+            setConnectedProviders((current) => (current.includes(apiProvider) ? current : [...current, apiProvider]))
+            setApiKey('')
+          }
+        } catch {
+          // saving is best-effort; generation already succeeded
+        }
+      }
     } catch {
       setOrganicError(oc.genError)
     }
@@ -564,6 +644,18 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
             <div style={{ border: '1px solid rgba(251,191,36,.3)', borderRadius: 16, padding: 14, display: 'grid', gap: 10 }}>
               <h4 className="sb-h3" style={{ margin: 0, fontSize: 15 }}>{oc.byokTitle}</h4>
               <p className="sb-body" style={{ margin: 0, fontSize: 13 }}>{oc.byokBody}</p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span className="sb-caption" style={{ color: '#86efac' }}>{oc.byokLiveLabel}</span>
+                {LIVE_PROVIDERS.map((name) => (
+                  <span key={name} style={{ ...chipStyle, borderColor: 'rgba(134,239,172,.4)' }}>{name}</span>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span className="sb-caption" style={{ color: '#fbbf24' }}>{oc.byokComingLabel}</span>
+                {COMING_PROVIDERS.map((name) => (
+                  <span key={name} style={{ ...chipStyle, opacity: 0.75 }}>{name}</span>
+                ))}
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(140px, 200px) 1fr', gap: 12 }}>
                 <label style={{ display: 'grid', gap: 6 }}>
                   <span className="sb-caption">{oc.byokProviderLabel}</span>
@@ -573,10 +665,16 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
                   </select>
                 </label>
                 <label style={{ display: 'grid', gap: 6 }}>
-                  <span className="sb-caption">{oc.byokKeyLabel}</span>
-                  <input type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={apiProvider === 'openai' ? 'sk-…' : 'sk-ant-…'} maxLength={400} style={fieldStyle} />
+                  <span className="sb-caption">{oc.byokKeyLabel}{providerConnected ? <span style={{ color: '#86efac', marginLeft: 8 }}>✓ {oc.byokConnected}</span> : null}</span>
+                  <input type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={providerConnected ? '✓ ' + oc.byokConnected : (apiProvider === 'openai' ? 'sk-…' : 'sk-ant-…')} maxLength={400} style={fieldStyle} />
                 </label>
               </div>
+              {signedIn && !providerConnected ? (
+                <label className="sb-caption" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input type="checkbox" checked={saveKey} onChange={(e) => setSaveKey(e.target.checked)} />
+                  <span>{oc.byokSaveKey}</span>
+                </label>
+              ) : null}
             </div>
 
             <label style={{ display: 'grid', gap: 6 }}>

@@ -23,10 +23,31 @@
       "Urgent & Direct"
     ],
     "regions": [
-      "North America",
-      "EMEA",
-      "APAC",
-      "LATAM"
+      {
+        "id": "us",
+        "label": "United States",
+        "macro_region": "North America"
+      },
+      {
+        "id": "latam",
+        "label": "Latin America",
+        "macro_region": "LATAM"
+      },
+      {
+        "id": "brazil",
+        "label": "Brazil",
+        "macro_region": "LATAM"
+      },
+      {
+        "id": "poland",
+        "label": "Poland",
+        "macro_region": "EMEA"
+      },
+      {
+        "id": "global_ru",
+        "label": "Global Russian-speaking audience",
+        "macro_region": "Global"
+      }
     ],
     "industries": [
       "Technology & Software",

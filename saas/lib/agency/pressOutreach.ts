@@ -197,3 +197,53 @@ export async function runLocalPressDistributionWorker(campaign: PressCampaign, o
   })
   return dispatchPressProofEmail(campaign, ownerEmail)
 }
+
+function extractEmail(value?: string | null): string {
+  const match = String(value || '').match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/)
+  return match ? match[0] : ''
+}
+
+export function editorEmailFrom(campaign: PressCampaign): string {
+  return extractEmail(campaign.editor_contact) || extractEmail(campaign.publication_contact)
+}
+
+export type EditorDispatchResult = {
+  ok: boolean
+  skipped: boolean
+  reason?: string
+  sent_to?: string
+}
+
+export async function dispatchPressReleaseToEditor(campaign: PressCampaign): Promise<EditorDispatchResult> {
+  const editorEmail = editorEmailFrom(campaign)
+  if (!editorEmail) return { ok: false, skipped: true, reason: 'no_editor_email' }
+
+  const resendKey = process.env.RESEND_API_KEY
+  if (!resendKey) return { ok: false, skipped: true, reason: 'missing_email_configuration' }
+
+  const ownerEmail = process.env.OWNER_EMAIL || process.env.SIGNALBOOST_OWNER_EMAIL || ''
+  const resend = new Resend(resendKey)
+  const from = process.env.RESEND_FROM_EMAIL || 'SignalBoost Press <press@signalboostapp.com>'
+  const subject = campaign.headline || `Press release for ${campaign.publication_name || 'your publication'}`
+  const body = [
+    campaign.article_notes || campaign.content_body,
+    '',
+    campaign.cta_url ? `More information: ${campaign.cta_url}` : '',
+    '',
+    '—',
+    'Sent via SignalBoost Press Outreach. Reply to this email to reach the sender.',
+  ].filter(Boolean).join('\n')
+
+  try {
+    await resend.emails.send({
+      from,
+      to: editorEmail,
+      bcc: ownerEmail || undefined,
+      subject,
+      text: body,
+    })
+    return { ok: true, skipped: false, sent_to: editorEmail }
+  } catch (error: any) {
+    return { ok: false, skipped: false, reason: error?.message || 'send_failed' }
+  }
+}

@@ -1,0 +1,28 @@
+app = "signalboost-pocketbase"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+  [build.args]
+    # Set this to a reviewed PocketBase release before deployment.
+    PB_VERSION = "REPLACE_WITH_VERSION"
+
+[env]
+  PORT = "8090"
+
+[http_service]
+  internal_port = 8090
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[mounts]
+  source = "pocketbase_data"
+  destination = "/pb/pb_data"

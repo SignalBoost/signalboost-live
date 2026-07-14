@@ -2,7 +2,8 @@ app = "signalboost-pocketbase-cadomos"
 primary_region = "iad"
 
 [build]
-  dockerfile = "infrastructure/pocketbase/Dockerfile"
+  # Paths in fly.toml are resolved relative to this file's directory.
+  dockerfile = "Dockerfile"
   [build.args]
     PB_VERSION = "0.29.3"
 

@@ -4,6 +4,9 @@
 // Keys live only in memory for the duration of the request. Never logged, never stored.
 
 import { NextResponse } from 'next/server'
+import { getAccess } from '@/lib/auth/access'
+import { getTextAdapter, getUserProvider } from '@/lib/agency/userProviders'
+import { resolveUserProviderKey } from '@/lib/agency/userProviderKeys'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -98,63 +101,6 @@ function extractJson(raw: string): OrganicAssets | null {
   }
 }
 
-type ByokCall = { ok: boolean; text?: string; code?: 'invalid_key' | 'provider_error' }
-
-async function callAnthropicWithUserKey(apiKey: string, systemPrompt: string, prompt: string): Promise<ByokCall> {
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 3000,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    })
-    if (response.status === 401 || response.status === 403) return { ok: false, code: 'invalid_key' }
-    if (!response.ok) return { ok: false, code: 'provider_error' }
-    const data = await response.json()
-    const text = data?.content?.[0]?.text || ''
-    if (!text) return { ok: false, code: 'provider_error' }
-    return { ok: true, text }
-  } catch {
-    return { ok: false, code: 'provider_error' }
-  }
-}
-
-async function callOpenAIWithUserKey(apiKey: string, systemPrompt: string, prompt: string): Promise<ByokCall> {
-  try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        max_tokens: 3000,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: prompt },
-        ],
-      }),
-    })
-    if (response.status === 401 || response.status === 403) return { ok: false, code: 'invalid_key' }
-    if (!response.ok) return { ok: false, code: 'provider_error' }
-    const data = await response.json()
-    const text = data?.choices?.[0]?.message?.content || ''
-    if (!text) return { ok: false, code: 'provider_error' }
-    return { ok: true, text }
-  } catch {
-    return { ok: false, code: 'provider_error' }
-  }
-}
-
 export async function POST(request: Request) {
   if (!sameOriginOk(request)) {
     const result: OrganicResult = { ok: false, error: 'origin not allowed', error_code: 'bad_request' }
@@ -176,8 +122,19 @@ export async function POST(request: Request) {
   const lang = clean(body?.lang, 5).toLowerCase()
   const langName = LANG_NAMES[lang] || 'English'
 
-  const apiProvider = clean(body?.apiProvider, 20).toLowerCase() === 'openai' ? 'openai' : 'anthropic'
-  const apiKey = clean(body?.apiKey, 400)
+  const requestedProvider = clean(body?.apiProvider, 60).toLowerCase()
+  const template = getUserProvider(requestedProvider)
+  const apiProvider = template && template.status === 'live' && template.capability === 'text' ? template.id : 'anthropic'
+
+  let apiKey = clean(body?.apiKey, 400)
+
+  if (!apiKey) {
+    // Plug-and-play: logged-in users can use a key they connected once.
+    const access = await getAccess().catch(() => null)
+    if (access?.userId) {
+      apiKey = (await resolveUserProviderKey(access.userId, apiProvider)) || ''
+    }
+  }
 
   if (!apiKey || apiKey.length < 20) {
     const result: OrganicResult = { ok: false, error: 'An AI provider API key is required. You pay your provider directly per generation.', error_code: 'missing_key' }
@@ -214,9 +171,13 @@ export async function POST(request: Request) {
 
   const systemPrompt = 'You are a marketing copy engine. Always return only valid JSON. No markdown fences, no commentary.'
 
-  const call = apiProvider === 'openai'
-    ? await callOpenAIWithUserKey(apiKey, systemPrompt, prompt)
-    : await callAnthropicWithUserKey(apiKey, systemPrompt, prompt)
+  const adapter = getTextAdapter(apiProvider)
+  if (!adapter) {
+    const result: OrganicResult = { ok: false, error: 'Provider not supported yet.', error_code: 'bad_request' }
+    return NextResponse.json(result, { status: 400 })
+  }
+
+  const call = await adapter.generate(apiKey, systemPrompt, prompt, 3000)
 
   if (!call.ok) {
     const status = call.code === 'invalid_key' ? 401 : 502

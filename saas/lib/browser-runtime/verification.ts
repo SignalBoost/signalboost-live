@@ -3,25 +3,9 @@ import type {
   BrowserTask,
   BrowserTaskResult,
   BrowserTaskStep,
+  BrowserVerificationCheck,
+  BrowserVerificationReport,
 } from './contracts.ts'
-
-export type BrowserVerificationStatus = 'verified' | 'failed'
-
-export interface BrowserVerificationCheck {
-  id: string
-  passed: boolean
-  summary: string
-}
-
-export interface BrowserVerificationReport {
-  taskId: string
-  incidentId: string
-  provider: string
-  status: BrowserVerificationStatus
-  verifiedAt: string
-  checks: BrowserVerificationCheck[]
-  errors: string[]
-}
 
 function expectedEvidenceKind(step: BrowserTaskStep): BrowserEvidence['kind'] {
   if (step.kind === 'navigate') return 'navigation'

@@ -5,6 +5,9 @@ import {
   buildSandboxBrowserTask,
   buildSandboxProtectedSaveTask,
 } from '../lib/browser-runtime/sandbox-adapter.ts'
+import { issueBrowserApprovalToken } from '../lib/browser-runtime/approval.ts'
+import { runBrowserTask } from '../lib/browser-runtime/runtime.ts'
+import type { BrowserApprovalClaims } from '../lib/browser-runtime/approval.ts'
 import type {
   BrowserEvidence,
   BrowserTask,
@@ -21,6 +24,8 @@ const base = {
   expiresAt: '2026-07-15T20:00:00.000Z',
   approvalToken: 'signed-token',
 }
+
+const signingSecret = 'browser-verification-integration-secret'
 
 function kindForStep(step: BrowserTaskStep): BrowserEvidence['kind'] {
   if (step.kind === 'navigate') return 'navigation'
@@ -63,6 +68,52 @@ function resultForTask(task: BrowserTask): BrowserTaskResult {
     pausedAtStepId: checkpointIndex >= 0 ? task.steps[checkpointIndex]?.id : undefined,
     evidence,
     verification: 'pending',
+  }
+}
+
+function signExecutableTask(task: BrowserTask, nonce: string): BrowserTask {
+  const claims: BrowserApprovalClaims = {
+    version: 1,
+    taskId: task.taskId,
+    incidentId: task.incidentId,
+    provider: task.provider,
+    adapterId: task.adapterId,
+    mode: task.mode,
+    allowedStepIds: task.steps.map(step => step.id),
+    allowedOrigins: task.allowedOrigins,
+    issuedAt: task.issuedAt,
+    expiresAt: task.expiresAt,
+    nonce,
+  }
+
+  task.approvalToken = issueBrowserApprovalToken(claims, signingSecret)
+  return task
+}
+
+function executablePorts() {
+  let currentUrl = 'about:blank'
+  let closed = false
+
+  return {
+    sessions: {
+      async open() {
+        return {
+          page: {
+            url: () => currentUrl,
+            goto: async (url: string) => { currentUrl = url },
+            click: async () => undefined,
+            fill: async () => undefined,
+            waitForSelector: async () => undefined,
+          },
+          close: async () => { closed = true },
+        }
+      },
+    },
+    context: {
+      resolveSecretRef: async (valueRef: string) => `resolved:${valueRef}`,
+      captureScreenshot: async (label: string) => `artifact://${label}`,
+    },
+    wasClosed: () => closed,
   }
 }
 
@@ -140,4 +191,78 @@ test('fails verification when task identity or completed-step order is tampered'
   assert.equal(report.status, 'failed')
   assert.ok(report.checks.some(item => item.id === 'incident-id' && !item.passed))
   assert.ok(report.checks.some(item => item.id === 'completed-steps' && !item.passed))
+})
+
+test('runtime returns a verified report when phase one pauses at its approval checkpoint', async () => {
+  const task = signExecutableTask(buildSandboxBrowserTask({
+    ...base,
+    approvalToken: '',
+  }), 'runtime-prepare')
+  const ports = executablePorts()
+
+  const result = await runBrowserTask({
+    task,
+    signingSecret,
+    now: new Date('2026-07-15T19:30:00.000Z'),
+    sessions: ports.sessions,
+    context: ports.context,
+  })
+
+  assert.equal(result.status, 'paused')
+  assert.notEqual(result.verification, 'pending')
+  if (result.verification !== 'pending') {
+    assert.equal(result.verification.status, 'verified')
+    assert.deepEqual(result.verification.errors, [])
+  }
+  assert.equal(ports.wasClosed(), true)
+})
+
+test('runtime returns a verified report for the separately approved protected-save task', async () => {
+  const task = signExecutableTask(buildSandboxProtectedSaveTask({
+    ...base,
+    taskId: 'task-sandbox-save-runtime',
+    approvalToken: '',
+  }), 'runtime-save')
+  const ports = executablePorts()
+
+  const result = await runBrowserTask({
+    task,
+    signingSecret,
+    now: new Date('2026-07-15T19:30:00.000Z'),
+    sessions: ports.sessions,
+    context: ports.context,
+  })
+
+  assert.equal(result.status, 'completed')
+  assert.notEqual(result.verification, 'pending')
+  if (result.verification !== 'pending') {
+    assert.equal(result.verification.status, 'verified')
+    assert.deepEqual(result.verification.errors, [])
+  }
+  assert.equal(ports.wasClosed(), true)
+})
+
+test('runtime returns a failed verification report when approval validation fails', async () => {
+  const task = signExecutableTask(buildSandboxBrowserTask({
+    ...base,
+    approvalToken: '',
+  }), 'runtime-invalid')
+  task.incidentId = 'incident-tampered-after-signing'
+  const ports = executablePorts()
+
+  const result = await runBrowserTask({
+    task,
+    signingSecret,
+    now: new Date('2026-07-15T19:30:00.000Z'),
+    sessions: ports.sessions,
+    context: ports.context,
+  })
+
+  assert.equal(result.status, 'failed')
+  assert.notEqual(result.verification, 'pending')
+  if (result.verification !== 'pending') {
+    assert.equal(result.verification.status, 'failed')
+    assert.ok(result.verification.errors.length > 0)
+  }
+  assert.equal(ports.wasClosed(), false)
 })

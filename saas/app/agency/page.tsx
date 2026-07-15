@@ -3,6 +3,7 @@
 import AgencyPricing from '@/components/agency/AgencyPricing'
 import PublicAgencyClient from '@/components/agency/PublicAgencyClient'
 import RenderCredits from '@/components/agency/RenderCredits'
+import VoiceStudio from '@/components/agency/VoiceStudio'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { getAgencyCopy } from '@/lib/i18n/agencyCopy'
 
@@ -24,6 +25,7 @@ export default function AgencyPage() {
         </div>
       </section>
       <div id="agency-client"><PublicAgencyClient copy={copy.client} /></div>
+      <VoiceStudio />
       <RenderCredits />
       <AgencyPricing copy={copy.pricing} />
       <section className="sb-page-shell sb-section" aria-label={copy.notes.complianceTitle}>

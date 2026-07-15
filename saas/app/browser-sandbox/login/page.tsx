@@ -8,13 +8,17 @@ export default function BrowserSandboxLoginPage() {
   const [view, setView] = useState<View>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [protectionMessage, setProtectionMessage] = useState('')
-  const [savedValue, setSavedValue] = useState('unchanged')
+  const [sandboxValue, setSandboxValue] = useState('unchanged')
+  const [savedValue, setSavedValue] = useState<string | null>(null)
 
   function submitLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!email || !password) return
     setView('dashboard')
+  }
+
+  function saveSandboxValue() {
+    setSavedValue(sandboxValue)
   }
 
   return (
@@ -82,35 +86,28 @@ export default function BrowserSandboxLoginPage() {
               <input
                 className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2"
                 name="sandboxValue"
-                defaultValue="unchanged"
+                value={sandboxValue}
+                onChange={event => {
+                  setSandboxValue(event.target.value)
+                  setSavedValue(null)
+                }}
               />
             </label>
-            <p
-              className="mt-3 text-sm text-slate-300"
-              data-sandbox-saved-value={savedValue}
-            >
-              Saved value: {savedValue}
-            </p>
-            <p className="mt-4 text-sm text-amber-200" id="protected-save-explanation">
-              A separate approval token is required. The pre-approval sandbox cannot save this value.
-            </p>
             <button
-              aria-describedby="protected-save-explanation"
-              className="mt-3 rounded-lg border border-amber-400 px-4 py-2 text-amber-300"
+              className="mt-4 rounded-lg border border-amber-400 px-4 py-2 text-amber-300"
               data-action="protected-save"
               type="button"
-              onClick={() => {
-                const input = document.querySelector<HTMLInputElement>('[name="sandboxValue"]')
-                const nextValue = input?.value || 'unchanged'
-                setSavedValue(nextValue)
-                setProtectionMessage('Protected save completed after owner approval.')
-              }}
+              onClick={saveSandboxValue}
             >
               Protected save
             </button>
-            {protectionMessage && (
-              <p className="mt-3 text-sm font-medium text-amber-200" data-browser-sandbox={protectionMessage.includes('completed') ? 'save-success' : undefined} role="status">
-                {protectionMessage}
+            {savedValue !== null && (
+              <p
+                className="mt-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-emerald-300"
+                data-browser-sandbox="save-success"
+                role="status"
+              >
+                Saved successfully: <span data-saved-value>{savedValue}</span>
               </p>
             )}
           </section>

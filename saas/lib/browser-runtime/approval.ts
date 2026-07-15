@@ -17,6 +17,12 @@ export interface BrowserApprovalClaims {
   checkpointStepId?: string
 }
 
+export interface BrowserApprovalVerificationScope {
+  expectedStepIds?: string[]
+  expectedPhase?: 1 | 2
+  expectedCheckpointStepId?: string
+}
+
 function encode(value: string): string {
   return Buffer.from(value, 'utf8').toString('base64url')
 }
@@ -44,7 +50,7 @@ export function verifyBrowserApprovalToken(
   task: BrowserTask,
   secret: string,
   now = new Date(),
-  expectedStepIds = task.steps.map(step => step.id),
+  scope: BrowserApprovalVerificationScope = {},
 ): BrowserApprovalClaims {
   if (!secret) throw new Error('Browser approval signing secret is required')
   const [payload, suppliedSignature, extra] = String(token || '').split('.')
@@ -57,6 +63,7 @@ export function verifyBrowserApprovalToken(
   }
 
   const claims = JSON.parse(decode(payload)) as BrowserApprovalClaims
+  const exactStepIds = scope.expectedStepIds ?? task.steps.map(step => step.id)
 
   if (claims.version !== 1) throw new Error('Unsupported browser approval token version')
   if (claims.taskId !== task.taskId) throw new Error('Approval token taskId mismatch')
@@ -67,11 +74,20 @@ export function verifyBrowserApprovalToken(
   if (claims.expiresAt !== task.expiresAt) throw new Error('Approval token expiry mismatch')
   if (new Date(claims.expiresAt).getTime() <= now.getTime()) throw new Error('Browser approval token expired')
   if (new Date(claims.issuedAt).getTime() > now.getTime() + 60_000) throw new Error('Browser approval token issued in the future')
-  if (JSON.stringify(claims.allowedStepIds) !== JSON.stringify(expectedStepIds)) {
+  if (JSON.stringify(claims.allowedStepIds) !== JSON.stringify(exactStepIds)) {
     throw new Error('Approval token does not authorize the exact browser steps')
   }
   if (JSON.stringify(claims.allowedOrigins) !== JSON.stringify(task.allowedOrigins)) {
     throw new Error('Approval token origin scope mismatch')
+  }
+  if (scope.expectedPhase !== undefined && claims.phase !== scope.expectedPhase) {
+    throw new Error(`Approval token phase mismatch: expected phase ${scope.expectedPhase}`)
+  }
+  if (
+    scope.expectedCheckpointStepId !== undefined &&
+    claims.checkpointStepId !== scope.expectedCheckpointStepId
+  ) {
+    throw new Error('Approval token checkpoint scope mismatch')
   }
 
   return claims

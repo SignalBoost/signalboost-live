@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildSandboxBrowserTask, SANDBOX_ADAPTER_ID } from '../lib/browser-runtime/sandbox-adapter.ts'
+import {
+  buildSandboxBrowserTask,
+  buildSandboxProtectedSaveTask,
+  SANDBOX_ADAPTER_ID,
+} from '../lib/browser-runtime/sandbox-adapter.ts'
 
 const base = {
   taskId: 'task-sandbox-1',
@@ -11,19 +15,30 @@ const base = {
   approvalToken: 'signed-token',
 }
 
-test('builds a bounded sandbox task ending at an approval checkpoint', () => {
+test('builds one bounded two-phase task with protected steps after the approval checkpoint', () => {
   const task = buildSandboxBrowserTask(base)
+  const checkpointIndex = task.steps.findIndex(step => step.kind === 'checkpoint')
+  const protectedSaveIndex = task.steps.findIndex(
+    step => step.kind === 'click' && step.selector === '[data-action="protected-save"]',
+  )
 
   assert.equal(task.provider, 'sandbox')
   assert.equal(task.adapterId, SANDBOX_ADAPTER_ID)
-  assert.equal(task.mode, 'observe')
+  assert.equal(task.mode, 'prepare_change')
   assert.deepEqual(task.allowedOrigins, ['http://localhost:4173'])
   assert.equal(task.steps[0]?.kind, 'navigate')
-  assert.equal(task.steps.at(-1)?.kind, 'checkpoint')
-  assert.equal(task.steps.some(step => step.kind === 'click' && step.selector === '[data-action="protected-save"]'), false)
+  assert.ok(checkpointIndex >= 0)
+  assert.ok(protectedSaveIndex > checkpointIndex)
+  assert.equal(
+    task.steps.slice(0, checkpointIndex).some(
+      step => step.kind === 'click' && step.selector === '[data-action="protected-save"]',
+    ),
+    false,
+  )
+  assert.equal(task.metadata?.phase, 'two-phase-resumable')
 })
 
-test('prepares the harmless sandbox value by reference before evidence and approval', () => {
+test('uses secret references rather than literal credential or setting values', () => {
   const task = buildSandboxBrowserTask(base)
   const fills = task.steps.filter(step => step.kind === 'fill')
 
@@ -32,41 +47,37 @@ test('prepares the harmless sandbox value by reference before evidence and appro
     [
       'sandbox://credentials/email',
       'sandbox://credentials/password',
-      'sandbox://config/test-environment-value',
+      'sandbox://settings/value',
     ],
   )
-
-  const fillIndex = task.steps.findIndex(step => step.id === 'fill-test-value')
-  const screenshotIndex = task.steps.findIndex(step => step.id === 'capture-ready')
-  const checkpointIndex = task.steps.findIndex(step => step.id === 'approval-checkpoint')
-
-  assert.ok(fillIndex >= 0)
-  assert.ok(screenshotIndex > fillIndex)
-  assert.ok(checkpointIndex > screenshotIndex)
 })
 
-test('rejects non-http sandbox URLs', () => {
+test('retains the separately bound replay task during resumable migration', () => {
+  const task = buildSandboxProtectedSaveTask({
+    ...base,
+    taskId: 'task-sandbox-save-1',
+    approvalToken: 'second-signed-token',
+  })
+
+  assert.equal(task.taskId, 'task-sandbox-save-1')
+  assert.equal(task.approvalToken, 'second-signed-token')
+  assert.notEqual(task.taskId, base.taskId)
+  assert.notEqual(task.approvalToken, base.approvalToken)
+  assert.equal(task.mode, 'prepare_change')
+  assert.equal(task.metadata?.phase, 'approved-save-legacy-replay')
+  assert.equal(task.steps.some(step => step.kind === 'checkpoint'), false)
+  assert.equal(task.steps.some(step => step.kind === 'click' && step.selector === '[data-action="protected-save"]'), true)
+  assert.equal(task.steps.some(step => step.kind === 'wait_for' && step.selector === '[data-browser-sandbox="save-success"]'), true)
+  assert.equal(task.steps.at(-1)?.kind, 'screenshot')
+})
+
+test('rejects non-http sandbox URLs for both phases', () => {
   assert.throws(
     () => buildSandboxBrowserTask({ ...base, baseUrl: 'file:///tmp/sandbox.html' }),
     /Unsupported sandbox protocol/,
   )
-})
-
-test('allows prepare_change but never execute_change input', () => {
-  const task = buildSandboxBrowserTask({ ...base, mode: 'prepare_change' })
-  assert.equal(task.mode, 'prepare_change')
-})
-
-test('builds the separately approved sandbox resume task with only remaining save steps', async () => {
-  const { buildSandboxBrowserResumeTask } = await import('../lib/browser-runtime/sandbox-adapter.ts')
-  const task = buildSandboxBrowserResumeTask(base)
-
-  assert.deepEqual(task.steps.map(step => step.id), [
-    'protected-save',
-    'wait-save-success',
-    'capture-final',
-  ])
-  assert.equal(task.steps[0]?.kind, 'click')
-  assert.equal(task.steps[0]?.kind === 'click' ? task.steps[0].selector : '', '[data-action="protected-save"]')
-  assert.equal(task.steps[1]?.kind === 'wait_for' ? task.steps[1].selector : '', '[data-browser-sandbox="save-success"]')
+  assert.throws(
+    () => buildSandboxProtectedSaveTask({ ...base, baseUrl: 'file:///tmp/sandbox.html' }),
+    /Unsupported sandbox protocol/,
+  )
 })

@@ -16,7 +16,6 @@ export interface PlaywrightPageLike {
   click(selector: string, options?: { timeout?: number }): Promise<unknown>
   fill(selector: string, value: string, options?: { timeout?: number }): Promise<unknown>
   waitForSelector(selector: string, options?: { timeout?: number }): Promise<unknown>
-  textContent?(selector: string): Promise<string | null>
 }
 
 export interface PlaywrightContextLike {
@@ -59,7 +58,6 @@ function adaptPage(page: PlaywrightPageLike): BrowserEnginePage {
     waitForSelector: async (selector, options) => {
       await page.waitForSelector(selector, { timeout: options?.timeoutMs })
     },
-    textContent: page.textContent ? selector => page.textContent?.(selector) ?? Promise.resolve(null) : undefined,
   }
 }
 

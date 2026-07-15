@@ -1,5 +1,5 @@
 // Portable Browser Runtime contracts.
-// This module must remain independent of Next.js, SignalBoost UI, Supabase, and provider SDKs.
+// This module must remain independent of Next.js UI, Supabase, and provider SDKs.
 
 export type BrowserTaskMode = 'observe' | 'prepare_change' | 'execute_change'
 export type BrowserTaskStatus = 'completed' | 'paused' | 'blocked' | 'failed'
@@ -36,24 +36,21 @@ export interface BrowserEvidence {
   url?: string
 }
 
-export interface BrowserEvidencePackage {
+export type BrowserVerificationStatus = 'verified' | 'failed'
+
+export interface BrowserVerificationCheck {
+  id: string
+  passed: boolean
+  summary: string
+}
+
+export interface BrowserVerificationReport {
   taskId: string
   incidentId: string
   provider: string
-  adapterId: string
-  approvalTokenDigest: string
-  startedAt: string
-  completedAt: string
-  orderedActionLog: BrowserEvidence[]
-  screenshots: string[]
-  finalUrl: string
-  browserRuntimeVersion: string
-  evidenceHash: string
-}
-
-export interface BrowserVerificationResult {
-  ok: boolean
-  checkedAt: string
+  status: BrowserVerificationStatus
+  verifiedAt: string
+  checks: BrowserVerificationCheck[]
   errors: string[]
 }
 
@@ -68,8 +65,7 @@ export interface BrowserTaskResult {
   pausedAtStepId?: string
   executionId?: string
   evidence: BrowserEvidence[]
-  evidencePackage?: BrowserEvidencePackage
-  verification: 'pending' | BrowserVerificationResult
+  verification: 'pending' | BrowserVerificationReport
   error?: string
 }
 
@@ -84,7 +80,6 @@ export interface BrowserPagePort {
   click(selector: string): Promise<void>
   fill(selector: string, value: string): Promise<void>
   waitForSelector(selector: string, timeoutMs?: number): Promise<void>
-  textContent?(selector: string): Promise<string | null>
 }
 
 export interface BrowserSessionPort {

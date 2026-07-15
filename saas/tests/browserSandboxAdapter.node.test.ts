@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildSandboxBrowserTask, SANDBOX_ADAPTER_ID } from '../lib/browser-runtime/sandbox-adapter'
+import { buildSandboxBrowserTask, SANDBOX_ADAPTER_ID } from '../lib/browser-runtime/sandbox-adapter.ts'
 
 const base = {
   taskId: 'task-sandbox-1',

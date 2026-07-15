@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
 
-async function openSandboxSettings(page: Parameters<Parameters<typeof test>[1]>[0]['page']) {
+async function openSandboxSettings(page: Page) {
   await page.goto('/browser-sandbox/login')
   await expect(page.getByText(/SignalBoost Browser Sandbox/i)).toBeVisible()
   await page.getByLabel('Email').fill('mission001@example.test')

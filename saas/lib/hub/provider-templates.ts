@@ -373,7 +373,7 @@ export const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     fields: [
       { id: 'key', label: 'Variable Key String', type: 'text', required: true, placeholder: 'NEXT_PUBLIC_API_URL' },
       { id: 'value', label: 'Variable Raw Secret Value', type: 'secret', required: true },
-      { id: 'target', label: 'Environment Deployment Ring', type: 'select', required: true, options: [
+      { id: 'target', label: 'Environment Deployment Ring', type: 'select', required: true, defaultValue: 'production', options: [
         { label: 'Production Only', value: 'production' },
         { label: 'All Environments (Prod/Preview/Dev)', value: 'all' }
       ]}

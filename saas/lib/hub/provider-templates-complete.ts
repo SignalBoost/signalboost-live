@@ -272,7 +272,7 @@ export const COMPLETE_TEMPLATES: Record<string, ProviderTemplate> = {
     fields: [
       { id: 'key', label: 'Key', type: 'text', required: true },
       { id: 'value', label: 'Value', type: 'text', required: true },
-      { id: 'target', label: 'Target (production/preview/development)', type: 'text', required: true },
+      { id: 'target', label: 'Target', type: 'select', required: true, defaultValue: 'production', options: [ { value: 'production', label: 'Production' }, { value: 'preview', label: 'Preview' }, { value: 'development', label: 'Development' } ] },
     ],
   },
   'vercel.list_domains': {

@@ -6,6 +6,7 @@ import { queueItemFromRecommendation } from '@/lib/cos/campaign-queue'
 import { autoPublishApprovedCampaign } from '@/lib/cos/campaign-queue/publish-core'
 import type { CosCampaignQueueStatus } from '@/lib/cos/campaign-queue'
 import { startSiteVideo } from '@/lib/operator/video'
+import { computeCampaignContentHash, withApprovalBinding } from '@/lib/cos/campaign-queue/approvalBinding'
 
 export const dynamic = 'force-dynamic'
 
@@ -346,8 +347,10 @@ export async function PATCH(req: NextRequest) {
   if (!idValue) return NextResponse.json({ ok: false, error: 'id is required' }, { status: 400 })
   const status = normalizeStatus(body?.status)
   if (!status) return NextResponse.json({ ok: false, error: 'Valid status is required.' }, { status: 400 })
+  let approvalRow: any = null
   if (status === 'approved') {
-    const { data: existing } = await ctx.admin.from('cos_campaign_queue').select('channel, metadata').eq('id', idValue).single()
+    const { data: existing } = await ctx.admin.from('cos_campaign_queue').select('*').eq('id', idValue).single()
+    approvalRow = existing
     const isVideoChannel = ['youtube', 'short_video'].includes(String(existing?.channel || ''))
     const vv: any = (existing?.metadata as any)?.video || {}
     if (isVideoChannel && (vv.branded !== true || !vv.voicedUrl)) return NextResponse.json({ ok: false, error: 'Approval blocked: preview required. The final branded video (SignalBoostAi + www.saas.signalboostapp.com burned in) is not ready yet — it must be previewable on the dashboard before this campaign can be approved.' }, { status: 409 })
@@ -357,6 +360,16 @@ export async function PATCH(req: NextRequest) {
   if (status === 'rejected') { patch.approved_by = null; patch.approved_at = null }
   if (body?.metadata !== undefined) patch.metadata = cleanDestination(body.metadata)
   if (body?.work_items !== undefined) patch.work_items = cleanDestination(body.work_items)
+  if (status === 'approved' && approvalRow) {
+    // Bind approval to the exact content being approved (Issue #205 Section 6.2).
+    const effective = {
+      ...approvalRow,
+      ...(patch.work_items !== undefined ? { work_items: patch.work_items } : {}),
+      metadata: patch.metadata !== undefined ? patch.metadata : approvalRow.metadata,
+    }
+    const contentHash = computeCampaignContentHash(effective)
+    patch.metadata = withApprovalBinding(effective.metadata, { approvedBy: ctx.user.id, contentHash })
+  }
   const { data, error } = await ctx.admin.from('cos_campaign_queue').update(patch).eq('id', idValue).select('*').single()
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
   await auditAdminAction({ admin: ctx.admin, actorId: ctx.user.id, action: `cos_campaign.${status}`, targetType: 'cos_campaign_queue', targetId: idValue, metadata: { fields: Object.keys(patch) } })

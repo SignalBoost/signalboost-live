@@ -1,6 +1,7 @@
 name: QA Scan
 
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
   pull_request:
@@ -13,10 +14,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.x'
-    - name: Run site checker
-      run: python site_checker.py
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      - name: Run site checker
+        run: python site_checker.py

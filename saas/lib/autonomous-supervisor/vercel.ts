@@ -1,20 +1,29 @@
-import { createHash, timingSafeEqual } from 'crypto'
+import { createHash, createHmac, timingSafeEqual } from 'crypto'
 import { getVercelDeployments } from '@/lib/hub/deployments-service'
-import { routeInfrastructureWrite } from '@/lib/infra-pr/router'
+import { stageInfrastructurePR } from '@/lib/hub/pr-engine'
 import type { DiagnosticResult, NormalizedIncidentPayload } from './types'
 
 function shortHash(value: string): string {
   return createHash('sha256').update(value).digest('hex').slice(0, 8).toUpperCase()
 }
 
-export function verifySupervisorWebhookSecret(rawBody: string, supplied: string | null): boolean {
+function equalHex(expected: string, supplied: string | null): boolean {
+  if (!supplied) return false
+  const normalized = supplied.replace(/^sha(1|256)=/i, '').trim().toLowerCase()
+  if (!/^[a-f0-9]+$/.test(normalized) || normalized.length !== expected.length) return false
+  return timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(normalized, 'hex'))
+}
+
+export function verifyVercelWebhookSignature(rawBody: string, supplied: string | null): boolean {
   const secret = process.env.COS_SUPERVISOR_WEBHOOK_SECRET || ''
   if (!secret) return false
-  const expected = createHash('sha256').update(`${secret}.${rawBody}`).digest('hex')
-  if (!supplied) return false
-  const a = Buffer.from(expected)
-  const b = Buffer.from(supplied.replace(/^sha256=/, ''))
-  return a.length === b.length && timingSafeEqual(a, b)
+  return equalHex(createHmac('sha1', secret).update(rawBody).digest('hex'), supplied)
+}
+
+export function verifySignalBoostSupervisorSignature(rawBody: string, supplied: string | null): boolean {
+  const secret = process.env.COS_SUPERVISOR_WEBHOOK_SECRET || ''
+  if (!secret) return false
+  return equalHex(createHmac('sha256', secret).update(rawBody).digest('hex'), supplied)
 }
 
 export async function normalizeVercelIncident(input: any): Promise<NormalizedIncidentPayload | null> {
@@ -25,7 +34,7 @@ export async function normalizeVercelIncident(input: any): Promise<NormalizedInc
 
   const project = String(deployment?.name || input?.project || input?.payload?.project?.name || process.env.VERCEL_PROJECT_NAME || 'signalboost-live')
   const rawLogs = String(input?.raw_logs || input?.logs || deployment?.errorMessage || deployment?.error || input?.payload?.error || '')
-  const summary = String(input?.error_summary || deployment?.errorMessage || deployment?.error || rawLogs.split('\n').find((l: string) => /error|failed/i.test(l)) || 'Vercel deployment failed.')
+  const summary = String(input?.error_summary || deployment?.errorMessage || deployment?.error || rawLogs.split('\n').find((line: string) => /error|failed/i.test(line)) || 'Vercel deployment failed.')
   const timestamp = new Date(input?.createdAt || input?.created_at || input?.timestamp || Date.now()).toISOString()
 
   let lastSuccessfulDeploy: string | null = input?.context?.last_successful_deploy || null
@@ -33,7 +42,7 @@ export async function normalizeVercelIncident(input: any): Promise<NormalizedInc
   const projectId = process.env.VERCEL_PROJECT_ID || ''
   if (!lastSuccessfulDeploy && token && projectId) {
     const deps = await getVercelDeployments(process.env.VERCEL_TEAM_ID || '', projectId, token, 20)
-    const ready = deps.deployments?.find(d => d.state === 'READY')
+    const ready = deps.deployments?.find(deploymentItem => deploymentItem.state === 'READY')
     if (ready?.createdAt) lastSuccessfulDeploy = new Date(ready.createdAt).toISOString()
   }
 
@@ -55,37 +64,38 @@ export async function normalizeVercelIncident(input: any): Promise<NormalizedInc
   }
 }
 
-function envKeyFromDiagnostic(diagnostic: DiagnosticResult, incident: NormalizedIncidentPayload): string | null {
-  const joined = [incident.error_summary, incident.raw_logs, diagnostic.diagnosis, ...diagnostic.repair_plan.map(p => p.action)].join('\n')
-  const match = joined.match(/\b([A-Z][A-Z0-9_]{2,})\b/g)?.find(k => /KEY|TOKEN|SECRET|ENV|URL|ID/.test(k))
-  return match || null
-}
+export async function stageApprovedInvestigation(incident: NormalizedIncidentPayload, diagnostic: DiagnosticResult) {
+  if (!diagnostic.requires_ui_agent) {
+    return { staged: false, mode: 'not_required' as const, message: 'The validated diagnosis does not require a UI agent.' }
+  }
 
-export async function dispatchUiAgentBackup(incident: NormalizedIncidentPayload, diagnostic: DiagnosticResult) {
-  if (!diagnostic.requires_ui_agent) return { staged: false, message: 'Diagnostic did not require a UI agent.' }
-  const key = envKeyFromDiagnostic(diagnostic, incident) || 'UNKNOWN_ENVIRONMENT_VARIABLE'
-  const repairedValue = process.env.COS_SUPERVISOR_TEST_REPAIRED_VALUE || 'REPAIRED_SUCCESSFULLY_12345'
-  const result = await routeInfrastructureWrite({
-    provider: 'vercel',
-    actionId: 'vercel.add_env_var',
-    verb: 'update',
-    role: 'owner',
-    title: `Autonomous supervisor repair for ${incident.project}`,
-    description: [
-      `Incident ${incident.incident_id} requires browser-agent backup for a Vercel environment-variable repair.`,
-      'The browser agent must navigate to the Vercel Environment Variables page, fill the repaired value, capture a screenshot, post it to the SignalBoost Hub UI, and hold for owner approval before saving or redeploying.',
+  const result = await stageInfrastructurePR({
+    title: `Supervisor investigation for ${incident.project}`,
+    summary: [
+      `Incident: ${incident.incident_id}`,
       `Diagnosis: ${diagnostic.diagnosis}`,
+      'This approval authorizes read-only inspection of Vercel environment-variable names and targets only.',
+      'It does not authorize entering values, saving changes, redeploying, exposing secrets, or launching an unconfigured browser runner.',
+      'A separate bounded approval is required before any production-changing executor action.',
     ].join('\n\n'),
-    payload: {
-      key,
-      value: repairedValue,
-      target: 'production',
-      supervisor_incident_id: incident.incident_id,
-      execution_mode: 'ui_agent_hold_for_approval',
-      approval_gate: 'Approve & Execute required before save/redeploy',
-    },
-    userId: 'autonomous-supervisor',
+    risk: diagnostic.risk_level === 'low' ? 'low' : diagnostic.risk_level === 'medium' ? 'medium' : 'high',
+    steps: [{
+      provider: 'vercel',
+      templateId: 'vercel.view_env',
+      label: `Read-only Vercel environment inspection for ${incident.incident_id}`,
+      payload: { supervisor_incident_id: incident.incident_id, inspection_only: true },
+    }],
+    createdBy: 'autonomous-supervisor',
+    createdByEmail: null,
   })
-  if (!result.ok) return { staged: false, message: result.error || 'Could not stage UI-agent backup.' }
-  return { staged: true, prId: result.pr_id, message: result.message || 'UI-agent backup staged for owner approval.' }
+
+  if (!result.ok || !result.pr) {
+    return { staged: false, mode: 'unavailable' as const, message: result.error || 'Could not stage the investigation in the active Infrastructure PR cockpit.' }
+  }
+  return {
+    staged: true,
+    mode: 'approval_review' as const,
+    prId: result.pr.id,
+    message: result.duplicate ? 'An identical read-only investigation is already awaiting approval.' : 'Read-only investigation staged in the active Infrastructure PR cockpit.',
+  }
 }

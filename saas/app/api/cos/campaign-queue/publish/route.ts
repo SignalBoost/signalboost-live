@@ -11,6 +11,7 @@ import { publishSocialPost, SOCIAL_CONNECTORS, type SocialPlatform } from '@/lib
 import { scoreCampaignReadiness } from '@/lib/cos/video-quality/campaign-scoring'
 import { buildTrackingUrl } from '@/lib/cos/campaign-queue/campaign-traffic'
 import { sendEmail } from '@/lib/email'
+import { campaignLanguage, resolveFinalVideoForLanguage, verifyApprovalBinding } from '@/lib/cos/campaign-queue/approvalBinding'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,28 +22,6 @@ const CHANNEL_TO_PLATFORM: Record<string, SocialPlatform | undefined> = {
 }
 
 const VIDEO_CHANNELS = ['youtube', 'short_video']
-
-function campaignLanguage(campaign: any): string {
-  const langs = Array.isArray(campaign.languages) ? campaign.languages.filter(Boolean).map(String) : []
-  if (langs.length) return langs[0]
-  const items = Array.isArray(campaign.work_items) ? campaign.work_items : []
-  const first = items.find((it: any) => it?.input?.language)
-  return first?.input?.language ? String(first.input.language) : ''
-}
-
-function finalVideoForLanguage(campaign: any, language: string): string | null {
-  const vmeta = campaign?.metadata?.video || {}
-  const voiced = vmeta.voiced && typeof vmeta.voiced === 'object' ? vmeta.voiced : {}
-  const brandedLangs = vmeta.brandedLangs && typeof vmeta.brandedLangs === 'object' ? vmeta.brandedLangs : {}
-  if (language && brandedLangs[language] && voiced[language]) return String(voiced[language])
-  const knownLangs = Array.from(new Set([
-    ...(Array.isArray(campaign.languages) ? campaign.languages.map(String) : []),
-    ...Object.keys(brandedLangs),
-    ...Object.keys(voiced),
-  ].filter(Boolean)))
-  if (knownLangs.length <= 1 && vmeta.branded === true && vmeta.voicedUrl) return String(vmeta.voicedUrl)
-  return null
-}
 
 export async function POST(req: NextRequest) {
   const ctx = await requireAdmin()
@@ -59,6 +38,12 @@ export async function POST(req: NextRequest) {
   // THE GATE: never publish anything that has not been approved.
   if (campaign.status !== 'approved') {
     return NextResponse.json({ ok: false, error: 'Campaign must be approved before publishing.' }, { status: 409 })
+  }
+
+  // VERSION BINDING: the live content must still match what the human approved.
+  const binding = verifyApprovalBinding(campaign)
+  if (!binding.ok) {
+    return NextResponse.json({ ok: false, error: binding.reason }, { status: 409 })
   }
 
   const platform = (body?.platform as SocialPlatform) || CHANNEL_TO_PLATFORM[String(campaign.channel)]
@@ -84,7 +69,7 @@ export async function POST(req: NextRequest) {
     if (vmeta.branded !== true) {
       return NextResponse.json({ ok: false, error: 'The mandatory SignalBoostAi brand banner is not on this video yet. Publishing is blocked.' }, { status: 409 })
     }
-    const exactFinal = finalVideoForLanguage(campaign, language)
+    const exactFinal = resolveFinalVideoForLanguage(campaign, language)
     if (!exactFinal) {
       return NextResponse.json({ ok: false, error: `No matching final branded video found for language ${language || 'unknown'}. Publishing refuses to fall back to another language/video.` }, { status: 409 })
     }

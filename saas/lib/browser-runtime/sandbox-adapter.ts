@@ -20,9 +20,8 @@ function normalizeBaseUrl(value: string): string {
   return url.origin
 }
 
-export function buildSandboxBrowserTask(input: SandboxTaskInput): BrowserTask {
-  const origin = normalizeBaseUrl(input.baseUrl)
-  const steps: BrowserTaskStep[] = [
+function navigationSteps(origin: string): BrowserTaskStep[] {
+  return [
     { id: 'open-login', kind: 'navigate', url: `${origin}/browser-sandbox/login` },
     { id: 'wait-login', kind: 'wait_for', selector: '[data-browser-sandbox="login"]' },
     { id: 'fill-email', kind: 'fill', selector: '[name="email"]', valueRef: 'sandbox://credentials/email' },
@@ -31,8 +30,16 @@ export function buildSandboxBrowserTask(input: SandboxTaskInput): BrowserTask {
     { id: 'wait-dashboard', kind: 'wait_for', selector: '[data-browser-sandbox="dashboard"]' },
     { id: 'open-settings', kind: 'click', selector: '[data-action="open-settings"]' },
     { id: 'wait-settings', kind: 'wait_for', selector: '[data-browser-sandbox="settings"]' },
+  ]
+}
+
+export function buildSandboxBrowserTask(input: SandboxTaskInput): BrowserTask {
+  const origin = normalizeBaseUrl(input.baseUrl)
+  const steps: BrowserTaskStep[] = [
+    ...navigationSteps(origin),
+    { id: 'fill-sandbox-value', kind: 'fill', selector: '[name="sandboxValue"]', valueRef: 'sandbox://settings/value' },
     { id: 'capture-ready', kind: 'screenshot', label: 'sandbox-settings-ready' },
-    { id: 'approval-checkpoint', kind: 'checkpoint', label: 'Ready to prepare sandbox change', requiresApproval: true },
+    { id: 'approval-checkpoint', kind: 'checkpoint', label: 'Ready to save sandbox change', requiresApproval: true },
   ]
 
   return {
@@ -40,12 +47,38 @@ export function buildSandboxBrowserTask(input: SandboxTaskInput): BrowserTask {
     incidentId: input.incidentId,
     provider: 'sandbox',
     adapterId: SANDBOX_ADAPTER_ID,
-    mode: input.mode ?? 'observe',
+    mode: input.mode ?? 'prepare_change',
     issuedAt: input.issuedAt,
     expiresAt: input.expiresAt,
     allowedOrigins: [origin],
     steps,
     approvalToken: input.approvalToken,
-    metadata: { sandboxVersion: 'v1' },
+    metadata: { sandboxVersion: 'v1', phase: 'prepare' },
+  }
+}
+
+export function buildSandboxProtectedSaveTask(input: SandboxTaskInput): BrowserTask {
+  const origin = normalizeBaseUrl(input.baseUrl)
+  const steps: BrowserTaskStep[] = [
+    ...navigationSteps(origin),
+    { id: 'fill-sandbox-value', kind: 'fill', selector: '[name="sandboxValue"]', valueRef: 'sandbox://settings/value' },
+    { id: 'capture-before-save', kind: 'screenshot', label: 'sandbox-before-protected-save' },
+    { id: 'protected-save', kind: 'click', selector: '[data-action="protected-save"]' },
+    { id: 'wait-save-success', kind: 'wait_for', selector: '[data-browser-sandbox="save-success"]' },
+    { id: 'capture-after-save', kind: 'screenshot', label: 'sandbox-after-protected-save' },
+  ]
+
+  return {
+    taskId: input.taskId,
+    incidentId: input.incidentId,
+    provider: 'sandbox',
+    adapterId: SANDBOX_ADAPTER_ID,
+    mode: 'prepare_change',
+    issuedAt: input.issuedAt,
+    expiresAt: input.expiresAt,
+    allowedOrigins: [origin],
+    steps,
+    approvalToken: input.approvalToken,
+    metadata: { sandboxVersion: 'v1', phase: 'approved-save' },
   }
 }

@@ -163,6 +163,8 @@ The portable Browser Runtime lives in `saas/lib/browser-runtime` and must remain
 The executable sandbox adapter uses adapter ID `signalboost.sandbox.v1` and the isolated `/browser-sandbox/login` route. Sandbox tasks must:
 
 - use only `http` or `https` origins explicitly listed in `allowedOrigins`;
+- re-check the live page origin after navigation and before and after click, fill, wait, and screenshot steps;
+- resolve secrets only while the live page remains on an approved origin, then re-check immediately before filling;
 - reference credentials through secret references such as `sandbox://credentials/email`, never literal values;
 - capture evidence before the approval boundary;
 - stop at a checkpoint requiring approval before any protected save;
@@ -613,6 +615,8 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-15: Added the autonomous Vercel supervisor PoC: signed failed-deployment webhook intake, normalized incident payloads, Gemini JSON diagnostics, and gated browser-agent/env-var repair staging through Infrastructure PRs with owner approval required before save or redeploy.
 
 - 2026-07-15: Added Mission 001 executable browser sandbox adapter: portable bounded task construction, local `/browser-sandbox/login` test portal, secret-reference credential resolution, evidence capture, and a mandatory approval checkpoint before any protected save. No production provider or credential is connected.
+
+- 2026-07-15: Hardened Mission 001 origin confinement: the runtime now validates the live page after navigation and around every browser interaction, rejects redirect escapes, and re-checks origin after secret resolution before filling.
 
 ## 20. Mandatory Final Reminder
 

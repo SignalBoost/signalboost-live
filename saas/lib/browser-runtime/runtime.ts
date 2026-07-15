@@ -7,11 +7,30 @@ import type {
   BrowserTaskResult,
 } from './contracts.ts'
 
-function assertAllowedOrigin(url: string, allowedOrigins: string[]): void {
-  const origin = new URL(url).origin
-  if (!allowedOrigins.includes(origin)) {
-    throw new Error(`Navigation origin is not approved: ${origin}`)
+function normalizeOrigin(value: string): string {
+  const url = new URL(value)
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error(`Browser runtime protocol is not approved: ${url.protocol}`)
   }
+  return url.origin
+}
+
+function assertAllowedOrigin(url: string, allowedOrigins: string[], context: string): string {
+  const origin = normalizeOrigin(url)
+  const approvedOrigins = allowedOrigins.map(normalizeOrigin)
+  if (!approvedOrigins.includes(origin)) {
+    throw new Error(`${context} origin is not approved: ${origin}`)
+  }
+  return url
+}
+
+function assertCurrentPageOrigin(
+  pageUrl: string,
+  allowedOrigins: string[],
+  stepId: string,
+  phase: 'before' | 'after',
+): string {
+  return assertAllowedOrigin(pageUrl, allowedOrigins, `Current page ${phase} step ${stepId}`)
 }
 
 function evidence(
@@ -46,6 +65,7 @@ export async function runBrowserTask(input: {
 
   try {
     verifyBrowserApprovalToken(task.approvalToken, task, signingSecret, input.now)
+    task.allowedOrigins.map(normalizeOrigin)
     session = await sessions.open(task)
 
     for (const step of task.steps) {
@@ -66,22 +86,32 @@ export async function runBrowserTask(input: {
       }
 
       if (step.kind === 'navigate') {
-        assertAllowedOrigin(step.url, task.allowedOrigins)
+        assertAllowedOrigin(step.url, task.allowedOrigins, `Navigation target for step ${step.id}`)
         await session.page.goto(step.url)
-        events.push(evidence(events.length + 1, step.id, 'navigation', 'Navigated to approved URL.', { url: step.url }))
+        const currentUrl = assertCurrentPageOrigin(session.page.url(), task.allowedOrigins, step.id, 'after')
+        events.push(evidence(events.length + 1, step.id, 'navigation', 'Navigated to approved URL.', { url: currentUrl }))
       } else if (step.kind === 'click') {
+        assertCurrentPageOrigin(session.page.url(), task.allowedOrigins, step.id, 'before')
         await session.page.click(step.selector)
-        events.push(evidence(events.length + 1, step.id, 'interaction', `Clicked approved selector ${step.selector}.`, { url: session.page.url() }))
+        const currentUrl = assertCurrentPageOrigin(session.page.url(), task.allowedOrigins, step.id, 'after')
+        events.push(evidence(events.length + 1, step.id, 'interaction', `Clicked approved selector ${step.selector}.`, { url: currentUrl }))
       } else if (step.kind === 'fill') {
+        assertCurrentPageOrigin(session.page.url(), task.allowedOrigins, step.id, 'before')
         const value = await context.resolveSecretRef(step.valueRef)
+        assertCurrentPageOrigin(session.page.url(), task.allowedOrigins, step.id, 'before')
         await session.page.fill(step.selector, value)
-        events.push(evidence(events.length + 1, step.id, 'interaction', `Filled approved selector ${step.selector} from a secret reference.`, { url: session.page.url() }))
+        const currentUrl = assertCurrentPageOrigin(session.page.url(), task.allowedOrigins, step.id, 'after')
+        events.push(evidence(events.length + 1, step.id, 'interaction', `Filled approved selector ${step.selector} from a secret reference.`, { url: currentUrl }))
       } else if (step.kind === 'wait_for') {
+        assertCurrentPageOrigin(session.page.url(), task.allowedOrigins, step.id, 'before')
         await session.page.waitForSelector(step.selector, step.timeoutMs)
-        events.push(evidence(events.length + 1, step.id, 'interaction', `Observed approved selector ${step.selector}.`, { url: session.page.url() }))
+        const currentUrl = assertCurrentPageOrigin(session.page.url(), task.allowedOrigins, step.id, 'after')
+        events.push(evidence(events.length + 1, step.id, 'interaction', `Observed approved selector ${step.selector}.`, { url: currentUrl }))
       } else if (step.kind === 'screenshot') {
+        assertCurrentPageOrigin(session.page.url(), task.allowedOrigins, step.id, 'before')
         const artifactRef = await context.captureScreenshot(step.label)
-        events.push(evidence(events.length + 1, step.id, 'screenshot', step.label, { artifactRef, url: session.page.url() }))
+        const currentUrl = assertCurrentPageOrigin(session.page.url(), task.allowedOrigins, step.id, 'after')
+        events.push(evidence(events.length + 1, step.id, 'screenshot', step.label, { artifactRef, url: currentUrl }))
       }
 
       completedStepIds.push(step.id)

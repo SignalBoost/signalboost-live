@@ -42,13 +42,17 @@ test('uses secret references rather than literal credential or setting values', 
   )
 })
 
-test('builds a separate approved task containing the protected save and verification', () => {
+test('builds a separately bound approved task containing the protected save and verification', () => {
   const task = buildSandboxProtectedSaveTask({
     ...base,
     taskId: 'task-sandbox-save-1',
     approvalToken: 'second-signed-token',
   })
 
+  assert.equal(task.taskId, 'task-sandbox-save-1')
+  assert.equal(task.approvalToken, 'second-signed-token')
+  assert.notEqual(task.taskId, base.taskId)
+  assert.notEqual(task.approvalToken, base.approvalToken)
   assert.equal(task.mode, 'prepare_change')
   assert.equal(task.metadata?.phase, 'approved-save')
   assert.equal(task.steps.some(step => step.kind === 'checkpoint'), false)

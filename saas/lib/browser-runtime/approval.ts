@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'crypto'
+import { createHash, createHmac, timingSafeEqual } from 'crypto'
 import type { BrowserTask, BrowserTaskMode } from './contracts.ts'
 
 export interface BrowserApprovalClaims {
@@ -13,6 +13,14 @@ export interface BrowserApprovalClaims {
   issuedAt: string
   expiresAt: string
   nonce: string
+  phase?: 1 | 2
+  checkpointStepId?: string
+}
+
+export interface BrowserApprovalVerificationScope {
+  expectedStepIds?: string[]
+  expectedPhase?: 1 | 2
+  expectedCheckpointStepId?: string
 }
 
 function encode(value: string): string {
@@ -27,6 +35,10 @@ function signature(payload: string, secret: string): string {
   return createHmac('sha256', secret).update(payload).digest('base64url')
 }
 
+export function digestBrowserApprovalToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex')
+}
+
 export function issueBrowserApprovalToken(claims: BrowserApprovalClaims, secret: string): string {
   if (!secret) throw new Error('Browser approval signing secret is required')
   const payload = encode(JSON.stringify(claims))
@@ -38,6 +50,7 @@ export function verifyBrowserApprovalToken(
   task: BrowserTask,
   secret: string,
   now = new Date(),
+  scope: BrowserApprovalVerificationScope = {},
 ): BrowserApprovalClaims {
   if (!secret) throw new Error('Browser approval signing secret is required')
   const [payload, suppliedSignature, extra] = String(token || '').split('.')
@@ -50,7 +63,7 @@ export function verifyBrowserApprovalToken(
   }
 
   const claims = JSON.parse(decode(payload)) as BrowserApprovalClaims
-  const exactStepIds = task.steps.map(step => step.id)
+  const exactStepIds = scope.expectedStepIds ?? task.steps.map(step => step.id)
 
   if (claims.version !== 1) throw new Error('Unsupported browser approval token version')
   if (claims.taskId !== task.taskId) throw new Error('Approval token taskId mismatch')
@@ -66,6 +79,15 @@ export function verifyBrowserApprovalToken(
   }
   if (JSON.stringify(claims.allowedOrigins) !== JSON.stringify(task.allowedOrigins)) {
     throw new Error('Approval token origin scope mismatch')
+  }
+  if (scope.expectedPhase !== undefined && claims.phase !== scope.expectedPhase) {
+    throw new Error(`Approval token phase mismatch: expected phase ${scope.expectedPhase}`)
+  }
+  if (
+    scope.expectedCheckpointStepId !== undefined &&
+    claims.checkpointStepId !== scope.expectedCheckpointStepId
+  ) {
+    throw new Error('Approval token checkpoint scope mismatch')
   }
 
   return claims

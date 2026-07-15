@@ -22,8 +22,9 @@ test.describe('Reviews module responsive SaaS page', () => {
     await page.goto('/dashboard/reviews')
 
     await expect(page.getByRole('region', { name: /Review filters and sorting/i })).toBeVisible()
-    await expect(page.getByRole('region', { name: /Review cards/i })).toBeVisible()
+    const reviewCards = page.getByRole('region', { name: /Review cards/i })
+    await expect(reviewCards).toBeVisible()
     await expect(page.getByText(guestNotice)).toBeVisible()
-    await expect(page.getByRole('button', { name: /Approve|Clear flag|Flag/i })).toHaveCount(0)
+    await expect(reviewCards.getByRole('button', { name: /Approve|Clear flag|Flag/i })).toHaveCount(0)
   })
 })

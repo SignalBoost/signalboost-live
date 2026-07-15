@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildSandboxBrowserTask, SANDBOX_ADAPTER_ID } from '../lib/browser-runtime/sandbox-adapter.ts'
+import {
+  buildSandboxBrowserTask,
+  buildSandboxProtectedSaveTask,
+  SANDBOX_ADAPTER_ID,
+} from '../lib/browser-runtime/sandbox-adapter.ts'
 
 const base = {
   taskId: 'task-sandbox-1',
@@ -11,36 +15,55 @@ const base = {
   approvalToken: 'signed-token',
 }
 
-test('builds a bounded sandbox task ending at an approval checkpoint', () => {
+test('builds a bounded sandbox preparation task ending at an approval checkpoint', () => {
   const task = buildSandboxBrowserTask(base)
 
   assert.equal(task.provider, 'sandbox')
   assert.equal(task.adapterId, SANDBOX_ADAPTER_ID)
-  assert.equal(task.mode, 'observe')
+  assert.equal(task.mode, 'prepare_change')
   assert.deepEqual(task.allowedOrigins, ['http://localhost:4173'])
   assert.equal(task.steps[0]?.kind, 'navigate')
   assert.equal(task.steps.at(-1)?.kind, 'checkpoint')
   assert.equal(task.steps.some(step => step.kind === 'click' && step.selector === '[data-action="protected-save"]'), false)
+  assert.equal(task.metadata?.phase, 'prepare')
 })
 
-test('uses secret references rather than credential values', () => {
+test('uses secret references rather than literal credential or setting values', () => {
   const task = buildSandboxBrowserTask(base)
   const fills = task.steps.filter(step => step.kind === 'fill')
 
   assert.deepEqual(
     fills.map(step => step.kind === 'fill' ? step.valueRef : ''),
-    ['sandbox://credentials/email', 'sandbox://credentials/password'],
+    [
+      'sandbox://credentials/email',
+      'sandbox://credentials/password',
+      'sandbox://settings/value',
+    ],
   )
 })
 
-test('rejects non-http sandbox URLs', () => {
+test('builds a separate approved task containing the protected save and verification', () => {
+  const task = buildSandboxProtectedSaveTask({
+    ...base,
+    taskId: 'task-sandbox-save-1',
+    approvalToken: 'second-signed-token',
+  })
+
+  assert.equal(task.mode, 'prepare_change')
+  assert.equal(task.metadata?.phase, 'approved-save')
+  assert.equal(task.steps.some(step => step.kind === 'checkpoint'), false)
+  assert.equal(task.steps.some(step => step.kind === 'click' && step.selector === '[data-action="protected-save"]'), true)
+  assert.equal(task.steps.some(step => step.kind === 'wait_for' && step.selector === '[data-browser-sandbox="save-success"]'), true)
+  assert.equal(task.steps.at(-1)?.kind, 'screenshot')
+})
+
+test('rejects non-http sandbox URLs for both phases', () => {
   assert.throws(
     () => buildSandboxBrowserTask({ ...base, baseUrl: 'file:///tmp/sandbox.html' }),
     /Unsupported sandbox protocol/,
   )
-})
-
-test('allows prepare_change but never execute_change input', () => {
-  const task = buildSandboxBrowserTask({ ...base, mode: 'prepare_change' })
-  assert.equal(task.mode, 'prepare_change')
+  assert.throws(
+    () => buildSandboxProtectedSaveTask({ ...base, baseUrl: 'file:///tmp/sandbox.html' }),
+    /Unsupported sandbox protocol/,
+  )
 })

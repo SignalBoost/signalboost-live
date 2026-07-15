@@ -590,6 +590,8 @@ Use this section for short notes when architecture, provider behavior, platform 
 
 - 2026-07-15: Refactored Console Hub provider-action form rendering toward zero-manual-fill controls: fixed option fields now reuse the shared searchable selector, live remote selectors no longer fall back to unrestricted manual typing, dependent selectors reset when parent selections change, single live options auto-select, and Vercel deployment target selectors default to production while keeping existing approval/confirmation gates.
 
+- 2026-07-15: Restored enterprise approval CI guard coverage in both the repository root and `saas/` workspace so root-level and SaaS package checks execute the same owner-approval/version-binding enforcement before merge.
+
 ## 20. Mandatory Final Reminder
 
 This file is the starting point.

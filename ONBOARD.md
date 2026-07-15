@@ -586,6 +586,8 @@ Use this section for short notes when architecture, provider behavior, platform 
 
 - 2026-07-15: Added Issue #205 Enterprise Memory doctrine implementation: enterprise memory tables, canonical URL fingerprint deduplication, memory-aware Enterprise Intelligence reuse, refresh-job concurrency guards, campaign/approval/confidence history, and CI guard scripts (`verify:issue-205`) for enterprise architecture, localization, and pipeline regressions.
 
+- 2026-07-15: Refactored Console Hub provider-action form rendering toward zero-manual-fill controls: fixed option fields now reuse the shared searchable selector, live remote selectors no longer fall back to unrestricted manual typing, dependent selectors reset when parent selections change, single live options auto-select, and Vercel deployment target selectors default to production while keeping existing approval/confirmation gates.
+
 ## 20. Mandatory Final Reminder
 
 This file is the starting point.

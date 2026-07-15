@@ -10,6 +10,7 @@ import {
   type ProviderFormField,
 } from '@/lib/hub/provider-templates'
 import { Lang, cardStyle, bodyStyle, labelStyle, monoStyle } from './shared'
+import { SearchableSelect } from '@/components/enterprise/SearchableSelect'
 import { useTranslation } from '@/components/i18n/useTranslation'
 
 // Providers migrated to the portable action engine. Their actions + pickers
@@ -96,7 +97,16 @@ export default function ProviderActionForm({
   }
 
   const handleFieldChange = (fieldId: string, value: unknown) => {
-    setValues(prev => ({ ...prev, [fieldId]: value }))
+    setValues(prev => {
+      const next = { ...prev, [fieldId]: value }
+      template.fields.forEach(candidate => {
+        const deps = candidate.source?.dependsOn || candidate.liveOptions?.dependsOn || []
+        if (deps.includes(fieldId)) {
+          delete next[candidate.id]
+        }
+      })
+      return next
+    })
 
     if (errors[fieldId]) {
       setErrors(prev => {
@@ -340,6 +350,15 @@ type FormFieldProps = {
 
 function FormField({ templateId, field, value, allValues, error, onChange }: FormFieldProps) {
   const { t } = useTranslation()
+
+  useEffect(() => {
+    if (field.type !== 'select' || value || !field.options?.length) return
+    const configuredDefault = field.defaultValue === undefined ? '' : String(field.defaultValue)
+    const firstSafeValue = configuredDefault || (field.options.length === 1 ? field.options[0].value : '')
+    if (firstSafeValue && field.options.some(option => option.value === firstSafeValue)) {
+      onChange(firstSafeValue)
+    }
+  }, [field, onChange, value])
   const baseStyle: CSSProperties = {
     width: '100%',
     padding: '11px 13px',
@@ -423,20 +442,14 @@ function FormField({ templateId, field, value, allValues, error, onChange }: For
 
       case 'select':
         return (
-          <select
+          <SearchableSelect
+            label={field.label}
+            options={(field.options || []).map(opt => ({ value: opt.value, label: opt.label }))}
             value={(value as string) || ''}
-            onChange={e => onChange(e.target.value)}
-            style={{ ...baseStyle, cursor: 'pointer' }}
-          >
-            <option value="" disabled style={{ color: '#111', background: '#fff' }}>
-              {field.placeholder || 'Select an option'}
-            </option>
-            {field.options?.map(opt => (
-              <option key={opt.value} value={opt.value} style={{ color: '#111', background: '#fff' }}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            onChange={onChange as (value: string) => void}
+            placeholder={field.placeholder || 'Search options'}
+            required={field.required}
+          />
         )
 
       case 'toggle':
@@ -458,7 +471,7 @@ function FormField({ templateId, field, value, allValues, error, onChange }: For
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
-      {field.type !== 'toggle' && (
+      {field.type !== 'toggle' && field.type !== 'select' && (
         <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 800, letterSpacing: '.1em', color: 'rgba(255,255,255,.62)' }}>
           <span aria-hidden="true" style={{ width: 4, height: 4, borderRadius: 999, background: '#1af0ff', flexShrink: 0 }} />
           {useVercelEnvPicker ? 'Environment Variable Target Key' : useStripeProductPicker ? 'Product' : field.label}
@@ -779,8 +792,8 @@ function RemoteSelect({
   const depValues = deps.map(d => String(allValues?.[d] ?? ''))
   const depsReady = deps.every((_d, i) => depValues[i] !== '')
   const depKey = JSON.stringify(depValues)
-  const listId = `remote-${field.id}-${source.action}`.replace(/[^a-zA-Z0-9_-]/g, '-')
 
+  const [reloadToken, setReloadToken] = useState(0)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [options, setOptions] = useState<{ label: string; value: string }[]>([])
@@ -821,9 +834,10 @@ function RemoteSelect({
         const hasDefault = defaultValue ? opts.some(o => o.value === defaultValue) : false
         const defaultBranch = String(res?.data?.defaultBranch || '')
         const hasDefaultBranch = defaultBranch ? opts.some(o => o.value === defaultBranch) : false
+        const singleValue = opts.length === 1 ? opts[0].value : ''
         const fallbackValue = field.id === 'branch' && source.action === 'github.list_branches'
-          ? hasDefault ? defaultValue : hasDefaultBranch ? defaultBranch : defaultValue
-          : defaultValue
+          ? hasDefault ? defaultValue : hasDefaultBranch ? defaultBranch : singleValue
+          : hasDefault ? defaultValue : singleValue
 
         if (!cur && fallbackValue) {
           onChange(fallbackValue)
@@ -839,7 +853,7 @@ function RemoteSelect({
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [depKey, depsReady, source.action, source.dataPath, source.valueKey, source.labelTemplate])
+  }, [depKey, depsReady, reloadToken, source.action, source.dataPath, source.valueKey, source.labelTemplate])
 
   const baseStyle: CSSProperties = {
     width: '100%', padding: '10px 12px', borderRadius: 8,
@@ -853,20 +867,24 @@ function RemoteSelect({
   const current = String(value ?? '')
   return (
     <div>
-      <input
-        list={listId}
+      <SearchableSelect
+        label={field.label}
+        options={options}
         value={current}
-        onChange={e => onChange(e.target.value)}
-        placeholder={loading ? 'Loading live options…' : loadError ? 'Fallback manual entry' : options.length ? 'Search or select…' : 'No live options found — fallback manual entry'}
-        style={baseStyle}
-        disabled={loading}
+        onChange={onChange as (value: string) => void}
+        placeholder={loading ? 'Loading live options…' : 'Search live options'}
+        disabled={loading || Boolean(loadError) || options.length === 0}
+        required={field.required}
       />
-      <datalist id={listId}>
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </datalist>
-      {loadError && <div style={{ fontSize: 11, color: 'rgba(239,68,68,.85)', marginTop: 4 }}>⚠️ {loadError}</div>}
+      {loading && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.55)', marginTop: 4 }}>Loading live provider values…</div>}
+      {loadError && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 6 }}>
+          <span style={{ fontSize: 11, color: 'rgba(239,68,68,.85)' }}>⚠️ {loadError}</span>
+          <button type="button" className="hub-chip" onClick={() => setReloadToken(token => token + 1)} style={{ ...secondaryButtonStyle, padding: '5px 9px', fontSize: 11 }}>Retry</button>
+        </div>
+      )}
       {!loading && !loadError && options.length > 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 4 }}>{source.action.startsWith('github.') ? 'Search live GitHub values.' : 'Search live provider values.'}</div>}
-      {!loading && !loadError && options.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 4 }}>{t('console.cui.nothing_to_select', 'Nothing to select here yet. Fallback manual entry is enabled.')}</div>}
+      {!loading && !loadError && options.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 4 }}>{t('console.cui.nothing_to_select', 'Nothing to select here yet. No manual fallback is available for live controlled fields.')}</div>}
     </div>
   )
 }

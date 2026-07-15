@@ -25,12 +25,12 @@ export const VERCEL_CONSOLE_TEMPLATES: Record<string, ProviderTemplate> = {
   'vercel.add_env_var': { id: 'vercel.add_env_var', label: 'Add Env Var', description: 'Create or update a Vercel environment variable through the guarded Hub action route.', icon: '➕', policyActionId: 'edit_vercel_env', previewBeforeSubmit: true, api: { service: 'vercel', method: 'POST', endpoint: '/v9/projects/{projectId}/env' }, fields: [
     { id: 'key', label: 'Variable Key', type: 'text', required: true, placeholder: 'NEXT_PUBLIC_API_URL' },
     { id: 'value', label: 'Variable Value', type: 'secret', required: true },
-    { id: 'target', label: 'Environment', type: 'select', required: true, options: [ { value: 'production', label: 'Production' }, { value: 'preview', label: 'Preview' }, { value: 'development', label: 'Development' }, { value: 'all', label: 'All Environments' } ] },
+    { id: 'target', label: 'Environment', type: 'select', required: true, defaultValue: 'production', options: [ { value: 'production', label: 'Production' }, { value: 'preview', label: 'Preview' }, { value: 'development', label: 'Development' }, { value: 'all', label: 'All Environments' } ] },
   ] },
   'vercel.edit_env': { id: 'vercel.edit_env', label: 'Edit Env Var', description: 'Update a Vercel environment variable value and/or target.', icon: '✏️', policyActionId: 'edit_vercel_env', previewBeforeSubmit: true, requiresConfirm: true, api: { service: 'vercel', method: 'PATCH', endpoint: '/v9/projects/{projectId}/env/{id}' }, fields: [
     { id: 'id', label: 'Environment Variable ID', type: 'text', required: true },
     { id: 'value', label: 'New Value', type: 'secret' },
-    { id: 'target', label: 'Environment', type: 'select', options: [ { value: 'production', label: 'Production' }, { value: 'preview', label: 'Preview' }, { value: 'development', label: 'Development' } ] },
+    { id: 'target', label: 'Environment', type: 'select', defaultValue: 'production', options: [ { value: 'production', label: 'Production' }, { value: 'preview', label: 'Preview' }, { value: 'development', label: 'Development' } ] },
   ] },
   'vercel.delete_env': { id: 'vercel.delete_env', label: 'Delete Env Var', description: 'Remove a Vercel environment variable after confirmation.', icon: '🗑️', policyActionId: 'delete_vercel_env', requiresConfirm: true, api: { service: 'vercel', method: 'DELETE', endpoint: '/v9/projects/{projectId}/env/{id}' }, fields: [ { id: 'id', label: 'Environment Variable ID', type: 'text', required: true } ] },
   'vercel.list_domains': { id: 'vercel.list_domains', label: 'Domains', description: 'List domains attached to the configured Vercel project.', icon: '🌐', policyActionId: 'read_provider_status', api: { service: 'vercel', method: 'GET', endpoint: '/v9/projects/{projectId}/domains' }, fields: [] },

@@ -268,6 +268,15 @@ export async function recordApproval(args: {
   approvalEvidence?: string
 }): Promise<void> {
   const admin = getAdminSupabase()
+  await admin.from('enterprise_approval_history').insert({
+    organization_id: args.organizationId,
+    campaign_id: args.campaignId,
+    decision: args.decision,
+    approved_version: args.approvedVersion ?? null,
+    content_hash: args.contentHash || '',
+    evidence: args.approvalEvidence || '',
+  })
+
   await admin.from('enterprise_campaign_memory').update({
     approval_decision: args.decision,
     approved_version: args.approvedVersion ?? null,

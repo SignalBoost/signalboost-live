@@ -14,7 +14,15 @@
     "worker:video": "node scripts/video-render-worker.mjs",
     "worker:cos-video": "node scripts/cos-video-production-worker.mjs",
     "migrate:pocketbase": "node scripts/pocketbase-migrate.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:enterprise-architecture": "node scripts/check-enterprise-architecture.mjs",
+    "check:enterprise-inputs": "node scripts/check-enterprise-architecture.mjs",
+    "check:enterprise-schemas": "node scripts/check-enterprise-architecture.mjs",
+    "check:enterprise-options": "node scripts/check-enterprise-architecture.mjs",
+    "check:enterprise-approval": "node scripts/check-enterprise-architecture.mjs",
+    "check:enterprise-localization": "node scripts/check-enterprise-localization.mjs",
+    "test:enterprise-pipeline": "node --test tests/enterpriseMemoryUrl.node.test.ts",
+    "verify:issue-205": "npm run check:enterprise-architecture && npm run check:enterprise-localization && npm run test:enterprise-pipeline && npm run typecheck"
   },
   "dependencies": {
     "next": "16.2.6",

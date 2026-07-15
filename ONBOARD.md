@@ -119,6 +119,7 @@ Sensitive actions must stay behind approval gates:
 - Spending money.
 - Creating or rotating provider keys.
 - Changing Vercel environment variables.
+- Autonomous deployment repair or browser-agent execution that would change production/provider state.
 - Modifying DNS or infrastructure.
 - Running database migrations.
 - Deleting or disabling resources.
@@ -374,6 +375,8 @@ Important doctrine for developers:
 - If a provider action exists in Console Hub, inspect the template and executor before claiming the action is missing.
 - If a provider template is changed, removed, renamed, or routed differently, update this onboarding document in the same PR.
 
+The autonomous Vercel supervisor PoC listens for signed failed-deployment webhooks at `/api/autonomous-supervisor/vercel`, normalizes incidents, asks Gemini for JSON-only diagnosis when configured, and only stages UI-agent/env-var repairs as gated Infrastructure PR proposals. Browser-agent backup must fill values, capture a screenshot for Hub review, and hold for explicit owner approval before saving, redeploying, or changing production state.
+
 The system can stage or execute provider operations through Console Hub templates, including:
 
 - Provider API calls.
@@ -591,6 +594,7 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-15: Refactored Console Hub provider-action form rendering toward zero-manual-fill controls: fixed option fields now reuse the shared searchable selector, live remote selectors no longer fall back to unrestricted manual typing, dependent selectors reset when parent selections change, single live options auto-select, and Vercel deployment target selectors default to production while keeping existing approval/confirmation gates.
 
 - 2026-07-15: Restored enterprise approval CI guard coverage in both the repository root and `saas/` workspace so root-level and SaaS package checks execute the same owner-approval/version-binding enforcement before merge.
+- 2026-07-15: Added the autonomous Vercel supervisor PoC: signed failed-deployment webhook intake, normalized incident payloads, Gemini JSON diagnostics, and gated browser-agent/env-var repair staging through Infrastructure PRs with owner approval required before save or redeploy.
 
 ## 20. Mandatory Final Reminder
 

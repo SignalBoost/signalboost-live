@@ -156,6 +156,7 @@ const PRODUCT_GROUPS: Group[] = [
       { icon: '🎬', label: 'Video Studio', href: '/dashboard/video', desc: 'Create videos, clips, and captions.' },
       { icon: '🎧', label: 'Audio Studio', href: '/dashboard/audio', desc: 'Generate voice and audio content.' },
       { icon: '🎨', label: 'Creative Studio', href: '/dashboard/creative', desc: 'Visual assets and campaign graphics.' },
+      { icon: '🎥', label: 'Campaign Studio', href: '/agency', desc: 'One prompt to a full campaign, voiceover, and render credits.' },
     ],
   },
   {

@@ -3,8 +3,8 @@ import type {
   BrowserSessionFactory,
   BrowserSessionPort,
   BrowserTask,
-} from './contracts'
-import type { BrowserLaunchProfile, BrowserLaunchProfileProvider } from './launch-profile'
+} from './contracts.ts'
+import type { BrowserLaunchProfile, BrowserLaunchProfileProvider } from './launch-profile.ts'
 
 export interface BrowserEnginePage {
   url(): string

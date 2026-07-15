@@ -6,7 +6,7 @@ import {
   type PlaywrightChromiumLike,
   type PlaywrightContextLike,
   type PlaywrightPageLike,
-} from '../lib/browser-runtime/playwright-launcher'
+} from '../lib/browser-runtime/playwright-launcher.ts'
 
 function fixture() {
   const calls: Array<{ name: string; args?: unknown }> = []

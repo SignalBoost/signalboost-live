@@ -20,6 +20,7 @@ import { getValidSocialToken } from '@/lib/outreach/social-token'
 import { publishSocialPost, SOCIAL_CONNECTORS, type SocialPlatform } from '@/lib/outreach/social-connectors'
 import { scoreCampaignReadiness } from '@/lib/cos/video-quality/campaign-scoring'
 import { buildTrackingUrl } from '@/lib/cos/campaign-queue/campaign-traffic'
+import { verifyApprovalBinding } from '@/lib/cos/campaign-queue/approvalBinding'
 import { sendEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
@@ -70,6 +71,12 @@ async function publishOne(sb: any, campaign: any): Promise<{ status: 'published'
   const approvedBy = String(campaign.approved_by || '')
   if (!UUID_RE.test(approvedBy)) {
     return { status: 'blocked', note: 'no approver uuid on record — approve via the dashboard so the publisher knows whose account to use' }
+  }
+
+  // VERSION BINDING: never auto-publish content that changed after approval.
+  const binding = verifyApprovalBinding(campaign)
+  if (!binding.ok) {
+    return { status: 'blocked', note: binding.reason }
   }
 
   const readiness = scoreCampaignReadiness(campaign)

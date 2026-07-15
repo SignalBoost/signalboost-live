@@ -156,6 +156,21 @@ Creative production layer: video, images, audio, voice, captions, thumbnails, pr
 
 Deployment and release coordination: Vercel, GitHub, Supabase, provider readiness, and integration validation.
 
+### Browser Runtime (Mission 001)
+
+The portable Browser Runtime lives in `saas/lib/browser-runtime` and must remain independent of Next.js UI, Supabase, and provider SDKs. Mission 001 advances the runtime only through bounded, testable slices.
+
+The executable sandbox adapter uses adapter ID `signalboost.sandbox.v1` and the isolated `/browser-sandbox/login` route. Sandbox tasks must:
+
+- use only `http` or `https` origins explicitly listed in `allowedOrigins`;
+- reference credentials through secret references such as `sandbox://credentials/email`, never literal values;
+- capture evidence before the approval boundary;
+- stop at a checkpoint requiring approval before any protected save;
+- never include a protected-save click in the pre-approval task; and
+- remain local/test-only until a separately reviewed production provider adapter is approved.
+
+The sandbox launch profile rejects `execute_change` tasks. Production/provider state changes, credential use, saves, redeploys, financial actions, and other sensitive operations remain outside Mission 001 unless Luis explicitly approves them through the existing governed approval flow.
+
 ### Owner/Admin
 
 High-privilege administration. Use strict owner/admin role gates.
@@ -594,7 +609,10 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-15: Refactored Console Hub provider-action form rendering toward zero-manual-fill controls: fixed option fields now reuse the shared searchable selector, live remote selectors no longer fall back to unrestricted manual typing, dependent selectors reset when parent selections change, single live options auto-select, and Vercel deployment target selectors default to production while keeping existing approval/confirmation gates.
 
 - 2026-07-15: Restored enterprise approval CI guard coverage in both the repository root and `saas/` workspace so root-level and SaaS package checks execute the same owner-approval/version-binding enforcement before merge.
+
 - 2026-07-15: Added the autonomous Vercel supervisor PoC: signed failed-deployment webhook intake, normalized incident payloads, Gemini JSON diagnostics, and gated browser-agent/env-var repair staging through Infrastructure PRs with owner approval required before save or redeploy.
+
+- 2026-07-15: Added Mission 001 executable browser sandbox adapter: portable bounded task construction, local `/browser-sandbox/login` test portal, secret-reference credential resolution, evidence capture, and a mandatory approval checkpoint before any protected save. No production provider or credential is connected.
 
 ## 20. Mandatory Final Reminder
 

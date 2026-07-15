@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
-import Concierge from '@/components/Concierge'
+import AppShell from '@/components/layout/AppShell'
 import LanguageSuggestion from '@/components/LanguageSuggestion'
 import ProductContextBridge from '@/components/ProductContextBridge'
 import { I18nProvider } from '@/components/i18n/I18nProvider'
@@ -130,10 +130,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Navbar />
           <ProductContextBridge />
           <main style={{ flex: 1, position: 'relative', zIndex: 1 }}>
-            {children}
+            <AppShell>{children}</AppShell>
           </main>
           <Footer />
-          <Concierge />
           <LanguageSuggestion />
         </I18nProvider>
         <Analytics />

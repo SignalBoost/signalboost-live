@@ -20,6 +20,7 @@ test('sandbox portal prepares a value but blocks protected save before approval'
   await valueInput.fill('browser-runtime-test-001')
   await expect(valueInput).toHaveValue('browser-runtime-test-001')
   await expect(savedValue).toHaveText(/Saved value: unchanged/i)
+  await expect(page.getByText(/A separate approval token is required/i)).toBeVisible()
 
   await protectedSave.click()
 

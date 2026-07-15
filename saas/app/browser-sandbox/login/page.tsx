@@ -8,11 +8,17 @@ export default function BrowserSandboxLoginPage() {
   const [view, setView] = useState<View>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [sandboxValue, setSandboxValue] = useState('unchanged')
+  const [savedValue, setSavedValue] = useState<string | null>(null)
 
   function submitLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!email || !password) return
     setView('dashboard')
+  }
+
+  function saveSandboxValue() {
+    setSavedValue(sandboxValue)
   }
 
   return (
@@ -80,16 +86,30 @@ export default function BrowserSandboxLoginPage() {
               <input
                 className="w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2"
                 name="sandboxValue"
-                defaultValue="unchanged"
+                value={sandboxValue}
+                onChange={event => {
+                  setSandboxValue(event.target.value)
+                  setSavedValue(null)
+                }}
               />
             </label>
             <button
               className="mt-4 rounded-lg border border-amber-400 px-4 py-2 text-amber-300"
               data-action="protected-save"
               type="button"
+              onClick={saveSandboxValue}
             >
               Protected save
             </button>
+            {savedValue !== null && (
+              <p
+                className="mt-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-emerald-300"
+                data-browser-sandbox="save-success"
+                role="status"
+              >
+                Saved successfully: <span data-saved-value>{savedValue}</span>
+              </p>
+            )}
           </section>
         )}
       </div>

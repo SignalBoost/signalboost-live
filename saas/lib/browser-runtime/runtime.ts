@@ -6,6 +6,7 @@ import type {
   BrowserTask,
   BrowserTaskResult,
 } from './contracts.ts'
+import { verifyBrowserTaskResult } from './verification.ts'
 
 function normalizeOrigin(value: string): string {
   const url = new URL(value)
@@ -50,6 +51,13 @@ function evidence(
   }
 }
 
+function finalizeResult(task: BrowserTask, result: BrowserTaskResult, now?: Date): BrowserTaskResult {
+  return {
+    ...result,
+    verification: verifyBrowserTaskResult(task, result, now ?? new Date()),
+  }
+}
+
 export async function runBrowserTask(input: {
   task: BrowserTask
   signingSecret: string
@@ -71,7 +79,7 @@ export async function runBrowserTask(input: {
     for (const step of task.steps) {
       if (step.kind === 'checkpoint') {
         events.push(evidence(events.length + 1, step.id, 'checkpoint', step.label))
-        return {
+        return finalizeResult(task, {
           taskId: task.taskId,
           incidentId: task.incidentId,
           provider: task.provider,
@@ -82,7 +90,7 @@ export async function runBrowserTask(input: {
           pausedAtStepId: step.id,
           evidence: events,
           verification: 'pending',
-        }
+        }, input.now)
       }
 
       if (step.kind === 'navigate') {
@@ -117,7 +125,7 @@ export async function runBrowserTask(input: {
       completedStepIds.push(step.id)
     }
 
-    return {
+    return finalizeResult(task, {
       taskId: task.taskId,
       incidentId: task.incidentId,
       provider: task.provider,
@@ -127,11 +135,11 @@ export async function runBrowserTask(input: {
       completedStepIds,
       evidence: events,
       verification: 'pending',
-    }
+    }, input.now)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown browser runtime error'
     events.push(evidence(events.length + 1, 'runtime', 'error', message))
-    return {
+    return finalizeResult(task, {
       taskId: task.taskId,
       incidentId: task.incidentId,
       provider: task.provider,
@@ -142,7 +150,7 @@ export async function runBrowserTask(input: {
       evidence: events,
       verification: 'pending',
       error: message,
-    }
+    }, input.now)
   } finally {
     await session?.close().catch(() => undefined)
   }

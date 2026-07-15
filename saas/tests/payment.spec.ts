@@ -1,26 +1,23 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test'
 
-test('Stripe payment checkout flow', async ({ page }) => {
-  // Use relative path
-  await page.goto('/pricing');
-  
-  // Click upgrade
-  const upgradeButton = page.getByRole('link', { name: /Upgrade Now|Get Started/i }).first();
-  await upgradeButton.click();
+test('pricing checkout prepares a mocked Stripe handoff without a real payment', async ({ page }) => {
+  let checkoutRequest: { plan?: string; productLine?: string } | null = null
 
-  // Wait for payment provider page
-  await page.waitForURL(/.*stripe.*/);
+  await page.addInitScript(() => localStorage.setItem('signalboost_language', 'en'))
+  await page.route('**/api/checkout', async route => {
+    checkoutRequest = route.request().postDataJSON()
+    const origin = new URL(route.request().url()).origin
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ url: `${origin}/pricing?checkout=mock` }),
+    })
+  })
 
-  // Fill test card details
-  await page.getByLabel('Email').fill('test@example.com');
-  await page.getByLabel('Card number').fill('4242' + '4242' + '4242' + '4242');
-  await page.getByLabel('Expiry').fill('12/26');
-  await page.getByLabel('CVC').fill('123');
-  await page.getByLabel('Name on card').fill('Test User');
-  
-  // Pay
-  await page.getByRole('button', { name: /Pay/i }).click();
+  await page.goto('/pricing')
+  await page.getByRole('tab', { name: /Core Platform/i }).click()
+  await page.getByRole('button', { name: /Upgrade Now/i }).first().click()
 
-  // Success check
-  await expect(page).toHaveURL(/.*success.*/);
-});
+  await expect(page).toHaveURL(/\/pricing\?checkout=mock$/)
+  expect(checkoutRequest).toEqual({ plan: 'launch', productLine: 'platform' })
+})

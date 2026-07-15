@@ -1,4 +1,4 @@
-import type { BrowserTask } from './contracts'
+import type { BrowserTask } from './contracts.ts'
 
 export interface BrowserLaunchProfile {
   id: string

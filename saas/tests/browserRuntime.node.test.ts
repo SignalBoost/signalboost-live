@@ -1,9 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { issueBrowserApprovalToken } from '../lib/browser-runtime/approval'
-import { runBrowserTask } from '../lib/browser-runtime/runtime'
-import type { BrowserApprovalClaims } from '../lib/browser-runtime/approval'
-import type { BrowserTask } from '../lib/browser-runtime/contracts'
+import { issueBrowserApprovalToken } from '../lib/browser-runtime/approval.ts'
+import { runBrowserTask } from '../lib/browser-runtime/runtime.ts'
+import type { BrowserApprovalClaims } from '../lib/browser-runtime/approval.ts'
+import type { BrowserTask } from '../lib/browser-runtime/contracts.ts'
 
 const secret = 'test-signing-secret'
 

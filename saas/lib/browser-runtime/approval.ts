@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'crypto'
-import type { BrowserTask, BrowserTaskMode } from './contracts'
+import type { BrowserTask, BrowserTaskMode } from './contracts.ts'
 
 export interface BrowserApprovalClaims {
   version: 1

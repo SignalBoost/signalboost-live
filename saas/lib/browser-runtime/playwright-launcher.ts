@@ -5,7 +5,7 @@ import type {
   BrowserEngineLaunchOptions,
   BrowserEngineLauncher,
   BrowserEnginePage,
-} from './session-factory'
+} from './session-factory.ts'
 
 // Structural Playwright contracts keep the portable runtime independent from a
 // specific Playwright package version. Hosts may supply chromium from either

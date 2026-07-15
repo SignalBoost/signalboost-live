@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import type { BrowserTask } from '../lib/browser-runtime/contracts'
-import { SandboxBrowserLaunchProfileProvider } from '../lib/browser-runtime/launch-profile'
-import { DefaultBrowserSessionFactory, type BrowserEngineLaunchOptions } from '../lib/browser-runtime/session-factory'
+import type { BrowserTask } from '../lib/browser-runtime/contracts.ts'
+import { SandboxBrowserLaunchProfileProvider } from '../lib/browser-runtime/launch-profile.ts'
+import { DefaultBrowserSessionFactory, type BrowserEngineLaunchOptions } from '../lib/browser-runtime/session-factory.ts'
 
 function task(overrides: Partial<BrowserTask> = {}): BrowserTask {
   return {

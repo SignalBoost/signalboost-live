@@ -1,19 +1,30 @@
 import { expect, test } from '@playwright/test'
 
-test.describe('Unified NASA-style SignalBoost cockpit', () => {
-  test('admin overview renders accessible executive cockpit', async ({ page }) => {
+test.describe('Unified SignalBoost public shell', () => {
+  test('admin route keeps guest users outside the restricted console', async ({ page }) => {
     await page.goto('/admin')
-    await expect(page.getByRole('banner', { name: /Executive Dashboard/i })).toBeVisible()
-    await expect(page.getByRole('link', { name: /Marketplace Monitor/i })).toBeVisible()
-    await expect(page.getByRole('region', { name: /Cockpit panels/i })).toBeVisible()
+
+    await expect(page).toHaveURL(/\/$/)
+    await expect(page.getByRole('banner', { name: /Owner Console/i })).toHaveCount(0)
   })
 
-  test('concierge supports keyboard-driven marketplace and SaaS prompts', async ({ page }) => {
+  test('concierge supports keyboard-driven prompts without a live AI dependency', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('signalboost_language', 'en'))
+    await page.route('**/api/concierge', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ reply: 'Marketplace outreach forecast is ready for review.' }),
+      })
+    })
+
     await page.goto('/')
     await page.getByRole('button', { name: /Concierge/i }).click()
-    await expect(page.getByRole('dialog', { name: /AI Concierge/i })).toBeVisible()
-    await page.getByLabel(/Ask anything/i).fill('Show outreach campaign forecasts for marketplace partners')
+
+    const concierge = page.getByRole('complementary', { name: /Concierge/i })
+    await expect(concierge).toBeVisible()
+    await concierge.getByLabel(/Ask anything/i).fill('Show outreach campaign forecasts for marketplace partners')
     await page.keyboard.press('Enter')
-    await expect(page.getByRole('log')).toContainText(/Outreach|Marketplace|forecast/i)
+    await expect(concierge.getByRole('log')).toContainText(/Marketplace outreach forecast/i)
   })
 })

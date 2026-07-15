@@ -6,8 +6,8 @@ import {
   type BrowserEngineContext,
   type BrowserEngineLauncher,
   type BrowserEnginePage,
-} from '../lib/browser-runtime/session-factory'
-import type { BrowserTask } from '../lib/browser-runtime/contracts'
+} from '../lib/browser-runtime/session-factory.ts'
+import type { BrowserTask } from '../lib/browser-runtime/contracts.ts'
 
 const task: BrowserTask = {
   taskId: 'task-1',

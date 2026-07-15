@@ -8,6 +8,7 @@ export default function BrowserSandboxLoginPage() {
   const [view, setView] = useState<View>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [protectionMessage, setProtectionMessage] = useState('')
 
   function submitLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -83,13 +84,29 @@ export default function BrowserSandboxLoginPage() {
                 defaultValue="unchanged"
               />
             </label>
+            <p
+              className="mt-3 text-sm text-slate-300"
+              data-sandbox-saved-value="unchanged"
+            >
+              Saved value: unchanged
+            </p>
+            <p className="mt-4 text-sm text-amber-200" id="protected-save-explanation">
+              A separate approval token is required. The pre-approval sandbox cannot save this value.
+            </p>
             <button
-              className="mt-4 rounded-lg border border-amber-400 px-4 py-2 text-amber-300"
+              aria-describedby="protected-save-explanation"
+              className="mt-3 rounded-lg border border-amber-400 px-4 py-2 text-amber-300"
               data-action="protected-save"
               type="button"
+              onClick={() => setProtectionMessage('Protected save blocked: owner approval is required.')}
             >
               Protected save
             </button>
+            {protectionMessage && (
+              <p className="mt-3 text-sm font-medium text-amber-200" role="status">
+                {protectionMessage}
+              </p>
+            )}
           </section>
         )}
       </div>

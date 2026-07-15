@@ -23,14 +23,26 @@ test('builds a bounded sandbox task ending at an approval checkpoint', () => {
   assert.equal(task.steps.some(step => step.kind === 'click' && step.selector === '[data-action="protected-save"]'), false)
 })
 
-test('uses secret references rather than credential values', () => {
+test('prepares the harmless sandbox value by reference before evidence and approval', () => {
   const task = buildSandboxBrowserTask(base)
   const fills = task.steps.filter(step => step.kind === 'fill')
 
   assert.deepEqual(
     fills.map(step => step.kind === 'fill' ? step.valueRef : ''),
-    ['sandbox://credentials/email', 'sandbox://credentials/password'],
+    [
+      'sandbox://credentials/email',
+      'sandbox://credentials/password',
+      'sandbox://config/test-environment-value',
+    ],
   )
+
+  const fillIndex = task.steps.findIndex(step => step.id === 'fill-test-value')
+  const screenshotIndex = task.steps.findIndex(step => step.id === 'capture-ready')
+  const checkpointIndex = task.steps.findIndex(step => step.id === 'approval-checkpoint')
+
+  assert.ok(fillIndex >= 0)
+  assert.ok(screenshotIndex > fillIndex)
+  assert.ok(checkpointIndex > screenshotIndex)
 })
 
 test('rejects non-http sandbox URLs', () => {

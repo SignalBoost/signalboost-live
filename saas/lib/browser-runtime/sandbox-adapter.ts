@@ -31,8 +31,19 @@ export function buildSandboxBrowserTask(input: SandboxTaskInput): BrowserTask {
     { id: 'wait-dashboard', kind: 'wait_for', selector: '[data-browser-sandbox="dashboard"]' },
     { id: 'open-settings', kind: 'click', selector: '[data-action="open-settings"]' },
     { id: 'wait-settings', kind: 'wait_for', selector: '[data-browser-sandbox="settings"]' },
+    {
+      id: 'fill-test-value',
+      kind: 'fill',
+      selector: '[name="sandboxValue"]',
+      valueRef: 'sandbox://config/test-environment-value',
+    },
     { id: 'capture-ready', kind: 'screenshot', label: 'sandbox-settings-ready' },
-    { id: 'approval-checkpoint', kind: 'checkpoint', label: 'Ready to prepare sandbox change', requiresApproval: true },
+    {
+      id: 'approval-checkpoint',
+      kind: 'checkpoint',
+      label: 'Sandbox value prepared; owner approval is required before protected save',
+      requiresApproval: true,
+    },
   ]
 
   return {

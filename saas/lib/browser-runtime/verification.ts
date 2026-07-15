@@ -7,12 +7,6 @@ import type {
   BrowserVerificationReport,
 } from './contracts.ts'
 
-export type {
-  BrowserVerificationCheck,
-  BrowserVerificationReport,
-  BrowserVerificationStatus,
-} from './contracts.ts'
-
 function expectedEvidenceKind(step: BrowserTaskStep): BrowserEvidence['kind'] {
   if (step.kind === 'navigate') return 'navigation'
   if (step.kind === 'screenshot') return 'screenshot'

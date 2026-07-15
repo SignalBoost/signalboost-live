@@ -1,11 +1,11 @@
-import { verifyBrowserApprovalToken } from './approval'
+import { verifyBrowserApprovalToken } from './approval.ts'
 import type {
   BrowserAdapterContext,
   BrowserEvidence,
   BrowserSessionFactory,
   BrowserTask,
   BrowserTaskResult,
-} from './contracts'
+} from './contracts.ts'
 
 function assertAllowedOrigin(url: string, allowedOrigins: string[]): void {
   const origin = new URL(url).origin

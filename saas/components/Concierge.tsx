@@ -288,12 +288,14 @@ export default function Concierge() {
           type="button"
           aria-expanded={open}
           aria-controls="signalboost-concierge-panel"
+          aria-label={t(dict, 'concierge.button', '✨ Concierge')}
           onClick={() => setOpen(true)}
           className="sb-ai-dock-tab"
+          title={t(dict, 'concierge.button', '✨ Concierge')}
         >
           <span aria-hidden>✨</span>
-          <span>AI</span>
-          <span className="sr-only">{t(dict, 'concierge.button', 'Concierge')}</span>
+          <span>Concierge</span>
+          <span className="sr-only">{t(dict, 'concierge.button', '✨ Concierge')}</span>
         </button>
       )}
 
@@ -301,7 +303,7 @@ export default function Concierge() {
         <aside
           id="signalboost-concierge-panel"
           role="complementary"
-          aria-label={t(dict, 'concierge.title', 'AI Concierge')}
+          aria-label={t(dict, 'concierge.title', '✨ Concierge')}
           aria-keyshortcuts="Control+K Meta+K Escape"
           onDragOver={e => { e.preventDefault(); if (!dragOver) setDragOver(true) }}
           onDragLeave={e => { e.preventDefault(); if (e.currentTarget === e.target) setDragOver(false) }}
@@ -321,14 +323,15 @@ export default function Concierge() {
           <div className="flex shrink-0 items-center justify-between border-b border-white/10 bg-white/[.045] px-4 py-3 backdrop-blur-md">
             <div>
               <div className="text-[11px] font-bold uppercase tracking-[.18em] text-cyan-300/80">SignalBoost</div>
-              <strong className="text-base text-white">{t(dict, 'concierge.title', 'AI Concierge')}</strong>
+              <strong className="text-base text-white">{t(dict, 'concierge.title', '✨ Concierge')}</strong>
             </div>
             <div className="flex items-center gap-2">
               <ResetButton onReset={resetVisibleChat} className="sb-button-ghost" />
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                aria-label={t(dict, 'concierge.close', 'Collapse AI Dock')}
+                aria-label={t(dict, 'concierge.close', 'Collapse Concierge dock')}
+                title={t(dict, 'concierge.close', 'Collapse Concierge dock')}
                 className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/10 text-lg leading-none text-white outline-none transition hover:bg-white/15 focus-visible:ring-2 focus-visible:ring-cyan-300"
               >
                 ×

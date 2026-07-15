@@ -6,7 +6,7 @@
     "build": "next build",
     "start": "next start",
     "dev": "next dev",
-    "test": "node --test tests/promptPreprocessor.node.test.ts tests/mediaSourcing.node.test.ts tests/unifiedPlatform.node.test.ts tests/reviews.node.test.ts tests/prRedact.node.test.ts tests/hubCatalogSource.node.test.ts tests/enterpriseMemoryUrl.node.test.ts tests/approvalBinding.node.test.ts tests/renderCredits.node.test.ts tests/browserRuntime.node.test.ts tests/browserSessionFactory.node.test.ts tests/browserPlaywrightLauncher.node.test.ts tests/renderCore.node.test.ts",
+    "test": "node --test tests/promptPreprocessor.node.test.ts tests/mediaSourcing.node.test.ts tests/unifiedPlatform.node.test.ts tests/reviews.node.test.ts tests/prRedact.node.test.ts tests/hubCatalogSource.node.test.ts tests/enterpriseMemoryUrl.node.test.ts tests/approvalBinding.node.test.ts tests/renderCredits.node.test.ts tests/browserRuntime.node.test.ts tests/browserSessionFactory.node.test.ts tests/browserPlaywrightLauncher.node.test.ts tests/browserSandboxProfile.node.test.ts tests/renderCore.node.test.ts",
     "validate:conflicts": "node scripts/validate-conflict-cleanup.mjs",
     "validate:i18n-copy": "node scripts/check-hardcoded-copy.mjs",
     "test:jest": "jest tests/unifiedPlatform.jest.test.ts tests/reviews.jest.test.ts",

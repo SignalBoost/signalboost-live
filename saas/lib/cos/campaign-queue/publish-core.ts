@@ -32,6 +32,7 @@ import { scoreCampaignReadiness } from '@/lib/cos/video-quality/campaign-scoring
 import { buildTrackingUrl } from '@/lib/cos/campaign-queue/campaign-traffic'
 import { sendEmail } from '@/lib/email'
 import { auditAdminAction } from '@/lib/outreach/security'
+import { verifyApprovalBinding } from '@/lib/cos/campaign-queue/approvalBinding'
 
 // COS channels that map to a direct social post. Others (blog/email/landing_page/
 // outreach/review_campaign) are handled by their own flows.
@@ -84,6 +85,12 @@ export async function publishCampaignCore(input: PublishCoreInput): Promise<Publ
   const publishableStatus = ['approved', 'queued', 'running'].includes(String(campaign.status))
   if (!ownerApproved || !publishableStatus) {
     return { ok: false, status: 409, error: 'Campaign must be approved by the owner before publishing.' }
+  }
+
+  // VERSION BINDING: the live content must still match what the owner approved.
+  const binding = verifyApprovalBinding(campaign)
+  if (!binding.ok) {
+    return { ok: false, status: 409, error: binding.reason }
   }
 
   // AUTONOMOUS GATE 1 & 2: video channels need a finished AND branded video.

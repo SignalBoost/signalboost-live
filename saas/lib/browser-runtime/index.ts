@@ -1,6 +1,7 @@
 export * from './contracts.ts'
 export * from './approval.ts'
 export * from './runtime.ts'
+export * from './verification.ts'
 export * from './session-factory.ts'
 export * from './playwright-launcher.ts'
 export * from './launch-profile.ts'

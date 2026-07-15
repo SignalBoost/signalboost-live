@@ -20,11 +20,18 @@ jobs:
       run: npx playwright install --with-deps
       working-directory: saas
     - name: Run Playwright tests
-      run: npm run test:playwright
+      run: |
+        set +e
+        npm run test:playwright > playwright-output.log 2>&1
+        status=$?
+        cat playwright-output.log
+        exit $status
       working-directory: saas
     - uses: actions/upload-artifact@v4
       if: always()
       with:
         name: playwright-report
-        path: saas/playwright-report/
+        path: |
+          saas/playwright-report/
+          saas/playwright-output.log
         retention-days: 30

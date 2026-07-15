@@ -36,6 +36,24 @@ export interface BrowserEvidence {
   url?: string
 }
 
+export type BrowserVerificationStatus = 'verified' | 'failed'
+
+export interface BrowserVerificationCheck {
+  id: string
+  passed: boolean
+  summary: string
+}
+
+export interface BrowserVerificationReport {
+  taskId: string
+  incidentId: string
+  provider: string
+  status: BrowserVerificationStatus
+  verifiedAt: string
+  checks: BrowserVerificationCheck[]
+  errors: string[]
+}
+
 export interface BrowserTaskResult {
   taskId: string
   incidentId: string
@@ -46,7 +64,7 @@ export interface BrowserTaskResult {
   completedStepIds: string[]
   pausedAtStepId?: string
   evidence: BrowserEvidence[]
-  verification: 'pending'
+  verification: 'pending' | BrowserVerificationReport
   error?: string
 }
 

@@ -1,0 +1,52 @@
+{
+  "name": "signalboost-clean",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "next build",
+    "start": "next start",
+    "dev": "next dev",
+    "test": "node --test tests/promptPreprocessor.node.test.ts tests/mediaSourcing.node.test.ts tests/unifiedPlatform.node.test.ts tests/reviews.node.test.ts tests/prRedact.node.test.ts tests/hubCatalogSource.node.test.ts tests/enterpriseMemoryUrl.node.test.ts tests/approvalBinding.node.test.ts",
+    "validate:conflicts": "node scripts/validate-conflict-cleanup.mjs",
+    "validate:i18n-copy": "node scripts/check-hardcoded-copy.mjs",
+    "test:jest": "jest tests/unifiedPlatform.jest.test.ts tests/reviews.jest.test.ts",
+    "test:playwright": "playwright test tests/unifiedPlatform.playwright.spec.ts tests/reviews.playwright.spec.ts",
+    "worker:video": "node scripts/video-render-worker.mjs",
+    "worker:cos-video": "node scripts/cos-video-production-worker.mjs",
+    "migrate:pocketbase": "node scripts/pocketbase-migrate.mjs",
+    "typecheck": "tsc --noEmit",
+    "check:enterprise-architecture": "node scripts/check-enterprise-architecture.mjs",
+    "check:enterprise-inputs": "node scripts/check-enterprise-architecture.mjs",
+    "check:enterprise-schemas": "node scripts/check-enterprise-architecture.mjs",
+    "check:enterprise-options": "node scripts/check-enterprise-architecture.mjs",
+    "check:enterprise-approval": "node scripts/check-enterprise-approval.mjs",
+    "check:enterprise-localization": "node scripts/check-enterprise-localization.mjs",
+    "test:enterprise-pipeline": "node --test tests/enterpriseMemoryUrl.node.test.ts tests/approvalBinding.node.test.ts",
+    "verify:issue-205": "npm run check:enterprise-architecture && npm run check:enterprise-approval && npm run check:enterprise-localization && npm run test:enterprise-pipeline && npm run typecheck"
+  },
+  "dependencies": {
+    "next": "16.2.6",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.49.4",
+    "@tanstack/react-virtual": "^3.13.12",
+    "@fal-ai/client": "^1.2.0",
+    "@vercel/analytics": "^1.4.1",
+    "resend": "^4.0.0",
+    "@anthropic-ai/sdk": "^0.104.2",
+    "openai": "^4.24.1",
+    "qrcode": "^1.5.4",
+    "tailwindcss": "^3.4.1",
+    "postcss": "^8.4.31",
+    "autoprefixer": "^10.4.16",
+    "stripe": "^14.25.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/node": "^22.0.0"
+  }
+}

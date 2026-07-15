@@ -4,6 +4,7 @@ import type {
   BrowserSessionPort,
   BrowserTask,
 } from './contracts'
+import type { BrowserLaunchProfile, BrowserLaunchProfileProvider } from './launch-profile'
 
 export interface BrowserEnginePage {
   url(): string
@@ -44,6 +45,7 @@ export interface BrowserEngineContextOptions {
 
 export interface BrowserSessionFactoryOptions {
   launcher: BrowserEngineLauncher
+  profileProvider?: BrowserLaunchProfileProvider
   headless?: boolean
   launchTimeoutMs?: number
   actionTimeoutMs?: number
@@ -78,14 +80,32 @@ function createPagePort(page: BrowserEnginePage, actionTimeoutMs: number): Brows
   }
 }
 
+function mergeProfile(
+  defaults: Required<Pick<BrowserSessionFactoryOptions, 'headless' | 'launchTimeoutMs' | 'actionTimeoutMs' | 'launchArgs' | 'viewport'>> &
+    Pick<BrowserSessionFactoryOptions, 'executablePath'>,
+  profile?: BrowserLaunchProfile,
+) {
+  return {
+    headless: profile?.headless ?? defaults.headless,
+    launchTimeoutMs: profile?.launchTimeoutMs ?? defaults.launchTimeoutMs,
+    actionTimeoutMs: profile?.actionTimeoutMs ?? defaults.actionTimeoutMs,
+    executablePath: profile?.executablePath ?? defaults.executablePath,
+    launchArgs: [...(profile?.launchArgs ?? defaults.launchArgs)],
+    viewport: { ...(profile?.viewport ?? defaults.viewport) },
+  }
+}
+
 export class DefaultBrowserSessionFactory implements BrowserSessionFactory {
-  private readonly options: Required<
+  private readonly launcher: BrowserEngineLauncher
+  private readonly profileProvider?: BrowserLaunchProfileProvider
+  private readonly defaults: Required<
     Pick<BrowserSessionFactoryOptions, 'headless' | 'launchTimeoutMs' | 'actionTimeoutMs' | 'launchArgs' | 'viewport'>
-  > & Pick<BrowserSessionFactoryOptions, 'launcher' | 'executablePath'>
+  > & Pick<BrowserSessionFactoryOptions, 'executablePath'>
 
   constructor(options: BrowserSessionFactoryOptions) {
-    this.options = {
-      launcher: options.launcher,
+    this.launcher = options.launcher
+    this.profileProvider = options.profileProvider
+    this.defaults = {
       headless: options.headless ?? true,
       launchTimeoutMs: options.launchTimeoutMs ?? DEFAULT_LAUNCH_TIMEOUT_MS,
       actionTimeoutMs: options.actionTimeoutMs ?? DEFAULT_ACTION_TIMEOUT_MS,
@@ -95,15 +115,17 @@ export class DefaultBrowserSessionFactory implements BrowserSessionFactory {
     }
   }
 
-  async open(_task: BrowserTask): Promise<BrowserSessionPort> {
+  async open(task: BrowserTask): Promise<BrowserSessionPort> {
+    const profile = this.profileProvider?.resolve(task)
+    const options = mergeProfile(this.defaults, profile)
     const browser = await withTimeout(
-      this.options.launcher.launch({
-        headless: this.options.headless,
-        timeoutMs: this.options.launchTimeoutMs,
-        executablePath: this.options.executablePath,
-        args: [...this.options.launchArgs],
+      this.launcher.launch({
+        headless: options.headless,
+        timeoutMs: options.launchTimeoutMs,
+        executablePath: options.executablePath,
+        args: [...options.launchArgs],
       }),
-      this.options.launchTimeoutMs,
+      options.launchTimeoutMs,
       'Browser launch',
     )
 
@@ -117,20 +139,20 @@ export class DefaultBrowserSessionFactory implements BrowserSessionFactory {
           ignoreHTTPSErrors: false,
           javaScriptEnabled: true,
           serviceWorkers: 'block',
-          viewport: { ...this.options.viewport },
+          viewport: { ...options.viewport },
         }),
-        this.options.launchTimeoutMs,
+        options.launchTimeoutMs,
         'Browser context creation',
       )
 
       const page = await withTimeout(
         context.newPage(),
-        this.options.launchTimeoutMs,
+        options.launchTimeoutMs,
         'Browser page creation',
       )
 
       return {
-        page: createPagePort(page, this.options.actionTimeoutMs),
+        page: createPagePort(page, options.actionTimeoutMs),
         close: async () => {
           if (closed) return
           closed = true

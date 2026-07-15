@@ -60,3 +60,26 @@ export function buildSandboxBrowserTask(input: SandboxTaskInput): BrowserTask {
     metadata: { sandboxVersion: 'v1' },
   }
 }
+
+export function buildSandboxBrowserResumeTask(input: SandboxTaskInput): BrowserTask {
+  const origin = normalizeBaseUrl(input.baseUrl)
+  const steps: BrowserTaskStep[] = [
+    { id: 'protected-save', kind: 'click', selector: '[data-action="protected-save"]' },
+    { id: 'wait-save-success', kind: 'wait_for', selector: '[data-browser-sandbox="save-success"]' },
+    { id: 'capture-final', kind: 'screenshot', label: 'sandbox-settings-saved' },
+  ]
+
+  return {
+    taskId: input.taskId,
+    incidentId: input.incidentId,
+    provider: 'sandbox',
+    adapterId: SANDBOX_ADAPTER_ID,
+    mode: input.mode ?? 'observe',
+    issuedAt: input.issuedAt,
+    expiresAt: input.expiresAt,
+    allowedOrigins: [origin],
+    steps,
+    approvalToken: input.approvalToken,
+    metadata: { sandboxVersion: 'v1', phase: 2 },
+  }
+}

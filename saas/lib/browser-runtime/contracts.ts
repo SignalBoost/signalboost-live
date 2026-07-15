@@ -36,6 +36,27 @@ export interface BrowserEvidence {
   url?: string
 }
 
+export interface BrowserEvidencePackage {
+  taskId: string
+  incidentId: string
+  provider: string
+  adapterId: string
+  approvalTokenDigest: string
+  startedAt: string
+  completedAt: string
+  orderedActionLog: BrowserEvidence[]
+  screenshots: string[]
+  finalUrl: string
+  browserRuntimeVersion: string
+  evidenceHash: string
+}
+
+export interface BrowserVerificationResult {
+  ok: boolean
+  checkedAt: string
+  errors: string[]
+}
+
 export interface BrowserTaskResult {
   taskId: string
   incidentId: string
@@ -45,8 +66,10 @@ export interface BrowserTaskResult {
   finishedAt: string
   completedStepIds: string[]
   pausedAtStepId?: string
+  executionId?: string
   evidence: BrowserEvidence[]
-  verification: 'pending'
+  evidencePackage?: BrowserEvidencePackage
+  verification: 'pending' | BrowserVerificationResult
   error?: string
 }
 
@@ -61,6 +84,7 @@ export interface BrowserPagePort {
   click(selector: string): Promise<void>
   fill(selector: string, value: string): Promise<void>
   waitForSelector(selector: string, timeoutMs?: number): Promise<void>
+  textContent?(selector: string): Promise<string | null>
 }
 
 export interface BrowserSessionPort {

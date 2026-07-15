@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'crypto'
+import { createHash, createHmac, timingSafeEqual } from 'crypto'
 import type { BrowserTask, BrowserTaskMode } from './contracts.ts'
 
 export interface BrowserApprovalClaims {
@@ -13,6 +13,8 @@ export interface BrowserApprovalClaims {
   issuedAt: string
   expiresAt: string
   nonce: string
+  phase?: 1 | 2
+  checkpointStepId?: string
 }
 
 function encode(value: string): string {
@@ -27,6 +29,10 @@ function signature(payload: string, secret: string): string {
   return createHmac('sha256', secret).update(payload).digest('base64url')
 }
 
+export function digestBrowserApprovalToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex')
+}
+
 export function issueBrowserApprovalToken(claims: BrowserApprovalClaims, secret: string): string {
   if (!secret) throw new Error('Browser approval signing secret is required')
   const payload = encode(JSON.stringify(claims))
@@ -38,6 +44,7 @@ export function verifyBrowserApprovalToken(
   task: BrowserTask,
   secret: string,
   now = new Date(),
+  expectedStepIds = task.steps.map(step => step.id),
 ): BrowserApprovalClaims {
   if (!secret) throw new Error('Browser approval signing secret is required')
   const [payload, suppliedSignature, extra] = String(token || '').split('.')
@@ -50,7 +57,6 @@ export function verifyBrowserApprovalToken(
   }
 
   const claims = JSON.parse(decode(payload)) as BrowserApprovalClaims
-  const exactStepIds = task.steps.map(step => step.id)
 
   if (claims.version !== 1) throw new Error('Unsupported browser approval token version')
   if (claims.taskId !== task.taskId) throw new Error('Approval token taskId mismatch')
@@ -61,7 +67,7 @@ export function verifyBrowserApprovalToken(
   if (claims.expiresAt !== task.expiresAt) throw new Error('Approval token expiry mismatch')
   if (new Date(claims.expiresAt).getTime() <= now.getTime()) throw new Error('Browser approval token expired')
   if (new Date(claims.issuedAt).getTime() > now.getTime() + 60_000) throw new Error('Browser approval token issued in the future')
-  if (JSON.stringify(claims.allowedStepIds) !== JSON.stringify(exactStepIds)) {
+  if (JSON.stringify(claims.allowedStepIds) !== JSON.stringify(expectedStepIds)) {
     throw new Error('Approval token does not authorize the exact browser steps')
   }
   if (JSON.stringify(claims.allowedOrigins) !== JSON.stringify(task.allowedOrigins)) {

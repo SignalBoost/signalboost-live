@@ -56,3 +56,17 @@ test('allows prepare_change but never execute_change input', () => {
   const task = buildSandboxBrowserTask({ ...base, mode: 'prepare_change' })
   assert.equal(task.mode, 'prepare_change')
 })
+
+test('builds the separately approved sandbox resume task with only remaining save steps', async () => {
+  const { buildSandboxBrowserResumeTask } = await import('../lib/browser-runtime/sandbox-adapter.ts')
+  const task = buildSandboxBrowserResumeTask(base)
+
+  assert.deepEqual(task.steps.map(step => step.id), [
+    'protected-save',
+    'wait-save-success',
+    'capture-final',
+  ])
+  assert.equal(task.steps[0]?.kind, 'click')
+  assert.equal(task.steps[0]?.kind === 'click' ? task.steps[0].selector : '', '[data-action="protected-save"]')
+  assert.equal(task.steps[1]?.kind === 'wait_for' ? task.steps[1].selector : '', '[data-browser-sandbox="save-success"]')
+})

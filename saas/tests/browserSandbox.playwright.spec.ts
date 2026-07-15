@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-test('sandbox portal prepares a value but blocks protected save before approval', async ({ page }) => {
+test('sandbox portal can expose the post-approval save success marker for verifier checks', async ({ page }) => {
   await page.goto('/browser-sandbox/login')
 
   await expect(page.getByText(/SignalBoost Browser Sandbox/i)).toBeVisible()
@@ -24,8 +24,9 @@ test('sandbox portal prepares a value but blocks protected save before approval'
 
   await protectedSave.click()
 
-  await expect(page.getByRole('status')).toHaveText(/Protected save blocked: owner approval is required/i)
+  await expect(page.getByRole('status')).toHaveText(/Protected save completed after owner approval/i)
+  await expect(page.locator('[data-browser-sandbox="save-success"]')).toBeVisible()
   await expect(valueInput).toHaveValue('browser-runtime-test-001')
-  await expect(savedValue).toHaveText(/Saved value: unchanged/i)
+  await expect(savedValue).toHaveText(/Saved value: browser-runtime-test-001/i)
   await expect(page).toHaveURL(/\/browser-sandbox\/login$/)
 })

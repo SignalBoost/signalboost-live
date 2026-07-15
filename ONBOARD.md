@@ -168,6 +168,9 @@ The executable sandbox adapter uses adapter ID `signalboost.sandbox.v1` and the 
 - reference credentials through secret references such as `sandbox://credentials/email`, never literal values;
 - capture evidence before the approval boundary;
 - stop at a checkpoint requiring approval before any protected save;
+- persist a resumable execution record with the exact remaining step list;
+- require a second, separately signed, task-bound approval token before resuming;
+- resume only the approved remaining steps and then verify final evidence independently;
 - never include a protected-save click in the pre-approval task; and
 - remain local/test-only until a separately reviewed production provider adapter is approved.
 
@@ -617,6 +620,8 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-15: Added Mission 001 executable browser sandbox adapter: portable bounded task construction, local `/browser-sandbox/login` test portal, secret-reference credential resolution, evidence capture, and a mandatory approval checkpoint before any protected save. No production provider or credential is connected.
 
 - 2026-07-15: Hardened Mission 001 origin confinement: the runtime now validates the live page after navigation and around every browser interaction, rejects redirect escapes, and re-checks origin after secret resolution before filling.
+
+- 2026-07-15: Added Mission 001 governed two-phase browser execution doctrine: phase 1 must pause at the approval checkpoint and persist a resumable record, phase 2 must use a separate signed token for only the remaining steps, and completion requires an evidence package plus independent verifier before being treated as complete.
 
 ## 20. Mandatory Final Reminder
 

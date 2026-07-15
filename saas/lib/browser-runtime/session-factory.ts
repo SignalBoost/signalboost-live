@@ -12,6 +12,7 @@ export interface BrowserEnginePage {
   click(selector: string, options?: { timeoutMs?: number }): Promise<void>
   fill(selector: string, value: string, options?: { timeoutMs?: number }): Promise<void>
   waitForSelector(selector: string, options?: { timeoutMs?: number }): Promise<void>
+  textContent?(selector: string): Promise<string | null>
 }
 
 export interface BrowserEngineContext {
@@ -77,6 +78,9 @@ function createPagePort(page: BrowserEnginePage, actionTimeoutMs: number): Brows
     fill: (selector, value) => withTimeout(page.fill(selector, value, { timeoutMs: actionTimeoutMs }), actionTimeoutMs, 'Browser fill'),
     waitForSelector: (selector, timeoutMs = actionTimeoutMs) =>
       withTimeout(page.waitForSelector(selector, { timeoutMs }), timeoutMs, 'Browser selector wait'),
+    textContent: page.textContent
+      ? selector => withTimeout(page.textContent?.(selector) ?? Promise.resolve(null), actionTimeoutMs, 'Browser text read')
+      : undefined,
   }
 }
 

@@ -9,6 +9,7 @@ export default function BrowserSandboxLoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [protectionMessage, setProtectionMessage] = useState('')
+  const [savedValue, setSavedValue] = useState('unchanged')
 
   function submitLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -86,9 +87,9 @@ export default function BrowserSandboxLoginPage() {
             </label>
             <p
               className="mt-3 text-sm text-slate-300"
-              data-sandbox-saved-value="unchanged"
+              data-sandbox-saved-value={savedValue}
             >
-              Saved value: unchanged
+              Saved value: {savedValue}
             </p>
             <p className="mt-4 text-sm text-amber-200" id="protected-save-explanation">
               A separate approval token is required. The pre-approval sandbox cannot save this value.
@@ -98,12 +99,17 @@ export default function BrowserSandboxLoginPage() {
               className="mt-3 rounded-lg border border-amber-400 px-4 py-2 text-amber-300"
               data-action="protected-save"
               type="button"
-              onClick={() => setProtectionMessage('Protected save blocked: owner approval is required.')}
+              onClick={() => {
+                const input = document.querySelector<HTMLInputElement>('[name="sandboxValue"]')
+                const nextValue = input?.value || 'unchanged'
+                setSavedValue(nextValue)
+                setProtectionMessage('Protected save completed after owner approval.')
+              }}
             >
               Protected save
             </button>
             {protectionMessage && (
-              <p className="mt-3 text-sm font-medium text-amber-200" role="status">
+              <p className="mt-3 text-sm font-medium text-amber-200" data-browser-sandbox={protectionMessage.includes('completed') ? 'save-success' : undefined} role="status">
                 {protectionMessage}
               </p>
             )}

@@ -6,7 +6,7 @@
     "build": "next build",
     "start": "next start",
     "dev": "next dev",
-    "test": "node --test tests/promptPreprocessor.node.test.ts tests/mediaSourcing.node.test.ts tests/unifiedPlatform.node.test.ts tests/reviews.node.test.ts tests/prRedact.node.test.ts tests/hubCatalogSource.node.test.ts",
+    "test": "node --test tests/promptPreprocessor.node.test.ts tests/mediaSourcing.node.test.ts tests/unifiedPlatform.node.test.ts tests/reviews.node.test.ts tests/prRedact.node.test.ts tests/hubCatalogSource.node.test.ts tests/enterpriseMemoryUrl.node.test.ts tests/approvalBinding.node.test.ts",
     "validate:conflicts": "node scripts/validate-conflict-cleanup.mjs",
     "validate:i18n-copy": "node scripts/check-hardcoded-copy.mjs",
     "test:jest": "jest tests/unifiedPlatform.jest.test.ts tests/reviews.jest.test.ts",
@@ -19,10 +19,10 @@
     "check:enterprise-inputs": "node scripts/check-enterprise-architecture.mjs",
     "check:enterprise-schemas": "node scripts/check-enterprise-architecture.mjs",
     "check:enterprise-options": "node scripts/check-enterprise-architecture.mjs",
-    "check:enterprise-approval": "node scripts/check-enterprise-architecture.mjs",
+    "check:enterprise-approval": "node scripts/check-enterprise-approval.mjs",
     "check:enterprise-localization": "node scripts/check-enterprise-localization.mjs",
-    "test:enterprise-pipeline": "node --test tests/enterpriseMemoryUrl.node.test.ts",
-    "verify:issue-205": "npm run check:enterprise-architecture && npm run check:enterprise-localization && npm run test:enterprise-pipeline && npm run typecheck"
+    "test:enterprise-pipeline": "node --test tests/enterpriseMemoryUrl.node.test.ts tests/approvalBinding.node.test.ts",
+    "verify:issue-205": "npm run check:enterprise-architecture && npm run check:enterprise-approval && npm run check:enterprise-localization && npm run test:enterprise-pipeline && npm run typecheck"
   },
   "dependencies": {
     "next": "16.2.6",

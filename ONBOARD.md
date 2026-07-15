@@ -171,6 +171,8 @@ The executable sandbox adapter uses adapter ID `signalboost.sandbox.v1` and the 
 - never include a protected-save click in the pre-approval task; and
 - remain local/test-only until a separately reviewed production provider adapter is approved.
 
+Every terminal Browser Runtime result (`paused`, `completed`, or `failed`) must include the deterministic verification report produced by the portable verifier. Callers must not treat a paused or completed execution as valid unless that report has status `verified`; a failed execution must retain a failed verification report for audit and diagnosis.
+
 The sandbox launch profile rejects `execute_change` tasks. Production/provider state changes, credential use, saves, redeploys, financial actions, and other sensitive operations remain outside Mission 001 unless Luis explicitly approves them through the existing governed approval flow.
 
 ### Owner/Admin
@@ -617,6 +619,8 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-15: Added Mission 001 executable browser sandbox adapter: portable bounded task construction, local `/browser-sandbox/login` test portal, secret-reference credential resolution, evidence capture, and a mandatory approval checkpoint before any protected save. No production provider or credential is connected.
 
 - 2026-07-15: Hardened Mission 001 origin confinement: the runtime now validates the live page after navigation and around every browser interaction, rejects redirect escapes, and re-checks origin after secret resolution before filling.
+
+- 2026-07-15: Integrated deterministic Mission 001 verification into every terminal Browser Runtime result. Paused and completed executions are valid only when the embedded verification report is `verified`; failed executions retain a failed report for audit and diagnosis.
 
 ## 20. Mandatory Final Reminder
 

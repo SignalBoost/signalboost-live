@@ -401,3 +401,17 @@ html, body { margin: 0; padding: 0; font-family: system-ui, sans-serif; backgrou
 
 /* Docs layout: fixed rail on wide screens, stacked on narrow */
 @media (min-width: 821px) { .sb-docs-grid { grid-template-columns: 240px minmax(0, 1fr) !important; } }
+
+/* ── AI Dock layout: reserves a permanent right column so assistant UI never overlays workspace content. ── */
+.sb-ai-app-shell { --sb-ai-dock-width: 400px; --sb-ai-dock-tablet-width: 320px; --sb-ai-dock-collapsed-width: 56px; display: grid; grid-template-columns: minmax(0, 1fr) var(--sb-ai-dock-width); align-items: start; gap: 20px; width: 100%; max-width: 100%; margin: 0; padding: 0 20px 0 0; box-sizing: border-box; }
+.sb-ai-workspace { min-width: 0; width: 100%; }
+.sb-ai-workspace .sb-app-shell, .sb-ai-workspace .sb-page-shell, .sb-ai-workspace .sb-dashboard-shell { margin-left: 0; margin-right: 0; max-width: min(1184px, 100%); }
+.sb-ai-dock { position: sticky; top: 88px; align-self: start; width: var(--sb-ai-dock-width); height: calc(100vh - 104px); min-width: 0; z-index: 2; }
+.sb-ai-dock.is-collapsed { display: flex; justify-content: flex-end; width: var(--sb-ai-dock-width); }
+.sb-ai-dock-tab { width: var(--sb-ai-dock-collapsed-width); height: min(240px, calc(100vh - 128px)); margin-left: auto; border: 1px solid rgba(255,195,0,.4); border-radius: 22px 0 0 22px; background: linear-gradient(180deg, rgba(255,195,0,.95), rgba(249,115,22,.95)); color: #07111f; box-shadow: 0 18px 48px rgba(255,149,0,.25); font-weight: 950; letter-spacing: .12em; writing-mode: vertical-rl; text-orientation: mixed; display: inline-flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; transition: transform 180ms ease, box-shadow 180ms ease; }
+.sb-ai-dock-tab:hover, .sb-ai-dock-tab:focus-visible { transform: translateX(-3px); box-shadow: 0 22px 60px rgba(255,149,0,.34); outline: 2px solid rgba(26,240,255,.8); outline-offset: 3px; }
+.sb-ai-dock-panel { height: 100%; max-height: 100%; width: 100%; border-radius: 28px 0 0 28px; background: linear-gradient(160deg, rgba(15,23,42,.94), rgba(3,7,18,.96)); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); transform-origin: right center; animation: sbDockIn 180ms ease both; }
+@keyframes sbDockIn { from { opacity: .82; transform: translateX(12px) scaleX(.98); } to { opacity: 1; transform: translateX(0) scaleX(1); } }
+@media (max-width: 1180px) { .sb-ai-app-shell { grid-template-columns: minmax(0, 1fr) var(--sb-ai-dock-tablet-width); gap: 14px; padding-right: 12px; } .sb-ai-dock, .sb-ai-dock.is-collapsed { width: var(--sb-ai-dock-tablet-width); } }
+@media (max-width: 860px) { .sb-ai-app-shell { display: block; padding-right: 0; } .sb-ai-dock { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: 100%; height: auto; z-index: 80; pointer-events: none; } .sb-ai-dock.is-collapsed { width: 100%; justify-content: flex-end; padding: 0 12px 12px 0; box-sizing: border-box; } .sb-ai-dock-tab { pointer-events: auto; width: auto; height: 48px; min-width: 88px; border-radius: 999px; writing-mode: horizontal-tb; letter-spacing: .04em; } .sb-ai-dock-panel { pointer-events: auto; height: min(78vh, 680px); max-height: calc(100vh - 88px); border-radius: 28px 28px 0 0; animation-name: sbDockSheetIn; } }
+@keyframes sbDockSheetIn { from { opacity: .88; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }

@@ -23,7 +23,6 @@ const ATTACH_MAX_BYTES = 10 * 1024 * 1024
 const ATTACH_MAX_FILES = 5
 const ATTACH_ALLOWED_RE = /^(image\/(png|jpe?g|gif|webp)|application\/pdf|text\/(plain|csv|markdown))$/i
 const ATTACH_INPUT_ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain,.txt,.md,.csv'
-const DESKTOP_PANEL_OFFSET = '456px'
 const ASSET_READY_KEY = 'signalboost.concierge.assetReady'
 // Credit pack pricing shows only when the activation flag is on (Vercel env:
 // NEXT_PUBLIC_CREDITS_ACTIVATION=1). Mirrors the Studio catalog badge gate.
@@ -112,22 +111,30 @@ export default function Concierge() {
   const [assetNotice, setAssetNotice] = useState<{ id: string; title: string } | null>(null)
   const logRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const conversationIdRef = useRef<string>('')
 
   useEffect(() => {
-    const syncLayout = () => {
-      const desktop = window.matchMedia('(min-width: 1024px)').matches
-      document.documentElement.style.setProperty('--concierge-panel-offset', open && desktop ? DESKTOP_PANEL_OFFSET : '0px')
-      document.body.style.paddingRight = open && desktop ? DESKTOP_PANEL_OFFSET : ''
-      document.body.style.transition = 'padding-right 220ms ease'
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      const tag = target?.tagName?.toLowerCase()
+      const isTyping = tag === 'input' || tag === 'textarea' || target?.isContentEditable
+
+      if (event.key === 'Escape' && open) {
+        event.preventDefault()
+        setOpen(false)
+        return
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k' && !isTyping) {
+        event.preventDefault()
+        setOpen(true)
+        requestAnimationFrame(() => inputRef.current?.focus())
+      }
     }
-    syncLayout()
-    window.addEventListener('resize', syncLayout)
-    return () => {
-      window.removeEventListener('resize', syncLayout)
-      document.documentElement.style.setProperty('--concierge-panel-offset', '0px')
-      document.body.style.paddingRight = ''
-    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
   }, [open])
 
   function readFileAsDataUrl(file: File): Promise<string> {
@@ -275,31 +282,31 @@ export default function Concierge() {
   }
 
   return (
-    <>
+    <div className={open ? 'sb-ai-dock is-open' : 'sb-ai-dock is-collapsed'}>
       {!open && (
-        <div className="fixed bottom-4 right-4 z-[80] pointer-events-none sm:bottom-6 sm:right-6">
-          <button
-            type="button"
-            aria-expanded={open}
-            aria-controls="signalboost-concierge-panel"
-            onClick={() => setOpen(true)}
-            className="pointer-events-auto flex items-center gap-2 rounded-full border border-amber-200/40 bg-gradient-to-br from-amber-300 to-orange-500 px-4 py-3 text-sm font-black text-slate-950 shadow-[0_12px_34px_rgba(255,149,0,.35)] outline-none transition hover:-translate-y-0.5 hover:shadow-[0_18px_48px_rgba(255,149,0,.45)] focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:px-5"
-          >
-            <span className="text-lg">✨</span>
-            {t(dict, 'concierge.button', 'Concierge')}
-          </button>
-        </div>
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls="signalboost-concierge-panel"
+          onClick={() => setOpen(true)}
+          className="sb-ai-dock-tab"
+        >
+          <span aria-hidden>✨</span>
+          <span>AI</span>
+          <span className="sr-only">{t(dict, 'concierge.button', 'Concierge')}</span>
+        </button>
       )}
 
       {open && (
         <aside
           id="signalboost-concierge-panel"
-          role="dialog"
+          role="complementary"
           aria-label={t(dict, 'concierge.title', 'AI Concierge')}
+          aria-keyshortcuts="Control+K Meta+K Escape"
           onDragOver={e => { e.preventDefault(); if (!dragOver) setDragOver(true) }}
           onDragLeave={e => { e.preventDefault(); if (e.currentTarget === e.target) setDragOver(false) }}
           onDrop={e => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer?.files || null) }}
-          className="fixed inset-x-2 bottom-2 top-20 z-[90] flex max-h-[calc(100vh-5.5rem)] flex-col overflow-hidden rounded-3xl border border-white/10 bg-slate-950/92 text-white shadow-2xl shadow-black/70 backdrop-blur-md lg:inset-x-auto lg:bottom-4 lg:right-4 lg:top-20 lg:w-[432px] lg:rounded-l-3xl lg:rounded-r-2xl"
+          className="sb-ai-dock-panel flex flex-col overflow-hidden border border-white/10 bg-slate-950/92 text-white shadow-2xl shadow-black/70 backdrop-blur-md"
         >
           {dragOver && (
             <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-3xl border-2 border-dashed border-cyan-300 bg-slate-950/90 p-6 text-center backdrop-blur-md">
@@ -321,7 +328,7 @@ export default function Concierge() {
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                aria-label={t(dict, 'concierge.close', 'Close concierge')}
+                aria-label={t(dict, 'concierge.close', 'Collapse AI Dock')}
                 className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/10 text-lg leading-none text-white outline-none transition hover:bg-white/15 focus-visible:ring-2 focus-visible:ring-cyan-300"
               >
                 ×
@@ -382,6 +389,7 @@ export default function Concierge() {
                 className="h-[42px] w-10 shrink-0 rounded-xl border border-white/10 bg-white/[.06] text-base text-white outline-none transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
               >📎</button>
               <textarea
+                ref={inputRef}
                 aria-label={t(dict, 'concierge.placeholder', 'Ask anything...')}
                 value={input}
                 onChange={e => {
@@ -402,6 +410,6 @@ export default function Concierge() {
           </div>
         </aside>
       )}
-    </>
+    </div>
   )
 }

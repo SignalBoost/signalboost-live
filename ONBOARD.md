@@ -584,6 +584,8 @@ Use this section for short notes when architecture, provider behavior, platform 
 
 ---
 
+- 2026-07-15: Added persistent AI Dock layout doctrine implementation: global SaaS pages now render through a shared AppShell with a reserved right-side assistant column on desktop/tablet, collapsed dock tab state, and mobile bottom-sheet behavior so Concierge interactions no longer overlay workspace forms or actions.
+
 - 2026-07-15: Added Issue #205 Enterprise Memory doctrine implementation: enterprise memory tables, canonical URL fingerprint deduplication, memory-aware Enterprise Intelligence reuse, refresh-job concurrency guards, campaign/approval/confidence history, and CI guard scripts (`verify:issue-205`) for enterprise architecture, localization, and pipeline regressions.
 
 ## 20. Mandatory Final Reminder

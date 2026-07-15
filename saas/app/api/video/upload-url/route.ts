@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAccess } from '@/lib/auth/access'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
@@ -22,6 +23,14 @@ async function ensureBucket(supabase: any) {
 }
 
 export async function POST(req: Request) {
+  const access = await getAccess().catch(() => null)
+  if (!access?.userId) {
+    return NextResponse.json(
+      { ok: false, error: 'You must be signed in to upload a video.' },
+      { status: 401 },
+    )
+  }
+
   const supabase = admin()
   if (!supabase) {
     return NextResponse.json(
@@ -34,7 +43,7 @@ export async function POST(req: Request) {
   try { body = await req.json() } catch {}
   const rawName = typeof body.filename === 'string' && body.filename ? body.filename : 'video.mp4'
   const safeName = rawName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80) || 'video.mp4'
-  const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`
+  const path = `${access.userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`
 
   try {
     await ensureBucket(supabase)
@@ -43,8 +52,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: error?.message || 'Could not create upload URL.' }, { status: 500 })
     }
     return NextResponse.json({ ok: true, data: { bucket: BUCKET, path: data.path, token: data.token } })
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Upload URL failed.'
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Upload URL failed.'
+    return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
 }

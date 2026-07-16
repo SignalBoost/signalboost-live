@@ -137,6 +137,16 @@ test('suspended provider and suspended capability fail closed', () => {
   assert.throws(() => createCapabilityRegistry([{ ...VercelBrowserAdapter.capabilities[0], maturity: 'suspended' }]).get(VercelBrowserAdapter.capabilities[0].capabilityId), /capability_suspended/)
 })
 
+test('provider registration preserves suspended capability metadata while selection remains blocked', () => {
+  const suspendedId = VercelBrowserAdapter.capabilities[0].capabilityId
+  const suspendedCapabilities = VercelBrowserAdapter.capabilities.map(capability => capability.capabilityId === suspendedId
+    ? { ...capability, maturity: 'suspended' as const, suspendedReasonCode: 'operator_hold' }
+    : capability)
+  const registered = new BrowserProviderRegistry().register({ ...VercelBrowserAdapter, capabilities: suspendedCapabilities })
+  assert.equal(registered.capabilities.find(capability => capability.capabilityId === suspendedId)?.maturity, 'suspended')
+  assert.throws(() => createCapabilityRegistry(registered.capabilities).get(suspendedId), /capability_suspended/)
+})
+
 test('Supervisor mapping and worker descriptor preserve policy boundaries', () => {
   const capability = VercelBrowserAdapter.capabilities[0]
   const mapped = mapBrowserProviderCapabilityToSupervisorCapability(capability)

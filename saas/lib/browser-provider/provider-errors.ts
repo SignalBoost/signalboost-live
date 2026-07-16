@@ -1,0 +1,1 @@
+export class BrowserProviderError extends Error { constructor(public readonly code: 'duplicate_provider'|'unknown_provider'|'unknown_capability'|'invalid_provider'|'immutable_read_only', message=code){ super(message); this.name='BrowserProviderError' } }

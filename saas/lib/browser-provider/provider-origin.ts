@@ -1,0 +1,3 @@
+export type OriginId='dashboard'|'projects'|'deployments'|'domains'|'settings'|'login'|'metadata'
+export interface OriginProfile { id:OriginId; origin:string; readOnly:true; schemaVersion:'1.0.0' }
+export function createOriginRegistry(items:readonly OriginProfile[]){ const sorted=[...items].sort((a,b)=>a.id.localeCompare(b.id)); const map=new Map(sorted.map(x=>[x.id,Object.freeze({...x,origin:new URL(x.origin).origin})])); return Object.freeze({ get(id:OriginId){const v=map.get(id);if(!v)throw new Error('unknown_origin');return v}, list(){return [...map.values()]}, toJSON(){return [...map.values()]} }) }

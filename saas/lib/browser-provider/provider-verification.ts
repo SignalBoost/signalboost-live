@@ -1,0 +1,3 @@
+export type VerificationId='deployment-healthy'|'deployment-failed'|'domain-configured'|'project-visible'|'environment-metadata-visible'
+export interface VerificationProfile { id:VerificationId; assertions:readonly string[]; schemaVersion:'1.0.0' }
+export function createVerificationRegistry(items:readonly VerificationProfile[]){const values=[...items].sort((a,b)=>a.id.localeCompare(b.id)).map(x=>Object.freeze({...x,assertions:Object.freeze([...x.assertions])}));const map=new Map(values.map(x=>[x.id,x]));return Object.freeze({get(id:VerificationId){const v=map.get(id);if(!v)throw new Error('unknown_verification');return v},list(){return [...values]}})}

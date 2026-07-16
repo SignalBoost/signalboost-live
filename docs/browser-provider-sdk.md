@@ -19,6 +19,7 @@ The Browser Provider Abstraction Layer (BPAL) is the single provider-neutral met
 - Selector model: structured role, label, test ID, exact text, or narrowly validated CSS selectors organized by provider domain.
 - Evidence and verification models: deterministic metadata profiles only; no callbacks, code, screenshot binaries, or success claims before execution.
 - Health and versioning: provider health is separate from platform/deployment health and uses `healthy`, `degraded`, `outage`, `unknown`, and `suspended`.
+- Diagnostics snapshot: `createBrowserProviderDiagnosticsSnapshot` produces a deterministic, deeply frozen, read-only policy view for Supervisor/operator review and fails closed if a provider claims production execution or executable worker capacity.
 
 ## Vercel
 
@@ -28,14 +29,16 @@ The canonical `VercelBrowserAdapter` is read-only and non-executing. It provides
 
 `mapBrowserProviderCapabilityToSupervisorCapability` maps BPAL capability metadata into the existing HA execution-policy capability shape while preserving risk, maturity, read-only state, production-disabled environments, verification profile identity, and origin identity. `createBrowserProviderWorkerDescriptor` exposes a zero-execution-capacity provider-worker descriptor for metadata-only adapters.
 
+The admin-only `/dashboard/supervisor/providers` screen renders the diagnostics snapshot for operator policy review. It exposes provider health, versions, exact origins, capability risk/maturity, API/browser/manual channel declarations, evidence and verification profile identities, and approval requirements. It contains no forms, mutation controls, provider requests, credentials, or browser execution path. The Supervisor HA page links to this screen.
+
 ## CI guard
 
 `npm run validate:bpal` runs `scripts/validate-bpal-guard.mjs`, which fails if a second registry, second root adapter contract, second Vercel adapter, forbidden BPAL execution/credential dependencies, direct Vercel knowledge inside Browser Runtime, or duplicate Vercel capability IDs are introduced.
 
 ## Localization
 
-Operator-facing BPAL labels use the `browserProvider.*` / `browserProvider.vercel.*` namespace and must be complete in English, Spanish, Portuguese, Polish, and Russian.
+Operator-facing BPAL labels use the `browserProvider.*` / `browserProvider.vercel.*` namespace and existing localized Supervisor policy labels. English, Spanish, Portuguese, Polish, and Russian coverage is verified by the Browser Provider diagnostics test suite.
 
 ## Next sprint
 
-The recommended next sprint is to wire BPAL metadata into operator-visible Supervisor diagnostics and policy review screens while keeping production/provider Browser execution disabled and preserving API-first HA policy.
+The recommended next sprint is to bind BPAL diagnostics to durable Supervisor audit records and capability-selection explanations without enabling production/provider Browser execution, credentials, or mutations.

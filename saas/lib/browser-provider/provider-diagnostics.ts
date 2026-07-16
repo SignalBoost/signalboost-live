@@ -34,7 +34,7 @@ export interface BrowserProviderDiagnostics {
   readonly displayNameKey: string
   readonly adapterVersion: string
   readonly schemaVersion: string
-  readonly health: Readonly<{ state: string; checkedAt: string; reasonCode?: string }>
+  readonly health: Readonly<{ state: string; checkedAt: string; reasonCode?: string; detailsKey?: string }>
   readonly version: Readonly<{ adapterVersion: string; capabilityVersion: string; schemaVersion: string }>
   readonly support: Readonly<{
     readOnlyInspection: boolean
@@ -65,7 +65,7 @@ export interface BrowserProviderDiagnosticsSnapshot {
 function deepFreeze<T>(value: T): T {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
     Object.freeze(value)
-    for (const nested of Object.values(value as Record<string, unknown>)) deepFreeze(nested)
+    for (const nested of Object.values(value as unknown as Record<string, unknown>)) deepFreeze(nested)
   }
   return value
 }

@@ -402,6 +402,13 @@ Important doctrine for developers:
 
 The autonomous Vercel supervisor PoC listens for signed failed-deployment webhooks at `/api/autonomous-supervisor/vercel`, normalizes incidents, asks Gemini for JSON-only diagnosis when configured, and only stages UI-agent/env-var repairs as gated Infrastructure PR proposals. Browser-agent backup must fill values, capture a screenshot for Hub review, and hold for explicit owner approval before saving, redeploying, or changing production state.
 
+Dynamic provider/action registry:
+
+- `public.provider_registry` stores configuration-driven integration rows for provider/action routing, endpoint templates, header templates, payload templates, JSON config schemas, output-path mappings, and channel metadata.
+- `saas/lib/engine/universalRunner.ts` is the provider-neutral backend runner for these rows. It hydrates templates from runtime variables, executes HTTP(S) requests, and maps provider responses through saved JSON paths without provider-specific imports.
+- Registry rows can model new software APIs or approved local hardware channels, but secrets must still be backend-only references or service-role-resolved values; do not store plaintext user/provider secrets in registry rows.
+- Sensitive live actions routed through registry rows remain subject to the same owner/HMI approval, payment confirmation, audit, and infrastructure-governance gates described in this document.
+
 The system can stage or execute provider operations through Console Hub templates, including:
 
 - Provider API calls.
@@ -640,6 +647,7 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-16: Hardened paid provider gates: wallet-funded non-zero render providers now require a server-side approval reference before reservation/provider execution, and the FAL/Kling marketing-sales video host requires the `COSA_PAID_VIDEO_PROVIDER_APPROVED` runtime flag before submitting paid video jobs.
 
 - 2026-07-16: Bound Mission 001 retained execution records and live in-process browser sessions to the approved task expiry. Expired continuations are removed and closed automatically, duplicate retained execution IDs fail closed, and resume rejects expired or orphaned state without consuming protected steps.
+- 2026-07-16: Added the dynamic `provider_registry` schema and provider-neutral universal runner for configuration-driven integration actions. New software API or approved local-channel integrations can be represented by database rows with endpoint, payload, schema, and output-path mappings, while secrets and sensitive actions remain governed by backend-only resolution and approval gates.
 
 ## 20. Mandatory Final Reminder
 

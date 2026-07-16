@@ -27,6 +27,7 @@ interface FixtureOptions {
   failPage?: boolean
   delayLaunchMs?: number
   delayContextMs?: number
+  delayPageMs?: number
 }
 
 function sleep(milliseconds: number): Promise<void> {
@@ -48,6 +49,7 @@ function fixture(options: FixtureOptions = {}) {
   const context: BrowserEngineContext = {
     newPage: async () => {
       calls.push('newPage')
+      if (options.delayPageMs) await sleep(options.delayPageMs)
       if (options.failPage) throw new Error('page failed')
       return page
     },
@@ -138,17 +140,36 @@ test('closes the context and browser when page creation fails', async () => {
   assert.deepEqual(calls.slice(-2), ['context.close', 'browser.close'])
 })
 
-test('fails closed when browser launch exceeds its deadline', async () => {
-  const { launcher } = fixture({ delayLaunchMs: 30 })
+test('closes a browser that resolves after the launch deadline', async () => {
+  const { calls, launcher } = fixture({ delayLaunchMs: 30 })
   const factory = new DefaultBrowserSessionFactory({ launcher, launchTimeoutMs: 5 })
+
   await assert.rejects(() => factory.open(task), /Browser launch timed out after 5ms/)
+  await sleep(40)
+
+  assert.equal(calls.filter(call => call === 'browser.close').length, 1)
 })
 
-test('fails closed when context creation exceeds its deadline', async () => {
+test('closes a context that resolves after the context deadline', async () => {
   const { calls, launcher } = fixture({ delayContextMs: 30 })
   const factory = new DefaultBrowserSessionFactory({ launcher, launchTimeoutMs: 5 })
+
   await assert.rejects(() => factory.open(task), /Browser context creation timed out after 5ms/)
-  assert.equal(calls.at(-1), 'browser.close')
+  await sleep(40)
+
+  assert.equal(calls.filter(call => call === 'context.close').length, 1)
+  assert.equal(calls.filter(call => call === 'browser.close').length, 1)
+})
+
+test('closes the active context and browser when page creation exceeds its deadline', async () => {
+  const { calls, launcher } = fixture({ delayPageMs: 30 })
+  const factory = new DefaultBrowserSessionFactory({ launcher, launchTimeoutMs: 5 })
+
+  await assert.rejects(() => factory.open(task), /Browser page creation timed out after 5ms/)
+  await sleep(40)
+
+  assert.equal(calls.filter(call => call === 'context.close').length, 1)
+  assert.equal(calls.filter(call => call === 'browser.close').length, 1)
 })
 
 test('rejects invalid timeout configuration', () => {

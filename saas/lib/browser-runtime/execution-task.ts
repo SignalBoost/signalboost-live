@@ -1,9 +1,27 @@
-import type { BrowserTask, BrowserTaskStep } from './contracts.ts'
+import type {
+  BrowserEvidence,
+  BrowserTask,
+  BrowserTaskStep,
+} from './contracts.ts'
+import type { BrowserExecutionRecord } from './execution-state.ts'
+
+function freezeCopy<T extends object>(value: T): T {
+  const snapshot = { ...value }
+  Object.freeze(snapshot)
+  return snapshot as T
+}
 
 function cloneStep(step: BrowserTaskStep): BrowserTaskStep {
-  const snapshot = { ...step } as BrowserTaskStep
-  Object.freeze(snapshot)
-  return snapshot
+  return freezeCopy(step)
+}
+
+function cloneEvidence(item: BrowserEvidence): BrowserEvidence {
+  return freezeCopy(item)
+}
+
+function freezeArray<T>(values: T[]): T[] {
+  Object.freeze(values)
+  return values
 }
 
 /**
@@ -16,11 +34,6 @@ function cloneStep(step: BrowserTaskStep): BrowserTaskStep {
  * ports cannot change approved scope after verification.
  */
 export function createBrowserExecutionTaskSnapshot(task: BrowserTask): BrowserTask {
-  const allowedOrigins = [...task.allowedOrigins]
-  const steps = task.steps.map(cloneStep)
-  Object.freeze(allowedOrigins)
-  Object.freeze(steps)
-
   const snapshot: BrowserTask = {
     taskId: task.taskId,
     incidentId: task.incidentId,
@@ -29,9 +42,39 @@ export function createBrowserExecutionTaskSnapshot(task: BrowserTask): BrowserTa
     mode: task.mode,
     issuedAt: task.issuedAt,
     expiresAt: task.expiresAt,
-    allowedOrigins,
-    steps,
+    allowedOrigins: freezeArray([...task.allowedOrigins]),
+    steps: freezeArray(task.steps.map(cloneStep)),
     approvalToken: task.approvalToken,
+  }
+
+  Object.freeze(snapshot)
+  return snapshot
+}
+
+/**
+ * Detaches resumable execution from the object returned by an injected store.
+ * A store may retain its own reference, so all execution-significant arrays and
+ * objects are copied and frozen before the next asynchronous boundary.
+ */
+export function createBrowserExecutionRecordSnapshot(
+  record: BrowserExecutionRecord,
+): BrowserExecutionRecord {
+  const snapshot: BrowserExecutionRecord = {
+    executionId: record.executionId,
+    taskId: record.taskId,
+    incidentId: record.incidentId,
+    provider: record.provider,
+    adapterId: record.adapterId,
+    mode: record.mode,
+    checkpointStepId: record.checkpointStepId,
+    startedAt: record.startedAt,
+    expiresAt: record.expiresAt,
+    completedStepIds: freezeArray([...record.completedStepIds]),
+    remainingSteps: freezeArray(record.remainingSteps.map(cloneStep)),
+    allowedOrigins: freezeArray([...record.allowedOrigins]),
+    preApprovalTokenDigest: record.preApprovalTokenDigest,
+    taskFingerprint: record.taskFingerprint,
+    evidence: freezeArray(record.evidence.map(cloneEvidence)),
   }
 
   Object.freeze(snapshot)

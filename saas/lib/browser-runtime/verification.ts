@@ -179,6 +179,7 @@ export function verifyBrowserTaskResult(
   now = new Date(),
   requiredExecutionId?: string,
 ): BrowserVerificationReport {
+  const executionExpectationWasProvided = arguments.length >= 4
   const checkpoints = task.steps.filter(step => step.kind === 'checkpoint')
   const checkpointIndex = task.steps.findIndex(step => step.kind === 'checkpoint')
   const expectedCheckpoint = checkpointIndex >= 0 ? task.steps[checkpointIndex] : undefined
@@ -191,19 +192,28 @@ export function verifyBrowserTaskResult(
   const expectedExecutionId = expectedCheckpoint?.kind === 'checkpoint'
     ? createBrowserExecutionId(task, expectedCheckpoint.id)
     : undefined
-  const executionIdRulePassed = requiredExecutionId === undefined
-    ? expectedExecutionId === undefined
-      ? result.executionId === undefined
-      : result.executionId === undefined || result.executionId === expectedExecutionId
-    : requiredExecutionId === expectedExecutionId && result.executionId === requiredExecutionId
+
+  let executionIdRulePassed: boolean
+  let executionIdRuleSummary: string
+
+  if (expectedExecutionId === undefined) {
+    executionIdRulePassed = requiredExecutionId === undefined && result.executionId === undefined
+    executionIdRuleSummary = 'Result has no continuation execution ID when the task has no checkpoint.'
+  } else if (executionExpectationWasProvided && requiredExecutionId === undefined) {
+    executionIdRulePassed = result.executionId === undefined
+    executionIdRuleSummary = 'Explicitly non-resumable checkpoint result has no continuation execution ID.'
+  } else {
+    const exactExecutionId = requiredExecutionId ?? expectedExecutionId
+    executionIdRulePassed = exactExecutionId === expectedExecutionId
+      && result.executionId === exactExecutionId
+    executionIdRuleSummary = 'Result execution ID exactly matches the approved checkpoint identity.'
+  }
 
   return verifyAgainstShape(task, result, {
     checkpointRulePassed: checkpoints.length <= 1,
     checkpointRuleSummary: 'Task contains at most one approval checkpoint.',
     executionIdRulePassed,
-    executionIdRuleSummary: requiredExecutionId === undefined
-      ? 'Result execution ID is absent or exactly matches the approved checkpoint identity.'
-      : 'Result execution ID exactly matches the required approved checkpoint identity.',
+    executionIdRuleSummary,
     expectedStatus: checkpointIndex >= 0 ? 'paused' : 'completed',
     expectedCompletedSteps,
     expectedEvidenceSteps,

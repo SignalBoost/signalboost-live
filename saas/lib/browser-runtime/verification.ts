@@ -1,3 +1,4 @@
+import { createBrowserExecutionId } from './execution-state.ts'
 import type {
   BrowserEvidence,
   BrowserTask,
@@ -55,6 +56,8 @@ function resolveVerificationClock(now: Date): { valid: boolean; verifiedAt: stri
 interface VerificationShape {
   checkpointRulePassed: boolean
   checkpointRuleSummary: string
+  executionIdRulePassed: boolean
+  executionIdRuleSummary: string
   expectedStatus: BrowserTaskResult['status']
   expectedCompletedSteps: BrowserTaskStep[]
   expectedEvidenceSteps: BrowserTaskStep[]
@@ -83,6 +86,7 @@ function verifyAgainstShape(
   check('incident-id', result.incidentId === task.incidentId, 'Result incident ID matches the approved task.')
   check('provider', result.provider === task.provider, 'Result provider matches the approved task.')
   check('checkpoint-shape', shape.checkpointRulePassed, shape.checkpointRuleSummary)
+  check('execution-id', shape.executionIdRulePassed, shape.executionIdRuleSummary)
   check('terminal-status', result.status === shape.expectedStatus, `Result terminates as ${shape.expectedStatus}.`)
   check(
     'completed-steps',
@@ -173,6 +177,7 @@ export function verifyBrowserTaskResult(
   task: BrowserTask,
   result: BrowserTaskResult,
   now = new Date(),
+  requiredExecutionId?: string,
 ): BrowserVerificationReport {
   const checkpoints = task.steps.filter(step => step.kind === 'checkpoint')
   const checkpointIndex = task.steps.findIndex(step => step.kind === 'checkpoint')
@@ -183,10 +188,22 @@ export function verifyBrowserTaskResult(
   const expectedEvidenceSteps = expectedCheckpoint?.kind === 'checkpoint'
     ? [...expectedCompletedSteps, expectedCheckpoint]
     : expectedCompletedSteps
+  const expectedExecutionId = expectedCheckpoint?.kind === 'checkpoint'
+    ? createBrowserExecutionId(task, expectedCheckpoint.id)
+    : undefined
+  const executionIdRulePassed = requiredExecutionId === undefined
+    ? expectedExecutionId === undefined
+      ? result.executionId === undefined
+      : result.executionId === undefined || result.executionId === expectedExecutionId
+    : requiredExecutionId === expectedExecutionId && result.executionId === requiredExecutionId
 
   return verifyAgainstShape(task, result, {
     checkpointRulePassed: checkpoints.length <= 1,
     checkpointRuleSummary: 'Task contains at most one approval checkpoint.',
+    executionIdRulePassed,
+    executionIdRuleSummary: requiredExecutionId === undefined
+      ? 'Result execution ID is absent or exactly matches the approved checkpoint identity.'
+      : 'Result execution ID exactly matches the required approved checkpoint identity.',
     expectedStatus: checkpointIndex >= 0 ? 'paused' : 'completed',
     expectedCompletedSteps,
     expectedEvidenceSteps,
@@ -202,10 +219,15 @@ export function verifyResumedBrowserTaskResult(
 ): BrowserVerificationReport {
   const checkpoints = task.steps.filter(step => step.kind === 'checkpoint')
   const checkpointIndex = task.steps.findIndex(step => step.id === checkpointStepId && step.kind === 'checkpoint')
+  const expectedExecutionId = checkpointIndex >= 0
+    ? createBrowserExecutionId(task, checkpointStepId)
+    : undefined
 
   return verifyAgainstShape(task, result, {
     checkpointRulePassed: checkpoints.length === 1 && checkpointIndex >= 0,
     checkpointRuleSummary: 'Resumed task contains exactly the approved checkpoint.',
+    executionIdRulePassed: expectedExecutionId !== undefined && result.executionId === expectedExecutionId,
+    executionIdRuleSummary: 'Resumed result execution ID exactly matches the approved checkpoint identity.',
     expectedStatus: 'completed',
     expectedCompletedSteps: task.steps.filter(step => step.kind !== 'checkpoint'),
     expectedEvidenceSteps: task.steps,

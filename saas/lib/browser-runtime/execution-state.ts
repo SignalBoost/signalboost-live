@@ -55,6 +55,12 @@ export interface InMemoryBrowserStateOptions {
   scheduler?: BrowserExpiryScheduler
 }
 
+export interface InMemoryBrowserSessionRegistryOptions extends InMemoryBrowserStateOptions {
+  maxRetainedSessions?: number
+}
+
+export const DEFAULT_MAX_RETAINED_BROWSER_SESSIONS = 8
+
 const MAX_TIMER_DELAY_MS = 2_147_483_647
 
 const defaultExpiryScheduler: BrowserExpiryScheduler = {
@@ -107,6 +113,14 @@ function retentionDelay(expiresAt: string, retainedAt: Date): number {
     throw new Error('Browser continuation is already expired')
   }
   return delayMs
+}
+
+function normalizeMaxRetainedSessions(value: number | undefined): number {
+  const resolved = value ?? DEFAULT_MAX_RETAINED_BROWSER_SESSIONS
+  if (!Number.isSafeInteger(resolved) || resolved <= 0) {
+    throw new Error('Browser session retention capacity must be a positive safe integer')
+  }
+  return resolved
 }
 
 function stableTaskPayload(task: BrowserTask): string {
@@ -201,9 +215,11 @@ interface RetainedSession {
 export class InMemoryBrowserSessionRegistry implements BrowserSessionRegistry {
   private readonly sessions = new Map<string, RetainedSession>()
   private readonly scheduler: BrowserExpiryScheduler
+  private readonly maxRetainedSessions: number
 
-  constructor(options: InMemoryBrowserStateOptions = {}) {
+  constructor(options: InMemoryBrowserSessionRegistryOptions = {}) {
     this.scheduler = options.scheduler ?? defaultExpiryScheduler
+    this.maxRetainedSessions = normalizeMaxRetainedSessions(options.maxRetainedSessions)
   }
 
   async retain(
@@ -213,7 +229,15 @@ export class InMemoryBrowserSessionRegistry implements BrowserSessionRegistry {
     retainedAt = new Date(),
   ): Promise<void> {
     if (this.sessions.has(executionId)) {
+      await session.close().catch(() => undefined)
       throw new Error(`Browser session already retained for execution ${executionId}`)
+    }
+
+    if (this.sessions.size >= this.maxRetainedSessions) {
+      await session.close().catch(() => undefined)
+      throw new Error(
+        `Browser session retention capacity reached (${this.maxRetainedSessions})`,
+      )
     }
 
     let delayMs: number

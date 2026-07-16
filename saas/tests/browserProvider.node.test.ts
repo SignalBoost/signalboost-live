@@ -51,6 +51,9 @@ test('canonical registries are deterministic, defensive, and reject duplicate or
 
   assert.equal(createNavigationRegistry(provider.navigationProfiles).list()[0].navigationProfileId, 'vercel_deployment_details')
   assert.throws(() => createNavigationRegistry([provider.navigationProfiles[0], provider.navigationProfiles[0]]), /duplicate_navigation/)
+  assert.throws(() => createNavigationRegistry([{ ...provider.navigationProfiles[0], routeTemplate: '//evil.example/path' }]), /invalid_navigation/)
+  assert.throws(() => createNavigationRegistry([{ ...provider.navigationProfiles[0], routeTemplate: '/dashboard/%2e%2e/escape' }]), /invalid_navigation/)
+  assert.throws(() => createNavigationRegistry([{ ...provider.navigationProfiles[0], requiredParameters: [] }]), /invalid_navigation/)
 
   assert.equal(createSelectorRegistry(provider.selectors).list()[0].selectorId, 'vercel_authentication_login_form')
   assert.throws(() => createSelectorRegistry([provider.selectors[0], provider.selectors[0]]), /duplicate_selector/)
@@ -61,6 +64,57 @@ test('canonical registries are deterministic, defensive, and reject duplicate or
 
   assert.equal(createVerificationRegistry(provider.verificationProfiles).list()[0].verificationProfileId, 'dashboard_differs_from_api')
   assert.throws(() => createVerificationRegistry([provider.verificationProfiles[0], provider.verificationProfiles[0]]), /duplicate_verification/)
+})
+
+test('adapter registration stores detached immutable metadata snapshots', () => {
+  const rawCapability = { ...VercelBrowserAdapter.capabilities[0], allowedOriginIds: [...VercelBrowserAdapter.capabilities[0].allowedOriginIds] }
+  const rawOrigin = { ...VercelBrowserAdapter.origins[0], environments: [...VercelBrowserAdapter.origins[0].environments] }
+  const rawAdapter = {
+    ...VercelBrowserAdapter,
+    capabilities: [rawCapability, ...VercelBrowserAdapter.capabilities.slice(1)],
+    origins: [rawOrigin],
+  }
+  const registry = new BrowserProviderRegistry()
+  const registered = registry.register(rawAdapter)
+  rawCapability.allowedOriginIds[0] = 'mutated_origin'
+  rawCapability.displayNameKey = 'mutated.key'
+  rawOrigin.environments[0] = 'production'
+
+  const stored = registered.capabilities.find(capability => capability.capabilityId === rawCapability.capabilityId)
+  assert.ok(stored)
+  assert.deepEqual(stored.allowedOriginIds, ['vercel_dashboard'])
+  assert.notEqual(stored.displayNameKey, 'mutated.key')
+  assert.deepEqual(registered.origins[0].environments, ['preview', 'sandbox'])
+  assert.ok(Object.isFrozen(stored))
+  assert.ok(Object.isFrozen(stored.allowedOriginIds))
+})
+
+test('adapter registration rejects cross-provider, dangling, version, and production metadata', () => {
+  const register = (adapter: typeof VercelBrowserAdapter) => new BrowserProviderRegistry().register(adapter)
+  const firstCapability = VercelBrowserAdapter.capabilities[0]
+
+  assert.throws(() => register({ ...VercelBrowserAdapter, supportsProduction: () => true }), /invalid_provider/)
+  assert.throws(() => register({ ...VercelBrowserAdapter, origins: [{ ...VercelBrowserAdapter.origins[0], providerId: 'other' }] }), /invalid_provider/)
+  assert.throws(() => register({ ...VercelBrowserAdapter, capabilities: [{ ...firstCapability, allowedOriginIds: ['missing_origin'] }, ...VercelBrowserAdapter.capabilities.slice(1)] }), /unknown_origin|invalid_provider/)
+  assert.throws(() => register({ ...VercelBrowserAdapter, capabilities: [{ ...firstCapability, capabilityVersion: 'mismatched-version' }, ...VercelBrowserAdapter.capabilities.slice(1)] }), /invalid_provider/)
+  assert.throws(() => register({ ...VercelBrowserAdapter, capabilities: [{ ...firstCapability, verificationProfileId: 'missing_verification' }, ...VercelBrowserAdapter.capabilities.slice(1)] }), /unknown_verification|invalid_provider/)
+  assert.throws(() => register({ ...VercelBrowserAdapter, navigationProfiles: [{ ...VercelBrowserAdapter.navigationProfiles[0], supportedCapabilities: ['missing_capability'] }, ...VercelBrowserAdapter.navigationProfiles.slice(1)] }), /unknown_capability|invalid_provider/)
+})
+
+test('Vercel capability bindings resolve to their declared navigation, verification, evidence, and origin metadata', () => {
+  const provider = createDefaultBrowserProviderRegistry().get('vercel')
+  const navigation = new Map(provider.navigationProfiles.map(profile => [profile.navigationProfileId, profile]))
+  const verification = new Map(provider.verificationProfiles.map(profile => [profile.verificationProfileId, profile]))
+  const evidence = new Map(provider.evidenceProfiles.map(profile => [profile.evidenceProfileId, profile]))
+  const origins = new Set(provider.origins.map(origin => origin.originId))
+
+  for (const capability of provider.capabilities) {
+    assert.ok(capability.navigationProfileId)
+    assert.ok(navigation.get(capability.navigationProfileId)?.supportedCapabilities.includes(capability.capabilityId))
+    assert.ok(verification.get(capability.verificationProfileId)?.supportedCapabilities.includes(capability.capabilityId))
+    assert.ok(evidence.get(capability.evidenceProfileId)?.supportedCapabilities.includes(capability.capabilityId))
+    for (const originId of capability.allowedOriginIds) assert.ok(origins.has(originId))
+  }
 })
 
 test('Vercel adapter is read-only, non-production, and exposes no mutation capability', () => {

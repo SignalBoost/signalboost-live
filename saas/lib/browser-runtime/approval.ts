@@ -30,8 +30,31 @@ export interface BrowserApprovalVerificationScope {
 
 const MAX_ISSUED_AT_CLOCK_SKEW_MS = 60_000
 const MAX_APPROVAL_STRING_LENGTH = 256
+const MAX_APPROVAL_SCOPE_ITEMS = 128
+const MAX_APPROVAL_TOKEN_LENGTH = 262_144
 const CANONICAL_APPROVAL_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+const CANONICAL_BASE64URL = /^[A-Za-z0-9_-]+$/
+const SHA256_BASE64URL_LENGTH = 43
 const SHA256_HEX = /^[a-f0-9]{64}$/
+const APPROVAL_CLAIM_KEYS = new Set([
+  'version',
+  'taskId',
+  'incidentId',
+  'provider',
+  'adapterId',
+  'mode',
+  'allowedStepIds',
+  'allowedOrigins',
+  'issuedAt',
+  'expiresAt',
+  'nonce',
+  'phase',
+  'checkpointStepId',
+  'executionId',
+  'preApprovalTokenDigest',
+])
+
+type UnknownRecord = Record<string, unknown>
 
 function encode(value: string): string {
   return Buffer.from(value, 'utf8').toString('base64url')
@@ -56,9 +79,24 @@ function assertCanonicalString(value: unknown, label: string): asserts value is 
   }
 }
 
+function assertExactClaimKeys(value: UnknownRecord): void {
+  const unexpected = Object.keys(value).filter(key => !APPROVAL_CLAIM_KEYS.has(key))
+  if (unexpected.length > 0) {
+    throw new Error(
+      `Browser approval token claims contain unsupported fields: ${unexpected.sort().join(', ')}`,
+    )
+  }
+}
+
 function validateUniqueStrings(value: unknown, label: string): string[] {
-  if (!Array.isArray(value) || value.length === 0) {
-    throw new Error(`${label} must be a non-empty array of unique non-empty strings`)
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    value.length > MAX_APPROVAL_SCOPE_ITEMS
+  ) {
+    throw new Error(
+      `${label} must be a non-empty bounded array of unique non-empty strings`,
+    )
   }
 
   const values: string[] = []
@@ -66,7 +104,9 @@ function validateUniqueStrings(value: unknown, label: string): string[] {
   for (const item of value) {
     assertCanonicalString(item, `${label} entry`)
     if (seen.has(item)) {
-      throw new Error(`${label} must be a non-empty array of unique non-empty strings`)
+      throw new Error(
+        `${label} must be a non-empty bounded array of unique non-empty strings`,
+      )
     }
     seen.add(item)
     values.push(item)
@@ -152,6 +192,34 @@ function parseApprovalTimestamp(value: string, label: 'issuedAt' | 'expiresAt'):
   return parsed
 }
 
+function parseTokenSegments(token: unknown): { payload: string; suppliedSignature: string } {
+  if (
+    typeof token !== 'string' ||
+    token.length === 0 ||
+    token.length > MAX_APPROVAL_TOKEN_LENGTH ||
+    token !== token.trim()
+  ) {
+    throw new Error(
+      `Browser approval token must be a non-empty canonical string no longer than ${MAX_APPROVAL_TOKEN_LENGTH} characters`,
+    )
+  }
+
+  const segments = token.split('.')
+  if (segments.length !== 2) throw new Error('Malformed browser approval token')
+  const [payload, suppliedSignature] = segments
+  if (
+    !payload ||
+    !suppliedSignature ||
+    !CANONICAL_BASE64URL.test(payload) ||
+    !CANONICAL_BASE64URL.test(suppliedSignature) ||
+    suppliedSignature.length !== SHA256_BASE64URL_LENGTH
+  ) {
+    throw new Error('Malformed browser approval token')
+  }
+
+  return { payload, suppliedSignature }
+}
+
 export function digestBrowserApprovalToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
 }
@@ -159,7 +227,11 @@ export function digestBrowserApprovalToken(token: string): string {
 export function issueBrowserApprovalToken(claims: BrowserApprovalClaims, secret: string): string {
   if (!secret) throw new Error('Browser approval signing secret is required')
   const payload = encode(JSON.stringify(claims))
-  return `${payload}.${signature(payload, secret)}`
+  const token = `${payload}.${signature(payload, secret)}`
+  if (token.length > MAX_APPROVAL_TOKEN_LENGTH) {
+    throw new Error(`Browser approval token exceeds ${MAX_APPROVAL_TOKEN_LENGTH} characters`)
+  }
+  return token
 }
 
 export function verifyBrowserApprovalToken(
@@ -170,8 +242,7 @@ export function verifyBrowserApprovalToken(
   scope: BrowserApprovalVerificationScope = {},
 ): BrowserApprovalClaims {
   if (!secret) throw new Error('Browser approval signing secret is required')
-  const [payload, suppliedSignature, extra] = String(token || '').split('.')
-  if (!payload || !suppliedSignature || extra) throw new Error('Malformed browser approval token')
+  const { payload, suppliedSignature } = parseTokenSegments(token)
 
   const expected = Buffer.from(signature(payload, secret))
   const supplied = Buffer.from(suppliedSignature)
@@ -189,7 +260,9 @@ export function verifyBrowserApprovalToken(
     throw new Error('Malformed browser approval token claims')
   }
 
-  const claims = parsedClaims as BrowserApprovalClaims
+  const claimsRecord = parsedClaims as UnknownRecord
+  assertExactClaimKeys(claimsRecord)
+  const claims = claimsRecord as unknown as BrowserApprovalClaims
   if (claims.version !== 1) throw new Error('Unsupported browser approval token version')
 
   assertCanonicalString(task.taskId, 'Browser task taskId')
@@ -274,4 +347,9 @@ export function verifyBrowserApprovalToken(
   }
 
   return claims
+}
+
+export {
+  MAX_APPROVAL_SCOPE_ITEMS as BROWSER_APPROVAL_MAX_SCOPE_ITEMS,
+  MAX_APPROVAL_TOKEN_LENGTH as BROWSER_APPROVAL_MAX_TOKEN_LENGTH,
 }

@@ -1,0 +1,5 @@
+'use client'
+
+export default function JsonEditor({ value, onChange, variables = [] }) {
+  return <div className="grid gap-3"><div className="flex items-center justify-between gap-3"><label className="text-sm font-bold text-slate-200">Request Body</label><span className="rounded-full border border-white/10 px-2 py-1 text-xs text-slate-400" title="Variable suggestions come from selected provider metadata.">Schema variables</span></div><textarea spellCheck={false} className="min-h-56 rounded-2xl border border-white/10 bg-slate-950/80 p-4 font-mono text-sm leading-6 text-blue-100 outline-none ring-cyan-300/40 focus:ring-2" value={value} onChange={event => onChange(event.target.value)} /><div className="flex flex-wrap gap-2">{variables.map(variable => <button key={variable} type="button" onClick={() => onChange(value.replace(/\n?}\s*$/, `${value.trim().endsWith('{') ? '' : ',\n'}  "${variable.split('.').pop()}": "{{${variable}}}"\n}`))} className="rounded-full bg-slate-800 px-3 py-1.5 text-xs font-bold text-slate-200 hover:bg-cyan-400/10">+ {'{{'}{variable}{'}}'}</button>)}</div></div>
+}

@@ -53,7 +53,8 @@ export class VercelObserver implements Observer {
     const repeated = consecutiveFailures.length >= cfg.repeatedFailureThreshold
     if (repeated) incidents.push(repeatedFailureIncident(cfg, consecutiveFailures.map(c => c.d), consecutiveFailures.map(c => c.state)))
     const latest = classified[0]
-    if (latest.state === 'failed' && !repeated) incidents.push(failedDeploymentIncident(cfg, latest.d))
+    const latestFailed = classified.find(c => c.state === 'failed')
+    if (latestFailed && !repeated) incidents.push(failedDeploymentIncident(cfg, latestFailed.d))
     if (latest.state === 'canceled' && cfg.environment === 'production') incidents.push(canceledProductionIncident(cfg, latest.d))
     if (latest.state === 'unknown') incidents.push(unknownStateIncident(cfg, latest.d))
     if (isStuck(latest.d, cfg.clock.now().getTime(), cfg.stuckDeploymentThresholdMs)) incidents.push(stuckDeploymentIncident(cfg, latest.d))

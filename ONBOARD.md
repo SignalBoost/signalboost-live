@@ -220,6 +220,13 @@ The harmless local scenario opens `/browser-sandbox/login`, fills only `sandbox:
 Known limitation: the execution and retained-session stores remain in-process test infrastructure. Production BrowserExecutor, Vercel browser automation, live provider credentials, and external provider mutations remain prohibited. The next recommended sprint is sandbox execution persistence plus operator-visible audit history, not production/provider browser execution.
 
 
+
+### Mission 001 — Canonical Browser Provider Abstraction Layer
+
+The canonical Browser Provider Abstraction Layer (BPAL) now lives only in `saas/lib/browser-provider/`, with `saas/lib/browser-provider/index.ts` as the public entry point. BPAL is metadata and policy support only: it defines provider adapter contracts, registry behavior, capabilities, origins, navigation profiles, selectors, evidence profiles, verification profiles, health, versioning, and Supervisor/worker metadata mapping. It does not execute browser tasks, import Playwright, invoke Browser Runtime, resolve credentials, call provider SDK clients, log into Vercel, mutate provider state, or enable production Browser execution.
+
+The canonical Vercel adapter is `VercelBrowserAdapter` under `saas/lib/browser-provider/vercel/`. It is read-only, non-executing, and `supportsProduction()` remains false. The legacy `saas/lib/browser-provider/providers/vercel-provider.ts` file is only a compatibility re-export; new imports must use the public BPAL entry point. `npm run validate:bpal` enforces the one-registry/one-adapter/one-Vercel-adapter rule and blocks forbidden execution, credential, provider-mutation, and Browser Runtime coupling inside BPAL. All operator-facing BPAL labels use `browserProvider.*` keys in English, Spanish, Portuguese, Polish, and Russian.
+
 ### Sprint 18 — Federated High-Availability Supervisor Control Plane
 
 Mission 001 now includes an active-active Supervisor coordination foundation. Multiple Supervisor instances may be healthy at the same time, but exactly one fenced owner may control a given work item, dispatch, or execution. Ownership is time-limited by leases and protected by monotonically increasing fencing tokens. A restarted process receives a new runtime ID, stale owners cannot renew/release/transition/dispatch/complete, and expired leases may be reassigned with a higher generation.
@@ -722,6 +729,8 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-16: Added Mission 001 Sprint 18 federated high-availability Supervisor contracts: active-active instance identity, durable work-item leases, monotonically increasing fencing tokens, provider-isolated worker routing, versioned API-first smart-failover policy, dispatcher fence checks, five-language operator labels, and documentation confirming production/real-provider Browser execution remains disabled.
 
 - 2026-07-16: Added Mission 001 durable federated coordination store: Supabase/Postgres-backed Supervisor instances, work items, atomic lease RPCs, monotonic fencing, exact owner renewal/release/transition checks, expired-lease reconciliation, read-only operator APIs, five-language HA labels, and fail-closed production wiring. Production never falls back to in-memory coordination, stale owners cannot execute, and lost browser sessions cannot resume.
+
+- 2026-07-16: Consolidated overlapping Browser Provider Abstraction Layer implementations into one canonical metadata-only BPAL under `saas/lib/browser-provider/`, added a canonical public entry point, read-only non-executing Vercel adapter, Supervisor metadata mapping, five-language `browserProvider.*` labels, and `npm run validate:bpal` duplication/execution guard. Production/provider Browser execution remains disabled and BPAL handles no credentials or mutations.
 
 ## 20. Mandatory Final Reminder
 

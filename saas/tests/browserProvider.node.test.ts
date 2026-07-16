@@ -1,5 +1,129 @@
-import test from 'node:test'; import assert from 'node:assert/strict'; import { ProviderRegistry, createCapabilityRegistry, createOriginRegistry, createNavigationRegistry, createSelectorRegistry, createVerificationRegistry, createEvidenceRegistry, vercelProvider, versionKey } from '../lib/browser-provider/index.ts'
-test('provider registry is deterministic and rejects duplicates/unknowns',()=>{const r=new ProviderRegistry();r.register(vercelProvider);assert.deepEqual(r.providers().map(x=>x.id),['vercel']);assert.throws(()=>r.register(vercelProvider),/duplicate_provider/);assert.throws(()=>r.lookup('missing'),/unknown_provider/);assert.equal(JSON.stringify(r.toJSON()),JSON.stringify(r.toJSON()))})
-test('registries are deterministic and reject unknown capabilities',()=>{const capabilities=createCapabilityRegistry(vercelProvider.capabilities);assert.equal(capabilities.list()[0].id,'capture-dashboard-evidence');assert.throws(()=>capabilities.get('missing'),/unknown_capability/);assert.equal(createOriginRegistry(vercelProvider.origins).list()[0].id,'dashboard');assert.equal(createNavigationRegistry(vercelProvider.navigation).list()[0].id,'deployment-detail');assert.equal(createSelectorRegistry(vercelProvider.selectors).list()[0].id,'authentication.login');assert.equal(createVerificationRegistry(vercelProvider.verification).list()[0].id,'deployment-failed');assert.equal(createEvidenceRegistry(vercelProvider.evidence).list()[0].id,'dashboard-overview')})
-test('versioning, health, maturity, risk and read-only are deterministic',()=>{const r=new ProviderRegistry();const p=r.register(vercelProvider);assert.equal(versionKey(p.version),'1.0.0|1.0.0|1.0.0');assert.equal(p.health.state,'unknown');for(const c of p.capabilities){assert.equal(c.readOnly,true);assert.equal(c.risk,'read_only');assert.equal(c.maturity,'sandbox_verified')}assert.ok(Object.isFrozen(p));assert.throws(()=>createCapabilityRegistry([{...p.capabilities[0],readOnly:false} as never]),/immutable_read_only/)})
-test('localization complete and forbidden dependencies absent',async()=>{for(const l of ['en','es','pt','pl','ru'] as const)assert.ok(vercelProvider.displayName[l]);const files=['provider-adapter.ts','provider-registry.ts','provider-capability.ts','provider-origin.ts','provider-navigation.ts','provider-selector.ts','provider-verification.ts','provider-evidence.ts','provider-health.ts','provider-version.ts','provider-errors.ts','providers/vercel-provider.ts'];const fs=await import('node:fs/promises');for(const f of files){const s=await fs.readFile(new URL(`../lib/browser-provider/${f}`,import.meta.url),'utf8');assert.doesNotMatch(s,/playwright|browser-runtime|credentials|password|secret/i)}})
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFile, readdir } from 'node:fs/promises'
+import { join } from 'node:path'
+import {
+  BrowserProviderRegistry,
+  ProviderRegistry,
+  VercelBrowserAdapter,
+  vercelProvider,
+  createDefaultBrowserProviderRegistry,
+  createCapabilityRegistry,
+  createOriginRegistry,
+  createNavigationRegistry,
+  createSelectorRegistry,
+  createVerificationRegistry,
+  createEvidenceRegistry,
+  versionKey,
+  mapBrowserProviderCapabilityToSupervisorCapability,
+  createBrowserProviderWorkerDescriptor,
+} from '../lib/browser-provider/index.ts'
+
+test('canonical public entry point exports expected symbols and compatibility aliases', () => {
+  assert.equal(typeof BrowserProviderRegistry, 'function')
+  assert.equal(ProviderRegistry, BrowserProviderRegistry)
+  assert.equal(vercelProvider, VercelBrowserAdapter)
+  assert.equal(createDefaultBrowserProviderRegistry().list()[0].providerId, 'vercel')
+})
+
+test('provider registry is deterministic and rejects duplicates and unknown providers', () => {
+  const registry = new BrowserProviderRegistry()
+  registry.register(VercelBrowserAdapter)
+  assert.deepEqual(registry.list().map(provider => provider.providerId), ['vercel'])
+  assert.throws(() => registry.register(VercelBrowserAdapter), /duplicate_provider/)
+  assert.throws(() => registry.get('missing'), /unknown_provider/)
+  assert.equal(JSON.stringify(registry.toJSON()), JSON.stringify(registry.toJSON()))
+})
+
+test('canonical registries are deterministic, defensive, and reject duplicate or invalid metadata', () => {
+  const provider = VercelBrowserAdapter
+  const capabilities = createCapabilityRegistry(provider.capabilities)
+  assert.equal(capabilities.list()[0].capabilityId, 'capture_dashboard_evidence')
+  assert.throws(() => capabilities.get('missing'), /unknown_capability/)
+  assert.throws(() => createCapabilityRegistry([provider.capabilities[0], provider.capabilities[0]]), /duplicate_capability/)
+  assert.throws(() => createCapabilityRegistry([{ ...provider.capabilities[0], readOnly: false }]), /immutable_read_only/)
+  const copy = capabilities.list()[0]
+  assert.throws(() => ((copy.allowedOriginIds as string[])[0] = 'mutated'), /Cannot assign|read only|not extensible/)
+
+  assert.equal(createOriginRegistry(provider.origins).list()[0].originId, 'vercel_dashboard')
+  assert.throws(() => createOriginRegistry([provider.origins[0], provider.origins[0]]), /duplicate_origin/)
+  assert.throws(() => createOriginRegistry([{ ...provider.origins[0], exactOrigin: 'http://vercel.com' }]), /invalid_origin/)
+
+  assert.equal(createNavigationRegistry(provider.navigationProfiles).list()[0].navigationProfileId, 'vercel_deployment_details')
+  assert.throws(() => createNavigationRegistry([provider.navigationProfiles[0], provider.navigationProfiles[0]]), /duplicate_navigation/)
+
+  assert.equal(createSelectorRegistry(provider.selectors).list()[0].selectorId, 'vercel_authentication_login_form')
+  assert.throws(() => createSelectorRegistry([provider.selectors[0], provider.selectors[0]]), /duplicate_selector/)
+  assert.throws(() => createSelectorRegistry([{ ...provider.selectors[0], selector: { strategy: 'css', css: '*' } }]), /invalid_selector/)
+
+  assert.equal(createEvidenceRegistry(provider.evidenceProfiles).list()[0].evidenceProfileId, 'dashboard_api_comparison')
+  assert.throws(() => createEvidenceRegistry([provider.evidenceProfiles[0], provider.evidenceProfiles[0]]), /duplicate_evidence/)
+
+  assert.equal(createVerificationRegistry(provider.verificationProfiles).list()[0].verificationProfileId, 'dashboard_differs_from_api')
+  assert.throws(() => createVerificationRegistry([provider.verificationProfiles[0], provider.verificationProfiles[0]]), /duplicate_verification/)
+})
+
+test('Vercel adapter is read-only, non-production, and exposes no mutation capability', () => {
+  assert.equal(VercelBrowserAdapter.supportsProduction(), false)
+  assert.equal(VercelBrowserAdapter.supportsReadOnlyInspection(), true)
+  assert.equal(VercelBrowserAdapter.supportsAutoFailover(), false)
+  assert.equal(versionKey(VercelBrowserAdapter.getVersion()), 'vercel-browser-adapter-v1|vercel-browser-capabilities-v1|1.0.0')
+  for (const capability of VercelBrowserAdapter.capabilities) {
+    assert.equal(capability.readOnly, true)
+    assert.equal(capability.riskClass, 'read_only')
+    assert.equal(capability.supportsAutoFailover, false)
+    assert.doesNotMatch(capability.operation, /create|update|delete|mutate|write|redeploy|rollback|set_/i)
+  }
+})
+
+test('suspended provider and suspended capability fail closed', () => {
+  const registry = new BrowserProviderRegistry()
+  registry.register({ ...VercelBrowserAdapter, health: { state: 'suspended', checkedAt: '1970-01-01T00:00:00.000Z' } })
+  assert.throws(() => registry.get('vercel'), /provider_suspended/)
+  assert.throws(() => createCapabilityRegistry([{ ...VercelBrowserAdapter.capabilities[0], maturity: 'suspended' }]).get(VercelBrowserAdapter.capabilities[0].capabilityId), /capability_suspended/)
+})
+
+test('Supervisor mapping and worker descriptor preserve policy boundaries', () => {
+  const capability = VercelBrowserAdapter.capabilities[0]
+  const mapped = mapBrowserProviderCapabilityToSupervisorCapability(capability)
+  assert.equal(mapped.riskClass, capability.riskClass)
+  assert.equal(mapped.maturity, capability.maturity)
+  assert.equal(mapped.channels.browser, capability.supportsBrowser)
+  assert.equal(mapped.supportsAutoFailover, false)
+  assert.deepEqual(mapped.allowedEnvironments, ['sandbox', 'preview'])
+  assert.equal(mapped.verificationProfileId, capability.verificationProfileId)
+  const worker = createBrowserProviderWorkerDescriptor(VercelBrowserAdapter)
+  assert.equal(worker.maximumConcurrentWork, 0)
+  assert.deepEqual(worker.executionDependencies, [])
+})
+
+test('BPAL source has one canonical implementation and forbidden imports are absent', async () => {
+  const root = new URL('../lib/browser-provider/', import.meta.url)
+  async function walk(url) {
+    const entries = await readdir(url, { withFileTypes: true })
+    const files = []
+    for (const entry of entries) {
+      const child = new URL(`${entry.name}${entry.isDirectory() ? '/' : ''}`, url)
+      if (entry.isDirectory()) files.push(...await walk(child))
+      else if (/\.ts$/.test(entry.name)) files.push(child)
+    }
+    return files
+  }
+  const files = await walk(root)
+  const texts = await Promise.all(files.map(async file => [file.pathname, await readFile(file, 'utf8')]))
+  assert.equal(texts.filter(([, text]) => /class\s+BrowserProviderRegistry\b/.test(text)).length, 1)
+  assert.equal(texts.filter(([, text]) => /interface\s+BrowserProviderAdapter\b/.test(text)).length, 1)
+  assert.equal(texts.filter(([, text]) => /\bVercelBrowserAdapter\b\s*[:=]/.test(text)).length, 1)
+  for (const [, text] of texts) assert.doesNotMatch(text, /playwright|browser-runtime|credential resolver|provider mutation|fetch\(|XMLHttpRequest/i)
+  const runtimeFiles = await readdir(new URL('../lib/browser-runtime/', import.meta.url))
+  for (const file of runtimeFiles.filter(name => name.endsWith('.ts'))) assert.doesNotMatch(await readFile(join(new URL('../lib/browser-runtime/', import.meta.url).pathname, file), 'utf8'), /vercel/i)
+})
+
+test('browser provider localization keys exist for all five languages', async () => {
+  const locales = ['en','es','pt','pl','ru']
+  const keys = [VercelBrowserAdapter.displayNameKey, ...VercelBrowserAdapter.capabilities.flatMap(c => [c.displayNameKey, c.descriptionKey]), ...VercelBrowserAdapter.origins.map(o => o.labelKey), ...VercelBrowserAdapter.navigationProfiles.map(n => n.labelKey)].filter(Boolean)
+  for (const locale of locales) {
+    const dict = JSON.parse(await readFile(new URL(`../locales/${locale}.json`, import.meta.url), 'utf8'))
+    for (const key of keys) assert.ok(key.split('.').reduce((value, part) => value?.[part], dict), `${locale}:${key}`)
+  }
+})

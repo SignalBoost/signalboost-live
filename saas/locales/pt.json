@@ -454,5 +454,62 @@
     "noActiveLease": "Sem lease ativo",
     "coordinationStoreHealth": "Saúde do armazenamento de coordenação",
     "abandonedBrowserExecutions": "Execuções de navegador abandonadas"
+  },
+  "browserProvider": {
+    "vercel": {
+      "displayName": "Vercel",
+      "capabilities": {
+        "read_deployment_status": {
+          "name": "Read Deployment Status",
+          "description": "Metadados de navegador da Vercel somente leitura"
+        },
+        "inspect_deployment_failure": {
+          "name": "Inspect Deployment Failure",
+          "description": "Metadados de navegador da Vercel somente leitura"
+        },
+        "inspect_deployment_logs": {
+          "name": "Inspect Deployment Logs",
+          "description": "Metadados de navegador da Vercel somente leitura"
+        },
+        "inspect_domain_status": {
+          "name": "Inspect Domain Status",
+          "description": "Metadados de navegador da Vercel somente leitura"
+        },
+        "inspect_project_metadata": {
+          "name": "Inspect Project Metadata",
+          "description": "Metadados de navegador da Vercel somente leitura"
+        },
+        "inspect_environment_variable_metadata": {
+          "name": "Inspect Environment Variable Metadata",
+          "description": "Metadados de navegador da Vercel somente leitura"
+        },
+        "capture_dashboard_evidence": {
+          "name": "Capture Dashboard Evidence",
+          "description": "Metadados de navegador da Vercel somente leitura"
+        },
+        "compare_dashboard_with_api": {
+          "name": "Compare Dashboard With Api",
+          "description": "Metadados de navegador da Vercel somente leitura"
+        }
+      },
+      "origins": {
+        "dashboard": "Painel da Vercel"
+      },
+      "navigation": {
+        "deployments": "Visualização do painel da Vercel",
+        "deploymentDetails": "Visualização do painel da Vercel",
+        "logs": "Visualização do painel da Vercel",
+        "domains": "Visualização do painel da Vercel",
+        "projectSettings": "Visualização do painel da Vercel",
+        "environmentVariables": "Visualização do painel da Vercel"
+      }
+    },
+    "health": {
+      "healthy": "Saudável",
+      "degraded": "Degradado",
+      "outage": "Indisponível",
+      "unknown": "Desconhecido",
+      "suspended": "Suspenso"
+    }
   }
 }

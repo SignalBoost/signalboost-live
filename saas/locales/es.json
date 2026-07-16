@@ -454,5 +454,62 @@
     "noActiveLease": "Sin arrendamiento activo",
     "coordinationStoreHealth": "Estado del almacén de coordinación",
     "abandonedBrowserExecutions": "Ejecuciones de navegador abandonadas"
+  },
+  "browserProvider": {
+    "vercel": {
+      "displayName": "Vercel",
+      "capabilities": {
+        "read_deployment_status": {
+          "name": "Read Deployment Status",
+          "description": "Metadatos de navegador de Vercel de solo lectura"
+        },
+        "inspect_deployment_failure": {
+          "name": "Inspect Deployment Failure",
+          "description": "Metadatos de navegador de Vercel de solo lectura"
+        },
+        "inspect_deployment_logs": {
+          "name": "Inspect Deployment Logs",
+          "description": "Metadatos de navegador de Vercel de solo lectura"
+        },
+        "inspect_domain_status": {
+          "name": "Inspect Domain Status",
+          "description": "Metadatos de navegador de Vercel de solo lectura"
+        },
+        "inspect_project_metadata": {
+          "name": "Inspect Project Metadata",
+          "description": "Metadatos de navegador de Vercel de solo lectura"
+        },
+        "inspect_environment_variable_metadata": {
+          "name": "Inspect Environment Variable Metadata",
+          "description": "Metadatos de navegador de Vercel de solo lectura"
+        },
+        "capture_dashboard_evidence": {
+          "name": "Capture Dashboard Evidence",
+          "description": "Metadatos de navegador de Vercel de solo lectura"
+        },
+        "compare_dashboard_with_api": {
+          "name": "Compare Dashboard With Api",
+          "description": "Metadatos de navegador de Vercel de solo lectura"
+        }
+      },
+      "origins": {
+        "dashboard": "Panel de Vercel"
+      },
+      "navigation": {
+        "deployments": "Vista del panel de Vercel",
+        "deploymentDetails": "Vista del panel de Vercel",
+        "logs": "Vista del panel de Vercel",
+        "domains": "Vista del panel de Vercel",
+        "projectSettings": "Vista del panel de Vercel",
+        "environmentVariables": "Vista del panel de Vercel"
+      }
+    },
+    "health": {
+      "healthy": "Correcto",
+      "degraded": "Degradado",
+      "outage": "Interrupción",
+      "unknown": "Desconocido",
+      "suspended": "Suspendido"
+    }
   }
 }

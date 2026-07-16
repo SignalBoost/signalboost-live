@@ -16,3 +16,7 @@ The initial adapter defines read-only metadata for deployment status/logs/failur
 ## Expansion
 
 Future Stripe, GitHub, Supabase, Cloudflare, AWS, and Azure adapters implement `BrowserProviderAdapter`, provide localized display metadata, register deterministic profiles, and remain read-only until separately governed.
+
+## Integration boundary
+
+BPAL remains a metadata-only layer. Browser Runtime and Supervisor integrations must consume its exported contracts without introducing a second provider registry, duplicate Vercel adapter, credential handling, dashboard mutations, or production browser execution. This boundary resolves the overlapping Mission 001 implementations while preserving the canonical SDK already present on `main`.

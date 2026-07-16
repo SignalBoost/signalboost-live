@@ -35,7 +35,7 @@ export interface BrowserProviderDiagnostics {
   readonly adapterVersion: string
   readonly schemaVersion: string
   readonly health: Readonly<{ state: string; checkedAt: string; reasonCode?: string; detailsKey?: string }>
-  readonly version: Readonly<{ adapterVersion: string; capabilityVersion: string; schemaVersion: string }>
+  readonly version: Readonly<{ adapterVersion: string; capabilityVersion: string; schemaVersion: string; updatedAt?: string }>
   readonly support: Readonly<{
     readOnlyInspection: boolean
     sandboxMetadata: boolean
@@ -85,10 +85,12 @@ export function createBrowserProviderDiagnosticsSnapshot(
       throw new BrowserProviderError('invalid_provider', 'BPAL diagnostics require a zero-execution, production-disabled provider')
     }
 
-    const capabilities = provider.capabilities.map(capability => {
+    const capabilities: BrowserProviderCapabilityDiagnostics[] = provider.capabilities.map(capability => {
       const policy = mapBrowserProviderCapabilityToSupervisorCapability(capability)
-      if (!capability.readOnly || policy.allowedEnvironments.includes('production')) {
-        throw new BrowserProviderError('invalid_provider', 'BPAL diagnostics may expose only read-only, non-production policy')
+      const allowedEnvironments = policy.allowedEnvironments ?? []
+      const verificationProfileId = policy.verificationProfileId
+      if (!capability.readOnly || allowedEnvironments.includes('production') || !verificationProfileId) {
+        throw new BrowserProviderError('invalid_provider', 'BPAL diagnostics may expose only verified read-only, non-production policy')
       }
 
       return {
@@ -98,21 +100,21 @@ export function createBrowserProviderDiagnosticsSnapshot(
         operation: capability.operation,
         riskClass: capability.riskClass,
         maturity: capability.maturity,
-        readOnly: true as const,
+        readOnly: true,
         reversible: capability.reversible,
         idempotent: capability.idempotent,
         requiresHumanApproval: capability.requiresHumanApproval,
         channels: { ...policy.channels },
         supportsAutoFailover: policy.supportsAutoFailover,
         supportsBrowserOnDemand: policy.supportsBrowserOnDemand,
-        allowedEnvironments: [...policy.allowedEnvironments],
+        allowedEnvironments: [...allowedEnvironments],
         allowedOriginIds: [...policy.approvedOrigins],
         navigationProfileId: capability.navigationProfileId,
         evidenceProfileId: capability.evidenceProfileId,
-        verificationProfileId: policy.verificationProfileId,
+        verificationProfileId,
         policyVersion: policy.policyVersion,
         capabilityVersion: policy.capabilityVersion,
-        productionExecutionEnabled: false as const,
+        productionExecutionEnabled: false,
       }
     })
 

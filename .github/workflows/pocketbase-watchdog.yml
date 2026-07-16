@@ -1,8 +1,9 @@
 name: PocketBase Health Watchdog
 
+# Scheduled checks are intentionally disabled until PocketBase becomes the
+# active production backend. Run this workflow manually after PocketBase is
+# deployed and POCKETBASE_HEALTH_URL is configured.
 on:
-  schedule:
-    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 permissions:

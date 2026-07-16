@@ -67,6 +67,7 @@ const CUSTOMER_GROUPS: Group[] = [
     items: [
       { icon: '🏠', label: 'Dashboard', href: '/dashboard', desc: 'Customer home base and next actions.' },
       { icon: '📋', label: 'Infrastructure Changes', href: '/dashboard/infrastructure', desc: 'Proposed infrastructure work and status.' },
+      { icon: '🔌', label: 'Integrations', href: '/integrations', desc: 'Build governed provider tools and integrations.' },
     ],
   },
   {

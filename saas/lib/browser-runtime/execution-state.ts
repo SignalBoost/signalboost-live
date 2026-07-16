@@ -45,6 +45,7 @@ export interface BrowserSessionRegistry {
   ): Promise<void>
   take(executionId: string): Promise<BrowserSessionPort | null>
   discard(executionId: string): Promise<void>
+  has?(executionId: string): Promise<boolean>
 }
 
 export interface BrowserSessionRegistryLifecycle extends BrowserSessionRegistry {
@@ -310,6 +311,10 @@ export class InMemoryBrowserSessionRegistry implements BrowserSessionRegistryLif
   async discard(executionId: string): Promise<void> {
     const session = await this.take(executionId)
     await session?.close().catch(() => undefined)
+  }
+
+  async has(executionId: string): Promise<boolean> {
+    return !this.shutDown && this.sessions.has(executionId)
   }
 
   shutdown(): Promise<void> {

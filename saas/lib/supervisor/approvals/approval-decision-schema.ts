@@ -1,0 +1,4 @@
+export const rejectionReasonCodes = ['operator_rejected','scope_unacceptable','evidence_insufficient','session_unavailable','expired','other'] as const
+export type RejectionReasonCode = typeof rejectionReasonCodes[number]
+export function parseApproveDecision(v: unknown) { if (v && typeof v === 'object' && !Array.isArray(v)) { const keys = Object.keys(v as Record<string, unknown>); if (keys.some(k => /token|step|origin|fingerprint|expir|claim/i.test(k))) throw new Error('client_override_rejected') } return {} }
+export function parseRejectDecision(v: unknown): { reasonCode: RejectionReasonCode; operatorNote?: string } { if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('reject_body_invalid'); const b=v as any; if (!rejectionReasonCodes.includes(b.reasonCode)) throw new Error('reason_code_invalid'); return { reasonCode:b.reasonCode, operatorNote: typeof b.operatorNote === 'string' ? b.operatorNote.replace(/[<>]/g,'').slice(0,500) : undefined } }

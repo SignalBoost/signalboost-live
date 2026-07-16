@@ -454,5 +454,62 @@
     "noActiveLease": "Нет активной аренды",
     "coordinationStoreHealth": "Состояние хранилища координации",
     "abandonedBrowserExecutions": "Оставленные исполнения браузера"
+  },
+  "browserProvider": {
+    "vercel": {
+      "displayName": "Vercel",
+      "capabilities": {
+        "read_deployment_status": {
+          "name": "Read Deployment Status",
+          "description": "Метаданные браузера Vercel только для чтения"
+        },
+        "inspect_deployment_failure": {
+          "name": "Inspect Deployment Failure",
+          "description": "Метаданные браузера Vercel только для чтения"
+        },
+        "inspect_deployment_logs": {
+          "name": "Inspect Deployment Logs",
+          "description": "Метаданные браузера Vercel только для чтения"
+        },
+        "inspect_domain_status": {
+          "name": "Inspect Domain Status",
+          "description": "Метаданные браузера Vercel только для чтения"
+        },
+        "inspect_project_metadata": {
+          "name": "Inspect Project Metadata",
+          "description": "Метаданные браузера Vercel только для чтения"
+        },
+        "inspect_environment_variable_metadata": {
+          "name": "Inspect Environment Variable Metadata",
+          "description": "Метаданные браузера Vercel только для чтения"
+        },
+        "capture_dashboard_evidence": {
+          "name": "Capture Dashboard Evidence",
+          "description": "Метаданные браузера Vercel только для чтения"
+        },
+        "compare_dashboard_with_api": {
+          "name": "Compare Dashboard With Api",
+          "description": "Метаданные браузера Vercel только для чтения"
+        }
+      },
+      "origins": {
+        "dashboard": "Панель Vercel"
+      },
+      "navigation": {
+        "deployments": "Представление панели Vercel",
+        "deploymentDetails": "Представление панели Vercel",
+        "logs": "Представление панели Vercel",
+        "domains": "Представление панели Vercel",
+        "projectSettings": "Представление панели Vercel",
+        "environmentVariables": "Представление панели Vercel"
+      }
+    },
+    "health": {
+      "healthy": "Исправен",
+      "degraded": "Снижен",
+      "outage": "Сбой",
+      "unknown": "Неизвестно",
+      "suspended": "Приостановлен"
+    }
   }
 }

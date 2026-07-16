@@ -247,3 +247,19 @@ RLS is enabled on the coordination tables. Anonymous reads are denied, public-cl
 Five-language operator labels were added for durable coordination, lease state, fencing generation, stale owners, browser-session loss, reconciliation, and production Browser execution disabled. Production Browser execution and real-provider Browser execution remain disabled.
 
 Known limitations: local tests use mocks rather than connecting to production Supabase; live dashboards are not accessed by this sprint. Next recommended sprint: wire scheduled startup reconciliation and approval invalidation hooks end-to-end against a local Supabase test database, then expand operator dashboard data fetching without adding mutation controls.
+
+## Mission 001 — Canonical BPAL Consolidation
+
+Two overlapping Browser Provider Abstraction Layer implementations were consolidated into one authoritative metadata-only architecture. The canonical module path is `saas/lib/browser-provider/`, and the only public entry point for consumers is `saas/lib/browser-provider/index.ts`.
+
+Canonical BPAL now contains one adapter contract, one provider registry, one capability model, one origin model, one navigation model, one selector model, one evidence model, one verification model, one provider-health model, one provider-version model, one Vercel read-only adapter, one Supervisor mapping path, one coherent test suite, and one `browserProvider.*` localization key family across English, Spanish, Portuguese, Polish, and Russian.
+
+The canonical Vercel adapter is `VercelBrowserAdapter` in `saas/lib/browser-provider/vercel/vercel-browser-adapter.ts`. It advertises read-only metadata for deployment status, deployment failures, deployment logs, domain status, project metadata, environment-variable metadata, dashboard evidence, and dashboard/API comparison. It does not log in, import Playwright, invoke Browser Runtime, perform network requests, resolve provider credentials, mutate provider state, or support production browser execution.
+
+Supervisor integration is metadata-only through `mapBrowserProviderCapabilityToSupervisorCapability` and `createBrowserProviderWorkerDescriptor`. The mapping preserves risk, maturity, read-only state, origin identity, verification profile identity, and production-disabled state; provider-worker execution capacity remains zero.
+
+Compatibility re-export retained: `saas/lib/browser-provider/providers/vercel-provider.ts` re-exports the canonical Vercel adapter for a bounded migration period. New internal imports must use `saas/lib/browser-provider/index.ts`.
+
+CI guard: `npm run validate:bpal` fails on duplicate BPAL registries/contracts/adapters, forbidden BPAL execution or credential dependencies, direct Vercel knowledge in Browser Runtime, and duplicate Vercel capability IDs.
+
+Next recommended sprint: surface BPAL metadata in Supervisor/operator diagnostics and policy review UI without enabling production/provider Browser execution or credentials.

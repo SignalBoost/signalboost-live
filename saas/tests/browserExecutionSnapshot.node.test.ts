@@ -13,6 +13,8 @@ import type {
 import {
   InMemoryBrowserExecutionStore,
   InMemoryBrowserSessionRegistry,
+  type BrowserExecutionRecord,
+  type BrowserExecutionStore,
   type BrowserSessionRegistry,
 } from '../lib/browser-runtime/execution-state.ts'
 import { resumeBrowserTask, runBrowserTask } from '../lib/browser-runtime/runtime.ts'
@@ -165,7 +167,7 @@ test('runtime executes a frozen approval-bound snapshot after session-open mutat
   if (result.verification !== 'pending') assert.equal(result.verification.status, 'verified')
 })
 
-test('resumed execution cannot broaden approved origins after continuation verification', async () => {
+test('resumed execution detaches approved task and retained record before async ports run', async () => {
   const task = makeResumableTask()
   task.approvalToken = issueApproval(
     task,
@@ -179,7 +181,16 @@ test('resumed execution cannot broaden approved origins after continuation verif
 
   const calls: string[] = []
   let currentUrl = 'about:blank'
-  const executionStore = new InMemoryBrowserExecutionStore()
+  let loadedRecord: BrowserExecutionRecord | null = null
+  const backingStore = new InMemoryBrowserExecutionStore()
+  const executionStore: BrowserExecutionStore = {
+    save: (record, retainedAt) => backingStore.save(record, retainedAt),
+    async load(executionId) {
+      loadedRecord = await backingStore.load(executionId)
+      return loadedRecord
+    },
+    delete: executionId => backingStore.delete(executionId),
+  }
   const backingRegistry = new InMemoryBrowserSessionRegistry()
   const mutatingRegistry: BrowserSessionRegistry = {
     retain: (
@@ -190,6 +201,14 @@ test('resumed execution cannot broaden approved origins after continuation verif
     ) => backingRegistry.retain(executionId, session, expiresAt, retainedAt),
     async take(executionId: string) {
       task.allowedOrigins.push('https://evil.example')
+      if (loadedRecord) {
+        loadedRecord.allowedOrigins.push('https://evil.example')
+        loadedRecord.remainingSteps[0] = {
+          id: 'protected-save',
+          kind: 'click',
+          selector: '#tampered-save',
+        }
+      }
       return backingRegistry.take(executionId)
     },
     discard: executionId => backingRegistry.discard(executionId),
@@ -266,8 +285,10 @@ test('resumed execution cannot broaden approved origins after continuation verif
   assert.equal(resumed.status, 'failed')
   assert.match(resumed.error || '', /Current page after step protected-save origin is not approved/)
   assert.equal(task.allowedOrigins.includes('https://evil.example'), true)
+  assert.equal(loadedRecord?.allowedOrigins.includes('https://evil.example'), true)
   assert.equal(calls.includes('click:#protected-save'), true)
+  assert.equal(calls.includes('click:#tampered-save'), false)
   assert.equal(calls.includes('wait:#save-success'), false)
   assert.equal(calls.includes('screenshot:after-save'), false)
-  assert.equal(await executionStore.load(paused.executionId!), null)
+  assert.equal(await backingStore.load(paused.executionId!), null)
 })

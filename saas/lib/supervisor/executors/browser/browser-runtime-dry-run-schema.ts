@@ -43,6 +43,7 @@ export interface BrowserRuntimeDryRunPackage {
 }
 
 const secretKey = /(password|api[_-]?key|access[_-]?token|private[_-]?key|secret|cookie|authorization)/i
+const allowedNonSecretTokenKeys = new Set(['approvalToken', 'approvalTokenCreated'])
 const badString = /(bearer\s+[a-z0-9._-]+|sk-[a-z0-9]{16,}|javascript:|<script|eval\s*\(|function\s*\(|\b(bash|sh|node|powershell)\s+)/i
 
 export function canonicalize(value: unknown): unknown {
@@ -59,7 +60,8 @@ function assertNoForbidden(value: unknown, path: string): void {
   else if (value && typeof value === 'object') {
     if (Object.getPrototypeOf(value) !== Object.prototype) throw new BrowserRuntimeAdapterError('non_plain_package', `${path} must be plain serializable data`, 'schema')
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      if (secretKey.test(k) && !/(Ref|Refs)$/.test(k)) throw new BrowserRuntimeAdapterError('secret_key_in_package', `${path}.${k} is forbidden`, 'secret')
+      const isAllowedNonSecretTokenField = allowedNonSecretTokenKeys.has(k)
+      if (secretKey.test(k) && !isAllowedNonSecretTokenField && !/(Ref|Refs)$/.test(k)) throw new BrowserRuntimeAdapterError('secret_key_in_package', `${path}.${k} is forbidden`, 'secret')
       assertNoForbidden(v, `${path}.${k}`)
     }
   } else if (typeof value === 'string' && badString.test(value)) throw new BrowserRuntimeAdapterError('unsafe_string_in_package', `${path} contains forbidden content`, 'secret')

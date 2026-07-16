@@ -1,7 +1,9 @@
 import type { BrowserTask, BrowserTaskStep } from './contracts.ts'
 
 function cloneStep(step: BrowserTaskStep): BrowserTaskStep {
-  return Object.freeze({ ...step }) as BrowserTaskStep
+  const snapshot = { ...step } as BrowserTaskStep
+  Object.freeze(snapshot)
+  return snapshot
 }
 
 /**
@@ -14,6 +16,11 @@ function cloneStep(step: BrowserTaskStep): BrowserTaskStep {
  * ports cannot change approved scope after verification.
  */
 export function createBrowserExecutionTaskSnapshot(task: BrowserTask): BrowserTask {
+  const allowedOrigins = [...task.allowedOrigins]
+  const steps = task.steps.map(cloneStep)
+  Object.freeze(allowedOrigins)
+  Object.freeze(steps)
+
   const snapshot: BrowserTask = {
     taskId: task.taskId,
     incidentId: task.incidentId,
@@ -22,10 +29,11 @@ export function createBrowserExecutionTaskSnapshot(task: BrowserTask): BrowserTa
     mode: task.mode,
     issuedAt: task.issuedAt,
     expiresAt: task.expiresAt,
-    allowedOrigins: Object.freeze([...task.allowedOrigins]) as string[],
-    steps: Object.freeze(task.steps.map(cloneStep)) as BrowserTaskStep[],
+    allowedOrigins,
+    steps,
     approvalToken: task.approvalToken,
   }
 
-  return Object.freeze(snapshot) as BrowserTask
+  Object.freeze(snapshot)
+  return snapshot
 }

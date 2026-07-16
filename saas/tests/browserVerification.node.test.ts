@@ -136,15 +136,16 @@ test('verifies the separately approved sandbox save evidence package', () => {
   assert.deepEqual(report.errors, [])
 })
 
-test('verifies a preparation result that pauses exactly at the approval checkpoint', () => {
+test('verifies an explicitly non-resumable preparation result at the approval checkpoint', () => {
   const task = buildSandboxBrowserTask(base)
   const result = resultForTask(task)
 
-  const report = verifyBrowserTaskResult(task, result)
+  const report = verifyBrowserTaskResult(task, result, undefined, undefined)
 
   assert.equal(report.status, 'verified')
   assert.equal(result.status, 'paused')
   assert.equal(result.pausedAtStepId, 'approval-checkpoint')
+  assert.ok(report.checks.some(item => item.id === 'execution-id' && item.passed))
 })
 
 test('fails verification when a required screenshot artifact is missing', () => {

@@ -156,7 +156,6 @@ const PRODUCT_GROUPS: Group[] = [
       { icon: '🎬', label: 'Video Studio', href: '/dashboard/video', desc: 'Create videos, clips, and captions.' },
       { icon: '🎧', label: 'Audio Studio', href: '/dashboard/audio', desc: 'Generate voice and audio content.' },
       { icon: '🎨', label: 'Creative Studio', href: '/dashboard/creative', desc: 'Visual assets and campaign graphics.' },
-      { icon: '🎥', label: 'Campaign Studio', href: '/agency', desc: 'One prompt to a full campaign, voiceover, and render credits.' },
     ],
   },
   {
@@ -217,7 +216,7 @@ function navPath(href: string) {
 }
 
 export default function PremiumCustomerNavbarV2() {
-  const navRef = useRef<HTMLElement>(null)
+const navRef = useRef<HTMLElement>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pathname = usePathname()
   const { lang, setLang, dict } = useI18n()
@@ -238,6 +237,7 @@ export default function PremiumCustomerNavbarV2() {
   const brandSubtitle = t(dict, 'nav.clientSuite', 'Client suite')
   const homeLabel = t(dict, 'nav.home', 'Home')
   const pricingLabel = t(dict, 'nav.pricing', 'Pricing')
+  const campaignStudioLabel = t(dict, 'nav.campaignStudio', 'Campaign Studio')
   const menuLabel = t(dict, 'nav.menu', 'Menu')
   const groups = [...(user ? visibleCustomerGroups(ownerAccess) : []), ...PRODUCT_GROUPS, ...(ownerAccess ? [OWNER_GROUP] : []), HELP_GROUP]
 
@@ -430,6 +430,7 @@ export default function PremiumCustomerNavbarV2() {
 
         <div className="sbnav-desktop">
           <Link href="/" className="sbnav-trigger" style={triggerStyle(pathname === '/', GOLD)}>{homeLabel}</Link>
+          <Link href="/agency" className="sbnav-trigger" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: pathname === '/agency' ? 'rgba(255,195,0,.22)' : 'rgba(255,195,0,.12)', border: `1px solid ${GOLD}66`, borderRadius: 999, color: '#fff', fontWeight: 800, whiteSpace: 'nowrap', textDecoration: 'none', boxShadow: `0 0 18px ${GOLD}33` }}><span aria-hidden>🎥</span>{campaignStudioLabel}</Link>
           {groups.map((group) => <MenuGroup key={group.id} group={group} />)}
           <Link href="/pricing" className="sbnav-trigger" style={triggerStyle(pathname === '/pricing', GOLD)}>{pricingLabel}</Link>
         </div>
@@ -488,6 +489,7 @@ export default function PremiumCustomerNavbarV2() {
 
           <div style={{ display: 'grid', gap: 4, marginBottom: 14 }}>
             <Link href="/" style={{ padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 800, fontSize: 14 }}>🏠 {homeLabel}</Link>
+            <Link href="/agency" style={{ padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 800, fontSize: 14, background: `${GOLD}1f`, border: `1px solid ${GOLD}55`, borderRadius: 12 }}>🎥 {campaignStudioLabel}</Link>
             <Link href="/pricing" style={{ padding: 10, textDecoration: 'none', color: '#fff', fontWeight: 800, fontSize: 14 }}>💳 {pricingLabel}</Link>
           </div>
 

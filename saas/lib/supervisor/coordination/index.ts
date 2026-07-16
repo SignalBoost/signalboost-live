@@ -41,3 +41,6 @@ export class SupervisorCoordinator { private store: CoordinationStore
  private leaseDurationMs: number
  constructor(store:CoordinationStore, identity:SupervisorInstance, leaseDurationMs=60000){ this.store=store; this.identity=identity; this.leaseDurationMs=leaseDurationMs } register(){return this.store.registerInstance(this.identity)} heartbeat(){return this.store.heartbeatInstance(this.identity.instanceId,this.identity.runtimeId)} drain(){return this.store.markInstanceDraining(this.identity.instanceId,this.identity.runtimeId)} acquire(workItemId:string){return this.store.acquireLease({workItemId,ownerInstanceId:this.identity.instanceId,ownerRuntimeId:this.identity.runtimeId,leaseDurationMs:this.leaseDurationMs})} }
 export function ownershipIdentity(l:Lease):OwnershipIdentity{return {leaseId:l.leaseId,ownerInstanceId:l.ownerInstanceId,ownerRuntimeId:l.ownerRuntimeId,fencingToken:l.fencingToken}}
+export { SupabaseCoordinationStore } from './supabase-coordination-store.ts'
+export { createSupervisorCoordinationStore } from './durable-coordination-store.ts'
+export { reconcileSupervisorCoordination } from './reconciliation.ts'

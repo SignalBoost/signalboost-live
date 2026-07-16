@@ -1,0 +1,1 @@
+export const coordinationRpcNames = Object.freeze({ acquireLease:'supervisor_acquire_lease', renewLease:'supervisor_renew_lease', releaseLease:'supervisor_release_lease', assertFence:'supervisor_assert_fence', transitionWorkItem:'supervisor_transition_work_item', reconcileExpiredLeases:'supervisor_reconcile_expired_leases' })

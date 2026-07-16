@@ -639,6 +639,8 @@ Use this section for short notes when architecture, provider behavior, platform 
 
 - 2026-07-16: Hardened paid provider gates: wallet-funded non-zero render providers now require a server-side approval reference before reservation/provider execution, and the FAL/Kling marketing-sales video host requires the `COSA_PAID_VIDEO_PROVIDER_APPROVED` runtime flag before submitting paid video jobs.
 
+- 2026-07-16: Added Mission 001 Sprint 13 deterministic Vercel Thinker integration: provider-specific Vercel repair-plan rules now produce schema-validated, API-capable diagnostic plans with `requiresBrowser: false` for failed, repeated, stuck, canceled, unavailable, and provider-connection incidents while preserving owner approval gates for every repair, redeploy, rollback, or credential action.
+
 ## 20. Mandatory Final Reminder
 
 This file is the starting point.

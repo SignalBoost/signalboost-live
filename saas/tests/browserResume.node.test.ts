@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 
 import { issueBrowserApprovalToken } from '../lib/browser-runtime/approval.ts'
 import {
+  createBrowserExecutionId,
   InMemoryBrowserExecutionStore,
   InMemoryBrowserSessionRegistry,
 } from '../lib/browser-runtime/execution-state.ts'
@@ -239,4 +240,38 @@ test('task tampering invalidates and closes the retained execution', async () =>
   assert.match(rejected.error || '', /fingerprint mismatch/)
   assert.equal(runtimePorts.wasClosed(), true)
   assert.equal(await executionStore.load(paused.executionId!), null)
+})
+
+test('unverified phase one never retains a resumable execution or session', async () => {
+  const calls: string[] = []
+  const task = makeTask()
+  task.steps.splice(3, 0, {
+    id: 'unexpected-second-checkpoint',
+    kind: 'checkpoint',
+    label: 'This invalidates the bounded phase-one shape',
+    requiresApproval: true,
+  })
+  task.approvalToken = sign(task, ['navigate', 'ready', 'approval-checkpoint'], 1, 'phase-1-unverified')
+  const executionStore = new InMemoryBrowserExecutionStore()
+  const sessionRegistry = new InMemoryBrowserSessionRegistry()
+  const runtimePorts = ports(calls)
+  const expectedExecutionId = createBrowserExecutionId(task, 'approval-checkpoint')
+
+  const paused = await runBrowserTask({
+    task,
+    signingSecret: secret,
+    sessions: runtimePorts.sessions,
+    context: runtimePorts.context,
+    executionStore,
+    sessionRegistry,
+    now,
+  })
+
+  assert.equal(paused.status, 'paused')
+  assert.equal(paused.executionId, undefined)
+  assert.notEqual(paused.verification, 'pending')
+  if (paused.verification !== 'pending') assert.equal(paused.verification.status, 'failed')
+  assert.equal(runtimePorts.wasClosed(), true)
+  assert.equal(calls.some(call => call.startsWith('click:')), false)
+  assert.equal(await executionStore.load(expectedExecutionId), null)
 })

@@ -3,6 +3,8 @@ import { repairPlanSchema, type RepairPlan, type RepairStep } from '../repair-pl
 import type { PolicyDecision } from '../execution-contracts.ts'
 import { ExecutorRegistry } from './executor-registry.ts'
 import { DispatchValidationError, ExecutorRegistryError } from './errors.ts'
+import { ownershipIdentity } from '../coordination/index.ts'
+import { browserReasons } from '../execution-policy/index.ts'
 import { apiCompatibleActions, browserCompatibleActions, dispatcherAuditSchemaVersion, executorSchemaVersion, isExecutorKind, manualCompatibleActions, type DispatchAuditEvent, type DispatchAuditEventType, type DispatchAuditSink, type ExecutorKind, type SupervisorDispatchRequest, type SupervisorExecutorResult } from './executor-types.ts'
 
 const secretPattern = /(secret|token|password|authorization|cookie|api[_-]?key|private[_-]?key|bearer\s+[a-z0-9._-]+)/i
@@ -61,6 +63,10 @@ export class SupervisorDispatcher {
     try { await this.audit(raw, 'dispatch_requested', { requestedExecutorKind: raw.requestedExecutorKind, approvedStepIds: raw.approvedStepIds }) } catch (e) { return fail(raw.dispatchId || 'unknown', kind, `Audit failed before execution: ${e instanceof Error ? e.message : 'unknown'}`) }
     try {
       const request = this.validate(raw)
+      if (request.executionDecision && request.coordinationStore) {
+        await request.coordinationStore.assertFence(request.executionDecision.workItemId, { leaseId: request.executionDecision.auditMetadata.leaseId as string || `lease-${request.executionDecision.workItemId}-${request.executionDecision.fencingToken}`, ownerInstanceId: request.executionDecision.ownerInstanceId, ownerRuntimeId: request.executionDecision.ownerRuntimeId, fencingToken: request.executionDecision.fencingToken })
+        await this.audit(raw, 'dispatch_fenced', { workItemId: request.executionDecision.workItemId, fencingToken: request.executionDecision.fencingToken })
+      }
       let executor
       try { executor = this.deps.registry.resolve(request.requestedExecutorKind) } catch (e) { await this.audit(raw, 'executor_missing', { reason: e instanceof Error ? e.message : 'missing' }); throw e }
       await this.audit(raw, 'dispatch_started', { executorKind: request.requestedExecutorKind, approvedStepIds: request.approvedStepIds })
@@ -85,6 +91,15 @@ export class SupervisorDispatcher {
     const policyIds = new Set(raw.policyDecision.approvedStepIds); for (const sid of raw.approvedStepIds) if (!policyIds.has(sid)) throw new DispatchValidationError('Unapproved step rejected.')
     if (raw.approvedStepIds.length !== raw.policyDecision.approvedStepIds.length) throw new DispatchValidationError('Approval scope must exactly match policy approvedStepIds.')
     const approved = steps(plan, raw.approvedStepIds); assertPlanCompatible(plan, approved, raw.requestedExecutorKind, raw.policyDecision)
+    if (raw.executionDecision) {
+      const d = raw.executionDecision
+      if (Date.parse(d.expiresAt) <= Date.now()) throw new DispatchValidationError('Execution decision expired.')
+      if (d.selectedChannel !== raw.requestedExecutorKind) throw new DispatchValidationError('Decision channel does not match executor.')
+      if (d.fencingToken < 1 || !d.ownerInstanceId || !d.ownerRuntimeId) throw new DispatchValidationError('Decision missing ownership fence.')
+      if (d.approvedStepIds.length !== raw.approvedStepIds.length || d.approvedStepIds.some((id, idx) => id !== raw.approvedStepIds[idx])) throw new DispatchValidationError('Decision approved step scope mismatch.')
+      if (raw.requestedExecutorKind === 'api' && d.selectedChannel === 'browser') throw new DispatchValidationError('API decision cannot route to BrowserExecutor.')
+      if (raw.requestedExecutorKind === 'browser' && (!d.browserReason || !browserReasons.includes(d.browserReason.reason))) throw new DispatchValidationError('Browser decision requires an accepted browser reason.')
+    }
     return { ...raw, incident, plan, requestedExecutorKind: raw.requestedExecutorKind }
   }
   private async audit(raw: Pick<SupervisorDispatchRequest, 'incident'|'dispatchId'>, eventType: DispatchAuditEventType, p: Record<string, unknown>) { const event: DispatchAuditEvent = Object.freeze({ eventId: id(), incidentId: raw.incident?.incidentId || 'unknown', dispatchId: raw.dispatchId || 'unknown', eventType, occurredAt: now(), payload: payload(p), schemaVersion: dispatcherAuditSchemaVersion }); await this.deps.audit.write(event) }

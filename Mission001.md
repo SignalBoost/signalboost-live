@@ -215,3 +215,19 @@ Sprint 21 hardens the portable Browser Runtime failure boundary without enabling
 - Sanitized errors retain enough non-sensitive context for deterministic verification and operator diagnosis.
 
 This slice remains sandbox-compatible and provider-neutral. It does not broaden allowed origins, authorize production execution, resolve new credentials, change approval semantics, or perform any provider mutation.
+
+## Sprint 18 — Federated High-Availability Supervisor Control Plane
+
+Mission 001 now has provider-neutral contracts for active-active Supervisor instances. A single Supervisor process is a single point of failure because an in-memory owner can die while work, browser continuations, or dispatch attempts are still pending. Multiple Supervisors may therefore be active simultaneously, but only one fenced owner may control a particular work item, incident, dispatch, or execution at a time.
+
+The coordination foundation defines durable work items, Supervisor instance identity, time-limited leases, monotonically increasing fencing tokens, deterministic stale-owner rejection, heartbeat/draining behavior, and provider-isolated workers. Lease acquisition and protected writes are compare-and-set style operations. Process restart changes the runtime ID and invalidates prior ownership. Terminal work cannot be reclaimed, and expired leases may be reassigned with a higher fencing generation.
+
+Shared governance is represented by versioned policy and capability metadata. API execution remains preferred. Smart failover may select Browser Agent automatically only for pre-authorized routine continuity work with registered capabilities, low risk, approved origins, deterministic verification, supported versions, and valid ownership fencing. Human intervention is an exception path for consequential, unsupported, stale, conflicting, unverifiable, credential, billing, ownership, permission, CAPTCHA, 2FA, deletion, irreversible, and production-browser conditions.
+
+Execution modes are `api_only`, `smart_failover`, and `browser_on_demand`. API failure classifications are strict machine-readable categories, and browser reasons are limited to `human_requested`, `api_capability_missing`, `api_unavailable_after_bounded_retries`, `api_result_inconsistent`, and `ui_verification_required`. Capability maturity levels are `experimental`, `sandbox_verified`, `human_approved`, `auto_failover_ready`, and `suspended`; risk classes are `read_only`, `low_risk_reversible`, `medium`, `high`, and `forbidden`.
+
+Browser sessions remain non-migratable. No audit record can resume a browser session. A lost browser session requires another Supervisor to wait for lease expiry, claim the work with a new fence, create a new execution ID, obtain new approvals, use a new nonce/token, and start a new Browser Runtime task. Browser Agent acts only as an automatic backup for pre-authorized routine operations. Production and real-provider Browser execution remain disabled.
+
+Operator visibility adds five-language labels for Supervisor instances, provider workers, work ownership, lease expiry, execution method, API retry/failover, browser reason, capability maturity, policy version, stale-owner rejection, manual operator routing, production-browser disabled status, and no-active-work status.
+
+Known limitations: the durable store is an injected deterministic in-memory implementation for this sprint; Supabase/Postgres persistence is intentionally a future implementation behind the same interface. Real-provider Browser automation is still disabled. Next recommended sprint: implement the Supabase/Postgres coordination store and durable at-most-once dispatch ledger, then wire read-only operator data from the durable store into the Supervisor HA page.

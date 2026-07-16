@@ -219,6 +219,15 @@ The harmless local scenario opens `/browser-sandbox/login`, fills only `sandbox:
 
 Known limitation: the execution and retained-session stores remain in-process test infrastructure. Production BrowserExecutor, Vercel browser automation, live provider credentials, and external provider mutations remain prohibited. The next recommended sprint is sandbox execution persistence plus operator-visible audit history, not production/provider browser execution.
 
+
+### Sprint 18 — Federated High-Availability Supervisor Control Plane
+
+Mission 001 now includes an active-active Supervisor coordination foundation. Multiple Supervisor instances may be healthy at the same time, but exactly one fenced owner may control a given work item, dispatch, or execution. Ownership is time-limited by leases and protected by monotonically increasing fencing tokens. A restarted process receives a new runtime ID, stale owners cannot renew/release/transition/dispatch/complete, and expired leases may be reassigned with a higher generation.
+
+Provider work is routed through provider-isolated worker contracts so a Vercel worker failure does not define global policy or block future providers. Shared governance uses versioned capability and high-availability policy metadata. API remains the preferred execution path; Browser Agent is only an automatic backup for pre-authorized routine continuity workflows in sandbox/dry-run contexts. Human intervention remains required for consequential, unsupported, uncertain, production-browser, stale-fence, CAPTCHA/2FA, billing, credential, ownership, permission, deletion, or irreversible operations.
+
+Browser sessions remain memory-bound and non-migratable. No audit or persistence record can resume a lost browser session. Replacement work must claim a new lease/fence, create a new execution ID, obtain new Browser Runtime approvals, and use new nonce/token material. Production and real-provider Browser execution remain disabled. New operator-facing Supervisor HA labels must exist in English, Spanish, Portuguese, Polish, and Russian.
+
 ### Sprint 17 — Durable Sandbox Execution Records and Operator Audit History
 
 Sprint 17 adds sanitized durable history for Mission 001 sandbox executions only. The persistence layer records serializable execution summaries, immutable sanitized audit events, and safe evidence references/digests in Supabase-backed tables plus a provider-neutral store interface. These records are audit-only: they cannot authorize, replay, resume, approve, retry, or launch a browser task.
@@ -699,6 +708,8 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-16: Bounded Mission 001 Browser Runtime approvals to a maximum one-hour validity window. Longer signed windows fail closed before session launch; this narrows authorization and does not enable production/provider execution.
 - 2026-07-16: Canonicalized Mission 001 Browser Runtime approval claim JSON. Issuance now uses deterministic top-level key ordering, and verification rejects validly signed alternate encodings or duplicate-key payloads before claim authorization. This narrows approval acceptance and does not enable production/provider execution.
 - 2026-07-16: Added bounded single-use approval replay protection to the Mission 001 sandbox Browser Runtime adapter. Verified phase-one and continuation token digests and nonces are consumed before browser session launch or protected continuation; replay and capacity exhaustion fail closed. This remains local/test-only and does not enable production/provider execution.
+
+- 2026-07-16: Added Mission 001 Sprint 18 federated high-availability Supervisor contracts: active-active instance identity, durable work-item leases, monotonically increasing fencing tokens, provider-isolated worker routing, versioned API-first smart-failover policy, dispatcher fence checks, five-language operator labels, and documentation confirming production/real-provider Browser execution remains disabled.
 
 ## 20. Mandatory Final Reminder
 

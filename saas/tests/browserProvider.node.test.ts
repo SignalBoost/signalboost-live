@@ -1,5 +1,142 @@
-import test from 'node:test'; import assert from 'node:assert/strict'; import { ProviderRegistry, createCapabilityRegistry, createOriginRegistry, createNavigationRegistry, createSelectorRegistry, createVerificationRegistry, createEvidenceRegistry, vercelProvider, versionKey } from '../lib/browser-provider/index.ts'
-test('provider registry is deterministic and rejects duplicates/unknowns',()=>{const r=new ProviderRegistry();r.register(vercelProvider);assert.deepEqual(r.providers().map(x=>x.id),['vercel']);assert.throws(()=>r.register(vercelProvider),/duplicate_provider/);assert.throws(()=>r.lookup('missing'),/unknown_provider/);assert.equal(JSON.stringify(r.toJSON()),JSON.stringify(r.toJSON()))})
-test('registries are deterministic and reject unknown capabilities',()=>{const capabilities=createCapabilityRegistry(vercelProvider.capabilities);assert.equal(capabilities.list()[0].id,'capture-dashboard-evidence');assert.throws(()=>capabilities.get('missing'),/unknown_capability/);assert.equal(createOriginRegistry(vercelProvider.origins).list()[0].id,'dashboard');assert.equal(createNavigationRegistry(vercelProvider.navigation).list()[0].id,'deployment-detail');assert.equal(createSelectorRegistry(vercelProvider.selectors).list()[0].id,'authentication.login');assert.equal(createVerificationRegistry(vercelProvider.verification).list()[0].id,'deployment-failed');assert.equal(createEvidenceRegistry(vercelProvider.evidence).list()[0].id,'dashboard-overview')})
-test('versioning, health, maturity, risk and read-only are deterministic',()=>{const r=new ProviderRegistry();const p=r.register(vercelProvider);assert.equal(versionKey(p.version),'1.0.0|1.0.0|1.0.0');assert.equal(p.health.state,'unknown');for(const c of p.capabilities){assert.equal(c.readOnly,true);assert.equal(c.risk,'read_only');assert.equal(c.maturity,'sandbox_verified')}assert.ok(Object.isFrozen(p));assert.throws(()=>createCapabilityRegistry([{...p.capabilities[0],readOnly:false} as never]),/immutable_read_only/)})
-test('localization complete and forbidden dependencies absent',async()=>{for(const l of ['en','es','pt','pl','ru'] as const)assert.ok(vercelProvider.displayName[l]);const files=['provider-adapter.ts','provider-registry.ts','provider-capability.ts','provider-origin.ts','provider-navigation.ts','provider-selector.ts','provider-verification.ts','provider-evidence.ts','provider-health.ts','provider-version.ts','provider-errors.ts','providers/vercel-provider.ts'];const fs=await import('node:fs/promises');for(const f of files){const s=await fs.readFile(new URL(`../lib/browser-provider/${f}`,import.meta.url),'utf8');assert.doesNotMatch(s,/playwright|browser-runtime|credentials|password|secret/i)}})
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import {
+  ProviderRegistry,
+  createCapabilityRegistry,
+  createOriginRegistry,
+  createNavigationRegistry,
+  createSelectorRegistry,
+  createVerificationRegistry,
+  createEvidenceRegistry,
+  vercelProvider,
+  versionKey,
+} from '../lib/browser-provider/index.ts'
+
+function cloneProvider(): any {
+  return JSON.parse(JSON.stringify(vercelProvider))
+}
+
+test('provider registry is deterministic and rejects duplicates/unknowns', () => {
+  const registry = new ProviderRegistry()
+  registry.register(vercelProvider)
+  assert.deepEqual(registry.providers().map(item => item.id), ['vercel'])
+  assert.throws(() => registry.register(vercelProvider), /duplicate_provider/)
+  assert.throws(() => registry.lookup('missing'), /unknown_provider/)
+  assert.equal(JSON.stringify(registry.toJSON()), JSON.stringify(registry.toJSON()))
+})
+
+test('registries are deterministic and reject unknown capabilities', () => {
+  const capabilities = createCapabilityRegistry(vercelProvider.capabilities)
+  assert.equal(capabilities.list()[0].id, 'capture-dashboard-evidence')
+  assert.throws(() => capabilities.get('missing'), /unknown_capability/)
+  assert.equal(createOriginRegistry(vercelProvider.origins).list()[0].id, 'dashboard')
+  assert.equal(createNavigationRegistry(vercelProvider.navigation).list()[0].id, 'deployment-detail')
+  assert.equal(createSelectorRegistry(vercelProvider.selectors).list()[0].id, 'authentication.login')
+  assert.equal(createVerificationRegistry(vercelProvider.verification).list()[0].id, 'deployment-failed')
+  assert.equal(createEvidenceRegistry(vercelProvider.evidence).list()[0].id, 'dashboard-overview')
+})
+
+test('versioning, health, maturity, risk and read-only are deterministic', () => {
+  const registry = new ProviderRegistry()
+  const provider = registry.register(vercelProvider)
+  assert.equal(versionKey(provider.version), '1.0.0|1.0.0|1.0.0')
+  assert.equal(provider.health.state, 'unknown')
+  assert.deepEqual([...new Set(provider.origins.map(origin => origin.origin))], ['https://vercel.com'])
+  for (const capability of provider.capabilities) {
+    assert.equal(capability.readOnly, true)
+    assert.equal(capability.risk, 'read_only')
+    assert.equal(capability.maturity, 'sandbox_verified')
+  }
+  assert.ok(Object.isFrozen(provider))
+  assert.throws(
+    () => createCapabilityRegistry([{ ...provider.capabilities[0], readOnly: false } as never]),
+    /immutable_read_only/,
+  )
+})
+
+test('provider registration creates a detached deeply frozen snapshot', () => {
+  const raw = cloneProvider()
+  const registry = new ProviderRegistry()
+  const registered = registry.register(raw)
+
+  raw.displayName.en = 'Changed'
+  raw.origins[0].origin = 'https://example.com'
+  raw.capabilities[0].allowedOrigins[0] = 'settings'
+  raw.capabilities[0].version.provider = '9.9.9'
+  raw.verification[0].assertions[0] = 'status=changed'
+  raw.evidence[0].expectedReads[0] = 'changed'
+
+  assert.equal(registered.displayName.en, 'Vercel')
+  assert.equal(registered.origins[0].origin, 'https://vercel.com')
+  assert.notEqual(registered.capabilities[0].allowedOrigins[0], 'settings')
+  assert.equal(registered.capabilities[0].version.provider, '1.0.0')
+  assert.notEqual(registered.verification[0].assertions[0], 'status=changed')
+  assert.notEqual(registered.evidence[0].expectedReads[0], 'changed')
+
+  assert.ok(Object.isFrozen(registered.displayName))
+  assert.ok(Object.isFrozen(registered.origins))
+  assert.ok(Object.isFrozen(registered.origins[0]))
+  assert.ok(Object.isFrozen(registered.capabilities))
+  assert.ok(Object.isFrozen(registered.capabilities[0]))
+  assert.ok(Object.isFrozen(registered.capabilities[0].allowedOrigins))
+  assert.ok(Object.isFrozen(registered.capabilities[0].version))
+  assert.ok(Object.isFrozen(registered.verification[0].assertions))
+  assert.ok(Object.isFrozen(registered.evidence[0].expectedReads))
+  assert.throws(() => {
+    ;(registered.capabilities[0].allowedOrigins as string[])[0] = 'settings'
+  }, TypeError)
+})
+
+test('provider registration rejects ambiguous metadata and dangling references', () => {
+  const duplicateOrigin = cloneProvider()
+  duplicateOrigin.origins.push({ ...duplicateOrigin.origins[0] })
+  assert.throws(() => new ProviderRegistry().register(duplicateOrigin), /duplicate_origin/)
+
+  const danglingNavigation = cloneProvider()
+  danglingNavigation.capabilities[0].navigationProfile = 'missing'
+  assert.throws(
+    () => new ProviderRegistry().register(danglingNavigation),
+    /capability_navigation_reference/,
+  )
+
+  const nonCanonicalOrigin = cloneProvider()
+  nonCanonicalOrigin.origins[0].origin = 'https://vercel.com/dashboard'
+  assert.throws(() => new ProviderRegistry().register(nonCanonicalOrigin), /origin_url/)
+
+  const protocolRelativeNavigation = cloneProvider()
+  protocolRelativeNavigation.navigation[0].pathTemplate = '//evil.example/path'
+  assert.throws(
+    () => new ProviderRegistry().register(protocolRelativeNavigation),
+    /navigation_path/,
+  )
+
+  const extraField = cloneProvider()
+  extraField.unreviewed = true
+  assert.throws(() => new ProviderRegistry().register(extraField), /provider_fields/)
+})
+
+test('localization complete and forbidden dependencies absent', async () => {
+  for (const locale of ['en', 'es', 'pt', 'pl', 'ru'] as const) {
+    assert.ok(vercelProvider.displayName[locale])
+  }
+
+  const files = [
+    'provider-adapter.ts',
+    'provider-registry.ts',
+    'provider-capability.ts',
+    'provider-origin.ts',
+    'provider-navigation.ts',
+    'provider-selector.ts',
+    'provider-verification.ts',
+    'provider-evidence.ts',
+    'provider-health.ts',
+    'provider-version.ts',
+    'provider-errors.ts',
+    'providers/vercel-provider.ts',
+  ]
+  const fs = await import('node:fs/promises')
+  for (const file of files) {
+    const source = await fs.readFile(new URL(`../lib/browser-provider/${file}`, import.meta.url), 'utf8')
+    assert.doesNotMatch(source, /playwright|browser-runtime|credentials|password|secret/i)
+  }
+})

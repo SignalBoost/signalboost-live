@@ -26,6 +26,18 @@ export interface BrowserTask {
   metadata?: Record<string, unknown>
 }
 
+/**
+ * Minimal, non-authorizing scope exposed to browser session launchers.
+ * Approval tokens, executable steps, task identity, and metadata must never
+ * cross the BrowserSessionFactory boundary.
+ */
+export interface BrowserSessionLaunchRequest {
+  readonly provider: string
+  readonly adapterId: string
+  readonly mode: BrowserTaskMode
+  readonly allowedOrigins: readonly string[]
+}
+
 export interface BrowserEvidence {
   sequence: number
   timestamp: string
@@ -88,5 +100,5 @@ export interface BrowserSessionPort {
 }
 
 export interface BrowserSessionFactory {
-  open(task: BrowserTask): Promise<BrowserSessionPort>
+  open(request: BrowserSessionLaunchRequest): Promise<BrowserSessionPort>
 }

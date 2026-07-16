@@ -85,17 +85,39 @@ export function createBrowserProviderPolicyReviewSnapshot(adapter: BrowserProvid
   const worker = createBrowserProviderWorkerDescriptor(adapter)
   const version = adapter.getVersion()
 
-  if (!adapter.supportsReadOnlyInspection() || adapter.supportsProduction() || worker.maximumConcurrentWork !== 0 || worker.executionDependencies.length !== 0) {
+  if (
+    !adapter.supportsReadOnlyInspection()
+    || adapter.supportsProduction()
+    || worker.maximumConcurrentWork !== 0
+    || worker.executionDependencies.length !== 0
+    || version.adapterVersion !== adapter.adapterVersion
+    || version.schemaVersion !== adapter.schemaVersion
+  ) {
     throw new BrowserProviderError('invalid_provider')
   }
 
+  const seenCapabilityIds = new Set<string>()
   const capabilities = adapter.capabilities
     .map(capability => {
       const mapped = mapBrowserProviderCapabilityToSupervisorCapability(capability)
       const environments = mapped.allowedEnvironments ?? []
-      if (!capability.readOnly || environments.length !== 2 || !environments.includes('sandbox') || !environments.includes('preview') || environments.includes('production')) {
+      if (
+        seenCapabilityIds.has(capability.capabilityId)
+        || capability.providerId !== adapter.providerId
+        || capability.adapterVersion !== adapter.adapterVersion
+        || capability.capabilityVersion !== version.capabilityVersion
+        || mapped.provider !== adapter.providerId
+        || mapped.browserAdapterId !== adapter.providerId
+        || !capability.readOnly
+        || mapped.approvedOrigins.length === 0
+        || environments.length !== 2
+        || !environments.includes('sandbox')
+        || !environments.includes('preview')
+        || environments.includes('production')
+      ) {
         throw new BrowserProviderError('invalid_provider')
       }
+      seenCapabilityIds.add(capability.capabilityId)
 
       return Object.freeze({
         capabilityId: capability.capabilityId,

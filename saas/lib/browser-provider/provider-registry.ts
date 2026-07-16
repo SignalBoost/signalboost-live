@@ -31,7 +31,8 @@ export class BrowserProviderRegistry {
     const verificationRegistry = createVerificationRegistry(provider.verificationProfiles)
     const evidenceRegistry = createEvidenceRegistry(provider.evidenceProfiles)
     const capabilities = capabilityRegistry.list()
-    const capabilityIds = new Set(capabilities.map(capability => capability.capabilityId))
+    const capabilityById = new Map(capabilities.map(capability => [capability.capabilityId, capability] as const))
+    const capabilityIds = new Set(capabilityById.keys())
 
     if (
       capabilities.length === 0
@@ -110,8 +111,8 @@ export class BrowserProviderRegistry {
       originRegistry.get(navigation.originId)
       if (navigation.supportedCapabilities.length === 0) throw new BrowserProviderError('invalid_provider')
       for (const capabilityId of navigation.supportedCapabilities) {
-        const capability = capabilityRegistry.get(capabilityId)
-        if (!capability.supportsBrowser || capability.navigationProfileId !== navigation.navigationProfileId) {
+        const capability = capabilityById.get(capabilityId)
+        if (!capability || !capability.supportsBrowser || capability.navigationProfileId !== navigation.navigationProfileId) {
           throw new BrowserProviderError('invalid_provider')
         }
       }

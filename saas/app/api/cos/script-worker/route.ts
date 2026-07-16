@@ -4,7 +4,7 @@
 // see saas/app/api/cos/script-worker/batch/route.ts.
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
-import { generateContentDraft } from '@/lib/cos/script-worker'
+import { generateContentDraft, generateContentDraftAI } from '@/lib/cos/script-worker'
 import type { CosContentWorkerInput } from '@/lib/cos/script-worker'
 
 export const dynamic = 'force-dynamic'
@@ -48,7 +48,8 @@ export async function POST(req: NextRequest) {
     brief: firstWorkItem?.input?.brief || 'Create a concise review-ready campaign draft. Keep publishing, sending, and spending behind owner approval.',
   }
 
-  const output = generateContentDraft(input)
+  const mode = String(body?.mode || 'template').toLowerCase() === 'ai' ? 'ai' : 'template'
+  const output = mode === 'ai' ? await generateContentDraftAI(input) : generateContentDraft(input)
   const timestamp = new Date().toISOString()
   const nextWorkItems = workItems.length
     ? workItems.map((item: any, index: number) => index === 0 ? { ...item, status: 'completed', output, updated_at: timestamp } : item)

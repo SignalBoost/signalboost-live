@@ -43,7 +43,7 @@ export function assertPlanCompatible(plan: RepairPlan, approved: RepairStep[], k
 export function validateExecutorResult(result: SupervisorExecutorResult, dispatchId: string, kind: ExecutorKind, approvedStepIds: string[]): void {
   if (!result || typeof result !== 'object') throw new DispatchValidationError('Executor result must be an object')
   if (result.dispatchId !== dispatchId || result.executorKind !== kind || result.schemaVersion !== executorSchemaVersion) throw new DispatchValidationError('Executor result metadata mismatch')
-  if (!['not_implemented','completed','failed','rejected'].includes(result.status)) throw new DispatchValidationError('Executor result status is unsupported')
+  if (!['not_implemented','dry_run_ready','completed','failed','rejected'].includes(result.status)) throw new DispatchValidationError('Executor result status is unsupported')
   if (Number.isNaN(Date.parse(result.startedAt)) || Number.isNaN(Date.parse(result.completedAt))) throw new DispatchValidationError('Executor result timestamps are invalid')
   const approved = new Set(approvedStepIds)
   for (const sid of result.executedStepIds) if (!approved.has(sid)) throw new DispatchValidationError('Executor reported unapproved step')

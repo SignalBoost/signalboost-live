@@ -156,3 +156,21 @@ Supported dry-run actions are exactly `navigate`, `click`, `fill`, `select`, `re
 Protected Supervisor steps map to Browser Runtime checkpoints without collapsing approval controls. Supervisor policy approval proves only that the dispatcher may route the exact approved step IDs. Browser Runtime signed task approval and continuation approval remain separate future controls; the dry-run adapter creates no approval token and does not mark a Browser Runtime task approved. Deterministic package fingerprints cover incident/plan identity, target origin, approved step order, mapped task, approval requirements, verification requirements, and schema version. The package verifier is static and side-effect-free.
 
 Known limitation: Browser Runtime live execution remains disconnected. The next recommended sprint is to enable execution only against an isolated local sandbox portal using signed Browser Runtime approvals and never against production/provider accounts.
+
+## Sprint 16 — Isolated Sandbox Browser Execution
+
+Sprint 16 enables one narrow BrowserExecutor execution path for the repository-local sandbox portal only. The allowed origin is centrally injected by tests and production code must not treat arbitrary localhost URLs as safe; the intended local test origin is `http://localhost:4173` and the portal path is `/browser-sandbox/login`.
+
+The flow is deliberately bounded:
+
+1. A Sprint 15 Browser Runtime dry-run package is runtime-validated and fingerprint-verified.
+2. The sandbox promoter confirms `targetEnvironment: sandbox`, exact configured sandbox origin, ordered step scope, one approval checkpoint, sandbox-only secret references, supported Browser Runtime actions, and no package tampering.
+3. The promoter produces the exact Browser Runtime task for execution without adding, removing, reordering, resolving secrets, or creating approval tokens.
+4. BrowserExecutor invokes Browser Runtime through `runBrowserTask` / `resumeBrowserTask`; it does not import Playwright, Chromium, browser-use, Stagehand, or provider SDKs and does not bypass `BrowserSessionFactory`.
+5. Phase one navigates only to the sandbox portal, fills harmless `sandbox://` references, captures pre-approval evidence, and pauses at the protected-action checkpoint.
+6. Phase two requires a separate Browser Runtime continuation approval bound to the retained execution and exact remaining step IDs before clicking the harmless Protected save control.
+7. Completion is accepted only when Browser Runtime deterministic verification is `verified`, required evidence exists, executed step IDs match the approved package, and the page origin stayed confined.
+
+Browser execution is enabled only for the isolated repository sandbox. Production BrowserExecutor execution remains disabled. Vercel browser automation remains disabled. Real provider credentials are prohibited, no external authenticated websites may be targeted, and no production provider mutations are introduced.
+
+Known limitation: retained execution state is in-process test infrastructure. Sprint 17 should add durable sandbox-only execution persistence and operator-visible sanitized audit history; it should not enable production/provider browser execution.

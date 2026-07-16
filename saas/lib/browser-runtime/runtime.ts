@@ -286,7 +286,13 @@ export async function resumeBrowserTask(input: {
       .slice(0, checkpointIndex)
       .map(step => step.id)
     const expectedRemainingSteps = input.task.steps.slice(checkpointIndex + 1)
+    const expectedExecutionId = createBrowserExecutionId(input.task, record.checkpointStepId)
+    const suppliedPreApprovalTokenDigest = digestBrowserApprovalToken(input.task.approvalToken)
 
+    if (record.executionId !== input.executionId) throw new Error('Resumable record executionId mismatch')
+    if (expectedExecutionId !== input.executionId) {
+      throw new Error('Resumable executionId does not match the task approval')
+    }
     if (record.taskId !== input.task.taskId) throw new Error('Resumable taskId mismatch')
     if (record.incidentId !== input.task.incidentId) throw new Error('Resumable incidentId mismatch')
     if (record.provider !== input.task.provider) throw new Error('Resumable provider mismatch')
@@ -294,6 +300,9 @@ export async function resumeBrowserTask(input: {
     if (record.mode !== input.task.mode) throw new Error('Resumable mode mismatch')
     if (record.taskFingerprint !== fingerprintBrowserTask(input.task)) {
       throw new Error('Resumable task fingerprint mismatch')
+    }
+    if (record.preApprovalTokenDigest !== suppliedPreApprovalTokenDigest) {
+      throw new Error('Resumable pre-approval token mismatch')
     }
     if (!sameJson(record.allowedOrigins, input.task.allowedOrigins)) {
       throw new Error('Resumable origin scope mismatch')
@@ -318,6 +327,8 @@ export async function resumeBrowserTask(input: {
         expectedStepIds: record.remainingSteps.map(step => step.id),
         expectedPhase: 2,
         expectedCheckpointStepId: record.checkpointStepId,
+        expectedExecutionId: input.executionId,
+        expectedPreApprovalTokenDigest: record.preApprovalTokenDigest,
       },
     )
 

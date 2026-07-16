@@ -257,3 +257,31 @@ test('a missing execution record discards any orphaned retained session', async 
   assert.equal(await fixture.sessionRegistry.take(fixture.executionId), null)
   assert.equal(fixture.scheduler.size, 0)
 })
+
+test('a duplicate pause cannot replace or orphan the first retained execution', async () => {
+  const fixture = await pauseExecution()
+  const secondCalls: string[] = []
+  const secondPorts = ports(secondCalls)
+
+  const rejected = await runBrowserTask({
+    task: fixture.task,
+    signingSecret: secret,
+    sessions: secondPorts.sessions,
+    context: secondPorts.context,
+    executionStore: fixture.executionStore,
+    sessionRegistry: fixture.sessionRegistry,
+    now,
+  })
+
+  assert.equal(rejected.status, 'failed')
+  assert.match(rejected.error || '', /execution already retained/)
+  assert.equal(secondPorts.closeCount(), 1)
+  assert.equal(fixture.runtimePorts.closeCount(), 0)
+  assert.notEqual(await fixture.executionStore.load(fixture.executionId), null)
+  assert.equal(fixture.scheduler.size, 2)
+
+  await fixture.sessionRegistry.discard(fixture.executionId)
+  await fixture.executionStore.delete(fixture.executionId)
+  assert.equal(fixture.runtimePorts.closeCount(), 1)
+  assert.equal(fixture.scheduler.size, 0)
+})

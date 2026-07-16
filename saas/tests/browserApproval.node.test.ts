@@ -240,3 +240,110 @@ test('approval verification rejects ambiguous continuation claim shapes', () => 
     /continuation claims require an explicit phase/,
   )
 })
+
+test('approval verification rejects unsupported or ambiguous step shapes', () => {
+  const unsupported = makeTask({
+    steps: [{ id: 'script', kind: 'evaluate', source: 'document.title' } as never],
+  })
+  assert.throws(
+    () => verify(unsupported, makeClaims(unsupported)),
+    /unsupported kind: evaluate/,
+  )
+
+  const extraField = makeTask({
+    steps: [{
+      id: 'observe',
+      kind: 'navigate',
+      url: 'https://sandbox.example.test/settings',
+      evaluate: 'document.title',
+    } as never],
+  })
+  assert.throws(
+    () => verify(extraField, makeClaims(extraField)),
+    /contains unsupported fields: evaluate/,
+  )
+})
+
+test('approval verification rejects navigation credentials and origin escapes', () => {
+  const embeddedCredentials = makeTask({
+    steps: [{
+      id: 'observe',
+      kind: 'navigate',
+      url: 'https://user:pass@sandbox.example.test/settings',
+    }],
+  })
+  assert.throws(
+    () => verify(embeddedCredentials, makeClaims(embeddedCredentials)),
+    /must not include embedded credentials/,
+  )
+
+  const originEscape = makeTask({
+    steps: [{ id: 'observe', kind: 'navigate', url: 'https://outside.example.test/settings' }],
+  })
+  assert.throws(
+    () => verify(originEscape, makeClaims(originEscape)),
+    /outside the approved origin scope/,
+  )
+})
+
+test('approval verification requires bounded selectors, references, and waits', () => {
+  const emptySelector = makeTask({
+    steps: [{ id: 'click', kind: 'click', selector: '   ' }],
+  })
+  assert.throws(
+    () => verify(emptySelector, makeClaims(emptySelector)),
+    /selector must be a non-empty canonical string/,
+  )
+
+  const literalFillValue = makeTask({
+    steps: [{ id: 'fill', kind: 'fill', selector: '#value', valueRef: 'literal-value' }],
+  })
+  assert.throws(
+    () => verify(literalFillValue, makeClaims(literalFillValue)),
+    /valueRef must be an explicit reference URI/,
+  )
+
+  const unboundedWait = makeTask({
+    steps: [{ id: 'wait', kind: 'wait_for', selector: '#ready', timeoutMs: 120_001 }],
+  })
+  assert.throws(
+    () => verify(unboundedWait, makeClaims(unboundedWait)),
+    /timeoutMs must be a positive safe integer no greater than 120000/,
+  )
+})
+
+test('approval verification requires explicit checkpoints and at most one boundary', () => {
+  const ambiguousCheckpoint = makeTask({
+    steps: [{
+      id: 'approval-checkpoint',
+      kind: 'checkpoint',
+      label: 'Owner approval required',
+      requiresApproval: false,
+    } as never],
+  })
+  assert.throws(
+    () => verify(ambiguousCheckpoint, makeClaims(ambiguousCheckpoint)),
+    /requiresApproval must be true/,
+  )
+
+  const multipleCheckpoints = makeTask({
+    steps: [
+      {
+        id: 'checkpoint-one',
+        kind: 'checkpoint',
+        label: 'First approval',
+        requiresApproval: true,
+      },
+      {
+        id: 'checkpoint-two',
+        kind: 'checkpoint',
+        label: 'Second approval',
+        requiresApproval: true,
+      },
+    ],
+  })
+  assert.throws(
+    () => verify(multipleCheckpoints, makeClaims(multipleCheckpoints)),
+    /at most one approval checkpoint/,
+  )
+})

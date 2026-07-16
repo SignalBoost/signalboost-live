@@ -107,7 +107,7 @@ function makeResumableTask(): BrowserTask {
   }
 }
 
-test('runtime executes a frozen approval-bound snapshot after session-open mutation attempts', async () => {
+test('runtime keeps authorizing and executable fields outside the session launch boundary', async () => {
   const task = makeSinglePhaseTask()
   const calls: string[] = []
   let currentUrl = 'about:blank'
@@ -117,12 +117,22 @@ test('runtime executes a frozen approval-bound snapshot after session-open mutat
     signingSecret: secret,
     now,
     sessions: {
-      async open(executionTask) {
-        assert.equal(Object.isFrozen(executionTask), true)
-        assert.equal(Object.isFrozen(executionTask.allowedOrigins), true)
-        assert.equal(Object.isFrozen(executionTask.steps), true)
-        assert.equal(executionTask.steps.every(step => Object.isFrozen(step)), true)
-        assert.equal(executionTask.metadata, undefined)
+      async open(launchRequest) {
+        assert.equal(Object.isFrozen(launchRequest), true)
+        assert.equal(Object.isFrozen(launchRequest.allowedOrigins), true)
+        assert.deepEqual(Object.keys(launchRequest).sort(), [
+          'adapterId',
+          'allowedOrigins',
+          'mode',
+          'provider',
+        ])
+        assert.equal('taskId' in launchRequest, false)
+        assert.equal('incidentId' in launchRequest, false)
+        assert.equal('issuedAt' in launchRequest, false)
+        assert.equal('expiresAt' in launchRequest, false)
+        assert.equal('approvalToken' in launchRequest, false)
+        assert.equal('steps' in launchRequest, false)
+        assert.equal('metadata' in launchRequest, false)
 
         task.allowedOrigins.push('https://evil.example')
         task.steps[1] = {

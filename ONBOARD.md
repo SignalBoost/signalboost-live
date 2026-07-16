@@ -637,6 +637,8 @@ Use this section for short notes when architecture, provider behavior, platform 
 
 - 2026-07-16: Added Mission 001 Sprint 12 Vercel Observer: a read-only provider observer with injected secret resolution, narrow Vercel client, deterministic deployment-state normalization, bounded read retries, sanitized normalized incidents, stable deduplication keys, and focused no-network tests. It does not diagnose or repair incidents.
 
+- 2026-07-16: Added Mission 001 Sprint 13 Vercel Thinker diagnostic rules: repeated deployment failures now read logs for the latest failed deployment in the sequence, canceled production deployments include alias reads, and environment-missing classification avoids dependency/runtime-undefined false positives while preserving owner-gated repair planning.
+
 - 2026-07-16: Hardened paid provider gates: wallet-funded non-zero render providers now require a server-side approval reference before reservation/provider execution, and the FAL/Kling marketing-sales video host requires the `COSA_PAID_VIDEO_PROVIDER_APPROVED` runtime flag before submitting paid video jobs.
 
 - 2026-07-16: Bound Mission 001 retained execution records and live in-process browser sessions to the approved task expiry. Expired continuations are removed and closed automatically, duplicate retained execution IDs fail closed, and resume rejects expired or orphaned state without consuming protected steps.

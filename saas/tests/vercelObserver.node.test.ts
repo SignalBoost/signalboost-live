@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { VercelObserver, VercelObserverError, incidentSchema, sanitizeString } from '../lib/supervisor/index.ts'
+import { classifyVercelBuildError, extractLatestFailedDeploymentId, getVercelReadEndpointsForIncident } from '../lib/supervisor/providers/vercel/thinker/rules.ts'
 
 const now = new Date('2026-07-16T12:00:00.000Z')
 const dep = (o = {}) => ({ id: 'dpl_1', projectId: 'prj_1', state: 'READY', target: 'preview', createdAt: now.getTime() - 60_000, meta: {}, ...o })
@@ -37,3 +38,20 @@ test('The Observer has no Executor dependency', () => assert.doesNotMatch(readFi
 test('The Observer has no Browser Runtime dependency', () => assert.doesNotMatch(readFileSync(new URL('../lib/supervisor/providers/vercel/vercel-observer.ts', import.meta.url), 'utf8'), /BrowserRuntime|Playwright|Chromium|browser-runtime/))
 test('No mutation methods exist on the Vercel client interface', () => assert.doesNotMatch(readFileSync(new URL('../lib/supervisor/providers/vercel/vercel-types.ts', import.meta.url), 'utf8'), /createDeployment|redeploy|cancelDeployment|updateProject|environment variable|delete|rotate|change domains/i))
 test('Tests perform no real network requests', async () => { const original = globalThis.fetch; globalThis.fetch = async () => { throw new Error('network forbidden') }; try { assert.deepEqual(await incidents([dep()]), []) } finally { globalThis.fetch = original } })
+
+test('Vercel thinker repeated-failure reads latest failed deployment logs', () => {
+  const endpoints = getVercelReadEndpointsForIncident({ metadata: { incidentType: 'repeated_deployment_failure', deploymentIds: ['dep_latest', 'dep_previous'] } } as any)
+  assert.ok(endpoints.some(entry => entry.endpoint === '/v2/deployments/dep_latest/events'))
+  assert.equal(extractLatestFailedDeploymentId({ metadata: { deploymentIds: ['dep_latest', 'dep_previous'] } } as any), 'dep_latest')
+})
+
+test('Vercel thinker canceled-production diagnostics include aliases', () => {
+  const endpoints = getVercelReadEndpointsForIncident({ metadata: { incidentType: 'canceled_production_deployment', deploymentId: 'dep_1' } } as any)
+  assert.ok(endpoints.some(entry => entry.endpoint === '/v4/aliases'))
+})
+
+test('Vercel env-missing classifier ignores dependency and runtime undefined errors', () => {
+  assert.equal(classifyVercelBuildError('Error: Missing environment variable OPENAI_API_KEY'), 'envMissing')
+  assert.equal(classifyVercelBuildError("Module not found: Can't resolve '@/missing'"), 'dependencyMissing')
+  assert.equal(classifyVercelBuildError("TypeError: Cannot read properties of undefined (reading 'foo')"), 'runtimeUndefined')
+})

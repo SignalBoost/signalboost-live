@@ -26,6 +26,7 @@ export type BrowserProviderErrorCode =
 export class BrowserProviderError extends Error {
   readonly code: BrowserProviderErrorCode
 
+  // Keep the diagnostic message independent from the finite machine-readable code union.
   constructor(code: BrowserProviderErrorCode, message: string = code) {
     super(message)
     this.name = 'BrowserProviderError'

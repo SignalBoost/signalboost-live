@@ -32,6 +32,10 @@ export interface BrowserExecutionStore {
   delete(executionId: string): Promise<void>
 }
 
+export interface BrowserExecutionStoreLifecycle extends BrowserExecutionStore {
+  shutdown(): Promise<void>
+}
+
 export interface BrowserSessionRegistry {
   retain(
     executionId: string,
@@ -41,6 +45,10 @@ export interface BrowserSessionRegistry {
   ): Promise<void>
   take(executionId: string): Promise<BrowserSessionPort | null>
   discard(executionId: string): Promise<void>
+}
+
+export interface BrowserSessionRegistryLifecycle extends BrowserSessionRegistry {
+  shutdown(): Promise<void>
 }
 
 export interface BrowserExpiryHandle {
@@ -159,15 +167,20 @@ function pendingExpiryHandle(): BrowserExpiryHandle {
   return { cancel() {} }
 }
 
-export class InMemoryBrowserExecutionStore implements BrowserExecutionStore {
+export class InMemoryBrowserExecutionStore implements BrowserExecutionStoreLifecycle {
   private readonly records = new Map<string, StoredExecution>()
   private readonly scheduler: BrowserExpiryScheduler
+  private shutDown = false
 
   constructor(options: InMemoryBrowserStateOptions = {}) {
     this.scheduler = options.scheduler ?? defaultExpiryScheduler
   }
 
   async save(record: BrowserExecutionRecord, retainedAt = new Date()): Promise<void> {
+    if (this.shutDown) {
+      throw new Error('Browser execution store is shut down')
+    }
+
     const delayMs = retentionDelay(record.expiresAt, retainedAt)
     if (this.records.has(record.executionId)) {
       throw new Error(`Browser execution already retained for execution ${record.executionId}`)
@@ -195,6 +208,7 @@ export class InMemoryBrowserExecutionStore implements BrowserExecutionStore {
   }
 
   async load(executionId: string): Promise<BrowserExecutionRecord | null> {
+    if (this.shutDown) return null
     const stored = this.records.get(executionId)
     return stored ? structuredClone(stored.record) : null
   }
@@ -205,6 +219,14 @@ export class InMemoryBrowserExecutionStore implements BrowserExecutionStore {
     this.records.delete(executionId)
     stored.expiry.cancel()
   }
+
+  async shutdown(): Promise<void> {
+    if (this.shutDown) return
+    this.shutDown = true
+    const storedExecutions = [...this.records.values()]
+    this.records.clear()
+    for (const stored of storedExecutions) stored.expiry.cancel()
+  }
 }
 
 interface RetainedSession {
@@ -212,10 +234,12 @@ interface RetainedSession {
   expiry: BrowserExpiryHandle
 }
 
-export class InMemoryBrowserSessionRegistry implements BrowserSessionRegistry {
+export class InMemoryBrowserSessionRegistry implements BrowserSessionRegistryLifecycle {
   private readonly sessions = new Map<string, RetainedSession>()
   private readonly scheduler: BrowserExpiryScheduler
   private readonly maxRetainedSessions: number
+  private shutDown = false
+  private shutdownPromise: Promise<void> | null = null
 
   constructor(options: InMemoryBrowserSessionRegistryOptions = {}) {
     this.scheduler = options.scheduler ?? defaultExpiryScheduler
@@ -228,6 +252,11 @@ export class InMemoryBrowserSessionRegistry implements BrowserSessionRegistry {
     expiresAt: string,
     retainedAt = new Date(),
   ): Promise<void> {
+    if (this.shutDown) {
+      await session.close().catch(() => undefined)
+      throw new Error('Browser session registry is shut down')
+    }
+
     if (this.sessions.has(executionId)) {
       await session.close().catch(() => undefined)
       throw new Error(`Browser session already retained for execution ${executionId}`)
@@ -270,6 +299,7 @@ export class InMemoryBrowserSessionRegistry implements BrowserSessionRegistry {
   }
 
   async take(executionId: string): Promise<BrowserSessionPort | null> {
+    if (this.shutDown) return null
     const retained = this.sessions.get(executionId)
     if (!retained) return null
     this.sessions.delete(executionId)
@@ -280,5 +310,22 @@ export class InMemoryBrowserSessionRegistry implements BrowserSessionRegistry {
   async discard(executionId: string): Promise<void> {
     const session = await this.take(executionId)
     await session?.close().catch(() => undefined)
+  }
+
+  shutdown(): Promise<void> {
+    if (this.shutdownPromise) return this.shutdownPromise
+
+    this.shutDown = true
+    const retainedSessions = [...this.sessions.values()]
+    this.sessions.clear()
+    for (const retained of retainedSessions) retained.expiry.cancel()
+
+    this.shutdownPromise = Promise.allSettled(
+      retainedSessions.map(retained =>
+        Promise.resolve().then(() => retained.session.close()),
+      ),
+    ).then(() => undefined)
+
+    return this.shutdownPromise
   }
 }

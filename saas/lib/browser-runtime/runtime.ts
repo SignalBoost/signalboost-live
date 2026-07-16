@@ -3,7 +3,10 @@ import {
   createBrowserExecutionId,
   fingerprintBrowserTask,
 } from './execution-state.ts'
-import { createBrowserExecutionTaskSnapshot } from './execution-task.ts'
+import {
+  createBrowserExecutionRecordSnapshot,
+  createBrowserExecutionTaskSnapshot,
+} from './execution-task.ts'
 import type {
   BrowserAdapterContext,
   BrowserEvidence,
@@ -297,7 +300,8 @@ export async function resumeBrowserTask(input: {
 
   try {
     task = createBrowserExecutionTaskSnapshot(input.task)
-    record = await input.executionStore.load(input.executionId)
+    const loadedRecord = await input.executionStore.load(input.executionId)
+    record = loadedRecord ? createBrowserExecutionRecordSnapshot(loadedRecord) : null
     startedAt = record?.startedAt ?? startedAt
     completedStepIds.push(...(record?.completedStepIds ?? []))
     events.push(...(record?.evidence ?? []))

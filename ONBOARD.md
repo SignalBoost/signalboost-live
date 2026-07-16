@@ -169,7 +169,7 @@ The executable sandbox adapter uses adapter ID `signalboost.sandbox.v1` and the 
 - capture evidence before the approval boundary;
 - stop phase 1 at a checkpoint before any protected save;
 - persist a serializable execution record containing the exact completed and remaining step lists while retaining the live browser session through a separate runtime registry;
-- require a second, separately signed token bound to the same task, incident, checkpoint, approved origins, and exact remaining step IDs;
+- require a second, separately signed token bound to the same task, incident, checkpoint, approved origins, exact remaining step IDs, one exact execution ID, and the digest of the phase-one approval that created the retained session;
 - resume only the retained post-checkpoint steps without replaying navigation, credential entry, or preparation steps;
 - permit protected-save steps in the task declaration only after the checkpoint, while the phase-1 token must neither authorize nor execute those steps;
 - independently verify the complete two-phase evidence sequence before completion is accepted; and
@@ -629,6 +629,8 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-15: Integrated deterministic Mission 001 verification into every terminal Browser Runtime result. Paused and completed executions are valid only when the embedded verification report is `verified`; failed executions retain a failed report for audit and diagnosis.
 
 - 2026-07-15: Added Mission 001 in-process resumable continuation: phase 1 stores the exact execution boundary and retains the live session separately, phase 2 requires a new checkpoint-bound token for only the remaining steps, and completion verifies the combined evidence without replaying login, credential entry, or preparation. Missing or crashed sessions fail closed.
+
+- 2026-07-15: Bound Mission 001 phase-two approvals to one exact retained execution ID and the originating phase-one approval-token digest. Cross-execution replay and phase-one token substitution now fail closed before a retained session can be consumed.
 
 ## 20. Mandatory Final Reminder
 

@@ -1,0 +1,5 @@
+'use client'
+function isObject(value: unknown): value is Record<string, unknown> { return Boolean(value) && typeof value === 'object' && !Array.isArray(value) }
+export default function TreeView({ value, path = '', onSelect }: { value: Record<string, unknown>; path?: string; onSelect: (path: string) => void }) {
+  return <ul style={{ listStyle: 'none', margin: 0, paddingLeft: path ? 16 : 0, display: 'grid', gap: 6 }}>{Object.entries(value).map(([key, child]) => { const next = path ? `${path}.${key}` : key; const branch = isObject(child) || Array.isArray(child); const objectChild = Array.isArray(child) ? { '0': child[0] || {} } : child as Record<string, unknown>; return <li key={next}><button type="button" onClick={() => !branch && onSelect(next)} disabled={branch} style={{ border: 0, background: 'transparent', color: branch ? '#ffc300' : '#e0faff', cursor: branch ? 'default' : 'pointer', padding: 0, fontWeight: branch ? 900 : 700 }}>{branch ? '▾ ' : '↳ '}{key}</button>{branch && <TreeView value={objectChild} path={next} onSelect={onSelect} />}</li> })}</ul>
+}

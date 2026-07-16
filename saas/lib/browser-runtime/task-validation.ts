@@ -77,7 +77,9 @@ function validateNavigateStep(
     throw new Error(`${stepLabel} url must not include embedded credentials`)
   }
   if (!allowedOrigins.has(target.origin)) {
-    throw new Error(`${stepLabel} url origin is not approved: ${target.origin}`)
+    throw new Error(
+      `${stepLabel} url origin is not approved and is outside the approved origin scope: ${target.origin}`,
+    )
   }
 }
 

@@ -7,9 +7,6 @@ import type {
   BrowserEnginePage,
 } from './session-factory.ts'
 
-// Structural Playwright contracts keep the portable runtime independent from a
-// specific Playwright package version. Hosts may supply chromium from either
-// `playwright` or `playwright-core` without coupling the runtime to that SDK.
 export interface PlaywrightPageLike {
   url(): string
   goto(url: string, options?: { timeout?: number }): Promise<unknown>
@@ -102,7 +99,6 @@ export class PlaywrightBrowserEngineLauncher implements BrowserEngineLauncher {
     }
 
     if (options.executablePath) launchOptions.executablePath = options.executablePath
-
     return adaptBrowser(await this.chromium.launch(launchOptions))
   }
 }

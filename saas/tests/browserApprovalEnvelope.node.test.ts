@@ -75,7 +75,7 @@ test('approval verification rejects unbounded signed scope arrays', () => {
 
   assert.throws(
     () => verifyBrowserApprovalToken(token, task, signingSecret, now),
-    /allowedOrigins must be a non-empty bounded array/,
+    /allowedOrigins must contain no more than 128 entries/,
   )
 })
 

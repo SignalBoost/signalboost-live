@@ -124,3 +124,119 @@ test('approval verification rejects an invalid verification clock', () => {
     /verification time must be valid/,
   )
 })
+
+test('approval verification rejects non-object signed claims deterministically', () => {
+  const task = makeTask()
+  const token = issueBrowserApprovalToken(null as unknown as BrowserApprovalClaims, secret)
+
+  assert.throws(
+    () => verifyBrowserApprovalToken(token, task, secret, now),
+    /Malformed browser approval token claims/,
+  )
+})
+
+test('approval verification requires a bounded non-empty nonce', () => {
+  const task = makeTask()
+
+  assert.throws(
+    () => verify(task, makeClaims(task, { nonce: '   ' })),
+    /nonce must be a non-empty canonical string/,
+  )
+  assert.throws(
+    () => verify(task, makeClaims(task, { nonce: 'n'.repeat(257) })),
+    /nonce must be a non-empty canonical string/,
+  )
+})
+
+test('approval verification rejects duplicate or empty task step IDs', () => {
+  const duplicateTask = makeTask({
+    steps: [
+      { id: 'duplicate', kind: 'navigate', url: 'https://sandbox.example.test/settings' },
+      { id: 'duplicate', kind: 'screenshot', label: 'duplicate step' },
+    ],
+  })
+  assert.throws(
+    () => verify(duplicateTask, makeClaims(duplicateTask)),
+    /Browser task step IDs must be a non-empty array of unique non-empty strings/,
+  )
+
+  const emptyTask = makeTask({
+    steps: [{ id: '', kind: 'navigate', url: 'https://sandbox.example.test/settings' }],
+  })
+  assert.throws(
+    () => verify(emptyTask, makeClaims(emptyTask)),
+    /Browser task step IDs entry must be a non-empty canonical string/,
+  )
+})
+
+test('approval verification requires canonical origin-only scope', () => {
+  const pathScopedTask = makeTask({
+    allowedOrigins: ['https://sandbox.example.test/settings'],
+  })
+  assert.throws(
+    () => verify(pathScopedTask, makeClaims(pathScopedTask)),
+    /Browser task allowedOrigins must contain only canonical HTTP\(S\) origins/,
+  )
+
+  const credentialScopedTask = makeTask({
+    allowedOrigins: ['https://user:password@sandbox.example.test'],
+  })
+  assert.throws(
+    () => verify(credentialScopedTask, makeClaims(credentialScopedTask)),
+    /Browser task allowedOrigins must contain only canonical HTTP\(S\) origins/,
+  )
+})
+
+test('approval verification rejects duplicate approved origins', () => {
+  const task = makeTask({
+    allowedOrigins: [
+      'https://sandbox.example.test',
+      'https://sandbox.example.test',
+    ],
+  })
+
+  assert.throws(
+    () => verify(task, makeClaims(task)),
+    /Browser task allowedOrigins must be a non-empty array of unique non-empty strings/,
+  )
+})
+
+test('approval verification rejects ambiguous continuation claim shapes', () => {
+  const task = makeTask({
+    steps: [
+      { id: 'observe', kind: 'navigate', url: 'https://sandbox.example.test/settings' },
+      {
+        id: 'approval-checkpoint',
+        kind: 'checkpoint',
+        label: 'Owner approval required',
+        requiresApproval: true,
+      },
+      { id: 'protected-save', kind: 'click', selector: '#protected-save' },
+    ],
+  })
+
+  assert.throws(
+    () => verify(task, makeClaims(task, {
+      phase: 1,
+      checkpointStepId: 'approval-checkpoint',
+      executionId: 'a'.repeat(64),
+      preApprovalTokenDigest: 'b'.repeat(64),
+    })),
+    /phase 1 must not include execution binding claims/,
+  )
+
+  assert.throws(
+    () => verify(task, makeClaims(task, {
+      phase: 2,
+      checkpointStepId: 'approval-checkpoint',
+    })),
+    /executionId must be a non-empty canonical string/,
+  )
+
+  assert.throws(
+    () => verify(task, makeClaims(task, {
+      checkpointStepId: 'approval-checkpoint',
+    })),
+    /continuation claims require an explicit phase/,
+  )
+})

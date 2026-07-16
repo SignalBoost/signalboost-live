@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { createHmac } from 'node:crypto'
 
 import {
   BROWSER_APPROVAL_MAX_LIFETIME_MS,
@@ -49,6 +50,14 @@ function makeClaims(task: BrowserTask): BrowserApprovalClaims {
     expiresAt: task.expiresAt,
     nonce: 'approval-envelope-nonce',
   }
+}
+
+function signRawClaimsJson(json: string): string {
+  const payload = Buffer.from(json, 'utf8').toString('base64url')
+  const tokenSignature = createHmac('sha256', signingSecret)
+    .update(payload)
+    .digest('base64url')
+  return `${payload}.${tokenSignature}`
 }
 
 test('approval verification rejects unsupported signed claim fields', () => {
@@ -110,6 +119,58 @@ test('approval verification rejects non-canonical token whitespace and segments'
   assert.throws(
     () => verifyBrowserApprovalToken(`${payload}.${tokenSignature}a`, task, signingSecret, now),
     /Malformed browser approval token/,
+  )
+})
+
+test('approval issuance canonicalizes claim order deterministically', () => {
+  const task = makeTask()
+  const claims = makeClaims(task)
+  const reordered: BrowserApprovalClaims = {
+    nonce: claims.nonce,
+    expiresAt: claims.expiresAt,
+    issuedAt: claims.issuedAt,
+    allowedOrigins: claims.allowedOrigins,
+    allowedStepIds: claims.allowedStepIds,
+    mode: claims.mode,
+    adapterId: claims.adapterId,
+    provider: claims.provider,
+    incidentId: claims.incidentId,
+    taskId: claims.taskId,
+    version: claims.version,
+  }
+
+  assert.equal(
+    issueBrowserApprovalToken(reordered, signingSecret),
+    issueBrowserApprovalToken(claims, signingSecret),
+  )
+})
+
+test('approval verification rejects valid signatures over non-canonical claim JSON', () => {
+  const task = makeTask()
+  const claims = makeClaims(task)
+  const prettyPrintedToken = signRawClaimsJson(JSON.stringify(claims, null, 2))
+
+  assert.throws(
+    () => verifyBrowserApprovalToken(prettyPrintedToken, task, signingSecret, now),
+    /claims must use canonical JSON encoding/,
+  )
+
+  const canonicalToken = issueBrowserApprovalToken(claims, signingSecret)
+  const [canonicalPayload] = canonicalToken.split('.')
+  const canonicalJson = Buffer.from(canonicalPayload, 'base64url').toString('utf8')
+  const duplicateTaskIdJson = canonicalJson.replace(
+    `"taskId":"${task.taskId}"`,
+    `"taskId":"${task.taskId}","taskId":"${task.taskId}"`,
+  )
+
+  assert.throws(
+    () => verifyBrowserApprovalToken(
+      signRawClaimsJson(duplicateTaskIdJson),
+      task,
+      signingSecret,
+      now,
+    ),
+    /claims must use canonical JSON encoding/,
   )
 })
 

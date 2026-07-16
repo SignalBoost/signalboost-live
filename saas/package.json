@@ -23,7 +23,7 @@
     "check:enterprise-localization": "node scripts/check-enterprise-localization.mjs",
     "test:enterprise-pipeline": "node --test tests/enterpriseMemoryUrl.node.test.ts tests/approvalBinding.node.test.ts",
     "verify:issue-205": "npm run check:enterprise-architecture && npm run check:enterprise-approval && npm run check:enterprise-localization && npm run test:enterprise-pipeline && npm run typecheck",
-    "test:supervisor": "node --test tests/supervisorCore.node.test.ts"
+    "test:supervisor": "node --test tests/supervisorCore.node.test.ts tests/vercelObserver.node.test.ts"
   },
   "dependencies": {
     "next": "16.2.6",

@@ -1,7 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { issueBrowserApprovalToken } from '../lib/browser-runtime/approval.ts'
+import {
+  digestBrowserApprovalToken,
+  issueBrowserApprovalToken,
+} from '../lib/browser-runtime/approval.ts'
 import {
   createBrowserExecutionId,
   InMemoryBrowserExecutionStore,
@@ -13,6 +16,12 @@ import type { BrowserTask } from '../lib/browser-runtime/contracts.ts'
 
 const secret = 'resume-test-secret'
 const now = new Date('2026-07-15T10:30:00.000Z')
+const remainingStepIds = ['protected-save', 'wait-success', 'after-save']
+
+interface ContinuationScope {
+  executionId: string
+  preApprovalTokenDigest: string
+}
 
 function makeTask(): BrowserTask {
   return {
@@ -36,7 +45,13 @@ function makeTask(): BrowserTask {
   }
 }
 
-function sign(task: BrowserTask, allowedStepIds: string[], phase: 1 | 2, nonce: string): string {
+function sign(
+  task: BrowserTask,
+  allowedStepIds: string[],
+  phase: 1 | 2,
+  nonce: string,
+  continuation?: ContinuationScope,
+): string {
   const claims: BrowserApprovalClaims = {
     version: 1,
     taskId: task.taskId,
@@ -51,8 +66,17 @@ function sign(task: BrowserTask, allowedStepIds: string[], phase: 1 | 2, nonce: 
     nonce,
     phase,
     checkpointStepId: 'approval-checkpoint',
+    executionId: continuation?.executionId,
+    preApprovalTokenDigest: continuation?.preApprovalTokenDigest,
   }
   return issueBrowserApprovalToken(claims, secret)
+}
+
+function continuationScope(task: BrowserTask, executionId: string): ContinuationScope {
+  return {
+    executionId,
+    preApprovalTokenDigest: digestBrowserApprovalToken(task.approvalToken),
+  }
 }
 
 function ports(calls: string[]) {
@@ -111,9 +135,10 @@ test('resumable execution pauses, resumes exact remaining steps, and verifies co
 
   const secondApprovalToken = sign(
     task,
-    ['protected-save', 'wait-success', 'after-save'],
+    remainingStepIds,
     2,
     'phase-2',
+    continuationScope(task, paused.executionId!),
   )
   const completed = await resumeBrowserTask({
     task,
@@ -166,7 +191,8 @@ test('invalid second approval does not execute or consume the retained session',
   })
   assert.ok(paused.executionId)
 
-  const wrongToken = sign(task, ['wait-success', 'protected-save', 'after-save'], 2, 'wrong-order')
+  const scope = continuationScope(task, paused.executionId!)
+  const wrongToken = sign(task, ['wait-success', 'protected-save', 'after-save'], 2, 'wrong-order', scope)
   const rejected = await resumeBrowserTask({
     task,
     executionId: paused.executionId!,
@@ -184,7 +210,7 @@ test('invalid second approval does not execute or consume the retained session',
   assert.equal(runtimePorts.wasClosed(), false)
   assert.notEqual(await executionStore.load(paused.executionId!), null)
 
-  const validToken = sign(task, ['protected-save', 'wait-success', 'after-save'], 2, 'valid-after-retry')
+  const validToken = sign(task, remainingStepIds, 2, 'valid-after-retry', scope)
   const completed = await resumeBrowserTask({
     task,
     executionId: paused.executionId!,
@@ -221,9 +247,10 @@ test('task tampering invalidates and closes the retained execution', async () =>
   tamperedTask.steps[3] = { id: 'protected-save', kind: 'click', selector: '#different-target' }
   const secondApprovalToken = sign(
     tamperedTask,
-    ['protected-save', 'wait-success', 'after-save'],
+    remainingStepIds,
     2,
     'tampered',
+    continuationScope(task, paused.executionId!),
   )
   const rejected = await resumeBrowserTask({
     task: tamperedTask,
@@ -238,6 +265,160 @@ test('task tampering invalidates and closes the retained execution', async () =>
 
   assert.equal(rejected.status, 'failed')
   assert.match(rejected.error || '', /fingerprint mismatch/)
+  assert.equal(runtimePorts.wasClosed(), true)
+  assert.equal(await executionStore.load(paused.executionId!), null)
+})
+
+test('phase-two approval cannot be replayed across distinct paused executions', async () => {
+  const executionStore = new InMemoryBrowserExecutionStore()
+  const sessionRegistry = new InMemoryBrowserSessionRegistry()
+  const callsA: string[] = []
+  const callsB: string[] = []
+  const portsA = ports(callsA)
+  const portsB = ports(callsB)
+  const taskA = makeTask()
+  const taskB = makeTask()
+  taskA.approvalToken = sign(taskA, ['navigate', 'ready', 'approval-checkpoint'], 1, 'phase-1-A')
+  taskB.approvalToken = sign(taskB, ['navigate', 'ready', 'approval-checkpoint'], 1, 'phase-1-B')
+
+  const pausedA = await runBrowserTask({
+    task: taskA,
+    signingSecret: secret,
+    sessions: portsA.sessions,
+    context: portsA.context,
+    executionStore,
+    sessionRegistry,
+    now,
+  })
+  const pausedB = await runBrowserTask({
+    task: taskB,
+    signingSecret: secret,
+    sessions: portsB.sessions,
+    context: portsB.context,
+    executionStore,
+    sessionRegistry,
+    now,
+  })
+
+  assert.ok(pausedA.executionId)
+  assert.ok(pausedB.executionId)
+  assert.notEqual(pausedA.executionId, pausedB.executionId)
+
+  const tokenForA = sign(
+    taskA,
+    remainingStepIds,
+    2,
+    'phase-2-A',
+    continuationScope(taskA, pausedA.executionId!),
+  )
+  const rejectedB = await resumeBrowserTask({
+    task: taskB,
+    executionId: pausedB.executionId!,
+    secondApprovalToken: tokenForA,
+    signingSecret: secret,
+    executionStore,
+    sessionRegistry,
+    context: portsB.context,
+    now,
+  })
+
+  assert.equal(rejectedB.status, 'failed')
+  assert.match(rejectedB.error || '', /execution scope mismatch/)
+  assert.equal(callsB.some(call => call.startsWith('click:')), false)
+  assert.equal(portsB.wasClosed(), false)
+  assert.notEqual(await executionStore.load(pausedB.executionId!), null)
+
+  const tokenForB = sign(
+    taskB,
+    remainingStepIds,
+    2,
+    'phase-2-B',
+    continuationScope(taskB, pausedB.executionId!),
+  )
+  const completedB = await resumeBrowserTask({
+    task: taskB,
+    executionId: pausedB.executionId!,
+    secondApprovalToken: tokenForB,
+    signingSecret: secret,
+    executionStore,
+    sessionRegistry,
+    context: portsB.context,
+    now,
+  })
+  assert.equal(completedB.status, 'completed')
+
+  const tokenForACleanup = sign(
+    taskA,
+    remainingStepIds,
+    2,
+    'phase-2-A-cleanup',
+    continuationScope(taskA, pausedA.executionId!),
+  )
+  const completedA = await resumeBrowserTask({
+    task: taskA,
+    executionId: pausedA.executionId!,
+    secondApprovalToken: tokenForACleanup,
+    signingSecret: secret,
+    executionStore,
+    sessionRegistry,
+    context: portsA.context,
+    now,
+  })
+  assert.equal(completedA.status, 'completed')
+})
+
+test('changing the phase-one approval invalidates the retained execution', async () => {
+  const calls: string[] = []
+  const task = makeTask()
+  task.approvalToken = sign(task, ['navigate', 'ready', 'approval-checkpoint'], 1, 'phase-1-original')
+  const originalPreApprovalToken = task.approvalToken
+  const executionStore = new InMemoryBrowserExecutionStore()
+  const sessionRegistry = new InMemoryBrowserSessionRegistry()
+  const runtimePorts = ports(calls)
+
+  const paused = await runBrowserTask({
+    task,
+    signingSecret: secret,
+    sessions: runtimePorts.sessions,
+    context: runtimePorts.context,
+    executionStore,
+    sessionRegistry,
+    now,
+  })
+  assert.ok(paused.executionId)
+
+  const swappedTask = structuredClone(task)
+  swappedTask.approvalToken = sign(
+    swappedTask,
+    ['navigate', 'ready', 'approval-checkpoint'],
+    1,
+    'phase-1-replacement',
+  )
+  const secondApprovalToken = sign(
+    swappedTask,
+    remainingStepIds,
+    2,
+    'phase-2-after-swap',
+    {
+      executionId: paused.executionId!,
+      preApprovalTokenDigest: digestBrowserApprovalToken(originalPreApprovalToken),
+    },
+  )
+
+  const rejected = await resumeBrowserTask({
+    task: swappedTask,
+    executionId: paused.executionId!,
+    secondApprovalToken,
+    signingSecret: secret,
+    executionStore,
+    sessionRegistry,
+    context: runtimePorts.context,
+    now,
+  })
+
+  assert.equal(rejected.status, 'failed')
+  assert.match(rejected.error || '', /task approval|pre-approval token/)
+  assert.equal(calls.some(call => call.startsWith('click:')), false)
   assert.equal(runtimePorts.wasClosed(), true)
   assert.equal(await executionStore.load(paused.executionId!), null)
 })

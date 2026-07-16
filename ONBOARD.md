@@ -167,6 +167,19 @@ Dispatcher at-most-once tracking is in-memory for Sprint 14: duplicate and concu
 
 ### Browser Runtime (Mission 001)
 
+### Sprint 15 — Browser Runtime Dry-Run Adapter
+
+Sprint 15 connects the Supervisor BrowserExecutor to Browser Runtime task contracts only as a deterministic dry-run translation boundary. The BrowserExecutor now constructs a validated `BrowserRuntimeDryRunPackage` and returns `dry_run_ready`; it does not execute the package, launch a browser, import Playwright/Chromium, create a BrowserSession, access any provider account, resolve credentials, click controls, submit forms, modify Vercel, or mutate production/sandbox provider state.
+
+The adapter accepts only a validated incident, repair plan, approved step IDs, browser dispatch metadata, an injected clock, and optional deterministic ID helper. It has no Observer, Thinker, Policy Engine, provider mutation client, BrowserSession, Playwright, secret resolver, credential, or LLM dependency. It fails closed if `requiresBrowser` is false, `targetOrigin` is missing or not an HTTPS origin, credentials/query/fragment/path scope are present, approved step IDs are unknown/duplicated/reordered, API and browser scope are mixed, unsupported actions appear, executable JavaScript or shell content is present, targets are natural-language-only, selectors broaden scope, or plaintext secret material appears.
+
+Supported dry-run actions are exactly `navigate`, `click`, `fill`, `select`, `read`, `screenshot`, `request_approval`, `verify`, and `stop`. Click/fill/select/read require structured targets (`role` plus accessible `name`, `label`, `testId`, exact `text`, or explicit `css` when safe). Fill values must be non-secret literals or references such as `secretRef`, `tokenRef`, `credentialRef`, or `valueRef`; references are preserved but never resolved.
+
+Protected Supervisor steps map to Browser Runtime checkpoints without collapsing approval controls. Supervisor policy approval proves only that the dispatcher may route the exact approved step IDs. Browser Runtime signed task approval and continuation approval remain separate future controls; the dry-run adapter creates no approval token and does not mark a Browser Runtime task approved. Deterministic package fingerprints cover incident/plan identity, target origin, approved step order, mapped task, approval requirements, verification requirements, and schema version. The package verifier is static and side-effect-free.
+
+Known limitation: Browser Runtime live execution remains disconnected. The next recommended sprint is to enable execution only against an isolated local sandbox portal using signed Browser Runtime approvals and never against production/provider accounts.
+
+
 The portable Browser Runtime lives in `saas/lib/browser-runtime` and must remain independent of Next.js UI, Supabase, and provider SDKs. Mission 001 advances the runtime only through bounded, testable slices.
 
 The executable sandbox adapter uses adapter ID `signalboost.sandbox.v1` and the isolated `/browser-sandbox/login` route. Sandbox tasks must:
@@ -654,6 +667,7 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-16: Hardened Mission 001 Browser Runtime approval time binding: signed approvals now match the exact task issue/expiry window and fail closed on malformed timestamps, invalid verification clocks, or non-positive approval windows.
 
 - 2026-07-16: Added Mission 001 Sprint 14 policy-to-executor bridge: provider-neutral executor registry, dispatcher validation, sanitized dispatch audit events, in-memory at-most-once dispatch protection, and non-mutating API/browser/manual executor stubs. This proves routing only; Browser Runtime and API mutations remain disabled, and durable process-restart dispatch tracking is deferred.
+- 2026-07-16: Added Mission 001 Sprint 15 Browser Runtime dry-run adapter: BrowserExecutor now translates approved browser scope into a validated, fingerprinted dry-run package only. It does not launch Playwright/Chromium, resolve credentials, access providers, or execute Browser Runtime tasks; live execution is deferred to an isolated sandbox-only sprint.
 
 ## 20. Mandatory Final Reminder
 

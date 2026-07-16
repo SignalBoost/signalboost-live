@@ -78,13 +78,36 @@ function validateViewport(viewport: { width: number; height: number }): void {
   assertPositiveInteger(viewport.height, 'Browser viewport height')
 }
 
-function withTimeout<T>(operation: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+function withTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs: number,
+  label: string,
+  onLateResolve?: (value: T) => Promise<void> | void,
+): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs)
+  let timedOut = false
+  const timeoutError = new Error(`${label} timed out after ${timeoutMs}ms`)
+
+  const guardedOperation = operation.then(async value => {
+    if (!timedOut) return value
+
+    try {
+      await onLateResolve?.(value)
+    } catch {
+      // Timeout cleanup is best-effort and must not replace the deterministic timeout error.
+    }
+
+    throw timeoutError
   })
 
-  return Promise.race([operation, timeout]).finally(() => {
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true
+      reject(timeoutError)
+    }, timeoutMs)
+  })
+
+  return Promise.race([guardedOperation, timeout]).finally(() => {
     if (timer) clearTimeout(timer)
   })
 }
@@ -162,10 +185,23 @@ export class DefaultBrowserSessionFactory implements BrowserSessionFactory {
       }),
       options.launchTimeoutMs,
       'Browser launch',
+      lateBrowser => lateBrowser.close(),
     )
 
     let context: BrowserEngineContext | null = null
-    let closed = false
+    let cleanupPromise: Promise<void> | null = null
+
+    const cleanup = (): Promise<void> => {
+      if (!cleanupPromise) {
+        cleanupPromise = (async () => {
+          const currentContext = context
+          context = null
+          await currentContext?.close().catch(() => undefined)
+          await browser.close().catch(() => undefined)
+        })()
+      }
+      return cleanupPromise
+    }
 
     try {
       context = await withTimeout(
@@ -178,22 +214,22 @@ export class DefaultBrowserSessionFactory implements BrowserSessionFactory {
         }),
         options.launchTimeoutMs,
         'Browser context creation',
+        lateContext => lateContext.close(),
       )
 
-      const page = await withTimeout(context.newPage(), options.launchTimeoutMs, 'Browser page creation')
+      const page = await withTimeout(
+        context.newPage(),
+        options.launchTimeoutMs,
+        'Browser page creation',
+        cleanup,
+      )
 
       return {
         page: createPagePort(page, options.actionTimeoutMs),
-        close: async () => {
-          if (closed) return
-          closed = true
-          await context?.close().catch(() => undefined)
-          await browser.close().catch(() => undefined)
-        },
+        close: cleanup,
       }
     } catch (error) {
-      await context?.close().catch(() => undefined)
-      await browser.close().catch(() => undefined)
+      await cleanup()
       throw error
     }
   }

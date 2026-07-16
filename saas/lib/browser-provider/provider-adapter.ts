@@ -40,6 +40,13 @@ export interface BrowserProviderAdapter {
 
 export function freezeProviderAdapter(adapter: BrowserProviderAdapter): BrowserProviderAdapter {
   const version = assertBrowserProviderVersion(adapter.getVersion())
+  const supportsReadOnlyExecution = adapter.supportsExecutionMode('read_only')
+  const supportsReadOnlyInspection = adapter.supportsReadOnlyInspection()
+  const supportsAutoFailover = adapter.supportsAutoFailover()
+  const supportsBrowserOnDemand = adapter.supportsBrowserOnDemand()
+  const supportsSandbox = adapter.supportsSandbox()
+  const supportsProduction = adapter.supportsProduction()
+
   if (
     !adapter.providerId?.trim()
     || !adapter.displayNameKey?.trim()
@@ -52,7 +59,10 @@ export function freezeProviderAdapter(adapter: BrowserProviderAdapter): BrowserP
   }
 
   return Object.freeze({
-    ...adapter,
+    providerId: adapter.providerId,
+    displayNameKey: adapter.displayNameKey,
+    adapterVersion: adapter.adapterVersion,
+    schemaVersion: adapter.schemaVersion,
     health: assertBrowserProviderHealth(adapter.health),
     capabilities: Object.freeze(adapter.capabilities.map(assertBrowserProviderCapability).sort((a, b) => a.capabilityId.localeCompare(b.capabilityId))),
     origins: Object.freeze(adapter.origins.map(assertBrowserProviderOrigin).sort((a, b) => a.originId.localeCompare(b.originId))),
@@ -60,6 +70,12 @@ export function freezeProviderAdapter(adapter: BrowserProviderAdapter): BrowserP
     selectors: Object.freeze(adapter.selectors.map(assertBrowserProviderSelector).sort((a, b) => a.selectorId.localeCompare(b.selectorId))),
     verificationProfiles: Object.freeze(adapter.verificationProfiles.map(assertBrowserProviderVerificationProfile).sort((a, b) => a.verificationProfileId.localeCompare(b.verificationProfileId))),
     evidenceProfiles: Object.freeze(adapter.evidenceProfiles.map(assertBrowserProviderEvidenceProfile).sort((a, b) => a.evidenceProfileId.localeCompare(b.evidenceProfileId))),
+    supportsExecutionMode: mode => mode === 'read_only' && supportsReadOnlyExecution,
+    supportsReadOnlyInspection: () => supportsReadOnlyInspection,
+    supportsAutoFailover: () => supportsAutoFailover,
+    supportsBrowserOnDemand: () => supportsBrowserOnDemand,
+    supportsSandbox: () => supportsSandbox,
+    supportsProduction: () => supportsProduction,
     getVersion: () => version,
   })
 }

@@ -47,6 +47,14 @@ function assertCurrentPageOrigin(
   return assertAllowedOrigin(pageUrl, allowedOrigins, `Current page ${phase} step ${stepId}`)
 }
 
+function parseContinuationExpiry(expiresAt: string): number {
+  const expiryMs = Date.parse(expiresAt)
+  if (!Number.isFinite(expiryMs)) {
+    throw new Error('Resumable browser execution expiry is invalid')
+  }
+  return expiryMs
+}
+
 function evidence(
   sequence: number,
   stepId: string,
@@ -187,6 +195,7 @@ export async function runBrowserTask(input: {
         }
 
         if (resumableRequested && input.executionStore && input.sessionRegistry) {
+          const retentionStartedAt = input.now ?? new Date()
           const executionId = createBrowserExecutionId(task, step.id)
           const remainingSteps = task.steps.slice(index + 1)
           await input.executionStore.save({
@@ -198,16 +207,22 @@ export async function runBrowserTask(input: {
             mode: task.mode,
             checkpointStepId: step.id,
             startedAt,
+            expiresAt: task.expiresAt,
             completedStepIds: [...completedStepIds],
             remainingSteps,
             allowedOrigins: [...task.allowedOrigins],
             preApprovalTokenDigest: digestBrowserApprovalToken(task.approvalToken),
             taskFingerprint: fingerprintBrowserTask(task),
             evidence: [...events],
-          })
+          }, retentionStartedAt)
 
           try {
-            await input.sessionRegistry.retain(executionId, session)
+            await input.sessionRegistry.retain(
+              executionId,
+              session,
+              task.expiresAt,
+              retentionStartedAt,
+            )
             keepSessionForResume = true
           } catch (error) {
             await input.executionStore.delete(executionId).catch(() => undefined)
@@ -265,6 +280,7 @@ export async function resumeBrowserTask(input: {
   context: BrowserAdapterContext
   now?: Date
 }): Promise<BrowserTaskResult> {
+  const resumeNow = input.now ?? new Date()
   const record = await input.executionStore.load(input.executionId)
   const startedAt = record?.startedAt ?? new Date().toISOString()
   const completedStepIds = [...(record?.completedStepIds ?? [])]
@@ -295,6 +311,10 @@ export async function resumeBrowserTask(input: {
     if (record.provider !== input.task.provider) throw new Error('Resumable provider mismatch')
     if (record.adapterId !== input.task.adapterId) throw new Error('Resumable adapterId mismatch')
     if (record.mode !== input.task.mode) throw new Error('Resumable mode mismatch')
+    if (record.expiresAt !== input.task.expiresAt) throw new Error('Resumable expiry scope mismatch')
+    if (parseContinuationExpiry(record.expiresAt) <= resumeNow.getTime()) {
+      throw new Error('Resumable browser execution expired')
+    }
     if (record.taskFingerprint !== fingerprintBrowserTask(input.task)) {
       throw new Error('Resumable task fingerprint mismatch')
     }
@@ -322,7 +342,7 @@ export async function resumeBrowserTask(input: {
       input.secondApprovalToken,
       input.task,
       input.signingSecret,
-      input.now,
+      resumeNow,
       {
         expectedStepIds: record.remainingSteps.map(step => step.id),
         expectedPhase: 2,
@@ -370,10 +390,12 @@ export async function resumeBrowserTask(input: {
       await session.close().catch(() => undefined)
       session = null
       await input.executionStore.delete(input.executionId).catch(() => undefined)
-    } else if (!recordValidated && record) {
+    } else if (!record) {
+      await input.sessionRegistry.discard(input.executionId).catch(() => undefined)
+    } else if (!recordValidated) {
       await input.sessionRegistry.discard(input.executionId).catch(() => undefined)
       await input.executionStore.delete(input.executionId).catch(() => undefined)
-    } else if (recordValidated && /session is missing or crashed/.test(message)) {
+    } else if (/session is missing or crashed/.test(message)) {
       await input.executionStore.delete(input.executionId).catch(() => undefined)
     }
 

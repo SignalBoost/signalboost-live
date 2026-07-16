@@ -648,6 +648,7 @@ Use this section for short notes when architecture, provider behavior, platform 
 
 - 2026-07-16: Bound Mission 001 retained execution records and live in-process browser sessions to the approved task expiry. Expired continuations are removed and closed automatically, duplicate retained execution IDs fail closed, and resume rejects expired or orphaned state without consuming protected steps.
 - 2026-07-16: Added the dynamic `provider_registry` schema and provider-neutral universal runner for configuration-driven integration actions. New software API or approved local-channel integrations can be represented by database rows with endpoint, payload, schema, and output-path mappings, while secrets and sensitive actions remain governed by backend-only resolution and approval gates.
+- 2026-07-16: Hardened the universal runner contract to support blueprint aliases (`request_template`, `response_mapping.output_path`), backend-only credential reference resolution, dynamic auth/header hydration, and structured offline/error diagnostics without provider-specific SDK imports.
 
 ## 20. Mandatory Final Reminder
 

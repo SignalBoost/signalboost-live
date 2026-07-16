@@ -1,5 +1,5 @@
 // Portable Browser Runtime contracts.
-// This module must remain independent of Next.js, SignalBoost UI, Supabase, and provider SDKs.
+// This module must remain independent of Next.js UI, Supabase, and provider SDKs.
 
 export type BrowserTaskMode = 'observe' | 'prepare_change' | 'execute_change'
 export type BrowserTaskStatus = 'completed' | 'paused' | 'blocked' | 'failed'
@@ -63,6 +63,7 @@ export interface BrowserTaskResult {
   finishedAt: string
   completedStepIds: string[]
   pausedAtStepId?: string
+  executionId?: string
   evidence: BrowserEvidence[]
   verification: 'pending' | BrowserVerificationReport
   error?: string

@@ -15,17 +15,27 @@ const base = {
   approvalToken: 'signed-token',
 }
 
-test('builds a bounded sandbox preparation task ending at an approval checkpoint', () => {
+test('builds one bounded two-phase task with protected steps after the approval checkpoint', () => {
   const task = buildSandboxBrowserTask(base)
+  const checkpointIndex = task.steps.findIndex(step => step.kind === 'checkpoint')
+  const protectedSaveIndex = task.steps.findIndex(
+    step => step.kind === 'click' && step.selector === '[data-action="protected-save"]',
+  )
 
   assert.equal(task.provider, 'sandbox')
   assert.equal(task.adapterId, SANDBOX_ADAPTER_ID)
   assert.equal(task.mode, 'prepare_change')
   assert.deepEqual(task.allowedOrigins, ['http://localhost:4173'])
   assert.equal(task.steps[0]?.kind, 'navigate')
-  assert.equal(task.steps.at(-1)?.kind, 'checkpoint')
-  assert.equal(task.steps.some(step => step.kind === 'click' && step.selector === '[data-action="protected-save"]'), false)
-  assert.equal(task.metadata?.phase, 'prepare')
+  assert.ok(checkpointIndex >= 0)
+  assert.ok(protectedSaveIndex > checkpointIndex)
+  assert.equal(
+    task.steps.slice(0, checkpointIndex).some(
+      step => step.kind === 'click' && step.selector === '[data-action="protected-save"]',
+    ),
+    false,
+  )
+  assert.equal(task.metadata?.phase, 'two-phase-resumable')
 })
 
 test('uses secret references rather than literal credential or setting values', () => {
@@ -42,7 +52,7 @@ test('uses secret references rather than literal credential or setting values', 
   )
 })
 
-test('builds a separately bound approved task containing the protected save and verification', () => {
+test('retains the separately bound replay task during resumable migration', () => {
   const task = buildSandboxProtectedSaveTask({
     ...base,
     taskId: 'task-sandbox-save-1',
@@ -54,7 +64,7 @@ test('builds a separately bound approved task containing the protected save and 
   assert.notEqual(task.taskId, base.taskId)
   assert.notEqual(task.approvalToken, base.approvalToken)
   assert.equal(task.mode, 'prepare_change')
-  assert.equal(task.metadata?.phase, 'approved-save')
+  assert.equal(task.metadata?.phase, 'approved-save-legacy-replay')
   assert.equal(task.steps.some(step => step.kind === 'checkpoint'), false)
   assert.equal(task.steps.some(step => step.kind === 'click' && step.selector === '[data-action="protected-save"]'), true)
   assert.equal(task.steps.some(step => step.kind === 'wait_for' && step.selector === '[data-browser-sandbox="save-success"]'), true)

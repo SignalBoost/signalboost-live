@@ -167,11 +167,17 @@ The executable sandbox adapter uses adapter ID `signalboost.sandbox.v1` and the 
 - resolve secrets only while the live page remains on an approved origin, then re-check immediately before filling;
 - reference credentials through secret references such as `sandbox://credentials/email`, never literal values;
 - capture evidence before the approval boundary;
-- stop at a checkpoint requiring approval before any protected save;
-- never include a protected-save click in the pre-approval task; and
+- stop phase 1 at a checkpoint before any protected save;
+- persist a serializable execution record containing the exact completed and remaining step lists while retaining the live browser session through a separate runtime registry;
+- require a second, separately signed token bound to the same task, incident, checkpoint, approved origins, and exact remaining step IDs;
+- resume only the retained post-checkpoint steps without replaying navigation, credential entry, or preparation steps;
+- permit protected-save steps in the task declaration only after the checkpoint, while the phase-1 token must neither authorize nor execute those steps;
+- independently verify the complete two-phase evidence sequence before completion is accepted; and
 - remain local/test-only until a separately reviewed production provider adapter is approved.
 
 Every terminal Browser Runtime result (`paused`, `completed`, or `failed`) must include the deterministic verification report produced by the portable verifier. Callers must not treat a paused or completed execution as valid unless that report has status `verified`; a failed execution must retain a failed verification report for audit and diagnosis.
+
+The current resumable implementation retains browser sessions in process. A durable execution store may persist serializable records, but a process restart invalidates the live session and must fail closed rather than replaying or reconstructing protected steps automatically.
 
 The sandbox launch profile rejects `execute_change` tasks. Production/provider state changes, credential use, saves, redeploys, financial actions, and other sensitive operations remain outside Mission 001 unless Luis explicitly approves them through the existing governed approval flow.
 
@@ -621,6 +627,8 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-15: Hardened Mission 001 origin confinement: the runtime now validates the live page after navigation and around every browser interaction, rejects redirect escapes, and re-checks origin after secret resolution before filling.
 
 - 2026-07-15: Integrated deterministic Mission 001 verification into every terminal Browser Runtime result. Paused and completed executions are valid only when the embedded verification report is `verified`; failed executions retain a failed report for audit and diagnosis.
+
+- 2026-07-15: Added Mission 001 in-process resumable continuation: phase 1 stores the exact execution boundary and retains the live session separately, phase 2 requires a new checkpoint-bound token for only the remaining steps, and completion verifies the combined evidence without replaying login, credential entry, or preparation. Missing or crashed sessions fail closed.
 
 ## 20. Mandatory Final Reminder
 

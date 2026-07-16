@@ -33,6 +33,14 @@ function navigationSteps(origin: string): BrowserTaskStep[] {
   ]
 }
 
+function protectedSaveSteps(): BrowserTaskStep[] {
+  return [
+    { id: 'protected-save', kind: 'click', selector: '[data-action="protected-save"]' },
+    { id: 'wait-save-success', kind: 'wait_for', selector: '[data-browser-sandbox="save-success"]' },
+    { id: 'capture-after-save', kind: 'screenshot', label: 'sandbox-after-protected-save' },
+  ]
+}
+
 export function buildSandboxBrowserTask(input: SandboxTaskInput): BrowserTask {
   const origin = normalizeBaseUrl(input.baseUrl)
   const steps: BrowserTaskStep[] = [
@@ -40,6 +48,7 @@ export function buildSandboxBrowserTask(input: SandboxTaskInput): BrowserTask {
     { id: 'fill-sandbox-value', kind: 'fill', selector: '[name="sandboxValue"]', valueRef: 'sandbox://settings/value' },
     { id: 'capture-ready', kind: 'screenshot', label: 'sandbox-settings-ready' },
     { id: 'approval-checkpoint', kind: 'checkpoint', label: 'Ready to save sandbox change', requiresApproval: true },
+    ...protectedSaveSteps(),
   ]
 
   return {
@@ -53,7 +62,7 @@ export function buildSandboxBrowserTask(input: SandboxTaskInput): BrowserTask {
     allowedOrigins: [origin],
     steps,
     approvalToken: input.approvalToken,
-    metadata: { sandboxVersion: 'v1', phase: 'prepare' },
+    metadata: { sandboxVersion: 'v1', phase: 'two-phase-resumable' },
   }
 }
 
@@ -63,9 +72,7 @@ export function buildSandboxProtectedSaveTask(input: SandboxTaskInput): BrowserT
     ...navigationSteps(origin),
     { id: 'fill-sandbox-value', kind: 'fill', selector: '[name="sandboxValue"]', valueRef: 'sandbox://settings/value' },
     { id: 'capture-before-save', kind: 'screenshot', label: 'sandbox-before-protected-save' },
-    { id: 'protected-save', kind: 'click', selector: '[data-action="protected-save"]' },
-    { id: 'wait-save-success', kind: 'wait_for', selector: '[data-browser-sandbox="save-success"]' },
-    { id: 'capture-after-save', kind: 'screenshot', label: 'sandbox-after-protected-save' },
+    ...protectedSaveSteps(),
   ]
 
   return {
@@ -79,6 +86,6 @@ export function buildSandboxProtectedSaveTask(input: SandboxTaskInput): BrowserT
     allowedOrigins: [origin],
     steps,
     approvalToken: input.approvalToken,
-    metadata: { sandboxVersion: 'v1', phase: 'approved-save' },
+    metadata: { sandboxVersion: 'v1', phase: 'approved-save-legacy-replay' },
   }
 }

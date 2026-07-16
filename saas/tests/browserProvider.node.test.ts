@@ -41,6 +41,7 @@ test('versioning, health, maturity, risk and read-only are deterministic', () =>
   const provider = registry.register(vercelProvider)
   assert.equal(versionKey(provider.version), '1.0.0|1.0.0|1.0.0')
   assert.equal(provider.health.state, 'unknown')
+  assert.deepEqual([...new Set(provider.origins.map(origin => origin.origin))], ['https://vercel.com'])
   for (const capability of provider.capabilities) {
     assert.equal(capability.readOnly, true)
     assert.equal(capability.risk, 'read_only')
@@ -101,6 +102,13 @@ test('provider registration rejects ambiguous metadata and dangling references',
   const nonCanonicalOrigin = cloneProvider()
   nonCanonicalOrigin.origins[0].origin = 'https://vercel.com/dashboard'
   assert.throws(() => new ProviderRegistry().register(nonCanonicalOrigin), /origin_url/)
+
+  const protocolRelativeNavigation = cloneProvider()
+  protocolRelativeNavigation.navigation[0].pathTemplate = '//evil.example/path'
+  assert.throws(
+    () => new ProviderRegistry().register(protocolRelativeNavigation),
+    /navigation_path/,
+  )
 
   const extraField = cloneProvider()
   extraField.unreviewed = true

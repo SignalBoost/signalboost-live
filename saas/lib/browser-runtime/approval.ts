@@ -15,12 +15,16 @@ export interface BrowserApprovalClaims {
   nonce: string
   phase?: 1 | 2
   checkpointStepId?: string
+  executionId?: string
+  preApprovalTokenDigest?: string
 }
 
 export interface BrowserApprovalVerificationScope {
   expectedStepIds?: string[]
   expectedPhase?: 1 | 2
   expectedCheckpointStepId?: string
+  expectedExecutionId?: string
+  expectedPreApprovalTokenDigest?: string
 }
 
 function encode(value: string): string {
@@ -88,6 +92,15 @@ export function verifyBrowserApprovalToken(
     claims.checkpointStepId !== scope.expectedCheckpointStepId
   ) {
     throw new Error('Approval token checkpoint scope mismatch')
+  }
+  if (scope.expectedExecutionId !== undefined && claims.executionId !== scope.expectedExecutionId) {
+    throw new Error('Approval token execution scope mismatch')
+  }
+  if (
+    scope.expectedPreApprovalTokenDigest !== undefined &&
+    claims.preApprovalTokenDigest !== scope.expectedPreApprovalTokenDigest
+  ) {
+    throw new Error('Approval token pre-approval scope mismatch')
   }
 
   return claims

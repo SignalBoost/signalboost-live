@@ -63,7 +63,7 @@ export class SandboxExecutionAdapter {
     } catch (error) {
       const code = error instanceof SandboxExecutionError ? error.code : promoted ? 'browser_approval_rejected' : 'sandbox_execution_rejected'
       const message = error instanceof Error ? error.message : 'Sandbox execution rejected.'
-      auditEvents.push(ev('sandbox_execution_failed', { dispatchId: request?.dispatchId ?? 'unknown', packageFingerprint: request?.packageFingerprint ?? 'unknown', errorCode: code }))
+      auditEvents.push(ev('sandbox_execution_failed', { dispatchId: request?.dispatchId ?? 'unknown', packageFingerprint: request?.packageFingerprint ?? 'unknown', errorCode: code, error: message }))
       return { status: promoted ? 'failed' : 'rejected', promoted, auditEvents, error: { code, message } }
     }
   }
@@ -89,7 +89,7 @@ export class SandboxExecutionAdapter {
     } catch (error) {
       const code = error instanceof SandboxExecutionError ? error.code : 'browser_continuation_approval_rejected'
       const message = error instanceof Error ? error.message : 'Sandbox continuation rejected.'
-      auditEvents.push(ev('sandbox_execution_failed', { dispatchId: typeof raw === 'object' && raw && 'dispatchId' in raw ? String((raw as { dispatchId?: unknown }).dispatchId ?? 'unknown') : 'unknown', executionId, errorCode: code }))
+      auditEvents.push(ev('sandbox_execution_failed', { dispatchId: typeof raw === 'object' && raw && 'dispatchId' in raw ? String((raw as { dispatchId?: unknown }).dispatchId ?? 'unknown') : 'unknown', executionId, errorCode: code, error: message }))
       return { status: 'failed', promoted, auditEvents, error: { code, message } }
     }
   }

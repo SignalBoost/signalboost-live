@@ -99,6 +99,24 @@ test('runtime redacts resolved values, approval material, credentials, and stack
   assert.equal(result.evidence.at(-1)?.summary, result.error)
 })
 
+test('standalone sanitizer redacts JSON-style quoted sensitive fields', () => {
+  const sanitized = sanitizeBrowserRuntimeError(
+    new Error(
+      'Provider payload: {"password":"json-password","api_key":"json-api-key",'
+      + '"access_token":"json-access-token","cookie":"session=json-cookie"}',
+    ),
+  )
+
+  assert.equal(sanitized.includes('json-password'), false)
+  assert.equal(sanitized.includes('json-api-key'), false)
+  assert.equal(sanitized.includes('json-access-token'), false)
+  assert.equal(sanitized.includes('json-cookie'), false)
+  assert.equal(sanitized.includes('"password":"[redacted]"'), true)
+  assert.equal(sanitized.includes('"api_key":"[redacted]"'), true)
+  assert.equal(sanitized.includes('"access_token":"[redacted]"'), true)
+  assert.equal(sanitized.includes('"cookie":"[redacted]"'), true)
+})
+
 test('standalone sanitizer bounds untrusted non-Error output and removes control characters', () => {
   const unsafe = {
     message: `provider failure\u0000 api_key=secret-value ${'x'.repeat(900)}`,

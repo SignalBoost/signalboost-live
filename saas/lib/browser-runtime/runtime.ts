@@ -3,6 +3,10 @@ import {
   createBrowserExecutionId,
   fingerprintBrowserTask,
 } from './execution-state.ts'
+import {
+  createBrowserExecutionRecordSnapshot,
+  createBrowserExecutionTaskSnapshot,
+} from './execution-task.ts'
 import type {
   BrowserAdapterContext,
   BrowserEvidence,
@@ -13,6 +17,7 @@ import type {
   BrowserTaskStep,
 } from './contracts.ts'
 import type {
+  BrowserExecutionRecord,
   BrowserExecutionStore,
   BrowserSessionRegistry,
 } from './execution-state.ts'
@@ -143,7 +148,8 @@ export async function runBrowserTask(input: {
   executionStore?: BrowserExecutionStore
   sessionRegistry?: BrowserSessionRegistry
 }): Promise<BrowserTaskResult> {
-  const { task, signingSecret, sessions, context } = input
+  const { signingSecret, sessions, context } = input
+  let task = input.task
   const startedAt = new Date().toISOString()
   const completedStepIds: string[] = []
   const events: BrowserEvidence[] = []
@@ -151,6 +157,8 @@ export async function runBrowserTask(input: {
   let keepSessionForResume = false
 
   try {
+    task = createBrowserExecutionTaskSnapshot(input.task)
+
     if (Boolean(input.executionStore) !== Boolean(input.sessionRegistry)) {
       throw new Error('Resumable execution requires both an execution store and a session registry')
     }
@@ -281,41 +289,50 @@ export async function resumeBrowserTask(input: {
   now?: Date
 }): Promise<BrowserTaskResult> {
   const resumeNow = input.now ?? new Date()
-  const record = await input.executionStore.load(input.executionId)
-  const startedAt = record?.startedAt ?? new Date().toISOString()
-  const completedStepIds = [...(record?.completedStepIds ?? [])]
-  const events = [...(record?.evidence ?? [])]
-  let checkpointStepId = record?.checkpointStepId ?? 'unknown-checkpoint'
+  let task = input.task
+  let record: BrowserExecutionRecord | null = null
+  let startedAt = new Date().toISOString()
+  const completedStepIds: string[] = []
+  const events: BrowserEvidence[] = []
+  let checkpointStepId = 'unknown-checkpoint'
   let session: BrowserSessionPort | null = null
   let recordValidated = false
 
   try {
+    task = createBrowserExecutionTaskSnapshot(input.task)
+    const loadedRecord = await input.executionStore.load(input.executionId)
+    record = loadedRecord ? createBrowserExecutionRecordSnapshot(loadedRecord) : null
+    startedAt = record?.startedAt ?? startedAt
+    completedStepIds.push(...(record?.completedStepIds ?? []))
+    events.push(...(record?.evidence ?? []))
+    checkpointStepId = record?.checkpointStepId ?? checkpointStepId
+
     if (!record) throw new Error('Resumable browser execution record is missing')
     checkpointStepId = record.checkpointStepId
 
-    const checkpointIndex = input.task.steps.findIndex(
+    const checkpointIndex = task.steps.findIndex(
       step => step.id === record.checkpointStepId && step.kind === 'checkpoint',
     )
     if (checkpointIndex < 0) throw new Error('Resumable checkpoint is missing from the task')
 
-    const expectedCompletedStepIds = input.task.steps
+    const expectedCompletedStepIds = task.steps
       .slice(0, checkpointIndex)
       .map(step => step.id)
-    const expectedRemainingSteps = input.task.steps.slice(checkpointIndex + 1)
-    const expectedExecutionId = createBrowserExecutionId(input.task, record.checkpointStepId)
-    const suppliedPreApprovalTokenDigest = digestBrowserApprovalToken(input.task.approvalToken)
+    const expectedRemainingSteps = task.steps.slice(checkpointIndex + 1)
+    const expectedExecutionId = createBrowserExecutionId(task, record.checkpointStepId)
+    const suppliedPreApprovalTokenDigest = digestBrowserApprovalToken(task.approvalToken)
 
     if (record.executionId !== input.executionId) throw new Error('Resumable record executionId mismatch')
-    if (record.taskId !== input.task.taskId) throw new Error('Resumable taskId mismatch')
-    if (record.incidentId !== input.task.incidentId) throw new Error('Resumable incidentId mismatch')
-    if (record.provider !== input.task.provider) throw new Error('Resumable provider mismatch')
-    if (record.adapterId !== input.task.adapterId) throw new Error('Resumable adapterId mismatch')
-    if (record.mode !== input.task.mode) throw new Error('Resumable mode mismatch')
-    if (record.expiresAt !== input.task.expiresAt) throw new Error('Resumable expiry scope mismatch')
+    if (record.taskId !== task.taskId) throw new Error('Resumable taskId mismatch')
+    if (record.incidentId !== task.incidentId) throw new Error('Resumable incidentId mismatch')
+    if (record.provider !== task.provider) throw new Error('Resumable provider mismatch')
+    if (record.adapterId !== task.adapterId) throw new Error('Resumable adapterId mismatch')
+    if (record.mode !== task.mode) throw new Error('Resumable mode mismatch')
+    if (record.expiresAt !== task.expiresAt) throw new Error('Resumable expiry scope mismatch')
     if (parseContinuationExpiry(record.expiresAt) <= resumeNow.getTime()) {
       throw new Error('Resumable browser execution expired')
     }
-    if (record.taskFingerprint !== fingerprintBrowserTask(input.task)) {
+    if (record.taskFingerprint !== fingerprintBrowserTask(task)) {
       throw new Error('Resumable task fingerprint mismatch')
     }
     if (record.preApprovalTokenDigest !== suppliedPreApprovalTokenDigest) {
@@ -324,7 +341,7 @@ export async function resumeBrowserTask(input: {
     if (expectedExecutionId !== input.executionId) {
       throw new Error('Resumable executionId does not match the task approval')
     }
-    if (!sameJson(record.allowedOrigins, input.task.allowedOrigins)) {
+    if (!sameJson(record.allowedOrigins, task.allowedOrigins)) {
       throw new Error('Resumable origin scope mismatch')
     }
     if (!sameJson(record.completedStepIds, expectedCompletedStepIds)) {
@@ -340,7 +357,7 @@ export async function resumeBrowserTask(input: {
 
     verifyBrowserApprovalToken(
       input.secondApprovalToken,
-      input.task,
+      task,
       input.signingSecret,
       resumeNow,
       {
@@ -354,17 +371,17 @@ export async function resumeBrowserTask(input: {
 
     session = await input.sessionRegistry.take(input.executionId)
     if (!session) throw new Error('Resumable browser session is missing or crashed')
-    assertCurrentPageOrigin(session.page.url(), input.task.allowedOrigins, record.checkpointStepId, 'after')
+    assertCurrentPageOrigin(session.page.url(), task.allowedOrigins, record.checkpointStepId, 'after')
 
     for (const step of record.remainingSteps) {
-      await executeStep({ step, task: input.task, session, context: input.context, events })
+      await executeStep({ step, task, session, context: input.context, events })
       completedStepIds.push(step.id)
     }
 
-    const result = finalizeResumedResult(input.task, record.checkpointStepId, {
-      taskId: input.task.taskId,
-      incidentId: input.task.incidentId,
-      provider: input.task.provider,
+    const result = finalizeResumedResult(task, record.checkpointStepId, {
+      taskId: task.taskId,
+      incidentId: task.incidentId,
+      provider: task.provider,
       status: 'completed',
       startedAt,
       finishedAt: new Date().toISOString(),
@@ -399,10 +416,10 @@ export async function resumeBrowserTask(input: {
       await input.executionStore.delete(input.executionId).catch(() => undefined)
     }
 
-    return finalizeResumedResult(input.task, checkpointStepId, {
-      taskId: input.task.taskId,
-      incidentId: input.task.incidentId,
-      provider: input.task.provider,
+    return finalizeResumedResult(task, checkpointStepId, {
+      taskId: task.taskId,
+      incidentId: task.incidentId,
+      provider: task.provider,
       status: 'failed',
       startedAt,
       finishedAt: new Date().toISOString(),

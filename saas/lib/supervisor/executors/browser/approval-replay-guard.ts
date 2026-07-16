@@ -1,11 +1,8 @@
-import {
-  digestBrowserApprovalToken,
-  type BrowserApprovalClaims,
-} from '../../../browser-runtime/approval.ts'
+import type { BrowserApprovalClaims } from '../../../browser-runtime/approval.ts'
 import { SandboxExecutionError } from './sandbox-execution-errors.ts'
 
 export interface SandboxApprovalReplayUse {
-  token: string
+  tokenDigest: string
   claims: Pick<BrowserApprovalClaims, 'taskId' | 'nonce' | 'phase' | 'expiresAt'>
 }
 
@@ -24,6 +21,7 @@ interface ConsumedApproval {
 }
 
 export const DEFAULT_MAX_CONSUMED_SANDBOX_APPROVALS = 1_024
+const SHA256_HEX = /^[a-f0-9]{64}$/
 
 function normalizeCapacity(value: number | undefined): number {
   const resolved = value ?? DEFAULT_MAX_CONSUMED_SANDBOX_APPROVALS
@@ -65,6 +63,12 @@ export class InMemorySandboxApprovalReplayGuard implements SandboxApprovalReplay
       )
     }
 
+    if (!SHA256_HEX.test(use.tokenDigest)) {
+      throw new SandboxExecutionError(
+        'invalid_approval_replay_claim',
+        'Browser approval token digest must be a canonical SHA-256 value.',
+      )
+    }
     assertCanonicalIdentifier(use.claims.taskId, 'Browser approval taskId')
     assertCanonicalIdentifier(use.claims.nonce, 'Browser approval nonce')
     if (use.claims.phase !== 1 && use.claims.phase !== 2) {
@@ -84,7 +88,7 @@ export class InMemorySandboxApprovalReplayGuard implements SandboxApprovalReplay
 
     this.pruneExpired(consumedAtMs)
 
-    const digest = digestBrowserApprovalToken(use.token)
+    const digest = use.tokenDigest
     if (this.approvalsByDigest.has(digest) || this.digestByNonce.has(use.claims.nonce)) {
       throw new SandboxExecutionError(
         'approval_replay_rejected',

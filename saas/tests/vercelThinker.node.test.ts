@@ -38,6 +38,28 @@ test('deployment failure plans inspect environment variable names without readin
   assert.equal(Object.hasOwn(envStep.parameters, 'value'), false)
 })
 
+test('repeated failures read every deployment id instead of the project id', () => {
+  const out = plan(
+    { incidentType: 'repeated_deployment_failure', deploymentIds: ['dpl_older', 'dpl_latest'] },
+    { affectedResource: 'prj_1' },
+  )
+  const deploymentReads = out.steps.filter(step => step.stepId.startsWith('read-deployment-') && !step.stepId.startsWith('read-deployment-events'))
+  assert.deepEqual(deploymentReads.map(step => step.parameters.deploymentId), ['dpl_older', 'dpl_latest'])
+  assert.equal(deploymentReads.some(step => step.parameters.deploymentId === 'prj_1'), false)
+})
+
+test('repeated failure without deployment ids fails closed', () => {
+  const out = plan({ incidentType: 'repeated_deployment_failure', deploymentId: undefined }, { affectedResource: 'prj_1' })
+  assert.equal(out.steps[0].action, 'stop')
+})
+
+test('observer provider_connection_failure is treated as an auth incident', () => {
+  const out = plan({ incidentType: 'provider_connection_failure', providerConnectionId: 'conn_1' })
+  assert.equal(out.steps[0].stepId, 'read-connection-metadata')
+  assert.equal(out.steps[0].parameters.connectionId, 'conn_1')
+  assert.equal(out.riskLevel, 'medium')
+})
+
 test('canceled production deployment plans alias inspection', () => {
   const out = plan({ incidentType: 'canceled_production_deployment' })
   assert.equal(out.steps.some(step => step.stepId === 'read-production-aliases'), true)

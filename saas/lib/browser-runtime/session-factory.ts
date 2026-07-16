@@ -1,9 +1,10 @@
 import type {
   BrowserPagePort,
   BrowserSessionFactory,
+  BrowserSessionLaunchRequest,
   BrowserSessionPort,
-  BrowserTask,
 } from './contracts.ts'
+import { createBrowserSessionLaunchRequestSnapshot } from './execution-task.ts'
 import type { BrowserLaunchProfile, BrowserLaunchProfileProvider } from './launch-profile.ts'
 
 export interface BrowserEnginePage {
@@ -173,8 +174,9 @@ export class DefaultBrowserSessionFactory implements BrowserSessionFactory {
     }
   }
 
-  async open(task: BrowserTask): Promise<BrowserSessionPort> {
-    const profile = this.profileProvider?.resolve(task)
+  async open(request: BrowserSessionLaunchRequest): Promise<BrowserSessionPort> {
+    const launchRequest = createBrowserSessionLaunchRequestSnapshot(request)
+    const profile = this.profileProvider?.resolve(launchRequest)
     const options = resolveOptions(this.defaults, profile)
     const browser = await withTimeout(
       this.launcher.launch({

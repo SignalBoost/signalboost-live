@@ -110,6 +110,8 @@ test('exposes only a detached frozen launch scope to profile providers', async (
     allowedOrigins: [...request.allowedOrigins],
     taskId: 'must-not-cross',
     incidentId: 'must-not-cross',
+    issuedAt: 'must-not-cross',
+    expiresAt: 'must-not-cross',
     approvalToken: 'must-not-cross',
     steps: [{ id: 'must-not-cross', kind: 'click', selector: '#must-not-cross' }],
     metadata: { mustNotCross: true },
@@ -129,6 +131,8 @@ test('exposes only a detached frozen launch scope to profile providers', async (
         ])
         assert.equal('taskId' in launchRequest, false)
         assert.equal('incidentId' in launchRequest, false)
+        assert.equal('issuedAt' in launchRequest, false)
+        assert.equal('expiresAt' in launchRequest, false)
         assert.equal('approvalToken' in launchRequest, false)
         assert.equal('steps' in launchRequest, false)
         assert.equal('metadata' in launchRequest, false)

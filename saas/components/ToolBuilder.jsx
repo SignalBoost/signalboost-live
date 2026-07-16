@@ -1,89 +1,108 @@
 'use client'
 
-const GOLD = '#ffc300'
-const CYAN = '#1af0ff'
-const GREEN = '#4ade80'
-const PINK = '#f472b6'
+import { useMemo, useState } from 'react'
 
-const integrationCards = [
-  {
-    icon: '🔌',
-    title: 'Provider action builder',
-    description: 'Create reusable provider actions with backend-only credentials, request templates, and mapped responses.',
-    accent: CYAN,
-  },
-  {
-    icon: '🧩',
-    title: 'Universal runner ready',
-    description: 'Connect software APIs through the provider-neutral runner without rewriting the campaign engine or UI.',
-    accent: GOLD,
-  },
-  {
-    icon: '🛡️',
-    title: 'Governed by default',
-    description: 'Keep secrets server-side and preserve owner approval gates before sensitive live actions execute.',
-    accent: GREEN,
-  },
-]
+const PROVIDERS = ['OpenAI', 'Anthropic', 'Vercel', 'Supabase', 'Stripe', 'GitHub', 'Resend', 'Awin', 'Travelpayouts', 'Custom REST API']
+const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
 
-const workflowSteps = [
-  'Choose a provider capability',
-  'Map request and response fields',
-  'Validate credentials server-side',
-  'Route sensitive actions through approval',
-]
+const field = { width: '100%', border: '1px solid rgba(148,163,184,.22)', borderRadius: 12, background: 'rgba(15,23,42,.82)', color: '#f8fafc', padding: '11px 12px', outline: 'none' }
+const label = { display: 'grid', gap: 7, color: '#cbd5e1', fontSize: 13, fontWeight: 800 }
+const card = { border: '1px solid rgba(148,163,184,.16)', borderRadius: 20, background: 'rgba(2,6,23,.72)', padding: 20, boxShadow: '0 24px 70px rgba(0,0,0,.24)' }
+
+function slugify(value) {
+  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+}
 
 export default function ToolBuilder() {
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [providerQuery, setProviderQuery] = useState('')
+  const [provider, setProvider] = useState('')
+  const [method, setMethod] = useState('POST')
+  const [endpoint, setEndpoint] = useState('')
+  const [authType, setAuthType] = useState('bearer')
+  const [tagInput, setTagInput] = useState('')
+  const [tags, setTags] = useState([])
+  const [requestTemplate, setRequestTemplate] = useState('{\n  "prompt": "{{input.prompt}}"\n}')
+  const [outputPath, setOutputPath] = useState('data.output')
+  const [copied, setCopied] = useState(false)
+
+  const providers = useMemo(() => PROVIDERS.filter(item => item.toLowerCase().includes(providerQuery.toLowerCase())), [providerQuery])
+  const compiled = useMemo(() => ({
+    id: slugify(name || `${provider || 'custom'}-tool`),
+    name: name || 'Untitled integration tool',
+    description,
+    provider: provider || null,
+    tags,
+    transport: {
+      method,
+      endpoint,
+      auth: { type: authType, credential_ref: authType === 'none' ? null : `${slugify(provider || 'provider')}_credential` },
+    },
+    request_template: (() => { try { return JSON.parse(requestTemplate) } catch { return requestTemplate } })(),
+    response_mapping: { output_path: outputPath },
+    governance: { requires_approval: method !== 'GET', secrets_backend_only: true },
+  }), [name, description, provider, tags, method, endpoint, authType, requestTemplate, outputPath])
+
+  function addTag(value = tagInput) {
+    const next = value.trim().toLowerCase()
+    if (next && !tags.includes(next)) setTags(current => [...current, next])
+    setTagInput('')
+  }
+
+  async function copyJson() {
+    await navigator.clipboard.writeText(JSON.stringify(compiled, null, 2))
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1400)
+  }
+
   return (
-    <section style={{ padding: '56px 20px 76px' }}>
-      <div style={{ width: 'min(1180px, 100%)', margin: '0 auto', display: 'grid', gap: 26 }}>
-        <div
-          style={{
-            position: 'relative',
-            overflow: 'hidden',
-            border: '1px solid rgba(26,240,255,.20)',
-            borderRadius: 28,
-            padding: '34px clamp(22px, 4vw, 46px)',
-            background: 'linear-gradient(135deg, rgba(3,7,18,.94), rgba(15,23,42,.78))',
-            boxShadow: '0 28px 90px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.08)',
-            backdropFilter: 'blur(18px)',
-            WebkitBackdropFilter: 'blur(18px)',
-          }}
-        >
-          <div aria-hidden style={{ position: 'absolute', inset: '-35% -10% auto auto', width: 420, height: 420, borderRadius: 999, background: 'radial-gradient(circle, rgba(26,240,255,.20), transparent 68%)', filter: 'blur(18px)' }} />
-          <div aria-hidden style={{ position: 'absolute', inset: 'auto auto -38% -8%', width: 360, height: 360, borderRadius: 999, background: 'radial-gradient(circle, rgba(255,195,0,.16), transparent 70%)', filter: 'blur(22px)' }} />
+    <main style={{ minHeight: '100%', padding: '28px clamp(14px,3vw,34px) 48px', color: '#f8fafc', background: 'radial-gradient(circle at top right, rgba(26,240,255,.08), transparent 28%), transparent' }}>
+      <div style={{ width: 'min(1440px,100%)', margin: '0 auto', display: 'grid', gap: 20 }}>
+        <header>
+          <p style={{ margin: 0, color: '#ffc300', fontWeight: 900, letterSpacing: '.16em', fontSize: 11, textTransform: 'uppercase' }}>Integrations</p>
+          <h1 style={{ margin: '6px 0 8px', fontSize: 'clamp(28px,4vw,46px)', letterSpacing: '-.04em' }}>Interactive Tool Builder</h1>
+          <p style={{ margin: 0, color: '#94a3b8', maxWidth: 760 }}>Define a provider action, inject searchable tags, and compile a provider-neutral JSON blueprint in real time.</p>
+        </header>
 
-          <div style={{ position: 'relative', display: 'grid', gap: 18, maxWidth: 780 }}>
-            <span style={{ color: GOLD, fontSize: 12, fontWeight: 900, letterSpacing: '.18em', textTransform: 'uppercase' }}>Integrations</span>
-            <h1 style={{ margin: 0, color: '#fff', fontSize: 'clamp(34px, 6vw, 64px)', lineHeight: .95, letterSpacing: '-.05em' }}>Visual Tool Builder</h1>
-            <p style={{ margin: 0, color: 'rgba(226,232,240,.78)', fontSize: 18, lineHeight: 1.65 }}>
-              Build governed integration tools for SignalBoostAi workflows. This workspace is available only after login and is designed for connected providers, backend-only keys, and human approval gates.
-            </p>
+        <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.05fr) minmax(320px,.95fr)', gap: 20, alignItems: 'start' }} className="tool-builder-grid">
+          <div style={{ ...card, display: 'grid', gap: 18 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 14 }} className="tool-builder-two">
+              <label style={label}>Tool name<input style={field} value={name} onChange={e => setName(e.target.value)} placeholder="Generate campaign video" /></label>
+              <label style={label}>HTTP method<select style={field} value={method} onChange={e => setMethod(e.target.value)}>{METHODS.map(item => <option key={item}>{item}</option>)}</select></label>
+            </div>
+
+            <label style={label}>Description<textarea style={{ ...field, minHeight: 84, resize: 'vertical' }} value={description} onChange={e => setDescription(e.target.value)} placeholder="What this tool does and when COSA should use it" /></label>
+
+            <div style={{ position: 'relative' }}>
+              <label style={label}>Provider search<input style={field} value={providerQuery} onChange={e => setProviderQuery(e.target.value)} placeholder="Search providers..." /></label>
+              {providerQuery && !provider && <div style={{ position: 'absolute', zIndex: 20, top: '100%', left: 0, right: 0, marginTop: 6, maxHeight: 220, overflow: 'auto', border: '1px solid rgba(148,163,184,.22)', borderRadius: 12, background: '#07101f', padding: 6 }}>
+                {providers.map(item => <button key={item} type="button" onClick={() => { setProvider(item); setProviderQuery(item) }} style={{ width: '100%', textAlign: 'left', border: 0, borderRadius: 9, background: 'transparent', color: '#e2e8f0', padding: '10px 11px', cursor: 'pointer' }}>{item}</button>)}
+                {!providers.length && <div style={{ padding: 10, color: '#94a3b8' }}>No provider found.</div>}
+              </div>}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 180px', gap: 14 }} className="tool-builder-two">
+              <label style={label}>Endpoint<input style={field} value={endpoint} onChange={e => setEndpoint(e.target.value)} placeholder="https://api.provider.com/v1/action" /></label>
+              <label style={label}>Authentication<select style={field} value={authType} onChange={e => setAuthType(e.target.value)}><option value="bearer">Bearer token</option><option value="api_key">API key</option><option value="basic">Basic auth</option><option value="none">None</option></select></label>
+            </div>
+
+            <div style={label}>Tags
+              <div style={{ display: 'flex', gap: 8 }}><input style={field} value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }} placeholder="Type a tag and press Enter" /><button type="button" onClick={() => addTag()} style={{ border: 0, borderRadius: 12, padding: '0 18px', background: '#ffc300', color: '#111827', fontWeight: 900, cursor: 'pointer' }}>Add</button></div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{tags.map(tag => <button key={tag} type="button" onClick={() => setTags(current => current.filter(item => item !== tag))} style={{ border: '1px solid rgba(26,240,255,.25)', borderRadius: 999, background: 'rgba(26,240,255,.08)', color: '#67e8f9', padding: '6px 10px', cursor: 'pointer' }}>{tag} ×</button>)}</div>
+            </div>
+
+            <label style={label}>Request template<textarea spellCheck={false} style={{ ...field, minHeight: 180, resize: 'vertical', fontFamily: 'ui-monospace,SFMono-Regular,Menlo,monospace' }} value={requestTemplate} onChange={e => setRequestTemplate(e.target.value)} /></label>
+            <label style={label}>Response output path<input style={field} value={outputPath} onChange={e => setOutputPath(e.target.value)} placeholder="data.output" /></label>
           </div>
-        </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
-          {integrationCards.map((card) => (
-            <article key={card.title} style={{ border: `1px solid ${card.accent}33`, borderRadius: 22, padding: 22, background: 'rgba(15,23,42,.72)', boxShadow: `0 0 32px ${card.accent}0f`, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}>
-              <div style={{ fontSize: 30, marginBottom: 14 }}>{card.icon}</div>
-              <h2 style={{ margin: '0 0 8px', color: '#fff', fontSize: 18 }}>{card.title}</h2>
-              <p style={{ margin: 0, color: 'rgba(203,213,225,.72)', fontSize: 14, lineHeight: 1.6 }}>{card.description}</p>
-            </article>
-          ))}
-        </div>
-
-        <div style={{ border: '1px solid rgba(255,255,255,.10)', borderRadius: 24, padding: 24, background: 'rgba(2,6,23,.64)' }}>
-          <h2 style={{ margin: '0 0 18px', color: '#fff', fontSize: 22 }}>Builder workflow</h2>
-          <div style={{ display: 'grid', gap: 12 }}>
-            {workflowSteps.map((step, index) => (
-              <div key={step} style={{ display: 'flex', alignItems: 'center', gap: 12, color: 'rgba(226,232,240,.86)' }}>
-                <span style={{ width: 30, height: 30, borderRadius: 999, display: 'grid', placeItems: 'center', background: index % 2 ? `${PINK}22` : `${CYAN}22`, border: '1px solid rgba(255,255,255,.12)', color: index % 2 ? PINK : CYAN, fontWeight: 900 }}>{index + 1}</span>
-                <span style={{ fontWeight: 750 }}>{step}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+          <aside style={{ ...card, position: 'sticky', top: 88, display: 'grid', gap: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}><div><div style={{ color: '#67e8f9', fontSize: 12, fontWeight: 900, letterSpacing: '.1em', textTransform: 'uppercase' }}>Live compiler</div><h2 style={{ margin: '4px 0 0', fontSize: 20 }}>Tool blueprint JSON</h2></div><button type="button" onClick={copyJson} style={{ border: '1px solid rgba(255,195,0,.35)', borderRadius: 10, background: 'rgba(255,195,0,.1)', color: '#ffc300', padding: '9px 12px', fontWeight: 900, cursor: 'pointer' }}>{copied ? 'Copied' : 'Copy JSON'}</button></div>
+            <pre style={{ margin: 0, maxHeight: '68vh', overflow: 'auto', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', borderRadius: 14, background: '#020617', border: '1px solid rgba(148,163,184,.14)', padding: 16, color: '#dbeafe', fontSize: 12.5, lineHeight: 1.6 }}>{JSON.stringify(compiled, null, 2)}</pre>
+          </aside>
+        </section>
       </div>
-    </section>
+      <style>{`@media(max-width:980px){.tool-builder-grid{grid-template-columns:1fr!important}.tool-builder-grid aside{position:static!important}}@media(max-width:640px){.tool-builder-two{grid-template-columns:1fr!important}}`}</style>
+    </main>
   )
 }

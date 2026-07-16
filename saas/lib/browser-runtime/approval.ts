@@ -27,6 +27,8 @@ export interface BrowserApprovalVerificationScope {
   expectedPreApprovalTokenDigest?: string
 }
 
+const MAX_ISSUED_AT_CLOCK_SKEW_MS = 60_000
+
 function encode(value: string): string {
   return Buffer.from(value, 'utf8').toString('base64url')
 }
@@ -37,6 +39,18 @@ function decode(value: string): string {
 
 function signature(payload: string, secret: string): string {
   return createHmac('sha256', secret).update(payload).digest('base64url')
+}
+
+function parseApprovalTimestamp(value: string, label: 'issuedAt' | 'expiresAt'): number {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(`Browser approval token ${label} must be a valid timestamp`)
+  }
+
+  const parsed = Date.parse(value)
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Browser approval token ${label} must be a valid timestamp`)
+  }
+  return parsed
 }
 
 export function digestBrowserApprovalToken(token: string): string {
@@ -75,9 +89,20 @@ export function verifyBrowserApprovalToken(
   if (claims.provider !== task.provider) throw new Error('Approval token provider mismatch')
   if (claims.adapterId !== task.adapterId) throw new Error('Approval token adapterId mismatch')
   if (claims.mode !== task.mode) throw new Error('Approval token mode mismatch')
+  if (claims.issuedAt !== task.issuedAt) throw new Error('Approval token issuedAt mismatch')
   if (claims.expiresAt !== task.expiresAt) throw new Error('Approval token expiry mismatch')
-  if (new Date(claims.expiresAt).getTime() <= now.getTime()) throw new Error('Browser approval token expired')
-  if (new Date(claims.issuedAt).getTime() > now.getTime() + 60_000) throw new Error('Browser approval token issued in the future')
+
+  const issuedAtMs = parseApprovalTimestamp(claims.issuedAt, 'issuedAt')
+  const expiresAtMs = parseApprovalTimestamp(claims.expiresAt, 'expiresAt')
+  const nowMs = now.getTime()
+  if (!Number.isFinite(nowMs)) throw new Error('Browser approval verification time must be valid')
+  if (expiresAtMs <= issuedAtMs) {
+    throw new Error('Browser approval token expiry must be after issuedAt')
+  }
+  if (expiresAtMs <= nowMs) throw new Error('Browser approval token expired')
+  if (issuedAtMs > nowMs + MAX_ISSUED_AT_CLOCK_SKEW_MS) {
+    throw new Error('Browser approval token issued in the future')
+  }
   if (JSON.stringify(claims.allowedStepIds) !== JSON.stringify(exactStepIds)) {
     throw new Error('Approval token does not authorize the exact browser steps')
   }

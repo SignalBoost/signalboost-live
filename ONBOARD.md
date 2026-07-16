@@ -166,6 +166,7 @@ The executable sandbox adapter uses adapter ID `signalboost.sandbox.v1` and the 
 - re-check the live page origin after navigation and before and after click, fill, wait, and screenshot steps;
 - resolve secrets only while the live page remains on an approved origin, then re-check immediately before filling;
 - reference credentials through secret references such as `sandbox://credentials/email`, never literal values;
+- require approval claims to match the task's exact `issuedAt` and `expiresAt` values, reject malformed timestamps, and reject approval windows that do not end after they begin;
 - capture evidence before the approval boundary;
 - stop phase 1 at a checkpoint before any protected save;
 - persist a serializable execution record containing the exact completed and remaining step lists while retaining the live browser session through a separate runtime registry;
@@ -620,25 +621,15 @@ Use this section for short notes when architecture, provider behavior, platform 
 ---
 
 - 2026-07-15: Added persistent AI Dock layout doctrine implementation: global SaaS pages now render through a shared AppShell with a reserved right-side assistant column on desktop/tablet, collapsed dock tab state, and mobile bottom-sheet behavior so Concierge interactions no longer overlay workspace forms or actions.
-
 - 2026-07-15: Added Issue #205 Enterprise Memory doctrine implementation: enterprise memory tables, canonical URL fingerprint deduplication, memory-aware Enterprise Intelligence reuse, refresh-job concurrency guards, campaign/approval/confidence history, and CI guard scripts (`verify:issue-205`) for enterprise architecture, localization, and pipeline regressions.
-
 - 2026-07-15: Refactored Console Hub provider-action form rendering toward zero-manual-fill controls: fixed option fields now reuse the shared searchable selector, live remote selectors no longer fall back to unrestricted manual typing, dependent selectors reset when parent selections change, single live options auto-select, and Vercel deployment target selectors default to production while keeping existing approval/confirmation gates.
-
 - 2026-07-15: Restored enterprise approval CI guard coverage in both the repository root and `saas/` workspace so root-level and SaaS package checks execute the same owner-approval/version-binding enforcement before merge.
-
 - 2026-07-15: Added the autonomous Vercel supervisor PoC: signed failed-deployment webhook intake, normalized incident payloads, Gemini JSON diagnostics, and gated browser-agent/env-var repair staging through Infrastructure PRs with owner approval required before save or redeploy.
-
 - 2026-07-15: Added Mission 001 executable browser sandbox adapter: portable bounded task construction, local `/browser-sandbox/login` test portal, secret-reference credential resolution, evidence capture, and a mandatory approval checkpoint before any protected save. No production provider or credential is connected.
-
 - 2026-07-15: Hardened Mission 001 origin confinement: the runtime now validates the live page after navigation and around every browser interaction, rejects redirect escapes, and re-checks origin after secret resolution before filling.
-
 - 2026-07-15: Integrated deterministic Mission 001 verification into every terminal Browser Runtime result. Paused and completed executions are valid only when the embedded verification report is `verified`; failed executions retain a failed report for audit and diagnosis.
-
 - 2026-07-15: Added Mission 001 in-process resumable continuation: phase 1 stores the exact execution boundary and retains the live session separately, phase 2 requires a new checkpoint-bound token for only the remaining steps, and completion verifies the combined evidence without replaying login, credential entry, or preparation. Missing or crashed sessions fail closed.
-
 - 2026-07-15: Bound Mission 001 phase-two approvals to one exact retained execution ID and the originating phase-one approval-token digest. Cross-execution replay and phase-one token substitution now fail closed before a retained session can be consumed.
-
 - 2026-07-16: Added a local Mission001 GitHub commit helper that reads a GitHub PAT from an untracked root `.env` file, plus a safe `.env.example` placeholder and usage instructions. Real PAT values must remain local and must never be committed.
 - 2026-07-16: Added Mission 001 Sprint 11 supervisor core contracts: provider-neutral incident and repair-plan validation, Observer/Thinker/Policy/Executor/Verifier/Audit interfaces, deterministic conservative policy behavior, fail-closed orchestration skeleton, and contract tests. Live Vercel observation and execution remain deferred.
 
@@ -651,6 +642,7 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-16: Hardened the universal runner contract to support blueprint aliases (`request_template`, `response_mapping.output_path`), backend-only credential reference resolution, dynamic auth/header hydration, and structured offline/error diagnostics without provider-specific SDK imports.
 
 - 2026-07-16: Added deterministic Vercel Thinker planning for Mission 001 supervisor incidents: read-only deployment/event/log planning, env-name-only inspection to reduce false-positive missing-variable diagnoses, production alias inspection for canceled production deployments, and latest-failed-deployment Observer selection. Thinker remains non-executing; protected repairs still require policy approval.
+- 2026-07-16: Hardened Mission 001 Browser Runtime approval time binding: signed approvals now match the exact task issue/expiry window and fail closed on malformed timestamps, invalid verification clocks, or non-positive approval windows.
 
 ## 20. Mandatory Final Reminder
 

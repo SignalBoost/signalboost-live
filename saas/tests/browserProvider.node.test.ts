@@ -73,6 +73,45 @@ test('provider capabilities are bound to their declared navigation origins', () 
   assert.deepEqual(dashboardEvidence?.allowedOrigins, ['dashboard'])
 })
 
+test('evidence requirements resolve to registered routes and selectors inside capability scope', () => {
+  const provider = new ProviderRegistry().register(vercelProvider)
+  const navigationById = new Map<string, (typeof provider.navigation)[number]>(
+    provider.navigation.map(profile => [profile.id, profile]),
+  )
+  const selectorIds = new Set(provider.selectors.map(selector => selector.id))
+  const evidenceById = new Map(provider.evidence.map(profile => [profile.id, profile]))
+
+  for (const evidence of provider.evidence) {
+    for (const navigationId of evidence.expectedScreenshots) {
+      assert.ok(navigationById.has(navigationId))
+    }
+    for (const selectorId of evidence.expectedReads) {
+      assert.ok(selectorIds.has(selectorId))
+    }
+  }
+
+  for (const capability of provider.capabilities) {
+    const evidence = evidenceById.get(capability.evidenceProfile)
+    assert.ok(evidence)
+    for (const navigationId of evidence.expectedScreenshots) {
+      const navigation = navigationById.get(navigationId)
+      assert.ok(navigation)
+      assert.ok(capability.allowedOrigins.includes(navigation.origin))
+    }
+  }
+
+  const environmentCapability = provider.capabilities.find(
+    item => item.id === 'read-environment-variable-metadata',
+  )
+  assert.equal(environmentCapability?.evidenceProfile, 'environment-metadata')
+  assert.deepEqual(evidenceById.get('environment-metadata')?.expectedScreenshots, [
+    'environment-metadata',
+  ])
+  assert.deepEqual(evidenceById.get('environment-metadata')?.expectedReads, [
+    'settings.environment',
+  ])
+})
+
 test('provider registration creates a detached deeply frozen snapshot', () => {
   const raw = cloneProvider()
   const registry = new ProviderRegistry()
@@ -123,6 +162,30 @@ test('provider registration rejects ambiguous metadata and dangling references',
   assert.throws(
     () => new ProviderRegistry().register(mismatchedNavigationOrigin),
     /capability_navigation_origin_mismatch/,
+  )
+
+  const danglingEvidenceNavigation = cloneProvider()
+  danglingEvidenceNavigation.evidence[0].expectedScreenshots = ['missing']
+  assert.throws(
+    () => new ProviderRegistry().register(danglingEvidenceNavigation),
+    /evidence_screenshot_navigation_reference/,
+  )
+
+  const danglingEvidenceSelector = cloneProvider()
+  danglingEvidenceSelector.evidence[0].expectedReads = ['missing.selector']
+  assert.throws(
+    () => new ProviderRegistry().register(danglingEvidenceSelector),
+    /evidence_read_selector_reference/,
+  )
+
+  const evidenceOriginEscape = cloneProvider()
+  const deploymentSuccess = evidenceOriginEscape.evidence.find(
+    (profile: any) => profile.id === 'deployment-success',
+  )
+  deploymentSuccess.expectedScreenshots = ['domains']
+  assert.throws(
+    () => new ProviderRegistry().register(evidenceOriginEscape),
+    /capability_evidence_navigation_origin_mismatch/,
   )
 
   const missingTransport = cloneProvider()

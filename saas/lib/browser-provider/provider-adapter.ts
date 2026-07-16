@@ -34,6 +34,7 @@ export interface BrowserProviderAdapter {
 }
 
 const identifierPattern = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/
+const referencePattern = /^[A-Za-z][A-Za-z0-9]*(?:[._-][A-Za-z0-9]+)*$/
 const semanticVersionPattern = /^\d+\.\d+\.\d+$/
 const locales: readonly Locale[] = ['en', 'es', 'pt', 'pl', 'ru']
 
@@ -60,9 +61,11 @@ function assertExactKeys(value: Record<string, unknown>, keys: readonly string[]
 }
 
 function assertIdentifier(value: unknown, label: string): asserts value is string {
-  if (typeof value !== 'string' || !identifierPattern.test(value) || value.length > 128) {
-    invalid(label)
-  }
+  if (typeof value !== 'string' || value.length > 128 || !identifierPattern.test(value)) invalid(label)
+}
+
+function assertReference(value: unknown, label: string): asserts value is string {
+  if (typeof value !== 'string' || value.length > 128 || !referencePattern.test(value)) invalid(label)
 }
 
 function assertBoundedText(value: unknown, label: string, maximum = 512): asserts value is string {
@@ -87,10 +90,10 @@ function assertUniqueIds(items: readonly { id: string }[], label: string): void 
   }
 }
 
-function assertUniqueStrings(values: readonly string[], label: string): void {
+function assertUniqueReferences(values: readonly string[], label: string): void {
   const seen = new Set<string>()
   for (const value of values) {
-    assertIdentifier(value, label)
+    assertReference(value, label)
     if (seen.has(value)) invalid(`duplicate_${label}`)
     seen.add(value)
   }
@@ -202,14 +205,16 @@ function assertEvidence(value: unknown): asserts value is EvidenceProfile {
     'evidence',
   )
   assertIdentifier(value.id, 'evidence_id')
+
   for (const [key, entries] of [
     ['evidence_screenshot', value.expectedScreenshots],
     ['evidence_read', value.expectedReads],
     ['evidence_metadata', value.expectedMetadata],
   ] as const) {
     assertArray(entries, key)
-    assertUniqueStrings(entries as string[], key)
+    assertUniqueReferences(entries as string[], key)
   }
+
   if (value.schemaVersion !== BPAL_SCHEMA_VERSION) invalid('evidence_schema')
 }
 
@@ -250,7 +255,7 @@ function assertCapability(value: unknown, adapterVersion: ProviderVersion): asse
   assertIdentifier(value.evidenceProfile, 'capability_evidence')
   assertIdentifier(value.navigationProfile, 'capability_navigation')
   assertArray(value.allowedOrigins, 'capability_origins')
-  assertUniqueStrings(value.allowedOrigins as string[], 'capability_origin')
+  assertUniqueReferences(value.allowedOrigins as string[], 'capability_origin')
   assertVersion(value.version, 'capability_version')
   if (versionKey(value.version) !== versionKey(adapterVersion)) invalid('capability_version_mismatch')
 }
@@ -291,35 +296,45 @@ export function assertProviderAdapter(value: unknown): asserts value is BrowserP
     invalid('provider_execution_modes')
   }
 
-  for (const key of ['capabilities', 'origins', 'selectors', 'navigation', 'verification', 'evidence'] as const) {
-    assertArray(value[key], `provider_${key}`)
-  }
+  assertArray(value.capabilities, 'provider_capabilities')
+  assertArray(value.origins, 'provider_origins')
+  assertArray(value.selectors, 'provider_selectors')
+  assertArray(value.navigation, 'provider_navigation')
+  assertArray(value.verification, 'provider_verification')
+  assertArray(value.evidence, 'provider_evidence')
 
   for (const item of value.origins) assertOrigin(item)
   for (const item of value.navigation) assertNavigation(item)
   for (const item of value.selectors) assertSelector(item)
   for (const item of value.verification) assertVerification(item)
   for (const item of value.evidence) assertEvidence(item)
-  for (const item of value.capabilities) assertCapability(item, value.version)
+  for (const item of value.capabilities) assertCapability(item, value.version as ProviderVersion)
 
-  assertUniqueIds(value.origins, 'origin')
-  assertUniqueIds(value.navigation, 'navigation')
-  assertUniqueIds(value.selectors, 'selector')
-  assertUniqueIds(value.verification, 'verification')
-  assertUniqueIds(value.evidence, 'evidence')
-  assertUniqueIds(value.capabilities, 'capability')
+  const origins = value.origins as unknown as OriginProfile[]
+  const navigation = value.navigation as unknown as NavigationProfile[]
+  const selectors = value.selectors as unknown as ProviderSelector[]
+  const verification = value.verification as unknown as VerificationProfile[]
+  const evidence = value.evidence as unknown as EvidenceProfile[]
+  const capabilities = value.capabilities as unknown as ProviderCapability[]
 
-  const originIds = new Set(value.origins.map(item => item.id))
-  const navigationIds = new Set(value.navigation.map(item => item.id))
-  const verificationIds = new Set(value.verification.map(item => item.id))
-  const evidenceIds = new Set(value.evidence.map(item => item.id))
+  assertUniqueIds(origins, 'origin')
+  assertUniqueIds(navigation, 'navigation')
+  assertUniqueIds(selectors, 'selector')
+  assertUniqueIds(verification, 'verification')
+  assertUniqueIds(evidence, 'evidence')
+  assertUniqueIds(capabilities, 'capability')
+
+  const originIds = new Set(origins.map(item => item.id))
+  const navigationIds = new Set(navigation.map(item => item.id))
+  const verificationIds = new Set(verification.map(item => item.id))
+  const evidenceIds = new Set(evidence.map(item => item.id))
   const operations = new Set<string>()
 
-  for (const item of value.navigation) {
+  for (const item of navigation) {
     if (!originIds.has(item.origin)) invalid('navigation_origin_reference')
   }
 
-  for (const item of value.capabilities) {
+  for (const item of capabilities) {
     if (operations.has(item.operation)) invalid('duplicate_capability_operation')
     operations.add(item.operation)
     if (!navigationIds.has(item.navigationProfile)) invalid('capability_navigation_reference')

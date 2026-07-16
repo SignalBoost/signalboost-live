@@ -204,6 +204,17 @@ The current resumable implementation retains browser sessions in process. Retain
 
 The sandbox launch profile rejects `execute_change` tasks. Production/provider state changes, credential use, saves, redeploys, financial actions, and other sensitive operations remain outside Mission 001 unless Luis explicitly approves them through the existing governed approval flow.
 
+
+### Sprint 16 — Isolated Sandbox Browser Execution
+
+Sprint 16 connects the Supervisor BrowserExecutor to the Browser Runtime public interface only for the isolated repository sandbox portal at the exact configured loopback origin (tests use `http://localhost:4173`). Browser execution remains disabled for production, preview, Vercel, Stripe, Supabase dashboards, GitHub settings, AWS, Cloudflare, real provider accounts, real credentials, and external authenticated websites.
+
+The sandbox execution boundary is a strict promotion contract: a schema-valid Sprint 15 dry-run package is re-verified, fingerprint-checked, confirmed as `targetEnvironment: sandbox`, confined to the exact configured sandbox origin, checked for ordered approved step scope and checkpoint structure, and then promoted without adding, removing, reordering, signing, or resolving any steps or secrets. Supervisor policy approval remains only a dispatch authorization; Browser Runtime phase-one signed task approval and separately signed continuation approval are still mandatory and bind to the exact promoted task, checkpoint, retained execution, remaining step IDs, and phase-one approval digest.
+
+The harmless local scenario opens `/browser-sandbox/login`, fills only `sandbox://` test references through the Browser Runtime context, captures pre-approval evidence, pauses before the protected save checkpoint, resumes only after continuation approval, clicks the sandbox-only Protected save control, waits for the success marker, captures post-save evidence, and accepts completion only when deterministic Browser Runtime verification is `verified`. Audit events record dispatch/package/execution identifiers, sandbox origin, approved/completed steps, checkpoint status, continuation status, artifact references, verification report, and terminal status while excluding secret literals, cookies, authorization headers, browser storage, raw HTML, Playwright objects, and sensitive stack traces.
+
+Known limitation: the execution and retained-session stores remain in-process test infrastructure. Production BrowserExecutor, Vercel browser automation, live provider credentials, and external provider mutations remain prohibited. The next recommended sprint is sandbox execution persistence plus operator-visible audit history, not production/provider browser execution.
+
 ### Owner/Admin
 
 High-privilege administration. Use strict owner/admin role gates.
@@ -668,6 +679,7 @@ Use this section for short notes when architecture, provider behavior, platform 
 
 - 2026-07-16: Added Mission 001 Sprint 14 policy-to-executor bridge: provider-neutral executor registry, dispatcher validation, sanitized dispatch audit events, in-memory at-most-once dispatch protection, and non-mutating API/browser/manual executor stubs. This proves routing only; Browser Runtime and API mutations remain disabled, and durable process-restart dispatch tracking is deferred.
 - 2026-07-16: Added Mission 001 Sprint 15 Browser Runtime dry-run adapter: BrowserExecutor now translates approved browser scope into a validated, fingerprinted dry-run package only. It does not launch Playwright/Chromium, resolve credentials, access providers, or execute Browser Runtime tasks; live execution is deferred to an isolated sandbox-only sprint.
+- 2026-07-16: Added Mission 001 Sprint 16 isolated sandbox browser execution: dry-run packages can be promoted only to the exact local repository sandbox origin with Browser Runtime signed phase-one and continuation approvals, deterministic verification, evidence capture, sanitized audit events, and no production/provider credential access. Production BrowserExecutor and Vercel browser automation remain disabled; Sprint 17 should add sandbox persistence and operator-visible audit history only.
 
 ## 20. Mandatory Final Reminder
 

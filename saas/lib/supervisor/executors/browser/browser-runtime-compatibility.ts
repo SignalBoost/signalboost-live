@@ -10,7 +10,7 @@ const executable = /(javascript:|data:|file:|blob:|chrome:|<script|eval\s*\(|fun
 export function normalizeApprovedOrigin(origin: string, environment: string): string {
   let url: URL
   try { url = new URL(origin) } catch { throw new BrowserRuntimeAdapterError('invalid_origin', 'targetOrigin must be a valid HTTPS origin') }
-  if (url.protocol !== 'https:') throw new BrowserRuntimeAdapterError('non_https_origin', 'targetOrigin must use HTTPS')
+  if (url.protocol !== 'https:' && !(environment === 'sandbox' && url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]'))) throw new BrowserRuntimeAdapterError('non_https_origin', 'targetOrigin must use HTTPS except for the configured local sandbox origin')
   if (url.username || url.password) throw new BrowserRuntimeAdapterError('origin_credentials', 'targetOrigin must not include credentials')
   if (url.search || url.hash) throw new BrowserRuntimeAdapterError('origin_scope', 'targetOrigin must not include query or fragment')
   if (url.pathname !== '/' && url.pathname !== '') throw new BrowserRuntimeAdapterError('origin_scope', 'targetOrigin must be an origin without path')

@@ -10,12 +10,28 @@ function invalid(detail: string): never {
  * to trust after provider registration.
  *
  * Shape validation lives in provider-adapter.ts. This validator binds each
- * capability to the logical origin declared by its navigation profile and
- * rejects transport flags that could otherwise advertise an unusable or
- * broader execution path.
+ * capability to its declared logical origin and proves that every evidence
+ * requirement resolves to registered navigation and selector metadata before
+ * the provider is published.
  */
 export function assertProviderCapabilityRouting(provider: BrowserProviderAdapter): void {
   const navigationById = new Map(provider.navigation.map(profile => [profile.id, profile]))
+  const selectorById = new Map(provider.selectors.map(selector => [selector.id, selector]))
+  const evidenceById = new Map(provider.evidence.map(profile => [profile.id, profile]))
+
+  for (const evidence of provider.evidence) {
+    for (const navigationId of evidence.expectedScreenshots) {
+      if (!navigationById.has(navigationId as never)) {
+        invalid('evidence_screenshot_navigation_reference')
+      }
+    }
+
+    for (const selectorId of evidence.expectedReads) {
+      if (!selectorById.has(selectorId)) {
+        invalid('evidence_read_selector_reference')
+      }
+    }
+  }
 
   for (const capability of provider.capabilities) {
     const navigation = navigationById.get(capability.navigationProfile)
@@ -23,6 +39,17 @@ export function assertProviderCapabilityRouting(provider: BrowserProviderAdapter
 
     if (!capability.allowedOrigins.includes(navigation.origin)) {
       invalid('capability_navigation_origin_mismatch')
+    }
+
+    const evidence = evidenceById.get(capability.evidenceProfile)
+    if (!evidence) invalid('capability_evidence_reference')
+
+    for (const navigationId of evidence.expectedScreenshots) {
+      const evidenceNavigation = navigationById.get(navigationId as never)
+      if (!evidenceNavigation) invalid('evidence_screenshot_navigation_reference')
+      if (!capability.allowedOrigins.includes(evidenceNavigation.origin)) {
+        invalid('capability_evidence_navigation_origin_mismatch')
+      }
     }
 
     if (!capability.supportsApi && !capability.supportsBrowser) {

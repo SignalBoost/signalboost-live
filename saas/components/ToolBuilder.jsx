@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import GovernancePanel from './GovernancePanel'
 import JsonBlueprint from './JsonBlueprint'
 import JsonEditor from './JsonEditor'
@@ -9,6 +9,11 @@ import ResponseMapper from './ResponseMapper'
 import TagSelector from './TagSelector'
 
 const parseJson = value => { try { return JSON.parse(value) } catch { return { _invalidJsonDraft: value } } }
+
+function normalizeProviders(payload) {
+  const raw = Array.isArray(payload) ? payload : Array.isArray(payload?.providers) ? payload.providers : []
+  return raw.filter(provider => provider && typeof provider.id === 'string' && typeof provider.name === 'string')
+}
 
 function EndpointField({ provider, value, onChange }) {
   const [query, setQuery] = useState('')
@@ -111,10 +116,13 @@ function AuthFields({ provider, value, onChange }) {
 }
 
 export default function ToolBuilder() {
+  const [providers, setProviders] = useState([])
+  const [providersLoading, setProvidersLoading] = useState(true)
+  const [providersError, setProvidersError] = useState('')
+  const [selectedProviderId, setSelectedProviderId] = useState('')
   const [name, setName] = useState('Customer enrichment workflow')
   const [description, setDescription] = useState('Governed integration blueprint with backend-only secrets, endpoint metadata, and supervisor monitoring.')
   const [tags, setTags] = useState([])
-  const [provider, setProvider] = useState(null)
   const [auth, setAuth] = useState({})
   const [method, setMethod] = useState('')
   const [endpoint, setEndpoint] = useState('')
@@ -124,27 +132,64 @@ export default function ToolBuilder() {
   const [logsOpen, setLogsOpen] = useState(false)
   const [testStatus, setTestStatus] = useState('Ready')
 
-  function handleProviderChange(nextProvider) {
-    setProvider(nextProvider)
+  const provider = useMemo(
+    () => providers.find(item => item.id === selectedProviderId) || null,
+    [providers, selectedProviderId],
+  )
 
+  const loadProviders = useCallback(async () => {
+    setProvidersLoading(true)
+    setProvidersError('')
+
+    try {
+      const response = await fetch('/api/providers', {
+        cache: 'no-store',
+        headers: { accept: 'application/json' },
+      })
+      if (!response.ok) throw new Error(`Provider lookup failed (${response.status})`)
+
+      const nextProviders = normalizeProviders(await response.json())
+      if (!nextProviders.length) throw new Error('Provider catalog is empty')
+
+      setProviders(nextProviders)
+      setSelectedProviderId(current => nextProviders.some(item => item.id === current) ? current : '')
+    } catch (error) {
+      setProviders([])
+      setSelectedProviderId('')
+      setProvidersError(error instanceof Error ? error.message : 'Provider catalog is unavailable')
+    } finally {
+      setProvidersLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadProviders()
+  }, [loadProviders])
+
+  function handleProviderChange(nextProvider) {
     if (!nextProvider) {
+      setSelectedProviderId('')
       setAuth({})
       setMethod('')
       setEndpoint('')
       return
     }
 
-    const nextMethod = nextProvider.defaultMethod || nextProvider.methods?.[0] || 'GET'
-    const nextEndpoint = nextProvider.defaultEndpoint || nextProvider.endpoints?.[0]?.url || ''
+    const canonicalProvider = providers.find(item => item.id === nextProvider.id)
+    if (!canonicalProvider) return
+
+    const nextMethod = canonicalProvider.defaultMethod || canonicalProvider.methods?.[0] || 'GET'
+    const nextEndpoint = canonicalProvider.defaultEndpoint || canonicalProvider.endpoints?.[0]?.url || ''
     const nextAuth = Object.fromEntries(
-      (nextProvider.authSchema || []).map(field => [
+      (canonicalProvider.authSchema || []).map(field => [
         field.key,
         field.type === 'oauth_ref'
-          ? `${nextProvider.id}_oauth_connection`
-          : `${nextProvider.id}_${field.key}`,
+          ? `${canonicalProvider.id}_oauth_connection`
+          : `${canonicalProvider.id}_${field.key}`,
       ]),
     )
 
+    setSelectedProviderId(canonicalProvider.id)
     setMethod(nextMethod)
     setEndpoint(nextEndpoint)
     setAuth(nextAuth)
@@ -196,7 +241,14 @@ export default function ToolBuilder() {
             <div className="grid gap-5">
               <label className="grid gap-2 text-sm font-bold text-slate-200">Integration Name<input className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-none ring-cyan-300/40 focus:ring-2" value={name} onChange={event => setName(event.target.value)} /></label>
               <label className="grid gap-2 text-sm font-bold text-slate-200">Description<textarea className="min-h-28 rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-none ring-cyan-300/40 focus:ring-2" value={description} onChange={event => setDescription(event.target.value)} /></label>
-              <ProviderDropdown value={provider?.id || ''} onChange={handleProviderChange} />
+              <ProviderDropdown
+                providers={providers}
+                value={provider}
+                onChange={handleProviderChange}
+                loading={providersLoading}
+                error={providersError}
+                onRetry={loadProviders}
+              />
               <TagSelector value={tags} onChange={setTags} />
               <AuthFields provider={provider} value={auth} onChange={setAuth} />
             </div>
@@ -226,7 +278,7 @@ export default function ToolBuilder() {
 
         <JsonBlueprint blueprint={blueprint} />
 
-        {logsOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"><div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-slate-950 p-6 shadow-2xl"><div className="mb-4 flex items-center justify-between"><h2 className="text-2xl font-black">Recent Logs</h2><button type="button" onClick={() => setLogsOpen(false)} className="rounded-xl border border-white/10 px-3 py-2 font-bold text-slate-200">Close</button></div><div className="grid gap-3 text-sm text-slate-300"><p>• Loaded provider metadata from /api/providers.</p><p>• Applied provider method and endpoint defaults atomically.</p><p>• Synchronized manual overrides into the compiled blueprint.</p></div></div></div>}
+        {logsOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"><div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-slate-950 p-6 shadow-2xl"><div className="mb-4 flex items-center justify-between"><h2 className="text-2xl font-black">Recent Logs</h2><button type="button" onClick={() => setLogsOpen(false)} className="rounded-xl border border-white/10 px-3 py-2 font-bold text-slate-200">Close</button></div><div className="grid gap-3 text-sm text-slate-300"><p>• ToolBuilder loaded and owns the provider catalog.</p><p>• ProviderDropdown reports only the selected catalog provider.</p><p>• Method, endpoint, auth, variables, and JSON share one provider source.</p></div></div></div>}
       </div>
     </main>
   )

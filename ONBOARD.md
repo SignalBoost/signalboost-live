@@ -177,7 +177,7 @@ The executable sandbox adapter uses adapter ID `signalboost.sandbox.v1` and the 
 
 Every terminal Browser Runtime result (`paused`, `completed`, or `failed`) must include the deterministic verification report produced by the portable verifier. Callers must not treat a paused or completed execution as valid unless that report has status `verified`; a failed execution must retain a failed verification report for audit and diagnosis.
 
-The current resumable implementation retains browser sessions in process. A durable execution store may persist serializable records, but a process restart invalidates the live session and must fail closed rather than replaying or reconstructing protected steps automatically.
+The current resumable implementation retains browser sessions in process. Retained execution records and live sessions expire with the approved task boundary; expired state must be removed and closed automatically. A durable execution store may persist serializable records, but a process restart invalidates the live session and must fail closed rather than replaying or reconstructing protected steps automatically.
 
 The sandbox launch profile rejects `execute_change` tasks. Production/provider state changes, credential use, saves, redeploys, financial actions, and other sensitive operations remain outside Mission 001 unless Luis explicitly approves them through the existing governed approval flow.
 
@@ -638,6 +638,8 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-16: Added Mission 001 Sprint 12 Vercel Observer: a read-only provider observer with injected secret resolution, narrow Vercel client, deterministic deployment-state normalization, bounded read retries, sanitized normalized incidents, stable deduplication keys, and focused no-network tests. It does not diagnose or repair incidents.
 
 - 2026-07-16: Hardened paid provider gates: wallet-funded non-zero render providers now require a server-side approval reference before reservation/provider execution, and the FAL/Kling marketing-sales video host requires the `COSA_PAID_VIDEO_PROVIDER_APPROVED` runtime flag before submitting paid video jobs.
+
+- 2026-07-16: Bound Mission 001 retained execution records and live in-process browser sessions to the approved task expiry. Expired continuations are removed and closed automatically, duplicate retained execution IDs fail closed, and resume rejects expired or orphaned state without consuming protected steps.
 
 ## 20. Mandatory Final Reminder
 

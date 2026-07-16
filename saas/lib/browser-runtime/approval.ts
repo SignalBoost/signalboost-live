@@ -28,6 +28,7 @@ export interface BrowserApprovalVerificationScope {
 }
 
 const MAX_ISSUED_AT_CLOCK_SKEW_MS = 60_000
+const CANONICAL_APPROVAL_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
 
 function encode(value: string): string {
   return Buffer.from(value, 'utf8').toString('base64url')
@@ -42,13 +43,13 @@ function signature(payload: string, secret: string): string {
 }
 
 function parseApprovalTimestamp(value: string, label: 'issuedAt' | 'expiresAt'): number {
-  if (typeof value !== 'string' || value.length === 0) {
-    throw new Error(`Browser approval token ${label} must be a valid timestamp`)
+  if (typeof value !== 'string' || !CANONICAL_APPROVAL_TIMESTAMP.test(value)) {
+    throw new Error(`Browser approval token ${label} must be a canonical UTC ISO timestamp`)
   }
 
   const parsed = Date.parse(value)
-  if (!Number.isFinite(parsed)) {
-    throw new Error(`Browser approval token ${label} must be a valid timestamp`)
+  if (!Number.isFinite(parsed) || new Date(parsed).toISOString() !== value) {
+    throw new Error(`Browser approval token ${label} must be a canonical UTC ISO timestamp`)
   }
   return parsed
 }

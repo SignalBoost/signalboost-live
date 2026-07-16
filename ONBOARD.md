@@ -156,6 +156,15 @@ Creative production layer: video, images, audio, voice, captions, thumbnails, pr
 
 Deployment and release coordination: Vercel, GitHub, Supabase, provider readiness, and integration validation.
 
+
+### Supervisor Executor Bridge (Mission 001)
+
+The Mission 001 policy-to-executor bridge lives in `saas/lib/supervisor/executors`. It is a provider-neutral routing layer, not a repair engine. The Policy Engine is the authorization boundary: only `approved` decisions with explicit approved step IDs may reach the dispatcher. `blocked` and `approval_required` outcomes are terminal.
+
+Supported executor kinds are exactly `api`, `browser`, and `manual`. Unknown kinds and missing executor registrations fail closed. The API executor is a non-mutating stub and does not call Universal Runner or provider SDKs. The browser executor is disabled and does not import or invoke Browser Runtime, Playwright, Chromium, Stagehand, or browser-use. The manual executor only routes incidents to human review and must not claim a repair succeeded.
+
+Dispatcher at-most-once tracking is in-memory for Sprint 14: duplicate and concurrent duplicate dispatch IDs are rejected for the lifetime of a dispatcher instance, but process-restart durable tracking is deferred. All dispatch results and audit payloads must stay serializable and sanitized; never include credentials, tokens, authorization headers, raw provider responses, stack traces, or browser objects.
+
 ### Browser Runtime (Mission 001)
 
 The portable Browser Runtime lives in `saas/lib/browser-runtime` and must remain independent of Next.js UI, Supabase, and provider SDKs. Mission 001 advances the runtime only through bounded, testable slices.
@@ -644,7 +653,7 @@ Use this section for short notes when architecture, provider behavior, platform 
 - 2026-07-16: Added deterministic Vercel Thinker planning for Mission 001 supervisor incidents: read-only deployment/event/log planning, env-name-only inspection to reduce false-positive missing-variable diagnoses, production alias inspection for canceled production deployments, and latest-failed-deployment Observer selection. Thinker remains non-executing; protected repairs still require policy approval.
 - 2026-07-16: Hardened Mission 001 Browser Runtime approval time binding: signed approvals now match the exact task issue/expiry window and fail closed on malformed timestamps, invalid verification clocks, or non-positive approval windows.
 
-- 2026-07-16: Added user provider configuration storage for the universal integration engine: `user_provider_configs` records the active provider and BYOK state, stores credential envelopes encrypted with the Vault AES-256-GCM helper, and `/api/execute-runner` decrypts saved user keys only in memory before invoking the provider-neutral runner.
+- 2026-07-16: Added Mission 001 Sprint 14 policy-to-executor bridge: provider-neutral executor registry, dispatcher validation, sanitized dispatch audit events, in-memory at-most-once dispatch protection, and non-mutating API/browser/manual executor stubs. This proves routing only; Browser Runtime and API mutations remain disabled, and durable process-restart dispatch tracking is deferred.
 
 ## 20. Mandatory Final Reminder
 

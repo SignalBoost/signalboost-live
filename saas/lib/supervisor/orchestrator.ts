@@ -1,13 +1,14 @@
 import { incidentSchema, isPlainSerializable, type SerializableValue, type SupervisorIncident } from './incident-schema.ts'
 import { repairPlanSchema, type RepairPlan } from './repair-plan-schema.ts'
 import type { AuditEvent, AuditSink, ExecutionContext, ExecutionResult, Executor, PolicyContext, PolicyDecision, PolicyEngine, SupervisorMode, Thinker, VerificationResult, Verifier } from './execution-contracts.ts'
+import type { ExecutorKind, SupervisorDispatcher } from './executors/index.ts'
 
 export type SupervisorOrchestrationResult =
   | { status: 'blocked'; policy?: PolicyDecision; reason: string }
   | { status: 'approval_required'; policy: PolicyDecision; reason: string }
   | { status: 'completed' | 'unresolved' | 'failed'; policy?: PolicyDecision; execution?: ExecutionResult; verification?: VerificationResult; reason: string }
 
-export interface SupervisorOrchestratorDeps { thinker: Thinker; policyEngine: PolicyEngine; executor: Executor; verifier: Verifier; audit: AuditSink; mode: SupervisorMode; policyContext?: PolicyContext; executionContext: ExecutionContext }
+export interface SupervisorOrchestratorDeps { thinker: Thinker; policyEngine: PolicyEngine; executor: Executor; verifier: Verifier; audit: AuditSink; mode: SupervisorMode; policyContext?: PolicyContext; executionContext: ExecutionContext; dispatcher?: SupervisorDispatcher; requestedExecutorKind?: ExecutorKind | ((input: { plan: RepairPlan; policy: PolicyDecision }) => ExecutorKind); dispatchIdFactory?: (input: { incident: SupervisorIncident; plan: RepairPlan; policy: PolicyDecision }) => string }
 
 const schemaVersion = 'supervisor-audit-v1'
 let eventCounter = 0
@@ -63,7 +64,29 @@ export class SupervisorOrchestrator {
         return { status: 'failed', policy, reason: 'Approved execution must include explicit step scope.' }
       }
       await this.audit(incident, 'execution_started', { approvedStepIds: policy.approvedStepIds })
-      const execution = await this.deps.executor.execute({ incident, plan, policy, approvedStepIds: [...policy.approvedStepIds], context: this.deps.executionContext })
+      let execution: ExecutionResult
+      if (this.deps.dispatcher) {
+        const requestedExecutorKind = typeof this.deps.requestedExecutorKind === 'function' ? this.deps.requestedExecutorKind({ plan, policy }) : (this.deps.requestedExecutorKind ?? 'api')
+        const dispatchResult = await this.deps.dispatcher.dispatch({
+          incident,
+          plan,
+          policyDecision: policy,
+          approvedStepIds: [...policy.approvedStepIds],
+          executionContext: this.deps.executionContext,
+          dispatchId: this.deps.dispatchIdFactory?.({ incident, plan, policy }) ?? `${this.deps.executionContext.executionId}:${plan.planId}`,
+          requestedExecutorKind,
+        })
+        execution = {
+          status: dispatchResult.status === 'completed' ? 'completed' : 'failed',
+          executedStepIds: dispatchResult.executedStepIds,
+          startedAt: dispatchResult.startedAt,
+          finishedAt: dispatchResult.completedAt,
+          summary: dispatchResult.evidence.map(item => item.summary).join(' '),
+          metadata: { dispatchId: dispatchResult.dispatchId, executorKind: dispatchResult.executorKind, dispatcherStatus: dispatchResult.status },
+        }
+      } else {
+        execution = await this.deps.executor.execute({ incident, plan, policy, approvedStepIds: [...policy.approvedStepIds], context: this.deps.executionContext })
+      }
       const approved = new Set(policy.approvedStepIds)
       if (execution.executedStepIds.some(stepId => !approved.has(stepId))) throw new Error('Executor reported steps outside approved scope')
       await this.audit(incident, 'execution_completed', { status: execution.status, executedStepIds: execution.executedStepIds })

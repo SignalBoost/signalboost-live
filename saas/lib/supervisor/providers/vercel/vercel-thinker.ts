@@ -18,8 +18,15 @@ function metadataString(incident: SupervisorIncident, key: string): string | und
   return typeof value === 'string' && value.trim() ? value : undefined
 }
 
+function metadataStrings(incident: SupervisorIncident, key: string): string[] {
+  const value = incident.metadata[key]
+  if (!Array.isArray(value)) return []
+  return value.filter((item): item is string => typeof item === 'string' && Boolean(item.trim()))
+}
+
 function incidentType(incident: SupervisorIncident): VercelIncidentType | 'unsupported' {
   const value = metadataString(incident, 'incidentType')
+  if (value === 'provider_connection_failure') return 'provider_auth_failed'
   if (value === 'deployment_failed' || value === 'repeated_deployment_failure' || value === 'stuck_deployment' || value === 'canceled_production_deployment' || value === 'unknown_provider_state' || value === 'provider_api_unavailable' || value === 'provider_auth_failed') return value
   return 'unsupported'
 }
@@ -40,12 +47,24 @@ function verifyStep(stepId: string, description: string): RepairStep {
   return { stepId, action: 'verify', description, protectedAction: false, parameters: { mode: 'read_only' }, expectedResult: 'Verification uses read-only Vercel/API observations only.' }
 }
 
-function baseReadSteps(incident: SupervisorIncident): RepairStep[] {
-  const deploymentId = metadataString(incident, 'deploymentId') ?? incident.affectedResource ?? null
+function deploymentReadSteps(deploymentId: string, suffix = ''): RepairStep[] {
+  const idSuffix = suffix ? `-${suffix}` : ''
   return [
-    readStep('read-deployment', 'Read the selected failed Vercel deployment details before diagnosing.', { provider: 'vercel', deploymentId }, 'Deployment state, target, commit metadata, and sanitized error summary are available.'),
-    readStep('read-deployment-events', 'Read deployment events and build/runtime logs for the selected deployment.', { provider: 'vercel', deploymentId, includeLogs: true }, 'Sanitized build events/log summaries are available without secret values.'),
+    readStep(`read-deployment${idSuffix}`, 'Read the selected failed Vercel deployment details before diagnosing.', { provider: 'vercel', deploymentId }, 'Deployment state, target, commit metadata, and sanitized error summary are available.'),
+    readStep(`read-deployment-events${idSuffix}`, 'Read deployment events and build/runtime logs for the selected deployment.', { provider: 'vercel', deploymentId, includeLogs: true }, 'Sanitized build events/log summaries are available without secret values.'),
   ]
+}
+
+function baseReadSteps(incident: SupervisorIncident, type: VercelIncidentType): RepairStep[] {
+  if (type === 'repeated_deployment_failure') {
+    const deploymentIds = metadataStrings(incident, 'deploymentIds')
+    if (!deploymentIds.length) return [stopStep('Repeated deployment failure did not include deploymentIds; human review is required.')]
+    return deploymentIds.flatMap((deploymentId, index) => deploymentReadSteps(deploymentId, String(index + 1)))
+  }
+
+  const deploymentId = metadataString(incident, 'deploymentId') ?? incident.affectedResource ?? null
+  if (!deploymentId) return [stopStep('Deployment incident did not include a deployment ID; human review is required.')]
+  return deploymentReadSteps(deploymentId)
 }
 
 function envReadSteps(incident: SupervisorIncident): RepairStep[] {
@@ -60,9 +79,9 @@ function aliasReadSteps(incident: SupervisorIncident): RepairStep[] {
   ]
 }
 
-function diagnosisFor(incident: SupervisorIncident, type: VercelIncidentType | 'unsupported'): string {
+function diagnosisFor(type: VercelIncidentType | 'unsupported'): string {
   if (type === 'deployment_failed') return 'A Vercel deployment failed. Diagnose from the latest failed deployment, its events, and sanitized logs before proposing any repair.'
-  if (type === 'repeated_deployment_failure') return 'Multiple recent Vercel deployments failed consecutively. Compare the latest failed deployments and logs to identify a shared root cause.'
+  if (type === 'repeated_deployment_failure') return 'Multiple recent Vercel deployments failed consecutively. Compare the failed deployments and logs to identify a shared root cause.'
   if (type === 'stuck_deployment') return 'A Vercel deployment appears stuck beyond the configured threshold. Confirm current provider state and events before any intervention.'
   if (type === 'canceled_production_deployment') return 'A production deployment was canceled. Inspect production aliases to determine whether live traffic is affected before any recovery action.'
   if (type === 'unknown_provider_state') return 'Vercel returned an unknown deployment state. Fail closed and gather read-only provider details for human review.'
@@ -81,7 +100,7 @@ export class DeterministicVercelThinker implements Thinker {
     return {
       planId,
       incidentId: incident.incidentId,
-      diagnosis: diagnosisFor(incident, type),
+      diagnosis: diagnosisFor(type),
       confidenceScore: unsupported ? 10 : type === 'provider_api_unavailable' || type === 'unknown_provider_state' ? 35 : 65,
       requiresBrowser: false,
       riskLevel: type === 'provider_auth_failed' ? 'medium' : unsupported ? 'high' : 'low',
@@ -97,7 +116,8 @@ export class DeterministicVercelThinker implements Thinker {
   private stepsFor(incident: SupervisorIncident, type: VercelIncidentType): RepairStep[] {
     if (type === 'provider_api_unavailable') return [readStep('retry-provider-read', 'Retry read-only Vercel status/deployment reads after the bounded observer backoff window.', { provider: 'vercel' })]
     if (type === 'provider_auth_failed') return [readStep('read-connection-metadata', 'Inspect Vercel connection metadata and required secret references without exposing or rotating secret values.', { provider: 'vercel', connectionId: metadataString(incident, 'providerConnectionId') ?? null, namesOnly: true })]
-    const steps = baseReadSteps(incident)
+    const steps = baseReadSteps(incident, type)
+    if (steps.some(step => step.action === 'stop')) return steps
     if (type === 'deployment_failed' || type === 'repeated_deployment_failure') steps.push(...envReadSteps(incident))
     if (type === 'canceled_production_deployment') steps.push(...aliasReadSteps(incident))
     if (type === 'unknown_provider_state') steps.push(stopStep('Unknown Vercel state requires human/provider review after read-only evidence collection.'))
